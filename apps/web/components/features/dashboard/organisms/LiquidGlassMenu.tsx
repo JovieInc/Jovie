@@ -268,6 +268,15 @@ export function LiquidGlassMenu({
   const closeMenu = useCallback(() => {
     setIsExpanded(false);
   }, []);
+  const handleMenuItemActivate = useCallback(
+    (item: LiquidGlassMenuItem, inputMethod: NavigationInputMethod) => {
+      // Query-backed destinations can keep the same pathname, so close the
+      // modal as part of activation instead of waiting for a pathname change.
+      closeMenu();
+      onItemActivate?.(item, inputMethod);
+    },
+    [closeMenu, onItemActivate]
+  );
   const closeMenuAndRestoreFocus = useCallback(() => {
     closeMenu();
     globalThis.requestAnimationFrame(() => moreButtonRef.current?.focus());
@@ -364,7 +373,7 @@ export function LiquidGlassMenu({
                     item={item}
                     active={isActive(item)}
                     onActivate={inputMethod =>
-                      onItemActivate?.(item, inputMethod)
+                      handleMenuItemActivate(item, inputMethod)
                     }
                   />
                 ))}
@@ -378,7 +387,7 @@ export function LiquidGlassMenu({
                         item={item}
                         active={isActive(item)}
                         onActivate={inputMethod =>
-                          onItemActivate?.(item, inputMethod)
+                          handleMenuItemActivate(item, inputMethod)
                         }
                       />
                     ))}
@@ -398,7 +407,7 @@ export function LiquidGlassMenu({
                         item={item}
                         active={isActive(item)}
                         onActivate={inputMethod =>
-                          onItemActivate?.(item, inputMethod)
+                          handleMenuItemActivate(item, inputMethod)
                         }
                       />
                     ))}

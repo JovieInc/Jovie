@@ -7,6 +7,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import {
   mockUseChatConversationsQuery,
   mockUsePathname,
+  mockUseSearchParams,
   renderDashboardNav,
   resetDashboardNavTestMocks,
 } from '@/tests/utils/dashboard-nav-test-support';
@@ -17,16 +18,21 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
 }));
 
 const CANONICAL_NAV = [
-  ['Library', APP_ROUTES.LIBRARY],
-  ['Contacts', APP_ROUTES.CONTACTS],
+  ['Home', APP_ROUTES.DASHBOARD],
   ['Presence', APP_ROUTES.PRESENCE],
+  ['Links', APP_ROUTES.CHAT_PROFILE_PANEL],
+  ['Audience', APP_ROUTES.CONTACTS_AUDIENCE],
 ] as const;
 
 const FORBIDDEN_PRIMARY_LABELS = [
-  'Search',
-  'Touring',
-  'Audience',
+  'Calendar',
+  'Contacts',
+  'Events',
+  'Library',
+  'Products',
   'Releases',
+  'Tasks',
+  'Videos',
 ] as const;
 
 const DASHBOARD_NAV_SOURCE =
@@ -132,7 +138,7 @@ describe('DashboardNav', () => {
     expect(getByRole('link', { name: 'New Chat' })).toBeInTheDocument();
   });
 
-  it('keeps the Inbox attention center visible at its root destination', () => {
+  it('gives Home sole current-page ownership at the shell root', () => {
     mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
@@ -141,9 +147,12 @@ describe('DashboardNav', () => {
       },
     });
 
-    expect(getByRole('link', { name: 'Inbox' })).toHaveAttribute(
+    expect(getByRole('link', { name: 'Home' })).toHaveAttribute(
       'aria-current',
       'page'
+    );
+    expect(getByRole('link', { name: 'Inbox' })).not.toHaveAttribute(
+      'aria-current'
     );
   });
 
@@ -236,34 +245,32 @@ describe('DashboardNav', () => {
       '[data-nav-section="primary"]'
     );
     expect(artistSection).not.toBeNull();
-    expect(
-      artistSection?.querySelector('a[href="/app/contacts"]')
-    ).not.toBeNull();
-    expect(getByRole('link', { name: 'Contacts' })).toHaveAttribute(
+    expect(getByRole('link', { name: 'Audience' })).toHaveAttribute(
       'href',
-      APP_ROUTES.CONTACTS
+      APP_ROUTES.CONTACTS_AUDIENCE
     );
   });
 
-  it('applies active state to the canonical library route and legacy aliases', () => {
-    for (const route of [
-      APP_ROUTES.LIBRARY,
-      APP_ROUTES.DASHBOARD_LIBRARY,
-      APP_ROUTES.DASHBOARD_RELEASES,
-      APP_ROUTES.RELEASES,
-    ]) {
-      mockUsePathname.mockReturnValue(route);
-      const view = renderDashboardNav({ renderFn: fastRender });
-      expect(view.getByRole('link', { name: 'Library' })).toHaveAttribute(
-        'aria-current',
-        'page'
-      );
-      expect(view.getByRole('link', { name: 'Library' })).toHaveAttribute(
-        'href',
-        APP_ROUTES.LIBRARY
-      );
-      view.unmount();
-    }
+  it('applies active state only inside query-backed job contexts', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.CHAT);
+    mockUseSearchParams.mockReturnValue(new URLSearchParams('panel=profile'));
+    const links = renderDashboardNav({ renderFn: fastRender });
+    expect(links.getByRole('link', { name: 'Links' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    expect(links.getByRole('link', { name: 'New Chat' })).not.toHaveAttribute(
+      'aria-current'
+    );
+    links.unmount();
+
+    mockUsePathname.mockReturnValue(APP_ROUTES.CONTACTS);
+    mockUseSearchParams.mockReturnValue(new URLSearchParams('tab=audience'));
+    const audience = renderDashboardNav({ renderFn: fastRender });
+    expect(audience.getByRole('link', { name: 'Audience' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
   });
 
   it('uses New Chat consistently for the elevated nav action and page title', async () => {
@@ -370,7 +377,7 @@ describe('DashboardNav', () => {
       sidebarProps: { defaultOpen: false },
     });
 
-    expect(primaryLinks(container)).toHaveLength(3);
+    expect(primaryLinks(container)).toHaveLength(4);
     expect(getByRole('link', { name: 'New Chat' }).parentElement).toHaveClass(
       'group-data-[collapsible=icon]:hidden'
     );

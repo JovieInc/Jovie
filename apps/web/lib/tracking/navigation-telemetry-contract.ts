@@ -19,6 +19,10 @@ export type NavigationTelemetryEvent =
   (typeof NAVIGATION_TELEMETRY_EVENTS)[number];
 
 export const NAVIGATION_ITEM_IDS = [
+  'home',
+  'presence',
+  'links',
+  'audience',
   'inbox',
   'chat',
   'library',
@@ -41,6 +45,20 @@ export const NAVIGATION_ROUTE_BUCKETS = [
   'other_app',
 ] as const;
 export type NavigationRouteBucket = (typeof NAVIGATION_ROUTE_BUCKETS)[number];
+
+const NAVIGATION_ITEM_DESTINATION_ROUTES = {
+  home: 'inbox',
+  presence: 'other_app',
+  links: 'chat',
+  audience: 'contacts',
+  inbox: 'inbox',
+  chat: 'chat',
+  library: 'library',
+  contacts: 'contacts',
+  calendar: 'calendar',
+  tasks: 'tasks',
+  settings: 'settings',
+} as const satisfies Partial<Record<NavigationItemId, NavigationRouteBucket>>;
 
 export const NAVIGATION_INPUT_METHODS = [
   'none',
@@ -164,9 +182,13 @@ export const navigationTelemetryPayloadSchema = z
     if (payload.input_method === 'none') {
       invalid('input_method', `${payload.event} requires an input method`);
     }
+    const expectedDestination =
+      payload.item_id === 'unknown'
+        ? undefined
+        : NAVIGATION_ITEM_DESTINATION_ROUTES[payload.item_id];
     if (
-      payload.item_id !== 'unknown' &&
-      payload.item_id !== payload.destination_route
+      expectedDestination !== undefined &&
+      expectedDestination !== payload.destination_route
     ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -240,6 +262,7 @@ export function bucketNavigationRoute(value: string): NavigationRouteBucket {
   ) {
     return 'chat';
   }
+  if (isPathWithin(pathname, APP_ROUTES.PROFILES)) return 'other_app';
   if (
     isPathWithin(pathname, APP_ROUTES.LIBRARY) ||
     isPathWithin(pathname, APP_ROUTES.RELEASES) ||

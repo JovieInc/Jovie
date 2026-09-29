@@ -3,7 +3,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Bell, Plus } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { toast } from '@/components/feedback';
@@ -41,7 +41,7 @@ import {
   userSettingsNavigation,
 } from './config';
 import { NavMenuItem } from './NavMenuItem';
-import { isLibraryNavigationRoute } from './navigation-state';
+import { isNavigationItemActive } from './navigation-state';
 import type { DashboardNavProps, NavItem } from './types';
 
 type DashboardNavSection = {
@@ -49,48 +49,6 @@ type DashboardNavSection = {
   readonly label?: string;
   readonly items: NavItem[];
 };
-
-function navItemPathname(href: string): string {
-  return new URL(href, 'https://jovie.local').pathname;
-}
-
-function isItemActive(pathname: string, item: NavItem): boolean {
-  // Inbox owns only the shell root. Prefix matching `/app` would otherwise
-  // mark it active on every customer route.
-  if (item.id === 'inbox') {
-    return normalizeTrailingSlash(pathname) === APP_ROUTES.DASHBOARD;
-  }
-
-  if (item.id === 'library') {
-    return isLibraryNavigationRoute(pathname);
-  }
-
-  const normalizedPathname = (() => {
-    if (isLibraryNavigationRoute(pathname)) {
-      return APP_ROUTES.LIBRARY;
-    }
-    if (
-      pathname === APP_ROUTES.DASHBOARD_AUDIENCE ||
-      pathname === APP_ROUTES.AUDIENCE
-    ) {
-      return APP_ROUTES.CONTACTS;
-    }
-    return pathname;
-  })();
-
-  const itemPathname = navItemPathname(item.href);
-
-  if (normalizedPathname === itemPathname || normalizedPathname === item.href) {
-    return true;
-  }
-
-  // Admin routes need exact match to avoid false positives
-  if (item.href === APP_ROUTES.ADMIN) {
-    return false;
-  }
-
-  return normalizedPathname.startsWith(`${itemPathname}/`);
-}
 
 function normalizeTrailingSlash(pathname: string): string {
   return pathname === '/' ? pathname : pathname.replace(/\/$/, '');
@@ -102,7 +60,11 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   const hasRuntimeUpdate = Boolean(runtimeUpdate?.available);
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
-  const router = useRouter();
+  const searchParams = useSearchParams();
+  const currentNavigationHref = useMemo(() => {
+    const query = searchParams.toString();
+    return query ? `${pathname}?${query}` : pathname;
+  }, [pathname, searchParams]);
   const queryClient = useQueryClient();
   const isElectron = useIsElectronRuntime();
   // Persisted navigation state is a client-only enhancement. Reading it during
@@ -185,8 +147,6 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
 
   // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const libraryPrefetchedProfileIdRef = useRef<string | null>(null);
-  const libraryWarmReadyProfileIdRef = useRef<string | null>(null);
   useEffect(
     () => () => {
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
@@ -194,67 +154,18 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     []
   );
 
-  useEffect(() => {
-    libraryPrefetchedProfileIdRef.current = null;
-    libraryWarmReadyProfileIdRef.current = null;
-  }, [profileId]);
-
-  const warmLibraryRoute = useCallback(async () => {
-    if (isDemo || !profileId) return;
-
-    router.prefetch(APP_ROUTES.LIBRARY);
-    if (libraryPrefetchedProfileIdRef.current === profileId) return;
-
-    libraryPrefetchedProfileIdRef.current = profileId;
-    try {
-      await Promise.all([
-        import('@/features/dashboard/organisms/release-provider-matrix'),
-        import('@/lib/queries/prefetch-dashboard').then(
-          ({ prefetchForRoute }) =>
-            prefetchForRoute('library', queryClient, profileId)
-        ),
-      ]);
-      libraryWarmReadyProfileIdRef.current = profileId;
-    } catch {
-      libraryPrefetchedProfileIdRef.current = null;
-      libraryWarmReadyProfileIdRef.current = null;
-    }
-  }, [isDemo, profileId, queryClient, router]);
-
-  useEffect(() => {
-    if (
-      isDemo ||
-      !profileId ||
-      libraryWarmReadyProfileIdRef.current === profileId ||
-      isLibraryNavigationRoute(pathname)
-    ) {
-      return;
-    }
-
-    const handle = setTimeout(() => {
-      warmLibraryRoute().catch(() => {});
-    }, 300);
-
-    return () => clearTimeout(handle);
-  }, [isDemo, pathname, profileId, warmLibraryRoute]);
-
   const handlePrefetch = useCallback(
     (itemId: string) => {
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
-      const prefetchDelayMs = itemId === 'library' ? 0 : 150;
       prefetchTimerRef.current = setTimeout(() => {
-        if (itemId === 'library') {
-          warmLibraryRoute().catch(() => {});
-          return;
-        }
         import('@/lib/queries/prefetch-dashboard')
           .then(({ prefetchForRoute }) =>
             prefetchForRoute(itemId, queryClient, profileId || undefined)
           )
           .catch(() => {});
-      }, prefetchDelayMs);
+      }, 150);
     },
-    [profileId, queryClient, warmLibraryRoute]
+    [profileId, queryClient]
   );
 
   // In demo mode, intercept nav clicks for tabs without demo data
@@ -323,7 +234,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
       return;
     startNavigationTelemetry({
       itemId: item.id,
-      sourcePathname: pathname,
+      sourcePathname: currentNavigationHref,
       destinationHref: item.href,
       inputMethod: navigationInputMethodFromClick(event.detail),
       context: telemetryContext,
@@ -336,11 +247,12 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
       const isNewThreadItem =
         item.id === 'chat' && item.href === APP_ROUTES.CHAT;
       const isActive = isNewThreadItem
-        ? normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT
-        : isItemActive(pathname, item);
+        ? normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT &&
+          searchParams.get('panel') !== 'profile'
+        : isNavigationItemActive(item, pathname, searchParams);
       const shortcut = NAV_SHORTCUTS[item.id];
 
-      // In demo mode, only Library has real content — intercept all other nav clicks.
+      // The demo fixture only implements Library content; root jobs stay disabled.
       const demoUnavailable = isDemo && item.id !== 'library';
 
       return (
@@ -362,7 +274,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
               : inputMethod =>
                   startNavigationTelemetry({
                     itemId: isInSettings ? 'settings' : item.id,
-                    sourcePathname: pathname,
+                    sourcePathname: currentNavigationHref,
                     destinationHref: item.href,
                     inputMethod,
                     context: telemetryContext,
@@ -375,11 +287,13 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
       );
     },
     [
+      currentNavigationHref,
       pathname,
       handleDemoNavClick,
       handlePrefetch,
       isDemo,
       isInSettings,
+      searchParams,
       telemetryContext,
     ]
   );
@@ -434,11 +348,6 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                     ? 'available'
                     : (inboxNavigation?.state ?? 'unknown')
                 }
-                aria-current={
-                  normalizeTrailingSlash(pathname) === APP_ROUTES.DASHBOARD
-                    ? 'page'
-                    : undefined
-                }
                 className='relative flex size-7 shrink-0 items-center justify-center rounded-full text-secondary-token hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2 after:lg:hidden'
               >
                 <Bell
@@ -466,7 +375,8 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                 href={APP_ROUTES.CHAT}
                 onClick={event => handleCommandClick(event, chatNavItem)}
                 aria-current={
-                  normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT
+                  normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT &&
+                  searchParams.get('panel') !== 'profile'
                     ? 'page'
                     : undefined
                 }
