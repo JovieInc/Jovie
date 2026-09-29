@@ -269,9 +269,9 @@ const SECTION_RESOLUTIONS = {
     ),
     occurrenceProofs: [
       {
-        variantId: 'centered-none',
+        variantId: 'split-claim-card',
         componentPath: 'apps/web/components/homepage/HomepageIdentityHero.tsx',
-        rootBinding: "data-testid='marketing-section-hero'",
+        rootBinding: "testId='marketing-section-hero'",
       },
       {
         variantId: 'left-none',
