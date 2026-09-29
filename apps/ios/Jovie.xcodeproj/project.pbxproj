@@ -63,6 +63,8 @@
 		A0B10F00000000000000000F /* ObservabilityRedactionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F00000000000000000D /* ObservabilityRedactionTests.swift */; };
 		A0B10F000000000000000012 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = A0B10F000000000000000011 /* Sentry */; };
 		A0B10F000000000000000020 /* AuthScreenStyleGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F000000000000000021 /* AuthScreenStyleGuardTests.swift */; };
+		A0671400A0671400A0671402 /* BiometricLockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0671400A0671400A0671401 /* BiometricLockView.swift */; };
+		A0671400A0671400A0671404 /* BiometricLockPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0671400A0671400A0671403 /* BiometricLockPolicyTests.swift */; };
 		A0A344000000000000000002 /* AppShellIntentNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A344000000000000000001 /* AppShellIntentNavigation.swift */; };
 		A0A344000000000000000004 /* AppShellIntentNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A344000000000000000003 /* AppShellIntentNavigationTests.swift */; };
 		A0J0V36330000000000000002 /* AppShellLeftDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36330000000000000001 /* AppShellLeftDrawer.swift */; };
@@ -218,6 +220,8 @@
 		A0B10F00000000000000000C /* ObservabilityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservabilityTests.swift; sourceTree = "<group>"; };
 		A0B10F00000000000000000D /* ObservabilityRedactionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservabilityRedactionTests.swift; sourceTree = "<group>"; };
 		A0B10F000000000000000021 /* AuthScreenStyleGuardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthScreenStyleGuardTests.swift; sourceTree = "<group>"; };
+		A0671400A0671400A0671401 /* BiometricLockView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BiometricLockView.swift; sourceTree = "<group>"; };
+		A0671400A0671400A0671403 /* BiometricLockPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BiometricLockPolicyTests.swift; sourceTree = "<group>"; };
 		A0A344000000000000000001 /* AppShellIntentNavigation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellIntentNavigation.swift; sourceTree = "<group>"; };
 		A0A344000000000000000003 /* AppShellIntentNavigationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellIntentNavigationTests.swift; sourceTree = "<group>"; };
 		A0J0V36330000000000000001 /* AppShellLeftDrawer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellLeftDrawer.swift; sourceTree = "<group>"; };
@@ -401,6 +405,7 @@
 			children = (
 				4C8753F36E077F69D925EE26 /* APIClientTests.swift */,
 				A93DB506915B418D06E897A4 /* AppStateTests.swift */,
+				A0671400A0671400A0671403 /* BiometricLockPolicyTests.swift */,
 				A0B10F000000000000000021 /* AuthScreenStyleGuardTests.swift */,
 				F1E2D3C4B5A697886756453E /* SettingsEscapeTrapGuardTests.swift */,
 				A0J0V2549000000000000000B /* ChatRepositoryTests.swift */,
@@ -643,6 +648,7 @@
 			isa = PBXGroup;
 			children = (
 				EDFB0D6D1DA6A287207AC1A6 /* AuthScreen.swift */,
+				A0671400A0671400A0671401 /* BiometricLockView.swift */,
 				BCA18C2D747C4D929F25DF70 /* MobileAuthCoordinator.swift */,
 			);
 			name = Auth;
@@ -797,6 +803,7 @@
 			files = (
 				C2C8C16A08954501FB61E562 /* APIClientTests.swift in Sources */,
 				EE4CBA88057592FAFCD7F926 /* AppStateTests.swift in Sources */,
+				A0671400A0671400A0671404 /* BiometricLockPolicyTests.swift in Sources */,
 				A0J0V2549000000000000000C /* ChatRepositoryTests.swift in Sources */,
 				A0J0V2549000000000000000E /* MobileChatClientTests.swift in Sources */,
 				A0J0V36390000000000000004 /* ComposerWorkflowSheetTests.swift in Sources */,
@@ -890,6 +897,7 @@
 				A0J0V3632A0000000000000E /* InboxSurfaceView.swift in Sources */,
 				5F4F3551CC9F4C09A2520AEB /* AppShellView.swift in Sources */,
 				F95545618F95E792DCBCA7DF /* AuthScreen.swift in Sources */,
+				A0671400A0671400A0671402 /* BiometricLockView.swift in Sources */,
 				CCA8CB157DC140048C2D28B9 /* MobileAuthCoordinator.swift in Sources */,
 				74E75D0A3C816805F65FA48A /* DashboardView.swift in Sources */,
 				A0J0V51480000000000000002 /* PublicProfileBrowserView.swift in Sources */,

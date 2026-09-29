@@ -30,9 +30,8 @@ struct DashboardView: View {
   @State private var isShowingVenueMode = false
   @State private var didCopyURL = false
   @State private var didPresentLaunchVenueMode = false
-  @State private var isAddingAppleWalletPass = false
+  @State private var appleWalletFlowState = AppleWalletFlowState.available
   @State private var appleWalletPassSheet: AppleWalletPassSheet?
-  @State private var appleWalletErrorMessage: String?
   @State private var publicProfileBrowserDestination: PublicProfileBrowserDestination?
 
   init(
@@ -72,25 +71,19 @@ struct DashboardView: View {
     .fullScreenCover(item: $publicProfileBrowserDestination) { destination in
       PublicProfileBrowserView(initialURL: destination.url, policy: destination.policy)
     }
-    .sheet(item: $appleWalletPassSheet) { sheet in
-      AppleWalletAddPassView(pass: sheet.pass)
-    }
-    .alert(
-      "Apple Wallet",
-      isPresented: Binding(
-        get: { appleWalletErrorMessage != nil },
-        set: { isPresented in
-          if !isPresented {
-            appleWalletErrorMessage = nil
-          }
+    .sheet(
+      item: $appleWalletPassSheet,
+      onDismiss: {
+        if appleWalletFlowState == .presenting {
+          appleWalletFlowState.presentationFinished(isInstalled: false)
         }
-      )
-    ) {
-      Button("OK", role: .cancel) {
-        appleWalletErrorMessage = nil
       }
-    } message: {
-      Text(appleWalletErrorMessage ?? "Couldn't add the Wallet pass.")
+    ) { sheet in
+      AppleWalletAddPassView(controller: sheet.controller) {
+        let isInstalled = PKPassLibrary().containsPass(sheet.pass)
+        appleWalletPassSheet = nil
+        appleWalletFlowState.presentationFinished(isInstalled: isInstalled)
+      }
     }
     .task(id: showVenueModeOnLaunch) {
       guard showVenueModeOnLaunch, !didPresentLaunchVenueMode else {
@@ -128,8 +121,8 @@ struct DashboardView: View {
   }
 
   // Mirrors the loaded layout exactly (full-width square QR, single URL line,
-  // one full-width pill, two half-width pills, top-aligned) so the skeleton → loaded transition
-  // causes zero layout shift on a cold (uncached) first load.
+  // one full-width pill, two half-width pills, and the Wallet slot, top-aligned)
+  // so the skeleton → loaded transition causes zero layout shift on a cold first load.
   private var skeleton: some View {
     VStack(spacing: JovieSpacing.large) {
       RoundedRectangle(cornerRadius: JovieRadius.large, style: .continuous)
@@ -151,66 +144,100 @@ struct DashboardView: View {
           .fill(JovieColor.surface1)
           .frame(height: 46)
       }
+
+      RoundedRectangle(cornerRadius: JovieRadius.small, style: .continuous)
+        .fill(JovieColor.surface1)
+        .frame(width: 220, height: 44)
+        .frame(minHeight: 88, alignment: .top)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     .redacted(reason: .placeholder)
   }
 
   private func loadedContent(response: MobileMeResponse) -> some View {
-    VStack(spacing: JovieSpacing.large) {
-      Button {
-        isShowingVenueMode = true
-      } label: {
-        QRCodeCardView(payload: response.qrPayload)
-      }
-      .buttonStyle(.plain)
-      .frame(maxWidth: .infinity)
-      .disabled(response.qrPayload == nil)
-      .accessibilityLabel(response.qrPayload == nil ? "QR unavailable" : "Profile QR Code")
-      .accessibilityIdentifier("profile-qr-button")
-
-      Text(response.publicProfileURL ?? "Profile link unavailable")
-        .font(JovieFont.body(size: 14))
-        .foregroundStyle(JovieColor.textTertiary)
-        .accessibilityIdentifier("dashboard-profile-url")
-
-      Button("Open Public Profile") {
-        if let destination = publicProfileDestination(from: response.publicProfileURL) {
-          publicProfileBrowserDestination = destination
+    ScrollView {
+      VStack(spacing: JovieSpacing.large) {
+        Button {
+          isShowingVenueMode = true
+        } label: {
+          QRCodeCardView(payload: response.qrPayload)
         }
-      }
-      .buttonStyle(JoviePillButtonStyle(filled: true))
-      .disabled(publicProfileDestination(from: response.publicProfileURL) == nil)
-      .accessibilityIdentifier("dashboard-open-public-profile-button")
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+        .disabled(response.qrPayload == nil)
+        .accessibilityLabel(response.qrPayload == nil ? "QR unavailable" : "Profile QR Code")
+        .accessibilityIdentifier("profile-qr-button")
 
-      HStack(spacing: JovieSpacing.medium) {
-        Button(didCopyURL ? "Copied" : "Copy URL") {
-          copyURL(response.publicProfileURL)
-        }
-        .buttonStyle(JoviePillButtonStyle(filled: false))
-        .disabled(response.publicProfileURL == nil)
-        .opacity(response.publicProfileURL == nil ? 0.35 : 1)
-        .accessibilityIdentifier("dashboard-copy-url-button")
-        .accessibilityValue(didCopyURL ? "Copied" : "Copy URL")
+        Text(response.publicProfileURL ?? "Profile link unavailable")
+          .font(JovieFont.body(size: 14))
+          .foregroundStyle(JovieColor.textTertiary)
+          .accessibilityIdentifier("dashboard-profile-url")
 
-        ShareLink(item: response.publicProfileURL ?? "") {
-          Text("Share")
+        Button("Open Public Profile") {
+          if let destination = publicProfileDestination(from: response.publicProfileURL) {
+            publicProfileBrowserDestination = destination
+          }
         }
         .buttonStyle(JoviePillButtonStyle(filled: true))
-        .disabled(response.publicProfileURL == nil)
-        .opacity(response.publicProfileURL == nil ? 0.35 : 1)
-        .accessibilityIdentifier("dashboard-share-profile-button")
-      }
+        .disabled(publicProfileDestination(from: response.publicProfileURL) == nil)
+        .accessibilityIdentifier("dashboard-open-public-profile-button")
 
-      if response.appleWalletProfilePassAvailable && PKAddPassesViewController.canAddPasses() {
+        HStack(spacing: JovieSpacing.medium) {
+          Button(didCopyURL ? "Copied" : "Copy URL") {
+            copyURL(response.publicProfileURL)
+          }
+          .buttonStyle(JoviePillButtonStyle(filled: false))
+          .disabled(response.publicProfileURL == nil)
+          .opacity(response.publicProfileURL == nil ? 0.35 : 1)
+          .accessibilityIdentifier("dashboard-copy-url-button")
+          .accessibilityValue(didCopyURL ? "Copied" : "Copy URL")
+
+          ShareLink(item: response.publicProfileURL ?? "") {
+            Text("Share")
+          }
+          .buttonStyle(JoviePillButtonStyle(filled: true))
+          .disabled(response.publicProfileURL == nil)
+          .opacity(response.publicProfileURL == nil ? 0.35 : 1)
+          .accessibilityIdentifier("dashboard-share-profile-button")
+        }
+
+        appleWalletControl(response: response)
+          .frame(minHeight: 88, alignment: .top)
+      }
+      .frame(maxWidth: .infinity, alignment: .top)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+  }
+
+  @ViewBuilder
+  private func appleWalletControl(response: MobileMeResponse) -> some View {
+    let availability = AppleWalletControlAvailability(
+      serverAvailable: response.appleWalletProfilePassAvailable,
+      deviceCanAddPasses: PKAddPassesViewController.canAddPasses()
+    )
+
+    if availability == .serverUnavailable {
+      walletStatus("Apple Wallet isn't available for this profile yet.")
+    } else if availability == .deviceUnsupported {
+      walletStatus("Apple Wallet isn't available on this device.")
+    } else if appleWalletFlowState == .installed {
+      walletStatus("Added to Apple Wallet")
+    } else {
+      VStack(spacing: JovieSpacing.small) {
+        if appleWalletFlowState == .failed {
+          walletStatus("Couldn't prepare the Wallet pass. Try again.")
+        } else if appleWalletFlowState == .controllerUnavailable {
+          walletStatus("Apple Wallet couldn't open. Try again.")
+        }
+
         ZStack(alignment: .trailing) {
-          AppleWalletAddPassButton(isEnabled: !isAddingAppleWalletPass) {
+          AppleWalletAddPassButton(isEnabled: !appleWalletFlowState.preventsRequest) {
             Task {
               await addAppleWalletPass()
             }
           }
 
-          if isAddingAppleWalletPass {
+          if appleWalletFlowState == .loading {
             ProgressView()
               .tint(.white)
               .padding(.trailing, 14)
@@ -219,9 +246,19 @@ struct DashboardView: View {
         }
         .frame(width: 220, height: 44)
         .accessibilityIdentifier("apple-wallet-profile-pass-button")
+        .accessibilityHint("Adds your public Jovie profile pass to Apple Wallet")
       }
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+  }
+
+  private func walletStatus(_ message: String) -> some View {
+    Text(message)
+      .font(JovieFont.body(size: 14))
+      .foregroundStyle(JovieColor.textTertiary)
+      .multilineTextAlignment(.center)
+      .fixedSize(horizontal: false, vertical: true)
+      .accessibilityLabel(message)
+      .accessibilityIdentifier("apple-wallet-profile-pass-status")
   }
 
   private func publicProfileDestination(from value: String?) -> PublicProfileBrowserDestination? {
@@ -233,16 +270,31 @@ struct DashboardView: View {
   }
 
   private func addAppleWalletPass() async {
-    guard !isAddingAppleWalletPass else { return }
-    isAddingAppleWalletPass = true
-    defer { isAddingAppleWalletPass = false }
+    guard appleWalletFlowState.beginRequest() else { return }
 
     do {
       let passData = try await loadAppleWalletProfilePass()
       let pass = try PKPass(data: passData)
-      appleWalletPassSheet = AppleWalletPassSheet(pass: pass)
+      if PKPassLibrary().containsPass(pass) {
+        appleWalletFlowState.preparedPass(isInstalled: true)
+        return
+      }
+
+      guard let controller = PKAddPassesViewController(pass: pass) else {
+        appleWalletFlowState.preparedPass(
+          isInstalled: false,
+          controllerAvailable: false
+        )
+        return
+      }
+
+      appleWalletFlowState.preparedPass(isInstalled: false)
+      appleWalletPassSheet = AppleWalletPassSheet(
+        pass: pass,
+        controller: controller
+      )
     } catch {
-      appleWalletErrorMessage = "Couldn't add the Wallet pass. Try again."
+      appleWalletFlowState.requestFailed()
     }
   }
 

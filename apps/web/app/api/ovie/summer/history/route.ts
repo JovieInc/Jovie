@@ -61,9 +61,7 @@ export async function GET() {
   } catch (error) {
     return (
       getSessionErrorResponse(error, headers) ??
-      unavailable(
-        'Summer history is unavailable. Do not resend the original turn.'
-      )
+      unavailable('Summer history couldn’t load. Reload to try again.')
     );
   }
   const authorization = authorizeFounderSummerUser(userId);
@@ -78,9 +76,7 @@ export async function GET() {
       return unavailable('Summer history requires current admin access.', 403);
     }
   } catch {
-    return unavailable(
-      'Summer history is unavailable. Do not resend the original turn.'
-    );
+    return unavailable('Summer history couldn’t load. Reload to try again.');
   }
   let raw: string | undefined;
   try {
@@ -92,22 +88,17 @@ export async function GET() {
       )
     )?.decided;
   } catch {
-    return unavailable(
-      'Summer history is unavailable. Do not resend the original turn.'
-    );
+    return unavailable('Summer history couldn’t load. Reload to try again.');
   }
   if (raw === undefined) {
-    return unavailable(
-      'No existing Summer history was found. No session was created. Do not resend the original turn.',
-      404
-    );
+    return unavailable('No Summer history was found yet.', 404);
   }
   let session: z.infer<typeof sessionSchema>;
   try {
     session = sessionSchema.parse(JSON.parse(raw));
   } catch {
     return unavailable(
-      'Summer history identity or recorded turns could not be verified. Do not resend the original turn.',
+      'Summer history couldn’t be verified. Reload to try again.',
       409
     );
   }
@@ -141,6 +132,7 @@ export async function GET() {
     content: string;
     clientMessageId: string | null;
     createdAt: string;
+    summerFailed?: true;
   };
   const messages: HistoryMessage[] = [];
   let collapsedRun: typeof sorted = [];
@@ -157,12 +149,15 @@ export async function GET() {
     }
     flushCollapsed();
     const id = `summer-history:${turn.turnIndex}`;
+    // Recorded failures stay marked in the transcript; the client collapses
+    // ones a later answer has superseded.
+    const failed = turn.state !== 'completed';
     const content = [
       turn.assistantText,
       turn.toolReceipt
         ? `Recorded tool result (${turn.toolReceipt.ok ? 'succeeded' : 'failed'}): ${turn.toolReceipt.summary}`
         : '',
-      turn.state !== 'completed'
+      failed
         ? `Summer turn status: ${turn.state}. Resend the message to retry it.`
         : '',
     ]
@@ -179,6 +174,7 @@ export async function GET() {
                 ? `${turn.clientTurnId}:user`
                 : null,
               createdAt: turn.createdAt,
+              ...(failed ? { summerFailed: true as const } : {}),
             },
           ]
         : []),
@@ -190,6 +186,7 @@ export async function GET() {
           ? `assistant:${turn.clientTurnId}`
           : null,
         createdAt: turn.createdAt,
+        ...(failed ? { summerFailed: true as const } : {}),
       }
     );
   }

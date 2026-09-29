@@ -664,7 +664,7 @@ const REQUIRED_MODEL_ROUTING_SCENARIOS = [
   'simple-pro-tool-light',
 ] as const;
 const REQUIRED_ONBOARDING_STATE_CASES = [
-  'latest-signal-instant-access',
+  'latest-signal-needs-more-info',
   'spotify-followers-instant-access',
   'weak-signal-force-waitlist',
   'weak-signal-needs-more-info',
@@ -7646,9 +7646,8 @@ function evaluateOnboardingSystemPromptContract(vars: EvalVars) {
       'Pricing',
       'reveal LATE',
       'Do NOT lead with pricing',
-      'Pro is $39/mo',
-      'Max is $149/mo',
-      '14-day reverse trial',
+      'Quote only these facts',
+      '14-day Pro trial. No credit card.',
     ]),
     forbidsInventedStatsAndPrematureLiveClaims: textIncludesAll(prompt, [
       'Never invent stats',
@@ -7772,8 +7771,10 @@ function evaluateChatTitleContract(vars: EvalVars) {
       "import { gateway, generateText } from '@/lib/ai/sdk'",
       "import { TITLE_MODEL } from '@/lib/constants/ai-models'",
     ]),
+    // Titles stay on the light (low-cost) tier; the vendor model is owned by
+    // lib/constants/ai-models (JOV-6533 moved it onto the gateway allowlist).
     usesTitleModelConstant:
-      TITLE_MODEL === 'google/gemini-2.0-flash' &&
+      TITLE_MODEL === CHAT_MODEL_LIGHT &&
       routeSource.includes('gateway(TITLE_MODEL)'),
     keepsTitleOnlyPrompt: textIncludesAll(systemPrompt, [
       'Generate a short, descriptive title',
@@ -7842,6 +7843,7 @@ function evaluateChatTitleContract(vars: EvalVars) {
     networkAttempted: false,
     titleCase,
     titleModel: TITLE_MODEL,
+    lightModel: CHAT_MODEL_LIGHT,
     routeSourcePath,
     routeSourceLength: routeSource.length,
     systemPrompt,

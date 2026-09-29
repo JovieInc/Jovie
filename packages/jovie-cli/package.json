@@ -2,7 +2,20 @@
   "name": "@jovie/cli",
   "private": false,
   "type": "module",
-  "description": "Read-only client for Jovie public artist profiles and agent resources.",
+  "description": "Jovie for AI agents: create artist profiles from a Spotify URL and read public artist data. CLI + MCP server + agent skill.",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "agent",
+    "ai-agent",
+    "skill",
+    "music",
+    "artist",
+    "spotify",
+    "link-in-bio",
+    "cli"
+  ],
+  "mcpName": "io.github.JovieInc/jovie",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -35,7 +48,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=22.23.2 <23"
+    "node": ">=24.21.0 <25"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -49,10 +62,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
-    "@types/node": "^26.6.2",
-    "@vitest/coverage-v8": "5.0.1",
+    "@types/node": "^26.6.3",
+    "@vitest/coverage-v8": "5.0.2",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
-    "vitest": "5.0.1"
+    "vitest": "5.0.2"
   }
 }

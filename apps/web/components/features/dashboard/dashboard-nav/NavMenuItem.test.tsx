@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { Music, SquarePen } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
@@ -7,6 +9,13 @@ import { NavMenuItem } from './NavMenuItem';
 vi.mock('@/lib/desktop/electron-bridge', () => ({
   useIsElectronRuntime: () => false,
 }));
+
+function readWebSource(sourcePath: string): string {
+  const webRoot = process.cwd().endsWith('/apps/web')
+    ? process.cwd()
+    : resolve(process.cwd(), 'apps/web');
+  return readFileSync(resolve(webRoot, sourcePath), 'utf8');
+}
 
 describe('NavMenuItem', () => {
   it('keeps a long primary label in its assigned grid track with a right-edge fade', () => {
@@ -91,5 +100,13 @@ describe('NavMenuItem', () => {
     expect(row.className).toContain('h-7');
     expect(row.className).toContain('rounded-lg');
     expect(row.className).toContain('grid-cols-(--app-shell-sidebar-nav-grid)');
+  });
+
+  it('imports sidebar chrome from the modular sidebar specifier', () => {
+    const source = readWebSource(
+      'components/features/dashboard/dashboard-nav/NavMenuItem.tsx'
+    );
+    expect(source).toContain("@/components/organisms/sidebar'");
+    expect(source).not.toContain(`@/components/organisms/${'Sidebar'}'`);
   });
 });

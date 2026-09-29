@@ -4,10 +4,9 @@ import { z } from 'zod';
 import { TOOL_SCHEMAS } from '@/lib/chat/tool-schemas';
 import {
   type AccessDecision,
-  evaluateAccessSignal,
+  decideOnboardingAccess,
 } from '@/lib/chat/tools/onboarding-access-eval';
 import {
-  collapseInterviewSignals,
   type InterviewSignal,
   interviewSignalSchema,
 } from '@/lib/chat/tools/onboarding-signals';
@@ -34,7 +33,7 @@ import { logger } from '@/lib/utils/logger';
  *
  *   Deterministic (real logic now):
  *     - recordInterviewSignal  → appends to in-memory signal accumulator
- *     - proposeNextStep        → runs evaluateAccessSignal against accumulator
+ *     - proposeNextStep        → runs decideOnboardingAccess against accumulator
  *
  *   Pass-throughs to existing APIs (real logic now):
  *     - searchSpotifyArtist    → emits a marker for client-side popout (the
@@ -334,6 +333,50 @@ export async function buildConfirmSpotifyArtistOutput(
   };
 }
 
+/** The artist the server already confirmed, rebuilt from turn state. */
+export function echoConfirmedArtist(
+  state: OnboardingTurnState
+): ConfirmSpotifyArtistOutput | UnconfirmedArtistOutput {
+  if (!state.spotifyArtistId) {
+    return {
+      action: 'spotify_artist_unconfirmed',
+      summary:
+        'No artist confirmed yet. Open the picker with searchSpotifyArtist; never guess an id.',
+    };
+  }
+  const metrics = state.artistMetrics;
+  return {
+    action: 'spotify_artist_confirmed',
+    spotifyArtistId: state.spotifyArtistId,
+    artist: state.spotifyArtistName
+      ? {
+          id: state.spotifyArtistId,
+          name: state.spotifyArtistName,
+          url: buildSpotifyArtistUrl(state.spotifyArtistId),
+          imageUrl: state.spotifyImageUrl,
+          followers: state.spotifyFollowers,
+          popularity: state.spotifyPopularity,
+          genres: state.spotifyGenres.slice(0, 3),
+          metrics:
+            metrics ??
+            normalizeArtistMetrics(
+              { followers: state.spotifyFollowers },
+              { source: 'tool_output' }
+            ),
+        }
+      : null,
+    metrics,
+    summary: state.spotifyArtistName
+      ? `${state.spotifyArtistName} is already confirmed.`
+      : 'Spotify artist selected; profile data is unavailable right now.',
+  };
+}
+
+export interface UnconfirmedArtistOutput {
+  readonly action: 'spotify_artist_unconfirmed';
+  readonly summary: string;
+}
+
 export interface CheckoutCardPayload {
   readonly action: 'propose_checkout';
   readonly plan: 'free' | 'pro' | 'max' | null;
@@ -366,8 +409,10 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
     confirmSpotifyArtist: tool({
       description: TOOL_SCHEMAS.confirmSpotifyArtist.description,
       inputSchema: TOOL_SCHEMAS.confirmSpotifyArtist.inputSchema,
-      execute: async ({ spotifyArtistId }) =>
-        buildConfirmSpotifyArtistOutput(spotifyArtistId, state),
+      // JOV-7134: the handler confirms the picker selection server-side from
+      // its real id (metadata the model never sees). The model can only echo
+      // that confirmation; it can never swap in or invent an artist id.
+      execute: async () => echoConfirmedArtist(state),
     }),
 
     checkHandle: tool({
@@ -443,42 +488,23 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
       description: TOOL_SCHEMAS.proposeNextStep.description,
       inputSchema: TOOL_SCHEMAS.proposeNextStep.inputSchema,
       execute: async () => {
-        // A durable waitlist request requires a public artist identity. Do not
-        // render the signup/terminal card before the confirmed Spotify artist
-        // has been restored into request-local state; the assistant must keep
-        // collecting the missing information instead.
-        if (state.accessControlled && !state.spotifyArtistId) {
+        // JOV-7144: the single access gate shared with the scripted fallback.
+        // The DB-backed controlled-access gate stays authoritative inside it.
+        const decision = decideOnboardingAccess({
+          accessControlled: state.accessControlled,
+          spotifyArtistId: state.spotifyArtistId,
+          spotifyFollowers: state.spotifyFollowers,
+          metrics: state.artistMetrics,
+          signals: state.signals,
+          turnCount: state.turnCount,
+        });
+        if (decision.rationale === 'confirmed_artist_required_for_waitlist') {
           return {
             action: 'propose_next_step' as const,
-            decision: {
-              kind: 'needs_more_info' as const,
-              rationale: 'confirmed_artist_required_for_waitlist',
-              score: 0,
-            },
+            decision,
             summary: 'More artist information is required before saving.',
           };
         }
-
-        // The existing DB-backed access gate is authoritative. While it is
-        // enabled, every anonymous visitor receives the same waitlist decision;
-        // audience scoring resumes only when controlled access is turned off.
-        const decision: AccessDecision = state.accessControlled
-          ? {
-              kind: 'waitlist',
-              rationale: 'controlled_access_gate_enabled',
-              score: 100,
-            }
-          : evaluateAccessSignal({
-              signal: collapseInterviewSignals(
-                state.signals.map(s => ({
-                  ...s,
-                  recordedAt: new Date().toISOString(),
-                }))
-              ),
-              spotifyFollowers: state.spotifyFollowers,
-              metrics: state.artistMetrics,
-              turnCount: state.turnCount,
-            });
         const payload: NextStepCardPayload = {
           action: 'propose_next_step',
           decision,

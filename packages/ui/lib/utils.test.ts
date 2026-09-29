@@ -62,4 +62,9 @@ describe('cn', () => {
       'text-secondary-token'
     );
   });
+
+  it('merges semantic overlay z-index layers with numeric ones', () => {
+    expect(cn('z-50', 'z-popover')).toBe('z-popover');
+    expect(cn('z-sheet', 'z-modal')).toBe('z-modal');
+  });
 });

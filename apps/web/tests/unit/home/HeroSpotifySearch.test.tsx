@@ -130,6 +130,24 @@ describe('HeroSpotifySearch', () => {
       ).toHaveAccessibleName('Search your name');
     });
 
+    it('leads the editorial pill with a glyph and lets the pill own focus (JOV-6946)', () => {
+      render(
+        <HeroSpotifySearch
+          appearance='editorial'
+          placeholder='Search your name'
+          submitLabel='Find me'
+        />
+      );
+
+      expect(
+        document.querySelector('.homepage-name-search__icon')
+      ).toHaveAttribute('aria-hidden', 'true');
+      // No square ring inside pill geometry: the frame draws the focus ring.
+      const input = screen.getByPlaceholderText('Search your name');
+      expect(input.className).not.toMatch(/focus-visible:ring-2/);
+      expect(input.className).toContain('focus-visible:outline-none');
+    });
+
     it('uses the shared editorial aura treatment for homepage pills', () => {
       render(
         <HeroSpotifySearch
@@ -150,6 +168,12 @@ describe('HeroSpotifySearch', () => {
     it('renders combobox role on input', () => {
       renderComponent();
       expect(getInput()).toHaveAttribute('role', 'combobox');
+    });
+
+    it('keeps a native /start handoff in the rendered document', () => {
+      renderComponent();
+      expect(getInput().closest('form')).toHaveAttribute('action', '/start');
+      expect(getInput()).toHaveAttribute('name', 'artist_name');
     });
 
     it('keeps the homepage search focus indicator visible', () => {

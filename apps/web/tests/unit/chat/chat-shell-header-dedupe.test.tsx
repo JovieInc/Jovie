@@ -35,7 +35,7 @@ vi.mock('@/components/organisms/PersistentAudioBar', () => ({
   PersistentAudioBar: () => null,
 }));
 
-vi.mock('@/components/organisms/Sidebar', () => ({
+vi.mock('@/components/organisms/sidebar', () => ({
   SidebarProvider: ({ children }: { children: ReactNode }) => children,
   SidebarTrigger: () => null,
   useSidebar: () => ({ isMobile: false, state: 'open' }),

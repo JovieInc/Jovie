@@ -21,7 +21,6 @@ import {
   resolveMarketingHeaderBrand,
 } from '@/data/marketing/headerBrand';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
-import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
 import {
   MARKETING_CUSTOMERS_FLYOUT,
   MARKETING_NAV_LINKS,
@@ -57,9 +56,28 @@ const DEFAULT_MARKETING_CTA: MarketingHeaderCta =
 const MARKETING_HEADER_CTA_BY_PATH: Readonly<
   Partial<Record<string, MarketingHeaderCta>>
 > = {
-  [APP_ROUTES.ARTIST_PROFILES]: MARKETING_CTA_INTENTS.claimProfile,
-  [APP_ROUTES.ARTIST_PROFILE_LEGACY]: MARKETING_CTA_INTENTS.claimProfile,
+  // Homepage conversion lock (JOV-5085): the homepage never shows Request
+  // access, even while waitlisting; /start runs the waitlist gate after auth.
+  // ui-casing-allow: canonical Pen header CTA copy (sentence case)
+  [APP_ROUTES.HOME]: { label: 'Find yourself', href: APP_ROUTES.START },
 };
+
+/**
+ * Resolve the header's primary CTA for a route. Every marketing-header route
+ * shares the single waitlist-mode front-door CTA (JOV-6860); the locked
+ * homepage override in MARKETING_HEADER_CTA_BY_PATH is the only divergence.
+ */
+export function resolveMarketingHeaderPrimaryCta(
+  pathname: string | null,
+  waitlistEnabled: boolean = FEATURE_FLAGS.WAITLIST_ENABLED
+): MarketingHeaderCta {
+  const override =
+    pathname === null ? undefined : MARKETING_HEADER_CTA_BY_PATH[pathname];
+  if (override) return override;
+  return waitlistEnabled === FEATURE_FLAGS.WAITLIST_ENABLED
+    ? DEFAULT_MARKETING_CTA
+    : getHomepageFrontDoorCtaContract(waitlistEnabled).primary;
+}
 
 export interface MarketingHeaderProps
   extends Readonly<{
@@ -171,9 +189,7 @@ export function MarketingHeader({
     iconOnly
   );
   const resolvedPrimaryCta =
-    primaryCta ??
-    (pathname === null ? undefined : MARKETING_HEADER_CTA_BY_PATH[pathname]) ??
-    DEFAULT_MARKETING_CTA;
+    primaryCta ?? resolveMarketingHeaderPrimaryCta(pathname);
   const resolvedLogoVariant =
     presentation === 'marketing-glass' || isArtistProfiles || iconOnly
       ? 'icon'

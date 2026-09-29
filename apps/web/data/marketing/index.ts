@@ -23,6 +23,27 @@
  */
 
 export type {
+  MarketingCharacterBoardDecision,
+  MarketingCharacterFinding,
+  MarketingCharacterGenerationBrief,
+  MarketingCharacterIndividualityAxis,
+  MarketingCharacterLightDirection,
+  MarketingCharacterPersona,
+  MarketingCharacterRecord,
+  MarketingCharacterShadowDirection,
+  MarketingCharacterSimilarityResult,
+  MarketingCharacterSystem,
+} from './characterSystem';
+export {
+  auditMarketingCharacterGenerationBrief,
+  findNearDuplicateMarketingCharacters,
+  formatMarketingCharacterSystemForPrompt,
+  JOVIE_MARKETING_CHARACTER_SYSTEM,
+  JOVIE_MARKETING_CHARACTER_SYSTEM_SCHEMA,
+  MARKETING_CHARACTER_INDIVIDUALITY_AXES,
+  scoreMarketingCharacterSimilarity,
+} from './characterSystem';
+export type {
   MarketingPenRegistryIssue,
   MarketingPenRegistryIssueCode,
   MarketingRecipeRegistryEntry,
@@ -85,15 +106,26 @@ export type {
   MarketingCopyTasteSignal,
   MarketingCopyTasteTag,
   MarketingCopyVisibleCopy,
+  RenderedCopyApprovedException,
+  RenderedCopyAuditOptions,
+  RenderedCopyCertification,
+  RenderedCopyCertificationInput,
+  RenderedCopyLine,
+  RenderedCopySection,
+  RenderedCopySurface,
 } from './copy';
 export {
   applyMarketingCopyTasteDecision,
   auditMarketingCopyPage,
   auditMarketingCopyPanel,
   auditMarketingCopySemantics,
+  auditRenderedCopyCertification,
+  auditRenderedMarketingCopy,
   createEmptyMarketingCopyTasteProfile,
   createMarketingCopyReviewDigest,
   createMarketingCopyTasteInboxItem,
+  createRenderedCopyCertification,
+  createRenderedCopyDigest,
   MARKETING_COPY_LINE_ROLES,
   MARKETING_COPY_REVIEW_ROLES,
   MARKETING_COPY_SEMANTIC_ENFORCEMENTS,
@@ -111,6 +143,30 @@ export type {
 } from './designGaps';
 export { getProposedSection, PROPOSED_SECTIONS } from './designGaps';
 export type {
+  MarketingEditorialBackgroundAccent,
+  MarketingEditorialBackgroundComposition,
+  MarketingEditorialBackgroundCurve,
+  MarketingEditorialBackgroundDecision,
+  MarketingEditorialBackgroundFinding,
+  MarketingEditorialBackgroundFindingCode,
+  MarketingEditorialBackgroundPoint,
+  MarketingEditorialBackgroundRect,
+  MarketingEditorialBackgroundVariant,
+  MarketingEditorialBackgroundVariantId,
+} from './editorialBackgrounds';
+export {
+  auditMarketingEditorialBackgroundDecision,
+  EDITORIAL_BACKGROUND_FLOW,
+  EDITORIAL_BACKGROUND_SOFT,
+  formatMarketingEditorialBackgroundsForPrompt,
+  getMarketingEditorialBackground,
+  isMarketingEditorialBackgroundVariantId,
+  JOVIE_EDITORIAL_BACKGROUND_SCHEMA,
+  JOVIE_EDITORIAL_BACKGROUND_VERSION,
+  MARKETING_EDITORIAL_BACKGROUND_VARIANT_IDS,
+  MARKETING_EDITORIAL_BACKGROUNDS,
+} from './editorialBackgrounds';
+export type {
   MarketingCreativeRole,
   MarketingGateReceipt,
   MarketingGenerationFinding,
@@ -124,6 +180,7 @@ export type {
 export {
   auditMarketingNarrativePlan,
   auditMarketingTasteAdmission,
+  MARKETING_ASSET_GENERATION_CHARACTER_CONTRACT,
   MARKETING_ASSET_GENERATION_COLOR_CONTRACT,
   MARKETING_ASSET_GENERATION_MEDIA_RECIPE_CONTRACT,
   MARKETING_CREATIVE_ROLES,
@@ -133,6 +190,7 @@ export {
   MARKETING_ROLE_REQUIREMENTS,
   MARKETING_STAGE_ATTEMPT_LIMITS,
   MARKETING_TASTE_GATE_IDS,
+  MARKETING_VISUAL_REVIEW_CHARACTER_CONTRACT,
   MARKETING_VISUAL_REVIEW_COLOR_CONTRACT,
   MARKETING_VISUAL_REVIEW_MEDIA_RECIPE_CONTRACT,
   selectMarketingModelCandidate,
@@ -264,13 +322,26 @@ export {
   validateMarketingMediaExportRequest,
 } from './mediaExport';
 export type {
+  MarketingMediaAccentReference,
+  MarketingMediaGeneratedArtworkSource,
+  MarketingMediaMotionFallbackId,
+  MarketingMediaMotionPolicy,
+  MarketingMediaOutputProfile,
+  MarketingMediaOutputProfileId,
+  MarketingMediaRealCaptureSource,
   MarketingMediaRecipeDecision,
   MarketingMediaRecipeFinding,
   MarketingMediaRecipeFindingCode,
   MarketingMediaRecipeId,
+  MarketingMediaRecipeInput,
+  MarketingMediaRecipeKind,
+  MarketingMediaRegisteredLivePresentationSource,
+  MarketingMediaSafeAreaPolicyId,
+  MarketingMediaSource,
 } from './mediaRecipes';
 export {
   auditMarketingMediaRecipeDecision,
+  COMPACT_GLASS_MEDIA_RECIPE,
   DARK_GLASS_MEDIA_RECIPE,
   FLOWING_ACCENT_MEDIA_RECIPE,
   formatMarketingMediaRecipesForPrompt,
@@ -278,10 +349,18 @@ export {
   isApprovedMarketingMediaRecipeId,
   JOVIE_MARKETING_MEDIA_RECIPE_SCHEMA,
   JOVIE_MARKETING_MEDIA_RECIPE_VERSION,
+  MARKETING_MEDIA_RECIPE_ACCENTS,
   MARKETING_MEDIA_RECIPE_FOUNDER_LOCK,
   MARKETING_MEDIA_RECIPE_IDS,
+  MARKETING_MEDIA_RECIPE_MOTION_FALLBACKS,
+  MARKETING_MEDIA_RECIPE_OUTPUT_PROFILES,
+  MARKETING_MEDIA_RECIPE_SAFE_AREAS,
+  MARKETING_MEDIA_RECIPE_SOURCE_MATRIX,
   MARKETING_MEDIA_RECIPES,
+  MARKETING_MEDIA_SAFE_AREA_POLICIES,
   resolveMarketingMediaRecipeForExport,
+  SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE,
+  validateMarketingMediaRecipeInput,
 } from './mediaRecipes';
 export type {
   MarketingPageContract,
@@ -322,6 +401,8 @@ export type {
   MarketingRouteDisposition,
   MarketingRouteDispositionLedgerEntry,
   MarketingRouteHealthTarget,
+  ProductEvidenceDeclaration,
+  ProductEvidenceKind,
   RouteManifestEntry,
   RouteRecipeParityReport,
 } from './routeManifest';
@@ -332,11 +413,14 @@ export {
   getRouteManifestEntry,
   getRouteRecipeParity,
   isExempt,
+  isProductRouteEntry,
   isRecipeRoute,
   MARKETING_EXACT_PUBLIC_ROUTE_TARGETS,
   MARKETING_ROUTE_DISPOSITION_LEDGER,
   MARKETING_ROUTE_HEALTH_TARGETS,
   MARKETING_ROUTE_MANIFEST,
+  PRODUCT_ROUTE_RECIPES,
+  productEvidenceDeclarationIssue,
 } from './routeManifest';
 export type {
   AudienceLegality,

@@ -3,7 +3,6 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageCertifiedSections } from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
-import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
 
 const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: false }));
@@ -37,119 +36,44 @@ vi.mock('next/image', () => ({
 }));
 
 describe('HomepageCertifiedSections', () => {
-  it('renders the locked connected and relationships sections without unsupported proof', () => {
+  it('renders one relationships section with real jov.ie/tim next steps (JOV-6946)', () => {
     render(
       <HomepageCertifiedSections
         previews={{
-          connected: HOMEPAGE_MEDIA_MAP.connected.asset,
-          relationships: HOMEPAGE_MEDIA_MAP.relationships.asset,
+          subscribe: HOMEPAGE_MEDIA_MAP.relationships.asset,
+          pay: HOMEPAGE_MEDIA_MAP.pay.asset,
         }}
       />
     );
 
-    expect(
-      screen.queryByTestId('marketing-section-logo-cloud')
-    ).not.toBeInTheDocument();
-
-    const sections = screen.getAllByTestId('marketing-section-feature-split');
-    expect(sections).toHaveLength(2);
-    expect(
-      sections.map(section => section.getAttribute('data-marketing-occurrence'))
-    ).toEqual(['connected', 'relationships']);
-
-    const connected = document.querySelector<HTMLElement>(
-      '[data-homepage-testid="homepage-section-connected"]'
-    )!;
-    expect(connected).toHaveAttribute('data-marketing-variant', 'editorial');
-    expect(connected).toHaveAttribute('data-rhythm', 'product');
-    expect(connected).toHaveTextContent('IDENTITY, ACROSS THE INTERNET');
-    expect(connected).toHaveTextContent(
-      HOMEPAGE_LAUNCH_COPY.certified.sections[0].headline
+    const sections = document.querySelectorAll('[data-homepage-testid]');
+    expect(sections).toHaveLength(1);
+    const section = sections[0] as HTMLElement;
+    expect(section).toHaveAttribute(
+      'data-homepage-testid',
+      'homepage-section-relationships'
     );
-    expect(connected).toHaveTextContent(
-      HOMEPAGE_LAUNCH_COPY.certified.sections[0].body
-    );
-    expect(connected.querySelectorAll('[data-homepage-visual]')).toHaveLength(
-      1
-    );
-    expect(connected.querySelector('.ap-phone-frame')).toBeNull();
+    expect(section).toHaveAttribute('data-marketing-variant', 'editorial');
+    expect(
+      within(section).getByRole('heading', {
+        level: 2,
+        name: 'Turn attention into relationships.',
+      })
+    ).toBeInTheDocument();
+    expect(section.textContent).not.toMatch(/\u2014/);
 
-    // JOV-6297: the conceptual artwork is replaced by the approved
-    // customer-zero profile surface — real avatar, name, and public URL
-    // beside the real product export.
-    expect(
-      within(connected)
-        .getByAltText('Tim White Profile — Listen')
-        .getAttribute('src')
-    ).toContain(HOMEPAGE_MEDIA_MAP.connected.asset.publicUrl);
-    const avatar = connected.querySelector<HTMLImageElement>(
-      '.homepage-connected-profile__avatar'
-    )!;
-    expect(avatar).toHaveAttribute('src', '/images/avatars/tim-white.jpg');
-    expect(connected).toHaveTextContent('Tim White');
-    expect(connected).toHaveTextContent('jov.ie/tim');
-    expect(
-      connected.querySelector('[src*="homepage-identity-optical"]')
-    ).toBeNull();
-
-    const relationships = document.querySelector<HTMLElement>(
-      '[data-homepage-testid="homepage-section-relationships"]'
-    )!;
-    expect(relationships).toHaveAttribute('data-rhythm', 'product');
-    expect(relationships).toHaveTextContent(
-      HOMEPAGE_LAUNCH_COPY.certified.sections[1].headline
-    );
-    expect(relationships).toHaveTextContent(
-      HOMEPAGE_LAUNCH_COPY.certified.sections[1].body
-    );
-    expect(relationships.querySelectorAll('img')).toHaveLength(1);
-    expect(
-      relationships.querySelectorAll('[data-homepage-visual]')
-    ).toHaveLength(1);
-    expect(
-      within(relationships).getByAltText('Tim White Profile — Subscribe')
-    ).toHaveAttribute('src', HOMEPAGE_MEDIA_MAP.relationships.asset.publicUrl);
-    const outcomesList = within(relationships)
-      .getAllByRole('list')
-      .find(list => list.getAttribute('aria-label') === 'Relationships')!;
-    expect(outcomesList).toBeDefined();
-
-    // JOV-6297: static ordered states of the shipped visibility surfaces —
-    // the public profile for people and the documented {username}/llms.txt
-    // for agents. No simulated third-party answer or vendor claim.
-    const visibility = within(relationships).getByRole('list', {
-      name: 'One Profile, Legible To People And To Agents',
-    });
-    const states = within(visibility).getAllByRole('listitem');
-    expect(states).toHaveLength(2);
-    expect(states[0]).toHaveAttribute('data-audience', 'people');
-    expect(states[1]).toHaveAttribute('data-audience', 'agents');
-    expect(states[0]).toHaveTextContent('People');
-    expect(states[0]).toHaveTextContent('jov.ie/tim');
-    expect(
-      within(states[0])
-        .getByAltText('Tim White Profile — Subscribe')
-        .getAttribute('src')
-    ).toContain('tim-white-profile-subscribe-phone.png');
-    expect(states[1]).toHaveTextContent('Agents');
-    expect(states[1]).toHaveTextContent('# Tim White');
-    expect(states[1]).toHaveTextContent('Canonical URL');
-    expect(states[1]).toHaveTextContent('jov.ie/tim/llms.txt');
-    expect(relationships).not.toHaveTextContent('VERIFIED');
-
-    const outcomes = within(outcomesList).getAllByRole('listitem');
-    expect(outcomes).toHaveLength(3);
-    expect(outcomes.map(outcome => outcome.textContent)).toEqual([
-      expect.stringContaining('Be found. Be understood.'),
-      expect.stringContaining('Know who cares.'),
-      expect.stringContaining('Built around who you are.'),
+    // Real captures only, in visual accent order: pay, then updates.
+    const images = within(section).getAllByRole('img');
+    expect(images.map(image => image.getAttribute('src'))).toEqual([
+      HOMEPAGE_MEDIA_MAP.pay.asset.publicUrl,
+      HOMEPAGE_MEDIA_MAP.relationships.asset.publicUrl,
     ]);
-    expect(
-      outcomes.map(outcome => outcome.querySelector('span')?.textContent)
-    ).toEqual(['01', '02', '03']);
-
-    expect(screen.queryAllByRole('link')).toHaveLength(0);
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(section).toHaveTextContent('A direct way to pay Tim, in one tap.');
+    expect(section).toHaveTextContent(
+      'Tim’s updates, sent only to people who asked for them.'
+    );
+    expect(section.querySelector('.homepage-chapter-visual')).toBeNull();
+    expect(section).not.toHaveTextContent(/Listener|Collaborator|Investor/);
   });
 
   it('records publication and fallback receipts for every homepage asset', () => {
@@ -167,13 +91,15 @@ describe('HomepageCertifiedSections', () => {
 });
 
 describe('HomepageClose', () => {
-  it('requests access instead of focusing absent search when gated', () => {
+  it('returns to the name search instead of requesting access when gated', () => {
     gate.WAITLIST_ENABLED = true;
     render(<HomepageClose />);
     expect(
-      screen.getByRole('link', { name: 'Request access' })
-    ).toHaveAttribute('href', '/signup');
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+      screen.getByRole('button', { name: 'Find your profile' })
+    ).toHaveAttribute('type', 'button');
+    expect(
+      screen.queryByRole('link', { name: 'Request access' })
+    ).not.toBeInTheDocument();
   });
   it('renders the saved closing headline and a single focus-only action', () => {
     render(<HomepageClose />);
@@ -194,7 +120,7 @@ describe('HomepageClose', () => {
       <>
         <form onSubmit={submit}>
           <input
-            id='homepage-name-search'
+            id='homepage-claim-handle'
             aria-label='Name'
             defaultValue='Beyoncé'
           />

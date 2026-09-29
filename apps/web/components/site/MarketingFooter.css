@@ -25,16 +25,11 @@
 
 .marketing-footer-premium .mf-eyebrow {
   display: block;
-  font-size: 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
   color: var(--mf-text-muted);
   line-height: 1;
   margin-bottom: var(--space-5);
-}
-
-.marketing-footer-premium .mf-eyebrow--caps {
-  text-transform: uppercase;
-  font-weight: 600;
-  letter-spacing: 0.22em;
 }
 
 .marketing-footer-premium .mf-link {

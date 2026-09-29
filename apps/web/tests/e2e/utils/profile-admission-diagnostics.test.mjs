@@ -314,14 +314,14 @@ test('build identity hashes exact bounded source/manifest/compiled bytes, never 
     write(
       '.next/dev/server/app-paths-manifest.json',
       JSON.stringify({
-        '/(marketing)/renders/profile-admission/page': 'app/profile.js',
+        '/(profile-admission)/renders/profile-admission/page': 'app/profile.js',
       })
     );
     write('.next/dev/server/app/profile.js', SECRET);
     write(
       '.next/server/app-paths-manifest.json',
       JSON.stringify({
-        '/(marketing)/renders/profile-admission/page': '../escape.js',
+        '/(profile-admission)/renders/profile-admission/page': '../escape.js',
       })
     );
     const row = readBuildIdentity(root);
@@ -337,7 +337,7 @@ test('build identity hashes exact bounded source/manifest/compiled bytes, never 
     write(
       '.next/dev/server/app-paths-manifest.json',
       JSON.stringify({
-        '/(marketing)/renders/profile-admission/page': '/tmp/secret',
+        '/(profile-admission)/renders/profile-admission/page': '/tmp/secret',
       })
     );
     assert.equal(readBuildIdentity(root).manifests[0].compiledPageSha256, null);

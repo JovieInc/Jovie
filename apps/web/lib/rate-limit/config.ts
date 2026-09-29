@@ -440,6 +440,21 @@ export const RATE_LIMITERS = {
     requireRedis: true,
   } satisfies RateLimitConfig,
 
+  /**
+   * Anonymous agent profile creation (POST /api/agents/profiles): 10 per hour
+   * per IP. Each call can hit Spotify and write a profile row.
+   */
+  agentProfileCreate: {
+    name: 'Agent Profile Create',
+    limit: 10,
+    window: '1 h',
+    prefix: 'public:agent-profile-create',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
   /** Public click: 50 requests per minute per IP */
   publicClick: {
     name: 'Public Click',
@@ -475,6 +490,22 @@ export const RATE_LIMITERS = {
     limit: 20,
     window: '1 m',
     prefix: 'public:claim-token',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
+  /**
+   * Private library share link reads: 30 requests per minute per IP.
+   * This token-bearing RSC surface performs database reads for both metadata
+   * and page content, so it needs a dedicated bucket before either lookup.
+   */
+  libraryAssetShareAccess: {
+    name: 'Library Asset Share Access',
+    limit: 30,
+    window: '1 m',
+    prefix: 'public:library-asset-share',
     analytics: false,
     algorithm: 'fixed-window',
     trafficClass: 'anonymous',

@@ -301,7 +301,7 @@ export async function enrichProfileFromDsp(
     throw new Error('Unauthorized');
   }
 
-  // Fetch profile via Clerk ID → users → creator_profiles join
+  // Fetch profile via app user ID → users → creator_profiles join
   const [profile] = await db
     .select({
       id: creatorProfiles.id,
@@ -328,7 +328,7 @@ export async function enrichProfileFromDsp(
     })
     .from(creatorProfiles)
     .innerJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(and(eq(users.clerkId, userId), eq(creatorProfiles.isClaimed, true)))
+    .where(and(eq(users.id, userId), eq(creatorProfiles.isClaimed, true)))
     .limit(1);
 
   if (!profile) {

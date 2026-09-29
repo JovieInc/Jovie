@@ -50,6 +50,10 @@ PHASES = [
 ]
 LANE_LABELS = ("agent-ready", "devin", "codex")
 REFRESH_REMOTE_S = 90
+# JOV-6836: promotion-loss metrics take ~25 s of GitHub reads; refresh them far less often.
+PROMOTION_SCRIPT = HERE.parent / "promotion-loss-metrics.mjs"
+PROMOTION_EVERY_S = 900
+_promotion: dict = {"at": 0.0, "data": None}
 GREEN, RED, ORANGE, PURPLE, BLUE = (52, 199, 89), (255, 69, 58), (255, 159, 10), (169, 130, 255), (17, 175, 255)
 DIM, FG, WHITE = (138, 138, 148), (236, 236, 240), (255, 255, 255)
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
@@ -128,8 +132,7 @@ def read_json(path: Path, default):
         return default
 
 
-def ledger_window(state: Path, hours: int = 24) -> list[dict]:
-    since = (utcnow() - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+def ledger_rows(state: Path) -> list[dict]:
     rows = []
     try:
         with open(state / "runs" / "ledger.jsonl") as handle:
@@ -138,11 +141,15 @@ def ledger_window(state: Path, hours: int = 24) -> list[dict]:
                     receipt = json.loads(line)
                 except ValueError:
                     continue
-                if receipt.get("endedAt", "") >= since:
-                    rows.append(receipt)
+                rows.append(receipt)
     except OSError:
         pass
     return rows
+
+
+def ledger_window(state: Path, hours: int = 24) -> list[dict]:
+    since = (utcnow() - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return [row for row in ledger_rows(state) if row.get("endedAt", "") >= since]
 
 
 def local_model(host) -> dict:
@@ -152,7 +159,9 @@ def local_model(host) -> dict:
     slots = {name: host.slots(name, spec.get("slots", 1)) for name, spec in enabled.items()}
     tree = read_text(state / "current" / ".tree")
     current = (state / "current").resolve()
-    receipts = ledger_window(state)
+    all_receipts = ledger_rows(state)
+    since = (utcnow() - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    receipts = [row for row in all_receipts if row.get("endedAt", "") >= since]
     verdicts = Counter(r.get("verdict") for r in receipts)
     landed = sorted((r for r in receipts if r.get("verdict") in ("landing", "verified-not-queued")),
                     key=lambda r: r.get("endedAt", ""), reverse=True)
@@ -173,6 +182,7 @@ def local_model(host) -> dict:
         "releaseMatchesHud": current == HERE, "hudDir": str(HERE),
         "providers": enabled, "slots": slots, "workers": running_workers(state),
         "ledger24h": dict(verdicts), "runs24h": len(receipts),
+        "receipts24h": receipts, "attributionReceipts": all_receipts,
         "lastLanding": landed[0].get("endedAt") if landed else None,
         "held": read_json(state / "held.json", {}), "failures": read_json(state / "failures.json", {}),
         "gateTimeouts": read_json(state / "gate-timeouts.json", {}), "requeue": read_json(state / "requeue.json", {}),
@@ -195,13 +205,13 @@ def linear_model(env_file: Path, in_flight: list[str] = ()) -> dict:
     try:
         client = lane.Linear(env_file)
         data = client.gql(
-            'query($labels:[String!]!,$numbers:[Float!]!){'
+            'query($labels:[String!]!' + (',$numbers:[Float!]!' if numbers else '') + '){'
             'pool: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},labels:{name:{in:$labels}}})'
             '{nodes{identifier priority labels{nodes{name}}}}'
-            'active: issues(first:50,filter:{team:{key:{eq:"JOV"}},number:{in:$numbers}})'
-            '{nodes{identifier title state{name}}}'
-            'triage: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Triage"}},labels:{name:{in:$labels}}})'
-            '{nodes{identifier}}}', {"labels": list(LANE_LABELS), "numbers": numbers or [0]})
+            + ('active: issues(first:50,filter:{team:{key:{eq:"JOV"}},number:{in:$numbers}})'
+               '{nodes{identifier title state{name}}}' if numbers else '')
+            + 'triage: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Triage"}},labels:{name:{in:$labels}}})'
+            '{nodes{identifier}}}', {"labels": list(LANE_LABELS), **({"numbers": numbers} if numbers else {})})
     except Exception as error:
         return {"ok": False, "error": f"{type(error).__name__}: {error}"[:100]}
     pool = Counter()
@@ -209,7 +219,7 @@ def linear_model(env_file: Path, in_flight: list[str] = ()) -> dict:
         for label in node["labels"]["nodes"]:
             if label["name"] in LANE_LABELS:
                 pool[label["name"]] += 1
-    active = {n["identifier"]: n["title"] for n in data["active"]["nodes"]}
+    active = {n["identifier"]: n["title"] for n in (data.get("active") or {"nodes": []})["nodes"]}
     return {"ok": True, "pool": dict(pool), "poolTotal": len(data["pool"]["nodes"]), "active": active,
             "triage": len(data["triage"]["nodes"]), "fetchedAt": utcnow().isoformat()}
 
@@ -247,9 +257,11 @@ def github_model() -> dict:
         model["errors"]["open"] = f"{type(error).__name__}: {error}"[:100]
     try:
         since = (utcnow() - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        merged = gh_json(["pr", "list", "--repo", lane.REPO_SLUG, "--state", "merged", "--limit", "30",
-                          "--search", f"merged:>={since}", "--json", "number,title,headRefName,mergedAt"])
+        merged = gh_json(["pr", "list", "--repo", lane.REPO_SLUG, "--state", "merged", "--limit", "100",
+                          "--search", f"merged:>={since}", "--json",
+                          "number,title,headRefName,createdAt,mergedAt"])
         model["merged24h"] = [{"number": m["number"], "title": m["title"], "mergedAt": m["mergedAt"],
+                               "createdAt": m["createdAt"], "headRefName": m["headRefName"],
                                "lane": (lambda found: found.group("lane") if found else None)(lane.LANE_BRANCH.match(m["headRefName"]))}
                               for m in sorted(merged, key=lambda m: m["mergedAt"], reverse=True)]
     except Exception as error:
@@ -265,13 +277,49 @@ def github_model() -> dict:
         model["errors"]["queue"] = f"{type(error).__name__}: {error}"[:100]
     try:
         limits = gh_json(["api", "rate_limit"])
-        model["rate"] = {"core": limits["resources"]["core"]["remaining"], "graphql": limits["resources"]["graphql"]["remaining"],
-                         "resetAt": datetime.fromtimestamp(limits["resources"]["graphql"]["reset"], timezone.utc).isoformat()}
+        budget = lane.graphql_budget()
+        if budget is None:
+            raise RuntimeError("GraphQL rateLimit unreadable")
+        model["rate"] = {"core": limits["resources"]["core"]["remaining"], "graphql": budget[0], "resetAt": budget[1]}
     except Exception as error:
         model["errors"]["rate"] = f"{type(error).__name__}: {error}"[:100]
+    model["promotion"] = promotion_model()
     model["ok"] = not model["errors"]
     model["fetchedAt"] = utcnow().isoformat()
     return model
+
+
+def promotion_model(now: float | None = None, run=subprocess.run) -> dict:
+    """Last 8 h of promotion-loss metrics (scripts/promotion-loss-metrics.mjs), cached."""
+    now = time.time() if now is None else now
+    if _promotion["data"] is None or now - _promotion["at"] >= PROMOTION_EVERY_S:
+        _promotion["at"] = now
+        try:
+            result = run(["node", str(PROMOTION_SCRIPT), "--since", "8h", "--json"],
+                         capture_output=True, text=True, timeout=180)
+            if result.returncode != 0:
+                raise RuntimeError((result.stderr or "exit %d" % result.returncode).strip()[-100:])
+            _promotion["data"] = json.loads(result.stdout)
+        except Exception as error:
+            _promotion["data"] = {"error": f"{type(error).__name__}: {error}"[:100]}
+    return _promotion["data"]
+
+
+def promotion_line(metrics: dict) -> str:
+    if not metrics or metrics.get("error"):
+        return rgb(FG, "PROMOTION 8h  ", bold=True) + rgb(RED, (metrics or {}).get("error", "unread"))
+    first = metrics["firstPass"]["rate"]
+    back = metrics["reenqueueMinutes"]
+    intake = metrics["intake"]
+    occupancy = metrics["occupancy"]
+    rate_color = GREEN if first is not None and first >= 0.9 else ORANGE
+    return (rgb(FG, "PROMOTION 8h  ", bold=True)
+            + rgb(rate_color, f"first-pass {'n/a' if first is None else f'{round(first * 100)}%'}")
+            + rgb(DIM, f" · ejected→back p75 {back['p75'] if back['p75'] is not None else 'n/a'}m ({back['pending']} waiting)"
+                       f" · open→enqueue p75 {metrics['openToFirstEnqueueMinutes']['p75']}m"
+                       f" · opens/h {intake['opensPerHour']} vs merges/h {intake['mergesPerHour']}"
+                       f" · CLEAN not queued {occupancy['cleanNotQueued']}"
+                       f" · keys >1 PR {intake['keysWithMultipleOpenPrs']}"))
 
 
 def system_model() -> dict:
@@ -347,6 +395,28 @@ def dur(seconds: int) -> str:
     if seconds < 86400:
         return f"{seconds // 3600}h{(seconds % 3600) // 60:02d}m"
     return f"{seconds // 86400}d{(seconds % 86400) // 3600}h"
+
+
+def attribution_label(value: dict) -> str:
+    category, origin_category = value.get("category"), value.get("originCategory")
+    origin, final = value.get("originProvider"), value.get("finalProvider")
+    if category == "autonomous-created":
+        label = f"autonomous {origin}"
+    elif category == "cross-provider-handoff":
+        label = f"autonomous {origin}→{final} handoff"
+    elif category == "cross-provider-finalizer":
+        base = "manual Codex app" if origin_category == "manual-codex-app-created" else \
+            "old codex/* landed later" if origin_category == "old-codex-branch-landed-later" else \
+            f"autonomous {origin or '?'}"
+        label = f"{base} · {final} finalizer"
+    elif category == "manual-codex-app-created":
+        label = "manual Codex app"
+    elif category == "old-codex-branch-landed-later":
+        label = "old codex/* landed later"
+    else:
+        label = category or "unattributed"
+    reviews = sorted({role["provider"] for role in value.get("roles", []) if role["category"] == "review-only"})
+    return label + (f" · {','.join(reviews)} review-only" if reviews else "")
 
 
 def section(title: str, width: int, color=DIM) -> str:
@@ -425,14 +495,20 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     else:
         parts = []
         for name, row in accounts.get("accounts", {}).items():
+            remaining = "?" if row.get("remainingPercent") is None else f"{row['remainingPercent']}%"
+            reset = "?" if row.get("naturalResetInS") is None else dur(row["naturalResetInS"])
+            banked = "?" if row.get("bankedResetCount") is None else str(row["bankedResetCount"])
+            detail = f"{name} {remaining} left · reset {reset} · banked {banked}"
             if row["leased"]:
-                parts.append(rgb(PURPLE, f"● {name} leased"))
+                parts.append(rgb(PURPLE, f"● {detail} · leased"))
             elif row["available"]:
-                parts.append(rgb(GREEN, f"✓ {name}"))
+                parts.append(rgb(GREEN, f"✓ {detail}"))
             else:
-                parts.append(rgb(RED, f"✕ {name} banked {dur(row['resetsInS'])}"))
+                parts.append(rgb(RED, f"✕ {detail} · retry {dur(row['resetsInS'])}"))
         summary = f"{len(accounts.get('available', []))}/{accounts.get('count', 0)} available"
-        lines.append(pad(rgb(FG, "CODEX ACCOUNTS  ", bold=True) + rgb(DIM, summary + "  ") + "  ".join(parts or [rgb(DIM, "no ChatGPT profiles found")]), width))
+        lines.append(pad(rgb(FG, "CODEX ACCOUNTS  ", bold=True) + rgb(DIM, summary), width))
+        for part in parts or [rgb(DIM, "no ChatGPT profiles found")]:
+            lines.append(pad("  " + part, width))
 
     # pipeline
     open_prs = github.get("open", [])
@@ -442,7 +518,7 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     if "open" in github.get("errors", {}):
         head += " · " + rgb(RED, "PR list: " + github["errors"]["open"])
     lines.append(rgb(FG, head, bold=True))
-    pipeline_budget = max(4, height - len(lines) - 14)
+    pipeline_budget = max(4, height - len(lines) - 15)
     merge_colors = {"CLEAN": GREEN, "UNSTABLE": ORANGE, "BLOCKED": ORANGE, "DIRTY": RED, "BEHIND": DIM, "HAS_HOOKS": DIM, "UNKNOWN": DIM}
     for pr in open_prs[:pipeline_budget]:
         merge = pr.get("merge") or "UNKNOWN"
@@ -472,11 +548,20 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
 
     # recently merged
     merged = github.get("merged24h", [])
-    lane_merged = [m for m in merged if m["lane"]]
-    lines.append(rgb(FG, f"RECENTLY MERGED · lanes {len(lane_merged)} of {len(merged)} in 24h · last landing {age(local.get('lastLanding'), now)}", bold=True)
+    attribution_receipts = local.get("attributionReceipts") or []
+    attributions = {m["number"]: lane.pr_attribution(m, attribution_receipts) for m in merged}
+    autonomous = sum(value.get("origin") == lane.AUTONOMOUS_ORIGIN for value in attributions.values())
+    manual_codex = sum(value.get("originCategory") == "manual-codex-app-created" for value in attributions.values())
+    old_codex = sum(value.get("originCategory") == "old-codex-branch-landed-later" for value in attributions.values())
+    lines.append(rgb(FG, f"RECENTLY MERGED · autonomous {autonomous} · manual Codex app {manual_codex} · "
+                     f"old codex/* {old_codex} · total {len(merged)} in 24h · last lane gate {age(local.get('lastLanding'), now)}", bold=True)
                  + ("" if "merged" not in github.get("errors", {}) else "  " + rgb(RED, github["errors"]["merged"])))
     for m in merged[:3]:
-        lines.append(pad(f" {rgb(GREEN, '✓')} #{m['number']} {clip(m['title'], 90)} {rgb(DIM, (m['lane'] or 'human') + ' · ' + age(m['mergedAt'], now))}", width))
+        label = attribution_label(attributions[m["number"]])
+        lines.append(pad(f" {rgb(GREEN, '✓')} #{m['number']} {clip(m['title'], 90)} "
+                         f"{rgb(DIM, label + ' · ' + age(m['mergedAt'], now))}", width))
+
+    lines.append(promotion_line(github.get("promotion")))
 
     # needs attention
     ledger = local["ledger24h"]
@@ -494,8 +579,18 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     if not attention:
         attention.append(rgb(GREEN, "✓ nothing needs a human"))
     lines.append(rgb(FG, "NEEDS ATTENTION  ", bold=True) + rgb(DIM, f"held {len(local['held'])} · failures {len(local['failures'])} · ") + " · ".join(attention[:4]))
+    throughput = lane.provider_throughput(local.get("receipts24h") or [], local.get("providers") or {}, merged,
+                                          attribution_receipts=attribution_receipts)
+    provider_parts = []
+    for provider, metric in throughput["providers"].items():
+        first_pass = metric["firstPassGreenRate"]
+        provider_parts.append(f"{provider} offer {metric['eligibleWorkOffered']} start {metric['workerStarts']} "
+                              f"productive {metric['productiveRuns']} PR {metric['prsCreated']} "
+                              f"first-pass {'n/a' if first_pass is None else f'{round(first_pass * 100)}%'} "
+                              f"repair {metric['remediationRuns']} landed {metric['landedOutput']}")
     counts = " · ".join(f"{k} {v}" for k, v in sorted(ledger.items())) or "no runs"
     lines.append(rgb(DIM, f"  24h verdicts: {counts}"))
+    lines.append(rgb(DIM, "  THROUGHPUT 24h · " + " | ".join(provider_parts)))
 
     # backlog
     if linear.get("ok"):

@@ -33,10 +33,6 @@ vi.mock('@/features/dashboard/organisms/profile-contact-sidebar', () => ({
   ProfileContactSidebar: () => null,
 }));
 
-vi.mock('@/features/dashboard/atoms/HeaderProfileProgress', () => ({
-  HeaderProfileProgress: () => null,
-}));
-
 vi.mock('@/features/dashboard/atoms/DrawerToggleButton', () => ({
   DrawerToggleButton: () => null,
 }));

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { buildClaimProfileStartHref } from '@/data/marketingCtaIntents';
 import { PRODUCT_COPY } from '@/data/productCopy';
 import { ProductLanding } from './ProductLanding';
@@ -111,16 +111,16 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
   it('keeps the homepage hero H1 on the homepage, not /product', () => {
     render(<ProductLanding />);
 
-    expect(HOMEPAGE_LAUNCH_COPY.hero.headline).toBe(
-      'Control how the world sees you.'
+    expect(HOMEPAGE_IDENTITY_COPY.hero.headline).toBe(
+      'Be found. Be understood.'
     );
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'Be found. Be understood.'
+      'Your living identity on the internet.'
     );
     expect(
       screen.queryByRole('heading', {
         level: 1,
-        name: 'Control how the world sees you.',
+        name: 'Be found. Be understood.',
       })
     ).toBeNull();
   });

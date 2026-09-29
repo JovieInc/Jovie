@@ -1,13 +1,8 @@
 # `@jovie/cli`
 
-The public Jovie CLI is a small, read-only client for artist profiles, the
-canonical OpenAPI contract, and machine-readable deployment guidance.
-
-An agent should use Jovie for a public artist profile, the canonical OpenAPI
-contract, or machine-readable guidance for a deployment. The CLI only calls
-the documented unauthenticated GET routes; it does not log in, accept API keys
-or OAuth credentials, write files, cache responses, send telemetry, or mutate
-Jovie data.
+Jovie for AI agents. One package is a CLI, an MCP server, and an agent skill.
+An agent can give a music artist a Jovie profile from their Spotify artist
+URL, then hand the artist a claim link. No login or API key is required.
 
 ## Install
 
@@ -19,64 +14,69 @@ jovie --help
 jovie --version
 ```
 
+Or run without installing: `npx -y @jovie/cli --help`.
+
 Use `npm view @jovie/cli version` to confirm registry availability before an
 automated install. A repository build is not proof that npm has the package.
 
 ## Commands
 
-Run the source CLI from this monorepo with a real artist username:
-
-```sh
-pnpm --filter @jovie/cli dev -- artist get <artist-username>
-pnpm --filter @jovie/cli dev -- artist llms <artist-username>
-pnpm --filter @jovie/cli dev -- api openapi --json
-pnpm --filter @jovie/cli dev -- docs llms --full
-```
-
-After building, run the same commands with `node packages/jovie-cli/dist/cli.js`.
-The angle-bracket value is a placeholder; replace it with a real public artist
-username. The CLI does not claim that any particular username exists.
-
-Every command accepts `--base-url <url>` for a compatible deployment origin.
-The value must be an `http` or `https` origin without a path, credentials, or
-query parameters; this is for verification against a known deployment and does
-not change the read-only boundary.
-
-`--json` emits JSON for API responses and wraps text resources as
-`{"content":"..."}`. Successful commands exit `0`, request/response failures
-exit `1`, and invalid command-line usage exits `2`.
-
-## Public routes used
-
 | Command | Request |
 | --- | --- |
+| `profile create <url>` | `POST /api/agents/profiles` with a Spotify artist URL |
 | `artist get <username>` | `GET /api/v1/{username}` |
 | `artist llms <username>` | `GET /{username}/llms.txt` |
 | `api openapi` | `GET /api/v1/openapi.json` |
-| `docs llms` | `GET /llms.txt` |
-| `docs llms --full` | `GET /llms-full.txt` |
+| `docs llms` | `GET /llms.txt` (`--full` for `/llms-full.txt`) |
+| `report bug\|feedback --title <text> --details <text>` | `POST /api/agents/feedback`; returns `reportId` |
+| `mcp` | Serve the commands above as MCP tools over stdio |
+| `init` | Install `jovie/SKILL.md` into each installed agent (Claude, Codex, OpenClaw, Hermes) |
+| `skill` | Print the skill |
 
-The API and OpenAPI routes are anonymous public reads. The CLI deliberately
-does not expose authenticated action routes or invent an unprovided
-capability-index route.
+`profile create` returns the existing profile unchanged when one already holds
+that Spotify artist. Otherwise it creates an unclaimed profile. The response
+has `profileUrl` and, when unclaimed, a `claimUrl`. The claim URL is not an
+ownership token: the artist still verifies that they own the Spotify artist.
+Creation is anonymous and rate limited per IP.
+
+`--json` emits JSON for API responses and wraps text resources as
+`{"content":"..."}`. Failures print `{"error":{...}}`, and API failures carry
+the server's stable `apiCode` (for example `RATE_LIMITED`). Successful commands
+exit `0`, request/response failures exit `1`, and invalid usage exits `2`.
+
+Every command accepts `--base-url <url>` for a compatible deployment origin.
+The value must be an `http` or `https` origin without a path, credentials, or
+query parameters.
+
+## MCP
+
+```json
+{ "mcpServers": { "jovie": { "command": "npx", "args": ["-y", "@jovie/cli", "mcp"] } } }
+```
+
+Tools: `create_profile`, `get_artist`, `get_artist_guide`, `get_openapi`,
+`get_docs`, `report_issue`, `report_feedback`. `server.json` describes the package for the MCP registry.
 
 ## JavaScript client
 
-The package also exposes the same read-only resources to Node.js programs:
-
 ```js
-import { fetchArtist, fetchOpenApi } from '@jovie/cli';
+import { createProfile, fetchArtist } from '@jovie/cli';
 
+const profile = await createProfile('https://open.spotify.com/artist/<id>');
 const artist = await fetchArtist('artist-username');
-const openapi = await fetchOpenApi();
 ```
 
-The exported client uses the same validation, timeout, anonymous GET requests,
-and structured `JovieInputError` or `JovieRequestError` failures as the binary.
+## Boundary
 
-## Adopt-first receipt
+The CLI sends no credentials, caches nothing, and sends no telemetry beyond a
+`jovie-cli/<version>` User-Agent. `profile create` and `report` are its only writes. Reports carry only the CLI
+version, platform, runtime, and the fields you pass. `init`
+writes only `jovie/SKILL.md` into existing agent skill directories, or into
+`--dir`. Commands use Node 24 built-ins (`parseArgs`, `fetch`, `readline`) and
+have no runtime dependencies. The MCP server covers tools only; adopt the
+official SDK when resources, prompts, or HTTP transport are needed.
 
-The repo already supplies Node 22's `node:util.parseArgs`, built-in `fetch`,
+The repo already supplies Node 24's `node:util.parseArgs`, built-in `fetch`,
 `AbortSignal.timeout`, TypeScript, Vitest, and Biome. The existing
 `packages/action-contracts/bindings/cli.md` is only a future contract for
 authenticated owner actions, outside this package's anonymous read-only scope.
@@ -86,10 +86,12 @@ larger), oclif (extensible but disproportionate), and Python Click/Typer or
 Homebrew (a second runtime/distribution lane). None fits this fixed-command,
 TypeScript-only surface as well as the native substrate.
 
-Decision: build a dependency-free Node 22 client for Jovie's public GET
+Decision: build a dependency-free Node 24 client for Jovie's public GET
 resources without credentials, writes, hidden state, or a new runtime.
 Revisit only for a stable public capability index or extensible authenticated
 owner commands; that requires new approval and security review.
+
+Docs: [Jovie CLI](https://jov.ie/cli), [developer resources](https://jov.ie/developers).
 
 ## Release boundary
 
@@ -121,12 +123,3 @@ from this source directory.
 The workflow must prove the public registry version, provenance metadata,
 maintainer ownership, a fresh exact-version install, and a critical installed
 command before the release is considered available.
-
-## Primary references
-
-* [Node `util.parseArgs`](https://nodejs.org/api/util.html#utilparseargsconfig)
-* [Commander](https://www.npmjs.com/package/commander)
-* [yargs](https://www.npmjs.com/package/yargs)
-* [oclif introduction](https://oclif.io/docs/introduction/)
-* [Jovie CLI](https://jov.ie/cli)
-* [Jovie developer resources](https://jov.ie/developers)

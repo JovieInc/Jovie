@@ -369,4 +369,52 @@ describe('Popover', () => {
       expect(screen.queryByText('Initial content')).not.toBeInTheDocument();
     });
   });
+
+  describe('anchor lifecycle', () => {
+    function RemovableAnchor({
+      onOpenChange,
+    }: {
+      readonly onOpenChange?: (open: boolean) => void;
+    }) {
+      const [anchorMounted, setAnchorMounted] = React.useState(true);
+      return (
+        <Popover defaultOpen onOpenChange={onOpenChange}>
+          {anchorMounted ? (
+            <PopoverTrigger asChild>
+              <button type='button'>Row actions</button>
+            </PopoverTrigger>
+          ) : null}
+          <PopoverContent>
+            <button type='button' onClick={() => setAnchorMounted(false)}>
+              Remove row
+            </button>
+          </PopoverContent>
+        </Popover>
+      );
+    }
+
+    it('closes when its trigger unmounts', async () => {
+      const onOpenChange = vi.fn();
+      render(<RemovableAnchor onOpenChange={onOpenChange} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Remove row' }));
+      await waitFor(() =>
+        expect(
+          screen.queryByRole('button', { name: 'Remove row' })
+        ).not.toBeInTheDocument()
+      );
+      expect(onOpenChange).toHaveBeenCalledWith(false);
+    });
+
+    it('stays open while its trigger stays mounted', async () => {
+      render(
+        <React.StrictMode>
+          <RemovableAnchor />
+        </React.StrictMode>
+      );
+      await Promise.resolve();
+      expect(
+        screen.getByRole('button', { name: 'Remove row' })
+      ).toBeInTheDocument();
+    });
+  });
 });

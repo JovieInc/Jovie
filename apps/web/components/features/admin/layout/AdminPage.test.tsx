@@ -35,8 +35,8 @@ describe('AdminPage', () => {
       screen.getByRole('region', { name: 'Key Metrics' })
     );
     expect(
-      screen.getAllByText('Monitor the business at a glance.')
-    ).toHaveLength(1);
+      screen.queryByText('Monitor the business at a glance.')
+    ).not.toBeInTheDocument();
 
     const tabs = screen.getByRole('tablist', {
       name: 'Overview primary views',
@@ -55,6 +55,28 @@ describe('AdminPage', () => {
     expect(screen.getByTestId('admin-overview-view')).toHaveTextContent(
       'Overview content'
     );
+    expect(
+      screen.getByRole('link', { name: 'Open Company Timeline' })
+    ).toHaveAttribute('href', '/app/ov/activity');
+  });
+
+  it('places page actions in the one canonical toolbar', () => {
+    render(
+      <AdminPage
+        title='Ops'
+        description='Metadata only.'
+        actions={<button type='button'>Fullscreen</button>}
+        testId='ops-page'
+      >
+        <p>Ops content</p>
+      </AdminPage>
+    );
+
+    expect(screen.getByTestId('admin-page-toolbar')).toContainElement(
+      screen.getByRole('button', { name: 'Fullscreen' })
+    );
+    expect(screen.queryByText('Metadata only.')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('admin-page-meta')).not.toBeInTheDocument();
   });
 });
 

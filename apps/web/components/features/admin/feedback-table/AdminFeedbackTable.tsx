@@ -12,7 +12,7 @@ import {
   DrawerPropertyRow,
   DrawerSection,
   DrawerSurfaceCard,
-  EntityHeaderCard,
+  EntityHeader,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { EmptyState } from '@/components/molecules/EmptyState';
@@ -230,7 +230,7 @@ function AdminFeedbackDetailPanel({
         selected ? (
           <DrawerSurfaceCard variant='card' className='overflow-hidden'>
             <div className='p-3.5'>
-              <EntityHeaderCard
+              <EntityHeader
                 eyebrow='Feedback'
                 title={getFeedbackUserLabel(selected.user)}
                 subtitle={selected.user.email ?? 'No email available'}

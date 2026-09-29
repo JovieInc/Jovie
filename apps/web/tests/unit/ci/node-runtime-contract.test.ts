@@ -30,13 +30,15 @@ function getJobBlock(workflow: string, jobKey: string): string {
 
 describe('Node runtime contract', () => {
   it('keeps canonical version files and workspace engines aligned', () => {
-    expect(canonicalNodeVersion).toBe('22.23.2');
+    expect(canonicalNodeVersion).toBe('24.21.0');
     expect(read('.node-version').trim()).toBe(canonicalNodeVersion);
 
-    const node22OnlyPackagePaths = [
+    const majorPinnedPackagePaths = [
       'package.json',
       'apps/console/package.json',
+      'apps/ovie/package.json',
       'apps/web/package.json',
+      'packages/jovie-cli/package.json',
     ];
     const minimumOnlyPackagePaths = [
       'apps/docs/package.json',
@@ -44,19 +46,24 @@ describe('Node runtime contract', () => {
       'packages/ui/package.json',
     ];
 
-    for (const packagePath of node22OnlyPackagePaths) {
+    for (const packagePath of majorPinnedPackagePaths) {
       const packageJson = JSON.parse(read(packagePath)) as {
         engines?: { node?: string };
       };
-      expect(packageJson.engines?.node, packagePath).toBe('>=22.23.2 <23');
+      expect(packageJson.engines?.node, packagePath).toBe('>=24.21.0 <25');
     }
 
     for (const packagePath of minimumOnlyPackagePaths) {
       const packageJson = JSON.parse(read(packagePath)) as {
         engines?: { node?: string };
       };
-      expect(packageJson.engines?.node, packagePath).toBe('>=22.23.2');
+      expect(packageJson.engines?.node, packagePath).toBe('>=24.21.0');
     }
+
+    const evePilot = JSON.parse(read('apps/eve-pilot/package.json')) as {
+      engines?: { node?: string };
+    };
+    expect(evePilot.engines?.node).toBe('>=24');
   });
 
   it('uses .nvmrc for reusable and standalone workflow setup', () => {
@@ -77,6 +84,15 @@ describe('Node runtime contract', () => {
     expect(read('.github/workflows/agent-pipeline.yml')).toMatch(
       /sparse-checkout: \|\n\s+\.nvmrc\n[\s\S]*?node-version-file: '\.nvmrc'/
     );
+
+    for (const workflowPath of [
+      '.github/workflows/fleet-gate-refresh.yml',
+      '.github/workflows/rolling-ci-dispatch.yml',
+    ]) {
+      const workflow = read(workflowPath);
+      expect(workflow, workflowPath).toContain("node-version: '24'");
+      expect(workflow, workflowPath).not.toContain("node-version: '22'");
+    }
   });
 
   it('checks seed-loader compatibility after canonical setup without delaying path detection', () => {

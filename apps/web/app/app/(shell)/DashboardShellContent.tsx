@@ -3,10 +3,11 @@ import { redirect } from 'next/navigation';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 import { UnavailablePage } from '@/components/UnavailablePage';
 import { APP_ROUTES } from '@/constants/routes';
-import { AdminStepUpBanner } from '@/features/admin/AdminStepUpBanner';
 import { ImpersonationBannerWrapper } from '@/features/admin/ImpersonationBannerWrapper';
 import { OperatorBannerWrapper } from '@/features/admin/OperatorBannerWrapper';
+import { WorkspaceLockScreen } from '@/features/workspace-lock/WorkspaceLockScreen';
 import { hasRecentAdminMfaReverification } from '@/lib/admin/mfa';
+import { shouldRenderOperatorChrome } from '@/lib/app-shell/workspaces';
 import { getUserBanStatus } from '@/lib/auth/ban-check';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { AppFlagProvider } from '@/lib/flags/client';
@@ -14,6 +15,13 @@ import { resolveAppShellRouteFlagNames } from '@/lib/flags/route-snapshots';
 import { getAppFlagsSnapshot } from '@/lib/flags/server';
 import { HydrateClient } from '@/lib/queries';
 import { getDehydratedState } from '@/lib/queries/server';
+import { MoneyVisibilityProvider } from '@/lib/workspace-lock/money-visibility';
+import {
+  isMoneyHiddenCookieValue,
+  isWorkspaceLockCookieValue,
+  MONEY_HIDDEN_COOKIE,
+  WORKSPACE_LOCK_COOKIE,
+} from '@/lib/workspace-lock/workspace-lock';
 import type { AppShellMode } from '@/types/app-shell';
 import { DashboardLoadTracker } from './DashboardLoadTracker';
 import {
@@ -75,11 +83,25 @@ export async function DashboardShellContent({
     return <UnavailablePage />;
   }
 
-  // Admin APIs need a passkey step-up on this session (JOV-4806). Decided
-  // here so the unlock bar paints on first render.
+  // Operator chrome renders only in Ovie; the customer shell looks the same
+  // for admins and creators (JOV-6771).
+  const showOperatorChrome = shouldRenderOperatorChrome(mode, {
+    isAdmin: dashboardData.isAdmin,
+  });
+
+  // Admin APIs need a passkey step-up on this session (JOV-4806), and anyone
+  // can lock their own workspace (JOV-6829). Both decided here so the full-area
+  // lock screen paints on first render — locked content is never sent to the
+  // client, so there is no flash or layout shift.
   const needsAdminStepUp =
-    dashboardData.isAdmin &&
+    showOperatorChrome &&
     !(await hasRecentAdminMfaReverification(await getCachedAuth()));
+  const workspaceLocked =
+    needsAdminStepUp ||
+    isWorkspaceLockCookieValue(cookieStore.get(WORKSPACE_LOCK_COOKIE)?.value);
+  const moneyHidden = isMoneyHiddenCookieValue(
+    cookieStore.get(MONEY_HIDDEN_COOKIE)?.value
+  );
 
   if (
     shouldRedirectToOnboarding(pathname) &&
@@ -97,10 +119,9 @@ export async function DashboardShellContent({
 
   const shellContents = (
     <div className='h-full'>
-      {/* ENG-004: Show environment issues to admins in non-production */}
-      <OperatorBannerWrapper isAdmin={dashboardData.isAdmin} />
+      {/* ENG-004: Show environment issues to admins in Ovie, non-production */}
+      <OperatorBannerWrapper isAdmin={showOperatorChrome} />
       <ImpersonationBannerWrapper />
-      {needsAdminStepUp ? <AdminStepUpBanner /> : null}
       <DashboardDataProvider value={dashboardData}>
         <DashboardLoadTracker pathname={pathname} userId={userId} />
         <ProfileCompletionRedirect />
@@ -110,7 +131,7 @@ export async function DashboardShellContent({
           sidebarDefaultOpen={sidebarDefaultOpen}
           previewPanelDefaultOpen={!useEssentialShell}
         >
-          {children}
+          {workspaceLocked ? <WorkspaceLockScreen /> : children}
         </AuthShellWrapper>
       </DashboardDataProvider>
     </div>
@@ -118,7 +139,9 @@ export async function DashboardShellContent({
 
   const flaggedShellContents = (
     <AppFlagProvider initialFlags={initialFlags}>
-      {shellContents}
+      <MoneyVisibilityProvider hidden={moneyHidden}>
+        {shellContents}
+      </MoneyVisibilityProvider>
     </AppFlagProvider>
   );
 

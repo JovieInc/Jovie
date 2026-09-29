@@ -27,7 +27,7 @@ export const ISSUE_CODES = Object.freeze({
   EXPIRED_EXCEPTION: 'expired-exception',
   EVIDENCE_FREE_EXCEPTION: 'evidence-free-exception',
 });
-/** @typedef {{ id: string, path: string, kind: 'count'|'count-map'|'set'|'findings'|'exceptions', counts?: string[], pointer?: string[], identityKeys?: string[], growthCode?: string }} RegistrySpec */
+/** @typedef {{ id: string, path: string, kind: 'count'|'count-map'|'set'|'findings'|'exceptions', counts?: string[], pointer?: string[], identityKeys?: string[], growthCode?: string, exceptionPointer?: string[] }} RegistrySpec */
 
 /** @type {readonly RegistrySpec[]} */
 export const DESIGN_EXCEPTION_REGISTRIES = Object.freeze(
@@ -43,7 +43,7 @@ export const DESIGN_EXCEPTION_REGISTRIES = Object.freeze(
 {"id":"server-imports","path":"apps/web/tests/unit/design-system/server-imports.baseline.json","kind":"count","counts":["count"]},
 {"id":"sidebar-nav-row","path":"apps/web/tests/unit/design-system/sidebar-nav-row.baseline.json","kind":"count","counts":["count"]},
 {"id":"contrast-ratchet","path":"apps/web/contrast-ratchet.baseline.json","kind":"count","counts":["bareTextBlack","bareBgWhite","bareTextWhite","bareBgBlack","arbitraryHex"]},
-{"id":"component-family-counts","path":"apps/web/tests/unit/design-system/component-family.baseline.json","kind":"count-map","pointer":["counts"]},
+{"id":"component-family-counts","path":"apps/web/tests/unit/design-system/component-family.baseline.json","kind":"count-map","pointer":["counts"],"exceptionPointer":["exceptions"]},
 {"id":"component-family-empty-states","path":"apps/web/tests/unit/design-system/component-family.baseline.json","kind":"set","pointer":["allowedEmptyStatePaths"],"growthCode":"path-growth"},
 {"id":"button-surface-max","path":"apps/web/tests/unit/design-system/button-surface-classes-remaining.json","kind":"count","counts":["maxRemaining"]},
 {"id":"button-surface-remaining","path":"apps/web/tests/unit/design-system/button-surface-classes-remaining.json","kind":"set","pointer":["remaining"],"growthCode":"set-growth"},
@@ -130,7 +130,7 @@ function fail(spec, code, detail) {
   return issue(code, spec.id, `${spec.path}: ${detail}`);
 }
 
-function compareCounts(spec, candidateRecord, baseRecord, keys) {
+function compareCounts(spec, candidateRecord, baseRecord, keys, raises, now) {
   /** @type {ReturnType<typeof issue>[]} */
   const issues = [];
   for (const key of keys) {
@@ -147,11 +147,23 @@ function compareCounts(spec, candidateRecord, baseRecord, keys) {
       continue;
     }
     if (candidate > base) {
+      const approval = isObject(raises) ? raises[key] : undefined;
+      const prefix = `${spec.path} raises entry ${key}`;
+      const approvalIssues = exceptionMetadataIssues(approval, prefix);
+      const expired =
+        ISO_DATE.test(approval?.expiresOn ?? '') &&
+        expiryMs(approval.expiresOn) < now.getTime();
+      if (approvalIssues.length === 0 && !expired) continue;
       issues.push(
         fail(
           spec,
           ISSUE_CODES.COUNT_GROWTH,
-          `${key} grew ${base} → ${candidate} versus trusted base`
+          `${key} grew ${base} → ${candidate} versus trusted base` +
+            (expired
+              ? `; declared raise expired on ${approval.expiresOn}`
+              : approvalIssues.length > 0
+                ? `; declared raise invalid: ${approvalIssues.join('; ')}`
+                : '')
         )
       );
     }
@@ -315,16 +327,67 @@ function compareRegistry(spec, candidateRecord, baseRecord, now) {
         spec,
         atPointer(candidateRecord, spec.pointer),
         atPointer(baseRecord, spec.pointer),
-        spec.counts ?? []
+        spec.counts ?? [],
+        undefined,
+        now
       );
     case 'count-map': {
       const left = atPointer(candidateRecord, spec.pointer);
       const right = atPointer(baseRecord, spec.pointer);
       const keys = [
-        ...Object.keys(isObject(right) ? right : {}),
-        ...Object.keys(isObject(left) ? left : {}),
+        ...new Set([
+          ...Object.keys(isObject(right) ? right : {}),
+          ...Object.keys(isObject(left) ? left : {}),
+        ]),
       ];
-      return compareCounts(spec, left, right, [...new Set(keys)]);
+      /** @type {ReturnType<typeof issue>[]} */
+      const issues = [];
+      /** @type {string[]} */
+      const gated = [];
+      const raises = isObject(candidateRecord)
+        ? candidateRecord.raises
+        : undefined;
+      for (const key of keys) {
+        const isNew = !(isObject(right) && key in right);
+        // A declared `raises` entry is an equivalent declaration for a new
+        // key — let compareCounts judge it against a zero base.
+        if (
+          !isNew ||
+          !spec.exceptionPointer ||
+          (isObject(raises) && key in raises)
+        ) {
+          gated.push(key);
+          continue;
+        }
+        const entries = atPointer(candidateRecord, spec.exceptionPointer);
+        const entry = Array.isArray(entries)
+          ? entries.find(item => isObject(item) && item.key === key)
+          : undefined;
+        const prefix = `${spec.path} exception ${key}`;
+        const metadataIssues = exceptionMetadataIssues(entry, prefix);
+        if (metadataIssues.length > 0) {
+          issues.push(
+            issue(
+              ISSUE_CODES.MISSING_EXCEPTION_METADATA,
+              spec.id,
+              metadataIssues.join('; ')
+            )
+          );
+        } else if (
+          ISO_DATE.test(entry.expiresOn ?? '') &&
+          expiryMs(entry.expiresOn) < now.getTime()
+        ) {
+          issues.push(
+            fail(
+              spec,
+              ISSUE_CODES.EXPIRED_EXCEPTION,
+              `${prefix}: expired on ${entry.expiresOn}`
+            )
+          );
+        }
+      }
+      issues.push(...compareCounts(spec, left, right, gated, raises, now));
+      return issues;
     }
     case 'set':
       return compareSet(spec, candidateRecord, baseRecord);

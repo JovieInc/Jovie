@@ -113,7 +113,7 @@ const TOOLBAR_STORAGE_KEY = '__dev_toolbar_open';
 const TOOLBAR_HIDDEN_KEY = '__dev_toolbar_hidden';
 
 const ENV_COLORS: Record<string, string> = {
-  production: 'bg-red-500/20 text-red-400 border-red-500/30',
+  production: 'bg-error/20 text-error border-error/30',
   preview: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
 };
 
@@ -194,7 +194,7 @@ const PROMOTE_LABELS: Record<PromoteState, string> = {
 
 function getPromoteButtonColor(state: PromoteState): string {
   if (state === 'done') return 'text-accent';
-  if (state === 'error') return 'text-red-400';
+  if (state === 'error') return 'text-error';
   return 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10';
 }
 
@@ -1170,7 +1170,7 @@ export function DevToolbar({
                   )}
 
                   {personaError && (
-                    <div className='border-t border-subtle px-3 py-2 text-3xs text-red-400'>
+                    <div className='border-t border-subtle px-3 py-2 text-3xs text-error'>
                       {personaError}
                     </div>
                   )}
