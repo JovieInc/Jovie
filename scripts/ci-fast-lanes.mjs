@@ -1707,8 +1707,13 @@ function runProfileAdmission() {
  * trips a guard or breaks its own test is green on PR CI and fails every
  * merge group behind it (JOV-5301, JOV-6904; locked-pen-chrome-contract
  * poisoned a batch on #19266).
+ * @param {{execute?: (command: string) => ExecResult | Promise<ExecResult>, changed?: readonly string[], exists?: (file: string) => boolean}} [opts]
  */
-function runMergeGroupGuards() {
+export function runMergeGroupGuards({
+  execute = shell,
+  changed,
+  exists = file => existsSync(resolve(REPO_ROOT, file)),
+} = {}) {
   const event = process.env.GITHUB_EVENT_NAME || '';
   if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
     return {
@@ -1718,15 +1723,13 @@ function runMergeGroupGuards() {
     };
   }
   const ownTests = (
-    changedFiles(['apps/web/**/*.test.ts', 'apps/web/**/*.test.tsx']) || []
+    changed ??
+    changedFiles(['apps/web/**/*.test.ts', 'apps/web/**/*.test.tsx']) ??
+    []
   )
-    .filter(
-      file =>
-        !file.startsWith('apps/web/tests/e2e/') &&
-        existsSync(resolve(REPO_ROOT, file))
-    )
+    .filter(file => !file.startsWith('apps/web/tests/e2e/') && exists(file))
     .map(file => shellQuote(file.replace(/^apps\/web\//, '')));
-  return shell([LANE_COMMANDS['merge-group-guards'], ...ownTests].join(' '));
+  return execute([LANE_COMMANDS['merge-group-guards'], ...ownTests].join(' '));
 }
 
 /** Quote a path for /bin/sh (route groups like `app/(profile-admission)/`). */
