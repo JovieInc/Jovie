@@ -67,6 +67,15 @@ describe('OnboardingShell status', () => {
     expect(alert.className).not.toMatch(/\bred-\d/);
   });
 
+  it('stacks chrome above chat in a column so the sign-in row cannot overlap messages (JOV-7193)', () => {
+    render(<OnboardingShell sessionLabel='pending' />);
+
+    const session = screen
+      .getByTestId('onboarding-sign-in-header')
+      .closest('[data-onboarding-session]');
+    expect(session).toHaveClass('flex', 'flex-col', 'min-h-0', 'flex-1');
+  });
+
   it('reports a failed chat start without verification jargon or error codes', () => {
     render(<OnboardingShell sessionLabel='pending' />);
 
