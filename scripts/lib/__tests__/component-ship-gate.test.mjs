@@ -745,10 +745,9 @@ function coverageViaResult({
 }
 
 describe('legacy test evidence resolution (JOV-6773)', () => {
-  const sourceRel =
-    'apps/web/components/features/dashboard/organisms/Foo.tsx';
+  const sourceRel = 'apps/web/components/features/dashboard/organisms/Foo.tsx';
   const testRel = 'apps/web/tests/unit/dashboard/Foo.test.tsx';
-  const componentSource = "export function Foo() { return null; }\n";
+  const componentSource = 'export function Foo() { return null; }\n';
 
   it('resolves a @/features/* import shortcut to its components/features source', () => {
     // tsconfig.json maps `@/features/*` to `./components/features/*`, one
