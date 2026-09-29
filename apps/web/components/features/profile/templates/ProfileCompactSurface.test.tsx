@@ -121,7 +121,9 @@ vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
 }));
 
 vi.mock('@/features/profile/nav/BottomTabBar', () => ({
-  BottomTabBar: () => null,
+  BottomTabBar: () => (
+    <nav data-testid='profile-bottom-nav' aria-label='Profile Navigation' />
+  ),
 }));
 
 vi.mock('@/lib/analytics', () => ({
@@ -199,6 +201,18 @@ function renderSurface(
 describe('ProfileCompactSurface', () => {
   beforeEach(() => {
     mockUseIsAuthenticated.mockReturnValue(false);
+  });
+
+  it('renders the floating bottom tab bar on the interactive profile', () => {
+    renderSurface();
+
+    expect(screen.getByTestId('profile-bottom-nav')).toBeTruthy();
+  });
+
+  it('hides the bottom tab bar in static previews so it cannot cover clipped content (JOV-7192)', () => {
+    renderSurface({ renderMode: 'preview', presentation: 'embedded' });
+
+    expect(screen.queryByTestId('profile-bottom-nav')).toBeNull();
   });
 
   it('uses pearlQuiet top chrome without IconButton restyle classes', () => {

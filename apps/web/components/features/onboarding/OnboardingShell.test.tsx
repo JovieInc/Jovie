@@ -15,12 +15,17 @@ vi.mock('@/components/organisms/sidebar', () => ({
 
 vi.mock('@/components/features/onboarding/OnboardingChat', () => ({
   OnboardingChat: ({
+    headerOverlay,
     turnstilePanel,
   }: {
+    readonly headerOverlay?: boolean;
     readonly turnstilePanel: ReactNode;
   }) => (
     <>
-      <div data-testid='onboarding-chat' />
+      <div
+        data-testid='onboarding-chat'
+        data-header-overlay={headerOverlay ? 'true' : 'false'}
+      />
       {turnstilePanel}
     </>
   ),
@@ -86,5 +91,14 @@ describe('OnboardingShell status', () => {
     );
     expect(alert).toHaveAttribute('role', 'alert');
     expect(alert.textContent).not.toMatch(/verification failed|\(\d+\)/i);
+  });
+
+  it('passes headerOverlay to the chat while the visitor is anonymous (JOV-7192)', () => {
+    render(<OnboardingShell sessionLabel='pending' />);
+
+    expect(screen.getByTestId('onboarding-chat')).toHaveAttribute(
+      'data-header-overlay',
+      'true'
+    );
   });
 });
