@@ -664,7 +664,7 @@ const REQUIRED_MODEL_ROUTING_SCENARIOS = [
   'simple-pro-tool-light',
 ] as const;
 const REQUIRED_ONBOARDING_STATE_CASES = [
-  'latest-signal-instant-access',
+  'latest-signal-needs-more-info',
   'spotify-followers-instant-access',
   'weak-signal-force-waitlist',
   'weak-signal-needs-more-info',
