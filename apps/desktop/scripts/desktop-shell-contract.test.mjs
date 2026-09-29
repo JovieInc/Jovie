@@ -1440,3 +1440,105 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
   assert.match(globalsCss, /padding-left: var\(--electron-controls-width\);/);
   assert.match(mainSource, /minWidth: 800,/);
 });
+
+test('Ovie recovery main IPC binds the live main window and root frame without a renderer URL', async () => {
+  const source = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const ast = ts.createSourceFile(
+    'main.ts',
+    source,
+    ts.ScriptTarget.Latest,
+    true
+  );
+  const handler = ast.statements.find(statement =>
+    statement
+      .getText(ast)
+      .startsWith('ipcMain.handle(\n  OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL,')
+  );
+  assert.ok(handler, 'real main process must register the narrow handler');
+  const compiled = ts.transpileModule(handler.getText(ast), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  let registered;
+  let request;
+  const mainContents = {
+    getURL: () => 'https://jov.ie/app/ov?runtime=electron',
+  };
+  runInNewContext(compiled, {
+    OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL: 'open-current-ovie-in-browser',
+    ipcMain: {
+      handle(channel, callback) {
+        assert.equal(channel, 'open-current-ovie-in-browser');
+        registered = callback;
+      },
+    },
+    mainWindow: { webContents: mainContents },
+    getIpcSenderUrl: event => event.senderFrame?.url ?? '',
+    URL_DISPOSITION_OPTIONS: { appUrl: 'https://jov.ie', appEnv: 'production' },
+    openCurrentOvieInBrowser: async input => {
+      request = input;
+      return { ok: true };
+    },
+    shell: {
+      openExternal() {
+        throw Error('OS open must be owned by validated boundary');
+      },
+    },
+  });
+  const frame = { parent: null, detached: false, url: mainContents.getURL() };
+  await registered({ sender: mainContents, senderFrame: frame });
+  assert.equal(request.isMainWindow, true);
+  assert.equal(request.isMainFrame, true);
+  assert.equal(request.currentUrl, mainContents.getURL());
+  assert.equal(request.senderUrl, frame.url);
+  assert.equal(request.args.length, 0);
+  await registered(
+    { sender: {}, senderFrame: { ...frame, parent: {} } },
+    'https://evil.example'
+  );
+  assert.equal(request.isMainWindow, false);
+  assert.equal(request.isMainFrame, false);
+  assert.equal(request.args[0], 'https://evil.example');
+  await registered({ sender: mainContents, senderFrame: null });
+  assert.equal(request.isMainFrame, false);
+  await registered({
+    sender: mainContents,
+    senderFrame: { ...frame, detached: true },
+  });
+  assert.equal(request.isMainFrame, false);
+});
+
+test('Ovie recovery real preload sends zero arguments on its dedicated channel', async () => {
+  const source = await readFile(join(desktopRoot, 'src/preload.ts'), 'utf8');
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.CommonJS,
+    },
+  }).outputText;
+  let api;
+  const calls = [];
+  const response = { ok: false, reason: 'blocked-url' };
+  runInNewContext(compiled, {
+    exports: {},
+    process: { platform: 'darwin', versions: { electron: '44' } },
+    document: { documentElement: { dataset: {} } },
+    require(id) {
+      assert.equal(id, 'electron');
+      return {
+        contextBridge: {
+          exposeInMainWorld(name, value) {
+            if (name === 'electronAPI') api = value;
+          },
+        },
+        ipcRenderer: {
+          invoke(...args) {
+            calls.push(args);
+            return Promise.resolve(response);
+          },
+        },
+      };
+    },
+  });
+  assert.equal(await api.openCurrentOvieInBrowser(), response);
+  assert.deepEqual(calls, [['open-current-ovie-in-browser']]);
+});

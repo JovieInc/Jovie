@@ -8,6 +8,7 @@ const GO_FORWARD_CHANNEL = 'go-forward';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
 const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
 const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
+const OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL = 'open-current-ovie-in-browser';
 const COPY_DESKTOP_AUTH_URL_CHANNEL = 'copy-desktop-auth-url';
 const OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL = 'open-public-profile-in-browser';
 const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
@@ -150,6 +151,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
       reason?: string;
     }>;
   },
+
+  /** Continue the current Ovie route in an independent browser session. */
+  openCurrentOvieInBrowser: () =>
+    ipcRenderer.invoke(OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL) as Promise<{
+      ok: boolean;
+      reason?: string;
+    }>,
 
   /** Open this isolated public profile in the system browser. */
   openPublicProfileInBrowser: () => {

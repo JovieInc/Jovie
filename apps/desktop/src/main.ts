@@ -21,6 +21,7 @@ import {
   shell,
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
+import { openCurrentOvieInBrowser } from './ovie-browser-recovery';
 import {
   OPERATOR_SPAWN_TIMEOUT_MS,
   runBoundedProcess,
@@ -250,6 +251,7 @@ const GO_FORWARD_CHANNEL = 'go-forward';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
 const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
 const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
+const OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL = 'open-current-ovie-in-browser';
 const COPY_DESKTOP_AUTH_URL_CHANNEL = 'copy-desktop-auth-url';
 const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
 const REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL =
@@ -3044,6 +3046,25 @@ ipcMain.handle(GO_FORWARD_CHANNEL, (event: IpcMainInvokeEvent) => {
   if (win && !win.isDestroyed() && win.webContents.canGoForward())
     win.webContents.goForward();
 });
+
+ipcMain.handle(
+  OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL,
+  (event: IpcMainInvokeEvent, ...args: unknown[]) =>
+    openCurrentOvieInBrowser(
+      {
+        isMainWindow: event.sender === mainWindow?.webContents,
+        isMainFrame:
+          event.senderFrame != null &&
+          !event.senderFrame.detached &&
+          event.senderFrame.parent === null,
+        senderUrl: getIpcSenderUrl(event),
+        currentUrl: mainWindow?.webContents.getURL() ?? '',
+        args,
+        options: URL_DISPOSITION_OPTIONS,
+      },
+      url => shell.openExternal(url)
+    )
+);
 
 ipcMain.handle(
   OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL,
