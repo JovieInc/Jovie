@@ -18,8 +18,8 @@ vi.mock('@/lib/ovie/privacy-lock/server', async importOriginal => ({
   mutateOviePrivacyLock: m.mutate,
 }));
 
-import { GET, POST } from '@/lib/ovie/privacy-lock/http';
 import { OviePrivacyLockError } from '@/lib/ovie/privacy-lock/server';
+import { GET, POST } from './route';
 
 const state = { enabled: false, locked: false, unlockedUntil: null };
 const request = (action: unknown, origin: string | null = 'https://jov.ie') =>
@@ -38,7 +38,7 @@ beforeEach(() => {
   m.state.mockResolvedValue(state);
   m.mutate.mockResolvedValue(state);
 });
-describe('dormant privacy recovery/settings handler', () => {
+describe('Ovie privacy recovery/settings route', () => {
   it('returns default off without mandatory passkey lock', async () => {
     const res = await GET();
     expect(res.status).toBe(200);
