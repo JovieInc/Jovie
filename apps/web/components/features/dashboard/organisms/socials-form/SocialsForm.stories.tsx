@@ -39,7 +39,7 @@ function SocialsFormQueryProvider({
 }
 
 const meta = {
-  title: 'Dashboard/Organisms/SocialsForm',
+  title: 'Dashboard/Organisms/SocialsForm/SocialsForm',
   component: SocialsForm,
   parameters: {
     layout: 'padded',
