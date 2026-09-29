@@ -243,7 +243,7 @@ enum AppRouteManifest {
     ),
     AppRouteEntry(
       id: "surface.profile",
-      title: "Profile",
+      title: "My Jovie Card",
       classification: .shipped,
       presentation: .surfacePane,
       source: "Jovie/Features/Dashboard/DashboardView.swift",

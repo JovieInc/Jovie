@@ -113,6 +113,9 @@ function generateMockProfiles(count: number): AdminCreatorProfileRow[] {
       isVerified,
       isFeatured,
       marketingOptOut: i % 20 === 0, // 5% opted out
+      location: null,
+      hometown: null,
+      activeSinceYear: null,
       isClaimed,
       claimToken: isClaimed ? null : `claim-token-${i}`,
       claimTokenExpiresAt: isClaimed

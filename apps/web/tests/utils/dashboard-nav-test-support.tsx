@@ -5,7 +5,7 @@ import React from 'react';
 import { vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { SidebarProvider } from '@/components/organisms/sidebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
 import { AppFlagProvider } from '@/lib/flags/client';

@@ -38,9 +38,9 @@ describe('Contacts authenticated-surface evals', () => {
   it('keeps Contacts on one primary workspace surface', () => {
     const page = readWeb('app/app/(shell)/contacts/page.tsx');
 
-    expect(page).toContain(
-      "className='flex h-full min-h-0 flex-col bg-(--app-shell-content-surface)'"
-    );
+    expect(page.match(/<WorkspacePage/g) ?? []).toHaveLength(1);
+    expect(page).toContain("frame='none'");
+    expect(page).toContain("contentPadding='none'");
   });
 
   it('keeps Contact and Audience details on one shared flat rail surface and reserves elevation for overlays', () => {
@@ -51,10 +51,6 @@ describe('Contacts authenticated-surface evals', () => {
     const audience = readWeb(
       'components/features/dashboard/organisms/audience-member-sidebar/AudienceMemberSidebar.tsx'
     );
-    const audienceHeader = readWeb(
-      'components/features/dashboard/atoms/AudienceMemberHeader.tsx'
-    );
-
     expect(rail).not.toContain('drawerClassName=');
     expect(rail).toContain("workspaceSurface='flat'");
     expect(rail).toContain("surfaceVariant='flat'");
@@ -62,8 +58,8 @@ describe('Contacts authenticated-surface evals', () => {
     expect(audience).toContain('<EntityTabbedRail');
     expect(details).toContain("layout='grid'");
     expect(details).toContain("testId='contact-entity-avatar-frame'");
-    expect(audienceHeader).toContain("layout='grid'");
-    expect(audienceHeader).toContain('<DrawerEntityAvatar');
+    expect(audience).toContain("layout='grid'");
+    expect(audience).toContain('<DrawerEntityAvatar');
     expect(details).toContain('<SelectContent');
     expect(details).not.toContain('<SelectContent className');
     expect(details).toContain('<DrawerChoiceChipGroup');

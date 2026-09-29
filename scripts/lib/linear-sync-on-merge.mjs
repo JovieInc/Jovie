@@ -11,7 +11,11 @@
 import { pathToFileURL } from 'node:url';
 
 export const LINEAR_API = 'https://api.linear.app/graphql';
-export const COMMISSIONING_PARENT_ALLOWLIST = new Set(['JOV-5853']);
+export const COMMISSIONING_PARENT_ALLOWLIST = new Set([
+  'JOV-5853',
+  // Liveness owner: merge is explicitly not exact-runtime or recurrence proof.
+  'JOV-6004',
+]);
 
 const IDENTIFIER_RE = /^JOV-(\d+)$/i;
 const COMMISSIONING_LABEL_RE = /commission/i;

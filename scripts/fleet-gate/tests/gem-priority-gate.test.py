@@ -325,6 +325,7 @@ class ProductionHealthTests(unittest.TestCase):
                 "status": "green",
                 "url": url,
                 "reportedStatus": "healthy",
+                "dependencies": {"vercel-alias": {"status": "green", "detail": "canonical alias resolved without redirect"}, "database": {"status": "unknown", "detail": "deploy health database check"}},
                 "deployedSha": "a" * 40,
             },
         )
@@ -3943,6 +3944,7 @@ class WorkflowContractTests(unittest.TestCase):
         )
         wrapper = (ROOT / "scripts/fleet-gate/evaluate-fleet-gate.sh").read_text(encoding="utf-8")
         self.assertIn('--consumer "$consumer"', wrapper)
+        self.assertIn('--request "$request"', wrapper)
         self.assertIn("fleet | deployment", wrapper)
         self.assertIn(AUTOENROLL_RECEIPT_JQ.split(" and\n")[0], wrapper)
 
@@ -3973,7 +3975,8 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("push:", content)
         self.assertIn("branches: [main]", content)
         self.assertIn("ref: main", content)
-        self.assertIn("node-version: '22'", content)
+        self.assertIn("node-version: '24'", content)
+        self.assertNotIn("node-version: '22'", content)
         self.assertIn("./.github/actions/evaluate-fleet-gate", content)
         # pull_request_target Refresh must be a dry run (no live latest.json
         # write while the main gate is unfenced); every other event persists.

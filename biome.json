@@ -23,8 +23,10 @@
       "!apps/web/lib/design/generated/**",
       "!apps/web/design/oklch-palette.json",
       "!apps/web/typecheck-tests-baseline.json",
+      "!apps/web/typecheck-stories-baseline.json",
       "!scripts/shared-ui-visual-arbitrary.baseline.json",
       "!apps/web/tests/unit/design-system/source-identity.baseline.json",
+      "!docs/design-system/drift-ledger.json",
       "!packages/action-contracts/generated/**",
       "!**/*.a11y-red.tsx",
       "!scripts/invariants/fixtures/done-sprint-invariants/**"

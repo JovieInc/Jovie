@@ -319,6 +319,14 @@ export type {
   StackableBadgeTone,
 } from './atoms/stackable-badge-group';
 export { StackableBadgeGroup } from './atoms/stackable-badge-group';
+// Status Glyph
+export type {
+  StatusGlyphFill,
+  StatusGlyphProps,
+  StatusGlyphSize,
+  StatusGlyphState,
+} from './atoms/status-glyph';
+export { STATUS_GLYPH_STATES, StatusGlyph } from './atoms/status-glyph';
 // Switch
 export { Switch } from './atoms/switch';
 // Textarea

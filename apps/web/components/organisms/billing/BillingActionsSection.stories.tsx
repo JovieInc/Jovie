@@ -42,13 +42,31 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
+  args: {
+    cancelDialogOpen: false,
+    setCancelDialogOpen: () => {},
+    handleCancelSubscription: () => {},
+    cancelMutationPending: false,
+  },
   render: () => <BillingActionsStory />,
 };
 
 export const CancellationDialog: Story = {
+  args: {
+    cancelDialogOpen: false,
+    setCancelDialogOpen: () => {},
+    handleCancelSubscription: () => {},
+    cancelMutationPending: false,
+  },
   render: () => <BillingActionsStory initialOpen />,
 };
 
 export const PendingCancellation: Story = {
+  args: {
+    cancelDialogOpen: false,
+    setCancelDialogOpen: () => {},
+    handleCancelSubscription: () => {},
+    cancelMutationPending: false,
+  },
   render: () => <BillingActionsStory initialOpen pending />,
 };

@@ -73,7 +73,7 @@ export default function ErrorBoundary({
 
         <div className='space-y-1.5'>
           <h3 className='text-sm font-medium text-secondary-token'>
-            {isSkewError ? 'App Updated' : 'Something went wrong'}
+            {isSkewError ? 'App updated' : 'Something went wrong'}
           </h3>
           <p className='text-app text-tertiary-token'>{displayMessage}</p>
         </div>

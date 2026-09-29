@@ -7,7 +7,7 @@ import {
   Sidebar,
   SidebarContent,
   SidebarProvider,
-} from '@/components/organisms/Sidebar';
+} from '@/components/organisms/sidebar';
 import { RuntimeUpdateProvider } from '@/components/shell/RuntimeUpdateProvider';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';

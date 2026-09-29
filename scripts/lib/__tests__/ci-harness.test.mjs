@@ -46,6 +46,9 @@ const EXPECTED_MERGE_GATE_NAMES = [
   'Cross-Product Integration (combined)',
   'Promptfoo Evals (deterministic)',
   'Golden Eval Set (deterministic)',
+  'Lighthouse (dashboard gate)',
+  'Lighthouse (onboarding gate)',
+  'Database Certification (isolated Neon)',
 ];
 
 describe('ci-harness manifest', () => {
@@ -116,8 +119,6 @@ describe('ci-harness manifest', () => {
       'Component Ship Gate (via ci-fast structural)',
       'UI Story Coverage Audit (shadow)',
       'Lighthouse (public routes manual)',
-      'Lighthouse (dashboard manual)',
-      'Lighthouse (onboarding manual)',
       'Lighthouse (admin manual)',
       'Lighthouse (chat manual)',
       'A11y (axe)',
@@ -129,7 +130,6 @@ describe('ci-harness manifest', () => {
       'E2E DB Migrate',
       'Full E2E (Preview)',
       'Admin E2E Smoke',
-      'Neon DB',
       'Preview Deploy (manual)',
       'Production Release',
       'Main Release Ready',
@@ -257,14 +257,11 @@ describe('ci-harness manifest', () => {
 
     const manualJobs = [
       'ci-knip',
-      'neon-db',
       'ci-drizzle-check',
       'ci-build-public',
       'ci-layout-guard',
       'ci-mobile-overflow',
       'ci-lighthouse-pr',
-      'ci-lighthouse-dashboard-pr',
-      'ci-lighthouse-onboarding-pr',
       'ci-lighthouse-admin-pr',
       'ci-lighthouse-chat-pr',
       'ci-pr-neon-migrate',
@@ -285,6 +282,30 @@ describe('ci-harness manifest', () => {
       const controller = job.slice(0, job.indexOf('    steps:'));
       expect(controller).toContain("github.event_name == 'workflow_dispatch'");
       expect(controller).not.toContain("github.event_name == 'pull_request'");
+    }
+    // JOV-6002: dashboard/onboarding Lighthouse are merge-group launch gates
+    // keyed on the launch-gate path flag, never source-PR events.
+    for (const jobId of [
+      'ci-lighthouse-dashboard-pr',
+      'ci-lighthouse-onboarding-pr',
+    ]) {
+      const job = extractWorkflowJobBlock(workflow, jobId);
+      const controller = job.slice(0, job.indexOf('    steps:'));
+      expect(controller).toContain("github.event_name == 'merge_group'");
+      expect(controller).toContain(
+        "needs.ci-path-changes.outputs.run_golden_path == 'true'"
+      );
+      expect(controller).not.toContain("github.event_name == 'pull_request'");
+    }
+    const mergeGroupReady = extractWorkflowJobBlock(
+      workflow,
+      'ci-merge-group-ready'
+    );
+    for (const jobId of [
+      'ci-lighthouse-dashboard-pr',
+      'ci-lighthouse-onboarding-pr',
+    ]) {
+      expect(mergeGroupReady).toContain(jobId);
     }
     expect(
       extractWorkflowJobBlock(workflow, 'ci-pr-vercel-preview')
@@ -542,6 +563,7 @@ describe('ci-harness manifest', () => {
     expect(mergeReady).toContain('ci-macos');
     expect(mergeReady).toContain('ci-cross-product-integration');
     expect(mergeReady).toContain('drizzle-migration-guard');
+    expect(mergeReady).toContain('neon-db');
     expect(mergeReady).not.toContain(
       'RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"'
     );

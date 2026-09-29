@@ -19,7 +19,7 @@ type SidebarMenuProps = PropsWithChildren;
 type SidebarMenuItemProps = PropsWithChildren;
 type SidebarMenuButtonProps = ComponentProps<'button'> & { isActive?: boolean };
 
-vi.mock('@/components/organisms/Sidebar', () => ({
+vi.mock('@/components/organisms/sidebar', () => ({
   SidebarGroup: ({ children, className }: SidebarGroupProps) => (
     <div data-testid='sidebar-group' className={className}>
       {children}

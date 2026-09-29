@@ -109,6 +109,10 @@ def run_wrapper(payload, *, consumer="fleet", expected_sha=None, extra_env=None,
         env["FLEET_GATE_DRY_RUN"] = dry_run
         env["FLEET_GATE_RECEIPT"] = str(receipt)
         env["FLEET_GATE_CONSUMER"] = consumer
+        if consumer == "deployment":
+            env["FLEET_GATE_SURFACE"] = "production-web"
+            env["FLEET_GATE_MUTATION"] = "promote-staged-web-release"
+            env["FLEET_GATE_RISK_LANE"] = "low"
         env["GITHUB_OUTPUT"] = str(out)
         if expected_sha is not None:
             env["EXPECTED_SHA"] = expected_sha
@@ -228,6 +232,21 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(receipt["signals"]["main"]["sha"], SHA)
         self.assertNotEqual(outputs.get("mode"), "normal")
 
+    def test_expected_sha_admits_an_ancestor_subject_forward_only(self):
+        # Main moved past the generation's subject while it waited for the lock.
+        code, outputs, receipt = run_wrapper(
+            signals(), expected_sha="b" * 40, extra_env={"FLEET_GATE_COMPARE_STATUS": "ahead"}
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(outputs["mode"], "normal")
+        for status in ("diverged", "behind", "identical", ""):
+            code, outputs, _ = run_wrapper(
+                signals(), expected_sha="b" * 40, extra_env={"FLEET_GATE_COMPARE_STATUS": status}
+            )
+            # "" falls through to the live compare; with no repo slug it fails closed.
+            self.assertEqual(code, 2, status)
+            self.assertNotEqual(outputs.get("mode"), "normal")
+
     def test_deployment_consumer_uses_deployment_admission_not_promotion(self):
         action = (ROOT / ".github/actions/evaluate-fleet-gate/action.yml").read_text()
         self.assertIn("FLEET_GATE_CONSUMER", action)
@@ -239,6 +258,21 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertTrue(receipt["deploymentAdmission"]["allowed"])
         self.assertEqual(outputs["deployment_allowed"], "true")
         self.assertEqual(outputs["mode"], "normal")
+
+        code, outputs, receipt = run_wrapper(
+            signals(controller={"status": "failed"}),
+            consumer="deployment",
+            expected_sha=SHA,
+        )
+        self.assertEqual(code, 0)
+        self.assertFalse(receipt["deploymentAdmission"]["allowed"])
+        self.assertEqual(outputs["deployment_allowed"], "true")
+        self.assertEqual(outputs["mode"], "normal")
+        admission = json.loads(base64.b64decode(outputs["receipt_b64"]))
+        self.assertEqual(
+            {row["signal"] for row in admission["scopedAdmission"]["unrelatedDegradations"]},
+            {"symphony-capacity"},
+        )
         self.assertEqual(outputs["gate_rc"], "0")
 
         code, outputs, receipt = run_wrapper(

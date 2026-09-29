@@ -135,6 +135,29 @@ def evaluate_receipt(**overrides):
     return GATE_MODULE.evaluate(signals(**overrides), now_iso())
 
 
+def scoped_request(surface="production-web", risk_lane="low", **overrides):
+    request = {
+        "consumer": "deployment",
+        "surface": surface,
+        "repository": "JovieInc/Jovie",
+        "revision": SHA,
+        "mutation": "promote-staged-web-release",
+        "riskLane": risk_lane,
+        "healthSignals": [],
+    }
+    request.update(overrides)
+    return request
+
+
+def production_health(alias, database="green"):
+    dependencies = {
+        "vercel-alias": {"status": alias, "detail": "alias health"},
+    }
+    if database is not None:
+        dependencies["database"] = {"status": database, "detail": "database health"}
+    return {"status": "green" if alias == database == "green" else "red", "deployedSha": SHA, "dependencies": dependencies}
+
+
 def legacy_controller_repair_receipt():
     """Preserve validation of receipts emitted before runtime/source decoupling."""
     receipt = evaluate_receipt(controller={"status": "failed"})
@@ -568,15 +591,19 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
 
     def test_cli_projects_stdin_and_fails_closed(self):
         receipt = inject_inventories(evaluate_receipt())
-        ok = subprocess.run(
-            ["python3", str(PROJECTOR)],
-            input=json.dumps(receipt),
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            request = pathlib.Path(tmp) / "request.json"
+            request.write_text(json.dumps(scoped_request()))
+            ok = subprocess.run(
+                ["python3", str(PROJECTOR), "--request", str(request)],
+                input=json.dumps(receipt),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
         self.assertEqual(ok.returncode, 0, ok.stderr)
         projection = json.loads(ok.stdout)
+        self.assertEqual(projection["scopedAdmission"]["surface"], "production-web")
         self.assertNotIn(
             "classifications", projection["signals"]["closureHealth"]
         )
@@ -590,6 +617,57 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         self.assertEqual(refused.returncode, 2)
         self.assertIn("Fleet admission projection failed", refused.stderr)
 
+    def test_scopes_unhealthy_signals_to_the_exact_mutation(self):
+        receipt = evaluate_receipt(
+            controller={"status": "failed"},
+            production=production_health("green", "red"),
+            closureHealth={**signals()["closureHealth"], "repository": "JovieInc/Sibling",
+                "status": "red", "newIssueIntakeAllowed": False,
+                "reasons": ["sibling repository unhealthy"]},
+        )
+        low = PROJECT.project_fleet_admission_receipt(receipt, scoped_request())[
+            "scopedAdmission"
+        ]
+        self.assertTrue(low["allowed"])
+        self.assertEqual((low["schema"], low["allowedMode"], low["freshness"]["fresh"], len(low["hardInvariants"])), ("jovie-fleet-admission/v2", "normal", True, 5))
+        self.assertEqual(
+            {row["signal"] for row in low["unrelatedDegradations"]},
+            {"database", "symphony-capacity", "repository:JovieInc/Sibling"},
+        )
+
+        migration = PROJECT.project_fleet_admission_receipt(
+            receipt, scoped_request("migration", "high", mutation="apply-migration")
+        )["scopedAdmission"]
+        self.assertFalse(migration["allowed"])
+        self.assertEqual(
+            {row["signal"] for row in migration["relevantBlockers"]},
+            {"database"},
+        )
+        self.assertIn("database", migration["nextProof"])
+        unknown = PROJECT.project_fleet_admission_receipt(
+            evaluate_receipt(production=production_health("green", None)),
+            scoped_request(risk_lane="high"),
+        )["scopedAdmission"]
+        self.assertEqual(unknown["relevantBlockers"][0]["status"], "unknown")
+
+    def test_production_alias_failure_does_not_block_independent_staging(self):
+        receipt = evaluate_receipt(production=production_health("red", "green"))
+        production = PROJECT.project_fleet_admission_receipt(
+            receipt, scoped_request()
+        )["scopedAdmission"]
+        self.assertFalse(production["allowed"])
+        self.assertIn("vercel-alias", production["nextProof"])
+
+        staging_signal = {"signal": "staging-alias", "status": "green", "detail": "staging exact", "proof": "staging-controller"}
+        staging = PROJECT.project_fleet_admission_receipt(receipt, scoped_request(
+            "staging-web", "low", mutation="deploy-staging-web",
+            healthSignals=[staging_signal],
+        ))["scopedAdmission"]
+        self.assertTrue(staging["allowed"])
+        self.assertIn(
+            "vercel-alias",
+            {row["signal"] for row in staging["unrelatedDegradations"]},
+        )
 
 class LargeAdmissionDrainLaunchTests(unittest.TestCase):
     def test_projected_large_receipt_launches_the_drain_path(self):

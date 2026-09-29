@@ -1,6 +1,15 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
+
+function readWebSource(sourcePath: string): string {
+  const webRoot = process.cwd().endsWith('/apps/web')
+    ? process.cwd()
+    : resolve(process.cwd(), 'apps/web');
+  return readFileSync(resolve(webRoot, sourcePath), 'utf8');
+}
 
 describe('AppShellContentPanel', () => {
   it('renders a flat full-width content container by default', () => {
@@ -41,7 +50,7 @@ describe('AppShellContentPanel', () => {
     const pageScrollOwner = screen.getByTestId('shell-panel');
     const outerPanel = container.querySelector('.mx-auto');
     expect(outerPanel).toHaveClass('max-w-(--app-shell-content-max-form)');
-    expect(container.innerHTML).toContain('px-3 py-3 sm:px-3.5 sm:py-3.5');
+    expect(container.innerHTML).toContain('p-(--app-shell-content-inset)');
     expect(pageScrollOwner).toHaveClass(
       'min-h-0',
       'overflow-y-auto',
@@ -60,7 +69,8 @@ describe('AppShellContentPanel', () => {
 
     expect(screen.getByText('Toolbar')).toBeInTheDocument();
     expect(screen.getByText('Panel content')).toBeInTheDocument();
-    expect(container.innerHTML).toContain('px-2.5 py-2.5 sm:px-3 sm:py-3');
+    expect(container.innerHTML).not.toContain('px-2.5 py-2.5 sm:px-3 sm:py-3');
+    expect(container.innerHTML).not.toContain('p-(--app-shell-content-inset)');
   });
 
   it('keeps panel scrolling constrained by default', () => {
@@ -72,5 +82,13 @@ describe('AppShellContentPanel', () => {
 
     expect(screen.getByText('Scrollable panel')).toBeInTheDocument();
     expect(container.innerHTML).toContain('min-h-0 overflow-hidden');
+  });
+
+  it('imports LINEAR_SURFACE from the canonical token module', () => {
+    const source = readWebSource(
+      'components/organisms/AppShellContentPanel.tsx'
+    );
+    expect(source).toContain('@/components/tokens/linear-surface');
+    expect(source).not.toContain("dashboard/tokens'");
   });
 });

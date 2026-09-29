@@ -6,7 +6,12 @@ const hoisted = vi.hoisted(() => {
   const selectWhereMock = vi
     .fn()
     .mockReturnValue({ orderBy: selectOrderByMock });
-  const selectFromMock = vi.fn().mockReturnValue({ where: selectWhereMock });
+  const selectLeftJoinMock = vi
+    .fn()
+    .mockReturnValue({ where: selectWhereMock });
+  const selectFromMock = vi
+    .fn()
+    .mockReturnValue({ where: selectWhereMock, leftJoin: selectLeftJoinMock });
   const selectMock = vi.fn().mockReturnValue({ from: selectFromMock });
 
   const insertReturningMock = vi.fn();
@@ -32,6 +37,7 @@ const hoisted = vi.hoisted(() => {
     countFromMock,
     countWhereMock,
     captureErrorMock: vi.fn(),
+    ensureChatWorkRecordMock: vi.fn().mockResolvedValue(null),
   };
 });
 
@@ -69,10 +75,30 @@ vi.mock('@/lib/db/schema/chat', () => ({
 }));
 
 vi.mock('drizzle-orm', () => ({
+  and: vi.fn(),
   count: vi.fn(),
   desc: vi.fn(),
   eq: vi.fn(),
+  isNull: vi.fn(),
+  lt: vi.fn(),
+  notInArray: vi.fn(),
+  or: vi.fn(),
   sql: vi.fn(() => ({ as: vi.fn(() => 'subquery') })),
+}));
+
+vi.mock('@/lib/db/schema/tasks', () => ({
+  tasks: {
+    id: 'id',
+    conversationId: 'conversationId',
+    creatorProfileId: 'creatorProfileId',
+    status: 'status',
+    archivedAt: 'archivedAt',
+    deletedAt: 'deletedAt',
+  },
+}));
+
+vi.mock('@/lib/tasks/chat-work-record', () => ({
+  ensureChatWorkRecord: hoisted.ensureChatWorkRecordMock,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -246,6 +272,64 @@ describe('POST /api/chat/conversations', () => {
     const response = await POST(request);
 
     expect(response.status).toBe(201);
+  });
+
+  it('creates a work record for the new conversation (JOV-4514)', async () => {
+    hoisted.getSessionContextMock.mockResolvedValue({
+      user: { id: 'user_123' },
+      profile: { id: 'profile_123' },
+    });
+    hoisted.selectFromMock.mockReturnValueOnce({
+      where: vi.fn().mockResolvedValue([{ value: 5 }]),
+    });
+    hoisted.insertReturningMock.mockResolvedValue([
+      { id: 'conv_new', title: null },
+    ]);
+
+    const { POST } = await import('@/app/api/chat/conversations/route');
+    const request = new Request('http://localhost/api/chat/conversations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const response = await POST(request);
+
+    expect(response.status).toBe(201);
+    expect(hoisted.ensureChatWorkRecordMock).toHaveBeenCalledWith({
+      conversationId: 'conv_new',
+      creatorProfileId: 'profile_123',
+    });
+  });
+
+  it('still returns 201 when work record creation fails', async () => {
+    hoisted.getSessionContextMock.mockResolvedValue({
+      user: { id: 'user_123' },
+      profile: { id: 'profile_123' },
+    });
+    hoisted.selectFromMock.mockReturnValueOnce({
+      where: vi.fn().mockResolvedValue([{ value: 5 }]),
+    });
+    hoisted.insertReturningMock.mockResolvedValue([
+      { id: 'conv_new', title: null },
+    ]);
+    hoisted.ensureChatWorkRecordMock.mockRejectedValueOnce(
+      new Error('tasks table unavailable')
+    );
+
+    const { POST } = await import('@/app/api/chat/conversations/route');
+    const request = new Request('http://localhost/api/chat/conversations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const response = await POST(request);
+
+    expect(response.status).toBe(201);
+    expect(hoisted.captureErrorMock).toHaveBeenCalledWith(
+      'Failed to create chat work record',
+      expect.any(Error),
+      expect.objectContaining({ conversationId: 'conv_new' })
+    );
   });
 
   it('returns 403 when conversation limit reached', async () => {

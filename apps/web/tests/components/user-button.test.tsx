@@ -52,8 +52,13 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
+vi.mock('@/components/organisms/desktop-update/DesktopUpdateProvider', () => ({
+  useDesktopUpdateContext: vi.fn(),
+}));
+
 import { usePathname, useRouter } from 'next/navigation';
 import { toast } from '@/components/feedback';
+import { useDesktopUpdateContext } from '@/components/organisms/desktop-update/DesktopUpdateProvider';
 import { UserButton } from '@/components/organisms/user-button/UserButton';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
@@ -87,6 +92,7 @@ const mockUseUserSafe = vi.mocked(useUserSafe);
 const mockUseAuthSafe = vi.mocked(useAuthSafe);
 const mockUseRouter = vi.mocked(useRouter);
 const mockUsePathname = vi.mocked(usePathname);
+const mockUseDesktopUpdateContext = vi.mocked(useDesktopUpdateContext);
 
 const originalLocation = window.location;
 const UPGRADE_CTA = `Get Verified — ${FALLBACK_VERIFIED_PRICE_LABEL}`;
@@ -219,6 +225,7 @@ describe('UserButton billing actions', () => {
       push: pushMock,
     } as any);
     mockUsePathname.mockReturnValue('/app');
+    mockUseDesktopUpdateContext.mockReturnValue(null);
 
     mockUseBillingStatusQuery.mockReset();
 
@@ -249,6 +256,74 @@ describe('UserButton billing actions', () => {
     expect(screen.queryByText('Jovie workspace')).not.toBeInTheDocument();
     await userEvent.click(screen.getByText('Adele Adkins'));
     expect(await screen.findByText('Settings')).toBeVisible();
+  });
+
+  it('keeps Sign out reachable: the account menu is never capped below the viewport (JOV-7130)', async () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: true, plan: 'pro', hasStripeCustomer: true },
+      isLoading: false,
+      error: null,
+    } as any);
+    render(<UserButton calm showUserInfo profileHref='/adele' />);
+    await userEvent.click(screen.getByText('Adele Adkins'));
+    const signOut = await screen.findByRole('menuitem', { name: /sign out/i });
+    const menu = signOut.closest('[role="menu"]') as HTMLElement;
+    // The shared max-h-96 cap hid Sign out under an inner scroll once the menu grew.
+    expect(menu.style.maxHeight).toBe(
+      'var(--radix-dropdown-menu-content-available-height)'
+    );
+  });
+
+  it('shows web build diagnostics in the account menu', async () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '26.9.1');
+    vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', 'abc1234');
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+
+    const user = userEvent.setup();
+    render(<UserButton showUserInfo />);
+    await user.click(screen.getByText('Adele Adkins'));
+
+    const diagnostics = await screen.findByTestId('app-build-diagnostics');
+    expect(diagnostics).toHaveTextContent('Version 26.9.1 (abc1234)');
+    expect(diagnostics).toHaveClass(
+      'min-h-8',
+      'text-2xs',
+      'text-tertiary-token',
+      'select-none'
+    );
+    expect(
+      screen.queryByTestId('electron-release-identity')
+    ).not.toBeInTheDocument();
+    expect(diagnostics.closest('[role="menuitem"]')).toBeNull();
+    vi.unstubAllEnvs();
+  });
+
+  it('shows desktop release identity in account-menu diagnostics', async () => {
+    document.documentElement.dataset.desktopRuntime = 'electron';
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+
+    const user = userEvent.setup();
+    render(<UserButton showUserInfo />);
+    await flushMicrotasks();
+    await user.click(screen.getByText('Adele Adkins'));
+
+    const diagnostics = await screen.findByTestId('app-build-diagnostics');
+    const desktopIdentity = await screen.findByTestId(
+      'electron-release-identity'
+    );
+    expect(diagnostics).toContainElement(desktopIdentity);
+    expect(desktopIdentity).toHaveTextContent(
+      'Desktop · Version Unknown · Unverified'
+    );
+    expect(screen.queryByText(/^Version /u)).not.toBeInTheDocument();
   });
 
   it('renders the compact trigger avatar on the canonical app frame size', () => {
@@ -723,6 +798,39 @@ describe('UserButton billing actions', () => {
     expect(screen.queryByText('Usage Stats')).not.toBeInTheDocument();
   });
 
+  it('shows the desktop update entry only when actionable and opens the modal from the menu', async () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+    const openModal = vi.fn();
+    mockUseDesktopUpdateContext.mockReturnValue({
+      state: { state: 'idle' },
+      openModal,
+    });
+
+    const user = userEvent.setup();
+    const { unmount } = render(<UserButton showUserInfo />);
+    await user.click(screen.getByText('Adele Adkins'));
+    expect(screen.queryByText(/^Update to /)).not.toBeInTheDocument();
+    unmount();
+
+    mockUseDesktopUpdateContext.mockReturnValue({
+      state: {
+        state: 'available',
+        version: '26.9.16',
+        releaseDate: '2026-09-27T00:00:00.000Z',
+        notesUrl: 'https://jov.ie/changelog',
+      },
+      openModal,
+    });
+    render(<UserButton showUserInfo />);
+    await user.click(screen.getByText('Adele Adkins'));
+    await user.click(await screen.findByText('Update to 26.9.16'));
+    expect(openModal).toHaveBeenCalledTimes(1);
+  });
+
   it('gives identity and help enough width while preserving menu focus order', async () => {
     const longDisplayName =
       'Adele Adkins and the Very Long International Touring Ensemble';
@@ -822,7 +930,7 @@ describe('UserButton billing actions', () => {
     await user.click(screen.getByRole('button', { name: /Adele Adkins/i }));
 
     const separators = screen.getAllByRole('separator');
-    expect(separators).toHaveLength(4);
+    expect(separators).toHaveLength(5);
     for (const separator of separators) {
       expect(separator).toHaveClass('h-2', 'border-0');
     }

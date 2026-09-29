@@ -731,7 +731,7 @@ mobile navigation derive from the same ordered item identities.
 |------|--------------------|-----------------------|------------|
 | Inbox / work queue | Shell root + opportunity stack | The first actionable card exposes its decision; do not add a competing page-level CTA | `/app` is the signed-in home |
 | Conversation | Chat workspace + composer | Focus the composer or the next required prompt; the composer owns the primary action | `/app/chat` and `/app/chat/[id]` |
-| Collection / workspace | `PageShell` + `DashboardWorkspacePanel` + `PageToolbar` + framed content | Put at most one primary pill CTA at the toolbar end; filters, display, and navigation stay secondary/ghost | Use the canonical workspace route, never a new alias stub |
+| Collection / workspace | `PageShell` + `PageToolbar` + framed content | Put at most one primary pill CTA at the toolbar end; filters, display, and navigation stay secondary/ghost | Use the canonical workspace route, never a new alias stub |
 | Entity detail | `EntitySidebarShell` inside the current workspace | Put the next entity action in the rail header or first rail section | Entity detail is rail-only; selecting a row must not create a second page scaffold or page-level entity route |
 | Settings | Settings shell/sidebar + `SettingsSection` | The first editable control begins the flow; one save/confirm action owns primary emphasis | Use the canonical `/app/settings/*` route |
 
@@ -978,6 +978,18 @@ titles) use sentence case — it reads more editorial and premium at display
 sizes. App/UI headings (H1-H4 inside the product) stay Title Case. In JSX,
 mark intentional marketing sentence-case headlines with
 `{/* ui-casing-allow: marketing display headline */}`.
+
+**Recovery/disclosure exception (Tim, 2026-09-28):** error-recovery UI copy —
+titles, retry/dismiss/return actions, and disclosure toggles (a "Show/Hide
+details" `<summary>` or button) — uses sentence case, not the default Title
+Case for buttons and labels. This follows the shape of
+`RECOVERY_COPY` in `apps/web/components/features/feedback/recovery-contract.ts`
+("Something went wrong", "Try again", "Error details"): every consumer that
+composes or extends those labels (e.g. `` `Show ${RECOVERY_COPY.detailsLabel}` ``,
+a "Return to Jovie" fallback action) must keep the full rendered label in
+sentence case, not just the shared fragment. Mark instances the linter flags
+with `// ui-casing-allow: recovery action sentence case (Tim, 2026-09-28)` (or
+the JSX-comment form for a text child).
 
 **Utility:** Use `capitalizeFirst()` from `apps/web/lib/utils/string-utils.ts` for dynamic data.
 

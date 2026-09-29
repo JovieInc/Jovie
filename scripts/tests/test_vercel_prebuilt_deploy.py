@@ -29,6 +29,20 @@ ACTION_CACHE_RESTORE_V6_1_0_SHA = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
 ACTION_CACHE_SAVE_V6_1_0_SHA = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
 
 
+def test_staging_controller_is_independent_and_exact_sha() -> None:
+    staging = (REPO_ROOT / ".github/workflows/staging-controller.yml").read_text()
+    production = (REPO_ROOT / ".github/workflows/production-controller.yml").read_text()
+    assert "workflows: [CI]" in staging
+    assert "group: staging-mutation" in staging
+    assert "outcome=not_applicable" in staging
+    assert "product-lane-release-${candidate_sha}-${candidate_attempt}" in staging
+    assert "release_mode: staging" in staging
+    assert "fleet-promotion" not in staging
+    assert "release_mode: production" in production
+    assert 'staging_receipt_sha="$web_evidence_sha"' in production
+    assert "https://staging.jov.ie/api/health/build-info" in production
+
+
 def test_production_next_cache_experiment_is_bounded_and_restore_only_by_default() -> None:
     """Keep the production cache experiment narrow enough to be reversible.
 
@@ -412,11 +426,7 @@ def test_workflow_waits_for_readiness_and_aliases_only_after_canary() -> None:
     )
     assert "vercel inspect" in workflow[wait_index:canary_index]
     assert "--wait" in workflow[wait_index:canary_index]
-    assert (
-        "needs: [deploy-staging, attest-staging-build, canary-health-gate, "
-        "alias-staging, production-head, migrate-production]"
-        in workflow[promote_index:]
-    )
+    assert "needs: [production-head, migrate-production]" in workflow[promote_index:]
 
     source_workflow = CI_WORKFLOW.read_text()
     preview_deploy_index = source_workflow.index(

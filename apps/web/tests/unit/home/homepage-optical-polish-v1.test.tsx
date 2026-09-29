@@ -73,7 +73,7 @@ describe('homepage-optical-polish-v1', () => {
 
     const close = read('components/homepage/HomepageClose.tsx');
     expect(close).not.toContain('HeroSpotifySearch');
-    expect(close).toContain("getElementById('homepage-name-search')");
+    expect(close).toContain("getElementById('homepage-claim-handle')");
     expect(close).toContain('?.focus()');
     expect(
       findChromeOverrideViolations(
@@ -141,8 +141,8 @@ describe('homepage-optical-polish-v1', () => {
     expect(certifiedCss).toMatch(
       /\.homepage-certified-proof__logos\s*\{[\s\S]*?margin-top:\s*0;/
     );
-    expect(certifiedCss).toContain('.homepage-connected-identity');
-    expect(certifiedCss).toContain('.homepage-relationship-outcomes');
+    // Pen My0zu (JOV-6946): the relationships beat shows real next steps.
+    expect(certifiedCss).toContain('.homepage-next-steps');
   });
 
   it('kills the elliptical wireframe and the 55% horizon line', () => {

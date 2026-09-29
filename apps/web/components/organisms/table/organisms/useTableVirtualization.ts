@@ -64,6 +64,8 @@ export function useTableVirtualization({
   overscan,
   enabled,
 }: TableVirtualizationConfig): TableVirtualizationResult {
+  // Reads live virtualizer state each render; see virtualizer-compiler-optout.test.ts.
+  'use no memo';
   // Initialize virtualizer with stable estimateSize function
   const virtualizer = useVirtualizer({
     count: rowCount,

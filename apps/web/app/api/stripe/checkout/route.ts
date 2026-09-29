@@ -15,6 +15,7 @@ import {
   MIN_REFERRAL_CODE_LENGTH,
   REFERRAL_CODE_PATTERN,
 } from '@/lib/referrals/config';
+import { trackServerEvent } from '@/lib/server-analytics';
 import {
   CheckoutCorrelationValidationError,
   hasCheckoutCorrelation,
@@ -289,6 +290,21 @@ export async function POST(request: NextRequest) {
       customerId,
       url: session.url,
     });
+
+    // Durable funnel event: checkout start is revenue-critical and must not
+    // depend on client gtag delivery. Identity keyed to the Stripe session
+    // makes it idempotent across refreshes and retries. A sink failure is
+    // captured to Sentry inside trackServerEvent and never blocks checkout.
+    await trackServerEvent(
+      'checkout_initiated',
+      {
+        checkoutSessionId: session.id,
+        plan: selectedPlan,
+        source: checkoutSource ?? 'default',
+      },
+      undefined,
+      { eventIdentity: `checkout:${session.id}` }
+    );
 
     return NextResponse.json(
       { sessionId: session.id, url: session.url },

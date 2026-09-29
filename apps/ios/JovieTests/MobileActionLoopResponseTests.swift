@@ -32,6 +32,49 @@ struct MobileActionLoopResponseTests {
     #expect(response.items.first?.title.contains("Detroit") == true)
   }
 
+  @Test func decodesSummerCardDetailOnInboxItem() throws {
+    let json = """
+    {
+      "pendingCount": 1,
+      "items": [
+        {
+          "id": "summer-card:sc_0123456789abcdef0123456789abcdef",
+          "typeLabel": "Spend",
+          "createdAt": "2026-09-06T10:00:00.000Z",
+          "title": "Book Detroit venue",
+          "why": "Approve the $400 deposit.",
+          "primaryActionLabel": "Decide",
+          "status": "pending",
+          "imageUrl": null,
+          "summerCard": {
+            "id": "sc_0123456789abcdef0123456789abcdef",
+            "kind": "spend",
+            "body": "Full deposit terms and date holds.",
+            "defaultIfSilent": "Hold expires Friday.",
+            "recipient": "Magic Stick",
+            "amountUsd": 400,
+            "evidence": ["https://example.com/quote"]
+          }
+        }
+      ],
+      "emptyActionCards": [],
+      "chatPrompt": "Ask Summer which taste cards need a decision."
+    }
+    """
+
+    let response = try JSONDecoder().decode(
+      MobileActionLoopInboxResponse.self,
+      from: Data(json.utf8)
+    )
+
+    let card = response.items.first?.summerCard
+    #expect(card?.id == "sc_0123456789abcdef0123456789abcdef")
+    #expect(card?.kind == "spend")
+    #expect(card?.recipient == "Magic Stick")
+    #expect(card?.amountLabel == "$400")
+    #expect(card?.evidenceURLs.first?.absoluteString == "https://example.com/quote")
+  }
+
   @Test func decodesMobileActionLoopCalendarPayload() throws {
     let json = """
     {

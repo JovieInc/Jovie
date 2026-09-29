@@ -239,7 +239,7 @@ function StatusShell({
         <span
           className={cn(
             'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-secondary-token',
-            tone === 'error' && 'text-red-400',
+            tone === 'error' && 'text-error',
             tone === 'success' && 'text-green-500'
           )}
         >
@@ -671,7 +671,7 @@ export function OnboardingHandleCheckCard({
           className={cn(
             'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-secondary-token',
             available && 'text-green-500',
-            available === false && 'text-red-400'
+            available === false && 'text-error'
           )}
           aria-hidden
         >

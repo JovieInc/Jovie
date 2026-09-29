@@ -37,7 +37,11 @@ import {
   isUnclaimedStructuredCreditProfile,
   markStructuredCreditProfileClaimed,
 } from '@/lib/profile/unclaimed-artist-profile';
-import { trackServerEvent } from '@/lib/server-analytics';
+import {
+  type ServerAnalyticsDelivery,
+  trackServerEvent,
+  trackServerEventTx,
+} from '@/lib/server-analytics';
 import { finalizePostOnboarding } from './post-onboarding';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
@@ -51,6 +55,22 @@ const DSP_DISCOVERY_PROVIDERS = [
 ] as const;
 
 class SpotifyProfileIdentityConflictError extends Error {}
+
+async function requireFunnelDelivery(
+  event: string,
+  delivery: ServerAnalyticsDelivery
+): Promise<void> {
+  if (delivery.ok) return;
+
+  const error = new Error(
+    `Onboarding Spotify funnel event rejected: ${event} (${delivery.error})`
+  );
+  await captureError('onboarding Spotify funnel event rejected', error, {
+    action: 'connectOnboardingSpotifyArtist',
+    event,
+  });
+  throw error;
+}
 
 export interface ConnectOnboardingSpotifyArtistParams {
   artistName: string;
@@ -187,7 +207,7 @@ async function markSpotifyImportFailed(profileId: string): Promise<void> {
   }
 }
 
-async function getOwnedProfile(profileId: string, clerkUserId: string) {
+async function getOwnedProfile(profileId: string, appUserId: string) {
   const [profile] = await db
     .select({
       dbUserId: users.id,
@@ -199,9 +219,7 @@ async function getOwnedProfile(profileId: string, clerkUserId: string) {
     })
     .from(creatorProfiles)
     .innerJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(
-      and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
-    )
+    .where(and(eq(creatorProfiles.id, profileId), eq(users.id, appUserId)))
     .limit(1);
 
   if (!profile) {
@@ -326,6 +344,27 @@ export async function connectOnboardingSpotifyArtist(
             source: 'direct_profile_spotify_match',
             finalizeOnboarding: true,
           });
+
+          // Durable funnel events commit atomically with the claim inside
+          // this transaction; stable identities deduplicate retries.
+          await requireFunnelDelivery(
+            'claim_completed',
+            await trackServerEventTx(
+              tx,
+              'claim_completed',
+              { profileId: profile.id, source: 'direct_profile_spotify_match' },
+              { eventIdentity: `claim_completed:${profile.id}` }
+            )
+          );
+          await requireFunnelDelivery(
+            'activation_achieved',
+            await trackServerEventTx(
+              tx,
+              'activation_achieved',
+              { profileId: profile.id, source: 'onboarding_completed' },
+              { eventIdentity: `activation_achieved:${profile.id}` }
+            )
+          );
 
           await tx
             .update(creatorProfiles)

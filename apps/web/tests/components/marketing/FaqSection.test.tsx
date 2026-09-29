@@ -22,6 +22,9 @@ describe('FaqSection', () => {
     expect(
       screen.getByRole('heading', { name: 'Frequently Asked Questions' })
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Frequently Asked Questions' })
+    ).not.toHaveClass('line-clamp-2');
     expect(section).toHaveClass('mx-auto', 'w-full', 'max-w-190');
     expect(section).toHaveAttribute('data-pen-contract', 'pAAhw');
     expect(section).toHaveAttribute(

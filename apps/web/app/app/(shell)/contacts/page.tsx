@@ -3,6 +3,7 @@ import type { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
 import { RouteSegmentControl } from '@/components/molecules/RouteSegmentControl';
 import { PageToolbar } from '@/components/organisms/table/molecules/PageToolbar';
+import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { AudienceTableLoadingShell } from '@/features/dashboard/organisms/dashboard-audience-table/AudienceTableLoadingShell';
@@ -108,14 +109,17 @@ export default async function ContactsPage({
   }
 
   return (
-    <div
-      className='flex h-full min-h-0 flex-col bg-(--app-shell-content-surface)'
+    <WorkspacePage
+      frame='none'
+      contentPadding='none'
       data-testid='contacts-workspace'
+      toolbar={
+        <ContactsWorkspaceTabs
+          activeTab={activeTab}
+          searchParams={resolvedSearchParams}
+        />
+      }
     >
-      <ContactsWorkspaceTabs
-        activeTab={activeTab}
-        searchParams={resolvedSearchParams}
-      />
       <div className='min-h-0 flex-1'>
         {activeTab === 'audience' ? (
           <Suspense fallback={<AudienceTableLoadingShell />}>
@@ -132,7 +136,7 @@ export default async function ContactsPage({
           />
         )}
       </div>
-    </div>
+    </WorkspacePage>
   );
 }
 

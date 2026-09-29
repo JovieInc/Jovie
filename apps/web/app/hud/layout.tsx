@@ -3,9 +3,9 @@ import { QueryProvider } from '@/components/providers/QueryProvider';
 import { HudDesktopBootSignal } from './HudDesktopBootSignal';
 
 /**
- * Isolated /hud query modes (fullscreen, kiosk, packaged Mac) stay outside
- * /app/* and do not inherit the shell QueryClient. Default /hud is rewritten
- * into the OV app shell. Provide a QueryClient for isolated HUD panels.
+ * The signed-token kiosk boundary stays outside /app/* and does not inherit
+ * the shell QueryClient. All interactive Ops presentations are rewritten into
+ * the OV app shell; this provider supports the remaining kiosk route.
  * The desktop boot signal is required so Electron does not treat a painted
  * HUD as a missed app-booted ping.
  */

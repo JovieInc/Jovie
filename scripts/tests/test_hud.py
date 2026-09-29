@@ -35,12 +35,18 @@ def model(**overrides) -> dict:
                 {"pid": 2, "provider": "devin", "run": None},
             ],
             "ledger24h": {"landing": 3, "failed": 1, "gate-timeout": 2}, "runs24h": 6,
+            "receipts24h": [{"runId": "lane-1", "issue": "JOV-1", "provider": "devin", "pr": 18671,
+                              "agentExit": 0, "verdict": "landing", "startedAt": "2026-09-26T19:00:00Z",
+                              "endedAt": "2026-09-26T19:30:00Z"}],
+            "attributionReceipts": [{"runId": "lane-1", "issue": "JOV-1", "provider": "devin", "pr": 18671,
+                                      "agentExit": 0, "verdict": "landing", "startedAt": "2026-09-26T19:00:00Z",
+                                      "endedAt": "2026-09-26T19:30:00Z"}],
             "lastLanding": "2026-09-26T20:30:00Z", "held": {"18712": {"sha": "a", "evidence": ["check-failed:bash scripts/hooks/pre-push-gate.sh affected"]}},
             "failures": {"JOV-1": {"count": 1, "at": 0}}, "gateTimeouts": {}, "requeue": {"18720": "h"},
             "cooldowns": {"hyperagent": 600}, "gateSeats": 2,
-            "codex": {"accounts": {"alpha": {"available": True, "leased": False, "resetsInS": 0},
-                                   "beta": {"available": False, "leased": False, "resetsInS": 5400},
-                                   "gamma": {"available": True, "leased": True, "resetsInS": 0}},
+            "codex": {"accounts": {"alpha": {"available": True, "leased": False, "resetsInS": 0, "remainingPercent": 48, "naturalResetInS": 600, "bankedResetCount": 2},
+                                   "beta": {"available": False, "leased": False, "resetsInS": 5400, "remainingPercent": 0, "naturalResetInS": 5400, "bankedResetCount": 1},
+                                   "gamma": {"available": True, "leased": True, "resetsInS": 0, "remainingPercent": 90, "naturalResetInS": 7200, "bankedResetCount": 0}},
                       "available": ["alpha"], "count": 3},
             "doctor": {"alerts": {"dispatch-crash": "dispatch failed 3 ticks in a row"}},
         },
@@ -52,8 +58,12 @@ def model(**overrides) -> dict:
                              "issue": "JOV-6544", "draft": False, "merge": "UNSTABLE", "updatedAt": "2026-09-26T20:20:26Z"},
                             {"number": 18712, "title": "JOV-6544 fix(web): warm release detail", "lane": "devin", "issue": "JOV-6544",
                              "draft": True, "merge": "CLEAN", "updatedAt": "2026-09-26T18:29:49Z"}],
-                   "merged24h": [{"number": 18671, "title": "fix(ios): preserve chat cache timestamps", "mergedAt": "2026-09-26T20:12:00Z", "lane": "devin"},
-                                 {"number": 18759, "title": "fix(lanes): one PR per issue", "mergedAt": "2026-09-26T20:54:50Z", "lane": None}],
+                   "merged24h": [{"number": 18671, "title": "fix(ios): preserve chat cache timestamps",
+                                   "createdAt": "2026-09-26T19:00:00Z", "mergedAt": "2026-09-26T20:12:00Z",
+                                   "headRefName": "devin/jov-1-20260926t190000", "lane": "devin"},
+                                 {"number": 18759, "title": "fix(lanes): one PR per issue",
+                                  "createdAt": "2026-09-26T20:00:00Z", "mergedAt": "2026-09-26T20:54:50Z",
+                                  "headRefName": "tim/jov-1", "lane": None}],
                    "queue": {"depth": 2, "entries": [{"number": 18724, "state": "AWAITING_CHECKS", "enqueuedAt": "2026-09-26T20:20:28Z"}]},
                    "rate": {"core": 4800, "graphql": 4700, "resetAt": "2026-09-26T21:30:00+00:00"},
                    "fetchedAt": "2026-09-26T21:00:00+00:00"},
@@ -99,9 +109,9 @@ class RenderTest(unittest.TestCase):
         self.assertIn("JOV-6544   Audio browsing: verify and close intent prefetch", text)
         self.assertIn("worker polling · pool 87 (own 0, shared 87)", text)
         self.assertIn("codex  vacant · no worker", text)
-        self.assertIn("✓ alpha", text)
-        self.assertIn("✕ beta banked 1h30m", text)
-        self.assertIn("● gamma leased", text)
+        self.assertIn("✓ alpha 48% left · reset 10m · banked 2", text)
+        self.assertIn("✕ beta 0% left · reset 1h30m · banked 1 · retry 1h30m", text)
+        self.assertIn("● gamma 90% left · reset 2h00m · banked 0 · leased", text)
 
     def test_pipeline_attention_and_backlog_rows(self):
         text = "\n".join(plain(line) for line in hud.render(model(), 160, 45))
@@ -114,7 +124,9 @@ class RenderTest(unittest.TestCase):
         self.assertIn("requeue pending #18720", text)
         self.assertIn("gate-timeout 2", text)
         self.assertIn("Todo pool 99 (agent-ready 87 · devin 0 · codex 19)", text)
-        self.assertIn("lanes 1 of 2 in 24h", text)
+        self.assertIn("autonomous 1 · manual Codex app 0 · old codex/* 0 · total 2 in 24h", text)
+        self.assertIn("THROUGHPUT 24h · codex offer 0", text)
+        self.assertIn("devin offer 1 start 1 productive 1 PR 1 first-pass 100%", text)
         self.assertIn("disk 3.1% free", text)
 
     def test_failed_sources_render_their_reason_never_a_blank(self):
@@ -148,3 +160,85 @@ class RenderTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PromotionTest(unittest.TestCase):
+    """JOV-6836: the HUD surfaces promotion-loss metrics, cached, and never blanks on failure."""
+    METRICS = {"firstPass": {"rate": 0.74}, "reenqueueMinutes": {"p75": 365, "pending": 2},
+               "openToFirstEnqueueMinutes": {"p75": 106.7}, "occupancy": {"cleanNotQueued": 6},
+               "intake": {"opensPerHour": 12.6, "mergesPerHour": 7.3, "keysWithMultipleOpenPrs": 10}}
+
+    def setUp(self):
+        hud._promotion.update(at=0.0, data=None)
+
+    def test_line_renders_metrics_and_errors(self):
+        text = "\n".join(plain(line) for line in hud.render(model(github={**model()["github"], "promotion": self.METRICS}), 200, 45))
+        self.assertIn("first-pass 74% · ejected→back p75 365m (2 waiting) · open→enqueue p75 106.7m", text)
+        self.assertIn("opens/h 12.6 vs merges/h 7.3 · CLEAN not queued 6 · keys >1 PR 10", text)
+        self.assertIn("PROMOTION 8h  unread", plain(hud.promotion_line(None)))
+        self.assertIn("boom", plain(hud.promotion_line({"error": "boom"})))
+
+    def test_model_runs_the_script_once_per_interval_and_reports_failures(self):
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            return type("R", (), {"returncode": 0, "stdout": '{"firstPass": {"rate": 1}}', "stderr": ""})()
+        self.assertEqual(hud.promotion_model(now=1000, run=run), {"firstPass": {"rate": 1}})
+        hud.promotion_model(now=1000 + hud.PROMOTION_EVERY_S - 1, run=run)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][-3:], ["--since", "8h", "--json"])
+        failed = hud.promotion_model(now=1000 + hud.PROMOTION_EVERY_S, run=lambda *a, **k: type(
+            "R", (), {"returncode": 1, "stdout": "", "stderr": "gh: HTTP 502"})())
+        self.assertIn("gh: HTTP 502", failed["error"])
+
+
+class LinearAndBudgetTest(unittest.TestCase):
+    """2026-09-27: Linear rejects `number in [0]` and REST rate_limit misreports GraphQL."""
+
+    def fake_linear(self, calls):
+        class Client:
+            def __init__(self, _env):
+                pass
+
+            def gql(self, query, variables):
+                calls.append((query, variables))
+                data = {"pool": {"nodes": [{"identifier": "JOV-1", "priority": 1, "labels": {"nodes": [{"name": "devin"}]}}]},
+                        "triage": {"nodes": []}}
+                if "$numbers" in query:
+                    data["active"] = {"nodes": [{"identifier": "JOV-7", "title": "t", "state": {"name": "In Progress"}}]}
+                return data
+        return Client
+
+    def test_idle_host_never_sends_a_zero_issue_number(self):
+        calls = []
+        original = hud.lane.Linear
+        hud.lane.Linear = self.fake_linear(calls)
+        try:
+            idle = hud.linear_model(Path("/x"))
+            busy = hud.linear_model(Path("/x"), ["JOV-7"])
+        finally:
+            hud.lane.Linear = original
+        self.assertTrue(idle["ok"])
+        self.assertEqual(idle["active"], {})
+        self.assertNotIn("numbers", calls[0][1])
+        self.assertNotIn("$numbers", calls[0][0])
+        self.assertEqual(calls[1][1]["numbers"], [7])
+        self.assertEqual(busy["active"], {"JOV-7": "t"})
+
+    def test_graphql_budget_reads_graphql_not_rest(self):
+        seen = []
+
+        def run(args, **_kwargs):
+            seen.append(args)
+            return type("R", (), {"returncode": 0, "stderr": "",
+                                  "stdout": '{"data":{"rateLimit":{"remaining":0,"resetAt":"2026-09-27T22:39:30Z"}}}'})()
+        original = hud.lane.subprocess.run
+        hud.lane.subprocess.run = run
+        try:
+            self.assertEqual(hud.lane.graphql_budget(), (0, "2026-09-27T22:39:30Z"))
+            hud.lane.subprocess.run = lambda *a, **k: type("R", (), {"returncode": 1, "stdout": "", "stderr": "x"})()
+            self.assertIsNone(hud.lane.graphql_budget())
+        finally:
+            hud.lane.subprocess.run = original
+        self.assertEqual(seen[0][:3], ["gh", "api", "graphql"])
