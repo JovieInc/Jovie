@@ -118,7 +118,9 @@ describe('task action gating', () => {
       } else {
         process.env.PUBLIC_NOAUTH_SMOKE = originalNoauthSmoke;
       }
-      if (originalVercelEnv !== undefined) {
+      if (originalVercelEnv === undefined) {
+        delete process.env.VERCEL_ENV;
+      } else {
         process.env.VERCEL_ENV = originalVercelEnv;
       }
     });
