@@ -11,8 +11,33 @@ const scriptPath = path.resolve(
   'validate-wallet-release-env.sh'
 );
 
+// macOS runners ship LibreSSL as `openssl`; fixtures and the script under test
+// need real OpenSSL. Mirror the resolution order in validate-wallet-release-env.sh.
+function resolveOpenssl() {
+  const candidates = [
+    process.env.APPLE_WALLET_OPENSSL,
+    'openssl',
+    '/opt/homebrew/opt/openssl@3/bin/openssl',
+    '/usr/local/opt/openssl@3/bin/openssl',
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    try {
+      const version = execFileSync(candidate, ['version'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      if (/^OpenSSL /.test(version.trim())) return candidate;
+    } catch {}
+  }
+  throw new Error(
+    'OpenSSL (not LibreSSL) is required for Wallet release env tests.'
+  );
+}
+
+const opensslBin = resolveOpenssl();
+
 function openssl(args, env) {
-  execFileSync('openssl', args, { env, stdio: 'ignore' });
+  execFileSync(opensslBin, args, { env, stdio: 'ignore' });
 }
 
 function makeSigningFixture(t) {
@@ -89,6 +114,7 @@ function makeSigningFixture(t) {
   );
   return {
     PATH: process.env.PATH,
+    APPLE_WALLET_OPENSSL: opensslBin,
     APPLE_WALLET_PASS_TYPE_IDENTIFIER: 'pass.ie.jov.profile',
     APPLE_WALLET_TEAM_IDENTIFIER: 'TEAM123456',
     APPLE_WALLET_SIGNER_CERT_PEM: readFileSync(signerCert, 'utf8'),
