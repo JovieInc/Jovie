@@ -75,6 +75,11 @@ describe('HomepageIdentityHero', () => {
     expect(screen.getByTestId('homepage-primary-cta')).toHaveTextContent(
       'Claim'
     );
+    // Phones: the claim leads the card so the consent banner never covers it.
+    expect(screen.getByTestId('homepage-editorial-hero-search')).toHaveClass(
+      'order-first',
+      'sm:order-none'
+    );
     expect(screen.queryByText('Search your name')).toBeNull();
     expect(screen.queryByText('Request access')).toBeNull();
     expect(screen.queryAllByRole('link')).toHaveLength(0);

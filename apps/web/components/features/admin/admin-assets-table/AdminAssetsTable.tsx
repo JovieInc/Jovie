@@ -102,7 +102,7 @@ function IssuesPills({ issues }: { readonly issues: string[] }) {
       {issues.map(issue => (
         <span
           key={issue}
-          className='inline-flex items-center rounded-full bg-red-500/10 px-1.5 py-0.5 text-3xs font-medium text-red-600 dark:text-red-400'
+          className='inline-flex items-center rounded-full bg-error/10 px-1.5 py-0.5 text-3xs font-medium text-error'
           title={issue}
         >
           {issue}

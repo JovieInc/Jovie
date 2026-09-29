@@ -102,7 +102,11 @@ export function HomepageIdentityHero({
               <span>{TIM_WHITE_PROFILE.publicProfileHandle}</span>
             </p>
           </div>
-          <div className='w-full' data-testid='homepage-editorial-hero-search'>
+          <div
+            // Phones: the claim leads the card so the consent banner never covers it.
+            className='order-first w-full sm:order-none'
+            data-testid='homepage-editorial-hero-search'
+          >
             <ProductClaimHandleForm
               domain={claim.domain}
               placeholder={claim.placeholder}

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -245,5 +247,18 @@ describe('AdminAssetsTable', () => {
     });
     render(<AdminAssetsTable {...baseProps} assets={storyAssets} />);
     expect(screen.getAllByText('Signal Bloom').length).toBeGreaterThan(0);
+  });
+
+  it('renders issue flags with the error token, not raw red-* (JOV-6773)', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/admin/admin-assets-table/AdminAssetsTable.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/\bred-\d/);
+    expect(source).toContain('text-error');
   });
 });
