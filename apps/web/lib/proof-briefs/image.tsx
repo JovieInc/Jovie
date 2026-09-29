@@ -18,7 +18,7 @@ export const PROOF_BRIEF_TEXT_LIMITS = {
   heroLabel: 64,
   heroSentence: 90,
   pointValue: 16,
-  pointLabel: 40,
+  pointLabel: 80,
   window: 40,
 } as const;
 
@@ -53,6 +53,7 @@ export function ProofBriefCard({
       style={{
         width: '100%',
         height: '100%',
+        boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
         background: THEME.bg,
@@ -67,6 +68,7 @@ export function ProofBriefCard({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          flexShrink: 0,
           fontSize: 22,
           fontWeight: 600,
           letterSpacing: '0.08em',
@@ -74,7 +76,7 @@ export function ProofBriefCard({
           color: THEME.textMuted,
         }}
       >
-        <div style={{ display: 'flex' }}>Weekly proof</div>
+        <div style={{ display: 'flex' }}>Your week with Jovie</div>
         <div style={{ display: 'flex' }}>
           {clampProofBriefText(
             brief.window.label,
@@ -144,6 +146,7 @@ export function ProofBriefCard({
           style={{
             display: 'flex',
             flexDirection: 'row',
+            flexShrink: 0,
             borderTop: `1px solid ${THEME.border}`,
             paddingTop: 28,
             marginBottom: 28,
@@ -181,8 +184,11 @@ export function ProofBriefCard({
                 style={{
                   display: 'flex',
                   fontSize: 22,
+                  lineHeight: 1.2,
                   color: THEME.textMuted,
                   letterSpacing: '-0.01em',
+                  textAlign: 'center',
+                  padding: '0 24px',
                 }}
               >
                 {clampProofBriefText(
@@ -195,12 +201,27 @@ export function ProofBriefCard({
         </div>
       ) : null}
 
+      {brief.unknowns.length > 0 ? (
+        <div
+          style={{
+            display: 'flex',
+            fontSize: 16,
+            color: THEME.textMuted,
+            marginBottom: 16,
+            flexShrink: 0,
+          }}
+        >
+          Unmeasured outcomes remain unknown, not zero.
+        </div>
+      ) : null}
+
       {/* Footer: provenance + subtle wordmark */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          flexShrink: 0,
           fontSize: 18,
           color: THEME.textMuted,
           letterSpacing: '-0.01em',

@@ -1,5 +1,15 @@
 import type { CertifiedProofBrief } from './contract';
-import { CERTIFIED_PROOF_BRIEF } from './fixture';
+import {
+  CERTIFIED_PROOF_BRIEF,
+  INSUFFICIENT_EVIDENCE_PROOF_BRIEF,
+} from './fixture';
+
+const CERTIFIED_BRIEFS = new Map(
+  [CERTIFIED_PROOF_BRIEF, INSUFFICIENT_EVIDENCE_PROOF_BRIEF].map(brief => [
+    brief.briefId,
+    brief,
+  ])
+);
 
 /**
  * Resolve a certified proof brief by id (+optional revision pin). The
@@ -11,11 +21,9 @@ export function resolveCertifiedProofBrief(
   briefId: string,
   revision?: number
 ): CertifiedProofBrief | null {
-  if (briefId !== CERTIFIED_PROOF_BRIEF.briefId) {
+  const brief = CERTIFIED_BRIEFS.get(briefId);
+  if (!brief || (revision != null && revision !== brief.revision)) {
     return null;
   }
-  if (revision != null && revision !== CERTIFIED_PROOF_BRIEF.revision) {
-    return null;
-  }
-  return CERTIFIED_PROOF_BRIEF;
+  return brief;
 }

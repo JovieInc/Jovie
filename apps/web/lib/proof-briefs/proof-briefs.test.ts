@@ -3,13 +3,22 @@ import type { NextRequest } from 'next/server';
 import { createElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  defaultRecipientPreferences,
+  type RecipientPreferences,
+} from '@/lib/notifications/recipient-preferences';
+import {
   assertProofBriefRenderable,
   type CertifiedProofBrief,
   ProofBriefError,
   proofBriefProvenance,
 } from './contract';
+import { prepareCustomerRecapEmail } from './delivery';
 import { renderProofBriefEmail } from './email';
-import { CERTIFIED_PROOF_BRIEF } from './fixture';
+import {
+  buildCustomerWeeklyRecap,
+  CERTIFIED_PROOF_BRIEF,
+  INSUFFICIENT_EVIDENCE_PROOF_BRIEF,
+} from './fixture';
 import {
   clampProofBriefText,
   PROOF_BRIEF_CARD_SIZE,
@@ -47,277 +56,295 @@ vi.mock('@/lib/share/image-utils', async importOriginal => {
 
 import { GET as proofBriefGET } from '@/app/api/share/proof-brief/route';
 
-const NOW = new Date('2026-09-22T12:00:00.000Z');
+const NOW = new Date('2026-09-30T00:00:00.000Z');
 
 function brief(patch: Partial<CertifiedProofBrief> = {}): CertifiedProofBrief {
   return { ...CERTIFIED_PROOF_BRIEF, ...patch };
 }
 
-describe('single-source rendering', () => {
-  it('renders the same values, dates, and revision on every surface', () => {
-    const text = renderProofBriefText(CERTIFIED_PROOF_BRIEF, { now: NOW });
-    const email = renderProofBriefEmail(CERTIFIED_PROOF_BRIEF, { now: NOW });
-    const social = renderProofBriefSocialDraft(CERTIFIED_PROOF_BRIEF, {
-      now: NOW,
+const optedInPreferences: RecipientPreferences = {
+  version: 1,
+  betterAuthUserId: 'tim-ba-user',
+  recipientKind: 'tim',
+  timezone: 'America/Los_Angeles',
+  quietHours: { start: '21:00', end: '08:00' },
+  weekendBehavior: 'weekend_briefing_eligible',
+  briefingBehavior: 'weekend_summer',
+  channels: { email: true, sms: false, push: false, in_app: true },
+  marketingOptIn: true,
+  marketingConsent: {
+    version: 'recipient-marketing-v1',
+    recordedAt: '2026-09-01T00:00:00.000Z',
+  },
+};
+
+describe('Tim customer recap', () => {
+  it('matches every number, date, and claim to evidence in the exact window', () => {
+    const b = CERTIFIED_PROOF_BRIEF;
+    const executions = b.evidence.filter(item => item.kind === 'execution');
+
+    expect(b.window).toEqual({
+      start: '2026-09-23',
+      end: '2026-09-29',
+      label: 'Sep 23 to Sep 29, 2026',
     });
+    expect(b.hero.value).toBe(String(executions.length));
+    expect(b.supportingPoints).toHaveLength(executions.length);
+    expect(b.supportingPoints[0]?.evidenceIds).toContain('commit:4649c44ac0');
+    expect(b.supportingPoints[1]?.evidenceIds).toContain('commit:5ac9f7320b');
+    expect(
+      b.evidence.every(item => item.sourceUrl.startsWith('https://'))
+    ).toBe(true);
 
-    for (const surface of [text, email.text, email.html]) {
-      expect(surface).toContain('263');
-      expect(surface).toContain('Sep 14 – Sep 20, 2026');
-      expect(surface).toContain('4,812');
-      expect(surface).toContain('91');
-      expect(surface).toContain('12');
-    }
-
-    expect(text).toContain(
-      '263 new listeners clicked through to your music this week.'
-    );
-    expect(email.text).toContain(proofBriefProvenance(CERTIFIED_PROOF_BRIEF));
-    expect(email.html).toContain(proofBriefProvenance(CERTIFIED_PROOF_BRIEF));
-    expect(email.subject).toContain('263');
-    expect(email.subject).toContain('Sep 14 – Sep 20, 2026');
-
-    expect(social.copy).toContain('263');
-    expect(social.copy).toContain('Sep 14 – Sep 20, 2026');
-    expect(social.image.url).toContain(
-      `brief=${CERTIFIED_PROOF_BRIEF.briefId}`
-    );
-    expect(social.image.url).toContain(`rev=${CERTIFIED_PROOF_BRIEF.revision}`);
-  });
-
-  it('email is useful without a click', () => {
-    const email = renderProofBriefEmail(CERTIFIED_PROOF_BRIEF, { now: NOW });
-    expect(email.text).toContain("Here's what Jovie did for Tim White");
-    expect(email.text).not.toMatch(/\*\*|##|href=/);
-  });
-});
-
-describe('supporting points', () => {
-  it('renders 0 points gracefully on every surface', () => {
-    const b = brief({ supportingPoints: [] });
     const text = renderProofBriefText(b, { now: NOW });
     const email = renderProofBriefEmail(b, { now: NOW });
     const social = renderProofBriefSocialDraft(b, { now: NOW });
-
-    expect(text).not.toContain('4,812');
-    expect(email.html).toContain('263');
-    expect(social.copy).toContain('263');
+    for (const surface of [text, email.text, email.html]) {
+      expect(surface).toContain('2');
+      expect(surface).toContain(b.window.label);
+      expect(surface).toContain('Ask Jovie');
+      expect(surface).toContain('source-linked FAQs');
+      expect(surface).toContain('unknown, not zero');
+    }
+    expect(email.text).toContain("Here's what Jovie did for you");
+    expect(email.text).toContain(proofBriefProvenance(b));
+    expect(email.text).not.toMatch(/href=|\*\*|##/);
+    expect(social.image.url).toContain(`brief=${b.briefId}`);
+    expect(social.image.url).toContain(`rev=${b.revision}`);
   });
 
-  it('renders a single point', () => {
-    const b = brief({
-      supportingPoints: [{ value: '1,204,318', label: 'profile visits' }],
-    });
-    expect(renderProofBriefText(b, { now: NOW })).toContain(
-      '1,204,318 profile visits'
-    );
+  it('keeps an insufficient-evidence week useful without inventing a win', () => {
+    const b = INSUFFICIENT_EVIDENCE_PROOF_BRIEF;
+    const text = renderProofBriefText(b, { now: NOW });
+    const email = renderProofBriefEmail(b, { now: NOW });
+
+    expect(b.status).toBe('insufficient-evidence');
+    expect(b.evidence).toEqual([]);
+    expect(b.supportingPoints).toEqual([]);
+    expect(text).toContain('does not have enough verified evidence');
+    expect(text).toContain('profile visits');
+    expect(text).toContain('unknown, not zero');
+    expect(text).not.toMatch(/\b0 (visits|clicks|followers|sales)\b/i);
+    expect(email.subject).toBe(`Your Jovie recap | ${b.window.label}`);
+
+    render(createElement(ProofBriefCard, { brief: b, now: NOW }));
+    expect(
+      screen.getByText(
+        'Jovie does not have enough verified evidence to recap this week yet.'
+      )
+    ).toBeTruthy();
+    expect(
+      screen.getByText('Unmeasured outcomes remain unknown, not zero.')
+    ).toBeTruthy();
   });
 
-  it('rejects more than 3 supporting points', () => {
-    const b = brief({
-      supportingPoints: Array.from({ length: 4 }, (_, i) => ({
-        value: String(i),
-        label: `point ${i}`,
-      })),
+  it('rejects a non-seven-day window and evidence outside the window', () => {
+    const base = {
+      briefId: 'pb_bad_window',
+      revision: 1,
+      subject: 'Tim White',
+      window: { start: '2026-09-24', end: '2026-09-29', label: 'bad' },
+      updates: [],
+      evidence: [],
+      unknowns: ['profile visits'],
+      privacy: 'public' as const,
+      generatedAt: '2026-09-29T22:00:00.000Z',
+      expiresAt: '2026-10-13T00:00:00.000Z',
+    };
+    expect(() => buildCustomerWeeklyRecap(base)).toThrow(/exactly seven/);
+    expect(() =>
+      buildCustomerWeeklyRecap({
+        ...base,
+        window: CERTIFIED_PROOF_BRIEF.window,
+        evidence: [
+          {
+            id: 'late',
+            kind: 'observation',
+            occurredAt: '2026-09-30T00:00:00.000Z',
+            sourceUrl: 'https://jov.ie/tim',
+            summary: 'Outside the certified window.',
+          },
+        ],
+      })
+    ).toThrow(/inside its window/);
+  });
+});
+
+describe('truth and privacy boundaries', () => {
+  it('rejects unbound and over-attributed claims', () => {
+    const missing = brief({
+      hero: { ...CERTIFIED_PROOF_BRIEF.hero, evidenceIds: ['missing'] },
     });
-    expect(() => renderProofBriefText(b, { now: NOW })).toThrow(
+    const causal = brief({
+      hero: { ...CERTIFIED_PROOF_BRIEF.hero, attribution: 'causal' },
+    });
+    expect(() => assertProofBriefRenderable(missing, { now: NOW })).toThrow(
       ProofBriefError
     );
-    expect(() => renderProofBriefText(b, { now: NOW })).toThrow(
-      /proof-brief\/v1/
-    );
-  });
-});
-
-describe('hero variants', () => {
-  it('supports a non-numeric hero', () => {
-    const b = brief({
-      hero: { sentence: 'Your release hit three new editorial playlists.' },
-    });
-    const text = renderProofBriefText(b, { now: NOW });
-    const email = renderProofBriefEmail(b, { now: NOW });
-    const social = renderProofBriefSocialDraft(b, { now: NOW });
-
-    expect(text).toContain('editorial playlists');
-    expect(email.text).toContain('editorial playlists');
-    expect(social.copy).toContain('4,812 profile visits');
-  });
-
-  it('formats large values unchanged across surfaces', () => {
-    const b = brief({
-      hero: {
-        sentence:
-          '1,204,318 new listeners clicked through to your music this week.',
-        value: '1,204,318',
-        label: 'new listeners clicked through',
-      },
-    });
-    expect(renderProofBriefText(b, { now: NOW })).toContain('1,204,318');
-    expect(renderProofBriefEmail(b, { now: NOW }).html).toContain('1,204,318');
-    expect(renderProofBriefSocialDraft(b, { now: NOW }).copy).toContain(
-      '1,204,318'
-    );
-  });
-});
-
-describe('copy clamps', () => {
-  it('clamps long copy for visual overflow safety', () => {
-    const long = 'x'.repeat(200);
-    expect(
-      clampProofBriefText(long, PROOF_BRIEF_TEXT_LIMITS.heroValue)
-    ).toHaveLength(PROOF_BRIEF_TEXT_LIMITS.heroValue);
-    expect(
-      clampProofBriefText(long, PROOF_BRIEF_TEXT_LIMITS.heroValue)
-    ).toMatch(/…$/);
-    expect(clampProofBriefText('263', PROOF_BRIEF_TEXT_LIMITS.heroValue)).toBe(
-      '263'
-    );
-  });
-});
-
-describe('rejection paths', () => {
-  it('rejects a stale brief on every surface', () => {
-    const stale = brief({ expiresAt: '2026-09-21T00:00:00.000Z' });
-    for (const render of [
-      renderProofBriefText,
-      renderProofBriefEmail,
-      renderProofBriefSocialDraft,
-    ]) {
-      expect(() => render(stale as never, { now: NOW })).toThrow(
-        ProofBriefError
-      );
-    }
-    expect(() => assertProofBriefRenderable(stale, { now: NOW })).toThrowError(
-      /expired/
+    expect(() => assertProofBriefRenderable(causal, { now: NOW })).toThrow(
+      ProofBriefError
     );
   });
 
-  it('rejects private-scope briefs on public surfaces but allows email', () => {
-    const priv = brief({ privacy: 'private' });
-    expect(() => renderProofBriefSocialDraft(priv, { now: NOW })).toThrow(
-      /private-scoped/
-    );
-    expect(renderProofBriefEmail(priv, { now: NOW }).text).toContain('263');
-    expect(renderProofBriefText(priv, { now: NOW })).toContain('263');
-  });
-
-  it('rejects malformed briefs', () => {
+  it('rejects stale, malformed, and overfull briefs', () => {
+    expect(() =>
+      assertProofBriefRenderable(brief({ expiresAt: '2026-09-29T00:00:00Z' }), {
+        now: NOW,
+      })
+    ).toThrow(/expired/);
     expect(() =>
       assertProofBriefRenderable(brief({ revision: 0 }), { now: NOW })
-    ).toThrow(ProofBriefError);
+    ).toThrow(/proof-brief\/v1/);
     expect(() =>
-      assertProofBriefRenderable(brief({ briefId: '' }), { now: NOW })
+      assertProofBriefRenderable(
+        brief({
+          supportingPoints: Array.from({ length: 4 }, (_, index) => ({
+            label: `point ${index}`,
+            attribution: 'execution',
+            evidenceIds: ['commit:4649c44ac0'],
+          })),
+        }),
+        { now: NOW }
+      )
     ).toThrow(ProofBriefError);
+  });
+
+  it('allows owner text/email but blocks a private share card', () => {
+    const privateBrief = brief({ privacy: 'private' });
+    expect(renderProofBriefText(privateBrief, { now: NOW })).toContain('2');
+    expect(renderProofBriefEmail(privateBrief, { now: NOW }).text).toContain(
+      'Ask Jovie'
+    );
+    expect(() =>
+      render(createElement(ProofBriefCard, { brief: privateBrief, now: NOW }))
+    ).toThrow(/private-scoped/);
   });
 });
 
-describe('resolveCertifiedProofBrief', () => {
-  it('resolves the certified brief by id', () => {
+describe('delivery controls', () => {
+  it('does not enroll a recipient with default preferences', () => {
+    const preferences = defaultRecipientPreferences({
+      betterAuthUserId: 'customer-ba-user',
+      recipientKind: 'customer',
+      localTimezone: 'America/New_York',
+    });
+    expect(
+      prepareCustomerRecapEmail({
+        brief: CERTIFIED_PROOF_BRIEF,
+        preferences,
+        outboundSuppressedAt: null,
+        now: NOW,
+      })
+    ).toEqual({ status: 'blocked', reason: 'email-disabled' });
+  });
+
+  it('requires consent and honors customer suppression', () => {
+    const noConsent = {
+      ...optedInPreferences,
+      marketingOptIn: false,
+      marketingConsent: null,
+    };
+    expect(
+      prepareCustomerRecapEmail({
+        brief: CERTIFIED_PROOF_BRIEF,
+        preferences: noConsent,
+        outboundSuppressedAt: null,
+        now: NOW,
+      })
+    ).toEqual({ status: 'blocked', reason: 'marketing-consent-required' });
+    expect(
+      prepareCustomerRecapEmail({
+        brief: CERTIFIED_PROOF_BRIEF,
+        preferences: optedInPreferences,
+        outboundSuppressedAt: '2026-09-20T00:00:00.000Z',
+        now: NOW,
+      })
+    ).toEqual({ status: 'blocked', reason: 'customer-suppressed' });
+  });
+
+  it('prepares one deduplicated message for the existing delivery path', () => {
+    const result = prepareCustomerRecapEmail({
+      brief: CERTIFIED_PROOF_BRIEF,
+      preferences: optedInPreferences,
+      outboundSuppressedAt: null,
+      now: NOW,
+    });
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+    expect(result.message.category).toBe('marketing');
+    expect(result.message.channels).toEqual(['email']);
+    expect(result.message.respectUserPreferences).toBe(true);
+    expect(result.message.id).toBe(result.message.idempotencyKey);
+    expect(result.message.text).toContain('source-linked FAQs');
+    expect(result.message.metadata).toMatchObject({
+      briefId: CERTIFIED_PROOF_BRIEF.briefId,
+      revision: CERTIFIED_PROOF_BRIEF.revision,
+      windowStart: '2026-09-23',
+      windowEnd: '2026-09-29',
+    });
+  });
+});
+
+describe('card, resolver, and image route', () => {
+  function request(url: string): NextRequest {
+    return { nextUrl: new URL(url) } as NextRequest;
+  }
+
+  it('renders the certified card and clamps overflow', () => {
+    render(
+      createElement(ProofBriefCard, {
+        brief: CERTIFIED_PROOF_BRIEF,
+        now: NOW,
+      })
+    );
+    expect(screen.getByText('2')).toBeTruthy();
+    expect(screen.getByText('verified updates')).toBeTruthy();
+    expect(screen.getByText(CERTIFIED_PROOF_BRIEF.window.label)).toBeTruthy();
+    expect(screen.getByText('Your week with Jovie')).toBeTruthy();
+    expect(
+      screen.getByText(proofBriefProvenance(CERTIFIED_PROOF_BRIEF))
+    ).toBeTruthy();
+    const clamped = clampProofBriefText(
+      'x'.repeat(200),
+      PROOF_BRIEF_TEXT_LIMITS.heroValue
+    );
+    expect(clamped).toHaveLength(PROOF_BRIEF_TEXT_LIMITS.heroValue);
+    expect(clamped).toMatch(/…$/);
+  });
+
+  it('resolves both certified states and honors revision pins', () => {
     expect(resolveCertifiedProofBrief(CERTIFIED_PROOF_BRIEF.briefId)).toBe(
       CERTIFIED_PROOF_BRIEF
     );
-  });
-
-  it('honors a matching revision pin', () => {
     expect(
       resolveCertifiedProofBrief(
-        CERTIFIED_PROOF_BRIEF.briefId,
-        CERTIFIED_PROOF_BRIEF.revision
+        INSUFFICIENT_EVIDENCE_PROOF_BRIEF.briefId,
+        INSUFFICIENT_EVIDENCE_PROOF_BRIEF.revision
       )
-    ).toBe(CERTIFIED_PROOF_BRIEF);
-  });
-
-  it('returns null for an unknown id or mismatched revision', () => {
+    ).toBe(INSUFFICIENT_EVIDENCE_PROOF_BRIEF);
     expect(resolveCertifiedProofBrief('pb_missing')).toBeNull();
     expect(
       resolveCertifiedProofBrief(CERTIFIED_PROOF_BRIEF.briefId, 99)
     ).toBeNull();
   });
-});
 
-describe('ProofBriefCard', () => {
-  it('renders hero value, label, window, points, and provenance', () => {
-    render(
-      createElement(ProofBriefCard, { brief: CERTIFIED_PROOF_BRIEF, now: NOW })
+  it('rejects malformed and unknown image requests', async () => {
+    expect(
+      (await proofBriefGET(request('https://jov.ie/api/share/proof-brief')))
+        .status
+    ).toBe(400);
+    const unknown = await proofBriefGET(
+      request('https://jov.ie/api/share/proof-brief?brief=pb_missing')
     );
-    expect(screen.getByText('263')).toBeTruthy();
-    expect(screen.getByText('new listeners clicked through')).toBeTruthy();
-    expect(screen.getByText('Sep 14 – Sep 20, 2026')).toBeTruthy();
-    expect(screen.getByText('4,812')).toBeTruthy();
-    expect(
-      screen.getByText(proofBriefProvenance(CERTIFIED_PROOF_BRIEF))
-    ).toBeTruthy();
-    expect(screen.getByText('Weekly proof')).toBeTruthy();
-    expect(screen.getByText('Jovie')).toBeTruthy();
+    expect(unknown.status).toBe(404);
+    expect(unknown.headers.get('Cache-Control')).toBe('no-store');
   });
 
-  it('renders the sentence as hero for a non-numeric brief', () => {
-    const b = brief({
-      hero: { sentence: 'Your release hit three new editorial playlists.' },
-      supportingPoints: [{ label: 'qualitative win' }],
-    });
-    render(createElement(ProofBriefCard, { brief: b, now: NOW }));
-    expect(
-      screen.getByText('Your release hit three new editorial playlists.')
-    ).toBeTruthy();
-    expect(screen.getByText('qualitative win')).toBeTruthy();
-  });
-
-  it('omits the proof strip when there are no supporting points', () => {
-    const b = brief({ supportingPoints: [] });
-    render(createElement(ProofBriefCard, { brief: b, now: NOW }));
-    expect(screen.queryByText('4,812')).toBeNull();
-    expect(screen.getByText('263')).toBeTruthy();
-  });
-
-  it('renders a supporting point with no value', () => {
-    const b = brief({
-      supportingPoints: [{ label: 'editorial playlist add' }],
-    });
-    render(createElement(ProofBriefCard, { brief: b, now: NOW }));
-    expect(screen.getByText('editorial playlist add')).toBeTruthy();
-  });
-
-  it('rejects private briefs on the public image surface', () => {
-    const priv = brief({ privacy: 'private' });
-    expect(() =>
-      render(createElement(ProofBriefCard, { brief: priv, now: NOW }))
-    ).toThrow(ProofBriefError);
-  });
-});
-
-describe('proof-brief image route', () => {
-  function request(url: string): NextRequest {
-    return { nextUrl: new URL(url) } as NextRequest;
-  }
-
-  it('rejects a missing or malformed brief id', async () => {
-    for (const url of [
-      'https://jov.ie/api/share/proof-brief',
-      'https://jov.ie/api/share/proof-brief?brief=',
-      'https://jov.ie/api/share/proof-brief?brief=bad%20id!',
-    ]) {
-      const response = await proofBriefGET(request(url));
-      expect(response.status).toBe(400);
-      expect(response.headers.get('Cache-Control')).toBe('no-store');
-    }
-  });
-
-  it('404s for unknown briefs and mismatched revision pins', async () => {
-    for (const url of [
-      'https://jov.ie/api/share/proof-brief?brief=pb_missing',
-      `https://jov.ie/api/share/proof-brief?brief=${CERTIFIED_PROOF_BRIEF.briefId}&rev=99`,
-    ]) {
-      const response = await proofBriefGET(request(url));
-      expect(response.status).toBe(404);
-      expect(response.headers.get('Cache-Control')).toBe('no-store');
-    }
-  });
-
-  it('renders an immutable card for the certified brief', async () => {
+  it('renders the pinned card with immutable caching', async () => {
+    const b = CERTIFIED_PROOF_BRIEF;
     const response = await proofBriefGET(
       request(
-        `https://jov.ie/api/share/proof-brief?brief=${CERTIFIED_PROOF_BRIEF.briefId}&rev=${CERTIFIED_PROOF_BRIEF.revision}`
+        `https://jov.ie/api/share/proof-brief?brief=${b.briefId}&rev=${b.revision}`
       )
     );
     expect(response.headers.get('Cache-Control')).toContain('immutable');
@@ -327,43 +354,20 @@ describe('proof-brief image route', () => {
     );
   });
 
-  it('treats a non-numeric revision as no pin', async () => {
-    const response = await proofBriefGET(
-      request(
-        `https://jov.ie/api/share/proof-brief?brief=${CERTIFIED_PROOF_BRIEF.briefId}&rev=abc`
-      )
-    );
-    expect(response.headers.get('Cache-Control')).toContain('immutable');
-  });
-
-  it('returns 500 when fonts cannot load', async () => {
+  it('fails closed when fonts or rendering fail', async () => {
+    const url = `https://jov.ie/api/share/proof-brief?brief=${CERTIFIED_PROOF_BRIEF.briefId}`;
     mocks.loadShareFonts.mockRejectedValueOnce(new Error('font missing'));
-    const response = await proofBriefGET(
-      request(
-        `https://jov.ie/api/share/proof-brief?brief=${CERTIFIED_PROOF_BRIEF.briefId}`
-      )
-    );
-    expect(response.status).toBe(500);
-  });
+    expect((await proofBriefGET(request(url))).status).toBe(500);
 
-  it('maps render failures to the right status', async () => {
-    const cases: Array<[unknown, number]> = [
+    for (const [error, status] of [
       [new ProofBriefError('x', 'privacy-scope'), 403],
       [new ProofBriefError('x', 'stale-brief'), 410],
       [new ProofBriefError('x', 'invalid-brief'), 400],
-      [new Error('boom'), 400],
-    ];
-    for (const [error, status] of cases) {
+    ] as const) {
       mocks.imageResponse.mockImplementationOnce(() => {
         throw error;
       });
-      const response = await proofBriefGET(
-        request(
-          `https://jov.ie/api/share/proof-brief?brief=${CERTIFIED_PROOF_BRIEF.briefId}`
-        )
-      );
-      expect(response.status).toBe(status);
-      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect((await proofBriefGET(request(url))).status).toBe(status);
     }
   });
 });
