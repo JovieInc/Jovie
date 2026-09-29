@@ -5,7 +5,7 @@ name: M2 Revenue-Path Canary
 # necessary-trust-boundary: GitHub-hosted production-liveness clock probes signed-out claim, $199 Pro checkout, and activation on prod without Stripe credentials or session creation; Slack and Linear secrets stay in the hosted job.
 # removal-trigger: Remove this hop when Production Controller or a first-party checkout monitor emits the same four-step receipt and files Linear plus Slack on red without a separate scheduled workflow.
 #
-# JOV-6439: daily + deploy-hook money-path probe.
+# JOV-6439: daily and manually callable money-path probe.
 # Distinct from Canary Health Gate (generic uptime) and the auth/public-profile
 # canaries. Signed-out → claim → $199 Pro checkout → activation.
 # Does not create Stripe sessions, identities, or paid subscriptions.
@@ -34,11 +34,6 @@ on:
         required: false
       LINEAR_API_KEY:
         required: false
-  workflow_run:
-    workflows: [Production Controller]
-    types: [completed]
-    branches: [main]
-
 permissions:
   contents: read
 
@@ -49,7 +44,6 @@ concurrency:
 jobs:
   m2-revenue-path:
     name: Signed-out claim $199 checkout activation
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:

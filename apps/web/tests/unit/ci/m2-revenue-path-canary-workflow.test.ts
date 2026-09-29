@@ -25,8 +25,7 @@ describe('M2 revenue-path canary workflow (JOV-6439)', () => {
     expect(workflow).toContain("- cron: '37 6 * * *'");
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toContain('workflow_call:');
-    expect(workflow).toContain('workflow_run:');
-    expect(workflow).toContain('workflows: [Production Controller]');
+    expect(workflow).not.toContain('workflow_run:');
     expect(workflow).not.toContain('pull_request:');
     expect(workflow).not.toContain('merge_group:');
   });

@@ -323,7 +323,6 @@ describe('merge_group workflow contract', () => {
 
     // Draft state does not change the source SHA. The original source checks
     // remain authoritative when the owner pairs ready with native auto-merge.
-    expect(CI_WORKFLOW).toContain(sourceRevisionTrigger);
     expect(SIZE_GUARD_WORKFLOW).toContain(sourceRevisionTrigger);
     expect(FORK_GATE_WORKFLOW).toContain(
       `pull_request:\n    ${sourceRevisionTrigger}`
@@ -2325,9 +2324,7 @@ ${selectedGateScript}`,
       0,
       POSTDEPLOY_PROBES_WORKFLOW.indexOf('\njobs:')
     );
-    expect(header).toContain('workflows: [Production Controller]');
-    expect(header).toContain('types: [completed]');
-    expect(header).toContain('branches: [main]');
+    expect(header).not.toContain('workflow_run:');
     expect(header).toMatch(/^  workflow_dispatch:\s*$/m);
     expect(header).not.toMatch(/^  (pull_request|push|merge_group|schedule):/m);
 

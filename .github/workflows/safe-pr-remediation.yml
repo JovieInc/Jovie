@@ -15,7 +15,7 @@ name: Safe PR Remediation
 
 on:
   workflow_run:
-    workflows: ['Eve Pilot', 'CI']
+    workflows: ['Eve Pilot']
     types: [completed]
 
 permissions: {}
