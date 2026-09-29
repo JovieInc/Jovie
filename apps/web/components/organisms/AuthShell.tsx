@@ -14,10 +14,7 @@ import { useRightPanel } from '@/contexts/RightPanelContext';
 import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
 import { MobileProfileDrawer } from '@/features/dashboard/organisms/MobileProfileDrawer';
-import {
-  isElectronRuntime,
-  useIsElectronRuntime,
-} from '@/lib/desktop/electron-bridge';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { env } from '@/lib/env-client';
 import type { AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
@@ -89,10 +86,12 @@ function AuthShellInner({
   });
   // The desktop window-control row (DesktopTitlebar) owns the single canonical
   // left-sidebar toggle in Electron; the header must not mount a second one.
-  // isElectronRuntime() is read synchronously (not via the effect-gated hook)
-  // so the duplicate control never flashes in during hydration.
+  // The effect-gated hook keeps server markup and the first client render
+  // identical — globals.css hides the duplicate under the
+  // `data-desktop-runtime="electron"` marker (set pre-hydration) until the
+  // hook removes it from the tree.
   const sidebarTrigger =
-    isMobile || isElectronRuntime() ? null : sidebarState === 'closed' ? (
+    isMobile || isElectron ? null : sidebarState === 'closed' ? (
       <SidebarCollapseButton />
     ) : null;
 

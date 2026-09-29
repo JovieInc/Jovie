@@ -122,12 +122,18 @@ export function DashboardHeader({
           <div className='max-sm:hidden flex items-center'>{leading}</div>
         ) : null}
         {sidebarTrigger ? (
-          <div className='max-lg:hidden items-center lg:flex'>
+          <div
+            className='max-lg:hidden items-center lg:flex'
+            data-shell-sidebar-trigger='true'
+          >
             {sidebarTrigger}
           </div>
         ) : null}
         {showDivider && sidebarTrigger && action ? (
-          <div className='max-lg:hidden lg:flex items-center'>
+          <div
+            className='max-lg:hidden lg:flex items-center'
+            data-shell-sidebar-divider='true'
+          >
             <VerticalDivider />
           </div>
         ) : null}

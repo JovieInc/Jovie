@@ -253,6 +253,16 @@ html[data-desktop-runtime="electron"]
   padding-left: var(--app-shell-gap);
 }
 
+/* In Electron the DesktopTitlebar window-control row owns the single canonical
+   left-sidebar toggle. The header's SSR'd trigger stays in the markup so
+   hydration matches; this marker (set pre-hydration by electron-runtime-init)
+   keeps the duplicate hidden and unfocusable until the hydration-safe runtime
+   hook removes it from the tree. (JOV-7207) */
+html[data-desktop-runtime="electron"] [data-shell-sidebar-trigger="true"],
+html[data-desktop-runtime="electron"] [data-shell-sidebar-divider="true"] {
+  display: none;
+}
+
 /* Marketing pages use document scrolling rather than app-shell scroll panes.
    Only override html — setting overflow-y:auto on body promotes overflow-x:clip
    to overflow-x:hidden, which creates a scroll container that breaks sticky. */
