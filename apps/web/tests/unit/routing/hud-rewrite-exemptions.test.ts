@@ -58,6 +58,9 @@ describe('/hud rewrite exemptions (JOV-7126)', () => {
     // kiosk (a signed token), and mode=kiosk — as exemptions from this
     // rewrite. A rule missing any one of them silently sends that request
     // to the wrong page without changing what the browser's URL bar shows.
+    // Length checked first so an extra/missing entry fails on count, not a
+    // confusing arrayContaining diff.
+    expect(missing).toHaveLength(3);
     expect(missing).toEqual(
       expect.arrayContaining([
         { type: 'query', key: 'fs', value: '1' },
@@ -65,6 +68,5 @@ describe('/hud rewrite exemptions (JOV-7126)', () => {
         { type: 'query', key: 'mode', value: 'kiosk' },
       ])
     );
-    expect(missing).toHaveLength(3);
   }, 20_000);
 });
