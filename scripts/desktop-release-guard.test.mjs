@@ -926,7 +926,7 @@ test('desktop dedup cross-proves an actual-publish-only marker', () => {
     /all\(\.artifacts\[\];[\s\S]*\.name == "desktop-production-published"/,
     /publish_marker_presence_count="\$\(jq '\.artifacts \| length'/,
     /publish_marker_presence_count.*-gt 0/s,
-    /status=completed&per_page=25/,
+    /status=completed&per_page=100/,
     /Recovered exact asset-proven desktop publish/,
     /Verify exact published release assets/,
     /desktop-release\.yml\/runs\?branch=main&event=push&status=success&per_page=100/,
@@ -1013,6 +1013,9 @@ test('desktop selection finds an intervening JOV-5996 change from the durable ba
   const runId = 202;
   const workflowId = 303;
   const publisherJobId = 404;
+  // workflow_run publishes stamp the run with main's newer tip, not the
+  // published generation (the 26.9.15/26.9.16 marker regression).
+  const publisherRunHead = 'c'.repeat(40);
   const markerName = 'desktop-production-published.json';
   await writeFile(
     join(root, markerName),
@@ -1086,7 +1089,7 @@ esac
               {
                 id: publisherJobId,
                 name: 'Publish production desktop release',
-                head_sha: baseline,
+                head_sha: publisherRunHead,
                 status: 'completed',
                 conclusion: 'success',
                 steps: [
@@ -1120,7 +1123,7 @@ esac
           head_repository: { full_name: repository },
           path: '.github/workflows/desktop-release.yml',
           event: 'workflow_run',
-          head_sha: baseline,
+          head_sha: publisherRunHead,
           display_title: `Desktop release ${baseline}`,
         }),
         MOCK_WORKFLOW_ID: String(workflowId),
@@ -1364,6 +1367,7 @@ test('desktop recovery ignores legacy push titles and selects new run-name evide
   assert.ok(jqProgram, 'missing embedded recovery selector');
   const oldSha = 'a'.repeat(40);
   const newSha = 'b'.repeat(40);
+  const triggerHead = 'c'.repeat(40);
   const output = execFileSync('jq', ['-r', jqProgram], {
     encoding: 'utf8',
     input: JSON.stringify([
@@ -1378,14 +1382,16 @@ test('desktop recovery ignores legacy push titles and selects new run-name evide
       {
         id: 2,
         run_attempt: 1,
-        head_sha: newSha,
+        // The run head is main's tip at trigger time, newer than the
+        // generation it published.
+        head_sha: triggerHead,
         event: 'workflow_run',
         display_title: `Desktop release ${newSha}`,
         created_at: '2026-07-19T00:00:00Z',
       },
     ]),
   });
-  assert.equal(output.trim(), `2\t1\t${newSha}`);
+  assert.equal(output.trim(), `2\t1\t${newSha}\t${triggerHead}`);
 });
 
 test('automatic desktop publishing stamps production-impacting source before release', () => {
