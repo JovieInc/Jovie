@@ -36,6 +36,9 @@
 # - Triage does not depend on the enable job; it is a separate scheduled run.
 # - Fork PRs: `pull_request` grants a read-only GITHUB_TOKEN, so enable is
 #   skipped with a notice rather than a guaranteed red check.
+# - Dependabot PRs: `pull_request` runs in the Dependabot secret store so the
+#   Jovie Bot key is empty (JOV-4782); enable is skipped with a notice and
+#   dependabot-auto-merge.yml / the triage sweep own the lane.
 
 name: Auto-Merge Default
 # clock-class: temporal-resource
@@ -80,6 +83,11 @@ jobs:
         # GitHub starts no workflows for events GITHUB_TOKEN creates, and auto-merge enqueues
         # as the actor that enabled it, so GITHUB_TOKEN-enabled PRs built merge groups with no
         # CI that sat at the queue head (#18873, #18960, #19048 on 2026-09-28).
+        # Dependabot pull_request runs only see the Dependabot secret store, so the
+        # Jovie Bot private key is empty and this mint fails hard (JOV-4782). The
+        # dependabot lane is owned by dependabot-auto-merge.yml plus the hourly
+        # triage --enable-missing sweep, which run with full secrets.
+        if: github.actor != 'dependabot[bot]'
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -88,11 +96,16 @@ jobs:
       - name: Enable auto-merge
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          ACTOR: ${{ github.actor }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           BASE_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          if [[ "$ACTOR" == "dependabot[bot]" ]]; then
+            echo "::notice::Dependabot pull_request context has no Jovie Bot secret (JOV-4782); dependabot-auto-merge.yml and the hourly triage sweep own this lane. Skipping."
+            exit 0
+          fi
           if [[ "$HEAD_REPO" != "$BASE_REPO" ]]; then
             echo "::notice::Fork PR — GITHUB_TOKEN is read-only on pull_request events from forks; skipping auto-merge enable."
             exit 0

@@ -477,8 +477,8 @@ importers:
         specifier: ^0.23.0
         version: 0.23.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@tanstack/react-query':
-        specifier: ^5.103.3
-        version: 5.103.3(react@19.2.8)
+        specifier: ^5.104.0
+        version: 5.104.0(react@19.2.8)
       '@tanstack/react-table':
         specifier: ^9.2.4
         version: 9.2.4(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -719,7 +719,7 @@ importers:
         version: 4.3.3
       '@tanstack/react-query-devtools':
         specifier: ^5.103.3
-        version: 5.103.3(@tanstack/react-query@5.103.3(react@19.2.8))(@types/react@19.2.18)(csstype@3.2.3)(react@19.2.8)
+        version: 5.103.3(@tanstack/react-query@5.104.0(react@19.2.8))(@types/react@19.2.18)(csstype@3.2.3)(react@19.2.8)
       '@testing-library/jest-dom':
         specifier: ^7.0.1
         version: 7.0.1(@testing-library/dom@10.4.2)(vitest@5.0.2)
@@ -6783,6 +6783,9 @@ packages:
   '@tanstack/query-core@5.103.3':
     resolution: {integrity: sha512-w6gJ5Alt+s55Wuok6/aURtR3AufW3PuNjnM0b3RC1xUz3MVA0EC9j7U3texGftvtOTYWiPVvQzCZjv3Cvzwc/g==}
 
+  '@tanstack/query-core@5.104.0':
+    resolution: {integrity: sha512-JrC2r/JQlXt7khBSdUpsgxNvybzOg+aITa+ARRMlP2AFo93Y8vIqz077rp+e61mJetSZ0T6AJbwW1JHer1vrPQ==}
+
   '@tanstack/query-devtools@5.103.3':
     resolution: {integrity: sha512-a1hKnE/yFXAV6xaep+sfe2w1MArEsumBWs1iia7H6TwwvofpovGkYaWtb7+Nyt7SuMfFbW2Hngbd/m83BbMsaQ==}
 
@@ -6800,8 +6803,8 @@ packages:
       '@types/react': ^18 || ^19
       react: 19.2.8
 
-  '@tanstack/react-query@5.103.3':
-    resolution: {integrity: sha512-QJMF0QUwJaFm6rrYAq1mlYyMsdiqd9w6gAsFSy+F+8g6/8pQrRy9u3a2yQGpSAmMO4DAZmRHwFZ8UulLaJkBmg==}
+  '@tanstack/react-query@5.104.0':
+    resolution: {integrity: sha512-e1TZmDCQnWIfiDVryIHeA6Idj+Lfx1hORLOhXS/l5wcgvtVD4yYqbTDl378sGQKIi2cSgb0TEMC9cKK8GGoJEw==}
     peerDependencies:
       react: 19.2.8
 
@@ -22716,6 +22719,8 @@ snapshots:
 
   '@tanstack/query-core@5.103.3': {}
 
+  '@tanstack/query-core@5.104.0': {}
+
   '@tanstack/query-devtools@5.103.3(csstype@3.2.3)':
     dependencies:
       '@kobalte/core': 0.13.14(solid-js@1.9.15)
@@ -22739,18 +22744,18 @@ snapshots:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
-  '@tanstack/react-query-devtools@5.103.3(@tanstack/react-query@5.103.3(react@19.2.8))(@types/react@19.2.18)(csstype@3.2.3)(react@19.2.8)':
+  '@tanstack/react-query-devtools@5.103.3(@tanstack/react-query@5.104.0(react@19.2.8))(@types/react@19.2.18)(csstype@3.2.3)(react@19.2.8)':
     dependencies:
       '@tanstack/query-devtools': 5.103.3(csstype@3.2.3)
-      '@tanstack/react-query': 5.103.3(react@19.2.8)
+      '@tanstack/react-query': 5.104.0(react@19.2.8)
       '@types/react': 19.2.18
       react: 19.2.8
     transitivePeerDependencies:
       - csstype
 
-  '@tanstack/react-query@5.103.3(react@19.2.8)':
+  '@tanstack/react-query@5.104.0(react@19.2.8)':
     dependencies:
-      '@tanstack/query-core': 5.103.3
+      '@tanstack/query-core': 5.104.0
       react: 19.2.8
 
   '@tanstack/react-store@0.11.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
