@@ -97,9 +97,6 @@ export const subscriptionFeedbackRailClassName =
 export const subscriptionFeedbackCopyClassName =
   'text-2xs leading-4 tracking-tight text-secondary-token/68';
 
-export const subscriptionErrorTextClassName =
-  'text-xs leading-4 tracking-[-0.012em] text-red-400';
-
 export const subscriptionSuccessTextClassName =
   'text-xs leading-4 tracking-[-0.012em] text-emerald-400';
 

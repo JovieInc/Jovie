@@ -192,6 +192,16 @@ const deliveryProductionSchema = z.object({
   behindMain: countMeasurementSchema,
 });
 
+const deliveryCertifiedHeadSchema = z.object({
+  sha: z
+    .string()
+    .regex(/^[0-9a-f]{40}$/i)
+    .nullable(),
+  certifiedAt: z.string().nullable(),
+});
+
+const deliveryStagingSchema = deliveryProductionSchema;
+
 const deliverySummerSchema = z.object({
   availability: z.enum(['up', 'down', 'degraded']).nullable(),
 });
@@ -219,11 +229,17 @@ export function parseDeliverySummary(value: unknown): DeliverySummary {
       empty.mergeQueueDepth
     ),
     inFlight: block(countMeasurementSchema, record.inFlight, empty.inFlight),
+    certifiedHead: block(
+      deliveryCertifiedHeadSchema,
+      record.certifiedHead,
+      empty.certifiedHead
+    ),
     production: block(
       deliveryProductionSchema,
       record.production,
       empty.production
     ),
+    staging: block(deliveryStagingSchema, record.staging, empty.staging),
     summer: block(deliverySummerSchema, record.summer, empty.summer),
   };
 }

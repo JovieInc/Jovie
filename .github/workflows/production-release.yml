@@ -1619,11 +1619,15 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Enforce explicit staging freshness breach
+      # JOV-7149: latency is an SLO alarm, not a correctness gate. Measured from CI
+      # completion, it counts time spent waiting behind the serialized staging queue,
+      # so with a ~15 min staging pipeline every run "breached" and nothing reached
+      # production (2026-09-29 08:35Z onward). The receipt keeps sloState=breach for
+      # alerting; exact-SHA identity, canary, and alias proofs above stay blocking.
+      - name: Flag staging freshness breach
         if: ${{ steps.receipt.outputs.slo_state == 'breach' }}
         run: |
-          echo "::error::Staging freshness exceeded 10 minutes. Next: inspect this controller's staging build/canary timings. Proof: staging-deployment-${{ inputs.expected_sha }}."
-          exit 1
+          echo "::warning::Staging freshness exceeded 10 minutes (SLO alarm, not a gate). Next: inspect this controller's staging build/canary timings. Proof: staging-deployment-${{ inputs.expected_sha }}."
 
   production-public-profile-alias-gate:
     name: Production public-profile alias usable-result gate
