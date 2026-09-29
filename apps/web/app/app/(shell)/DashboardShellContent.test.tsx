@@ -119,6 +119,30 @@ vi.mock('./shell-route-matches', () => ({
 
 import { DashboardShellContent } from './DashboardShellContent';
 
+const shell = (
+  mode: 'ov' | 'customer',
+  child: React.ReactNode,
+  pathname = '/app'
+) =>
+  DashboardShellContent({ userId: 'user-1', pathname, mode, children: child });
+
+const ovieState = (enabled: boolean, locked: boolean) => {
+  mocks.getFreshAuth.mockResolvedValue({
+    userId: 'user-1',
+    sessionId: 'session-1',
+  });
+  mocks.privacyState.mockResolvedValue({
+    enabled,
+    locked,
+    unlockedUntil: null,
+  });
+};
+
+const boundaryMount = () =>
+  document
+    .querySelector('[data-boundary-mount]')
+    ?.getAttribute('data-boundary-mount');
+
 const dashboardData = {
   user: { id: 'user-1' },
   creatorProfiles: [],
@@ -148,21 +172,8 @@ describe('DashboardShellContent privacy decision', () => {
   });
 
   it('does not invoke dashboard data or serialize child pages while Ovie is locked', async () => {
-    mocks.getFreshAuth.mockResolvedValue({
-      userId: 'user-1',
-      sessionId: 'session-1',
-    });
-    mocks.privacyState.mockResolvedValue({
-      enabled: true,
-      locked: true,
-      unlockedUntil: null,
-    });
-    const tree = await DashboardShellContent({
-      userId: 'user-1',
-      pathname: '/app',
-      mode: 'ov',
-      children: <div>Private route child</div>,
-    });
+    ovieState(true, true);
+    const tree = await shell('ov', <div>Private route child</div>);
 
     render(tree);
     expect(screen.getByText('Unlock Ovie')).toBeInTheDocument();
@@ -181,22 +192,9 @@ describe('DashboardShellContent privacy decision', () => {
 
   it('keeps disabled Ovie privacy usable without consulting the legacy step-up state', async () => {
     mocks.essential.mockReturnValue(false);
-    mocks.getFreshAuth.mockResolvedValue({
-      userId: 'user-1',
-      sessionId: 'session-1',
-    });
-    mocks.privacyState.mockResolvedValue({
-      enabled: false,
-      locked: false,
-      unlockedUntil: null,
-    });
+    ovieState(false, false);
     mocks.dashboard.mockResolvedValue(dashboardData);
-    const tree = await DashboardShellContent({
-      userId: 'user-1',
-      pathname: '/app',
-      mode: 'ov',
-      children: <div>Ovie dashboard</div>,
-    });
+    const tree = await shell('ov', <div>Ovie dashboard</div>);
 
     render(tree);
     expect(screen.getByText('Ovie dashboard')).toBeInTheDocument();
@@ -206,12 +204,7 @@ describe('DashboardShellContent privacy decision', () => {
 
   it('never queries Ovie privacy for the ordinary Jovie shell', async () => {
     mocks.shellDashboard.mockResolvedValue(dashboardData);
-    const tree = await DashboardShellContent({
-      userId: 'user-1',
-      pathname: '/app',
-      mode: 'customer',
-      children: <div>Jovie dashboard</div>,
-    });
+    const tree = await shell('customer', <div>Jovie dashboard</div>);
 
     render(tree);
     expect(screen.getByText('Jovie dashboard')).toBeInTheDocument();
@@ -221,33 +214,13 @@ describe('DashboardShellContent privacy decision', () => {
 
   it('reinitializes the privacy boundary on warm Jovie to locked Ovie navigation', async () => {
     mocks.shellDashboard.mockResolvedValue(dashboardData);
-    const jovieTree = await DashboardShellContent({
-      userId: 'user-1',
-      pathname: '/app',
-      mode: 'customer',
-      children: <div>Jovie dashboard</div>,
-    });
+    const jovieTree = await shell('customer', <div>Jovie dashboard</div>);
     const view = render(jovieTree);
-    const jovieMount = document
-      .querySelector('[data-boundary-mount]')
-      ?.getAttribute('data-boundary-mount');
+    const jovieMount = boundaryMount();
     expect(screen.getByText('Jovie dashboard')).toBeInTheDocument();
 
-    mocks.getFreshAuth.mockResolvedValue({
-      userId: 'user-1',
-      sessionId: 'session-1',
-    });
-    mocks.privacyState.mockResolvedValue({
-      enabled: true,
-      locked: true,
-      unlockedUntil: null,
-    });
-    const ovieTree = await DashboardShellContent({
-      userId: 'user-1',
-      pathname: '/app',
-      mode: 'ov',
-      children: <div>Private Ovie dashboard</div>,
-    });
+    ovieState(true, true);
+    const ovieTree = await shell('ov', <div>Private Ovie dashboard</div>);
     view.rerender(ovieTree);
 
     expect(screen.getByText('Unlock Ovie')).toBeInTheDocument();
@@ -258,39 +231,23 @@ describe('DashboardShellContent privacy decision', () => {
     expect(
       document.querySelector('[data-effective-locked="true"]')
     ).toBeTruthy();
-    expect(
-      document
-        .querySelector('[data-boundary-mount]')
-        ?.getAttribute('data-boundary-mount')
-    ).not.toBe(jovieMount);
+    expect(boundaryMount()).not.toBe(jovieMount);
   });
 
   it('keeps the privacy boundary mounted across ordinary route changes', async () => {
     mocks.shellDashboard.mockResolvedValue(dashboardData);
-    const firstTree = await DashboardShellContent({
-      userId: 'user-1',
-      pathname: '/app',
-      mode: 'customer',
-      children: <div>Dashboard route</div>,
-    });
+    const firstTree = await shell('customer', <div>Dashboard route</div>);
     const view = render(firstTree);
-    const initialMount = document
-      .querySelector('[data-boundary-mount]')
-      ?.getAttribute('data-boundary-mount');
+    const initialMount = boundaryMount();
 
-    const nextTree = await DashboardShellContent({
-      userId: 'user-1',
-      pathname: '/app/settings',
-      mode: 'customer',
-      children: <div>Settings route</div>,
-    });
+    const nextTree = await shell(
+      'customer',
+      <div>Settings route</div>,
+      '/app/settings'
+    );
     view.rerender(nextTree);
 
     expect(screen.getByText('Settings route')).toBeInTheDocument();
-    expect(
-      document
-        .querySelector('[data-boundary-mount]')
-        ?.getAttribute('data-boundary-mount')
-    ).toBe(initialMount);
+    expect(boundaryMount()).toBe(initialMount);
   });
 });

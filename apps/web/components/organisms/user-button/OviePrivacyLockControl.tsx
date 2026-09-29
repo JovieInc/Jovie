@@ -82,7 +82,13 @@ export function OviePrivacyLockControl({
       if (!state.enabled) {
         await ensurePrivacyLockCanBeEnabled();
         const enabled = await updateWorkspacePrivacyLock('enable');
-        if (!enabled.enabled || !enabled.locked) {
+        const activeReceipt =
+          enabled.unlockedUntil !== null &&
+          Date.parse(enabled.unlockedUntil) > Date.now();
+        const confirmedEnabledState =
+          enabled.enabled &&
+          (enabled.locked ? enabled.unlockedUntil === null : activeReceipt);
+        if (!confirmedEnabledState) {
           throw new Error(
             'Ovie did not confirm privacy protection. Try again.'
           );

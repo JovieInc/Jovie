@@ -57,6 +57,36 @@ describe('OviePrivacyLockControl', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('accepts idempotent enable when the server preserves a valid unlock receipt', async () => {
+    const reload = vi.fn();
+    vi.stubGlobal('location', { reload });
+    getState.mockResolvedValue({
+      enabled: false,
+      locked: false,
+      unlockedUntil: null,
+    });
+    updateState.mockResolvedValue({
+      enabled: true,
+      locked: false,
+      unlockedUntil: new Date(Date.now() + 60_000).toISOString(),
+    });
+    ensureReady.mockResolvedValue(undefined);
+
+    render(
+      <OviePrivacyLockControl ensurePrivacyLockCanBeEnabled={ensureReady} />
+    );
+    await screen.findByText('Off · requires an existing admin passkey');
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Enable Ovie privacy lock' })
+    );
+
+    expect(
+      await screen.findByText('On · unlocked for up to 24 hours')
+    ).toBeInTheDocument();
+    expect(reload).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('keeps protection off and exposes readiness failures without enabling', async () => {
     getState.mockResolvedValue({
       enabled: false,

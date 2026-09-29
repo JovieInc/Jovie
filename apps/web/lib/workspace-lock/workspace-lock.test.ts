@@ -10,6 +10,7 @@ import {
   setMoneyHidden,
   updateWorkspacePrivacyLock,
   WORKSPACE_LOCK_COOKIE,
+  WORKSPACE_PRIVACY_LOCK_CONFIRMED_EVENT,
   WorkspacePrivacyLockError,
 } from './workspace-lock';
 
@@ -201,6 +202,10 @@ describe('server-owned Ovie privacy lock client', () => {
 
 describe('legacy lock and money helper behavior during activation', () => {
   it('reloads only after the server confirms the Ovie lock', async () => {
+    const confirmed = vi.fn();
+    window.addEventListener(WORKSPACE_PRIVACY_LOCK_CONFIRMED_EVENT, confirmed, {
+      once: true,
+    });
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({ enabled: true, locked: true, unlockedUntil: null }),
@@ -216,6 +221,15 @@ describe('legacy lock and money helper behavior during activation', () => {
       })
     );
     expect(document.cookie).not.toContain(`${WORKSPACE_LOCK_COOKIE}=1`);
+    expect(confirmed).toHaveBeenCalledOnce();
+    expect((confirmed.mock.calls[0]?.[0] as CustomEvent).detail).toEqual({
+      enabled: true,
+      locked: true,
+      unlockedUntil: null,
+    });
+    expect(confirmed.mock.invocationCallOrder[0]).toBeLessThan(
+      reload.mock.invocationCallOrder[0]!
+    );
     expect(reload).toHaveBeenCalledOnce();
   });
 

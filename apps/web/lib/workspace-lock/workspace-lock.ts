@@ -188,6 +188,14 @@ export async function lockWorkspace() {
       'Ovie did not confirm the privacy lock. Try again.'
     );
   }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent<WorkspacePrivacyLockState>(
+        WORKSPACE_PRIVACY_LOCK_CONFIRMED_EVENT,
+        { detail: state }
+      )
+    );
+  }
   clearWorkspaceLock();
   globalThis.location?.reload();
 }
