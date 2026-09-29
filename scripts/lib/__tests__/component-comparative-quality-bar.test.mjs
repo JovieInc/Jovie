@@ -33,13 +33,15 @@ const redFor = baselineId =>
 
 // The inventory walk and trusted-base git resolution are module-cached but
 // cost seconds on a cold filesystem; paying them inside one test pushes it
-// over the per-test timeout on CI. Warm both caches up front instead.
+// over the per-test timeout on CI. Warm the full runComparativeQualityBar
+// pipeline (and both module caches) up front instead.
 beforeAll(() => {
   discoverAtomMoleculeInventory();
   resolveTrustedBaseEnrollment();
+  runComparativeQualityBar();
 }, 60_000);
 
-describe('component comparative quality bar', () => {
+describe('component comparative quality bar', { timeout: 30_000 }, () => {
   it('extends the approved Shadcn outcome batch without a second contradictory registry', () => {
     const approved = new Map(
       OUTCOME_INVENTORY.entries.map(entry => [entry.id, entry])
