@@ -51,7 +51,10 @@ describe('signInUser test-auth bypass navigation', () => {
     process.env.E2E_USE_TEST_AUTH_BYPASS = '1';
     delete process.env.BASE_URL;
 
-    const goto = vi.fn(async () => ({ status: () => 303 }));
+    const goto = vi.fn(
+      async (_url: string, _options?: Parameters<Page['goto']>[1]) =>
+        ({ status: () => 303 }) as unknown as Awaited<ReturnType<Page['goto']>>
+    );
     const readyLocator = { isVisible: () => Promise.resolve(true) };
     const page = {
       goto,
