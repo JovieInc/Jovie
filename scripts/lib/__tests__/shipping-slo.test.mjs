@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildGistSloBlock,
@@ -16,6 +18,11 @@ import {
   validateBaseline,
 } from '../shipping-slo.mjs';
 
+const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
+const WORKFLOW = readFileSync(
+  resolve(REPO_ROOT, '.github/workflows/shipping-slo.yml'),
+  'utf8'
+);
 const NOW = Date.parse('2026-09-28T00:00:00Z');
 const DAY = 86_400_000;
 const ago = days => new Date(NOW - days * DAY).toISOString();
@@ -46,6 +53,20 @@ const seedBaseline = () =>
       ])
     )
   );
+
+describe('shipping SLO workflow credentials', () => {
+  it('does not persist the read-only checkout credential before app-token git writes', () => {
+    expect(WORKFLOW).toMatch(
+      /- name: Checkout\s+uses: actions\/checkout@[^\n]+\s+with:\s+persist-credentials: false/
+    );
+    expect(WORKFLOW).toContain(
+      'GH_TOKEN: ${{ steps.app-token.outputs.token }}'
+    );
+    expect(WORKFLOW).toContain(
+      'git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"'
+    );
+  });
+});
 
 describe('ciWalltimeByEvent', () => {
   it('computes per-event p95 from successful completed runs in the window', () => {
