@@ -91,8 +91,8 @@ export function ChatProposeNextStepCard({
       return (
         <div className='min-h-72 px-1 py-1'>
           <p className='text-mid leading-7 text-primary-token'>
-            Saving your request to the waitlist now. Keep this page open until
-            the receipt appears.
+            Saving your request and reserving your name and profile now. Keep
+            this page open until the receipt appears.
           </p>
         </div>
       );
@@ -102,8 +102,8 @@ export function ChatProposeNextStepCard({
       return (
         <div className='min-h-72 px-1 py-1'>
           <p className='text-mid leading-7 text-primary-token'>
-            Add a verified email to save this request. You are not on the list
-            until the confirmation appears.
+            Add a verified email to save this request and reserve your name and
+            profile. You are not on the list until the confirmation appears.
           </p>
         </div>
       );
@@ -112,8 +112,8 @@ export function ChatProposeNextStepCard({
     return (
       <div className='min-h-72 space-y-3 px-1 py-1'>
         <p className='mb-3 text-mid leading-7 text-primary-token'>
-          Add a verified email to save this request. You are not on the list
-          until the confirmation appears.
+          Add a verified email to save this request and reserve your name and
+          profile. You are not on the list until the confirmation appears.
         </p>
         <AuthShell
           mode='sign-up'

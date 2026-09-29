@@ -19,12 +19,17 @@ interface WaitlistOutcomeViewProps {
   readonly onRetry?: () => void;
   /** Known contact email for the receipt (optional). */
   readonly email?: string | null;
+  /**
+   * jov.ie handle held by the reservation profile, when one exists. Copy
+   * only claims the handle is reserved when this is non-null.
+   */
+  readonly reservedHandle?: string | null;
 }
 
 type OutcomeCopy = {
   readonly title: string;
-  /** Body may depend on whether a contact email is known (never invent one). */
-  readonly body: (hasEmail: boolean) => string;
+  /** Body may depend on the known contact email and reserved handle. */
+  readonly body: (hasEmail: boolean, reservedHandle: string | null) => string;
   readonly icon: typeof CheckCircle2;
   readonly actionLabel?: string;
   readonly actionHref?: string;
@@ -77,10 +82,12 @@ const OUTCOME_COPY: Record<WaitlistOutcomeViewProps['outcome'], OutcomeCopy> = {
   },
   pending: {
     title: "You're on the list",
-    body: hasEmail =>
-      hasEmail
-        ? "Request saved. We'll email you when a spot opens — typically within a few days of capacity."
-        : 'Request saved. Return via /start when a spot opens — typically within a few days of capacity.',
+    body: (hasEmail, reservedHandle) =>
+      reservedHandle
+        ? `jov.ie/${reservedHandle} is yours. Your name and profile are reserved — we'll email you the moment your spot opens.`
+        : hasEmail
+          ? "Request saved. We'll email you when a spot opens — typically within a few days of capacity."
+          : 'Request saved. Return via /start when a spot opens — typically within a few days of capacity.',
     icon: Clock3,
     showNextSteps: true,
   },
@@ -154,11 +161,12 @@ export function WaitlistOutcomeView({
   outcome,
   onRetry,
   email,
+  reservedHandle,
 }: Readonly<WaitlistOutcomeViewProps>) {
   const copy = OUTCOME_COPY[outcome];
   const Icon = copy.icon;
   const hasEmail = Boolean(email?.trim());
-  const body = copy.body(hasEmail);
+  const body = copy.body(hasEmail, reservedHandle?.trim() || null);
   const canRetry =
     (outcome === 'save_failed' || outcome === 'rate_limited') && onRetry;
   const { signOut } = useAuthSafe();
