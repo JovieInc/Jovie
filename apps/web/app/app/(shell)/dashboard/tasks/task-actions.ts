@@ -49,7 +49,7 @@ import type {
 import { requireProfileId } from '../requireProfileId';
 import {
   getScreenCertTaskById,
-  SCREEN_CERT_TASKS_FIXTURE,
+  getScreenCertTasksFixture,
 } from './_lib/screen-cert-fixture';
 
 const DEFAULT_TASK_LIMIT = 50;
@@ -444,7 +444,7 @@ export async function getTasks(filters?: TaskFilters): Promise<TaskListResult> {
     // calls this with DEFAULT_TASK_WORKSPACE_FILTERS (limit only, no
     // status/search/cursor), so a filtered result is never observed by
     // the producer this fixture serves.
-    return SCREEN_CERT_TASKS_FIXTURE;
+    return getScreenCertTasksFixture();
   }
   await requireTasksWorkspaceAccess();
   const limit = clampLimit(filters?.limit);

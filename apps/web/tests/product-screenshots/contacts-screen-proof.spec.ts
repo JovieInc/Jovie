@@ -2,6 +2,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { SCREEN_CERT_CONTACTS_SELECTED_NAME } from '@/app/api/dashboard/contacts/_lib/screen-cert-fixture';
 import { waitForHydration } from '../e2e/utils/smoke-test-utils';
 import { collectBrowserErrors } from '../visual-qa/route-quality';
 import { createAppShellDegradedTolerance } from './_lib/app-shell-degraded-tolerance';
@@ -41,7 +42,6 @@ const enterUrl = `/api/dev/test-auth/enter?persona=creator&redirect=${encodeURIC
 
 // Contact rows render `${personName} @ ${companyName}` (columns.tsx) — match
 // on the person's name rather than the full combined string.
-const SELECTED_CONTACT_NAME = 'Priya Anand';
 
 // Shared with tasks-screen-proof.spec.ts — both mount the full
 // authenticated app shell and see the same unrelated chrome-widget
@@ -114,7 +114,9 @@ test('emits exact-head contacts desktop and mobile evidence', async ({
 
     // Select a contact so the capture shows the populated list plus the
     // open detail sidebar, per JOV-7127-pattern review parity with Pen.
-    await root.getByText(SELECTED_CONTACT_NAME, { exact: false }).click();
+    await root
+      .getByText(SCREEN_CERT_CONTACTS_SELECTED_NAME, { exact: false })
+      .click();
     await expect(
       page.locator('[data-testid="contact-detail-entity-header"]:visible')
     ).toBeVisible();
