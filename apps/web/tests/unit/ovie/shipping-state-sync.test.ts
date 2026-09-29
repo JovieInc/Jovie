@@ -103,6 +103,8 @@ function baseline(
         measuredMeanings: { exactLiveBuild: true },
       }
     ),
+    'staging-controller': ok('staging-controller', { conclusion: 'success' }),
+    'staging-build-info': ok('staging-build-info', { commitSha: SHA }),
     ...overrides,
   };
 }

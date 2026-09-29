@@ -579,6 +579,36 @@ describe('electron-bridge — defensive guards', () => {
       expect(() => unsub()).not.toThrow();
     });
   });
+
+  describe('showDesktopNotification — native notification bridge', () => {
+    it('silently no-ops when electronAPI is absent (browser)', async () => {
+      await expect(
+        __testing.showDesktopNotification({ title: 'New message' })
+      ).resolves.toBeUndefined();
+      expect(captureWarningMock).not.toHaveBeenCalled();
+    });
+
+    it('silently no-ops when showNotification is missing (stale binary)', async () => {
+      setElectronAPI({ versions: { app: '0.1.0' } });
+      await expect(
+        __testing.showDesktopNotification({ title: 'New message' })
+      ).resolves.toBeUndefined();
+      expect(captureWarningMock).not.toHaveBeenCalled();
+    });
+
+    it('passes the payload through to the bridge', async () => {
+      const showNotification = vi.fn().mockResolvedValue({ ok: true });
+      setElectronAPI({ showNotification });
+
+      const payload = {
+        title: 'New fan DM',
+        body: 'Alex sent you a message',
+        url: '/inbox?thread=123',
+      };
+      await __testing.showDesktopNotification(payload);
+      expect(showNotification).toHaveBeenCalledWith(payload);
+    });
+  });
 });
 
 /**

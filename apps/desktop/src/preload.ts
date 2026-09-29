@@ -18,6 +18,7 @@ const CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL =
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
 const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
 const TRAY_ACTION_CHANNEL = 'tray-action';
+const DESKTOP_NOTIFICATION_CHANNEL = 'desktop-notification-show';
 const APP_BOOTED_CHANNEL = 'app-booted';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
 const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity';
@@ -211,6 +212,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on(TRAY_ACTION_CHANNEL, listener);
     return () => ipcRenderer.removeListener(TRAY_ACTION_CHANNEL, listener);
   },
+
+  /**
+   * Post a native OS notification (JOV-6716). The main process validates the
+   * payload and, on click, routes `url` through the same URL disposition rules
+   * as in-app navigation — deep links land on the right screen, unsafe URLs
+   * just focus the window.
+   */
+  showNotification: (payload: {
+    title: string;
+    body?: string;
+    url?: string;
+  }) =>
+    ipcRenderer.invoke(DESKTOP_NOTIFICATION_CHANNEL, payload) as Promise<{
+      ok: boolean;
+      reason?: string;
+    }>,
 
   /**
    * First successful hosted-app paint (JOV-3595). Cancels the main-process

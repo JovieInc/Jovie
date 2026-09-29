@@ -28,6 +28,18 @@ async function sampleChest(mockup: Buffer): Promise<{
   return { r: data[0] ?? 0, g: data[1] ?? 0, b: data[2] ?? 0 };
 }
 
+async function sampleHood(mockup: Buffer): Promise<{
+  readonly r: number;
+  readonly g: number;
+  readonly b: number;
+}> {
+  const { data } = await sharp(mockup)
+    .extract({ left: 900, top: 180, width: 1, height: 1 })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  return { r: data[0] ?? 0, g: data[1] ?? 0, b: data[2] ?? 0 };
+}
+
 describe('renderMockup', () => {
   it('renders distinct product-aware fallback mockups', async () => {
     const printFile = await buildPrintFile();
@@ -49,6 +61,17 @@ describe('renderMockup', () => {
     expect(tee.equals(hoodie)).toBe(false);
     expect(tee.equals(hat)).toBe(false);
     expect(hoodie.equals(hat)).toBe(false);
+
+    const [teeHood, hoodieHood] = await Promise.all([
+      sampleHood(tee),
+      sampleHood(hoodie),
+    ]);
+    expect(teeHood.r).toBeGreaterThan(200);
+    expect(teeHood.g).toBeGreaterThan(200);
+    expect(teeHood.b).toBeGreaterThan(200);
+    expect(hoodieHood.r).toBeLessThan(80);
+    expect(hoodieHood.g).toBeLessThan(80);
+    expect(hoodieHood.b).toBeLessThan(80);
   });
 
   it('keeps a generated full-bleed graphic visible on the garment', async () => {
