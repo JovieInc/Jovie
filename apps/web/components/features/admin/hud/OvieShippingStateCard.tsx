@@ -245,7 +245,7 @@ function ShippingStateBody({
       </p>
       {delivery.lanes.capacity ? (
         <div
-          className='rounded-lg border border-subtle px-2.5'
+          className='rounded-lg border border-subtle px-3'
           data-testid='capacity-horizon'
         >
           <div className='flex items-center justify-between py-2 text-2xs text-secondary-token'>
