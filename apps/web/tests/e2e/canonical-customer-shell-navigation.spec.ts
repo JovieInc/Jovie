@@ -17,30 +17,24 @@ test.skip(
   'Requires E2E_USE_TEST_AUTH_BYPASS=1'
 );
 
-const CANONICAL_LABELS = [
-  'Inbox',
-  'New Chat',
-  'Library',
-  'Contacts',
-  'Calendar',
-  'Tasks',
-] as const;
+const CANONICAL_LABELS = ['Home', 'Presence', 'Links', 'Audience'] as const;
 
 const CANONICAL_HREFS = [
   APP_ROUTES.DASHBOARD,
-  APP_ROUTES.CHAT,
-  APP_ROUTES.LIBRARY,
-  APP_ROUTES.CONTACTS,
-  APP_ROUTES.CALENDAR,
-  APP_ROUTES.TASKS,
+  APP_ROUTES.PROFILES,
+  APP_ROUTES.CHAT_PROFILE_PANEL,
+  APP_ROUTES.CONTACTS_AUDIENCE,
 ] as const;
 
 const FORBIDDEN_LABELS = [
-  'Search',
-  'Touring',
-  'Audience',
-  'Profiles',
+  'Calendar',
+  'Contacts',
+  'Events',
+  'Library',
+  'Products',
   'Releases',
+  'Tasks',
+  'Videos',
 ] as const;
 
 async function installStableShell(page: Page) {
@@ -120,13 +114,12 @@ test('mobile navigation and canonical sidebar are stable at 375, 768, and 1440',
     });
     await expect(expanded).toBeVisible();
     const expandedLinks = expanded.getByRole('link');
-    await expect(expandedLinks).toHaveCount(8);
+    await expect(expandedLinks).toHaveCount(5);
     expect(await linkContract(expandedLinks)).toEqual([
       ...CANONICAL_LABELS.map((label, index) => ({
         label,
         href: CANONICAL_HREFS[index],
       })),
-      { label: 'Presence', href: APP_ROUTES.PROFILES },
       { label: 'Settings', href: APP_ROUTES.SETTINGS },
     ]);
     for (const label of FORBIDDEN_LABELS) {
@@ -155,11 +148,12 @@ test('mobile navigation and canonical sidebar are stable at 375, 768, and 1440',
   ).toBeHidden();
 
   const primarySection = desktopNav.locator('[data-nav-section]').first();
-  expect(await linkContract(primarySection.getByRole('link'))).toEqual([
-    { label: 'Library', href: APP_ROUTES.LIBRARY },
-    { label: 'Contacts', href: APP_ROUTES.CONTACTS },
-    { label: 'Presence', href: APP_ROUTES.PROFILES },
-  ]);
+  expect(await linkContract(primarySection.getByRole('link'))).toEqual(
+    CANONICAL_LABELS.map((label, index) => ({
+      label,
+      href: CANONICAL_HREFS[index],
+    }))
+  );
   for (const label of FORBIDDEN_LABELS) {
     await expect(primarySection.getByRole('link', { name: label })).toHaveCount(
       0

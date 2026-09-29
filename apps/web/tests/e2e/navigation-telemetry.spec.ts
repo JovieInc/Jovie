@@ -34,14 +34,14 @@ async function installConsentAndClsObserver(page: Page) {
       String(value).includes(endpoint);
     const capture = (
       body: BodyInit | null | undefined,
-      librarySurfaceVisible: boolean,
+      presenceSurfaceVisible: boolean,
       observationSequence: number
     ) => {
       const append = (raw: string) => {
         try {
           window.__JOVIE_NAV_TELEMETRY_OBSERVATIONS__?.push({
             payload: JSON.parse(raw) as NavigationTelemetryPayload,
-            librarySurfaceVisible,
+            presenceSurfaceVisible,
             sequence: observationSequence,
           });
         } catch {
@@ -59,13 +59,13 @@ async function installConsentAndClsObserver(page: Page) {
 
     const originalSendBeacon = navigator.sendBeacon.bind(navigator);
     navigator.sendBeacon = (url, data) => {
-      const librarySurfaceVisible = Boolean(
-        document.querySelector('[data-testid="library-surface"]')
+      const presenceSurfaceVisible = Boolean(
+        document.querySelector('[data-testid="profiles-workspace"]')
       );
       const observationSequence = sequence++;
       const sent = originalSendBeacon(url, data);
       if (sent && isNavigationTelemetryUrl(url)) {
-        capture(data, librarySurfaceVisible, observationSequence);
+        capture(data, presenceSurfaceVisible, observationSequence);
       }
       return sent;
     };
@@ -76,7 +76,7 @@ async function installConsentAndClsObserver(page: Page) {
       if (isNavigationTelemetryUrl(url)) {
         capture(
           init?.body,
-          Boolean(document.querySelector('[data-testid="library-surface"]')),
+          Boolean(document.querySelector('[data-testid="profiles-workspace"]')),
           sequence++
         );
       }
@@ -116,10 +116,10 @@ test('desktop navigation emits exactly one redacted activation-to-ready pair', a
   });
   await page
     .getByRole('navigation', { name: 'Dashboard Navigation' })
-    .getByRole('link', { name: 'Library' })
+    .getByRole('link', { name: 'Presence' })
     .click();
-  await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.LIBRARY}$`));
-  await expect(page.getByTestId('library-surface')).toBeVisible({
+  await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.PROFILES}$`));
+  await expect(page.getByTestId('profiles-workspace')).toBeVisible({
     timeout: 30_000,
   });
   await expect
@@ -129,7 +129,7 @@ test('desktop navigation emits exactly one redacted activation-to-ready pair', a
           () =>
             window.__JOVIE_NAV_TELEMETRY_OBSERVATIONS__?.filter(
               observation =>
-                observation.payload.item_id === 'library' &&
+                observation.payload.item_id === 'presence' &&
                 ['activation', 'destination_ready'].includes(
                   observation.payload.event
                 )
@@ -145,7 +145,7 @@ test('desktop navigation emits exactly one redacted activation-to-ready pair', a
   const clickToReady = observations
     .filter(
       observation =>
-        observation.payload.item_id === 'library' &&
+        observation.payload.item_id === 'presence' &&
         ['activation', 'destination_ready'].includes(observation.payload.event)
     )
     .toSorted((left, right) => left.sequence - right.sequence);
@@ -155,14 +155,14 @@ test('desktop navigation emits exactly one redacted activation-to-ready pair', a
   ]);
   expect(clickToReady[0]?.payload).toMatchObject({
     source_route: 'chat',
-    destination_route: 'library',
+    destination_route: 'other_app',
     input_method: 'pointer',
     platform: 'web_desktop',
     nav_variant: 'canonical_customer_ia_v1',
     consent_mode: 'explicit',
   });
-  expect(clickToReady[0]?.librarySurfaceVisible).toBe(false);
-  expect(clickToReady[1]?.librarySurfaceVisible).toBe(true);
+  expect(clickToReady[0]?.presenceSurfaceVisible).toBe(false);
+  expect(clickToReady[1]?.presenceSurfaceVisible).toBe(true);
   expect(clickToReady[1]?.payload.latency_bucket).not.toBe('na');
 
   const payloads = observations.map(({ payload }) => payload);
@@ -192,7 +192,7 @@ test('desktop navigation emits exactly one redacted activation-to-ready pair', a
     body: JSON.stringify(payloads, null, 2),
     contentType: 'application/json',
   });
-  await testInfo.attach('navigation-telemetry-library', {
+  await testInfo.attach('navigation-telemetry-presence', {
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png',
   });
@@ -211,7 +211,7 @@ declare global {
 
   interface BrowserTelemetryObservation {
     readonly payload: NavigationTelemetryPayload;
-    readonly librarySurfaceVisible: boolean;
+    readonly presenceSurfaceVisible: boolean;
     readonly sequence: number;
   }
 }

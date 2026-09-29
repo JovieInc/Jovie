@@ -39,6 +39,8 @@ export const APP_ROUTES = {
   /** @deprecated Profile is now a drawer on the chat route. Use CHAT instead. */
   PROFILE: '/app/chat',
   CONTACTS: '/app/contacts',
+  /** Audience context inside the Contacts workspace. */
+  CONTACTS_AUDIENCE: '/app/contacts?tab=audience',
   RELEASES: '/app/releases',
   TOUR_DATES: '/app/tour-dates',
   CALENDAR: '/app/calendar',

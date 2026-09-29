@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import type { NavItem } from './types';
 
 const LIBRARY_ROUTE_ROOTS = [
   APP_ROUTES.LIBRARY,
@@ -19,4 +20,52 @@ export function isLibraryNavigationRoute(pathname: string): boolean {
     route =>
       normalizedPathname === route || normalizedPathname.startsWith(`${route}/`)
   );
+}
+
+interface NavigationSearchParams {
+  getAll(name: string): string[];
+}
+
+function normalizePathname(pathname: string): string {
+  return pathname === '/' ? pathname : pathname.replace(/\/$/, '');
+}
+
+/**
+ * Match a root navigation item without treating query-backed contextual views
+ * as their entire parent workspace. Extra query params are allowed so filters
+ * inside Links or Audience do not clear the active root destination.
+ */
+export function isNavigationItemActive(
+  item: Pick<NavItem, 'href' | 'id'>,
+  pathname: string,
+  searchParams: NavigationSearchParams
+): boolean {
+  const normalizedPathname = normalizePathname(pathname);
+
+  if (item.id === 'home') {
+    return normalizedPathname === APP_ROUTES.DASHBOARD;
+  }
+
+  if (item.id === 'library' && isLibraryNavigationRoute(pathname)) {
+    return true;
+  }
+
+  const target = new URL(item.href, 'https://jovie.local');
+  const targetPathname = normalizePathname(target.pathname);
+  if (
+    normalizedPathname !== targetPathname &&
+    !normalizedPathname.startsWith(`${targetPathname}/`)
+  ) {
+    return false;
+  }
+
+  for (const key of new Set(target.searchParams.keys())) {
+    const expected = target.searchParams.getAll(key);
+    const current = searchParams.getAll(key);
+    if (!expected.every(value => current.includes(value))) {
+      return false;
+    }
+  }
+
+  return true;
 }
