@@ -43,7 +43,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          run_ids="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --event merge_group --status success --limit 10 --json databaseId --jq '.[].databaseId')"
+          # GitHub's server-side `status=success` filter can return stale runs;
+          # list recent queue runs first, then filter their conclusions locally.
+          run_ids="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --event merge_group --limit 50 --json databaseId,conclusion --jq 'map(select(.conclusion == "success"))[:10][].databaseId')"
           if [ -z "$run_ids" ]; then
             echo "::error::No successful merge-queue CI run found."
             exit 1
@@ -64,6 +66,10 @@ jobs:
             fi
             echo "::notice::Run $run_id ran no Build jobs; trying an older run."
           done
+          if [ ! -s build.log ]; then
+            echo "::error::No successful merge-queue CI run with Build logs found."
+            exit 1
+          fi
           echo "url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run_id" >> "$GITHUB_OUTPUT"
 
       - name: File deduped deprecation issues
