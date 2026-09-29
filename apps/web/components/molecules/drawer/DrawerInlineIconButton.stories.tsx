@@ -1,7 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Copy } from 'lucide-react';
 import { expect, fn, userEvent, within } from 'storybook/test';
-import { DrawerInlineIconButton } from './DrawerInlineIconButton';
+import {
+  DrawerInlineIconButton,
+  type DrawerInlineIconButtonProps,
+} from './DrawerInlineIconButton';
 
 const meta = {
   title: 'Molecules/Drawer/DrawerInlineIconButton',
@@ -21,7 +24,7 @@ const meta = {
     onClick: fn(),
     children: <Copy className='h-3.5 w-3.5' />,
   },
-} satisfies Meta<typeof DrawerInlineIconButton>;
+} satisfies Meta<Extract<DrawerInlineIconButtonProps, { href?: never }>>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -44,8 +47,11 @@ export const FadeOnParentHover: Story = {
 
 export const AsLink: Story = {
   args: {
-    href: 'https://jov.ie/tim',
     'aria-label': 'Open profile',
-    onClick: undefined,
   },
+  render: () => (
+    <DrawerInlineIconButton href='https://jov.ie/tim' aria-label='Open profile'>
+      <Copy className='h-3.5 w-3.5' />
+    </DrawerInlineIconButton>
+  ),
 };

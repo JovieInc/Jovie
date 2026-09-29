@@ -32,9 +32,7 @@ function BuiltMenuPreview({
   return (
     <ul className='w-56 rounded-lg border border-subtle bg-surface-1 p-1 text-app'>
       {items.map((item, index) =>
-        'type' in item ? (
-          <li key={`separator-${index}`} className='my-1 h-px bg-subtle' />
-        ) : (
+        'onClick' in item ? (
           <li
             key={item.id}
             className={
@@ -43,6 +41,8 @@ function BuiltMenuPreview({
           >
             {item.label}
           </li>
+        ) : (
+          <li key={`separator-${index}`} className='my-1 h-px bg-subtle' />
         )
       )}
     </ul>
