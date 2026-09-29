@@ -295,8 +295,13 @@ def dispositions(prs: list[dict], plan: dict, attempts: dict, max_attempts: int,
         elif attempts.get(str(number), {}).get("count", 0) >= max_attempts:
             row.update(state="hold:fix-exhausted", next="bug intake / the pool")
         elif pr.get("isDraft"):
-            row.update(state="draft", reason="inside the 48h stale SLO",
-                       next="its writer, or the sweep at the SLO")
+            if idle_s >= STALE_DRAFT_S:
+                row.update(state="draft", reason="past the 48h stale SLO",
+                           next=("closes as abandoned at the 7d age SLO" if agent_owned(pr)
+                                 else "writer-owned branch; the sweep never closes non-agent drafts"))
+            else:
+                row.update(state="draft", reason="inside the 48h stale SLO",
+                           next="its writer, or the sweep at the SLO")
         else:
             row.update(state="orphaned", next="orphan-prs alert")
         rows.append(row)
