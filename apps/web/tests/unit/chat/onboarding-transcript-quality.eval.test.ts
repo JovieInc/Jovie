@@ -11,7 +11,24 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import {
+  formatPublicPriceDisplay,
+  getPublicPriceClaim,
+} from '@/lib/billing/offer-truth';
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
+
+// JOV-7135: the only dollar amounts an onboarding transcript may quote.
+const TRUE_PRICES = new Set(
+  (['free', 'pro'] as const).map(plan =>
+    formatPublicPriceDisplay(getPublicPriceClaim(plan)).replace('/mo', '')
+  )
+);
+
+function quotesUntruePrice(text: string): boolean {
+  return (text.match(/\$\d[\d,]*(?:\.\d+)?/g) ?? []).some(
+    amount => !TRUE_PRICES.has(amount)
+  );
+}
 
 interface TranscriptTurn {
   readonly role: 'user' | 'assistant';
@@ -87,6 +104,14 @@ function evaluateTranscript(turns: readonly TranscriptTurn[]): TranscriptCheck {
     reasons.push('pricing appeared before checkout intent');
   }
 
+  for (const turn of turns) {
+    if (turn.role === 'assistant' && quotesUntruePrice(turn.text)) {
+      reasons.push(
+        `assistant quoted a price that is not offer truth: ${turn.text}`
+      );
+    }
+  }
+
   const fullText = turns
     .map(turn => turn.text)
     .join('\n')
@@ -124,7 +149,7 @@ describe('Onboarding transcript quality eval', () => {
       {
         role: 'assistant',
         afterTool: 'proposeCheckout',
-        text: 'That is the move. Pro is $39/mo, free tier exists if you want to start lighter.',
+        text: `That is the move. Pro is ${formatPublicPriceDisplay(getPublicPriceClaim('pro'))}, free tier exists if you want to start lighter.`,
       },
     ]);
 
@@ -153,6 +178,39 @@ describe('Onboarding transcript quality eval', () => {
         'pricing appeared before checkout intent',
         'generic objection copy detected: we offer a comprehensive solution',
       ])
+    );
+  });
+});
+
+describe('onboarding price truth (JOV-7135)', () => {
+  it('fails a transcript that quotes a stale price', () => {
+    const result = evaluateTranscript([
+      { role: 'assistant', text: 'I will remember this chat if you sign up.' },
+      {
+        role: 'assistant',
+        afterTool: 'confirmSpotifyArtist',
+        text: 'Pulled up this artist. 12.3K Spotify followers, one release this year.',
+      },
+      {
+        role: 'assistant',
+        afterTool: 'proposeCheckout',
+        text: 'Pro is $39/mo.',
+      },
+    ]);
+    expect(result.reasons).toEqual(
+      expect.arrayContaining([expect.stringContaining('not offer truth')])
+    );
+  });
+
+  it('keeps every price literal out of the prompt source', async () => {
+    const { readFileSync } = await import('node:fs');
+    const source = readFileSync(
+      new URL('../../../lib/chat/prompts/onboarding.ts', import.meta.url),
+      'utf8'
+    );
+    expect(source).not.toMatch(/\$\d/);
+    expect(ONBOARDING_SYSTEM_PROMPT).toContain(
+      formatPublicPriceDisplay(getPublicPriceClaim('pro'))
     );
   });
 });
