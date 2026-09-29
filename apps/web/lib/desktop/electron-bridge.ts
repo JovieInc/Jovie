@@ -99,6 +99,16 @@ export interface ElectronAPI {
    */
   readonly onTrayAction?: (cb: (action: string) => void) => () => void;
   /**
+   * Post a native OS notification. On click the main process routes `url`
+   * through the desktop URL disposition rules, so only routes the shell
+   * already allows can be deep-linked. Optional on older binaries.
+   */
+  readonly showNotification?: (payload: {
+    title: string;
+    body?: string;
+    url?: string;
+  }) => Promise<{ readonly ok: boolean; readonly reason?: string }>;
+  /**
    * Signal first successful React paint so the desktop shell can cancel its
    * boot watchdog (JOV-3595). Optional — older binaries ignore the channel.
    */
@@ -788,6 +798,26 @@ export function onDesktopTrayAction(cb: (action: string) => void): () => void {
   return typeof unsubscribe === 'function' ? unsubscribe : noopUnsubscribe;
 }
 
+export interface DesktopNotificationPayload {
+  readonly title: string;
+  readonly body?: string;
+  readonly url?: string;
+}
+
+/**
+ * Post a native OS notification for an event the user already opted into by
+ * email (inbox, chat). Clicking it deep-links into the app via the desktop
+ * URL disposition rules. Silently no-ops in the browser and on stale binaries
+ * that predate the notification bridge.
+ */
+export async function showDesktopNotification(
+  payload: DesktopNotificationPayload
+): Promise<void> {
+  const api = getRawElectronAPI();
+  if (!api || typeof api.showNotification !== 'function') return;
+  await api.showNotification(payload);
+}
+
 export async function launchOperatorControl(
   request: OperatorLaunchRequest
 ): Promise<{ readonly ok: boolean; readonly reason?: string }> {
@@ -822,6 +852,7 @@ export const __testing = {
   consumeDesktopAuthCompletion,
   setDesktopTrayState,
   onDesktopTrayAction,
+  showDesktopNotification,
   launchOperatorControl,
   notifyDesktopAppBooted,
   RELEASE_DOWNLOAD_URL,

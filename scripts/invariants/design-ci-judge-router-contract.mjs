@@ -28,7 +28,9 @@ const EXPECTATIONS = [
     includes: [
       'JOV-INV-040',
       'export async function buildDesignCiJudgeMatrix',
+      'export function evaluateDesignCiJudgeMatrix',
       "'unroutable-judge'",
+      "'no-executable-proof'",
     ],
   },
   {

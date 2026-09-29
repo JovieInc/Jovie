@@ -194,7 +194,15 @@ export function ClaimHandleForm({
             aria-describedby={helperState.text ? 'handle-hint' : undefined}
             className={cn(
               'system-b-claim-handle-input',
-              'min-w-0 flex-1 bg-transparent focus-visible:border-focus focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-focus-ring)',
+              // JOV-INV-019: tailwind-merge collapses focus-visible:outline
+              // and focus-visible:outline-2 into the same conflict group and
+              // keeps only the last one, so outline-style never actually
+              // turns on (outline-width without outline-style paints
+              // nothing) — and focus-visible:border-focus had no border
+              // width on this bare input to make a color change visible.
+              // focus-ring-themed is the shared box-shadow-based ring the
+              // rest of the app uses for exactly this reason.
+              'min-w-0 flex-1 bg-transparent focus-ring-themed',
               isHeroLike
                 ? 'placeholder:text-quaternary-token'
                 : 'placeholder:text-tertiary-token'
