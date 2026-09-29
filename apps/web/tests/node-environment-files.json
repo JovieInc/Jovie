@@ -764,7 +764,6 @@
   "tests/unit/home/homepage-proof-no-card-v1.test.ts",
   "tests/unit/home/mounted-home-artist-outcomes-system-b-style-guard.test.ts",
   "tests/unit/home/mounted-home-closed-loop-system-b-style-guard.test.ts",
-  "tests/unit/home/mounted-home-command-center-system-b-style-guard.test.ts",
   "tests/unit/home/mounted-home-footer-cta-system-b-style-guard.test.ts",
   "tests/unit/home/mounted-home-grid-spine-system-b-style-guard.test.ts",
   "tests/unit/home/mounted-home-hero-system-b-style-guard.test.ts",
