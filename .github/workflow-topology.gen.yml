@@ -242,6 +242,7 @@ nodes:
       - Production Controller
       - Rolling CI Dispatch
       - Staging Controller
+      - Test Flakiness Report
     triggeringStateTransition:
       - merge_group
       - push
@@ -279,7 +280,6 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - push
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:analyze
     jobCount: 1
@@ -377,9 +377,10 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Test Flakiness Report
     triggeringStateTransition:
-      - schedule
+      - push
       - workflow_dispatch
     terminalReceipt: job:notify
     jobCount: 2
@@ -391,7 +392,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
+      - push
       - workflow_dispatch
     terminalReceipt: job:real-model-eval
     jobCount: 1
@@ -744,22 +745,23 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
+      - push
       - workflow_dispatch
     terminalReceipt: job:report
-    jobCount: 6
-  - name: Nightly Tests
+    jobCount: 5
+  - name: Changed-Evidence Test Suites
     path: .github/workflows/nightly-tests.yml
     active: true
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Test Flakiness Report
     triggeringStateTransition:
-      - schedule
+      - push
       - workflow_dispatch
     terminalReceipt: job:notify
-    jobCount: 5
+    jobCount: 4
   - name: Node Runtime Compatibility
     path: .github/workflows/node-runtime-compatibility.yml
     active: true
@@ -1095,7 +1097,6 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - push
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:workflow-execution-posture
     jobCount: 6
@@ -1153,10 +1154,10 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
       - workflow_dispatch
+      - workflow_run
     terminalReceipt: job:sonarcloud
-    jobCount: 2
+    jobCount: 1
   - name: Source Admission Review Signal
     path: .github/workflows/source-admission-review-signal.yml
     active: true
@@ -1253,12 +1254,13 @@ nodes:
   - name: Test Coverage Audit
     path: .github/workflows/test-coverage-audit.yml
     active: true
-    category: telemetry-aggregation
-    authoritativeProducer: Delivery Control Receipts
+    category: source-validation
+    authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - SonarCloud
     triggeringStateTransition:
-      - schedule
+      - push
       - workflow_dispatch
     terminalReceipt: job:audit
     jobCount: 1
@@ -1270,8 +1272,8 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
       - workflow_dispatch
+      - workflow_run
     terminalReceipt: job:analyze-flakiness
     jobCount: 1
   - name: TSC Cache Warm
@@ -1289,8 +1291,8 @@ nodes:
   - name: UI Story Coverage Audit
     path: .github/workflows/ui-story-coverage-audit.yml
     active: true
-    category: telemetry-aggregation
-    authoritativeProducer: Delivery Control Receipts
+    category: source-validation
+    authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
@@ -1362,9 +1364,21 @@ edges:
   - from: Eve Pilot
     to: Safe PR Remediation
     type: workflow_run
+  - from: Test Coverage Audit
+    to: SonarCloud
+    type: workflow_run
   - from: CI
     to: Staging Controller
     type: workflow_run
   - from: Staging Controller
     to: Production Release
     type: workflow_call
+  - from: CI
+    to: Test Flakiness Report
+    type: workflow_run
+  - from: Changed-Evidence Test Suites
+    to: Test Flakiness Report
+    type: workflow_run
+  - from: E2E Full Browser Matrix
+    to: Test Flakiness Report
+    type: workflow_run

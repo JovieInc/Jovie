@@ -5,6 +5,7 @@ import { buildTopology, findCycle, validateTopology } from './ci-workflow-topolo
 
 test('repository workflows satisfy the topology and fan-out contract', () => {
   const { policy, nodes, edges } = buildTopology();
+  assert.equal(nodes.find(node => node.name === 'Test Coverage Audit')?.category, 'source-validation');
   assert.deepEqual(validateTopology({ policy, nodes, edges }).errors, []);
   const observers = new Set(nodes.filter(node => node.active && node.category === 'telemetry-aggregation').map(node => node.name));
   assert.equal(edges.some(edge => edge.type === 'workflow_run' && observers.has(edge.from)), false);
