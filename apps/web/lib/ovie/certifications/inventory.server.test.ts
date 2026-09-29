@@ -1,16 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MARKETING_COMPONENT_REGISTRY } from '@/data/marketing/componentRegistry';
 import {
-  type AcquisitionCertificationCandidate,
-  type AcquisitionCertificationPorts,
-  AcquisitionCertificationStore,
-} from '@/lib/acquisition/certification-store';
-import {
-  buildCertificationDecisionDigest,
-  type CertificationEvidenceReceipt,
-} from '@/lib/agent-os/certification';
+  ACQUISITION_SUBJECT as CUSTOMER_SUBJECT,
+  acquisitionStoreHarness as customerStoreHarness,
+} from '@/lib/acquisition/certification-store.fixtures';
+import { buildCertificationDecisionDigest } from '@/lib/agent-os/certification';
 import { MarketingCertificationStore } from '@/lib/agent-os/certification-adapter';
-import type { CertificationRecordBackend } from '@/lib/agent-os/certification-cas';
 import {
   FIXTURE_NOW,
   fixturePacket,
@@ -311,118 +306,6 @@ describe('recordOvieCertificationDecision', () => {
     expect(d.backendInstance.records.size).toBe(0);
   });
 });
-
-const CUSTOMER_SUBJECT = 'acquisition:premade-artist-profile:lead1:run1';
-const CUSTOMER_SHA = 'a'.repeat(40);
-const CUSTOMER_NOW = '2026-09-12T22:00:00.000Z';
-
-function customerProof(
-  tier: CertificationEvidenceReceipt['tier']
-): CertificationEvidenceReceipt {
-  return {
-    id: tier,
-    tier,
-    status: 'passed',
-    sourceSha: CUSTOMER_SHA,
-    ref: `fixture:${tier}`,
-    digest: `fixture-digest:${tier}`,
-    summary: 'Synthetic test evidence only',
-  };
-}
-
-function customerCandidate(): AcquisitionCertificationCandidate {
-  return {
-    subjectId: CUSTOMER_SUBJECT,
-    leadId: 'lead1',
-    runId: 'run1',
-    profileId: 'profile1',
-    revision: 'domain-revision-1',
-    sourceRef: 'fixture:lead1/run1/revision1',
-    displayName: 'Fixture artist',
-    profileUrl: 'https://example.test/artist',
-    claimUrl: 'https://example.test/claim',
-    qualificationRef: 'fixture:qualification1',
-    requestedScope: 'Review premade profile only; no external send',
-    observedAt: '2026-09-12T21:00:00.000Z',
-    expiresAt: '2026-09-13T21:00:00.000Z',
-    packet: {
-      contract: 'jovie.certification/v1',
-      subject: {
-        id: CUSTOMER_SUBJECT,
-        kind: 'acquisition-premade-artist-profile',
-        title: 'Fixture artist',
-      },
-      source: {
-        repository: 'JovieInc/Jovie',
-        ref: 'fixture:evaluator',
-        sha: CUSTOMER_SHA,
-        expectedSha: CUSTOMER_SHA,
-        paths: ['lib/acquisition/kernel.ts'],
-        digest: 'fixture:evaluator-source',
-      },
-      canonicalReferences: [customerProof('canonical_references')],
-      invariantEvaluation: [customerProof('invariant_evaluation')],
-      testsCoverage: [customerProof('tests_coverage')],
-      visualProof: [customerProof('visual_proof')],
-      requiredVariants: [
-        {
-          id: 'profile',
-          label: 'Profile',
-          sourceSha: CUSTOMER_SHA,
-          proof: customerProof('required_variants'),
-          requiredMediaIds: ['profile-media'],
-        },
-      ],
-      itemMedia: [
-        {
-          id: 'profile-media',
-          itemId: CUSTOMER_SUBJECT,
-          variantId: 'profile',
-          status: 'passed',
-          sourceSha: CUSTOMER_SHA,
-          ref: 'fixture:profile-media',
-          digest: 'fixture:profile-content',
-          summary: 'Fixture profile',
-        },
-      ],
-    },
-  };
-}
-
-function customerStoreHarness() {
-  const records = new Map<string, unknown>();
-  const backend: CertificationRecordBackend = {
-    get: async key => records.get(key) ?? null,
-    setIfAbsent: async (key, value) => {
-      if (records.has(key)) return false;
-      records.set(key, value);
-      return true;
-    },
-    compareAndSet: async (key, expected, next) => {
-      if (records.get(key) !== expected) return false;
-      records.set(key, next);
-      return true;
-    },
-  };
-  const effects = new Map<string, string>();
-  const ports: AcquisitionCertificationPorts = {
-    withCurrentCandidate: async (_subject, operation) =>
-      operation(structuredClone(customerCandidate())),
-    authorize: async () => 'server-resolved-founder',
-    effect: {
-      idempotency: 'durable-action-key-and-payload-digest',
-      execute: async ({ receipt }) => {
-        const prior = effects.get(receipt.dispatch.key);
-        if (prior) return prior;
-        const value = `effect:${effects.size + 1}`;
-        effects.set(receipt.dispatch.key, value);
-        return value;
-      },
-    },
-    now: () => CUSTOMER_NOW,
-  };
-  return { store: new AcquisitionCertificationStore(backend, ports), backend };
-}
 
 function customerDeps(
   harness: ReturnType<typeof customerStoreHarness>
