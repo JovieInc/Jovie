@@ -593,7 +593,7 @@ describe('founder design invariants (JOV-INV-038)', () => {
     assert.deepEqual(
       scanNavSemantics(
         'apps/web/data/marketingNavigation.ts',
-        "const L = [{ href: APP_ROUTES.SOLUTIONS_FOUNDERS, label: 'Founders' }, { href: 'https://status.jov.ie', label: 'Status', external: true }];"
+        "const L = [{ href: APP_ROUTES.SOLUTIONS_FOUNDERS, label: 'Founders' }, { href: 'https://x.com/meetjovie', label: 'X', external: true }];"
       ),
       []
     );

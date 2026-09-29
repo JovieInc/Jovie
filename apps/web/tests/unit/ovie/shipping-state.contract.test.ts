@@ -135,6 +135,8 @@ function baseline(
         measuredMeanings: { exactLiveBuild: true },
       }
     ),
+    'staging-controller': ok('staging-controller', { conclusion: 'success' }),
+    'staging-build-info': ok('staging-build-info', { commitSha: SHA }),
     ...overrides,
   };
 }
@@ -164,7 +166,9 @@ describe('ovie.shipping-state.v1 contract', () => {
       'github-merges',
       'exact-sha-ci',
       'production-controller',
+      'staging-controller',
       'live-build-info',
+      'staging-build-info',
       'summer-runtime',
     ]);
     expect(BUDGET).toBe(10_000);

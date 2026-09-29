@@ -6,7 +6,10 @@ import { useEffect } from 'react';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { computeRatePercent } from '@/lib/analytics/metrics';
-import type { CountMeasurement } from '@/lib/ovie/shipping-state';
+import type {
+  CapacityHorizonLease,
+  CountMeasurement,
+} from '@/lib/ovie/shipping-state';
 import type {
   ShippingMeaningView,
   ShippingStateView,
@@ -64,6 +67,10 @@ function formatProduction(production: Delivery['production']): string {
   return production.version ? `${production.version} ${sha}` : sha;
 }
 
+function formatCertifiedHead(certifiedHead: Delivery['certifiedHead']): string {
+  return certifiedHead.sha ? certifiedHead.sha.slice(0, 7) : NOT_MEASURED;
+}
+
 const SUMMER_LABEL = { up: 'Up', down: 'Down', degraded: 'Degraded' } as const;
 
 function formatAge(seconds: number | null): string | null {
@@ -71,6 +78,61 @@ function formatAge(seconds: number | null): string | null {
   if (seconds < 60) return 'just now';
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
   return `${Math.floor(seconds / 3600)}h ago`;
+}
+
+function formatDuration(seconds: number | null): string {
+  if (seconds === null) return 'source gap';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+}
+
+function CapacityLeaseRow({ row }: { readonly row: CapacityHorizonLease }) {
+  const work = row.route?.selectedJob ?? 'selection source gap';
+  const reason = row.route?.reason ?? row.forecast.bottleneck ?? 'no blocker';
+  const href = row.route?.selectedJob
+    ? `https://linear.app/jovie/issue/${row.route.selectedJob}`
+    : null;
+  return (
+    <div className='border-t border-subtle py-2 first:border-t-0'>
+      <p className='text-2xs font-medium text-primary-token'>
+        {row.alias} · {row.available ? 'usable' : 'inaccessible'} ·{' '}
+        {row.subscriptionStatus} · {row.usableRemaining ?? '?'}% ·{' '}
+        {row.bankedCount ?? '?'} banked · {row.event.label}{' '}
+        {formatDuration(row.event.countdownSeconds)} · {row.mode}
+      </p>
+      <p className='mt-0.5 text-2xs text-secondary-token'>
+        drain p50 {row.forecast.completionP50At ?? 'source gap'} @{' '}
+        {row.forecast.sustainablePercentPerHour ?? '?'}%/h · unused{' '}
+        {row.forecast.projectedUnused ?? '?'}% · coverage{' '}
+        {row.forecast.qualifiedWork.length} · {row.concurrency ?? '?'}{' '}
+        concurrency · {row.compatibility.cli ?? '?'}+
+        {row.compatibility.harness ?? '?'} · {row.freshness.status}
+      </p>
+      <details className='mt-0.5 text-2xs text-tertiary-token'>
+        <summary title={reason}>
+          {href ? (
+            <a
+              className='text-accent-blue hover:underline'
+              href={href}
+              target='_blank'
+              rel='noreferrer'
+            >
+              {work}
+            </a>
+          ) : (
+            work
+          )}{' '}
+          · {reason}
+        </summary>
+        <p>
+          alternatives{' '}
+          {row.route?.alternativesConsidered.join(', ') || 'none recorded'} ·
+          replan {row.route?.replanConditions.join(', ') || 'source gap'} · gaps{' '}
+          {row.route?.sourceGaps.join(', ') || 'none'}
+        </p>
+      </details>
+    </div>
+  );
 }
 
 function lanesLine(lanes: Delivery['lanes']): string {
@@ -157,6 +219,8 @@ function ShippingStateBody({
         .join(' / '),
     ],
     ['Merged 7d', formatWeek(delivery.merges)],
+    ['Certified HEAD', formatCertifiedHead(delivery.certifiedHead)],
+    ['Staging', formatProduction(delivery.staging)],
     ['Production', formatProduction(delivery.production)],
     ['Behind Main', formatCount(delivery.production.behindMain)],
     ['CI Green', formatMeaning(view.ciGreen)],
@@ -185,6 +249,37 @@ function ShippingStateBody({
       >
         {lanesDetail || 'Lanes feed not measured'}
       </p>
+      {delivery.lanes.capacity ? (
+        <div
+          className='rounded-lg border border-subtle px-3'
+          data-testid='capacity-horizon'
+        >
+          <div className='flex items-center justify-between py-2 text-2xs text-secondary-token'>
+            <span>Capacity horizon</span>
+            <span>
+              {delivery.lanes.capacity.incidents.length} incident · show-only
+            </span>
+          </div>
+          <p className='border-t border-subtle py-2 text-2xs text-secondary-token'>
+            {delivery.lanes.capacity.outcomes.useful} useful ·{' '}
+            {delivery.lanes.capacity.outcomes.certified} certified ·{' '}
+            {delivery.lanes.capacity.outcomes.duplicate} duplicate ·{' '}
+            {delivery.lanes.capacity.outcomes.retry} retry ·{' '}
+            {delivery.lanes.capacity.outcomes.failed} failed ·{' '}
+            {delivery.lanes.capacity.outcomes.unknown} unknown
+          </p>
+          {delivery.lanes.capacity.leases.map(row => (
+            <CapacityLeaseRow key={row.leaseId} row={row} />
+          ))}
+          <p className='border-t border-subtle py-2 text-2xs text-tertiary-token'>
+            Top blocker: {delivery.lanes.capacity.topBlocker ?? 'none'}
+          </p>
+        </div>
+      ) : (
+        <p className='min-h-4 text-2xs leading-4 text-tertiary-token'>
+          Capacity source gap
+        </p>
+      )}
       <p className='min-h-4 truncate text-2xs leading-4 text-secondary-token'>
         {delivery.lanes.alerts.join(' · ')}
       </p>

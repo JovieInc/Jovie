@@ -146,7 +146,6 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
       { href: APP_ROUTES.SUPPORT, label: 'Support' },
       { href: APP_ROUTES.COMPARE, label: 'Compare' },
       { href: APP_ROUTES.ALTERNATIVES, label: 'Alternatives' },
-      { href: 'https://status.jov.ie', label: 'Status', external: true },
     ],
   },
   {

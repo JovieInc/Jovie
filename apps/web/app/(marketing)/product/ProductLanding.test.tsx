@@ -85,14 +85,14 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
   it('keeps the claim handle keyboard focus visible', () => {
     render(<ProductLanding />);
 
-    expect(
-      screen.getByRole('textbox', { name: 'Choose Your Handle' })
-    ).toHaveClass(
-      'focus-visible:border-focus',
-      'focus-visible:outline-2',
-      'focus-visible:outline-offset-2',
-      'focus-visible:outline-(--color-focus-ring)'
-    );
+    // JOV-INV-019: focus-visible:outline + focus-visible:outline-2 never
+    // actually rendered — tailwind-merge collapses them into one conflict
+    // group and keeps only the last, and outline-width without
+    // outline-style paints nothing regardless. focus-ring-themed is the
+    // shared box-shadow-based ring the rest of the app uses.
+    const input = screen.getByRole('textbox', { name: 'Choose Your Handle' });
+    expect(input).toHaveClass('focus-ring-themed');
+    expect(input.className).not.toMatch(/focus-visible:outline\b/);
   });
 
   it('keeps invalid handles local instead of navigating', () => {

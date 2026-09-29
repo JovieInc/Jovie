@@ -488,9 +488,33 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
             shown += 1
     lines.append(closer(width))
 
-    # codex accounts
+    # Perishable capacity: the exact receipt Ovi consumes, with no HUD-side forecast math.
     accounts = local["codex"]
-    if accounts.get("error"):
+    capacity = (local.get("doctor") or {}).get("capacity")
+    if capacity and capacity.get("schema") == "jovie.capacity-horizon/v1":
+        incidents = capacity.get("incidents") or []
+        lines.append(pad(rgb(FG, "CAPACITY HORIZON  ", bold=True) +
+                         rgb(RED if incidents else DIM,
+                             f"{len(capacity.get('leases') or [])} leases · {len(incidents)} incident(s) · show-only"), width))
+        for row in (capacity.get("leases") or [])[:4]:
+            remaining = "?" if row.get("usableRemaining") is None else f"{row['usableRemaining']:g}%"
+            banked = "?" if row.get("bankedCount") is None else str(row["bankedCount"])
+            event = row.get("event") or {}
+            deadline = "?" if event.get("countdownSeconds") is None else dur(event["countdownSeconds"])
+            forecast = row.get("forecast") or {}
+            unused = "?" if forecast.get("projectedUnused") is None else f"{forecast['projectedUnused']:g}%"
+            drain = forecast.get("completionP50At") or "?"
+            rate = "?" if forecast.get("sustainablePercentPerHour") is None else f"{forecast['sustainablePercentPerHour']:g}%/h"
+            route = row.get("route") or {}
+            job = route.get("selectedJob") or "no selected job"
+            mode = str(row.get("mode") or "unknown").upper()
+            freshness = row.get("freshness") or {}
+            detail = (f"{row.get('alias', '?')} {remaining} · banked {banked} · {event.get('label', 'source gap')} "
+                      f"{deadline} · drain {drain} @ {rate} · unused {unused} · coverage {len(forecast.get('qualifiedWork') or [])} · {mode} · {job} · {freshness.get('status', 'unknown')}")
+            lines.append(pad("  " + rgb(RED if mode == "EMERGENCY" else ORANGE if mode == "FAST" else GREEN, detail), width))
+        blocker = capacity.get("topBlocker") or "no material blocker"
+        lines.append(pad("  " + rgb(RED if incidents else DIM, f"top blocker: {blocker}"), width))
+    elif accounts.get("error"):
         lines.append(pad(rgb(FG, "CODEX ACCOUNTS  ", bold=True) + rgb(RED, accounts["error"]), width))
     else:
         parts = []

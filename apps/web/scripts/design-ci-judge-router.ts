@@ -1,5 +1,5 @@
 /**
- * Design CI batch judge router (JOV-6944 slice 1).
+ * JOV-INV-040: Design CI batch judge router (JOV-6944).
  *
  * Enumerates the certifiable units that already exist in code (screen
  * registry, marketing component registry, app-screen registry) and the
@@ -10,15 +10,22 @@
  * judge cannot be determined from existing registry metadata is marked
  * `insufficient` rather than guessed.
  *
- * This module does not evaluate anything yet — it only proves discovery,
- * applicability, and routing. Every cell's state is `insufficient` here by
- * construction (see CELL_STATE docs below); wiring real per-unit evaluation
- * and persistence through the `jovie.certification/v1` registry is JOV-6944
- * slice 2/3, not this file.
+ * `buildDesignCiJudgeMatrix` stays pure routing (no execution, every cell
+ * `insufficient`) so its own callers/tests keep a stable, cheap contract.
+ * `evaluateDesignCiJudgeMatrix` is the real payoff: it actually runs each
+ * deterministic row's enforcement consumer once (deduped across rows that
+ * share a consumer file), records real pass/fail with evidence, and fans
+ * that result out to every applicable unit — no per-unit rerun. Visual,
+ * Jev, and human cells stay `insufficient` with the reason stated; no
+ * dispatcher exists for them yet (see design-ci-judge-router-evaluation.test.ts
+ * for proof that each of those judges' *real* mechanisms can genuinely
+ * fail, independent of this file).
  *
- *   tsx scripts/design-ci-judge-router.ts [--json]
+ *   tsx scripts/design-ci-judge-router.ts [--json] [--persist [--base-url <url>]]
  */
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -57,15 +64,20 @@ export type JudgeRoute =
   | 'insufficient';
 
 /**
- * A cell's persisted state is always one of these three. `insufficient`
- * covers two distinct reasons (see `InsufficientReason`): the judge itself
- * is unknown, or a known judge simply has not evaluated this cell yet. This
- * module never produces `pass`/`fail` — that requires real evaluation,
- * which is out of scope for slice 1.
+ * A cell's persisted state. `deterministic`-routed cells carry a real
+ * `pass`/`fail` from actually running that row's enforcement consumer
+ * (see `evaluateDesignCiJudgeMatrix`). `insufficient` covers three
+ * distinct reasons (see `InsufficientReason`): the judge itself is
+ * unknown, a known judge has not evaluated this cell yet (visual/jev/
+ * human — no real invocation is wired for those routes), or a
+ * deterministic row's consumer could not be safely located/executed.
  */
 export type CellState = 'pass' | 'fail' | 'insufficient';
 
-export type InsufficientReason = 'unroutable-judge' | 'not-yet-evaluated';
+export type InsufficientReason =
+  | 'unroutable-judge'
+  | 'not-yet-evaluated'
+  | 'no-executable-proof';
 
 export type UnitKind =
   | 'screen'
@@ -505,6 +517,320 @@ export async function buildDesignCiJudgeMatrix(): Promise<DesignCiJudgeMatrix> {
 }
 
 // ---------------------------------------------------------------------------
+// Real evaluation: run each deterministic row's enforcement consumer once,
+// fan the result out to every applicable unit. Visual/Jev/human rows are
+// left exactly as buildDesignCiJudgeMatrix produced them — no dispatcher
+// exists for those routes yet (see the module doc comment).
+// ---------------------------------------------------------------------------
+
+export type ConsumerExecutionKind =
+  | 'node-test'
+  | 'node-cli'
+  | 'python'
+  | 'bash'
+  | 'vitest';
+
+export interface ConsumerExecutionPlan {
+  readonly kind: ConsumerExecutionKind;
+  /** Repo-relative (or, for vitest, apps/web-relative) path actually run. */
+  readonly execPath: string;
+}
+
+const CLI_GUARD_PATTERN =
+  /process\.argv\[1\]\s*===\s*fileURLToPath\(import\.meta\.url\)/;
+
+/**
+ * Resolves one `enforcementConsumers`/`detectors` entry (optionally with a
+ * `#exportName` fragment, which is stripped — the fragment names a
+ * function inside the file, not a separately runnable target) to how it
+ * would actually be executed, or `null` when there is no safe, non-guessed
+ * way to run it:
+ *   - a `.test.mjs` file runs directly under `node --test`;
+ *   - a `.mjs`/`.js` file with its own `if (process.argv[1] === ...)` CLI
+ *     guard runs directly under `node`;
+ *   - a `.mjs`/`.js` file without that guard (a pure library) falls back
+ *     to a same-basename sibling `.test.mjs`/`.test.js`, since that is
+ *     what actually proves it — never guessed to be self-executing;
+ *   - `.py` runs under `python3`, `.sh` under `bash`;
+ *   - an `apps/web/**\/*.test.ts(x)` file runs under the real vitest config;
+ *   - anything else (docs, workflows, a non-test `.ts`/`.tsx` route or
+ *     component with no locatable test, `.spec.ts` browser specs that need
+ *     a running server) is not executed here — the row falls back to
+ *     `insufficient` with a stated reason instead of a fabricated result.
+ */
+export function resolveConsumerExecution(
+  consumerEvidence: string,
+  repoRoot: string
+): ConsumerExecutionPlan | null {
+  const bare = consumerEvidence.split('#')[0] ?? '';
+  const absolute = resolvePath(repoRoot, bare);
+
+  if (bare.endsWith('.test.mjs')) {
+    return existsSync(absolute) ? { kind: 'node-test', execPath: bare } : null;
+  }
+  if (bare.endsWith('.mjs') || bare.endsWith('.js')) {
+    if (!existsSync(absolute)) return null;
+    if (CLI_GUARD_PATTERN.test(readFileSync(absolute, 'utf8'))) {
+      return { kind: 'node-cli', execPath: bare };
+    }
+    const siblingTest = bare.replace(/\.(mjs|js)$/, '.test.$1');
+    return existsSync(resolvePath(repoRoot, siblingTest))
+      ? { kind: 'node-test', execPath: siblingTest }
+      : null;
+  }
+  if (bare.endsWith('.py')) {
+    return existsSync(absolute) ? { kind: 'python', execPath: bare } : null;
+  }
+  if (bare.endsWith('.sh')) {
+    return existsSync(absolute) ? { kind: 'bash', execPath: bare } : null;
+  }
+  if (
+    bare.startsWith('apps/web/') &&
+    (bare.endsWith('.test.ts') || bare.endsWith('.test.tsx'))
+  ) {
+    return existsSync(absolute)
+      ? { kind: 'vitest', execPath: bare.slice('apps/web/'.length) }
+      : null;
+  }
+  return null;
+}
+
+export interface ConsumerCheckOutcome {
+  readonly ok: boolean;
+  /**
+   * True when a non-zero exit looks like a CLI usage/argument error (the
+   * consumer is an operational tool that expects runtime flags this
+   * router never has, not a self-contained repo scanner) rather than a
+   * genuine invariant violation. Such an outcome must never count as a
+   * real `fail` — that would fabricate a result from a malformed
+   * invocation, not from checking anything.
+   */
+  readonly usageError: boolean;
+  readonly command: string;
+  readonly output: string;
+}
+
+const CONSUMER_TIMEOUT_MS = 120_000;
+const OUTPUT_TAIL_CHARS = 2_000;
+const USAGE_ERROR_PATTERN =
+  /^usage:|the following arguments are required|missing required argument|error: unrecognized arguments/im;
+
+function truncateTail(text: string): string {
+  return text.length > OUTPUT_TAIL_CHARS
+    ? text.slice(-OUTPUT_TAIL_CHARS)
+    : text;
+}
+
+function commandFor(plan: ConsumerExecutionPlan): {
+  file: string;
+  args: string[];
+  cwd: string;
+} {
+  switch (plan.kind) {
+    case 'node-test':
+      return {
+        file: process.execPath,
+        args: ['--test', plan.execPath],
+        cwd: REPO_ROOT,
+      };
+    case 'node-cli':
+      return { file: process.execPath, args: [plan.execPath], cwd: REPO_ROOT };
+    case 'python':
+      return { file: 'python3', args: [plan.execPath], cwd: REPO_ROOT };
+    case 'bash':
+      return { file: 'bash', args: [plan.execPath], cwd: REPO_ROOT };
+    case 'vitest':
+      return {
+        file: 'pnpm',
+        args: [
+          'exec',
+          'vitest',
+          'run',
+          '--config=vitest.config.mts',
+          plan.execPath,
+        ],
+        cwd: resolvePath(REPO_ROOT, 'apps/web'),
+      };
+    default:
+      throw new Error(`unreachable consumer kind: ${String(plan.kind)}`);
+  }
+}
+
+/**
+ * Actually spawns the consumer's real check. The only place this module
+ * runs anything. `timeoutMs` defaults to the production ceiling; tests
+ * override it to exercise the timeout path without waiting 120s for real.
+ */
+export function runConsumerExecution(
+  plan: ConsumerExecutionPlan,
+  timeoutMs: number = CONSUMER_TIMEOUT_MS
+): ConsumerCheckOutcome {
+  const { file, args, cwd } = commandFor(plan);
+  const command = [file, ...args].join(' ');
+  try {
+    const output = execFileSync(file, args, {
+      cwd,
+      timeout: timeoutMs,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return {
+      ok: true,
+      usageError: false,
+      command,
+      output: truncateTail(output),
+    };
+  } catch (error) {
+    const failure = error as {
+      stdout?: string;
+      stderr?: string;
+      message?: string;
+      killed?: boolean;
+      signal?: string | null;
+      code?: string | null;
+    };
+    // A hung consumer must fail with an unambiguous timeout reason, not
+    // whatever text happens to land in stdout/stderr (often nothing —
+    // the process is killed mid-run) or a generic spawn error string.
+    const timedOut = failure.code === 'ETIMEDOUT' || failure.killed === true;
+    const combined = timedOut
+      ? `timed out after ${timeoutMs}ms (signal ${failure.signal ?? 'unknown'}): ${command}`
+      : `${failure.stdout ?? ''}\n${failure.stderr ?? ''}`.trim() ||
+        (failure.message ?? String(error));
+    return {
+      ok: false,
+      usageError: !timedOut && USAGE_ERROR_PATTERN.test(combined),
+      command,
+      output: truncateTail(combined),
+    };
+  }
+}
+
+export interface RowEvaluation {
+  readonly rowId: string;
+  readonly state: CellState;
+  readonly insufficientReason: InsufficientReason | null;
+  readonly evidence: readonly string[];
+  /** Failing consumer output, truncated. Null when the row passed or never ran. */
+  readonly detail: string | null;
+}
+
+/**
+ * Runs one deterministic row's real check(s), deduped against a shared
+ * cache keyed by exec target so rows that share a consumer file (e.g.
+ * several exploded JOV-INV-038 sub-rules pointing at design-surfaces.mjs)
+ * only run it once.
+ */
+export function evaluateDeterministicRow(
+  row: RoutedInvariantRow,
+  repoRoot: string,
+  cache: Map<string, ConsumerCheckOutcome>,
+  timeoutMs: number = CONSUMER_TIMEOUT_MS
+): RowEvaluation {
+  const plans = row.routeEvidence
+    .map(evidence => resolveConsumerExecution(evidence, repoRoot))
+    .filter((plan): plan is ConsumerExecutionPlan => plan !== null);
+  const uniquePlans = [
+    ...new Map(
+      plans.map(plan => [`${plan.kind}:${plan.execPath}`, plan])
+    ).values(),
+  ];
+
+  if (uniquePlans.length === 0) {
+    return {
+      rowId: row.rowId,
+      state: 'insufficient',
+      insufficientReason: 'no-executable-proof',
+      evidence: [],
+      detail: null,
+    };
+  }
+
+  const outcomes = uniquePlans.map(plan => {
+    const key = `${plan.kind}:${plan.execPath}`;
+    let outcome = cache.get(key);
+    if (!outcome) {
+      outcome = runConsumerExecution(plan, timeoutMs);
+      cache.set(key, outcome);
+    }
+    return outcome;
+  });
+  // A usage-error outcome (an operational tool that expects runtime flags
+  // this router never supplies) is not a genuine violation — never let it
+  // fabricate a fail. A real failure elsewhere still fails the row.
+  const genuineFailures = outcomes.filter(
+    outcome => !outcome.ok && !outcome.usageError
+  );
+  const onlyUsageErrors =
+    genuineFailures.length === 0 &&
+    outcomes.some(outcome => !outcome.ok && outcome.usageError);
+
+  if (onlyUsageErrors) {
+    return {
+      rowId: row.rowId,
+      state: 'insufficient',
+      insufficientReason: 'no-executable-proof',
+      evidence: outcomes.map(outcome => outcome.command),
+      detail: null,
+    };
+  }
+
+  return {
+    rowId: row.rowId,
+    state: genuineFailures.length > 0 ? 'fail' : 'pass',
+    insufficientReason: null,
+    evidence: outcomes.map(outcome => outcome.command),
+    detail:
+      genuineFailures.length > 0
+        ? genuineFailures.map(f => f.output).join('\n---\n')
+        : null,
+  };
+}
+
+/**
+ * Evaluates every deterministic row for real (one real check per row,
+ * deduped, fanned out to applicable units) and returns a new matrix with
+ * those cells' state/evidence updated. `buildDesignCiJudgeMatrix`'s own
+ * output is never mutated in place.
+ */
+export function evaluateDesignCiJudgeMatrix(
+  matrix: DesignCiJudgeMatrix,
+  repoRoot: string,
+  timeoutMs: number = CONSUMER_TIMEOUT_MS
+): {
+  readonly matrix: DesignCiJudgeMatrix;
+  readonly rowEvaluations: readonly RowEvaluation[];
+} {
+  const cache = new Map<string, ConsumerCheckOutcome>();
+  const evaluationByRow = new Map<string, RowEvaluation>();
+  // A row with zero applicable cells has nothing to fan a result out to —
+  // running its real check would be pure overhead with no certification
+  // effect, and would surface as a confusing "0 units affected" fail/pass.
+  const rowIdsWithCells = new Set(matrix.cells.map(cell => cell.rowId));
+  for (const row of matrix.rows) {
+    if (row.route !== 'deterministic') continue;
+    if (!rowIdsWithCells.has(row.rowId)) continue;
+    evaluationByRow.set(
+      row.rowId,
+      evaluateDeterministicRow(row, repoRoot, cache, timeoutMs)
+    );
+  }
+  const cells = matrix.cells.map(cell => {
+    const evaluation = evaluationByRow.get(cell.rowId);
+    if (!evaluation) return cell;
+    return {
+      ...cell,
+      state: evaluation.state,
+      insufficientReason: evaluation.insufficientReason,
+    };
+  });
+  return {
+    matrix: { ...matrix, cells },
+    rowEvaluations: [...evaluationByRow.values()],
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Fingerprints (only computed on the --persist path; routing itself never
 // needs them). Mirrors the `sha256:<hex>` shape and the sorted-key stable
 // stringify already used by scripts/invariants/registry.mjs and
@@ -695,8 +1021,39 @@ function countBy<T, K extends string>(
   return counts;
 }
 
-export function formatMatrixReport(matrix: DesignCiJudgeMatrix): string {
+export function formatMatrixReport(
+  matrix: DesignCiJudgeMatrix,
+  rowEvaluations: readonly RowEvaluation[] = []
+): string {
   const lines: string[] = [];
+
+  const failed = rowEvaluations.filter(
+    evaluation => evaluation.state === 'fail'
+  );
+  const rowById = new Map(matrix.rows.map(row => [row.rowId, row]));
+  const unitsByRow = new Map<string, number>();
+  for (const cell of matrix.cells) {
+    unitsByRow.set(cell.rowId, (unitsByRow.get(cell.rowId) ?? 0) + 1);
+  }
+  if (failed.length > 0) {
+    lines.push(`FAILED (${failed.length} invariant row(s)):`);
+    for (const evaluation of failed) {
+      const row = rowById.get(evaluation.rowId);
+      const affected = unitsByRow.get(evaluation.rowId) ?? 0;
+      lines.push(
+        `  ✖ ${evaluation.rowId} — ${row?.title ?? '<unknown>'} (${affected} unit${affected === 1 ? '' : 's'} affected)`
+      );
+      for (const command of evaluation.evidence)
+        lines.push(`      $ ${command}`);
+      if (evaluation.detail) {
+        for (const detailLine of evaluation.detail.split('\n').slice(0, 20)) {
+          lines.push(`      ${detailLine}`);
+        }
+      }
+    }
+    lines.push('');
+  }
+
   lines.push(`design-ci judge matrix — generated ${matrix.generatedAt}`);
   lines.push(
     `rows=${matrix.rows.length} units=${matrix.units.length} cells=${matrix.cells.length}`
@@ -725,7 +1082,11 @@ export function formatMatrixReport(matrix: DesignCiJudgeMatrix): string {
     lines.push(`  ${route}: ${byRoute.get(route) ?? 0}`);
   }
   lines.push('insufficient reasons:');
-  for (const reason of ['not-yet-evaluated', 'unroutable-judge'] as const) {
+  for (const reason of [
+    'not-yet-evaluated',
+    'unroutable-judge',
+    'no-executable-proof',
+  ] as const) {
     lines.push(`  ${reason}: ${byReason.get(reason) ?? 0}`);
   }
 
@@ -734,6 +1095,20 @@ export function formatMatrixReport(matrix: DesignCiJudgeMatrix): string {
   lines.push(`unroutable invariant rows (${unroutable.length}):`);
   for (const row of unroutable) {
     lines.push(`  ${row.rowId} — ${row.title}`);
+  }
+
+  const noProof = rowEvaluations.filter(
+    evaluation => evaluation.insufficientReason === 'no-executable-proof'
+  );
+  if (noProof.length > 0) {
+    lines.push('');
+    lines.push(
+      `deterministic rows with no locatable executable proof (${noProof.length}):`
+    );
+    for (const evaluation of noProof) {
+      const row = rowById.get(evaluation.rowId);
+      lines.push(`  ${evaluation.rowId} — ${row?.title ?? '<unknown>'}`);
+    }
   }
 
   return lines.join('\n');
@@ -749,18 +1124,29 @@ function argValue(flag: string): string | undefined {
 }
 
 async function main(): Promise<void> {
-  const matrix = await buildDesignCiJudgeMatrix();
-  if (process.argv.includes('--json')) {
-    process.stdout.write(`${JSON.stringify(matrix, null, 2)}\n`);
-  } else {
-    process.stdout.write(`${formatMatrixReport(matrix)}\n`);
-  }
-  if (matrix.rows.length === 0 || matrix.units.length === 0) {
+  const routed = await buildDesignCiJudgeMatrix();
+  if (routed.rows.length === 0 || routed.units.length === 0) {
     process.stderr.write(
       'design-ci-judge-router: empty rows or units — this is a bug, not a clean matrix.\n'
     );
     process.exitCode = 1;
     return;
+  }
+
+  // Real by default — this is what actually certifies anything. --no-evaluate
+  // skips running the deterministic checks and reports routing only (fast,
+  // useful for debugging the matrix shape itself).
+  const shouldEvaluate = !process.argv.includes('--no-evaluate');
+  const { matrix, rowEvaluations } = shouldEvaluate
+    ? evaluateDesignCiJudgeMatrix(routed, REPO_ROOT)
+    : { matrix: routed, rowEvaluations: [] as readonly RowEvaluation[] };
+
+  if (process.argv.includes('--json')) {
+    process.stdout.write(
+      `${JSON.stringify({ ...matrix, rowEvaluations }, null, 2)}\n`
+    );
+  } else {
+    process.stdout.write(`${formatMatrixReport(matrix, rowEvaluations)}\n`);
   }
 
   // Read-only by default. Nothing below this line runs unless --persist is

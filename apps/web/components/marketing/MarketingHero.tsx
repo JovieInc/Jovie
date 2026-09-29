@@ -120,6 +120,12 @@ export interface MarketingHeroLandingProps extends MarketingHeroBaseProps {
   readonly secondaryCtaHref?: string;
   readonly subcopy?: string;
   readonly proofPoints?: readonly string[];
+  /**
+   * Headline line budget. Defaults to 2 (Linear-style clamp). Pass 'none'
+   * when a hero must never truncate its headline (e.g. a promise-breaking
+   * value prop that would render clipped at small widths or zoomed text).
+   */
+  readonly headlineMaxLines?: 2 | 3 | 'none';
   readonly copyClassName?: string;
   readonly titleClassName?: string;
   readonly mediaClassName?: string;
@@ -182,7 +188,7 @@ function MarketingHeroTitle({
   id?: string;
   testId?: string;
   className: string;
-  maxLines?: 2 | 3;
+  maxLines?: 2 | 3 | 'none';
   children: ReactNode;
 }>) {
   return (
@@ -190,16 +196,28 @@ function MarketingHeroTitle({
       id={id}
       data-testid={testId}
       className={cn(
-        maxLines === 3 ? 'line-clamp-3' : 'line-clamp-2',
+        maxLines === 'none'
+          ? undefined
+          : maxLines === 3
+            ? 'line-clamp-3'
+            : 'line-clamp-2',
         className
       )}
       style={
-        maxLines === 3
+        maxLines === 'none'
           ? ({
-              WebkitLineClamp: 3,
-              maxBlockSize: 'calc(3 * 1lh)',
+              display: 'block',
+              maxBlockSize: 'none',
+              overflow: 'visible',
+              WebkitBoxOrient: 'initial',
+              WebkitLineClamp: 'unset',
             } satisfies CSSProperties)
-          : undefined
+          : maxLines === 3
+            ? ({
+                WebkitLineClamp: 3,
+                maxBlockSize: 'calc(3 * 1lh)',
+              } satisfies CSSProperties)
+            : undefined
       }
     >
       {children}
@@ -368,6 +386,7 @@ function MarketingHeroLanding({
   secondaryCtaHref,
   subcopy,
   proofPoints = [],
+  headlineMaxLines = 2,
   copyClassName,
   titleClassName,
   mediaClassName,
@@ -405,8 +424,10 @@ function MarketingHeroLanding({
               <MarketingHeroTitle
                 id={headingId}
                 testId={titleTestId}
+                maxLines={headlineMaxLines}
                 className={cn(
-                  'marketing-h1-linear marketing-h1-max-two-lines mt-5 text-primary-token',
+                  'marketing-h1-linear mt-5 text-primary-token',
+                  headlineMaxLines === 2 && 'marketing-h1-max-two-lines',
                   titleClassName
                 )}
               >

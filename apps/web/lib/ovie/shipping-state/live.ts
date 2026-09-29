@@ -1,3 +1,4 @@
+import { parseCapacityHorizon } from './client';
 import {
   DELIVERY_MERGE_REPOS,
   type DeliveryLane,
@@ -31,6 +32,7 @@ export const NAMED_AUTHORITY_URLS = {
   'lanes-status':
     'https://gist.githubusercontent.com/itstimwhite/07ec460956451da7632fe852934f21c5/raw/lanes-status.json',
   'live-build-info': 'https://jov.ie/api/health/build-info',
+  'staging-build-info': 'https://staging.jov.ie/api/health/build-info',
   'summer-runtime': 'https://summer.jov.ie/runtime/v1/health',
 } as const;
 
@@ -44,6 +46,7 @@ export const SOURCE_CACHE_TTL_MS = {
   'lane-pull-requests': 15_000,
   'github-merges': 60_000,
   'live-build-info': 30_000,
+  'staging-build-info': 30_000,
   'summer-runtime': 30_000,
 } as const satisfies Partial<Record<ShippingSourceId, number>>;
 const FAILED_READ_CACHE_TTL_MS = 5_000;
@@ -522,7 +525,7 @@ export async function readMergeQueue(io: LiveIo): Promise<AuthorityRead> {
 
 export async function readWorkflow(
   io: LiveIo,
-  sourceId: 'exact-sha-ci' | 'production-controller',
+  sourceId: 'exact-sha-ci' | 'production-controller' | 'staging-controller',
   workflow: string
 ): Promise<AuthorityRead> {
   const repositoryUrl = `${GITHUB_API_URL}/repos/${encodeURIComponent(io.githubOwner ?? '')}/${encodeURIComponent(io.githubRepo ?? '')}`;
@@ -753,6 +756,10 @@ export async function readWorkflow(
       errorMessage: green ? undefined : (conclusion ?? 'ci-not-green'),
       measuredMeanings:
         sourceId === 'exact-sha-ci' ? { ciGreen: green } : undefined,
+      delivery:
+        sourceId === 'staging-controller'
+          ? { certifiedHead: certifiedHeadFromRuns(runs) }
+          : undefined,
     };
   } catch (error) {
     if (sourceId === 'production-controller') {
@@ -770,6 +777,25 @@ export async function readWorkflow(
       error instanceof Error ? error.message : 'workflow unreachable'
     );
   }
+}
+
+/**
+ * The exact main HEAD the staging controller generation certified: the
+ * newest fetched run whose own conclusion was success. Absent runs report
+ * nothing rather than zero.
+ */
+function certifiedHeadFromRuns(runs: readonly Record<string, unknown>[]): {
+  readonly sha: string | null;
+  readonly certifiedAt: string | null;
+} {
+  const certified = runs.find(
+    run => run.conclusion === 'success' && isExactSha(run.head_sha)
+  );
+  return {
+    sha:
+      certified && isExactSha(certified.head_sha) ? certified.head_sha : null,
+    certifiedAt: certified ? parseTimestamp(certified.updated_at) : null,
+  };
 }
 
 function countRecord(value: unknown): Record<string, number> {
@@ -841,6 +867,7 @@ export function parseLanesStatus(
     alerts,
     heldByReason: countRecord(payload.held_by_reason),
     failedByReason: countRecord(payload.failed_by_reason),
+    capacity: parseCapacityHorizon(payload.capacity),
     publishedAt,
     stale: false,
   };
@@ -1225,12 +1252,15 @@ async function readBehindMain(io: LiveIo, sha: string) {
   }
 }
 
-/** jov.ie build-info plus how many main commits production is missing. */
-export async function readLiveBuild(io: LiveIo): Promise<AuthorityRead> {
+/** A `jovie-build-info/v1` host receipt plus its distance behind main. */
+async function readBuildInfo(
+  io: LiveIo,
+  sourceId: 'live-build-info' | 'staging-build-info'
+): Promise<AuthorityRead> {
   const read = await readNamedUrl(
     io,
-    'live-build-info',
-    NAMED_AUTHORITY_URLS['live-build-info'],
+    sourceId,
+    NAMED_AUTHORITY_URLS[sourceId],
     PUBLIC_SOURCE_TIMEOUT_MS
   );
   if (read.status !== 'ok' || !read.payload) return read;
@@ -1241,17 +1271,29 @@ export async function readLiveBuild(io: LiveIo): Promise<AuthorityRead> {
     Number.isFinite(payload.deployedAt)
       ? new Date(payload.deployedAt).toISOString()
       : parseTimestamp(payload.deployedAt);
+  const block = {
+    sha,
+    version: sanitizeOpaqueIdentifier(payload.version, 32),
+    deployedAt,
+    behindMain: sha ? await readBehindMain(io, sha) : NOT_MEASURED_COUNT,
+  };
   return {
     ...read,
-    delivery: {
-      production: {
-        sha,
-        version: sanitizeOpaqueIdentifier(payload.version, 32),
-        deployedAt,
-        behindMain: sha ? await readBehindMain(io, sha) : NOT_MEASURED_COUNT,
-      },
-    },
+    delivery:
+      sourceId === 'live-build-info'
+        ? { production: block }
+        : { staging: block },
   };
+}
+
+/** jov.ie build-info plus how many main commits production is missing. */
+export async function readLiveBuild(io: LiveIo): Promise<AuthorityRead> {
+  return readBuildInfo(io, 'live-build-info');
+}
+
+/** staging.jov.ie build-info — the standing staging revision. */
+export async function readStagingBuild(io: LiveIo): Promise<AuthorityRead> {
+  return readBuildInfo(io, 'staging-build-info');
 }
 
 /** Summer's public runtime health channel (`/runtime/v1/health`). */
@@ -1305,10 +1347,17 @@ export function createLiveShippingStateReaders(
     'exact-sha-ci': () => readWorkflow(io, 'exact-sha-ci', 'ci.yml'),
     'production-controller': () =>
       readWorkflow(io, 'production-controller', 'production-controller.yml'),
+    'staging-controller': () =>
+      readWorkflow(io, 'staging-controller', 'staging-controller.yml'),
     'live-build-info': cachedReader(
       io,
       () => readLiveBuild(io),
       SOURCE_CACHE_TTL_MS['live-build-info']
+    ),
+    'staging-build-info': cachedReader(
+      io,
+      () => readStagingBuild(io),
+      SOURCE_CACHE_TTL_MS['staging-build-info']
     ),
     'summer-runtime': cachedReader(
       io,
