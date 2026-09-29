@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { OnboardingChatEmptyIntro } from '@/components/features/onboarding/OnboardingChatEmptyIntro';
@@ -16,13 +16,34 @@ vi.mock('@/components/organisms/sidebar', () => ({
 }));
 
 vi.mock('@/components/features/onboarding/OnboardingChat', () => ({
-  OnboardingChat: () => <div data-testid='onboarding-chat' />,
+  OnboardingChat: ({
+    turnstilePanel,
+  }: {
+    readonly turnstilePanel: ReactNode;
+  }) => (
+    <>
+      <div data-testid='onboarding-chat' />
+      {turnstilePanel}
+    </>
+  ),
+}));
+
+const turnstileProps = vi.hoisted(() => ({
+  current: null as {
+    readonly onStateChange?: (state: {
+      status: string;
+      message: string | null;
+    }) => void;
+  } | null,
 }));
 
 vi.mock('@/components/features/onboarding/OnboardingTurnstile', () => ({
   getBrowserTurnstileHostname: () => 'localhost',
   isOnboardingTurnstilePanelVisible: () => false,
-  OnboardingTurnstile: () => null,
+  OnboardingTurnstile: (props: Record<string, unknown>) => {
+    turnstileProps.current = props;
+    return null;
+  },
   resolveTurnstileSiteKey: () => null,
 }));
 
@@ -46,6 +67,24 @@ describe('onboarding sign-in placement', () => {
     render(<OnboardingShell sessionLabel='pending' isSignedIn />);
 
     expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
+  });
+
+  it('reports a failed chat start without verification jargon or error codes', () => {
+    render(<OnboardingShell sessionLabel='pending' />);
+
+    expect(turnstileProps.current?.onStateChange).toBeTruthy();
+    act(() => {
+      turnstileProps.current?.onStateChange?.({
+        status: 'error',
+        message: null,
+      });
+    });
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent(
+      "We couldn't start your chat. Refresh the page to try again."
+    );
+    expect(alert.textContent).not.toMatch(/verification failed|\(\d+\)/i);
   });
 
   it('removes the centered duplicate and starter rail from the blank entry', () => {

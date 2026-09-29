@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/onboarding/OnboardingChatEmptyIntro.test.tsx
 import { LoaderCircle } from 'lucide-react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';

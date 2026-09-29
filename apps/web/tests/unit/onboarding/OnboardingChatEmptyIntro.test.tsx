@@ -24,6 +24,8 @@ describe('OnboardingChatEmptyIntro', () => {
     render(<OnboardingChatEmptyIntro mode='spotify_handoff' />);
 
     expect(screen.getByText('Getting Your Artist Ready')).toBeTruthy();
+    expect(screen.getByText('Your message is on its way.')).toBeTruthy();
+    expect(screen.queryByText(/verification/i)).toBeNull();
     expect(screen.getByRole('status')).toHaveTextContent(
       'Preparing your first message'
     );
