@@ -78,6 +78,28 @@ function exactBaseUrl(testInfo: TestInfo): string {
   return requireExactNavigationOrigin(baseURL);
 }
 
+// Vaul hardcodes `transition: transform .5s cubic-bezier(...)` on
+// [data-vaul-drawer] regardless of prefers-reduced-motion (emulateMedia
+// above has no effect on it: it's a plain CSS transition the library sets
+// itself, not one gated behind a media query). A `waitForTimeout` shorter
+// than that leaves the sheet mid-slide when a screenshot-based check runs,
+// and a slide is a real, uncomposited-color-shifting transform: the
+// contrast detector's pixel sampling picked up a genuinely different,
+// run-to-run-varying frame instead of the settled one. Poll the drawer's
+// own transform until two consecutive reads agree instead of guessing a
+// fixed delay.
+async function waitForDrawerToSettle(page: Page): Promise<void> {
+  const drawer = page.locator('[data-vaul-drawer]').first();
+  if ((await drawer.count()) === 0) return;
+  let previous: string | null = null;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const current = await drawer.evaluate(el => getComputedStyle(el).transform);
+    if (current === previous) return;
+    previous = current;
+    await page.waitForTimeout(50);
+  }
+}
+
 async function prepareProfileState(
   page: Page,
   state: (typeof profileStates)[number]
@@ -92,6 +114,7 @@ async function prepareProfileState(
   const menu = page.getByRole('button', { name: 'Menu', exact: true });
   await menu.click();
   await expect(page.getByTestId('profile-menu-drawer')).toBeVisible();
+  await waitForDrawerToSettle(page);
   if (state.kind === 'drawer') return;
 
   await page
@@ -102,6 +125,10 @@ async function prepareProfileState(
     return;
   }
   await expect(page.getByTestId('profile-menu-drawer')).toBeVisible();
+  // The secondary panel (e.g. Pay) is taller than the root menu list, so
+  // Vaul re-measures and re-transitions the drawer's own height/transform a
+  // second time here, independent of the settle-wait above.
+  await waitForDrawerToSettle(page);
 }
 
 async function expectDeliberateRed(
@@ -357,7 +384,17 @@ test('certifies every marketing route and public-profile open state', async ({
         page.getByTestId('public-profile-layout-shell')
       ).toBeVisible();
       await prepareProfileState(page, state);
-      await page.waitForTimeout(150);
+      // ProfileUnifiedDrawer.tsx cross-fades drawer views via Framer Motion
+      // AnimatePresence (mode="wait": the outgoing view exits over 120ms,
+      // then the incoming one enters over another 120ms) — a JS-driven
+      // opacity animation the library runs unconditionally, not a CSS
+      // transition/animation, so page.emulateMedia({reducedMotion: 'reduce'})
+      // above has no effect on it. 150ms could still land mid cross-fade,
+      // which for a state with brand-accent-colored content (e.g. the
+      // selected-amount pill on Pay) blends its real background toward the
+      // drawer's own dark surface and reads as a false low-contrast finding.
+      // Clear both phases with margin.
+      await page.waitForTimeout(400);
 
       const snapshot = await inspectRouteDom(page, {
         surface: 'public-profile',
