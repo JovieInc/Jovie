@@ -8,9 +8,23 @@ export const SCHEDULE_CLASSES = Object.freeze([
   'upstream-advisory',
 ]);
 
+export const EVIDENCE_DRIVEN_WORKFLOWS = Object.freeze([
+  '.github/workflows/codeql.yml',
+  '.github/workflows/e2e-full-matrix.yml',
+  '.github/workflows/eval-real-model.yml',
+  '.github/workflows/nightly-testing-agent.yml',
+  '.github/workflows/nightly-tests.yml',
+  '.github/workflows/security.yml',
+  '.github/workflows/sonarcloud.yml',
+  '.github/workflows/test-coverage-audit.yml',
+  '.github/workflows/test-flakiness-report.yml',
+]);
+
 const WORKFLOW_FILE_RE = /\.ya?ml$/;
 const CRON_RE = /^\s*-\s*cron:/m;
 const CLASS_RE = /^\s*#\s*clock-class:\s+(\S+)\s*$/m;
+const CAUSAL_TRIGGER_RE =
+  /^  (?:push|workflow_run|repository_dispatch|deployment_status):/m;
 
 export function parseScheduleClass(source = '') {
   return String(source).match(CLASS_RE)?.[1] ?? null;
@@ -23,9 +37,22 @@ export function hasCronSchedule(source = '') {
 export function inventoryScheduledWorkflows(files = []) {
   const errors = [];
   const rows = [];
+  const evidenceDriven = new Set(EVIDENCE_DRIVEN_WORKFLOWS);
   for (const file of files) {
     const path = file.path;
     const source = String(file.source ?? '');
+    if (evidenceDriven.has(path)) {
+      if (hasCronSchedule(source)) {
+        errors.push(
+          `${path}: broad evidence workflow must not run from a cron schedule`
+        );
+      }
+      if (!CAUSAL_TRIGGER_RE.test(source)) {
+        errors.push(
+          `${path}: broad evidence workflow requires a causal event trigger`
+        );
+      }
+    }
     if (!hasCronSchedule(source)) continue;
     const scheduleClass = parseScheduleClass(source);
     rows.push({ path, scheduleClass });

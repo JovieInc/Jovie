@@ -449,8 +449,8 @@ def test_repair_controllers_use_causal_events_instead_of_polling() -> None:
     assert "workflows: ['CI']" in conflicts
 
 
-def test_sha_bound_nightlies_skip_only_repeated_scheduled_heads() -> None:
-    """Expensive clocks fail closed and manual dispatches always execute."""
+def test_changed_evidence_workflows_do_not_use_schedule_dedupe() -> None:
+    """Event-driven evidence lanes execute directly from their changed inputs."""
     action = (
         REPO_ROOT / ".github" / "actions" / "skip-if-unchanged" / "action.yml"
     ).read_text(encoding="utf-8")
@@ -468,9 +468,11 @@ def test_sha_bound_nightlies_skip_only_repeated_scheduled_heads() -> None:
     ):
         workflow = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
         assert "actions: read" in workflow, workflow_name
-        assert "uses: ./.github/actions/skip-if-unchanged" in workflow, workflow_name
-        assert "needs: unchanged" in workflow, workflow_name
-        assert "needs.unchanged.outputs.skip != 'true'" in workflow, workflow_name
+        assert (
+            "uses: ./.github/actions/skip-if-unchanged" not in workflow
+        ), workflow_name
+        assert "needs: unchanged" not in workflow, workflow_name
+        assert "needs.unchanged.outputs.skip" not in workflow, workflow_name
 
     live_model = (WORKFLOWS / "eval-real-model.yml").read_text(encoding="utf-8")
     nightly = (WORKFLOWS / "nightly-tests.yml").read_text(encoding="utf-8")
@@ -1237,8 +1239,8 @@ def test_live_model_work_never_fans_out_from_pull_requests() -> None:
     assert "github.event_name == 'pull_request' && '0'" in deterministic
 
 
-def test_deep_lanes_are_staggered_and_bounded() -> None:
-    """Scheduled exhaustive coverage should not fan out across the runner pool."""
+def test_deep_lanes_are_event_driven_and_bounded() -> None:
+    """Changed-evidence coverage should not fan out across the runner pool."""
     full_matrix = (WORKFLOWS / "e2e-full-matrix.yml").read_text(encoding="utf-8")
     nightly_agent = (WORKFLOWS / "nightly-testing-agent.yml").read_text(
         encoding="utf-8"
@@ -1246,14 +1248,16 @@ def test_deep_lanes_are_staggered_and_bounded() -> None:
 
     assert "max-parallel: 1" in full_matrix
     assert "needs: [context, deterministic]" in nightly_agent
-    assert "'30 4 * * *'" in nightly_agent
+    assert "schedule:" not in nightly_agent
+    assert "push:" in nightly_agent
 
     nightly = (WORKFLOWS / "nightly-tests.yml").read_text(encoding="utf-8")
     screenshots = (WORKFLOWS / "screenshots.yml").read_text(encoding="utf-8")
     harness = (WORKFLOWS / "agent-harness-health-report.yml").read_text(
         encoding="utf-8"
     )
-    assert "'30 23 * * *'" in nightly
+    assert "schedule:" not in nightly
+    assert "push:" in nightly
     screenshot_triggers = screenshots.split("\non:\n", 1)[1].split(
         "\npermissions:", 1
     )[0]

@@ -303,7 +303,12 @@ export function ActionDial({
           }}
         />
       </div>
-      <p className='text-muted-foreground mt-1 text-center text-xs'>{hint}</p>
+      {/* JOV-INV-019 image-contrast: text-muted-foreground resolves to
+          text-secondary-token, which measures 4.48:1 against a real photo
+          background on the pay hint (just under the 4.5:1 floor); bump one
+          rung to text-primary-token for margin, same fix as the tab-bar
+          scrim label. */}
+      <p className='mt-1 text-center text-xs text-primary-token'>{hint}</p>
       <p className='sr-only' role='status' aria-live='polite'>
         {active.label} selected
       </p>

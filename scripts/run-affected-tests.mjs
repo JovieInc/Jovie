@@ -144,8 +144,6 @@ const HOMEPAGE_SYSTEM_B_STYLE_GUARD_TESTS = [
   'apps/web/tests/unit/home/mounted-home-product-statement-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-trust-strip-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-workspace-system-b-style-guard.test.ts',
-  'apps/web/tests/unit/home/release-mode-mock-card-system-b-style-guard.test.tsx',
-  'apps/web/tests/unit/home/release-operating-system-showcase-system-b-style-guard.test.tsx',
 ];
 const HOMEPAGE_SYSTEM_B_GUARD_EXACT_INPUTS = new Set([
   'apps/web/components/marketing/ClientFaqAccordion.tsx',

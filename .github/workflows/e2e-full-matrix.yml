@@ -1,10 +1,24 @@
 name: E2E Full Browser Matrix
-# clock-class: skip-if-unchanged
 
 on:
-  schedule:
-    # Weekly deep matrix, well after the daily/nightly suites have drained.
-    - cron: '15 15 * * 1'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/app/**'
+      - 'apps/web/components/**'
+      - 'apps/web/drizzle/**'
+      - 'apps/web/lib/auth/**'
+      - 'apps/web/lib/db/**'
+      - 'apps/web/playwright*.ts'
+      - 'apps/web/tests/e2e/**'
+      - 'apps/web/tests/helpers/**'
+      - 'apps/web/tests/seed-test-data.ts'
+      - 'packages/action-contracts/**'
+      - 'packages/auth-routing/**'
+      - '.github/actions/setup-playwright/**'
+      - '.github/workflows/e2e-full-matrix.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
   workflow_dispatch:
     inputs:
       test_filter:
@@ -80,7 +94,7 @@ jobs:
           if [ -n "${{ github.event.inputs.test_filter }}" ]; then
             node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test "${{ github.event.inputs.test_filter }}" --project=${{ matrix.browser }} --reporter=line
           else
-            # Exclude nightly tests (they run daily in nightly-e2e-tests.yml)
+            # The nightly-tagged chaos lane remains owned by nightly-tests.yml.
             node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --ignore-snapshots --project=${{ matrix.browser }} --reporter=line
           fi
         env:
@@ -154,7 +168,7 @@ jobs:
   notify:
     name: Notify Results
     needs: [e2e-full-matrix]
-    if: ${{ always() && github.event_name == 'schedule' }}
+    if: ${{ always() && github.event_name == 'push' }}
     runs-on: ubuntu-latest
     steps:
       - name: Slack notification on failure

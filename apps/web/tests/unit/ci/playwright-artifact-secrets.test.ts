@@ -1586,11 +1586,11 @@ ${fixtureCheckout}
     );
     const publishReport = stepBlock(
       nightlyAgent,
-      'Publish daily report and ops status'
+      'Publish evidence report and ops status'
     );
     const commitReport = stepBlock(
       nightlyAgent,
-      'Commit daily report when changed'
+      'Commit evidence report when changed'
     );
     const uploadReport = stepBlock(nightlyAgent, 'Upload final report');
     const reportJob = jobBlock(nightlyAgent, 'report');

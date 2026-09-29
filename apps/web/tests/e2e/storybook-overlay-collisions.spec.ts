@@ -4,6 +4,9 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 /**
  * Overlay collision stress suite.
  *
+ * JOV-INV-039: runtime proof for the overlay layer contract's semantic
+ * stacking order and collision guarantees.
+ *
  * Drives `Guardrails/Overlay Collisions` stories built from the canonical
  * @jovie/ui primitives and asserts the overlay layer contract:
  *   - the newest overlay is the topmost hit target (no overlay renders

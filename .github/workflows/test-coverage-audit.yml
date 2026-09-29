@@ -1,12 +1,12 @@
 # Test Coverage Audit
 #
-# PURPOSE: Nightly regeneration of docs/TEST_COVERAGE_HEATMAP.md from the
-# hand-curated docs/TEST_RISK_REGISTER.md plus v8 coverage data.
+# PURPOSE: Regenerate docs/TEST_COVERAGE_HEATMAP.md when source, tests, or the
+# hand-curated docs/TEST_RISK_REGISTER.md changes.
 #
 # Output: commits an updated heatmap to main only when values change and uploads
-# daily unit coverage to Codecov.
+# resulting unit coverage to Codecov.
 # Also commits apps/web/reports/test-coverage-snapshot.json (machine-readable
-# baseline) so the nightly `pnpm run test:coverage:diff` check (and local
+# baseline) so `pnpm run test:coverage:diff` (and local
 # `test:coverage:diff`) can compare to the canonical baseline from main.
 # Failures notify Slack. GitHub Issues are not a backlog destination.
 #
@@ -14,12 +14,21 @@
 # Generator:    scripts/audit-test-coverage.ts
 
 name: Test Coverage Audit
-# clock-class: skip-if-unchanged
 
 on:
-  schedule:
-    # Run after the nightly deterministic lanes and weekly full matrix.
-    - cron: '30 18 * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - '!apps/web/reports/test-coverage-snapshot.json'
+      - 'packages/**'
+      - 'docs/TEST_RISK_REGISTER.md'
+      - 'scripts/audit-test-coverage.ts'
+      - 'sonar-project.properties'
+      - '.github/workflows/sonarcloud.yml'
+      - '.github/workflows/test-coverage-audit.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
   workflow_dispatch:
     inputs:
       commit:
@@ -80,7 +89,7 @@ jobs:
           verbose: true
 
       - name: Commit if changed
-        if: ${{ github.event_name == 'schedule' || inputs.commit }}
+        if: ${{ github.event_name == 'push' || inputs.commit }}
         run: |
           if git diff --quiet docs/TEST_COVERAGE_HEATMAP.md apps/web/reports/test-coverage-snapshot.json 2>/dev/null; then
             echo "No heatmap changes."
@@ -98,7 +107,7 @@ jobs:
             echo "Nothing staged after rebase."
             exit 0
           fi
-          git commit -m "chore(testing): nightly heatmap refresh" \
+          git commit -m "chore(testing): refresh changed-evidence heatmap" \
             -m "Generated from the risk register and current V8 coverage." \
             -m "Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
           git push
@@ -111,7 +120,7 @@ jobs:
           set -euo pipefail
           PAYLOAD=$(cat <<EOF
           {
-            "text": "Nightly test coverage audit failed",
+            "text": "Changed-evidence test coverage audit failed",
             "attachments": [
               {
                 "color": "danger",
