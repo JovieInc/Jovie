@@ -145,6 +145,39 @@ describe('session-bound Ovie privacy persistence', () => {
       expiresAt: new Date(now.getTime() + 86400000),
     });
   });
+  it('renews an expired deterministic receipt only after a fresh ceremony', async () => {
+    let persisted = { ...unlocked, expiresAt: new Date(now.getTime() - 1) };
+    mocks.results = [
+      [enabled],
+      [enabled],
+      [persisted],
+      [
+        {
+          value: now.toISOString(),
+          expiresAt: new Date(now.getTime() + 43200000),
+        },
+      ],
+      [enabled],
+    ];
+    const select = mocks.select.getMockImplementation()!;
+    mocks.select.mockImplementation(() => {
+      const query = select();
+      query.limit = async () => mocks.results.shift() ?? [persisted];
+      return query;
+    });
+    mocks.insert.mockImplementation(() => ({
+      values: (receipt: typeof persisted) => ({
+        // Model the existing deterministic primary-key row: ignore cannot renew it.
+        onConflictDoNothing: async () => {},
+        onConflictDoUpdate: async () => {
+          persisted = receipt;
+        },
+      }),
+    }));
+    expect((await mutateOviePrivacyLock(auth, 'unlock')).unlockedUntil).toBe(
+      unlocked.expiresAt.toISOString()
+    );
+  });
   it('does not refresh expiry on repeated unlock', async () => {
     mocks.results = [[enabled], [enabled], [unlocked]];
     expect((await mutateOviePrivacyLock(auth, 'unlock')).unlockedUntil).toBe(

@@ -3,6 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // ---------------------------------------------------------------------------
 // Hoisted mocks – created before any module resolution
 // ---------------------------------------------------------------------------
+const mockPrivacy = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/ovie/privacy-lock/server', () => ({
+  assertOviePrivacyUnlocked: mockPrivacy,
+}));
+
 const {
   mockGetCachedAuth,
   mockIsAdmin,
@@ -236,6 +241,7 @@ describe('admin/actions.ts', () => {
     // Default: authenticated admin
     mockGetCachedAuth.mockResolvedValue({ userId: 'admin_123' });
     mockIsAdmin.mockResolvedValue(true);
+    mockPrivacy.mockResolvedValue(undefined);
     mockInvalidateProfileCache.mockResolvedValue(undefined);
     mockInvalidateProxyUserStateCache.mockResolvedValue(undefined);
     // requireAdmin() now does a db.select() to check admin's ban status.
@@ -251,6 +257,16 @@ describe('admin/actions.ts', () => {
   // Admin authorization – applies to EVERY exported action
   // =========================================================================
   describe('admin authorization', () => {
+    it('denies a locked operator before performing an admin mutation', async () => {
+      mockPrivacy.mockRejectedValue(Error('Unlock Ovie to continue.'));
+      const { toggleCreatorVerifiedAction } = await import(
+        '@/app/app/(shell)/admin/actions'
+      );
+      await expect(
+        toggleCreatorVerifiedAction(makeFormData({ profileId: 'p1' }))
+      ).rejects.toThrow('Unlock Ovie');
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
     const actionNames = [
       'toggleCreatorVerifiedAction',
       'bulkRerunCreatorIngestionAction',
