@@ -35,7 +35,7 @@ export function renderProofBriefSocialDraft(
         ? `${strongest.value} ${strongest.label} for ${brief.subject} this week.`
         : brief.hero.sentence;
 
-  const copy = [leadLine, `${brief.window.label} — proof from Jovie.`].join(
+  const copy = [leadLine, `${brief.window.label} | proof from Jovie.`].join(
     '\n'
   );
 

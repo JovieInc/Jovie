@@ -32,11 +32,12 @@ export function renderProofBriefEmail(
   assertProofBriefRenderable(brief, { now: options.now });
 
   const subject = brief.hero.value
-    ? `${brief.hero.value} ${brief.hero.label ?? 'results'} — ${brief.window.label}`
-    : `${brief.window.label} update`;
+    ? `${brief.hero.value} ${brief.hero.label ?? 'results'} | ${brief.window.label}`
+    : `Your Jovie recap | ${brief.window.label}`;
 
   const textLines: string[] = [
-    `Here's what Jovie did for ${brief.subject} this week.`,
+    "Here's what Jovie did for you in the last 7 days.",
+    `${brief.subject} | ${brief.window.label}`,
     '',
     brief.hero.sentence,
     '',
@@ -47,7 +48,11 @@ export function renderProofBriefEmail(
   if (brief.supportingPoints.length > 0) {
     textLines.push('');
   }
-  textLines.push(`Window: ${brief.window.label}`);
+  if (brief.unknowns.length > 0) {
+    textLines.push(`Not measured: ${brief.unknowns.join(', ')}.`);
+    textLines.push('These outcomes remain unknown, not zero.');
+    textLines.push('');
+  }
   textLines.push(proofBriefProvenance(brief));
 
   const pointsHtml = brief.supportingPoints
@@ -60,12 +65,18 @@ export function renderProofBriefEmail(
     )
     .join('');
 
+  const unknownsHtml = brief.unknowns.length
+    ? `<p style="font-size:13px;line-height:1.5;color:#86868B;margin:0 0 20px;">Not measured: ${escapeHtml(brief.unknowns.join(', '))}. These outcomes remain unknown, not zero.</p>`
+    : '';
+
   const html = `<div style="font-family:'Satoshi',Helvetica,Arial,sans-serif;background:#000000;color:#F5F5F7;padding:32px;">
-  <p style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#86868B;margin:0 0 16px;">Weekly proof · ${escapeHtml(brief.window.label)}</p>
-  <p style="font-size:16px;color:#86868B;margin:0 0 8px;">Here's what Jovie did for ${escapeHtml(brief.subject)} this week.</p>
+  <p style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#86868B;margin:0 0 16px;">Your week with Jovie | ${escapeHtml(brief.window.label)}</p>
+  <p style="font-size:16px;color:#86868B;margin:0 0 8px;">Here's what Jovie did for you in the last 7 days.</p>
+  <p style="font-size:14px;color:#86868B;margin:0 0 20px;">${escapeHtml(brief.subject)}</p>
   ${brief.hero.value ? `<p style="font-size:48px;font-weight:700;letter-spacing:-0.02em;margin:0;">${escapeHtml(brief.hero.value)}</p>` : ''}
   <p style="font-size:20px;font-weight:600;margin:8px 0 24px;">${escapeHtml(brief.hero.sentence)}</p>
   <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">${pointsHtml}</table>
+  ${unknownsHtml}
   <p style="font-size:12px;color:#86868B;margin:0;">${escapeHtml(proofBriefProvenance(brief))}</p>
 </div>`;
 

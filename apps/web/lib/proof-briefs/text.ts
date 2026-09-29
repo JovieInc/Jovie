@@ -14,13 +14,22 @@ export function renderProofBriefText(
 ): string {
   assertProofBriefRenderable(brief, { now: options.now });
 
-  const lines: string[] = [brief.hero.sentence];
+  const lines: string[] = [
+    "Here's what Jovie did for you in the last 7 days.",
+    `${brief.subject} | ${brief.window.label}`,
+    '',
+    brief.hero.sentence,
+  ];
 
   for (const point of brief.supportingPoints) {
     lines.push(`- ${point.value ? `${point.value} ` : ''}${point.label}`);
   }
 
-  lines.push(`${brief.window.label}`);
+  if (brief.unknowns.length > 0) {
+    lines.push('');
+    lines.push(`Not measured: ${brief.unknowns.join(', ')}.`);
+    lines.push('These outcomes remain unknown, not zero.');
+  }
 
   return lines.join('\n');
 }
