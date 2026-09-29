@@ -1,10 +1,19 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
-import { KanbanBoard } from './KanbanBoard';
+import { KanbanBoard, type KanbanBoardProps } from './KanbanBoard';
+
+interface StoryItem {
+  readonly id: string;
+  readonly label: string;
+}
+
+function KanbanBoardStoryHarness(props: KanbanBoardProps<StoryItem>) {
+  return <KanbanBoard {...props} />;
+}
 
 const meta = {
   title: 'Features/Admin/Table/KanbanBoard',
-  component: KanbanBoard,
+  component: KanbanBoardStoryHarness,
   parameters: {
     layout: 'fullscreen',
     jovie: {
@@ -38,7 +47,7 @@ const meta = {
     onItemMove: fn(),
     enableVirtualization: false,
   },
-} satisfies Meta<typeof KanbanBoard>;
+} satisfies Meta<typeof KanbanBoardStoryHarness>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

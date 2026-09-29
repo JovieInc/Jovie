@@ -944,6 +944,44 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     );
   });
 
+  it('keeps the /hud isolated producer identity synchronized with the trusted resolver (JOV-7126)', () => {
+    const workflow = readFileSync(
+      join(ROOT, '.github/workflows/screenshots.yml'),
+      'utf8'
+    );
+    assert.equal(SCREEN_PROOF_ROUTES['web.hud-isolated'], '/hud?fs=1');
+    assert.equal(
+      screenProofArtifactName('web.hud-isolated'),
+      `${PRODUCER.artifact}-hud-isolated`
+    );
+    assert.notEqual(
+      screenProofArtifactName('web.hud-isolated'),
+      screenProofArtifactName('web.public-profile')
+    );
+    assert.notEqual(
+      screenProofArtifactName('web.hud-isolated'),
+      screenProofArtifactName('web.artists')
+    );
+    assert.match(workflow, /--screen=web\.hud-isolated/);
+    assert.match(
+      workflow,
+      new RegExp(`name: ${screenProofArtifactName('web.hud-isolated')}`)
+    );
+    assert.match(workflow, /--screen-id=web\.hud-isolated/);
+    assert.match(
+      workflow,
+      /hud-isolated-artifact-id: \$\{\{ steps\.hud-isolated-proof\.outputs\.artifact-id \}\}/
+    );
+    const hudSpec = readFileSync(
+      join(
+        ROOT,
+        'apps/web/tests/product-screenshots/hud-isolated-screen-proof.spec.ts'
+      ),
+      'utf8'
+    );
+    assert.match(hudSpec, /const proofRoute = '\/hud\?fs=1'/);
+  });
+
   it('routes changed screens to their matching artifacts in one certification pass', () => {
     const homepage = home();
     const profile = SCREEN_REGISTRY.find(
@@ -1389,6 +1427,185 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       process.env.PATH = priorPath;
       if (priorDiffBase === undefined) delete process.env.SCREEN_CERT_DIFF_BASE;
       else process.env.SCREEN_CERT_DIFF_BASE = priorDiffBase;
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('binds web.hud-isolated to its exact query-string proof route (JOV-7126)', () => {
+    // web.hud-isolated is the first SCREEN_PROOF_ROUTES entry whose route
+    // carries a query string (/hud?fs=1 is the only way to reach this
+    // screen's registered source rather than the app-shell-wrapped
+    // web.ov-hud-shell screen). This proves validLocalFinalUrl's
+    // query-aware comparison actually binds the exact query, not just the
+    // pathname.
+    const root = mkdtempSync(join(tmpdir(), 'screen-resolver-hud-query-'));
+    const priorPath = process.env.PATH;
+    const screenId = 'web.hud-isolated';
+    const screen = SCREEN_REGISTRY.find(entry => entry.id === screenId);
+    assert.ok(screen, `${screenId} must stay registered for this test`);
+    const proofRoute = SCREEN_PROOF_ROUTES[screenId];
+    assert.equal(proofRoute, '/hud?fs=1');
+    try {
+      const head = spawnSync('git', ['rev-parse', 'HEAD'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+      }).stdout.trim();
+      const image = readFileSync(
+        join(ROOT, 'docs/screenshots/gem-symphony-hud-430x90.png')
+      );
+      /** @type {[string, Buffer][]} */
+      const images = [
+        ['screenshots/desktop.png', image],
+        ['screenshots/mobile.png', image],
+      ];
+      const now = Date.now();
+      const iso = offset => new Date(now + offset).toISOString();
+      const buildProof = finalUrl => ({
+        schema: SCREEN_BROWSER_PROOF_SCHEMA,
+        producer: 'external-render-runner',
+        status: 'unverified-candidate',
+        certificationStatus: 'not-certified',
+        screenId,
+        headSha: head,
+        tier: 'rendered-evidence',
+        runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/81/attempts/1',
+        producerRunId: 81,
+        producerRunAttempt: 1,
+        producerJobId: 101,
+        environment: 'local-production-build',
+        sourcePaths: [...screen.sources].sort(),
+        capturedAt: iso(-60_000),
+        artifactDigest: `sha256:${'0'.repeat(64)}`,
+        activeFlow: { disclosure: false },
+        historyProof: { separate: true, path: 'docs/VISUAL_TESTING_POLICY.md' },
+        visibleActions: ['Exit fullscreen'],
+        viewports: ['desktop', 'mobile'].map(id => ({
+          id,
+          requestedRoute: proofRoute,
+          finalUrl,
+          decision: 'pass',
+          rendered: true,
+          axe: { violations: 0 },
+          overflow: { maxHorizontalPx: 0 },
+          interaction: { passed: true },
+          cls: { value: 0 },
+          contrast: { passed: true },
+          runtime: {
+            consoleErrors: 0,
+            pageErrors: 0,
+            failedResponses: 0,
+            failedRequests: 0,
+          },
+        })),
+      });
+      for (const [name, bytes] of images) {
+        mkdirSync(dirname(join(root, name)), { recursive: true });
+        writeFileSync(join(root, name), bytes);
+      }
+      const buildArchive = proof => {
+        writeFileSync(join(root, 'screen-proof.json'), JSON.stringify(proof));
+        rmSync(join(root, 'proof.zip'), { force: true });
+        assert.equal(
+          spawnSync(
+            'zip',
+            [
+              '-q',
+              'proof.zip',
+              'screen-proof.json',
+              ...images.map(([name]) => name),
+            ],
+            { cwd: root }
+          ).status,
+          0
+        );
+        return readFileSync(join(root, 'proof.zip'));
+      };
+      const makeRecords = zip => ({
+        artifact: {
+          id: 44,
+          name: screenProofArtifactName(screenId),
+          expired: false,
+          digest: sha256(zip),
+          created_at: iso(-30_000),
+          workflow_run: { id: 81 },
+        },
+        run: {
+          id: 81,
+          run_attempt: 1,
+          repository: { full_name: 'JovieInc/Jovie' },
+          head_branch: 'main',
+          head_sha: head,
+          path: '.github/workflows/screenshots.yml',
+          event: 'push',
+          conclusion: 'success',
+        },
+        jobs: {
+          jobs: [
+            {
+              id: 101,
+              name: 'Generate Screenshots',
+              run_id: 81,
+              run_attempt: 1,
+              head_sha: head,
+              conclusion: 'success',
+              started_at: iso(-90_000),
+              completed_at: iso(-10_000),
+            },
+          ],
+        },
+      });
+      const gh = join(root, 'gh');
+      writeFileSync(
+        gh,
+        `#!/usr/bin/env node\nconst fs=require('node:fs');const p=process.argv.at(-1);const r=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'records.json'))}));if(p.endsWith('/zip'))process.stdout.write(fs.readFileSync(${JSON.stringify(join(root, 'proof.zip'))}));else process.stdout.write(JSON.stringify(p.includes('/artifacts/')?r.artifact:p.includes('/attempts/')?r.jobs:r.run));`
+      );
+      chmodSync(gh, 0o755);
+      process.env.PATH = `${root}:${priorPath}`;
+      const context = {
+        headSha: head,
+        screenId,
+        sourcePaths: [...screen.sources],
+        viewports: ['desktop', 'mobile'],
+        proofRoute,
+      };
+
+      // 1. The exact query (?fs=1) resolves.
+      const exactProof = buildProof('http://localhost:3000/hud?fs=1');
+      const digest1 = createHash('sha256');
+      for (const [name, bytes] of images) {
+        digest1.update(name);
+        digest1.update('\0');
+        digest1.update(bytes);
+        digest1.update('\0');
+      }
+      exactProof.artifactDigest = `sha256:${digest1.digest('hex')}`;
+      const zip1 = buildArchive(exactProof);
+      writeFileSync(
+        join(root, 'records.json'),
+        JSON.stringify(makeRecords(zip1))
+      );
+      const resolved = resolveTrustedScreenProof({ artifactId: 44, context });
+      assert.deepEqual(resolved.findings, []);
+      assert.equal(resolved.proof?.screenId, screenId);
+
+      // 2. The bare path with no query (what plain /hud would report) is
+      // rejected — the shell-wrapped screen's URL must not satisfy the
+      // isolated screen's proof.
+      const wrongQueryProof = buildProof('http://localhost:3000/hud');
+      wrongQueryProof.artifactDigest = exactProof.artifactDigest;
+      const zip2 = buildArchive(wrongQueryProof);
+      writeFileSync(
+        join(root, 'records.json'),
+        JSON.stringify(makeRecords(zip2))
+      );
+      const rejected = resolveTrustedScreenProof({ artifactId: 44, context });
+      assert.equal(rejected.proof, null);
+      assert.match(
+        rejected.findings.join('\n'),
+        /required browser measurements are unavailable/
+      );
+    } finally {
+      process.env.PATH = priorPath;
       rmSync(root, { force: true, recursive: true });
     }
   });

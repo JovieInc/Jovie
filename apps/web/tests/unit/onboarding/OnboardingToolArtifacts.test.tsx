@@ -298,6 +298,36 @@ describe('onboarding tool artifacts', () => {
     expect(onHandleCandidateChange).toHaveBeenLastCalledWith('');
   });
 
+  it('renders an unavailable handle with the error token, not raw red-* (JOV-6773)', () => {
+    mocks.handleAvailability.data = { available: false };
+
+    fastRender(
+      <OnboardingHandleCheckCard
+        state='output-available'
+        output={{ action: 'check_handle', handle: 'takenartist' }}
+      />
+    );
+
+    expect(screen.getByText('is not available')).toBeDefined();
+    const card = screen.getByTestId('onboarding-handle-check');
+    expect(card.className).toContain('text-error');
+    expect(card.className).not.toMatch(/\bred-\d/);
+    const icon = card.querySelector('[aria-hidden="true"]');
+    expect(icon?.className).toContain('text-error');
+    expect(icon?.className).not.toMatch(/\bred-\d/);
+  });
+
+  it('renders a failed artist lookup with the error token, not raw red-* (JOV-6773)', () => {
+    fastRender(<OnboardingArtistConfirmedCard state='output-error' />);
+
+    expect(
+      screen.getByText('Artist profile could not be loaded')
+    ).toBeDefined();
+    const alert = screen.getByRole('alert');
+    expect(alert.className).toContain('text-error');
+    expect(alert.className).not.toMatch(/\bred-\d/);
+  });
+
   it('emits Confirm Handle widget event when the CTA is pressed', () => {
     mocks.handleAvailability.data = { available: true };
     const onConfirmHandle = vi.fn();

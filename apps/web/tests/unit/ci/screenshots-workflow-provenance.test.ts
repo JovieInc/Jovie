@@ -239,6 +239,57 @@ describe('Product Screenshots provenance cleanliness', () => {
     );
   });
 
+  it('emits and certifies a source-bound hud-isolated browser proof (JOV-7126)', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const capture = getStepBlock(workflow, 'Capture hud-isolated screen proof');
+    const bind = getStepBlock(
+      workflow,
+      'Bind hud-isolated proof to producer provenance'
+    );
+    const upload = getStepBlock(workflow, 'Upload hud-isolated screen proof');
+    const certify = getStepBlock(workflow, 'Certify exact screen captures');
+
+    expect(workflow).toContain("- 'apps/web/app/hud/**'");
+    expect(workflow).toContain(
+      'hud-isolated-artifact-id: ${{ steps.hud-isolated-proof.outputs.artifact-id }}'
+    );
+    // The secretless dev-test-auth admin bypass (JOV-7126) must be visible to
+    // the long-lived production server process, which only ever reads the
+    // job-level env (or its own step's env) — a later step's env cannot
+    // reach an already-running server. It must be set before that server
+    // starts.
+    expect(workflow).toContain("E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'");
+    expect(
+      workflow.indexOf("E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'")
+    ).toBeLessThan(stepIndex(workflow, 'Start production server'));
+    expect(capture).toContain('hud-isolated-screen-proof.spec.ts');
+    expect(bind).toContain('--screen=web.hud-isolated');
+    expect(bind).toContain('--producer-job-id="$PRODUCER_JOB_ID"');
+    // Each screen's proof gets its own GH artifact name (upload-artifact
+    // forbids reusing another screen's name within this run).
+    expect(upload).toContain('name: screen-browser-proof-hud-isolated');
+    expect(upload).toContain('screenshots/desktop.png');
+    expect(upload).toContain('screenshots/mobile.png');
+    expect(certify).toContain('--screen-id=web.hud-isolated');
+    expect(certify).toContain(
+      'needs.generate.outputs.hud-isolated-artifact-id'
+    );
+    expect(stepIndex(workflow, 'Capture /artists screen proof')).toBeLessThan(
+      stepIndex(workflow, 'Capture hud-isolated screen proof')
+    );
+    expect(
+      stepIndex(workflow, 'Upload hud-isolated screen proof')
+    ).toBeLessThan(stepIndex(workflow, 'Certify exact screen captures'));
+    expect(
+      stepIndex(workflow, 'Upload hud-isolated screen proof')
+    ).toBeLessThan(
+      stepIndex(
+        workflow,
+        'Verify public screenshot exports from production build'
+      )
+    );
+  });
+
   it('still emits a blocked receipt when screenshot generation fails', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const certifyJob = workflow.slice(workflow.indexOf('\n  certify:'));
@@ -252,6 +303,12 @@ describe('Product Screenshots provenance cleanliness', () => {
     expect(certifyJob).toContain(
       "if: always() && hashFiles('.artifacts/screen-certification/*.json') != ''"
     );
+    // JOV-7126: a blocked receipt for an earlier --screen-id call must not
+    // abort the shell before a later one runs, or that screen's evidence
+    // silently never gets attempted.
+    const certify = getStepBlock(workflow, 'Certify exact screen captures');
+    expect(certify).toContain('|| STATUS=$?');
+    expect(certify).toContain('exit "$STATUS"');
   });
 
   it('keeps trusted proof production independent from catalog publication', () => {

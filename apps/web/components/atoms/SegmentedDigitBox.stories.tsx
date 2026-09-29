@@ -12,6 +12,10 @@ const meta = {
   component: SegmentedDigitBox,
   parameters: {
     layout: 'centered',
+    // `e` isn't a real prop — the required-props scanner picks up the `e:
+    // React.KeyboardEvent<...>` parameter name inside onKeyDown's inline
+    // function type in SegmentedDigitBoxProps.
+    jovie: { uncoveredProps: ['e'] },
   },
   args: {
     digit: '',

@@ -49,16 +49,26 @@ export const INVESTOR_ANSWER_REUSE_PACK = {
         claimId: 'company-identity-definition',
         revisionId: SOURCE_VERSION,
         kind: 'identity',
+        assertion: 'founder-attested',
+        subject: 'Jovie company definition',
         statement: COMPANY_IDENTITY.definition,
         disclosure: 'public',
         evidenceQuality: 'canonical',
         evidenceRefs: ['apps/web/data/companyIdentity.ts#COMPANY_IDENTITY'],
+        asOf: '2026-09-17',
+        reviewedBy: 'Tim White',
+        reviewedAt: '2026-09-17',
+        limitations: [
+          'Founder-provided positioning; not an independently verified market definition.',
+        ],
         revisedAt: '2026-09-17',
       },
       {
         claimId: 'public-profile-availability',
         revisionId: 'jov-6216-public-profile-2026-09-17',
         kind: 'current-availability',
+        assertion: 'observed-fact',
+        subject: 'Public profile availability',
         statement:
           'A claimable public profile page is generally available with open access.',
         disclosure: 'public',
@@ -66,6 +76,10 @@ export const INVESTOR_ANSWER_REUSE_PACK = {
         evidenceRefs: [
           'apps/web/data/marketing/featureAvailability.ts#public-profile',
         ],
+        asOf: MARKETING_FEATURE_CAPABILITIES['public-profile'].contentRevision,
+        reviewedBy: 'Tim White',
+        reviewedAt: '2026-09-17',
+        limitations: [],
         revisedAt:
           MARKETING_FEATURE_CAPABILITIES['public-profile'].contentRevision,
       },
