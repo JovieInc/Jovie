@@ -69,10 +69,6 @@ vi.mock('@/components/organisms/user-button', () => ({
   },
 }));
 
-vi.mock('@/features/feedback/SidebarUpgradeBanner', () => ({
-  SidebarUpgradeBanner: () => <div data-testid='sidebar-upgrade-banner' />,
-}));
-
 vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
   UpdateAvailablePill: () => (
     <button type='button' data-testid='update-available-pill'>

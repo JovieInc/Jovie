@@ -43,10 +43,6 @@ vi.mock('@/components/organisms/user-button', () => ({
   UserButton: () => <div data-testid='fixture-user-button' />,
 }));
 
-vi.mock('@/features/feedback/SidebarUpgradeBanner', () => ({
-  SidebarUpgradeBanner: () => null,
-}));
-
 vi.mock('@/features/feedback/SidebarInstallBanner', () => ({
   SidebarInstallBanner: () => null,
 }));
