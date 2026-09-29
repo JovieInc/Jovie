@@ -11,10 +11,12 @@ const cycleTheme = vi.fn();
 const signOut = vi.fn();
 const push = vi.fn();
 const assign = vi.fn();
+const lockWorkspaceMock = vi.hoisted(() => vi.fn());
 
 beforeEach(() => {
   assign.mockClear();
   push.mockClear();
+  lockWorkspaceMock.mockClear();
   vi.stubGlobal('location', { assign });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -32,6 +34,9 @@ vi.mock('@/components/site/theme-toggle/useThemeToggle', () => ({
 vi.mock('next/navigation', () => ({
   usePathname: () => shortcutState.pathname,
   useRouter: () => ({ push }),
+}));
+vi.mock('@/lib/workspace-lock/workspace-lock', () => ({
+  lockWorkspace: lockWorkspaceMock,
 }));
 
 import { useGlobalShortcutActions } from './useGlobalShortcutActions';
@@ -165,6 +170,34 @@ describe('useGlobalShortcutActions (JOV-1827)', () => {
 
     expect(push).not.toHaveBeenCalled();
     expect(assign).not.toHaveBeenCalled();
+  });
+
+  it('does not register manual workspace lock in Jovie', () => {
+    shortcutState.pathname = '/app/chat';
+    render(<Probe />);
+
+    fireEvent.keyDown(window, {
+      key: 'l',
+      code: 'KeyL',
+      altKey: true,
+      shiftKey: true,
+    });
+
+    expect(lockWorkspaceMock).not.toHaveBeenCalled();
+  });
+
+  it('retains manual workspace lock in Ovie', () => {
+    shortcutState.pathname = '/app/ov/ops';
+    render(<Probe />);
+
+    fireEvent.keyDown(window, {
+      key: 'l',
+      code: 'KeyL',
+      altKey: true,
+      shiftKey: true,
+    });
+
+    expect(lockWorkspaceMock).toHaveBeenCalledOnce();
   });
 
   it('does not switch workspaces while typing or composing', () => {
