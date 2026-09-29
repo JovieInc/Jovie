@@ -295,9 +295,10 @@ describe('SessionStart still uses setup.sh for the skip', () => {
 });
 
 describe('package prepare hook lifecycle', () => {
-  const prepare = JSON.parse(
+  const rootPackage = JSON.parse(
     readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
-  ).scripts.prepare;
+  );
+  const prepare = rootPackage.scripts.prepare;
   const configurator = readFileSync(
     resolve(repoRoot, 'scripts/hooks/configure-git-hooks.sh'),
     'utf8'
@@ -345,6 +346,13 @@ describe('package prepare hook lifecycle', () => {
       spawnSync(command, args, { cwd, env, encoding: 'utf8', timeout: 10000 });
     return { root, env, run };
   }
+
+  it('keeps tracked hook setup independent of Husky wrappers', () => {
+    expect(rootPackage.devDependencies).not.toHaveProperty('husky');
+    expect(rootPackage.devDependencies).toHaveProperty('@commitlint/cli');
+    expect(rootPackage.devDependencies).toHaveProperty('lint-staged');
+    expect(prepare).toContain('scripts/hooks/configure-git-hooks.sh');
+  });
 
   it('keeps tracked push gates active in another linked worktree after package prepare', () => {
     const { root, env, run } = fixture();
