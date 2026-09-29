@@ -23,6 +23,27 @@
  */
 
 export type {
+  MarketingCharacterBoardDecision,
+  MarketingCharacterFinding,
+  MarketingCharacterGenerationBrief,
+  MarketingCharacterIndividualityAxis,
+  MarketingCharacterLightDirection,
+  MarketingCharacterPersona,
+  MarketingCharacterRecord,
+  MarketingCharacterShadowDirection,
+  MarketingCharacterSimilarityResult,
+  MarketingCharacterSystem,
+} from './characterSystem';
+export {
+  auditMarketingCharacterGenerationBrief,
+  findNearDuplicateMarketingCharacters,
+  formatMarketingCharacterSystemForPrompt,
+  JOVIE_MARKETING_CHARACTER_SYSTEM,
+  JOVIE_MARKETING_CHARACTER_SYSTEM_SCHEMA,
+  MARKETING_CHARACTER_INDIVIDUALITY_AXES,
+  scoreMarketingCharacterSimilarity,
+} from './characterSystem';
+export type {
   MarketingPenRegistryIssue,
   MarketingPenRegistryIssueCode,
   MarketingRecipeRegistryEntry,
@@ -159,6 +180,7 @@ export type {
 export {
   auditMarketingNarrativePlan,
   auditMarketingTasteAdmission,
+  MARKETING_ASSET_GENERATION_CHARACTER_CONTRACT,
   MARKETING_ASSET_GENERATION_COLOR_CONTRACT,
   MARKETING_ASSET_GENERATION_MEDIA_RECIPE_CONTRACT,
   MARKETING_CREATIVE_ROLES,
@@ -168,6 +190,7 @@ export {
   MARKETING_ROLE_REQUIREMENTS,
   MARKETING_STAGE_ATTEMPT_LIMITS,
   MARKETING_TASTE_GATE_IDS,
+  MARKETING_VISUAL_REVIEW_CHARACTER_CONTRACT,
   MARKETING_VISUAL_REVIEW_COLOR_CONTRACT,
   MARKETING_VISUAL_REVIEW_MEDIA_RECIPE_CONTRACT,
   selectMarketingModelCandidate,
