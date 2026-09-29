@@ -6,6 +6,7 @@ import type { Row, RowData } from '@/lib/tanstack-table';
 import { flexRender } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import '../table.types';
+import { TABLE_CELL_CONTENT_CLASSNAME } from '../atoms/TableCell';
 import { presets, rowState, tableAlignment } from '../table.styles';
 
 /**
@@ -211,7 +212,12 @@ function VirtualizedTableRowComponent<TData extends RowData>({
                   : cell.column.getSize(),
             }}
           >
-            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+            <div
+              className={TABLE_CELL_CONTENT_CLASSNAME}
+              data-table-cell-content='stable'
+            >
+              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+            </div>
           </td>
         );
       })}
