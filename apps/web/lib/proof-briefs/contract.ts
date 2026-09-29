@@ -30,6 +30,35 @@ interface ProofBriefClaimBinding {
   readonly evidenceIds: readonly string[];
 }
 
+/**
+ * Product branding carried on the brief so one renderer serves every product
+ * in the family (JOV-7220). The adapter picks the brand; renderers never fork.
+ */
+export interface ProofBriefBrand {
+  /** Footer wordmark, e.g. "Jovie" or "LogYourBody". */
+  readonly product: string;
+  /** Eyebrow line above the window, e.g. "Your week with Jovie". */
+  readonly eyebrow: string;
+  /** Copy intro for text/email surfaces. */
+  readonly intro: string;
+  /** Email subject fallback when the hero has no numeric value. */
+  readonly recapNoun: string;
+}
+
+export const JOVIE_PROOF_BRIEF_BRAND: ProofBriefBrand = {
+  product: 'Jovie',
+  eyebrow: 'Your week with Jovie',
+  intro: "Here's what Jovie did for you in the last 7 days.",
+  recapNoun: 'Jovie recap',
+} as const;
+
+export const LYB_PROOF_BRIEF_BRAND: ProofBriefBrand = {
+  product: 'LogYourBody',
+  eyebrow: 'Your progress with LogYourBody',
+  intro: "Here's what changed in your LogYourBody measurements.",
+  recapNoun: 'LogYourBody progress',
+} as const;
+
 export interface ProofBriefWindow {
   /** Inclusive ISO date bounds for the certified window. */
   readonly start: string;
@@ -72,6 +101,8 @@ export interface CertifiedProofBrief {
   readonly generatedAt: string;
   /** ISO timestamp after which the snapshot is stale and must not render. */
   readonly expiresAt: string;
+  /** Product branding; absent means the Jovie default. */
+  readonly brand?: ProofBriefBrand;
 }
 
 export class ProofBriefError extends Error {
@@ -187,6 +218,12 @@ export function assertProofBriefRenderable(
     !brief.unknowns.every(
       item => typeof item === 'string' && item.length > 0
     ) ||
+    (brief.brand != null &&
+      !['product', 'eyebrow', 'intro', 'recapNoun'].every(
+        key =>
+          typeof brief.brand?.[key as keyof ProofBriefBrand] === 'string' &&
+          (brief.brand[key as keyof ProofBriefBrand] as string).length > 0
+      )) ||
     !claimsAreBound
   ) {
     throw new ProofBriefError(
@@ -213,4 +250,9 @@ export function assertProofBriefRenderable(
 /** Shared provenance stamp rendered (or asserted) on every surface. */
 export function proofBriefProvenance(brief: CertifiedProofBrief): string {
   return `Proof ${brief.briefId} · rev ${brief.revision}`;
+}
+
+/** Brand for a brief; Jovie when the adapter did not set one. */
+export function proofBriefBrand(brief: CertifiedProofBrief): ProofBriefBrand {
+  return brief.brand ?? JOVIE_PROOF_BRIEF_BRAND;
 }
