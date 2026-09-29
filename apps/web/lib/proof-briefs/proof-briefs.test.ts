@@ -25,6 +25,12 @@ import {
   PROOF_BRIEF_TEXT_LIMITS,
   ProofBriefCard,
 } from './image';
+import {
+  buildLybProgressBrief,
+  LYB_FIXTURE_PROOF_BRIEF,
+  LYB_INSUFFICIENT_PROOF_BRIEF,
+  type LybProgressMeasurement,
+} from './lyb';
 import { resolveCertifiedProofBrief } from './resolve';
 import { renderProofBriefSocialDraft } from './social';
 import { renderProofBriefText } from './text';
@@ -167,6 +173,135 @@ describe('Tim customer recap', () => {
         ],
       })
     ).toThrow(/inside its window/);
+  });
+});
+
+describe('Log Your Body progress adapter', () => {
+  const lybBase = {
+    briefId: 'pb_lyb_test',
+    revision: 1,
+    subject: 'Fixture Athlete',
+    window: {
+      start: '2026-09-01',
+      end: '2026-09-28',
+      label: 'Sep 1 to Sep 28, 2026',
+    },
+    unknowns: [] as string[],
+    privacy: 'public' as const,
+    generatedAt: '2026-09-29T22:30:00.000Z',
+    expiresAt: '2026-10-13T00:00:00.000Z',
+  };
+  const reading = (value: number, measuredAt: string) => ({
+    value,
+    measuredAt,
+  });
+  const metric = (
+    patch: Partial<LybProgressMeasurement> = {}
+  ): LybProgressMeasurement => ({
+    metricId: 'body-fat',
+    label: 'Body fat',
+    unit: 'pts',
+    baseline: reading(20, '2026-09-01T08:00:00.000Z'),
+    current: reading(18, '2026-09-28T08:00:00.000Z'),
+    sourceUrl: 'https://logyourbody.com/u/fixture/body-fat',
+    ...patch,
+  });
+
+  it('renders the fixture through every shared surface with LYB branding', () => {
+    const b = LYB_FIXTURE_PROOF_BRIEF;
+    expect(b.brand?.product).toBe('LogYourBody');
+    expect(b.hero.value).toBe('-1.5 pts');
+    expect(b.hero.label).toBe('Body fat');
+    expect(b.supportingPoints).toHaveLength(3);
+    expect(b.evidence.every(e => e.kind === 'observation')).toBe(true);
+    expect(b.unknowns).toContain(
+      'body-fat readings are estimates, not clinical measurements'
+    );
+
+    const text = renderProofBriefText(b, { now: NOW });
+    const email = renderProofBriefEmail(b, { now: NOW });
+    const social = renderProofBriefSocialDraft(b, { now: NOW });
+    expect(text).toContain('LogYourBody measurements');
+    expect(text).toContain('moved from 21.4 pts to 19.9 pts');
+    expect(text).not.toContain('Jovie');
+    expect(email.html).toContain('Your progress with LogYourBody');
+    expect(social.copy).toContain('proof from LogYourBody.');
+
+    render(createElement(ProofBriefCard, { brief: b, now: NOW }));
+    expect(screen.getByText('Your progress with LogYourBody')).toBeTruthy();
+    expect(screen.getByText('LogYourBody')).toBeTruthy();
+    expect(screen.getByText('-1.5 pts')).toBeTruthy();
+    expect(screen.getByText('Bench press 1RM')).toBeTruthy();
+    expect(screen.getByText(proofBriefProvenance(b))).toBeTruthy();
+  });
+
+  it('resolves the LYB fixtures through the shared image route path', () => {
+    expect(resolveCertifiedProofBrief(LYB_FIXTURE_PROOF_BRIEF.briefId)).toBe(
+      LYB_FIXTURE_PROOF_BRIEF
+    );
+    expect(
+      resolveCertifiedProofBrief(
+        LYB_INSUFFICIENT_PROOF_BRIEF.briefId,
+        LYB_INSUFFICIENT_PROOF_BRIEF.revision
+      )
+    ).toBe(LYB_INSUFFICIENT_PROOF_BRIEF);
+  });
+
+  it('certifies an insufficient-evidence period without inventing progress', () => {
+    const b = LYB_INSUFFICIENT_PROOF_BRIEF;
+    expect(b.status).toBe('insufficient-evidence');
+    expect(b.supportingPoints).toEqual([]);
+    const text = renderProofBriefText(b, { now: NOW });
+    expect(text).toContain('does not have comparable measurements');
+    expect(text).toContain('unknown, not zero');
+  });
+
+  it('rejects unpaired, out-of-window, and future measurements', () => {
+    const future = metric({
+      current: reading(18, '2026-10-05T08:00:00.000Z'),
+    });
+    const reversed = metric({
+      baseline: reading(20, '2026-09-20T08:00:00.000Z'),
+      current: reading(18, '2026-09-10T08:00:00.000Z'),
+    });
+    const outside = metric({
+      baseline: reading(20, '2026-08-01T08:00:00.000Z'),
+    });
+    for (const bad of [future, reversed, outside]) {
+      expect(() =>
+        buildLybProgressBrief({ ...lybBase, measurements: [bad] })
+      ).toThrow(/comparable in-window pair/);
+    }
+    expect(() =>
+      buildLybProgressBrief({
+        ...lybBase,
+        measurements: Array.from({ length: 5 }, (_, i) =>
+          metric({ metricId: `m${i}` })
+        ),
+      })
+    ).toThrow(/at most 4/);
+  });
+
+  it('honors heroMetricId and signs deltas correctly', () => {
+    const b = buildLybProgressBrief({
+      ...lybBase,
+      measurements: [
+        metric(),
+        metric({
+          metricId: 'bench-1rm',
+          label: 'Bench press 1RM',
+          unit: 'lb',
+          baseline: reading(185, '2026-09-02T17:00:00.000Z'),
+          current: reading(200, '2026-09-26T17:00:00.000Z'),
+          sourceUrl: 'https://logyourbody.com/u/fixture/bench',
+        }),
+      ],
+      heroMetricId: 'bench-1rm',
+    });
+    expect(b.hero.label).toBe('Bench press 1RM');
+    expect(b.hero.value).toBe('+15 lb');
+    expect(b.supportingPoints[0]?.value).toBe('-2 pts');
+    expect(b.hero.attribution).toBe('observed');
   });
 });
 

@@ -1,6 +1,7 @@
 import {
   assertProofBriefRenderable,
   type CertifiedProofBrief,
+  proofBriefBrand,
 } from './contract';
 import { PROOF_BRIEF_CARD_SIZE } from './image';
 
@@ -30,14 +31,15 @@ export function renderProofBriefSocialDraft(
   const strongest = brief.supportingPoints.find(p => p.value != null);
   const leadLine =
     brief.hero.value != null
-      ? `${brief.hero.value} ${brief.hero.label ?? 'results'} for ${brief.subject} this week.`
+      ? `${brief.hero.value} ${brief.hero.label ?? 'results'} for ${brief.subject}.`
       : strongest
-        ? `${strongest.value} ${strongest.label} for ${brief.subject} this week.`
+        ? `${strongest.value} ${strongest.label} for ${brief.subject}.`
         : brief.hero.sentence;
 
-  const copy = [leadLine, `${brief.window.label} | proof from Jovie.`].join(
-    '\n'
-  );
+  const copy = [
+    leadLine,
+    `${brief.window.label} | proof from ${proofBriefBrand(brief).product}.`,
+  ].join('\n');
 
   return {
     copy,

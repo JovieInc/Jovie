@@ -3,12 +3,15 @@ import {
   CERTIFIED_PROOF_BRIEF,
   INSUFFICIENT_EVIDENCE_PROOF_BRIEF,
 } from './fixture';
+import { LYB_FIXTURE_PROOF_BRIEF, LYB_INSUFFICIENT_PROOF_BRIEF } from './lyb';
 
 const CERTIFIED_BRIEFS = new Map(
-  [CERTIFIED_PROOF_BRIEF, INSUFFICIENT_EVIDENCE_PROOF_BRIEF].map(brief => [
-    brief.briefId,
-    brief,
-  ])
+  [
+    CERTIFIED_PROOF_BRIEF,
+    INSUFFICIENT_EVIDENCE_PROOF_BRIEF,
+    LYB_FIXTURE_PROOF_BRIEF,
+    LYB_INSUFFICIENT_PROOF_BRIEF,
+  ].map(brief => [brief.briefId, brief])
 );
 
 /**
