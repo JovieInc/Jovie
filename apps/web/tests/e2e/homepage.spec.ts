@@ -1,4 +1,5 @@
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
+import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { expect, test } from './setup';
 import { waitForHydration } from './utils/smoke-test-utils';
 
@@ -78,8 +79,13 @@ test.describe('Homepage', () => {
       'action',
       '/start'
     );
+    // The claim card proves the claim with Tim's real jov.ie/tim profile
+    // (JOV-INV-038, #19163 onward) — no illustrative placeholder proof.
     await expect(
-      hero.getByText('Illustrative profile · Ready to claim')
+      hero.getByText(HOMEPAGE_IDENTITY_COPY.hero.preview.name)
+    ).toBeVisible();
+    await expect(
+      hero.getByText(HOMEPAGE_IDENTITY_COPY.hero.preview.label)
     ).toBeVisible();
     await expect(page.getByPlaceholder('Search your name')).toHaveCount(0);
     await expect(page.getByText('Request access')).toHaveCount(0);
@@ -204,6 +210,70 @@ test.describe('Homepage', () => {
           viewport.width + 1
         );
       }
+    }
+  });
+
+  /**
+   * JOV-7126 follow-up: at 768 the split shell drops to two columns a whole
+   * breakpoint before the shared H1 ramp expects it, so "Be understood."
+   * needed a third line and the two-line clamp truncated it to "Be..."; the
+   * name column in the claim card was narrow enough to wrap "Founder, Jovie"
+   * onto three lines. Pen x4j9f fixes both with the existing type/spacing
+   * tokens. Check the broken width plus its 390/1440 neighbors for regressions.
+   */
+  test('renders the full headline and a single-line role at 768, with no regression at 390 and 1440', async ({
+    page,
+  }) => {
+    // getClientRects() on the element itself always returns exactly one
+    // rect for a block box, no matter how many lines its text wraps to —
+    // the fragmentation into lines only shows up on a Range over its text.
+    const countVisualLines = (el: Element): number => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      return range.getClientRects().length;
+    };
+
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 768, height: 1024 },
+      { width: 1440, height: 900 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await gotoHomepage(page);
+      await page.evaluate(() => document.fonts.ready);
+
+      const heading = page.getByRole('heading', { level: 1 });
+      await expect(heading).toBeVisible();
+      await expect(heading).toHaveText('Be found.Be understood.');
+
+      // Each sentence is its own <span class="block">. The shared two-line
+      // clamp only ever truncates when the second span itself needs a
+      // second visual line (three lines total for the h1).
+      const secondLine = heading.locator('span', {
+        hasText: 'Be understood.',
+      });
+      const secondLineCount = await secondLine.evaluate(countVisualLines);
+      expect(
+        secondLineCount,
+        `"Be understood." wrapped to ${secondLineCount} lines at ${viewport.width}px, so the two-line clamp truncates it`
+      ).toBe(1);
+
+      const headingBox = await heading.evaluate(el => ({
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+      }));
+      expect(
+        headingBox.scrollWidth,
+        `headline overflows its own box at ${viewport.width}px: ${JSON.stringify(headingBox)}`
+      ).toBeLessThanOrEqual(headingBox.clientWidth + 1);
+
+      const role = page.getByText('Founder, Jovie');
+      await expect(role).toBeVisible();
+      const roleLineCount = await role.evaluate(countVisualLines);
+      expect(
+        roleLineCount,
+        `"Founder, Jovie" wrapped to ${roleLineCount} lines at ${viewport.width}px`
+      ).toBe(1);
     }
   });
 
