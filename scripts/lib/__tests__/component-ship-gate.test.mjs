@@ -315,6 +315,67 @@ describe('story match checks', () => {
     });
     expect(result.ok).toBe(true);
   });
+
+  it('does not flag an unrelated internal helper Props interface as required (JOV-6773)', () => {
+    // Widget itself only requires `title`. RowProps belongs to a
+    // non-exported helper in the same file (e.g. MatchConfidenceBreakdown's
+    // ScoreRowProps, SettingsAdPixelsSection's PlatformSectionProps) and
+    // must not leak into Widget's required-prop surface.
+    const source = `
+      interface RowProps {
+        readonly label: string;
+        readonly value: number;
+      }
+      function Row(_p: RowProps) { return null }
+      export interface WidgetProps {
+        readonly title: string;
+      }
+      export function Widget(_p: WidgetProps) { return null }
+    `;
+    expect(extractRequiredPropNames(source, ['Widget'])).toEqual(['title']);
+
+    const story = `
+      import { Widget } from './Widget';
+      export default { component: Widget };
+      export const Default = { args: { title: 'Hi' } };
+    `;
+    const result = checkStoryMatchesComponent({
+      componentSource: source,
+      storySource: story,
+      componentRel: 'x/Widget.tsx',
+      storyRel: 'x/Widget.stories.tsx',
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('does not mistake a Tailwind disabled: variant for a disabled prop (JOV-6773)', () => {
+    // WidgetProps has no `disabled` field at all -- only a `disabled:
+    // opacity-50` Tailwind variant inside a className string, which a bare
+    // substring/whole-file search for `disabled\s*:` would match.
+    const source = `
+      export interface WidgetProps {
+        readonly title: string;
+      }
+      export function Widget({ title }: WidgetProps) {
+        return <button className="disabled:opacity-50">{title}</button>;
+      }
+    `;
+    const story = `
+      import { Widget } from './Widget';
+      export default { component: Widget };
+      export const Default = { args: { title: 'Hi' } };
+    `;
+    const result = checkStoryMatchesComponent({
+      componentSource: source,
+      storySource: story,
+      componentRel: 'x/Widget.tsx',
+      storyRel: 'x/Widget.stories.tsx',
+    });
+    expect(result.ok).toBe(true);
+    expect(result.findings.some(f => f.rule === 'story-state-matrix')).toBe(
+      false
+    );
+  });
 });
 
 describe('diff gate', () => {

@@ -6,6 +6,10 @@ const meta = {
   component: SettingsSmsAccessSection,
   parameters: {
     layout: 'padded',
+    // `disabled` isn't a SettingsSmsAccessSectionProps field (no such prop
+    // exists) — the story-state-matrix scanner picks up the internal
+    // `disabled={isPending}` button attribute driven by the mutation state.
+    jovie: { uncoveredProps: ['disabled'] },
   },
   args: {
     smsSubscriberCount: 0,
