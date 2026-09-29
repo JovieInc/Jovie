@@ -59,6 +59,13 @@ export interface AuthStateRecord {
    * when the app declared support at `/auth/start`.
    */
   readonly desktopReturnCode?: boolean;
+  /**
+   * RFC 8252 section 7.3: the ephemeral 127.0.0.1 port the pending desktop
+   * flow is listening on. The return page hands the code/state pair to it
+   * directly, so sign-in completes even when jovie:// is not handled.
+   * Present only when the app declared a listener at `/auth/start`.
+   */
+  readonly desktopLoopbackPort?: number;
   readonly createdAt: number;
   readonly expiresAt: number;
   readonly consumedAt?: number | null;
@@ -112,6 +119,7 @@ const ELECTRON_AUTH_COMPLETE_PROTOCOLS = [
 const IOS_UNIVERSAL_AUTH_COMPLETE_PATH = NATIVE_HANDBACK_BOUNCE_PATHS.ios;
 const DEFAULT_DOCS_URL = 'https://docs.jov.ie';
 const LOOPBACK_HANDBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+export const DESKTOP_LOOPBACK_COMPLETE_PATH = '/auth/complete';
 
 const RETURN_BLOCKED_PREFIXES = [
   '/api',
@@ -326,12 +334,23 @@ export function createAuthStateRecord(input: {
   readonly codeChallenge?: string | null;
   readonly desktopFlow?: string | null;
   readonly desktopReturnCode?: boolean;
+  readonly desktopLoopbackPort?: number | null;
   readonly now: number;
 }): AuthStateRecord {
   const returnTo = sanitizeReturnTo(input.client, input.returnTo);
   if (!returnTo) {
     throw new Error('Invalid return_to for auth state');
   }
+
+  const desktopLoopbackPort =
+    input.client === 'electron' &&
+    Boolean(input.desktopFlow) &&
+    typeof input.desktopLoopbackPort === 'number' &&
+    Number.isInteger(input.desktopLoopbackPort) &&
+    input.desktopLoopbackPort >= 1 &&
+    input.desktopLoopbackPort <= 65535
+      ? input.desktopLoopbackPort
+      : undefined;
 
   return {
     client: input.client,
@@ -344,6 +363,7 @@ export function createAuthStateRecord(input: {
       input.client === 'electron' &&
       Boolean(input.desktopFlow) &&
       input.desktopReturnCode === true,
+    desktopLoopbackPort,
     createdAt: input.now,
     expiresAt: input.now + AUTH_STATE_TTL_MS,
     consumedAt: null,
@@ -392,6 +412,8 @@ export function buildNativeHandbackBouncePath(input: {
   readonly desktopFlow?: string | null;
   /** Electron only: shown when the deep link cannot reach the app. */
   readonly returnCode?: string | null;
+  /** Electron only: the app's pending-flow loopback listener port. */
+  readonly desktopLoopbackPort?: number | null;
 }): string {
   const url = new URL(
     buildUrlWithCodeAndState(
@@ -406,7 +428,45 @@ export function buildNativeHandbackBouncePath(input: {
   if (input.client === 'electron' && input.desktopFlow && input.returnCode) {
     url.searchParams.set('return_code', input.returnCode);
   }
+  if (
+    input.client === 'electron' &&
+    input.desktopFlow &&
+    typeof input.desktopLoopbackPort === 'number'
+  ) {
+    url.searchParams.set('loopback_port', String(input.desktopLoopbackPort));
+  }
   return `${url.pathname}${url.search}`;
+}
+
+/**
+ * The `desktop_loopback` value an app build advertises at `/auth/start`: a
+ * decimal TCP port. Anything else is rejected up front instead of being
+ * silently dropped so a malformed build fails visibly.
+ */
+export function parseDesktopLoopbackPortParam(
+  value: string | null | undefined
+): number | null {
+  if (!value || !/^\d{1,5}$/.test(value)) return null;
+  const port = Number(value);
+  return port >= 1 && port <= 65535 ? port : null;
+}
+
+/**
+ * RFC 8252 section 7.3 loopback handback for the Mac app: the return page
+ * posts the same code/state/desktop_flow the deep link carries to the app's
+ * pending-flow listener on 127.0.0.1. Loopback only — a fetch from a signed-
+ * in page cannot leave the machine, so there is no phishing surface.
+ */
+export function buildDesktopAuthLoopbackUrl(input: {
+  readonly port: number;
+  readonly code: string;
+  readonly state: string;
+  readonly desktopFlow?: string | null;
+}): string {
+  return buildUrlWithCodeAndState(
+    `http://127.0.0.1:${input.port}${DESKTOP_LOOPBACK_COMPLETE_PATH}`,
+    input
+  );
 }
 
 function isLoopbackHandbackHost(hostname: string): boolean {
