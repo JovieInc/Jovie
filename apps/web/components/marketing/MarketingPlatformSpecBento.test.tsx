@@ -16,9 +16,10 @@ describe('MarketingPlatformSpecBento', () => {
         name: PLATFORM_SPEC_BENTO_COPY.headline,
       })
     ).toBeInTheDocument();
-    expect(
-      screen.getByTestId('marketing-platform-spec-bento')
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('marketing-section-spec-wall')).toHaveAttribute(
+      'data-marketing-variant',
+      '5-screenshot-bento'
+    );
 
     const tiles = screen.getAllByTestId('platform-spec-tile');
     expect(tiles).toHaveLength(PLATFORM_SPEC_TILES.length);

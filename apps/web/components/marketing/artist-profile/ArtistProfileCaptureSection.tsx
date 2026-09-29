@@ -29,6 +29,10 @@ export function ArtistProfileCaptureSection({
   if (!isEditorialCapture(capture)) {
     return (
       <ArtistProfileSectionShell
+        sectionId='capture'
+        sectionVariant='product-demo'
+        sectionOwner='apps/web/components/marketing/artist-profile/ArtistProfileCaptureSection.tsx'
+        sectionOccurrence='fan-capture'
         className='ap-capture-section--visual'
         id={id}
         penContractId={MARKETING_PEN_CONTRACT_IDS.section.capture}
@@ -50,6 +54,10 @@ export function ArtistProfileCaptureSection({
 
   return (
     <ArtistProfileSectionShell
+      sectionId='capture'
+      sectionVariant='product-demo'
+      sectionOwner='apps/web/components/marketing/artist-profile/ArtistProfileCaptureSection.tsx'
+      sectionOccurrence='fan-capture'
       className='ap-capture-loop bg-surface-0'
       id={id}
       penContractId={MARKETING_PEN_CONTRACT_IDS.section.capture}

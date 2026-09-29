@@ -28,8 +28,8 @@ export interface PlatformSpecTile {
 const LIVE_PROFILE_HREF = TIM_WHITE_PROFILE.publicProfilePath;
 
 export const SHIPPED_SITES_SHOWCASE_COPY = {
-  headline: 'Live Artist Sites',
-  body: 'Real Jovie profiles already shipping. Open one and see the same link change with the moment.',
+  headline: 'The profile in action.',
+  body: 'Demonstration profiles and product views. Open Tim White’s public profile to see what is live now.',
 } as const;
 
 export const PLATFORM_SPEC_BENTO_COPY = {
@@ -45,7 +45,7 @@ export const SHIPPED_SITE_TILES: readonly ShippedSiteTile[] = [
     href: LIVE_PROFILE_HREF,
     label: 'Latest Release',
     scenarioId: 'tim-white-profile-live-mobile',
-    alt: "Tim White's live Jovie artist profile with the current release first.",
+    alt: "Demo of Tim White's Jovie artist profile with a release first.",
     kind: 'phone',
   },
   {

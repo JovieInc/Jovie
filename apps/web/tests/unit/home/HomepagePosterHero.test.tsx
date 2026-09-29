@@ -43,6 +43,26 @@ function renderHero(
 }
 
 describe('MarketingPosterHero', () => {
+  it('binds a declared profile hero on the semantic root without duplicating it', () => {
+    render(
+      <MarketingPosterHero
+        headline='Profile'
+        subtitle='Your public profile.'
+        primaryCta={primaryCta}
+        media={<div>Product</div>}
+        sectionVariant='centered-phone'
+        sectionOwner='apps/web/components/marketing/MarketingPosterHero.tsx'
+      />
+    );
+    const root = screen.getByTestId('marketing-section-hero');
+    expect(root.tagName).toBe('SECTION');
+    expect(root).toHaveAttribute('data-marketing-variant', 'centered-phone');
+    expect(root).toHaveAttribute(
+      'data-marketing-owner',
+      'apps/web/components/marketing/MarketingPosterHero.tsx'
+    );
+    expect(screen.queryByTestId('homepage-hero-shell')).toBeNull();
+  });
   it('renders one accessible heading and one primary CTA', () => {
     renderHero();
 

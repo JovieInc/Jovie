@@ -35,6 +35,10 @@ describe('PricingComparisonChart', () => {
     expect(within(desktopTable).getByText('Free')).toBeInTheDocument();
     expect(within(desktopTable).getByText('Pro')).toBeInTheDocument();
     expect(within(mobileTable).getByText('Pro')).toBeInTheDocument();
+    expect(within(desktopTable).getAllByText('Included')).toHaveLength(2);
+    expect(within(mobileTable).getAllByText('Included')).toHaveLength(1);
+    expect(desktopTable.querySelector('svg')).toBeNull();
+    expect(mobileTable.querySelector('svg')).toBeNull();
     expect(
       screen.getByText('All limits subject to fair-use guardrails.')
     ).toBeInTheDocument();

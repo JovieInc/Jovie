@@ -1,7 +1,7 @@
 'use client';
 
-import { Check, Minus } from 'lucide-react';
 import { Fragment, useState } from 'react';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import {
   ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
   formatPublicPriceDisplay,
@@ -45,21 +45,14 @@ function CellValue({
   }
 
   if (value === true) {
-    return (
-      <Check
-        aria-label='Included'
-        className='system-b-pricing-inclusion-icon'
-      />
-    );
+    return <span className='system-b-pricing-chart-value'>Included</span>;
   }
 
   if (comingSoon) {
     return <span className='system-b-pricing-chart-badge'>Soon</span>;
   }
 
-  return (
-    <Minus aria-label='Not Included' className='system-b-pricing-minus-icon' />
-  );
+  return <span className='system-b-pricing-chart-value'>Not included</span>;
 }
 
 function MobileFeatureRow({
@@ -146,6 +139,7 @@ export function PricingComparisonChart() {
   return (
     <div
       className='system-b-pricing-chart'
+      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.comparison}
       data-offer-contract={ARTIST_VISIBILITY_OFFER_CONTRACT_ID}
     >
       <div className='system-b-pricing-mobile-selector'>

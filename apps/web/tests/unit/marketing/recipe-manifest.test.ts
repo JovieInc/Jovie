@@ -687,9 +687,9 @@ describe('marketing route manifest integrity', () => {
     expect(pricingReport.actualSectionIds).toEqual([
       'hero',
       'pricing',
-      'social-proof',
       'comparison',
       'cta',
+      'capture',
     ]);
     expect(pricingReport.expectedSectionIds).toEqual([
       'hero',
@@ -708,12 +708,15 @@ describe('marketing route manifest integrity', () => {
       'feature-split',
       'feature-grid',
       'capture',
-      'comparison',
+      'feature-split',
+      'feature-split',
+      'product-gallery',
       'spec-wall',
       'how-it-works',
-      'feature-grid',
+      'product-gallery',
       'faq',
       'cta',
+      'capture',
     ]);
     expect(artistReport.evidenceStatus).toBe('verified');
     expect(artistReport.matches).toBe(false);

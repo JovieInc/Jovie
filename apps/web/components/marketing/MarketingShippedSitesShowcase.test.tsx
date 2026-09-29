@@ -18,7 +18,7 @@ const KIT_SOURCE_FILES = [
 ] as const;
 
 describe('MarketingShippedSitesShowcase', () => {
-  it('renders live shipped artist tiles, not placeholder copy', () => {
+  it('labels demo product views and links them to the real public profile', () => {
     render(<MarketingShippedSitesShowcase />);
 
     expect(
@@ -31,6 +31,14 @@ describe('MarketingShippedSitesShowcase', () => {
       screen.getByTestId('marketing-shipped-sites-showcase')
     ).toBeInTheDocument();
 
+    expect(
+      screen.getByText(SHIPPED_SITES_SHOWCASE_COPY.body)
+    ).toHaveTextContent('Demonstration profiles');
+    expect(
+      screen.queryByText(
+        /Real Jovie profiles already shipping|Live Artist Sites/i
+      )
+    ).toBeNull();
     const tiles = screen.getAllByTestId('shipped-site-tile');
     expect(tiles).toHaveLength(SHIPPED_SITE_TILES.length);
     expect(tiles.length).toBeGreaterThanOrEqual(6);

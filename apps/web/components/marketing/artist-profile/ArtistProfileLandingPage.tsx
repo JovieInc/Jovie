@@ -52,7 +52,13 @@ function ArtistProfileAnnotatedTruth({
   const callouts = specWall.callouts ?? DEFAULT_CALLOUTS;
 
   return (
-    <ArtistProfileSectionShell className='ap-annotated-truth bg-surface-0'>
+    <ArtistProfileSectionShell
+      className='ap-annotated-truth bg-surface-0'
+      sectionId='feature-split'
+      sectionVariant='phone-left'
+      sectionOwner='apps/web/components/marketing/artist-profile/ArtistProfileLandingPage.tsx'
+      sectionOccurrence='annotated-truth'
+    >
       <div className='mx-auto max-w-public-content'>
         <ArtistProfileSectionHeader
           align='left'
@@ -68,7 +74,7 @@ function ArtistProfileAnnotatedTruth({
               <Image
                 fill
                 src={LIVE_PROFILE.publicUrl}
-                alt="Tim White's live Jovie artist profile."
+                alt="Demo of Tim White's Jovie artist profile."
                 className='object-cover object-top'
                 sizes='(min-width: 1024px) 21rem, 18rem'
               />

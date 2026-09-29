@@ -27,6 +27,9 @@ export function MarketingPlatformSpecBento({
 }: Readonly<MarketingPlatformSpecBentoProps>) {
   return (
     <ArtistProfileSectionShell
+      sectionId='spec-wall'
+      sectionVariant='5-screenshot-bento'
+      sectionOwner='apps/web/components/marketing/MarketingPlatformSpecBento.tsx'
       className='m-spec-bento'
       penContractId={MARKETING_PEN_CONTRACT_IDS.section.specWall}
     >
