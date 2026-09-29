@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { SidebarProvider, useSidebar } from './context';
 
@@ -11,13 +12,9 @@ function SidebarStateReadout() {
       <p>
         isMobile: <span className='font-caption'>{String(isMobile)}</span>
       </p>
-      <button
-        type='button'
-        onClick={toggleSidebar}
-        className='rounded-md border border-subtle bg-surface-0 px-3 py-1.5 text-sm'
-      >
+      <Button type='button' variant='outline' size='sm' onClick={toggleSidebar}>
         Toggle sidebar
-      </button>
+      </Button>
     </div>
   );
 }
