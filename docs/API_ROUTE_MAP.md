@@ -377,6 +377,12 @@
 | `/api/merch/checkout` | POST | `public` | Create a Stripe Checkout session for a live Jovie merch card |
 | `/{username}/merch/{cardId}` | GET | `public` | Public merch product page with mockups, size/quantity selection, and checkout |
 
+### Mobile
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/mobile/v1/push-devices` | PUT, DELETE | mobile session | Register or remove the signed-in user's encrypted APNs device token. |
+
 ### Notifications
 
 | Route | Methods | Auth | Description |
