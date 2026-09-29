@@ -132,7 +132,7 @@ function CapacityLeaseRow({ row }: { readonly row: CapacityHorizonLease }) {
               triangle, so a text marker replaces it as the toggle
               affordance. */}
           <summary className='inline cursor-pointer list-none' title={reason}>
-            ▸ {reason}
+            <span aria-hidden='true'>▸</span> {reason}
           </summary>
           <p>
             alternatives{' '}
