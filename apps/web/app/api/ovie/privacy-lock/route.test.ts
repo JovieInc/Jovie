@@ -18,8 +18,8 @@ vi.mock('@/lib/ovie/privacy-lock/server', async importOriginal => ({
   mutateOviePrivacyLock: m.mutate,
 }));
 
+import { GET, POST } from '@/lib/ovie/privacy-lock/http';
 import { OviePrivacyLockError } from '@/lib/ovie/privacy-lock/server';
-import { GET, POST } from './route';
 
 const state = { enabled: false, locked: false, unlockedUntil: null };
 const request = (action: unknown, origin: string | null = 'https://jov.ie') =>
@@ -38,7 +38,7 @@ beforeEach(() => {
   m.state.mockResolvedValue(state);
   m.mutate.mockResolvedValue(state);
 });
-describe('privacy recovery/settings endpoint', () => {
+describe('dormant privacy recovery/settings handler', () => {
   it('returns default off without mandatory passkey lock', async () => {
     const res = await GET();
     expect(res.status).toBe(200);
@@ -74,6 +74,17 @@ describe('privacy recovery/settings endpoint', () => {
   );
   it('rejects invalid action', async () => {
     expect((await POST(request('bypass'))).status).toBe(400);
+    expect(m.mutate).not.toHaveBeenCalled();
+  });
+  it('rejects malformed JSON before any mutation', async () => {
+    const req = new Request('https://jov.ie/api/ovie/privacy-lock', {
+      method: 'POST',
+      headers: { Origin: 'https://jov.ie', 'Content-Type': 'application/json' },
+      body: '{',
+    });
+    const response = await POST(req);
+    expect(response.status).toBe(400);
+    expect((await response.json()).code).toBe('INVALID_ACTION');
     expect(m.mutate).not.toHaveBeenCalled();
   });
   it('rejects unauthenticated sessions', async () => {

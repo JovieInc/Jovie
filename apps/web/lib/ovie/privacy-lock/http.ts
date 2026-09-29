@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { NextResponse } from 'next/server';
 // @coverage-via apps/web/app/api/ovie/privacy-lock/route.test.ts
 import { isAdmin } from '@/lib/admin/roles';
@@ -10,7 +12,7 @@ import {
   type PrivacyAction,
   type PrivacyAuth,
 } from '@/lib/ovie/privacy-lock/server';
-export const runtime = 'nodejs';
+
 const HEADERS = { 'Cache-Control': 'private, no-store' } as const;
 async function identity(): Promise<PrivacyAuth> {
   const auth = await getFreshAuth();
