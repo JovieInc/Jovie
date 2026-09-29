@@ -1364,8 +1364,12 @@ describe('merge_group workflow contract', () => {
     const emptyCheckIdx = pullRequestBranch.indexOf(
       'if [[ -z "${CHANGED_FILES//[$\'\\t\\r\\n\' ]/}" ]]; then'
     );
+    // The fallback diffs merge-base(origin/<base>, PR head)..PR head.
     const headFallbackIdx = pullRequestBranch.indexOf(
-      'origin/${{ github.base_ref }}...$PULL_REQUEST_HEAD_SHA'
+      '"origin/${{ github.base_ref }}" "$PULL_REQUEST_HEAD_SHA")'
+    );
+    expect(pullRequestBranch).toContain(
+      'CLASSIFICATION_HEAD_REF="$PULL_REQUEST_HEAD_SHA"'
     );
     const hardFailIdx = pullRequestBranch.indexOf(
       'refusing a false docs-only classification'
@@ -1497,7 +1501,7 @@ describe('merge_group workflow contract', () => {
     expect(pathChanges).toContain('python3 "$TRUSTED_BRAND_SCRUBBER"');
     expect(pathChanges).not.toContain('python3 scripts/brand-scrub.py');
     expect(pathChanges).toContain(
-      'git show "${CLASSIFICATION_BASE_REF}:scripts/lib/product-lane-classifier.mjs"'
+      'git show "${CLASSIFICATION_POLICY_REF}:scripts/lib/product-lane-classifier.mjs"'
     );
     expect(pathChanges).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
     expect(pathChanges).not.toContain(
