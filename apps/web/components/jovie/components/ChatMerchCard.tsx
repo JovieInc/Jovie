@@ -365,8 +365,8 @@ export function ChatMerchSelectionCard({
             <Link
               href='/app/library?view=merch'
               className={cn(
-                'inline-flex h-8 items-center rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-[background-color,border-color] duration-subtle hover:border-default hover:bg-surface-2',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
+                'inline-flex h-8 items-center rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-colors duration-subtle hover:border-default hover:bg-surface-2',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-border-focus)/55'
               )}
             >
               Open Library
@@ -377,8 +377,8 @@ export function ChatMerchSelectionCard({
                 target='_blank'
                 rel='noreferrer'
                 className={cn(
-                  'inline-flex h-8 items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-[background-color,border-color] duration-subtle hover:border-default hover:bg-surface-2',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
+                  'inline-flex h-8 items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-colors duration-subtle hover:border-default hover:bg-surface-2',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-border-focus)/55'
                 )}
               >
                 Public Page
