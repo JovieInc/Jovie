@@ -2319,7 +2319,17 @@ describe('iOS stage contract', () => {
     );
     expect(iosWorkflow).not.toMatch(/^  pull_request:/m);
     expect(iosWorkflow).not.toMatch(/^  push:/m);
-    expect(iosWorkflow).toContain('runs-on: macos-26');
+    // Hosted macOS stays the fallback; the self-hosted Mac is heartbeat-gated
+    // and never probed for release regressions.
+    expect(iosWorkflow).toContain(
+      `runs-on: \${{ needs.mac-runner-route.outputs.runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-26' }}`
+    );
+    expect(iosWorkflow).toContain(
+      'HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml'
+    );
+    expect(iosWorkflow).toContain(
+      "if: ${{ !inputs.full-regression && vars.JOVIE_MAC_RUNNER != 'off' }}"
+    );
     expect(pathChanges).toContain(
       "run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}"
     );
