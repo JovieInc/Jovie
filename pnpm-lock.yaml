@@ -77,6 +77,9 @@ overrides:
   '@peculiar/asn1-schema': 2.9.5
 
 patchedDependencies:
+  '@parse/node-apn@8.1.0':
+    hash: opd7y2ntic64ft2yv2l7i2dsgm
+    path: patches/@parse__node-apn@8.1.0.patch
   eslint-plugin-react@7.37.5:
     hash: mlutsxmrfyfqudrh4lhi3c7bnu
     path: patches/eslint-plugin-react@7.37.5.patch
@@ -424,7 +427,7 @@ importers:
         version: 2.11.0(@opentelemetry/api@1.9.1)
       '@parse/node-apn':
         specifier: 8.1.0
-        version: 8.1.0
+        version: 8.1.0(patch_hash=opd7y2ntic64ft2yv2l7i2dsgm)
       '@radix-ui/react-alert-dialog':
         specifier: ^1.1.23
         version: 1.1.23(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -20678,7 +20681,7 @@ snapshots:
   '@pagefind/windows-x64@1.5.2':
     optional: true
 
-  '@parse/node-apn@8.1.0':
+  '@parse/node-apn@8.1.0(patch_hash=opd7y2ntic64ft2yv2l7i2dsgm)':
     dependencies:
       debug: 4.4.3(supports-color@8.1.1)
       jsonwebtoken: 9.0.3
