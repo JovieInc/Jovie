@@ -37,10 +37,13 @@ jobs:
   # queue, and waits only a bounded queue-derived window when a newer
   # generation is already approaching, so no staging deploy, migration,
   # canary, promotion, or rollback mutation can start for a stale SHA.
-  # A stale-but-ancestor SHA yields only to a generation already queued behind
-  # it, and never once main has carried unshipped commits past the starvation
-  # bound (release-lineage-gate.sh), so a continuous merge stream cannot starve
-  # production the way exact-SHA yields did on 2026-09-26.
+  # A stale-but-ancestor SHA yields to a generation already queued behind it,
+  # even past the starvation bound, so a stale backlog drains to the newest
+  # queued generation instead of every generation running the full pipeline
+  # (JOV-7149). The starvation bound (release-lineage-gate.sh) applies only to
+  # generations already in flight past coalescing, so a continuous merge
+  # stream cannot starve production the way exact-SHA yields did on
+  # 2026-09-26.
   coalesce-production:
     name: Coalesce release wave
     if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' }}
@@ -64,8 +67,10 @@ jobs:
           EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
           REPOSITORY: ${{ github.repository }}
           # Starvation bound for the forward-only lineage gate: once main has
-          # carried unshipped commits this long, an ancestor generation keeps
-          # the lease even though a newer generation is queued behind it.
+          # carried unshipped commits this long, an in-flight ancestor
+          # generation keeps the lease even though a newer generation is
+          # queued behind it. Still-queued ancestors yield regardless, so a
+          # stale backlog drains to the newest queued generation.
           PRODUCTION_STARVATION_SECONDS: '5400'
           # The bounded window derives from queue state, never a universal
           # constant: one increment per newer generation already validating in
@@ -147,9 +152,10 @@ jobs:
             exit 1
           }
           if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
-            # Forward-only starvation bound: yield only to a generation that is
-            # already queued behind this one, and never once main has carried
-            # unshipped commits past PRODUCTION_STARVATION_SECONDS.
+            # Forward-only lineage: yield to a generation already queued
+            # behind this one, even past PRODUCTION_STARVATION_SECONDS —
+            # a still-queued generation costs seconds to yield, so a stale
+            # backlog drains to the newest queued generation (JOV-7149).
             gate_decision="$(CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="before evaluation" \
               bash .github/scripts/release-lineage-gate.sh | tail -n 1)"
             if [ "$gate_decision" != "decision=proceed" ]; then
@@ -157,7 +163,7 @@ jobs:
               exit 0
             fi
             echo "is_current=true" >> "$GITHUB_OUTPUT"
-            record_receipt "proceed" "main advanced to $current_main_sha but this ancestor generation keeps the lease (forward-only starvation bound)" "$EXPECTED_SHA" 0 "authorize exact CI evidence"
+            record_receipt "proceed" "main advanced to $current_main_sha but no newer generation is queued; this ancestor generation keeps the lease" "$EXPECTED_SHA" 0 "authorize exact CI evidence"
             exit 0
           fi
 
@@ -212,7 +218,7 @@ jobs:
               exit 0
             fi
             echo "is_current=true" >> "$GITHUB_OUTPUT"
-            record_receipt "proceed" "main advanced to $current_main_sha during the window but this ancestor generation keeps the lease (forward-only starvation bound)" "$EXPECTED_SHA" "$wait_seconds" "authorize exact CI evidence"
+            record_receipt "proceed" "main advanced to $current_main_sha during the window but no newer generation is queued; this ancestor generation keeps the lease" "$EXPECTED_SHA" "$wait_seconds" "authorize exact CI evidence"
             exit 0
           fi
 
@@ -352,7 +358,7 @@ jobs:
             exit 1
           }
           if [ "$current_main_sha" != "$EXPECTED_SHA" ] &&
-            [ "$(CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="before production authorization" \
+            [ "$(CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="before production authorization" IN_FLIGHT=true \
               bash .github/scripts/release-lineage-gate.sh | tail -n 1)" != "decision=proceed" ]; then
             echo "::notice::Controller generation $EXPECTED_SHA yielded to $current_main_sha before production authorization."
             exit 0
@@ -647,7 +653,7 @@ jobs:
               exit 1
             }
             if [ "$final_main_sha" != "$EXPECTED_SHA" ] &&
-              [ "$(CURRENT_MAIN_SHA="$final_main_sha" BOUNDARY="at authorization" \
+              [ "$(CURRENT_MAIN_SHA="$final_main_sha" BOUNDARY="at authorization" IN_FLIGHT=true \
                 bash .github/scripts/release-lineage-gate.sh | tail -n 1)" != "decision=proceed" ]; then
               echo "::notice::Controller generation $EXPECTED_SHA yielded to $final_main_sha at authorization."
               echo "is_current=false" >> "$GITHUB_OUTPUT"
