@@ -101,10 +101,12 @@ passin_args=()
 if ! is_blank "${APPLE_WALLET_SIGNER_KEY_PASSPHRASE:-}"; then
   passin_args=(-passin env:APPLE_WALLET_SIGNER_KEY_PASSPHRASE)
 fi
-"$openssl" pkey -in "$signer_key" "${passin_args[@]}" -check -noout >/dev/null 2>&1 || fail 'Wallet signer private key or passphrase is invalid.'
+# macOS ships bash 3.2, where "${arr[@]}" on an empty array is an unbound
+# variable error under set -u. The "${arr[@]+...}" idiom expands safely.
+"$openssl" pkey -in "$signer_key" ${passin_args[@]+"${passin_args[@]}"} -check -noout >/dev/null 2>&1 || fail 'Wallet signer private key or passphrase is invalid.'
 "$openssl" x509 -in "$signer_cert" -pubkey -noout \
   | "$openssl" pkey -pubin -outform DER > "$wallet_tmp_dir/cert-public.der" 2>/dev/null
-"$openssl" pkey -in "$signer_key" "${passin_args[@]}" -pubout -outform DER \
+"$openssl" pkey -in "$signer_key" ${passin_args[@]+"${passin_args[@]}"} -pubout -outform DER \
   > "$wallet_tmp_dir/key-public.der" 2>/dev/null
 cmp -s "$wallet_tmp_dir/cert-public.der" "$wallet_tmp_dir/key-public.der" || fail 'Wallet signer certificate and private key do not match.'
 
