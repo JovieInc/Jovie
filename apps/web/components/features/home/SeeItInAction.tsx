@@ -7,7 +7,7 @@ export function SeeItInAction() {
         className='mx-auto h-px max-w-lg border-0'
         style={{
           background:
-            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
+            'linear-gradient(to right, transparent, var(--color-border-subtle), transparent)',
         }}
       />
       <SeeItInActionCarousel />

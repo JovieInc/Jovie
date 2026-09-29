@@ -7,9 +7,9 @@ function PhoneShowcaseSkeleton() {
   return (
     <div
       aria-hidden='true'
-      className='w-full max-w-[21rem] rounded-[2.4rem] border border-subtle bg-surface-0/90 p-4 shadow-card-elevated'
+      className='w-full max-w-[21rem] rounded-4xl border border-subtle bg-surface-0/90 p-4 shadow-card-elevated'
     >
-      <div className='rounded-[2rem] border border-subtle bg-surface-1 p-5'>
+      <div className='rounded-3xl border border-subtle bg-surface-1 p-5'>
         <div className='mx-auto h-20 w-20 rounded-full bg-surface-2' />
         <div className='mx-auto mt-4 h-4 w-28 rounded-full bg-surface-2' />
         <div className='mx-auto mt-2 h-3 w-20 rounded-full bg-surface-2' />

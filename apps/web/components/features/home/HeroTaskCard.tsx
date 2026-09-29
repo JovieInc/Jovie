@@ -38,7 +38,7 @@ export function HeroTaskCard({
   return (
     <div
       className={[
-        'relative overflow-hidden rounded-[1.1rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] text-primary-token shadow-[0_24px_80px_rgba(0,0,0,0.32),0_4px_18px_rgba(0,0,0,0.22)]',
+        'relative overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] text-primary-token shadow-[0_24px_80px_rgba(0,0,0,0.32),0_4px_18px_rgba(0,0,0,0.22)]',
         compact ? 'p-3' : 'p-4',
       ].join(' ')}
     >

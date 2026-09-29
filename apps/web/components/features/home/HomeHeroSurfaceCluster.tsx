@@ -34,23 +34,18 @@ function StatusIcon({
   if (icon === 'check') {
     return (
       <CheckCircle2
-        className={`h-3.5 w-3.5 shrink-0 ${className}`}
+        className={`h-4 w-4 shrink-0 ${className}`}
         aria-hidden='true'
       />
     );
   }
   if (icon === 'ring') {
     return (
-      <span
-        className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 ${className}`}
-      />
+      <span className={`h-4 w-4 shrink-0 rounded-full border-2 ${className}`} />
     );
   }
   return (
-    <Circle
-      className={`h-3.5 w-3.5 shrink-0 ${className}`}
-      aria-hidden='true'
-    />
+    <Circle className={`h-4 w-4 shrink-0 ${className}`} aria-hidden='true' />
   );
 }
 
@@ -61,7 +56,7 @@ function HeroTaskPanel() {
         <p className='text-3xs font-medium tracking-wider text-white/42'>
           Release Tasks
         </p>
-        <span className='rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-3xs font-medium text-white/62'>
+        <span className='rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-3xs font-medium text-white/62'>
           {HOME_HERO_TASKS.length} Open
         </span>
       </div>

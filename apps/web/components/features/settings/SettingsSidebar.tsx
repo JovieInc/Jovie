@@ -61,7 +61,7 @@ export function SettingsSidebar({ className }: SettingsSidebarProps) {
               <div key={group.id} data-testid={`settings-group-${group.id}`}>
                 <p
                   className={cn(
-                    'mb-1 px-2.5 text-2xs font-medium',
+                    'mb-1 px-3 text-2xs font-medium',
                     groupActive ? 'text-primary-token' : 'text-tertiary-token'
                   )}
                 >
@@ -103,7 +103,7 @@ export function SettingsSidebar({ className }: SettingsSidebarProps) {
             );
           })}
           {groups.length === 0 && (
-            <p className='px-2.5 text-xs text-tertiary-token'>
+            <p className='px-3 text-xs text-tertiary-token'>
               No settings match your search.
             </p>
           )}

@@ -24,17 +24,17 @@ function ListenContent() {
   const dsps = [
     {
       name: 'Spotify',
-      icon: <SocialIcon platform='spotify' className='w-3.5 h-3.5' />,
+      icon: <SocialIcon platform='spotify' className='h-4 w-4' />,
       color: '#1DB954',
     },
     {
       name: 'Apple Music',
-      icon: <SocialIcon platform='apple' className='w-3.5 h-3.5' />,
+      icon: <SocialIcon platform='apple' className='h-4 w-4' />,
       color: '#FA243C',
     },
     {
       name: 'YouTube',
-      icon: <SocialIcon platform='youtube' className='w-3.5 h-3.5' />,
+      icon: <SocialIcon platform='youtube' className='h-4 w-4' />,
       color: '#FF0000',
     },
   ];
@@ -43,13 +43,13 @@ function ListenContent() {
       {dsps.map(dsp => (
         <div
           key={dsp.name}
-          className='flex items-center justify-between p-2.5 rounded-xl'
+          className='flex items-center justify-between p-3 rounded-xl'
           style={{
             backgroundColor: 'rgba(255,255,255,0.04)',
             border: '1px solid rgba(255,255,255,0.06)',
           }}
         >
-          <div className='flex items-center gap-2.5'>
+          <div className='flex items-center gap-3'>
             <div
               className='w-7 h-7 rounded-lg flex items-center justify-center'
               style={{
@@ -74,7 +74,7 @@ function ListenContent() {
 
 function PayContent() {
   return (
-    <div className='flex flex-col gap-2.5'>
+    <div className='flex flex-col gap-3'>
       <p className='text-3xs font-medium uppercase tracking-[0.15em] text-white/40'>
         Choose amount
       </p>
@@ -108,7 +108,7 @@ function PayContent() {
           </div>
         ))}
       </div>
-      <div className='flex items-center justify-center rounded-xl px-4 py-2.5 text-app font-medium bg-white dark:bg-surface-1 text-black dark:text-white mt-1'>
+      <div className='flex items-center justify-center rounded-xl px-4 py-3 text-app font-medium bg-white dark:bg-surface-1 text-black dark:text-white mt-1'>
         Continue with Venmo
       </div>
     </div>
@@ -126,7 +126,7 @@ function TourContent() {
       {shows.map(show => (
         <div
           key={show.city}
-          className='flex items-center justify-between p-2.5 rounded-xl'
+          className='flex items-center justify-between p-3 rounded-xl'
           style={{
             backgroundColor: 'rgba(255,255,255,0.04)',
             border: '1px solid rgba(255,255,255,0.06)',
@@ -172,7 +172,7 @@ export function PhoneHeroDemo() {
             priority
           />
         </div>
-        <p className='mt-2.5 text-mid font-semibold text-white dark:text-white'>
+        <p className='mt-3 text-mid font-semibold text-white dark:text-white'>
           {PROFILE.name}
         </p>
         <p className='mt-0.5 text-2xs text-white/40 text-center px-4'>
