@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { creatorClaimInvites } from '@/lib/db/schema/profiles';
 import { enqueueBulkClaimInviteJobs } from '@/lib/email/jobs/enqueue';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { logger } from '@/lib/utils/logger';
 import {
   bulkInviteSchema,
@@ -35,7 +35,9 @@ export const runtime = 'nodejs';
  */
 export async function POST(request: Request) {
   try {
-    const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
+    const entitlements = await getOvieOperatorEntitlements({
+      session: 'fresh',
+    });
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -260,7 +262,7 @@ export async function POST(request: Request) {
  */
 export async function GET(request: Request) {
   try {
-    const entitlements = await getCurrentUserEntitlements();
+    const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { error: 'Unauthorized' },

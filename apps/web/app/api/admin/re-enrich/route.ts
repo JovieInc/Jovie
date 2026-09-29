@@ -5,9 +5,9 @@ import {
   reEnrichProfile,
   sweepUnderEnrichedProfiles,
 } from '@/lib/discography/re-enrich';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -34,7 +34,9 @@ const reEnrichSchema = z
 
 export async function POST(request: Request) {
   try {
-    const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
+    const entitlements = await getOvieOperatorEntitlements({
+      session: 'fresh',
+    });
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { error: 'Unauthorized' },

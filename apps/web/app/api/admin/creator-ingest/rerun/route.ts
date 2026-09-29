@@ -1,12 +1,12 @@
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { enqueueLinktreeIngestionJob } from '@/lib/ingestion/jobs';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { IngestionStatusManager } from '@/lib/ingestion/status-manager';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { logger } from '@/lib/utils/logger';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import { ingestionRerunSchema } from '@/lib/validation/schemas';
@@ -17,7 +17,9 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function POST(request: Request) {
   try {
-    const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
+    const entitlements = await getOvieOperatorEntitlements({
+      session: 'fresh',
+    });
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { error: 'Unauthorized' },

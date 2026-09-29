@@ -4,13 +4,13 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
 import { leadPipelineSettings } from '@/lib/db/schema/leads';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   captureError,
   captureWarning,
   getSafeErrorMessage,
 } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -105,7 +105,7 @@ function isMissingLeadPipelineSettingsSchemaError(error: unknown): boolean {
  * GET /api/admin/leads/settings — Return pipeline settings.
  */
 export async function GET() {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },
@@ -164,7 +164,7 @@ export async function GET() {
  * PATCH /api/admin/leads/settings — Update pipeline settings.
  */
 export async function PATCH(request: NextRequest) {
-  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
+  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },

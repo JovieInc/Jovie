@@ -14,7 +14,6 @@ import { cacheQuery } from '@/lib/db/cache';
 import { getDeepErrorMessage } from '@/lib/db/errors';
 import { leads } from '@/lib/db/schema/leads';
 import { sqlArray } from '@/lib/db/sql-helpers';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   captureError,
   captureWarning,
@@ -23,6 +22,7 @@ import {
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { processLeadBatch } from '@/lib/leads/process-batch';
 import { seedLeadFromUrl } from '@/lib/leads/url-intake';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { mapConcurrent } from '@/lib/utils/map-concurrent';
 import {
   leadListQuerySchema,
@@ -113,7 +113,7 @@ async function insertLeadWithLegacyFallback(seed: {
 export async function GET(request: NextRequest) {
   const entitlements = await cacheQuery(
     'entitlements:admin-leads',
-    () => getCurrentUserEntitlements(),
+    () => getOvieOperatorEntitlements({ purpose: 'read' }),
     { ttlSeconds: 300 }
   );
   if (!entitlements.isAuthenticated) {
@@ -327,7 +327,7 @@ async function processLeadUrl(
  * Inserts new leads as 'discovered', then triggers qualification.
  */
 export async function POST(request: NextRequest) {
-  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
+  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },
