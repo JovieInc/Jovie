@@ -499,7 +499,7 @@ describe('artists directory catalog (JOV-6126)', () => {
 describe('artists directory completeness gating', () => {
   it('rereads completeness and removes a formerly eligible profile on the next request', async () => {
     vi.stubEnv('DATABASE_URL', 'postgres://test');
-    mockDbSelectRows([makeCatalogRow(0)]);
+    mockDbSelectBatches([[makeCatalogRow(0)], [makeCatalogRow(0)]]);
     assess
       .mockReset()
       .mockResolvedValueOnce(new Map([['id-000000', { eligible: true }]]))
