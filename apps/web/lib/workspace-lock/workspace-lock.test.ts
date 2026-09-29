@@ -1,19 +1,29 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  clearWorkspaceLock,
   getWorkspacePrivacyLockState,
+  isMoneyHidden,
   isMoneyHiddenCookieValue,
   isWorkspaceLockCookieValue,
+  lockWorkspace,
   MONEY_HIDDEN_COOKIE,
+  setMoneyHidden,
   updateWorkspacePrivacyLock,
   WORKSPACE_LOCK_COOKIE,
   WorkspacePrivacyLockError,
 } from './workspace-lock';
 
 const fetchMock = vi.fn();
+const reload = vi.fn();
+Object.defineProperty(globalThis, 'location', {
+  configurable: true,
+  value: { reload },
+});
 
 beforeEach(() => {
   fetchMock.mockReset();
   vi.stubGlobal('fetch', fetchMock);
+  reload.mockReset();
 });
 
 afterEach(() => {
@@ -186,5 +196,60 @@ describe('server-owned Ovie privacy lock client', () => {
     await rejection;
 
     expect(requestSignal?.aborted).toBe(true);
+  });
+});
+
+describe('legacy lock and money helper behavior during activation', () => {
+  it('reloads only after the server confirms the Ovie lock', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ enabled: true, locked: true, unlockedUntil: null }),
+    });
+
+    await lockWorkspace();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/ovie/privacy-lock',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ action: 'lock' }),
+      })
+    );
+    expect(document.cookie).not.toContain(`${WORKSPACE_LOCK_COOKIE}=1`);
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
+  it('does not reload or create a client lock when the server refuses confirmation', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        enabled: false,
+        locked: false,
+        unlockedUntil: null,
+      }),
+    });
+
+    await expect(lockWorkspace()).rejects.toBeInstanceOf(
+      WorkspacePrivacyLockError
+    );
+
+    expect(document.cookie).not.toContain(`${WORKSPACE_LOCK_COOKIE}=1`);
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('clears only the legacy cookie after a confirmed server unlock', () => {
+    document.cookie = `${WORKSPACE_LOCK_COOKIE}=1; path=/`;
+    clearWorkspaceLock();
+    expect(document.cookie).not.toContain(`${WORKSPACE_LOCK_COOKIE}=1`);
+  });
+
+  it('keeps money visibility cookie behavior intact', () => {
+    setMoneyHidden(true);
+    expect(document.cookie).toContain(`${MONEY_HIDDEN_COOKIE}=1`);
+    expect(isMoneyHidden()).toBe(true);
+
+    setMoneyHidden(false);
+    expect(isMoneyHidden()).toBe(false);
+    expect(reload).toHaveBeenCalledTimes(2);
   });
 });

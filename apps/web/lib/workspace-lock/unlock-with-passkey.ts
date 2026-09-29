@@ -1,5 +1,6 @@
 import { authClient } from '@/lib/auth/client';
 import { isDesktopEnvironment } from '@/lib/desktop/electron-bridge';
+import { updateWorkspacePrivacyLock } from './workspace-lock';
 
 /**
  * Passkey / Touch ID step-up shared by the workspace lock screen and the
@@ -49,6 +50,8 @@ const SIGN_IN_CANCELLED_MESSAGE =
   'The passkey prompt was canceled. Try again to unlock.';
 const SETUP_REQUIRED_MESSAGE =
   'The passkey offered by your password manager is not registered to this account. Try again to set up a new passkey, or choose a different authenticator.';
+const PRIVACY_PASSKEY_REQUIRED_MESSAGE =
+  'No passkey is registered for this Ovie account. Contact an admin to update the privacy-lock settings.';
 
 /**
  * Provider codes for an authenticator abort before verified registration.
@@ -193,11 +196,60 @@ async function assertStepUpActive(): Promise<void> {
   }
 }
 
-export async function unlockWithPasskey(): Promise<void> {
+async function assertPrivacyLockUnlocked(): Promise<void> {
+  const state = await withTimeout(
+    updateWorkspacePrivacyLock('unlock'),
+    new PasskeyStepUpError('unconfirmed', UNCONFIRMED_MESSAGE)
+  );
+  const unlockedUntil = state.unlockedUntil
+    ? Date.parse(state.unlockedUntil)
+    : Number.NaN;
+  if (
+    !state.enabled ||
+    state.locked ||
+    !Number.isFinite(unlockedUntil) ||
+    unlockedUntil <= Date.now()
+  ) {
+    throw new PasskeyStepUpError('unconfirmed', UNCONFIRMED_MESSAGE);
+  }
+}
+
+/**
+ * Check that this runtime can present a passkey and this account already has
+ * one before enabling privacy lock. This never enrolls credentials.
+ */
+export async function ensurePrivacyLockCanBeEnabled(): Promise<void> {
+  await assertCeremonyCanRun();
+  const listed = await withTimeout(authClient.passkey.listUserPasskeys());
+  if (listed.error) {
+    throw new PasskeyStepUpError('unconfirmed', listed.error.message);
+  }
+  if ((listed.data ?? []).length === 0) {
+    throw new PasskeyStepUpError(
+      'setup-required',
+      PRIVACY_PASSKEY_REQUIRED_MESSAGE
+    );
+  }
+}
+
+export interface UnlockWithPasskeyOptions {
+  /** Defaults to the existing Ovie admin step-up contract. */
+  purpose?: 'admin' | 'privacy';
+}
+
+export async function unlockWithPasskey({
+  purpose = 'admin',
+}: UnlockWithPasskeyOptions = {}): Promise<void> {
   await assertCeremonyCanRun();
 
   const listed = await withTimeout(authClient.passkey.listUserPasskeys());
   if (listed.error) throw new Error(listed.error.message);
+  if ((listed.data ?? []).length === 0 && purpose === 'privacy') {
+    throw new PasskeyStepUpError(
+      'setup-required',
+      PRIVACY_PASSKEY_REQUIRED_MESSAGE
+    );
+  }
   if ((listed.data ?? []).length === 0) {
     const added = await withTimeout(
       authClient.passkey.addPasskey({ name: 'Ovie' })
@@ -230,5 +282,9 @@ export async function unlockWithPasskey(): Promise<void> {
     throw toStepUpError(signedIn.error, SIGN_IN_CANCELLED_MESSAGE);
   }
 
+  if (purpose === 'privacy') {
+    await assertPrivacyLockUnlocked();
+    return;
+  }
   await assertStepUpActive();
 }

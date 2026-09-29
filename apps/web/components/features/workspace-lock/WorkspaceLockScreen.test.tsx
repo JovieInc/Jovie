@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkspaceLockScreen } from './WorkspaceLockScreen';
 
 const client = vi.hoisted(() => ({
@@ -27,6 +28,7 @@ vi.mock('@/lib/desktop/electron-bridge', () => ({
 }));
 
 const reload = vi.fn();
+const fetchMock = vi.fn();
 Object.defineProperty(window, 'location', {
   value: { ...window.location, reload },
   writable: true,
@@ -42,10 +44,18 @@ Object.defineProperty(navigator, 'credentials', {
   configurable: true,
   value: { get: vi.fn(), create: vi.fn() },
 });
-vi.stubGlobal(
-  'fetch',
-  vi.fn(async () => ({ ok: true, json: async () => ({ unlocked: true }) }))
-);
+beforeEach(() => {
+  fetchMock.mockReset();
+  fetchMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      enabled: true,
+      locked: false,
+      unlockedUntil: '2099-01-01T00:00:00.000Z',
+    }),
+  });
+  vi.stubGlobal('fetch', fetchMock);
+});
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -55,24 +65,59 @@ afterEach(() => {
 });
 
 describe('WorkspaceLockScreen', () => {
-  it('renders the locked state with a calm, uncircled fingerprint and unlock copy', () => {
+  it('renders a clear locked state with one primary, accessible unlock action', () => {
     render(<WorkspaceLockScreen />);
     expect(
-      screen.getAllByRole('button', { name: /unlock to continue/i }).length
-    ).toBeGreaterThan(0);
-    expect(screen.getByText('Unlock to continue')).toBeTruthy();
-    expect(
-      screen.getByText('Unlock to continue').closest('button')
+      screen.getByRole('heading', { name: 'Ovie Is Locked' })
     ).toBeTruthy();
+    expect(screen.getByText("Verify it's you to continue.")).toBeTruthy();
+    const unlock = screen.getByRole('button', { name: 'Unlock with passkey' });
+    expect(unlock.className).toContain('bg-btn-primary');
+    expect(unlock.contains(screen.getByTestId('workspace-lock-glyph'))).toBe(
+      true
+    );
+    expect(screen.getAllByRole('button')).toHaveLength(1);
     expect(document.querySelector('[data-workspace-lock="true"]')).toBeTruthy();
     // Tim 2026-09-29: no circle around the fingerprint, desaturated and quiet.
-    const glyph = screen.getByTestId('workspace-lock-glyph');
-    expect(glyph.getAttribute('class')).toContain('text-tertiary-token');
-    expect(glyph.getAttribute('class')).not.toContain('destructive');
-    expect(glyph.parentElement?.className ?? '').not.toContain('rounded-full');
+    expect(
+      screen.getByTestId('workspace-lock-glyph').parentElement?.className ?? ''
+    ).not.toContain('rounded-full');
   });
 
-  it('unlocks via passkey, clears the lock cookie, and reloads', async () => {
+  it('activates the same unlock action by keyboard', async () => {
+    const user = userEvent.setup();
+    client.listUserPasskeys.mockResolvedValue({
+      data: [{ id: 'pk1' }],
+      error: null,
+    });
+    client.signInPasskey.mockResolvedValue({ data: {}, error: null });
+    render(<WorkspaceLockScreen />);
+
+    const unlock = screen.getByRole('button', { name: 'Unlock with passkey' });
+    unlock.focus();
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(reload).toHaveBeenCalledOnce());
+    expect(client.signInPasskey).toHaveBeenCalledOnce();
+  });
+
+  it('suppresses duplicate unlock attempts while the passkey check is pending', async () => {
+    const user = userEvent.setup();
+    client.listUserPasskeys.mockReturnValue(new Promise(() => {}));
+    render(<WorkspaceLockScreen />);
+
+    const unlock = screen.getByRole('button', { name: 'Unlock with passkey' });
+    await user.click(unlock);
+    expect(unlock).toBeDisabled();
+    await user.click(unlock);
+
+    expect(client.listUserPasskeys).toHaveBeenCalledOnce();
+    expect(
+      screen.getByRole('button', { name: /waiting for passkey/i })
+    ).toBeDisabled();
+  });
+
+  it('unlocks through a confirmed server privacy receipt before clearing the legacy cookie', async () => {
     document.cookie = 'jovie_workspace_lock=1; path=/';
     client.listUserPasskeys.mockResolvedValue({
       data: [{ id: 'pk1' }],
@@ -81,23 +126,60 @@ describe('WorkspaceLockScreen', () => {
     client.signInPasskey.mockResolvedValue({ data: {}, error: null });
     render(<WorkspaceLockScreen />);
 
-    fireEvent.click(screen.getByText('Unlock to continue'));
+    fireEvent.click(screen.getByTestId('workspace-lock-glyph'));
 
     await waitFor(() => expect(reload).toHaveBeenCalledOnce());
     expect(client.signInPasskey).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/ovie/privacy-lock',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'same-origin',
+        body: JSON.stringify({ action: 'unlock' }),
+      })
+    );
     expect(document.cookie).not.toContain('jovie_workspace_lock=1');
   });
 
-  it('enrolls a first passkey when none exists', async () => {
-    client.listUserPasskeys.mockResolvedValue({ data: [], error: null });
-    client.addPasskey.mockResolvedValue({ data: {}, error: null });
+  it('keeps the lock when the server does not confirm an unlock receipt', async () => {
+    document.cookie = 'jovie_workspace_lock=1; path=/';
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ enabled: true, locked: true, unlockedUntil: null }),
+    });
+    client.listUserPasskeys.mockResolvedValue({
+      data: [{ id: 'pk1' }],
+      error: null,
+    });
     client.signInPasskey.mockResolvedValue({ data: {}, error: null });
     render(<WorkspaceLockScreen />);
 
-    fireEvent.click(screen.getByText('Unlock to continue'));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Unlock with passkey' })
+    );
 
-    await waitFor(() => expect(reload).toHaveBeenCalledOnce());
-    expect(client.addPasskey).toHaveBeenCalledWith({ name: 'Ovie' });
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+    expect(reload).not.toHaveBeenCalled();
+    expect(document.cookie).toContain('jovie_workspace_lock=1');
+  });
+
+  it('asks for a previously enrolled passkey without changing credentials', async () => {
+    client.listUserPasskeys.mockResolvedValue({ data: [], error: null });
+    render(<WorkspaceLockScreen />);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Unlock with passkey' })
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toContain(
+        'No passkey is registered for this Ovie account'
+      )
+    );
+    expect(client.addPasskey).not.toHaveBeenCalled();
+    expect(client.signInPasskey).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
   });
 
   it('shows an actionable error when the passkey prompt never appears', async () => {
@@ -111,7 +193,9 @@ describe('WorkspaceLockScreen', () => {
     client.signInPasskey.mockReturnValue(new Promise(() => {}));
     render(<WorkspaceLockScreen />);
 
-    fireEvent.click(screen.getByText('Unlock to continue'));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Unlock with passkey' })
+    );
 
     await waitFor(() =>
       expect(screen.getByRole('alert').textContent).toContain(
@@ -119,7 +203,9 @@ describe('WorkspaceLockScreen', () => {
       )
     );
     expect(reload).not.toHaveBeenCalled();
-    expect(screen.getByText('Unlock to continue')).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Unlock with passkey' })
+    ).toBeTruthy();
   });
 
   it('offers the browser recovery in the desktop app when the ceremony cannot run', async () => {
@@ -127,14 +213,25 @@ describe('WorkspaceLockScreen', () => {
     desktop.platformProbe.mockResolvedValue(false);
     render(<WorkspaceLockScreen />);
 
-    fireEvent.click(screen.getByText('Unlock to continue'));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Unlock with passkey' })
+    );
 
     await waitFor(() =>
       expect(screen.getByRole('alert').textContent).toContain('in your browser')
     );
-    expect(
-      screen.getByRole('button', { name: 'Open In Browser' })
-    ).toBeTruthy();
+    const openInBrowser = screen.getByRole('button', {
+      name: 'Open In Browser',
+    });
+    expect(openInBrowser).toBeTruthy();
+    const openWindow = vi.spyOn(window, 'open').mockReturnValue(null);
+    fireEvent.click(openInBrowser);
+    expect(openWindow).toHaveBeenCalledWith(
+      window.location.href,
+      '_blank',
+      'noopener,noreferrer'
+    );
+    openWindow.mockRestore();
     expect(client.signInPasskey).not.toHaveBeenCalled();
   });
 
@@ -150,7 +247,9 @@ describe('WorkspaceLockScreen', () => {
     });
     render(<WorkspaceLockScreen />);
 
-    fireEvent.click(screen.getByText('Unlock to continue'));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Unlock with passkey' })
+    );
 
     await waitFor(() =>
       expect(screen.getByRole('alert').textContent).toContain('Passkey denied')
