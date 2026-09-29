@@ -284,10 +284,11 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     await page.setContent(
       '<main>' +
         // A real dialog/drawer disables pointer-events on the page behind
-        // it (Vaul/Radix scroll-lock + focus boundary), which also removes
-        // it from elementsFromPoint's hit chain — this is what the fix
-        // relies on, so the fixture must reproduce it, not just the
-        // z-ordering.
+        // it (Vaul/Radix scroll-lock + focus boundary). The detector forces
+        // pointer-events:auto for the duration of its own scan (see the
+        // sibling test below), so this fixture's pointer-events:none isn't
+        // what excludes it — the later, fully opaque "Sheet content" div
+        // genuinely painting on top at this pixel is.
         '<div style="position:fixed;inset:0;background-image:linear-gradient(115deg,#050505 100%,#050505 100%);pointer-events:none">' +
         '<span style="position:absolute;top:40px;left:20px;color:#f7f8f8;font-size:15px">Behind the sheet</span>' +
         '</div>' +
@@ -298,6 +299,34 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     expect(
       snapshot.receipts.some(receipt => receipt.text === 'Behind the sheet')
     ).toBe(false);
+  });
+
+  test('still certifies a visible pointer-events:none candidate with nothing covering it', async ({
+    page,
+  }) => {
+    // elementsFromPoint() is a hit-test API: pointer-events:none removes an
+    // element from it even when nothing else is painted on top — it's used
+    // deliberately for decorative/click-through overlays throughout the
+    // product (42+ call sites), and none of them stop being visible glyphs.
+    // Without forcing pointer-events:auto during the scan, this candidate
+    // would be silently dropped from every check, not just the one above
+    // where something genuinely covers it.
+    await page.setContent(
+      '<main>' +
+        '<div style="position:fixed;inset:0;background-image:linear-gradient(115deg,#ffffff 100%,#ffffff 100%)">' +
+        '<span style="position:absolute;top:40px;left:20px;color:#f5f5f5;font-size:15px;pointer-events:none">Click-through label</span>' +
+        '</div>' +
+        '</main>'
+    );
+    const snapshot = await inspectImageContrast(page);
+    const receipt = snapshot.receipts.find(
+      item => item.text === 'Click-through label'
+    );
+    expect(receipt).toBeDefined();
+    expect(receipt?.pass).toBe(false);
+    expect(snapshot.findings.map(finding => finding.kind)).toContain(
+      'image-contrast'
+    );
   });
 });
 

@@ -107,6 +107,18 @@ async function scanCandidates(page: Page): Promise<PageScan> {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
+    // elementsFromPoint() is a hit-test API: it silently omits any element
+    // (or descendant of one) with pointer-events:none, even when that
+    // element is the topmost thing actually PAINTED there — a decorative
+    // badge, a label over an image, a control disabled for click-through.
+    // Occlusion below cares about paint order, not click eligibility, so
+    // force every element hit-testable for the duration of this scan. This
+    // is read-only inspection (no dispatched input), so it's safe to revert
+    // immediately after.
+    const pointerEventsOverride = document.createElement('style');
+    pointerEventsOverride.textContent = '*{pointer-events:auto!important}';
+    document.head.appendChild(pointerEventsOverride);
+
     const round = (value: number): number => Math.round(value * 100) / 100;
     const isRendered = (element: Element): boolean => {
       const rect = element.getBoundingClientRect();
@@ -212,38 +224,51 @@ async function scanCandidates(page: Page): Promise<PageScan> {
       if (seen.has(element) || !isRendered(element)) return;
       const clipped = intersectViewport(element.getBoundingClientRect());
       if (!clipped) return;
-      // Resolve the real hit-test stack at the candidate's own center once,
-      // up front. A later, unrelated, fully opaque sibling (an open drawer
-      // sheet, a modal scrim) can cover a candidate that still has a
-      // perfectly normal box and an ancestor that paints a CSS image
-      // further up the tree — that ancestor relationship alone doesn't mean
-      // a user can see the two together. If the candidate itself isn't
-      // reachable at its own sample point, nothing is visually at risk
-      // there, regardless of what the DOM ancestry contains.
-      const sampleX = Math.min(
-        viewportWidth - 1,
-        Math.max(0, clipped.x + clipped.width / 2)
-      );
-      const sampleY = Math.min(
-        viewportHeight - 1,
-        Math.max(0, clipped.y + clipped.height / 2)
-      );
-      const stack = document.elementsFromPoint(sampleX, sampleY);
-      const candidateDepth = stack.findIndex(
-        item => item === element || element.contains(item)
-      );
-      if (candidateDepth === -1) return;
       const layersBehind = imageLayers.filter(({ element: layer, rect }) => {
         if (element.contains(layer)) return false;
-        const overlapX =
-          Math.min(clipped.x + clipped.width, rect.right) -
-          Math.max(clipped.x, rect.left);
-        const overlapY =
-          Math.min(clipped.y + clipped.height, rect.bottom) -
-          Math.max(clipped.y, rect.top);
-        if (overlapX <= 0 || overlapY <= 0) return false;
+        const overlapLeft = Math.max(clipped.x, rect.left);
+        const overlapTop = Math.max(clipped.y, rect.top);
+        const overlapRight = Math.min(clipped.x + clipped.width, rect.right);
+        const overlapBottom = Math.min(clipped.y + clipped.height, rect.bottom);
+        if (overlapRight <= overlapLeft || overlapBottom <= overlapTop) {
+          return false;
+        }
+        // Resolve the hit-test stack at the center of THIS layer's overlap
+        // with the candidate, not the candidate's own center: a candidate
+        // can span several layers, or be only partially covered elsewhere
+        // by an unrelated sibling (an open drawer sheet, a modal scrim). A
+        // single global sample point would wrongly call the whole candidate
+        // unreachable — or wrongly call a layer "behind" it — based on
+        // whatever happens to sit at a point that isn't even part of this
+        // particular overlap.
+        const sampleX = Math.min(
+          viewportWidth - 1,
+          Math.max(0, (overlapLeft + overlapRight) / 2)
+        );
+        const sampleY = Math.min(
+          viewportHeight - 1,
+          Math.max(0, (overlapTop + overlapBottom) / 2)
+        );
+        const stack = document.elementsFromPoint(sampleX, sampleY);
+        const candidateDepth = stack.findIndex(item => item === element);
+        if (candidateDepth === -1) return false;
+        // Anything strictly above the candidate in the stack that ISN'T one
+        // of its own ancestors OR descendants (e.g. an icon glyph painted
+        // inside it) is a genuinely unrelated third party — a later, opaque
+        // sibling (an open drawer sheet, a modal scrim) — that currently
+        // occupies this pixel instead. That holds even when `layer` is the
+        // candidate's own image-painting ancestor: the ancestor relationship
+        // alone doesn't prove today's screenshot actually pairs them if
+        // something else sits on top of both.
+        const occludedByUnrelated = stack
+          .slice(0, candidateDepth)
+          .some(item => !item.contains(element) && !element.contains(item));
+        if (occludedByUnrelated) return false;
+        // An ancestor that paints the image is trivially behind its own
+        // descendant candidate once we know the candidate is genuinely
+        // reachable (unoccluded) here.
         if (layer.contains(element)) return true;
-        // The layer must stack below the candidate at the overlap point.
+        // Otherwise the layer must stack below the candidate at this point.
         const layerDepth = stack.findIndex(
           item => item === layer || layer.contains(item)
         );
@@ -300,6 +325,8 @@ async function scanCandidates(page: Page): Promise<PageScan> {
         if (label) pushCandidate(element, label);
       }
     }
+
+    pointerEventsOverride.remove();
 
     return {
       candidates,
