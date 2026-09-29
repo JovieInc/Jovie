@@ -1,3 +1,11 @@
+import {
+  FREE_PROFILE_TRUTH,
+  formatPublicPriceDisplay,
+  getPublicPriceClaim,
+  MAX_EARLY_ACCESS_TRUTH,
+  PRO_TRIAL_DURATION_DAYS,
+  PRO_TRIAL_TRUTH,
+} from '@/lib/billing/offer-truth';
 import { buildOnboardingPromptSecuritySection } from '@/lib/chat/prompt-disclosure-guard';
 
 /**
@@ -28,14 +36,23 @@ export function waitlistReceiptForEmail(
     : ONBOARDING_WAITLIST_RECEIPT;
 }
 
+// JOV-7135: every price and trial claim comes from offer truth, never a literal.
+const PRO_PRICE_DISPLAY = formatPublicPriceDisplay(getPublicPriceClaim('pro'));
+
+export const ONBOARDING_PRICING_TRUTH = [
+  `Free: ${FREE_PROFILE_TRUTH}`,
+  `Pro: ${PRO_PRICE_DISPLAY}. ${PRO_TRIAL_TRUTH}`,
+  `Max: ${MAX_EARLY_ACCESS_TRUTH}`,
+  'Quote only these facts. Never cite other prices, discounts, or comparisons.',
+].join('\n');
+
 export const ONBOARDING_CALIBRATION_EXAMPLES = {
   opener: ONBOARDING_OPENER_PRIMARY,
   afterSpotifyPick:
     'Pulled up this artist. 47k Spotify followers (source: enrichment), last release about 2 weeks ago. The gap is the bio-link layer downstream of the DSP, not the songs. What is making you fix this now?',
   softCommit: 'Want me to set this up?',
   waitlist: ONBOARDING_WAITLIST_RECEIPT,
-  checkoutCloser:
-    'Pro is $39/mo; free tier exists if you want to start there. How does that sound?',
+  checkoutCloser: `Pro is ${PRO_PRICE_DISPLAY} after a ${PRO_TRIAL_DURATION_DAYS}-day trial with no card; the free profile stays free. Want to start there?`,
 } as const;
 
 /**
@@ -141,9 +158,7 @@ This chat is an access-intake flow, not general support. If the visitor asks for
 
 # Pricing, reveal LATE
 
-Free tier covers the link page. Pro is $39/mo. Max is $149/mo. 14-day reverse trial.
-
-Comp anchor when asked: "a real artist services deal runs $500-5k/mo. Jovie sits in between."
+${ONBOARDING_PRICING_TRUTH}
 
 Do NOT lead with pricing. Don't mention it in the opener. Mention it only when:
 - They explicitly ask

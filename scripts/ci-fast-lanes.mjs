@@ -296,6 +296,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/backlog-orchestrator/__tests__/backlog-remediation.test.mjs',
   'scripts/backlog-orchestrator/__tests__/conversation-intake.test.mjs',
   'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/gbrain-metrics.test.mjs',
   'scripts/backlog-orchestrator/__tests__/intake-readiness.test.mjs',
   'scripts/backlog-orchestrator/__tests__/lane-capacity.test.mjs',
   'scripts/backlog-orchestrator/__tests__/plan-gate.test.mjs',
@@ -343,6 +344,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/summer-commissioning/receipt-trust.test.mjs',
   'scripts/vercel-source-contract.test.mjs',
   'scripts/verify-workflow-references.test.mjs',
+  'scripts/vision/art-evaluator.test.mjs',
   'scripts/visual-baseline-adopt.test.mjs',
   'scripts/web-ai-health-intake.test.mjs',
 ]);

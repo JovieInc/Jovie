@@ -7646,9 +7646,8 @@ function evaluateOnboardingSystemPromptContract(vars: EvalVars) {
       'Pricing',
       'reveal LATE',
       'Do NOT lead with pricing',
-      'Pro is $39/mo',
-      'Max is $149/mo',
-      '14-day reverse trial',
+      'Quote only these facts',
+      '14-day Pro trial. No credit card.',
     ]),
     forbidsInventedStatsAndPrematureLiveClaims: textIncludesAll(prompt, [
       'Never invent stats',
