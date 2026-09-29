@@ -18,6 +18,11 @@ export const JOVIE_CARD_COPY = {
     headline: 'Your Jovie profile. Ready for the real world.',
     body: 'We’re bringing your Jovie profile to Apple Wallet as a personal card for the people you meet in person. Join the list for access updates.',
   },
+  sections: {
+    howItWorks: 'From hello to your profile',
+    introduction: 'An introduction. Not a list of usernames',
+    closing: 'Bring your profile into the room',
+  },
   steps: [
     {
       title: 'Keep it close',
