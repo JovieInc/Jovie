@@ -146,7 +146,7 @@ describe('OvieCeoOverview', () => {
   it('keeps action controls outside the provenance dl (axe only-dlitems)', () => {
     const onRetry = vi.fn();
     const metrics = buildMetrics();
-    metrics.sources.stripe = { ...metrics.sources.stripe, state: 'stale' };
+    metrics.sources.stripe = { ...metrics.sources.stripe, state: 'degraded' };
     const { container } = render(
       <OvieCeoOverview metrics={metrics} onRetry={onRetry} />
     );
