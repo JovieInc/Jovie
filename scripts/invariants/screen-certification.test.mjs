@@ -46,6 +46,7 @@ import {
   PRODUCER,
   REQUIRED_MARKETING_QUALITY_CHECKS,
   resolveTrustedScreenProof,
+  screenProofArtifactName,
 } from './screen-proof-resolver.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -579,7 +580,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       let records = {
         artifact: {
           id: 42,
-          name: 'screen-browser-proof',
+          name: screenProofArtifactName('web.homepage'),
           expired: false,
           digest: sha256(zip),
           created_at: iso(-30_000),
@@ -815,6 +816,54 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     }
   });
 
+  it('keeps the /artists producer identity synchronized with the trusted resolver (JOV-7125)', () => {
+    const workflow = readFileSync(
+      join(ROOT, '.github/workflows/screenshots.yml'),
+      'utf8'
+    );
+    assert.equal(SCREEN_PROOF_ROUTES['web.artists'], '/artists');
+    // web.public-profile keeps the original bare PRODUCER.artifact name;
+    // every other SCREEN_PROOF_ROUTES-style producer gets its own dedicated
+    // name so two single-screen producer artifacts never collide inside one
+    // workflow run's artifact namespace.
+    assert.equal(
+      screenProofArtifactName('web.public-profile'),
+      PRODUCER.artifact
+    );
+    assert.equal(
+      screenProofArtifactName('web.artists'),
+      `${PRODUCER.artifact}-artists`
+    );
+    assert.notEqual(
+      screenProofArtifactName('web.artists'),
+      screenProofArtifactName('web.public-profile')
+    );
+    assert.equal(screenProofArtifactName('malformed-no-dot'), null);
+    assert.equal(screenProofArtifactName(42), null);
+    assert.match(workflow, /- 'apps\/web\/app\/artists\/\*\*'/);
+    assert.match(workflow, /--screen=web\.artists/);
+    assert.match(
+      workflow,
+      new RegExp(`name: ${screenProofArtifactName('web.artists')}`)
+    );
+    assert.match(workflow, /--screen-id=web\.artists/);
+    assert.match(
+      workflow,
+      /artists-artifact-id: \$\{\{ steps\.artists-proof\.outputs\.artifact-id \}\}/
+    );
+    const artistsSpec = readFileSync(
+      join(
+        ROOT,
+        'apps/web/tests/product-screenshots/artists-screen-proof.spec.ts'
+      ),
+      'utf8'
+    );
+    assert.match(
+      artistsSpec,
+      new RegExp(`const artistsRoute = '${SCREEN_PROOF_ROUTES['web.artists']}'`)
+    );
+  });
+
   it('routes changed screens to their matching artifacts in one certification pass', () => {
     const homepage = home();
     const profile = SCREEN_REGISTRY.find(
@@ -991,7 +1040,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       const records = {
         artifact: {
           id: 42,
-          name: 'screen-browser-proof',
+          name: screenProofArtifactName('web.homepage'),
           expired: false,
           digest: sha256(zip),
           created_at: iso(-30_000),
@@ -1076,6 +1125,185 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       assert.match(
         forged.receipt.issues.join('\n'),
         /trusted external browser producer integration is unavailable/
+      );
+    } finally {
+      process.env.PATH = priorPath;
+      if (priorDiffBase === undefined) delete process.env.SCREEN_CERT_DIFF_BASE;
+      else process.env.SCREEN_CERT_DIFF_BASE = priorDiffBase;
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('resolves a genuine /artists SCREEN_PROOF_ROUTES producer artifact into an exact-build pass (JOV-7125)', () => {
+    const root = mkdtempSync(join(tmpdir(), 'screen-resolver-artists-pass-'));
+    const priorPath = process.env.PATH;
+    const priorDiffBase = process.env.SCREEN_CERT_DIFF_BASE;
+    try {
+      const head = spawnSync('git', ['rev-parse', 'HEAD'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+      }).stdout.trim();
+      const image = readFileSync(
+        join(ROOT, 'docs/screenshots/gem-symphony-hud-430x90.png')
+      );
+      /** @type {[string, Buffer][]} */
+      const images = [
+        ['screenshots/desktop.png', image],
+        ['screenshots/mobile.png', image],
+      ];
+      const now = Date.now();
+      const iso = offset => new Date(now + offset).toISOString();
+      const proofRoute = SCREEN_PROOF_ROUTES['web.artists'];
+      const buildProof = () => ({
+        schema: SCREEN_BROWSER_PROOF_SCHEMA,
+        producer: 'external-render-runner',
+        status: 'unverified-candidate',
+        certificationStatus: 'not-certified',
+        screenId: 'web.artists',
+        headSha: head,
+        tier: 'rendered-evidence',
+        runUrl: `https://github.com/JovieInc/Jovie/actions/runs/78/attempts/2`,
+        producerRunId: 78,
+        producerRunAttempt: 2,
+        producerJobId: 100,
+        environment: 'local-production-build',
+        sourcePaths: ['apps/web/app/artists/page.tsx'],
+        capturedAt: iso(-60_000),
+        artifactDigest: `sha256:${'0'.repeat(64)}`,
+        activeFlow: { disclosure: false },
+        historyProof: { separate: true, path: 'docs/VISUAL_TESTING_POLICY.md' },
+        visibleActions: ['Certify', 'Block'],
+        viewports: ['desktop', 'mobile'].map(id => ({
+          id,
+          requestedRoute: proofRoute,
+          finalUrl: `http://localhost:3000${proofRoute}`,
+          decision: 'pass',
+          rendered: true,
+          axe: { violations: 0 },
+          overflow: { maxHorizontalPx: 0 },
+          interaction: { passed: true },
+          cls: { value: 0 },
+          contrast: { passed: true },
+          runtime: {
+            consoleErrors: 0,
+            pageErrors: 0,
+            failedResponses: 0,
+            failedRequests: 0,
+          },
+        })),
+      });
+      const proof = buildProof();
+      const digest = createHash('sha256');
+      for (const [name, bytes] of images) {
+        mkdirSync(dirname(join(root, name)), { recursive: true });
+        writeFileSync(join(root, name), bytes);
+        digest.update(name);
+        digest.update('\0');
+        digest.update(bytes);
+        digest.update('\0');
+      }
+      proof.artifactDigest = `sha256:${digest.digest('hex')}`;
+      const buildArchive = () => {
+        writeFileSync(join(root, 'screen-proof.json'), JSON.stringify(proof));
+        rmSync(join(root, 'proof.zip'), { force: true });
+        assert.equal(
+          spawnSync(
+            'zip',
+            [
+              '-q',
+              'proof.zip',
+              'screen-proof.json',
+              ...images.map(([name]) => name),
+            ],
+            { cwd: root }
+          ).status,
+          0
+        );
+        return readFileSync(join(root, 'proof.zip'));
+      };
+      const zip = buildArchive();
+      const makeRecords = artifactName => ({
+        artifact: {
+          id: 43,
+          name: artifactName,
+          expired: false,
+          digest: sha256(zip),
+          created_at: iso(-30_000),
+          workflow_run: { id: 78 },
+        },
+        run: {
+          id: 78,
+          run_attempt: 2,
+          repository: { full_name: 'JovieInc/Jovie' },
+          head_branch: 'main',
+          head_sha: head,
+          path: '.github/workflows/screenshots.yml',
+          event: 'push',
+          conclusion: 'success',
+        },
+        jobs: {
+          jobs: [
+            {
+              id: 100,
+              name: 'Generate Screenshots',
+              run_id: 78,
+              run_attempt: 2,
+              head_sha: head,
+              conclusion: 'success',
+              started_at: iso(-90_000),
+              completed_at: iso(-10_000),
+            },
+          ],
+        },
+      });
+      const gh = join(root, 'gh');
+      writeFileSync(
+        gh,
+        `#!/usr/bin/env node\nconst fs=require('node:fs');const p=process.argv.at(-1);const r=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'records.json'))}));if(p.endsWith('/zip'))process.stdout.write(fs.readFileSync(${JSON.stringify(join(root, 'proof.zip'))}));else process.stdout.write(JSON.stringify(p.includes('/artifacts/')?r.artifact:p.includes('/attempts/')?r.jobs:r.run));`
+      );
+      chmodSync(gh, 0o755);
+      process.env.PATH = `${root}:${priorPath}`;
+      process.env.SCREEN_CERT_DIFF_BASE = 'c'.repeat(40);
+
+      // The dedicated `screen-browser-proof-artists` artifact name resolves.
+      writeFileSync(
+        join(root, 'records.json'),
+        JSON.stringify(makeRecords(screenProofArtifactName('web.artists')))
+      );
+      const result = runScreenCertification({
+        headSha: head,
+        changedFiles: ['apps/web/app/artists/page.tsx'],
+        proofRequests: [{ artifactId: 43, screenId: 'web.artists' }],
+      });
+      assert.equal(result.ok, true, result.receipt.issues.join('\n'));
+      assert.equal(result.receipt.certified, true);
+      assert.deepEqual(result.receipt.changedScreens, [
+        {
+          id: 'web.artists',
+          verdict: 'pass',
+          findings: [],
+          artifactDigest: proof.artifactDigest,
+          rendererRunUrl: proof.runUrl,
+        },
+      ]);
+
+      // The public-profile screen's legacy bare artifact name must not also
+      // authenticate web.artists evidence — each SCREEN_PROOF_ROUTES-style
+      // producer owns its own name.
+      writeFileSync(
+        join(root, 'records.json'),
+        JSON.stringify(makeRecords(PRODUCER.artifact))
+      );
+      const wrongName = runScreenCertification({
+        headSha: head,
+        changedFiles: ['apps/web/app/artists/page.tsx'],
+        proofRequests: [{ artifactId: 43, screenId: 'web.artists' }],
+      });
+      assert.equal(wrongName.ok, false);
+      assert.equal(wrongName.receipt.certified, false);
+      assert.match(
+        wrongName.receipt.issues.join('\n'),
+        /artifact run, workflow, or exact producer attempt is not trusted/
       );
     } finally {
       process.env.PATH = priorPath;
@@ -1174,7 +1402,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         const records = {
           artifact: {
             id: 42,
-            name: 'screen-browser-proof',
+            name: screenProofArtifactName('web.homepage'),
             expired: false,
             digest: `sha256:${'0'.repeat(64)}`,
             created_at: iso(-30_000),
