@@ -79,9 +79,11 @@ describe('loadAskJovieContext', () => {
     );
 
     const { context } = await loadAskJovieContext('tim');
-    expect(context?.latestRelease?.releaseDate).toBe(
-      '2026-03-01T00:00:00.000Z'
-    );
+    expect(context?.latestRelease).toMatchObject({
+      title: 'Glasshouse',
+      releaseType: 'album',
+      releaseDate: '2026-03-01T00:00:00.000Z',
+    });
   });
 
   it('normalizes Date objects on release rows into ISO strings', async () => {
