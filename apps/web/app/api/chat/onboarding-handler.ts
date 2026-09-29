@@ -1,7 +1,11 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
-import type { UIMessage } from 'ai';
+import {
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  type UIMessage,
+} from 'ai';
 import { and, desc, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -11,6 +15,7 @@ import {
 } from '@/lib/ai/gateway-errors';
 import { auth } from '@/lib/auth/better-auth';
 import {
+  confirmSelectedArtist,
   decideFallbackTurn,
   type FallbackTurn,
 } from '@/lib/chat/onboarding-script/engine';
@@ -507,6 +512,18 @@ export async function tryHandleAnonymousOnboardingChat(
   });
   const tools = buildOnboardingTools(onboardingState);
 
+  // JOV-7134: the artist picker carries the real Spotify id only in message
+  // metadata, which never reaches the model. Confirm the pick here from that
+  // id, show the model the result as a completed tool call, and stream the
+  // same tool part to the client (profile rail) and persistence.
+  const serverArtistConfirmation = await confirmSelectedArtist(
+    uiMessages,
+    onboardingState
+  );
+  const modelUiMessages = serverArtistConfirmation
+    ? [...uiMessages, serverArtistConfirmation.historyMessage]
+    : uiMessages;
+
   // --- Telemetry hooks (mirror authenticated chat) ---
   const telemetry: ChatTelemetry = {
     setTags: tags => {
@@ -605,7 +622,7 @@ export async function tryHandleAnonymousOnboardingChat(
 
     let streamFailed = false;
     const turn = await executeChatTurn({
-      uiMessages,
+      uiMessages: modelUiMessages,
       artistContext: null,
       releases: [],
       resolvedProfileId: null,
@@ -640,24 +657,56 @@ export async function tryHandleAnonymousOnboardingChat(
       },
     });
 
+    const persistResponse = async ({
+      responseMessage,
+      outcome,
+    }: {
+      responseMessage: UIMessage;
+      outcome: { status: string };
+    }) => {
+      if (streamFailed || outcome.status === 'failed') {
+        return;
+      }
+      await persistAnonymousAssistantMessage({
+        conversationId,
+        latestUserClientMessageId: latestUserMessage.clientMessageId,
+        responseMessage,
+      });
+    };
+    // Mid-stream failures cannot swap the Response for the scripted
+    // fallback; the lint-clean script line is the recovery copy instead.
+    const streamErrorText = (error: unknown) =>
+      isGatewayBudgetExceededError(error)
+        ? resolveChatStreamErrorMessage(error)
+        : STREAM_ERROR_LINE.text;
+
+    if (serverArtistConfirmation) {
+      const stream = createUIMessageStream({
+        execute: ({ writer }) => {
+          writer.write({ type: 'start' });
+          for (const chunk of serverArtistConfirmation.chunks) {
+            writer.write(chunk);
+          }
+          writer.merge(
+            turn.streamResult.toUIMessageStream({
+              sendStart: false,
+              onError: streamErrorText,
+            })
+          );
+        },
+        onError: streamErrorText,
+        onFinish: persistResponse,
+      });
+      return createUIMessageStreamResponse({
+        stream,
+        headers: responseHeaders,
+      });
+    }
+
     return turn.streamResult.toUIMessageStreamResponse({
       headers: responseHeaders,
-      onFinish: async ({ responseMessage, outcome }) => {
-        if (streamFailed || outcome.status === 'failed') {
-          return;
-        }
-        await persistAnonymousAssistantMessage({
-          conversationId,
-          latestUserClientMessageId: latestUserMessage.clientMessageId,
-          responseMessage,
-        });
-      },
-      // Mid-stream failures cannot swap the Response for the scripted
-      // fallback; the lint-clean script line is the recovery copy instead.
-      onError: error =>
-        isGatewayBudgetExceededError(error)
-          ? resolveChatStreamErrorMessage(error)
-          : STREAM_ERROR_LINE.text,
+      onFinish: persistResponse,
+      onError: streamErrorText,
     });
   } catch (error) {
     if (isClientDisconnect(error, req.signal)) {
