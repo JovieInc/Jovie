@@ -144,7 +144,7 @@ function NativeCompleteContent() {
     (returnTo: string) => {
       router.replace(returnTo);
       globalThis.setTimeout(() => {
-        if (globalThis.location.pathname === '/auth/native-complete') {
+        if (globalThis.location?.pathname === '/auth/native-complete') {
           globalThis.location.assign(returnTo);
         }
       }, 500);
@@ -216,7 +216,7 @@ function NativeCompleteContent() {
             if (verification === 'ready') {
               router.replace(returnTo);
               globalThis.setTimeout(() => {
-                if (globalThis.location.pathname === '/auth/native-complete') {
+                if (globalThis.location?.pathname === '/auth/native-complete') {
                   globalThis.location.assign(returnTo);
                 }
               }, 500);
