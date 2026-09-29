@@ -361,7 +361,7 @@ export function OvieCertificationsWorkspace() {
 
   const handleDecide = useCallback(
     async (kind: OvieCertificationDecisionKind, notes: string | null) => {
-      if (!selected?.decision.evidenceDigest) return;
+      if (!selected?.decision.evidenceDigest) return false;
       setPendingDecision(kind);
       setDecisionError(null);
       try {
@@ -373,8 +373,10 @@ export function OvieCertificationsWorkspace() {
           actionId: crypto.randomUUID(),
         });
         toast.success(DECISION_TOASTS[kind]);
+        return true;
       } catch (error) {
         setDecisionError(getCertificationDecisionErrorMessage(error));
+        return false;
       } finally {
         setPendingDecision(null);
       }

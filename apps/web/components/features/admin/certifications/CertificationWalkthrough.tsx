@@ -24,6 +24,7 @@ import {
   type WalkthroughPlaybackAnchor,
 } from '@/lib/ovie/certifications/walkthrough';
 import { cn } from '@/lib/utils';
+import type { CertificationDecisionHandler } from './CertificationDetailRail';
 import { shortSha } from './certification-view';
 
 export const CERTIFICATION_WALKTHROUGH_SPEEDS = [1, 1.5, 2] as const;
@@ -33,10 +34,7 @@ interface CertificationWalkthroughProps {
   readonly row: OvieCertificationRow | null;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
-  readonly onDecide: (
-    decision: OvieCertificationDecisionKind,
-    notes: string | null
-  ) => Promise<void>;
+  readonly onDecide: CertificationDecisionHandler;
   readonly pendingDecision: OvieCertificationDecisionKind | null;
 }
 
@@ -63,6 +61,7 @@ export function CertificationWalkthrough({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const transcriberRef = useRef<Transcriber | null>(null);
   const transcriptRef = useRef('');
+  const activeRowIdRef = useRef<string | null>(null);
   const [review, setReview] = useState<CertificationWalkthroughReview | null>(
     null
   );
@@ -75,6 +74,14 @@ export function CertificationWalkthrough({
   // after a new revision binds the new digest, never a stale one.
   useEffect(() => {
     if (open && row) {
+      // Query refreshes replace the row object every minute. Preserve the
+      // in-progress review for the same subject so a changed digest is shown
+      // as stale without discarding the founder's comments.
+      if (activeRowIdRef.current === row.id) return;
+      transcriberRef.current?.cancel();
+      transcriberRef.current = null;
+      setDictating(false);
+      activeRowIdRef.current = row.id;
       setReview(createWalkthroughReview(row));
       setFinished(false);
       setDictationError(null);
@@ -82,6 +89,7 @@ export function CertificationWalkthrough({
     } else if (!open) {
       transcriberRef.current?.cancel();
       transcriberRef.current = null;
+      activeRowIdRef.current = null;
       setDictating(false);
       setReview(null);
       setFinished(false);
@@ -167,7 +175,8 @@ export function CertificationWalkthrough({
       const notes =
         findings.length > 0 ? buildWalkthroughNotes(review, findings) : null;
       if (decision === 'changes_requested' && !notes) return;
-      await onDecide(decision, notes);
+      const recorded = await onDecide(decision, notes);
+      if (recorded === false) return;
       onOpenChange(false);
     },
     [review, stale, findings, onDecide, onOpenChange]
@@ -183,7 +192,7 @@ export function CertificationWalkthrough({
           data-testid='certification-walkthrough'
           className='fixed inset-2 z-modal flex flex-col overflow-hidden rounded-(--system-b-radius-panel) border border-default bg-surface-elevated sm:inset-4'
         >
-          <div className='flex min-w-0 items-center gap-2 border-b border-(--app-shell-frame-seam) px-4 py-2.5'>
+          <div className='flex min-w-0 items-center gap-2 border-b border-(--app-shell-frame-seam) px-4 py-2'>
             <DialogPrimitive.Title className='min-w-0 truncate text-sm font-medium text-primary-token'>
               {review?.subjectTitle ?? row?.subject.title ?? 'Walkthrough'}
             </DialogPrimitive.Title>
@@ -308,7 +317,7 @@ export function CertificationWalkthrough({
                     ? item.playbackSeconds
                     : item.anchor.playbackSeconds;
                   const text = item.text;
-                  const key = isFinding ? item.id : item.id;
+                  const key = item.id;
                   return (
                     <li
                       key={key}

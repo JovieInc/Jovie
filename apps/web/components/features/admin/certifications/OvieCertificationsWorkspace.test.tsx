@@ -67,7 +67,7 @@ function latestRailProps() {
   if (!panel) throw new Error('no rail registered');
   return panel.props as {
     row: { id: string } | null;
-    onDecide: (kind: string, notes: string | null) => Promise<void>;
+    onDecide: (kind: string, notes: string | null) => Promise<boolean | void>;
     onWalkthrough?: () => void;
     decisionError: string | null;
   };

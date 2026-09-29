@@ -36,7 +36,7 @@ function renderWalkthrough(
     onDecide?: (
       decision: 'approved' | 'changes_requested' | 'rejected',
       notes: string | null
-    ) => Promise<void>;
+    ) => Promise<boolean | void>;
     pendingDecision?: 'approved' | 'changes_requested' | 'rejected' | null;
   } = {}
 ) {
@@ -140,9 +140,17 @@ describe('CertificationWalkthrough', () => {
       />
     );
 
+    dictate('Keep this comment across refreshes');
+
     rerender(
       <CertificationWalkthrough
-        row={null}
+        row={{
+          ...row,
+          decision: {
+            ...row.decision,
+            evidenceDigest: 'f'.repeat(64),
+          },
+        }}
         open={true}
         onOpenChange={vi.fn()}
         onDecide={onDecide}
@@ -151,7 +159,24 @@ describe('CertificationWalkthrough', () => {
     );
 
     expect(screen.getByTestId('walkthrough-stale')).toBeInTheDocument();
+    expect(
+      screen.getByText('Keep this comment across refreshes')
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Certify' })).toBeDisabled();
+  });
+
+  it('keeps the walkthrough open when the decision is not recorded', async () => {
+    const onOpenChange = vi.fn();
+    const onDecide = vi.fn(async () => false);
+    renderWalkthrough({ onOpenChange, onDecide });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Certify' }));
+    });
+
+    expect(onDecide).toHaveBeenCalledWith('approved', null);
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(screen.getByTestId('certification-walkthrough')).toBeInTheDocument();
   });
 
   it('surfaces an error when dictation is unsupported', () => {

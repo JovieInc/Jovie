@@ -40,7 +40,7 @@ export interface CertificationDecisionHandler {
   (
     decision: OvieCertificationDecisionKind,
     notes: string | null
-  ): Promise<void>;
+  ): Promise<boolean | void>;
 }
 
 interface CertificationDetailRailProps {
