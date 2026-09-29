@@ -47,10 +47,10 @@
       "uncovered": 0
     },
     "apps/web/components": {
-      "percent": 76.89,
-      "covered": 1088,
-      "total": 1415,
-      "uncovered": 327
+      "percent": 77.41,
+      "covered": 1086,
+      "total": 1403,
+      "uncovered": 317
     }
   }
 }
