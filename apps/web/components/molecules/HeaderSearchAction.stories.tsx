@@ -26,7 +26,7 @@ export const Collapsed: Story = {
     const trigger = canvas.getByRole('button', { name: 'Open search' });
     await userEvent.click(trigger);
     await expect(
-      canvas.getByRole('textbox', { name: 'Search releases' })
+      canvas.getByRole('searchbox', { name: 'Search releases' })
     ).toBeInTheDocument();
   },
 };
