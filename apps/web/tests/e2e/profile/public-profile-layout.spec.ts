@@ -243,7 +243,7 @@ async function collectLayoutMetrics(page: Page) {
       document.querySelectorAll<HTMLElement>(
         [
           '[data-testid="profile-home-alerts-row"]',
-          '[data-testid="profile-home-alerts-fallback-card"]',
+          '[data-testid="profile-identity-get-updates"]',
           '[data-testid="profile-tab-bar"] button',
           '[data-testid="profile-desktop-surface"] nav button',
           '[data-testid="profile-desktop-surface"] button[aria-label="Menu"]',

@@ -466,9 +466,8 @@ function renderAlertsFallbackPreview(dataTestId: string) {
         artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}
         latestRelease={null}
         profileSettings={SHOWCASE_PROFILE_SETTINGS}
-        featuredPlaylistFallback={null}
         tourDates={[]}
-        hasPlayableDestinations={false}
+        hasPlayableDestinations
         renderMode='preview'
         isSubscribed={false}
         resolveNearbyTour={false}
