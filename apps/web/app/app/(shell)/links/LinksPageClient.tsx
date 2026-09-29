@@ -54,7 +54,7 @@ function LinkInspector({ row }: { readonly row: LinkRow }) {
     >
       <div className='flex flex-col gap-1'>
         <span className={typography.cellTertiary}>{row.type}</span>
-        <h2 className='text-sm font-semibold text-primary-token'>
+        <h2 className='line-clamp-2 text-sm font-semibold text-primary-token'>
           {row.title}
         </h2>
       </div>
