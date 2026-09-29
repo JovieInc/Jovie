@@ -144,6 +144,49 @@ export interface ShowEntityInput {
   readonly ticketStatus?: TicketStatus | null;
 }
 
+export interface ContactEntityInput {
+  readonly id: string;
+  readonly roleLabel: string;
+  readonly contactName?: string | null;
+  readonly companyLabel?: string | null;
+  readonly imageUrl?: string | null;
+}
+
+/** Public person/business contact → unified model with no private channel data. */
+export function contactToEntityCard(
+  contact: ContactEntityInput,
+  options: Readonly<{ handle: string; ctaLabel?: string }>
+): EntityCardModel {
+  const preset = KIND_PRESETS.person;
+  const title =
+    contact.contactName?.trim() ||
+    contact.companyLabel?.trim() ||
+    contact.roleLabel;
+  const meta = [
+    contact.roleLabel,
+    contact.contactName ? contact.companyLabel : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const href = `/${encodeURIComponent(options.handle)}?mode=contact`;
+
+  return {
+    id: contact.id,
+    kind: 'person',
+    href,
+    imageUrl: contact.imageUrl ?? null,
+    imageAlt: title,
+    accent: preset.accent,
+    eyebrow: 'Contact',
+    title,
+    meta: meta || null,
+    cta: {
+      label: options.ctaLabel ?? preset.ctaLabel,
+      href,
+    },
+  };
+}
+
 export interface ChatReleaseContextInput {
   readonly id: string;
   readonly title: string;
