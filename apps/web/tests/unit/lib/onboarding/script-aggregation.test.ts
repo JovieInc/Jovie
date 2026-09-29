@@ -1,7 +1,25 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
-vi.mock('@/lib/db', () => ({ db: {} }));
+
+// Drizzle query builder whose every chained call resolves to an empty result,
+// so the aggregation runner exercises its wiring without a database.
+const emptyDbChain = vi.hoisted(() => {
+  const chain: unknown = new Proxy(() => {}, {
+    get(_target, prop) {
+      if (prop === 'then') {
+        return (resolve: (value: unknown) => void) => resolve([]);
+      }
+      return () => chain;
+    },
+    apply() {
+      return chain;
+    },
+  });
+  return chain;
+});
+
+vi.mock('@/lib/db', () => ({ db: emptyDbChain }));
 
 import {
   adjustPromotedWeight,
@@ -10,6 +28,7 @@ import {
   deriveStepFromToolEvents,
   MIN_CANDIDATE_CONVERSIONS,
   ONBOARDING_SCRIPT_AUTO_PROMOTION,
+  runOnboardingScriptAggregation,
   shouldPromoteCandidate,
 } from '@/lib/onboarding/script-aggregation';
 
@@ -217,5 +236,13 @@ describe('candidateLineKey', () => {
 describe('ungated promotion freeze (JOV-7140)', () => {
   it('keeps live-copy promotion off until it runs through evals and a PR', () => {
     expect(ONBOARDING_SCRIPT_AUTO_PROMOTION).toBe(false);
+  });
+
+  it('skips promote/reweight/retire while frozen and reports it', async () => {
+    const summary = await runOnboardingScriptAggregation();
+    expect(summary.promotion).toBe('frozen');
+    expect(summary.promoted).toBe(0);
+    expect(summary.retired).toBe(0);
+    expect(summary.reweighted).toBe(0);
   });
 });
