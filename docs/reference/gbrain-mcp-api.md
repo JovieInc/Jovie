@@ -87,3 +87,26 @@ tool output from `result.content[].text`.
 `GET /health` — Returns OK with version info. No auth required. Used by the
 gate script to verify the server is up before registering it as an MCP
 provider.
+
+## Retrieval telemetry (JOV-7099)
+
+Jovie's CLI client (`scripts/backlog-orchestrator/gbrain-client.mjs`) emits a
+fail-soft telemetry record for every `get`/`search` lookup. Records append as
+JSONL to `$XDG_CACHE_HOME/jovie/gbrain-retrieval.jsonl` (or
+`JOVIE_GBRAIN_TELEMETRY=<path>`; set to `off` to disable). The file always
+lives outside the git tree.
+
+Each record captures `operation`, `outcome` (`hit`, `clean_miss`, `error`,
+`timeout`), `source` (`get`/`keyword`/`semantic`), `ms`, `resultCount`,
+`target`, bound page `revisions`, and an optional `cacheHit` flag for callers
+with a source/version-checked cache.
+
+Print the service-contract summary (success/clean-miss/error/timeout rates,
+p50/p95/p99 latency, per-source split, cache hit rate):
+
+```bash
+node scripts/backlog-orchestrator/gbrain-metrics.mjs [--file=<path>]
+```
+
+Rates are `null` when there are no observations — unknowns stay explicit
+rather than reporting a fabricated zero.
