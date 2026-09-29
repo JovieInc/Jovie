@@ -7,6 +7,130 @@
 
 export const QUEUE_RANKING_RECEIPT_SCHEMA = 'jovie.queue-ranking/v2';
 
+// JOV-7091: upstream prevention leverage. A bounded machine-enforceable
+// prevention change (guardrail/invariant/ratchet) earns queue priority only
+// when evidence shows it protects multiple queued issues from a repeated
+// defect class. A bare "invariant" label or title is never sufficient.
+export const PREVENTION_MIN_AFFECTED = 2;
+export const PREVENTION_SCORE_CAP = 25;
+
+const PREVENTION_LABEL_PATTERN =
+  /^(?:invariant|guardrail|ratchet|ci-gate|quality-gate|prevention)$/i;
+const PREVENTION_TITLE_PATTERN =
+  /\b(?:guardrail|invariant|ratchet|regression[- ]gate|prevention)\b/i;
+const PREVENTION_AUTHORITY_LABELS = new Set([
+  'founder-request',
+  'summer-priority',
+]);
+
+const PREVENTION_SEVERITY_WEIGHTS = {
+  'revenue-protection': 1.5,
+  reliability: 1.25,
+  paid: 1.1,
+  throughput: 1.0,
+  retention: 1.0,
+  activation: 0.9,
+  expansion: 0.9,
+  acquisition: 0.75,
+  unknown: 0.5,
+};
+
+function candidateLabelNames(candidate) {
+  const source = candidate?.issue?.labels ?? candidate?.labels;
+  const nodes = source?.nodes || source || [];
+  return nodes
+    .map(label => (typeof label === 'string' ? label : label?.name))
+    .filter(Boolean);
+}
+
+function defectClassTerms(text) {
+  return new Set(
+    String(text || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .split(/\s+/)
+      .filter(word => word.length > 4)
+  );
+}
+
+/**
+ * Assess whether a candidate is an evidence-backed cross-cutting prevention
+ * change. Returns a normalized-value receipt or null when the evidence is too
+ * weak (no prevention signal, or fewer than PREVENTION_MIN_AFFECTED queued
+ * issues sharing the defect class it protects).
+ */
+export function assessPreventionLeverage(candidate, queue = []) {
+  const labels = candidateLabelNames(candidate);
+  const signalLabel =
+    labels.find(label => PREVENTION_LABEL_PATTERN.test(label)) ?? null;
+  const signalTitle = PREVENTION_TITLE_PATTERN.test(candidate?.title || '');
+  if (!signalLabel && !signalTitle) return null;
+
+  const area = candidate?.area;
+  const related = new Set(
+    (candidate?.relatedIssues || []).map(relation => relation.identifier)
+  );
+  const terms = defectClassTerms(
+    `${candidate?.title || ''} ${candidate?.issue?.description || ''}`
+  );
+  const affected = (queue || []).filter(member => {
+    if (!member || member.identifier === candidate.identifier) return false;
+    if (related.has(member.identifier)) return true;
+    if (area && area !== 'unknown' && member.area === area) return true;
+    const memberTerms = defectClassTerms(
+      `${member.title || ''} ${member.issue?.description || ''}`
+    );
+    const shared = [...terms].filter(term => memberTerms.has(term));
+    return shared.length >= 2;
+  });
+  if (affected.length < PREVENTION_MIN_AFFECTED) return null;
+
+  const severityWeight = Math.max(
+    PREVENTION_SEVERITY_WEIGHTS[candidate.mrrCategory] ?? 0.5,
+    ...affected.map(
+      member => PREVENTION_SEVERITY_WEIGHTS[member.mrrCategory] ?? 0.5
+    )
+  );
+  const recurrence = Math.min(1, affected.length / 5);
+  const founderEvidence = affected.some(member =>
+    candidateLabelNames(member).some(label =>
+      PREVENTION_AUTHORITY_LABELS.has(label.toLowerCase())
+    )
+  );
+  const confidence = Math.min(
+    1,
+    0.35 +
+      0.1 * affected.length +
+      (signalLabel ? 0.15 : 0) +
+      (founderEvidence ? 0.1 : 0)
+  );
+  const amount =
+    Math.round(affected.length * 10 * severityWeight * recurrence * 10) / 10;
+  return {
+    amount,
+    unit: 'normalized-value',
+    confidence: Math.round(confidence * 100) / 100,
+    sourceRef: `prevention-leverage://${candidate.identifier}`,
+    affectedIssues: affected.map(member => member.identifier).sort(),
+    reason:
+      `${affected.length} queued issue(s) share the protected defect class ` +
+      `(severity ${severityWeight}, recurrence ${recurrence})` +
+      (signalLabel ? `; label:${signalLabel}` : '; title signal'),
+  };
+}
+
+/**
+ * Bounded score contribution of a prevention assessment. Evidence-gated, so a
+ * noisy or mislabeled invariant yields zero adjustment.
+ */
+export function preventionScoreAdjustment(assessment) {
+  if (!assessment) return 0;
+  return Math.min(
+    PREVENTION_SCORE_CAP,
+    Math.round(assessment.amount * assessment.confidence)
+  );
+}
+
 /**
  * Score an issue classification deterministically.
  * Returns a numeric score between 0-100 and a breakdown.
@@ -64,9 +188,16 @@ export function scoreIssue(classification) {
   // Penality for many relations (might be messy/duplicate)
   const relationPenalty = Math.min(relatedIssues.length * 2, 10);
 
+  // JOV-7091: bounded upstream-prevention bonus, derived only from an
+  // evidence-backed assessment attached upstream (see assessPreventionLeverage).
+  const preventionAdj = preventionScoreAdjustment(classification.prevention);
+
   const score = Math.max(
     0,
-    Math.min(100, base + confAdj + effortAdj + wsBonus - relationPenalty)
+    Math.min(
+      100,
+      base + confAdj + effortAdj + wsBonus + preventionAdj - relationPenalty
+    )
   );
 
   return {
@@ -77,6 +208,7 @@ export function scoreIssue(classification) {
       effortAdj,
       wsBonus,
       relationPenalty,
+      preventionAdj,
     },
   };
 }
@@ -142,7 +274,8 @@ function costEvidence(classification) {
 function preventionEvidence(classification, valueUnit) {
   const supplied =
     classification.economic?.preventionLeverage ??
-    classification.preventionLeverage;
+    classification.preventionLeverage ??
+    classification.prevention;
   if (
     finiteNonNegative(supplied?.amount) &&
     supplied?.unit === valueUnit &&
@@ -153,6 +286,10 @@ function preventionEvidence(classification, valueUnit) {
       unit: supplied.unit,
       confidence: Math.max(0, Math.min(1, supplied.confidence ?? 0)),
       sourceRefs: [supplied.sourceRef],
+      reason: supplied.reason ?? null,
+      affectedIssues: Array.isArray(supplied.affectedIssues)
+        ? [...supplied.affectedIssues].sort()
+        : [],
     };
   }
   return {
@@ -160,6 +297,8 @@ function preventionEvidence(classification, valueUnit) {
     unit: valueUnit,
     confidence: 0,
     sourceRefs: [],
+    reason: null,
+    affectedIssues: [],
   };
 }
 
@@ -231,6 +370,35 @@ export function rankQueueCandidates(
   const displacedOpportunity = displaced?.comparable
     ? Math.max(0, displaced.expectedNetValue)
     : null;
+  // Order the queue would have had with zero prevention leverage. Compared
+  // against the actual winner this explains whether prevention leverage
+  // changed the admission order.
+  const withoutPrevention = economic
+    ? records.toSorted(
+        (left, right) =>
+          right.expectedValue.amount -
+            right.fullyLoadedCost.amount -
+            (left.expectedValue.amount - left.fullyLoadedCost.amount) ||
+          left.candidate.identifier.localeCompare(right.candidate.identifier)
+      )
+    : records.toSorted(
+        (left, right) =>
+          right.candidate.score -
+            preventionScoreAdjustment(right.candidate.prevention) -
+            (left.candidate.score -
+              preventionScoreAdjustment(left.candidate.prevention)) ||
+          left.candidate.identifier.localeCompare(right.candidate.identifier)
+      );
+  const orderingReasons = [];
+  if (
+    selected &&
+    withoutPrevention[0] &&
+    selected.candidate.identifier !==
+      withoutPrevention[0].candidate.identifier &&
+    (selected.preventionLeverage.amount ?? 0) > 0
+  ) {
+    orderingReasons.push('prevention-leverage');
+  }
   const confidence = selected
     ? Math.min(
         selected.expectedValue.confidence,
@@ -267,6 +435,7 @@ export function rankQueueCandidates(
     orderingChanged:
       Boolean(selected && legacy[0]) &&
       selected.candidate.identifier !== legacy[0].candidate.identifier,
+    orderingReasons,
     confidence,
     missingSourceContracts,
     rankings: ranked.map((record, index) => ({
