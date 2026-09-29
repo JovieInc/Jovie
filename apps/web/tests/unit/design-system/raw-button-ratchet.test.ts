@@ -29,6 +29,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = join(__dirname, '..', '..', '..');
 const SCAN_DIRS = ['components', 'app'].map(d => join(WEB_ROOT, d));
 const BASELINE_PATH = join(__dirname, 'raw-button.baseline.json');
+const CANONICAL_TRIGGER_STORIES = [
+  'components/molecules/GenrePicker.stories.tsx',
+  'components/molecules/LocationPicker.stories.tsx',
+  'components/molecules/menus/ToolbarMenuPrimitives.stories.tsx',
+] as const;
 
 // A raw lowercase `<button` opening tag: `<button` followed by whitespace,
 // `>`, or `/` (self-closing). The lookahead avoids matching the canonical
@@ -66,6 +71,17 @@ function countRawButtons(): number {
 }
 
 describe('design-system raw-button ratchet', () => {
+  it.each(CANONICAL_TRIGGER_STORIES)(
+    'uses the canonical Button for story triggers in %s',
+    relativePath => {
+      const source = readFileSync(join(WEB_ROOT, relativePath), 'utf8');
+
+      expect(source.match(RAW_BUTTON) ?? []).toHaveLength(0);
+      expect(source).toContain("from '@jovie/ui'");
+      expect(source).toMatch(/<Button(?=[\s/>])/);
+    }
+  );
+
   it('raw <button> usage does not increase above the baseline', () => {
     const current = countRawButtons();
 
