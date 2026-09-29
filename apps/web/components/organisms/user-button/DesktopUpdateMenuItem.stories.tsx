@@ -21,7 +21,11 @@ function MenuItemPreview({
               key={item.id}
               className='flex h-7 items-center gap-2.5 rounded-md px-2.5 text-app text-primary-token'
             >
-              {item.icon ? <item.icon className='h-4 w-4' /> : null}
+              {typeof item.icon === 'function' ? (
+                <item.icon className='h-4 w-4' />
+              ) : (
+                item.icon
+              )}
               {item.label}
             </div>
           ) : (
