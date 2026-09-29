@@ -1,20 +1,29 @@
-# Nightly Tests
+# Changed-Evidence Test Suites
 #
-# PURPOSE: Consolidated nightly test suite running both unit tests and E2E tests
-# in parallel. Alerts to Slack on failures.
+# PURPOSE: Full unit, dead-code, and E2E evidence after relevant main inputs
+# change. Manual dispatch remains available for bounded diagnostics.
 #
 # REPLACES: nightly-unit-tests.yml, nightly-e2e-tests.yml
 #
-# SCHEDULE: Daily at 11:30 PM America/Los_Angeles. This leaves at least a
-# 90-minute buffer before the fixed 09:00 UTC screenshot and Tuesday harness.
-
-name: Nightly Tests
-# clock-class: skip-if-unchanged
+name: Changed-Evidence Test Suites
 
 on:
-  schedule:
-    - cron: '30 23 * * *'
-      timezone: 'America/Los_Angeles'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - '!apps/web/reports/**'
+      - '!apps/web/test-results/**'
+      - 'packages/**'
+      - '.github/actions/setup-node-pnpm/**'
+      - '.github/actions/setup-playwright/**'
+      - '.github/workflows/nightly-tests.yml'
+      - '.node-version'
+      - '.nvmrc'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'turbo.json'
   workflow_dispatch:
     inputs:
       suite:
@@ -45,30 +54,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  unchanged:
-    name: Skip if no new SHA
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    outputs:
-      skip: ${{ steps.gate.outputs.skip }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          sparse-checkout: .github/actions/skip-if-unchanged
-      - id: gate
-        uses: ./.github/actions/skip-if-unchanged
-        with:
-          workflow: nightly-tests.yml
-
   knip:
     name: Knip Dead Code Audit
-    needs: unchanged
     if: >-
-      needs.unchanged.outputs.skip != 'true' && (
-      github.event_name == 'schedule' ||
+      github.event_name == 'push' ||
       github.event.inputs.suite == 'all' ||
-      github.event.inputs.suite == 'unit')
+      github.event.inputs.suite == 'unit'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -86,16 +77,14 @@ jobs:
   # ==========================================================================
   unit-tests:
     name: Full Unit Test Suite
-    needs: unchanged
     if: >-
-      needs.unchanged.outputs.skip != 'true' && (
-      github.event_name == 'schedule' ||
+      github.event_name == 'push' ||
       github.event.inputs.suite == 'all' ||
-      github.event.inputs.suite == 'unit')
+      github.event.inputs.suite == 'unit'
     runs-on: ubuntu-latest
     # The unsharded suite was still making steady progress when the 30m cap
-    # cancelled it every night (Jul 15-20, JOV-4326). 60m fits the current
-    # suite with headroom; the nightly cadence tolerates the longer lane.
+    # cancelled it repeatedly (Jul 15-20, JOV-4326). 60m fits the current
+    # suite with headroom.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -129,9 +118,9 @@ jobs:
   # E2E Tests
   # ==========================================================================
   e2e-tests:
-    name: Nightly E2E Suite
+    name: Changed-Evidence E2E Suite
     if: >-
-      github.event_name == 'schedule' ||
+      github.event_name == 'push' ||
       github.event.inputs.suite == 'all' ||
       github.event.inputs.suite == 'e2e' ||
       github.event.inputs.suite == 'design-v1'
@@ -177,7 +166,7 @@ jobs:
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
       - name: Seed nightly QA data
-        if: ${{ github.event_name == 'schedule' || github.event.inputs.test_filter == '' || github.event.inputs.suite == 'design-v1' }}
+        if: ${{ github.event_name == 'push' || github.event.inputs.test_filter == '' || github.event.inputs.suite == 'design-v1' }}
         run: |
           cd apps/web
           pnpm run seed:test-data
@@ -191,7 +180,7 @@ jobs:
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
 
       - name: Start route QA bypass server
-        if: ${{ github.event_name == 'schedule' || github.event.inputs.test_filter == '' || github.event.inputs.suite == 'design-v1' }}
+        if: ${{ github.event_name == 'push' || github.event.inputs.test_filter == '' || github.event.inputs.suite == 'design-v1' }}
         run: |
           cd apps/web
           pnpm run dev:local:playwright > "$RUNNER_TEMP/nightly-qa-web.log" 2>&1 &
@@ -271,7 +260,7 @@ jobs:
           E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
 
       - name: Run full surface chaos sweep
-        if: ${{ github.event_name == 'schedule' || (github.event.inputs.test_filter == '' && github.event.inputs.suite != 'design-v1') }}
+        if: ${{ github.event_name == 'push' || (github.event.inputs.test_filter == '' && github.event.inputs.suite != 'design-v1') }}
         run: |
           cd apps/web
           node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- bash -c "
@@ -297,7 +286,7 @@ jobs:
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
 
       - name: Stop route QA bypass server
-        if: ${{ always() && (github.event_name == 'schedule' || github.event.inputs.test_filter == '' || github.event.inputs.suite == 'design-v1') }}
+        if: ${{ always() && (github.event_name == 'push' || github.event.inputs.test_filter == '' || github.event.inputs.suite == 'design-v1') }}
         run: |
           if [ -f "$RUNNER_TEMP/nightly-qa-web.pid" ]; then
             pid="$(cat "$RUNNER_TEMP/nightly-qa-web.pid")"
@@ -343,7 +332,7 @@ jobs:
           retention-days: 7
 
       - name: Upload full surface chaos report
-        if: ${{ always() && (github.event_name == 'schedule' || (github.event.inputs.test_filter == '' && github.event.inputs.suite != 'design-v1')) && hashFiles('apps/web/test-results/full-surface-chaos-report.json') != '' }}
+        if: ${{ always() && (github.event_name == 'push' || (github.event.inputs.test_filter == '' && github.event.inputs.suite != 'design-v1')) && hashFiles('apps/web/test-results/full-surface-chaos-report.json') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: full-surface-chaos-${{ github.run_id }}
