@@ -21,8 +21,8 @@ importers:
         specifier: 3.35.0
         version: 3.35.0(zod@4.6.5)
       eve:
-        specifier: 0.66.3
-        version: 0.66.3(@opentelemetry/api@1.9.1)(ai@7.0.112(zod@4.6.5))(braintrust@3.35.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.4)
+        specifier: 0.67.0
+        version: 0.67.0(@opentelemetry/api@1.9.1)(ai@7.0.112(zod@4.6.5))(braintrust@3.35.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.4)
       just-bash:
         specifier: 3.4.2
         version: 3.4.2
@@ -1865,8 +1865,8 @@ packages:
     resolution: {integrity: sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg==}
     engines: {node: '>= 0.6'}
 
-  eve@0.66.3:
-    resolution: {integrity: sha512-oJkQdVrlmb1GFeaSUNY6IF71ttXjQdFnkKQP+84Qlvs/M+fUqMjGTqnwevQ+qFvc8KCswo3cbBohKOCGdgZPFg==}
+  eve@0.67.0:
+    resolution: {integrity: sha512-eMN9wSmGEeCcEffoB238DOx/iqisNmvc+VCLasJ2MssCB5pdmIbm4GX/KUVJARxP3twCxB7VOvy5N9w4BHOb4w==}
     engines: {node: '>=24'}
     hasBin: true
     peerDependencies:
@@ -4862,7 +4862,7 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.66.3(@opentelemetry/api@1.9.1)(ai@7.0.112(zod@4.6.5))(braintrust@3.35.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.4):
+  eve@0.67.0(@opentelemetry/api@1.9.1)(ai@7.0.112(zod@4.6.5))(braintrust@3.35.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.4):
     dependencies:
       ai: 7.0.112(zod@4.6.5)
       nitro: 3.0.260903-beta
