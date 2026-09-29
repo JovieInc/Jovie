@@ -22,7 +22,7 @@ const CANONICAL_NAVIGATION = [
 ] as const;
 
 const ARTIST_NAVIGATION = [
-  ['profiles', 'Presence', APP_ROUTES.PROFILES],
+  ['presence', 'Presence', APP_ROUTES.PRESENCE],
 ] as const;
 
 function toContract(
@@ -103,9 +103,10 @@ describe('canonical customer shell navigation', () => {
       expect.arrayContaining(['Search', 'Touring', 'Audience', 'Releases'])
     );
     expect(ids).toContain('tasks');
-    expect(artistNavigation.map(item => item.id)).toEqual(['profiles']);
+    expect(artistNavigation.map(item => item.id)).toEqual(['presence']);
     expect(APP_ROUTES.TOUR_DATES).toBe('/app/tour-dates');
     expect(APP_ROUTES.AUDIENCE).toBe('/app/audience');
+    expect(APP_ROUTES.PRESENCE).toBe('/app/presence');
     expect(APP_ROUTES.PROFILES).toBe('/app/profiles');
     expect(APP_ROUTES.RELEASES).toBe('/app/releases');
     expect(APP_ROUTES.TASKS).toBe('/app/tasks');

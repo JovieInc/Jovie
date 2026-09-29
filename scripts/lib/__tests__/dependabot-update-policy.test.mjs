@@ -406,7 +406,7 @@ describe('Dependabot reconciliation workflow contract', () => {
     expect(WORKFLOW).toContain(
       'github.event.workflow_run.workflow_id == 178737329'
     );
-    expect(WORKFLOW).toContain('types: [completed]');
+    expect(WORKFLOW).not.toMatch(/\n  workflow_run:/);
     expect(WORKFLOW).toContain('scripts/dependabot-workflow-run-adapter.mjs');
     expect(WORKFLOW).toContain("steps.run-context.outputs.eligible == 'true'");
     expect(WORKFLOW).toContain('timeout-minutes: 10');

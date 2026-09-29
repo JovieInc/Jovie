@@ -128,7 +128,7 @@ test('mobile navigation and canonical sidebar are stable at 375, 768, and 1440',
         label,
         href: CANONICAL_HREFS[index],
       })),
-      { label: 'Presence', href: APP_ROUTES.PROFILES },
+      { label: 'Presence', href: APP_ROUTES.PRESENCE },
       { label: 'Settings', href: APP_ROUTES.SETTINGS },
     ]);
     for (const label of FORBIDDEN_LABELS) {
@@ -160,7 +160,7 @@ test('mobile navigation and canonical sidebar are stable at 375, 768, and 1440',
   expect(await linkContract(primarySection.getByRole('link'))).toEqual([
     { label: 'Library', href: APP_ROUTES.LIBRARY },
     { label: 'Contacts', href: APP_ROUTES.CONTACTS },
-    { label: 'Presence', href: APP_ROUTES.PROFILES },
+    { label: 'Presence', href: APP_ROUTES.PRESENCE },
   ]);
   for (const label of FORBIDDEN_LABELS) {
     await expect(primarySection.getByRole('link', { name: label })).toHaveCount(

@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
-import { CreateProfileDialog } from './CreateProfileDialog';
+import { CreateIdentityDialog } from './CreateProfileDialog';
 
 const meta = {
-  title: 'Organisms/CreateProfileDialog',
-  component: CreateProfileDialog,
+  title: 'Organisms/CreateIdentityDialog',
+  component: CreateIdentityDialog,
   parameters: {
     layout: 'centered',
   },
@@ -12,7 +12,7 @@ const meta = {
     open: true,
     onOpenChange: fn(),
   },
-} satisfies Meta<typeof CreateProfileDialog>;
+} satisfies Meta<typeof CreateIdentityDialog>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

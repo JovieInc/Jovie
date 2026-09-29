@@ -310,7 +310,7 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
     render(<CheckoutSuccessPage />);
     expect(
       screen.getByRole('link', { name: /open artist visibility/i })
-    ).toHaveAttribute('href', '/app/profiles');
+    ).toHaveAttribute('href', '/app/presence');
   });
 
   it('secondary CTA routes to /app/releases on Max', () => {

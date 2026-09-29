@@ -36,6 +36,6 @@ describe('resolveCheckoutSuccessView', () => {
     ).toMatchObject({ kind: 'success', plan: 'pro' });
     expect(
       getPaidSuccessPrimaryHref({ plan: 'pro', isOnboardingUpgrade: false })
-    ).toBe(APP_ROUTES.PROFILES);
+    ).toBe(APP_ROUTES.PRESENCE);
   });
 });

@@ -221,8 +221,11 @@ web.smartlink-track|web|release-landing|apps/web/app/[username]/[slug]/[trackSlu
 web.out-link|web|wrapped-link-interstitial|apps/web/app/out/[id]/page.tsx|desktop,mobile
 web.report|web|abuse-report-intake|apps/web/app/report/page.tsx|desktop,mobile
 web.dashboard-releases|web|dashboard-releases|apps/web/app/app/(shell)/dashboard/releases/page.tsx|desktop,mobile
+web.dashboard-presence|web|dashboard-presence|apps/web/app/app/(shell)/dashboard/presence/page.tsx|desktop,mobile
 web.dashboard-contacts|web|dashboard-contacts|apps/web/app/app/(shell)/dashboard/contacts/|desktop,mobile
 web.contacts|web|contacts|apps/web/app/app/(shell)/contacts/page.tsx|desktop,mobile
+web.presence|web|presence|apps/web/app/app/(shell)/presence/page.tsx|desktop,mobile
+web.profiles|web|profiles|apps/web/app/app/(shell)/profiles/page.tsx|desktop,mobile
 web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
 web.links|web|links|apps/web/app/app/(shell)/links/page.tsx,apps/web/app/app/(shell)/dashboard/links/page.tsx|desktop,mobile
 web.library-private-share|web|library-asset-share|apps/web/app/p/[token]/|desktop,mobile

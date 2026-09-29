@@ -135,7 +135,7 @@ describe('DashboardMobileTabs', () => {
       APP_ROUTES.CONTACTS,
       APP_ROUTES.CALENDAR,
       APP_ROUTES.TASKS,
-      APP_ROUTES.PROFILES,
+      APP_ROUTES.PRESENCE,
     ]);
     expect(links.at(8)).toHaveTextContent('Public Profile');
     expect(links.at(8)).toHaveAttribute('href', '/timwhite');

@@ -6,8 +6,7 @@ run-name: >-
   ${{ inputs.controller_run || github.event.workflow_run.id }}
 
 on:
-  # Controller completion is the primary recovery signal. The manual input is
-  # retained as a bounded break-glass path for historical generations. This
+  # Manual input is a bounded break-glass path for historical generations. This
   # workflow never redeploys, never mutates aliases, and never rolls back: it
   # re-proves the already-deployed generation and preserves the marker only
   # while canonical production still owns it.
@@ -15,10 +14,7 @@ on:
   # accountable-writer: Shipping-Control
   # necessary-trust-boundary: Expired-marker stub deletion runs only inside the bounded recovery job after exact promotion, Sentry-gate, and skipped-rollback evidence; it removes only expired same-name artifact stubs and never mutates release state.
   # revisit-trigger: Revisit when the marker store gains atomic replace semantics so a re-proof upload cannot duplicate a marker name.
-  workflow_run:
-    workflows: [Production Controller]
-    types: [completed]
-    branches: [main]
+  # compatibility-expiry: 2026-10-31; fold this break-glass path into Production Controller.
   workflow_dispatch:
     inputs:
       sha:

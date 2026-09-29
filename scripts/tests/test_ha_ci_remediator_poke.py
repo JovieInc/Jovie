@@ -66,8 +66,7 @@ def test_run_name_is_searchable_per_pr_and_sha() -> None:
     workflow = _text()
 
     assert "run-name: ha-remediate/PR" in workflow
-    assert "ha-remediate/PR${{ github.event.workflow_run.pull_requests[0].number || inputs.pr_number || 'na' }}/" in workflow
-    assert "${{ github.event.workflow_run.head_sha || github.sha }}" in workflow
+    assert "run-name: ha-remediate/PR${{ inputs.pr_number || 'na' }}/${{ inputs.head_sha || 'invalid-head' }}" in workflow
 
 
 def test_gate_runs_before_the_hyperagent_poke() -> None:
@@ -176,7 +175,6 @@ def test_pr_16419_exclusion_is_preserved() -> None:
     workflow = _text()
 
     assert "inputs.pr_number != '16419'" in workflow
-    assert "pull_requests[0].number != 16419" in workflow
 
 
 def test_runs_on_github_hosted_ubuntu_latest() -> None:
@@ -209,12 +207,11 @@ def test_slim_json_payload_is_posted() -> None:
     assert "run_url" in workflow
 
 
-def test_only_ci_failures_on_pull_request_and_merge_group() -> None:
+def test_manual_dispatch_requires_exact_pr_head() -> None:
     workflow = _text()
 
-    assert "workflow_run.conclusion == 'failure'" in workflow
-    assert "pull_request" in workflow
-    assert "merge_group" in workflow
+    assert "workflow_dispatch:" in workflow
+    assert "Requested head is not the current exact PR head" in workflow
 
 
 def test_non_202_does_not_write_success_receipt() -> None:
