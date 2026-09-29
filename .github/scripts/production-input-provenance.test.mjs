@@ -589,12 +589,17 @@ test('production controller waits longer for the staging receipt than staging ta
     'utf8'
   );
   const attempts = Number(
-    workflow.match(/for attempt in \$\(seq 1 (\d+)\); do\n\s+staging_artifact_id/)?.[1]
+    workflow.match(
+      /for attempt in \$\(seq 1 (\d+)\); do\n\s+staging_artifact_id/
+    )?.[1]
   );
   const job = workflow.slice(workflow.indexOf('  authorize-production:'));
   const timeout = Number(job.match(/timeout-minutes: (\d+)/)?.[1]);
   const waitMinutes = (attempts * 10) / 60;
   // Staging took ~20 min end to end on 2026-09-29; a 10 min wait failed valid releases.
   assert.ok(waitMinutes >= 20, `wait ${waitMinutes}m`);
-  assert.ok(timeout >= waitMinutes + 5, `timeout ${timeout}m vs wait ${waitMinutes}m`);
+  assert.ok(
+    timeout >= waitMinutes + 5,
+    `timeout ${timeout}m vs wait ${waitMinutes}m`
+  );
 });
