@@ -186,10 +186,7 @@ export class DesignCiJudgeCertificationStore {
         const nextCells = { ...ledger.cells };
         for (const input of inputs) {
           const existing = nextCells[input.cellId];
-          if (
-            existing &&
-            existing.inputFingerprint === input.inputFingerprint
-          ) {
+          if (existing?.inputFingerprint === input.inputFingerprint) {
             skippedUnchanged.push(input.cellId);
             continue;
           }
