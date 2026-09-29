@@ -211,6 +211,7 @@ apps/desktop/src/*
 !apps/desktop/src/desktop-auth-handback.ts
 !apps/desktop/src/desktop-auto-update.ts
 !apps/desktop/src/desktop-csp-watchdog.ts
+!apps/desktop/src/desktop-notifications.ts
 !apps/desktop/src/desktop-permissions.ts
 !apps/desktop/src/desktop-security-reporting.ts
 !apps/desktop/src/window-state.ts

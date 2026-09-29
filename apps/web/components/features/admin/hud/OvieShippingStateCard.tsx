@@ -67,6 +67,10 @@ function formatProduction(production: Delivery['production']): string {
   return production.version ? `${production.version} ${sha}` : sha;
 }
 
+function formatCertifiedHead(certifiedHead: Delivery['certifiedHead']): string {
+  return certifiedHead.sha ? certifiedHead.sha.slice(0, 7) : NOT_MEASURED;
+}
+
 const SUMMER_LABEL = { up: 'Up', down: 'Down', degraded: 'Degraded' } as const;
 
 function formatAge(seconds: number | null): string | null {
@@ -215,6 +219,8 @@ function ShippingStateBody({
         .join(' / '),
     ],
     ['Merged 7d', formatWeek(delivery.merges)],
+    ['Certified HEAD', formatCertifiedHead(delivery.certifiedHead)],
+    ['Staging', formatProduction(delivery.staging)],
     ['Production', formatProduction(delivery.production)],
     ['Behind Main', formatCount(delivery.production.behindMain)],
     ['CI Green', formatMeaning(view.ciGreen)],
