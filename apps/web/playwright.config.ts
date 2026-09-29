@@ -91,6 +91,7 @@ if (sentryE2eEnabled) {
 export default defineConfig({
   captureGitInfo: { commit: false, diff: false },
   testDir: './tests/e2e',
+  testMatch: '**/*.spec.ts',
   // Nightly and Storybook specs have dedicated servers/configs and must never
   // be discovered against the default Next.js app server.
   testIgnore: ['**/nightly/**', '**/storybook-*.spec.ts'],
