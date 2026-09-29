@@ -499,7 +499,7 @@ describe('DesktopAuthPage', () => {
       <DesktopAuthClient authUrlParam={getAuthUrlParam()} touchIdHint />
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Enter a Code' })
+      await screen.findByRole('button', { name: 'Enter A Code' })
     );
     expect(
       screen.getByRole('button', { name: 'Sign In With Touch ID' })

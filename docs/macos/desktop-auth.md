@@ -152,6 +152,15 @@ macOS only honors that entitlement when the profile authorizes it (TN3125);
 without the profile the entitlement stops the app from launching, so the
 entitlement and profiles land together. Local builds stay browser-only.
 
+The profiles are committed (`apps/desktop/build/jovie-mac*.provisionprofile`,
+App Store Connect names "Jovie Mac Developer ID" and "Jovie Mac Staging
+Developer ID", bound to the Developer ID Application certificate that signs
+releases, valid to 2031-05-10). A profile is not a secret; every shipped app
+embeds it. Each channel's builder config pairs its own entitlements file with
+its own profile, and the shell contract test checks the bundle IDs match. When
+the signing certificate is renewed, regenerate both profiles against the new
+certificate before the old one expires, or signed builds stop launching.
+
 ### Password managers (1Password, iCloud Keychain)
 
 Passkeys saved in 1Password or iCloud Keychain do not work inside the Mac app.
