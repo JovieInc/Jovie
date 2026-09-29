@@ -28,4 +28,17 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  args: {
+    url: '',
+    placeholder: 'Paste a link',
+    detectedLink: null,
+    inputRef: { current: null },
+    onUrlChange: () => {},
+    onKeyDown: () => {},
+    onClear: () => {},
+    onPlatformSelect: () => {},
+    onArtistSearchSelect: () => {},
+    onRestoreFocus: () => {},
+  },
+};
