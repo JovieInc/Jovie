@@ -67,6 +67,19 @@ describe('product lane classifier', () => {
     ).toThrow(ProductLaneClassificationError);
   });
 
+  it('keeps the Mac media-ingest package in the mac lane', () => {
+    const receipt = classifyProductLanes([
+      'packages/media-ingest/src/ingest.ts',
+      'packages/media-ingest/package.json',
+    ]);
+    expect(
+      receipt.classifications.every(item => item.rule === 'mac-product')
+    ).toBe(true);
+    expect(() =>
+      classifyProductLanes(['packages/media-ingestion/index.ts'])
+    ).toThrow(ProductLaneClassificationError);
+  });
+
   it('selects the web contract lane for release communications extraction', () => {
     const receipt = classifyProductLanes([
       'packages/release-communications/index.ts',
