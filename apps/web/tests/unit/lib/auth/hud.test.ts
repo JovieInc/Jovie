@@ -25,7 +25,9 @@ vi.mock('@/lib/env-server', () => ({
 }));
 
 vi.mock('@/lib/ovie/privacy-lock/access', () => ({
-  requireOvieApiAccess: async () => {
+  requireOvieApiAccess: async (options?: { privileged?: boolean }) => {
+    // This fixture represents expired admin MFA with an active privacy unlock.
+    if (options?.privileged) return new Response(null, { status: 403 });
     const ent = await mockGetCurrentUserEntitlements();
     return ent.isAuthenticated && ent.userId && (await mockIsAdmin(ent.userId))
       ? null
