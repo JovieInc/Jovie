@@ -656,16 +656,21 @@ function commandFor(plan: ConsumerExecutionPlan): {
   }
 }
 
-/** Actually spawns the consumer's real check. The only place this module runs anything. */
+/**
+ * Actually spawns the consumer's real check. The only place this module
+ * runs anything. `timeoutMs` defaults to the production ceiling; tests
+ * override it to exercise the timeout path without waiting 120s for real.
+ */
 export function runConsumerExecution(
-  plan: ConsumerExecutionPlan
+  plan: ConsumerExecutionPlan,
+  timeoutMs: number = CONSUMER_TIMEOUT_MS
 ): ConsumerCheckOutcome {
   const { file, args, cwd } = commandFor(plan);
   const command = [file, ...args].join(' ');
   try {
     const output = execFileSync(file, args, {
       cwd,
-      timeout: CONSUMER_TIMEOUT_MS,
+      timeout: timeoutMs,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -680,13 +685,21 @@ export function runConsumerExecution(
       stdout?: string;
       stderr?: string;
       message?: string;
+      killed?: boolean;
+      signal?: string | null;
+      code?: string | null;
     };
-    const combined =
-      `${failure.stdout ?? ''}\n${failure.stderr ?? ''}`.trim() ||
-      (failure.message ?? String(error));
+    // A hung consumer must fail with an unambiguous timeout reason, not
+    // whatever text happens to land in stdout/stderr (often nothing —
+    // the process is killed mid-run) or a generic spawn error string.
+    const timedOut = failure.code === 'ETIMEDOUT' || failure.killed === true;
+    const combined = timedOut
+      ? `timed out after ${timeoutMs}ms (signal ${failure.signal ?? 'unknown'}): ${command}`
+      : `${failure.stdout ?? ''}\n${failure.stderr ?? ''}`.trim() ||
+        (failure.message ?? String(error));
     return {
       ok: false,
-      usageError: USAGE_ERROR_PATTERN.test(combined),
+      usageError: !timedOut && USAGE_ERROR_PATTERN.test(combined),
       command,
       output: truncateTail(combined),
     };
@@ -711,7 +724,8 @@ export interface RowEvaluation {
 export function evaluateDeterministicRow(
   row: RoutedInvariantRow,
   repoRoot: string,
-  cache: Map<string, ConsumerCheckOutcome>
+  cache: Map<string, ConsumerCheckOutcome>,
+  timeoutMs: number = CONSUMER_TIMEOUT_MS
 ): RowEvaluation {
   const plans = row.routeEvidence
     .map(evidence => resolveConsumerExecution(evidence, repoRoot))
@@ -736,7 +750,7 @@ export function evaluateDeterministicRow(
     const key = `${plan.kind}:${plan.execPath}`;
     let outcome = cache.get(key);
     if (!outcome) {
-      outcome = runConsumerExecution(plan);
+      outcome = runConsumerExecution(plan, timeoutMs);
       cache.set(key, outcome);
     }
     return outcome;
@@ -781,7 +795,8 @@ export function evaluateDeterministicRow(
  */
 export function evaluateDesignCiJudgeMatrix(
   matrix: DesignCiJudgeMatrix,
-  repoRoot: string
+  repoRoot: string,
+  timeoutMs: number = CONSUMER_TIMEOUT_MS
 ): {
   readonly matrix: DesignCiJudgeMatrix;
   readonly rowEvaluations: readonly RowEvaluation[];
@@ -797,7 +812,7 @@ export function evaluateDesignCiJudgeMatrix(
     if (!rowIdsWithCells.has(row.rowId)) continue;
     evaluationByRow.set(
       row.rowId,
-      evaluateDeterministicRow(row, repoRoot, cache)
+      evaluateDeterministicRow(row, repoRoot, cache, timeoutMs)
     );
   }
   const cells = matrix.cells.map(cell => {
