@@ -104,7 +104,6 @@
         "apps/web/app/spinner-test/page.tsx",
         "apps/web/components/features/admin/FunnelMetricsStrip.tsx",
         "apps/web/components/features/admin/OperationalControlPanel.tsx",
-        "apps/web/components/features/admin/OutreachPipelineCard.tsx",
         "apps/web/components/features/admin/ReliabilityCard.tsx",
         "apps/web/components/features/admin/SentryMetricsCard.tsx",
         "apps/web/components/features/admin/agent-os/AgentOsRunsPanel.tsx",
