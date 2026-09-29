@@ -46,6 +46,7 @@ export const ServerEnvSchema = z.object({
   NEXT_PUBLIC_BUILD_SHA: z.string().optional(),
   NEXT_PUBLIC_SENTRY_RELEASE: z.string().optional(),
   VERCEL_GIT_COMMIT_SHA: z.string().optional(),
+  VERCEL_DEPLOYMENT_ID: z.string().optional(),
   VERCEL_DEPLOYMENT_TIME: z.string().optional(),
   VERCEL_URL: z
     .string()
@@ -484,6 +485,7 @@ export const ENV_KEYS = [
   'NEXT_PUBLIC_BUILD_SHA',
   'NEXT_PUBLIC_SENTRY_RELEASE',
   'VERCEL_GIT_COMMIT_SHA',
+  'VERCEL_DEPLOYMENT_ID',
   'VERCEL_DEPLOYMENT_TIME',
   'VERCEL_URL',
   'VERCEL_BRANCH_URL',

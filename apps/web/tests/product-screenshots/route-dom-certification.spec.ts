@@ -3,6 +3,10 @@ import path from 'node:path';
 import { expect, type Page, type TestInfo, test } from '@playwright/test';
 import { MARKETING_EXACT_PUBLIC_ROUTE_TARGETS } from '@/data/marketing';
 import { SCREENSHOT_VIEWPORTS } from '@/lib/screenshots/registry';
+import {
+  IMAGE_CONTRAST_CERTIFICATION_SCHEMA,
+  inspectImageContrast,
+} from '../e2e/utils/image-contrast-detector';
 import { installPublicRouteMocks } from '../e2e/utils/public-surface-helpers';
 import {
   inspectRouteDom,
@@ -18,7 +22,7 @@ import {
 
 // Invariant consumer: JOV-INV-019.
 // Canon evidence: certifies marketing routes and public-profile open states against the rendered DOM.
-// Deliberate red: rejects overlap, text dumps, duplicate heroes, semantic duplicates, narrow sheets, clipped content, and raw controls.
+// Deliberate red: rejects overlap, text dumps, duplicate heroes, semantic duplicates, narrow sheets, clipped content, raw controls, and low image-aware contrast behind glyphs and header controls.
 
 const profileRoute = '/unfazed';
 const outputRoot = path.resolve(
@@ -169,6 +173,35 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     );
     await expectDeliberateRed(page, 'public-profile', 'raw-control');
   });
+
+  // JOV-6916: text-aware-contrast deliberate-red. R01 painted a bright
+  // upper-right corner exactly where the docked header renders Log in and
+  // the primary CTA; light glyphs over that corner must reproduce red.
+  test('reproduces the R01 bright header corner behind Log in and the CTA', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<main><div style="position:fixed;inset:0;background-image:linear-gradient(115deg,#050505 55%,#ffffff 55.5%)"></div><header style="position:fixed;top:0;left:0;right:0;display:flex;justify-content:flex-end;gap:24px;padding:20px"><a href="/signin" style="color:#ffffff;font-size:15px">Log in</a><a href="/start" style="color:#ffffff;font-size:15px">Get started</a></header><section style="margin-top:120px"><h1 style="color:#ffffff">R01 header corner</h1></section></main>'
+    );
+    const snapshot = await inspectImageContrast(page);
+    expect(snapshot.schemaVersion).toBe(IMAGE_CONTRAST_CERTIFICATION_SCHEMA);
+    expect(snapshot.findings.map(finding => finding.kind)).toContain(
+      'image-contrast'
+    );
+    expect(snapshot.receipts.length).toBeGreaterThan(0);
+  });
+
+  test('emits passing receipts for glyphs over reserved dark imagery', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<main><div style="position:fixed;inset:0;background-image:linear-gradient(115deg,#050505 100%,#050505 100%)"></div><header style="position:fixed;top:0;left:0;right:0;display:flex;justify-content:flex-end;gap:24px;padding:20px"><a href="/signin" style="color:#ffffff;font-size:15px">Log in</a></header></main>'
+    );
+    const snapshot = await inspectImageContrast(page);
+    expect(snapshot.findings).toEqual([]);
+    expect(snapshot.receipts.length).toBeGreaterThan(0);
+    expect(snapshot.receipts.every(receipt => receipt.pass)).toBe(true);
+  });
 });
 
 test('certifies every marketing route and public-profile open state', async ({
@@ -208,6 +241,8 @@ test('certifies every marketing route and public-profile open state', async ({
       await page.waitForTimeout(250);
 
       const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
+      const imageContrast = await inspectImageContrast(page);
+      const findings = [...snapshot.findings, ...imageContrast.findings];
       const snapshotPath = path.join(
         'marketing',
         `${safeName(target.url)}-${viewport}.json`
@@ -222,15 +257,17 @@ test('certifies every marketing route and public-profile open state', async ({
         viewport,
         state: 'default',
         ...snapshot,
+        findings,
+        imageContrast,
       });
       receipts.push({
         route: target.url,
         viewport,
         state: 'default',
         snapshotPath,
-        findingCount: snapshot.findings.length,
+        findingCount: findings.length,
       });
-      expect.soft(snapshot.findings, `${target.url} ${viewport}`).toEqual([]);
+      expect.soft(findings, `${target.url} ${viewport}`).toEqual([]);
     }
   }
 
@@ -255,6 +292,8 @@ test('certifies every marketing route and public-profile open state', async ({
       const snapshot = await inspectRouteDom(page, {
         surface: 'public-profile',
       });
+      const imageContrast = await inspectImageContrast(page);
+      const findings = [...snapshot.findings, ...imageContrast.findings];
       const viewportId = `${viewport.width}x${viewport.height}`;
       const snapshotPath = path.join(
         'public-profile',
@@ -269,16 +308,18 @@ test('certifies every marketing route and public-profile open state', async ({
         viewport: viewportId,
         state: state.id,
         ...snapshot,
+        findings,
+        imageContrast,
       });
       receipts.push({
         route: profileRoute,
         viewport: viewportId,
         state: state.id,
         snapshotPath,
-        findingCount: snapshot.findings.length,
+        findingCount: findings.length,
       });
       expect
-        .soft(snapshot.findings, `${profileRoute} ${viewportId} ${state.id}`)
+        .soft(findings, `${profileRoute} ${viewportId} ${state.id}`)
         .toEqual([]);
     }
   }
