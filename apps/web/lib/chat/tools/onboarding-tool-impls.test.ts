@@ -160,3 +160,28 @@ describe('proposeNextStep controlled access', () => {
     });
   });
 });
+
+describe('confirmSpotifyArtist tool (JOV-7134)', () => {
+  it('never lets the model confirm or swap an artist id', async () => {
+    const state = createOnboardingTurnState({ sessionId: 's', turnCount: 3 });
+    const tools = buildOnboardingTools(state);
+    const run = (id: string) =>
+      tools.confirmSpotifyArtist.execute?.(
+        { spotifyArtistId: id },
+        {} as never
+      );
+
+    await expect(run('invented-id')).resolves.toMatchObject({
+      action: 'spotify_artist_unconfirmed',
+    });
+    expect(state.spotifyArtistId).toBeNull();
+
+    deriveOnboardingTurnStateFromMessages(state, [assistantMessage]);
+    await expect(run('0000000000000000000000')).resolves.toMatchObject({
+      action: 'spotify_artist_confirmed',
+      spotifyArtistId: '1Cs0zKBU1kc0i8ypK3B9ai',
+      artist: { name: 'David Guetta', followers: 28_000_000 },
+    });
+    expect(state.spotifyArtistId).toBe('1Cs0zKBU1kc0i8ypK3B9ai');
+  });
+});

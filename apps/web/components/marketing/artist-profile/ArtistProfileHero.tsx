@@ -16,7 +16,10 @@ const HERO_PROFILE = getMarketingExportImage('tim-white-profile-live-mobile');
 
 function ArtistProfileHeroMedia() {
   return (
-    <div className='ap-hero__product-stage'>
+    <div
+      className='ap-hero__product-stage'
+      data-testid='artist-profile-hero-product'
+    >
       <div className='ap-hero__stage-grid' aria-hidden='true' />
       <ArtistProfilePhoneFrame className='ap-hero__phone'>
         <Image

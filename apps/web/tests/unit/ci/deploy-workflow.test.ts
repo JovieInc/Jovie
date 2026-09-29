@@ -997,13 +997,7 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(controllerHeader).toContain('group: production-mutation');
     expect(controllerHeader).toContain('queue: max');
     expect(controllerHeader).toContain('cancel-in-progress: false');
-    for (const prerequisite of [
-      'deploy-staging',
-      'attest-staging-build',
-      'canary-health-gate',
-      'alias-staging',
-      'production-head',
-    ]) {
+    for (const prerequisite of ['production-head']) {
       expect(migrationJob).toContain(prerequisite);
       expect(migrationJob).toContain(
         `needs.${prerequisite}.result == 'success'`
@@ -1012,6 +1006,7 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(migrationJob).toContain(
       "needs.production-head.outputs.is_current == 'true'"
     );
+    expect(migrationJob).toContain('inputs.staging_verified');
     expect(migrationJob).toContain('ref: ${{ inputs.expected_sha }}');
     expect(migrationJob).not.toContain('/commits/main');
     expect(migrationJob).not.toContain('migration-head');
@@ -2595,7 +2590,7 @@ describe('canary health gate workflow', () => {
     const receiptJob = getJobBlock(release, 'staging-deployment-receipt');
     const reassert = getStepBlock(
       receiptJob,
-      'Reassert the exact preview after production settles'
+      'Classify staging generation after mutation'
     );
     const prove = getStepBlock(
       receiptJob,
@@ -2607,23 +2602,19 @@ describe('canary health gate workflow', () => {
     );
     const releaseResult = getJobBlock(release, 'release-result');
 
-    expect(receiptJob).toContain(
-      'needs: [deploy-staging, alias-staging, promote-production, rollback-production]'
-    );
+    expect(receiptJob).toContain('needs: [deploy-staging, alias-staging]');
     expect(receiptJob).toContain("needs.alias-staging.result == 'success'");
     expect(receiptJob).toContain(
       "needs.alias-staging.outputs.is_current == 'true'"
     );
-    expect(reassert).toContain(
-      'vercel alias set "$deployment_url" staging.jov.ie'
-    );
+    expect(reassert).toContain('staging_refresh_outcome=current');
     expect(reassert).toContain(
       'gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq \'.sha\''
     );
+    expect(reassert).toContain('[ "$current_main" = "$EXPECTED_COMMIT_SHA" ]');
     expect(reassert).toContain(
-      '[[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]'
+      'staging_refresh_outcome=superseded_after_mutation'
     );
-    expect(reassert).toContain('needs.deploy-staging.outputs.deploy_url_b64');
     expect(prove).toContain('EXPECTED_DEPLOYMENT_ID:');
     expect(prove).toContain('EXPECTED_COMMIT_SHA:');
     expect(prove).toContain('--arg url "$deployment_url"');
@@ -2653,15 +2644,13 @@ describe('canary health gate workflow', () => {
     expect(writeReceipt).toContain(
       'gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq \'.sha\''
     );
-    expect(writeReceipt).toContain(
-      '[[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]'
-    );
+    expect(writeReceipt).toContain('[[ "$current_main" =~ ^[0-9a-f]{40}$ ]]');
     expect(writeReceipt).toContain('currentMainSha: $currentMainSha');
     expect(writeReceipt).toContain(
-      'ROLLBACK_RESULT: ${{ needs.rollback-production.result }}'
+      'STAGING_REFRESH_OUTCOME: ${{ steps.reassert.outputs.staging_refresh_outcome }}'
     );
-    expect(writeReceipt).toContain('rollbackResult: $rollbackResult');
-    expect(writeReceipt).toContain('state: "deployed"');
+    expect(writeReceipt).toContain('sloState: $sloState');
+    expect(writeReceipt).toContain('state: $state');
     expect(writeReceipt).toContain('terminal: true');
     expect(writeReceipt).toContain(
       'privacy: "robots-block-all-and-http-noindex"'
@@ -2673,19 +2662,19 @@ describe('canary health gate workflow', () => {
     expect(receiptJob).not.toContain('vercel rollback');
     expect(releaseResult).toContain('staging-deployment-receipt,');
     expect(releaseResult).toContain(
-      'staging_refresh_outcome="${{ needs.staging-deployment-receipt.outputs.staging_refresh_outcome }}"'
+      "if: ${{ always() && inputs.release_mode == 'production' }}"
     );
     expect(releaseResult).toContain(
-      '[ "${{ needs.staging-deployment-receipt.result }}" != "success" ]'
+      'if [ "${{ inputs.staging_verified }}" != "true" ]; then'
     );
     expect(releaseResult).toContain(
-      '[ "${{ needs.staging-deployment-receipt.outputs.deployed }}" = "true" ]'
+      'Production release lacks the exact staging controller receipt.'
     );
     expect(releaseResult).toContain(
-      'Superseded staging refresh lacked exact pre-promotion staging gates or exact production promotion evidence.'
+      'Pre-production supersession lacks an exact staging receipt.'
     );
     expect(releaseResult).toContain(
-      'Current staging refresh lacked an exact deployed receipt.'
+      'production-head:${{ needs.production-head.result }}'
     );
     expect(release.indexOf('  promote-production:')).toBeLessThan(
       release.indexOf('  staging-deployment-receipt:')
@@ -2857,7 +2846,7 @@ case "$url" in
       printf 'SECRET_SENTINEL' > "$output_path"
     else
       jq -n --arg sha "$sha" --arg environment "$environment" \
-        '{commitSha: $sha, environment: $environment, privateField: "SECRET_SENTINEL"}' > "$output_path"
+        '{commitSha: $sha, deploymentId: $ENV.EXPECTED_DEPLOYMENT_ID, environment: $environment, privateField: "SECRET_SENTINEL"}' > "$output_path"
     fi
     if "$write_meta"; then printf '%s\\n%s' "$status" "$content_type"; fi
     exit "$curl_status"
@@ -2888,7 +2877,7 @@ esac
         );
 
         const expectedSha = '0123456789abcdef0123456789abcdef01234567';
-        const expectedDeploymentId = 'dpl_exact_receipt';
+        const expectedDeploymentId = 'dpl_exactreceipt';
         const result = spawnSync(
           'bash',
           [
@@ -2952,7 +2941,7 @@ esac
             )
           );
           expect(output).toContain(
-            `commitSha=${expectedSha} environment=preview`
+            `commitSha=${expectedSha} deploymentId=${expectedDeploymentId} environment=preview`
           );
         } else if (
           scenario === 'missing-noindex' ||

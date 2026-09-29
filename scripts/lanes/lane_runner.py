@@ -39,6 +39,7 @@ import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
 import pr_events  # noqa: E402
 import reason_lane  # noqa: E402
+import yc_corpus  # noqa: E402
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
 THIS = sys.modules[__name__]
@@ -76,7 +77,8 @@ HOST = socket.gethostname().split(".")[0]
 LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lane_runner.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
-              "scripts/tests/test_reason_lane.py", "scripts/tests/test_gh_app_token.py",
+              "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
+              "scripts/tests/test_gh_app_token.py",
               "scripts/tests/test_disk_guard.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs"]
@@ -1770,6 +1772,12 @@ def dispatch(host: Host) -> int:
         tick["reason"] = reason_lane.tick(host, THIS, lambda: Linear(host.linear_env))
     except Exception as error:  # Summer's reasoning jobs never take dispatch down
         tick["reasonError"] = f"{type(error).__name__}: {error}"[:200]
+    try:
+        corpus_owner = os.environ.get("YC_CORPUS_OWNER", "gem").split(".")[0]
+        tick["ycCorpus"] = (yc_corpus.tick(host.state) if HOST == corpus_owner else
+                            {"status": "not-owner", "owner": corpus_owner})
+    except Exception as error:  # external knowledge freshness never takes dispatch down
+        tick["ycCorpusError"] = f"{type(error).__name__}: {error}"[:200]
     update_json(host.state / "tick.json", lambda data: (data.clear(), data.update(tick)))
     try:
         doctor.run(host, sys.modules[__name__], codex_lane_module())

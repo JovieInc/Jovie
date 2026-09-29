@@ -79,7 +79,10 @@ export function ArtistNotificationsHero({
             </div>
           </div>
 
-          <div className='system-b-artist-notifications-card-stage'>
+          <div
+            className='system-b-artist-notifications-card-stage'
+            data-testid='artist-notifications-card-stage'
+          >
             {hero.floatingCards.map(card => (
               <div
                 key={card.id}
