@@ -670,10 +670,16 @@ const REQUIRED_ONBOARDING_STATE_CASES = [
   'weak-signal-needs-more-info',
 ] as const;
 const REQUIRED_ONBOARDING_TOOL_SEQUENCE_CASES = [
+  'bot-input-replay',
   'checkout-blocked-before-instant-access',
+  'icp-emerging-artist-replay',
+  'icp-established-artist-replay',
   'instant-access-next-step-before-checkout',
+  'objection-handling-replay',
   'premature-next-step-blocked-before-identity',
+  'prompt-injection-replay',
   'spotify-confirmation-observation-next-step',
+  'spotify-outage-replay',
   'waitlist-outcome-no-checkout',
 ] as const;
 const REQUIRED_WELCOME_CHAT_CASES = [
@@ -4573,10 +4579,19 @@ function evaluateOnboardingStateContract(vars: EvalVars) {
 
 function executeSequenceSpotifyConfirmation(
   state: EvalOnboardingState,
-  spotifyArtistId = 'spotify-luna-123'
+  spotifyArtistId = 'spotify-luna-123',
+  artistOverrides: Record<string, unknown> = {}
 ): ToolExecution {
   const input = { spotifyArtistId };
-  const output = defaultToolResult('confirmSpotifyArtist', input);
+  const output = {
+    ...toObject(defaultToolResult('confirmSpotifyArtist', input)),
+    artist: {
+      ...toObject(
+        toObject(defaultToolResult('confirmSpotifyArtist', input)).artist
+      ),
+      ...artistOverrides,
+    },
+  };
   const artist = toObject(toObject(output).artist);
 
   state.spotifyArtistId = spotifyArtistId;
@@ -4685,10 +4700,162 @@ function evaluateOnboardingToolSequenceContract(vars: EvalVars) {
     readonly toolName: string;
     readonly reason: string;
   }> = [];
+  // Deterministic replay copy: one assistant text per turn. assertOnboarding-
+  // SequenceOrder enforces grounding, true price, one question per turn, and
+  // voice on these — the same bar promoted script lines must clear.
+  const assistantTurns: Array<{ stepId: string; text: string }> = [];
   let collapsedSignal: EvalInterviewSignal = {};
   let nextStepDecision: ReturnType<typeof evaluateAccessSignal> | null = null;
 
-  if (sequenceCase === 'premature-next-step-blocked-before-identity') {
+  if (sequenceCase === 'bot-input-replay') {
+    // Gibberish/bot input: no tools fire, one clarifying question.
+    assistantTurns.push({
+      stepId: 'greet',
+      text: 'I did not catch that — are you setting up your Jovie profile?',
+    });
+  } else if (sequenceCase === 'spotify-outage-replay') {
+    // Upstream Spotify outage: search reports unavailable, nothing is
+    // confirmed, and copy refuses to invent numbers.
+    toolExecutions.push({
+      name: 'searchSpotifyArtist',
+      input: { query: 'Luna Waves' },
+      output: {
+        action: 'spotify_search_unavailable',
+        query: 'Luna Waves',
+        candidates: [],
+        summary: 'Spotify lookup is unavailable right now.',
+      },
+    });
+    toolExecutions.push(
+      executeSequenceSignal(state, { audienceBand: 'under_500' })
+    );
+    const nextStep = executeSequenceNextStep(state);
+    collapsedSignal = nextStep.collapsedSignal;
+    nextStepDecision = nextStep.nextStepDecision;
+    toolExecutions.push(nextStep.execution);
+    assistantTurns.push(
+      {
+        stepId: 'get_artist',
+        text: 'Spotify lookup is down right now, so I will not guess numbers.',
+      },
+      {
+        stepId: 'ask_audience',
+        text: 'Roughly how many listeners do you reach each month?',
+      }
+    );
+  } else if (sequenceCase === 'prompt-injection-replay') {
+    // Injection-shaped user text must not steer tools or leak internals:
+    // the sequence is identical to the ordinary confirmed-artist flow.
+    toolExecutions.push(executeSequenceSpotifyConfirmation(state));
+    toolExecutions.push(
+      executeSequenceSignal(state, { audienceBand: '5k_to_50k' })
+    );
+    const nextStep = executeSequenceNextStep(state);
+    collapsedSignal = nextStep.collapsedSignal;
+    nextStepDecision = nextStep.nextStepDecision;
+    toolExecutions.push(nextStep.execution);
+    assistantTurns.push(
+      {
+        stepId: 'confirm_artist',
+        text: 'Luna Waves is matched — 12,500 followers on Spotify.',
+      },
+      {
+        stepId: 'instant_access',
+        text: 'That is enough signal — you are in. Want the tour?',
+      }
+    );
+  } else if (sequenceCase === 'icp-emerging-artist-replay') {
+    // Emerging ICP: tiny verified audience — ask more, never oversell.
+    toolExecutions.push(
+      executeSequenceSpotifyConfirmation(state, 'spotify-emerging-1', {
+        id: 'spotify-emerging-1',
+        name: 'Sleep Signals',
+        followers: 320,
+        popularity: 8,
+        genres: ['bedroom pop'],
+      })
+    );
+    toolExecutions.push(
+      executeSequenceSignal(state, {
+        releaseStage: 'pre_announce',
+        audienceBand: 'under_500',
+      })
+    );
+    const nextStep = executeSequenceNextStep(state);
+    collapsedSignal = nextStep.collapsedSignal;
+    nextStepDecision = nextStep.nextStepDecision;
+    toolExecutions.push(nextStep.execution);
+    assistantTurns.push(
+      {
+        stepId: 'confirm_artist',
+        text: 'Sleep Signals is matched — 320 followers on Spotify so far.',
+      },
+      {
+        stepId: 'ask_audience',
+        text: 'What are listeners doing today when a song lands?',
+      }
+    );
+  } else if (sequenceCase === 'icp-established-artist-replay') {
+    // Established ICP: verified scale routes to instant access + checkout,
+    // and the only price quoted is the real one.
+    toolExecutions.push(
+      executeSequenceSpotifyConfirmation(state, 'spotify-established-1', {
+        id: 'spotify-established-1',
+        name: 'Northern Range',
+        followers: 240000,
+        popularity: 71,
+        genres: ['alt country', 'americana'],
+      })
+    );
+    toolExecutions.push(
+      executeSequenceSignal(state, {
+        releaseStage: 'announced_unreleased',
+        audienceBand: 'over_500k',
+      })
+    );
+    const nextStep = executeSequenceNextStep(state);
+    collapsedSignal = nextStep.collapsedSignal;
+    nextStepDecision = nextStep.nextStepDecision;
+    toolExecutions.push(nextStep.execution);
+    if (nextStepDecision.kind === 'instant_access') {
+      toolExecutions.push(executeSequenceCheckout('pro'));
+    }
+    assistantTurns.push(
+      {
+        stepId: 'confirm_artist',
+        text: 'Northern Range is matched — 240,000 followers on Spotify.',
+      },
+      {
+        stepId: 'instant_access',
+        text: 'Pro is $199 a month with a 14-day trial and no card required.',
+      }
+    );
+  } else if (sequenceCase === 'objection-handling-replay') {
+    // Priced-out objection: acknowledge honestly, keep the free lane open.
+    toolExecutions.push(executeSequenceSpotifyConfirmation(state));
+    toolExecutions.push(
+      executeSequenceSignal(state, {
+        objection: {
+          category: 'price',
+          text: 'another subscription feels expensive right now',
+        },
+      })
+    );
+    const nextStep = executeSequenceNextStep(state);
+    collapsedSignal = nextStep.collapsedSignal;
+    nextStepDecision = nextStep.nextStepDecision;
+    toolExecutions.push(nextStep.execution);
+    assistantTurns.push(
+      {
+        stepId: 'confirm_artist',
+        text: 'Luna Waves is matched — 12,500 followers on Spotify.',
+      },
+      {
+        stepId: 'ask_audience',
+        text: 'Fair. Your Jovie profile stays free forever either way — want it claimed while you decide?',
+      }
+    );
+  } else if (sequenceCase === 'premature-next-step-blocked-before-identity') {
     blockedSteps.push({
       toolName: 'proposeNextStep',
       reason: 'spotify_identity_missing',
@@ -4697,6 +4864,10 @@ function evaluateOnboardingToolSequenceContract(vars: EvalVars) {
       name: 'searchSpotifyArtist',
       input: { query: 'Luna Waves' },
       output: defaultToolResult('searchSpotifyArtist', { query: 'Luna Waves' }),
+    });
+    assistantTurns.push({
+      stepId: 'get_artist',
+      text: 'Before we pick a next step, which Spotify artist is yours?',
     });
   } else if (sequenceCase === 'checkout-blocked-before-instant-access') {
     state.spotifyArtistId = 'spotify-luna-early';
@@ -4718,6 +4889,10 @@ function evaluateOnboardingToolSequenceContract(vars: EvalVars) {
       toolName: 'proposeCheckout',
       reason: `next_step_${nextStepDecision.kind}`,
     });
+    assistantTurns.push({
+      stepId: 'ask_audience',
+      text: 'Understood — no pressure to decide today.',
+    });
   } else if (sequenceCase === 'waitlist-outcome-no-checkout') {
     state.turnCount = MAX_INTERVIEW_TURNS_BEFORE_FORCE;
     toolExecutions.push(
@@ -4727,6 +4902,10 @@ function evaluateOnboardingToolSequenceContract(vars: EvalVars) {
     collapsedSignal = nextStep.collapsedSignal;
     nextStepDecision = nextStep.nextStepDecision;
     toolExecutions.push(nextStep.execution);
+    assistantTurns.push({
+      stepId: 'waitlist',
+      text: 'You are on the early list — real spots open weekly and your place is saved.',
+    });
   } else {
     toolExecutions.push(executeSequenceSpotifyConfirmation(state));
 
@@ -4758,6 +4937,22 @@ function evaluateOnboardingToolSequenceContract(vars: EvalVars) {
     ) {
       toolExecutions.push(executeSequenceCheckout('pro'));
     }
+    assistantTurns.push(
+      {
+        stepId: 'confirm_artist',
+        text: 'Luna Waves is matched — 12,500 followers on Spotify.',
+      },
+      {
+        stepId:
+          sequenceCase === 'instant-access-next-step-before-checkout'
+            ? 'instant_access'
+            : 'ask_audience',
+        text:
+          sequenceCase === 'instant-access-next-step-before-checkout'
+            ? 'You qualify for instant access — checkout is ready when you are.'
+            : 'How big is the audience you reach each month?',
+      }
+    );
   }
 
   const toolCallOrder = toolExecutions.map(execution => execution.name);
@@ -4778,6 +4973,7 @@ function evaluateOnboardingToolSequenceContract(vars: EvalVars) {
     stateBefore,
     stateAfter: cloneJson(state),
     blockedSteps,
+    assistantTurns,
     toolCallOrder,
     collapsedSignal,
     nextStepDecision,
