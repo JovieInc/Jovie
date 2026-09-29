@@ -51,6 +51,13 @@ import {
 } from './desktop-auth-handback';
 import { startDesktopAuthLoopbackServer } from './desktop-auth-loopback';
 import {
+  applyDesktopPasskeyStateUpdate,
+  type DesktopPasskeyState,
+  describeWebAuthnAccounts,
+  parseDesktopPasskeyState,
+  resolveDesktopWebAuthnConfig,
+} from './desktop-passkey';
+import {
   bindPendingDesktopAuthCompletion,
   DESKTOP_AUTH_FLOW_PARAM,
   type PendingDesktopAuthPkce,
@@ -247,6 +254,10 @@ const COPY_DESKTOP_AUTH_URL_CHANNEL = 'copy-desktop-auth-url';
 const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
 const REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL =
   'redeem-desktop-auth-return-code';
+const GET_DESKTOP_PASSKEY_STATE_CHANNEL = 'get-desktop-passkey-state';
+const SET_DESKTOP_PASSKEY_STATE_CHANNEL = 'set-desktop-passkey-state';
+const COMPLETE_DESKTOP_PASSKEY_SIGN_IN_CHANNEL =
+  'complete-desktop-passkey-sign-in';
 const CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL =
   'consume-desktop-auth-completion';
 const DESKTOP_AUTH_HANDOFF_PATH = '/desktop-auth';
@@ -343,6 +354,8 @@ let lastCompletedAuthCode: string | null = null;
 // A request only completes a flow while one is pending — the flow nonce and
 // PKCE verifier still gate the handoff.
 let authLoopbackPort: number | null = null;
+// True once Touch ID WebAuthn is configured (signed build with profile).
+let desktopPasskeyAvailable = false;
 let mainWindowHiddenForAuthHandoff = false;
 let currentHudBuildFingerprint: string | null = null;
 // webContents ids still showing the web build that preceded the current one.
@@ -768,6 +781,11 @@ function buildDesktopBrowserAuthUrl(urlString: string): string | null {
 function buildDesktopAuthHandoffUrl(authUrl: string): string {
   const url = new URL(DESKTOP_AUTH_HANDOFF_PATH, APP_URL);
   url.searchParams.set('auth_url', authUrl);
+  // UI hint only, so the handoff renders its Touch ID row without a layout
+  // shift. WebAuthn itself decides whether sign-in works.
+  if (desktopPasskeyAvailable && readDesktopPasskeyState().enrolled) {
+    url.searchParams.set('touch_id', '1');
+  }
   return url.toString();
 }
 
@@ -1118,6 +1136,98 @@ function handleAuthCompletion(
 
   pendingAuthCompletion = nativeCompletion;
   return 'completed';
+}
+
+const DESKTOP_PASSKEY_STATE_FILE = path.join(
+  app.getPath('userData'),
+  'desktop-passkey.json'
+);
+
+// Loaded once when Touch ID is configured; writes keep it current. The
+// main process never blocks on disk after startup.
+let desktopPasskeyState = parseDesktopPasskeyState(undefined);
+
+function readDesktopPasskeyState(): DesktopPasskeyState {
+  return desktopPasskeyState;
+}
+
+async function writeDesktopPasskeyState(
+  state: DesktopPasskeyState
+): Promise<boolean> {
+  try {
+    await fs.promises.writeFile(
+      DESKTOP_PASSKEY_STATE_FILE,
+      JSON.stringify(state),
+      { mode: 0o600 }
+    );
+    desktopPasskeyState = state;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Touch ID sign-in (JOV-6727, docs/macos/desktop-auth.md). Only a signed
+// build that embeds the Developer ID provisioning profile may use the
+// keychain-access-groups entitlement; without it, stay off.
+async function configureDesktopWebAuthn(): Promise<void> {
+  const config = resolveDesktopWebAuthnConfig({
+    platform: process.platform,
+    isPackaged: app.isPackaged,
+    appEnv: APP_ENV,
+    hasEmbeddedProvisioningProfile: await fs.promises
+      .access(path.join(process.resourcesPath, '..', 'embedded.provisionprofile'))
+      .then(
+        () => true,
+        () => false
+      ),
+  });
+  if (!config) return;
+
+  try {
+    app.configureWebAuthn({ touchID: config });
+    desktopPasskeyAvailable = true;
+    try {
+      desktopPasskeyState = parseDesktopPasskeyState(
+        await fs.promises.readFile(DESKTOP_PASSKEY_STATE_FILE, 'utf8')
+      );
+    } catch {
+      // No state yet: not enrolled, never asked.
+    }
+  } catch (error) {
+    console.error('[Jovie Desktop] Touch ID WebAuthn unavailable', {
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    return;
+  }
+
+  session.defaultSession.on(
+    'select-webauthn-account',
+    (_event, details, callback) => {
+      // The request hangs until the callback runs, so every path calls it.
+      const choice = describeWebAuthnAccounts(details.accounts);
+      if (choice.kind !== 'choose') {
+        callback(choice.kind === 'single' ? choice.credentialId : undefined);
+        return;
+      }
+      const options = {
+        type: 'question' as const,
+        message: 'Choose an account',
+        buttons: [...choice.labels, 'Cancel'],
+        defaultId: 0,
+        cancelId: choice.labels.length,
+      };
+      const parent = BrowserWindow.getFocusedWindow();
+      (parent
+        ? dialog.showMessageBox(parent, options)
+        : dialog.showMessageBox(options)
+      )
+        .then(({ response }) =>
+          callback(details.accounts[response]?.credentialId)
+        )
+        .catch(() => callback());
+    }
+  );
 }
 
 function loadReturnedRoute(route: string): void {
@@ -3076,6 +3186,51 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
+  GET_DESKTOP_PASSKEY_STATE_CHANNEL,
+  (event: IpcMainInvokeEvent, ...args: unknown[]) => {
+    if (!isTrustedIpcSender(event) || args.length !== 0) {
+      return { available: false, enrolled: false, dismissed: false };
+    }
+    return { available: desktopPasskeyAvailable, ...readDesktopPasskeyState() };
+  }
+);
+
+ipcMain.handle(
+  SET_DESKTOP_PASSKEY_STATE_CHANNEL,
+  async (
+    event: IpcMainInvokeEvent,
+    update: unknown,
+    ...args: unknown[]
+  ): Promise<DesktopAuthOpenResult> => {
+    const next = applyDesktopPasskeyStateUpdate(update);
+    if (!isTrustedIpcSender(event) || args.length !== 0 || !next) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+    return (await writeDesktopPasskeyState(next))
+      ? { ok: true }
+      : { ok: false, reason: 'state-write-failed' };
+  }
+);
+
+ipcMain.handle(
+  COMPLETE_DESKTOP_PASSKEY_SIGN_IN_CHANNEL,
+  (event: IpcMainInvokeEvent, ...args: unknown[]): DesktopAuthOpenResult => {
+    if (
+      !isTrustedDesktopAuthSender(event) ||
+      args.length !== 0 ||
+      !desktopPasskeyAvailable
+    ) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+    // The passkey sign-in already set the session cookie in this session.
+    // Drop the browser flow and open the workspace; /app re-checks auth.
+    clearPendingDesktopAuthFlow();
+    loadReturnedRoute('/app');
+    return { ok: true };
+  }
+);
+
+ipcMain.handle(
   CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL,
   (event: IpcMainInvokeEvent, ...args: unknown[]) => {
     if (!isTrustedDesktopAuthCompleteSender(event) || args.length !== 0) {
@@ -3225,6 +3380,8 @@ app.whenReady().then(async () => {
     app.exit(0);
     return;
   }
+
+  await configureDesktopWebAuthn();
 
   const appIconPath = getAppIconPath();
   if (process.platform === 'darwin' && appIconPath && app.dock) {
