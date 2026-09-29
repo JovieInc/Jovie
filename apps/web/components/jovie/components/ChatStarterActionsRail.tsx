@@ -4,6 +4,7 @@ import { Button, IconButton } from '@jovie/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
 import { CHAT_STARTER_ACTIONS } from '../starter-actions';
 import type { ChatActionCard as ChatActionCardModel } from '../types';
 import { ChatActionCard } from './ChatActionCard';
@@ -67,7 +68,7 @@ export function ChatStarterActionsRail({
     <section
       aria-label='Starter Actions'
       aria-roledescription='carousel'
-      className='group/carousel relative mx-auto w-full max-w-[28rem]'
+      className='group/carousel relative mx-auto w-full max-w-md'
       data-testid='chat-starter-actions-rail'
     >
       <fieldset
@@ -85,30 +86,44 @@ export function ChatStarterActionsRail({
           onDismiss={() => onDismiss(activeCard)}
         />
       </fieldset>
-      <button
-        type='button'
-        aria-label='Show Previous Starter Action'
-        disabled={boundedIndex === 0}
-        onClick={() => setActiveIndex(current => Math.max(current - 1, 0))}
-        className='absolute -left-12 top-20 hidden size-11 -translate-y-1/2 cursor-pointer place-items-center rounded-full text-secondary-token opacity-0 transition-[opacity,transform,color] duration-subtle ease-out group-hover/carousel:opacity-100 hover:text-primary-token focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-default disabled:opacity-0 motion-reduce:transition-none sm:grid'
+      <div
+        className={cn(
+          'absolute -left-12 top-20 hidden -translate-y-1/2 opacity-0 transition-opacity duration-subtle sm:block',
+          boundedIndex === 0
+            ? ''
+            : 'group-hover/carousel:opacity-100 focus-within:opacity-100'
+        )}
       >
-        <ChevronLeft className='size-7' strokeWidth={2.75} aria-hidden='true' />
-      </button>
-      <button
-        type='button'
-        aria-label='Show Next Starter Action'
-        disabled={boundedIndex === lastIndex}
-        onClick={() =>
-          setActiveIndex(current => Math.min(current + 1, lastIndex))
-        }
-        className='absolute -right-12 top-20 hidden size-11 -translate-y-1/2 cursor-pointer place-items-center rounded-full text-secondary-token opacity-0 transition-[opacity,transform,color] duration-subtle ease-out group-hover/carousel:opacity-100 hover:text-primary-token focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-default disabled:opacity-0 motion-reduce:transition-none sm:grid'
+        <IconButton
+          variant='secondary'
+          size='md'
+          ariaLabel='Show Previous Starter Action'
+          disabled={boundedIndex === 0}
+          onClick={() => setActiveIndex(current => Math.max(current - 1, 0))}
+        >
+          <ChevronLeft strokeWidth={2.75} aria-hidden='true' />
+        </IconButton>
+      </div>
+      <div
+        className={cn(
+          'absolute -right-12 top-20 hidden -translate-y-1/2 opacity-0 transition-opacity duration-subtle sm:block',
+          boundedIndex === lastIndex
+            ? ''
+            : 'group-hover/carousel:opacity-100 focus-within:opacity-100'
+        )}
       >
-        <ChevronRight
-          className='size-7'
-          strokeWidth={2.75}
-          aria-hidden='true'
-        />
-      </button>
+        <IconButton
+          variant='secondary'
+          size='md'
+          ariaLabel='Show Next Starter Action'
+          disabled={boundedIndex === lastIndex}
+          onClick={() =>
+            setActiveIndex(current => Math.min(current + 1, lastIndex))
+          }
+        >
+          <ChevronRight strokeWidth={2.75} aria-hidden='true' />
+        </IconButton>
+      </div>
       {cards.length > 1 ? (
         <>
           <div className='mt-2 flex min-h-11 items-center justify-between gap-3 sm:hidden'>
@@ -120,7 +135,8 @@ export function ChatStarterActionsRail({
             </span>
             <Button
               type='button'
-              variant='ghost'
+              variant='tertiary'
+              size='sm'
               aria-label='Show More Starter Actions'
               onClick={() =>
                 setActiveIndex(current =>
@@ -147,7 +163,12 @@ export function ChatStarterActionsRail({
                 className='group'
               >
                 <span
-                  className='size-1 rounded-full bg-quaternary-token/65 transition-[transform,background-color] duration-subtle group-hover:bg-tertiary-token group-aria-[current=true]:scale-125 group-aria-[current=true]:bg-secondary-token motion-reduce:transition-none'
+                  className={cn(
+                    'size-1 rounded-full transition duration-subtle motion-reduce:transition-none',
+                    index === boundedIndex
+                      ? 'scale-125 bg-secondary-token'
+                      : 'bg-quaternary-token/65 group-hover:bg-tertiary-token'
+                  )}
                   aria-hidden='true'
                 />
               </IconButton>

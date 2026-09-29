@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, userEvent, within } from 'storybook/test';
+import { DrawerButton } from './DrawerButton';
 import { DrawerSection } from './DrawerSection';
 
 const meta = {
@@ -56,12 +57,9 @@ export const NotCollapsible: Story = {
 export const WithActions: Story = {
   args: {
     actions: (
-      <button
-        type='button'
-        className='text-2xs text-secondary-token hover:text-primary-token'
-      >
+      <DrawerButton tone='ghost' size='sm'>
         Edit
-      </button>
+      </DrawerButton>
     ),
   },
 };
