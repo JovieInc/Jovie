@@ -165,7 +165,13 @@ function laneCopy(lane: MerchDesignLane): {
   }
 }
 
-function buildPrintSvg(params: {
+/**
+ * The deterministic print artwork the merch fallback path generates
+ * (JOV-2894). Exported so offline tooling (e.g. the Instant Merch
+ * marketing-proof generator) renders the identical artwork the product
+ * produces instead of a divergent marketing-only asset.
+ */
+export function buildPrintSvg(params: {
   readonly artistName: string;
   readonly designName: string;
   readonly lane: MerchDesignLane;

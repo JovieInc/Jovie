@@ -562,7 +562,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       status: 'verified',
       source: 'route audit 2026-08-01',
       notes:
-        'Hero mounts the real chat merch review surface (ChatMerchDesignCarousel) with representative concepts that are illustrative and not proof claims; selection hands off into the authenticated merch conversation.',
+        'Hero mounts the real chat merch review surface (ChatMerchDesignCarousel) with Tim White dogfood concepts whose previews are garment mockups rendered by the canonical merch pipeline (scripts/generate-instant-merch-proof.ts); selection hands off into the authenticated merch conversation.',
     },
     status: 'active',
     specVersion: '1.0.0',
