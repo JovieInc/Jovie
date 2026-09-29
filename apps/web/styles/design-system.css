@@ -323,7 +323,14 @@
   --profile-rail-dot-active: rgba(255, 255, 255, 0.92);
   --profile-rail-dot-inactive: rgba(255, 255, 255, 0.18);
   --profile-composer-border: rgba(255, 255, 255, 0.1);
-  --profile-dock-bg: rgba(30, 32, 40, 0.52);
+  /* JOV-INV-019 image-contrast: the dock sits over the page's own photo
+     content (mode-card artwork, ambient backdrop), so its glass scrim must
+     stay opaque enough to guarantee 4.5:1 for its white glyphs against any
+     underlying image, not just a typical dark one. Darkened + raised opacity
+     2026-09-29 (was rgba(30, 32, 40, 0.52)); lens now shares the same dark
+     material instead of a white tint that diluted the scrim under the
+     active tab. */
+  --profile-dock-bg: rgba(18, 19, 24, 0.86);
   --profile-dock-border: rgba(255, 255, 255, 0.18);
   --profile-dock-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 14px 34px rgba(0, 0, 0, 0.3);
@@ -338,7 +345,7 @@
   --profile-dock-glow: rgba(255, 255, 255, 0.05);
   --profile-dock-rim-top: rgba(255, 255, 255, 0.38);
   --profile-dock-rim-bottom: rgba(0, 0, 0, 0.24);
-  --profile-dock-lens-bg: rgba(255, 255, 255, 0.13);
+  --profile-dock-lens-bg: rgba(18, 19, 24, 0.86);
   --profile-dock-lens-sheen: rgba(255, 255, 255, 0.14);
   --profile-dock-lens-rim: rgba(255, 255, 255, 0.34);
   --profile-dock-lens-rim-bottom: rgba(255, 255, 255, 0.06);
@@ -1632,7 +1639,9 @@
   --profile-rail-dot-active: rgba(255, 255, 255, 0.92);
   --profile-rail-dot-inactive: rgba(255, 255, 255, 0.18);
   --profile-composer-border: rgba(255, 255, 255, 0.1);
-  --profile-dock-bg: rgba(30, 32, 40, 0.52);
+  /* JOV-INV-019 image-contrast: keep this in sync with the .profile-viewport
+     block above — see its comment for why the scrim must be this opaque. */
+  --profile-dock-bg: rgba(18, 19, 24, 0.86);
   --profile-dock-border: rgba(255, 255, 255, 0.18);
   --profile-dock-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 14px 34px rgba(0, 0, 0, 0.3);
@@ -1647,7 +1656,7 @@
   --profile-dock-glow: rgba(255, 255, 255, 0.05);
   --profile-dock-rim-top: rgba(255, 255, 255, 0.38);
   --profile-dock-rim-bottom: rgba(0, 0, 0, 0.24);
-  --profile-dock-lens-bg: rgba(255, 255, 255, 0.13);
+  --profile-dock-lens-bg: rgba(18, 19, 24, 0.86);
   --profile-dock-lens-sheen: rgba(255, 255, 255, 0.14);
   --profile-dock-lens-rim: rgba(255, 255, 255, 0.34);
   --profile-dock-lens-rim-bottom: rgba(255, 255, 255, 0.06);

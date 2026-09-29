@@ -88,10 +88,9 @@ describe('MarketingFooter', () => {
     expect(screen.getByRole('heading', { name: 'Product' })).not.toHaveClass(
       'mf-eyebrow--caps'
     );
-    expect(screen.getByRole('link', { name: 'Status' })).toHaveAttribute(
-      'href',
-      'https://status.jov.ie'
-    );
+    // status.jov.ie currently serves Vercel DEPLOYMENT_NOT_FOUND; the public
+    // footer omits the link until the status deployment is restored (JOV-7135).
+    expect(screen.queryByRole('link', { name: 'Status' })).toBeNull();
   });
 
   it('renders the full homepage footer without the duplicate final CTA', () => {

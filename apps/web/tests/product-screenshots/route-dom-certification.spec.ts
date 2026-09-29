@@ -78,6 +78,35 @@ function exactBaseUrl(testInfo: TestInfo): string {
   return requireExactNavigationOrigin(baseURL);
 }
 
+// Vaul hardcodes `transition: transform .5s cubic-bezier(...)` on
+// [data-vaul-drawer] regardless of prefers-reduced-motion (emulateMedia
+// above has no effect on it: it's a plain CSS transition the library sets
+// itself, not one gated behind a media query). A `waitForTimeout` shorter
+// than that leaves the sheet mid-slide when a screenshot-based check runs,
+// and a slide is a real, uncomposited-color-shifting transform: the
+// contrast detector's pixel sampling picked up a genuinely different,
+// run-to-run-varying frame instead of the settled one. Poll the drawer's
+// own transform until two consecutive reads agree instead of guessing a
+// fixed delay.
+async function waitForDrawerToSettle(page: Page): Promise<void> {
+  const drawer = page.locator('[data-vaul-drawer]').first();
+  if ((await drawer.count()) === 0) return;
+  let previous: string | null = null;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const current = await drawer.evaluate(el => getComputedStyle(el).transform);
+    if (current === previous) return;
+    previous = current;
+    await page.waitForTimeout(50);
+  }
+  // Retry budget exhausted without two consecutive matching reads: surface
+  // it instead of silently proceeding on a transform that may still be
+  // moving, so a future flake here points straight at this wait rather than
+  // back through the same false-positive investigation that added it.
+  console.warn(
+    `waitForDrawerToSettle: transform did not stabilize after 1s (last read: ${previous})`
+  );
+}
+
 async function prepareProfileState(
   page: Page,
   state: (typeof profileStates)[number]
@@ -92,6 +121,7 @@ async function prepareProfileState(
   const menu = page.getByRole('button', { name: 'Menu', exact: true });
   await menu.click();
   await expect(page.getByTestId('profile-menu-drawer')).toBeVisible();
+  await waitForDrawerToSettle(page);
   if (state.kind === 'drawer') return;
 
   await page
@@ -102,6 +132,10 @@ async function prepareProfileState(
     return;
   }
   await expect(page.getByTestId('profile-menu-drawer')).toBeVisible();
+  // The secondary panel (e.g. Pay) is taller than the root menu list, so
+  // Vaul re-measures and re-transitions the drawer's own height/transform a
+  // second time here, independent of the settle-wait above.
+  await waitForDrawerToSettle(page);
 }
 
 async function expectDeliberateRed(
@@ -202,6 +236,105 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     expect(snapshot.receipts.length).toBeGreaterThan(0);
     expect(snapshot.receipts.every(receipt => receipt.pass)).toBe(true);
   });
+
+  // JOV-INV-019 (2026-09-29): a real /unfazed pass surfaced three detector
+  // false positives — none reflected what a sighted user actually sees.
+  test('samples a nested override color and box instead of an interactive control that inherits a different one', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<main>' +
+        '<div style="position:fixed;inset:0;background-image:linear-gradient(115deg,#ffffff 100%,#ffffff 100%)"></div>' +
+        '<a href="/pay" style="position:relative;display:flex;height:44px;width:160px;align-items:center;justify-content:center;color:#ffffff">' +
+        '<span style="display:flex;height:28px;width:140px;align-items:center;justify-content:center;border-radius:9999px;background:#050608;color:#f7f8f8">Pay $10</span>' +
+        '</a>' +
+        '</main>'
+    );
+    const snapshot = await inspectImageContrast(page);
+    expect(snapshot.findings).toEqual([]);
+    expect(snapshot.receipts.some(receipt => receipt.text === 'Pay $10')).toBe(
+      true
+    );
+    expect(
+      snapshot.receipts.every(
+        receipt => receipt.text !== 'Pay $10' || receipt.pass
+      )
+    ).toBe(true);
+  });
+
+  test('excludes a visually hidden sr-only label from image-contrast candidates', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<main>' +
+        '<div style="position:fixed;inset:0;background-image:linear-gradient(115deg,#ffffff 100%,#ffffff 100%)"></div>' +
+        '<button aria-label="Home" style="position:relative;color:#ffffff">' +
+        '<span style="position:absolute;width:1px;height:1px;overflow:hidden;white-space:nowrap;clip:rect(0,0,0,0)">Home</span>' +
+        '<svg aria-hidden="true" width="16" height="16"><circle cx="8" cy="8" r="6" fill="currentColor"></circle></svg>' +
+        '</button>' +
+        '</main>'
+    );
+    const snapshot = await inspectImageContrast(page);
+    expect(snapshot.findings.map(finding => finding.kind)).toContain(
+      'image-contrast'
+    );
+    expect(
+      snapshot.receipts.some(
+        receipt => receipt.text === 'Home' && !receipt.pass
+      )
+    ).toBe(true);
+  });
+
+  test('excludes a candidate fully covered by a later opaque overlay', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<main>' +
+        // A real dialog/drawer disables pointer-events on the page behind
+        // it (Vaul/Radix scroll-lock + focus boundary). The detector forces
+        // pointer-events:auto for the duration of its own scan (see the
+        // sibling test below), so this fixture's pointer-events:none isn't
+        // what excludes it — the later, fully opaque "Sheet content" div
+        // genuinely painting on top at this pixel is.
+        '<div style="position:fixed;inset:0;background-image:linear-gradient(115deg,#050505 100%,#050505 100%);pointer-events:none">' +
+        '<span style="position:absolute;top:40px;left:20px;color:#f7f8f8;font-size:15px">Behind the sheet</span>' +
+        '</div>' +
+        '<div style="position:fixed;inset:0;background:#050608">Sheet content</div>' +
+        '</main>'
+    );
+    const snapshot = await inspectImageContrast(page);
+    expect(
+      snapshot.receipts.some(receipt => receipt.text === 'Behind the sheet')
+    ).toBe(false);
+  });
+
+  test('still certifies a visible pointer-events:none candidate with nothing covering it', async ({
+    page,
+  }) => {
+    // elementsFromPoint() is a hit-test API: pointer-events:none removes an
+    // element from it even when nothing else is painted on top — it's used
+    // deliberately for decorative/click-through overlays throughout the
+    // product (42+ call sites), and none of them stop being visible glyphs.
+    // Without forcing pointer-events:auto during the scan, this candidate
+    // would be silently dropped from every check, not just the one above
+    // where something genuinely covers it.
+    await page.setContent(
+      '<main>' +
+        '<div style="position:fixed;inset:0;background-image:linear-gradient(115deg,#ffffff 100%,#ffffff 100%)">' +
+        '<span style="position:absolute;top:40px;left:20px;color:#f5f5f5;font-size:15px;pointer-events:none">Click-through label</span>' +
+        '</div>' +
+        '</main>'
+    );
+    const snapshot = await inspectImageContrast(page);
+    const receipt = snapshot.receipts.find(
+      item => item.text === 'Click-through label'
+    );
+    expect(receipt).toBeDefined();
+    expect(receipt?.pass).toBe(false);
+    expect(snapshot.findings.map(finding => finding.kind)).toContain(
+      'image-contrast'
+    );
+  });
 });
 
 test('certifies every marketing route and public-profile open state', async ({
@@ -287,7 +420,17 @@ test('certifies every marketing route and public-profile open state', async ({
         page.getByTestId('public-profile-layout-shell')
       ).toBeVisible();
       await prepareProfileState(page, state);
-      await page.waitForTimeout(150);
+      // ProfileUnifiedDrawer.tsx cross-fades drawer views via Framer Motion
+      // AnimatePresence (mode="wait": the outgoing view exits over 120ms,
+      // then the incoming one enters over another 120ms) — a JS-driven
+      // opacity animation the library runs unconditionally, not a CSS
+      // transition/animation, so page.emulateMedia({reducedMotion: 'reduce'})
+      // above has no effect on it. 150ms could still land mid cross-fade,
+      // which for a state with brand-accent-colored content (e.g. the
+      // selected-amount pill on Pay) blends its real background toward the
+      // drawer's own dark surface and reads as a false low-contrast finding.
+      // Clear both phases with margin.
+      await page.waitForTimeout(400);
 
       const snapshot = await inspectRouteDom(page, {
         surface: 'public-profile',

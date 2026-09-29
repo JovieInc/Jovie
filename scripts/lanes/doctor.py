@@ -276,8 +276,13 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["orphan-prs"] = (f"{len(sweep['orphans'])} open PRs have no owner (not queued, no live lane-fix label, "
                                 f"no hold): {listed}")
     if swept_age is not None and swept_age < 2 * pr_events.RECONCILE_S:
+        # Held dispositions (explicit hold, fix-exhausted, dependency wait) are already
+        # decided and named in the feed's oldest_prs; the alert exists for aged PRs the
+        # lanes can still act on — otherwise held PRs keep it firing forever.
         aged = [row for row in sweep.get("dispositions") or []
-                if (row.get("ageH") or 0) * 3600 >= AGED_PR_S and row.get("state") != "closing"]
+                if (row.get("ageH") or 0) * 3600 >= AGED_PR_S
+                and row.get("state") != "closing"
+                and not (row.get("state") or "").startswith("hold:")]
         if aged:
             listed = ", ".join(f"#{row['pr']} {row['ageH'] // 24}d {row['state']}"
                                + (f" ({row['reason']})" if row.get("reason") else "")

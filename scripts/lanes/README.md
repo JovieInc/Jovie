@@ -78,7 +78,9 @@ Gaps closed after the first week (no PR may sit unowned):
 - Every open PR also gets one truthful disposition in `reconcile.json` (`dispositions`,
   oldest first: `advancing`, `queued`, `ready`, `hold:<reason>`, `hold:dependency`,
   `closing`, `draft`, `orphaned`), and the doctor raises `aged-prs` for anything open past
-  7 days so the shipping cockpit always names the oldest PRs and why they are still open.
+  7 days that is still undecided — `hold:*` dispositions are already deliberate parks and
+  stay named in `oldest_prs` — so the shipping cockpit always names the oldest open PRs
+  and why they are still open.
 - Invariant: every open non-draft PR is in the merge queue, carries a `lane-fix-*` label the
   lanes will still act on, or is held with a reason (a hold label, or `lane-fix-exhausted`
   after bug intake). Anything else is listed in `reconcile.json` and raised by the doctor as

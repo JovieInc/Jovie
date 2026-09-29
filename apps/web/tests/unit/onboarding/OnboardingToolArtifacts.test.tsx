@@ -347,6 +347,40 @@ describe('onboarding tool artifacts', () => {
     ).toBeDefined();
   });
 
+  it('collapses a handle_confirmed output to a non-interactive status', () => {
+    fastRender(
+      <OnboardingHandleCheckCard
+        state='output-available'
+        output={{ action: 'handle_confirmed', handle: 'validartist' }}
+        onConfirmHandle={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Handle confirmed')).toBeDefined();
+    expect(screen.getByText('@validartist')).toBeDefined();
+    expect(screen.queryByLabelText('Edit Proposed Handle')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Confirm Handle' })).toBeNull();
+    expect(screen.queryByTestId('onboarding-confirm-handle')).toBeNull();
+  });
+
+  it('collapses a social_attached output to a non-interactive status', () => {
+    fastRender(
+      <OnboardingSocialLinkCard
+        state='output-available'
+        output={{
+          action: 'social_attached',
+          url: 'https://instagram.com/testartist',
+        }}
+        onAttachAccount={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Social account attached')).toBeDefined();
+    expect(screen.queryByLabelText('Social Profile URL')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Attach Account' })).toBeNull();
+    expect(screen.queryByTestId('onboarding-attach-account')).toBeNull();
+  });
+
   it('renders proposed social links with Attach Account CTA', () => {
     const onAttachAccount = vi.fn();
     fastRender(
