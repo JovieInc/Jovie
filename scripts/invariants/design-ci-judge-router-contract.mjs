@@ -44,7 +44,7 @@ const EXPECTATIONS = [
   },
   {
     path: 'apps/web/app/api/internal/ovie/design-ci-judge-evidence/route.ts',
-    includes: ['verifyCronRequest', 'upsertDesignCiJudgeCells'],
+    includes: ['handleCronEvidencePost', 'upsertDesignCiJudgeCells'],
   },
   {
     path: 'apps/web/package.json',

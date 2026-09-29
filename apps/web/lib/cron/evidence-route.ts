@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
+import type { z } from 'zod';
+import { verifyCronRequest } from './auth';
 
 /**
  * Shared skeleton for a cron-secret-authenticated internal evidence route:
- * cap the body size, parse JSON, and hand off to the caller's own zod
- * schema. Extracted from `certification-evidence/route.ts` after
+ * verify auth, cap the body size, parse JSON, validate against the
+ * caller's own zod schema, then hand off to the caller's handler.
+ * Extracted from `certification-evidence/route.ts` after
  * `design-ci-judge-evidence/route.ts` duplicated it closely enough to trip
  * SonarCloud's new-code duplication gate (JOV-6944) — both routes share
- * this now instead of each carrying its own copy.
+ * this now instead of each carrying its own near-identical copy.
  */
 
 export const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -38,4 +41,35 @@ export async function parseBoundedJsonBody(
       response: jsonResponse({ error: 'invalid_json' }, 400),
     };
   }
+}
+
+/**
+ * The full route skeleton: auth, size cap, JSON parse, schema validation,
+ * then the caller's own handler for the one thing that actually differs
+ * between evidence routes — what to do with the validated payload.
+ */
+export async function handleCronEvidencePost<Schema extends z.ZodType>(
+  request: Request,
+  options: {
+    readonly route: string;
+    readonly maxBytes: number;
+    readonly schema: Schema;
+    readonly invalidLabel: string;
+    readonly handle: (data: z.infer<Schema>) => Promise<NextResponse>;
+  }
+): Promise<NextResponse> {
+  const authError = verifyCronRequest(request, { route: options.route });
+  if (authError) return authError;
+
+  const parsedBody = await parseBoundedJsonBody(request, options.maxBytes);
+  if (!parsedBody.ok) return parsedBody.response;
+
+  const parsed = options.schema.safeParse(parsedBody.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      { error: options.invalidLabel, issues: parsed.error.issues.slice(0, 10) },
+      400
+    );
+  }
+  return options.handle(parsed.data);
 }

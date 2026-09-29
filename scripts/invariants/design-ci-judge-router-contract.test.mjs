@@ -50,10 +50,13 @@ describe('JOV-INV-040 design-ci judge router contract', () => {
       'apps/web/app/api/internal/ovie/design-ci-judge-evidence/route.ts';
     const failures = evaluateDesignCiJudgeRouterContract({
       files: {
-        [path]: source(path).replaceAll('verifyCronRequest', 'skipAuth'),
+        [path]: source(path).replaceAll(
+          'handleCronEvidencePost',
+          'unauthenticatedHandler'
+        ),
       },
     });
-    assert.match(failures.join('\n'), /verifyCronRequest/);
+    assert.match(failures.join('\n'), /handleCronEvidencePost/);
   });
 
   it('deliberate red: rejects the CLI script going missing from package.json', () => {

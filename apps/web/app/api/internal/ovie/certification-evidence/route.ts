@@ -11,8 +11,10 @@ import {
   MarketingCertificationRegistryDriftError,
 } from '@/lib/agent-os/certification-adapter';
 import { ingestMarketingCertificationPacket } from '@/lib/agent-os/certification-runtime-store';
-import { verifyCronRequest } from '@/lib/cron/auth';
-import { jsonResponse, parseBoundedJsonBody } from '@/lib/cron/evidence-route';
+import {
+  handleCronEvidencePost,
+  jsonResponse,
+} from '@/lib/cron/evidence-route';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -121,40 +123,37 @@ const bodySchema = z
   .strict();
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const authError = verifyCronRequest(request, { route: ROUTE });
-  if (authError) return authError;
-
-  const parsedBody = await parseBoundedJsonBody(request, MAX_BODY_BYTES);
-  if (!parsedBody.ok) return parsedBody.response;
-
-  const parsed = bodySchema.safeParse(parsedBody.value);
-  if (!parsed.success) {
-    return jsonResponse(
-      { error: 'invalid_packet', issues: parsed.error.issues.slice(0, 10) },
-      400
-    );
-  }
-
-  try {
-    const row = await ingestMarketingCertificationPacket(
-      parsed.data.packet as CertificationReviewPacket,
-      parsed.data.evaluatedAt
-    );
-    return jsonResponse({ ok: true, row }, 200);
-  } catch (error) {
-    if (error instanceof MarketingCertificationRegistryDriftError) {
-      return jsonResponse(
-        { error: 'unknown_subject', message: error.message },
-        422
-      );
-    }
-    if (error instanceof MarketingCertificationPersistenceError) {
-      // Identity/source mismatch, or a packet not newer than the ledger's.
-      return jsonResponse({ error: 'rejected', message: error.message }, 422);
-    }
-    logger.error('[certification-evidence] ingest failed', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return jsonResponse({ error: 'ingest_failed' }, 503);
-  }
+  return handleCronEvidencePost(request, {
+    route: ROUTE,
+    maxBytes: MAX_BODY_BYTES,
+    schema: bodySchema,
+    invalidLabel: 'invalid_packet',
+    handle: async data => {
+      try {
+        const row = await ingestMarketingCertificationPacket(
+          data.packet as CertificationReviewPacket,
+          data.evaluatedAt
+        );
+        return jsonResponse({ ok: true, row }, 200);
+      } catch (error) {
+        if (error instanceof MarketingCertificationRegistryDriftError) {
+          return jsonResponse(
+            { error: 'unknown_subject', message: error.message },
+            422
+          );
+        }
+        if (error instanceof MarketingCertificationPersistenceError) {
+          // Identity/source mismatch, or a packet not newer than the ledger's.
+          return jsonResponse(
+            { error: 'rejected', message: error.message },
+            422
+          );
+        }
+        logger.error('[certification-evidence] ingest failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return jsonResponse({ error: 'ingest_failed' }, 503);
+      }
+    },
+  });
 }

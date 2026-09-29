@@ -2,8 +2,10 @@ import type { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { DesignCiJudgeCertificationPersistenceError } from '@/lib/agent-os/design-ci-judge-certification';
 import { upsertDesignCiJudgeCells } from '@/lib/agent-os/design-ci-judge-runtime-store';
-import { verifyCronRequest } from '@/lib/cron/auth';
-import { jsonResponse, parseBoundedJsonBody } from '@/lib/cron/evidence-route';
+import {
+  handleCronEvidencePost,
+  jsonResponse,
+} from '@/lib/cron/evidence-route';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -53,33 +55,30 @@ const bodySchema = z
   .strict();
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const authError = verifyCronRequest(request, { route: ROUTE });
-  if (authError) return authError;
-
-  const parsedBody = await parseBoundedJsonBody(request, MAX_BODY_BYTES);
-  if (!parsedBody.ok) return parsedBody.response;
-
-  const parsed = bodySchema.safeParse(parsedBody.value);
-  if (!parsed.success) {
-    return jsonResponse(
-      { error: 'invalid_batch', issues: parsed.error.issues.slice(0, 10) },
-      400
-    );
-  }
-
-  try {
-    const result = await upsertDesignCiJudgeCells(
-      parsed.data.cells,
-      parsed.data.evaluatedAt
-    );
-    return jsonResponse({ ok: true, ...result }, 200);
-  } catch (error) {
-    if (error instanceof DesignCiJudgeCertificationPersistenceError) {
-      return jsonResponse({ error: 'rejected', message: error.message }, 422);
-    }
-    logger.error('[design-ci-judge-evidence] upsert failed', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return jsonResponse({ error: 'upsert_failed' }, 503);
-  }
+  return handleCronEvidencePost(request, {
+    route: ROUTE,
+    maxBytes: MAX_BODY_BYTES,
+    schema: bodySchema,
+    invalidLabel: 'invalid_batch',
+    handle: async data => {
+      try {
+        const result = await upsertDesignCiJudgeCells(
+          data.cells,
+          data.evaluatedAt
+        );
+        return jsonResponse({ ok: true, ...result }, 200);
+      } catch (error) {
+        if (error instanceof DesignCiJudgeCertificationPersistenceError) {
+          return jsonResponse(
+            { error: 'rejected', message: error.message },
+            422
+          );
+        }
+        logger.error('[design-ci-judge-evidence] upsert failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return jsonResponse({ error: 'upsert_failed' }, 503);
+      }
+    },
+  });
 }
