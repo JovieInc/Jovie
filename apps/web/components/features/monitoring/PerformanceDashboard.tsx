@@ -85,7 +85,7 @@ export function PerformanceDashboard({
       case 'needs-improvement':
         return 'bg-yellow-100 text-yellow-800';
       case 'poor':
-        return 'bg-red-100 text-red-800';
+        return 'bg-error-subtle text-error';
       default:
         return 'bg-gray-100 text-gray-800';
     }
