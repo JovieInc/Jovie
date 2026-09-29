@@ -36,6 +36,7 @@ import {
 import { track } from '@/lib/analytics';
 import {
   ONBOARDING_WIDGET_EVENTS,
+  WIDGET_COMPLETION_ACTIONS,
   widgetEventDisplayText,
 } from '@/lib/chat/onboarding-script/widget-events';
 import { useAppFlag } from '@/lib/flags/client';
@@ -71,6 +72,8 @@ import {
   getOnboardingErrorMessage,
   getToolName,
   getToolParts,
+  hasToolOutputAction,
+  hasWidgetEvent,
   isArtistConfirmedOutput,
   isArtistPickerOutput,
   isCheckoutPayload,
@@ -182,6 +185,8 @@ type OnboardingToolRendererArgs = {
   readonly onNoneOfTheseArtists: () => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
+  readonly handleStepDone: boolean;
+  readonly socialStepDone: boolean;
 };
 
 type OnboardingToolRenderer = (
@@ -237,9 +242,17 @@ const renderCheckHandle: OnboardingToolRenderer = ({
   part,
   key,
   isBusy,
+  handleStepDone,
 }) => {
   const output = part.output;
   if (!(isHandleCheckOutput(output) || output === undefined)) {
+    return null;
+  }
+
+  // Once the handle step is complete, only the `handle_confirmed` output
+  // renders (as a compact status) — stale `check_handle` parts collapse so
+  // no interactive card survives a completed step.
+  if (handleStepDone && output?.action !== 'handle_confirmed') {
     return null;
   }
 
@@ -260,9 +273,14 @@ const renderProposeSocialLink: OnboardingToolRenderer = ({
   key,
   isBusy,
   onAttachAccount,
+  socialStepDone,
 }) => {
   const output = part.output;
   if (!(isSocialLinkOutput(output) || output === undefined)) {
+    return null;
+  }
+
+  if (socialStepDone && output?.action !== 'social_attached') {
     return null;
   }
 
@@ -323,6 +341,8 @@ function renderOnboardingTools({
   onNoneOfTheseArtists,
   onSelectArtist,
   selectedArtistId,
+  handleStepDone,
+  socialStepDone,
 }: {
   readonly messageId: string;
   readonly toolParts: readonly ToolPart[];
@@ -334,6 +354,8 @@ function renderOnboardingTools({
   readonly onNoneOfTheseArtists: () => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
+  readonly handleStepDone: boolean;
+  readonly socialStepDone: boolean;
 }) {
   const genericParts: ToolPart[] = [];
   const cards: ReactNode[] = [];
@@ -362,6 +384,8 @@ function renderOnboardingTools({
         onNoneOfTheseArtists,
         onSelectArtist,
         selectedArtistId,
+        handleStepDone,
+        socialStepDone,
       });
       if (card) {
         cards.push(card);
@@ -413,6 +437,19 @@ function OnboardingMessageList({
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
 }) {
+  const handleStepDone =
+    hasToolOutputAction(
+      displayMessages,
+      WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED
+    ) ||
+    hasWidgetEvent(displayMessages, ONBOARDING_WIDGET_EVENTS.HANDLE_CONFIRMED);
+  const socialStepDone =
+    hasToolOutputAction(
+      displayMessages,
+      WIDGET_COMPLETION_ACTIONS.SOCIAL_ATTACHED
+    ) ||
+    hasWidgetEvent(displayMessages, ONBOARDING_WIDGET_EVENTS.SOCIAL_ATTACHED);
+
   return (
     <div className='flex flex-col pb-4'>
       {displayMessages.map(message => {
@@ -451,6 +488,8 @@ function OnboardingMessageList({
                   onNoneOfTheseArtists,
                   onSelectArtist,
                   selectedArtistId,
+                  handleStepDone,
+                  socialStepDone,
                 })
               : null}
           </div>
