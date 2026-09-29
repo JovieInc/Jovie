@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "direction": "lock_up",
-  "updatedAt": "2026-09-29T05:08:12.407Z",
+  "updatedAt": "2026-09-29T05:26:00.503Z",
   "note": "Coverage % and uncovered floors may only improve. Run `pnpm story-coverage:update` after adding stories. New components without stories fail even if % holds.",
   "roots": {
     "packages/ui/atoms": {
@@ -47,10 +47,10 @@
       "uncovered": 0
     },
     "apps/web/components": {
-      "percent": 78.64,
-      "covered": 1101,
-      "total": 1400,
-      "uncovered": 299
+      "percent": 80.35,
+      "covered": 1116,
+      "total": 1389,
+      "uncovered": 273
     }
   }
 }
