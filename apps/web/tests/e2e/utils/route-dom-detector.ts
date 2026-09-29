@@ -13,7 +13,24 @@ export type RouteDomFindingKind =
   | 'unintended-overlap'
   | 'container-width-sheet'
   | 'unreachable-content'
-  | 'raw-control';
+  | 'raw-control'
+  // Marketing taste invariants (ui.md, DESIGN_INVARIANTS.md). Ratcheted by
+  // route-dom-marketing-baseline.json until existing routes are fixed.
+  | 'nested-decorative-surface'
+  | 'stranded-text'
+  | 'heading-hierarchy-inversion'
+  | 'clipped-heading'
+  | 'misaligned-text-stack'
+  | 'placeholder-copy';
+
+export const MARKETING_TASTE_FINDING_KINDS: readonly RouteDomFindingKind[] = [
+  'nested-decorative-surface',
+  'stranded-text',
+  'heading-hierarchy-inversion',
+  'clipped-heading',
+  'misaligned-text-stack',
+  'placeholder-copy',
+];
 
 export interface RouteDomFinding {
   readonly kind: RouteDomFindingKind;
@@ -297,6 +314,218 @@ export async function inspectRouteDom(
               measurements: { overlapX, overlapY },
             });
           }
+        }
+      }
+
+      if (surface === 'marketing') {
+        const visibleIn = (element: Element): boolean =>
+          isRendered(element) &&
+          !optedOut(element) &&
+          !element.closest('[aria-hidden="true"], [inert]');
+        const px = (value: string): number => Number.parseFloat(value) || 0;
+        const isSurface = (element: Element): boolean => {
+          const style = getComputedStyle(element);
+          const bordered =
+            ['Top', 'Right', 'Bottom', 'Left'].filter(
+              side =>
+                px(
+                  style.getPropertyValue(`border-${side.toLowerCase()}-width`)
+                ) > 0 &&
+                style.getPropertyValue(`border-${side.toLowerCase()}-style`) !==
+                  'none'
+            ).length === 4;
+          const shadowed = style.boxShadow !== 'none';
+          return (bordered || shadowed) && px(style.borderTopLeftRadius) >= 8;
+        };
+        const interactive =
+          'a,button,input,select,textarea,label,[role="button"],[role="tab"],[role="dialog"],dialog';
+
+        // 1. Decorative surface nested in another (ui.md "nested decorative
+        //    carding"). Small chips/badges inside a card are fine: the inner
+        //    surface must cover at least half of the outer one.
+        const surfaces = Array.from(root.querySelectorAll('*')).filter(
+          element =>
+            visibleIn(element) &&
+            !element.matches(interactive) &&
+            !element.closest('form') &&
+            isSurface(element)
+        );
+        const nestedPairs = new Set<Element>();
+        for (const inner of surfaces) {
+          const outer = surfaces.find(
+            candidate => candidate !== inner && candidate.contains(inner)
+          );
+          if (!outer || nestedPairs.has(outer)) continue;
+          const outerRect = rectOf(outer);
+          const innerRect = rectOf(inner);
+          const coverage =
+            (innerRect.width * innerRect.height) /
+            Math.max(1, outerRect.width * outerRect.height);
+          // Overflowing children (coverage > 1) are not visually nested.
+          if (coverage < 0.5 || coverage > 1.02) continue;
+          nestedPairs.add(outer);
+          findings.push({
+            kind: 'nested-decorative-surface',
+            message:
+              'A bordered or shadowed rounded surface wraps another one covering most of it.',
+            elements: [describe(outer), describe(inner)],
+            measurements: { coverage: round(coverage) },
+          });
+        }
+
+        // 2. Copy stranded between composed blocks (MKT-D06): a paragraph
+        //    outside any section whose only siblings are composed blocks.
+        const composed =
+          'section,article,header,footer,figure,form,li,dialog,nav,aside,table,[role="dialog"]';
+        for (const paragraph of Array.from(root.querySelectorAll('p'))) {
+          if (!visibleIn(paragraph) || paragraph.closest(composed)) continue;
+          if (!normalizedText(paragraph.textContent)) continue;
+          const siblings = Array.from(
+            paragraph.parentElement?.children ?? []
+          ).filter(element => element !== paragraph && visibleIn(element));
+          if (
+            siblings.length === 0 ||
+            !siblings.every(element => element.matches(composed))
+          ) {
+            continue;
+          }
+          findings.push({
+            kind: 'stranded-text',
+            message:
+              'A paragraph sits alone between composed sections instead of inside one.',
+            elements: [describe(paragraph)],
+          });
+        }
+
+        // 3. A section heading must not out-scale the page headline.
+        const h1 = Array.from(root.querySelectorAll('h1')).find(visibleIn);
+        if (h1) {
+          const h1Size = px(getComputedStyle(h1).fontSize);
+          for (const heading of Array.from(root.querySelectorAll('h2, h3'))) {
+            if (!visibleIn(heading)) continue;
+            const size = px(getComputedStyle(heading).fontSize);
+            if (size <= h1Size + 1) continue;
+            findings.push({
+              kind: 'heading-hierarchy-inversion',
+              message: `${heading.tagName.toLowerCase()} renders larger than the page h1.`,
+              elements: [describe(heading), describe(h1)],
+              measurements: { headingPx: size, h1Px: h1Size },
+            });
+          }
+        }
+
+        // 4. Headings must not be truncated (JOV-6906). Tight display
+        //    leading makes glyphs overflow their box without hiding text, so
+        //    measure the clamp itself: the unclamped height must fit.
+        for (const heading of Array.from(root.querySelectorAll('h1, h2, h3'))) {
+          if (!visibleIn(heading) || !(heading instanceof HTMLElement)) {
+            continue;
+          }
+          const style = getComputedStyle(heading);
+          const clamp = style.getPropertyValue('-webkit-line-clamp');
+          let hiddenY = 0;
+          if (clamp && clamp !== 'none') {
+            const clampedHeight = heading.getBoundingClientRect().height;
+            const previous =
+              heading.style.getPropertyValue('-webkit-line-clamp');
+            heading.style.setProperty('-webkit-line-clamp', 'unset');
+            const fullHeight = heading.getBoundingClientRect().height;
+            heading.style.setProperty('-webkit-line-clamp', previous);
+            hiddenY = fullHeight - clampedHeight;
+          }
+          const lineHeight =
+            px(style.lineHeight) || px(style.fontSize) * 1.2 || 16;
+          const hiddenX =
+            style.textOverflow === 'ellipsis'
+              ? heading.scrollWidth - heading.clientWidth
+              : 0;
+          if (hiddenY < lineHeight / 2 && hiddenX <= 2) continue;
+          findings.push({
+            kind: 'clipped-heading',
+            message:
+              'A heading is clamped or clipped and hides part of its text.',
+            elements: [describe(heading)],
+            measurements: { hiddenY: round(hiddenY), hiddenX: round(hiddenX) },
+          });
+        }
+
+        // 5. Heading, lede, and actions in one stack share an axis. Text
+        //    axis comes from text-align (not ink, which includes clamped
+        //    lines); actions use the union of their controls.
+        const controlSelector = 'a[href],button,input,select,textarea';
+        type Axis = { readonly mode: 'left' | 'center'; readonly at: number };
+        const textAxis = (element: Element): Axis => {
+          const style = getComputedStyle(element);
+          const rect = rectOf(element);
+          return style.textAlign === 'center'
+            ? { mode: 'center', at: rect.x + rect.width / 2 }
+            : { mode: 'left', at: rect.x + px(style.paddingLeft) };
+        };
+        for (const heading of Array.from(root.querySelectorAll('h1, h2'))) {
+          if (!visibleIn(heading)) continue;
+          const siblings = Array.from(heading.parentElement?.children ?? []);
+          const after = siblings.slice(siblings.indexOf(heading) + 1);
+          const lede = after.find(
+            element => element.tagName === 'P' && visibleIn(element)
+          );
+          const actions = after.find(
+            element =>
+              element.tagName !== 'P' &&
+              visibleIn(element) &&
+              (element.matches(controlSelector) ||
+                element.querySelector(controlSelector))
+          );
+          if (!lede || !actions) continue;
+          const controls = (
+            actions.matches(controlSelector)
+              ? [actions]
+              : Array.from(actions.querySelectorAll(controlSelector))
+          ).filter(visibleIn);
+          if (controls.length === 0) continue;
+          // A form's field sits inside its own framed box (prefix, padding);
+          // the form's edge is the visible action edge.
+          const form = actions.matches('form')
+            ? actions
+            : actions.querySelector('form');
+          const boxes = form && visibleIn(form) ? [form] : controls;
+          const actionLeft = Math.min(...boxes.map(c => rectOf(c).x));
+          const actionRight = Math.max(...boxes.map(c => rectOf(c).right));
+          const headingAxis = textAxis(heading);
+          const ledeAxis = textAxis(lede);
+          const actionAt =
+            headingAxis.mode === 'center'
+              ? (actionLeft + actionRight) / 2
+              : actionLeft;
+          const aligned =
+            headingAxis.mode === ledeAxis.mode &&
+            Math.abs(headingAxis.at - ledeAxis.at) <= 6 &&
+            Math.abs(headingAxis.at - actionAt) <= 6;
+          if (aligned) continue;
+          findings.push({
+            kind: 'misaligned-text-stack',
+            message:
+              'A heading, its lede, and its actions do not share one left edge or center axis.',
+            elements: [describe(heading), describe(lede), describe(actions)],
+            measurements: {
+              headingAt: round(headingAxis.at),
+              ledeAt: round(ledeAxis.at),
+              actionAt: round(actionAt),
+            },
+          });
+        }
+
+        // 6. Placeholder content presented as the product.
+        const placeholder = /^(?:your name|lorem ipsum\b.*|placeholder)$/i;
+        for (const element of Array.from(
+          root.querySelectorAll('h1,h2,h3,h4,p,span,li,figcaption')
+        )) {
+          if (element.children.length > 0 || !visibleIn(element)) continue;
+          if (!placeholder.test(normalizedText(element.textContent))) continue;
+          findings.push({
+            kind: 'placeholder-copy',
+            message: 'Placeholder copy renders as product content.',
+            elements: [describe(element)],
+          });
         }
       }
 
