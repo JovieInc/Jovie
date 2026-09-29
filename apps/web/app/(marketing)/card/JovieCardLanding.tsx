@@ -65,7 +65,8 @@ export function JovieCardLanding() {
       >
         <h2
           id='jovie-card-how-heading'
-          className='system-b-marketing-section-heading line-clamp-2 text-primary-token'
+          data-wrap='editorial-title'
+          className='system-b-marketing-section-heading text-primary-token'
         >
           {JOVIE_CARD_COPY.sections.howItWorks}
         </h2>
@@ -97,7 +98,8 @@ export function JovieCardLanding() {
         <div className='mx-auto w-full max-w-public-content px-6 py-20 sm:px-8 lg:px-10 lg:py-28'>
           <h2
             id='jovie-card-introduction-heading'
-            className='system-b-marketing-section-heading line-clamp-2 max-w-3xl text-primary-token'
+            data-wrap='editorial-title'
+            className='system-b-marketing-section-heading max-w-3xl text-primary-token'
           >
             {JOVIE_CARD_COPY.sections.introduction}
           </h2>
@@ -145,7 +147,8 @@ export function JovieCardLanding() {
           <div className='max-w-xl'>
             <h2
               id='jovie-card-cta-heading'
-              className='system-b-marketing-section-heading line-clamp-2 text-primary-token'
+              data-wrap='editorial-title'
+              className='system-b-marketing-section-heading text-primary-token'
             >
               {JOVIE_CARD_COPY.sections.closing}
             </h2>
