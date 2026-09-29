@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { Instagram } from 'lucide-react';
+import { AtSign } from 'lucide-react';
 import { fn } from 'storybook/test';
 import { SidebarLinkRow } from './SidebarLinkRow';
 
@@ -17,7 +17,7 @@ const meta = {
     ),
   ],
   args: {
-    icon: <Instagram className='h-4 w-4' />,
+    icon: <AtSign className='h-4 w-4' />,
     label: 'Instagram',
     url: 'https://instagram.com/jovie',
   },
