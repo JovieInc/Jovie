@@ -30,7 +30,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "c5958c1f456d5ea6248c3bd8264502578ff7f84547ce0339dbb39741dd8a9eda"
+    "bodySha256": "7f1face547e59ffda17d07013083a9e53e16c70cbd3c8e367c665ef429646bde"
   },
   {
     "file": ".claude/rules/gstack.md",
@@ -44,7 +44,7 @@
   {
     "file": ".claude/rules/hermes-air.md",
     "paths": ["docs/HERMES_AIR.md"],
-    "bodySha256": "26c7560e73f11bf7137a09a2b962eaa023feec0691251b7c3d70368d8ff404d8"
+    "bodySha256": "96281ca1e3039407a003dff93b13642902ae4368fa8a9157ee4f8fed4cca27c1"
   },
   {
     "file": ".claude/rules/infra.md",
