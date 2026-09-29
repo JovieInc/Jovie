@@ -96,7 +96,7 @@ jobs:
             echo 'No coverable web product source; non-applicable receipt recorded.'
             exit 0
           fi
-          JOVIE_COVERAGE_INCLUDE="$(jq -r '.include[]' <<<"$plan")"
+          JOVIE_COVERAGE_INCLUDE="$(jq -r '.coverageInclude // [] | .[]' <<<"$plan")"
           JOVIE_COVERAGE_RELATED_TESTS="$(jq -r '.relatedTests[]?' <<<"$plan")"
           export JOVIE_COVERAGE_INCLUDE JOVIE_COVERAGE_RELATED_TESTS
           pnpm --filter @jovie/web test:coverage --changed "$base_sha" --bail 1
