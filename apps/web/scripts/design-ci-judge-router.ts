@@ -1,5 +1,5 @@
 /**
- * Design CI batch judge router (JOV-6944 slice 1).
+ * JOV-INV-040: Design CI batch judge router (JOV-6944).
  *
  * Enumerates the certifiable units that already exist in code (screen
  * registry, marketing component registry, app-screen registry) and the
@@ -10,13 +10,17 @@
  * judge cannot be determined from existing registry metadata is marked
  * `insufficient` rather than guessed.
  *
- * This module does not evaluate anything yet — it only proves discovery,
- * applicability, and routing. Every cell's state is `insufficient` here by
- * construction (see CELL_STATE docs below); wiring real per-unit evaluation
- * and persistence through the `jovie.certification/v1` registry is JOV-6944
- * slice 2/3, not this file.
+ * This module proves discovery, applicability, and routing, and can
+ * persist through the real `jovie.certification/v1` registry (see
+ * fingerprintCells/persistCells below). It does not yet dispatch real
+ * per-unit judge evaluation into the matrix itself — every cell's state
+ * stays `insufficient` here by construction. That each judge route's real
+ * mechanism can genuinely fail is proven directly against the real
+ * judges (scripts/invariants/overlay-layer-contract.mjs, design-surfaces.mjs,
+ * jev-shadow.mjs) in design-ci-judge-router-evaluation.test.ts, not by a
+ * dispatcher owned by this file.
  *
- *   tsx scripts/design-ci-judge-router.ts [--json]
+ *   tsx scripts/design-ci-judge-router.ts [--json] [--persist [--base-url <url>]]
  */
 import { createHash } from 'node:crypto';
 import { dirname, resolve as resolvePath } from 'node:path';

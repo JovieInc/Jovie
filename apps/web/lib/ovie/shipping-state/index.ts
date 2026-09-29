@@ -1,4 +1,9 @@
 export {
+  type CapacityDrainMode,
+  type CapacityHorizon,
+  type CapacityHorizonLease,
+} from './capacity';
+export {
   type BooleanMeasurement,
   type CountMeasurement,
   DELIVERY_MERGE_REPOS,

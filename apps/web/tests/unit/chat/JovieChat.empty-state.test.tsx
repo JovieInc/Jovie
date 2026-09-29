@@ -392,6 +392,7 @@ describe('JovieChat empty state', () => {
     renderWithQueryClient(
       <JovieChat
         profileId='profile-1'
+        featureIntroCatalog={featureIntroCatalog}
         actionCards={[
           {
             id: 'build-artist-profile',
@@ -437,6 +438,10 @@ describe('JovieChat empty state', () => {
       'data-empty-affordance',
       'starter-actions'
     );
+    // JOV-7113: the What's New card docks above the composer only on the bare
+    // welcome; while starter-action cards own the empty state it must not
+    // crowd the dock and cover their CTA.
+    expect(screen.queryByTestId('feature-intro-card')).toBeNull();
     // one-chrome-layer-v1: starter-action chrome XOR the usage banner.
     expect(screen.queryByTestId('chat-usage')).toBeNull();
     expect(
