@@ -314,6 +314,24 @@ export const AlwaysDark: Story = {
 };
 
 /**
+ * Danger tone — swaps the neutral tooltip surface for the shared error
+ * tokens (same ones as Banner's error variant), for inline validation
+ * feedback rather than decorative or informational content.
+ */
+export const Danger: Story = {
+  render: () => (
+    <Tooltip defaultOpen>
+      <TooltipTrigger>
+        <Button variant='outline'>Invalid field</Button>
+      </TooltipTrigger>
+      <TooltipContent tone='danger' side='bottom'>
+        Enter a valid email address
+      </TooltipContent>
+    </Tooltip>
+  ),
+};
+
+/**
  * Accessibility features demonstration
  */
 export const AccessibilityFeatures: Story = {

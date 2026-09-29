@@ -68,6 +68,15 @@ export const TOOLTIP_SURFACE_BASE =
   'border border-default bg-surface-tooltip text-tooltip-foreground shadow-sm';
 
 /**
+ * Danger tooltip surface — same error tokens as MENU_ITEM_DESTRUCTIVE and
+ * Banner's error variant (see banner-semantic-contract.ts), reused here so
+ * an error tooltip (e.g. inline validation) stays on the approved color
+ * system instead of a one-off className restyle (JOV-6773).
+ */
+export const TOOLTIP_SURFACE_DANGER =
+  'border border-error/30 bg-error-subtle text-error shadow-sm';
+
+/**
  * The shared rounded rectangle used by wrapped overlay content.
  */
 export const OVERLAY_CONTENT_RADIUS = 'rounded-(--system-b-radius-overlay)';
