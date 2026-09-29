@@ -629,10 +629,18 @@ const nextConfig = {
         // Default /hud is a filesystem route outside /app/(shell). Intercept
         // it before that page so Ops inherits sidebar + app chrome. A signed
         // kiosk token is the only presentation boundary; browser fullscreen
-        // expands the existing main-content surface.
+        // expands the existing main-content surface. `fs=1` is the third
+        // exemption (JOV-7126): it is the only way to reach the isolated
+        // apps/web/app/hud/page.tsx source directly (screen-cert producer
+        // web.hud-isolated, per scripts/invariants/screen-certification.mjs),
+        // which documented this exemption before it actually existed here —
+        // that source page stays admin-gated on its own
+        // (getCurrentAdminPageAccess), so this exemption does not widen who
+        // can reach it, only which of the two equivalent pages renders.
         {
           source: '/hud',
           missing: [
+            { type: 'query', key: 'fs', value: '1' },
             { type: 'query', key: 'kiosk' },
             { type: 'query', key: 'mode', value: 'kiosk' },
           ],

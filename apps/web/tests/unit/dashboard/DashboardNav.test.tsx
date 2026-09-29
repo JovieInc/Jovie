@@ -19,7 +19,7 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
 const CANONICAL_NAV = [
   ['Library', APP_ROUTES.LIBRARY],
   ['Contacts', APP_ROUTES.CONTACTS],
-  ['Presence', APP_ROUTES.PROFILES],
+  ['Presence', APP_ROUTES.PRESENCE],
 ] as const;
 
 const FORBIDDEN_PRIMARY_LABELS = [
@@ -82,7 +82,7 @@ describe('DashboardNav', () => {
 
     expect(getByRole('link', { name: 'Presence' })).toHaveAttribute(
       'href',
-      APP_ROUTES.PROFILES
+      APP_ROUTES.PRESENCE
     );
     expect(queryByRole('button', { name: 'Open Artist profile' })).toBeNull();
     expect(queryByRole('link', { name: 'Settings' })).toBeNull();
@@ -230,7 +230,7 @@ describe('DashboardNav', () => {
     expect(container.querySelector('[aria-expanded]')).toBeNull();
     expect(getByRole('link', { name: 'Presence' })).toHaveAttribute(
       'href',
-      APP_ROUTES.PROFILES
+      APP_ROUTES.PRESENCE
     );
     const artistSection = container.querySelector(
       '[data-nav-section="primary"]'

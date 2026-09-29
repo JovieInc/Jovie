@@ -971,13 +971,18 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
     return gate_pr(host, pr, worktree, log, sensitive=sensitive)
 
 
-def gate_slot(host: Host) -> Locked:
-    """One of `gate_slots` host-wide gate seats; waits (polling) until one is free."""
+def gate_slot(host: Host) -> tuple[Locked, float]:
+    """One of `gate_slots` host-wide gate seats; waits (polling) until one is free.
+
+    Returns the held seat and the seconds spent queued for it, so seat contention is
+    measured per gated PR instead of inferred from timeouts.
+    """
+    started = time.time()
     while True:
         for index in range(host.gate_slots):
             lock = Locked(host.state / "slots" / f"gate.{index}.lock", blocking=False)
             if lock.held:
-                return lock
+                return lock, time.time() - started
             lock.release()
         time.sleep(15)
 
@@ -1006,7 +1011,10 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False) 
               "changedFiles": len(changes), "reasons": reasons}
     if not reasons:
         commands = check_commands([change.path for change in changes])
-        seat = gate_slot(host) if commands else None
+        seat = None
+        if commands:
+            seat, waited = gate_slot(host)
+            result["gateWaitS"] = round(waited)
         try:
             for command in commands:
                 try:

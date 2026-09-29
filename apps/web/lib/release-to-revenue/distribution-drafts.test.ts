@@ -1,3 +1,4 @@
+import { lintCopy } from '@jovie/copy';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockDb, mockEq, mockRecordWorkflowRunOutcome } = vi.hoisted(() => ({
@@ -112,6 +113,25 @@ describe('buildDistributionDrafts', () => {
       'https://jov.ie/timwhite/merch/card-1'
     );
     expect(drafts.items.every(item => item.status === 'pending')).toBe(true);
+  });
+
+  it('keeps every drafted post inside the customer-voice copy floor', () => {
+    const drafts = buildDistributionDrafts({
+      releaseTitle: 'Neon Sky',
+      releaseLink: 'https://jov.ie/timwhite/neon-sky',
+      merchDropLink: 'https://jov.ie/timwhite/merch/card-1',
+      platform: 'instagram',
+      createdAt: '2026-06-20T08:00:00.000Z',
+    });
+
+    // Drafts ship in the customer's voice; canon/VOICE.md requires the
+    // deterministic floor to pass before send (JOV-6616).
+    for (const item of drafts.items) {
+      const { blocking } = lintCopy(item.body, {
+        register: 'customer-voice',
+      });
+      expect(blocking, `${item.variant}: ${item.body}`).toEqual([]);
+    }
   });
 });
 

@@ -1,7 +1,9 @@
 import { fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
-import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import {
+  DashboardDataContext,
+  type DashboardDataContextValue,
+} from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { FounderDoorProvider } from '@/contexts/FounderDoorContext';
 import { FOUNDER_DOOR_STORAGE_KEY } from '@/lib/ovie/founder-door';
 
@@ -47,7 +49,9 @@ function Probe({ withProvider = true }: { readonly withProvider?: boolean }) {
       value={
         {
           isAdmin: shortcutState.isAdmin,
-        } as DashboardData
+          identities: [],
+          activeIdentity: null,
+        } as unknown as DashboardDataContextValue
       }
     >
       <FounderDoorProvider>{node}</FounderDoorProvider>

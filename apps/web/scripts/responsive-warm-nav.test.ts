@@ -28,7 +28,7 @@ describe('resolveResponsiveWarmNavMeasurement', () => {
     expect(canonicalSidebarNavigation.map(item => item.id)).toEqual([
       'library',
       'contacts',
-      'profiles',
+      'presence',
     ]);
     expect(canonicalSidebarNavigation.map(item => item.href)).not.toContain(
       APP_ROUTES.CALENDAR

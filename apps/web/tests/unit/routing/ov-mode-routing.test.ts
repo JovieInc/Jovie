@@ -84,7 +84,12 @@ describe('OV mode routing', () => {
     };
     const hudInShell = {
       source: APP_ROUTES.HUD,
+      // fs=1 (JOV-7126): the hud-isolated screen-cert producer's own path to
+      // the isolated apps/web/app/hud/page.tsx source. See
+      // tests/unit/routing/hud-rewrite-exemptions.test.ts for the dedicated
+      // contract test on this rewrite's exemption set.
       missing: [
+        { type: 'query', key: 'fs', value: '1' },
         { type: 'query', key: 'kiosk' },
         { type: 'query', key: 'mode', value: 'kiosk' },
       ],

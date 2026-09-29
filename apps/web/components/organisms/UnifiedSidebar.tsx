@@ -56,7 +56,7 @@ import {
   isOperatorNavigationHrefActive,
   OPERATOR_NAV_SECTIONS,
 } from './operator-navigation';
-import { ProfileSwitcher } from './ProfileSwitcher';
+import { IdentitySwitcher } from './ProfileSwitcher';
 import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
 
 export interface UnifiedSidebarProps {
@@ -228,7 +228,7 @@ function SidebarHeaderNav({
   isRouteSidebar,
   isOperatorSection,
   canSwitchWorkspaces,
-  hasMultipleProfiles,
+  hasMultipleIdentities,
   isDemoRoute,
   variant = 'jovie',
   routeBackHref = APP_ROUTES.DASHBOARD,
@@ -237,7 +237,7 @@ function SidebarHeaderNav({
   isRouteSidebar: boolean;
   isOperatorSection: boolean;
   canSwitchWorkspaces: boolean;
-  hasMultipleProfiles: boolean;
+  hasMultipleIdentities: boolean;
   isDemoRoute: boolean;
   variant?: BrandVariant;
   routeBackHref?: string;
@@ -298,8 +298,8 @@ function SidebarHeaderNav({
             />
           );
         }
-        if (hasMultipleProfiles && !isOperatorSection) {
-          return <ProfileSwitcher />;
+        if (hasMultipleIdentities && !isOperatorSection) {
+          return <IdentitySwitcher />;
         }
         // Clean header: the Jovie mark is the global "Ask Jovie" entry point
         // (JOV-6569). OV skin keeps its static identity wordmark; user menu
@@ -380,7 +380,7 @@ export function UnifiedSidebar({
   section,
   variant = 'jovie',
 }: UnifiedSidebarProps) {
-  const { creatorProfiles, isAdmin: canSwitchWorkspaces } = useDashboardData();
+  const { identities, isAdmin: canSwitchWorkspaces } = useDashboardData();
   const sidebarOverride = useShellSidebarOverride();
   const { state: sidebarState } = useSidebar();
   const pathname = usePathname();
@@ -388,7 +388,7 @@ export function UnifiedSidebar({
   const isInSettings = section === 'settings';
   const isOperatorSection = section === 'admin' || section === 'ov';
   const isRouteSidebar = isInSettings || sidebarOverride !== null;
-  const hasMultipleProfiles = creatorProfiles.length >= 2;
+  const hasMultipleIdentities = identities.length >= 2;
   // Read the bridge synchronously so the desktop update listener mounts on
   // the first committed sidebar render. Electron emits update events once;
   // waiting for the effect-backed runtime hook would miss a boot-time event.
@@ -424,7 +424,7 @@ export function UnifiedSidebar({
           isRouteSidebar={isRouteSidebar}
           isOperatorSection={isOperatorSection}
           canSwitchWorkspaces={canSwitchWorkspaces}
-          hasMultipleProfiles={hasMultipleProfiles}
+          hasMultipleIdentities={hasMultipleIdentities}
           isDemoRoute={isDemoRoute}
           variant={variant}
           routeBackHref={sidebarOverride?.backHref}

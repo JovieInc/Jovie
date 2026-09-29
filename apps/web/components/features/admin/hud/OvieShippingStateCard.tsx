@@ -108,29 +108,40 @@ function CapacityLeaseRow({ row }: { readonly row: CapacityHorizonLease }) {
         concurrency · {row.compatibility.cli ?? '?'}+
         {row.compatibility.harness ?? '?'} · {row.freshness.status}
       </p>
-      <details className='mt-0.5 text-2xs text-tertiary-token'>
-        <summary title={reason}>
-          {href ? (
-            <a
-              className='text-accent-blue hover:underline'
-              href={href}
-              target='_blank'
-              rel='noreferrer'
-            >
-              {work}
-            </a>
-          ) : (
-            work
-          )}{' '}
-          · {reason}
-        </summary>
-        <p>
-          alternatives{' '}
-          {row.route?.alternativesConsidered.join(', ') || 'none recorded'} ·
-          replan {row.route?.replanConditions.join(', ') || 'source gap'} · gaps{' '}
-          {row.route?.sourceGaps.join(', ') || 'none'}
-        </p>
-      </details>
+      {/* axe nested-interactive (WCAG 4.1.2): <summary> is itself a native
+          toggle control, so the Linear link must sit outside it rather than
+          nested inside — it's a sibling here instead, and the disclosure
+          only wraps the plain-text reason. A <div> wrapper (not <p>) because
+          <details> is block content a <p> cannot validly contain. */}
+      <div className='mt-0.5 text-2xs text-tertiary-token'>
+        {href ? (
+          <a
+            className='text-accent-blue hover:underline'
+            href={href}
+            target='_blank'
+            rel='noreferrer'
+          >
+            {work}
+          </a>
+        ) : (
+          work
+        )}{' '}
+        ·{' '}
+        <details className='inline'>
+          {/* list-none (via `inline`) drops the default disclosure
+              triangle, so a text marker replaces it as the toggle
+              affordance. */}
+          <summary className='inline cursor-pointer list-none' title={reason}>
+            <span aria-hidden='true'>▸</span> {reason}
+          </summary>
+          <p>
+            alternatives{' '}
+            {row.route?.alternativesConsidered.join(', ') || 'none recorded'} ·
+            replan {row.route?.replanConditions.join(', ') || 'source gap'} ·
+            gaps {row.route?.sourceGaps.join(', ') || 'none'}
+          </p>
+        </details>
+      </div>
     </div>
   );
 }

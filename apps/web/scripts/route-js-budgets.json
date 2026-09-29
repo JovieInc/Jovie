@@ -12,7 +12,7 @@
     "/app/settings/artist-profile": 1035,
     "/app/admin/system": 1030,
     "/app/admin/hud": 990,
-    "/app/profiles": 950,
+    "/app/presence": 950,
     "/app": 935,
     "/app/contacts": 925,
     "/app/dashboard/releases/[releaseId]/downloads": 920,

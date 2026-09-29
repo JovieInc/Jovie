@@ -184,8 +184,16 @@ function CommandPaletteHeaderHarness() {
 }
 
 function withDashboard(node: ReactNode, isAdmin = false) {
+  const dashboard = makeDashboard(isAdmin);
+
   return (
-    <DashboardDataContext.Provider value={makeDashboard(isAdmin)}>
+    <DashboardDataContext.Provider
+      value={{
+        ...dashboard,
+        identities: dashboard.creatorProfiles,
+        activeIdentity: dashboard.selectedProfile,
+      }}
+    >
       <HeaderActionsProvider>
         {node}
         <CommandPaletteMainSurface />

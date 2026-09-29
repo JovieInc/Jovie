@@ -48,6 +48,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Generate Jovie Bot token
         id: app-token
@@ -74,10 +76,12 @@ jobs:
           TIGHTEN=$(jq '[.evaluation.tightenCandidates[]] | length' "$RUNNER_TEMP/shipping-slo.json")
           FLAT_STALL=$(jq '.evaluation.flatStall' "$RUNNER_TEMP/shipping-slo.json")
           SAMPLES=$(jq '.sampled.ciRuns + .sampled.mergedPrs' "$RUNNER_TEMP/shipping-slo.json")
-          echo "regressions=$REGRESSIONS" >> "$GITHUB_OUTPUT"
-          echo "tighten=$TIGHTEN" >> "$GITHUB_OUTPUT"
-          echo "flat_stall=$FLAT_STALL" >> "$GITHUB_OUTPUT"
-          echo "samples=$SAMPLES" >> "$GITHUB_OUTPUT"
+          {
+            echo "regressions=$REGRESSIONS"
+            echo "tighten=$TIGHTEN"
+            echo "flat_stall=$FLAT_STALL"
+            echo "samples=$SAMPLES"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Commit latest snapshot to main
         env:

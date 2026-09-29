@@ -312,7 +312,7 @@
     "require-in-the-middle": "8.0.1",
     "resend": "^6.29.0",
     "server-only": "^0.0.1",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "sonner": "^2.0.8",
     "streamdown": "^2.6.0",
     "stripe": "^22.6.2",
