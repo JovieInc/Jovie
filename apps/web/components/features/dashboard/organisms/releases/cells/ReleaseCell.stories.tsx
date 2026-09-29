@@ -8,6 +8,7 @@ const release: ReleaseViewModel = {
   title: 'Skyline Dreams',
   slug: 'skyline-dreams',
   releaseType: 'single',
+  status: 'released',
   isExplicit: false,
   releaseDate: '2026-01-01',
   artworkUrl: undefined,

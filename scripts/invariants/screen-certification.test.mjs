@@ -2467,8 +2467,11 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
-  it('registers the engineering publication surface for changed-surface certification', () => {
-    const source = 'apps/web/app/(marketing)/engineering/';
+  it('registers the engineering publication index as its own screen for changed-surface certification (JOV-7110)', () => {
+    // JOV-7110: web.engineering-publication used to bundle both the /engineering
+    // index and the /engineering/preview gallery as one screen, but the schema
+    // binds exactly one manifest route per screen. Split into two ids below;
+    // this one owns only the sources that render /engineering.
     const screen = SCREEN_REGISTRY.find(
       entry => entry.id === 'web.engineering-publication'
     );
@@ -2477,9 +2480,16 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       id: 'web.engineering-publication',
       platform: 'web',
       owner: 'engineering-publication',
-      sources: [source],
+      sources: [
+        'apps/web/app/(marketing)/engineering/page.tsx',
+        'apps/web/app/(marketing)/engineering/[slug]/page.tsx',
+      ],
       viewports: ['desktop', 'mobile'],
     });
+    assert.equal(
+      SCREEN_MARKETING_ROUTES['web.engineering-publication'],
+      '/engineering'
+    );
 
     const result = evaluateChangedScreens({
       changedFiles: [
@@ -2488,6 +2498,39 @@ describe('JOV-INV-018 screen-certification/v2', () => {
           path: 'apps/web/app/(marketing)/engineering/[slug]/page.tsx',
           status: 'A',
         },
+      ],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.engineering-publication',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the engineering preview gallery as its own screen for changed-surface certification (JOV-7110)', () => {
+    const source = 'apps/web/app/(marketing)/engineering/preview/';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.engineering-preview'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.engineering-preview',
+      platform: 'web',
+      owner: 'engineering-preview',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+    assert.equal(
+      SCREEN_MARKETING_ROUTES['web.engineering-preview'],
+      '/engineering/preview'
+    );
+
+    const result = evaluateChangedScreens({
+      changedFiles: [
         {
           path: 'apps/web/app/(marketing)/engineering/preview/page.tsx',
           status: 'A',
@@ -2502,7 +2545,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.deepEqual(result.issues, []);
     assert.deepEqual(result.changedScreens, [
       {
-        id: 'web.engineering-publication',
+        id: 'web.engineering-preview',
         verdict: 'evidence-required',
         findings: [],
       },
