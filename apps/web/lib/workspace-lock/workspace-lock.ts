@@ -11,6 +11,8 @@ export const WORKSPACE_LOCK_COOKIE = 'jovie_workspace_lock';
 export const MONEY_HIDDEN_COOKIE = 'jovie_money_hidden';
 
 const COOKIE_ON = '1';
+const PRIVACY_LOCK_PATH = '/api/ovie/privacy-lock';
+const PRIVACY_LOCK_REQUEST_TIMEOUT_MS = 10_000;
 
 function readCookie(name: string): string | null {
   if (typeof document === 'undefined') return null;
@@ -34,6 +36,146 @@ export function isWorkspaceLockCookieValue(value: string | undefined | null) {
 
 export function isMoneyHiddenCookieValue(value: string | undefined | null) {
   return value === COOKIE_ON;
+}
+
+export type WorkspacePrivacyLockAction =
+  | 'enable'
+  | 'disable'
+  | 'lock'
+  | 'unlock';
+
+export interface WorkspacePrivacyLockState {
+  enabled: boolean;
+  locked: boolean;
+  unlockedUntil: string | null;
+}
+
+export class WorkspacePrivacyLockError extends Error {
+  constructor(
+    message: string,
+    readonly code: string = 'unconfirmed'
+  ) {
+    super(message);
+    this.name = 'WorkspacePrivacyLockError';
+  }
+}
+
+function isPrivacyLockState(
+  value: unknown
+): value is WorkspacePrivacyLockState {
+  if (typeof value !== 'object' || value === null) return false;
+  const state = value as Record<string, unknown>;
+  if (
+    typeof state.enabled !== 'boolean' ||
+    typeof state.locked !== 'boolean' ||
+    (typeof state.unlockedUntil !== 'string' && state.unlockedUntil !== null)
+  ) {
+    return false;
+  }
+  if (!state.enabled)
+    return state.locked === false && state.unlockedUntil === null;
+  if (state.locked) return state.unlockedUntil === null;
+  if (typeof state.unlockedUntil !== 'string') return false;
+  const unlockedUntil = Date.parse(state.unlockedUntil);
+  return Number.isFinite(unlockedUntil) && unlockedUntil > Date.now();
+}
+
+function apiErrorMessage(code: string): string {
+  switch (code) {
+    case 'unauthenticated':
+    case 'UNAUTHORIZED':
+      return 'Your session expired. Sign in again to unlock Ovie.';
+    case 'forbidden':
+    case 'FORBIDDEN':
+      return 'You do not have permission to unlock Ovie.';
+    case 'PASSKEY_STEP_UP_REQUIRED':
+      return 'This passkey cannot unlock Ovie. Use the passkey set up for admin access.';
+    case 'PASSKEY_SETUP_REQUIRED':
+      return 'Set up an admin-capable passkey before enabling Ovie privacy lock.';
+    case 'PRIVACY_UNLOCK_REQUIRED':
+      return 'Unlock Ovie before changing this privacy setting.';
+    default:
+      return 'Could not confirm the Ovie privacy lock. Check your connection and try again.';
+  }
+}
+
+async function requestPrivacyLockState(
+  init: RequestInit
+): Promise<WorkspacePrivacyLockState> {
+  const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      fetch(PRIVACY_LOCK_PATH, { ...init, signal: controller.signal }).then(
+        parsePrivacyLockState
+      ),
+      new Promise<WorkspacePrivacyLockState>((_, reject) => {
+        timeout = globalThis.setTimeout(() => {
+          controller.abort();
+          reject(
+            new WorkspacePrivacyLockError(
+              'The Ovie privacy lock took too long to respond. Try again.',
+              'timeout'
+            )
+          );
+        }, PRIVACY_LOCK_REQUEST_TIMEOUT_MS);
+      }),
+    ]);
+  } catch (error) {
+    if (error instanceof WorkspacePrivacyLockError) throw error;
+    throw new WorkspacePrivacyLockError(
+      'Could not confirm the Ovie privacy lock. Check your connection and try again.'
+    );
+  } finally {
+    if (timeout !== undefined) globalThis.clearTimeout(timeout);
+  }
+}
+
+async function parsePrivacyLockState(
+  response: Response
+): Promise<WorkspacePrivacyLockState> {
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new WorkspacePrivacyLockError(
+      'Could not confirm the Ovie privacy lock. Check your connection and try again.'
+    );
+  }
+  if (!response.ok) {
+    const code =
+      typeof body === 'object' &&
+      body !== null &&
+      typeof (body as Record<string, unknown>).code === 'string'
+        ? String((body as Record<string, unknown>).code)
+        : 'unconfirmed';
+    throw new WorkspacePrivacyLockError(apiErrorMessage(code), code);
+  }
+  if (!isPrivacyLockState(body)) {
+    throw new WorkspacePrivacyLockError(
+      'Could not confirm the Ovie privacy lock. Check your connection and try again.'
+    );
+  }
+  return body;
+}
+
+export async function getWorkspacePrivacyLockState(): Promise<WorkspacePrivacyLockState> {
+  return requestPrivacyLockState({
+    credentials: 'same-origin',
+    cache: 'no-store',
+  });
+}
+
+export async function updateWorkspacePrivacyLock(
+  action: WorkspacePrivacyLockAction
+): Promise<WorkspacePrivacyLockState> {
+  return requestPrivacyLockState({
+    method: 'POST',
+    credentials: 'same-origin',
+    cache: 'no-store',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action }),
+  });
 }
 
 /** Lock the workspace and re-render so the lock screen replaces content. */
