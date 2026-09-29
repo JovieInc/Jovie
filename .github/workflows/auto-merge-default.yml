@@ -72,7 +72,17 @@ concurrency:
 jobs:
   enable:
     name: Enable auto-merge (squash)
-    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    # Same-repo + non-Dependabot only: GitHub runs pull_request workflows for
+    # fork heads and dependabot[bot] actors with no secrets access, so the
+    # Jovie Bot private key is empty and token generation fails before the
+    # in-job fork notice could run. Dependabot PRs get native merge intent
+    # from dependabot-auto-merge.yml (pull_request_target); forks and missed
+    # events are covered by the hourly triage sweep's --enable-missing.
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
