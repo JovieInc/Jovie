@@ -125,10 +125,20 @@ export async function DashboardShellContent({
   const sidebarDefaultOpen = sidebarCookie
     ? sidebarCookie.value !== 'false'
     : !dashboardData?.sidebarCollapsed;
+  // Keep the client shell stable across route changes, but remount its
+  // stateful privacy boundary when server authorization state changes.
+  const privacyBoundaryKey = JSON.stringify([
+    mode,
+    userId,
+    privacyEnabled,
+    initiallyLocked,
+    lockedUntil,
+  ]);
 
   const shellContents = (
     <div className='h-full'>
       <DashboardShellPrivacyBoundary
+        key={privacyBoundaryKey}
         mode={mode}
         userId={userId}
         dashboardData={dashboardData}

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -9,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   flags: vi.fn(),
   dehydrated: vi.fn(),
   essential: vi.fn(),
+  boundaryMounts: 0,
 }));
 
 vi.mock('next/headers', () => ({
@@ -78,20 +80,29 @@ vi.mock('./DashboardShellPrivacyBoundary', () => ({
   DashboardShellPrivacyBoundary: ({
     children,
     initiallyLocked,
+    dashboardData,
     unlockedShellChrome,
   }: {
     children: React.ReactNode;
     initiallyLocked: boolean;
+    dashboardData: unknown;
     unlockedShellChrome?: React.ReactNode;
-  }) => (
-    <div
-      data-has-chrome={String(Boolean(unlockedShellChrome))}
-      data-has-children={String(Boolean(children))}
-      data-initially-locked={String(initiallyLocked)}
-    >
-      {initiallyLocked ? <div>Unlock Ovie</div> : children}
-    </div>
-  ),
+  }) => {
+    const [locked] = useState(initiallyLocked);
+    const [mountId] = useState(() => ++mocks.boundaryMounts);
+    if (!dashboardData && !locked) return null;
+    return (
+      <div
+        data-boundary-mount={mountId}
+        data-has-chrome={String(Boolean(unlockedShellChrome))}
+        data-has-children={String(Boolean(children))}
+        data-initially-locked={String(initiallyLocked)}
+        data-effective-locked={String(locked)}
+      >
+        {locked ? <div>Unlock Ovie</div> : children}
+      </div>
+    );
+  },
 }));
 vi.mock('./dashboard/actions', () => ({
   getDashboardData: mocks.dashboard,
@@ -130,6 +141,7 @@ const dashboardData = {
 describe('DashboardShellContent privacy decision', () => {
   afterEach(() => vi.clearAllMocks());
   beforeEach(() => {
+    mocks.boundaryMounts = 0;
     mocks.flags.mockResolvedValue({});
     mocks.dehydrated.mockReturnValue({ private: 'cache' });
     mocks.essential.mockReturnValue(true);
@@ -205,5 +217,80 @@ describe('DashboardShellContent privacy decision', () => {
     expect(screen.getByText('Jovie dashboard')).toBeInTheDocument();
     expect(mocks.privacyState).not.toHaveBeenCalled();
     expect(mocks.getFreshAuth).not.toHaveBeenCalled();
+  });
+
+  it('reinitializes the privacy boundary on warm Jovie to locked Ovie navigation', async () => {
+    mocks.shellDashboard.mockResolvedValue(dashboardData);
+    const jovieTree = await DashboardShellContent({
+      userId: 'user-1',
+      pathname: '/app',
+      mode: 'customer',
+      children: <div>Jovie dashboard</div>,
+    });
+    const view = render(jovieTree);
+    const jovieMount = document
+      .querySelector('[data-boundary-mount]')
+      ?.getAttribute('data-boundary-mount');
+    expect(screen.getByText('Jovie dashboard')).toBeInTheDocument();
+
+    mocks.getFreshAuth.mockResolvedValue({
+      userId: 'user-1',
+      sessionId: 'session-1',
+    });
+    mocks.privacyState.mockResolvedValue({
+      enabled: true,
+      locked: true,
+      unlockedUntil: null,
+    });
+    const ovieTree = await DashboardShellContent({
+      userId: 'user-1',
+      pathname: '/app',
+      mode: 'ov',
+      children: <div>Private Ovie dashboard</div>,
+    });
+    view.rerender(ovieTree);
+
+    expect(screen.getByText('Unlock Ovie')).toBeInTheDocument();
+    expect(screen.queryByText('Jovie dashboard')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Private Ovie dashboard')
+    ).not.toBeInTheDocument();
+    expect(
+      document.querySelector('[data-effective-locked="true"]')
+    ).toBeTruthy();
+    expect(
+      document
+        .querySelector('[data-boundary-mount]')
+        ?.getAttribute('data-boundary-mount')
+    ).not.toBe(jovieMount);
+  });
+
+  it('keeps the privacy boundary mounted across ordinary route changes', async () => {
+    mocks.shellDashboard.mockResolvedValue(dashboardData);
+    const firstTree = await DashboardShellContent({
+      userId: 'user-1',
+      pathname: '/app',
+      mode: 'customer',
+      children: <div>Dashboard route</div>,
+    });
+    const view = render(firstTree);
+    const initialMount = document
+      .querySelector('[data-boundary-mount]')
+      ?.getAttribute('data-boundary-mount');
+
+    const nextTree = await DashboardShellContent({
+      userId: 'user-1',
+      pathname: '/app/settings',
+      mode: 'customer',
+      children: <div>Settings route</div>,
+    });
+    view.rerender(nextTree);
+
+    expect(screen.getByText('Settings route')).toBeInTheDocument();
+    expect(
+      document
+        .querySelector('[data-boundary-mount]')
+        ?.getAttribute('data-boundary-mount')
+    ).toBe(initialMount);
   });
 });
