@@ -117,8 +117,11 @@ vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
 }));
 
 vi.mock('@/features/profile/nav/BottomTabBar', () => ({
-  BottomTabBar: () => (
-    <nav data-testid='profile-bottom-nav' aria-label='Profile Navigation' />
+  BottomTabBar: ({ aboveNav }: { readonly aboveNav?: React.ReactNode }) => (
+    <div data-testid='profile-tab-bar'>
+      {aboveNav}
+      <nav data-testid='profile-bottom-nav' aria-label='Profile Navigation' />
+    </div>
   ),
 }));
 
@@ -203,6 +206,27 @@ describe('ProfileCompactSurface', () => {
     renderSurface();
 
     expect(screen.getByTestId('profile-bottom-nav')).toBeTruthy();
+  });
+
+  it('shows the phone claim bar above the dock on proof profiles (JOV-7114)', () => {
+    renderSurface({ proofClaimCta: { href: '/start', label: 'Claim yours' } });
+
+    const bar = screen.getByTestId('profile-proof-claim-bar');
+    expect(bar).toHaveClass('md:hidden');
+    expect(screen.getByTestId('profile-proof-claim-bar-cta')).toHaveAttribute(
+      'href',
+      '/start'
+    );
+    // Rides inside the dock, directly above the nav, so it moves with it.
+    expect(bar.nextElementSibling).toBe(
+      screen.getByTestId('profile-bottom-nav')
+    );
+  });
+
+  it('omits the claim bar on regular profiles', () => {
+    renderSurface();
+
+    expect(screen.queryByTestId('profile-proof-claim-bar')).toBeNull();
   });
 
   it('hides the bottom tab bar in static previews so it cannot cover clipped content (JOV-7192)', () => {

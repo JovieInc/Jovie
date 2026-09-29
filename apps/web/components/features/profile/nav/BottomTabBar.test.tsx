@@ -51,6 +51,17 @@ describe('BottomTabBar — tab rendering', () => {
     expect(screen.queryByRole('button', { name: 'Get updates' })).toBeNull();
   });
 
+  it('renders aboveNav inside the dock, directly above the nav (JOV-7114)', () => {
+    render(
+      <BottomTabBar
+        {...makeProps({ aboveNav: <span data-testid='above'>Claim</span> })}
+      />
+    );
+    expect(screen.getByTestId('above').nextElementSibling).toBe(
+      screen.getByTestId('profile-bottom-nav')
+    );
+  });
+
   it('keeps Events when hasTourDates is false', () => {
     render(<BottomTabBar {...makeProps({ hasTourDates: false })} />);
     expect(screen.getByRole('button', { name: 'Events' })).toBeInTheDocument();
