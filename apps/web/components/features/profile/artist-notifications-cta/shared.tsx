@@ -2,7 +2,7 @@
 
 import {
   buttonVariants,
-  Skeleton,
+  LoadingSkeleton,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -104,7 +104,7 @@ export const subscriptionSuccessTextClassName =
   'text-xs leading-4 tracking-[-0.012em] text-emerald-400';
 
 export const subscriptionDesktopErrorAffordanceClassName =
-  'inline-flex items-center gap-1.5 text-red-400';
+  'inline-flex items-center gap-1.5 text-error';
 
 interface UseSubscriptionErrorFeedbackOptions {
   readonly error: string | null;
@@ -309,10 +309,7 @@ export function SubscriptionDesktopErrorIndicator({
             <span className='sr-only'>{error}</span>
           </span>
         </TooltipTrigger>
-        <TooltipContent
-          side='bottom'
-          className='max-w-70 border-red-500/20 bg-red-950/90 text-red-200'
-        >
+        <TooltipContent side='bottom' tone='danger' className='max-w-70'>
           {error}
         </TooltipContent>
       </Tooltip>
@@ -369,7 +366,12 @@ export function SubscriptionFormSkeleton() {
   return (
     <output className='block space-y-3' aria-busy='true'>
       <span className='sr-only'>Loading subscription form</span>
-      <Skeleton className='h-14 w-full rounded-[2rem]' />
+      <LoadingSkeleton
+        height='h-14'
+        width='w-full'
+        rounded='full'
+        announce={false}
+      />
       {/* Disclaimer area skeleton - fixed height to prevent layout shift */}
       <div className='h-4' />
     </output>
