@@ -3,10 +3,9 @@ import { randomUUID } from 'node:crypto';
 import type { UIMessage, UIMessageChunk } from 'ai';
 import {
   type AccessDecision,
-  evaluateAccessSignal,
+  decideOnboardingAccess,
 } from '@/lib/chat/tools/onboarding-access-eval';
 import type { AudienceBand } from '@/lib/chat/tools/onboarding-signals';
-import { collapseInterviewSignals } from '@/lib/chat/tools/onboarding-signals';
 import {
   buildConfirmSpotifyArtistOutput,
   type OnboardingTurnState,
@@ -297,36 +296,20 @@ function decideAccess(
   extraBand: AudienceBand | null,
   options?: { readonly forceTurnCap?: boolean }
 ): AccessDecision {
-  if (state.accessControlled) {
-    if (!state.spotifyArtistId) {
-      return {
-        kind: 'needs_more_info',
-        rationale: 'confirmed_artist_required_for_waitlist',
-        score: 0,
-      };
-    }
-    return {
-      kind: 'waitlist',
-      rationale: 'controlled_access_gate_enabled',
-      score: 100,
-    };
-  }
-
-  const recordedAt = new Date().toISOString();
-  const signals = state.signals.map(signal => ({ ...signal, recordedAt }));
-  if (extraBand) {
-    signals.push({ audienceBand: extraBand, recordedAt });
-  }
   // Incomplete acks must not force waitlist via turn cap — freeze turnCount
   // under the force threshold unless we have real signal this turn.
   const turnCount =
     options?.forceTurnCap === false
       ? Math.min(state.turnCount, 2)
       : state.turnCount;
-  return evaluateAccessSignal({
-    signal: collapseInterviewSignals(signals),
+  return decideOnboardingAccess({
+    accessControlled: state.accessControlled,
+    spotifyArtistId: state.spotifyArtistId,
     spotifyFollowers: state.spotifyFollowers,
+    metrics: state.artistMetrics,
+    signals: state.signals,
     turnCount,
+    extraBand,
   });
 }
 

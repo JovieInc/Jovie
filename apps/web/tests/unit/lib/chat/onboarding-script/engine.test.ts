@@ -399,7 +399,7 @@ describe('decideFallbackTurn', () => {
     );
   });
 
-  it('promotes to instant access when the audience reply clears the bar', async () => {
+  it('does not promote to instant access on a self-reported audience (JOV-7144)', async () => {
     const lowSignal = {
       ...CONFIRMED_OUTPUT,
       artist: { ...CONFIRMED_OUTPUT.artist, followers: 120 },
@@ -413,7 +413,7 @@ describe('decideFallbackTurn', () => {
       ]),
       user('around 20k on instagram'),
     ]);
-    expect(turn.line.stepId).toBe('instant_access');
+    expect(turn.line.stepId).not.toBe('instant_access');
   });
 
   it('reopens artist search on none-of-these widget event', async () => {
