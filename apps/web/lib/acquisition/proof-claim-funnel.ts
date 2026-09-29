@@ -138,7 +138,7 @@ export function resolveProofClaimCta(
 
   return {
     label: 'Get yours',
-    href: buildProofClaimHref(false),
+    href: buildProofClaimHref(),
     note: `${offer.product} · $${offer.monthlyUsd}/mo`,
     support: `${offer.product} is $${offer.monthlyUsd}/mo.`,
     limited: false,
