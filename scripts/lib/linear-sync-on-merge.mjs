@@ -6,9 +6,12 @@
  * Linked means a linear-issue-id / linear-issue-identifier marker in the PR
  * body, a jov-NNNN branch reference, or the identifier in the title.
  * Commissioning parents are detected by label, sub-issues, or the allowlist.
+ * Invariant consumer: JOV-INV-041.
  */
 
 import { pathToFileURL } from 'node:url';
+
+import { evaluateEscapedDefectClosure } from './escaped-defect-closure.mjs';
 
 export const LINEAR_API = 'https://api.linear.app/graphql';
 export const COMMISSIONING_PARENT_ALLOWLIST = new Set([
@@ -180,6 +183,8 @@ export function pullRequestLinksIssue(pull, issue) {
  *   id: string,
  *   identifier: string,
  *   labels: string[],
+ *   description: string,
+ *   comments: string[],
  *   children: string[],
  *   hasChildren: boolean,
  *   states: { id?: string, name?: string, type?: string }[],
@@ -206,6 +211,15 @@ export function readIssueSnapshot(issue) {
         )
       ? /** @type {{ nodes: unknown[] }} */ (record.children).nodes
       : [];
+  const commentNodes = Array.isArray(record.comments)
+    ? record.comments
+    : record.comments &&
+        typeof record.comments === 'object' &&
+        Array.isArray(
+          /** @type {{ nodes?: unknown }} */ (record.comments).nodes
+        )
+      ? /** @type {{ nodes: unknown[] }} */ (record.comments).nodes
+      : [];
   const team =
     record.team && typeof record.team === 'object'
       ? /** @type {{ states?: { nodes?: unknown } }} */ (record.team)
@@ -226,6 +240,16 @@ export function readIssueSnapshot(issue) {
         ? record.identifier.toUpperCase()
         : '',
     labels: labelNodes.map(labelName).filter(Boolean),
+    description:
+      typeof record.description === 'string' ? record.description : '',
+    comments: commentNodes
+      .map(comment => {
+        if (typeof comment === 'string') return comment;
+        if (!comment || typeof comment !== 'object') return '';
+        const body = Reflect.get(comment, 'body');
+        return typeof body === 'string' ? body : '';
+      })
+      .filter(Boolean),
     children,
     hasChildren: childNodes.length > 0,
     states: states.filter(state => state && typeof state === 'object'),
@@ -309,6 +333,8 @@ export function nextLink(header) {
  *     readonly id?: string,
  *     readonly identifier?: string,
  *     readonly labels?: readonly string[],
+ *     readonly description?: string,
+ *     readonly comments?: readonly string[],
  *     readonly children?: readonly string[],
  *     readonly hasChildren?: boolean,
  *   },
@@ -336,6 +362,17 @@ export function decideLinearCloseOnMerge(input) {
   const reasons = [];
   const parent = parentHoldReason(input.issue, input.allowlist);
   if (parent) reasons.push(parent);
+  const escapedDefect = evaluateEscapedDefectClosure(input.issue);
+  if (escapedDefect.applicable) {
+    reasons.push(
+      'Escaped defects stay open at merge: closure requires product repair and detector evidence from the exact deployed build.'
+    );
+    if (!escapedDefect.ok) {
+      reasons.push(
+        `Closure evidence is incomplete: ${escapedDefect.errors.join('; ')}.`
+      );
+    }
+  }
   if (blocking.length > 0) reasons.push(formatBlockingPulls(blocking));
   if (input.scanComplete === false) {
     reasons.push(
@@ -435,7 +472,9 @@ const ISSUE_QUERY = `query IssueDoneState($issueId: String!) {
   issue(id: $issueId) {
     id
     identifier
+    description
     labels(first: 50) { nodes { name } }
+    comments(first: 50) { nodes { body } }
     children(first: 50) { nodes { identifier } }
     team { states { nodes { id name type } } }
   }

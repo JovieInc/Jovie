@@ -25,6 +25,11 @@ the implementation slot only after its exact-head receipt is acknowledged.
 | Activation | Production controller | Exact deployed runtime proof |
 | Closure | Summer | Closure receipt referencing activation proof |
 
+For an issue labeled `escaped-defect`, the closure receipt must also satisfy
+[JOV-INV-041](quality/ESCAPED_DEFECT_CLOSURE.md): product repair and
+detector repair, including exact deployed-build retest and deliberate-red
+detector proof. The merge event deliberately leaves that issue open.
+
 Missing ownership, stale/changed heads, failed checks, lost or duplicate events,
 and expired holds remain bounded repair/evidence outcomes. The policy digest is
 included in delivery receipts so a runtime can reject a mismatched contract.
