@@ -57,10 +57,7 @@ test('workflow only fetches logs from successful Build jobs', () => {
   // GitHub's server-side status filter has returned stale successful runs in
   // production, so filter recent run conclusions in jq instead.
   assert.doesNotMatch(workflow, /--status success/);
-  assert.match(
-    workflow,
-    /map\(select\(\.conclusion == "success"\)\)\[:10\]/
-  );
+  assert.match(workflow, /map\(select\(\.conclusion == "success"\)\)\[:10\]/);
   assert.match(
     workflow,
     /No successful merge-queue CI run with Build logs found/
