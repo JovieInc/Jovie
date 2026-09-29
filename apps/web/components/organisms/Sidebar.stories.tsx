@@ -31,6 +31,13 @@ const mockDashboardData: DashboardData = {
     totalReceivedCents: 0,
     monthReceivedCents: 0,
   },
+  profileCompletion: {
+    percentage: 0,
+    completedCount: 0,
+    totalCount: 6,
+    steps: [],
+    profileIsLive: false,
+  },
 };
 
 const meta: Meta<typeof Sidebar> = {
