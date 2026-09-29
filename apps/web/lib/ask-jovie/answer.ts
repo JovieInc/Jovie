@@ -211,8 +211,11 @@ export function classifyAskJovieQuestion(
     return 'official_links';
   }
   if (
-    /\b(who is|who are|bio)\b/.test(q) ||
-    /\babout (this|the) artist\b/.test(q)
+    /\b(who is|who are|bio|genres?|style of music|kind of music|type of music)\b/.test(
+      q
+    ) ||
+    /\babout (this|the) artist\b/.test(q) ||
+    /\bwhere (is|are) .*\b(from|based|located)\b/.test(q)
   ) {
     return 'profile';
   }
