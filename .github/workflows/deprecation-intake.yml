@@ -5,9 +5,10 @@
 name: Deprecation Intake (Linear devin lane)
 
 # clock-class: skip-if-unchanged
-# Daily: read the latest successful main build log, file one deduped Linear
-# issue per distinct deprecation warning (Todo + label devin) so the
-# autonomous lane fixes deprecations without a human.
+# Daily: read the latest successful merge-queue build log (main push runs
+# skip the Build jobs; the queue exercises the exact head that lands), file
+# one deduped Linear issue per distinct deprecation warning (Todo + label
+# devin) so the autonomous lane fixes deprecations without a human.
 
 on:
   schedule:
@@ -42,14 +43,26 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          run_id="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push --status success --limit 1 --json databaseId --jq '.[0].databaseId')"
-          if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
-            echo "::error::No successful main CI run found."
+          run_ids="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --event merge_group --status success --limit 10 --json databaseId --jq '.[].databaseId')"
+          if [ -z "$run_ids" ]; then
+            echo "::error::No successful merge-queue CI run found."
             exit 1
           fi
           : > build.log
-          for job in $(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" --jq '.jobs[] | select(.name | test("^Build")) | .id'); do
-            gh api "repos/$GITHUB_REPOSITORY/actions/jobs/$job/logs" >> build.log
+          for run_id in $run_ids; do
+            # Skipped jobs have no log blob — the logs endpoint 404s on them.
+            for job in $(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" --jq '.jobs[] | select((.name | test("^Build")) and (.conclusion == "success")) | .id'); do
+              if chunk="$(gh api "repos/$GITHUB_REPOSITORY/actions/jobs/$job/logs")"; then
+                printf '%s\n' "$chunk" >> build.log
+              else
+                echo "::warning::Could not fetch log for job $job (run $run_id); skipping."
+              fi
+            done
+            if [ -s build.log ]; then
+              echo "Collected build logs from run $run_id"
+              break
+            fi
+            echo "::notice::Run $run_id ran no Build jobs; trying an older run."
           done
           echo "url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run_id" >> "$GITHUB_OUTPUT"
 

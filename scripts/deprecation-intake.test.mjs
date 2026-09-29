@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   extractDeprecations,
   normalizeWarning,
@@ -33,4 +36,22 @@ test('normalizes runner paths so fingerprints are stable', () => {
     ),
     '(node) warn <path> deprecated'
   );
+});
+
+// Skipped jobs have no log blob; the job-logs endpoint 404s on them and
+// `set -e` kills the step (nightly-failure JOV-6876). Only fetch logs for
+// Build jobs that actually ran.
+test('workflow only fetches logs from successful Build jobs', () => {
+  const repoRoot = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '..'
+  );
+  const workflow = readFileSync(
+    path.join(repoRoot, '.github/workflows/deprecation-intake.yml'),
+    'utf8'
+  );
+  assert.match(workflow, /\.conclusion == "success"/);
+  // Main push runs skip the Build jobs under the merge-queue model; the
+  // queue run is the real "main build".
+  assert.match(workflow, /--event merge_group/);
 });
