@@ -6,7 +6,7 @@ import {
   createUIMessageStreamResponse,
   type UIMessage,
 } from 'ai';
-import { and, desc, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
+import { and, asc, desc, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
@@ -28,8 +28,10 @@ import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
 import { sanitizeConversationTitle } from '@/lib/chat/title';
 import {
+  decodeToolEvents,
   encodeToolEvents,
   type PersistedToolEvent,
+  toolEventToMessagePart,
 } from '@/lib/chat/tool-events';
 import {
   buildOnboardingTools,
@@ -504,11 +506,15 @@ export async function tryHandleAnonymousOnboardingChat(
   }
 
   // --- Build the per-turn state accumulator and the onboarding tool palette ---
+  // JOV-7143: turn state (artist, followers, interview signals) feeds the
+  // access decision, so it comes from the tool calls this server persisted,
+  // never from tool outputs in the client-supplied history.
+  const serverToolHistory = await loadServerToolHistory(conversationId);
   const onboardingState = createOnboardingTurnState({
     sessionId,
     turnCount,
     accessControlled,
-    messages: uiMessages,
+    messages: serverToolHistory,
   });
   const tools = buildOnboardingTools(onboardingState);
 
@@ -581,7 +587,7 @@ export async function tryHandleAnonymousOnboardingChat(
       sessionId,
       turnCount,
       accessControlled,
-      messages: uiMessages,
+      messages: serverToolHistory,
     });
     const turn: FallbackTurn = await decideFallbackTurn({
       uiMessages,
@@ -814,6 +820,33 @@ function extractUIMessageText(parts: UIMessage['parts']): string {
     .join('');
 }
 
+/**
+ * JOV-7143: the tool calls this server streamed and persisted for the
+ * conversation, as UI messages for turn-state derivation. Oldest first.
+ */
+async function loadServerToolHistory(
+  conversationId: string
+): Promise<UIMessage[]> {
+  const rows = await db
+    .select({ id: chatMessages.id, toolCalls: chatMessages.toolCalls })
+    .from(chatMessages)
+    .where(
+      and(
+        eq(chatMessages.conversationId, conversationId),
+        eq(chatMessages.role, 'assistant')
+      )
+    )
+    .orderBy(asc(chatMessages.createdAt))
+    .limit(MAX_SERVER_TOOL_HISTORY_ROWS);
+  return rows.map(row => ({
+    id: String(row.id),
+    role: 'assistant' as const,
+    parts: decodeToolEvents(row.toolCalls).events.map(toolEventToMessagePart),
+  }));
+}
+
+const MAX_SERVER_TOOL_HISTORY_ROWS = 200;
+
 async function reserveAnonymousOnboardingConversation({
   sessionId,
   latestUserMessage,
@@ -1002,8 +1035,10 @@ function validateMessageShape(msg: unknown, index: number): string | null {
     return `messages[${index}] must be an object`;
   }
   const m = msg as { role?: unknown; parts?: unknown };
-  if (m.role !== 'user' && m.role !== 'assistant' && m.role !== 'system') {
-    return `messages[${index}].role must be user/assistant/system`;
+  // JOV-7143: the onboarding client never sends system messages; accepting
+  // them let a caller inject instructions into the model's history.
+  if (m.role !== 'user' && m.role !== 'assistant') {
+    return `messages[${index}].role must be user/assistant`;
   }
   if (!Array.isArray(m.parts)) {
     return `messages[${index}].parts must be an array`;
