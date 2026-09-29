@@ -19,7 +19,7 @@ const meta = {
   },
   decorators: [withDashboardProviders],
   render: args => (
-    <div className='flex min-h-[40rem] items-end bg-base'>
+    <div className='flex min-h-screen items-end bg-base'>
       <div className='w-full'>
         <DashboardMobileTabs {...args} />
       </div>
