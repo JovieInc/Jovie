@@ -843,15 +843,23 @@
 
 /* Reserve the floating dock outside the home scroll box at every compact
    breakpoint. End padding makes the last row reachable after scrolling, but
-   it cannot stop an absolute dock from covering the current viewport. */
+   it cannot stop an absolute dock from covering the current viewport. The
+   desktop shell is a fixed-height phone card, so without this the last card
+   renders half-covered by the dock at rest even though it can technically
+   scroll into view (JOV-7192). Embedded previews render no dock, so they keep
+   the in-box padding instead. */
 :where(
-  [data-testid="profile-compact-surface"][data-mode="profile"]
+  [data-testid="profile-compact-surface"][data-mode="profile"]:not(
+      [data-presentation="embedded"]
+    )
     > .profile-home-content-column
 ) {
   margin-bottom: var(--profile-bottom-nav-height);
 }
 
-[data-testid="profile-compact-surface"][data-mode="profile"]
+[data-testid="profile-compact-surface"][data-mode="profile"]:not(
+    [data-presentation="embedded"]
+  )
   .profile-home-content-scroll {
   padding-bottom: 0;
 }
