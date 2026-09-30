@@ -12,6 +12,7 @@ import {
   formatMarketingCharacterSystemForPrompt,
   JOVIE_MARKETING_CHARACTER_SYSTEM,
 } from './characterSystem';
+import type { FactoryStage } from './factory/spine';
 import {
   formatJovieImageColorPolicyForPrompt,
   JOVIE_IMAGE_COLOR_POLICY,
@@ -37,6 +38,23 @@ export const MARKETING_GENERATION_STAGES = [
 
 export type MarketingGenerationStage =
   (typeof MARKETING_GENERATION_STAGES)[number];
+
+/**
+ * Alias onto the canonical factory spine (factory/spine.ts FACTORY_STAGES).
+ * Values are unchanged for existing callers; each legacy stage maps to its
+ * canonical factory stage.
+ */
+export const MARKETING_GENERATION_STAGE_TO_FACTORY_STAGE: Readonly<
+  Record<MarketingGenerationStage, FactoryStage>
+> = {
+  truth: 'truth',
+  narrative: 'narrative',
+  copy: 'copy',
+  'section-design': 'layout',
+  'asset-generation': 'asset',
+  'adversarial-review': 'adversarial-trust',
+  'taste-admission': 'publish',
+};
 
 export const MARKETING_STAGE_ATTEMPT_LIMITS: Readonly<
   Record<MarketingGenerationStage, number>

@@ -19,6 +19,25 @@ export const LANDING_STAGES = [
 ] as const;
 export type LandingStage = (typeof LANDING_STAGES)[number];
 
+/**
+ * Alias onto the canonical factory spine
+ * (apps/web/data/marketing/factory/spine.ts FACTORY_STAGES). This package
+ * cannot import app code, so the mapping is declared as literals and the
+ * factory-spine test enforces that every value is a real factory stage.
+ */
+export const LANDING_STAGE_TO_FACTORY_STAGE: Readonly<
+  Record<LandingStage, string>
+> = {
+  capabilities: 'truth',
+  outcomes: 'outcomes',
+  copy: 'copy',
+  layout: 'layout',
+  style: 'layout',
+  designSystem: 'render',
+  proof: 'proof',
+  social: 'proof',
+};
+
 export interface LandingSpec {
   readonly id: string;
   readonly route: string;

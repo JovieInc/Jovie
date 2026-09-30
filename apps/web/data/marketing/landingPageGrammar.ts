@@ -10,6 +10,7 @@ import {
   getMarketingRegistryEntry,
   getMarketingSectionRegistryEntry,
 } from './componentRegistry';
+import type { FactoryStage } from './factory/spine';
 import type { RecipeId } from './recipes';
 import { MARKETING_RECIPES } from './recipes';
 import type { MarketingSectionId } from './sections';
@@ -30,6 +31,23 @@ export const LANDING_PAGE_PIPELINE_STAGES = [
 
 export type LandingPagePipelineStage =
   (typeof LANDING_PAGE_PIPELINE_STAGES)[number];
+
+/**
+ * Alias onto the canonical factory spine (factory/spine.ts FACTORY_STAGES).
+ * Values are unchanged for existing callers; each pipeline stage maps to its
+ * canonical factory stage.
+ */
+export const LANDING_PAGE_PIPELINE_STAGE_TO_FACTORY_STAGE: Readonly<
+  Record<LandingPagePipelineStage, FactoryStage>
+> = {
+  'classify-intent': 'truth',
+  'choose-section-jobs': 'outcomes',
+  'choose-variants': 'layout',
+  'fit-copy': 'copy',
+  'choose-media-strategy': 'media-decision',
+  'render-locked-atoms': 'render',
+  'evaluate-composition': 'adversarial-trust',
+};
 
 export const LANDING_PAGE_FAMILY_IDS = [
   'hero',

@@ -167,6 +167,24 @@ export {
   MARKETING_EDITORIAL_BACKGROUNDS,
 } from './editorialBackgrounds';
 export type {
+  FactoryEvaluator,
+  FactoryProducer,
+  FactoryStage,
+  StageReceipt,
+} from './factory/spine';
+export {
+  FACTORY_RECEIPT_SCHEMA,
+  FACTORY_STAGE_ARTIFACT_SCHEMA_IDS,
+  FACTORY_STAGE_ARTIFACT_SCHEMAS,
+  FACTORY_STAGE_ATTEMPT_LIMIT,
+  FACTORY_STAGES,
+  FactoryEvaluatorSchema,
+  FactoryProducerSchema,
+  FactoryStageSchema,
+  StageReceiptSchema,
+  stageReceiptPassed,
+} from './factory/spine';
+export type {
   MarketingCreativeRole,
   MarketingGateReceipt,
   MarketingGenerationFinding,
@@ -185,6 +203,7 @@ export {
   MARKETING_ASSET_GENERATION_MEDIA_RECIPE_CONTRACT,
   MARKETING_CREATIVE_ROLES,
   MARKETING_GENERATION_SPEC_VERSION,
+  MARKETING_GENERATION_STAGE_TO_FACTORY_STAGE,
   MARKETING_GENERATION_STAGES,
   MARKETING_MODEL_CAPABILITIES,
   MARKETING_ROLE_REQUIREMENTS,
@@ -288,6 +307,7 @@ export {
   LANDING_PAGE_GRAMMAR_SCHEMA,
   LANDING_PAGE_HOMEPAGE_LOCK,
   LANDING_PAGE_PEN_WORKSPACE,
+  LANDING_PAGE_PIPELINE_STAGE_TO_FACTORY_STAGE,
   LANDING_PAGE_PIPELINE_STAGES,
   LANDING_PAGE_ROUTE_TYPES,
 } from './landingPageGrammar';
