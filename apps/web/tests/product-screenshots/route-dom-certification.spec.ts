@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, type Page, type TestInfo, test } from '@playwright/test';
@@ -10,6 +11,7 @@ import {
 import { installPublicRouteMocks } from '../e2e/utils/public-surface-helpers';
 import {
   inspectRouteDom,
+  MARKETING_TASTE_FINDING_KINDS,
   ROUTE_DOM_CERTIFICATION_SCHEMA,
   type RouteDomFindingKind,
 } from '../e2e/utils/route-dom-detector';
@@ -37,6 +39,19 @@ const deploymentId = process.env.EXPECTED_PRODUCTION_DEPLOYMENT_ID ?? null;
 const certificationScope = process.env.ROUTE_DOM_CERTIFICATION_SCOPE ?? 'all';
 
 test.describe.configure({ retries: 0 });
+
+// Marketing taste kinds are ratcheted: existing routes may not exceed their
+// recorded count per route/viewport/kind, and new routes start at zero.
+// Regenerate after fixes with UPDATE_ROUTE_DOM_TASTE_BASELINE=1.
+const tasteBaselinePath = path.resolve(
+  'tests/product-screenshots/route-dom-marketing-baseline.json'
+);
+const tasteBaseline: Record<string, number> = JSON.parse(
+  readFileSync(tasteBaselinePath, 'utf8')
+);
+const updateTasteBaseline = process.env.UPDATE_ROUTE_DOM_TASTE_BASELINE === '1';
+const isTasteKind = (kind: string): boolean =>
+  (MARKETING_TASTE_FINDING_KINDS as readonly string[]).includes(kind);
 
 const profileViewports = [
   { width: 390, height: 844 },
@@ -208,6 +223,65 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     await expectDeliberateRed(page, 'public-profile', 'raw-control');
   });
 
+  // Marketing taste invariants — each fixture reproduces a shipped defect.
+  test('rejects a card nested inside a card (/card preview)', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<main><section><h1>Card</h1><div style="border:1px solid #333;border-radius:24px;padding:20px;width:400px"><div style="border:1px solid #333;border-radius:16px;height:200px"><span style="border:1px solid #333;border-radius:999px">Preview</span></div></div></section></main>'
+    );
+    await expectDeliberateRed(page, 'marketing', 'nested-decorative-surface');
+  });
+
+  test('rejects copy stranded outside any section (/card "Coming soon")', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<main><div><section><h1>Hero</h1><p>Lede copy for the hero.</p></section><p>Coming soon</p></div></main>'
+    );
+    await expectDeliberateRed(page, 'marketing', 'stranded-text');
+  });
+
+  test('rejects a section heading larger than the h1', async ({ page }) => {
+    await page.setContent(
+      '<main><section><h1 style="font-size:56px">Hero</h1></section><section><h2 style="font-size:64px">Section</h2></section></main>'
+    );
+    await expectDeliberateRed(page, 'marketing', 'heading-hierarchy-inversion');
+  });
+
+  test('rejects a line-clamped heading that hides text (/product CTA)', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<main><section><h2 style="width:200px;font-size:32px;line-height:1;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden">See what shows up when people search for you.</h2></section></main>'
+    );
+    await expectDeliberateRed(page, 'marketing', 'clipped-heading');
+  });
+
+  test('rejects an unstyled terminal CTA stack (/product footer CTA)', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<main><section style="width:1200px"><div><h2>See what shows up when people search for you.</h2><p style="max-width:400px;margin:0 auto">Claim your Jovie profile free.</p><div style="display:flex;justify-content:center"><a href="/start">Claim your Jovie</a></div></div></section></main>'
+    );
+    await expectDeliberateRed(page, 'marketing', 'misaligned-text-stack');
+  });
+
+  test('rejects placeholder copy shipped as product', async ({ page }) => {
+    await page.setContent(
+      '<main><section><h1>Card</h1><figure><p>Your name</p></figure></section></main>'
+    );
+    await expectDeliberateRed(page, 'marketing', 'placeholder-copy');
+  });
+
+  test('passes a composed, centered terminal CTA', async ({ page }) => {
+    await page.setContent(
+      '<main><section><h1 style="font-size:56px">Hero</h1><p>Lede copy for the hero.</p></section><section style="width:1200px"><div style="display:flex;flex-direction:column;align-items:center;text-align:center"><h2 style="font-size:48px">See what shows up.</h2><p>Claim your Jovie profile free.</p><div><a href="/start">Claim your Jovie</a></div></div></section></main>'
+    );
+    const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
+    expect(snapshot.findings).toEqual([]);
+  });
+
   // JOV-6916: text-aware-contrast deliberate-red. R01 painted a bright
   // upper-right corner exactly where the docked header renders Log in and
   // the primary CTA; light glyphs over that corner must reproduce red.
@@ -356,6 +430,7 @@ test('certifies every marketing route and public-profile open state', async ({
   }
 
   const receipts: Array<Record<string, string | number>> = [];
+  const nextTasteBaseline: Record<string, number> = {};
 
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const target of certificationScope === 'public-profile'
@@ -400,8 +475,42 @@ test('certifies every marketing route and public-profile open state', async ({
         snapshotPath,
         findingCount: findings.length,
       });
-      expect.soft(findings, `${target.url} ${viewport}`).toEqual([]);
+      const tasteCounts = new Map<string, number>();
+      for (const finding of findings) {
+        if (!isTasteKind(finding.kind)) continue;
+        const key = `${target.url}|${viewport}|${finding.kind}`;
+        tasteCounts.set(key, (tasteCounts.get(key) ?? 0) + 1);
+      }
+      for (const [key, count] of tasteCounts) nextTasteBaseline[key] = count;
+      const overBaseline = [...tasteCounts]
+        .filter(([key, count]) => count > (tasteBaseline[key] ?? 0))
+        .map(([key, count]) => `${key}: ${count} > ${tasteBaseline[key] ?? 0}`);
+      expect
+        .soft(
+          findings.filter(finding => !isTasteKind(finding.kind)),
+          `${target.url} ${viewport}`
+        )
+        .toEqual([]);
+      if (!updateTasteBaseline) {
+        expect
+          .soft(overBaseline, `${target.url} ${viewport} taste ratchet`)
+          .toEqual([]);
+      }
     }
+  }
+  if (updateTasteBaseline && certificationScope !== 'public-profile') {
+    await writeFile(
+      tasteBaselinePath,
+      `${JSON.stringify(
+        Object.fromEntries(
+          Object.entries(nextTasteBaseline).sort(([a], [b]) =>
+            a.localeCompare(b)
+          )
+        ),
+        null,
+        2
+      )}\n`
+    );
   }
 
   for (const viewport of certificationScope === 'marketing'

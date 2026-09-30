@@ -73,7 +73,7 @@ export function getPaymentFailedText(data: PaymentFailedTemplateData): string {
   let urgencyMessage = '';
   if (attemptCount >= 3 || (daysRemaining && daysRemaining <= 3)) {
     urgencyMessage =
-      '\n\n⚠️ This is your final notice. Your Pro access will be cancelled if payment is not received soon.';
+      '\n\nFinal notice: Your Pro access will be cancelled if payment is not received soon.';
   }
 
   const daysMessage = daysRemaining

@@ -26,8 +26,13 @@ export const MARKETING_PEN_CONTRACT_IDS = {
     socialProof: 'RVUME',
     stats: 'fkRn8',
     pricing: 'D34VIr',
+    /** Registry index read natively 2026-09-29. Visual import/owner approval remains pending. */
+    comparison: 'x5gKwl',
     faq: 'pAAhw',
     specWall: 'rWyLP',
+    /** Native existing demonstration gallery owners read 2026-09-29; not adoption proof. */
+    productGallery: 'NGW0P',
+    productGalleryReleaseRail: 'EnK3s',
     capture: 'Nqx7t',
     monetization: 'F3grtS',
     contentProse: 'hRysI',

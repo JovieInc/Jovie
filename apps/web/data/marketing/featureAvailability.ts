@@ -1,16 +1,26 @@
 import {
-  type Capability,
+  type CapabilityDefinition,
+  FEATURE_MATURITY_STATES,
+  type FeatureAccessState,
+  type FeatureAudienceScope,
+  type FeatureMaturity,
+  type MarketingCapabilityId,
+  PRODUCT_CAPABILITIES,
+  type PublicationPermission,
+  ROUTE_CAPABILITY_BINDINGS,
+} from '@/data/product-truth/registry';
+
+export {
   FEATURE_ACCESS_STATES,
   FEATURE_AUDIENCE_SCOPES,
   FEATURE_MATURITY_STATES,
   type FeatureAccessState,
   type FeatureAudienceScope,
   type FeatureMaturity,
-  MARKETING_CAPABILITY_IDS,
   type MarketingCapabilityId,
-  PRODUCT_TRUTH_CAPABILITIES,
   PUBLICATION_PERMISSIONS,
   type PublicationPermission,
+  ROUTE_CAPABILITY_BINDINGS,
 } from '@/data/product-truth/registry';
 
 /**
@@ -18,8 +28,8 @@ import {
  *
  * Models four decisions that must stay distinct:
  * - `maturity` — how built the feature is (proposed → GA). Owned upstream by
- *   the JOV-6223 capability registry in `@/data/product-truth/registry`;
- *   this file is the public-route projection of that state.
+ *   the JOV-6223 capability registry; this file is the public-route
+ *   projection of that state.
  * - `publication` — permission to announce/publish the feature publicly.
  * - `access` — permission to actually use the feature.
  * - `pricingEligible` — derived; a feature is purchasable only when it has
@@ -34,20 +44,6 @@ import {
  * interest instead of claiming immediate access. An acquisition experiment
  * succeeding can never promote a proposed feature to available.
  */
-
-export type {
-  FeatureAccessState,
-  FeatureAudienceScope,
-  FeatureMaturity,
-  MarketingCapabilityId,
-  PublicationPermission,
-};
-export {
-  FEATURE_ACCESS_STATES,
-  FEATURE_AUDIENCE_SCOPES,
-  FEATURE_MATURITY_STATES,
-  PUBLICATION_PERMISSIONS,
-};
 
 export interface FeatureCapabilityRecord {
   readonly capabilityId: string;
@@ -78,58 +74,33 @@ export interface FeatureCapabilityRecord {
   readonly accessLabel?: string;
 }
 
-function toFeatureCapabilityRecord(
-  capabilityId: string
-): FeatureCapabilityRecord {
-  const capability = (
-    PRODUCT_TRUTH_CAPABILITIES as Readonly<Record<string, Capability>>
-  )[capabilityId];
+function projectCapability(
+  capabilityId: string,
+  definition: CapabilityDefinition
+): FeatureCapabilityRecord | null {
+  if (!definition.marketing) return null;
   return {
-    capabilityId: capability.id,
-    maturity: capability.maturity,
-    publication: capability.publication,
-    access: capability.access,
-    audience: capability.audience,
-    offerId: capability.offerId,
-    supportedJobs: capability.supportedJobs,
-    proofAuthorized: capability.proofAuthorized,
-    contentRevision: capability.contentRevision,
-    accessLabel: capability.accessLabel,
+    capabilityId,
+    maturity: definition.maturity,
+    publication: definition.publication,
+    access: definition.access,
+    ...definition.marketing,
   };
 }
 
 /**
- * Marketing capability projection of the product-truth registry (JOV-7247).
- * The canonical records now live in `PRODUCT_TRUTH_CAPABILITIES`; this
- * export keeps its stable shape and keys for existing consumers.
+ * Public-route projection of the product-truth registry
+ * (`data/product-truth/registry.ts`). Only capabilities with a `marketing`
+ * block appear here; product-only capabilities never leak into public routes.
  */
-export const MARKETING_FEATURE_CAPABILITIES: Readonly<
-  Record<MarketingCapabilityId, FeatureCapabilityRecord>
-> = Object.fromEntries(
-  MARKETING_CAPABILITY_IDS.map(id => [id, toFeatureCapabilityRecord(id)])
-) as Record<MarketingCapabilityId, FeatureCapabilityRecord>;
-
-/**
- * Canonical route URL → capability binding. Routes without a binding carry
- * no capability claim (editorial, legal, company pages) and are governed by
- * the route manifest alone — a binding is required before a route may claim
- * availability for a feature.
- */
-export const ROUTE_CAPABILITY_BINDINGS = {
-  '/card': 'jovie-card',
-  '/voice': 'voice',
-  '/smart-links': 'smart-links',
-  '/artist-profiles': 'artist-profiles',
-  '/artist-notifications': 'artist-notifications',
-  '/instant-merch': 'instant-merch',
-  '/youtube-thumbnails': 'youtube-thumbnails',
-  '/pay': 'pay',
-  '/launch': 'release-launch',
-  '/cli': 'cli',
-  '/product': 'public-profile',
-  '/new': 'release-launch',
-  '/download': 'app-download',
-} as const satisfies Readonly<Record<string, MarketingCapabilityId>>;
+export const MARKETING_FEATURE_CAPABILITIES = Object.fromEntries(
+  Object.entries(
+    PRODUCT_CAPABILITIES as Readonly<Record<string, CapabilityDefinition>>
+  ).flatMap(([capabilityId, definition]) => {
+    const record = projectCapability(capabilityId, definition);
+    return record ? [[capabilityId, record] as const] : [];
+  })
+) as Readonly<Record<MarketingCapabilityId, FeatureCapabilityRecord>>;
 
 const CAPABILITY_RECORDS: Readonly<Record<string, FeatureCapabilityRecord>> =
   MARKETING_FEATURE_CAPABILITIES;

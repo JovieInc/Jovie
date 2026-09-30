@@ -31,7 +31,7 @@ describe('AboutPageContent', () => {
       'Frequently Asked Questions',
       'Ready to build your Jovie profile?',
     ]);
-    expect(screen.getByText('— Tim White, Founder')).toBeVisible();
+    expect(screen.getByText('Tim White, Founder')).toBeVisible();
     expect(
       screen.getByRole('img', { name: 'Tim White, founder of Jovie' })
     ).toBeVisible();
@@ -79,12 +79,12 @@ describe('AboutPageContent', () => {
       {
         question: 'Is Jovie free?',
         answer:
-          'Yes, Jovie offers a free tier that lets you create a profile and start from your name. Paid plans unlock advanced analytics, notifications, contact export, and more.',
+          'Yes, Jovie offers a free tier that lets you create a profile and start with your name. Paid plans add advanced analytics, notifications, and contact export.',
       },
       {
         question: 'How is Jovie different from Linktree?',
         answer:
-          'Linktree is a general-purpose link list. Jovie is a living profile for presence and relationships — work, links, and a next step in one place. For artists, that includes smart links for releases, fan capture, and notifications when new music drops.',
+          'Linktree is a general-purpose link list. Jovie keeps your work, links, and a clear next step in one living profile. For artists, that includes smart links for releases, fan capture, and notifications when new music drops.',
       },
     ]);
 

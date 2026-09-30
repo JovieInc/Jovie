@@ -1466,10 +1466,17 @@ describe('production occurrence structural source bindings', () => {
   });
 });
 
-it('binds every nonterminal acquisition occurrence to its declared variant owner', () => {
-  for (const url of ['/', '/youtube-thumbnails']) {
+it('binds priority pages and acquisition occurrences to their declared variant owners', () => {
+  for (const url of [
+    '/',
+    '/pricing',
+    '/artist-profiles',
+    '/youtube-thumbnails',
+  ]) {
     const route = MARKETING_ROUTE_MANIFEST.find(entry => entry.url === url)!;
-    expect(route.bindingEvidence.status).toBe('unverified');
+    expect(route.bindingEvidence.status).toBe(
+      url === '/youtube-thumbnails' ? 'unverified' : 'verified'
+    );
     for (const binding of route.renderedSections) {
       expect(binding.kind).toBe('approved-section');
       if (binding.kind !== 'approved-section')
@@ -1477,6 +1484,12 @@ it('binds every nonterminal acquisition occurrence to its declared variant owner
       const section = MARKETING_SECTION_REGISTRY.find(
         entry => entry.sectionId === binding.sectionId
       )!;
+      expect(
+        MARKETING_SECTIONS.find(
+          section => section.id === binding.sectionId
+        )?.variants.find(variant => variant.id === binding.variantId)?.status
+      ).toBe('active');
+      if (section.resolvedSource === binding.componentPath) continue;
       expect(section.occurrenceProofs).toEqual(
         expect.arrayContaining([
           expect.objectContaining({

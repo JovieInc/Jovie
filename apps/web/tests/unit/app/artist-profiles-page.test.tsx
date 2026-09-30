@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import type { ImgHTMLAttributes, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ArtistProfileLandingPage } from '@/components/marketing/artist-profile/ArtistProfileLandingPage';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
@@ -11,6 +11,26 @@ import {
 } from '@/data/artistProfilePageOrder';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
+
+// next/image with `priority` makes React DOM preload the image by querying
+// `link[imagesrcset="..."]`; the hero's srcset makes that selector longer
+// than the 2048-character limit jsdom 30's selector engine enforces, which
+// throws an unhandled RangeError. Image preloading is not what this
+// composition test covers (Radix Slot boundaries are), so render a plain img.
+vi.mock('next/image', () => ({
+  default: ({
+    fill: _fill,
+    priority: _priority,
+    quality: _quality,
+    placeholder: _placeholder,
+    blurDataURL: _blurDataURL,
+    unoptimized: _unoptimized,
+    loader: _loader,
+    ...props
+  }: ImgHTMLAttributes<HTMLImageElement> & Record<string, unknown>) => (
+    <img {...props} alt={typeof props.alt === 'string' ? props.alt : ''} />
+  ),
+}));
 
 interface ChildrenProps {
   readonly children?: ReactNode;
@@ -329,6 +349,9 @@ describe('ArtistProfilesPage', () => {
     );
     expect(screen.getAllByTestId('artist-profile-truth-tile')).toHaveLength(4);
     expect(
+      screen.getByAltText("Demo of Tim White's Jovie artist profile.")
+    ).toBeInTheDocument();
+    expect(
       screen.getAllByTestId('artist-profile-related-feature')
     ).toHaveLength(4);
     expect(
@@ -339,7 +362,7 @@ describe('ArtistProfilesPage', () => {
     ).toHaveAttribute('href', '/instant-merch');
     expect(ARTIST_PROFILE_COPY.faq.items).toHaveLength(4);
     expect(
-      screen.getByRole('heading', { name: 'Live Artist Sites' })
+      screen.getByRole('heading', { name: 'The profile in action.' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'The Artist Platform' })
