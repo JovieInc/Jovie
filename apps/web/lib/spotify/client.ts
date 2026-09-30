@@ -217,12 +217,17 @@ class SpotifyClientManager {
     options: RequestInit = {}
   ): Promise<T> {
     if (options.signal?.aborted) throw new CallerCancellationError();
+    // Diagnostics identify the operation, never caller queries, IDs or tokens.
+    const operation =
+      /^\/(search|artists|albums|tracks|playlists)(?:[/?]|$)/.exec(
+        endpoint
+      )?.[1] ?? 'request';
     // Check circuit breaker before attempting request
     if (!spotifyCircuitBreaker.canExecute()) {
       const stats = spotifyCircuitBreaker.getStats();
       Sentry.captureMessage('Spotify circuit breaker is open', {
         level: 'warning',
-        extra: { stats, endpoint },
+        extra: { stats, endpoint: operation },
       });
       throw spotifyApiError(
         {
@@ -249,9 +254,9 @@ class SpotifyClientManager {
     // Execute with circuit breaker and retry logic
     return spotifyCircuitBreaker.execute(async () => {
       return Sentry.startSpan(
-        { op: 'http.client', name: `Spotify API ${endpoint}` },
+        { op: 'http.client', name: `Spotify API ${operation}` },
         async span => {
-          span.setAttribute('spotify.endpoint', endpoint);
+          span.setAttribute('spotify.endpoint', operation);
 
           const result = await retryAsync(
             () => this.executeRequest<T>(url, token, options, span),

@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const spanAttributes = vi.hoisted(() => vi.fn());
 vi.mock('@sentry/nextjs', () => ({
-  startSpan: (_options: unknown, run: (span: unknown) => unknown) =>
-    run({ setAttribute: vi.fn() }),
+  startSpan: vi.fn((_options: unknown, run: (span: unknown) => unknown) =>
+    run({ setAttribute: spanAttributes })
+  ),
   addBreadcrumb: vi.fn(),
   captureException: vi.fn(),
   captureMessage: vi.fn(),
@@ -17,6 +19,7 @@ vi.mock('@/lib/dsp-enrichment/providers/apple-music-auth', () => ({
   clearAppleMusicTokenCache: vi.fn(),
 }));
 
+import * as Sentry from '@sentry/nextjs';
 import { clearDspCaches } from '@/lib/dsp-enrichment/cache';
 import { appleMusicCircuitBreaker } from '@/lib/dsp-enrichment/circuit-breakers';
 import { getArtist as appleArtist } from '@/lib/dsp-enrichment/providers/apple-music';
@@ -52,6 +55,7 @@ function stalledBody(signal: AbortSignal) {
 
 describe('canonical provider HTTP transport for public music reads', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     clearDspCaches();
     spotifyCircuitBreaker.reset();
     appleMusicCircuitBreaker.reset();
@@ -62,6 +66,49 @@ describe('canonical provider HTTP transport for public music reads', () => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
+
+  it.each([
+    '/search',
+    `/artists/${ID}`,
+    `https://api.spotify.com/v1/artists/${ID}`,
+  ])(
+    '%s keeps query, IDs and tokens out of diagnostics without rewriting HTTP',
+    async path => {
+      const endpoint = `${path}?q=private-query-fixture&access_token=private-token-fixture`;
+      const fetcher = vi.fn().mockResolvedValue(Response.json(raw));
+      vi.stubGlobal('fetch', fetcher);
+      await spotifyClient.requestJson(endpoint);
+      expect(fetcher.mock.calls[0][0]).toBe(
+        endpoint.startsWith('http')
+          ? endpoint
+          : `https://api.spotify.com/v1${endpoint}`
+      );
+      expect(fetcher.mock.calls[0][1].headers.Authorization).toBe(
+        'Bearer test-only'
+      );
+      fetcher.mockResolvedValueOnce(
+        Response.json(
+          { error: { message: 'private-token-fixture' } },
+          { status: 404 }
+        )
+      );
+      await expect(spotifyClient.requestJson(endpoint)).rejects.toThrow();
+      vi.spyOn(spotifyCircuitBreaker, 'canExecute').mockReturnValue(false);
+      await expect(spotifyClient.requestJson(endpoint)).rejects.toThrow();
+      const diagnostics = JSON.stringify([
+        vi.mocked(Sentry.startSpan).mock.calls.map(([options]) => options),
+        spanAttributes.mock.calls,
+        vi.mocked(Sentry.captureMessage).mock.calls,
+      ]);
+      for (const value of [
+        ID,
+        'private-query-fixture',
+        'private-token-fixture',
+        'test-only',
+      ])
+        expect(diagnostics).not.toContain(value);
+    }
+  );
 
   it.each(['spotify', 'apple'] as const)(
     '%s aborts a stalled response body and never retries caller cancellation',
