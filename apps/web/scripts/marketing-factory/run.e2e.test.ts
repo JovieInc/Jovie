@@ -247,6 +247,23 @@ describe('page stage gates', () => {
     ).toMatchObject([{ gateId: 'responsive-accessibility', verdict: 'pass' }]);
   });
 
+  it('reports both reasons when the red team and visual review are unavailable', async () => {
+    await run();
+    const resumed = await run({
+      fromStage: 'adversarial-trust',
+      providers: dryProviders(brief, {
+        transport: null,
+        reviewVisual: async () => ({
+          status: 'credentials-unavailable',
+          reason: 'no vision judge',
+        }),
+      }),
+    });
+
+    expect(resumed.status).toBe('credentials-unavailable');
+    expect(resumed.reason).toMatch(/red-team needs .*; no vision judge/);
+  });
+
   it('fails trust when the visual reviewer shares the producer family', async () => {
     const manifest = await run({
       providers: dryProviders(brief, {
