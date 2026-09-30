@@ -5,8 +5,19 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAdminPeopleRightPanel } from '@/components/features/admin/AdminPeopleRightPanelProvider';
 import { toast } from '@/components/feedback';
+import {
+  DrawerSection,
+  EntityHeader,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
 import { AdminTableHeader } from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
+import { useAdminTableKeyboardNavigation } from '@/features/admin/table/useAdminTableKeyboardNavigation';
+import type {
+  ContactCertificationInspection,
+  ContactEvidenceDecision,
+  ContactEvidenceItem,
+} from '@/lib/contacts/certification';
 import {
   CONTACT_LIFECYCLE_STAGES,
   type ContactLifecycleStage,
@@ -53,9 +64,20 @@ interface TimelineItem {
   fromStage: ContactLifecycleStage | null;
   toStage: ContactLifecycleStage;
   actorType: string;
-  source: string | null;
-  reason: string | null;
   createdAt: string;
+}
+
+interface ContactDetailResponse {
+  readonly timeline: TimelineItem[];
+  readonly certification: ContactCertificationInspection;
+}
+
+function humanize(value: string) {
+  if (value === 'dsp') return 'DSP artist identities';
+  if (value === 'catalog') return 'Releases, recordings & ISRCs';
+  if (value === 'stale') return 'Recertification required';
+  const label = value.replaceAll('_', ' ');
+  return label[0]?.toUpperCase() + label.slice(1);
 }
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -94,37 +116,165 @@ function StageBadge({ stage }: { readonly stage: ContactLifecycleStage }) {
   );
 }
 
+function EvidenceItemCard({
+  item,
+  pending,
+  onDecision,
+}: Readonly<{
+  item: ContactEvidenceItem;
+  pending: boolean;
+  onDecision: (
+    item: ContactEvidenceItem,
+    decision: ContactEvidenceDecision,
+    correction?: string
+  ) => Promise<void>;
+}>) {
+  const [correction, setCorrection] = useState('');
+  const confidenceLabel =
+    item.confidence === null
+      ? 'unknown'
+      : `${Math.round(item.confidence * 100)}%`;
+  return (
+    <article className='space-y-2 border-t border-subtle px-1 py-3 first:border-t-0'>
+      <p className='text-xs font-medium text-primary-token'>{item.label}</p>
+      {item.url ? (
+        <a
+          className='block truncate text-xs text-link'
+          href={item.url}
+          target='_blank'
+          rel='noreferrer'
+        >
+          {item.value}
+        </a>
+      ) : (
+        <p className='break-words text-xs text-secondary-token'>{item.value}</p>
+      )}
+      <p className='text-2xs text-tertiary-token'>
+        {item.source} · {formatDate(item.observedAt)} · {confidenceLabel}{' '}
+        confidence · {item.freshness}
+      </p>
+      <p className='text-2xs text-secondary-token'>{item.rationale}</p>
+      <fieldset
+        className='grid grid-cols-3 gap-1.5'
+        aria-label={`Review ${item.label}`}
+      >
+        {(['yes', 'no', 'unsure'] as const).map(decision => (
+          <Button
+            key={decision}
+            size='sm'
+            variant={item.decision === decision ? 'primary' : 'secondary'}
+            disabled={pending}
+            aria-pressed={item.decision === decision}
+            onClick={() => void onDecision(item, decision)}
+          >
+            {decision === 'yes' ? 'Yes' : decision === 'no' ? 'No' : 'Unsure'}
+          </Button>
+        ))}
+      </fieldset>
+      {['canonical:display-name', 'canonical:handle'].includes(item.key) ? (
+        <form
+          className='flex gap-1.5'
+          onSubmit={event => {
+            event.preventDefault();
+            if (correction.trim()) void onDecision(item, 'no', correction);
+          }}
+        >
+          <input
+            aria-label={`Correct ${item.label}`}
+            value={correction}
+            onChange={event => setCorrection(event.target.value)}
+            placeholder='Correct value'
+            className='h-7 min-w-0 flex-1 rounded-md border border-strong bg-surface-0 px-2 text-xs text-primary-token'
+          />
+          <Button
+            size='sm'
+            variant='secondary'
+            disabled={pending || !correction.trim()}
+            type='submit'
+          >
+            Save
+          </Button>
+        </form>
+      ) : null}
+    </article>
+  );
+}
+
 function ContactDetailPanel({
   contact,
   onClose,
-}: {
-  readonly contact: AdminContactRow | null;
-  readonly onClose: () => void;
-}) {
+}: Readonly<{
+  contact: AdminContactRow | null;
+  onClose: () => void;
+}>) {
   const router = useRouter();
-  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
+  const [detail, setDetail] = useState<ContactDetailResponse | null>(null);
   const [pending, setPending] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!contact) {
-      setTimeline([]);
-      return;
-    }
-    let cancelled = false;
+    setDetail(null);
+    if (!contact) return;
     fetch(`/api/admin/contacts?key=${encodeURIComponent(contact.dedupeKey)}`, {
       headers: { Accept: 'application/json' },
     })
-      .then(res => (res.ok ? res.json() : { timeline: [] }))
-      .then(data => {
-        if (!cancelled) setTimeline(data.timeline ?? []);
+      .then(response => {
+        if (!response.ok) throw new Error('load_failed');
+        return response.json() as Promise<ContactDetailResponse>;
       })
-      .catch(() => {
-        if (!cancelled) setTimeline([]);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .then(setDetail)
+      .catch(() => toast.error('Evidence could not be loaded'));
   }, [contact]);
+
+  const post = useCallback(
+    async (body: Record<string, unknown>) => {
+      if (!contact) return;
+      const response = await fetch('/api/admin/contacts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ dedupeKey: contact.dedupeKey, ...body }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        certification?: ContactCertificationInspection;
+      };
+      if (!response.ok) throw new Error(data.error ?? 'Update failed');
+      if (data.certification) {
+        setDetail(current =>
+          current ? { ...current, certification: data.certification! } : current
+        );
+      }
+    },
+    [contact]
+  );
+
+  const review = useCallback(
+    async (
+      item: ContactEvidenceItem,
+      decision: ContactEvidenceDecision,
+      correction?: string
+    ) => {
+      setPending(item.key);
+      try {
+        await post({
+          action: 'review_evidence',
+          evidenceKey: item.key,
+          evidenceRevision: item.revision,
+          decision,
+          correction,
+        });
+        toast.success(correction ? 'Correction saved' : 'Evidence updated');
+        if (correction) router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Update failed');
+      } finally {
+        setPending(null);
+      }
+    },
+    [post, router]
+  );
 
   const setStage = useCallback(
     async (toStage: ContactLifecycleStage) => {
@@ -171,121 +321,161 @@ function ContactDetailPanel({
     [contact, router]
   );
 
-  if (!contact) {
-    return (
-      <div className='flex h-full flex-col items-center justify-center gap-2 p-6 text-center'>
-        <p className='text-sm font-medium text-primary-token'>
-          No contact selected
-        </p>
-        <p className='text-xs text-secondary-token'>
-          Select a row to inspect the canonical record.
-        </p>
-      </div>
-    );
-  }
+  const certification = detail?.certification;
+  const grouped = useMemo(() => {
+    const groups = new Map<
+      ContactEvidenceItem['category'],
+      ContactEvidenceItem[]
+    >();
+    for (const current of certification?.items ?? []) {
+      const list = groups.get(current.category) ?? [];
+      list.push(current);
+      groups.set(current.category, list);
+    }
+    return groups;
+  }, [certification]);
 
   return (
-    <div
-      className='flex h-full flex-col gap-4 overflow-y-auto p-4'
+    <EntitySidebarShell
+      isOpen={Boolean(contact)}
+      width={440}
+      ariaLabel='Customer identity certification'
       data-testid='admin-contact-detail-panel'
-    >
-      <div className='flex items-start justify-between gap-2'>
-        <div className='min-w-0'>
-          <p className='truncate text-sm font-semibold tracking-tight text-primary-token'>
-            {contact.displayName ??
+      scrollStrategy='shell'
+      onClose={onClose}
+      headerMode='minimal'
+      hideMinimalHeaderBar
+      entityHeaderSurface='flat'
+      isEmpty={!contact}
+      emptyMessage='Select a customer to inspect discovered evidence.'
+      entityHeader={
+        contact ? (
+          <EntityHeader
+            title={
+              contact.displayName ??
               contact.email ??
               contact.handle ??
-              'Unknown'}
-          </p>
-          <p className='truncate text-xs text-secondary-token'>
-            {contact.email ?? contact.handle ?? contact.dedupeKey}
-          </p>
-        </div>
-        <Button variant='ghost' size='sm' onClick={onClose}>
-          Close
-        </Button>
-      </div>
-
-      <div className='flex items-center gap-2'>
-        <StageBadge stage={contact.stage} />
-        {contact.overrideStage && contact.overrideStage !== contact.stage ? (
-          <span className='text-xs text-secondary-token'>
-            override: {getContactLifecycleStageLabel(contact.overrideStage)}
-          </span>
-        ) : null}
-      </div>
-
-      <dl className='grid grid-cols-2 gap-x-3 gap-y-2 text-xs'>
-        <dt className='text-secondary-token'>Sources</dt>
-        <dd className='text-primary-token'>{contact.sources.join(', ')}</dd>
-        <dt className='text-secondary-token'>First seen</dt>
-        <dd className='text-primary-token'>
-          {formatDate(contact.firstSeenAt)}
-        </dd>
-        <dt className='text-secondary-token'>Stage entered</dt>
-        <dd className='text-primary-token'>{formatDate(contact.stageAt)}</dd>
-        <dt className='text-secondary-token'>Last activity</dt>
-        <dd className='text-primary-token'>{formatDate(contact.activityAt)}</dd>
-        <dt className='text-secondary-token'>Identity key</dt>
-        <dd className='truncate font-mono text-primary-token'>
-          {contact.dedupeKey}
-        </dd>
-      </dl>
-
-      <div className='flex flex-wrap gap-2'>
-        <Button
-          size='sm'
-          variant='secondary'
-          disabled={pending != null || contact.stage === 'approved'}
-          onClick={() => setStage('approved')}
-        >
-          {pending === 'approved' ? 'Approving…' : 'Approve'}
-        </Button>
-        <Button
-          size='sm'
-          variant='secondary'
-          disabled={pending != null || contact.stage === 'certified'}
-          onClick={() => setStage('certified')}
-        >
-          {pending === 'certified' ? 'Certifying…' : 'Certify'}
-        </Button>
-        <Button
-          size='sm'
-          variant='secondary'
-          disabled={pending != null || contact.stage === 'churned'}
-          onClick={() => setStage('churned')}
-        >
-          {pending === 'churned' ? 'Updating…' : 'Mark churned'}
-        </Button>
-      </div>
-
-      <div>
-        <p className='mb-2 text-xs font-medium text-secondary-token'>
-          Stage history
+              'Unknown'
+            }
+            subtitle={contact.email ?? contact.handle ?? contact.dedupeKey}
+            meta={
+              <div className='flex items-center gap-2'>
+                <StageBadge stage={contact.stage} />
+                {certification ? (
+                  <span className='text-xs text-secondary-token'>
+                    {humanize(certification.status)}
+                  </span>
+                ) : null}
+              </div>
+            }
+          />
+        ) : undefined
+      }
+      footer={
+        contact && certification ? (
+          <Button
+            className='w-full'
+            disabled={!certification.canCertify || pending !== null}
+            onClick={() => {
+              setPending('certify');
+              void post({
+                action: 'certify_profile',
+                evidenceRevision: certification.evidenceRevision,
+              })
+                .then(() => {
+                  toast.success('Current evidence revision certified');
+                  router.refresh();
+                })
+                .catch(error =>
+                  toast.error(
+                    error instanceof Error
+                      ? error.message
+                      : 'Certification failed'
+                  )
+                )
+                .finally(() => setPending(null));
+            }}
+          >
+            {pending === 'certify' ? 'Certifying…' : 'Certify current profile'}
+          </Button>
+        ) : undefined
+      }
+    >
+      {contact && !detail ? (
+        <p className='min-h-24 p-4 text-xs text-secondary-token'>
+          Loading discovered evidence…
         </p>
-        {timeline.length === 0 ? (
-          <p className='text-xs text-secondary-token'>
-            No recorded transitions yet.
-          </p>
-        ) : (
-          <ol className='space-y-2'>
-            {timeline.map(item => (
-              <li key={item.id} className='text-xs'>
-                <span className='text-primary-token'>
-                  {item.fromStage
-                    ? getContactLifecycleStageLabel(item.fromStage)
+      ) : null}
+      {contact && certification ? (
+        <>
+          <DrawerSection title='Coverage' collapsible={false}>
+            <div className='grid grid-cols-4 gap-1 px-1 text-center text-xs'>
+              {(['confirmed', 'rejected', 'unresolved', 'stale'] as const).map(
+                key => (
+                  <div key={key} className='rounded-md bg-surface-0 px-1 py-2'>
+                    <p className='font-medium text-primary-token'>
+                      {certification.coverage[key]}
+                    </p>
+                    <p className='text-2xs text-tertiary-token'>{key}</p>
+                  </div>
+                )
+              )}
+            </div>
+            <p className='px-1 pt-2 text-2xs text-tertiary-token'>
+              Checked:{' '}
+              {certification.coverage.sourceClassesChecked.join(', ') || 'none'}
+            </p>
+          </DrawerSection>
+          {[...grouped].map(([category, items]) => (
+            <DrawerSection
+              key={category}
+              title={humanize(category)}
+              defaultOpen={category !== 'facts'}
+            >
+              {items.map(current => (
+                <EvidenceItemCard
+                  key={current.key}
+                  item={current}
+                  pending={pending === current.key}
+                  onDecision={review}
+                />
+              ))}
+            </DrawerSection>
+          ))}
+          <DrawerSection title='Lifecycle'>
+            <div className='flex gap-2 px-1 pb-2'>
+              <Button
+                size='sm'
+                variant='secondary'
+                disabled={pending !== null || contact.stage === 'approved'}
+                onClick={() => void setStage('approved')}
+              >
+                Approve
+              </Button>
+              <Button
+                size='sm'
+                variant='secondary'
+                disabled={pending !== null || contact.stage === 'churned'}
+                onClick={() => void setStage('churned')}
+              >
+                Mark Churned
+              </Button>
+            </div>
+            <ol className='space-y-2 px-1'>
+              {(detail?.timeline ?? []).map(entry => (
+                <li key={entry.id} className='text-xs text-secondary-token'>
+                  {entry.fromStage
+                    ? getContactLifecycleStageLabel(entry.fromStage)
                     : '—'}{' '}
-                  → {getContactLifecycleStageLabel(item.toStage)}
-                </span>
-                <span className='ml-2 text-secondary-token'>
-                  {item.actorType} · {formatDate(item.createdAt)}
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
-    </div>
+                  → {getContactLifecycleStageLabel(entry.toStage)} ·{' '}
+                  {entry.actorType} · {formatDate(entry.createdAt)}
+                </li>
+              ))}
+            </ol>
+          </DrawerSection>
+        </>
+      ) : null}
+    </EntitySidebarShell>
   );
 }
 
@@ -298,7 +488,21 @@ export function AdminContactsTable({
   search,
   metrics,
 }: Readonly<AdminContactsTableProps>) {
-  const [selected, setSelected] = useState<AdminContactRow | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = useMemo(
+    () => rows.find(row => row.dedupeKey === selectedId) ?? null,
+    [rows, selectedId]
+  );
+  const { handleKeyDown } = useAdminTableKeyboardNavigation({
+    items: rows,
+    selectedId,
+    onSelect: setSelectedId,
+    onToggleSidebar: () =>
+      setSelectedId(current => (current ? null : (rows[0]?.dedupeKey ?? null))),
+    onCloseSidebar: () => setSelectedId(null),
+    isSidebarOpen: selected !== null,
+    getId: row => row.dedupeKey,
+  });
 
   const buildHref = useCallback(
     (params: Record<string, string | null>) => {
@@ -320,7 +524,7 @@ export function AdminContactsTable({
     () => (
       <ContactDetailPanel
         contact={selected}
-        onClose={() => setSelected(null)}
+        onClose={() => setSelectedId(null)}
       />
     ),
     [selected]
@@ -340,6 +544,7 @@ export function AdminContactsTable({
     <AdminTableShell
       testId='admin-contacts-content'
       className='rounded-none border-0'
+      scrollContainerProps={{ tabIndex: 0, onKeyDown: handleKeyDown }}
       toolbar={
         <>
           <AdminTableHeader
@@ -468,13 +673,14 @@ export function AdminContactsTable({
                 <tr
                   key={row.dedupeKey}
                   onClick={() =>
-                    setSelected(prev =>
-                      prev?.dedupeKey === row.dedupeKey ? null : row
+                    setSelectedId(previous =>
+                      previous === row.dedupeKey ? null : row.dedupeKey
                     )
                   }
+                  aria-selected={selectedId === row.dedupeKey}
                   className={cn(
                     'h-14 cursor-pointer border-t border-(--app-shell-frame-seam)',
-                    selected?.dedupeKey === row.dedupeKey
+                    selectedId === row.dedupeKey
                       ? 'bg-surface-2'
                       : 'hover:bg-surface-1'
                   )}
