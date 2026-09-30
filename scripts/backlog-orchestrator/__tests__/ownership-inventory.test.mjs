@@ -87,6 +87,7 @@ Change the Summer runtime manifest in JovieInc/summer-config. No Jovie product f
 describe('JOV-5278 ownership inventory', () => {
   beforeEach(context => {
     // Admission fixtures must use the same clock as their existing receipts.
+    assert.ok('mock' in context, 'fixture clock needs a test context');
     context.mock.timers.enable({ apis: ['Date'], now: new Date(NOW) });
   });
 
