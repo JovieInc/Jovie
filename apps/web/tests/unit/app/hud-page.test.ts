@@ -1,3 +1,7 @@
+vi.mock('@/lib/ovie/privacy-lock/server', () => ({
+  assertOviePrivacyUnlocked: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import HudPage from '@/app/hud/page';
 

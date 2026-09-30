@@ -49,6 +49,9 @@ const NON_PRODUCT = /\.(test|spec|stories)\.[jt]sx?$/;
 const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
   'apps/web/components/marketing/FaqSection.tsx',
   'apps/web/components/marketing/artist-notifications/ArtistNotificationsHero.tsx',
+  // Terminal CTA headlines are the page's closing value proposition; a
+  // two-line clamp truncated /product's at 390px ("…people searc…").
+  'apps/web/components/site/MarketingTerminalCta.tsx',
 ]);
 
 function hasEditorialTitleContract(

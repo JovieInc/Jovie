@@ -22,6 +22,16 @@ describe('ProductScreenshotFrame — dark-glass product frame (JOV-6247)', () =>
     expect(el).not.toHaveClass('psf--dark-glass');
   });
 
+  it('keeps the bezel on the neutral surface token, not the accent hover fill', () => {
+    render(
+      <ProductScreenshotFrame scenarioId={DESKTOP_SCENARIO} sizes={SIZES} />
+    );
+
+    const el = frame();
+    expect(el).toHaveClass('bg-surface-1');
+    expect(el.className).not.toContain('bg-(--color-accent-hover)');
+  });
+
   it('applies the locked dark-glass material as a variant', () => {
     render(
       <ProductScreenshotFrame
