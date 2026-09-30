@@ -125,7 +125,7 @@ export function OviePrivacyLockControl({
 
   if (state?.enabled && state.locked) {
     return (
-      <div className='px-2.5 py-2' data-testid='ovie-privacy-lock-control'>
+      <div className='px-3 py-2' data-testid='ovie-privacy-lock-control'>
         <p className='text-xs font-medium text-primary-token'>Ovie is locked</p>
         <p className='mt-0.5 text-2xs text-secondary-token'>
           Unlock with your passkey to continue.
@@ -141,7 +141,7 @@ export function OviePrivacyLockControl({
       : 'Enable Ovie privacy lock';
 
   return (
-    <div className='px-2.5 py-2' data-testid='ovie-privacy-lock-control'>
+    <div className='px-3 py-2' data-testid='ovie-privacy-lock-control'>
       <p className='text-xs font-medium text-primary-token'>
         Ovie privacy lock
       </p>
