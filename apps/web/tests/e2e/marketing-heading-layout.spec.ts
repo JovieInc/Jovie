@@ -24,7 +24,7 @@ for (const width of [320, 375, 390, 430, 720, 768, 1440]) {
       const headings = page.locator(
         route === '/'
           ? '#homepage-section-presence-heading'
-          : 'main h2.ap-shell-h2'
+          : 'main h2.ap-shell-h2, main [data-testid="final-cta-headline"]'
       );
       expect(await headings.count()).toBeGreaterThan(0);
       for (const heading of await headings.all()) {
