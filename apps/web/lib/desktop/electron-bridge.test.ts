@@ -734,3 +734,40 @@ describe('useDesktopBuildIdentity — build-identity handoff', () => {
     expect(result.current).toBeUndefined();
   });
 });
+
+describe('narrow current Ovie browser bridge', () => {
+  it('passes no destination to native and never uses window.open', async () => {
+    const open = vi.fn(async () => ({ ok: true }));
+    setElectronAPI({ openCurrentOvieInBrowser: open });
+    expect(await __testing.openCurrentOvieInBrowser()).toEqual({ ok: true });
+    expect(open).toHaveBeenCalledExactlyOnceWith();
+    expect(windowOpenSpy).not.toHaveBeenCalled();
+  });
+  it('fails closed for stale binary or ordinary browser', async () => {
+    expect((await __testing.openCurrentOvieInBrowser()).ok).toBe(false);
+    setElectronAPI({});
+    expect(await __testing.openCurrentOvieInBrowser()).toEqual({
+      ok: false,
+      reason: 'ovie-browser-bridge-unavailable',
+    });
+    expect(windowOpenSpy).not.toHaveBeenCalled();
+  });
+  it.each([null, { ok: false }, { ok: false, reason: 'blocked-url' }])(
+    'preserves explicit native failure %j',
+    async result => {
+      setElectronAPI({ openCurrentOvieInBrowser: vi.fn(async () => result) });
+      expect((await __testing.openCurrentOvieInBrowser()).ok).toBe(false);
+      expect(windowOpenSpy).not.toHaveBeenCalled();
+    }
+  );
+  it('converts rejected IPC into actionable failure', async () => {
+    setElectronAPI({
+      openCurrentOvieInBrowser: vi.fn().mockRejectedValue(Error('IPC lost')),
+    });
+    expect(await __testing.openCurrentOvieInBrowser()).toEqual({
+      ok: false,
+      reason: 'ovie-browser-open-failed',
+    });
+    expect(windowOpenSpy).not.toHaveBeenCalled();
+  });
+});

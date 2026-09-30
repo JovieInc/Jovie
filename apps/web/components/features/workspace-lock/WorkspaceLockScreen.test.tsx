@@ -20,10 +20,12 @@ vi.mock('@/lib/auth/client', () => ({
 
 const desktop = vi.hoisted(() => ({
   isDesktopEnvironment: vi.fn(() => false),
+  openCurrentOvieInBrowser: vi.fn(async () => ({ ok: true })),
   platformProbe: vi.fn(async () => true),
 }));
 vi.mock('@/lib/desktop/electron-bridge', () => ({
   isDesktopEnvironment: desktop.isDesktopEnvironment,
+  openCurrentOvieInBrowser: desktop.openCurrentOvieInBrowser,
 }));
 
 const reload = vi.fn();
@@ -133,7 +135,7 @@ describe('WorkspaceLockScreen', () => {
       expect(screen.getByRole('alert').textContent).toContain('in your browser')
     );
     expect(
-      screen.getByRole('button', { name: 'Open In Browser' })
+      screen.getByRole('button', { name: 'Continue in browser' })
     ).toBeTruthy();
     expect(client.signInPasskey).not.toHaveBeenCalled();
   });
@@ -160,5 +162,64 @@ describe('WorkspaceLockScreen', () => {
     expect(screen.getByRole('alert').className).toContain('text-xs');
     expect(reload).not.toHaveBeenCalled();
     expect(document.cookie).toContain('jovie_workspace_lock=1');
+  });
+});
+
+describe('native browser recovery', () => {
+  it('continues in independent browser without unlocking or reloading native', async () => {
+    document.cookie = 'jovie_workspace_lock=1; path=/';
+    desktop.isDesktopEnvironment.mockReturnValue(true);
+    desktop.platformProbe.mockResolvedValue(false);
+    desktop.openCurrentOvieInBrowser.mockResolvedValue({ ok: true });
+    render(<WorkspaceLockScreen />);
+    fireEvent.click(screen.getByText('Unlock to continue'));
+    const button = await screen.findByRole('button', {
+      name: 'Continue in browser',
+    });
+    fireEvent.click(button);
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'This desktop session stays locked.'
+      )
+    );
+    expect(desktop.openCurrentOvieInBrowser).toHaveBeenCalledWith();
+    expect(reload).not.toHaveBeenCalled();
+    expect(document.cookie).toContain('jovie_workspace_lock=1');
+  });
+  it('reports failure and allows retry while pending disables only local recovery', async () => {
+    desktop.isDesktopEnvironment.mockReturnValue(true);
+    desktop.platformProbe.mockResolvedValue(false);
+    let resolve!: (value: { ok: boolean }) => void;
+    desktop.openCurrentOvieInBrowser.mockReturnValue(
+      new Promise(done => {
+        resolve = done;
+      })
+    );
+    render(<WorkspaceLockScreen />);
+    fireEvent.click(screen.getByText('Unlock to continue'));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Continue in browser' })
+    );
+    expect(
+      screen.getByRole('button', { name: 'Opening browser…' })
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Opening browser…' })
+    ).toHaveClass('min-w-40');
+    expect(screen.getByRole('alert')).toHaveClass('min-h-12');
+    resolve({ ok: false });
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Could not open your browser.'
+      )
+    );
+    expect(
+      screen.getByRole('button', { name: 'Continue in browser' })
+    ).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Continue in browser' })
+    ).toHaveClass('min-w-40');
+    expect(screen.getByRole('alert')).toHaveClass('min-h-12');
+    expect(reload).not.toHaveBeenCalled();
   });
 });

@@ -2278,6 +2278,13 @@ export function buildControlCoverageCommands() {
   ];
 }
 
+const SUMMER_PIN_GUARD_WEB_TEST =
+  'apps/web/lib/ovie/summer-deployment-pin-guard.test.ts';
+const SUMMER_PIN_GUARD_NODE_COMMAND = [
+  'node',
+  ['--test', 'scripts/summer-deployment-pin-guard.test.mjs'],
+];
+
 export function buildSelectedTestCommands(
   plan,
   maxWorkers,
@@ -2285,6 +2292,9 @@ export function buildSelectedTestCommands(
   head
 ) {
   const commands = [];
+  if (plan.selectedTests.includes(SUMMER_PIN_GUARD_WEB_TEST)) {
+    commands.push(SUMMER_PIN_GUARD_NODE_COMMAND);
+  }
   if (plan.deliveryControllerCoverage) {
     commands.push(['node', [...DELIVERY_CONTROLLER_COVERAGE_ARGS]]);
   }
@@ -2441,6 +2451,8 @@ export function buildFullSuiteCommands(maxWorkers, shardCount = 8) {
   return [
     buildCompanyRegistryTestCommand(),
     buildProjectCreationTestCommand(),
+    // Keep the full repository pin scan outside Vitest's 12-second test budget.
+    SUMMER_PIN_GUARD_NODE_COMMAND,
     ...commands,
   ];
 }
