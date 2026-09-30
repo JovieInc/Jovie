@@ -330,22 +330,31 @@ describe('collectInventory', () => {
     expect(big.inventory.counts.open.fetched).toBe(1600);
   });
 
-  it('handles boundary conditions: empty project, stale revision, no token', async () => {
+  it('handles an empty project and missing credentials', async () => {
     const empty = await collect({ openTotal: 0 }).promise;
     expect(empty.status).toBe('COMPLETE');
     expect(empty.issues).toHaveLength(0);
     expect(empty.inventory.counts.open.apiTotal).toBe(0);
     expect(empty.inventory.incompleteness).toHaveLength(0);
 
-    const stale = await collect({ revision: 'other-sha' }).promise;
-    expect(stale.status).toBe('COMPLETE');
-    expect(stale.inventory.staleness).toMatchObject({
-      analysisRevision: 'other-sha',
-      observedSha: 'abc123',
-      stale: true,
-    });
-
     await expectSonarError(collectInventory({ token: '' }), 'credentials');
+  });
+
+  it('invalidates inventory when analysis binding is missing', async () => {
+    const result = await collect({ analyses: [] }).promise;
+
+    expect(result.status).toBe('INCOMPLETE');
+    expect(result.atomic).toBe(false);
+    expect(result.inventory.analysis).toBeNull();
+    expect(result.inventory.incompleteness).toContainEqual({
+      partition: 'project-analysis',
+      reason: 'analysis_missing',
+    });
+    expect(
+      result.inventory.warnings.some(w =>
+        w.includes('no project analysis is available')
+      )
+    ).toBe(true);
   });
 
   it('pins the branch and binds the inventory to analysis + observed sha', async () => {
@@ -366,12 +375,20 @@ describe('collectInventory', () => {
     expect(inventory.staleness.stale).toBe(false);
   });
 
-  it('flags a stale analysis revision relative to the observed sha', async () => {
+  it('invalidates a stale analysis revision relative to the observed sha', async () => {
     const result = await collect(
       { openTotal: 1, revision: 'old-revision' },
       { env: { GITHUB_SHA: 'new-sha' } }
     ).promise;
+    expect(result.status).toBe('INCOMPLETE');
+    expect(result.atomic).toBe(false);
     expect(result.inventory.staleness.stale).toBe(true);
+    expect(result.inventory.incompleteness).toContainEqual({
+      partition: 'project-analysis',
+      reason: 'analysis_revision_stale',
+      analysisRevision: 'old-revision',
+      observedSha: 'new-sha',
+    });
     expect(
       result.inventory.warnings.some(w => w.includes('lags observed commit'))
     ).toBe(true);
@@ -643,6 +660,45 @@ describe('main', () => {
       expect(inventory.incompleteness.length).toBeGreaterThan(0);
     } finally {
       rmSync(flagged.root, { recursive: true, force: true });
+    }
+  });
+
+  it('exits 2 with an explicit reason for missing or stale analysis', async () => {
+    for (const { worldOptions, env, reason } of [
+      {
+        worldOptions: { analyses: [] },
+        env: { GITHUB_SHA: 'abc123' },
+        reason: 'analysis_missing',
+      },
+      {
+        worldOptions: { revision: 'old-revision' },
+        env: { GITHUB_SHA: 'new-sha' },
+        reason: 'analysis_revision_stale',
+      },
+    ]) {
+      const { fetchImpl } = world(worldOptions);
+      const fixture = await runFixture(
+        { SONAR_TOKEN: TOKEN, SONAR_BASE_URL: BASE, ...env },
+        fetchImpl
+      );
+      try {
+        expect(fixture.exits).toEqual([2]);
+        const inventory = JSON.parse(
+          readFileSync(
+            join(issuesDirOf(fixture.root), 'sonar-issues-inventory.json'),
+            'utf8'
+          )
+        );
+        expect(inventory).toMatchObject({
+          status: 'INCOMPLETE',
+          atomic: false,
+        });
+        expect(inventory.incompleteness).toEqual(
+          expect.arrayContaining([expect.objectContaining({ reason })])
+        );
+      } finally {
+        rmSync(fixture.root, { recursive: true, force: true });
+      }
     }
   });
 
