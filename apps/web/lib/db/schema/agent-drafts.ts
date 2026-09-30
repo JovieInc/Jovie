@@ -6,8 +6,8 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
-import type { PublicArtistSnapshot } from '@/lib/agent-acquisition/artist-resolution';
 import type { AgentAcquisition } from '@/lib/agent-acquisition/draft-contract';
+import type { AgentVisibilityDraftPreview } from '@/lib/agent-acquisition/draft-preview';
 
 /** Private draft artifacts, not artist accounts or published creator profiles. */
 export const agentVisibilityDrafts = pgTable(
@@ -16,7 +16,7 @@ export const agentVisibilityDrafts = pgTable(
     id: uuid('id').primaryKey(),
     artistId: text('artist_id').notNull(),
     capabilityHash: text('capability_hash').notNull(),
-    preview: jsonb('preview').$type<PublicArtistSnapshot>().notNull(),
+    preview: jsonb('preview').$type<AgentVisibilityDraftPreview>().notNull(),
     acquisition: jsonb('acquisition').$type<AgentAcquisition>().notNull(),
     expiresAt: timestamp('expires_at').notNull(),
     claimedAt: timestamp('claimed_at'),
