@@ -16,7 +16,6 @@ import {
 } from 'react';
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { ChatThreadNavigationRail } from '@/components/features/chat/navigation-rail';
-import { track } from '@/lib/analytics';
 import { AUDIO_FILE_ACCEPT } from '@/lib/audio/constants';
 import {
   CHAT_TRANSCRIPT_ROW_ESTIMATE_PX,
@@ -37,19 +36,13 @@ import {
   resolveChatEmptyStateInsight,
 } from './chat-empty-greeting';
 import { DESKTOP_CONTENT_GRID_ANCHOR } from './chat-empty-starters';
-import { resolveChatEmptyStateAffordance } from './chat-empty-state-contract';
 import { CHAT_CONTENT_SHELL_CLASSNAME } from './chat-layout';
 import { ChatDropZoneOverlay } from './components/ChatDropZoneOverlay';
-import { ChatEmptyStateWelcome } from './components/ChatEmptyStateComposerRegion';
 import { ChatEmptyStateGreeting } from './components/ChatEmptyStateGreeting';
-import { ChatEmptyStateOpportunityCards } from './components/ChatEmptyStateOpportunityCards';
 import { ChatPinnedOpportunityHeader } from './components/ChatPinnedOpportunityHeader';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
-import { ChatStarterActionsRail } from './components/ChatStarterActionsRail';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
-import { FeatureIntroHost } from './components/FeatureIntroCard';
 import { OvieEditorialBriefing } from './components/OvieEditorialBriefing';
-import { FEATURED_SKILL_SUGGESTIONS } from './components/SuggestedPrompts';
 import {
   useChatFileAttachments,
   useChatJankMonitor,
@@ -68,11 +61,7 @@ import {
   ChatLoadingConversationSkeleton,
   ChatThreadMessages,
 } from './JovieChatSections';
-import { CHAT_STARTER_ACTIONS } from './starter-actions';
-import type {
-  ChatActionCard as ChatActionCardModel,
-  JovieChatProps,
-} from './types';
+import type { JovieChatProps } from './types';
 
 const VIRTUALIZATION_THRESHOLD =
   CHAT_TRANSCRIPT_WINDOW.virtualizeAfterMessageCount;
@@ -104,8 +93,6 @@ export function JovieChat({
   isProfileComplete = false,
   chatMode,
   ovieHomeBriefing,
-  actionCards,
-  featureIntroCatalog,
   ambientOwnedByShell = false,
 }: JovieChatProps) {
   // TanStack Virtual returns fresh rows from a stable `virtualizer` object. React
@@ -118,10 +105,6 @@ export function JovieChat({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioFileInputRef = useRef<HTMLInputElement>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
-  /** Local dismiss ledger for empty-state action cards (session-scoped). */
-  const [dismissedActionCardIds, setDismissedActionCardIds] = useState<
-    ReadonlySet<ChatActionCardModel['id']>
-  >(() => new Set());
   /**
    * Pinned opportunity card for empty-thread → card-open mode
    * (GH #13177 / #13174 / JOV-3933). Declared before useJovieChat so the
@@ -165,35 +148,6 @@ export function JovieChat({
     pinnedOpportunity,
     chatMode,
   });
-
-  const visibleActionCards = useMemo(() => {
-    if (!actionCards || actionCards.length === 0) return [];
-    return actionCards.filter(card => !dismissedActionCardIds.has(card.id));
-  }, [actionCards, dismissedActionCardIds]);
-  const featuredSkillSuggestionCount = FEATURED_SKILL_SUGGESTIONS.length;
-
-  const handleDismissActionCard = useCallback((card: ChatActionCardModel) => {
-    track('chat_starter_action_dismissed', {
-      action: CHAT_STARTER_ACTIONS[card.id].telemetryKey,
-      surface: 'card',
-    });
-    setDismissedActionCardIds(prev => {
-      const next = new Set(prev);
-      next.add(card.id);
-      return next;
-    });
-  }, []);
-
-  const handleActOnActionCard = useCallback(
-    (card: ChatActionCardModel) => {
-      track('chat_starter_action_selected', {
-        action: CHAT_STARTER_ACTIONS[card.id].telemetryKey,
-        surface: 'card',
-      });
-      handleSuggestedPrompt(card.prompt);
-    },
-    [handleSuggestedPrompt]
-  );
 
   // ─── Sticky scroll via ResizeObserver ────────────────────────────
   const {
@@ -493,48 +447,43 @@ export function JovieChat({
   const searchParams = useSearchParams();
   const deepLinkOpportunityId = searchParams.get('opportunityId');
 
-  // Empty-thread opportunity cards (GH #13177): only when there is no active
-  // conversation content yet. Zero pending → restore actionCards + prompt rail
-  // first-run scaffolding (JOV-3547) instead of a bare composer.
-  // Also load when deep-linking a pin from the inbox (JOV-3933).
+  // Pending opportunity cards load only to resolve an ?opportunityId= pin
+  // deep link (JOV-3933). The empty-chat card stack is retired (JOV-7150):
+  // the empty state is one sentence plus the composer, nothing else.
   const conversationExists = Boolean(
     hasMessages || conversationId || activeConversationId
   );
   const conversationInProgress = isLoading || isSubmitting || isStreaming;
-  const shouldLoadOpportunityCards =
-    (chatMode !== 'ov' &&
-      !conversationExists &&
-      !conversationInProgress &&
-      !isLoadingConversation) ||
-    Boolean(chatMode !== 'ov' && deepLinkOpportunityId && !pinnedOpportunity);
+  const shouldLoadOpportunityCards = Boolean(
+    chatMode !== 'ov' && deepLinkOpportunityId && !pinnedOpportunity
+  );
   const { data: pendingOpportunityCards = [] } =
     usePendingOpportunityCardsQuery({
       enabled: shouldLoadOpportunityCards,
     });
-  const showEmptyOpportunityCards =
-    !conversationExists &&
-    !conversationInProgress &&
-    !isLoadingConversation &&
-    !pinnedOpportunity &&
-    pendingOpportunityCards.length > 0;
 
-  const handleSelectOpportunityCard = useCallback(
-    (card: OpportunityInboxCardViewModel) => {
-      setPinnedOpportunity(card);
-    },
-    []
-  );
+  // Once a deep-linked pin is applied (or dismissed) it stays handled so
+  // unpinning can't re-pin the same card while the param is still in the URL.
+  const deepLinkPinHandledRef = useRef(false);
   const handleUnpinOpportunity = useCallback(() => {
+    deepLinkPinHandledRef.current = true;
     setPinnedOpportunity(null);
   }, []);
 
   // Deep-link: /app/chat?opportunityId=<uuid> pins the matching card.
   useEffect(() => {
-    if (!deepLinkOpportunityId || pinnedOpportunity) return;
+    if (
+      !deepLinkOpportunityId ||
+      pinnedOpportunity ||
+      deepLinkPinHandledRef.current
+    ) {
+      return;
+    }
     const match = pendingOpportunityCards.find(
       card => card.id === deepLinkOpportunityId
     );
     if (match) {
+      deepLinkPinHandledRef.current = true;
       setPinnedOpportunity(match);
     }
   }, [deepLinkOpportunityId, pendingOpportunityCards, pinnedOpportunity]);
@@ -555,32 +504,14 @@ export function JovieChat({
     chatMode === 'ov' && ovieHomeBriefing != null && !showThreadView;
   const composerHasIntent =
     composerPickerOpen || Boolean(input.trim()) || chipTray.chips.length > 0;
-  const emptyStateAffordance = resolveChatEmptyStateAffordance({
-    conversationExists,
-    conversationInProgress,
-    composerHasIntent,
-    opportunityCardCount: showEmptyOpportunityCards
-      ? pendingOpportunityCards.length
-      : 0,
-    starterActionCount: visibleActionCards.length,
-    suggestionCount: featuredSkillSuggestionCount,
-  });
-  const showEmptyActionCards = emptyStateAffordance === 'starter-actions';
-  // JOV-5387: Just ask + executable sample sits above the starter-actions
-  // rail so cards never replace it. The bare and chip states now render
-  // ChatEmptyStateGreeting instead (JOV-7150) — this only gates the
-  // starter-actions rail's own heading.
-  const showEmptyWelcome =
-    !composerHasIntent && emptyStateAffordance === 'starter-actions';
-  // JOV-7150: one greeting + one real insight replaces the "Just ask"
-  // heading and the chip/suggestion state — no cards, no chips. Opportunity
-  // cards and the starter-actions rail (real, actionable items) are
-  // untouched; this only covers the bare and chip-only affordances.
+  // JOV-7150: the empty state is one sentence — a real insight when one
+  // exists, otherwise a plain greeting — above the composer. No cards, no
+  // chips, no demo exchange, no competing CTA surface. While the composer
+  // carries intent (typing, picker open, chips) even the greeting steps
+  // back so the composer owns attention.
   const chatEmptyStateFirstName = getChatEmptyStateFirstName(displayName);
   const showEmptyGreeting =
-    !composerHasIntent &&
-    (emptyStateAffordance === 'none' ||
-      emptyStateAffordance === 'suggestion-pills');
+    !showThreadView && !showOvieBriefing && !composerHasIntent;
   const { data: insightsSummary } = useInsightsSummaryQuery({
     enabled: showEmptyGreeting,
   });
@@ -733,12 +664,9 @@ export function JovieChat({
       chatInputProps={chatInputProps}
       chatMode={chatMode}
       showThreadView={showThreadView}
-      // one-chrome-layer-v1: prompt suggests / starter cards XOR status
-      // banners — the usage banner yields whenever the empty state is already
-      // showing a chrome affordance layer.
-      suppressUsageAlert={
-        showOvieBriefing || (!showThreadView && emptyStateAffordance !== 'none')
-      }
+      // one-chrome-layer-v1: the Ovie briefing owns the empty-state chrome
+      // layer, so the usage banner yields to it.
+      suppressUsageAlert={showOvieBriefing}
       isRateLimited={isRateLimited}
       showManifest={showManifest}
       manifestCollapsed={manifestCollapsed}
@@ -845,7 +773,11 @@ export function JovieChat({
               <div
                 className='flex min-h-0 flex-1 flex-col'
                 data-empty-affordance={
-                  showOvieBriefing ? 'ovie-briefing' : emptyStateAffordance
+                  showOvieBriefing
+                    ? 'ovie-briefing'
+                    : showEmptyGreeting
+                      ? 'greeting'
+                      : 'none'
                 }
                 data-grid-anchor={DESKTOP_CONTENT_GRID_ANCHOR}
                 data-testid='chat-empty-state-viewport'
@@ -872,42 +804,8 @@ export function JovieChat({
                 ) : (
                   <ChatEmptyStateComposerRegion
                     stableDocked
-                    onSelectSample={handleSuggestedPrompt}
                     above={
-                      showEmptyOpportunityCards ? (
-                        <ChatEmptyStateOpportunityCards
-                          cards={pendingOpportunityCards}
-                          onSelect={handleSelectOpportunityCard}
-                        />
-                      ) : showEmptyActionCards ? (
-                        <div
-                          // single-column-one-width-v1: the empty-state column
-                          // inherits the 45rem content shell — no stepped max-w.
-                          className='mx-auto flex min-h-full w-full flex-col items-center justify-start gap-5 py-2 sm:py-3'
-                          data-testid='chat-empty-state-action-card-slot'
-                        >
-                          {!composerHasIntent ? (
-                            <FeatureIntroHost
-                              catalog={featureIntroCatalog}
-                              onHighlightCTA={() => {
-                                inputRef.current?.focus();
-                              }}
-                            />
-                          ) : null}
-                          {showEmptyWelcome ? (
-                            <ChatEmptyStateWelcome
-                              onSelectSample={handleSuggestedPrompt}
-                            />
-                          ) : null}
-                          <div className='flex w-full min-h-0 flex-1 flex-col items-center justify-center'>
-                            <ChatStarterActionsRail
-                              cards={visibleActionCards}
-                              onAct={handleActOnActionCard}
-                              onDismiss={handleDismissActionCard}
-                            />
-                          </div>
-                        </div>
-                      ) : showEmptyGreeting ? (
+                      showEmptyGreeting ? (
                         <ChatEmptyStateGreeting
                           firstName={chatEmptyStateFirstName}
                           insight={chatEmptyStateInsight}
@@ -915,14 +813,6 @@ export function JovieChat({
                       ) : undefined
                     }
                   >
-                    {!composerHasIntent && emptyStateAffordance === 'none' ? (
-                      <FeatureIntroHost
-                        catalog={featureIntroCatalog}
-                        onHighlightCTA={() => {
-                          inputRef.current?.focus();
-                        }}
-                      />
-                    ) : null}
                     {composerSurface}
                     {inlineChatError ? (
                       <div className='mt-3 w-full'>{inlineChatError}</div>

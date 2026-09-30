@@ -347,21 +347,21 @@ describe('JovieChat styling regressions', () => {
     );
   });
 
-  it("keeps What's New above starter actions and out of the composer dock (JOV-5350)", () => {
-    // Asserted node:fs read of the exact component source — the
-    // FeatureIntroHost must join the scrollable starter-action slot rather
-    // than crowding the fixed composer dock and covering the card CTA.
+  it('keeps the empty state to one greeting sentence — no card surfaces (JOV-7150)', () => {
+    // Asserted node:fs read of the exact component source — the empty chat
+    // must not mount competing prompt surfaces (What's New card, starter
+    // actions rail, opportunity card stack, demo sample) alongside the
+    // greeting. Founder's direction: one sentence above the composer.
     const jovieChatSource = readFileSync(
       resolve(process.cwd(), 'components/jovie/JovieChat.tsx'),
       'utf8'
     );
 
-    expect(jovieChatSource).toMatch(
-      /data-testid='chat-empty-state-action-card-slot'[\s\S]{0,300}<FeatureIntroHost/
-    );
-    expect(jovieChatSource).toMatch(
-      /!composerHasIntent && emptyStateAffordance === 'none'[\s\S]{0,200}<FeatureIntroHost/
-    );
+    expect(jovieChatSource).not.toContain('<FeatureIntroHost');
+    expect(jovieChatSource).not.toContain('<ChatStarterActionsRail');
+    expect(jovieChatSource).not.toContain('<ChatEmptyStateOpportunityCards');
+    expect(jovieChatSource).not.toContain('<ChatEmptyStateWelcome');
+    expect(jovieChatSource).not.toContain('<SuggestedPrompts');
   });
 
   it('renders the greeting (not chips) for the bare and suggestion-pill empty states (JOV-7150)', () => {
