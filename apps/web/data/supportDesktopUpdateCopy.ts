@@ -18,8 +18,9 @@ export const DESKTOP_UPDATE_COPY = {
     errorTitle: 'Update Did Not Download',
     released: (date: string) => `Released ${date}`,
     downloadingDescription: 'Keep working. Jovie tells you when it is ready.',
+    // ShipIt aborts the install if Jovie is reopened mid-swap (2026-09-29).
     readyDescription:
-      'Restart Jovie to finish installing. It takes a few seconds.',
+      'Jovie closes, installs and reopens by itself. This can take a minute, so do not reopen it.',
     errorDescription: 'Check your connection and try again.',
     errorFinalDescription:
       'Download the latest version from jov.ie/download to update.',
