@@ -49,7 +49,10 @@ const nativeSurfaces = [
   }),
   surface('native.titlebar', 'Native titlebar and traffic lights', {
     kind: 'native-window',
-    sources: [NATIVE_SOURCE, 'apps/web/components/atoms/DesktopTitlebar.tsx'],
+    sources: [
+      NATIVE_SOURCE,
+      'apps/web/components/organisms/DesktopTitlebar.tsx',
+    ],
     states: ['drag-region', 'no-drag-controls', 'traffic-light-alignment'],
   }),
   surface('native.application-menu', 'Application menu and shortcuts', {

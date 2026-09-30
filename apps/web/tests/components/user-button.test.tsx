@@ -339,6 +339,11 @@ describe('UserButton billing actions', () => {
     expect(desktopIdentity).toHaveTextContent(
       'Desktop · Version Unknown · Unverified'
     );
+    expect(desktopIdentity).toHaveAttribute('role', 'status');
+    expect(desktopIdentity).toHaveAttribute('data-provenance', 'unverified');
+    expect(desktopIdentity).toHaveAccessibleName(
+      'Desktop environment, version unknown, source revision unverified'
+    );
     expect(screen.queryByText(/^Version /u)).not.toBeInTheDocument();
   });
 

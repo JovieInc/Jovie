@@ -26,7 +26,7 @@ import {
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { DesktopReleaseIdentity } from '@/components/atoms/DesktopTitlebar';
+import { DesktopReleaseIdentity } from '@/components/organisms/DesktopTitlebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { DESKTOP_UPDATE_COPY } from '@/data/supportDesktopUpdateCopy';

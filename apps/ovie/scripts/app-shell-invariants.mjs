@@ -169,7 +169,7 @@ export async function auditOvieAppShell(repoRoot = defaultRepoRoot) {
       'desktop sidebar must not render a second collapse control',
     ],
     titlebar: [
-      'apps/web/components/atoms/DesktopTitlebar.tsx',
+      'apps/web/components/organisms/DesktopTitlebar.tsx',
       text =>
         text.includes("data-electron-titlebar='true'") &&
         text.includes('traffic') &&
