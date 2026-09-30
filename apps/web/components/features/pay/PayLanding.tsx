@@ -43,7 +43,7 @@ function TipsHero() {
         {/* eslint-disable @jovie/canonical-ui-label-casing -- Preserve approved sentence-case marketing copy while adding binding evidence. */}
         <h1
           id='pay-hero-heading'
-          className='marketing-h1-linear mt-6 max-w-[12ch] text-primary-token'
+          className='marketing-h1-linear mt-6 max-w-2xl text-primary-token'
         >
           Turn every payment into a follower.
         </h1>
@@ -176,7 +176,7 @@ function BenefitsSection() {
             <div>
               <p className='marketing-kicker'>Why it matters</p>
               {/* ui-casing-allow: marketing display headline */}
-              <h2 className='marketing-h2-linear mt-6 max-w-[11ch] text-primary-token'>
+              <h2 className='marketing-h2-linear mt-6 max-w-[11ch] text-primary-token xl:leading-tight'>
                 Payments are just the beginning.
               </h2>
             </div>
