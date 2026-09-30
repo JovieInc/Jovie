@@ -301,6 +301,7 @@ describe('proof registry', () => {
       'baseline-logo-umg',
       'baseline-logo-armada',
       'baseline-logo-black-hole-recordings',
+      'baseline-sell-out-tour-capture',
       'baseline-about-founder-experience',
       'baseline-launch-tracks-generated',
       'baseline-launch-ai-market',
@@ -339,5 +340,31 @@ describe('proof registry', () => {
   it('links every registered proof to a claim in the product-truth registry', () => {
     const claimIds = new Set(listProductTruthClaims().map(claim => claim.id));
     expect(findUnresolvedProofClaims(claimIds)).toEqual([]);
+  });
+
+  it('does not count the tour capture as proof of the Sell Out outcome', () => {
+    expect(
+      PROOF_REGISTRY.some(
+        proof =>
+          proof.kind === 'product-proof' &&
+          proof.artifact.kind === 'screenshot-scenario' &&
+          proof.artifact.scenarioId === 'tim-white-profile-tour-mobile'
+      )
+    ).toBe(false);
+    const item = MARKETING_PROOF_AUDIT_BASELINE.items.find(
+      entry => entry.id === 'baseline-sell-out-tour-capture'
+    );
+    expect(item?.request).toEqual({
+      recordType: 'proof-request',
+      kind: 'product-proof',
+      claimId: 'capability.events.ticket-sales',
+      pagesBlocked: [
+        '/',
+        '/artist-profile',
+        '/artist-profiles',
+        '/solutions/artists',
+      ],
+      suggestedLane: 'product-capture',
+    });
   });
 });
