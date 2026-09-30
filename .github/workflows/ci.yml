@@ -1836,6 +1836,7 @@ jobs:
             echo "kbd=false"
             echo "crawler=false"
             echo "overlay=false"
+            echo "privacy=false"
             echo "run=false"
           } >> "$GITHUB_OUTPUT"
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
@@ -1847,6 +1848,7 @@ jobs:
           # Overlay primitives, their layer tokens, and the
           # collision harness re-prove stacking, focus, and viewport fit.
           OVERLAY_STORYBOOK_PATTERN='^(packages/ui/atoms/(dialog|alert-dialog|sheet|popover|dropdown-menu|context-menu|select|tooltip)\.tsx|packages/ui/lib/(overlay-styles|overlay-focus|dropdown-styles|utils)\.ts|apps/web/styles/tailwind-foundation\.css|apps/web/\.storybook/stories/overlay-collisions\.stories\.tsx|apps/web/tests/e2e/storybook-overlay-collisions\.spec\.ts)$'
+          PRIVACY_STORYBOOK_PATTERN='^apps/web/(app/app/\(shell\)/DashboardShellPrivacyBoundary(\.test)?\.tsx|lib/workspace-lock/workspace-lock\.ts|components/features/workspace-lock/WorkspaceLockScreen\.tsx|\.storybook/main\.ts|tests/unit/storybook/dashboard-layout-client-mock\.test\.tsx|\.storybook/stories/ovie-privacy-boundary\.stories\.tsx|tests/e2e/storybook-ovie-privacy-boundary\.spec\.ts)$'
           changed_files="$RUNNER_TEMP/storybook-changed-files.txt"
           git diff --name-only "origin/${{ github.base_ref }}" HEAD > "$changed_files"
           if grep -qE "$SPOTIFY_STORYBOOK_PATTERN" "$changed_files"; then
@@ -1870,6 +1872,12 @@ jobs:
           if grep -qE "$OVERLAY_STORYBOOK_PATTERN" "$changed_files"; then
             {
               echo "overlay=true"
+              echo "run=true"
+            } >> "$GITHUB_OUTPUT"
+          fi
+          if grep -qE "$PRIVACY_STORYBOOK_PATTERN" "$changed_files"; then
+            {
+              echo "privacy=true"
               echo "run=true"
             } >> "$GITHUB_OUTPUT"
           fi
@@ -1949,6 +1957,7 @@ jobs:
           RUN_KBD: ${{ steps.storybook-browser.outputs.kbd }}
           RUN_CRAWLER: ${{ steps.storybook-browser.outputs.crawler }}
           RUN_OVERLAY: ${{ steps.storybook-browser.outputs.overlay }}
+          RUN_PRIVACY: ${{ steps.storybook-browser.outputs.privacy }}
           STORYBOOK_BASE_URL: http://localhost:6006
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
@@ -1968,6 +1977,9 @@ jobs:
           fi
           if [[ "$RUN_OVERLAY" == 'true' ]]; then
             specs+=(tests/e2e/storybook-overlay-collisions.spec.ts)
+          fi
+          if [[ "$RUN_PRIVACY" == 'true' ]]; then
+            specs+=(tests/e2e/storybook-ovie-privacy-boundary.spec.ts)
           fi
           test "${#specs[@]}" -gt 0
           pnpm exec storybook dev -p 6006 --no-open &
@@ -3173,6 +3185,7 @@ jobs:
                   tests/e2e/storybook-sheet.spec.ts \
                   tests/e2e/storybook-overlay-collisions.spec.ts \
                   tests/e2e/storybook-spotify-connect.spec.ts \
+                  tests/e2e/storybook-ovie-privacy-boundary.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \
                   --workers=2
               exit 0
