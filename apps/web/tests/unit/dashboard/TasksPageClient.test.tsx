@@ -257,9 +257,9 @@ const mockTaskTwo = {
   title: 'Confirm final DSP delivery checklist',
   description: 'Follow up on delivery status and confirm provider approval.',
   status: 'in_progress',
-  agentStatus: 'processing',
+  agentStatus: 'drafting',
   priority: 'medium',
-} as const;
+} as const satisfies TaskView;
 
 const mockJovieTask = {
   ...mockTask,
