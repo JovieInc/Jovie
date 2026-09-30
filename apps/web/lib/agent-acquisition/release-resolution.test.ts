@@ -360,7 +360,7 @@ describe('agent release resolution', () => {
     const { MusicfetchRequestError } = await import(
       '@/lib/musicfetch/resilient-client'
     );
-    request.mockRejectedValueOnce(new MusicfetchRequestError('bad URL', 400));
+    request.mockRejectedValueOnce(new MusicfetchRequestError('not found', 404));
     expect(await resolveAgentRelease(supported)).toMatchObject({
       code: 'RELEASE_NOT_FOUND',
       retryable: false,
@@ -371,4 +371,31 @@ describe('agent release resolution', () => {
       retryable: true,
     });
   });
+
+  it.each([400, 401, 402, 403, 422, 429, 500, 503])(
+    'keeps provider HTTP %i failures distinct from a missing release',
+    async status => {
+      const { MusicfetchRequestError } = await import(
+        '@/lib/musicfetch/resilient-client'
+      );
+      request.mockRejectedValueOnce(
+        new MusicfetchRequestError(
+          'subscription not active: private detail',
+          status
+        )
+      );
+      const result = await resolveAgentRelease(
+        prepareReleaseLaunchSchema.parse({
+          ...draft,
+          release_url: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+        })
+      );
+      expect(result).toEqual({
+        status: 'error',
+        code: 'UPSTREAM_FAILURE',
+        retryable: true,
+      });
+      expect(request).toHaveBeenCalledTimes(1);
+    }
+  );
 });
