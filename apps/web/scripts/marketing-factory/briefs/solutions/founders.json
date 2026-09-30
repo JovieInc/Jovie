@@ -22,7 +22,10 @@
     "capability.artist-notifications.opt-in-fan-notifications",
     "offer.free.price"
   ],
-  "hero": { "useCase": "claim-conversion", "conversion": "claim-profile" },
+  "hero": {
+    "useCase": "claim-conversion",
+    "conversion": "claim-profile"
+  },
   "proof": [
     {
       "sectionInstanceId": "capture-1",
@@ -37,7 +40,9 @@
         "sectionJob": "hero",
         "family": "artist-lp",
         "audience": "general",
-        "evidence": { "captureScenario": "public-profile-desktop" },
+        "evidence": {
+          "captureScenario": "public-profile-desktop"
+        },
         "fold": "above"
       }
     },
@@ -47,7 +52,9 @@
         "sectionJob": "feature",
         "family": "artist-lp",
         "audience": "general",
-        "evidence": { "captureScenario": "tim-white-profile-subscribe-mobile" },
+        "evidence": {
+          "captureScenario": "tim-white-profile-subscribe-mobile"
+        },
         "fold": "below"
       }
     },
@@ -157,6 +164,12 @@
         },
         {
           "sectionInstanceId": "capture-1",
+          "slot": "headline",
+          "text": "Visitors become subscribers",
+          "claimIds": ["capability.artist-profiles.audience-capture"]
+        },
+        {
+          "sectionInstanceId": "capture-1",
           "slot": "body",
           "text": "Visitors subscribe from your page. When you have news, they get a notification they opted into.",
           "claimIds": [
@@ -172,6 +185,9 @@
         }
       ]
     },
-    "render": { "cls": 0, "lcpMs": 1200 }
+    "render": {
+      "cls": 0,
+      "lcpMs": 1200
+    }
   }
 }

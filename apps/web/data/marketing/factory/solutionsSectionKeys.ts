@@ -1,4 +1,4 @@
-import { MARKETING_SECTION_IDS, type MarketingSectionId } from '../sections';
+import type { MarketingSectionId } from '../sections';
 
 /**
  * Data-only projection of SOLUTIONS_SECTION_RENDERERS
@@ -20,11 +20,43 @@ const ARTIST_SOLUTIONS_SECTION_KEYS = {
   'artist-final-cta': 'cta',
 } as const satisfies Readonly<Record<string, MarketingSectionId>>;
 
-export type FactorySolutionsSectionKey = `factory-${MarketingSectionId}`;
+/** Record-driven renderers; only sections with a real record-driven owner. */
+const FACTORY_SOLUTIONS_SECTION_KEYS = {
+  'factory-hero': 'hero',
+  'factory-feature-split': 'feature-split',
+  'factory-cta': 'cta',
+  'factory-faq': 'faq',
+} as const satisfies Readonly<Record<string, MarketingSectionId>>;
 
-const FACTORY_SOLUTIONS_SECTION_KEYS = Object.fromEntries(
-  MARKETING_SECTION_IDS.map(sectionId => [`factory-${sectionId}`, sectionId])
-) as Readonly<Record<FactorySolutionsSectionKey, MarketingSectionId>>;
+export type FactorySolutionsSectionKey =
+  keyof typeof FACTORY_SOLUTIONS_SECTION_KEYS;
+
+/**
+ * Copy slots each record-driven section needs under its instance id. The
+ * /solutions build gate and the factory render stage both enforce it.
+ */
+export const FACTORY_REQUIRED_COPY_SLOTS: Readonly<
+  Record<FactorySolutionsSectionKey, readonly string[]>
+> = {
+  'factory-hero': ['headline', 'subhead'],
+  'factory-feature-split': ['headline', 'body'],
+  'factory-cta': ['headline'],
+  'factory-faq': [],
+};
+
+/** Missing `<instanceId>.<slot>` copy for record-driven sections. */
+export function findMissingFactoryCopySlots(
+  sections: readonly { renderer: string; instanceId?: string }[],
+  copy: Readonly<Record<string, unknown>>
+): string[] {
+  return sections.flatMap(({ renderer, instanceId }) =>
+    Object.hasOwn(FACTORY_REQUIRED_COPY_SLOTS, renderer)
+      ? FACTORY_REQUIRED_COPY_SLOTS[renderer as FactorySolutionsSectionKey]
+          .map(slot => `${instanceId}.${slot}`)
+          .filter(key => !Object.hasOwn(copy, key))
+      : []
+  );
+}
 
 export const SOLUTIONS_SECTION_KEYS = {
   ...ARTIST_SOLUTIONS_SECTION_KEYS,

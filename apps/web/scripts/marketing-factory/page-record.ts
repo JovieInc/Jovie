@@ -21,7 +21,10 @@ import {
   pageRecordPath,
   resolvePageCopy,
 } from '../../data/marketing/factory/pageRecord';
-import { assignSolutionsSectionKeys } from '../../data/marketing/factory/solutionsSectionKeys';
+import {
+  assignSolutionsSectionKeys,
+  findMissingFactoryCopySlots,
+} from '../../data/marketing/factory/solutionsSectionKeys';
 import { FACTORY_STAGES } from '../../data/marketing/factory/spine';
 import { MARKETING_PEN_CONTRACT_IDS } from '../../data/marketing/penContracts';
 import { listProductTruthClaims } from '../../data/product-truth/claims';
@@ -140,6 +143,10 @@ export function buildFactoryPageRecord(
   // Same checks as assertRenderableSolutionsRecord, the build gate.
   const claims = listProductTruthClaims();
   const issues = [
+    ...findMissingFactoryCopySlots(
+      parsed.data.composition.sections,
+      parsed.data.copy
+    ).map(slot => `missing copy slot ${slot}`),
     ...unrendered,
     ...findUnresolvedRecordClaims(parsed.data, claims).map(
       id => `unknown claim ${id}`

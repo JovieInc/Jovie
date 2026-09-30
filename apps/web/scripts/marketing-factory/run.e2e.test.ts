@@ -131,6 +131,36 @@ describe('factory:run --dry end to end', () => {
     );
   });
 
+  it('fails render when a record-driven section is missing a copy slot', async () => {
+    const copy = brief.dry?.copy as {
+      slots: { sectionInstanceId: string; slot: string }[];
+    };
+    const manifest = await run({
+      providers: dryProviders(brief, {
+        async generate(request) {
+          const value =
+            request.stage === 'copy'
+              ? {
+                  slots: copy.slots.filter(
+                    slot =>
+                      !(
+                        slot.sectionInstanceId === 'capture-1' &&
+                        slot.slot === 'headline'
+                      )
+                  ),
+                }
+              : brief.dry?.[request.stage];
+          return { status: 'ok', value };
+        },
+      }),
+    });
+
+    expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'render' });
+    expect(record('12-render.attempt-2.json').feedbackIn.join('; ')).toContain(
+      'missing copy slot capture-1.headline'
+    );
+  });
+
   it('fails render when the run cannot form a valid page record', async () => {
     const manifest = await run({
       brief: {

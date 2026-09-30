@@ -27,6 +27,7 @@ import SolutionsAudiencePage, {
 } from './page';
 import {
   assertRenderableSolutionsRecord,
+  getSolutionsSectionRenderer,
   SOLUTIONS_SECTION_RENDERERS,
   SolutionsRecordBody,
   SolutionsRecordJsonLd,
@@ -97,6 +98,7 @@ function factoryRecord(copyOverrides: PageRecord['copy'] = {}) {
       'hero-1.subhead': {
         text: 'Turn visitors into subscribers you can reach again.',
       },
+      'capture-1.headline': { text: 'Visitors become subscribers' },
       'capture-1.body': {
         text: 'Visitors subscribe from your page and opt into updates.',
       },
@@ -158,8 +160,54 @@ describe('/solutions/[audience] family renderer (JOV-7275)', () => {
     );
     expect(container).toHaveTextContent('Start free today');
     expect(
-      container.querySelector('[data-factory-media="/og/default.png"]')
+      container.querySelector('[data-marketing-variant="split-claim-card"]')
     ).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-marketing-variant="phone-right"]')
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('img[alt="Subscriber capture preview"]')
+    ).toBeInTheDocument();
+  });
+
+  it('emits only canonical registry variants from factory sections', () => {
+    const { container } = render(
+      <SolutionsRecordBody record={factoryRecord()} />
+    );
+    for (const node of container.querySelectorAll('[data-marketing-variant]')) {
+      const sectionId = node
+        .closest('[data-testid^="marketing-section-"]')
+        ?.getAttribute('data-testid')
+        ?.replace('marketing-section-', '');
+      const variant = node.getAttribute('data-marketing-variant') ?? '';
+      if (sectionId && sectionId !== 'faq') {
+        expect(
+          getMarketingSection(sectionId as 'hero').variants.map(v => v.id)
+        ).toContain(variant);
+      }
+    }
+  });
+
+  it('rejects factory keys that have no record-driven renderer', () => {
+    const valid = factoryRecord();
+    const record = definePage({
+      ...valid,
+      composition: {
+        ...valid.composition,
+        sections: [
+          ...valid.composition.sections,
+          {
+            renderer: 'factory-pricing',
+            instanceId: 'pricing-1',
+            sectionId: 'pricing',
+          },
+        ],
+      },
+    });
+
+    expect(() => assertRenderableSolutionsRecord(record)).toThrowError(
+      /section factory-pricing does not render pricing/u
+    );
   });
 
   it('fails the build gate when a factory section is missing a required copy slot', () => {
@@ -292,10 +340,18 @@ describe('/solutions/[audience] family renderer (JOV-7275)', () => {
     for (const renderer of Object.values(SOLUTIONS_SECTION_RENDERERS)) {
       expect(getMarketingSection(renderer.sectionId).status).toBe('approved');
     }
+    const factoryKeys = Object.keys(SOLUTIONS_SECTION_RENDERERS).filter(key =>
+      key.startsWith('factory-')
+    );
+    expect(factoryKeys).toEqual([
+      'factory-hero',
+      'factory-feature-split',
+      'factory-cta',
+      'factory-faq',
+    ]);
     for (const sectionId of MARKETING_SECTION_IDS) {
-      expect(SOLUTIONS_SECTION_RENDERERS[`factory-${sectionId}`]).toMatchObject(
-        { sectionId }
-      );
+      const renderer = getSolutionsSectionRenderer(`factory-${sectionId}`);
+      if (renderer) expect(renderer.sectionId).toBe(sectionId);
     }
   });
 
