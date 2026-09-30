@@ -3,7 +3,7 @@
 import { Tabs } from '@jovie/ui';
 import { AnimatePresence, motion } from 'motion/react';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
@@ -25,6 +25,10 @@ export function ArtistProfileModeSwitcher({
   showIntroHeading = true,
 }: Readonly<ArtistProfileModeSwitcherProps>) {
   const reducedMotion = useReducedMotion();
+  const [interactiveReady, setInteractiveReady] = useState(false);
+  useEffect(() => {
+    setInteractiveReady(true);
+  }, []);
   const [[activeIndex, slideDirection], setActiveMode] = useState<
     readonly [number, number]
   >([0, 1]);
@@ -115,6 +119,8 @@ export function ArtistProfileModeSwitcher({
         ) : null}
 
         <Tabs.Root
+          data-interactive-ready={interactiveReady ? 'true' : 'false'}
+          aria-busy={!interactiveReady}
           value={activeMode.id}
           onValueChange={value => selectMode(value)}
           className={cn(showIntroHeading ? 'mt-9 w-full' : 'w-full')}
@@ -135,8 +141,10 @@ export function ArtistProfileModeSwitcher({
                 <Tabs.Trigger
                   key={mode.id}
                   value={mode.id}
+                  disabled={!interactiveReady}
                   className={cn(
                     'relative flex min-w-0 items-center justify-center whitespace-nowrap px-2 text-center text-2xs font-semibold leading-none text-tertiary-token transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus data-[state=active]:text-primary-token sm:text-xs',
+                    'disabled:cursor-wait disabled:opacity-[var(--state-disabled-opacity)]',
                     showIntroHeading
                       ? 'min-h-12 rounded-lg'
                       : 'min-h-11 rounded-full'
