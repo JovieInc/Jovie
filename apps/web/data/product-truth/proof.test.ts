@@ -1,7 +1,6 @@
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
+import { listProductTruthClaims } from './claims';
 import {
   createProofPageContext,
   findUnresolvedProofClaims,
@@ -327,40 +326,18 @@ describe('proof registry', () => {
 
   it('reports proof items whose claim is not registered', () => {
     expect(
-      findUnresolvedProofClaims(new Set(['capture-fans', 'get-paid']))
-    ).toEqual([
-      { proofId: 'product-profile-tour-capture', claimId: 'sell-out' },
-    ]);
-    expect(
-      findUnresolvedProofClaims(
-        new Set(['capture-fans', 'get-paid', 'sell-out'])
-      )
-    ).toEqual([]);
+      findUnresolvedProofClaims(new Set(['claim-a']), [
+        { id: 'proof-a', claimId: 'claim-a' },
+        { id: 'proof-b', claimId: 'claim-missing' },
+      ])
+    ).toEqual([{ proofId: 'proof-b', claimId: 'claim-missing' }]);
+    expect(findUnresolvedProofClaims(new Set())).toHaveLength(
+      PROOF_REGISTRY.length
+    );
   });
 
-  const claimRegistryPath = join(import.meta.dirname, 'registry.ts');
-  it.skipIf(!existsSync(claimRegistryPath))(
-    'links every registered proof to a claim in the product-truth registry (skipped until registry.ts lands, JOV-6223)',
-    async () => {
-      const registryModule: Record<string, unknown> = await import(
-        /* @vite-ignore */ claimRegistryPath
-      );
-      const claimIds = new Set<string>();
-      for (const value of Object.values(registryModule)) {
-        if (!Array.isArray(value)) continue;
-        for (const entry of value) {
-          if (
-            entry &&
-            typeof entry === 'object' &&
-            'capabilityId' in entry &&
-            typeof (entry as { id?: unknown }).id === 'string'
-          ) {
-            claimIds.add((entry as { id: string }).id);
-          }
-        }
-      }
-      expect(claimIds.size).toBeGreaterThan(0);
-      expect(findUnresolvedProofClaims(claimIds)).toEqual([]);
-    }
-  );
+  it('links every registered proof to a claim in the product-truth registry', () => {
+    const claimIds = new Set(listProductTruthClaims().map(claim => claim.id));
+    expect(findUnresolvedProofClaims(claimIds)).toEqual([]);
+  });
 });

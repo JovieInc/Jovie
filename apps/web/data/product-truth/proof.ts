@@ -468,7 +468,7 @@ const VERIFIED_PRODUCT_PROOF = [
     recordType: 'proof',
     id: 'product-profile-subscribe-capture',
     kind: 'product-proof',
-    claimId: 'capture-fans',
+    claimId: 'capability.artist-profiles.audience-capture',
     sectionIds: ['relationships', 'feature-split'],
     artifact: {
       kind: 'screenshot-scenario',
@@ -480,7 +480,7 @@ const VERIFIED_PRODUCT_PROOF = [
     recordType: 'proof',
     id: 'product-profile-pay-capture',
     kind: 'product-proof',
-    claimId: 'get-paid',
+    claimId: 'capability.pay.artist-payment-surface',
     sectionIds: ['relationships', 'feature-split'],
     artifact: {
       kind: 'screenshot-scenario',
@@ -492,7 +492,7 @@ const VERIFIED_PRODUCT_PROOF = [
     recordType: 'proof',
     id: 'product-profile-tour-capture',
     kind: 'product-proof',
-    claimId: 'sell-out',
+    claimId: 'capability.artist-profiles.public-artist-profile',
     sectionIds: ['feature-split'],
     artifact: {
       kind: 'screenshot-scenario',
