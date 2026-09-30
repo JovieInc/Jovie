@@ -1,95 +1,123 @@
 /**
- * Provenance helpers for generated marketing media (JOV-7250).
+ * Provenance for generated marketing media (JOV-7250, EU AI Act Art. 50).
  *
- * Every generated asset carries two things:
- *  - an unsigned C2PA-style manifest written as a `<asset>.c2pa.json`
- *    sidecar (real C2PA signing requires a certificate chain; the manifest
- *    records the claim structure so a signer can attach later), and
- *  - explicit AI-generated markup (`AI_GENERATED_MARKUP`), embedded in the
- *    manifest's CreativeWork assertion and stamped into HTML surfaces via
- *    `data-ai-generated`.
- *
- * `art-evaluator.mjs` rejects any generated asset missing this sidecar.
+ * Every generated asset gets a sidecar JSON with the ai-generated flag and
+ * the IPTC trainedAlgorithmicMedia source type. When c2patool is installed
+ * the same facts are embedded as a C2PA manifest; when it is not, the
+ * sidecar records why, so the gap is visible instead of silent.
  */
-import { writeFileSync } from 'node:fs';
 
-export const GENERATED_ASSET_PROVENANCE_SCHEMA = 'jovie-generated-asset/v1';
+import { spawnSync } from 'node:child_process';
+import type { SpawnSyncLike } from './credentials';
 
-/** AI-generated markup string stamped on rendered surfaces. */
-export const AI_GENERATED_MARKUP = 'data-ai-generated="true"';
+export const MARKETING_MEDIA_PROVENANCE_SCHEMA =
+  'jovie.media-provenance/v1' as const;
 
-export interface GeneratedAssetProvenanceInput {
-  readonly assetId: string;
-  /** Adapter/model that produced the asset, e.g. `fal/flux-schnell`. */
-  readonly generator: string;
-  readonly prompt: string;
-  readonly sourceDecisionRule?: string;
+export const IPTC_TRAINED_ALGORITHMIC_MEDIA =
+  'http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia';
+
+export const C2PA_CLAIM_GENERATOR = 'jovie-marketing-factory/1.0';
+
+export type C2paStatus =
+  | {
+      readonly status: 'embedded';
+      readonly tool: 'c2patool';
+      readonly signedAssetPath: string;
+    }
+  | { readonly status: 'unavailable'; readonly reason: string };
+
+export interface ArtEvaluationRecord {
+  readonly ok: boolean;
+  readonly modes: readonly string[];
+  readonly judgeModel: string;
+  readonly notes: readonly string[];
 }
 
-export interface GeneratedAssetProvenance {
-  readonly schema: typeof GENERATED_ASSET_PROVENANCE_SCHEMA;
+export interface ProvenanceSidecar {
+  readonly schema: typeof MARKETING_MEDIA_PROVENANCE_SCHEMA;
   readonly assetId: string;
-  readonly generator: string;
+  readonly assetPath: string;
+  readonly sha256: string;
   readonly aiGenerated: true;
-  readonly markup: typeof AI_GENERATED_MARKUP;
-  readonly c2pa: {
-    readonly claimGenerator: string;
-    readonly assertions: readonly {
-      readonly label: string;
-      readonly data: Record<string, unknown>;
-    }[];
-    readonly signature: null;
+  readonly digitalSourceType: typeof IPTC_TRAINED_ALGORITHMIC_MEDIA;
+  readonly generator: {
+    readonly provider: string;
+    readonly model: string;
+    readonly family: string;
   };
+  readonly prompt: string;
+  readonly recipeId: string;
+  readonly characterId: string | null;
+  readonly createdAt: string;
+  readonly c2pa: C2paStatus;
+  readonly artEvaluation: ArtEvaluationRecord | null;
 }
 
-export function buildGeneratedAssetProvenance(
-  input: GeneratedAssetProvenanceInput
-): GeneratedAssetProvenance {
+export function sidecarPathFor(assetPath: string): string {
+  return `${assetPath}.provenance.json`;
+}
+
+/** c2patool manifest definition: a c2pa.created action marked AI-generated. */
+export function buildC2paManifestDefinition(input: {
+  readonly title: string;
+  readonly provider: string;
+  readonly model: string;
+}) {
   return {
-    schema: GENERATED_ASSET_PROVENANCE_SCHEMA,
-    assetId: input.assetId,
-    generator: input.generator,
-    aiGenerated: true,
-    markup: AI_GENERATED_MARKUP,
-    c2pa: {
-      claimGenerator: `jovie-marketing-media/${GENERATED_ASSET_PROVENANCE_SCHEMA}`,
-      assertions: [
-        {
-          label: 'c2pa.actions',
-          data: {
-            actions: [
-              {
-                action: 'c2pa.created',
-                digitalSourceType: 'trainedAlgorithmicMedia',
-              },
-            ],
-          },
+    claim_generator: C2PA_CLAIM_GENERATOR,
+    title: input.title,
+    assertions: [
+      {
+        label: 'c2pa.actions',
+        data: {
+          actions: [
+            {
+              action: 'c2pa.created',
+              digitalSourceType: IPTC_TRAINED_ALGORITHMIC_MEDIA,
+              softwareAgent: `${input.provider}/${input.model}`,
+            },
+          ],
         },
-        {
-          label: 'stds.schema-org.CreativeWork',
-          data: {
-            '@type': 'CreativeWork',
-            digitalSourceType:
-              'http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia',
-            prompt: input.prompt,
-            decisionRule: input.sourceDecisionRule ?? null,
-          },
-        },
-      ],
-      signature: null,
-    },
+      },
+    ],
   };
 }
 
-export function provenanceSidecarPath(assetPath: string): string {
-  return `${assetPath}.c2pa.json`;
-}
-
-export function writeProvenanceSidecar(
-  assetPath: string,
-  provenance: GeneratedAssetProvenance
-): string {
-  const sidecar = provenanceSidecarPath(assetPath);
-  writeFileSync(sidecar, `${JSON.stringify(provenance, null, 2)}\n`);
-  return sidecar;
+/**
+ * Embeds the manifest with c2patool when it is installed. Signing uses the
+ * tool's configured certificate; production signing keys are a follow-up.
+ */
+export function embedC2paManifest(input: {
+  readonly assetPath: string;
+  readonly manifestPath: string;
+  readonly outputPath: string;
+  readonly spawnImpl?: SpawnSyncLike;
+}): C2paStatus {
+  const spawnImpl = input.spawnImpl ?? (spawnSync as SpawnSyncLike);
+  const probe = spawnImpl('c2patool', ['--version'], {
+    encoding: 'utf8',
+    timeout: 10_000,
+  });
+  if (probe.error || probe.status !== 0) {
+    return {
+      status: 'unavailable',
+      reason: 'c2patool is not installed; provenance is sidecar-only',
+    };
+  }
+  const result = spawnImpl(
+    'c2patool',
+    [input.assetPath, '-m', input.manifestPath, '-o', input.outputPath, '-f'],
+    { encoding: 'utf8', timeout: 60_000 }
+  );
+  if (result.error || result.status !== 0) {
+    return {
+      status: 'unavailable',
+      reason: `c2patool exited ${result.status ?? 'without status'}; provenance is sidecar-only`,
+    };
+  }
+  return {
+    status: 'embedded',
+    tool: 'c2patool',
+    signedAssetPath: input.outputPath,
+  };
 }
