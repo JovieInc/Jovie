@@ -38,6 +38,15 @@ describe('pay landing System B source contract', () => {
     expect(source.match(/<ClaimHandleForm/g) ?? []).toHaveLength(2);
   });
 
+  it('keeps headings clear of the two-line H1 clamp and the card rows', async () => {
+    const source = await readFile(sourcePath, 'utf8');
+
+    // JOV-7230: a 12ch H1 wrapped to three lines and the global two-line
+    // clamp cut it to "into a…"; mt-0 pulled card rows onto the H2 descenders.
+    expect(source).not.toMatch(/marketing-h1-linear[^']*max-w-\[1[0-5]ch\]/);
+    expect(source).not.toMatch(/homepage-section-stack mt-0/);
+  });
+
   it('keeps the final claim section to the handle form action path', () => {
     render(<PayLanding />);
 
