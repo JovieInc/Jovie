@@ -1,6 +1,6 @@
 {
-  "id": "a5ca7016-1de9-46dd-ae55-c969653a86d0",
-  "prevId": "ce527d62-f391-4dc3-9be1-69118e408a27",
+  "id": "517c3c8b-e679-4c56-9811-dd665c82b7ab",
+  "prevId": "a5ca7016-1de9-46dd-ae55-c969653a86d0",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -25322,6 +25322,52 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.music_resolver_receipts": {
+      "name": "music_resolver_receipts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "input_key": {
+          "name": "input_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "receipt": {
+          "name": "receipt",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "music_resolver_receipts_input_key_unique": {
+          "name": "music_resolver_receipts_input_key_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "input_key"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

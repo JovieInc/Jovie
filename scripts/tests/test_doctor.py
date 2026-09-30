@@ -421,7 +421,11 @@ class RunnablePoolTest(unittest.TestCase):
                 "JOV-EXHAUSTED": 3, "JOV-BACKOFF": {"count": 1, "at": 9990}}))
             tracker = mock.Mock()
             tracker.lane_issues.return_value = candidates
-            with mock.patch.dict(os.environ, {"LANES_SELFTEST": "1"}), \
+            # Host slot overrides must not replace this fixture's provider capacities.
+            fixture_env = {"LANES_SELFTEST": "1", **{
+                f"LANES_SLOTS_{name.upper()}": str(config["slots"])
+                for name, config in providers.items()}}
+            with mock.patch.dict(os.environ, fixture_env), \
                     mock.patch.object(lane, "load_providers", return_value=providers), \
                     mock.patch.object(lane, "Linear", return_value=tracker), \
                     mock.patch.object(lane, "in_flight_issues", return_value=frozenset({"JOV-OWNED"})), \

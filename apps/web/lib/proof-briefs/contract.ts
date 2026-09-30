@@ -12,6 +12,16 @@ export const PROOF_BRIEF_SCHEMA = 'proof-brief/v1' as const;
 export const MAX_SUPPORTING_POINTS = 3;
 
 export type ProofBriefPrivacy = 'public' | 'private';
+
+/** Audiences a certified brief may be prepared for. */
+export const PROOF_BRIEF_AUDIENCES = [
+  'investor',
+  'customer',
+  'manager',
+  'founder',
+  'internal',
+] as const;
+export type ProofBriefAudience = (typeof PROOF_BRIEF_AUDIENCES)[number];
 export type ProofBriefStatus = 'progress' | 'insufficient-evidence';
 export type ProofBriefAttribution = 'execution' | 'observed' | 'causal';
 export type ProofBriefEvidenceKind = 'execution' | 'observation' | 'causal';
@@ -103,6 +113,11 @@ export interface CertifiedProofBrief {
   readonly expiresAt: string;
   /** Product branding; absent means the Jovie default. */
   readonly brand?: ProofBriefBrand;
+  /**
+   * Audiences this brief is certified for; absent means subject-scoped
+   * recaps only (customer/manager), never investor-facing.
+   */
+  readonly audiences?: readonly ProofBriefAudience[];
 }
 
 export class ProofBriefError extends Error {
@@ -218,6 +233,11 @@ export function assertProofBriefRenderable(
     !brief.unknowns.every(
       item => typeof item === 'string' && item.length > 0
     ) ||
+    (brief.audiences != null &&
+      (!Array.isArray(brief.audiences) ||
+        !brief.audiences.every(audience =>
+          (PROOF_BRIEF_AUDIENCES as readonly string[]).includes(audience)
+        ))) ||
     (brief.brand != null &&
       !['product', 'eyebrow', 'intro', 'recapNoun'].every(
         key =>

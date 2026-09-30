@@ -362,6 +362,13 @@ export const ServerEnvSchema = z.object({
   // AgentOS workflows are compile-ready but runtime-disabled by default.
   AGENT_OS_WORKFLOWS_ENABLED: z.enum(['true', 'false']).optional(),
 
+  /**
+   * Creator Financial Health hard kill switch (JOV-4621). 'true'/'1' forces
+   * every finance surface off immediately, independent of the
+   * CREATOR_FINANCE flag-resolution latency.
+   */
+  FINANCE_DISABLE: z.enum(['0', '1', 'true', 'false']).optional(),
+
   // Eve core-chat shadow bridge. Off unless explicitly enabled and configured.
   EVE_CORE_CHAT_MODE: z.enum(['off', 'shadow']).optional(),
   EVE_CORE_CHAT_URL: z.string().url().optional(),
@@ -654,6 +661,7 @@ export const ENV_KEYS = [
   'LANGFUSE_BASE_URL',
   'JOVIE_ENABLE_LANGFUSE',
   'AGENT_OS_WORKFLOWS_ENABLED',
+  'FINANCE_DISABLE',
   'EVE_CORE_CHAT_MODE',
   'EVE_CORE_CHAT_URL',
   'EVE_CORE_CHAT_AUTH_TOKEN',

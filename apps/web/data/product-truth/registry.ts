@@ -663,6 +663,9 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   PAID_WELCOME_EMAIL: { nonMarketing: 'transactional email kill switch' },
   MERCH_QA_GATE: { capabilityId: 'instant-merch' },
   AGENT_PROFILE_CREATE: { capabilityId: 'cli' },
+  CREATOR_FINANCE: {
+    nonMarketing: 'owner-only finance release gate; no public claim (JOV-4621)',
+  },
   NEW_RELEASE_PAGE: { nonMarketing: 'UI layout toggle' },
   CANVAS_GRAIN: { nonMarketing: 'UI visual treatment' },
   CYAN_FOCUS_GLOW: { nonMarketing: 'UI visual treatment' },
