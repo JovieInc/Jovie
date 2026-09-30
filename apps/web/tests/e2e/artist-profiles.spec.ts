@@ -70,6 +70,14 @@ async function getGeometrySnapshot(
   return locator.evaluate(el => {
     const rect = el.getBoundingClientRect();
 
+    (
+      window as unknown as {
+        __jovieOriginalEntryMark?: (phase: string) => void;
+      }
+    ).__jovieOriginalEntryMark?.(
+      `geometry:${el.getAttribute('data-testid') ?? el.getAttribute('role') ?? el.tagName}`
+    );
+
     return {
       documentTop: window.scrollY + rect.top,
       height: rect.height,
@@ -78,6 +86,150 @@ async function getGeometrySnapshot(
       y: rect.y,
     };
   });
+}
+
+// Diagnosis only: observe the original two-click entry without settling,
+// recentering, changing focus, or changing the 400ms/1px oracle.
+async function observeOriginalEntry(page: import('@playwright/test').Page) {
+  page.on('console', message => {
+    if (message.text().startsWith('ORIGINAL_ENTRY_TRACE ')) {
+      console.log(message.text());
+    }
+  });
+  await page.addInitScript(() => {
+    let sequence = 0;
+    let frames = 0;
+    let omittedEvents = 0;
+    let lastScrollY = window.scrollY;
+    const rect = (element: Element | null) => {
+      if (!element) return null;
+      const box = element.getBoundingClientRect();
+      return {
+        documentTop: box.top + window.scrollY,
+        x: box.x,
+        y: box.y,
+        height: box.height,
+        width: box.width,
+      };
+    };
+    const describe = (element: Element | null) =>
+      element
+        ? {
+            tag: element.tagName,
+            role: element.getAttribute('role'),
+            label: element.closest('[role="tab"]')?.textContent,
+          }
+        : null;
+    const record = (phase: string, event?: Event) => {
+      // Bound console lines and observer work; keep all explicit phase marks.
+      if (
+        ++sequence > 240 &&
+        !phase.startsWith('phase:') &&
+        !phase.startsWith('geometry:')
+      ) {
+        omittedEvents++;
+        return;
+      }
+      const section = document.querySelector(
+        '[data-testid="artist-profile-section-adaptive"]'
+      );
+      const tabList = section?.querySelector('[role="tablist"]') ?? null;
+      const image = section?.querySelector('img');
+      const pointer = event instanceof MouseEvent ? event : null;
+      console.info(
+        'ORIGINAL_ENTRY_TRACE ' +
+          JSON.stringify({
+            sequence,
+            phase,
+            at: performance.now(),
+            frames,
+            omittedEvents,
+            scrollY: window.scrollY,
+            maxScroll:
+              document.documentElement.scrollHeight - window.innerHeight,
+            viewport: [window.innerWidth, window.innerHeight],
+            ready: section
+              ?.querySelector('[data-interactive-ready]')
+              ?.getAttribute('data-interactive-ready'),
+            selected: tabList?.querySelector('[aria-selected="true"]')
+              ?.textContent,
+            documentReady: document.readyState,
+            fonts: document.fonts.status,
+            image: image
+              ? {
+                  complete: image.complete,
+                  naturalWidth: image.naturalWidth,
+                  currentSrc: image.currentSrc,
+                }
+              : null,
+            focus: describe(document.activeElement),
+            target: describe(
+              event?.target instanceof Element ? event.target : null
+            ),
+            pointer: pointer
+              ? {
+                  x: pointer.clientX,
+                  y: pointer.clientY,
+                  hit: describe(
+                    document.elementFromPoint(pointer.clientX, pointer.clientY)
+                  ),
+                }
+              : null,
+            surfaces: {
+              section: rect(section),
+              phone: rect(image ?? null),
+              tabList: rect(tabList),
+              panel: rect(tabList?.nextElementSibling ?? null),
+            },
+            tabs: Array.from(
+              tabList?.querySelectorAll('[role="tab"]') ?? []
+            ).map(tab => ({
+              label: tab.textContent,
+              disabled: tab.hasAttribute('disabled'),
+              bounds: rect(tab),
+            })),
+          })
+      );
+    };
+    (
+      window as unknown as { __jovieOriginalEntryMark: (phase: string) => void }
+    ).__jovieOriginalEntryMark = record;
+    for (const type of [
+      'scroll',
+      'focusin',
+      'pointerdown',
+      'pointerup',
+      'click',
+      'wheel',
+    ]) {
+      document.addEventListener(type, event => record(type, event), {
+        capture: true,
+        passive: true,
+      });
+    }
+    const frame = () => {
+      frames++;
+      if (window.scrollY !== lastScrollY) {
+        lastScrollY = window.scrollY;
+        record('raf-scroll-change');
+      }
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  });
+}
+
+async function markOriginalEntry(
+  page: import('@playwright/test').Page,
+  phase: string
+) {
+  await page.evaluate(label => {
+    (
+      window as unknown as {
+        __jovieOriginalEntryMark?: (phase: string) => void;
+      }
+    ).__jovieOriginalEntryMark?.(`phase:${label}`);
+  }, phase);
 }
 
 function expectStableGeometry(
@@ -94,10 +246,36 @@ function expectStableGeometry(
 }
 
 test.describe('Artist Profiles Landing', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    if (
+      testInfo.title ===
+      'adaptive mode changes preserve desktop and mobile geometry'
+    ) {
+      await observeOriginalEntry(page);
+    }
     await interceptAnalytics(page);
     await page.goto('/artist-profiles', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
+  });
+
+  test.afterEach(async ({ page }, testInfo) => {
+    if (
+      testInfo.title ===
+      'adaptive mode changes preserve desktop and mobile geometry'
+    ) {
+      try {
+        await markOriginalEntry(page, `finally:${testInfo.status}`);
+      } catch {
+        console.log(
+          'ORIGINAL_ENTRY_TRACE ' +
+            JSON.stringify({
+              phase: 'finally-incomplete',
+              status: testInfo.status,
+              reason: 'page-mark-unavailable',
+            })
+        );
+      }
+    }
   });
 
   test('hero renders with headline and CTAs', async ({ page }) => {
@@ -297,11 +475,15 @@ test.describe('Artist Profiles Landing', () => {
         name: 'Pre-save',
       });
 
+      await markOriginalEntry(page, `${viewport.name}:entry-before-scroll`);
       await tabList.scrollIntoViewIfNeeded();
+      await markOriginalEntry(page, `${viewport.name}:entry-after-scroll`);
       await expect(phone).toBeVisible();
       await expect(tabList).toBeVisible();
       await expect(panelSlot).toBeVisible();
+      await markOriginalEntry(page, `${viewport.name}:first-presave-invoke`);
       await upcomingRelease.click();
+      await markOriginalEntry(page, `${viewport.name}:first-presave-resolved`);
       await expect(upcomingRelease).toHaveAttribute('aria-selected', 'true');
       await page.waitForTimeout(MODE_TRANSITION_SETTLE_MS);
 
@@ -311,12 +493,16 @@ test.describe('Artist Profiles Landing', () => {
         phone: await getGeometrySnapshot(phone),
         tabList: await getGeometrySnapshot(tabList),
       };
+      await markOriginalEntry(page, `${viewport.name}:baseline-collected`);
 
       for (const label of ARTIST_PROFILE_MODE_LABELS) {
         const tab = adaptiveSection.getByRole('tab', { name: label });
+        await markOriginalEntry(page, `${viewport.name}:${label}:invoke`);
         await tab.click();
+        await markOriginalEntry(page, `${viewport.name}:${label}:resolved`);
         await expect(tab).toHaveAttribute('aria-selected', 'true');
         await page.waitForTimeout(MODE_TRANSITION_SETTLE_MS);
+        await markOriginalEntry(page, `${viewport.name}:${label}:400ms`);
 
         await expectNoHorizontalOverflow(page);
         expectStableGeometry(
