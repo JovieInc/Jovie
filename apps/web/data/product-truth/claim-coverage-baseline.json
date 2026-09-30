@@ -1,9 +1,0 @@
-{
-  "description": "Shrink-only baseline of claim-bearing marketing copy that does not yet resolve to a product-truth claim (JOV-7247). Resolve a claim, then rerun the claim-audit test with UPDATE_PRODUCT_TRUTH_BASELINE=1. Never add entries by hand.",
-  "unresolved": {
-    "apps/web/data/artistProfileCopy.ts#2acdd5a23af4": "Turn a $10 busking tip into a lifelong customer.",
-    "apps/web/data/artistProfileCopy.ts#8e0fa3d22220": "Jessica paid you $10",
-    "apps/web/data/artistProfileCopy.ts#a1d7a7585e38": "Best for this listener",
-    "apps/web/data/jovieCardCopy.ts#666191e0c4d0": "Bring up the card when you meet someone and want to share more than a username."
-  }
-}
