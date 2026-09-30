@@ -1502,7 +1502,7 @@ const CREATOR_SHELL_ROUTES = [
     measureMode: 'page-load',
     readySelectors: {
       content: ['[data-testid="library-surface"]'],
-      loading: ['main[aria-label="Loading Library"]'],
+      loading: ['main[aria-label="Loading Work"]'],
     },
     timings: [
       { metric: 'first-contentful-paint', budget: 1800 },
@@ -1526,7 +1526,7 @@ const CREATOR_SHELL_ROUTES = [
     measureMode: 'page-load',
     readySelectors: {
       content: ['[data-testid="library-surface"]'],
-      loading: ['main[aria-label="Loading Library"]'],
+      loading: ['main[aria-label="Loading Work"]'],
     },
     timings: [
       { metric: 'first-contentful-paint', budget: 1800 },

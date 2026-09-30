@@ -81,7 +81,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     () => ({
       isElectron,
       isMobile,
-      navVariant: 'canonical_customer_ia_v1',
+      navVariant: 'canonical_identity_work_v1',
     }),
     [isElectron, isMobile]
   );
@@ -252,7 +252,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
         : isNavigationItemActive(item, pathname, searchParams);
       const shortcut = NAV_SHORTCUTS[item.id];
 
-      // The demo fixture only implements Library content; root jobs stay disabled.
+      // The demo fixture only implements Work content; other roots stay disabled.
       const demoUnavailable = isDemo && item.id !== 'library';
 
       return (

@@ -52,7 +52,7 @@ describe('partitionCustomerNavigation', () => {
     expect(partition.visible.map(item => item.id)).toEqual([
       'home',
       'presence',
-      'links',
+      'library',
     ]);
     expect(partition.more.map(item => item.id)).toEqual(['audience']);
     expect(partition.visible).toEqual(mobilePrimaryNavigation);
@@ -126,7 +126,7 @@ describe('partitionCustomerNavigation', () => {
     expect(partition.visible.map(item => item.id)).toEqual([
       'home',
       'presence',
-      'links',
+      'library',
     ]);
   });
 
