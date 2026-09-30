@@ -29,8 +29,19 @@ describe('PricingComparisonChart', () => {
       ).toHaveAttribute('scope', 'col');
       for (const header of table.querySelectorAll('thead th')) {
         expect(header).toHaveAccessibleName();
+        expect(header).toHaveClass('whitespace-nowrap');
+        expect(header).not.toHaveAttribute('data-wrap', 'feature-label');
       }
     }
+
+    const feature = within(mobileTable).getByRole('rowheader', {
+      name: 'Contact / subscriber capture',
+    });
+    expect(feature).toHaveAttribute('scope', 'row');
+    expect(feature).toHaveAttribute('data-wrap', 'feature-label');
+    expect(feature.className).not.toMatch(
+      /line-clamp|truncate|whitespace-nowrap/
+    );
 
     expect(within(desktopTable).getByText('Free')).toBeInTheDocument();
     expect(within(desktopTable).getByText('Pro')).toBeInTheDocument();

@@ -14,12 +14,15 @@ describe('ArtistProfileSectionHeader', () => {
     );
 
     expect(screen.getByText('Artist Profile')).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', {
-        level: 2,
-        name: 'Your music stays together. The right action leads.',
-      })
-    ).toHaveTextContent('Your music stays together. The right action leads.');
+    const heading = screen.getByRole('heading', {
+      level: 2,
+      name: 'Your music stays together. The right action leads.',
+    });
+    expect(heading).toHaveTextContent(
+      'Your music stays together. The right action leads.'
+    );
+    expect(heading).toHaveAttribute('data-wrap', 'editorial-title');
+    expect(heading.className).not.toMatch(/line-clamp|truncate/);
     expect(
       screen.getByText('Route every visitor to the next useful action.')
     ).toBeInTheDocument();

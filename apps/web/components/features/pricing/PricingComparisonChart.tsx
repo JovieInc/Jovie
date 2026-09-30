@@ -66,6 +66,7 @@ function MobileFeatureRow({
     <tr className='system-b-pricing-chart-row'>
       <th
         scope='row'
+        data-wrap='feature-label'
         className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature'
       >
         {feature.name}

@@ -26,11 +26,7 @@
       "geo:geo-sibling-links"
     ],
     "/artist-profile": ["agentic:structured-data"],
-    "/artist-profiles": [
-      "agentic:structured-data",
-      "geo:geo-jsonld-type",
-      "geo:geo-sibling-links"
-    ],
+    "/artist-profiles": ["geo:geo-jsonld-type", "geo:geo-sibling-links"],
     "/blog": ["agentic:structured-data", "geo:geo-jsonld-type"],
     "/blog/authors/tim": [
       "copy:copy-lint",

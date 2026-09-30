@@ -402,25 +402,9 @@ export async function inspectImageContrast(
   const styleTag = await page.addStyleTag({
     content: `[${HIDE_ATTRIBUTE}], [${HIDE_ATTRIBUTE}] * { color: transparent !important; text-shadow: none !important; -webkit-text-stroke: transparent !important; caret-color: transparent !important; }`,
   });
-  // `Page.captureScreenshot` can transiently fail ("Unable to capture
-  // screenshot") when the CDP call lands before the compositor has produced a
-  // frame for freshly injected content (e.g. a `page.setContent` fixture) —
-  // the DOM and fonts report ready while the surface isn't. It is not a
-  // content signal, so retry the capture on a bounded budget rather than
-  // failing the certification on a renderer race.
-  let screenshot: Buffer | undefined;
+  let screenshot: Buffer;
   try {
-    let lastError: unknown;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        screenshot = await page.screenshot({ type: 'png' });
-        break;
-      } catch (error) {
-        lastError = error;
-        await page.waitForTimeout(50);
-      }
-    }
-    if (!screenshot) throw lastError;
+    screenshot = await page.screenshot({ type: 'png' });
   } finally {
     await styleTag.evaluate(tag => tag.remove());
   }
