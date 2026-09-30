@@ -781,6 +781,30 @@ describe('UserButton billing actions', () => {
     ).toHaveClass('group-data-[collapsible=icon]:hidden');
   });
 
+  it('only offers manual workspace lock inside Ovie', async () => {
+    const user = userEvent.setup();
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+    mockUsePathname.mockReturnValue('/app');
+    const jovie = render(<UserButton showUserInfo />);
+    await user.click(screen.getByText('Adele Adkins'));
+    expect(screen.queryByText('Lock Workspace')).not.toBeInTheDocument();
+    jovie.unmount();
+
+    mockUsePathname.mockReturnValue('/app/ov/ops');
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+    render(<UserButton showUserInfo />);
+    await user.click(screen.getByText('Adele Adkins'));
+    expect(screen.getByText('Lock Workspace')).toBeInTheDocument();
+  });
+
   it('shows an inline usage remaining row in the user menu', async () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: false, plan: null, hasStripeCustomer: false },

@@ -64,19 +64,15 @@ vi.mock(
 
 vi.mock('@/features/profile/ProfileHomeRail', () => ({
   ProfileHomeRail: ({
-    showAlertsCard,
     featuredAccent,
   }: {
-    readonly showAlertsCard?: boolean;
     readonly featuredAccent?: { accent: string; strength: string };
   }) => (
     <div
       data-testid='mock-profile-home-rail'
       data-featured-accent={featuredAccent?.accent}
       data-featured-strength={featuredAccent?.strength}
-    >
-      {showAlertsCard ? <div data-testid='profile-home-alerts-row' /> : null}
-    </div>
+    />
   ),
 }));
 
@@ -121,8 +117,11 @@ vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
 }));
 
 vi.mock('@/features/profile/nav/BottomTabBar', () => ({
-  BottomTabBar: () => (
-    <nav data-testid='profile-bottom-nav' aria-label='Profile Navigation' />
+  BottomTabBar: ({ aboveNav }: { readonly aboveNav?: React.ReactNode }) => (
+    <div data-testid='profile-tab-bar'>
+      {aboveNav}
+      <nav data-testid='profile-bottom-nav' aria-label='Profile Navigation' />
+    </div>
   ),
 }));
 
@@ -207,6 +206,27 @@ describe('ProfileCompactSurface', () => {
     renderSurface();
 
     expect(screen.getByTestId('profile-bottom-nav')).toBeTruthy();
+  });
+
+  it('shows the phone claim bar above the dock on proof profiles (JOV-7114)', () => {
+    renderSurface({ proofClaimCta: { href: '/start', label: 'Claim yours' } });
+
+    const bar = screen.getByTestId('profile-proof-claim-bar');
+    expect(bar).toHaveClass('md:hidden');
+    expect(screen.getByTestId('profile-proof-claim-bar-cta')).toHaveAttribute(
+      'href',
+      '/start'
+    );
+    // Rides inside the dock, directly above the nav, so it moves with it.
+    expect(bar.nextElementSibling).toBe(
+      screen.getByTestId('profile-bottom-nav')
+    );
+  });
+
+  it('omits the claim bar on regular profiles', () => {
+    renderSurface();
+
+    expect(screen.queryByTestId('profile-proof-claim-bar')).toBeNull();
   });
 
   it('hides the bottom tab bar in static previews so it cannot cover clipped content (JOV-7192)', () => {
@@ -332,21 +352,22 @@ describe('ProfileCompactSurface', () => {
     ).toBeNull();
   });
 
-  // JOV-6198: fan-capture gates the Get updates action, not the destination
-  // set. The home alerts row must disappear when fan capture is off while
-  // the primary tab panel keeps rendering.
-  it('hides the home alerts card when fan capture is disabled', () => {
+  // JOV-6198/JOV-7123: fan-capture gates the Get Updates action on the
+  // identity header — there is no separate alerts card on the home surface.
+  it('hides the home Get Updates action when fan capture is disabled', () => {
     renderSurface({ allowFanCapture: false });
 
     expect(
-      screen.queryByTestId('profile-home-alerts-row')
+      screen.queryByTestId('profile-identity-get-updates')
     ).not.toBeInTheDocument();
   });
 
-  it('shows the home alerts card when fan capture is enabled', () => {
+  it('shows the home Get Updates action when fan capture is enabled', () => {
     renderSurface({ allowFanCapture: true });
 
-    expect(screen.getByTestId('profile-home-alerts-row')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('profile-identity-get-updates')
+    ).toBeInTheDocument();
   });
 
   it('leads the identity header with Get Updates and opens the subscribe flow', () => {

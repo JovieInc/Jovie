@@ -299,7 +299,7 @@ jobs:
     needs: [coalesce-production, fleet-promotion]
     if: ${{ needs.coalesce-production.result == 'success' && needs.coalesce-production.outputs.is_current == 'true' && needs.fleet-promotion.result == 'success' && needs.fleet-promotion.outputs.deployment_allowed == 'true' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     permissions:
       contents: read
       actions: read
@@ -663,12 +663,14 @@ jobs:
               [[ "$staging_compare" =~ ^(ahead|identical)$ ]] || { echo "::error::Canonical staging SHA $staging_receipt_sha is not on the production lineage to $EXPECTED_SHA."; exit 1; }
               staging_artifact_name="staging-deployment-${staging_receipt_sha}"
               staging_artifact_id=""
-              for attempt in $(seq 1 60); do
+              # 25 min bound: staging queue + deploy took ~20 min on 2026-09-29; a 10 min wait
+              # failed valid releases with "receipt missing" (JOV-19527).
+              for attempt in $(seq 1 150); do
                 staging_artifact_id="$(gh api \
                   "repos/$REPOSITORY/actions/artifacts?name=$staging_artifact_name&per_page=100" \
                   --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at, .id) | last | .id // empty')"
                 [ -n "$staging_artifact_id" ] && break
-                [ "$attempt" -lt 60 ] && sleep 10
+                [ "$attempt" -lt 150 ] && sleep 10
               done
               [[ "$staging_artifact_id" =~ ^[1-9][0-9]*$ ]] || {
                 echo "::error::Exact staging receipt is missing. Next: inspect Staging Controller for $staging_receipt_sha. Proof: $staging_artifact_name."

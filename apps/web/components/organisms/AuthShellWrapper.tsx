@@ -52,6 +52,7 @@ export { TableMetaProvider, usePendingShell, useTableMeta };
 
 export interface AuthShellWrapperProps {
   readonly mode?: AppShellMode;
+  readonly isWorkspaceLocked?: boolean;
   readonly persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;
   readonly sidebarDefaultOpen?: boolean;
   readonly previewPanelDefaultOpen?: boolean;
@@ -73,12 +74,14 @@ function KeyboardShortcutsHandler() {
  */
 function AuthShellWrapperInner({
   mode,
+  isWorkspaceLocked = false,
   persistSidebarCollapsed,
   sidebarDefaultOpen,
   previewPanelDefaultOpen,
   children,
 }: Readonly<{
   mode: AppShellMode;
+  isWorkspaceLocked?: boolean;
   persistSidebarCollapsed?: AuthShellWrapperProps['persistSidebarCollapsed'];
   sidebarDefaultOpen?: boolean;
   previewPanelDefaultOpen?: boolean;
@@ -199,7 +202,7 @@ function AuthShellWrapperInner({
   );
   const shellChildren = (
     <div className='relative flex h-full min-h-0 flex-col'>
-      {headerActions.isCommandPaletteOpen ? (
+      {!isWorkspaceLocked && headerActions.isCommandPaletteOpen ? (
         <CommandPaletteMainSurface />
       ) : (
         children
@@ -289,6 +292,7 @@ function AuthShellWrapperInner({
  */
 export function AuthShellWrapper({
   mode = 'customer',
+  isWorkspaceLocked = false,
   persistSidebarCollapsed,
   sidebarDefaultOpen,
   previewPanelDefaultOpen,
@@ -302,6 +306,7 @@ export function AuthShellWrapper({
             <ShellSidebarOverrideProvider>
               <AuthShellWrapperInner
                 mode={mode}
+                isWorkspaceLocked={isWorkspaceLocked}
                 persistSidebarCollapsed={persistSidebarCollapsed}
                 sidebarDefaultOpen={sidebarDefaultOpen}
                 previewPanelDefaultOpen={previewPanelDefaultOpen}
@@ -309,7 +314,7 @@ export function AuthShellWrapper({
                 {children}
               </AuthShellWrapperInner>
               <KeyboardShortcutsHandler />
-              <CommandPalette />
+              {!isWorkspaceLocked ? <CommandPalette /> : null}
             </ShellSidebarOverrideProvider>
           </HeaderActionsProvider>
         </FounderDoorProvider>

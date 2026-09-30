@@ -122,24 +122,34 @@ async function request(
   const baseUrl = normalizeBaseUrl(options.baseUrl);
   const url = resourceUrl(baseUrl, pathname);
   const method = jsonBody === undefined ? 'GET' : 'POST';
-  let response: Response;
+  let response: Response | undefined;
+  let lastError: unknown;
 
-  try {
-    response = await getFetch(options)(url, {
-      method,
-      headers: {
-        Accept: accept,
-        'User-Agent': options.userAgent ?? DEFAULT_USER_AGENT,
-        ...(jsonBody === undefined
-          ? {}
-          : { 'Content-Type': 'application/json' }),
-      },
-      ...(jsonBody === undefined ? {} : { body: JSON.stringify(jsonBody) }),
-      signal: requestSignal(options),
-    });
-  } catch (error) {
+  // One retry absorbs transient transport failures and cold-start timeouts;
+  // each attempt gets a fresh timeout signal. A caller abort never retries.
+  for (let attempt = 0; attempt < 2 && !options.signal?.aborted; attempt++) {
+    try {
+      response = await getFetch(options)(url, {
+        method,
+        headers: {
+          Accept: accept,
+          'User-Agent': options.userAgent ?? DEFAULT_USER_AGENT,
+          ...(jsonBody === undefined
+            ? {}
+            : { 'Content-Type': 'application/json' }),
+        },
+        ...(jsonBody === undefined ? {} : { body: JSON.stringify(jsonBody) }),
+        signal: requestSignal(options),
+      });
+      break;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (!response) {
     throw new JovieRequestError(
-      `${method} ${url} failed: ${errorMessage(error)}`,
+      `${method} ${url} failed: ${errorMessage(lastError)}`,
       url
     );
   }

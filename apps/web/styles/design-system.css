@@ -781,6 +781,27 @@
     transform: translateX(-50%);
   }
 
+  /* The Ask Jovie launcher floats above the profile dock (50px) and, on
+     proof profiles, the claim bar above it (52px), never on top (JOV-7114). */
+  [data-ask-jovie-launcher] {
+    bottom: calc(env(safe-area-inset-bottom) + 62px);
+  }
+
+  body:has([data-testid="profile-proof-claim-bar"]) [data-ask-jovie-launcher] {
+    bottom: calc(env(safe-area-inset-bottom) + 114px);
+  }
+
+  /* The proof claim bar rides inside the dock; content clears both. */
+  :root:has([data-testid="profile-proof-claim-bar"]) {
+    --profile-bottom-nav-height: calc(
+      var(--space-8) +
+      max(10px, env(safe-area-inset-bottom)) +
+      var(--space-2) +
+      var(--space-6) +
+      52px
+    );
+  }
+
   .profile-viewport ~ .profile-aeo-content {
     position: absolute;
     top: 0;

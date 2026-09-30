@@ -1,12 +1,4 @@
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockDbSelect,
@@ -157,15 +149,11 @@ function createFromWhereOrderByLimitChain(result: unknown[]) {
 }
 
 const NOW = new Date('2026-03-24T18:00:00.000Z');
-let scheduleReleaseNotifications: typeof import('@/app/api/cron/schedule-release-notifications/route').scheduleReleaseNotifications;
+const { scheduleReleaseNotifications } = await import(
+  '@/app/api/cron/schedule-release-notifications/route'
+);
 
 describe('scheduleReleaseNotifications', () => {
-  beforeAll(async () => {
-    ({ scheduleReleaseNotifications } = await import(
-      '@/app/api/cron/schedule-release-notifications/route'
-    ));
-  });
-
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
