@@ -44,7 +44,7 @@ const completeFacts = {
   dsp_links: {
     spotify: 'https://open.spotify.com/album/release-id',
   },
-  artist_ids: {},
+  artists: [{ name: 'The Artist', ids: { spotify: 'artist-id' } }],
 };
 let row: {
   id: string;
@@ -216,7 +216,9 @@ describe('release.prepare_launch', () => {
         {
           ...completeFacts,
           source: 'release_url',
-          artist_ids: { spotify: 'different-artist' },
+          artists: [
+            { name: 'The Artist', ids: { spotify: 'different-artist' } },
+          ],
         },
         {
           ...completeFacts,
@@ -244,6 +246,145 @@ describe('release.prepare_launch', () => {
       'artwork_url',
       'artist_identity',
     ]);
+  });
+
+  it('reports distinct YouTube and Apple track IDs as conflicts while tracking-only variants merge', async () => {
+    const yt = (id: string) => `https://www.youtube.com/watch?v=${id}`;
+    mocks.resolve.mockResolvedValueOnce({
+      status: 'resolved',
+      facts: [
+        {
+          ...completeFacts,
+          dsp_links: {
+            youtube: yt('video-one'),
+            apple_music:
+              'https://music.apple.com/us/album/signal-fire/1234?i=5678',
+          },
+        },
+        {
+          ...completeFacts,
+          dsp_links: {
+            youtube: `${yt('video-two')}&utm_source=agent`,
+            apple_music:
+              'https://music.apple.com/us/album/signal-fire/1234?i=9999',
+          },
+        },
+      ],
+    });
+    const conflicted = await prepareReleaseLaunch(input);
+    expect(conflicted).toMatchObject({ status: 'draft_needs_input' });
+    if (conflicted.status === 'error') throw new Error('Expected a draft');
+    expect(conflicted.conflicts.map(conflict => conflict.field)).toEqual(
+      expect.arrayContaining(['dsp_links.youtube', 'dsp_links.apple_music'])
+    );
+    expect(conflicted.release.dsp_links.youtube).toBeUndefined();
+
+    row.preview.launch = undefined;
+    mocks.resolve.mockResolvedValueOnce({
+      status: 'resolved',
+      facts: [
+        {
+          ...completeFacts,
+          dsp_links: {
+            youtube: `${yt('same-video')}&utm_source=agent&si=xyz`,
+            apple_music:
+              'https://music.apple.com/us/album/signal-fire/1234?i=5678&ls=1',
+          },
+        },
+        {
+          ...completeFacts,
+          dsp_links: {
+            youtube: `${yt('same-video')}#chapters`,
+            apple_music:
+              'https://music.apple.com/us/album/signal-fire/1234?i=5678&at=aff#x',
+          },
+        },
+      ],
+    });
+    const merged = await prepareReleaseLaunch(input);
+    expect(merged).toMatchObject({
+      status: 'launch_draft_ready',
+      release: {
+        dsp_links: { youtube: yt('same-video') + '&utm_source=agent&si=xyz' },
+      },
+      conflicts: [],
+    });
+  });
+
+  it('rejects wrong, substring and non-Latin artist identities and accepts credited collaborators', async () => {
+    const withArtists = (
+      artists: ReadonlyArray<{ name: string; ids: Record<string, string> }>
+    ) => ({ ...completeFacts, artists });
+    // Each variant needs a fresh stored launch, or the fingerprint replay wins.
+    const resetLaunch = () => {
+      row.preview.launch = undefined;
+    };
+
+    // Substring collision: "Ann" is contained in "Joanne" but is not her.
+    mocks.resolve.mockResolvedValueOnce({
+      status: 'resolved',
+      facts: [withArtists([{ name: 'Joanne', ids: {} }])],
+    });
+    expect(await prepareReleaseLaunch(input)).toMatchObject({
+      status: 'draft_needs_input',
+      conflicts: [{ field: 'artist_identity' }],
+    });
+
+    // Non-Latin credited artist still mismatches the draft artist.
+    resetLaunch();
+    mocks.resolve.mockResolvedValueOnce({
+      status: 'resolved',
+      facts: [withArtists([{ name: '宇多田ヒカル', ids: {} }])],
+    });
+    expect(await prepareReleaseLaunch(input)).toMatchObject({
+      status: 'draft_needs_input',
+      conflicts: [{ field: 'artist_identity' }],
+    });
+
+    // A fact with no artist identity stays unresolved instead of passing.
+    resetLaunch();
+    mocks.resolve.mockResolvedValueOnce({
+      status: 'resolved',
+      facts: [{ ...completeFacts, artists: [] }],
+    });
+    expect(await prepareReleaseLaunch(input)).toMatchObject({
+      status: 'draft_needs_input',
+      conflicts: [{ field: 'artist_identity' }],
+    });
+
+    // Collaborations pass when any credited artist carries the draft's
+    // provider ID or exact normalized name.
+    resetLaunch();
+    mocks.resolve.mockResolvedValueOnce({
+      status: 'resolved',
+      facts: [
+        withArtists([
+          { name: 'The Artist', ids: {} },
+          { name: 'Featured Guest', ids: {} },
+        ]),
+      ],
+    });
+    expect(await prepareReleaseLaunch(input)).toMatchObject({
+      status: 'launch_draft_ready',
+      conflicts: [],
+    });
+    resetLaunch();
+    mocks.resolve.mockResolvedValueOnce({
+      status: 'resolved',
+      facts: [
+        {
+          ...completeFacts,
+          artists: [
+            { name: 'Featured Guest', ids: {} },
+            { name: 'Lead', ids: { spotify: 'artist-id' } },
+          ],
+        },
+      ],
+    });
+    expect(await prepareReleaseLaunch(input)).toMatchObject({
+      status: 'launch_draft_ready',
+      conflicts: [],
+    });
   });
 
   it('fails closed for invalid capabilities and racing draft replacements', async () => {
