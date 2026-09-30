@@ -26,6 +26,19 @@ import {
 } from '../../run-affected-tests.mjs';
 
 describe('affected-test selector inventory', () => {
+  it('enforces real merge-sync writer coverage in its existing focused CI selector', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/lib/linear-sync-on-merge.mjs',
+    ]);
+    const [, args] = buildSelectedTestCommands(plan).find(([, args]) =>
+      args.includes('lib/__tests__/linear-sync-on-merge.test.mjs')
+    );
+    expect(args).toContain('--coverage');
+    expect(args).toContain('--coverage.include=lib/linear-sync-on-merge.mjs');
+    expect(args).toContain('--coverage.thresholds.lines=85');
+    expect(args).toContain('--coverage.thresholds.branches=70');
+  });
+
   it('references only existing scripts tests', () => {
     const selector = readFileSync(
       resolve(import.meta.dirname, '../../run-affected-tests.mjs'),
