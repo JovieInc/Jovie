@@ -40,10 +40,16 @@ export function PresenceLockAffordance({
           onPointerUp={() => {
             pointerActivationRef.current = false;
           }}
+          onPointerLeave={() => {
+            pointerActivationRef.current = false;
+          }}
           onPointerCancel={() => {
             pointerActivationRef.current = false;
           }}
           onKeyDown={event => event.stopPropagation()}
+          onBlur={() => {
+            pointerActivationRef.current = false;
+          }}
           onFocus={() => {
             // Pointer focus precedes click. Let Radix handle that click once;
             // opening here would make the same click toggle the popover shut.

@@ -1260,4 +1260,26 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       screen.queryByTestId('presence-lock-explanation')
     ).not.toBeInTheDocument();
   });
+
+  it('clears an aborted pointer press before the next focus', async () => {
+    renderWorkspace(data);
+
+    const lock = screen.getAllByTestId('presence-lock')[0] as HTMLElement;
+    fireEvent.pointerDown(lock, { pointerId: 1, pointerType: 'mouse' });
+    fireEvent.focus(lock);
+    expect(lock).toHaveAttribute('aria-expanded', 'false');
+
+    // Move out of the trigger and release elsewhere, then move focus away and
+    // back. Pointerup on the outside target cannot clear the trigger's guard.
+    fireEvent.pointerLeave(lock, { pointerId: 1, pointerType: 'mouse' });
+    fireEvent.pointerUp(document.body, { pointerId: 1, pointerType: 'mouse' });
+    fireEvent.blur(lock);
+    fireEvent.focus(lock);
+
+    const explanation = await screen.findByTestId('presence-lock-explanation');
+    expect(explanation).toHaveTextContent(
+      'Upgrade required to monitor this page.'
+    );
+    expect(lock).toHaveAttribute('aria-expanded', 'true');
+  });
 });
