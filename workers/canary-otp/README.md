@@ -12,6 +12,15 @@ code exists, and `503` for configuration/storage failures. All are `no-store`.
 Wrong addresses and unauthorized callers cannot read KV. The handler also checks
 the mail's Date, so an old message arriving late cannot satisfy a new run.
 
+Sender acceptance also requires exactly one `Authentication-Results` header
+from `mx.cloudflare.net`, with `dmarc=pass` and an exact `header.from` domain
+match. Missing, duplicated, failed, foreign, or ambiguous results are rejected.
+Neither the MIME From nor the SMTP envelope sender is authentication on its own.
+This deliberately narrow parser relies on Cloudflare adding its receiving-MX
+result; live acceptance must verify that boundary with a legitimate Jovie email
+and a spoofed email carrying a forged pass header. Until both receipts exist,
+the mailbox is not commissioned. Do not relax the check to make a test pass.
+
 ## Adopt-first decision — September 29, 2026
 
 **Compose** the already-approved Cloudflare Email Routing + Worker + KV stack.
@@ -32,6 +41,7 @@ proof of propagation time or deployed behavior.
 Sources:
 - [Email Worker API and recommended parser](https://developers.cloudflare.com/email-service/api/route-emails/email-handler/)
 - [Subdomain routing](https://developers.cloudflare.com/email-service/configuration/subdomains/)
+- [Cloudflare incoming authentication and DMARC enforcement](https://developers.cloudflare.com/email-service/reference/postmaster/)
 - [PostalMime source and license](https://github.com/postalsys/postal-mime)
 
 ## Provisioning and acceptance

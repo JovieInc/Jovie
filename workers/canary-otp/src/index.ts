@@ -19,6 +19,36 @@ interface OtpState {
   issuedAtMs: number;
 }
 
+function authenticatedSender(
+  headers: { key: string; value: string }[],
+  sender: string
+): boolean {
+  // Trust only the receiving MX's result, never a MIME From or SMTP MAIL FROM
+  // alone. Reject duplicate headers rather than selecting an attacker-supplied
+  // pass alongside the receiver's failure. Verify this boundary live before
+  // activation; changes to Cloudflare's header contract fail closed.
+  const results = headers.filter(h => h.key === 'authentication-results');
+  if (results.length !== 1) return false;
+  const [authority, ...methods] = results[0].value.split(';');
+  if (authority.trim() !== 'mx.cloudflare.net') return false;
+  const dmarc = methods.map(s => s.trim()).filter(s => /^dmarc\s*=/.test(s));
+  if (dmarc.length !== 1) return false;
+  // A semicolon in an earlier comment/quoted string is not a method boundary.
+  // Reject that syntax instead of interpreting attacker-controlled comment text.
+  const prefix = results[0].value.slice(0, results[0].value.indexOf(dmarc[0]));
+  if (/[()"\\]/.test(prefix)) return false;
+  // Deliberately accept only the receiver's narrow, comment-free result shape.
+  // Broad substring matching could mistake a comment or unrelated domain for
+  // an authenticated match. Extra/ambiguous syntax is rejected.
+  const match =
+    /^dmarc=pass\s+header\.from=([a-zA-Z0-9.-]+)(?:\s+policy\.dmarc=(?:none|quarantine|reject))?$/.exec(
+      dmarc[0]
+    );
+  return (
+    !!match && match[1].toLowerCase() === sender.split('@')[1].toLowerCase()
+  );
+}
+
 function validConfig(env: Env): boolean {
   try {
     const origin = new URL(env.OTP_CHECK_ORIGIN);
@@ -113,6 +143,7 @@ export default {
       // satisfy a new run. The app still validates and consumes the actual OTP.
       if (
         mail.from?.address !== env.CANARY_FROM ||
+        !authenticatedSender(mail.headers, env.CANARY_FROM) ||
         !Number.isFinite(issuedAtMs) ||
         issuedAtMs > receivedAtMs + 30_000 ||
         issuedAtMs < receivedAtMs - TTL_MS

@@ -49,10 +49,14 @@ function setup(t) {
   return { env, kv };
 }
 
-function mail(overrides = {}, raw) {
-  const body =
+const receiverAuth =
+  'Authentication-Results: mx.cloudflare.net; dkim=pass header.d=jov.ie; dmarc=pass header.from=jov.ie policy.dmarc=reject; spf=pass smtp.mailfrom=send.jov.ie\r\n';
+
+function mail(overrides = {}, raw, authentication = receiverAuth) {
+  const content =
     raw ??
     `From: Jovie <no-reply@jov.ie>\r\nTo: ${email}\r\nDate: ${new Date(now).toUTCString()}\r\nSubject: Sign in to Jovie\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nYour Jovie verification code: 123456\r\n`;
+  const body = authentication + content;
   return {
     to: email,
     rawSize: new TextEncoder().encode(body).length,
@@ -89,6 +93,38 @@ test('MIME email persists only the code and times, and authorized run reads it w
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
   assert.equal(response.headers.get('Access-Control-Allow-Origin'), null);
   assert.deepEqual(await response.json(), kv.value);
+});
+
+test('rejects spoofed senders and missing, failed, foreign or ambiguous authentication', async t => {
+  const { env, kv } = setup(t);
+  for (const auth of [
+    '',
+    receiverAuth.replace('mx.cloudflare.net', 'attacker.example.com'),
+    receiverAuth.replace('dmarc=pass', 'dmarc=fail'),
+    receiverAuth.replace(
+      'header.from=jov.ie',
+      'header.from=attacker.example.com'
+    ),
+    receiverAuth.replace(
+      'header.from=jov.ie',
+      'header.from=jov.ie.attacker.example.com'
+    ),
+    receiverAuth.replace(
+      'dmarc=pass header.from=jov.ie policy.dmarc=reject',
+      'dmarc=fail (dmarc=pass header.from=jov.ie)'
+    ),
+    receiverAuth + receiverAuth,
+    receiverAuth.replace('dmarc=pass', 'dmarc=fail') + receiverAuth,
+    receiverAuth.replace('; spf=', '; dmarc=pass header.from=jov.ie; spf='),
+    receiverAuth.replace('dmarc=pass', 'dmarc=none'),
+    receiverAuth.replace('dmarc=pass', 'arc=pass'),
+    'Authentication-Results: mx.cloudflare.net; spf=fail (untrusted; dmarc=pass header.from=jov.ie; comment)\r\n',
+  ]) {
+    const message = mail({}, undefined, auth);
+    await worker.email(message, env);
+    assert.equal(message.rejected, 'Mail not accepted');
+  }
+  assert.equal(kv.writes, 0);
 });
 
 test('handles multipart base64 mail using the real MIME parser', async t => {
