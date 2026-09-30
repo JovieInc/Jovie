@@ -486,6 +486,15 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
     ],
   ],
   [
+    'scripts/publish-coverage-report.test.mjs',
+    'scripts/lib/publish-coverage-report.mjs',
+    [
+      '--test-coverage-lines=95',
+      '--test-coverage-branches=90',
+      '--test-coverage-functions=90',
+    ],
+  ],
+  [
     'scripts/coverage-surface-files.test.mjs',
     'scripts/lib/coverage-surface-files.mjs',
     [

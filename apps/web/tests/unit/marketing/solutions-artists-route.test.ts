@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
-import { getMarketingPageContractForPathname } from '@/data/marketing/pageContracts';
+import { resolveMarketingPageContract } from '@/data/marketing/factory/pageRecordContract';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
 import { MARKETING_CUSTOMERS_FLYOUT } from '@/data/marketingNavigation';
 import { getPublicProfileCandidate } from '@/lib/routing/proxy-routing';
@@ -23,7 +23,7 @@ describe('/solutions/artists artist solution route (JOV-5861)', () => {
   });
 
   it('keeps the artist solution scoped to music language with claim-profile CTA', () => {
-    const contract = getMarketingPageContractForPathname('/solutions/artists');
+    const contract = resolveMarketingPageContract('/solutions/artists');
     expect(contract?.copyScope).toBe('music');
     expect(contract?.primaryCta.href).toBe(APP_ROUTES.SIGNUP);
   });

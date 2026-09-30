@@ -15,6 +15,7 @@ import {
   verifyFactoryRun,
   writeJson,
 } from './receipts';
+import { fixtureCaptures } from './render-measurer';
 import { runFactory } from './run';
 
 const PAGE_ID = 'solutions-founders';
@@ -85,6 +86,32 @@ describe('factory:run --dry end to end', () => {
     });
   });
 
+  it('fails render when a section has no /solutions renderer', async () => {
+    const narrative = brief.dry?.narrative as {
+      sections: { sectionId: string }[];
+    };
+    const manifest = await run({
+      providers: dryProviders(brief, {
+        async generate(request) {
+          const value =
+            request.stage === 'narrative'
+              ? {
+                  sections: narrative.sections.map((section, index) =>
+                    index === 1 ? { ...section, sectionId: 'pricing' } : section
+                  ),
+                }
+              : brief.dry?.[request.stage];
+          return { status: 'ok', value };
+        },
+      }),
+    });
+
+    expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'render' });
+    expect(record('12-render.attempt-2.json').feedbackIn).toContain(
+      'page-record-schema: no solutions renderer for pricing'
+    );
+  });
+
   it('fails render when the run cannot form a valid page record', async () => {
     const manifest = await run({
       brief: {
@@ -147,6 +174,7 @@ describe('page stage gates', () => {
         : entry
     );
     const manifest = await run({
+      allowPartial: true,
       brief: { ...brief, media },
       providers: liveProviders(fixtureTransport(), {
         generate: dryProviders(brief).generate,
@@ -204,24 +232,123 @@ describe('page stage gates', () => {
     );
   });
 
+  it('hands the render measurer the candidate record to preview', async () => {
+    const seen: unknown[] = [];
+    const dry = dryProviders(brief);
+    await run({
+      providers: dryProviders(brief, {
+        measureRender: async (route, at) => {
+          seen.push(at);
+          return dry.measureRender(route, at);
+        },
+      }),
+    });
+
+    const runsDir = join(runDir(), 'render', 'preview-records');
+    expect(seen).toEqual([
+      {
+        outDir: join(runDir(), 'render'),
+        preview: { recordId: 'solutions.founders', runsDir },
+      },
+    ]);
+    expect(
+      readJson<{ id: string; status: string }>(
+        join(runsDir, 'solutions-founders', 'page-record.json')
+      )
+    ).toMatchObject({ id: 'solutions.founders', status: 'shadow' });
+  });
+
   it('fails render when CLS or LCP is over budget', async () => {
     const manifest = await run({
       providers: dryProviders(brief, {
-        measureRender: async () => ({ status: 'ok', cls: 0.2, lcpMs: 3100 }),
+        measureRender: async route => ({
+          status: 'ok',
+          cls: 0.2,
+          lcpMs: 3100,
+          captures: fixtureCaptures(route, { cls: 0.2, lcpMs: 3100 }),
+        }),
       }),
     });
 
     expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'render' });
     expect(record('12-render.attempt-1.json').receipt.invariantsFailed).toEqual(
-      ['render-cls', 'render-lcp']
+      [
+        'render-cls:mobile',
+        'render-lcp:mobile',
+        'render-cls:desktop',
+        'render-lcp:desktop',
+      ]
     );
   });
 
-  it('stops live runs at render until a render measurer is wired', async () => {
+  it('blocks trust when no visual-review receipt can be produced', async () => {
+    const manifest = await run({
+      providers: dryProviders(brief, {
+        reviewVisual: async () => ({
+          status: 'credentials-unavailable',
+          reason: 'no cross-family vision judge is reachable from this machine',
+        }),
+      }),
+    });
+
+    expect(manifest).toMatchObject({
+      status: 'credentials-unavailable',
+      stoppedAt: 'adversarial-trust',
+    });
+    expect(
+      record('14-adversarial-trust.attempt-1.json').notes.tasteReceipts
+    ).toMatchObject([{ gateId: 'responsive-accessibility', verdict: 'pass' }]);
+  });
+
+  it('reports both reasons when the red team and visual review are unavailable', async () => {
+    await run();
+    const resumed = await run({
+      fromStage: 'adversarial-trust',
+      allowPartial: true,
+      providers: dryProviders(brief, {
+        transport: null,
+        reviewVisual: async () => ({
+          status: 'credentials-unavailable',
+          reason: 'no vision judge',
+        }),
+      }),
+    });
+
+    expect(resumed.status).toBe('credentials-unavailable');
+    expect(resumed.reason).toMatch(/red-team needs .*; no vision judge/);
+  });
+
+  it('fails trust when the visual reviewer shares the producer family', async () => {
+    const manifest = await run({
+      providers: dryProviders(brief, {
+        reviewVisual: async () => ({
+          status: 'reviewed',
+          judgeModel: 'fixture:anthropic/claude-sonnet-5',
+          verdict: 'pass',
+          score: 1,
+          findings: [],
+          judges: [],
+        }),
+      }),
+    });
+
+    expect(manifest).toMatchObject({
+      status: 'failed',
+      stoppedAt: 'adversarial-trust',
+    });
+    expect(
+      record('14-adversarial-trust.attempt-1.json').receipt.invariantsFailed
+    ).toContain('visual-taste-admission');
+    expect(
+      record('14-adversarial-trust.attempt-2.json').feedbackIn.join(' ')
+    ).toMatch(/same-family-judge/);
+  });
+
+  it('with --allow-partial, live runs still stop at render without a measurer', async () => {
     const live = liveProviders(fixtureTransport(), {
       generate: dryProviders(brief).generate,
     });
-    const manifest = await run({ providers: live });
+    const manifest = await run({ providers: live, allowPartial: true });
 
     expect(manifest).toMatchObject({
       status: 'credentials-unavailable',

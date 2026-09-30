@@ -2,6 +2,10 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import {
+  getPageRecordContracts,
+  type PageRecordPageContract,
+} from '@/data/marketing/factory/pageRecordContract';
 import { validateStageReceipt } from '@/data/marketing/factory/spine';
 import type { RouteManifestEntry } from '@/data/marketing/routeManifest';
 import {
@@ -113,6 +117,60 @@ describe('sweepTargets', () => {
       inSitemap: true,
       family: 'pricing',
     });
+  });
+});
+
+describe('per-record sweep (JOV-7283)', () => {
+  const artists = getPageRecordContracts().find(
+    contract => contract.recordId === 'solutions.artists'
+  ) as PageRecordPageContract;
+  const founders: PageRecordPageContract = {
+    ...artists,
+    url: '/solutions/founders',
+    recordId: 'solutions.founders',
+    audience: 'founders',
+    copyScope: 'shared',
+    forbiddenTerms: ['fan', 'music'],
+  };
+
+  it('sweeps every routed record path of a family wildcard', () => {
+    const family = entry('/solutions/*', {
+      recipeId: 'artist-lp',
+      healthCheck: { path: '/solutions/artists', expected: 'page' },
+    });
+    const targets = sweepTargets([family], [artists, founders]);
+    expect(targets.map(t => t.pathname)).toEqual([
+      '/solutions/artists',
+      '/solutions/founders',
+    ]);
+    expect(targets[1]?.recordContract?.recordId).toBe('solutions.founders');
+    // Without records the wildcard falls back to its health-check path.
+    expect(sweepTargets([family], []).map(t => t.pathname)).toEqual([
+      '/solutions/artists',
+    ]);
+    expect(
+      sweepTargets().find(t => t.pathname === '/solutions/artists')
+        ?.recordContract?.copyScope
+    ).toBe('music');
+  });
+
+  it('fails copy-scope when a record page renders a forbidden term', () => {
+    const run = (contract: PageRecordPageContract) =>
+      sweep([
+        {
+          target: {
+            ...target(contract.url, false),
+            recordContract: contract,
+          },
+          html: html(contract.url, GOOD_BODY, PRODUCT_LD),
+          status: 200,
+          source: 'x',
+        },
+      ])[0]?.certification.checks.find(check => check.id === 'copy-scope');
+    expect(run(artists)).toMatchObject({ status: 'passed' });
+    const failed = run(founders);
+    expect(failed).toMatchObject({ dimension: 'copy', status: 'failed' });
+    expect(failed?.summary).toContain('fan');
   });
 });
 
