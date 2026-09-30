@@ -72,7 +72,7 @@ const meta = {
   },
   args: {
     initialState: OFF,
-    readiness: async () => undefined,
+    readiness: async () => {},
   },
 } satisfies Meta<typeof LocalPrivacyLockApi>;
 
