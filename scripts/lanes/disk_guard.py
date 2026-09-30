@@ -5,9 +5,10 @@ Runs inside the existing event paths — the dispatch tick and each worker spawn
 never on its own timer. Below LOW_PCT free on the state filesystem the guard sweeps,
 in order: DerivedData idle > 5h, clean worktrees idle > 12h (branches kept),
 .next/test-results inside idle worktrees that stay, `xcrun simctl delete
-unavailable`, `pnpm store prune`. Free space at or below CRITICAL_PCT after the
-sweep is `critical` in the receipt; the doctor turns that reading into a Linear
-Triage signal for Summer. Every step fails soft: one bad path never stops the rest.
+unavailable`. The shared pnpm store stays intact: pruning it while active worktrees
+install with copy imports amplifies disk use. Free space at or below CRITICAL_PCT
+after the sweep is `critical` in the receipt; the doctor turns that reading into a
+Linear Triage signal for Summer. Every step fails soft: one bad path never stops the rest.
 """
 from __future__ import annotations
 
@@ -117,13 +118,13 @@ def sweep_worktrees(host, run, now: float, report: dict) -> None:
 
 
 def sweep_host_tools(run, report: dict) -> None:
-    for cmd in (["xcrun", "simctl", "delete", "unavailable"], ["pnpm", "store", "prune"]):
+    for cmd in (["xcrun", "simctl", "delete", "unavailable"],):
         if shutil.which(cmd[0]) is None:
             continue
-        # launchd starts lanes in "/" (read-only); pnpm writes a temp file into its cwd and exits 226 (EROFS).
         result = run(cmd, capture_output=True, text=True, timeout=600, cwd=Path.home())
         (report["actions"] if result.returncode == 0 else report["errors"]).append(
             f"{' '.join(cmd)} -> {result.returncode}" if result.returncode else f"ran {' '.join(cmd)}")
+    report["actions"].append("preserved shared pnpm store")
 
 
 def check(host, *, run=subprocess.run, now: float | None = None) -> dict:
