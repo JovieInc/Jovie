@@ -167,6 +167,14 @@ async function assetStage(ctx: StageContext): Promise<StageResult> {
       });
       continue;
     }
+    if (ref.id.startsWith('photo:')) {
+      checks.check(
+        `asset-provenance:${ref.id}`,
+        false,
+        'rights-cleared photo import is not wired'
+      );
+      continue;
+    }
     const outcome = await ctx.providers.generateAsset({
       prompt: `${ctx.brief.icp}: ${ref.sectionInstanceId}`,
       recipeId: ref.source as never,
@@ -182,7 +190,7 @@ async function assetStage(ctx: StageContext): Promise<StageResult> {
         { unavailable: outcome.reason }
       );
     }
-    // Generated and photo assets ship only with a provenance sidecar and an
+    // Generated assets ship only with a provenance sidecar and an
     // art-evaluator record, which factory:run does not produce yet.
     checks.check(
       `asset-provenance:${ref.id}`,
