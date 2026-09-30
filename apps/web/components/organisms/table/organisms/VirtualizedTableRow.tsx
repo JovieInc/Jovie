@@ -200,7 +200,10 @@ function VirtualizedTableRowComponent<TData extends RowData>({
             }}
           >
             <div
-              className={TABLE_CELL_CONTENT_CLASSNAME}
+              className={cn(
+                TABLE_CELL_CONTENT_CLASSNAME,
+                meta?.cellContentClassName
+              )}
               data-table-cell-content='stable'
             >
               {flexRender(cell.column.columnDef.cell, cell.getContext())}

@@ -35,7 +35,10 @@ import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataConte
 import { providerConfig } from '@/app/app/(shell)/dashboard/releases/config';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { ReleaseTaskDueBadge } from '@/components/features/dashboard/release-tasks/ReleaseTaskDueBadge';
-import { TaskDataTable } from '@/components/features/dashboard/tasks/TaskDataTable';
+import {
+  TASK_DATA_TABLE_MULTILINE_CELL_CONTENT_CLASSNAME,
+  TaskDataTable,
+} from '@/components/features/dashboard/tasks/TaskDataTable';
 import { TaskDescriptionHelper } from '@/components/features/dashboard/tasks/TaskDescriptionHelper';
 import {
   PriorityBars,
@@ -2184,7 +2187,11 @@ export function TasksPageClient() {
           header: 'Tasks',
           size: 9999,
           cell: renderTaskCell,
-          meta: { className: 'px-0' },
+          meta: {
+            className: 'px-0',
+            cellContentClassName:
+              TASK_DATA_TABLE_MULTILINE_CELL_CONTENT_CLASSNAME,
+          },
         }),
       ] as ColumnDef<TaskView, unknown>[],
     [renderTaskCell]
