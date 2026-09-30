@@ -89,6 +89,25 @@ describe('quality-gap-finder', () => {
       assert.equal(gaps[0].mechanical, true);
     });
 
+    it('skips evidence owned by another repo', () => {
+      const gaps = collectInvariantGaps(
+        [
+          invariant('JOV-INV-905', [
+            {
+              path: 'scripts/tests/test_openai_symphony_install.py',
+              repo: 'JovieInc/symphony-control',
+            },
+            { path: 'scripts/a/unwired.test.mjs' },
+          ]),
+        ],
+        ''
+      );
+      assert.deepEqual(
+        gaps.map(gap => gap.key),
+        ['JOV-INV-905:scripts/a/unwired.test.mjs']
+      );
+    });
+
     it('reads Vitest include globs as runner prefixes', () => {
       const root = repo({
         'scripts/vitest.config.mts':

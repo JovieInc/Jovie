@@ -56,6 +56,7 @@
   "lib/acquisition/proof-claim-funnel.server.test.ts",
   "lib/acquisition/proof-claim-funnel.test.ts",
   "lib/acquisition/youtube-closed-loop.test.ts",
+  "lib/activation/",
   "lib/activity/load-jovie-work-feed.test.ts",
   "lib/aeo/visibility-measurement.test.ts",
   "lib/agent-os/",
