@@ -60,7 +60,7 @@ function ProductClose() {
       {/* ui-casing-allow: marketing display headline */}
       <h2
         id='product-close-heading'
-        className='product-close__headline text-primary-token'
+        className='product-close__headline line-clamp-2 text-primary-token'
       >
         {close.headlineLine1} <br />
         {close.headlineLine2}
