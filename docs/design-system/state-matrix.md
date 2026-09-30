@@ -62,6 +62,20 @@ These states apply across families and were previously undocumented.
 
 ---
 
+## Artist profile mode readiness
+
+| State | Token | Selector | Story | Primitive |
+| --- | --- | --- | --- | --- |
+| Before hydration | `--state-disabled-opacity` | `[data-interactive-ready="false"][aria-busy="true"]`, tab `:disabled` | `Marketing/Artist Profile/ArtistProfileModeSwitcher/Readiness` | `apps/web/components/marketing/artist-profile/ArtistProfileModeSwitcher.tsx` |
+| Interactive | Existing selected-tab surface and focus tokens | `[data-interactive-ready="true"][aria-busy="false"]` | `Marketing/Artist Profile/ArtistProfileModeSwitcher/Readiness` | Same canonical mode owner |
+
+Server-rendered choices stay disabled until their handlers attach. The existing
+preview and panel geometry remain visible; hydration enables the same controls.
+The readiness story exercises selection after activation, and the adjacent SSR
+regression covers the pending state without claiming DOM-ready proves hydration.
+
+---
+
 ## Inputs and auth forms
 
 | State | Token | Selector | Story | Primitive |
