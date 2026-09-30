@@ -28,5 +28,5 @@ test('rejects cycles, duplicate owners, and budget regressions', () => {
 test('yaml parse result is narrowed before property access (JOV-7290)', () => {
   const source = fs.readFileSync(new URL('./ci-workflow-topology.mjs', import.meta.url), 'utf8');
   assert.match(source, /@typedef \{object\} WorkflowYaml/);
-  assert.match(source, /@type \{WorkflowYaml\} \*\/ \(yaml\.load/);
+  assert.match(source, /@type \{WorkflowYaml\} \*\/ \(yamlLoad/);
 });
