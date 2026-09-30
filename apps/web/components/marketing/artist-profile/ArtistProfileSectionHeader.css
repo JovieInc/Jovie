@@ -11,7 +11,7 @@
  */
 
 .ap-shell-h2 {
-  font-size: clamp(2.25rem, 4.8vw, 3.5rem);
+  font-size: clamp(2rem, 4.8vw, 3.5rem);
   line-height: 1.02;
   letter-spacing: -0.04em;
 }
