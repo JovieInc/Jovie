@@ -29,7 +29,6 @@ export interface VirtualizedTableRowProps<TData extends RowData> {
   readonly rowRefsMap: Map<number, HTMLTableRowElement>;
   readonly shouldEnableKeyboardNav: boolean;
   readonly shouldVirtualize: boolean;
-  readonly virtualStart?: number;
   readonly focusedIndex: number;
   /** Consumer-owned selected state, composed with TanStack selection. */
   readonly isSelected?: boolean;
@@ -58,7 +57,7 @@ export interface VirtualizedTableRowProps<TData extends RowData> {
  *
  * Features:
  * - Memoization to prevent unnecessary re-renders
- * - Virtualization support with absolute positioning
+ * - Virtualization support (in-flow rows between spacer rows)
  * - Keyboard navigation support
  * - Context menu support
  * - Dynamic row measurement for variable heights
@@ -73,7 +72,6 @@ function VirtualizedTableRowComponent<TData extends RowData>({
   rowRefsMap,
   shouldEnableKeyboardNav,
   shouldVirtualize,
-  virtualStart,
   focusedIndex,
   isSelected = false,
   onRowClick,
@@ -179,17 +177,6 @@ function VirtualizedTableRowComponent<TData extends RowData>({
       onKeyDown={handleKeyDown}
       onFocus={handleFocusChange}
       onContextMenu={handleContextMenu}
-      style={
-        shouldVirtualize && virtualStart !== undefined
-          ? {
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              transform: `translateY(${virtualStart}px)`,
-            }
-          : undefined
-      }
     >
       {row.getVisibleCells().map(cell => {
         const meta = cell.column.columnDef.meta;
