@@ -120,7 +120,8 @@ def sweep_host_tools(run, report: dict) -> None:
     for cmd in (["xcrun", "simctl", "delete", "unavailable"], ["pnpm", "store", "prune"]):
         if shutil.which(cmd[0]) is None:
             continue
-        result = run(cmd, capture_output=True, text=True, timeout=600)
+        # launchd starts lanes in "/" (read-only); pnpm writes a temp file into its cwd and exits 226 (EROFS).
+        result = run(cmd, capture_output=True, text=True, timeout=600, cwd=Path.home())
         (report["actions"] if result.returncode == 0 else report["errors"]).append(
             f"{' '.join(cmd)} -> {result.returncode}" if result.returncode else f"ran {' '.join(cmd)}")
 

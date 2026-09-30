@@ -154,10 +154,11 @@ class CheckTest(unittest.TestCase):
         saved = (guard.free_pct, guard.shutil.which)
         guard.free_pct = lambda path: 10.0
         guard.shutil.which = lambda name: "/bin/" + name if name in ("xcrun", "pnpm") else None
-        ran = []
+        ran, cwds = [], {}
 
         def run(args, **kw):
             ran.append(args[0] if isinstance(args, list) else args)
+            cwds[args[0]] = kw.get("cwd")
             return self._porcelain_empty() if args[:3] == ["git", "worktree", "list"] else ok(args)
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -169,6 +170,7 @@ class CheckTest(unittest.TestCase):
             self.assertFalse(report["critical"])
             self.assertIn("xcrun", ran)
             self.assertIn("pnpm", ran)
+            self.assertEqual(cwds["pnpm"], Path.home())
 
     def _porcelain_empty(self):
         return SimpleNamespace(returncode=0, stdout="worktree /repo\nHEAD x\nbranch refs/heads/main\n", stderr="")
