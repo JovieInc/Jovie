@@ -2241,7 +2241,7 @@ ${selectedGateScript}`,
 
     expect(coalesce).toContain('timeout-minutes: 5');
     expect(coalesce).toContain(
-      "github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'"
+      "needs.release-source.outputs.eligible == 'true'"
     );
     // No universal fixed delay: the bounded window derives from merge-queue
     // depth and is capped inside the 5-minute job budget.
@@ -2266,7 +2266,7 @@ ${selectedGateScript}`,
     expect(coalesce).toContain('echo "is_current=false"');
     expect(coalesce).toContain('echo "is_current=true" >> "$GITHUB_OUTPUT"');
     expect(authorize).toContain(
-      'needs: [coalesce-production, fleet-promotion]'
+      'needs: [release-source, coalesce-production, fleet-promotion]'
     );
     expect(authorize).toContain(
       "needs.coalesce-production.outputs.is_current == 'true'"
@@ -2319,7 +2319,9 @@ ${selectedGateScript}`,
     expect(PRODUCTION_RELEASE_WORKFLOW).toContain('  promote-production:');
     expect(PRODUCTION_RELEASE_WORKFLOW).not.toContain('concurrency:');
 
-    expect(verified).toContain("github.event.workflow_run.event == 'push'");
+    expect(verified).toContain(
+      "fromJSON(needs.release-source.outputs.ci).event == 'push'"
+    );
     expect(verified).toContain(
       "needs.authorize-production.result == 'success'"
     );

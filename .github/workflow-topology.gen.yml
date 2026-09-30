@@ -239,7 +239,6 @@ nodes:
       - Auto-Ready Agent Drafts
       - iOS CI
       - PR Conflict Handler
-      - Production Controller
       - Rolling CI Dispatch
       - Staging Controller
       - Test Flakiness Report
@@ -944,7 +943,7 @@ nodes:
     triggeringStateTransition:
       - workflow_run
     terminalReceipt: job:production-verified
-    jobCount: 8
+    jobCount: 9
   - name: Production Marker Recovery
     path: .github/workflows/production-marker-recovery.yml
     active: true
@@ -1201,6 +1200,7 @@ nodes:
     authoritativeProducer: Production Controller
     authoritativeFor: []
     allowedConsumers:
+      - Production Controller
       - Production Release
     triggeringStateTransition:
       - workflow_run
@@ -1365,7 +1365,7 @@ edges:
   - from: iOS TestFlight
     to: iOS CI
     type: workflow_call
-  - from: CI
+  - from: Staging Controller
     to: Production Controller
     type: workflow_run
   - from: Production Controller
