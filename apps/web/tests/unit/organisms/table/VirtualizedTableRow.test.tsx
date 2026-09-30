@@ -10,7 +10,11 @@ const createRow = (
   name: string,
   isSelected = false,
   actionVisibility?: 'always' | 'contextual',
-  meta?: { align?: 'left' | 'center' | 'right'; className?: string },
+  meta?: {
+    align?: 'left' | 'center' | 'right';
+    className?: string;
+    cellContentClassName?: string;
+  },
   cellSize = 150
 ): Row<TestRow> =>
   ({
@@ -244,6 +248,61 @@ describe('VirtualizedTableRow', () => {
     expect(
       actionCell?.querySelector('[data-table-cell-content="stable"]')
     ).toHaveClass('h-8', 'max-h-8', 'overflow-hidden');
+  });
+
+  it('keeps the default single-line cell content unless a column opts in', () => {
+    render(
+      <table>
+        <tbody>
+          <VirtualizedTableRow
+            {...baseProps}
+            row={createRow('1', 'One', false, undefined, {})}
+          />
+        </tbody>
+      </table>
+    );
+
+    expect(
+      screen
+        .getByRole('cell')
+        .querySelector('[data-table-cell-content="stable"]')
+    ).toHaveClass('h-8', 'max-h-8', 'overflow-hidden', 'whitespace-nowrap');
+  });
+
+  it('lets a column opt into wrapping without changing the shared default', () => {
+    render(
+      <table>
+        <tbody>
+          <VirtualizedTableRow
+            {...baseProps}
+            row={createRow('1', 'One', false, undefined, {
+              cellContentClassName:
+                'h-auto max-h-none overflow-visible text-clip whitespace-normal leading-normal',
+            })}
+          />
+        </tbody>
+      </table>
+    );
+
+    const content = screen
+      .getByRole('cell')
+      .querySelector('[data-table-cell-content="stable"]');
+    expect(content).toHaveClass(
+      'h-auto',
+      'max-h-none',
+      'overflow-visible',
+      'text-clip',
+      'whitespace-normal',
+      'leading-normal'
+    );
+    expect(content).not.toHaveClass(
+      'h-8',
+      'max-h-8',
+      'overflow-hidden',
+      'text-ellipsis',
+      'whitespace-nowrap',
+      'leading-8'
+    );
   });
 
   it('applies column meta alignment to rendered cells', () => {
