@@ -112,6 +112,23 @@ describe('DesktopTitlebar', () => {
     ).not.toBeInTheDocument();
   });
 
+  it.each([
+    [{ isMobile: true, openMobile: false }, 'Expand sidebar', 'false'],
+    [{ isMobile: true, openMobile: true }, 'Collapse sidebar', 'true'],
+  ])(
+    'labels the mobile drawer from its own state, not the desktop rail state',
+    (overrides, expectedLabel, expectedExpanded) => {
+      // Keep the desktop rail open in both fixtures. On compact layouts the
+      // titlebar button controls openMobile, so its name and expanded state
+      // must follow the drawer instead.
+      renderTitlebar(overrides);
+
+      const toggle = screen.getByRole('button', { name: expectedLabel });
+      expect(toggle).toHaveAttribute('aria-expanded', expectedExpanded);
+      expect(toggle).toHaveAttribute('aria-pressed', expectedExpanded);
+    }
+  );
+
   it('renders no Electron controls in the browser runtime', () => {
     electronRuntimeMock.isElectronRuntime = false;
 
