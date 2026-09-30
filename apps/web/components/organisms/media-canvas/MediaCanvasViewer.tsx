@@ -92,7 +92,7 @@ export function MediaCanvasViewer({
               type='button'
               onClick={onClose}
               aria-label='Close Viewer'
-              className='grid size-8 place-items-center rounded-full text-white/70 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40'
+              className='relative grid size-8 place-items-center rounded-full text-white/70 before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""] hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40'
             >
               <X className='size-4' aria-hidden='true' />
             </button>
@@ -185,7 +185,7 @@ function NavButton({
       disabled={disabled}
       aria-label={side === 'left' ? 'Previous' : 'Next'}
       className={cn(
-        'absolute top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-white/8 text-white/80 hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-0',
+        'absolute top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-white/8 text-white/80 before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""] hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-0',
         side === 'left' ? 'left-3' : 'right-3'
       )}
     >
