@@ -1422,16 +1422,17 @@ jobs:
             if jq -e '
               type == "object" and
               (.id | type == "string") and
-              (.readyState | type == "string") and
-              (.target | type == "string")
+              (.readyState | type == "string")
             ' >/dev/null 2>&1 <<<"$alias_json"; then
               alias_id="$(jq -r '.id' <<<"$alias_json")"
               alias_state="$(jq -r '.readyState | ascii_upcase' <<<"$alias_json")"
-              alias_target="$(jq -r '.target | ascii_downcase' <<<"$alias_json")"
               if [ "$alias_id" = "$EXPECTED_DEPLOYMENT_ID" ] &&
-                [ "$alias_state" = "READY" ] &&
-                [ "$alias_target" = "preview" ]; then
-                echo "staging.jov.ie owns exact READY preview $alias_id."
+                [ "$alias_state" = "READY" ]; then
+                # Vercel inspect does not consistently expose target metadata.
+                # The live build-info proof below binds the exact deployment to
+                # the preview environment without making alias convergence race
+                # an optional inspect field.
+                echo "staging.jov.ie owns exact READY deployment $alias_id."
                 break
               fi
             fi

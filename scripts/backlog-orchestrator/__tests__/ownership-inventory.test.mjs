@@ -16,7 +16,7 @@ import {
 import * as planGate from '../plan-gate.mjs';
 import { planEvidenceFor, withPreLeaseReceipts } from './pre-lease.mjs';
 
-const NOW = '2026-08-22T12:00:00.000Z';
+const NOW = new Date().toISOString();
 
 function issue(overrides = {}) {
   return {
@@ -46,7 +46,7 @@ Keep repository-aware admission in scripts/backlog-orchestrator/admission-gate.m
 
 ## Acceptance criteria
 * New packets name target fields.`,
-    createdAt: '2026-08-01T00:00:00.000Z',
+    createdAt: new Date(Date.now() - 21 * 86_400_000).toISOString(),
     priority: 2,
     estimate: 2,
     state: { name: 'Todo' },
