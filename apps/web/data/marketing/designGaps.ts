@@ -484,3 +484,29 @@ export function getProposedSectionEvidence(
       `design-gap:${proposal.id}:${proposal.status}:${proposal.existingApprovedVariantInsufficiency}`
   );
 }
+
+const proposalSlug = (value: string): string =>
+  value
+    .trim()
+    .toLocaleLowerCase()
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/^-+|-+$/g, '');
+
+/**
+ * An open proposal already tracks a job when the job names the proposal id or
+ * its slugged section name. Rejected and implemented proposals never match.
+ */
+export function findProposedSectionForJob(
+  job: string
+): ProposedSectionRecord | null {
+  const slug = proposalSlug(job);
+  return (
+    PROPOSED_SECTIONS.find(
+      proposal =>
+        proposal.status !== 'rejected' &&
+        proposal.status !== 'implemented' &&
+        (proposalSlug(proposal.id) === slug ||
+          proposalSlug(proposal.proposedSectionName) === slug)
+    ) ?? null
+  );
+}
