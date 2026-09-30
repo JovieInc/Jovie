@@ -1,5 +1,27 @@
 import type { MarketingAudience, MarketingSectionId } from './sections';
 
+export const SECTION_REQUEST_CANONICAL_PATH = [
+  { stage: 'linear', requirement: 'factory:section-request' },
+  { stage: 'pen', requirement: 'STAGING proposal' },
+  {
+    stage: 'audit',
+    requirement: 'frontend-skill and design-canonical audits',
+  },
+  {
+    stage: 'implementation',
+    requirement: 'code component and Storybook story',
+  },
+  { stage: 'taste', requirement: "Tim's taste review" },
+  { stage: 'promotion', requirement: 'registry promotion' },
+] as const;
+
+export const SECTION_REQUEST_GOVERNANCE = {
+  catalog: 'apps/web/data/marketing/designGaps.ts#PROPOSED_SECTIONS',
+  workflow: 'docs/marketing/DESIGN_GAPS.md',
+  localComponentFallback: 'forbidden',
+  canonicalPath: SECTION_REQUEST_CANONICAL_PATH,
+} as const;
+
 export type ProposedSectionId = `PROPOSED-SECTION-${number}`;
 export type ProposedSectionStatus =
   | 'proposed'
@@ -449,4 +471,16 @@ export function getProposedSection(
   id: ProposedSectionId
 ): ProposedSectionRecord | null {
   return PROPOSED_SECTIONS.find(proposal => proposal.id === id) ?? null;
+}
+
+export function getProposedSectionEvidence(
+  sectionIds: readonly MarketingSectionId[]
+): readonly string[] {
+  const candidates = new Set<MarketingSectionId>(sectionIds);
+  return PROPOSED_SECTIONS.filter(proposal =>
+    candidates.has(proposal.sectionType)
+  ).map(
+    proposal =>
+      `design-gap:${proposal.id}:${proposal.status}:${proposal.existingApprovedVariantInsufficiency}`
+  );
 }
