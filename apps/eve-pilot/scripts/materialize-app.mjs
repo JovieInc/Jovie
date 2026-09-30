@@ -101,16 +101,11 @@ export function materializeApp(identity, destination, source = pilot) {
     `identities/${identity}/instructions.md`,
   ];
   const files = new Map(
-    paths.map(path => [
-      path,
-      readFileSync(resolve(source, path), 'utf8').replace(
-        '../../../../packages/agent-transport-contracts/prediction-outcome',
-        '../../vendor/agent-transport-contracts/prediction-outcome'
-      ),
-    ])
+    paths.map(path => [path, readFileSync(resolve(source, path), 'utf8')])
   );
   const put = (path, text) => files.set(path, text);
   const manifest = JSON.parse(files.get('package.json'));
+  delete manifest.dependencies['@jovie/agent-transport-contracts'];
   manifest.name =
     identity === 'summer' ? '@jovieinc/summer-runtime' : '@jovie/jovie-agent';
   manifest.private = true;
@@ -182,6 +177,15 @@ export default defineChannel({ routes: [GET('/runtime/v1/health', async () => {
     "import { disableRoute } from 'eve/channels';\nexport default disableRoute();\n"
   );
   if (identity === 'summer') {
+    put(
+      'agent/lib/summer-bottleneck-loop.ts',
+      files
+        .get('agent/lib/summer-bottleneck-loop.ts')
+        .replace(
+          '@jovie/agent-transport-contracts',
+          '../../vendor/agent-transport-contracts/index'
+        )
+    );
     put(
       'agent/channels/eve.ts',
       "import { disableRoute } from 'eve/channels';\nexport default disableRoute();\n"
