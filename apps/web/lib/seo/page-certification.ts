@@ -3,18 +3,24 @@
  *
  * Pure evaluators over a rendered HTML snapshot. They emit receipts shaped for
  * the `jovie.certification/v1` kernel (`invariant_evaluation` tier, receipt ids
- * `seo.technical`, `seo.agentic`, `seo.copy`) so the certification ledger and
+ * `seo.technical`, `seo.agentic`, `seo.copy`, `seo.geo`) so the certification ledger and
  * Summer consume one evidence envelope instead of a second SEO registry.
  *
- * Producers: the blog content source test; the sitemap-driven live sweep
- * (`seo:certify`) lands in a follow-up.
+ * Producers: the blog content source test and the manifest-wide
+ * `pnpm --filter web seo:certify` sweep (JOV-7249), which adds the `geo`
+ * dimension from lib/seo/geo-certification.ts.
  */
 import { type CopyRegister, lintCopy } from '@jovie/copy';
 import type { CertificationEvidenceReceipt } from '@/lib/agent-os/certification';
 
 export const SEO_CERTIFICATION_CONTRACT = 'jovie.seo-certification/v1' as const;
 
-export const SEO_CHECK_DIMENSIONS = ['technical', 'agentic', 'copy'] as const;
+export const SEO_CHECK_DIMENSIONS = [
+  'technical',
+  'agentic',
+  'copy',
+  'geo',
+] as const;
 export type SeoCheckDimension = (typeof SEO_CHECK_DIMENSIONS)[number];
 
 /** `warn` is advisory: it never fails a page, it ranks the backlog. */
@@ -68,7 +74,10 @@ export interface ExtractedSeoHead {
   readonly ogImage: string | null;
   readonly twitterCard: string | null;
   readonly hreflang: readonly { lang: string; href: string }[];
+  /** Top-level `@type`s (including `@graph` members). */
   readonly jsonLdTypes: readonly string[];
+  /** Every `@type` at any depth, e.g. an Offer nested in `mainEntity`. */
+  readonly jsonLdNestedTypes: readonly string[];
   readonly jsonLdErrors: number;
   readonly h1Count: number;
   readonly visibleText: string;
@@ -200,6 +209,14 @@ function stripTags(html: string): string {
  * HTML that agents and crawlers receive without running client JS.
  */
 export function extractVisibleText(html: string): string {
+  return stripTags(pageOwnedHtml(html));
+}
+
+/**
+ * Body HTML the page owns: no code, no head, no shared header/nav/footer
+ * chrome. GEO checks read links and paragraphs from this scope.
+ */
+export function pageOwnedHtml(html: string): string {
   const withoutCode = removeElements(html, [
     'script',
     'style',
@@ -209,7 +226,12 @@ export function extractVisibleText(html: string): string {
     'head',
   ]);
   const scope = elementContents(withoutCode, 'body')[0] ?? withoutCode;
-  return stripTags(removeElements(scope, ['header', 'nav', 'footer']));
+  return removeElements(scope, ['header', 'nav', 'footer']);
+}
+
+/** Tag-stripped, entity-decoded, whitespace-collapsed text. */
+export function htmlToText(html: string): string {
+  return stripTags(html);
 }
 
 function metaContent(
@@ -238,8 +260,28 @@ function collectJsonLdTypes(node: unknown, types: string[]): void {
   if (record['@graph']) collectJsonLdTypes(record['@graph'], types);
 }
 
-function jsonLdBlocks(html: string): { types: string[]; errors: number } {
+function collectNestedJsonLdTypes(node: unknown, types: string[]): void {
+  if (Array.isArray(node)) {
+    for (const item of node) collectNestedJsonLdTypes(item, types);
+    return;
+  }
+  if (!node || typeof node !== 'object') return;
+  const type = (node as Record<string, unknown>)['@type'];
+  if (typeof type === 'string') types.push(type);
+  if (Array.isArray(type))
+    for (const item of type) if (typeof item === 'string') types.push(item);
+  for (const [key, value] of Object.entries(node)) {
+    if (key !== '@type') collectNestedJsonLdTypes(value, types);
+  }
+}
+
+function jsonLdBlocks(html: string): {
+  types: string[];
+  nestedTypes: string[];
+  errors: number;
+} {
   const types: string[] = [];
+  const nestedTypes: string[] = [];
   let errors = 0;
   const lower = html.toLowerCase();
   let cursor = lower.indexOf('<script');
@@ -250,14 +292,16 @@ function jsonLdBlocks(html: string): { types: string[]; errors: number } {
     const attributes = parseAttributes(html.slice(cursor + 7, start));
     if (attributes.type?.toLowerCase() === 'application/ld+json') {
       try {
-        collectJsonLdTypes(JSON.parse(html.slice(start + 1, end)), types);
+        const parsed: unknown = JSON.parse(html.slice(start + 1, end));
+        collectJsonLdTypes(parsed, types);
+        collectNestedJsonLdTypes(parsed, nestedTypes);
       } catch {
         errors += 1;
       }
     }
     cursor = lower.indexOf('<script', end);
   }
-  return { types, errors };
+  return { types, nestedTypes, errors };
 }
 
 export function extractSeoHead(html: string): ExtractedSeoHead {
@@ -285,6 +329,7 @@ export function extractSeoHead(html: string): ExtractedSeoHead {
       )
       .map(link => ({ lang: link.hreflang ?? '', href: link.href ?? '' })),
     jsonLdTypes: jsonLd.types,
+    jsonLdNestedTypes: [...new Set(jsonLd.nestedTypes)],
     jsonLdErrors: jsonLd.errors,
     h1Count: findTags(html, 'h1').length,
     visibleText: extractVisibleText(html),

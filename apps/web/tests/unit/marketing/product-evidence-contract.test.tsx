@@ -86,11 +86,13 @@ import DownloadPage from '@/app/(marketing)/download/page';
 import { InstantMerchLanding } from '@/app/(marketing)/instant-merch/InstantMerchLanding';
 import { ProductLanding } from '@/app/(marketing)/product/ProductLanding';
 import { SmartLinksLanding } from '@/app/(marketing)/smart-links/SmartLinksLanding';
+import { SolutionsRecordBody } from '@/app/(marketing)/solutions/[audience]/sections';
 import { YoutubeThumbnailsLanding } from '@/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding';
 import { PayLanding } from '@/components/features/pay/PayLanding';
 import { ArtistNotificationsLanding } from '@/components/marketing/artist-notifications/ArtistNotificationsLanding';
 import { ArtistProfileLandingRoute } from '@/components/marketing/artist-profile/ArtistProfileLandingRoute';
 import { VoicePageContent } from '@/components/organisms/VoicePageContent';
+import { solutionsArtistsPage } from '@/content/pages/solutions/artists';
 
 // Vitest runs this package with cwd = apps/web.
 const WEB_ROOT = process.cwd();
@@ -137,7 +139,9 @@ function renderedEvidenceIssue(
 const RENDERERS: Readonly<Record<string, () => ReactElement>> = {
   '(marketing)/artist-profiles/page.tsx': () => <ArtistProfileLandingRoute />,
   '(marketing)/artist-profile/page.tsx': () => <ArtistProfileLandingRoute />,
-  '(marketing)/solutions/artists/page.tsx': () => <ArtistProfileLandingRoute />,
+  '(marketing)/solutions/[audience]/page.tsx': () => (
+    <SolutionsRecordBody record={solutionsArtistsPage} />
+  ),
   '(marketing)/artist-notifications/page.tsx': () => (
     <ArtistNotificationsLanding copy={ARTIST_NOTIFICATIONS_COPY} />
   ),

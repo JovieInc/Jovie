@@ -179,6 +179,7 @@ describe('mounted homepage pricing System B source contract', () => {
       'penContractId={MARKETING_PEN_CONTRACT_IDS.shell.footerCta}'
     );
     expect(source).toContain('testId={sectionTestId}');
+    expect(source).toContain('sectionVariant={sectionVariant}');
     expect(source).toContain('headingTestId={headingTestId}');
     expect(source).toContain('actionTestId={actionTestId}');
     expect(source).not.toContain('<section');

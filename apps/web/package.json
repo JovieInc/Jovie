@@ -17,6 +17,7 @@
     "check:signup-readiness": "tsx scripts/check-signup-readiness.ts",
     "seo:ratchet": "vitest run tests/unit/seo --config=vitest.config.mts",
     "seo:ratchet:live": "tsx scripts/seo-ratchet-live-check.ts",
+    "seo:certify": "tsx scripts/seo-certify.ts",
     "check:signed-in-auth": "tsx scripts/verify-signed-in-auth.ts",
     "verify:signed-in-auth": "tsx scripts/verify-signed-in-auth.ts",
     "build": "node scripts/stage-runtime-data.mjs && NODE_OPTIONS=--max-old-space-size=8192 NEXT_IGNORE_TYPECHECK=1 next build --turbopack",

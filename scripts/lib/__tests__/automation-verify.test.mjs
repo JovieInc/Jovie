@@ -50,7 +50,7 @@ describe('affected-test selector inventory', () => {
 describe('structural control stage execution', () => {
   it('starts registry, project, control coverage, Dependabot coverage, CLI coverage, web, continuity, and FX stages in order', async () => {
     const stages = buildControlTestCommands();
-    expect(stages).toHaveLength(17);
+    expect(stages).toHaveLength(18);
     expect(stages[0]).toEqual(buildCompanyRegistryTestCommand());
     expect(stages[1]).toEqual(buildProjectCreationTestCommand());
     expect(stages[2][1]).toContain('lib/__tests__/pr-conflict-event.test.mjs');
@@ -147,6 +147,18 @@ describe('structural control stage execution', () => {
       ],
     ]);
     expect(stages[16]).toEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
+        '--test-coverage-include=scripts/lib/coverage-surface-files.mjs',
+        '--test-coverage-lines=100',
+        '--test-coverage-branches=100',
+        '--test-coverage-functions=100',
+        'scripts/coverage-surface-files.test.mjs',
+      ],
+    ]);
+    expect(stages[17]).toEqual([
       'pnpm',
       ['run', 'test:rolling-ci-fx:coverage'],
     ]);
@@ -2485,6 +2497,72 @@ describe('automation-verify affected scope', () => {
     );
     expect(formatAffectedTestPlanDiagnostic(plan)).toBe(
       '[affected-tests] mode=full related=1 mandatory=0 fallbackReason="uncovered source path(s): apps/web/lib/unknown.ts"'
+    );
+  });
+
+  describe('marketing Pen contract bindings', () => {
+    const source = 'apps/web/data/marketing/penContracts.ts';
+    const bindingTests = [
+      'apps/web/tests/unit/marketing/component-registry.test.ts',
+      'apps/web/tests/unit/marketing/locked-pen-chrome-contract.test.ts',
+      'apps/web/tests/unit/marketing/artist-profile/ArtistProfileAdaptiveSection.test.tsx',
+      'apps/web/tests/unit/marketing/artist-profile/ArtistProfileOutcomesLedger.test.tsx',
+      'apps/web/tests/unit/marketing/MarketingTerminalCta.test.tsx',
+    ];
+
+    it('requires all real binding tests for the exact contract source', () => {
+      const plan = buildAffectedTestPlan([source]);
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toEqual(bindingTests);
+      expect(plan.selectedTests).toEqual(bindingTests);
+      expect(buildSelectedTestCommands(plan, '2')).toEqual([
+        [
+          'pnpm',
+          [
+            '--filter',
+            '@jovie/web',
+            'exec',
+            'vitest',
+            'run',
+            ...bindingTests.map(file => file.replace('apps/web/', '')),
+            '--passWithNoTests',
+            '--maxWorkers',
+            '2',
+          ],
+        ],
+      ]);
+    });
+
+    it.each(bindingTests)(
+      'fails closed when binding test %s is missing',
+      missing => {
+        const plan = buildAffectedTestPlan([source], {
+          isFileAvailable: file => file !== missing,
+        });
+        expect(plan.mode).toBe('full');
+        expect(plan.fallbackReason).toContain(source);
+      }
+    );
+
+    it.each([
+      ['apps/web/data/marketing/penContracts-neighbor.ts'],
+      [source, 'apps/web/data/marketing/penContracts-neighbor.ts'],
+      [
+        source,
+        'apps/web/data/marketing/penContracts-neighbor.ts',
+        bindingTests[0],
+      ],
+      [source, 'apps/web/tests/setup.ts'],
+      [
+        source,
+        'scripts/run-affected-tests.mjs',
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+      ],
+    ])(
+      'preserves full fallback for unknown, global or mixed inputs %j',
+      (...files) => {
+        expect(buildAffectedTestPlan(files).mode).toBe('full');
+      }
     );
   });
 

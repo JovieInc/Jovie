@@ -11,12 +11,14 @@ describe('/solutions/artists artist solution route (JOV-5861)', () => {
   it('binds the route to the artist-lp recipe in the manifest', () => {
     expect(APP_ROUTES.SOLUTIONS_ARTISTS).toBe('/solutions/artists');
     const entry = MARKETING_ROUTE_MANIFEST.find(
-      candidate => candidate.glob === '(marketing)/solutions/artists/page.tsx'
+      candidate =>
+        candidate.glob === '(marketing)/solutions/[audience]/page.tsx'
     );
     expect(entry).toBeDefined();
     expect(entry?.recipeId).toBe('artist-lp');
     expect(entry?.status).toBe('active');
-    expect(entry?.url).toBe('/solutions/artists');
+    expect(entry?.url).toBe('/solutions/*');
+    expect(entry?.healthCheck?.path).toBe('/solutions/artists');
     expect(entry?.aliasOf).toBeUndefined();
   });
 

@@ -29,6 +29,16 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
     'apps/web/tests/unit/design-system/arbitrary-values.baseline.json',
     ['apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'],
   ],
+  [
+    'apps/web/data/marketing/penContracts.ts',
+    [
+      'apps/web/tests/unit/marketing/component-registry.test.ts',
+      'apps/web/tests/unit/marketing/locked-pen-chrome-contract.test.ts',
+      'apps/web/tests/unit/marketing/artist-profile/ArtistProfileAdaptiveSection.test.tsx',
+      'apps/web/tests/unit/marketing/artist-profile/ArtistProfileOutcomesLedger.test.tsx',
+      'apps/web/tests/unit/marketing/MarketingTerminalCta.test.tsx',
+    ],
+  ],
 ]);
 // Any web source that uses TanStack Virtual must stay out of React Compiler
 // memoization (JOV-6702); the invariant has no import edge to such files.
@@ -473,6 +483,15 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
       '--test-coverage-lines=85',
       '--test-coverage-branches=75',
       '--test-coverage-functions=90',
+    ],
+  ],
+  [
+    'scripts/coverage-surface-files.test.mjs',
+    'scripts/lib/coverage-surface-files.mjs',
+    [
+      '--test-coverage-lines=100',
+      '--test-coverage-branches=100',
+      '--test-coverage-functions=100',
     ],
   ],
 ];

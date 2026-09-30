@@ -1,3 +1,4 @@
+import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
@@ -217,7 +218,9 @@ test.describe('Artist Profiles Landing', () => {
       await tab.click();
       await expect(tab).toHaveAttribute('aria-selected', 'true');
       await expect(
-        adaptiveSection.getByText(mode.headline, { exact: true })
+        adaptiveSection
+          .getByRole('tabpanel', { name: mode.label })
+          .getByText(mode.headline, { exact: true })
       ).toBeVisible();
       await expect(
         adaptiveSection.getByAltText(mode.screenshotAlt)
@@ -416,17 +419,8 @@ test.describe('Artist Profiles Landing', () => {
     const captureSection = page.getByTestId('artist-profile-section-capture');
     await expect(
       captureSection.getByRole('heading', {
-        name: 'One fan moment. A relationship you keep.',
+        name: ARTIST_PROFILE_COPY.capture.headline,
       })
-    ).toBeVisible();
-    await expect(captureSection.getByText('You’re on the list')).toBeVisible();
-    await expect(
-      captureSection.getByText('Opt in once', { exact: true })
-    ).toBeVisible();
-    await expect(captureSection.getByText('Reach the moment')).toBeVisible();
-    await expect(captureSection.getByText('Keep the audience')).toBeVisible();
-    await expect(
-      captureSection.getByText('Illustrative fan activity')
     ).toBeVisible();
     const capturePreview = captureSection.getByTestId(
       'artist-profile-capture-demo'

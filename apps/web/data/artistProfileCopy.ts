@@ -429,7 +429,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     eyebrow: '',
     headline: 'The link your music deserves.',
     subhead:
-      'One profile that puts the right action first—from release alerts and release day to nearby shows, support, and fan follow-up.',
+      'One profile that puts the right action first for release alerts, launch day, nearby shows, support, and fan follow-up.',
     ctaLabel: 'Claim your profile',
     signature: 'jov.ie/you',
     proofWhisper: 'Used by artists on',
@@ -772,7 +772,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   },
   opinionated: {
     headline: 'Stop designing your link-in-bio.',
-    body: 'Jovie leads with the next action a fan needs—not a page of choices for you to keep redesigning. Make music. Jovie turns attention into action.',
+    body: 'Jovie leads with the next action a fan needs. You get a clear path without redesigning the page. Make music. Jovie turns attention into action.',
     principle: 'One profile. Built to convert.',
   },
   outcomeDuo: {
@@ -1065,7 +1065,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         body: 'Music, shows, support, and updates stay in one place.',
       },
     ],
-    relatedHeadline: 'Built to be found—and to turn discovery into action.',
+    relatedHeadline: 'Help people find you and take the next step.',
     relatedFeatures: [
       {
         id: 'search-answer-visibility',
@@ -1075,7 +1075,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       {
         id: 'audience-quality',
         title: 'Audience Quality Filtering',
-        body: 'Use source, segment, consent, and engagement signals to separate casual traffic from the fans most likely to act.',
+        body: 'Use source, segment, consent, and engagement signals to identify the fans most likely to act.',
       },
       {
         id: 'fan-notifications',

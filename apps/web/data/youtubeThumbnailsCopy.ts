@@ -24,7 +24,7 @@ export const YOUTUBE_THUMBNAILS_COPY = {
     loading: 'Finding your latest videos…',
     previewOnly: 'Redos open soon. These are the three we would start with.',
     redosReady:
-      'Your three free redos. Download or apply them after you create an account — applying needs YouTube Connect.',
+      'Your three free redos. Create an account to download them. Applying one also needs YouTube Connect.',
     invalidChannel:
       'We could not find that channel. Paste the @handle or the channel link.',
     noVideos: 'That channel has no public videos yet.',

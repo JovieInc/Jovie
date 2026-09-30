@@ -9,6 +9,7 @@ vi.mock('next/cache', () => ({
 }));
 
 vi.mock('@/constants/app', () => ({
+  APP_NAME: 'Jovie',
   BASE_URL: 'https://jov.ie',
 }));
 
@@ -226,6 +227,7 @@ describe('sitemap', () => {
         'https://jov.ie/legal/cookies',
         'https://jov.ie/legal/dmca',
         'https://jov.ie/artist-profiles',
+        'https://jov.ie/solutions/artists',
         'https://jov.ie/product',
         'https://jov.ie/youtube-thumbnails',
         'https://jov.ie/tim',

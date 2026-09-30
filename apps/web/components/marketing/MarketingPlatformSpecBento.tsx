@@ -27,6 +27,9 @@ export function MarketingPlatformSpecBento({
 }: Readonly<MarketingPlatformSpecBentoProps>) {
   return (
     <ArtistProfileSectionShell
+      sectionId='spec-wall'
+      sectionVariant='5-screenshot-bento'
+      sectionOwner='apps/web/components/marketing/MarketingPlatformSpecBento.tsx'
       className='m-spec-bento'
       penContractId={MARKETING_PEN_CONTRACT_IDS.section.specWall}
     >
@@ -38,6 +41,10 @@ export function MarketingPlatformSpecBento({
           className='max-w-3xl'
           bodyClassName='max-w-xl'
         />
+
+        <p className='mt-4 text-sm text-secondary-token'>
+          Preserved product demonstrations · illustrative data
+        </p>
 
         <div className='m-spec-bento__grid mt-10'>
           {PLATFORM_SPEC_TILES.map(tile => {

@@ -21,8 +21,12 @@ export function MarketingShippedSitesShowcase({
 }: Readonly<MarketingShippedSitesShowcaseProps>) {
   return (
     <ArtistProfileSectionShell
+      sectionId='product-gallery'
+      sectionVariant='profile-grid'
+      sectionOwner='apps/web/components/marketing/MarketingShippedSitesShowcase.tsx'
+      sectionOccurrence='product-examples'
       className='m-shipped-sites'
-      penContractId={MARKETING_PEN_CONTRACT_IDS.section.socialProof}
+      penContractId={MARKETING_PEN_CONTRACT_IDS.section.productGallery}
     >
       <div className='mx-auto max-w-public-content' data-testid={testId}>
         <ArtistProfileSectionHeader

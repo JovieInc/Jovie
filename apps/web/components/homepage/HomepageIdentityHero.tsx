@@ -40,7 +40,6 @@ export function HomepageIdentityHero({
     <div
       className='homepage-claim-hero marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'
       data-homepage-testid='homepage-hero-shell'
-      data-marketing-owner='apps/web/components/homepage/HomepageIdentityHero.tsx'
     >
       <HomepageCertifiedExposure />
       <MarketingHeroPhoto {...HERO_TEXTURE} />
@@ -52,6 +51,8 @@ export function HomepageIdentityHero({
         variant='split'
         headingId={headingId}
         testId='marketing-section-hero'
+        sectionVariant='split-claim-card'
+        sectionOwner='apps/web/components/homepage/HomepageIdentityHero.tsx'
       >
         <div className='max-w-xl'>
           <p className='marketing-kicker'>{copy.kicker}</p>
