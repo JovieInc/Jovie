@@ -10,7 +10,7 @@ routes it loads (`/desktop-auth`, `/auth/start`, `/auth/callback`,
 
 1. The main process mints PKCE (S256 verifier + challenge) and a flow nonce,
    and shows the `/desktop-auth` handoff window.
-2. "Continue in Browser" opens `/auth/start?client=electron&...` in the default
+2. "Continue In Browser" opens `/auth/start?client=electron&...` in the default
    browser with `shell.openExternal`.
 3. After sign-in, `/auth/callback` stores a single-use exchange code and
    bounces through `/auth/native-return`, which fires
@@ -140,7 +140,7 @@ Flow: after a browser sign-in, `/auth/native-complete` offers "Sign In With
 Touch ID Next Time?" once (the session is fresh at that moment). "Turn On
 Touch ID" adds a platform passkey named "Jovie for Mac"; the choice is kept
 in `userData/desktop-passkey.json` (enrolled or dismissed, no secrets, mode
-600). Later handoffs show "Sign In With Touch ID" above "Continue in Browser"
+600). Later handoffs show "Sign In With Touch ID" above "Continue In Browser"
 and finish in the app with no browser trip. If Touch ID fails or is
 cancelled, the browser path is right there.
 
@@ -172,33 +172,54 @@ created for that Mac. In any browser, including the browser handoff,
 
 ## Design brief (for the Pen design session)
 
-Surface: the existing `/desktop-auth` handoff window (820 x 520, centered
-column, `max-w-90`, `MacCinematicSurface`). Row order is fixed so state
-changes never shift the column: action stack, two-line status, one text row.
+Surface: the existing `/desktop-auth` handoff window (820 x 520, centered column, `max-w-90`, `MacCinematicSurface`). Keep the shell and brand treatment. The hierarchy below specializes JOV-6942 rules 2, 3, 5, 20, and 22 for a focused auth task. It does not create a second design canon or a whole-app button-count rule.
 
-| State | Action stack | Status line | Text row |
-| --- | --- | --- | --- |
-| Idle | Continue in Browser / Copy Sign-In Link / Cancel Sign-In | (empty) | Enter A Code · Scan With Phone (canonical link Buttons, sm) |
-| Opening | Opening Browser... (disabled) / Copy (disabled) / Cancel | (empty) | Enter A Code · Scan With Phone |
-| Waiting | Open Browser Again / Copy Sign-In Link / Cancel | Check your browser. | Enter A Code · Scan With Phone |
-| Waiting 30s+ | same | Not seeing it? Copy the sign-in link and paste it into any browser. | Enter A Code · Scan With Phone |
-| Copied | same | Sign-in link copied. Paste it into any browser. | Enter A Code · Scan With Phone |
-| Open failed | Try Again / Copy / Cancel | The browser did not open. Try again, or copy the sign-in link. | Enter A Code · Scan With Phone |
-| QR | QR of the sign-in link (176px, white card) | Scan with your phone to finish sign-in there. | Back To Browser Sign-in |
-| Code entry | Code input (XXXX-XXXX, mono, letter-spaced) / Continue / Cancel | Signed in but Jovie did not open? Enter the code your browser shows. | Back To Browser Sign-in |
-| Code wrong | same, input keeps focus | That code did not match. Check it and try again. | Back To Browser Sign-in |
-| Code expired | same | This sign-in expired. Open the browser again for a new code. | Back To Browser Sign-in |
-| Signing in | Continue shows Signing In... (disabled) | Signing in... | disabled |
+The browser-selected default state has a visible **Finish Signing In** heading and the support line **Continue in your browser, then return to Jovie.** Exactly three task controls are exposed:
+
+1. Continue In Browser or Open Browser Again, the only full-width primary
+   Button.
+2. Other Sign-in Options, a subordinate canonical link Button that discloses
+   the fallback group.
+3. Cancel Sign-in, a separately spaced canonical link Button with quiet text
+   treatment. It remains a semantic button with the shared 44px hit target.
+
+Copy Sign-in Link, Enter A Code, and Scan With Phone do not exist in the focus order until the disclosure is open. Every supported option uses the same canonical tertiary row primitive. Return-code-dependent options are hidden when the installed Mac bridge cannot redeem a code.
+
+For an enrolled returning user, Touch ID is the selected method. The same three-control hierarchy becomes Sign In With Touch ID, Other Sign-in Options, and Cancel Sign-in. Continue In Browser joins the equal fallback rows until selected. A cancelled or failed Touch ID attempt selects the browser step, makes its action primary, and keeps Touch ID reachable from the fallback group.
+
+| State | Visible action area | Status and recovery |
+| --- | --- | --- |
+| Idle | Continue In Browser / Other Sign-in Options / Cancel Sign-in | Supporting copy explains the browser handoff before the controls. |
+| Opening | Opening Browser... (disabled) / options disabled / Cancel Sign-in | Opening your browser... Duplicate browser invocation is suppressed. |
+| Waiting | Open Browser Again / Other Sign-in Options / Cancel Sign-in | Check your browser. |
+| Waiting 30s+ | Same three controls | Not seeing it? Copy the sign-in link and paste it into any browser. |
+| Open failed | Try Again / Other Sign-in Options / Cancel Sign-in | The browser did not open. Try again, or copy the sign-in link. Retry receives focus. |
+| Alternatives | Browser primary / disclosure / equal option rows / Cancel Sign-in | Copy, code, and phone are peer rows. Escape closes the group and restores focus to the disclosure. |
+| Copying | Equal option rows, with copy disabled and honest in-progress label | Copying the sign-in link... Browser invocation is suppressed during the copy. |
+| Copied | Copy Sign-in Link Again plus the other supported peer rows | Sign-in link copied. Paste it into any browser. |
+| Clipboard failed | Same option group | The sign-in link could not be copied. Try again. |
+| QR loading | Selected phone step only, with Back and Cancel Sign-in | Creating the QR code... Browser reopening is not a competing primary. |
+| QR ready | QR of the sign-in link (176px, white card) / Enter A Code / Back / Cancel Sign-in | Finish signing in on your phone, then enter the code it shows. Enter A Code is direct and does not require a browser-step detour. |
+| QR failed | Enter A Code / Back / Cancel Sign-in | The QR code could not be created. Choose another sign-in option. |
+| Code entry | Canonical code input (XXXX-XXXX) / Continue / Back / Cancel Sign-in | The input receives focus. Browser reopening is absent. |
+| Code wrong | Same, input keeps focus | That code did not match. Check it and try again. |
+| Code expired | Same | This sign-in expired. Open the browser again for a new code. Back returns to the option group without cancelling the attempt. |
+| Offline or network failure | Same | Could not reach Jovie. Check your connection and try again. The entered code remains available. |
+| Signing in | Continue shows Signing In... and is disabled | Signing in... Status is announced without moving focus. |
+| Completed | Selected code step remains until the native window transitions | Sign-in complete. Returning to Jovie... |
+| Cancelled | No selected-method mutation | The native close action clears the pending flow and closes the handoff window. |
+| Touch ID ready | Sign In With Touch ID / Other Sign-in Options / Cancel Sign-in | Touch ID is the sole primary. Browser, copy, code, and phone stay in the equal fallback group. |
+| Touch ID working | Sign In With Touch ID (disabled) / options disabled / Cancel Sign-in | Waiting for Touch ID... Duplicate biometric invocation is suppressed. |
+| Touch ID failed or cancelled | Continue In Browser / Other Sign-in Options / Cancel Sign-in | Touch ID did not sign you in. Continue in the browser instead. Browser receives focus; Touch ID remains available after disclosure. |
+
+The status slot keeps a stable two-line minimum height. Capability resolution does not expose or reserve hidden fallback controls. Opening alternatives is an intentional local disclosure, so its bounded height change is allowed. Code and QR replace the browser action area instead of appending to it. Back changes the selected method and restores focus to its option row; it never cancels the pending attempt.
+
+Pen ownership remains with the existing JOV-6709 design session. This brief records the implementation contract but does not claim a Pen node ID or human-certified baseline.
 
 Browser return page (`/auth/native-return`, web card): under "Return to
 Jovie", a divider, then "Jovie did not open? Enter this code in the app." and
 the code in large mono, selectable.
 
-Touch ID: after a first sign-in on a Mac that supports it, the completion
-screen asks once, "Sign In With Touch ID Next Time?" with "Turn On Touch ID"
-(primary) and "Not Now" (secondary), both canonical `@jovie/ui` buttons. Once
-enrolled, the handoff adds "Sign In With Touch ID" as the first row in both
-the browser and code modes (so switching modes keeps the row count), and
-"Continue in Browser" drops to the secondary style. Status while waiting:
-"Waiting for Touch ID..."; on failure: "Touch ID did not sign you in.
-Continue in the browser instead."
+Touch ID: after a first sign-in on a supported Mac, the completion screen asks once, "Sign In With Touch ID Next Time?" with "Turn On Touch ID" (primary) and "Not Now" (secondary), both canonical `@jovie/ui` buttons. Once enrolled, the handoff selects Touch ID as its sole primary method; browser, copy, code, and phone are peer fallbacks behind Other Sign-in Options.
+
+Selecting code or phone replaces the Touch ID action area. A failed or cancelled biometric attempt selects and focuses Continue In Browser while keeping Touch ID available as a fallback. Status while waiting: "Waiting for Touch ID..."; on failure: "Touch ID did not sign you in. Continue in the browser instead."

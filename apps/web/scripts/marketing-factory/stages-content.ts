@@ -248,7 +248,11 @@ function copyStage(ctx: StageContext): Promise<StageResult> {
           family: modelFamily(verdict.model),
           kind: 'llm' as const,
           verdict: verdict.pass ? ('pass' as const) : ('revise' as const),
-          score: Math.min(...Object.values(verdict.scores)) / 10,
+          // Judges score 1-10; clamp so an out-of-range reply cannot break the receipt schema.
+          score: Math.min(
+            1,
+            Math.max(0, Math.min(...Object.values(verdict.scores)) / 10)
+          ),
           rubricVersion: RUBRIC_VERSION,
         })),
       };

@@ -6,6 +6,7 @@
 
 import { existsSync, statSync } from 'node:fs';
 import { extname, join } from 'node:path';
+import { modelFamily } from '@jovie/copy';
 import {
   decideMedium,
   resolveMediaSourcing,
@@ -25,9 +26,13 @@ import {
   isRegisteredMarketingCapture,
   resolveCapture,
 } from '../marketing-media/capture-adapter';
+import { buildFactoryPageRecord } from './page-record';
+import { digestOf, writeJson } from './receipts';
+import { evaluateRenderCaptures } from './render-measurer';
 import {
   artifactOf,
   Checks,
+  type Evaluator,
   judge,
   result,
   type StageContext,
@@ -35,6 +40,7 @@ import {
   type StageRunner,
   sectionIdsOf,
 } from './stage-kit';
+import { auditVisualAdmission, buildVisualGateReceipts } from './visual-review';
 
 function mediaDecisions(ctx: StageContext) {
   return ctx.brief.media.map(entry => ({
@@ -167,6 +173,14 @@ async function assetStage(ctx: StageContext): Promise<StageResult> {
       });
       continue;
     }
+    if (ref.id.startsWith('photo:')) {
+      checks.check(
+        `asset-provenance:${ref.id}`,
+        false,
+        'rights-cleared photo import is not wired'
+      );
+      continue;
+    }
     const outcome = await ctx.providers.generateAsset({
       prompt: `${ctx.brief.icp}: ${ref.sectionInstanceId}`,
       recipeId: ref.source as never,
@@ -182,7 +196,7 @@ async function assetStage(ctx: StageContext): Promise<StageResult> {
         { unavailable: outcome.reason }
       );
     }
-    // Generated and photo assets ship only with a provenance sidecar and an
+    // Generated assets ship only with a provenance sidecar and an
     // art-evaluator record, which factory:run does not produce yet.
     checks.check(
       `asset-provenance:${ref.id}`,
@@ -193,47 +207,34 @@ async function assetStage(ctx: StageContext): Promise<StageResult> {
   return result(checks, { pageId: ctx.pageId, assets });
 }
 
-/** Minimal local page record; reconciled with JOV-7275 pageRecord.ts. */
-export function buildPageRecord(ctx: StageContext) {
-  const copy = artifactOf(ctx, 'copy');
-  return {
-    schema: 'jovie.factory-page-record/v0',
-    pageId: ctx.pageId,
-    family: ctx.brief.family,
-    slug: ctx.brief.slug,
-    route: ctx.brief.route,
-    status: 'shadow' as const,
-    claimIds: artifactOf(ctx, 'truth').claims.map(claim => claim.id),
-    composition: artifactOf(ctx, 'layout'),
-    hero: artifactOf(ctx, 'hero-variant'),
-    copy: copy.slots,
-    proof: artifactOf(ctx, 'proof'),
-    sectionRequests: artifactOf(ctx, 'gap-detection').sectionRequests,
-    media: artifactOf(ctx, 'media-decision').sections,
-    assets: artifactOf(ctx, 'asset').assets,
-  };
-}
-
 async function renderStage(ctx: StageContext): Promise<StageResult> {
   const checks = new Checks();
-  const record = buildPageRecord(ctx);
-  const measured = await ctx.providers.measureRender(ctx.brief.route);
+  const { record, issues } = buildFactoryPageRecord(ctx, null);
+  checks.check('page-record-schema', issues.length === 0, issues.join('; '));
+  // The candidate the local build previews (FACTORY_PREVIEW_RECORD).
+  const previewDir = join(ctx.runDir, 'render', 'preview-records');
+  const recordId = `${ctx.brief.family}.${ctx.brief.slug}`;
+  if (issues.length === 0) {
+    writeJson(
+      join(previewDir, recordId.replace('.', '-'), 'page-record.json'),
+      record
+    );
+  }
+  const measured = await ctx.providers.measureRender(ctx.brief.route, {
+    outDir: join(ctx.runDir, 'render'),
+    ...(issues.length === 0
+      ? { preview: { recordId, runsDir: previewDir } }
+      : {}),
+  });
   if (measured.status !== 'ok') {
     return result(checks, null, {
       unavailable: measured.reason,
       notes: { record },
     });
   }
-  checks.check(
-    'render-cls',
-    measured.cls <= 0.05,
-    `CLS ${measured.cls} > 0.05`
-  );
-  checks.check(
-    'render-lcp',
-    measured.lcpMs < 2500,
-    `LCP ${measured.lcpMs}ms >= 2500ms`
-  );
+  for (const check of evaluateRenderCaptures(measured.captures)) {
+    checks.check(check.id, check.ok, check.message);
+  }
   return result(
     checks,
     {
@@ -241,6 +242,7 @@ async function renderStage(ctx: StageContext): Promise<StageResult> {
       route: ctx.brief.route,
       cls: measured.cls,
       lcpMs: measured.lcpMs,
+      captures: measured.captures,
     },
     { notes: { record } }
   );
@@ -350,6 +352,57 @@ async function seoStage(ctx: StageContext): Promise<StageResult> {
   );
 }
 
+/**
+ * Visual taste admission: cross-family vision review of the render stage's
+ * screenshots, bound to the candidate record's digest, then the visual
+ * gates of auditMarketingTasteAdmission.
+ */
+async function visualAdmission(
+  ctx: StageContext,
+  checks: Checks,
+  producerModel: string
+) {
+  const captures = artifactOf(ctx, 'render').captures ?? [];
+  // The record the render stage measured, before the trust score lands.
+  const candidateDigest = digestOf(buildFactoryPageRecord(ctx, null).record);
+  const review = await ctx.providers.reviewVisual({
+    pageId: ctx.pageId,
+    captures,
+    producerModel,
+  });
+  const receipts = buildVisualGateReceipts({
+    candidateDigest,
+    captures,
+    review,
+    producerModel,
+  });
+  if (review.status !== 'reviewed') {
+    return { evaluators: [], receipts, unavailable: review.reason };
+  }
+  const admission = auditVisualAdmission({
+    candidateDigest,
+    generatorModelId: producerModel,
+    receipts,
+  });
+  checks.check(
+    'visual-taste-admission',
+    admission.length === 0,
+    admission.map(finding => finding.message).join('; ')
+  );
+  const judgeModel = review.judgeModel.replace(/^fixture:/u, '');
+  const evaluators: Evaluator[] = [
+    {
+      id: ctx.providers.label(judgeModel),
+      family: modelFamily(judgeModel),
+      kind: 'vision',
+      verdict: review.verdict,
+      score: review.score,
+      rubricVersion: 'factory-visual-review/1',
+    },
+  ];
+  return { evaluators, receipts, unavailable: null };
+}
+
 async function trustStage(ctx: StageContext): Promise<StageResult> {
   const checks = new Checks();
   const upstream = FACTORY_STAGES.slice(
@@ -390,7 +443,9 @@ async function trustStage(ctx: StageContext): Promise<StageResult> {
       verdict.unsupportedClaims.join('; ')
     );
   }
-  const scores = verdict.evaluators.map(e => e.score);
+  const visual = await visualAdmission(ctx, checks, copyProducer ?? '');
+  const evaluators = [...verdict.evaluators, ...visual.evaluators];
+  const scores = evaluators.map(e => e.score);
   return result(
     checks,
     {
@@ -401,21 +456,33 @@ async function trustStage(ctx: StageContext): Promise<StageResult> {
       unsupportedClaims: verdict.unsupportedClaims,
     },
     {
-      evaluators: verdict.evaluators,
+      evaluators,
       feedback: [...checks.feedback, ...verdict.critique],
-      unavailable: verdict.unavailable,
+      unavailable:
+        [verdict.unavailable, visual.unavailable].filter(Boolean).join('; ') ||
+        null,
+      notes: { tasteReceipts: visual.receipts },
     }
   );
 }
 
 async function publishStage(ctx: StageContext): Promise<StageResult> {
   const checks = new Checks();
-  checks.check('ramp-shadow-only', true);
-  return result(checks, {
-    pageId: ctx.pageId,
-    rampState: 'shadow',
-    batchId: null,
-  });
+  const { record, issues } = buildFactoryPageRecord(
+    ctx,
+    artifactOf(ctx, 'adversarial-trust').score
+  );
+  checks.check('page-record-schema', issues.length === 0, issues.join('; '));
+  checks.check(
+    'ramp-shadow-only',
+    (record as { status?: string }).status === 'shadow',
+    'publish only writes shadow records until the ramp ships'
+  );
+  return result(
+    checks,
+    { pageId: ctx.pageId, rampState: 'shadow', batchId: null },
+    { notes: { record } }
+  );
 }
 
 export const PAGE_STAGE_RUNNERS = {

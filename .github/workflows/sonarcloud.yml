@@ -82,6 +82,22 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
+      - name: Disable SonarCloud automatic analysis
+        if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
+        run: |
+          # CI analysis is authoritative. SonarQube Cloud refuses a scanner run
+          # while project-level Automatic Analysis is toggled on, which someone
+          # can flip back on in the UI. Disable it the same way the UI does so a
+          # stale toggle cannot fail main again. The endpoint is undocumented,
+          # so warn-and-continue if the request itself fails — the scan below
+          # remains the real signal.
+          if ! curl -sS -f -X POST \
+            -H "Authorization: Bearer ${SONAR_TOKEN}" \
+            "https://sonarcloud.io/api/autoscan/activation" \
+            -d "enable=false&projectKey=JovieInc_Jovie"; then
+            echo "::warning::Could not disable SonarCloud automatic analysis; the scan will fail if it is still enabled."
+          fi
+
       - name: SonarQube Scan
         if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
         uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4 # v8.2.1 trufflehog:ignore (pinned action SHA is a git commit, not a credential)

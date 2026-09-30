@@ -797,6 +797,14 @@ Mobile wraps that pill in a 44px tap target. Not 32-in-44 and not density-32
 on every size. CTA labels use medium (`--font-weight-medium` / 510). Do not
 keep them at semibold (~590) and do not drop medium surfaces to book/400.
 
+#### Focused task-action hierarchy
+
+In focused auth, onboarding, connection, and recovery states, visual prominence follows the recommended next step. Alternate routes to the same outcome form one subordinate group and stay progressively disclosed when the normal path does not need them. Peer alternatives use one peer row primitive, regardless of implementation history. Routine cancellation is a separate, visually quiet exit, never a peer CTA.
+
+This is an applicability rule, not a universal button-count cap. Passive and completed states may have no primary action. Safety-critical Stop actions and genuine decision or confirmation dialogs keep their explicit action semantics.
+
+Each focused surface declares its default-state control budget and covers loading, failure, disabled, keyboard, focus, reduced-motion, long-copy, and compact-window states. The desktop auth specialization and deliberate-red / neighboring-green evaluator live in `docs/macos/desktop-auth.md` and `apps/web/tests/unit/design-system/desktop-auth-task-hierarchy-v1.test.tsx`.
+
 ### Sidebar (App Shell)
 
 | Token | Light | Dark |
@@ -1062,5 +1070,6 @@ the JSX-comment form for a text child).
 | 2026-09-10 | Ion / product focus is `#11AFFF` (lighter blue), not `#1F7BF5` | Tim KEEP ~1:26 PT. Ultra/pulse/mint/orange/red stay noir-ion lock hexes. Exactly 5 elevations; no panel. |
 | 2026-09-10 | ActionButton / product CTAs: 28px visible, 510, radius 999; mobile 44px hit wrapping the 28px pill | Tim KEEP ~1:26 PT. Not 32-in-44 and not density-32 everywhere. Homepage not rewritten. `#17156` HOLD. `#17453` untouched. |
 | 2026-09-10 | Pen node ZiaWI is the canonical color SoT (`ziawi-color-sot-v1`) | Tim add ~1:34 PT. React tokens in #17584 must match ZiaWI. Do not invent a parallel React-only color root. |
+| 2026-09-29 | **EVENT: Focused task actions follow the recommended next step.** | Tim review on JOV-6709. Alternate completion paths form one progressively disclosed peer group; routine cancellation is a separate quiet exit. This specializes JOV-6942 hierarchy rules without creating a whole-app control cap. |
 
 | 2026-09-14 | BlogCard editorial titles: full live-text titles, no truncation or global fixed height, per-row subgrid tracks (`data-wrap="editorial-title"`) | Founder decision, PR #17852. Only BlogCard is exempt from heading bounds via the explicit marker + both required subgrid tracks; all other heading bounds remain enforced. |
