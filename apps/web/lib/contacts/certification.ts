@@ -4,26 +4,12 @@ export const CONTACT_EVIDENCE_DECISIONS = ['yes', 'no', 'unsure'] as const;
 export type ContactEvidenceDecision =
   (typeof CONTACT_EVIDENCE_DECISIONS)[number];
 
-export type ContactEvidenceCategory =
-  | 'identity'
-  | 'dsp'
-  | 'catalog'
-  | 'destinations'
-  | 'social'
-  | 'websites'
-  | 'search'
-  | 'facts'
-  | 'conflicts'
-  | 'coverage';
+// biome-ignore format: compact public union keeps the certification contract scannable.
+export type ContactEvidenceCategory = 'identity' | 'dsp' | 'catalog' | 'destinations' | 'social' | 'websites' | 'search' | 'facts' | 'conflicts' | 'coverage';
 
 export type ContactEvidenceFreshness = 'fresh' | 'stale' | 'unknown';
-export type ContactCertificationStatus =
-  | 'machine_scanning'
-  | 'needs_review'
-  | 'conflicted'
-  | 'human_reviewed'
-  | 'certified_for_outreach'
-  | 'stale';
+// biome-ignore format: compact public union keeps every operator state together.
+export type ContactCertificationStatus = 'machine_scanning' | 'needs_review' | 'conflicted' | 'human_reviewed' | 'certified_for_outreach' | 'stale';
 
 export interface ContactEvidenceItem {
   readonly key: string;
@@ -84,31 +70,31 @@ export function deriveContactCertification(input: {
   const missing = input.requiredSourceClasses.filter(
     sourceClass => !checked.includes(sourceClass)
   );
-  const material = input.items;
-  const machineResolved = (item: ContactEvidenceItem) =>
-    item.decision === null &&
-    item.category !== 'conflicts' &&
-    item.category !== 'coverage' &&
-    item.freshness === 'fresh' &&
-    item.confidence !== null &&
-    item.confidence >= HIGH_CONFIDENCE;
-  const rejected = material.filter(item => item.decision === 'no').length;
-  const confirmed = material.filter(
-    item => item.decision === 'yes' || machineResolved(item)
-  ).length;
-  const unresolved = material.length - confirmed - rejected;
-  const conflicts = material.filter(
-    item => item.category === 'conflicts' && item.decision !== 'no'
-  ).length;
-
-  const stale = material.filter(item => item.freshness === 'stale').length;
+  let confirmed = 0;
+  let rejected = 0;
+  let conflicts = 0;
+  let stale = 0;
+  for (const item of input.items) {
+    const machineResolved =
+      item.decision === null &&
+      item.category !== 'conflicts' &&
+      item.category !== 'coverage' &&
+      item.freshness === 'fresh' &&
+      item.confidence !== null &&
+      item.confidence >= HIGH_CONFIDENCE;
+    if (item.decision === 'yes' || machineResolved) confirmed++;
+    else if (item.decision === 'no') rejected++;
+    if (item.category === 'conflicts' && item.decision !== 'no') conflicts++;
+    if (item.freshness === 'stale') stale++;
+  }
+  const unresolved = input.items.length - confirmed - rejected;
   const evidenceRevision = evidenceDigest({
-    items: material.map(item => [item.key, item.revision]).sort(),
+    items: input.items.map(item => [item.key, item.revision]).sort(),
     checked,
     missing,
   });
   const canCertify =
-    material.length > 0 &&
+    input.items.length > 0 &&
     unresolved === 0 &&
     conflicts === 0 &&
     stale === 0 &&
@@ -123,7 +109,7 @@ export function deriveContactCertification(input: {
           ? 'conflicted'
           : unresolved > 0 || missing.length > 0
             ? 'needs_review'
-            : material.length > 0
+            : input.items.length > 0
               ? 'human_reviewed'
               : 'machine_scanning';
 

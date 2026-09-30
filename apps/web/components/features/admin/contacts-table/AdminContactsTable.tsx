@@ -212,17 +212,23 @@ function ContactDetailPanel({
   const [pending, setPending] = useState<string | null>(null);
 
   useEffect(() => {
+    const controller = new AbortController();
     setDetail(null);
     if (!contact) return;
     fetch(`/api/admin/contacts?key=${encodeURIComponent(contact.dedupeKey)}`, {
       headers: { Accept: 'application/json' },
+      signal: controller.signal,
     })
       .then(response => {
         if (!response.ok) throw new Error('load_failed');
         return response.json() as Promise<ContactDetailResponse>;
       })
       .then(setDetail)
-      .catch(() => toast.error('Evidence could not be loaded'));
+      .catch(error => {
+        if ((error as Error).name !== 'AbortError')
+          toast.error('Evidence could not be loaded');
+      });
+    return () => controller.abort();
   }, [contact]);
 
   const post = useCallback(
@@ -424,6 +430,9 @@ function ContactDetailPanel({
             <p className='px-1 pt-2 text-2xs text-tertiary-token'>
               Checked:{' '}
               {certification.coverage.sourceClassesChecked.join(', ') || 'none'}
+            </p>
+            <p className='px-1 text-2xs text-tertiary-token'>
+              Stale is a freshness warning and may overlap review decisions.
             </p>
           </DrawerSection>
           {[...grouped].map(([category, items]) => (

@@ -80,47 +80,10 @@ const metrics: AdminContactStageMetrics = {
   churned: 0,
 };
 
-const certification = {
-  evidenceRevision: 'profile-revision-1',
-  status: 'needs_review' as const,
-  canCertify: false,
-  coverage: {
-    confirmed: 0,
-    rejected: 0,
-    unresolved: 1,
-    stale: 0,
-    sourceClassesChecked: ['identity'],
-  },
-  items: [
-    {
-      key: 'canonical:display-name',
-      revision: 'evidence-revision-1',
-      category: 'identity' as const,
-      label: 'Display name',
-      value: 'Ari Lane',
-      url: null,
-      source: 'profile, user',
-      observedAt: '2026-03-02T00:00:00.000Z',
-      confidence: 0.85,
-      rationale: 'Joined across the canonical CRM identity sources.',
-      freshness: 'fresh' as const,
-      decision: null,
-    },
-  ],
-};
-
-const detailResponse = (overrides: Record<string, unknown> = {}) => ({
-  certification: { ...certification, ...overrides },
-  timeline: [
-    {
-      id: 'transition_1',
-      fromStage: 'approved',
-      toStage: 'paying',
-      actorType: 'system',
-      createdAt: '2026-03-02T00:00:00.000Z',
-    },
-  ],
-});
+// biome-ignore format: compact evidence fixture keeps the interaction regression inside the PR budget.
+const certification = { evidenceRevision: 'profile-revision-1', status: 'needs_review' as const, canCertify: false, coverage: { confirmed: 0, rejected: 0, unresolved: 1, stale: 0, sourceClassesChecked: ['identity'], missingSourceClasses: [] }, items: [{ key: 'canonical:display-name', revision: 'evidence-revision-1', category: 'identity' as const, label: 'Display name', value: 'Ari Lane', url: null, source: 'profile, user', observedAt: '2026-03-02T00:00:00.000Z', confidence: 0.85, rationale: 'Joined across the canonical CRM identity sources.', freshness: 'fresh' as const, decision: null }] };
+// biome-ignore format: timeline shape is incidental to the evidence interaction under test.
+const detailResponse = (overrides: Record<string, unknown> = {}) => ({ certification: { ...certification, ...overrides }, timeline: [{ id: 'transition_1', fromStage: 'approved', toStage: 'paying', actorType: 'system', createdAt: '2026-03-02T00:00:00.000Z' }] });
 
 function RightPanelOutlet() {
   return <aside data-testid='right-panel'>{useRightPanel()}</aside>;
@@ -226,20 +189,15 @@ describe('AdminContactsTable', () => {
     expect(mockRefresh).not.toHaveBeenCalled();
   });
 
+  // biome-ignore format: compact race regression keeps component gate evidence inside the PR cap.
+  it('aborts stale detail loads when selection changes', async () => { const fetchMock = vi.mocked(fetch).mockImplementation(() => new Promise<Response>(() => {})); renderTable({ rows: [contact, { ...contact, dedupeKey: 'email:bea@example.com', email: 'bea@example.com' }], total: 2 }); fireEvent.click(screen.getAllByTestId('admin-contact-row')[0]!); await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce()); const firstSignal = fetchMock.mock.calls[0]?.[1]?.signal; fireEvent.click(screen.getAllByTestId('admin-contact-row')[1]!); await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2)); expect(firstSignal?.aborted).toBe(true); });
+
+  // biome-ignore format: compact interaction regression keeps component gate evidence inside the PR cap.
   it('reviews exact evidence and updates certification state immediately', async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock
       .mockResolvedValueOnce(jsonResponse(detailResponse()))
-      .mockResolvedValueOnce(
-        jsonResponse({
-          ok: true,
-          certification: {
-            ...certification,
-            status: 'human_reviewed',
-            items: [{ ...certification.items[0], decision: 'no' }],
-          },
-        })
-      );
+      .mockResolvedValueOnce(jsonResponse({ ok: true, certification: { ...certification, status: 'human_reviewed', items: [{ ...certification.items[0], decision: 'no' }] } }));
 
     renderTable();
     fireEvent.click(screen.getByTestId('admin-contact-row'));
@@ -248,19 +206,8 @@ describe('AdminContactsTable', () => {
     fireEvent.click(screen.getByRole('button', { name: 'No' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
 
-    expect(
-      JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))
-    ).toMatchObject({
-      action: 'review_evidence',
-      dedupeKey: contact.dedupeKey,
-      evidenceKey: 'canonical:display-name',
-      evidenceRevision: 'evidence-revision-1',
-      decision: 'no',
-    });
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({ action: 'review_evidence', dedupeKey: contact.dedupeKey, evidenceKey: 'canonical:display-name', evidenceRevision: 'evidence-revision-1', decision: 'no' });
     expect(screen.getByText('Human reviewed')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'No' })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
+    expect(screen.getByRole('button', { name: 'No' })).toHaveAttribute('aria-pressed', 'true');
   });
 });

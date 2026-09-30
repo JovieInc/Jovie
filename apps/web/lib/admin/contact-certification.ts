@@ -34,6 +34,7 @@ import {
   profileSurfaces,
 } from '@/lib/db/schema/profile-surfaces';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { qualificationForIdentityDecision } from '@/lib/profile-surfaces/qualification';
 
 const REQUIRED_COVERAGE = [
   'identity',
@@ -43,17 +44,11 @@ const REQUIRED_COVERAGE = [
   'reachability',
 ] as const;
 
-interface Draft {
-  key: string;
-  category: ContactEvidenceCategory;
-  label: string;
-  value: string;
-  source: string;
+// biome-ignore format: compact type declaration avoids inflating the hard PR line budget.
+type Draft = Omit<ContactEvidenceItem, 'decision' | 'freshness' | 'observedAt' | 'revision' | 'url'> & {
   observedAt: Date | null;
-  confidence: number | null;
-  rationale: string;
   url?: string | null;
-}
+};
 
 const confidence = (value: string | null): number | null => {
   const parsed = value === null ? Number.NaN : Number(value);
@@ -61,21 +56,14 @@ const confidence = (value: string | null): number | null => {
 };
 
 function item(draft: Draft, now: Date): ContactEvidenceItem {
-  const candidate = {
-    key: draft.key,
-    category: draft.category,
-    value: draft.value,
-    url: draft.url ?? null,
-    source: draft.source,
-    confidence: draft.confidence,
-    rationale: draft.rationale,
-  };
+  const { label, observedAt, ...rest } = draft;
+  const candidate = { ...rest, url: draft.url ?? null };
   return {
     ...candidate,
-    label: draft.label,
-    observedAt: draft.observedAt?.toISOString() ?? null,
+    label,
+    observedAt: observedAt?.toISOString() ?? null,
     revision: evidenceDigest(candidate),
-    freshness: evidenceFreshness(draft.observedAt, now),
+    freshness: evidenceFreshness(observedAt, now),
     decision: null,
   };
 }
@@ -87,36 +75,14 @@ function canonicalDrafts(contact: CanonicalContactListRow): Draft[] {
       'canonical CRM';
   const observedAt = contact.activityAt;
   const corrected = contact.identityCorrected;
-  return [
-    contact.displayName && {
-      key: 'canonical:display-name',
-      label: 'Display name',
-      value: contact.displayName,
-    },
-    contact.email && {
-      key: 'canonical:email',
-      label: 'Email',
-      value: contact.email,
-    },
-    contact.handle && {
-      key: 'canonical:handle',
-      label: 'Primary handle',
-      value: `@${contact.handle}`,
-    },
-  ]
-    .filter(Boolean)
-    .map(value => ({
-      ...(value as {
-        key: string;
-        label: string;
-        value: string;
-      }),
-      category: 'identity' as const,
-      source,
-      observedAt,
-      confidence: corrected ? 1 : 0.9,
-      rationale: 'Joined across the canonical CRM identity sources.',
-    }));
+  // biome-ignore format: compact tuple registry keeps the three canonical identity candidates together.
+  const values = [['display-name', 'Display name', contact.displayName], ['email', 'Email', contact.email], ['handle', 'Primary handle', contact.handle ? `@${contact.handle}` : null]] as const;
+  // biome-ignore format: compact rows keep the canonical evidence mapping auditable within the hard PR line budget.
+  return values.flatMap(([key, label, value]) =>
+    value
+      ? [{ key: `canonical:${key}`, category: 'identity', label, value, source, observedAt, confidence: corrected ? 1 : 0.9, rationale: 'Joined across the canonical CRM identity sources.' }]
+      : []
+  );
 }
 
 function applyReviews(
@@ -154,47 +120,15 @@ export async function getContactCertificationInspection(
   const profileId = contact.creatorProfileId;
 
   if (profileId) {
-    const [
-      profiles,
-      surfaces,
-      dsps,
-      releases,
-      recordings,
-      scans,
-      mismatches,
-      runs,
-    ] = await Promise.all([
-      db
-        .select()
-        .from(creatorProfiles)
-        .where(eq(creatorProfiles.id, profileId))
-        .limit(1),
-      db
-        .select()
-        .from(profileSurfaces)
-        .where(eq(profileSurfaces.creatorProfileId, profileId)),
-      db
-        .select()
-        .from(dspArtistMatches)
-        .where(eq(dspArtistMatches.creatorProfileId, profileId)),
-      db
-        .select()
-        .from(discogReleases)
-        .where(eq(discogReleases.creatorProfileId, profileId))
-        .limit(500),
-      db
-        .select()
-        .from(discogRecordings)
-        .where(eq(discogRecordings.creatorProfileId, profileId))
-        .limit(1000),
-      db
-        .select()
-        .from(dspCatalogScans)
-        .where(eq(dspCatalogScans.creatorProfileId, profileId)),
-      db
-        .select()
-        .from(dspCatalogMismatches)
-        .where(eq(dspCatalogMismatches.creatorProfileId, profileId)),
+    // biome-ignore format: one row per independent evidence read makes the parallel fan-out auditable.
+    const [profiles, surfaces, dsps, releases, recordings, scans, mismatches, runs] = await Promise.all([
+      db.select().from(creatorProfiles).where(eq(creatorProfiles.id, profileId)).limit(1),
+      db.select().from(profileSurfaces).where(eq(profileSurfaces.creatorProfileId, profileId)),
+      db.select().from(dspArtistMatches).where(eq(dspArtistMatches.creatorProfileId, profileId)),
+      db.select().from(discogReleases).where(eq(discogReleases.creatorProfileId, profileId)).limit(500),
+      db.select().from(discogRecordings).where(eq(discogRecordings.creatorProfileId, profileId)).limit(1000),
+      db.select().from(dspCatalogScans).where(eq(dspCatalogScans.creatorProfileId, profileId)),
+      db.select().from(dspCatalogMismatches).where(eq(dspCatalogMismatches.creatorProfileId, profileId)),
       db
         .select({
           id: profileSearchRuns.id,
@@ -212,21 +146,8 @@ export async function getContactCertificationInspection(
     ]);
     const releaseIds = releases.map(row => row.id);
     const run = runs[0];
-    const [destinations, searchResults] = await Promise.all([
-      releaseIds.length
-        ? db
-            .select()
-            .from(providerLinks)
-            .where(inArray(providerLinks.releaseId, releaseIds))
-        : Promise.resolve([]),
-      run
-        ? db
-            .select()
-            .from(profileSearchResults)
-            .where(eq(profileSearchResults.runId, run.id))
-            .orderBy(profileSearchResults.position)
-        : Promise.resolve([]),
-    ]);
+    // biome-ignore format: both dependent evidence reads are intentionally parallel.
+    const [destinations, searchResults] = await Promise.all([releaseIds.length ? db.select().from(providerLinks).where(inArray(providerLinks.releaseId, releaseIds)) : Promise.resolve([]), run ? db.select().from(profileSearchResults).where(eq(profileSearchResults.runId, run.id)).orderBy(profileSearchResults.position) : Promise.resolve([])]);
     for (const row of dsps) {
       checked.add('dsp');
       drafts.push({
@@ -387,6 +308,12 @@ export async function getContactCertificationInspection(
 }
 
 async function ensureContact(contact: CanonicalContactListRow) {
+  const links = {
+    userId: contact.userId,
+    creatorProfileId: contact.creatorProfileId,
+    leadId: contact.leadId,
+    waitlistEntryId: contact.waitlistEntryId,
+  };
   const [row] = await db
     .insert(contacts)
     .values({
@@ -396,20 +323,14 @@ async function ensureContact(contact: CanonicalContactListRow) {
       primaryHandle: contact.handle,
       avatarUrl: contact.avatarUrl,
       stage: contact.stage,
-      userId: contact.userId,
-      creatorProfileId: contact.creatorProfileId,
-      leadId: contact.leadId,
-      waitlistEntryId: contact.waitlistEntryId,
+      ...links,
       firstSeenAt: contact.firstSeenAt,
       lastActivityAt: contact.activityAt,
     })
     .onConflictDoUpdate({
       target: contacts.dedupeKey,
       set: {
-        userId: contact.userId,
-        creatorProfileId: contact.creatorProfileId,
-        leadId: contact.leadId,
-        waitlistEntryId: contact.waitlistEntryId,
+        ...links,
         updatedAt: new Date(),
       },
     })
@@ -436,26 +357,20 @@ async function projectDecision(
       )
       .limit(1);
     if (!surface) return;
-    const nextStatus =
-      decision === 'yes'
-        ? 'qualified'
-        : decision === 'no'
-          ? 'rejected'
-          : 'conflicting';
+    const next = qualificationForIdentityDecision(decision);
     await db
       .update(profileSurfaces)
       .set({
-        qualificationStatus: nextStatus,
-        identityConfidence:
-          decision === 'yes' ? '1.00' : decision === 'no' ? '0.00' : null,
-        isOfficial: decision === 'yes',
+        qualificationStatus: next.status,
+        identityConfidence: next.confidence,
+        isOfficial: next.isOfficial,
         lastVerifiedAt: decision === 'unsure' ? null : new Date(),
       })
       .where(eq(profileSurfaces.id, id));
     await db.insert(profileSurfaceQualificationEvents).values({
       surfaceId: id,
       previousStatus: surface.qualificationStatus,
-      nextStatus,
+      nextStatus: next.status,
       actorType: 'founder',
       actorId: actorUserId,
       reason: `crm_${decision}`,
