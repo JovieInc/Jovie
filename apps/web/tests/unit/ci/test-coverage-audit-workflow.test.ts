@@ -27,13 +27,21 @@ function getStepBlock(workflow: string, stepName: string): string {
 }
 
 describe('test coverage audit workflow', () => {
-  it('leaves enough time for coverage plus baseline publication', () => {
+  it('leaves measured time for full coverage plus baseline publication', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const timeout = Number(
       workflow.match(/^\s+timeout-minutes:\s+(\d+)$/m)?.[1]
     );
 
-    expect(timeout).toBeGreaterThanOrEqual(45);
+    expect(timeout).toBeGreaterThanOrEqual(90);
+  });
+
+  it('preserves the single non-cancelling coverage producer', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+
+    expect(workflow).toMatch(
+      /concurrency:\n(?:\s+#.*\n)*\s+group: test-coverage-audit\n\s+cancel-in-progress: false/
+    );
   });
 
   it('keeps generated commit message lines within commitlint limits', () => {
