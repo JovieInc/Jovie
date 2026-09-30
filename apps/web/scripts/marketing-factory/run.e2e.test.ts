@@ -92,6 +92,48 @@ describe('factory:run --dry end to end', () => {
 });
 
 describe('page stage gates', () => {
+  it('fails rights-cleared photos without calling the image generator', async () => {
+    let generated = 0;
+    const media = brief.media.map(entry =>
+      entry.sectionInstanceId === 'cta-1'
+        ? {
+            ...entry,
+            input: {
+              ...entry.input,
+              sectionJob: 'person' as const,
+              evidence: {
+                realPhoto: {
+                  id: 'founder-portrait',
+                  rights: 'owned' as const,
+                  credit: 'Jovie',
+                },
+              },
+            },
+          }
+        : entry
+    );
+    const manifest = await run({
+      brief: { ...brief, media },
+      providers: liveProviders(fixtureTransport(), {
+        generate: dryProviders(brief).generate,
+        generateAsset: async () => {
+          generated += 1;
+          return {
+            status: 'credentials-unavailable',
+            provider: 'x',
+            reason: 'x',
+          };
+        },
+      }),
+    });
+
+    expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'asset' });
+    expect(generated).toBe(0);
+    expect(record('11-asset.attempt-1.json').receipt.invariantsFailed).toEqual([
+      'asset-provenance:photo:founder-portrait',
+    ]);
+  });
+
   it('fails the red team when a judge finds an unsupported claim', async () => {
     const manifest = await run({
       providers: dryProviders(brief, {

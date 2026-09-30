@@ -3,7 +3,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadFactoryBrief } from './brief';
-import { dryProviders, fixtureTransport, liveProviders } from './providers';
+import {
+  dryProviders,
+  FIXTURE_PASS_VERDICT,
+  fixtureTransport,
+  liveProviders,
+} from './providers';
 import {
   readJson,
   type StageAttemptRecord,
@@ -188,6 +193,20 @@ describe('harness rules', () => {
     expect(record('02-outcomes.attempt-2.json').feedbackIn).toContain(
       'name the outcome'
     );
+  });
+
+  it('clamps out-of-range copy judge scores into the receipt range', async () => {
+    const manifest = await run({
+      providers: dryProviders(brief, {
+        transport: fixtureTransport(() =>
+          FIXTURE_PASS_VERDICT.replaceAll(/":9\b/g, '":12')
+        ),
+      }),
+    });
+
+    expect(manifest.chain.map(link => link.stage)).toContain('copy');
+    const copy = record('04-copy.attempt-1.json').receipt;
+    expect(copy.evaluators.every(e => e.score <= 1)).toBe(true);
   });
 
   it('reports credentials-unavailable instead of passing without models', async () => {
