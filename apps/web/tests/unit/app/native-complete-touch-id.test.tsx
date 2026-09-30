@@ -1,5 +1,13 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   routerReplace: vi.fn(),
@@ -47,6 +55,10 @@ beforeAll(async () => {
 }, 60_000);
 
 describe('native-complete Touch ID offer', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     window.history.pushState({}, '', '/auth/native-complete?client=electron');
@@ -123,4 +135,56 @@ describe('native-complete Touch ID offer', () => {
     expect(hoisted.setDesktopPasskeyState).toHaveBeenCalledWith('dismissed');
     expect(hoisted.routerReplace).toHaveBeenCalledWith('/app/chat');
   });
+
+  it('opens the workspace and keeps the hard-navigation fallback while dismissal persistence is pending', async () => {
+    hoisted.getDesktopPasskeyState.mockResolvedValueOnce({
+      available: true,
+      enrolled: false,
+      dismissed: false,
+    });
+    hoisted.setDesktopPasskeyState.mockReturnValueOnce(new Promise(() => {}));
+    await renderPage();
+    vi.useFakeTimers();
+    const assign = vi.fn();
+    vi.stubGlobal('location', {
+      pathname: '/auth/native-complete',
+      assign,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Not Now' }));
+
+    expect(hoisted.setDesktopPasskeyState).toHaveBeenCalledWith('dismissed');
+    expect(hoisted.routerReplace).toHaveBeenCalledWith('/app/chat');
+    expect(hoisted.addPasskey).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(500));
+    expect(assign).toHaveBeenCalledWith('/app/chat');
+  });
+
+  it.each(['success', 'failure', 'rejection'])(
+    'continues after a settled %s without enrolling a credential',
+    async result => {
+      hoisted.getDesktopPasskeyState.mockResolvedValueOnce({
+        available: true,
+        enrolled: false,
+        dismissed: false,
+      });
+      if (result === 'rejection') {
+        hoisted.setDesktopPasskeyState.mockRejectedValueOnce(
+          new Error('preference-write-failed')
+        );
+      } else {
+        hoisted.setDesktopPasskeyState.mockResolvedValueOnce({
+          ok: result === 'success',
+        });
+      }
+      await renderPage();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Not Now' }));
+      });
+      expect(hoisted.setDesktopPasskeyState).toHaveBeenCalledWith('dismissed');
+      expect(hoisted.routerReplace).toHaveBeenCalledWith('/app/chat');
+      expect(hoisted.addPasskey).not.toHaveBeenCalled();
+    }
+  );
 });

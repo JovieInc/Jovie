@@ -6,6 +6,7 @@ vi.mock('next/cache', () => ({
 }));
 
 vi.mock('@/constants/app', () => ({
+  APP_NAME: 'Jovie',
   BASE_URL: 'https://jov.ie',
 }));
 

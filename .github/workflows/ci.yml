@@ -2888,6 +2888,12 @@ jobs:
         # Deterministic gzip sizes from the build manifests; a few seconds.
         # Ratchet lives in apps/web/scripts/route-js-budgets.json.
         run: node apps/web/scripts/route-js-budget.mjs --next-dir apps/web/.next
+      - name: Certify marketing SEO against prerendered HTML
+        # JOV-7277: reads .next/server/app/*.html from the build above (no
+        # server, no network) and ratchets against the shrink-only
+        # lib/seo/seo-certify-baseline.json. Fails on a new failure or on
+        # fixed debt still listed in the baseline. A few seconds.
+        run: pnpm --filter @jovie/web seo:certify --sha "$GITHUB_SHA" --run-ref "ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
       - name: Run deterministic layout behavior guard
         run: |
           set -euo pipefail

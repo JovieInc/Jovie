@@ -227,7 +227,7 @@ describe('route hero audit', () => {
         "/pricing": "unlocked-code-variant: centered-none -> left-buttons",
         "/product": "unbound: - -> split-link-claim",
         "/smart-links": "unbound: - -> left-buttons",
-        "/solutions/artists": "unbound: - -> split-link-claim",
+        "/solutions/*": "unbound: - -> split-link-claim",
         "/support": "unbound: - -> left-content",
         "/voice": "unbound: - -> left-buttons",
         "/waitlist": "unbound: - -> left-content",

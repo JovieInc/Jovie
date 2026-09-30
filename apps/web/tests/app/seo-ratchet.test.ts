@@ -405,6 +405,7 @@ describe('seo-ratchet sitemap.xml shape', () => {
       unstable_cache: (callback: () => Promise<unknown>) => callback,
     }));
     vi.doMock('@/constants/app', () => ({
+      APP_NAME: 'Jovie',
       BASE_URL: 'https://jov.ie',
     }));
     vi.doMock('@/lib/env-server', () => ({

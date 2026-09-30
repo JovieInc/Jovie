@@ -269,6 +269,7 @@
   "scripts/fetch-sonar-issues.test.mjs",
   "scripts/lighthouse-exact-target-guard.test.ts",
   "scripts/linear-compare/owned-output-directory.test.ts",
+  "scripts/marketing-factory/",
   "scripts/mobile-overflow-guard.test.ts",
   "scripts/owned-output-path.test.ts",
   "scripts/performance-auth.test.ts",

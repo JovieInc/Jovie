@@ -46,7 +46,7 @@ const DEFAULT_CALLOUTS = [
   },
 ] as const;
 
-function ArtistProfileAnnotatedTruth({
+export function ArtistProfileAnnotatedTruth({
   specWall,
 }: Readonly<{ specWall: ArtistProfileLandingCopy['specWall'] }>) {
   const callouts = specWall.callouts ?? DEFAULT_CALLOUTS;

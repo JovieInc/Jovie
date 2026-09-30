@@ -1,6 +1,11 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import {
+  findForbiddenTerms,
+  SCOPE_FORBIDDEN_TERMS,
+} from '@/data/marketing/factory/pageRecord';
+import { getPageRecordContracts } from '@/data/marketing/factory/pageRecordContract';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
 
 /**
@@ -28,8 +33,16 @@ const BASELINE_PATH = resolve(
   'tests/unit/marketing/marketing-route-source-invariants.baseline.json'
 );
 
-/** Only first-party UI/copy modules are walked; lib/ and packages are not UI. */
-const SCANNED_ROOTS = ['app/', 'components/', 'data/'] as const;
+/**
+ * Only first-party UI/copy modules are walked; lib/ and packages are not UI.
+ * content/pages/ holds factory page records, the copy source of family routes.
+ */
+const SCANNED_ROOTS = [
+  'app/',
+  'components/',
+  'data/',
+  'content/pages/',
+] as const;
 const NON_PRODUCT = /\.(test|spec|stories)\.[jt]sx?$/;
 
 interface SourceRule {
@@ -172,6 +185,30 @@ function manifestEntryFiles() {
   return byRoute;
 }
 
+const STRING_LITERAL = /(['"`])((?:\\.|(?!\1)[^\\\n])*)\1/g;
+
+/**
+ * Per-record copy scope (JOV-7283): a record's own source file and every
+ * local copy module it imports must avoid the terms its brief forbids. A
+ * founders record importing artist copy fails here even when the record's
+ * own fields are clean.
+ */
+function findRecordScopeViolations(
+  files: readonly string[],
+  forbidden: readonly string[]
+) {
+  const hits: string[] = [];
+  for (const file of files) {
+    const source = readFileSync(resolve(WEB_ROOT, file), 'utf8');
+    for (const match of source.matchAll(STRING_LITERAL)) {
+      for (const term of findForbiddenTerms(match[2] ?? '', forbidden)) {
+        hits.push(`${file}: "${term}"`);
+      }
+    }
+  }
+  return [...new Set(hits)];
+}
+
 function findViolations(files: readonly string[]) {
   const counts: Record<string, number> = {};
   for (const file of files) {
@@ -237,6 +274,30 @@ describe('marketing route source invariants (manifest-driven)', () => {
         /\b(?:group-)?hover:-?(?:translate-[xy]|scale)-/g
       )
     ).toBeNull();
+  });
+
+  it('holds every routed page record to its own copy scope', () => {
+    const contracts = getPageRecordContracts();
+    expect(contracts.length).toBeGreaterThan(0);
+    for (const contract of contracts) {
+      const [family, slug] = contract.recordId.split('.');
+      const recordFile = `content/pages/${family}/${slug}.ts`;
+      expect(existsSync(resolve(WEB_ROOT, recordFile)), recordFile).toBe(true);
+      const files = collectRouteSources([recordFile]);
+      expect(files, contract.recordId).toContain(recordFile);
+      expect(
+        findRecordScopeViolations(files, contract.forbiddenTerms),
+        `${contract.recordId} (${contract.copyScope})`
+      ).toEqual([]);
+    }
+  });
+
+  it('fails the artists sources when held to shared scope (red sample)', () => {
+    const files = collectRouteSources(['content/pages/solutions/artists.ts']);
+    expect(files).toContain('data/artistProfileCopy.ts');
+    expect(
+      findRecordScopeViolations(files, SCOPE_FORBIDDEN_TERMS.shared)
+    ).not.toEqual([]);
   });
 
   it('never grows, and ratchets down, the violation baseline', () => {

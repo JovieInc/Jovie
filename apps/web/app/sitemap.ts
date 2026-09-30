@@ -6,6 +6,8 @@ import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getAlternativeSlugs } from '@/content/alternatives';
 import { getComparisonSlugs } from '@/content/comparisons';
+import { getIndexedSolutionsPages } from '@/content/pages/solutions';
+import { pageRecordPath } from '@/data/marketing/factory/pageRecord';
 import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { getChangelogReleases } from '@/lib/changelog-source';
@@ -260,6 +262,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   for (const slug of getAlternativeSlugs()) {
     marketingPages.push(sitemapEntry(`${APP_ROUTES.ALTERNATIVES}/${slug}`));
+  }
+
+  // Factory page records: only `indexed` records publish (JOV-7275).
+  for (const record of getIndexedSolutionsPages()) {
+    marketingPages.push(sitemapEntry(pageRecordPath(record)));
   }
 
   const editorialPages: MetadataRoute.Sitemap = [
