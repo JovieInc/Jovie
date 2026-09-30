@@ -43,7 +43,7 @@ function TipsHero() {
         {/* eslint-disable @jovie/canonical-ui-label-casing -- Preserve approved sentence-case marketing copy while adding binding evidence. */}
         <h1
           id='pay-hero-heading'
-          className='marketing-h1-linear mt-6 max-w-[18ch] text-primary-token'
+          className='marketing-h1-linear mt-6 max-w-2xl text-primary-token'
         >
           Turn every payment into a follower.
         </h1>
