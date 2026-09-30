@@ -92,9 +92,11 @@ export function MediaCanvasViewer({
               type='button'
               onClick={onClose}
               aria-label='Close Viewer'
-              className='relative grid size-8 place-items-center rounded-full text-white/70 before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""] hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40'
+              className='group grid size-11 place-items-center rounded-full text-white/70 hover:text-white focus-visible:outline-none'
             >
-              <X className='size-4' aria-hidden='true' />
+              <span className='grid size-8 place-items-center rounded-full group-hover:bg-white/10 group-focus-visible:ring-2 group-focus-visible:ring-white/40'>
+                <X className='size-4' aria-hidden='true' />
+              </span>
             </button>
           </div>
 
@@ -185,11 +187,13 @@ function NavButton({
       disabled={disabled}
       aria-label={side === 'left' ? 'Previous' : 'Next'}
       className={cn(
-        'absolute top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-white/8 text-white/80 before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""] hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-0',
+        'group absolute top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full text-white/80 hover:text-white focus-visible:outline-none disabled:opacity-0',
         side === 'left' ? 'left-3' : 'right-3'
       )}
     >
-      <Icon className='size-5' aria-hidden='true' />
+      <span className='grid size-10 place-items-center rounded-full bg-white/8 group-hover:bg-white/15 group-focus-visible:ring-2 group-focus-visible:ring-white/40'>
+        <Icon className='size-5' aria-hidden='true' />
+      </span>
     </button>
   );
 }
