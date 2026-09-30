@@ -7,6 +7,7 @@ import {
   certificationPlans,
   defectReceipts,
   fileDefects,
+  postCertificationPacket,
   storyFileFor,
   testFilesFor,
 } from './marketing-certification-producer';
@@ -270,5 +271,56 @@ describe('marketing certification producer', () => {
       title: expect.stringContaining('shell.footer visual_proof'),
     });
     expect(calls[0]?.description).toContain(SHA);
+  });
+});
+
+describe('postCertificationPacket', () => {
+  const packet = buildPacket({
+    entry: footer,
+    sha: SHA,
+    runRef: 'run',
+    penIssueIds: new Set(),
+    invariants: null,
+    ownTests: null,
+    ownTestFiles: [],
+    stories: null,
+    story: null,
+    sourceDigest: null,
+  });
+
+  it('posts the packet with bearer auth to the ingest route', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fakeFetch = (async (url: URL, init: RequestInit) => {
+      calls.push({ url: url.toString(), init });
+      return new Response('{"state":"pending"}', { status: 202 });
+    }) as unknown as typeof fetch;
+    const result = await postCertificationPacket(
+      'https://example.test',
+      'secret',
+      packet,
+      fakeFetch
+    );
+    expect(result).toEqual({ ok: true, summary: '202 {"state":"pending"}' });
+    expect(calls[0]?.url).toBe(
+      'https://example.test/api/internal/ovie/certification-evidence'
+    );
+    expect(
+      (calls[0]?.init.headers as Record<string, string>).authorization
+    ).toBe('Bearer secret');
+    expect(JSON.parse(String(calls[0]?.init.body)).packet.subject.id).toBe(
+      'shell.footer'
+    );
+  });
+
+  it('reports a rejected post as not ok', async () => {
+    const fakeFetch = (async () =>
+      new Response('nope', { status: 401 })) as unknown as typeof fetch;
+    const result = await postCertificationPacket(
+      'https://example.test',
+      'bad',
+      packet,
+      fakeFetch
+    );
+    expect(result).toEqual({ ok: false, summary: '401 nope' });
   });
 });
