@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -367,11 +374,78 @@ describe('official Symphony backlog remediation', () => {
     assert.equal(scaled.reason, 'capacity-available');
   });
 
+  it('parses host pressure from an isolated proc fixture', () => {
+    const procRoot = mkdtempSync(join(tmpdir(), 'jovie-proc-fixture-'));
+    try {
+      mkdirSync(join(procRoot, 'pressure'), { recursive: true });
+      writeFileSync(
+        join(procRoot, 'pressure/cpu'),
+        'some avg10=1.50 avg60=0.90 avg300=0.40 total=111\n' +
+          'full avg10=0.00 avg60=0.00 avg300=0.00 total=0\n'
+      );
+      writeFileSync(
+        join(procRoot, 'pressure/memory'),
+        'some avg10=0.30 avg60=0.20 avg300=0.10 total=222\n' +
+          'full avg10=0.10 avg60=0.05 avg300=0.02 total=333\n'
+      );
+      writeFileSync(
+        join(procRoot, 'pressure/io'),
+        'some avg10=0.40 avg60=0.30 avg300=0.20 total=444\n' +
+          'full avg10=0.20 avg60=0.10 avg300=0.05 total=555\n'
+      );
+      writeFileSync(join(procRoot, 'loadavg'), '2.50 1.00 0.50 2/512 12345\n');
+      writeFileSync(
+        join(procRoot, 'cpuinfo'),
+        'processor\t: 0\nmodel name\t: fixture\n\n' +
+          'processor\t: 1\nmodel name\t: fixture\n\n' +
+          'processor\t: 2\nmodel name\t: fixture\n\n' +
+          'processor\t: 3\nmodel name\t: fixture\n'
+      );
+      writeFileSync(
+        join(procRoot, 'meminfo'),
+        'MemTotal:       33554432 kB\nMemFree:         8388608 kB\n' +
+          'MemAvailable:   16777216 kB\n'
+      );
+
+      const host = readHostPressure(procRoot);
+      assert.equal(host.cpuSomeAvg10, 1.5);
+      assert.equal(host.memoryFullAvg10, 0.1);
+      assert.equal(host.ioFullAvg10, 0.2);
+      assert.equal(host.loadAvg1, 2.5);
+      assert.equal(host.cpuCount, 4);
+      assert.equal(host.availableMemoryBytes, 16777216 * 1024);
+    } finally {
+      rmSync(procRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed with null metrics when proc evidence is absent', () => {
+    const host = readHostPressure('/nonexistent-proc-root-jov-7232');
+    assert.deepEqual(host, {
+      cpuSomeAvg10: null,
+      memoryFullAvg10: null,
+      ioFullAvg10: null,
+      loadAvg1: null,
+      cpuCount: null,
+      availableMemoryBytes: null,
+    });
+
+    const unknown = evaluateRuntimeCapacity(healthySignals({ host }), {
+      now: NOW,
+      previousCleanStreak: CLEAN_STREAK_REQUIRED,
+    });
+    assert.equal(unknown.allowed, false);
+    assert.equal(unknown.reason, 'host-pressure-unknown');
+    assert.equal(unknown.pressure, 'unknown');
+  });
+
   it('includes normalized host load in capacity evidence and backoff', () => {
-    const host = readHostPressure('/proc');
-    assert.ok(Number.isFinite(host.loadAvg1));
-    assert.ok(Number.isInteger(host.cpuCount));
-    assert.ok(host.cpuCount > 0);
+    if (process.platform === 'linux') {
+      const host = readHostPressure('/proc');
+      assert.ok(Number.isFinite(host.loadAvg1));
+      assert.ok(Number.isInteger(host.cpuCount));
+      assert.ok(host.cpuCount > 0);
+    }
 
     const overloaded = evaluateRuntimeCapacity(
       healthySignals({
