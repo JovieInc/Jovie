@@ -1,0 +1,87 @@
+/**
+ * Factory page brief (JOV-7276): everything `factory:run` needs for one page.
+ * Briefs live in briefs/<family>/<slug>.json. The `dry` block holds the
+ * canned strategist and copywriter output that `--dry` replays offline; live
+ * runs ignore it and ask the routed models instead.
+ */
+
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
+import { MarketingBriefSchema } from '../../data/marketing/composition';
+import type { HeroDecisionInput } from '../../data/marketing/factory/heroDecision';
+import { FactoryMediaDecisionInputSchema } from '../../data/marketing/factory/mediaDecision';
+import { SectionJobNeedSchema } from '../../data/marketing/factory/sectionRequest';
+import { PROOF_KINDS } from '../../data/product-truth/proof';
+
+const Id = z.string().min(1);
+
+export const FactoryPageBriefSchema = z.object({
+  family: z.string().regex(/^[a-z0-9-]+$/u),
+  slug: z.string().regex(/^[a-z0-9-]+$/u),
+  route: z.string().startsWith('/'),
+  /** Deterministic "today" for proof freshness and receipt reproducibility. */
+  asOf: z.iso.date(),
+  brief: MarketingBriefSchema,
+  icp: Id,
+  jobsToBeDone: z.array(Id).min(1),
+  /** The only product-truth claims this page may make. */
+  claimIds: z.array(Id).min(1),
+  sectionJobs: z.array(SectionJobNeedSchema).default([]),
+  /** Typed by heroDecision.ts; the harness checks it through selectHeroDecision. */
+  hero: z.custom<HeroDecisionInput>(
+    value => typeof value === 'object' && value !== null && 'useCase' in value
+  ),
+  proof: z
+    .array(
+      z.object({
+        sectionInstanceId: Id,
+        kind: z.enum(PROOF_KINDS),
+        claimId: Id,
+        fallbackKinds: z.array(z.enum(PROOF_KINDS)).optional(),
+      })
+    )
+    .default([]),
+  media: z
+    .array(
+      z.object({
+        sectionInstanceId: Id,
+        input: FactoryMediaDecisionInputSchema,
+      })
+    )
+    .min(1),
+  seo: z.object({
+    siblingLinks: z.array(z.string().startsWith('/')).min(3).max(5),
+    jsonLdTypes: z.array(Id).min(1),
+  }),
+  /** Canned generator output for `--dry`, keyed by the model-produced stage. */
+  dry: z
+    .object({
+      outcomes: z.unknown(),
+      narrative: z.unknown(),
+      copy: z.unknown(),
+      render: z.object({ cls: z.number(), lcpMs: z.number() }),
+    })
+    .optional(),
+});
+
+export type FactoryPageBrief = z.infer<typeof FactoryPageBriefSchema>;
+
+export const FACTORY_BRIEFS_DIR = join(
+  dirname(fileURLToPath(import.meta.url)),
+  'briefs'
+);
+
+export function factoryPageId(family: string, slug: string): string {
+  return `${family}-${slug}`;
+}
+
+export function loadFactoryBrief(
+  family: string,
+  slug: string,
+  dir: string = FACTORY_BRIEFS_DIR
+): FactoryPageBrief {
+  const path = join(dir, family, `${slug}.json`);
+  return FactoryPageBriefSchema.parse(JSON.parse(readFileSync(path, 'utf8')));
+}
