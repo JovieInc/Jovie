@@ -44,7 +44,9 @@
 }
 
 .artist-profile-faq .faq-section__heading {
-  max-width: 12ch;
+  /* 14ch holds "Asked Questions" on one line so the title never strands
+     its last word (ui.md line-break quality). */
+  max-width: 14ch;
   margin: 0;
   color: var(--color-text-primary-token);
   font-family: var(--font-sans);

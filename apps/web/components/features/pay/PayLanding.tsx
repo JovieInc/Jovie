@@ -14,6 +14,7 @@ import {
   MarketingHero,
   MarketingHeroPhoto,
   MarketingPageShell,
+  NoOrphanText,
 } from '@/components/marketing';
 import { ClaimHandleForm } from '@/features/home/claim-handle';
 
@@ -40,14 +41,12 @@ function TipsHero() {
       >
         <p className='marketing-kicker'>Pay</p>
         {/* ui-casing-allow: marketing display headline */}
-        {/* eslint-disable @jovie/canonical-ui-label-casing -- Preserve approved sentence-case marketing copy while adding binding evidence. */}
         <h1
           id='pay-hero-heading'
           className='marketing-h1-linear mt-6 max-w-[12ch] text-primary-token'
         >
-          Turn every payment into a follower.
+          <NoOrphanText>Turn every payment into a follower.</NoOrphanText>
         </h1>
-        {/* eslint-enable @jovie/canonical-ui-label-casing */}
 
         <p className='marketing-lead-linear mt-6 max-w-[33rem] text-secondary-token'>
           Scan the code, pay in seconds, and land on a Jovie profile that keeps

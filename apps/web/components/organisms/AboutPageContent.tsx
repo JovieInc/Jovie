@@ -4,6 +4,7 @@ import {
   MarketingContainer,
   MarketingHero,
   MarketingHeroPhoto,
+  NoOrphanText,
 } from '@/components/marketing';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { ABOUT_COPY, ABOUT_FAQ_ITEMS } from '@/data/aboutCopy';
@@ -30,7 +31,7 @@ export function AboutPageContent() {
             {ABOUT_COPY.kicker}
           </p>
           <h1 className='mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl lg:text-6xl'>
-            {ABOUT_COPY.headline}
+            <NoOrphanText>{ABOUT_COPY.headline}</NoOrphanText>
           </h1>
           <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
             {ABOUT_COPY.support}

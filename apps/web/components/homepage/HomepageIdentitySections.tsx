@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import type { ReactNode } from 'react';
+import { NoOrphanText } from '@/components/marketing/NoOrphanText';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import './HomepageIdentity.css';
 
@@ -68,7 +69,7 @@ function EditorialSection({
               className='homepage-identity-section__headline'
               data-homepage-section-heading
             >
-              {section.headline}
+              <NoOrphanText>{section.headline}</NoOrphanText>
             </h2>
           </div>
           <p className='homepage-identity-section__body'>{section.body}</p>

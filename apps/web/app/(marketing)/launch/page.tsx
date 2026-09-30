@@ -22,6 +22,7 @@ import {
   MarketingContainer,
   MarketingHeroPhoto,
   MarketingPageShell,
+  NoOrphanText,
 } from '@/components/marketing';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
@@ -418,7 +419,7 @@ function SectionIntro({
         id={headingId}
         className={cn('system-b-launch-section-title', 'line-clamp-2')}
       >
-        {title}
+        <NoOrphanText>{title}</NoOrphanText>
       </h2>
       <p className='system-b-launch-section-copy'>{body}</p>
     </div>
@@ -467,7 +468,9 @@ export default function LaunchPage() {
                   className={cn('system-b-launch-hero-title', 'line-clamp-2')}
                 >
                   {/* ui-casing-allow: marketing display headline */}
-                  Your entire music career. One intelligent link.
+                  <NoOrphanText>
+                    Your entire music career. One intelligent link.
+                  </NoOrphanText>
                 </h1>
                 <p className='system-b-launch-hero-lead'>
                   Import Spotify, create smart links for every release, and turn
@@ -862,7 +865,9 @@ export default function LaunchPage() {
           <MarketingContainer width='page'>
             <h2 id='cta-heading' className='line-clamp-2'>
               {/* ui-casing-allow: marketing display headline */}
-              Your music deserves better than a stack of links.
+              <NoOrphanText>
+                Your music deserves better than a stack of links.
+              </NoOrphanText>
             </h2>
             <div>
               <Link href={APP_ROUTES.SIGNUP}>Request access</Link>

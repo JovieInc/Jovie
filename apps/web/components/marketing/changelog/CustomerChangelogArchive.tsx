@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
+import { NoOrphanText } from '@/components/marketing/NoOrphanText';
 import { FilterChip } from '@/components/molecules/filters/FilterChip';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -113,7 +114,9 @@ function EntryRow({
             {/* ui-casing-allow: tiny taxonomy caption, not IA heading */}
             {CUSTOMER_CHANGELOG_CATEGORY_LABELS[entry.category]}
           </p>
-          <h3 className='changelog-entry__title'>{entry.title}</h3>
+          <h3 className='changelog-entry__title'>
+            <NoOrphanText>{entry.title}</NoOrphanText>
+          </h3>
           <EntryMedia entry={entry} tone={tone} variant='feature' />
           {hasLevel2 ? (
             <div className='space-y-2'>

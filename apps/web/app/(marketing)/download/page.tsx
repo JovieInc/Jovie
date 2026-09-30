@@ -15,6 +15,7 @@ import {
   FaqSection,
   MarketingContainer,
   MarketingHeroPhoto,
+  NoOrphanText,
 } from '@/components/marketing';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
@@ -175,7 +176,9 @@ export default function DownloadPage() {
                     id='download-hero-heading'
                     className='mt-5 text-balance text-5xl font-bold leading-none tracking-normal text-(--system-b-text-primary) sm:text-6xl line-clamp-2'
                   >
-                    Jovie, Installed Where You Work.
+                    <NoOrphanText>
+                      Jovie, Installed Where You Work.
+                    </NoOrphanText>
                   </h1>
                   <p
                     className={`mt-6 max-w-xl text-balance text-lg leading-relaxed tracking-normal ${muted}`}
@@ -283,8 +286,8 @@ export default function DownloadPage() {
                         {platform.label}
                       </span>
                     </div>
-                    <h2 className='mt-5 max-w-xs text-balance text-3xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl line-clamp-2'>
-                      {platform.title}
+                    <h2 className='mt-5 max-w-xs lg:max-w-lg text-balance text-3xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl line-clamp-2'>
+                      <NoOrphanText>{platform.title}</NoOrphanText>
                     </h2>
                     <p
                       className={`mt-4 max-w-lg text-base leading-relaxed ${muted}`}
@@ -324,8 +327,8 @@ export default function DownloadPage() {
           <div className='grid gap-12 lg:grid-cols-2 lg:gap-20'>
             <div>
               <p className='homepage-section-eyebrow'>Release workflow</p>
-              <h2 className='mt-4 max-w-xs text-balance text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl line-clamp-2'>
-                Everything In Jovie, Closer.
+              <h2 className='mt-4 max-w-xs lg:max-w-lg text-balance text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl line-clamp-2'>
+                <NoOrphanText>Everything In Jovie, Closer.</NoOrphanText>
               </h2>
             </div>
             <div className='grid gap-x-10 gap-y-10 sm:grid-cols-2'>
@@ -351,8 +354,8 @@ export default function DownloadPage() {
             <div className='grid gap-12 lg:grid-cols-2 lg:items-start'>
               <div>
                 <p className='homepage-section-eyebrow'>Install details</p>
-                <h2 className='mt-4 max-w-xs text-balance text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl line-clamp-2'>
-                  Built To Stay Out Of The Way.
+                <h2 className='mt-4 max-w-xs lg:max-w-lg text-balance text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl line-clamp-2'>
+                  <NoOrphanText>Built To Stay Out Of The Way.</NoOrphanText>
                 </h2>
               </div>
               <div className='grid gap-8 sm:grid-cols-3'>

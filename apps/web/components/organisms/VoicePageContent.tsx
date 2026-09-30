@@ -1,7 +1,11 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { VoiceDemoVisual } from '@/components/features/landing/VoiceDemoVisual';
-import { MarketingContainer, MarketingHero } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingHero,
+  NoOrphanText,
+} from '@/components/marketing';
 import { APP_ROUTES } from '@/constants/routes';
 
 export const VOICE_PAGE_STEPS = [
@@ -36,7 +40,8 @@ export function VoicePageContent() {
         title={
           <>
             Clone your voice.
-            <br className='hidden sm:block' /> From any YouTube video.
+            <br className='hidden sm:block' />{' '}
+            <NoOrphanText>From any YouTube video.</NoOrphanText>
           </>
         }
         body={

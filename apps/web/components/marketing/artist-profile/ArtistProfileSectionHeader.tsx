@@ -1,3 +1,4 @@
+import { NoOrphanText } from '@/components/marketing/NoOrphanText';
 import { cn } from '@/lib/utils';
 import './ArtistProfileSectionHeader.css';
 
@@ -49,7 +50,7 @@ export function ArtistProfileSectionHeader({
       ) : null}
       {/* ui-casing-allow: marketing display headline */}
       <h2 className={cn(SHELL_H2_CLASS, headlineClassName, 'line-clamp-2')}>
-        {headline}
+        <NoOrphanText>{headline}</NoOrphanText>
       </h2>
       {body ? (
         <p

@@ -2,6 +2,7 @@
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 import { ClientFaqAccordion } from './ClientFaqAccordion';
+import { NoOrphanText } from './NoOrphanText';
 
 interface FaqItem {
   readonly question: string;
@@ -43,7 +44,7 @@ export function FaqSection({
             'system-b-marketing-section-heading text-primary-token'
         )}
       >
-        {heading}
+        <NoOrphanText>{heading}</NoOrphanText>
       </h2>
       <ClientFaqAccordion
         items={items}

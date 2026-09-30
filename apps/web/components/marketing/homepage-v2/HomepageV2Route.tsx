@@ -24,6 +24,7 @@ import {
   ArtistProfileCaptureVisual,
   ArtistProfileReactivationVisual,
 } from '@/components/marketing/MarketingStoryPrimitives';
+import { NoOrphanText } from '@/components/marketing/NoOrphanText';
 import { APP_ROUTES } from '@/constants/routes';
 import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
@@ -99,7 +100,7 @@ function HomepageV2Hero() {
               data-testid='homepage-v2-hero'
               className='homepage-v2-hero__headline text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl lg:text-6xl line-clamp-2'
             >
-              {HOMEPAGE_V2_COPY.hero.headline}
+              <NoOrphanText>{HOMEPAGE_V2_COPY.hero.headline}</NoOrphanText>
             </h1>
             <p className='homepage-v2-hero__sub mt-5 text-lg leading-relaxed text-secondary-token'>
               {HOMEPAGE_V2_COPY.hero.subhead}

@@ -8,6 +8,7 @@ import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 import { MarketingContainer } from './MarketingContainer';
 import { MarketingHeroPhoto } from './MarketingHeroPhoto';
+import { NoOrphanText } from './NoOrphanText';
 
 /**
  * Unique per-route hero photograph (marketing-routes-code-spec, 2026-09-26).
@@ -220,7 +221,7 @@ function MarketingHeroTitle({
             : undefined
       }
     >
-      {children}
+      <NoOrphanText>{children}</NoOrphanText>
     </h1>
   );
 }

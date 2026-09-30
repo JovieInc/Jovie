@@ -74,5 +74,6 @@ export type {
   MarketingSurfaceVariant,
 } from './MarketingSurfaceCard';
 export { MarketingSurfaceCard } from './MarketingSurfaceCard';
+export { NoOrphanText } from './NoOrphanText';
 export type { NumberedSectionProps, SubItem } from './NumberedSection';
 export { NumberedSection } from './NumberedSection';

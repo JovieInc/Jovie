@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { NoOrphanText } from '@/components/marketing/NoOrphanText';
 
 interface WaitlistInviteMessageProps {
   readonly title: string;
@@ -13,7 +14,7 @@ export function WaitlistInviteMessage({
     <main className='mx-auto flex min-h-screen w-full max-w-lg flex-col justify-center px-6 py-16'>
       <div className='space-y-4'>
         <h1 className='text-title font-semibold tracking-normal text-primary-token'>
-          {title}
+          <NoOrphanText>{title}</NoOrphanText>
         </h1>
         <p className='text-base leading-7 text-secondary-token'>{body}</p>
         <Link
