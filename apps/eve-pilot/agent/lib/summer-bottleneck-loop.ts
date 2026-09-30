@@ -1381,13 +1381,7 @@ async function processStoredSnapshot(
       consentValidUntil: null,
     },
     management: {
-      strategyVersionRef: null,
-      opportunityRef: recordPaths.event,
-      alternativesRef: recordPaths.claim,
-      hypothesis: 'the authorized repair removes the selected bottleneck',
-      authorityRef: `linear:${task.existingRepair.identifier}`,
-      outcomeOwner: task.owner,
-      reviewAt: task.existingRepair.expiresAt,
+      productBetContractRef: null,
     },
   });
   const predictionWrite = await dependencies.store.create(

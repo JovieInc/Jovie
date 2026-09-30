@@ -58,10 +58,8 @@ export function parseDecisionPredictionReceipt(input: unknown): DecisionPredicti
   const disclosure = validate.object(receipt.disclosure, ['providerData', 'consent', 'consentRef', 'consentValidUntil'], 'disclosure');
   const providerData = validate.oneOf(disclosure.providerData, ['authorized', 'withheld'], 'providerData'); const consent = validate.oneOf(disclosure.consent, ['valid', 'not-required'], 'consent');
   validate.text(disclosure.consentRef, 'consentRef', true); const consentUntil = disclosure.consentValidUntil === null ? null : validate.iso(disclosure.consentValidUntil, 'consentValidUntil');
-  const management = validate.object(receipt.management, ['strategyVersionRef', 'opportunityRef', 'alternativesRef', 'hypothesis', 'authorityRef', 'outcomeOwner', 'reviewAt'], 'management');
-  for (const key of ['strategyVersionRef', 'opportunityRef']) validate.text(management[key], key, true);
-  for (const key of ['alternativesRef', 'hypothesis', 'authorityRef', 'outcomeOwner']) validate.text(management[key], key);
-  validate.iso(management.reviewAt, 'reviewAt');
+  const management = validate.object(receipt.management, ['productBetContractRef'], 'management');
+  validate.text(management.productBetContractRef, 'productBetContractRef', true);
   if (temporal === 'prospective' && (captured > predicted || predicted > decided)) throw new Error('prospective timing is invalid');
   if (providerData === 'withheld' && (versions.provider !== null || versions.model !== null)) throw new Error('provider disclosure is unauthorized');
   if ((providerData === 'authorized' && consent !== 'valid') || (consent === 'valid' && (!disclosure.consentRef || !consentUntil || Date.parse(consentUntil) < decided))) throw new Error('consent is missing or expired');
