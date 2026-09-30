@@ -689,6 +689,64 @@ describe('Ovie MCP handler', () => {
     expect(body.write).toBe(false);
     expect(body.hits[0]?.slug).toBe('ovie-mcp');
   });
+
+  it('prepares the latest certified investor proof brief for the founder', async () => {
+    const result = await handleOvieMcpRequest({
+      principal: founder,
+      body: rpc('tools/call', {
+        name: 'get_proof_brief',
+        arguments: {},
+      }),
+    });
+    expect(result.status).toBe(200);
+    const body = toolResult<{
+      schema: string;
+      found: boolean;
+      audience: string;
+      briefId: string;
+      revision: number;
+      window: { label: string };
+      text: string;
+      imageUrl: string | null;
+      card: { schema: string; facts: Array<{ label: string; value: string }> };
+      sent: boolean;
+    }>(result.body);
+    expect(body.schema).toBe('summer.proof-brief.v1');
+    expect(body.found).toBe(true);
+    expect(body.audience).toBe('investor');
+    expect(body.briefId).toBe('pb_2026-09-29_jovie_investor');
+    expect(body.text).toContain('last 7 days');
+    expect(body.imageUrl).toContain(
+      `/api/share/proof-brief?brief=${body.briefId}&rev=${body.revision}`
+    );
+    expect(body.card.schema).toBe('summer.ops-card.v1');
+    expect(body.card.facts.some(f => f.label === 'Share image')).toBe(true);
+    expect(body.sent).toBe(false);
+  });
+
+  it('scopes get_proof_brief to the founder', async () => {
+    const result = await handleOvieMcpRequest({
+      principal: user,
+      body: rpc('tools/call', {
+        name: 'get_proof_brief',
+        arguments: {},
+      }),
+    });
+    expect(result.status).toBe(403);
+  });
+
+  it('reports found:false for an unknown pinned brief', async () => {
+    const result = await handleOvieMcpRequest({
+      principal: founder,
+      body: rpc('tools/call', {
+        name: 'get_proof_brief',
+        arguments: { brief_id: 'pb_missing' },
+      }),
+    });
+    expect(result.status).toBe(200);
+    const body = toolResult<{ found: boolean }>(result.body);
+    expect(body.found).toBe(false);
+  });
 });
 
 describe('Ovie MCP OAuth', () => {

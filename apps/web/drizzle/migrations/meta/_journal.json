@@ -876,6 +876,13 @@
       "when": 1790749693182,
       "tag": "0124_violet_lily_hollister",
       "breakpoints": true
+    },
+    {
+      "idx": 125,
+      "version": "7",
+      "when": 1790800906539,
+      "tag": "0125_sturdy_yellow_claw",
+      "breakpoints": true
     }
   ]
 }
