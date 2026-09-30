@@ -167,6 +167,29 @@ export {
   MARKETING_EDITORIAL_BACKGROUNDS,
 } from './editorialBackgrounds';
 export type {
+  FactoryStage,
+  FactoryStageArtifact,
+  StageReceipt,
+} from './factory/spine';
+export {
+  applyStagePassedBit,
+  COPY_LANDING_STAGE_TO_FACTORY,
+  FACTORY_CERTIFIER_HARNESS,
+  FACTORY_EVALUATOR_KINDS,
+  FACTORY_HERO_VARIANT_IDS,
+  FACTORY_MEDIA_KINDS,
+  FACTORY_RAMP_STATES,
+  FACTORY_RECEIPT_SCHEMA,
+  FACTORY_SPINE_VERSION,
+  FACTORY_STAGE_ARTIFACT_SCHEMAS,
+  FACTORY_STAGE_MAX_ATTEMPTS,
+  FACTORY_STAGES,
+  LANDING_PAGE_PIPELINE_STAGE_TO_FACTORY,
+  MARKETING_GENERATION_STAGE_TO_FACTORY,
+  StageReceiptSchema,
+  validateStageReceipt,
+} from './factory/spine';
+export type {
   MarketingCreativeRole,
   MarketingGateReceipt,
   MarketingGenerationFinding,

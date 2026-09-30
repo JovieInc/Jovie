@@ -11,8 +11,22 @@ const mockGetEligibleProfileCount = vi.hoisted(() => vi.fn());
 const mockDbInsert = vi.hoisted(() => vi.fn());
 
 // Mock dependencies
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  getOvieOperatorEntitlements: mockGetCurrentUserEntitlements,
+  requireOvieApiAccess: vi.fn(async () => {
+    const entitlements = await mockGetCurrentUserEntitlements();
+    if (!entitlements.isAuthenticated)
+      return Response.json(
+        { error: 'Please sign in.', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      );
+    if (!entitlements.isAdmin)
+      return Response.json(
+        { error: 'Admin access required.', code: 'FORBIDDEN' },
+        { status: 403 }
+      );
+    return null;
+  }),
 }));
 
 vi.mock('@/lib/email/jobs/enqueue', () => ({
@@ -176,7 +190,7 @@ describe('POST /api/admin/creator-invite/bulk', () => {
     const data = await response.json();
 
     expect(response.status).toBe(401);
-    expect(data.error).toBe('Unauthorized');
+    expect(data.error).toBe('Please sign in.');
   });
 
   it('returns 403 when user is not admin', async () => {
@@ -196,7 +210,7 @@ describe('POST /api/admin/creator-invite/bulk', () => {
     const data = await response.json();
 
     expect(response.status).toBe(403);
-    expect(data.error).toBe('Forbidden');
+    expect(data.error).toBe('Admin access required.');
   });
 
   it('returns 400 for invalid request body', async () => {
