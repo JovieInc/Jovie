@@ -334,3 +334,60 @@ export function auditHeroRoutes(
     };
   });
 }
+
+/** A page record's declared hero, from its per-record contract. */
+export interface HeroRecordBinding {
+  readonly url: string;
+  readonly heroVariant: HeroVariantName;
+}
+
+/**
+ * The hero intent for a concrete pathname: an exact intent wins, else the
+ * family wildcard (`/solutions/*`) whose prefix matches one segment.
+ */
+export function heroIntentForPathname(
+  pathname: string,
+  intents: readonly HeroRouteIntent[] = HERO_ROUTE_INTENTS
+): HeroRouteIntent | null {
+  const exact = intents.find(intent => intent.url === pathname);
+  if (exact) return exact;
+  return (
+    intents.find(intent => {
+      if (!intent.url.endsWith('/*')) return false;
+      const prefix = intent.url.slice(0, -1);
+      const rest = pathname.slice(prefix.length);
+      return pathname.startsWith(prefix) && rest !== '' && !rest.includes('/');
+    }) ?? null
+  );
+}
+
+export interface HeroRecordAuditRow {
+  readonly url: string;
+  readonly observed: HeroVariantName;
+  /** Null when no hero intent covers the record path. */
+  readonly expected: HeroVariantName | null;
+  readonly mismatch: 'unbound' | 'wrong-variant' | null;
+}
+
+/**
+ * Audits each record's declared `heroVariant` against the table's pick for
+ * the record's own path. A record with no hero intent is `unbound`.
+ */
+export function auditRecordHeroes(
+  records: readonly HeroRecordBinding[],
+  intents: readonly HeroRouteIntent[] = HERO_ROUTE_INTENTS
+): readonly HeroRecordAuditRow[] {
+  return records.map(record => {
+    const intent = heroIntentForPathname(record.url, intents);
+    const expected = intent ? selectHeroDecision(intent.input).variant : null;
+    let mismatch: HeroRecordAuditRow['mismatch'] = null;
+    if (!expected) mismatch = 'unbound';
+    else if (record.heroVariant !== expected) mismatch = 'wrong-variant';
+    return {
+      url: record.url,
+      observed: record.heroVariant,
+      expected,
+      mismatch,
+    };
+  });
+}

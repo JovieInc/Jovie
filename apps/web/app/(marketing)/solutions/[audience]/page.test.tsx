@@ -86,6 +86,19 @@ describe('/solutions/[audience] family renderer (JOV-7275)', () => {
     expect(schema.description).toBe(ARTIST_PROFILE_COPY.seo.description);
   });
 
+  it('renders the record contract markers once, in music scope', async () => {
+    const { container } = render(
+      await SolutionsAudiencePage(params('artists'))
+    );
+    const markers = container.querySelectorAll('[data-copy-scope]');
+    expect(markers).toHaveLength(1);
+    expect(markers[0]).toHaveAttribute('data-copy-scope', 'music');
+    expect(markers[0]).toHaveAttribute(
+      'data-page-job',
+      solutionsArtistsPage.brief.job
+    );
+  });
+
   it('emits FAQPage JSON-LD only when the record declares seo.faq', async () => {
     const withFaq = definePage({
       ...solutionsArtistsPage,
