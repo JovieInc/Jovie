@@ -30,7 +30,9 @@ function surface(
     monitoringState: 'active',
     rank: 4,
     previousRank: 6,
-    lastObservedAt: '2026-09-16T00:00:00.000Z',
+    lastObservedAt: new Date(
+      Date.now() - PRESENCE_STALE_AFTER_MS / 2
+    ).toISOString(),
     ...overrides,
   };
 }
