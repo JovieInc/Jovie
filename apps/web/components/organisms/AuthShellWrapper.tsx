@@ -1,6 +1,6 @@
 'use client';
 
-// @coverage-via apps/web/tests/unit/components/organisms/AuthShellWrapper.test.tsx
+// @coverage-via apps/web/components/organisms/AuthShellWrapper.search-state.test.tsx
 import { TooltipProvider } from '@jovie/ui';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
