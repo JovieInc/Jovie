@@ -192,6 +192,9 @@ ruvector.db
 
 # AgentOS run artifacts (binary outputs not source-controlled)
 agentos/runs/**/artifacts/
+
+# Marketing factory run receipts (pnpm factory:run; JOV-7276)
+/runs/factory/
 .hermes/
 agentos/
 docs/leads/
