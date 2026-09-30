@@ -1951,10 +1951,14 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 /* The hero is fully laid out and interactive on the first frame. The only
-   delayed state is paint: one 100ms beat, then an opacity-only reveal. */
+   delayed state is paint: one 100ms beat, then an opacity-only reveal.
+   The from-frame uses 0.01, not 0: content that first paints at opacity 0
+   is never eligible as an LCP candidate, which let post-hydration overlays
+   (the cookie banner) become the LCP element at their late mount time
+   (JOV-7286). 0.01 is visually identical to 0 but keeps the hero eligible. */
 @keyframes homepage-hero-content-reveal {
   from {
-    opacity: 0;
+    opacity: 0.01;
   }
 
   to {
