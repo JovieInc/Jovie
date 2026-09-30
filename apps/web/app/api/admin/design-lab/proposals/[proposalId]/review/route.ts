@@ -5,8 +5,8 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { reviewDesignProposal } from '@/lib/agent-os/design-lab/review';
 import { DesignProposalReviewRequestSchema } from '@/lib/agent-os/design-lab/types';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -23,7 +23,9 @@ export async function POST(
   context: { params: Promise<{ proposalId: string }> }
 ): Promise<Response> {
   try {
-    const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
+    const entitlements = await getOvieOperatorEntitlements({
+      session: 'fresh',
+    });
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         {

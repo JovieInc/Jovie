@@ -28,7 +28,6 @@ const MERCURY_CACHE_KEY = 'admin:mercury:metrics';
 
 interface MercuryEnv {
   apiToken: string;
-  checkingAccountId: string;
 }
 
 interface MercuryTransaction {
@@ -37,6 +36,7 @@ interface MercuryTransaction {
   currency?: string;
   direction?: string;
   type?: string;
+  kind?: string;
   description?: string;
 }
 
@@ -101,7 +101,7 @@ function buildUnconfiguredResponse(): AdminMercuryMetrics {
     defaultStatus: 'unknown',
     observedAtIso: new Date().toISOString(),
     errorMessage:
-      'Mercury credentials not configured (set MERCURY_API_TOKEN or MERCURY_API_KEY and MERCURY_CHECKING_ACCOUNT_ID or MERCURY_ACCOUNT_ID)',
+      'Mercury credentials not configured (set MERCURY_API_TOKEN or MERCURY_API_KEY)',
   };
 }
 
@@ -146,16 +146,12 @@ function getMercuryEnv(): MercuryEnv | null {
   // Use logical OR to treat empty strings as missing (fallback to secondary key)
   const apiToken =
     env.MERCURY_API_TOKEN?.trim() || env.MERCURY_API_KEY?.trim() || '';
-  const checkingAccountId =
-    env.MERCURY_CHECKING_ACCOUNT_ID?.trim() ||
-    env.MERCURY_ACCOUNT_ID?.trim() ||
-    '';
 
-  if (!apiToken || !checkingAccountId) {
+  if (!apiToken) {
     return null;
   }
 
-  return { apiToken, checkingAccountId };
+  return { apiToken };
 }
 
 async function fetchMercury<T>(
@@ -273,34 +269,50 @@ function isDebit(transaction: MercuryTransaction, amount: number): boolean {
 // NOTE: Mercury API returns amounts in USD dollars (e.g. 328.92 = $328.92),
 // NOT cents. Do not divide by 100.
 
-async function getCheckingBalanceUsd(): Promise<number> {
-  const mercuryEnv = getMercuryEnv();
-  if (!mercuryEnv) return 0;
-
-  // Mercury's current API uses singular `/account/{id}` (list-all remains
-  // `/accounts`). Plural `/accounts/{id}` 404s with errors.notFound.
-  const account = await fetchMercury<unknown>(
-    `/account/${mercuryEnv.checkingAccountId}`
-  );
-  const accountRecord = asRecord(account, 'Mercury account response');
-  const rawBalance =
-    accountRecord.availableBalance ??
-    accountRecord.currentBalance ??
-    accountRecord.balance;
-  const balanceUsd = Number(rawBalance);
-  if (rawBalance == null || !Number.isFinite(balanceUsd)) {
-    throw new TypeError('Mercury account balance is missing or invalid.');
-  }
-  return balanceUsd;
+interface MercuryAccountSummary {
+  id: string;
+  balanceUsd: number;
 }
 
-async function getCheckingTransactions(
+/**
+ * Company cash is every active Mercury account (checking + savings), not one
+ * configured account: the configured checking account held $0 while the money
+ * sat in another, so Ovie showed "$0 cash" (2026-09-30).
+ */
+async function getActiveAccounts(): Promise<MercuryAccountSummary[]> {
+  const response = asRecord(
+    await fetchMercury<unknown>('/accounts'),
+    'Mercury accounts response'
+  );
+  if (!Array.isArray(response.accounts)) {
+    throw new TypeError('Mercury accounts collection is missing.');
+  }
+  const accounts: MercuryAccountSummary[] = [];
+  for (const raw of response.accounts) {
+    const account = asRecord(raw, 'Mercury account');
+    if (account.status !== 'active') continue;
+    if (typeof account.id !== 'string' || account.id.length === 0) {
+      throw new TypeError('Mercury account id is missing.');
+    }
+    const rawBalance =
+      account.availableBalance ?? account.currentBalance ?? account.balance;
+    const balanceUsd = Number(rawBalance);
+    if (rawBalance == null || !Number.isFinite(balanceUsd)) {
+      throw new TypeError('Mercury account balance is missing or invalid.');
+    }
+    accounts.push({ id: account.id, balanceUsd });
+  }
+  if (accounts.length === 0) {
+    throw new TypeError('Mercury returned no active accounts.');
+  }
+  return accounts;
+}
+
+async function getAccountTransactions(
+  accountId: string,
   startDate: Date,
   endDate: Date
 ): Promise<MercuryTransaction[]> {
-  const mercuryEnv = getMercuryEnv();
-  if (!mercuryEnv) return [];
-
   const transactions: MercuryTransaction[] = [];
   let cursor: string | undefined;
   // Safety guard: cap pagination to avoid unbounded iteration if Mercury
@@ -313,14 +325,11 @@ async function getCheckingTransactions(
     pageCount++;
 
     const response = validateTransactionsResponse(
-      await fetchMercury<unknown>(
-        `/account/${mercuryEnv.checkingAccountId}/transactions`,
-        {
-          start: startDate.toISOString(),
-          end: endDate.toISOString(),
-          ...(cursor ? { cursor } : {}),
-        }
-      )
+      await fetchMercury<unknown>(`/account/${accountId}/transactions`, {
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+        ...(cursor ? { cursor } : {}),
+      })
     );
 
     transactions.push(...response.transactions);
@@ -358,8 +367,9 @@ async function loadAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
     const endDate = new Date();
     const startDate = new Date(endDate.getTime() - 30 * MS_PER_DAY);
 
-    // Fetch balance first — it's fast and most important for the HUD.
-    const balanceUsd = await getCheckingBalanceUsd();
+    // Fetch balances first — fast and most important for the HUD.
+    const accounts = await getActiveAccounts();
+    const balanceUsd = accounts.reduce((sum, a) => sum + a.balanceUsd, 0);
 
     // Transactions can be slow (30-day pagination). Preserve the accurate
     // balance when they time out, but never present missing burn as measured
@@ -368,8 +378,14 @@ async function loadAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
     let burnRateAvailable = true;
     let burnErrorMessage: string | undefined;
     try {
-      const transactions = await getCheckingTransactions(startDate, endDate);
-      burnRateUsd = transactions.reduce((total, transaction) => {
+      const perAccount = await Promise.all(
+        accounts.map(account =>
+          getAccountTransactions(account.id, startDate, endDate)
+        )
+      );
+      burnRateUsd = perAccount.flat().reduce((total, transaction) => {
+        // Moving money between our own accounts is not spend.
+        if (transaction.kind === 'internalTransfer') return total;
         const amount = normalizeAmount(transaction.amount);
         if (!isDebit(transaction, amount)) return total;
         return total + Math.abs(amount);

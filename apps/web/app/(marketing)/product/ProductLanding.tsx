@@ -4,8 +4,8 @@ import {
   MarketingPageShell,
   MarketingSurfaceCard,
 } from '@/components/marketing';
-import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
-import { PRODUCT_CLAIM_HREF, PRODUCT_COPY } from '@/data/productCopy';
+import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
+import { PRODUCT_COPY } from '@/data/productCopy';
 import { ProductClaimHandleForm } from './ProductClaimHandleForm';
 import './ProductLanding.css';
 
@@ -46,6 +46,39 @@ function ProductClaimCard() {
   );
 }
 
+function ProductClose() {
+  const { claimCard, close } = PRODUCT_COPY;
+
+  return (
+    <MarketingCtaSection
+      className='product-close'
+      data-testid='product-close'
+      data-marketing-variant='editorial-search'
+      data-marketing-owner='apps/web/app/(marketing)/product/ProductLanding.tsx'
+      aria-labelledby='product-close-heading'
+    >
+      {/* ui-casing-allow: marketing display headline */}
+      <h2
+        id='product-close-heading'
+        className='product-close__headline text-primary-token'
+        data-wrap='editorial-title'
+      >
+        {close.headlineLine1} <br />
+        {close.headlineLine2}
+      </h2>
+      <div className='product-close__actions' data-testid='product-close-claim'>
+        <ProductClaimHandleForm
+          domain={claimCard.domain}
+          placeholder={claimCard.handle}
+          submitLabel={claimCard.cta}
+          inputId='product-close-claim-handle'
+          testIdPrefix='product-close'
+        />
+      </div>
+    </MarketingCtaSection>
+  );
+}
+
 export function ProductLanding() {
   const { hero } = PRODUCT_COPY;
 
@@ -79,15 +112,7 @@ export function ProductLanding() {
           <ProductClaimCard />
         </MarketingHero>
       </div>
-      <MarketingFooterCta
-        title='See what shows up when people search for you.'
-        body='Claim your Jovie profile free and start turning attention into relationships today.'
-        ctaLabel='Claim your Jovie'
-        ctaHref={PRODUCT_CLAIM_HREF}
-        ctaAnalyticsEvent='product_footer_cta_claim'
-        ctaAnalyticsSource='product_page_footer'
-        prefetch={false}
-      />
+      <ProductClose />
     </MarketingPageShell>
   );
 }

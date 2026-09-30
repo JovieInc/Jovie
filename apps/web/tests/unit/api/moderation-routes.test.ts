@@ -9,8 +9,8 @@ const hoisted = vi.hoisted(() => ({
   rateLimit: vi.fn(),
 }));
 
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: hoisted.auth,
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  getOvieOperatorEntitlements: hoisted.auth,
 }));
 vi.mock('@/lib/admin/moderation', () => ({
   applyModerationTakedown: hoisted.takedown,

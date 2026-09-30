@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { creatorClaimInvites } from '@/lib/db/schema/profiles';
 import { enqueueBulkClaimInviteJobs } from '@/lib/email/jobs/enqueue';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import {
+  getOvieOperatorEntitlements,
+  requireOvieApiAccess,
+} from '@/lib/ovie/privacy-lock/access';
 import { logger } from '@/lib/utils/logger';
 import {
   bulkInviteSchema,
@@ -35,20 +38,8 @@ export const runtime = 'nodejs';
  */
 export async function POST(request: Request) {
   try {
-    const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
-    if (!entitlements.isAuthenticated) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    if (!entitlements.isAdmin) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403, headers: NO_STORE_HEADERS }
-      );
-    }
+    const denied = await requireOvieApiAccess({ privileged: true });
+    if (denied) return denied;
 
     const parsedBody = await parseJsonBody<unknown>(request, {
       route: 'POST /api/admin/creator-invite/bulk',
@@ -260,7 +251,7 @@ export async function POST(request: Request) {
  */
 export async function GET(request: Request) {
   try {
-    const entitlements = await getCurrentUserEntitlements();
+    const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { error: 'Unauthorized' },

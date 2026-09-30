@@ -3,6 +3,9 @@ import { APP_ROUTES } from '@/constants/routes';
 import { getMarketingPageContractForPathname } from '@/data/marketing/pageContracts';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
 import { MARKETING_CUSTOMERS_FLYOUT } from '@/data/marketingNavigation';
+import { getPublicProfileCandidate } from '@/lib/routing/proxy-routing';
+import { classifySurface } from '@/lib/seo/page-certification';
+import { isReservedUsername } from '@/lib/validation/username-core';
 
 describe('/solutions/artists artist solution route (JOV-5861)', () => {
   it('binds the route to the artist-lp recipe in the manifest', () => {
@@ -35,5 +38,34 @@ describe('/solutions/artists artist solution route (JOV-5861)', () => {
       candidate => candidate.url === '/artists'
     );
     expect(directoryEntry?.recipeId).not.toBe('artist-lp');
+  });
+});
+
+describe('bare /solutions root (JOV-7230)', () => {
+  it('redirects /solutions to the shipped /solutions/artists page', async () => {
+    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfig = nextConfigModule.default ?? nextConfigModule;
+    const redirects = (await nextConfig.redirects()) as {
+      source: string;
+      destination: string;
+      permanent: boolean;
+    }[];
+
+    expect(
+      redirects.find(redirect => redirect.source === '/solutions')
+    ).toEqual({
+      source: '/solutions',
+      destination: APP_ROUTES.SOLUTIONS_ARTISTS,
+      permanent: true,
+    });
+  });
+
+  it('never resolves /solutions as a public profile handle', () => {
+    expect(isReservedUsername('solutions')).toBe(true);
+    expect(getPublicProfileCandidate('/solutions')).toBeNull();
+  });
+
+  it('keeps /solutions/artists classified as a marketing surface', () => {
+    expect(classifySurface('/solutions/artists')).toBe('marketing');
   });
 });
