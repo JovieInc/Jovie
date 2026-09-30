@@ -1,0 +1,4 @@
+{
+  "$comment": "Shrink-only ratchet (JOV-7247): claim ids that are registered but do not yet resolve in their source file. The product-truth test fails if a new unlisted claim fails to resolve, and fails if an entry here starts resolving (remove it).",
+  "unresolvedClaims": []
+}
