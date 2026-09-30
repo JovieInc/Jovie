@@ -129,6 +129,7 @@ import {
 import { evaluateRemoteDebuggingGuard } from './remote-debugging-guard';
 import {
   classifyDesktopLoadFailure,
+  createAuthHandoffNavigationRecovery,
   createLocalHostedLoadRetryController,
   type DesktopLoadFailureReason,
   type DesktopLoadFailureView,
@@ -142,6 +143,7 @@ import {
   decideRendererWatchdogExpiry,
   describeDesktopLoadFailure,
   hostedUrlCandidates,
+  isChromiumErrorDocument,
   parseDidStartNavigation,
   RECOVERY_UNLATCH_POLL_MS,
   rendererWatchdogMs,
@@ -179,6 +181,10 @@ if (APP_ENV === 'staging') {
 }
 
 const APP_ORIGIN = new URL(APP_URL).origin;
+const authNavigationRecoveries = new Map<
+  number,
+  ReturnType<typeof createAuthHandoffNavigationRecovery>
+>();
 const URL_DISPOSITION_OPTIONS = { appUrl: APP_URL, appEnv: APP_ENV } as const;
 const APP_ENTRY_URL = buildAppUrl('/app/chat');
 const SETTINGS_URL = buildAppUrl('/app/settings');
@@ -957,7 +963,12 @@ function restoreMainWindowAfterAuthHandoff(): void {
   if (!mainWindowHiddenForAuthHandoff) return;
   mainWindowHiddenForAuthHandoff = false;
   if (mainWindow && !mainWindow.isDestroyed()) {
-    if (
+    const recovery = authNavigationRecoveries.get(mainWindow.webContents.id);
+    const interruptedTarget = recovery?.cancel();
+    if (interruptedTarget) {
+      const completed = recovery!.navigationCompletion();
+      void mainWindow.loadURL(interruptedTarget).then(completed, () => {});
+    } else if (
       shouldRecoverAuthHandoffToCanonicalShell(mainWindow.webContents.getURL())
     ) {
       const authUrl = buildCentralDesktopAuthUrl('sign_in', '/app');
@@ -1057,6 +1068,9 @@ function loadAuthCompletion(completion: DesktopAuthCompletion): void {
     mainWindow && !mainWindow.isDestroyed()
       ? mainWindow
       : createWindow(targetUrl);
+  // Successful auth owns its returned route; cancellation recovery must not
+  // replay the earlier interrupted navigation when the handoff closes.
+  authNavigationRecoveries.get(win.webContents.id)?.clear();
 
   if (win.webContents.getURL() !== targetUrl) {
     void win.loadURL(targetUrl);
@@ -1239,6 +1253,8 @@ function loadReturnedRoute(route: string): void {
       ? mainWindow
       : createWindow(targetUrl);
 
+  // Successful handback owns its returned route, not the interrupted old one.
+  authNavigationRecoveries.get(win.webContents.id)?.clear();
   if (win.webContents.getURL() !== targetUrl) {
     void win.loadURL(targetUrl);
   }
@@ -1388,6 +1404,27 @@ function maybeShowDesktopAuthHandoff(urlString: string): boolean {
   if (!authUrl) return false;
 
   showDesktopAuthHandoff(authUrl);
+  return true;
+}
+
+function interceptMainWindowAuthNavigation(
+  win: BrowserWindow,
+  url: string
+): boolean {
+  const authUrl = buildDesktopBrowserAuthUrl(url);
+  if (!authUrl) return false;
+  const recovery = authNavigationRecoveries.get(win.webContents.id);
+  const action = recovery?.authIntercepted();
+  if (action === 'ignore') return true;
+  if (action === 'canonical-auth-shell') {
+    // A failed one-shot retry remains recoverable in this window, not a loop
+    // of newly opened handoffs. Existing server auth checks remain authority.
+    const completed = recovery!.navigationCompletion();
+    void win.loadURL(buildDesktopAuthHandoffUrl(authUrl)).then(completed, () => {});
+    showWindow(win);
+  } else {
+    showDesktopAuthHandoff(authUrl);
+  }
   return true;
 }
 
@@ -2364,6 +2401,26 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   });
 
   mainWindow = win;
+  const authNavigationRecovery = createAuthHandoffNavigationRecovery(APP_ORIGIN);
+  const authNavigationContentsId = win.webContents.id;
+  authNavigationRecoveries.set(authNavigationContentsId, authNavigationRecovery);
+  win.on('closed', () => {
+    authNavigationRecovery.clear();
+    authNavigationRecoveries.delete(authNavigationContentsId);
+  });
+  win.webContents.on('did-start-navigation', (...args: unknown[]) => {
+    const navigation = parseDidStartNavigation(args);
+    if (!navigation) return;
+    authNavigationRecovery.navigationStarted({
+      ...navigation,
+      currentUrl: win.webContents.getURL(),
+    });
+  });
+  win.webContents.on('did-finish-load', () => {
+    if (!isChromiumErrorDocument(win.webContents.getURL())) {
+      authNavigationRecovery.documentFinished();
+    }
+  });
 
   win.webContents.setUserAgent(
     `${win.webContents.getUserAgent()} ${DESKTOP_USER_AGENT_PRODUCT}`
@@ -2379,7 +2436,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   attachRendererRecovery(win, {
     shouldSkipWatchdog: isAuthHandoffInteractive,
     onAbortedMainFrame: validatedURL =>
-      maybeShowDesktopAuthHandoff(resolveNavigationUrl(validatedURL)),
+      interceptMainWindowAuthNavigation(win, resolveNavigationUrl(validatedURL)),
   });
 
   registerMainWindowPermissionHandlers(win.webContents.session);
@@ -2388,7 +2445,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   // dedicated handoff; all other safe URLs open in the system browser.
   win.webContents.on('will-navigate', (event, url) => {
     const navigationUrl = resolveNavigationUrl(url);
-    if (maybeShowDesktopAuthHandoff(navigationUrl)) {
+    if (interceptMainWindowAuthNavigation(win, navigationUrl)) {
       event.preventDefault();
       return;
     }
@@ -2426,7 +2483,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
 
   win.webContents.on('will-redirect', (event, url, _isInPlace, isMainFrame) => {
     const navigationUrl = resolveNavigationUrl(url);
-    if (maybeShowDesktopAuthHandoff(navigationUrl)) {
+    if (isMainFrame && interceptMainWindowAuthNavigation(win, navigationUrl)) {
       event.preventDefault();
       return;
     }

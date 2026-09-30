@@ -1542,3 +1542,202 @@ test('Ovie recovery real preload sends zero arguments on its dedicated channel',
   assert.equal(await api.openCurrentOvieInBrowser(), response);
   assert.deepEqual(calls, [['open-current-ovie-in-browser']]);
 });
+
+test('real native cancel wiring retries only an interrupted workspace document', async () => {
+  const source = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const recoverySource = await readFile(
+    join(desktopRoot, 'src/renderer-recovery.ts'),
+    'utf8'
+  );
+  const exports = {};
+  runInNewContext(
+    ts.transpileModule(recoverySource, {
+      compilerOptions: {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.CommonJS,
+      },
+    }).outputText,
+    { exports, URL, setTimeout, clearTimeout }
+  );
+  const ast = ts.createSourceFile(
+    'main.ts',
+    source,
+    ts.ScriptTarget.Latest,
+    true
+  );
+  const declarations = [
+    'restoreMainWindowAfterAuthHandoff',
+    'interceptMainWindowAuthNavigation',
+    'loadReturnedRoute',
+  ];
+  const declarationSource = declarations
+    .map(name => {
+      const declaration = ast.statements.find(
+        node => ts.isFunctionDeclaration(node) && node.name?.text === name
+      );
+      assert.ok(declaration, `real ${name} must exist`);
+      return declaration.getText(ast);
+    })
+    .join('\n');
+  const createWindow = ast.statements.find(
+    node => ts.isFunctionDeclaration(node) && node.name?.text === 'createWindow'
+  );
+  const registrations = [];
+  const visit = node => {
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.getText(ast) === 'win.webContents.on' &&
+      [
+        'did-start-navigation',
+        'did-finish-load',
+        'will-navigate',
+        'will-redirect',
+      ].includes(node.arguments[0]?.text)
+    ) {
+      registrations.push(node.getText(ast));
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(createWindow);
+  assert.equal(registrations.length, 4);
+  const cancelHandler = ast.statements.find(node =>
+    node
+      .getText(ast)
+      .startsWith('ipcMain.handle(\n  CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL,')
+  );
+  assert.ok(cancelHandler);
+  const events = new Map();
+  const loads = [];
+  const handoffs = [];
+  const completions = [];
+  let currentUrl = 'https://jov.ie/app/ov/chat';
+  let cancel;
+  const recovery =
+    exports.createAuthHandoffNavigationRecovery('https://jov.ie');
+  const win = {
+    isDestroyed: () => false,
+    webContents: {
+      id: 7,
+      getURL: () => currentUrl,
+      on: (event, callback) => events.set(event, callback),
+    },
+    loadURL: url => {
+      loads.push(url);
+      return new Promise(resolve => completions.push(resolve));
+    },
+  };
+  const context = {
+    URL,
+    APP_URL: 'https://jov.ie',
+    win,
+    mainWindow: win,
+    mainWindowHiddenForAuthHandoff: true,
+    authNavigationRecovery: recovery,
+    authNavigationRecoveries: new Map([[7, recovery]]),
+    parseDidStartNavigation: exports.parseDidStartNavigation,
+    isChromiumErrorDocument: exports.isChromiumErrorDocument,
+    shouldRecoverAuthHandoffToCanonicalShell:
+      exports.shouldRecoverAuthHandoffToCanonicalShell,
+    buildDesktopBrowserAuthUrl: url =>
+      url.endsWith('/signin') ? '/auth/native-start' : null,
+    buildDesktopAuthHandoffUrl: () => 'https://jov.ie/desktop-auth',
+    buildCentralDesktopAuthUrl: () => '/auth/native-start',
+    resolveNavigationUrl: value => value,
+    showDesktopAuthHandoff: url => handoffs.push(url),
+    showWindow: () => {},
+    getUrlDisposition: () => 'in-app',
+    shouldLoadDesktopAuthRouteInApp: () => false,
+    clearPendingDesktopAuthFlow: () => {},
+    isTrustedDesktopAuthSender: event => event.trusted,
+    CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL: 'close-desktop-auth-window',
+    ipcMain: {
+      handle: (_channel, handler) => {
+        cancel = handler;
+      },
+    },
+    BrowserWindow: {
+      fromWebContents: () => ({
+        isDestroyed: () => false,
+        close: () => context.restoreMainWindowAfterAuthHandoff(),
+      }),
+    },
+  };
+  context.authHandoffWindow = {
+    isDestroyed: () => false,
+    close: () => context.restoreMainWindowAfterAuthHandoff(),
+  };
+  const compiled = ts.transpileModule(
+    `${declarationSource}\n${registrations.join(';\n')};\n${cancelHandler.getText(ast)}`,
+    {
+      compilerOptions: { target: ts.ScriptTarget.ES2022 },
+    }
+  ).outputText;
+  runInNewContext(compiled, context);
+  const redirect = () => {
+    let prevented = false;
+    events.get('will-redirect')(
+      {
+        preventDefault: () => {
+          prevented = true;
+        },
+      },
+      'https://jov.ie/signin',
+      false,
+      true
+    );
+    assert.equal(prevented, true);
+  };
+  // The user left locked OV with an actual top-frame document navigation.
+  events.get('did-start-navigation')({}, 'https://jov.ie/app', false, true);
+  currentUrl = 'https://jov.ie/app'; // partially mounted shell before interception
+  redirect();
+  assert.equal(handoffs.length, 1);
+  assert.equal(cancel({ trusted: true }).ok, true);
+  assert.deepEqual(loads, ['https://jov.ie/app']); // no credentials/manual reload
+  // Successful server-authorized navigation finishes and clears the retry.
+  events.get('did-start-navigation')({}, 'https://jov.ie/app', false, true);
+  events.get('did-finish-load')();
+  completions[0]();
+  await Promise.resolve();
+  context.mainWindowHiddenForAuthHandoff = true;
+  redirect();
+  cancel({ trusted: true });
+  assert.equal(
+    loads.length,
+    1,
+    'an intact authenticated draft must not reload'
+  );
+  // A second interrupted navigation which still needs auth recovers inline.
+  context.mainWindowHiddenForAuthHandoff = true;
+  events.get('did-start-navigation')(
+    {},
+    'https://jov.ie/app/chat',
+    false,
+    true
+  );
+  redirect();
+  cancel({ trusted: true });
+  const previousHandoffs = handoffs.length;
+  events.get('did-start-navigation')(
+    {},
+    'https://jov.ie/app/chat',
+    false,
+    true
+  );
+  events.get('did-finish-load')(); // stale finish must not erase retry protection
+  redirect();
+  assert.equal(loads.at(-1), 'https://jov.ie/desktop-auth');
+  events.get('did-finish-load')();
+  redirect(); // duplicate abort/redirect cannot open another handoff
+  assert.equal(handoffs.length, previousHandoffs);
+  assert.equal(cancel({ trusted: false }).ok, false);
+  // A successful auth handback must never replay the interrupted old route.
+  events.get('did-start-navigation')({}, 'https://jov.ie/app/old', false, true);
+  redirect();
+  context.mainWindowHiddenForAuthHandoff = true;
+  const loadsBeforeHandback = loads.length;
+  context.loadReturnedRoute('/app/returned');
+  assert.deepEqual(loads.slice(loadsBeforeHandback), [
+    'https://jov.ie/app/returned',
+  ]);
+});
