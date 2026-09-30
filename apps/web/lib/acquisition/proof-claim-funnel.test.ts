@@ -14,6 +14,7 @@ import {
   isProofProfileHandle,
   PROOF_CLAIM_CAMPAIGN_KEY,
   PROOF_CLAIM_FUNNEL_EVENTS,
+  PROOF_CLAIM_STARTER_PROMPT,
   PROOF_CLAIM_VARIANT_ID,
   PROOF_PROFILE,
   proofClaimAttribution,
@@ -57,6 +58,9 @@ describe('proof-to-claim funnel contract (JOV-6440)', () => {
     expect(href).toContain(`campaign=${PROOF_CLAIM_CAMPAIGN_KEY}`);
     expect(href).not.toContain(APP_ROUTES.SIGNUP);
     expect(resolveProofClaimCta(false).href).toBe(href);
+    expect(
+      new URL(href, 'https://jov.ie').searchParams.get('starter_prompt')
+    ).toBe(PROOF_CLAIM_STARTER_PROMPT);
     expect(resolveProofClaimCta(false).label).toBe('Get yours');
     expect(resolveProofClaimCta(false).note).toContain('$199/mo');
   });

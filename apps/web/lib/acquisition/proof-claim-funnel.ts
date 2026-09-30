@@ -117,8 +117,15 @@ function withProofClaimParams(href: string): string {
 
 // Every claim enters the /start qualify chat (Tim 2026-09-28, JOV-3379); the
 // chat admits (sign up, then Pro) or reserves the name while access is limited.
+// The starter prompt opens the chat on claiming a name instead of the blank
+// "what are you working on" entry (JOV-7114).
+export const PROOF_CLAIM_STARTER_PROMPT = 'I want my own jov.ie.';
+
 export function buildProofClaimHref(): string {
-  return withProofClaimParams(APP_ROUTES.START);
+  const params = new URLSearchParams({
+    starter_prompt: PROOF_CLAIM_STARTER_PROMPT,
+  });
+  return withProofClaimParams(`${APP_ROUTES.START}?${params.toString()}`);
 }
 
 export function resolveProofClaimCta(

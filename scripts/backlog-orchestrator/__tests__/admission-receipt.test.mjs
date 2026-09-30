@@ -1,6 +1,6 @@
 // biome-ignore-all format: Preserve legacy fixture formatting.
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { beforeEach, describe, it } from 'node:test';
 
 import * as admissionGate from '../admission-gate.mjs';
 import * as admitter from '../admitter.mjs';
@@ -12,7 +12,7 @@ import {
   withPreLeaseReceipts,
 } from './pre-lease.mjs';
 
-const NOW = new Date().toISOString();
+const NOW = '2026-08-22T12:00:00.000Z';
 
 function issue(overrides = {}) {
   return {
@@ -108,6 +108,12 @@ function clientFor(issue, { labels = [] } = {}) {
 }
 
 describe('revision-scoped admission receipt', () => {
+  beforeEach(context => {
+    // Keep candidate ages and pre-lease receipts on the same fixture clock.
+    assert.ok('mock' in context, 'fixture clock needs a test context');
+    context.mock.timers.enable({ apis: ['Date'], now: new Date(NOW) });
+  });
+
   it('admits from the receipt without the triple labels', () => {
     const candidate = admitted();
     assert.equal(admissionGate.validateAdmissionCandidate(candidate), null);
