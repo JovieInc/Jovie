@@ -61,6 +61,7 @@ function ProductClose() {
       <h2
         id='product-close-heading'
         className='product-close__headline text-primary-token'
+        data-wrap='editorial-title'
       >
         {close.headlineLine1} <br />
         {close.headlineLine2}
