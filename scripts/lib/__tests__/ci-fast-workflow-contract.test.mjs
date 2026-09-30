@@ -613,6 +613,9 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(chosen.stdout.trim().split('\n')).toEqual([
         'tests/e2e/storybook-task-row-geometry.spec.ts',
       ]);
+      expect(
+        jobBlock('ci-storybook-surfaces', 'ci-cross-product-integration')
+      ).toContain('tests/e2e/storybook-task-row-geometry.spec.ts');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
