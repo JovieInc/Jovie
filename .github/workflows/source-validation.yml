@@ -36,6 +36,7 @@ jobs:
           pnpm ci:harness:check
           pnpm typecheck
           pnpm biome:check
+          ESLINT_CHANGED_BASE="origin/${{ github.base_ref }}" pnpm --filter @jovie/web run lint:eslint:changed
           pnpm component-ship-gate
           pnpm ci:control:test
   security:
