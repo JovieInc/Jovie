@@ -81,6 +81,8 @@ export interface ElectronAPI {
     readonly ok: boolean;
     readonly reason?: string;
   }>;
+  /** Continue the main Ovie route in an independent browser session. */
+  readonly openCurrentOvieInBrowser?: () => Promise<DesktopAuthActionResult>;
   /** Open the current isolated public profile in the system browser. */
   readonly openPublicProfileInBrowser?: () => Promise<DesktopAuthActionResult>;
   /** Close the dedicated desktop auth handoff window. */
@@ -637,6 +639,22 @@ export async function completeDesktopPasskeySignIn(): Promise<DesktopAuthActionR
     : { ok: false, reason: result.reason ?? 'desktop-passkey-complete-failed' };
 }
 
+export async function openCurrentOvieInBrowser(): Promise<DesktopAuthActionResult> {
+  const api = getRawElectronAPI();
+  if (!api || typeof api.openCurrentOvieInBrowser !== 'function') {
+    if (api) reportMissingBridgeMethod('openCurrentOvieInBrowser');
+    return { ok: false, reason: 'ovie-browser-bridge-unavailable' };
+  }
+  try {
+    const result = await api.openCurrentOvieInBrowser();
+    return result?.ok === true
+      ? { ok: true }
+      : { ok: false, reason: result?.reason ?? 'ovie-browser-open-failed' };
+  } catch {
+    return { ok: false, reason: 'ovie-browser-open-failed' };
+  }
+}
+
 export async function openPublicProfileInBrowser(): Promise<DesktopAuthActionResult> {
   const api = getRawElectronAPI();
   if (api && typeof api.openPublicProfileInBrowser === 'function') {
@@ -917,6 +935,7 @@ export const __testing = {
   setDesktopPasskeyState,
   completeDesktopPasskeySignIn,
   openPublicProfileInBrowser,
+  openCurrentOvieInBrowser,
   closeDesktopAuthWindow,
   consumeDesktopAuthCompletion,
   setDesktopTrayState,

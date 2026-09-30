@@ -8,6 +8,8 @@ import * as deterministicGates from '../deterministic-gates.mjs';
 import * as planGate from '../plan-gate.mjs';
 import { withPreLeaseReceipts } from './pre-lease.mjs';
 
+const NOW = new Date().toISOString();
+
 function issue(overrides = {}) {
   return {
     id: 'issue-id',
@@ -40,7 +42,7 @@ Normalize the unstable token before sending the event.
 ## Acceptance criteria
 * Repeated events group into one issue.
 * Focused normalizer tests pass.`,
-    createdAt: '2026-08-01T00:00:00.000Z',
+    createdAt: new Date(Date.now() - 4 * 86_400_000).toISOString(),
     priority: 2,
     estimate: 2,
     state: { name: 'Backlog' },
@@ -279,7 +281,7 @@ Normalize the unstable token before sending the event.
     for (const candidate of cases) {
       assert.notEqual(
         deterministicGates.validateDeterministicPlanCandidate(candidate, {
-          now: '2026-08-05T00:00:00.000Z',
+          now: NOW,
         }),
         null
       );
@@ -328,7 +330,7 @@ Normalize the unstable token before sending the event.
         issue({ identifier: 'JOV-4304', priority: 3 }),
         issue({ identifier: 'JOV-4305', priority: 2 }),
       ],
-      { now: '2026-08-05T00:00:00.000Z' }
+      { now: NOW }
     );
     assert.equal(result.selected.identifier, 'JOV-4305');
   });
@@ -340,7 +342,7 @@ Normalize the unstable token before sending the event.
         issue({ identifier: 'JOV-4305', priority: 2 }),
       ],
       {
-        now: '2026-08-05T00:00:00.000Z',
+        now: NOW,
         excludeIdentifiers: ['JOV-4305'],
       }
     );

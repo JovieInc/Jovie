@@ -51,8 +51,8 @@ Use one revision-scoped admission receipt.
 ## Acceptance criteria
 * Receipts admit work without the three labels.
 * Protected work stays excluded.`,
-    createdAt: '2026-08-01T00:00:00.000Z',
-    updatedAt: '2026-08-18T00:00:00.000Z',
+    createdAt: new Date(Date.now() - 21 * 86_400_000).toISOString(),
+    updatedAt: new Date(Date.now() - 86_400_000).toISOString(),
     priority: 2,
     estimate: 2,
     state: { name: 'Todo' },

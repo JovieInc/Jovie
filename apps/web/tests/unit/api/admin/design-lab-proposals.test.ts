@@ -4,14 +4,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 
 const hoisted = vi.hoisted(() => ({
-  getCurrentUserEntitlements: vi.fn(),
+  getOvieOperatorEntitlements: vi.fn(),
   listPendingDesignProposals: vi.fn(),
   reviewDesignProposal: vi.fn(),
   captureError: vi.fn(),
 }));
 
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: hoisted.getCurrentUserEntitlements,
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  getOvieOperatorEntitlements: hoisted.getOvieOperatorEntitlements,
 }));
 
 vi.mock('@/lib/agent-os/design-lab/proposals', () => ({
@@ -57,7 +57,7 @@ function reviewRequest(body: unknown): NextRequest {
 describe('Taste Inbox design proposal API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    hoisted.getCurrentUserEntitlements.mockResolvedValue(
+    hoisted.getOvieOperatorEntitlements.mockResolvedValue(
       entitlements({ isAdmin: true })
     );
     hoisted.listPendingDesignProposals.mockResolvedValue([]);
@@ -85,7 +85,7 @@ describe('Taste Inbox design proposal API', () => {
   });
 
   it('returns an actionable forbidden response when admin reverification is stale', async () => {
-    hoisted.getCurrentUserEntitlements.mockResolvedValue(entitlements({}));
+    hoisted.getOvieOperatorEntitlements.mockResolvedValue(entitlements({}));
 
     const { GET } = await import('@/app/api/admin/design-lab/proposals/route');
     const response = await GET();

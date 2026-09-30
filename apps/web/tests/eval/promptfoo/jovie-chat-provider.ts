@@ -7227,22 +7227,24 @@ function evaluateInterviewSummaryContract(vars: EvalVars) {
       "text.indexOf('{')",
       "text.lastIndexOf('}')",
     ]),
-    requiresTextBlockBeforeParsing: textIncludesAll(summarizerSource, [
-      "message.content.find(block => block.type === 'text')",
-      'No text response from Claude',
+    requiresTextBeforeParsing: textIncludesAll(summarizerSource, [
+      'result.text',
+      'No text response from model',
     ]),
   };
   const costSafetyFacts = {
-    usesHaikuModel: textIncludesAll(summarizerSource, [
-      "const MODEL_ID = 'claude-haiku-4-5-20251001'",
-      'model: MODEL_ID',
+    usesGatewayModel: textIncludesAll(summarizerSource, [
+      'const MODEL_ID = CHAT_MODEL_LIGHT',
+      'model: gateway(MODEL_ID)',
     ]),
-    capsOutputTokens: textIncludesAll(summarizerSource, ['max_tokens: 800']),
-    usesBoundedAnthropicTimeout: textIncludesAll(summarizerSource, [
-      'ANTHROPIC_REQUEST_TIMEOUT_MS = 30_000',
+    capsOutputTokens: textIncludesAll(summarizerSource, [
+      'maxOutputTokens: 800',
+    ]),
+    usesBoundedTimeout: textIncludesAll(summarizerSource, [
+      'REQUEST_TIMEOUT_MS = 30_000',
       'withTimeout',
-      'timeoutMs: ANTHROPIC_REQUEST_TIMEOUT_MS + 1_000',
-      "context: 'Anthropic summarizeInterview'",
+      'timeoutMs: REQUEST_TIMEOUT_MS + 1_000',
+      "context: 'summarizeInterview'",
     ]),
     cronLimitsBatchAndAttempts: textIncludesAll(cronRouteSource, [
       'MAX_INTERVIEWS_PER_RUN = 10',
@@ -7293,9 +7295,9 @@ function evaluateInterviewSummaryContract(vars: EvalVars) {
     cronRouteSourcePath,
     summarizerSourceLength: summarizerSource.length,
     cronRouteSourceLength: cronRouteSource.length,
-    modelId: 'claude-haiku-4-5-20251001',
+    modelId: 'zai/glm-5.3-flash',
     maxTokens: 800,
-    anthropicRequestTimeoutMs: 30_000,
+    requestTimeoutMs: 30_000,
     wrapperTimeoutMs: 31_000,
     promptFacts,
     missingPromptFacts: Object.entries(promptFacts)
@@ -7545,18 +7547,18 @@ function evaluatePlaylistGenerationContract(vars: EvalVars) {
       'playlistCount % GENRE_ROTATION.length',
       'playlistCount % CATEGORY_ROTATION.length',
     ]),
-    usesHaikuModel: textIncludesAll(conceptSource, [
-      "model: 'claude-haiku-4-5-20251001'",
-      'max_tokens: 2000',
+    usesGatewayModel: textIncludesAll(conceptSource, [
+      'model: gateway(CHAT_MODEL_LIGHT)',
+      'maxOutputTokens: 2000',
     ]),
-    usesBoundedAnthropicTimeout: textIncludesAll(conceptSource, [
-      'ANTHROPIC_REQUEST_TIMEOUT_MS = 30_000',
+    usesBoundedTimeout: textIncludesAll(conceptSource, [
+      'REQUEST_TIMEOUT_MS = 30_000',
       'withTimeout',
-      'timeoutMs: ANTHROPIC_REQUEST_TIMEOUT_MS + 1_000',
-      "context: 'Anthropic generatePlaylistConcept'",
+      'timeoutMs: REQUEST_TIMEOUT_MS + 1_000',
+      "context: 'generatePlaylistConcept'",
     ]),
     parsesJsonThenSchema: textIncludesAll(conceptSource, [
-      'extractJsonPayload(textBlock.text)',
+      'extractJsonPayload(result.text)',
       'JSON.parse(jsonStr)',
       'PlaylistConceptSchema.parse(parsed)',
     ]),
@@ -7610,15 +7612,15 @@ function evaluatePlaylistGenerationContract(vars: EvalVars) {
       'CURATED_TRACK_IDS_SCHEMA = z.array(z.string()).min(10).max(50)',
       'CURATED_TRACK_IDS_SCHEMA.parse(parsed)',
     ]),
-    usesSonnetModel: textIncludesAll(curationSource, [
-      "model: 'claude-sonnet-4-20250514'",
-      'max_tokens: 1500',
+    usesGatewayModel: textIncludesAll(curationSource, [
+      'model: gateway(CHAT_MODEL)',
+      'maxOutputTokens: 1500',
     ]),
-    usesBoundedAnthropicTimeout: textIncludesAll(curationSource, [
-      'ANTHROPIC_REQUEST_TIMEOUT_MS = 30_000',
+    usesBoundedTimeout: textIncludesAll(curationSource, [
+      'REQUEST_TIMEOUT_MS = 30_000',
       'withTimeout',
-      'timeoutMs: ANTHROPIC_REQUEST_TIMEOUT_MS + 1_000',
-      "context: 'Anthropic curateTracklist'",
+      'timeoutMs: REQUEST_TIMEOUT_MS + 1_000',
+      "context: 'curateTracklist'",
     ]),
     parsesJsonPayload: textIncludesAll(curationSource, [
       'extractJsonPayload(responseText)',
@@ -7707,14 +7709,14 @@ function evaluatePlaylistGenerationContract(vars: EvalVars) {
       pipeline: pipelineSource.length,
     },
     modelIds: {
-      concept: 'claude-haiku-4-5-20251001',
-      curation: 'claude-sonnet-4-20250514',
+      concept: 'zai/glm-5.3-flash',
+      curation: 'zai/glm-5.3',
     },
     maxTokens: {
       concept: 2000,
       curation: 1500,
     },
-    anthropicRequestTimeoutMs: 30_000,
+    requestTimeoutMs: 30_000,
     wrapperTimeoutMs: 31_000,
     promptLengths: {
       concept: conceptPrompt.length,

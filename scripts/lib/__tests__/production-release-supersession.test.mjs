@@ -748,6 +748,9 @@ esac
     const fixture = makeFixture('lineage-promote-');
     stubLineageGh(fixture.bin);
     const promoted = join(fixture.root, 'promoted');
+    const stagingAlias = join(fixture.root, 'staging-alias');
+    const stagingRestore = join(fixture.root, 'staging-restore');
+    writeFileSync(stagingAlias, 'dpl_staging_preview');
     const vercel = join(fixture.root, 'vercel');
     writeFileSync(
       vercel,
@@ -757,10 +760,19 @@ case "$1" in
     id="$2"
     if [ "$2" = "jov.ie" ]; then
       if [ -f "$STUB_PROMOTED" ]; then id="$STUB_DEPLOY_ID"; else id="dpl_previous_generation"; fi
+    elif [ "$2" = "staging.jov.ie" ]; then
+      id="$(cat "$STUB_STAGING_ALIAS")"
     fi
-    printf '{"id":"%s","readyState":"READY","target":"production","url":"https://jovie-%s-jovie.vercel.app"}\\n' "$id" "$id" ;;
+    target="production"
+    if [ "$id" = "dpl_staging_preview" ]; then target="preview"; fi
+    printf '{"id":"%s","readyState":"READY","target":"%s","url":"https://jovie-%s-jovie.vercel.app"}\\n' "$id" "$target" "$id" ;;
   rolling-release) printf 'null\\n' ;;
-  promote) printf '%s\\n' "$*" > "$STUB_PROMOTED" ;;
+  promote)
+    printf '%s\\n' "$*" > "$STUB_PROMOTED"
+    printf '%s' "$STUB_DEPLOY_ID" > "$STUB_STAGING_ALIAS" ;;
+  alias)
+    printf '%s\\n' "$*" > "$STUB_STAGING_RESTORE"
+    printf '%s' 'dpl_staging_preview' > "$STUB_STAGING_ALIAS" ;;
 esac
 `
     );
@@ -785,6 +797,8 @@ esac
           STUB_DEPLOY_ID: DEPLOYMENT_ID,
           STUB_MAIN_SHA: mainSha,
           STUB_PROMOTED: promoted,
+          STUB_STAGING_ALIAS: stagingAlias,
+          STUB_STAGING_RESTORE: stagingRestore,
           VERCEL_CLI: vercel,
           VERCEL_ORG_ID: 'team_stub',
           VERCEL_PROJECT_ID: 'prj_stub',
@@ -796,6 +810,8 @@ esac
       promoted: existsSync(promoted),
       result,
       outputs: parseOutputs(fixture.output),
+      stagingAlias: readFileSync(stagingAlias, 'utf8'),
+      stagingRestored: existsSync(stagingRestore),
     };
   }
 
@@ -803,11 +819,15 @@ esac
     const exact = runPromote(EXPECTED_SHA, 'identical');
     expect(exact.result.status, exact.result.stderr).toBe(0);
     expect(exact.promoted).toBe(true);
+    expect(exact.stagingAlias).toBe('dpl_staging_preview');
+    expect(exact.stagingRestored).toBe(true);
     expect(exact.outputs.promotion_sha).toBe(EXPECTED_SHA);
 
     const ancestor = runPromote(NEWER_SHA, 'ahead');
     expect(ancestor.result.status, ancestor.result.stderr).toBe(0);
     expect(ancestor.promoted).toBe(true);
+    expect(ancestor.stagingAlias).toBe('dpl_staging_preview');
+    expect(ancestor.stagingRestored).toBe(true);
     expect(ancestor.outputs.promotion_sha).toBe(EXPECTED_SHA);
   });
 
@@ -815,6 +835,8 @@ esac
     const diverged = runPromote(NEWER_SHA, 'diverged');
     expect(diverged.result.status, diverged.result.stderr).toBe(0);
     expect(diverged.promoted).toBe(false);
+    expect(diverged.stagingAlias).toBe('dpl_staging_preview');
+    expect(diverged.stagingRestored).toBe(false);
     expect(diverged.outputs.promotion_sha).toBe(NEWER_SHA);
   });
 });

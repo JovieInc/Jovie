@@ -1,0 +1,16 @@
+{
+  "name": "@jovie/canary-otp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types --experimental-test-coverage --test-coverage-include=src/index.ts --test-coverage-lines=95 --test-coverage-branches=90 --test src/index.test.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "postal-mime": "2.7.6"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260926.1",
+    "typescript": "^5.8.2"
+  }
+}

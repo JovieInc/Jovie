@@ -10,6 +10,9 @@ describe('HomeTrustSection', () => {
     expect(container.querySelectorAll('.homepage-trust-logo')).toHaveLength(
       TRUST_LOGO_ASSETS.length
     );
+    for (const logo of container.querySelectorAll('.homepage-trust-logo')) {
+      expect(logo.parentElement).toHaveClass('w-full', 'sm:w-auto');
+    }
     const secondary = container.querySelectorAll(
       '[data-mobile-logo="secondary"]'
     );

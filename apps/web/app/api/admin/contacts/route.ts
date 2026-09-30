@@ -6,14 +6,14 @@ import {
   setCanonicalContactStage,
 } from '@/lib/admin/contacts';
 import { isContactLifecycleStage } from '@/lib/contacts/lifecycle';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-async function requireAdmin() {
-  const entitlements = await getCurrentUserEntitlements();
+async function requireAdmin(purpose?: 'read') {
+  const entitlements = await getOvieOperatorEntitlements({ purpose });
   if (!entitlements.isAuthenticated) {
     return {
       error: NextResponse.json(
@@ -34,7 +34,7 @@ async function requireAdmin() {
 }
 
 export async function GET(request: Request) {
-  const gate = await requireAdmin();
+  const gate = await requireAdmin('read');
   if (gate.error) return gate.error;
 
   const { searchParams } = new URL(request.url);
