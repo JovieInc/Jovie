@@ -18,6 +18,7 @@ import {
   fixtureCaptures,
   liveRenderMeasurer,
   type RenderCapture,
+  type RenderRequestOptions,
   renderOptionsFromEnv,
 } from './render-measurer';
 import {
@@ -66,7 +67,7 @@ export interface FactoryProviders {
   generate(request: GenerateRequest): Promise<Generated | Unavailable>;
   measureRender(
     route: string,
-    at?: { readonly outDir?: string }
+    at?: RenderRequestOptions
   ): Promise<RenderMeasurement | Unavailable>;
   /** Cross-family vision review of the render stage's screenshots. */
   reviewVisual(request: VisualReviewRequest): Promise<VisualReviewOutcome>;
