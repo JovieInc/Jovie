@@ -38,6 +38,7 @@ sys.path.insert(0, str(HERE))
 import disk_guard  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
+import hyperagent_lane  # noqa: E402
 import pr_events  # noqa: E402
 import reason_lane  # noqa: E402
 import yc_corpus  # noqa: E402
@@ -75,7 +76,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = 2 * 3600
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lane_runner.py",
+LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -836,7 +837,88 @@ def next_provider(host: Host, exclude: set[str], providers: dict | None = None):
 
 # ---------------------------------------------------------------- one run
 
+def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
+    """Use the same execution contract and gate for remote work, without local-code failover."""
+    import runpy
+    runs = host.state / "runs"
+    runs.mkdir(parents=True, exist_ok=True)
+    ident = execution_attempt.identity("linear-work", {"issue": issue.identifier, "outcome": "draft-pr"},
+                                       {"title": issue.title, "description": issue.description})
+    branch = f"hyperagent/{issue.identifier.lower()}-{ident['identityDigest'][:15]}"
+    evidence = runs / f"{ident['identityDigest']}.provider.jsonl"
+    run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-{issue.identifier}-hyperagent-{uuid.uuid4().hex[:6]}"
+    receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "provider": "hyperagent", "model": spec.get("model"),
+               "origin": AUTONOMOUS_ORIGIN, "issue": issue.identifier, "linearIssueId": issue.id,
+               "branch": branch, "startedAt": now_iso(), "offer": {"eligible": True, "accepted": False},
+               "attribution": {"category": "autonomous-created", "originProvider": "hyperagent", "finalProvider": "hyperagent"}}
+    def hold(reason):
+        return {"verdict": "remote-held", "reasons": [reason], "next_action": "reconcile-existing-remote-attempt"}
+    claimed = None
+    if not hyperagent_lane.verified(spec, time.time()):
+        receipt.update(hold("remote-preflight-unverified"))
+    else:
+        owner = {"owner": HOST, "runtime": "symphony-lanes", "provider": "hyperagent", "model": spec.get("model"),
+                 "tool": "lane_runner", "accountPool": "hyperagent"}
+        coordination = execution_coordination(execution_attempt.GITHUB_LEDGER_ANCHOR)
+        policy = {"attempts": MAX_FAILURES, "concurrency": 1, "wallSeconds": host.agent_timeout * MAX_FAILURES,
+                  "spend": MAX_FAILURES, "mutations": MAX_FAILURES, "leaseSeconds": host.agent_timeout + 900, "version": "lanes-v1"}
+        try:
+            if evidence.exists():
+                state = json.loads(evidence.read_text().splitlines()[-1])
+                fence = state["binding"]["attempt"]
+                claimed = execution_attempt.resume(runs / "execution-attempts.jsonl", ident, fence, owner,
+                                                   coordination=coordination)
+            else:
+                claimed = execution_attempt.claim(runs / "execution-attempts.jsonl", ident, owner, policy,
+                    {"triggerId": run_id, "correlationId": issue.identifier, "causationId": issue.id}, coordination=coordination)
+            receipt["execution"] = claimed
+            if not claimed["admitted"]:
+                receipt.update(hold(claimed["reason"]))
+            else:
+                executable = shutil.which("hyperagent")
+                if not executable:
+                    raise OSError("Hyperagent transport unavailable")
+                api = runpy.run_path(executable)
+                prompt = render_prompt(issue, branch, context_pack(issue), provider="hyperagent")
+                (runs / f"{run_id}.prompt.md").write_text(prompt)
+                def boundary(spend, mutations):
+                    execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
+                                               {"spend": spend, "mutations": mutations}, coordination=coordination)
+                def find_pr(number):
+                    result = sh(["gh", "pr", "view", str(number), "--repo", REPO_SLUG, "--json",
+                                 "number,url,state,title,body,headRefName,headRefOid"])
+                    if result.returncode:
+                        raise RuntimeError("PR read unavailable")
+                    return json.loads(result.stdout)
+                def gate(pr):
+                    boundary(0, 1)
+                    # Existing adoption owns its isolated checkout, diff policy,
+                    # canonical checks and native queue; no second PR is created.
+                    return adopt_pr(host, "hyperagent", pr)
+                receipt["offer"]["accepted"] = True
+                receipt.update(hyperagent_lane.run(spec, issue.identifier, claimed["fencingToken"], branch, prompt,
+                    evidence, api["mcp_call"], find_pr, gate, timeout=host.agent_timeout,
+                    before_dispatch=lambda: boundary(1, 1)))
+                if receipt["verdict"] != "remote-held":
+                    result = "succeeded" if receipt["verdict"] in ("landing", "verified-not-queued", "held", "gate-timeout") else "failed_unknown"
+                    receipt["execution"] = execution_attempt.finish(runs / "execution-attempts.jsonl", ident,
+                        claimed["fencingToken"], result, {"evidenceDigest": execution_attempt.digest(receipt),
+                            "costs": {"apiCost": None}, "dependencies": ["hyperagent"],
+                            "mutationsPerformed": ["remote_thread", "pull_request_adoption"]}, coordination=coordination)
+        except Exception:
+            # Never expose OAuth errors, call another model, or call an unknown
+            # create outcome cancelled. Its durable journal remains authoritative.
+            receipt.update(hold("remote-adapter-unavailable"))
+    receipt.update(endedAt=now_iso(), result={"verdict": receipt.get("verdict"), "pr": receipt.get("pr"),
+                   "prUrl": receipt.get("prUrl"), "commit": receipt.get("headSha")})
+    with (runs / "ledger.jsonl").open("a") as ledger:
+        ledger.write(json.dumps(receipt) + "\n")
+    return receipt
+
+
 def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -> dict:
+    if name == "hyperagent":
+        return run_hyperagent_issue(host, spec, issue)
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-{issue.identifier}-{name}-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
     runs.mkdir(parents=True, exist_ok=True)
@@ -1955,6 +2037,13 @@ def worker(host: Host, name: str) -> int:
                                  f"({', '.join(receipt.get('reasons', []))}); unknown outcome quarantined, lane "
                                  "cooling down. Disposition: blocked on the provider dependency; re-entry "
                                  "once a healthy lane or a human clears it.")
+        slot.release()
+        return 1
+    if verdict == "remote-held":
+        # Leave remote ownership In Progress. Retrying a local worktree or
+        # another model would duplicate a live/unknown paid remote attempt.
+        linear.comment(issue.id, f"🤖 lane `{name}` remote hold ({', '.join(receipt.get('reasons', []))}); "
+                                 "resume/reconcile the existing thread; no provider failover ran.")
         slot.release()
         return 1
     if verdict == "not-shippable":

@@ -36,6 +36,23 @@ class ExecutionAttemptTest(unittest.TestCase):
         children = [subprocess.Popen([sys.executable, str(MODULE)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True) for _ in range(2)]
         results = [json.loads(child.communicate(json.dumps(request))[0]) for child in children]
         self.assertEqual([row["admitted"] for row in results].count(True), 1)
+    def test_resume_preserves_live_owner_fence_lease_and_budget(self):
+        claimed = self.claim()
+        before = self.path.read_text()
+        resumed = attempt.resume(self.path, self.ident, claimed["fencingToken"], owner(), now=105, coordination=LOCAL)
+        self.assertTrue(resumed["admitted"])
+        self.assertTrue(resumed["resumed"])
+        self.assertEqual(resumed["fencingToken"], claimed["fencingToken"])
+        self.assertEqual(resumed["leaseExpiresAt"], 110)
+        self.assertEqual(resumed["remainingBudgets"], claimed["remainingBudgets"])
+        self.assertEqual(self.path.read_text(), before)
+    def test_resume_rejects_foreign_owner_wrong_fence_expiry_and_terminal(self):
+        claimed = self.claim()
+        for who, fence, now in [(owner("other"), claimed["fencingToken"], 105),
+                                (owner(), "wrong", 105), (owner(), claimed["fencingToken"], 110)]:
+            self.assertFalse(attempt.resume(self.path, self.ident, fence, who, now=now, coordination=LOCAL)["admitted"])
+        self.finish(self.ident, claimed, "succeeded", {}, 106)
+        self.assertFalse(attempt.resume(self.path, self.ident, claimed["fencingToken"], owner(), now=107, coordination=LOCAL)["admitted"])
     def test_github_coordination_dedupes_racing_local_paths(self):
         rows, lock, barrier = [], threading.Lock(), threading.Barrier(2)
         def fake_rows(*_):
