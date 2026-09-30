@@ -50,7 +50,7 @@ describe('direct answer', () => {
     ).toBe('failed');
   });
 
-  it('fails when the answer starts after the 100-word window', () => {
+  it('fails when the answer starts after the first 100 words', () => {
     const filler = Array.from({ length: 120 }, (_, i) => `w${i}`).join(' ');
     const check = auditDirectAnswer(
       page(`<div>${filler}</div><p>${ANSWER}</p>`)
