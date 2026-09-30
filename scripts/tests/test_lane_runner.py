@@ -798,6 +798,32 @@ class WorkerTest(unittest.TestCase):
         lane.in_flight_issues = lambda: frozenset({"JOV-3"})
         lane.run_issue = lambda *a: self.fail("duplicate PR for JOV-3")
         self.assertEqual(lane.worker(self.host, "devin"), 0)
+
+    def test_a_clean_exit_at_the_claim_scan_is_recorded_for_the_doctor(self):
+        """The doctor's spawn-exit rule trusts this marker to mean 'nothing claimable',
+        not 'died on claim'; it must exist and name why the worker stopped."""
+        lane.in_flight_issues = lambda: frozenset({"JOV-3"})
+        self.assertEqual(lane.worker(self.host, "devin"), 0)
+        record = json.loads((self.host.state / "worker-idle.json").read_text())["devin"]
+        self.assertEqual(record["reason"], "none-eligible")
+        self.assertTrue(record["at"].endswith("Z"))
+
+    def test_over_budget_and_unknown_in_flight_exits_name_their_reason(self):
+        lane.lane_prs = lambda name, fields="": [{"headRefName": "devin/a", "isDraft": True},
+                                                 {"headRefName": "devin/b", "isDraft": True}]
+        self.assertEqual(lane.worker(self.host, "devin"), 0)
+        self.assertEqual(json.loads((self.host.state / "worker-idle.json").read_text())
+                         ["devin"]["reason"], "over-budget")
+        lane.lane_prs = lambda name, fields="": []
+        lane.in_flight_issues = lambda: None
+        self.assertEqual(lane.worker(self.host, "devin"), 0)
+        self.assertEqual(json.loads((self.host.state / "worker-idle.json").read_text())
+                         ["devin"]["reason"], "in-flight-unknown")
+
+    def test_a_crash_before_the_scan_leaves_no_idle_record(self):
+        lane.lane_prs = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom"))
+        self.assertRaises(RuntimeError, lane.worker, self.host, "devin")
+        self.assertFalse((self.host.state / "worker-idle.json").exists())
         self.assertEqual(self.linear.moves, [])
 
     def test_a_lane_over_its_open_pr_budget_claims_nothing_new(self):

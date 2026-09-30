@@ -137,10 +137,13 @@ Each new alert key opens a Linear issue in Triage (label `symphony`, "Symphony d
 to Done; a key that fires again within six hours reopens the same issue. Keys:
 `tick-error`, `provider-down:<lane>`, `provider-idle:<lane>`, `codex-all-banked`, `codex-broken`, `linear-down`,
 `pool-empty`, `no-landing`, `gate-timeouts`, `failed-runs`, `disk-low`, `disk-critical`,
-`github-quota`, `hud-stale`, `orphan-prs`.
+`github-quota`, `hud-stale`, `orphan-prs`, `aged-prs`, `spawn-exit`.
 `provider-idle:<lane>` is urgent: after five continuous minutes with compatible work, a
 healthy provider, configured slots, repeated dispatch attempts, and zero workers, capacity
-is being lost. Every alert also produces a generation-deduped
+is being lost. `spawn-exit` fires when workers spawn every tick but no run starts or ends
+and no worktree exists; a worker that finishes its claim scan with nothing to do records a
+clean exit in `worker-idle.json`, so the alert only means workers are dying before or during
+the claim — a clean 'nothing claimable' exit is not a deadlock. Every alert also produces a generation-deduped
 `jovie.control-plane-liveness-condition/v1` receipt in `doctor.json` and the independent
 status feed. The receipt carries its owner, affected resources, first observation, source
 freshness, ten-minute escalation deadline, recovery result, next action, and terminal

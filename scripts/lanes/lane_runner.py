@@ -1782,6 +1782,21 @@ def failures_path(host: Host) -> Path:
     return host.state / "failures.json"
 
 
+def record_idle_exit(host: Host, name: str, reason: str) -> None:
+    """A durable marker that a spawned worker reached the claim scan and exited cleanly, so the
+    doctor's spawn-exit rule can tell 'pool had nothing claimable' from workers dying on claim."""
+    lock = Locked(host.state / "claim.lock", blocking=True)
+    try:
+        path = host.state / "worker-idle.json"
+        data = json.loads(path.read_text()) if path.exists() else {}
+        data[name] = {"at": now_iso(), "reason": reason}
+        path.write_text(json.dumps(data))
+    except (OSError, ValueError):
+        pass
+    finally:
+        lock.release()
+
+
 def worker(host: Host, name: str) -> int:
     spec = load_providers()[name]
     if not spec.get("enabled", True):
@@ -1812,9 +1827,9 @@ def worker(host: Host, name: str) -> int:
         adopt = None if red or not provider_may_run(name, "adopt") else claim_adoptable_pr(host, name, prs)
         issue = None
         sweep_lane_prs(host, name, linear)
-        in_flight = None if red or adopt or over_budget(name, lane_prs(name, fields=LIGHT_PR_FIELDS),
-                                                        host.slots(name, spec.get("slots", 1))) \
-            else in_flight_issues()
+        full = not (red or adopt) and over_budget(name, lane_prs(name, fields=LIGHT_PR_FIELDS),
+                                                  host.slots(name, spec.get("slots", 1)))
+        in_flight = None if red or adopt or full else in_flight_issues()
         if in_flight is not None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
             issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
@@ -1833,6 +1848,8 @@ def worker(host: Host, name: str) -> int:
         slot.release()
         return reexec(host, name)
     if issue is None:
+        record_idle_exit(host, name, "over-budget" if full else
+                         "in-flight-unknown" if in_flight is None else "none-eligible")
         return 0
     linear.comment(issue.id, f"🤖 lane `{name}` claimed this issue (model `{spec.get('model')}`).")
     receipt = run_issue(host, name, spec, linear, issue)
