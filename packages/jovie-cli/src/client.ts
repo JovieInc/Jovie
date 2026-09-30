@@ -55,7 +55,11 @@ export async function readResponseBody(
   response: Response,
   signal: AbortSignal
 ): Promise<string> {
-  if (!response.body) return '';
+  if (!response.body) {
+    if (signal.aborted)
+      throw new Error('Response deadline exceeded or canceled.');
+    return '';
+  }
   const reader = response.body.getReader();
   if (signal.aborted) {
     void reader.cancel().catch(() => {});

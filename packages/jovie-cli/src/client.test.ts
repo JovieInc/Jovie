@@ -432,6 +432,9 @@ describe('response decoding and preexisting cancellation', () => {
       readResponseBody(new Response('abc'), controller.signal)
     ).rejects.toThrow('canceled');
     await expect(
+      readResponseBody(new Response(null, { status: 204 }), controller.signal)
+    ).rejects.toThrow('canceled');
+    await expect(
       fetchSiteLlms(false, {
         fetchImpl: async (_url, init) => {
           init?.signal?.dispatchEvent(new Event('abort'));
