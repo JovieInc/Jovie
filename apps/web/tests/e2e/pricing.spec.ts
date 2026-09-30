@@ -192,14 +192,12 @@ test.describe('Pricing Page', () => {
     ).toHaveCount(0);
   });
 
-  test('keeps shared logo-bar assets inside the product card (JOV-6849, JOV-7233)', async ({
+  test('keeps shared logo-bar assets inside the notification trust card (JOV-6849, JOV-7233)', async ({
     page,
   }) => {
-    await page.goto('/product', { waitUntil: 'domcontentloaded' });
+    await page.goto('/artist-notifications', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
-    const logoBar = page.locator(
-      '.marketing-hero-logos [data-testid="homepage-trust"]'
-    );
+    const logoBar = page.locator('main [data-testid="homepage-trust"]');
     await expect(logoBar).toBeVisible();
     const brokenImages = await logoBar
       .locator('img')
