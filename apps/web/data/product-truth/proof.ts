@@ -488,18 +488,6 @@ const VERIFIED_PRODUCT_PROOF = [
       route: '/tim',
     },
   },
-  {
-    recordType: 'proof',
-    id: 'product-profile-tour-capture',
-    kind: 'product-proof',
-    claimId: 'capability.artist-profiles.public-artist-profile',
-    sectionIds: ['feature-split'],
-    artifact: {
-      kind: 'screenshot-scenario',
-      scenarioId: 'tim-white-profile-tour-mobile',
-      route: '/tim',
-    },
-  },
 ] as const satisfies readonly ProductProof[];
 
 for (const proof of VERIFIED_PRODUCT_PROOF) {
@@ -765,6 +753,17 @@ const UNVERIFIED_MARKETING_PROOF: readonly MarketingProofAuditObservation[] = [
     subjectName: asset.id,
     missing: ['relationship', 'permissionRecord'],
   })),
+  {
+    // The tour capture stays as an image, but no events or ticketing
+    // capability backs the "Sell Out" outcome, so it is not proof of it.
+    id: 'baseline-sell-out-tour-capture',
+    kind: 'product-proof',
+    claimId: 'capability.events.ticket-sales',
+    pages: ['/', '/artist-profile', '/artist-profiles', '/solutions/artists'],
+    observedValue: 'Sell Out outcome shown with tim-white-profile-tour-mobile',
+    sourceLocation: 'apps/web/data/artistProfileCopy.ts',
+    missing: ['registered events or ticketing claim'],
+  },
   {
     id: 'baseline-about-founder-experience',
     kind: 'metric',
