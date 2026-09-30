@@ -18,6 +18,7 @@ on:
       - 'apps/web/features/**'
       - 'apps/web/lib/**'
       - 'apps/web/data/homepage*.ts'
+      - 'apps/web/data/**'
       - 'apps/web/public/**'
       - 'apps/web/styles/**'
       - 'apps/console/**'
