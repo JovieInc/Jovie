@@ -4,6 +4,7 @@ import { TooltipProvider } from '@jovie/ui';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { TASK_DATA_TABLE_MULTILINE_CELL_CONTENT_CLASSNAME } from '@/components/features/dashboard/tasks/TaskDataTable';
 import { APP_ROUTES } from '@/constants/routes';
 import type { TaskBoardResult, TaskStatus, TaskView } from '@/lib/tasks/types';
 
@@ -743,6 +744,10 @@ function getLatestTableProps() {
   return mockUnifiedTable.mock.calls.at(-1)?.[0] as
     | {
         readonly data?: ReadonlyArray<TaskView>;
+        readonly columns?: ReadonlyArray<{
+          readonly id?: string;
+          readonly meta?: { readonly cellContentClassName?: string };
+        }>;
         readonly onRowClick?: (task: TaskView) => void;
         readonly isRowSelected?: (task: TaskView, index: number) => boolean;
         readonly getRowClassName?: (task: TaskView, index: number) => string;
@@ -1742,6 +1747,18 @@ describe('TasksPageClient', () => {
 
     expect(mockUseTasksQuery.mock.calls.at(-1)?.[1]).toEqual(
       expect.objectContaining({ search: 'metadata' })
+    );
+  });
+
+  it('opts the task title cell into multiline row content', () => {
+    renderPage();
+
+    const titleColumn = getLatestTableProps()?.columns?.find(
+      column => column.id === 'title'
+    );
+
+    expect(titleColumn?.meta?.cellContentClassName).toBe(
+      TASK_DATA_TABLE_MULTILINE_CELL_CONTENT_CLASSNAME
     );
   });
 
