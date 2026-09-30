@@ -1,14 +1,15 @@
 import 'server-only';
 
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, gt, isNull } from 'drizzle-orm';
 import { BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import { agentVisibilityDrafts } from '@/lib/db/schema/agent-drafts';
 import { resolveAgentArtist } from './artist-resolution';
 import { draftTokenHash, verifyDraftCapability } from './draft-capability';
 import { createAgentDraftSchema, type DraftCapability } from './draft-contract';
+import type { StoredReleaseLaunch } from './draft-preview';
 
-type DraftRow = typeof agentVisibilityDrafts.$inferSelect;
+export type AgentDraftRow = typeof agentVisibilityDrafts.$inferSelect;
 
 async function findDraft(
   capability: DraftCapability,
@@ -31,9 +32,10 @@ async function findDraft(
   return row ?? null;
 }
 
-function presentDraft(row: DraftRow) {
+function presentDraft(row: AgentDraftRow) {
+  const { launch, ...artist } = row.preview;
   const missing = (['bio', 'image_url'] as const).filter(
-    field => !row.preview[field]
+    field => !artist[field]
   );
   return {
     status: 'draft_ready' as const,
@@ -42,7 +44,8 @@ function presentDraft(row: DraftRow) {
     receipt_id: row.id,
     status_url: `${BASE_URL}/api/agents/drafts/${row.id}`,
     expires_at: row.expiresAt.toISOString(),
-    artist: row.preview,
+    artist,
+    ...(launch ? { launch: launch.result } : {}),
     acquisition: { ...row.acquisition, draft_id: row.id },
     ownership: 'unverified' as const,
     published_url: null,
@@ -67,6 +70,45 @@ export async function readAgentDraft(draftId: string, token: string) {
   if (!capability || capability.draft_id !== draftId) return unavailable();
   const row = await findDraft(capability, token, new Date());
   return row ? presentDraft(row) : unavailable();
+}
+
+export async function loadAgentDraftForMutation(
+  draftId: string,
+  token: string
+): Promise<AgentDraftRow | null> {
+  const capability = verifyDraftCapability(token);
+  if (!capability || capability.draft_id !== draftId) return null;
+  return findDraft(capability, token, new Date());
+}
+
+/** Compare-and-set keeps racing retries from replacing a different launch. */
+export async function storeAgentReleaseLaunch(
+  draftId: string,
+  token: string,
+  expectedFingerprint: string | null,
+  launch: StoredReleaseLaunch
+): Promise<AgentDraftRow | null> {
+  const capability = verifyDraftCapability(token);
+  if (!capability || capability.draft_id !== draftId) return null;
+  const now = new Date();
+  const current = await findDraft(capability, token, now);
+  if (!current) return null;
+  await db
+    .update(agentVisibilityDrafts)
+    .set({ preview: { ...current.preview, launch } })
+    .where(
+      and(
+        eq(agentVisibilityDrafts.id, capability.draft_id),
+        eq(agentVisibilityDrafts.artistId, capability.artist_id),
+        eq(agentVisibilityDrafts.capabilityHash, draftTokenHash(token)),
+        gt(agentVisibilityDrafts.expiresAt, now),
+        isNull(agentVisibilityDrafts.claimedAt),
+        expectedFingerprint
+          ? drizzleSql`${agentVisibilityDrafts.preview}->'launch'->>'inputFingerprint' = ${expectedFingerprint}`
+          : drizzleSql`${agentVisibilityDrafts.preview}->'launch' IS NULL`
+      )
+    );
+  return findDraft(capability, token, new Date());
 }
 
 /** One PK-protected insert makes retries and racing instances share one draft. */
