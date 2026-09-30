@@ -1,3 +1,8 @@
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { Readable } from 'node:stream';
+import JSZip from 'jszip';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
@@ -55,6 +60,169 @@ const ARTIST_PROFILE_MODE_LABELS = [
   'On tour',
   'Support',
 ] as const;
+
+// Diagnostic branch only. Retain actionability timing, never raw trace payloads,
+// snapshots, network, selectors, expressions, cookies or console text.
+const actionTraceDirectories = new WeakMap<
+  import('@playwright/test').Page,
+  string
+>();
+const allowedActionMessages = new Set([
+  'waiting for element to be visible, enabled and stable',
+  'element is visible, enabled and stable',
+  'waiting for element to be visible and stable',
+  'element is visible and stable',
+  'scrolling into view if needed',
+  'done scrolling',
+  'performing click action',
+  'click action done',
+  'waiting for scheduled navigations to finish',
+  'navigations have finished',
+]);
+
+async function boundedTraceText(entry: JSZip.JSZipObject): Promise<string> {
+  const pieces: Buffer[] = [];
+  let bytes = 0;
+  // JSZip's legacy readable-stream has no async iterator; wrap it in the
+  // installed Node runtime's Readable before consuming bounded chunks.
+  const stream = new Readable({ read() {} }).wrap(entry.nodeStream());
+  for await (const piece of stream) {
+    if (!Buffer.isBuffer(piece)) throw new Error('unexpected trace stream');
+    bytes += piece.byteLength;
+    if (bytes > 12 * 1024 * 1024) {
+      throw new Error('decompressed diagnostic exceeds bounded input');
+    }
+    pieces.push(piece);
+  }
+  return Buffer.concat(pieces).toString('utf8');
+}
+
+async function finishActionTimingTrace(
+  page: import('@playwright/test').Page,
+  identity: { title: string; retry: number; project: string }
+) {
+  const directory = actionTraceDirectories.get(page);
+  if (!directory) return;
+  actionTraceDirectories.delete(page);
+  let summary: { retained: number; omitted: number } | null = null;
+  try {
+    const tracePath = path.join(directory, 'temporary.zip');
+    await page.context().tracing.stop({ path: tracePath });
+    const buffer = await readFile(tracePath);
+    if (buffer.byteLength > 24 * 1024 * 1024) {
+      throw new Error('diagnostic trace exceeds bounded input');
+    }
+    const archive = await JSZip.loadAsync(buffer);
+    for (const entry of Object.values(archive.files)) {
+      if (entry.name.endsWith('.network') && (await boundedTraceText(entry))) {
+        throw new Error('unexpected network capture in diagnostic');
+      }
+    }
+    const entries = Object.values(archive.files).filter(entry =>
+      entry.name.endsWith('.trace')
+    );
+    if (entries.length !== 1) throw new Error('unexpected trace entry count');
+    const events: Record<string, unknown>[] = [];
+    for (const entry of entries) {
+      for (const line of (await boundedTraceText(entry)).split('\n')) {
+        if (!line) continue;
+        if (events.length >= 24000) throw new Error('too many trace events');
+        const event: unknown = JSON.parse(line);
+        if (event && typeof event === 'object' && !Array.isArray(event)) {
+          events.push(event as Record<string, unknown>);
+        }
+      }
+    }
+    const origin = events.find(event => event.type === 'context-options');
+    const wallTime = origin?.wallTime;
+    const monotonicTime = origin?.monotonicTime;
+    if (typeof wallTime !== 'number' || typeof monotonicTime !== 'number') {
+      throw new Error('diagnostic clock origin unavailable');
+    }
+    const calls = new Map<string, string>();
+    for (const event of events) {
+      if (
+        event.type === 'before' &&
+        typeof event.callId === 'string' &&
+        (event.method === 'click' || event.method === 'scrollIntoViewIfNeeded')
+      ) {
+        calls.set(event.callId, event.method);
+      }
+    }
+    let retained = 0;
+    let omitted = 0;
+    for (const event of events) {
+      if (typeof event.callId !== 'string' || !calls.has(event.callId))
+        continue;
+      const message =
+        typeof event.message === 'string' ? event.message.trim() : null;
+      if (
+        event.type !== 'before' &&
+        event.type !== 'after' &&
+        event.type !== 'input' &&
+        !(event.type === 'log' && message && allowedActionMessages.has(message))
+      ) {
+        continue;
+      }
+      const at =
+        event.type === 'before'
+          ? event.startTime
+          : event.type === 'after'
+            ? event.endTime
+            : event.time;
+      if (typeof at !== 'number' && event.type !== 'input') continue;
+      if (++retained > 320) {
+        omitted++;
+        continue;
+      }
+      console.log(
+        'ORIGINAL_ACTIONABILITY_TIMING ' +
+          JSON.stringify({
+            identity,
+            callId: event.callId,
+            method: calls.get(event.callId),
+            phase: event.type,
+            wallTime:
+              typeof at === 'number' ? wallTime + at - monotonicTime : null,
+            ...(event.type === 'log' ? { message } : {}),
+            ...(event.type === 'after' ? { failed: !!event.error } : {}),
+          })
+      );
+    }
+    summary = { retained, omitted };
+  } catch {
+    // Diagnostic collection must not replace the unchanged product assertion.
+    console.log(
+      'ORIGINAL_ACTIONABILITY_TIMING ' +
+        JSON.stringify({ identity, phase: 'incomplete' })
+    );
+  } finally {
+    try {
+      await rm(directory, { recursive: true, force: true });
+      const remaining = await stat(directory).catch(error => {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+        throw error;
+      });
+      if (remaining) throw new Error('diagnostic directory remains');
+      if (summary) {
+        console.log(
+          'ORIGINAL_ACTIONABILITY_TIMING ' +
+            JSON.stringify({
+              identity,
+              phase: 'complete',
+              ...summary,
+              temporaryDeleted: true,
+            })
+        );
+      }
+    } catch {
+      console.log(
+        'ORIGINAL_ACTIONABILITY_TIMING ' +
+          JSON.stringify({ identity, phase: 'cleanup-incomplete' })
+      );
+    }
+  }
+}
 
 interface GeometrySnapshot {
   readonly documentTop: number;
@@ -198,6 +366,7 @@ async function observeOriginalEntry(
             sequence,
             phase,
             at: performance.now(),
+            wallTime: Date.now(),
             frames,
             readyDeliveredAt,
             readyDeliveredFrame,
@@ -346,6 +515,27 @@ test.describe('Artist Profiles Landing', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     if (
       testInfo.title ===
+      'adaptive mode changes preserve desktop and mobile geometry'
+    ) {
+      const directory = await mkdtemp(
+        path.join(tmpdir(), 'jovie-action-timing-')
+      );
+      try {
+        await page.context().tracing.start({
+          screenshots: false,
+          snapshots: false,
+          sources: false,
+        });
+        actionTraceDirectories.set(page, directory);
+      } catch {
+        await rm(directory, { recursive: true, force: true });
+        console.log(
+          'ORIGINAL_ACTIONABILITY_TIMING {"phase":"start-incomplete"}'
+        );
+      }
+    }
+    if (
+      testInfo.title ===
         'adaptive mode changes preserve desktop and mobile geometry' ||
       testInfo.title.startsWith('entry discriminator:')
     ) {
@@ -379,6 +569,11 @@ test.describe('Artist Profiles Landing', () => {
         );
       }
     }
+    await finishActionTimingTrace(page, {
+      title: testInfo.title,
+      retry: testInfo.retry,
+      project: testInfo.project.name,
+    });
   });
 
   test('hero renders with headline and CTAs', async ({ page }) => {
