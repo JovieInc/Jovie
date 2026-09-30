@@ -314,7 +314,7 @@ export function AlertGrowthLanding({
                     value={phoneInput}
                     onChange={e => setPhoneInput(e.target.value)}
                     disabled={isPending}
-                    className='border-subtle bg-surface-0 text-primary-token focus-visible:ring-accent h-12 w-full rounded-(--profile-action-radius) border px-3.5 text-lg focus:outline-none focus-visible:ring-2'
+                    className='border-subtle bg-surface-0 text-primary-token focus-visible:ring-accent h-12 w-full rounded-(--profile-action-radius) border px-3.5 text-base focus:outline-none focus-visible:ring-2'
                   />
                 </>
               ) : (
@@ -334,7 +334,7 @@ export function AlertGrowthLanding({
                     value={emailInput}
                     onChange={e => setEmailInput(e.target.value)}
                     disabled={isPending}
-                    className='border-subtle bg-surface-0 text-primary-token focus-visible:ring-accent h-12 w-full rounded-(--profile-action-radius) border px-3.5 text-lg focus:outline-none focus-visible:ring-2'
+                    className='border-subtle bg-surface-0 text-primary-token focus-visible:ring-accent h-12 w-full rounded-(--profile-action-radius) border px-3.5 text-base focus:outline-none focus-visible:ring-2'
                   />
                 </>
               )}
@@ -452,7 +452,7 @@ function SubscribedState({
         className='bg-surface-1 border-subtle rounded-(--profile-card-radius) border p-5'
         data-testid='alerts-landing-pending'
       >
-        <h2 className='text-primary-token text-lg font-semibold tracking-normal'>
+        <h2 className='text-primary-token text-base font-semibold tracking-normal'>
           Check Your {channel === 'sms' ? 'Phone' : 'Inbox'}.
         </h2>
         <p className='text-secondary-token mt-2 text-sm'>
@@ -470,7 +470,7 @@ function SubscribedState({
       className='bg-surface-1 border-subtle rounded-(--profile-card-radius) border p-5'
       data-testid='alerts-landing-success'
     >
-      <h2 className='text-primary-token text-lg font-semibold tracking-normal'>
+      <h2 className='text-primary-token text-base font-semibold tracking-normal'>
         You&apos;re On The List.
       </h2>
       <p className='text-secondary-token mt-2 text-sm'>

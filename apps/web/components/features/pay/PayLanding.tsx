@@ -197,7 +197,7 @@ function BenefitsSection() {
                 <div className='flex h-10 w-10 items-center justify-center rounded-xl border border-subtle bg-surface-1'>
                   <benefit.icon className='h-5 w-5 text-secondary-token' />
                 </div>
-                <h3 className='mt-5 text-lg font-medium tracking-tight text-primary-token'>
+                <h3 className='mt-5 text-base font-medium tracking-tight text-primary-token'>
                   {benefit.title}
                 </h3>
                 <p className='mt-3 text-sm leading-relaxed text-secondary-token'>

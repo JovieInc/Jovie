@@ -261,7 +261,7 @@ function FridayRhythmContent({
           <span className='block'>Make Every Friday</span>
           <span className='block'>Count</span>
         </h2>
-        <p className='mt-5 max-w-[34rem] text-mid leading-[1.65] tracking-[-0.005em] text-white/56 sm:text-lg'>
+        <p className='mt-5 max-w-[34rem] text-mid leading-[1.65] tracking-[-0.005em] text-white/56 sm:text-base'>
           Jovie turns each release week into a command center for singles,
           presaves, merch, videos, recaps, and follow-up.
         </p>

@@ -77,7 +77,7 @@ export default async function AlternativesPage({
             alt={data.heroImage.alt}
             className='object-cover opacity-25'
           />
-          <div className='absolute inset-0 bg-gradient-to-b from-base via-base/70 to-base' />
+          <div className='absolute inset-0 bg-gradient-to-b from-base via-(--color-bg-base)/70 to-base' />
         </div>
         <p className='text-sm font-medium text-tertiary-token'>Alternative</p>
         <h1 className='mt-6 max-w-2xl text-4xl font-semibold leading-tight tracking-tight text-balance text-primary-token sm:text-5xl line-clamp-2'>
@@ -98,7 +98,7 @@ export default async function AlternativesPage({
             {data.whySwitch.map(reason => (
               <li
                 key={reason}
-                className='flex gap-3 text-lg leading-relaxed text-secondary-token'
+                className='flex gap-3 text-base leading-relaxed text-secondary-token'
               >
                 <span className='mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent-token' />
                 {reason}

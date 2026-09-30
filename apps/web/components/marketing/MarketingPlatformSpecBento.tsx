@@ -70,7 +70,7 @@ export function MarketingPlatformSpecBento({
                 <div className='relative z-10 mt-4 max-w-sm'>
                   <h3
                     className={cn(
-                      'text-lg font-semibold tracking-tight',
+                      'text-base font-semibold tracking-tight',
                       TITLE_ACCENT_CLASS[tile.accent]
                     )}
                   >

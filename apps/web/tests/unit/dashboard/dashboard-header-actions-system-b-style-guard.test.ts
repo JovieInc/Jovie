@@ -35,7 +35,7 @@ describe('dashboard header action System B styling', () => {
 
   it('keeps admin execution actions on the neutral primary recipe', () => {
     expect(adminBannerSource).toContain("variant='primary'");
-    expect(adminBannerSource).toContain("className='text-lg'");
+    expect(adminBannerSource).toContain("className='text-base'");
     expect(adminOpsSource).toContain('border-(--linear-btn-primary-border)');
     expect(adminOpsSource).toContain('bg-btn-primary');
     expect(adminOpsSource).toContain('text-btn-primary-foreground');

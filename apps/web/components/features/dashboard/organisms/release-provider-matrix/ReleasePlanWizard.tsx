@@ -309,7 +309,7 @@ export function ReleasePlanWizard({
             Step {stepIndex + 1} of {STEPS.length}
           </div>
           <div>
-            <div className='text-lg font-medium'>{stepMeta?.title}</div>
+            <div className='text-base font-medium'>{stepMeta?.title}</div>
             <div className='text-sm text-muted-foreground mt-1'>
               {stepMeta?.description}
             </div>

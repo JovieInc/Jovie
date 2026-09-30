@@ -278,7 +278,7 @@ export function DrawerHero({
                 'min-w-0 flex-1 font-semibold text-primary-token line-clamp-2',
                 isRailDensity
                   ? 'text-sm leading-tight tracking-tight'
-                  : 'text-lg leading-tight',
+                  : 'text-base leading-tight',
                 resolvedTitleLineClamp &&
                   STABLE_HEADER_LINE_CLAMP_CLASSNAME[resolvedTitleLineClamp],
                 stableLayout &&

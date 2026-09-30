@@ -70,7 +70,7 @@ export default function CompareIndexPage() {
               <li key={comparison.href}>
                 <Link
                   href={comparison.href}
-                  className='text-lg font-medium text-primary-token underline decoration-subtle underline-offset-4 transition-colors hover:decoration-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+                  className='text-base font-medium text-primary-token underline decoration-subtle underline-offset-4 transition-colors hover:decoration-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
                 >
                   {comparison.label}
                 </Link>

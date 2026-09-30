@@ -44,7 +44,7 @@ export function AboutPageContent() {
             <h2 className='text-2xl font-semibold text-primary-token'>
               {ABOUT_COPY.origin.heading}
             </h2>
-            <div className='mt-6 space-y-5 text-lg leading-relaxed text-secondary-token'>
+            <div className='mt-6 space-y-5 text-base leading-relaxed text-secondary-token'>
               {ABOUT_COPY.origin.paragraphs.map(paragraph => (
                 <p key={paragraph}>{paragraph}</p>
               ))}

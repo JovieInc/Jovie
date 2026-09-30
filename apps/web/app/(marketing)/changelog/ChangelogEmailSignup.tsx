@@ -215,7 +215,7 @@ export function ChangelogEmailSignup({
       >
         {heading}
       </h2>
-      <p className='mt-4 grid text-lg text-secondary-token'>
+      <p className='mt-4 grid text-base text-secondary-token'>
         <span className='invisible col-start-1 row-start-1' aria-hidden='true'>
           {copy.successDescription}
         </span>

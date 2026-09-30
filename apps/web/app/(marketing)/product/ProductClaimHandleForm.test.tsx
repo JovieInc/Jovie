@@ -18,7 +18,7 @@ describe('ProductClaimHandleForm domain-prefix contrast', () => {
     // background. This span is shared by the homepage hero, homepage close,
     // and /product page claim forms, so fixing it here fixes all three.
     expect(source).toMatch(
-      /<span className='shrink-0 select-none text-lg text-secondary-token'>/
+      /<span className='shrink-0 select-none text-base text-secondary-token'>/
     );
     expect(source).not.toContain('text-tertiary-token');
   });

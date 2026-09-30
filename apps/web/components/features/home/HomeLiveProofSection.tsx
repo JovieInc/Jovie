@@ -101,7 +101,7 @@ export function HomeLiveProofSection({
               {/* ui-casing-allow: marketing display headline */}
               See it live.
             </h2>
-            <p className='mt-4 max-w-[31rem] text-mid leading-[1.7] text-secondary-token sm:text-lg'>
+            <p className='mt-4 max-w-[31rem] text-mid leading-[1.7] text-secondary-token sm:text-base'>
               Real artist profiles. Real release moments.
             </p>
           </div>

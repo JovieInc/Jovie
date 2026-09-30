@@ -12,7 +12,7 @@ export function NewSocialProofSection() {
                 <span className='block'>Built to convert.</span>
               </h2>
 
-              <p className='mt-3 text-sm sm:text-lg text-secondary-token leading-relaxed text-linear'>
+              <p className='mt-3 text-sm sm:text-base text-secondary-token leading-relaxed text-linear'>
                 Fast load, clear next steps, and a layout built to keep fans
                 moving—from tap to listen to follow.
               </p>

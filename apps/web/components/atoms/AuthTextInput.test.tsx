@@ -36,7 +36,7 @@ describe('AuthTextInput', () => {
 
     expect(input.className).toContain('h-11');
     expect(input.className).toContain('min-h-11');
-    expect(input.className).toContain('text-lg');
+    expect(input.className).toContain('text-base');
     expect(input.className).toContain('sm:h-10');
     expect(input.className).toContain('sm:min-h-10');
     expect(input.className).toContain('sm:text-sm');

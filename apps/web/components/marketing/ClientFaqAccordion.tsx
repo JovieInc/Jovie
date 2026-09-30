@@ -99,7 +99,7 @@ export function ClientFaqAccordion({
               className='faq-accordion__panel overflow-hidden'
             >
               <div className='min-h-0 overflow-hidden'>
-                <p className='faq-accordion__answer max-w-prose pb-7 pr-10 pt-2 text-lg leading-7 text-secondary-token'>
+                <p className='faq-accordion__answer max-w-prose pb-7 pr-10 pt-2 text-base leading-7 text-secondary-token'>
                   {item.answer}
                 </p>
               </div>

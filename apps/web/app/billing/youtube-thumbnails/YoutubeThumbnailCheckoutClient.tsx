@@ -47,7 +47,7 @@ export function YoutubeThumbnailCheckoutClient({
       <h1 className='mt-3 text-3xl font-semibold tracking-tight text-primary-token sm:text-4xl'>
         Founder Access
       </h1>
-      <p className='mt-4 text-lg leading-7 text-secondary-token'>
+      <p className='mt-4 text-base leading-7 text-secondary-token'>
         Unlimited candidate generation and up to 10 native YouTube experiment
         starts each month. Your approved identity and style rules stay locked.
       </p>

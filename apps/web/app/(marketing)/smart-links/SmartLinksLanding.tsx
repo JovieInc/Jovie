@@ -50,7 +50,7 @@ export function SmartLinksLanding() {
               >
                 One Link. Their Music App.
               </h1>
-              <p className='mt-6 max-w-xl text-lg leading-7 text-secondary-token sm:text-lg'>
+              <p className='mt-6 max-w-xl text-base leading-7 text-secondary-token sm:text-lg'>
                 Let visitors choose where to listen. The action stays put while
                 the service moves, and their choice follows the next song.
               </p>
@@ -119,7 +119,7 @@ export function SmartLinksLanding() {
           >
             Make Every Link Sing.
           </h2>
-          <p className='mx-auto mt-4 max-w-xl text-lg leading-7 text-secondary-token'>
+          <p className='mx-auto mt-4 max-w-xl text-base leading-7 text-secondary-token'>
             Give every release a home that takes visitors to their chosen music
             app.
           </p>

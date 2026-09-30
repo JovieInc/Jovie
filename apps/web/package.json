@@ -339,6 +339,7 @@
     "@storybook/addon-docs": "10.5.10",
     "@storybook/addon-vitest": "10.6.0",
     "@storybook/nextjs-vite": "10.6.0",
+    "@storybook/react-vite": "10.6.0",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
     "@tailwindcss/postcss": "^4.3.3",

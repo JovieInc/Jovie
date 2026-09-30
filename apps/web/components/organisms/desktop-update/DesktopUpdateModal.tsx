@@ -236,8 +236,9 @@ export function DesktopUpdateModal({
     state.state === 'available' || state.state === 'ready'
       ? state.version
       : null;
-  if (knownVersion && knownVersion !== lastVersion)
-    setLastVersion(knownVersion);
+  useEffect(() => {
+    if (knownVersion) setLastVersion(knownVersion);
+  }, [knownVersion]);
 
   if (
     state.state !== 'available' &&

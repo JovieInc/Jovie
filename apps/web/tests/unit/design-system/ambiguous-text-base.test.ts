@@ -1,69 +1,80 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import postcss from 'postcss';
+import { compile } from 'tailwindcss';
+import { beforeAll, describe, expect, it } from 'vitest';
 
-// The theme defines both --text-base (16px) and --color-base, so Tailwind
-// v4 compiles `text-base` to `color: var(--color-base)`, not a size. Since
-// #18100 every `text-base` title rendered at the h2 base size in the page
-// background colour. Use `text-lg` (16px on the consolidated scale) in the
-// web app, `text-(length:--text-base)` in packages/ui, or
-// `text-(--color-bg-base)` when you mean the colour.
-const AMBIGUOUS = /(?<![-\w[])text-base(?![-\w/])/;
-const repo = resolve(__dirname, '../../../../..');
-const roots = [
-  'apps/web/app',
-  'apps/web/components',
-  'apps/web/lib',
-  'apps/web/styles',
-  'apps/web/hooks',
-  'apps/web/contexts',
-  'packages/ui/atoms',
-  'packages/ui/lib',
-];
+const WEB_ROOT = join(import.meta.dirname, '..', '..', '..');
+const foundation = readFileSync(
+  join(WEB_ROOT, 'styles', 'tailwind-foundation.css'),
+  'utf8'
+);
+let compiledCss = '';
 
-// Ratchet: these files still use text-base and carry unrelated lint debt
-// (primitive restyles, label casing) that touching them would surface.
-// Remove an entry as soon as its file is migrated; the list only shrinks.
-const BASELINE = new Set([
-  'apps/web/app/(marketing)/card/JovieCardLanding.tsx',
-  'apps/web/app/(marketing)/developers/page.tsx',
-  'apps/web/app/app/(shell)/admin/features/FlagChangeConfirmDialog.tsx',
-  'apps/web/app/sentry-example-page/page.tsx',
-  'apps/web/components/features/admin/BulkDeleteCreatorDialog.tsx',
-  'apps/web/components/features/admin/DeleteCreatorDialog.tsx',
-  'apps/web/components/features/home/NewFeaturesSection.tsx',
-  'apps/web/components/features/home/ProfileMockup.tsx',
-  'apps/web/components/features/home/RecentlyShippedSection.tsx',
-  'apps/web/components/organisms/profile-notifications-menu/ProfileNotificationsMenu.tsx',
-]);
+beforeAll(async () => {
+  const source = postcss.parse(foundation);
+  const declarations: string[] = [];
 
-function sourceFiles(dir: string, out: string[] = []): string[] {
-  for (const name of readdirSync(dir)) {
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) {
-      if (name !== 'node_modules') sourceFiles(path, out);
-    } else if (/\.(tsx?|css)$/.test(name) && !/\.test\./.test(name)) {
-      out.push(path);
+  source.walkAtRules(rule => {
+    if (rule.name === 'theme' || rule.name === 'utility') {
+      declarations.push(rule.toString());
     }
-  }
-  return out;
-}
-
-describe('ambiguous text-base', () => {
-  it('is never used as a class outside the shrinking baseline', () => {
-    const users = roots
-      .flatMap(root => sourceFiles(join(repo, root)))
-      .filter(file => AMBIGUOUS.test(readFileSync(file, 'utf8')))
-      .map(file => relative(repo, file));
-    expect(users.filter(file => !BASELINE.has(file))).toEqual([]);
-    // A migrated file must leave the baseline so it cannot regress.
-    expect([...BASELINE].filter(file => !users.includes(file))).toEqual([]);
   });
 
-  it('still catches the class and ignores the CSS variable', () => {
-    expect(AMBIGUOUS.test("className='text-base font-medium'")).toBe(true);
-    expect(AMBIGUOUS.test("'sm:text-base'")).toBe(true);
-    expect(AMBIGUOUS.test('font-size: var(--text-base);')).toBe(false);
-    expect(AMBIGUOUS.test('text-(length:--text-base)')).toBe(false);
+  const compiler = await compile(
+    '@theme { --text-base: 1rem; --text-base--line-height: 1.5; }\n' +
+      `${declarations.join('\n')}\n@tailwind utilities;`
+  );
+  compiledCss = compiler.build([
+    'text-base',
+    'bg-base',
+    'from-base',
+    'to-base',
+    'bg-(--color-bg-base)/90',
+    'bg-(--color-bg-base)/96',
+    'via-(--color-bg-base)/70',
+  ]);
+});
+
+function declarationsFor(selector: string): Record<string, string> {
+  const declarations: Record<string, string> = {};
+  postcss.parse(compiledCss).walkRules(rule => {
+    if (rule.selector !== selector) return;
+    rule.walkDecls(declaration => {
+      declarations[declaration.prop] = declaration.value;
+    });
+  });
+  return declarations;
+}
+
+describe('unambiguous text-base Tailwind emission', () => {
+  it('keeps text-base bound to the 16px type token, not a color token', () => {
+    const declarations = declarationsFor('.text-base');
+
+    expect(declarations['font-size']).toBe('var(--text-base)');
+    expect(declarations['line-height']).toContain('--text-base--line-height');
+    expect(declarations.color).toBeUndefined();
+    expect(foundation).not.toContain('--color-base:');
+  });
+
+  it('preserves the established base surface and gradient utilities', () => {
+    expect(declarationsFor('.bg-base')['background-color']).toBe(
+      'var(--color-bg-base)'
+    );
+    expect(declarationsFor('.from-base')['--tw-gradient-from']).toBe(
+      'var(--color-bg-base)'
+    );
+    expect(declarationsFor('.to-base')['--tw-gradient-to']).toBe(
+      'var(--color-bg-base)'
+    );
+    expect(compiledCss).toContain(
+      'color-mix(in oklab, var(--color-bg-base) 90%, transparent)'
+    );
+    expect(compiledCss).toContain(
+      'color-mix(in oklab, var(--color-bg-base) 96%, transparent)'
+    );
+    expect(compiledCss).toContain(
+      'color-mix(in oklab, var(--color-bg-base) 70%, transparent)'
+    );
   });
 });

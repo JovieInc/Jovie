@@ -45,7 +45,7 @@ export function HeroLinear({ fullScreen = false }: Readonly<HeroLinearProps>) {
               <br />
               Crush Every Release.
             </h1>
-            <p className='mt-5 text-lg font-normal leading-6 tracking-[-0.011em] text-tertiary-token'>
+            <p className='mt-5 text-base font-normal leading-6 tracking-[-0.011em] text-tertiary-token'>
               Smart links, release automation, and fan insight that keep every
               launch moving.
             </p>

@@ -85,7 +85,7 @@ export function AudienceMemberSidebar({
             reserveMetaSlot
             metaOverflow='scroll'
             className='px-2 py-2'
-            titleClassName='text-lg leading-5 tracking-[-0.02em]'
+            titleClassName='text-base leading-5 tracking-[-0.02em]'
             thumbnail={
               <DrawerEntityAvatar
                 src={computeMemberAvatarSrc(member)}
