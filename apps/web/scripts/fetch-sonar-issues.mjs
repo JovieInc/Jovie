@@ -356,6 +356,27 @@ async function latestAnalysis(ctx) {
   );
 }
 
+function analysisIdentityGaps(analysis) {
+  return ['key', 'revision', 'date'].filter(field => {
+    const value = analysis?.[field];
+    return (
+      typeof value !== 'string' ||
+      value.trim().length === 0 ||
+      (field === 'date' && !Number.isFinite(Date.parse(value)))
+    );
+  });
+}
+
+function matchingAnalysisSnapshots(before, after) {
+  return (
+    analysisIdentityGaps(before).length === 0 &&
+    analysisIdentityGaps(after).length === 0 &&
+    before.key === after.key &&
+    before.revision === after.revision &&
+    Date.parse(before.date) === Date.parse(after.date)
+  );
+}
+
 async function validateProjectAndBranch(ctx) {
   const url = `${ctx.baseUrl}/api/components/show?${new URLSearchParams({ component: ctx.projectKey, branch: ctx.branch }).toString()}`;
   try {
@@ -668,12 +689,9 @@ export async function collectInventory({
       `no project analysis is available for branch ${branch} — findings cannot be bound to a Sonar analysis`
     );
   }
-  // The before/after pair must both be present with a matching analysis key,
+  // Both snapshots must carry valid, matching identity, revision and time,
   // otherwise the collection window cannot be verified as atomic.
-  if (
-    boundAnalysis &&
-    !(before?.key && after?.key && before.key === after.key)
-  ) {
+  if (boundAnalysis && !matchingAnalysisSnapshots(before, after)) {
     atomic = false;
     incompleteness.push({
       partition: 'project-analysis',
@@ -687,20 +705,17 @@ export async function collectInventory({
   }
   // A bound analysis must carry full identity: key + revision + date. An
   // absent field leaves staleness/age unverifiable, so it cannot be COMPLETE.
-  if (boundAnalysis && (!boundAnalysis.revision || !boundAnalysis.date)) {
+  const identityGaps = analysisIdentityGaps(boundAnalysis);
+  if (boundAnalysis && identityGaps.length > 0) {
     atomic = false;
-    const missing = [
-      ...(!boundAnalysis.revision ? ['revision'] : []),
-      ...(!boundAnalysis.date ? ['date'] : []),
-    ];
     incompleteness.push({
       partition: 'project-analysis',
       reason: 'analysis_identity_incomplete',
       analysisKey: boundAnalysis.key,
-      missing,
+      missing: identityGaps,
     });
     warnings.push(
-      `bound analysis ${boundAnalysis.key} is missing identity field(s) [${missing.join(', ')}] — findings cannot be fully bound to a Sonar analysis`
+      `bound analysis ${boundAnalysis.key} has missing identity field(s) or invalid values [${identityGaps.join(', ')}] — findings cannot be fully bound to a Sonar analysis`
     );
   }
   if (stale) {

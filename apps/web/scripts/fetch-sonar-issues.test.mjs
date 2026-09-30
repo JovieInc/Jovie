@@ -141,7 +141,9 @@ function world({
       const key = analyses[Math.min(analysisIndex++, analyses.length - 1)];
       return ok({
         paging: { pageIndex: 1, pageSize: 1, total: key ? 1 : 0 },
-        analyses: key ? [{ key, date, revision }] : [],
+        analyses: key
+          ? [typeof key === 'object' ? key : { key, date, revision }]
+          : [],
       });
     }
     if (parsed.pathname === '/api/issues/search') {
@@ -643,6 +645,57 @@ describe('main', () => {
     return { root, exits, logger };
   };
   const issuesDirOf = root => join(root, 'apps/web/.issues');
+
+  it.each([
+    ['invalid timestamp', { date: 'not-a-date' }],
+    ['blank revision', { revision: ' ' }],
+    ['non-string revision', { revision: 123 }],
+    ['non-string analysis key', { key: { id: 'A1' } }],
+    ['incomplete before identity', { revision: null }, true],
+    ['different before revision', { revision: 'external-revision' }, true],
+    ['different before date', { date: '2026-09-21T00:00:00Z' }, true],
+  ])(
+    'rejects %s through collection, CLI and persisted health',
+    async (_name, changed, beforeOnly = false) => {
+      const valid = {
+        key: 'A1',
+        revision: 'abc123',
+        date: '2026-09-20T00:00:00+0000',
+      };
+      const broken = { ...valid, ...changed };
+      const analyses = beforeOnly ? [broken, valid] : [broken, broken];
+      const collected = await collect({ analyses }).promise;
+      expect(collected.status).toBe('INCOMPLETE');
+      expect(collected.atomic).toBe(false);
+      expect(
+        collected.inventory.incompleteness.some(
+          entry => entry.partition === 'project-analysis'
+        )
+      ).toBe(true);
+      const { fetchImpl } = world({ analyses });
+      const { root, exits } = await runFixture(
+        { SONAR_TOKEN: TOKEN, SONAR_BASE_URL: BASE, GITHUB_SHA: 'abc123' },
+        fetchImpl
+      );
+      try {
+        expect(exits).toEqual([2]);
+        const artifact = JSON.parse(
+          readFileSync(
+            join(issuesDirOf(root), 'sonar-issues-inventory.json'),
+            'utf8'
+          )
+        );
+        expect(artifact).toMatchObject({ status: 'INCOMPLETE', atomic: false });
+        expect(
+          artifact.incompleteness.some(
+            entry => entry.partition === 'project-analysis'
+          )
+        ).toBe(true);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  );
 
   it('exits 1 without a SONAR_TOKEN and writes nothing', async () => {
     const root = fixtureRoot();
