@@ -55,10 +55,10 @@ if (!exactHead)
 
 /**
  * Next production streaming can paint the app-shell Suspense fallback
- * (unlabeled skeleton + aria-hidden Just ask) before DashboardShellContent
- * resolves. Capture must wait for the live authenticated chrome, not the
- * first HTML chunk. JOV-5387 New Chat evidence also requires the loaded
- * empty-state heading, which is not aria-hidden.
+ * (unlabeled skeleton + aria-hidden greeting region) before
+ * DashboardShellContent resolves. Capture must wait for the live
+ * authenticated chrome, not the first HTML chunk. JOV-5387 New Chat evidence
+ * also requires the loaded empty-state greeting, which is not aria-hidden.
  */
 async function waitForAuthenticatedShell(page, route) {
   if (!route.startsWith('/app/')) return;
@@ -97,11 +97,13 @@ async function waitForAuthenticatedShell(page, route) {
   });
 
   if (route === '/app/chat' || route.startsWith('/app/chat/')) {
-    // Loading still-frame uses the same test id with aria-hidden. Capture the
-    // loaded Just ask heading, which must stay visible with starter-action cards.
+    // JOV-7150: the loaded empty state is one greeting sentence rendered as
+    // chat-empty-state-greeting-text. The loading still-frame only renders an
+    // aria-hidden skeleton inside chat-empty-state-greeting-region, so the
+    // -text testid is unique to the loaded state.
     await page
-      .getByRole('heading', { name: 'Just ask' })
-      .and(page.getByTestId('chat-empty-state-greeting'))
+      .getByRole('heading', { name: /Good (morning|afternoon|evening)/ })
+      .and(page.getByTestId('chat-empty-state-greeting-text'))
       .filter({ visible: true })
       .first()
       .waitFor({

@@ -588,8 +588,10 @@ describe('bounded PR visual review contract', () => {
     expect(capture).toContain(
       "getByRole('heading', { name: 'New Chat', level: 1 })"
     );
-    expect(capture).toContain("getByRole('heading', { name: 'Just ask' })");
-    expect(capture).toContain("getByTestId('chat-empty-state-greeting')");
+    expect(capture).toContain(
+      "getByRole('heading', { name: /Good (morning|afternoon|evening)/ })"
+    );
+    expect(capture).toContain("getByTestId('chat-empty-state-greeting-text')");
     expect(capture).toContain("'domcontentloaded'");
   });
 });
