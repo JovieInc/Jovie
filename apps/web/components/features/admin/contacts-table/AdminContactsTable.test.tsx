@@ -80,6 +80,56 @@ const metrics: AdminContactStageMetrics = {
   churned: 0,
 };
 
+const certification = {
+  dedupeKey: contact.dedupeKey,
+  evidenceRevision: 'profile-revision-1',
+  status: 'needs_review' as const,
+  canCertify: false,
+  certifiedAt: null,
+  coverage: {
+    confirmed: 0,
+    rejected: 0,
+    unresolved: 1,
+    stale: 0,
+    sourceClassesChecked: ['identity'],
+    missingSourceClasses: ['dsp'],
+  },
+  items: [
+    {
+      key: 'canonical:display-name',
+      revision: 'evidence-revision-1',
+      category: 'identity' as const,
+      label: 'Display name',
+      value: 'Ari Lane',
+      url: null,
+      source: 'profile, user',
+      observedAt: '2026-03-02T00:00:00.000Z',
+      confidence: 0.85,
+      rationale: 'Joined across the canonical CRM identity sources.',
+      freshness: 'fresh' as const,
+      material: true,
+      correctable: true,
+      decision: null,
+      correction: null,
+    },
+  ],
+};
+
+const detailResponse = (overrides: Record<string, unknown> = {}) => ({
+  certification: { ...certification, ...overrides },
+  timeline: [
+    {
+      id: 'transition_1',
+      fromStage: 'approved',
+      toStage: 'paying',
+      actorType: 'system',
+      source: 'billing',
+      reason: null,
+      createdAt: '2026-03-02T00:00:00.000Z',
+    },
+  ],
+});
+
 function RightPanelOutlet() {
   return <aside data-testid='right-panel'>{useRightPanel()}</aside>;
 }
@@ -139,21 +189,7 @@ describe('AdminContactsTable', () => {
   it('opens lifecycle history and applies a manual stage transition', async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock
-      .mockResolvedValueOnce(
-        jsonResponse({
-          timeline: [
-            {
-              id: 'transition_1',
-              fromStage: 'approved',
-              toStage: 'paying',
-              actorType: 'system',
-              source: 'billing',
-              reason: null,
-              createdAt: '2026-03-02T00:00:00.000Z',
-            },
-          ],
-        })
-      )
+      .mockResolvedValueOnce(jsonResponse(detailResponse()))
       .mockResolvedValueOnce(jsonResponse({ ok: true }));
 
     renderTable();
@@ -180,7 +216,7 @@ describe('AdminContactsTable', () => {
   it('surfaces a failed stage transition and restores the actions', async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock
-      .mockResolvedValueOnce(jsonResponse({ timeline: [] }))
+      .mockResolvedValueOnce(jsonResponse(detailResponse()))
       .mockResolvedValueOnce(
         jsonResponse({ error: 'Stage change denied' }, 409)
       );
@@ -196,5 +232,53 @@ describe('AdminContactsTable', () => {
 
     expect(screen.getByRole('button', { name: 'Approve' })).toBeEnabled();
     expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  it('reviews exact evidence and updates certification state immediately', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(detailResponse()))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          certification: {
+            ...certification,
+            status: 'human_reviewed',
+            canCertify: true,
+            coverage: {
+              ...certification.coverage,
+              rejected: 1,
+              unresolved: 0,
+              missingSourceClasses: [],
+            },
+            items: [{ ...certification.items[0], decision: 'no' }],
+          },
+        })
+      );
+
+    renderTable();
+    fireEvent.click(screen.getByTestId('admin-contact-row'));
+    expect(await screen.findByText('Display name')).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: 'No' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    expect(
+      JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))
+    ).toMatchObject({
+      action: 'review_evidence',
+      dedupeKey: contact.dedupeKey,
+      evidenceKey: 'canonical:display-name',
+      evidenceRevision: 'evidence-revision-1',
+      decision: 'no',
+    });
+    expect(screen.getByText('Human reviewed')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'No' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(
+      screen.getByRole('button', { name: 'Certify current profile' })
+    ).toBeEnabled();
   });
 });

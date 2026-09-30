@@ -252,6 +252,8 @@ export {
 export {
   type Contact,
   type ContactStageTransition,
+  contactEvidenceReviews,
+  contactProfileCertifications,
   contactStageTransitions,
   contacts,
   insertContactSchema,

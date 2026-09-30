@@ -113,6 +113,64 @@ export const contactStageTransitions = pgTable(
   })
 );
 
+/** Append-only founder evidence for one exact machine candidate revision. */
+export const contactEvidenceReviews = pgTable(
+  'contact_evidence_reviews',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    contactId: uuid('contact_id')
+      .notNull()
+      .references(() => contacts.id, { onDelete: 'cascade' }),
+    dedupeKey: text('dedupe_key').notNull(),
+    evidenceKey: text('evidence_key').notNull(),
+    evidenceRevision: text('evidence_revision').notNull(),
+    decision: text('decision').notNull(),
+    candidateSnapshot: jsonb('candidate_snapshot')
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    correction: jsonb('correction').$type<{ value: string } | null>(),
+    actorUserId: uuid('actor_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    contactEvidenceIndex: index(
+      'idx_contact_evidence_reviews_contact_evidence_created'
+    ).on(table.contactId, table.evidenceKey, table.createdAt),
+    dedupeKeyIndex: index('idx_contact_evidence_reviews_dedupe_key').on(
+      table.dedupeKey
+    ),
+  })
+);
+
+/** A certification binds only to the exact evidence revision reviewed. */
+export const contactProfileCertifications = pgTable(
+  'contact_profile_certifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    contactId: uuid('contact_id')
+      .notNull()
+      .references(() => contacts.id, { onDelete: 'cascade' }),
+    evidenceRevision: text('evidence_revision').notNull(),
+    coverageSnapshot: jsonb('coverage_snapshot')
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    actorUserId: uuid('actor_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    certifiedAt: timestamp('certified_at').defaultNow().notNull(),
+  },
+  table => ({
+    contactRevisionUnique: uniqueIndex(
+      'idx_contact_profile_certifications_contact_revision_unique'
+    ).on(table.contactId, table.evidenceRevision),
+    contactCertifiedIndex: index(
+      'idx_contact_profile_certifications_contact_certified'
+    ).on(table.contactId, table.certifiedAt),
+  })
+);
+
 // Schema validations
 export const insertContactSchema = createInsertSchema(contacts);
 export const selectContactSchema = createSelectSchema(contacts);
