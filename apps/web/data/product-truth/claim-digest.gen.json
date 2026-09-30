@@ -1,6 +1,7 @@
 {
   "version": 1,
   "claims": {
+    "about.founder.live-shows": "e9c4580a41e91f05",
     "capability.app-download.install-the-jovie-app": "969bc5ee07c13d24",
     "capability.artist-notifications.audience-reactivation": "02e8a8b71562a6de",
     "capability.artist-notifications.opt-in-fan-notifications": "dbf126463ef55ea5",
@@ -78,6 +79,7 @@
     "plan.pro.verified-badge": "6d31daa620c69342"
   },
   "capabilities": {
+    "about.founder.live-shows": "artist-profiles",
     "capability.app-download.install-the-jovie-app": "app-download",
     "capability.artist-notifications.audience-reactivation": "artist-notifications",
     "capability.artist-notifications.opt-in-fan-notifications": "artist-notifications",
