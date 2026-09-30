@@ -7,7 +7,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary'],
-      include: ['src/**/*.ts'],
+      include: ['src/**/*.ts', 'scripts/verify-published-package.mjs'],
       exclude: ['src/**/*.test.ts'],
       thresholds: {
         branches: 90,
