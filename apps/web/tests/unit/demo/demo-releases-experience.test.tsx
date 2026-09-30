@@ -173,6 +173,10 @@ const { DemoReleasesExperience } = await import(
   '@/features/demo/DemoReleasesExperience'
 );
 
+// Load the real lazy drawer before timing UI interactions, rather than timing
+// Vitest's cold module transforms as part of the track-number regression.
+await import('@/components/organisms/release-sidebar');
+
 const LEADING_RELEASE_TITLE = "I'm Not Alone Remixes";
 
 function renderDemo() {

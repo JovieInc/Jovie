@@ -11,8 +11,8 @@ vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
 }));
 
-vi.mock('@/lib/admin', () => ({
-  requireAdmin: mockRequireAdmin,
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  requireOvieApiAccess: mockRequireAdmin,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({

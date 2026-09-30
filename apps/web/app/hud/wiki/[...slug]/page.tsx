@@ -3,6 +3,7 @@ import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ShellPageTitle } from '@/components/features/admin/layout/ShellPageTitle';
 import { WikiPageArticle } from '@/components/features/admin/wiki/WikiPageArticle';
 import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { assertOviePrivacyUnlocked } from '@/lib/ovie/privacy-lock/server';
 import { getPage } from '@/lib/wiki/gbrain-client';
 
 interface Props {
@@ -11,6 +12,7 @@ interface Props {
 
 export default async function WikiPageView({ params }: Props) {
   const access = await getCurrentAdminPageAccess();
+  if (access.hasAdminRole) await assertOviePrivacyUnlocked();
   if (!access.isAuthenticated) unauthorized();
   if (!access.hasAdminRole) forbidden();
 

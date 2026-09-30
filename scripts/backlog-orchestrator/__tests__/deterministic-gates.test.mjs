@@ -1,12 +1,14 @@
 // biome-ignore-all format: Preserve legacy fixture formatting.
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { beforeEach, describe, it } from 'node:test';
 import { validateOptimizationContract } from '../../invariants/optimization-contract.mjs';
 import * as admissionGate from '../admission-gate.mjs';
 import * as admitter from '../admitter.mjs';
 import * as deterministicGates from '../deterministic-gates.mjs';
 import * as planGate from '../plan-gate.mjs';
 import { withPreLeaseReceipts } from './pre-lease.mjs';
+
+const NOW = new Date().toISOString();
 
 function issue(overrides = {}) {
   return {
@@ -40,7 +42,7 @@ Normalize the unstable token before sending the event.
 ## Acceptance criteria
 * Repeated events group into one issue.
 * Focused normalizer tests pass.`,
-    createdAt: '2026-08-01T00:00:00.000Z',
+    createdAt: new Date(Date.now() - 4 * 86_400_000).toISOString(),
     priority: 2,
     estimate: 2,
     state: { name: 'Backlog' },
@@ -81,6 +83,12 @@ function plannedIssue(overrides = {}) {
 }
 
 describe('deterministic no-model gates', () => {
+  beforeEach(context => {
+    // Use the existing pre-lease receipt date, independently of wall-clock time.
+    assert.ok('mock' in context, 'fixture clock needs a test context');
+    context.mock.timers.enable({ apis: ['Date'], now: new Date('2026-08-22T12:00:00.000Z') });
+  });
+
   it('builds complete bounded plan evidence only from an allowlisted issue', () => {
     const result = deterministicGates.buildDeterministicPlanEvidence(issue());
     assert.equal(result.reason, null);
@@ -273,7 +281,7 @@ Normalize the unstable token before sending the event.
     for (const candidate of cases) {
       assert.notEqual(
         deterministicGates.validateDeterministicPlanCandidate(candidate, {
-          now: '2026-08-05T00:00:00.000Z',
+          now: NOW,
         }),
         null
       );
@@ -322,7 +330,7 @@ Normalize the unstable token before sending the event.
         issue({ identifier: 'JOV-4304', priority: 3 }),
         issue({ identifier: 'JOV-4305', priority: 2 }),
       ],
-      { now: '2026-08-05T00:00:00.000Z' }
+      { now: NOW }
     );
     assert.equal(result.selected.identifier, 'JOV-4305');
   });
@@ -334,7 +342,7 @@ Normalize the unstable token before sending the event.
         issue({ identifier: 'JOV-4305', priority: 2 }),
       ],
       {
-        now: '2026-08-05T00:00:00.000Z',
+        now: NOW,
         excludeIdentifiers: ['JOV-4305'],
       }
     );

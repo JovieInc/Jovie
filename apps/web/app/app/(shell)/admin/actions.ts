@@ -3,7 +3,6 @@
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { APP_ROUTES } from '@/constants/routes';
-
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { getCachedAuth } from '@/lib/auth/cached';
@@ -22,6 +21,7 @@ import {
   enqueueMusicFetchEnrichmentJob,
   fireDspDiscovery,
 } from '@/lib/ingestion/jobs';
+import { assertOviePrivacyUnlocked } from '@/lib/ovie/privacy-lock/server';
 import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
 import { logger } from '@/lib/utils/logger';
@@ -102,6 +102,7 @@ async function requireAdmin(): Promise<string> {
     throw new AdminUnauthorizedError();
   }
 
+  await assertOviePrivacyUnlocked();
   return userId;
 }
 

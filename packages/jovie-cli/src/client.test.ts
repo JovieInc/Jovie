@@ -165,7 +165,9 @@ describe('Jovie public resource client', () => {
   });
 
   it('wraps transport errors without exposing request internals', async () => {
+    let attempts = 0;
     const fetchImpl: FetchImplementation = async () => {
+      attempts += 1;
       throw new Error('socket unavailable');
     };
 
@@ -173,6 +175,7 @@ describe('Jovie public resource client', () => {
       code: 'REQUEST_FAILED',
       message: 'GET https://jov.ie/llms.txt failed: socket unavailable',
     });
+    expect(attempts).toBe(2);
 
     const nonErrorFetch: FetchImplementation = async () => {
       throw 'connection closed';
@@ -182,6 +185,40 @@ describe('Jovie public resource client', () => {
     ).rejects.toMatchObject({
       message: 'GET https://jov.ie/llms.txt failed: connection closed',
     });
+  });
+
+  it('retries a transient transport failure once', async () => {
+    let attempts = 0;
+    const fetchImpl: FetchImplementation = async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw new Error('The operation was aborted due to timeout');
+      }
+      return new Response('{"artist":{"username":"demo"}}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    };
+
+    await expect(fetchArtist('demo', { fetchImpl })).resolves.toEqual({
+      artist: { username: 'demo' },
+    });
+    expect(attempts).toBe(2);
+  });
+
+  it('never retries after the caller aborts', async () => {
+    let attempts = 0;
+    const controller = new AbortController();
+    const fetchImpl: FetchImplementation = async () => {
+      attempts += 1;
+      controller.abort();
+      throw new Error('aborted');
+    };
+
+    await expect(
+      fetchArtist('demo', { fetchImpl, signal: controller.signal })
+    ).rejects.toMatchObject({ code: 'REQUEST_FAILED' });
+    expect(attempts).toBe(1);
   });
 
   it('combines a caller cancellation signal with the request timeout', async () => {

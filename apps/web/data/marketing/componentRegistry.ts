@@ -440,7 +440,7 @@ const SECTION_RESOLUTIONS = {
     exportName: 'MarketingCtaSection',
     // Pen `y8oKXI` is the section.cta registry entry; it points at design owner
     // `K4ar1`. The rendered root still emits the caller's adapter shell id
-    // (footerCta `LCLXI` / finalCta `iY5Lp`), which Pen indexes through
+    // (footerCta `DiH2U` / finalCta `DKVHD`), which Pen indexes through
     // section.cta, so the root proofs below are unchanged.
     penRootIds: [MARKETING_PEN_CONTRACT_IDS.section.cta],
     rootProofs: [
