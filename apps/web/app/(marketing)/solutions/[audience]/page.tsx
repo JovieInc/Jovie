@@ -6,10 +6,10 @@ import {
 } from '@/content/pages/solutions';
 import type { PageRecord } from '@/data/marketing/factory/pageRecord';
 import { buildPageRecordMetadata } from '@/data/marketing/factory/pageRecordMetadata';
-import { buildSoftwareSchema } from '@/lib/constants/schemas';
 import {
   assertRenderableSolutionsRecord,
   SolutionsRecordBody,
+  SolutionsRecordJsonLd,
 } from './sections';
 
 export const revalidate = false;
@@ -45,11 +45,7 @@ export default async function SolutionsAudiencePage({
 
   return (
     <>
-      {record.seo.schema.includes('SoftwareApplication') ? (
-        <script type='application/ld+json'>
-          {buildSoftwareSchema(record.seo.description)}
-        </script>
-      ) : null}
+      <SolutionsRecordJsonLd record={record} />
       <SolutionsRecordBody record={record} />
     </>
   );

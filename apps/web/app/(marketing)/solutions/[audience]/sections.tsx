@@ -21,6 +21,7 @@ import {
 import type { MarketingSectionId } from '@/data/marketing/sections';
 import { listProductTruthClaims } from '@/data/product-truth/claims';
 import type { Claim } from '@/data/product-truth/registry';
+import { buildFaqSchema, buildSoftwareSchema } from '@/lib/constants/schemas';
 import { ARTIST_PROFILE_FLAGS } from '@/lib/featureFlags';
 import '@/components/marketing/artist-profile/ArtistProfileLandingPage.css';
 
@@ -140,6 +141,25 @@ export function getSolutionsSectionRenderer(
   return Object.hasOwn(SOLUTIONS_SECTION_RENDERERS, key)
     ? SOLUTIONS_SECTION_RENDERERS[key as SolutionsSectionRendererKey]
     : null;
+}
+
+/** JSON-LD from `record.seo`: the declared schema types plus FAQ entries. */
+export function SolutionsRecordJsonLd({
+  record,
+}: Readonly<{ record: PageRecord }>) {
+  const { seo } = record;
+  return (
+    <>
+      {seo.schema.includes('SoftwareApplication') ? (
+        <script type='application/ld+json'>
+          {buildSoftwareSchema(seo.description)}
+        </script>
+      ) : null}
+      {seo.faq.length > 0 ? (
+        <script type='application/ld+json'>{buildFaqSchema(seo.faq)}</script>
+      ) : null}
+    </>
+  );
 }
 
 /** Page body for a solutions record: the page shell plus composed sections. */
