@@ -19,6 +19,8 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { publicEnv } from '@/lib/env-public';
 import { buildSurfaceCandidates } from './candidates';
 import {
+  type ProfileQualificationStatus,
+  reconcileQualificationStatus,
   selectDurablyMissingSurfaceIds,
   selectRetirableSurfaceIds,
 } from './contracts';
@@ -91,10 +93,22 @@ export async function reconcileProfileSurfaces(
   });
   if (values.length === 0) return { surfaces: 0, sources: 0 };
 
+  const existingByUrl = new Map(
+    existingRows.map(row => [row.normalizedUrl, row] as const)
+  );
+  const upsertValues = values.map(value => ({
+    ...value,
+    qualificationStatus: reconcileQualificationStatus(
+      existingByUrl.get(value.normalizedUrl)
+        ?.qualificationStatus as ProfileQualificationStatus | null,
+      value.qualificationStatus
+    ),
+  }));
+
   const reconciled = await db
     .insert(profileSurfaces)
     .values(
-      values.map(value => ({
+      upsertValues.map(value => ({
         creatorProfileId,
         kind: value.kind,
         platform: value.platform,
@@ -126,9 +140,21 @@ export async function reconcileProfileSurfaces(
         handle: drizzleSql`excluded.handle`,
         url: drizzleSql`excluded.url`,
         externalId: drizzleSql`excluded.external_id`,
-        qualificationStatus: drizzleSql`excluded.qualification_status`,
-        identityConfidence: drizzleSql`excluded.identity_confidence`,
-        isOfficial: drizzleSql`excluded.is_official`,
+        qualificationStatus: drizzleSql`CASE
+          WHEN ${profileSurfaces.qualificationStatus} IN ('qualified', 'conflicting', 'rejected')
+            THEN ${profileSurfaces.qualificationStatus}
+          ELSE excluded.qualification_status
+        END`,
+        identityConfidence: drizzleSql`CASE
+          WHEN ${profileSurfaces.qualificationStatus} IN ('qualified', 'conflicting', 'rejected')
+            THEN ${profileSurfaces.identityConfidence}
+          ELSE excluded.identity_confidence
+        END`,
+        isOfficial: drizzleSql`CASE
+          WHEN ${profileSurfaces.qualificationStatus} IN ('qualified', 'conflicting', 'rejected')
+            THEN ${profileSurfaces.isOfficial}
+          ELSE excluded.is_official
+        END`,
         monitoringPriority: drizzleSql`excluded.monitoring_priority`,
         lastDiscoveredAt: startedAt,
         updatedAt: startedAt,
@@ -203,11 +229,8 @@ export async function reconcileProfileSurfaces(
       );
   }
 
-  const previousByUrl = new Map(
-    existingRows.map(row => [row.normalizedUrl, row] as const)
-  );
   const qualificationEvents = reconciled.flatMap(row => {
-    const previous = previousByUrl.get(row.normalizedUrl);
+    const previous = existingByUrl.get(row.normalizedUrl);
     if (previous?.qualificationStatus === row.qualificationStatus) return [];
     return [
       {
@@ -247,7 +270,10 @@ export async function reconcileProfileSurfaces(
   const surfaceIdsToRetire = selectRetirableSurfaceIds(
     knownSurfaceIds,
     currentSurfaceIds,
-    surfacesWithSources
+    surfacesWithSources,
+    existingRows
+      .filter(row => row.qualificationStatus === 'rejected')
+      .map(row => row.id)
   ).filter(surfaceId => durablyMissingSurfaceIds.has(surfaceId));
   if (surfaceIdsToRetire.length > 0) {
     await db
