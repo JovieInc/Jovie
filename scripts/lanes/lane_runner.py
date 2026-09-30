@@ -92,6 +92,8 @@ OPEN_PRS_PER_SLOT = 2
 STALE_DRAFT_S = 24 * 3600
 SWEEP_EVERY_S = 1800
 PROVIDER_COOLDOWN_S = 900
+WORKTREE_INSTALL = ["pnpm", "install", "--frozen-lockfile", "--prefer-offline",
+                    "--package-import-method=hardlink"]
 # Waiting work gains one priority level per day, capped at urgent. This preserves
 # urgent-first admission while guaranteeing that a sustained P1 stream cannot
 # starve older work forever.
@@ -460,7 +462,15 @@ def issue_is_sensitive(issue: Issue) -> bool:
 
 
 def issue_hits_red_line(issue: Issue) -> bool:
-    return SENSITIVE_RED_LINES.search(f"{issue.title}\n{issue.description}") is not None
+    text = f"{issue.title}\n{issue.description}"
+    for match in SENSITIVE_RED_LINES.finditer(text):
+        # Public-page schema fixtures are test data, not live plan prices.
+        # Only exempt this complete reference, never the whole issue.
+        if (re.fullmatch(r"live\s+`/pricing", match.group(0), re.IGNORECASE)
+                and re.match(r"`\s+schema\s+fixture\b", text[match.end():], re.IGNORECASE)):
+            continue
+        return True
+    return False
 
 
 def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
@@ -776,29 +786,88 @@ def template(args: list[str], values: dict) -> list[str]:
     return [arg.format(**{"here": str(HERE), **values}) for arg in args]
 
 
-def run_agent(cmd: list[str], cwd: Path, log, timeout: int) -> subprocess.CompletedProcess:
-    """The provider and every child it spawns live in one process group, so a timeout kills
-    all of them instead of leaving an agent editing a worktree the runner already gave up on."""
-    import signal
-    proc = subprocess.Popen(cmd, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+def process_group_alive(group: int) -> bool:
     try:
-        code = proc.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
+        os.killpg(group, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # Darwin can report EPERM for an empty group after its leader is reaped.
+        # Verify membership instead of treating a real permission denial as success.
+        members = subprocess.run(["ps", "-axo", "pgid=,stat="], capture_output=True, text=True, timeout=5)
+        if members.returncode != 0:
+            raise
+        return any(fields[0] == str(group) and not fields[1].startswith("Z")
+                   for line in members.stdout.splitlines() if len(fields := line.split()) == 2)
+
+
+def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
+              guard_interval: float = 30) -> subprocess.CompletedProcess:
+    """The provider and every child it spawns live in one process group, so a timeout kills
+    all of them instead of leaving an agent editing a worktree the runner already gave up on.
+    Agent-started pnpm installs must also reuse the shared store instead of copying it."""
+    import signal
+    if guard:
+        guard()
+    env = {**os.environ, "npm_config_package_import_method": "hardlink"}
+    proc = subprocess.Popen(cmd, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True,
+                            start_new_session=True, env=env)
+    try:
+        deadline = time.monotonic() + timeout
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(cmd, timeout)
+            try:
+                code = proc.wait(timeout=min(guard_interval, remaining) if guard else remaining)
+                break
+            except subprocess.TimeoutExpired:
+                if guard:
+                    guard()
+                if not guard or time.monotonic() >= deadline:
+                    raise
+    except BaseException:
         for sig, grace in ((signal.SIGTERM, 15), (signal.SIGKILL, 5)):
             try:
                 os.killpg(proc.pid, sig)
             except ProcessLookupError:
                 break
-            try:
-                proc.wait(timeout=grace)
-                break
-            except subprocess.TimeoutExpired:
+            except PermissionError:
+                if not process_group_alive(proc.pid):
+                    break
+                raise
+            deadline = time.monotonic() + grace
+            while time.monotonic() < deadline:
+                proc.poll()  # Reap the leader; its exit does not prove its children exited.
+                if not process_group_alive(proc.pid):
+                    break
+                time.sleep(0.05)
+            else:
                 continue
-        raise subprocess.TimeoutExpired(cmd, timeout)
+            break
+        raise
     return subprocess.CompletedProcess(cmd, code)
 
 
 PROVIDER_HANDOFFS = 2
+
+
+class DiskAdmissionError(RuntimeError):
+    pass
+
+
+def require_disk(host: Host, stage: str) -> None:
+    report = disk_guard.check(host)
+    if not report.get("admitted"):
+        raise DiskAdmissionError(f"{stage}:{report.get('reason', 'disk-unobservable')}")
+
+
+def install_dependencies(host: Host, worktree: Path, log) -> None:
+    require_disk(host, "dependency-install")
+    sh(WORKTREE_INSTALL, cwd=worktree, timeout=1800, log=log)
+
+
 HANDOFF_NOTE = ("A previous agent (lane `{prev}`) stopped before finishing (exit {code}), most likely an "
                 "exhausted account or provider failure. Its partial work is in this worktree: check "
                 "`git status`, `git diff` and `git log origin/main..HEAD`, then finish the task. Do not "
@@ -869,10 +938,11 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     receipt["offer"]["accepted"] = True
     with open(runs / f"{run_id}.log", "w") as log:
         try:
+            require_disk(host, "issue-checkout")
             sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
             sh(["git", "worktree", "add", "-q", "-b", branch, str(worktree), "origin/main"], cwd=host.repo, log=log)
             # Always installed: the gate's checks need it even when the provider works remotely.
-            sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
+            install_dependencies(host, worktree, log)
             prompt = render_prompt(issue, branch, context_pack(issue), provider=name)
             prompt_file = runs / f"{run_id}.prompt.md"
             prompt_file.write_text(prompt)
@@ -881,7 +951,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                                        {"spend": 1, "mutations": 1}, coordination=coordination)
             agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree),
                                                        "provider_receipt": str(provider_evidence)}),
-                              worktree, log, host.agent_timeout)
+                              worktree, log, host.agent_timeout,
+                              guard=lambda: require_disk(host, "agent-running"))
             # Tim 2026-09-27: an exhausted provider never leaves the issue half-done; another
             # lane finishes it on the same worktree.
             handoffs, current = [], name
@@ -902,7 +973,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                 agent = run_agent(template(nxt_spec["cmd"], {"prompt": handoff_prompt, "prompt_file": str(handoff_file),
                                                              "cwd": str(worktree),
                                                              "provider_receipt": str(provider_evidence)}),
-                                  worktree, log, host.agent_timeout)
+                                  worktree, log, host.agent_timeout,
+                                  guard=lambda: require_disk(host, "handoff-agent-running"))
                 current = nxt_name
             if handoffs:
                 receipt.update(handoffs=handoffs, finishedBy=current)
@@ -917,13 +989,18 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             elif agent.returncode != 0 and receipt.get("verdict") == "no-change":
                 # The provider never worked the issue (auth, quota, crash): its fault, not the issue's.
                 receipt.update(verdict="provider-error", reasons=[f"agent-exit:{agent.returncode}"])
+        except DiskAdmissionError as error:
+            receipt.update(verdict="disk-held", reasons=[str(error)])
         except subprocess.TimeoutExpired as error:
             receipt.update(verdict="failed", reasons=[f"timeout:{error.cmd[0] if error.cmd else '?'}"])
         except Exception as error:  # a broken run must still leave a receipt and free its issue
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
-            remove_worktree(host, worktree)
-            sh(["git", "branch", "-D", branch], cwd=host.repo)
+            if receipt.get("verdict") == "disk-held":
+                preserve_repair(worktree, receipt)
+            else:
+                remove_worktree(host, worktree)
+                sh(["git", "branch", "-D", branch], cwd=host.repo)
     evidence = read_provider_evidence(provider_evidence)
     if evidence:
         receipt["providerEvidence"] = evidence
@@ -1331,6 +1408,8 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
         "",
         "## Contract",
         "- Fix the root cause on this branch; push to the same branch. Do not open a new PR.",
+        f"- Immediately before every install or push, read `gh pr view {pr['number']} --repo {REPO_SLUG} --json state`.",
+        "  If the target merged/closed or its state is unreadable, stop and preserve local changes; do not install or push.",
         "- Repo gates are real requirements (e.g. component-ship-gate needs tests + stories for",
         "  shipped UI components). Never skip, weaken or --no-verify a check.",
         "- If the failure is unrelated to this PR (broken main, infra), change nothing and end with",
@@ -1341,10 +1420,11 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
 LOCKFILES = frozenset({"pnpm-lock.yaml"})
 
 
-def resolve_lockfile_conflict(worktree: Path, branch: str, log) -> bool:
+def resolve_lockfile_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
     """JOV-6837: a PR that conflicts with main only in pnpm-lock.yaml needs no model. Merge
     main, take its lockfile, regenerate it from the merged manifests, push (no force). Any
     other conflict, or a failed regeneration, aborts and leaves the PR to the agent."""
+    guard()
     merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
     if merged.returncode != 0:
         conflicted = set(sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout.split())
@@ -1352,6 +1432,7 @@ def resolve_lockfile_conflict(worktree: Path, branch: str, log) -> bool:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
         sh(["git", "checkout", "origin/main", "--", *sorted(conflicted)], cwd=worktree, log=log)
+        guard()
         regenerated = sh(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], cwd=worktree, timeout=900, log=log)
         if regenerated.returncode != 0:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
@@ -1360,11 +1441,118 @@ def resolve_lockfile_conflict(worktree: Path, branch: str, log) -> bool:
         if sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
+    guard()
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
 
 
+def reconcile_fix_target(pr: dict) -> dict | None:
+    """Read the target immediately before repair work; an unreadable target fails closed."""
+    try:
+        viewed = sh(["gh", "pr", "view", str(pr["number"]), "--repo", REPO_SLUG, "--json",
+                     "state,mergedAt,headRefName,headRefOid,url,isDraft,mergeStateStatus,reviewDecision,statusCheckRollup"], timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    try:
+        live = json.loads(viewed.stdout) if viewed.returncode == 0 else None
+    except (TypeError, ValueError):
+        live = None
+    if not isinstance(live, dict) or str(live.get("state") or "").upper() not in {"OPEN", "CLOSED", "MERGED"}:
+        return None
+    if str(live["state"]).upper() == "OPEN" and any(
+            not isinstance(live.get(field), str) or not live[field].strip()
+            for field in ("headRefOid", "headRefName")):
+        return None
+    return {**pr, **live}
+
+
+def fix_request_source(pr: dict) -> dict:
+    """Keep the evidence that requested repair even when its target has become terminal."""
+    return {
+        "schema": "jovie-fix-request-source/v1",
+        "pr": pr["number"],
+        "url": pr.get("url"),
+        "branch": pr.get("headRefName"),
+        "head": pr.get("headRefOid"),
+        "eventKinds": list(pr.get("eventKinds") or []),
+        "gateEvidence": list(pr.get("gateEvidence") or []),
+        "queueFailure": pr.get("queueFailure"),
+        "reviewDecision": pr.get("reviewDecision"),
+        "checks": [(check.get("name"), check.get("conclusion"))
+                   for check in pr.get("statusCheckRollup") or []],
+    }
+
+
+def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
+    """Release the host-local claim without fabricating an attempt when called directly."""
+    def finish(attempts: dict) -> None:
+        attempt = attempts.get(str(pr["number"]))
+        if not attempt or attempt.get("sha") != pr.get("headRefOid"):
+            return
+        attempt.update(endedAt=time.time(), pushed=receipt.get("verdict") == "fix-pushed")
+        if receipt.get("verdict") == "fix-pushed" and receipt.get("headAfter"):
+            attempt["pushedHead"] = receipt["headAfter"]
+    update_json(host.state / "fix-attempts.json", finish)
+
+
+class RepairStopped(RuntimeError):
+    def __init__(self, reason: str, live: dict | None, stage: str):
+        super().__init__(reason)
+        self.live, self.stage = live, stage
+
+
+def repair_created_head(worktree: Path, head: str, *, allow_local_progress: bool = False) -> bool:
+    """Only accept a new remote head created in this attempt's fresh checkout.
+
+    A fetch/reset/checkout of another writer's commit is not repair provenance.
+    Unreadable or pruned reflogs fail closed and retain the worktree for review.
+    """
+    try:
+        local = sh(["git", "rev-parse", "HEAD"], cwd=worktree, timeout=30)
+        if local.returncode != 0:
+            return False
+        if local.stdout.strip() != head:
+            if not allow_local_progress or sh(["git", "merge-base", "--is-ancestor", head, "HEAD"],
+                                              cwd=worktree, timeout=30).returncode != 0:
+                return False
+        log = sh(["git", "reflog", "show", "--format=%H%x00%gs", "HEAD"], cwd=worktree, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return log.returncode == 0 and any(
+        sha == head and re.match(
+            r"(?:commit(?: \([^)]*\))?:|merge[^:]*: Merge made by |rebase \((?:pick|reword|squash|fixup|continue)\):|am:)",
+            action)
+        for line in log.stdout.splitlines() if "\0" in line
+        for sha, action in [line.split("\0", 1)])
+
+
+def require_fix_target(pr: dict, stage: str, *, worktree: Path | None = None) -> dict:
+    live = reconcile_fix_target(pr)
+    if live is None:
+        raise RepairStopped("target-state-unavailable", live, stage)
+    state = str(live.get("state") or "").upper()
+    if state != "OPEN":
+        raise RepairStopped("target-pr-merged" if state == "MERGED" else "target-pr-closed", live, stage)
+    if live.get("headRefOid") != pr["headRefOid"]:
+        if worktree is None or not repair_created_head(worktree, live["headRefOid"],
+                                                       allow_local_progress=stage == "agent-running"):
+            raise RepairStopped("target-head-superseded", live, stage)
+    return live
+
+
+def preserve_repair(worktree: Path, receipt: dict) -> None:
+    """A cancelled run's local work is evidence, including uncommitted follow-up."""
+    if worktree.exists():
+        marker = {"schema": "jovie-preserved-repair/v1", "runId": receipt["runId"],
+                  "pr": receipt.get("pr"), "issue": receipt.get("issue"),
+                  "reason": receipt.get("reasons"), "at": now_iso()}
+        receipt["preservedWorktree"] = str(worktree)
+        try:
+            (worktree / disk_guard.PRESERVED_REPAIR).write_text(json.dumps(marker, indent=1))
+        except OSError as error:
+            receipt["preservationError"] = str(error)[:200]
+
+
 def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
-    pr = with_checks(pr)
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-PR{pr['number']}-{name}-fix-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
     runs.mkdir(parents=True, exist_ok=True)
@@ -1374,7 +1562,36 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
                "accountClass": spec.get("accountClass"), "origin": AUTONOMOUS_ORIGIN,
                "attribution": {"category": "autonomous-remediation", "provider": name},
                "worktree": str(worktree), "branch": pr["headRefName"], "pr": pr["number"],
-               "headBefore": pr["headRefOid"], "startedAt": now_iso()}
+               "headBefore": pr["headRefOid"], "requestSource": fix_request_source(pr),
+               "startedAt": now_iso()}
+    live = reconcile_fix_target(pr)
+    receipt["targetStateReads"] = 1
+    state = str((live or {}).get("state") or "").upper()
+    changed_head = state == "OPEN" and live.get("headRefOid") != pr["headRefOid"] if live else False
+    if live is None or state != "OPEN" or changed_head:
+        reason = "target-state-unavailable" if live is None else \
+            "target-pr-merged" if state == "MERGED" else \
+            "target-pr-closed" if state == "CLOSED" else "target-head-superseded"
+        verdict = "reconcile-unavailable" if live is None else "cancelled"
+        receipt.update(
+            verdict=verdict,
+            reasons=[reason],
+            cancellation={
+                "schema": "jovie-fix-cancellation/v1",
+                "reason": reason,
+                "observedState": state or "UNKNOWN",
+                "mergedAt": (live or {}).get("mergedAt"),
+                "observedHead": (live or {}).get("headRefOid"),
+                "requestSource": receipt["requestSource"],
+            },
+            endedAt=now_iso(),
+            result={"verdict": verdict, "commit": None, "pr": pr["number"]},
+        )
+        end_local_fix_attempt(host, pr, receipt)
+        with open(runs / "ledger.jsonl", "a") as ledger:
+            ledger.write(json.dumps(receipt) + "\n")
+        return receipt
+    pr = live
     failure = {"checks": [(check.get("name"), check.get("conclusion")) for check in pr.get("statusCheckRollup") or []],
                "merge": pr.get("mergeStateStatus"), "review": pr.get("reviewDecision")}
     ident = execution_attempt.identity("pr-remediation",
@@ -1407,40 +1624,68 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
         return receipt
     with open(runs / f"{run_id}.log", "w") as log:
         try:
+            def verify_target(target, stage, *, worktree=None):
+                receipt["targetStateReads"] += 1
+                return require_fix_target(target, stage, worktree=worktree)
+            require_disk(host, "repair-checkout")
+            verify_target(pr, "before-checkout")
             sh(["git", "fetch", "-q", "origin", "main", pr["headRefName"]], cwd=host.repo, log=log)
+            verify_target(pr, "after-fetch")
             add_worktree(host, ["-B", pr["headRefName"], str(worktree), f"origin/{pr['headRefName']}"], log)
+            def boundary(stage="repair-command", allow_local_push=False):
+                require_disk(host, stage)
+                verify_target(pr, stage, worktree=worktree if allow_local_push else None)
             lockfile_only = False
             if pr.get("mergeStateStatus") == "DIRTY":
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 0, "mutations": 1}, coordination=coordination)
-                lockfile_only = resolve_lockfile_conflict(worktree, pr["headRefName"], log)
+                lockfile_only = resolve_lockfile_conflict(worktree, pr["headRefName"], log, guard=boundary)
             agent = None
             if lockfile_only:
                 receipt.update(resolution="lockfile-regenerated")
             else:
-                sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
+                boundary("before-install")
+                install_dependencies(host, worktree, log)
                 prompt = render_fix_prompt(pr, failure_excerpt(pr))
                 prompt_file = runs / f"{run_id}.prompt.md"
                 prompt_file.write_text(prompt)
+                boundary("before-agent")
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination)
                 agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),
                                                          "provider_receipt": str(provider_evidence)}),
-                                  worktree, log, host.agent_timeout)
+                                  worktree, log, host.agent_timeout,
+                                  guard=lambda: boundary("agent-running", allow_local_push=True))
+            verify_target(pr, "after-agent", worktree=worktree)
             head = sh(["git", "ls-remote", "origin", f"refs/heads/{pr['headRefName']}"], cwd=host.repo).stdout.split()
             after = head[0] if head else ""
             pushed = bool(after) and after != pr["headRefOid"]
+            if pushed and not repair_created_head(worktree, after):
+                raise RepairStopped("target-head-superseded", {**pr, "state": "OPEN", "headRefOid": after},
+                                    "after-remote-read")
             receipt.update(agentExit=agent.returncode if agent else None, headAfter=after,
                            verdict="fix-pushed" if pushed else "fix-no-change")
             if pushed:
+                verify_target({**pr, "headRefOid": after}, "before-push-effects")
                 # A new fix head earns another queue try; a repeat failure re-marks it. The PR
                 # summary carries no labels, so delete unconditionally (404 when absent).
                 sh(["gh", "api", "-X", "DELETE",
                     f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/{pr_events.POISON_LABEL}"], log=log)
             if pushed and not pr.get("isDraft"):
                 # Conflicts and failures can drop auto-merge; re-arm it so the fix actually lands.
+                verify_target({**pr, "headRefOid": after}, "before-merge-intent")
                 sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto"], log=log)
+        except RepairStopped as error:
+            live = error.live or {}
+            receipt.update(verdict="reconcile-unavailable" if error.live is None else "cancelled",
+                           reasons=[str(error)], cancellation={
+                               "schema": "jovie-fix-cancellation/v1", "reason": str(error),
+                               "stage": error.stage, "observedState": live.get("state", "UNKNOWN"),
+                               "mergedAt": live.get("mergedAt"), "observedHead": live.get("headRefOid"),
+                               "requestSource": receipt["requestSource"]})
+        except DiskAdmissionError as error:
+            receipt.update(verdict="disk-held", reasons=[str(error)])
         except subprocess.TimeoutExpired:
             receipt.update(verdict="failed", reasons=["timeout"])
         except WorktreeUnavailable as error:
@@ -1449,14 +1694,14 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
         except Exception as error:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
-            remove_worktree(host, worktree)
+            if receipt.get("verdict") in {"cancelled", "reconcile-unavailable", "disk-held"}:
+                preserve_repair(worktree, receipt)
+            else:
+                remove_worktree(host, worktree)
             # The attempt is over: a head it did not move may be tried again by the next lane.
             # A head the fix itself pushed continues this generation rather than earning
             # re-entry (JOV-7089), so it is recorded as the generation's self-produced head.
-            update_json(host.state / "fix-attempts.json", lambda attempts: attempts.get(str(pr["number"]), {}).update(
-                endedAt=time.time(), pushed=receipt.get("verdict") == "fix-pushed",
-                **({"pushedHead": receipt["headAfter"]}
-                   if receipt.get("verdict") == "fix-pushed" and receipt.get("headAfter") else {})))
+            end_local_fix_attempt(host, pr, receipt)
     evidence = read_provider_evidence(provider_evidence)
     if evidence:
         receipt["providerEvidence"] = evidence
@@ -1515,9 +1760,10 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
                "startedAt": now_iso()}
     with open(runs / f"{run_id}.log", "w") as log:
         try:
+            require_disk(host, "adopt-checkout")
             sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
             add_worktree(host, ["--detach", str(worktree), "origin/main"], log)
-            sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
+            install_dependencies(host, worktree, log)
             labels = {label["name"].lower() for label in pr.get("labels", [])}
             receipt.update(gate_pr(host, pr, worktree, log, sensitive=SENSITIVE_PR_LABEL in labels))
         except WorktreeUnavailable as error:
@@ -1801,18 +2047,25 @@ def worker(host: Host, name: str) -> int:
     spec = load_providers()[name]
     if not spec.get("enabled", True):
         return 0  # a lane turned off in a newer release stops at its next re-exec
-    try:
-        disk_guard.check(host)  # spawn is an event path: reclaim before the run needs disk
-    except Exception:
-        pass
     slot = None
     for index in range(host.slots(name, spec.get("slots", 1))):
         lock = Locked(host.state / "slots" / f"{name}.{index}.lock", blocking=False)
         if lock.held:
             slot = lock
             break
+        lock.release()
     if slot is None:
         return 0
+    try:
+        report = disk_guard.check(host, sweep=True)
+        if not report.get("admitted"):
+            record_idle_exit(host, name, report.get("reason", "disk-unobservable"))
+            slot.release()
+            return 1
+    except Exception:
+        record_idle_exit(host, name, "disk-unobservable")
+        slot.release()
+        return 1
     linear = Linear(host.linear_env)
     claim = Locked(host.state / "claim.lock", blocking=True)
     try:
@@ -1850,10 +2103,15 @@ def worker(host: Host, name: str) -> int:
     if issue is None:
         record_idle_exit(host, name, "over-budget" if full else
                          "in-flight-unknown" if in_flight is None else "none-eligible")
+        slot.release()
         return 0
     linear.comment(issue.id, f"🤖 lane `{name}` claimed this issue (model `{spec.get('model')}`).")
     receipt = run_issue(host, name, spec, linear, issue)
     verdict = receipt.get("verdict")
+    if verdict == "disk-held":
+        linear.move(issue.id, "Todo")
+        slot.release()
+        return 1  # do not charge the issue's retry budget or re-exec into pressure
     if verdict == "duplicate-active":
         linear.comment(issue.id, "🤖 lane claim reconciled to the existing durable attempt; no second provider call ran.")
         slot.release()
@@ -1933,9 +2191,10 @@ def ensure_full_history(host: Host) -> None:
 def dispatch(host: Host) -> int:
     tick = {"at": now_iso(), "release": read_marker(host), "unhealthy": [], "spawned": [], "error": None}
     try:
-        ensure_full_history(host)
-        prune_worktrees(host)
         tick["disk"] = disk_guard.check(host)
+        if not tick["disk"].get("admitted"):
+            raise DiskAdmissionError(tick["disk"].get("reason", "disk-unobservable"))
+        ensure_full_history(host)
         for name, spec in load_providers().items():
             slots = host.slots(name, spec.get("slots", 1))
             # LANES_SLOTS_<P>=0 scopes a provider off this host: no health probe, no provider-down alert.
@@ -1951,6 +2210,9 @@ def dispatch(host: Host) -> int:
                 tick["spawned"].append(name)
     except Exception as error:  # the tick must still leave a receipt the doctor can raise
         tick["error"] = f"{type(error).__name__}: {error}"[:300]
+    if tick["error"]:
+        # A denied tick must not launch another worker through ancillary event paths.
+        return finish_dispatch(host, tick)
     try:
         tick["events"] = pr_events.tick(host, THIS, lambda: Linear(host.linear_env))
     except Exception as error:  # the ready/orphan queue never takes dispatch down
@@ -1965,6 +2227,11 @@ def dispatch(host: Host) -> int:
                             {"status": "not-owner", "owner": corpus_owner})
     except Exception as error:  # external knowledge freshness never takes dispatch down
         tick["ycCorpusError"] = f"{type(error).__name__}: {error}"[:200]
+    return finish_dispatch(host, tick)
+
+
+def finish_dispatch(host: Host, tick: dict) -> int:
+    """Retain the existing doctor's alert path even when admission denied all work."""
     update_json(host.state / "tick.json", lambda data: (data.clear(), data.update(tick)))
     try:
         doctor.run(host, sys.modules[__name__], codex_lane_module())
@@ -2019,6 +2286,8 @@ def prune_worktrees(host: Host, max_age_s: int = 6 * 3600) -> None:
     if not root.exists():
         return
     for path in root.iterdir():
+        if (path / disk_guard.PRESERVED_REPAIR).exists():
+            continue
         try:
             stale = time.time() - path.stat().st_mtime > max_age_s
         except FileNotFoundError:

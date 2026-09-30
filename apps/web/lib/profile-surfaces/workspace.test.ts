@@ -157,6 +157,19 @@ describe('connections workspace helpers', () => {
     expect(getConnectionStatus(locked).label).toBe('Limit Reached');
   });
 
+  it('retains rejected identities as non-actionable negative evidence', () => {
+    expect(
+      getConnectionStatus(
+        surface({ qualificationStatus: 'rejected', monitoringState: 'active' })
+      )
+    ).toMatchObject({
+      label: 'Not You',
+      needsAttention: false,
+      nextAction:
+        'This identity was rejected and is retained as negative evidence.',
+    });
+  });
+
   it('orders broken, limited, measured, then unmeasured connections', () => {
     const notConnected = connector({ status: 'not_connected' });
     const limited = surface({

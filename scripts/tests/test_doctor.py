@@ -12,6 +12,8 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -319,7 +321,8 @@ class StatusFeedTest(unittest.TestCase):
             host = type("Host", (), {"state": state})()
             lane = type("Lane", (), {"HOST": "gem", "provider_throughput": staticmethod(throughput_stub)})
             conditions = {"disk-low": {"schema": "jovie.control-plane-liveness-condition/v1"}}
-            feed = doctor.status_feed(host, lane, obs(pool=12, lastLandingAge=30), {"disk-low": "x"},
+            feed = doctor.status_feed(host, lane, obs(pool=12, lastLandingAge=30, capacityByProvider={
+                "devin": {"running": 1, "slots": 2}, "codex": {"running": 0, "slots": 1}}), {"disk-low": "x"},
                                       {"release": "abc1234"}, conditions=conditions)
             held.close()
         self.assertEqual((feed["running"], feed["idle"], feed["pool"], feed["release"]), (1, 2, 12, "abc1234"))
@@ -390,13 +393,86 @@ class StatusFeedTest(unittest.TestCase):
             (state / "slots/codex.0.lock").touch()
             host = type("Host", (), {"state": state})()
             lane = type("Lane", (), {"HOST": "gem", "provider_throughput": staticmethod(throughput_stub)})
-            observed = obs(now=1000.0, poolByProvider={"codex": 5})
+            observed = obs(now=1000.0, poolByProvider={"codex": 5},
+                           capacityByProvider={"codex": {"running": 0, "slots": 1}})
             feed = doctor.status_feed(host, lane, observed, {}, {}, {"idleQualifiedSince": {"codex": 900.0}})
         metric = feed["throughput"]["providers"]["codex"]
         self.assertEqual(metric["idleReason"], "capacity-idle-with-qualified-work")
         self.assertEqual(metric["accountIdleSecondsWhileQualifiedWorkExists"], 100)
         self.assertEqual(feed["_idleQualifiedSince"], {"codex": 900.0})
 
+
+
+class RunnablePoolTest(unittest.TestCase):
+    def test_observe_uses_worker_admission_and_deduplicates_provider_pools(self):
+        lane = load("lane_runner")
+        def issue(key, labels=(), description=""):
+            return lane.Issue(key, key, "Task", description, 1, "2026-09-01T00:00:00Z", list(labels))
+        candidates = [issue("JOV-GOOD"), issue("JOV-EPIC", ["type:epic"]),
+                      issue("JOV-SENSITIVE", ["auth"]), issue("JOV-PRICE", description="Change live pricing"),
+                      issue("JOV-OWNED"), issue("JOV-EXHAUSTED"), issue("JOV-BACKOFF")]
+        providers = {"devin": {"label": "devin", "slots": 4},
+                     "codex": {"label": "codex", "slots": 3},
+                     "claude": {"label": "claude", "slots": 2, "enabled": False}}
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            host = lane.Host(state=state, linear_env=state / "test.env")
+            (state / "failures.json").write_text(json.dumps({
+                "JOV-EXHAUSTED": 3, "JOV-BACKOFF": {"count": 1, "at": 9990}}))
+            tracker = mock.Mock()
+            tracker.lane_issues.return_value = candidates
+            # Host slot overrides must not replace this fixture's provider capacities.
+            fixture_env = {"LANES_SELFTEST": "1", **{
+                f"LANES_SLOTS_{name.upper()}": str(config["slots"])
+                for name, config in providers.items()}}
+            with mock.patch.dict(os.environ, fixture_env), \
+                    mock.patch.object(lane, "load_providers", return_value=providers), \
+                    mock.patch.object(lane, "Linear", return_value=tracker), \
+                    mock.patch.object(lane, "in_flight_issues", return_value=frozenset({"JOV-OWNED"})), \
+                    mock.patch.object(lane, "load_github_env"), \
+                    mock.patch.object(lane, "graphql_budget", return_value=None):
+                observed = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=10000)
+                self.assertEqual(observed["pool"], 2)
+                self.assertEqual(observed["candidatePool"], 7)
+                self.assertEqual(observed["qualifiedJobsByProvider"], {
+                    "devin": ["JOV-GOOD"], "codex": ["JOV-GOOD", "JOV-SENSITIVE"], "claude": []})
+                self.assertEqual(observed["poolByProvider"], {"devin": 1, "codex": 2, "claude": 0})
+                self.assertEqual(tracker.lane_issues.call_args_list, [mock.call("devin"), mock.call("codex")])
+                with mock.patch.dict(os.environ, {"LANES_SLOTS_CODEX": "0"}):
+                    tracker.lane_issues.reset_mock()
+                    observed = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=10000)
+                    self.assertEqual(observed["pool"], 1)
+                    self.assertEqual(observed["qualifiedJobsByProvider"], {"devin": ["JOV-GOOD"], "codex": [], "claude": []})
+                    self.assertEqual(observed["poolByProvider"]["codex"], 0)
+                    tracker.lane_issues.assert_called_once_with("devin")
+                with mock.patch.object(lane, "in_flight_issues", return_value=None):
+                    observed = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=10000)
+                    self.assertIsNone(observed["pool"])
+                    self.assertIn("ownership unreadable", observed["linearError"])
+                    self.assertEqual(observed["qualifiedJobsByProvider"], {})
+
+    def test_configured_capacity_ignores_stale_locks_and_reports_draining_workers(self):
+        import fcntl
+        lane = load("lane_runner")
+        providers = {"devin": {"slots": 4}, "codex": {"slots": 3},
+                     "claude": {"slots": 2, "enabled": False}}
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / "slots").mkdir()
+            for name in ("devin.0", "devin.9", "codex.0", "claude.0", "retired.0"):
+                (state / "slots" / f"{name}.lock").touch()
+            with open(state / "slots/codex.0.lock", "w") as held:
+                fcntl.flock(held, fcntl.LOCK_EX)
+                with mock.patch.object(lane, "load_providers", return_value=providers), \
+                        mock.patch.dict(os.environ, {"LANES_SLOTS_CODEX": "0"}):
+                    capacity = doctor.host_capacity(lane.Host(state=state), lane)
+                self.assertEqual(capacity, {"devin": {"slots": 4, "running": 0},
+                    "codex": {"slots": 0, "running": 1}, "claude": {"slots": 0, "running": 0}})
+                feed_lane = SimpleNamespace(HOST="mac", provider_throughput=throughput_stub)
+                feed = doctor.status_feed(SimpleNamespace(state=state), feed_lane,
+                                          obs(capacityByProvider=capacity), {}, {})
+                self.assertEqual((feed["running"], feed["idle"]), (1, 4))
+                self.assertNotIn("retired", feed["lanes"])
 
 class SloFeedTest(unittest.TestCase):
     def test_feed_passes_the_slo_block_through(self):

@@ -56,6 +56,11 @@ export interface ProfileWorkspaceSurfaceRow {
   readonly rank: number | null;
   readonly previousRank: number | null;
   readonly lastObservedAt: string | null;
+  readonly identityEvidence?: {
+    readonly sourceCount: number;
+    readonly sourceTypes: readonly string[];
+    readonly confidence: number | null;
+  };
   readonly identityPhoto?: PresenceIdentityPhoto;
 }
 
@@ -306,20 +311,39 @@ export async function loadProfilesWorkspaceData(input: {
       .map(preference => preference.surfaceId)
   );
   const surfaceIds = surfaces.map(surface => surface.id);
-  const socialSourceRows =
+  const sourceRows =
     surfaceIds.length === 0
       ? []
       : await db
-          .select({ surfaceId: profileSurfaceSources.surfaceId })
+          .select({
+            surfaceId: profileSurfaceSources.surfaceId,
+            sourceType: profileSurfaceSources.sourceType,
+          })
           .from(profileSurfaceSources)
           .where(
             and(
               inArray(profileSurfaceSources.surfaceId, surfaceIds),
-              eq(profileSurfaceSources.sourceType, 'social_link'),
               eq(profileSurfaceSources.isLive, true)
             )
           );
-  const socialSourceIds = new Set(socialSourceRows.map(row => row.surfaceId));
+  const sourceTypesBySurface = new Map<string, Set<string>>();
+  for (const source of sourceRows) {
+    const sourceTypes = sourceTypesBySurface.get(source.surfaceId) ?? new Set();
+    sourceTypes.add(source.sourceType);
+    sourceTypesBySurface.set(source.surfaceId, sourceTypes);
+  }
+  const sourceCountBySurface = new Map<string, number>();
+  for (const source of sourceRows) {
+    sourceCountBySurface.set(
+      source.surfaceId,
+      (sourceCountBySurface.get(source.surfaceId) ?? 0) + 1
+    );
+  }
+  const socialSourceIds = new Set(
+    sourceRows
+      .filter(row => row.sourceType === 'social_link')
+      .map(row => row.surfaceId)
+  );
   const dspMatches = await db
     .select({
       providerId: dspArtistMatches.providerId,
@@ -400,6 +424,14 @@ export async function loadProfilesWorkspaceData(input: {
         rankFor(surface.id, previousRun?.id)
       ),
       lastObservedAt: observedAt,
+      identityEvidence: {
+        sourceCount: sourceCountBySurface.get(surface.id) ?? 0,
+        sourceTypes: [...(sourceTypesBySurface.get(surface.id) ?? [])].sort(),
+        confidence:
+          surface.identityConfidence === null
+            ? null
+            : Number(surface.identityConfidence),
+      },
       identityPhoto: resolveIdentityPhoto({
         kind: surface.kind,
         artistAvatarUrl: profileRows[0]?.avatarUrl ?? null,

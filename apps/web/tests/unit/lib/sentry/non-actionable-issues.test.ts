@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DESTINATION_STREAM_CLOSED_IGNORE_ERRORS,
+  isNonActionableDestinationStreamEvent,
+  isNonActionableDestinationStreamIssue,
   isNonActionableLoopbackBetterAuthHostEvent,
   isNonActionableLoopbackBetterAuthHostIssue,
   isNonActionableSpotifyReleaseCreditBoundEvent,
@@ -467,6 +470,61 @@ describe('non-actionable Sentry issues', () => {
       ).toBe(false);
       expect(
         isNonActionableVercelIpcEvent({
+          exception: { values: [{ value: 'Unauthorized' }] },
+        })
+      ).toBe(false);
+    });
+  });
+
+  describe('isNonActionableDestinationStreamIssue (JOV-7319)', () => {
+    const title = 'Error: The destination stream closed early.';
+
+    it('matches the Linear/Sentry title', () => {
+      expect(isNonActionableDestinationStreamIssue({ title })).toBe(true);
+      expect(
+        DESTINATION_STREAM_CLOSED_IGNORE_ERRORS.some(pattern =>
+          pattern.test(title)
+        )
+      ).toBe(true);
+    });
+
+    it('matches the write-error variant on title or culprit', () => {
+      expect(
+        isNonActionableDestinationStreamIssue({
+          title: 'Error: The destination stream errored while writing data.',
+        })
+      ).toBe(true);
+      expect(
+        isNonActionableDestinationStreamIssue({
+          title: 'Error',
+          culprit: 'The destination stream closed early.',
+        })
+      ).toBe(true);
+    });
+
+    it('matches a Sentry exception event', () => {
+      expect(
+        isNonActionableDestinationStreamEvent({
+          exception: {
+            values: [
+              {
+                type: 'Error',
+                value: 'The destination stream closed early.',
+              },
+            ],
+          },
+        })
+      ).toBe(true);
+    });
+
+    it('does not match unrelated stream or render errors', () => {
+      expect(
+        isNonActionableDestinationStreamIssue({
+          title: 'Error: The destination stream errored while flushing chunks',
+        })
+      ).toBe(false);
+      expect(
+        isNonActionableDestinationStreamEvent({
           exception: { values: [{ value: 'Unauthorized' }] },
         })
       ).toBe(false);
