@@ -1,9 +1,15 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 import {
   createProofPageContext,
+  findUnresolvedProofClaims,
   LOGO_ASSET_SOURCE,
   MARKETING_PROOF_AUDIT_BASELINE,
+  PROOF_REGISTRY,
   type ProofCandidate,
+  proofFreshnessDate,
   selectProof,
   validateProof,
 } from './proof';
@@ -23,7 +29,7 @@ describe('proof registry', () => {
         kind: 'logo',
         claimId: 'relationship.logo.awal',
         brand: 'AWAL',
-        relationship: 'distribution platform used by represented artists',
+        relationship: 'customer',
         assetId: 'awal',
         source: LOGO_ASSET_SOURCE,
       })
@@ -135,4 +141,226 @@ describe('proof registry', () => {
       expect(item.missing.length).toBeGreaterThan(0);
     }
   });
+
+  it('rejects a logo relationship outside customer, integration, press', () => {
+    expect(
+      codes({
+        recordType: 'proof',
+        id: 'logo-vague-relationship',
+        kind: 'logo',
+        claimId: 'relationship.logo.awal',
+        brand: 'AWAL',
+        relationship: 'partner' as never,
+        assetId: 'awal',
+        source: LOGO_ASSET_SOURCE,
+        permissionRecord: {
+          recordId: 'perm-1',
+          grantedBy: 'AWAL marketing',
+          grantedAt: '2026-09-01T00:00:00.000Z',
+          scope: 'marketing site logo bar',
+        },
+      })
+    ).toEqual(['missing-logo-relationship']);
+  });
+
+  it('accepts a fully permissioned logo', () => {
+    expect(
+      codes({
+        recordType: 'proof',
+        id: 'logo-permissioned',
+        kind: 'logo',
+        claimId: 'relationship.logo.awal',
+        brand: 'AWAL',
+        relationship: 'integration',
+        assetId: 'awal',
+        source: LOGO_ASSET_SOURCE,
+        permissionRecord: {
+          recordId: 'perm-1',
+          grantedBy: 'AWAL marketing',
+          grantedAt: '2026-09-01T00:00:00.000Z',
+          scope: 'marketing site logo bar',
+        },
+      })
+    ).toEqual([]);
+  });
+
+  it('ranks by section relevance, then audience, then freshness, then strength', () => {
+    const route = (
+      id: string,
+      extra: Partial<ProofCandidate> = {}
+    ): ProofCandidate =>
+      ({
+        recordType: 'proof',
+        id,
+        kind: 'product-proof',
+        claimId: 'claim-rank',
+        artifact: { kind: 'route', route: `/${id}` },
+        ...extra,
+      }) as ProofCandidate;
+    const capture = (id: string, capturedAt: string, extra = {}) =>
+      route(id, {
+        artifact: {
+          kind: 'screenshot-scenario',
+          scenarioId: id,
+          route: '/tim',
+          capturedAt,
+        },
+        ...extra,
+      } as Partial<ProofCandidate>);
+
+    const registry = [
+      route('a-generic'),
+      route('b-other-audience', { audiences: ['developer'] }),
+      capture('c-old', '2026-01-01T00:00:00.000Z', { audiences: ['artist'] }),
+      capture('d-new', '2026-09-01T00:00:00.000Z', { audiences: ['artist'] }),
+      route('e-weak-artist', { audiences: ['artist'], strength: 'weak' }),
+      route('f-strong-artist', { audiences: ['artist'], strength: 'strong' }),
+      route('g-section', { sectionIds: ['hero'] }),
+    ];
+    const page = createProofPageContext('/rank', AS_OF);
+    const section = {
+      id: 'hero',
+      kind: 'product-proof',
+      claimId: 'claim-rank',
+      audience: 'artist',
+      page,
+    } as const;
+    const order = registry.map(() => {
+      const picked = selectProof(section, registry);
+      return 'id' in picked ? picked.id : picked.recordType;
+    });
+
+    expect(order).toEqual([
+      'g-section',
+      'd-new',
+      'c-old',
+      'f-strong-artist',
+      'e-weak-artist',
+      'a-generic',
+      'b-other-audience',
+    ]);
+    // Registry order must not change the ranking.
+    const reversedPage = createProofPageContext('/rank', AS_OF);
+    expect(
+      selectProof({ ...section, page: reversedPage }, [...registry].reverse())
+    ).toMatchObject({ id: 'g-section' });
+  });
+
+  it('prefers the requested kind and falls back in the declared order', () => {
+    const page = createProofPageContext('/fallback', AS_OF);
+    const registry = [
+      {
+        recordType: 'proof',
+        id: 'fallback-route',
+        kind: 'product-proof',
+        claimId: 'claim-f',
+        artifact: { kind: 'route', route: '/f' },
+      },
+    ] as const satisfies readonly ProofCandidate[];
+
+    expect(
+      selectProof(
+        {
+          id: 'social',
+          kind: 'quote',
+          fallbackKinds: ['product-proof'],
+          claimId: 'claim-f',
+          page,
+        },
+        registry
+      )
+    ).toMatchObject({ id: 'fallback-route' });
+  });
+
+  it('reads freshness from the kind-specific date', () => {
+    expect(
+      proofFreshnessDate({
+        recordType: 'proof',
+        id: 'm',
+        kind: 'metric',
+        claimId: 'c',
+        measuredAt: '2026-09-01T00:00:00.000Z',
+      })
+    ).toBe('2026-09-01T00:00:00.000Z');
+    expect(
+      proofFreshnessDate({
+        recordType: 'proof',
+        id: 'r',
+        kind: 'product-proof',
+        claimId: 'c',
+        artifact: { kind: 'route', route: '/r' },
+      })
+    ).toBeUndefined();
+  });
+
+  it('keeps the unproven audit baseline shrink-only', () => {
+    // Remove an id here when its proof lands. Adding one needs a proof
+    // request plan, never new unproven content on a live page.
+    const allowed = new Set([
+      'baseline-logo-awal',
+      'baseline-logo-orchard',
+      'baseline-logo-umg',
+      'baseline-logo-armada',
+      'baseline-logo-black-hole-recordings',
+      'baseline-about-founder-experience',
+      'baseline-launch-tracks-generated',
+      'baseline-launch-ai-market',
+      'baseline-launch-fan-ltv',
+      'baseline-launch-demo-audience-metrics',
+    ]);
+    const ids = MARKETING_PROOF_AUDIT_BASELINE.items.map(item => item.id);
+    expect(ids.filter(id => !allowed.has(id))).toEqual([]);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('never renders a customer quote without consented proof', () => {
+    const consented = new Set(
+      PROOF_REGISTRY.filter(
+        proof => proof.kind === 'quote' && validateProof(proof, AS_OF).valid
+      ).map(proof => proof.kind === 'quote' && proof.verbatimText)
+    );
+    const unproven = ARTIST_PROFILE_SOCIAL_PROOF.quotes.filter(
+      quote => !consented.has(quote.quote)
+    );
+    expect(unproven).toEqual([]);
+  });
+
+  it('reports proof items whose claim is not registered', () => {
+    expect(
+      findUnresolvedProofClaims(new Set(['capture-fans', 'get-paid']))
+    ).toEqual([
+      { proofId: 'product-profile-tour-capture', claimId: 'sell-out' },
+    ]);
+    expect(
+      findUnresolvedProofClaims(
+        new Set(['capture-fans', 'get-paid', 'sell-out'])
+      )
+    ).toEqual([]);
+  });
+
+  const claimRegistryPath = join(import.meta.dirname, 'registry.ts');
+  it.skipIf(!existsSync(claimRegistryPath))(
+    'links every registered proof to a claim in the product-truth registry (skipped until registry.ts lands, JOV-6223)',
+    async () => {
+      const registryModule: Record<string, unknown> = await import(
+        /* @vite-ignore */ claimRegistryPath
+      );
+      const claimIds = new Set<string>();
+      for (const value of Object.values(registryModule)) {
+        if (!Array.isArray(value)) continue;
+        for (const entry of value) {
+          if (
+            entry &&
+            typeof entry === 'object' &&
+            'capabilityId' in entry &&
+            typeof (entry as { id?: unknown }).id === 'string'
+          ) {
+            claimIds.add((entry as { id: string }).id);
+          }
+        }
+      }
+      expect(claimIds.size).toBeGreaterThan(0);
+      expect(findUnresolvedProofClaims(claimIds)).toEqual([]);
+    }
+  );
 });
