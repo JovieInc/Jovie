@@ -6,6 +6,10 @@ import { lintCopy } from './lint';
  *
  * Great page = great capabilities -> outcomes -> copy -> layout -> style ->
  * design system -> product proof -> stats and quotes.
+ *
+ * This is a gate-order subset of the marketing factory stage spine. The
+ * projection lives in apps/web/data/marketing/factory/spine.ts because this
+ * package cannot import apps/web.
  */
 export const LANDING_STAGES = [
   'capabilities',

@@ -25,6 +25,7 @@ import {
 
 export const MARKETING_GENERATION_SPEC_VERSION = '1.0.0';
 
+/** Alias of the factory stage spine; see factory/spine.ts for the mapping. */
 export const MARKETING_GENERATION_STAGES = [
   'truth',
   'narrative',
