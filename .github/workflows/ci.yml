@@ -3130,7 +3130,7 @@ jobs:
           JOVIE_STORYBOOK_MANUAL_AXE: '1'
       # Web-independent checks ride here, off the Build + Layout tail.
       - name: Check extension and observability ingest
-        run: pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test
+        run: pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test && pnpm --filter @jovie/canary-otp typecheck && pnpm --filter @jovie/canary-otp test
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
       # Surface-elevation matrix (JOV-2156): screenshot every allowed/banned
