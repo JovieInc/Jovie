@@ -27,10 +27,6 @@
   }
 }
 
-.ap-mode-switcher__tab:disabled {
-  opacity: var(--state-disabled-opacity);
-}
-
 .ap-mode-switcher__active-tab {
   box-shadow:
     0 1px 3px 0
