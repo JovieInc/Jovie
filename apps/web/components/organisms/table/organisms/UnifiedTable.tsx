@@ -557,7 +557,6 @@ export function UnifiedTable<TData extends RowData>({
   const {
     virtualizer: rowVirtualizer,
     virtualRows,
-    totalSize,
     paddingTop,
     paddingBottom,
   } = useTableVirtualization({
@@ -824,7 +823,6 @@ export function UnifiedTable<TData extends RowData>({
           rows={rows}
           shouldVirtualize={shouldVirtualize}
           virtualRows={virtualRows}
-          totalSize={totalSize}
           paddingTop={paddingTop}
           paddingBottom={paddingBottom}
           rowVirtualizer={rowVirtualizer}

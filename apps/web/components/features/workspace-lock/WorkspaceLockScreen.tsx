@@ -3,7 +3,10 @@
 import { Button } from '@jovie/ui';
 import { Fingerprint } from 'lucide-react';
 import { useState } from 'react';
-import { isDesktopEnvironment } from '@/lib/desktop/electron-bridge';
+import {
+  isDesktopEnvironment,
+  openCurrentOvieInBrowser,
+} from '@/lib/desktop/electron-bridge';
 import { unlockWithPasskey } from '@/lib/workspace-lock/unlock-with-passkey';
 import { clearWorkspaceLock } from '@/lib/workspace-lock/workspace-lock';
 
@@ -18,6 +21,7 @@ type Status = 'idle' | 'working' | 'error';
 export function WorkspaceLockScreen() {
   const [status, setStatus] = useState<Status>('idle');
   const [message, setMessage] = useState<string | null>(null);
+  const [openingBrowser, setOpeningBrowser] = useState(false);
 
   async function unlock() {
     setStatus('working');
@@ -36,6 +40,20 @@ export function WorkspaceLockScreen() {
     }
   }
 
+  async function continueInBrowser() {
+    setOpeningBrowser(true);
+    try {
+      const result = await openCurrentOvieInBrowser();
+      setMessage(
+        result.ok
+          ? 'Continue in your browser. This desktop session stays locked.'
+          : 'Could not open your browser. Update the desktop app or open Ovie in your browser.'
+      );
+    } finally {
+      setOpeningBrowser(false);
+    }
+  }
+
   return (
     <div
       role='status'
@@ -51,12 +69,15 @@ export function WorkspaceLockScreen() {
         variant='tertiary'
         type='button'
         onClick={unlock}
-        disabled={status === 'working'}
+        disabled={status === 'working' || openingBrowser}
       >
         {status === 'working' ? 'Waiting for passkey…' : 'Unlock to continue'}
       </Button>
       {message ? (
-        <p role='alert' className='text-xs text-secondary-token'>
+        <p
+          role='alert'
+          className='min-h-12 max-w-sm text-center text-xs text-secondary-token'
+        >
           {message}
         </p>
       ) : null}
@@ -64,11 +85,11 @@ export function WorkspaceLockScreen() {
         <Button
           variant='tertiary'
           type='button'
-          onClick={() =>
-            window.open(window.location.href, '_blank', 'noopener,noreferrer')
-          }
+          className='min-w-40'
+          onClick={continueInBrowser}
+          disabled={openingBrowser}
         >
-          Open In Browser
+          {openingBrowser ? 'Opening browser…' : 'Continue in browser'}
         </Button>
       ) : null}
     </div>

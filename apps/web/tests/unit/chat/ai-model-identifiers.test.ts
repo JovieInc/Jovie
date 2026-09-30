@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   ALBUM_ART_GATEWAY_IMAGE_MODEL,
+  assertGatewayModelAllowed,
   CHAT_MODEL,
   CHAT_MODEL_LIGHT,
   CHAT_MODEL_ROTATION_CHAIN,
+  DESIGN_TASTE_SWEEP_MODEL,
   GATEWAY_ALLOWED_MODELS,
   GATEWAY_ALLOWLIST_NAME,
   INSIGHT_MODEL,
@@ -54,8 +56,30 @@ describe('AI Gateway model identifiers', () => {
       PITCH_MODEL,
       TITLE_MODEL,
       PACKAGING_INTELLIGENCE_MODEL,
+      DESIGN_TASTE_SWEEP_MODEL,
     ]) {
       expect(GATEWAY_ALLOWED_MODELS).toContain(model);
+    }
+  });
+
+  it('rejects openai/anthropic gateway ids and allows the rest (JOV-7119)', () => {
+    for (const banned of [
+      'openai/gpt-6-sol',
+      'openai/gpt-6-luna',
+      'openai/gpt-image-1.5',
+      'anthropic/claude-haiku-4-5-20251001',
+      'anthropic/claude-sonnet-4-20250514',
+    ]) {
+      expect(() => assertGatewayModelAllowed(banned)).toThrow(
+        /banned provider/
+      );
+    }
+    for (const allowed of [
+      ...GATEWAY_ALLOWED_MODELS,
+      ALBUM_ART_GATEWAY_IMAGE_MODEL,
+      'google/gemini-2.5-flash-image',
+    ]) {
+      expect(() => assertGatewayModelAllowed(allowed)).not.toThrow();
     }
   });
 

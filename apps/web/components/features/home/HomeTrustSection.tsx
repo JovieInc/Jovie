@@ -41,6 +41,7 @@ function getLabelMarginClass(
 function getSlotClass(isInlineStrip: boolean, slotName: string): string {
   return cn(
     'flex min-w-0 items-center justify-center',
+    !isInlineStrip && 'w-full sm:w-auto',
     isInlineStrip &&
       `homepage-trust-logo-slot homepage-trust-logo-slot--${slotName} system-b-mounted-home-trust-strip-logo-slot system-b-mounted-home-trust-strip-logo-slot--${slotName}`
   );

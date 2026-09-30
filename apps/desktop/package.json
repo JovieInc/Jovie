@@ -40,7 +40,7 @@
     "test:summer-runtime-bridge": "vitest run --config vitest.config.mts scripts/summer-runtime-bridge.test.ts",
     "test:voice-session": "vitest run --config vitest.config.mts scripts/voice-session.test.ts",
     "test:desktop-build-identity": "vitest run --config vitest.config.mts scripts/build-identity.test.ts",
-    "test:desktop-ipc-sender": "vitest run --config vitest.config.mts scripts/ipc-sender.test.ts",
+    "test:desktop-ipc-sender": "vitest run --config vitest.config.mts scripts/ipc-sender.test.ts scripts/ovie-browser-recovery.test.ts --coverage --coverage.include=src/ovie-browser-recovery.ts --coverage.thresholds.lines=100 --coverage.thresholds.branches=100 --coverage.thresholds.functions=100",
     "test:desktop-notifications": "vitest run --config vitest.config.mts scripts/desktop-notifications.test.ts",
     "test:preload-bundle": "node --test scripts/preload-bundle.test.mjs",
     "test:desktop-shell": "node --test scripts/desktop-shell-contract.test.mjs",

@@ -110,4 +110,33 @@ describe('VirtualizedTableBody', () => {
       })
     );
   });
+
+  it('lays virtual rows out between spacer rows without positioning the tbody', () => {
+    const rows = [createRow('1', 'One'), createRow('2', 'Two')];
+    const virtualRows = [
+      { index: 1, start: 44, size: 44, end: 88, key: '1', lane: 0 },
+    ] as VirtualItem[];
+
+    const { container } = render(
+      <table>
+        <VirtualizedTableBody
+          {...baseProps}
+          rows={rows}
+          shouldVirtualize
+          virtualRows={virtualRows}
+          paddingTop={44}
+          paddingBottom={792}
+        />
+      </table>
+    );
+
+    const tbody = container.querySelector('tbody');
+    expect(tbody?.style.position).toBe('');
+    expect(tbody?.style.height).toBe('');
+    const bodyRows = [...(tbody?.children ?? [])] as HTMLElement[];
+    expect(bodyRows).toHaveLength(3);
+    expect(bodyRows[0].querySelector('td')?.style.height).toBe('44px');
+    expect(bodyRows[1]).toBe(screen.getByTestId('table-row-2'));
+    expect(bodyRows[2].querySelector('td')?.style.height).toBe('792px');
+  });
 });

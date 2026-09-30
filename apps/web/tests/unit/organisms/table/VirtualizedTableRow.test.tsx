@@ -277,4 +277,25 @@ describe('VirtualizedTableRow', () => {
     expect(cell).toHaveClass('text-secondary-token');
     expect(cell).not.toHaveClass('text-primary-token');
   });
+
+  it('keeps virtualized rows in normal table flow for WebKit', () => {
+    // Absolutely positioned rows need <tbody> as their containing block, and
+    // WebKit never makes a table row group one. In Safari they escaped to the
+    // page origin and painted over the page chrome.
+    render(
+      <table>
+        <tbody>
+          <VirtualizedTableRow
+            {...baseProps}
+            shouldVirtualize
+            measureElement={vi.fn()}
+          />
+        </tbody>
+      </table>
+    );
+
+    const row = screen.getByRole('row');
+    expect(row.style.position).toBe('');
+    expect(row.style.transform).toBe('');
+  });
 });

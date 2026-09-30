@@ -5,7 +5,11 @@ import type { ReactNode } from 'react';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
+import { AudiencePanelProvider } from '@/features/dashboard/organisms/AudiencePanelContext';
+import { queryKeys } from '@/lib/queries/keys';
+import type { AiCrawlerAnalyticsResponse } from '@/types/ai-crawler-analytics';
 
 /**
  * Shared Storybook fixtures for the heavier `features/dashboard` organisms
@@ -71,9 +75,22 @@ export const DEFAULT_DASHBOARD_DATA: DashboardData = {
   },
 } as DashboardData;
 
-/** Fresh QueryClient tuned for stories: no retries, no background refetch. */
+/** Measured zero-state AI crawler analytics ("Waiting for first AI crawl"). */
+export const DASHBOARD_FIXTURE_AI_CRAWLERS: AiCrawlerAnalyticsResponse = {
+  totalRequests: 0,
+  weeklyRequests: 0,
+  crawlers: [],
+  dailyTrend: [],
+  syncedAt: '2026-09-01T12:00:00.000Z',
+  isPro: true,
+  isTeaser: false,
+};
+
+/** Fresh QueryClient tuned for stories: no retries, no background refetch.
+ * Seeds dashboard queries that shell surfaces read on mount so stories render
+ * without a network. */
 export function createDashboardQueryClient(): QueryClient {
-  return new QueryClient({
+  const client = new QueryClient({
     defaultOptions: {
       queries: {
         retry: false,
@@ -83,6 +100,11 @@ export function createDashboardQueryClient(): QueryClient {
       mutations: { retry: false },
     },
   });
+  client.setQueryData(
+    queryKeys.dashboard.aiCrawlers(),
+    DASHBOARD_FIXTURE_AI_CRAWLERS
+  );
+  return client;
 }
 
 /** Wraps `children` with the full dashboard provider stack for direct reuse
@@ -100,7 +122,11 @@ export function DashboardStoryProviders({
     <QueryClientProvider client={queryClient ?? createDashboardQueryClient()}>
       <DashboardDataProvider value={dashboardData}>
         <PreviewPanelProvider>
-          <RightPanelProvider>{children}</RightPanelProvider>
+          <RightPanelProvider>
+            <HeaderActionsProvider>
+              <AudiencePanelProvider>{children}</AudiencePanelProvider>
+            </HeaderActionsProvider>
+          </RightPanelProvider>
         </PreviewPanelProvider>
       </DashboardDataProvider>
     </QueryClientProvider>
@@ -109,7 +135,8 @@ export function DashboardStoryProviders({
 
 /**
  * Decorator bundling the common dashboard provider stack (react-query +
- * DashboardDataProvider + PreviewPanelProvider + RightPanelProvider) with
+ * DashboardDataProvider + PreviewPanelProvider + RightPanelProvider +
+ * HeaderActionsProvider + AudiencePanelProvider) with
  * the default fixture data. Combine with `withSignedInSession` from
  * `signed-in-session.tsx` when a story also needs an authenticated session.
  */
