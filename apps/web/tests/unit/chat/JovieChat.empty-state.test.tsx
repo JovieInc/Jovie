@@ -1,4 +1,5 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { JovieChat } from '@/components/jovie/JovieChat';
@@ -164,6 +165,8 @@ const mockPendingOpportunityCards: Array<{
   readonly category: 'suggestion';
 }> = [];
 
+const mockOpportunityQueryOptions = vi.fn();
+
 let mockInsightsSummary: {
   readonly insights: Array<{ readonly status: string; readonly title: string }>;
   readonly totalActive: number;
@@ -185,11 +188,14 @@ vi.mock('@/lib/queries', () => ({
     isLoading: false,
     isError: false,
   }),
-  usePendingOpportunityCardsQuery: () => ({
-    data: mockPendingOpportunityCards,
-    isLoading: false,
-    isError: false,
-  }),
+  usePendingOpportunityCardsQuery: (options: { enabled?: boolean }) => {
+    mockOpportunityQueryOptions(options);
+    return {
+      data: mockPendingOpportunityCards,
+      isLoading: false,
+      isError: false,
+    };
+  },
   useInsightsSummaryQuery: () => ({
     data: mockInsightsSummary,
     isLoading: false,
@@ -643,9 +649,49 @@ describe('JovieChat empty state', () => {
     fireEvent.click(getByTestId('chat-pinned-opportunity-unpin'));
 
     expect(queryByTestId('chat-pinned-opportunity-header')).toBeNull();
+    expect(mockOpportunityQueryOptions).toHaveBeenLastCalledWith({
+      enabled: false,
+    });
     // Unpinning returns to the one-sentence greeting, not a card stack.
     expect(queryByTestId('chat-empty-state-opportunity-cards')).toBeNull();
     expect(getByTestId('chat-empty-state-greeting-text')).toBeTruthy();
+  });
+
+  it('handles a revisited opportunity link after navigation without remounting', () => {
+    mockPendingOpportunityCards.push({
+      id: 'opp-revisit',
+      typeLabel: 'Suggestion',
+      createdAt: '2026-07-01T12:00:00.000Z',
+      title: 'Review this opportunity',
+      why: 'A new booking inquiry arrived.',
+      primaryActionLabel: 'Review inquiry',
+      status: 'pending',
+      category: 'suggestion',
+    });
+    mockSearchParams = new URLSearchParams('opportunityId=opp-revisit');
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const { getByTestId, queryByTestId, rerender } = render(
+      <JovieChat profileId='profile-1' />,
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        ),
+      }
+    );
+    expect(getByTestId('chat-pinned-opportunity-header')).toBeTruthy();
+    fireEvent.click(getByTestId('chat-pinned-opportunity-unpin'));
+    expect(queryByTestId('chat-pinned-opportunity-header')).toBeNull();
+
+    mockSearchParams = new URLSearchParams();
+    rerender(<JovieChat profileId='profile-1' />);
+    expect(queryByTestId('chat-pinned-opportunity-header')).toBeNull();
+    mockSearchParams = new URLSearchParams('opportunityId=opp-revisit');
+    rerender(<JovieChat profileId='profile-1' />);
+    expect(getByTestId('chat-pinned-opportunity-header')).toBeTruthy();
   });
 
   it('does not render opportunity cards when there are none pending', () => {
