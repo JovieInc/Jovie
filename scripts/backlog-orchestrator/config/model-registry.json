@@ -215,15 +215,15 @@
       "weaknesses": ["often-missing-on-gem", "not-architecture"]
     },
     {
-      "id": "deepseek-v4-flash",
+      "id": "glm-5.3-flash-gateway",
       "provider": "vercel-ai-gateway",
-      "model": "deepseek/deepseek-v4-flash",
-      "family": "deepseek",
+      "model": "zai/glm-5.3-flash",
+      "family": "glm",
       "channel": "api",
       "pool": "vercel-gateway",
       "quality": 65,
-      "list_price_in": 0.15,
-      "list_price_out": 0.6,
+      "list_price_in": 0.2,
+      "list_price_out": 1.5,
       "capabilities": ["mechanical", "code", "review", "semantic"],
       "cost_tier": "gateway-budgeted-paid",
       "executable_env": "GEM_DEEPSEEK_EXECUTABLE",
@@ -585,7 +585,7 @@
       "hyperagent-kimi-k3",
       "hyperagent-deepseek-v4",
       "hyperagent-astra",
-      "deepseek-v4-flash",
+      "glm-5.3-flash-gateway",
       "qwen-coder-local"
     ],
     "new_pr": [
@@ -602,7 +602,7 @@
       "hyperagent-kimi-k3",
       "hyperagent-deepseek-v4",
       "hyperagent-astra",
-      "deepseek-v4-flash",
+      "glm-5.3-flash-gateway",
       "qwen-coder-local"
     ]
   },
