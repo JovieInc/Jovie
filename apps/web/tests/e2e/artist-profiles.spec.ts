@@ -62,6 +62,9 @@ interface GeometrySnapshot {
   readonly width: number;
   readonly x: number;
   readonly y: number;
+  readonly scrollY: number;
+  readonly viewportHeight: number;
+  readonly selectedMode: string | null;
 }
 
 async function getGeometrySnapshot(
@@ -76,6 +79,12 @@ async function getGeometrySnapshot(
       width: rect.width,
       x: rect.x,
       y: rect.y,
+      scrollY: window.scrollY,
+      viewportHeight: window.innerHeight,
+      selectedMode:
+        document.querySelector(
+          '[data-testid="artist-profile-section-adaptive"] [role="tab"][aria-selected="true"]'
+        )?.textContent ?? null,
     };
   });
 }
@@ -88,9 +97,59 @@ function expectStableGeometry(
   for (const key of ['documentTop', 'height', 'width', 'x', 'y'] as const) {
     expect(
       Math.abs(current[key] - baseline[key]),
-      `${surface} ${key} shifted`
+      `${surface} ${key} shifted: ${JSON.stringify({ baseline, current })}`
     ).toBeLessThanOrEqual(GEOMETRY_TOLERANCE_PX);
   }
+}
+
+async function observeMarketingScroll(page: import('@playwright/test').Page) {
+  page.on('console', message => {
+    if (message.text().startsWith('MARKETING_SCROLL_DIAGNOSTIC ')) {
+      console.log(message.text());
+    }
+  });
+  const installObserver = () => {
+    const record = (event: Event) => {
+      const adaptive = document.querySelector(
+        '[data-testid="artist-profile-section-adaptive"]'
+      );
+      const tabList = adaptive?.querySelector('[role="tablist"]');
+      const tabBounds = Array.from(
+        tabList?.querySelectorAll('[role="tab"]') ?? []
+      ).map(tab => {
+        const rect = tab.getBoundingClientRect();
+        return { label: tab.textContent, y: rect.y, height: rect.height };
+      });
+      console.info(
+        'MARKETING_SCROLL_DIAGNOSTIC ' +
+          JSON.stringify({
+            event: event.type,
+            at: performance.now(),
+            scrollY: window.scrollY,
+            viewportHeight: window.innerHeight,
+            selected: tabList?.querySelector('[aria-selected="true"]')
+              ?.textContent,
+            tabBounds,
+            remainingScroll:
+              document.documentElement.scrollHeight -
+              window.innerHeight -
+              window.scrollY,
+            targetTag:
+              event.target instanceof Element ? event.target.tagName : null,
+            pointerTargetTag:
+              event instanceof MouseEvent
+                ? document.elementFromPoint(event.clientX, event.clientY)
+                    ?.tagName
+                : null,
+          })
+      );
+    };
+    for (const type of ['scroll', 'focusin', 'pointerdown', 'wheel']) {
+      document.addEventListener(type, record, { capture: true, passive: true });
+    }
+  };
+  await page.addInitScript(installObserver);
+  await page.evaluate(installObserver);
 }
 
 test.describe('Artist Profiles Landing', () => {
@@ -274,6 +333,7 @@ test.describe('Artist Profiles Landing', () => {
   test('adaptive mode changes preserve desktop and mobile geometry', async ({
     page,
   }) => {
+    await observeMarketingScroll(page);
     for (const viewport of [
       { name: 'desktop', width: 1440, height: 960 },
       { name: 'mobile', width: 390, height: 844 },
@@ -397,6 +457,7 @@ test.describe('Artist Profiles Landing', () => {
   test('four fan outcomes keep a stable ledger across breakpoints', async ({
     page,
   }) => {
+    await observeMarketingScroll(page);
     await expectNoHorizontalOverflow(page);
 
     const outcomesSection = page.getByTestId('artist-profile-section-outcomes');
