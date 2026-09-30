@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DesktopReleaseIdentity,
   DesktopTitlebar,
-} from '@/components/atoms/DesktopTitlebar';
+} from '@/components/organisms/DesktopTitlebar';
 import { SidebarContext } from '@/components/organisms/sidebar/context';
 
 const electronRuntimeMock = vi.hoisted(() => ({
