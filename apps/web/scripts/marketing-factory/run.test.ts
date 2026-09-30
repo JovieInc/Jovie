@@ -34,6 +34,8 @@ function run(options: Partial<Parameters<typeof runFactory>[0]> = {}) {
     dry: true,
     runsDir,
     runners: CONTENT_STAGE_RUNNERS,
+    // These tests exercise stage behavior past the preflight; see preflight.test.ts.
+    allowPartial: true,
     ...options,
   });
 }

@@ -5,20 +5,26 @@
  * requests, the media plan and the asset manifest have no record fields;
  * they stay in the run and are bound by their digests in `receipts`.
  *
- * Renderer keys are the narrative section instance ids. The /solutions
- * renderer map does not know them yet, so a factory record can only be
- * routed once data-driven solutions sections exist; the record stays in
- * shadow until then, and assertRenderableSolutionsRecord fails closed.
+ * Renderer keys come from the /solutions renderer map (via the data-only
+ * SOLUTIONS_SECTION_KEYS), one per narrative section in order, and the
+ * record is held to the same checks as assertRenderableSolutionsRecord:
+ * claims resolve, copy resolves, every section has a renderer. Today's
+ * renderers are artist-specific and read their own copy, not record.copy,
+ * so a factory record stays in shadow until data-driven sections exist.
  */
 
 import { HERO_DECISION_TABLE } from '../../data/marketing/factory/heroDecision';
 import {
+  findUnresolvedRecordClaims,
   type PageRecordInput,
   PageRecordSchema,
   pageRecordPath,
+  resolvePageCopy,
 } from '../../data/marketing/factory/pageRecord';
+import { assignSolutionsSectionKeys } from '../../data/marketing/factory/solutionsSectionKeys';
 import { FACTORY_STAGES } from '../../data/marketing/factory/spine';
 import { MARKETING_PEN_CONTRACT_IDS } from '../../data/marketing/penContracts';
+import { listProductTruthClaims } from '../../data/product-truth/claims';
 import { getMarketingExportImage } from '../../lib/screenshots/registry';
 import { artifactOf, type StageContext } from './stage-kit';
 
@@ -50,6 +56,13 @@ export function buildFactoryPageRecord(
     asset.id.startsWith(CAPTURE_PREFIX)
   );
   const recipeId = artifactOf(ctx, 'layout').recipeId;
+  const sections = artifactOf(ctx, 'narrative').sections;
+  const rendererKeys = assignSolutionsSectionKeys(
+    sections.map(section => section.sectionId)
+  );
+  const unrendered = sections
+    .filter((_, index) => rendererKeys[index] === null)
+    .map(section => `no solutions renderer for ${section.sectionId}`);
 
   const record = {
     id: `${brief.family}.${brief.slug}`,
@@ -65,8 +78,8 @@ export function buildFactoryPageRecord(
     composition: {
       recipeId,
       penContractId: PEN_CONTRACT_BY_RECIPE[recipeId],
-      sections: artifactOf(ctx, 'narrative').sections.map(section => ({
-        renderer: section.sectionInstanceId,
+      sections: sections.map((section, index) => ({
+        renderer: rendererKeys[index] ?? section.sectionInstanceId,
         sectionId: section.sectionId,
       })),
     },
@@ -115,17 +128,30 @@ export function buildFactoryPageRecord(
   if (!parsed.success) {
     return {
       record,
-      issues: parsed.error.issues.map(
-        issue => `${issue.path.join('.') || 'record'}: ${issue.message}`
-      ),
+      issues: [
+        ...parsed.error.issues.map(
+          issue => `${issue.path.join('.') || 'record'}: ${issue.message}`
+        ),
+        ...unrendered,
+      ],
     };
   }
+  // Same checks as assertRenderableSolutionsRecord, the build gate.
+  const claims = listProductTruthClaims();
+  const issues = [
+    ...unrendered,
+    ...findUnresolvedRecordClaims(parsed.data, claims).map(
+      id => `unknown claim ${id}`
+    ),
+  ];
+  try {
+    resolvePageCopy(parsed.data, claims);
+  } catch (error) {
+    issues.push(error instanceof Error ? error.message : String(error));
+  }
   const route = pageRecordPath(parsed.data);
-  return {
-    record: parsed.data,
-    issues:
-      route === brief.route
-        ? []
-        : [`record routes to ${route}, brief says ${brief.route}`],
-  };
+  if (route !== brief.route) {
+    issues.push(`record routes to ${route}, brief says ${brief.route}`);
+  }
+  return { record: parsed.data, issues };
 }

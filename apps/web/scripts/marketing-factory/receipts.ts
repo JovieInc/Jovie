@@ -90,6 +90,16 @@ export const FactoryRunManifestSchema = z.object({
     })
   ),
   attempts: z.array(z.string().min(1)),
+  /** Set when the preflight refused the run before any stage ran. */
+  preflight: z
+    .array(
+      z.object({
+        stage: z.enum(FACTORY_STAGES),
+        code: z.enum(['no-runner', 'credentials-unavailable']),
+        reason: z.string().min(1),
+      })
+    )
+    .optional(),
 });
 
 export type FactoryRunManifest = z.infer<typeof FactoryRunManifestSchema>;
