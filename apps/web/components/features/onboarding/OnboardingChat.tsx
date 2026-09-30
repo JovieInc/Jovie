@@ -568,10 +568,6 @@ function getOnboardingComposerPlaceholder(
     : 'Artist, release, or link...';
 }
 
-function getSendLocalError(chatError: ChatError | null) {
-  return chatError?.errorCode === 'TURNSTILE_REQUIRED' ? null : chatError;
-}
-
 function OnboardingFlowStatus({
   reserveTurnstileSpace = false,
   shouldShowTurnstileBanner,
@@ -735,6 +731,7 @@ export function OnboardingChat({
     hasInitialStarterPrompt ? initialStarterPrompt : null
   );
   const wasAwaitingTurnstileRetryRef = useRef(false);
+  const pendingVerifiedSubmitRef = useRef(false);
   const [localAutomationBypass, setLocalAutomationBypass] = useState<
     boolean | null
   >(null);
@@ -829,6 +826,9 @@ export function OnboardingChat({
       if (isAwaitingFirstToken) {
         setVerificationRequested(true);
         onTurnstileRequired?.('One quick check before we send');
+        pendingVerifiedSubmitRef.current = true;
+        pendingStarterPromptRef.current = null;
+        hasAutoSubmittedStarterPromptRef.current = true;
         return;
       }
       lastAttemptedMessageRef.current = text;
@@ -1003,6 +1003,15 @@ export function OnboardingChat({
   }, [messages.length]);
 
   useEffect(() => {
+    if (!pendingVerifiedSubmitRef.current) return;
+    if (isAwaitingFirstToken || isBusy || localAutomationBypass === null) {
+      return;
+    }
+    pendingVerifiedSubmitRef.current = false;
+    submitText(latestInputRef.current);
+  }, [isAwaitingFirstToken, isBusy, localAutomationBypass, submitText]);
+
+  useEffect(() => {
     if (isAwaitingFirstToken) {
       if (chatError?.errorCode === 'TURNSTILE_REQUIRED') {
         wasAwaitingTurnstileRetryRef.current = true;
@@ -1103,7 +1112,7 @@ export function OnboardingChat({
     onAddSkill: chipTray.addSkill,
     onAddEntity: chipTray.addEntity,
   } as const;
-  const sendLocalError = getSendLocalError(chatError);
+  const sendLocalError = chatError;
   const onboardingComposerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
       {sendLocalError ? (
