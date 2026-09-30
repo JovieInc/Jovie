@@ -3,15 +3,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   select: vi.fn(),
   insert: vi.fn(),
+  update: vi.fn(),
   resolve: vi.fn(),
 }));
 vi.mock('@/lib/db', () => ({
-  db: { select: mocks.select, insert: mocks.insert },
+  db: { select: mocks.select, insert: mocks.insert, update: mocks.update },
 }));
 vi.mock('./artist-resolution', () => ({ resolveAgentArtist: mocks.resolve }));
 
 import { draftTokenHash, mintDraftCapability } from './draft-capability';
-import { createAgentDraft, readAgentDraft } from './draft-store';
+import type { StoredReleaseLaunch } from './draft-preview';
+import {
+  createAgentDraft,
+  readAgentDraft,
+  storeAgentReleaseLaunch,
+} from './draft-store';
 
 const artistId = 'spotify:4Z8W4fKeB5YxbusRsdQVPb';
 const artist = {
@@ -46,15 +52,20 @@ function grant() {
 }
 let reads = vi.fn();
 let writes = vi.fn();
+let updates = vi.fn();
 beforeEach(() => {
   vi.resetAllMocks();
   reads = vi.fn().mockResolvedValue([]);
   writes = vi.fn().mockResolvedValue(undefined);
+  updates = vi.fn().mockResolvedValue(undefined);
   mocks.select.mockReturnValue({
     from: () => ({ where: () => ({ limit: reads }) }),
   });
   mocks.insert.mockReturnValue({
     values: (value: unknown) => ({ onConflictDoNothing: () => writes(value) }),
+  });
+  mocks.update.mockReturnValue({
+    set: (value: unknown) => ({ where: () => updates(value) }),
   });
   mocks.resolve.mockResolvedValue(resolution);
 });
@@ -101,6 +112,31 @@ describe('capability-bound draft persistence', () => {
     );
     expect(mocks.resolve).not.toHaveBeenCalled();
     expect(mocks.insert).not.toHaveBeenCalled();
+  });
+  it('stores a launch atomically while keeping its fingerprint private', async () => {
+    const g = grant();
+    const launch = {
+      inputFingerprint: 'private-input-fingerprint',
+      result: { status: 'launch_draft_ready' },
+    } as unknown as StoredReleaseLaunch;
+    const rowWithLaunch = {
+      ...g.row,
+      preview: { ...artist, launch },
+    };
+    reads
+      .mockResolvedValueOnce([g.row])
+      .mockResolvedValueOnce([rowWithLaunch])
+      .mockResolvedValueOnce([rowWithLaunch]);
+
+    expect(
+      await storeAgentReleaseLaunch(g.row.id, g.token, null, launch)
+    ).toEqual(rowWithLaunch);
+    expect(updates).toHaveBeenCalledExactlyOnceWith({
+      preview: rowWithLaunch.preview,
+    });
+    const presented = await readAgentDraft(g.row.id, g.token);
+    expect(presented).toMatchObject({ launch: launch.result });
+    expect(JSON.stringify(presented)).not.toContain(launch.inputFingerprint);
   });
   it('denies artist substitution, unrelated receipt IDs, expiry and malformed inputs before DB access', async () => {
     const g = grant();

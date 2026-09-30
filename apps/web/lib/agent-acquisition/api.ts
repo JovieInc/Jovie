@@ -19,8 +19,10 @@ import { mintDraftCapability } from './draft-capability';
 import {
   agentAcquisitionSchema,
   createAgentDraftSchema,
+  prepareReleaseLaunchSchema,
 } from './draft-contract';
 import { createAgentDraft, readAgentDraft } from './draft-store';
+import { prepareReleaseLaunch } from './release-launch';
 
 const searchInput = agentArtistInputSchema.extend({
   acquisition: agentAcquisitionSchema,
@@ -49,10 +51,26 @@ export const AGENT_DRAFT_TOOLS = [
       openWorldHint: true,
     },
   },
+  {
+    name: 'release.prepare_launch',
+    description:
+      'Resolve public release facts and create or resume an unpublished artist, release-page, and smart-link draft. Requires the draft capability. Returns only unresolved questions and never claims, publishes, or purchases.',
+    inputSchema: z.toJSONSchema(prepareReleaseLaunchSchema),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
 ];
 const callSchema = z
   .object({
-    tool: z.enum(['artist.search_or_import', 'workspace.create_draft']),
+    tool: z.enum([
+      'artist.search_or_import',
+      'workspace.create_draft',
+      'release.prepare_launch',
+    ]),
     arguments: z.unknown(),
   })
   .strict();
@@ -93,6 +111,7 @@ export async function guardAgentRequest(request: Request, write = false) {
 
 export async function executeAgentDraftTool(tool: string, args: unknown) {
   if (tool === 'workspace.create_draft') return createAgentDraft(args);
+  if (tool === 'release.prepare_launch') return prepareReleaseLaunch(args);
   const parsed = searchInput.safeParse(args);
   if (tool !== 'artist.search_or_import' || !parsed.success)
     return {
@@ -162,7 +181,8 @@ export async function handleAgentDraftPost(request: Request) {
       result.status !== 'error'
         ? 200
         : result.code === 'DRAFT_UNAVAILABLE' ||
-            result.code === 'ARTIST_NOT_FOUND'
+            result.code === 'ARTIST_NOT_FOUND' ||
+            result.code === 'RELEASE_NOT_FOUND'
           ? 404
           : result.retryable
             ? 503
