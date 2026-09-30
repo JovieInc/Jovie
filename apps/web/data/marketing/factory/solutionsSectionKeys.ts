@@ -1,4 +1,4 @@
-import type { MarketingSectionId } from '../sections';
+import { MARKETING_SECTION_IDS, type MarketingSectionId } from '../sections';
 
 /**
  * Data-only projection of SOLUTIONS_SECTION_RENDERERS
@@ -6,7 +6,7 @@ import type { MarketingSectionId } from '../sections';
  * canonical section id. Node scripts such as factory:run cannot import the
  * React renderer map, so they read this; a parity test fails on any drift.
  */
-export const SOLUTIONS_SECTION_KEYS = {
+const ARTIST_SOLUTIONS_SECTION_KEYS = {
   'artist-hero-adaptive-intro': 'hero',
   'artist-outcomes': 'feature-grid',
   'artist-capture': 'capture',
@@ -20,25 +20,29 @@ export const SOLUTIONS_SECTION_KEYS = {
   'artist-final-cta': 'cta',
 } as const satisfies Readonly<Record<string, MarketingSectionId>>;
 
+export type FactorySolutionsSectionKey = `factory-${MarketingSectionId}`;
+
+const FACTORY_SOLUTIONS_SECTION_KEYS = Object.fromEntries(
+  MARKETING_SECTION_IDS.map(sectionId => [`factory-${sectionId}`, sectionId])
+) as Readonly<Record<FactorySolutionsSectionKey, MarketingSectionId>>;
+
+export const SOLUTIONS_SECTION_KEYS = {
+  ...ARTIST_SOLUTIONS_SECTION_KEYS,
+  ...FACTORY_SOLUTIONS_SECTION_KEYS,
+} as const satisfies Readonly<Record<string, MarketingSectionId>>;
+
 export type SolutionsSectionKey = keyof typeof SOLUTIONS_SECTION_KEYS;
 
 /**
- * Picks one renderer per section, in order, never reusing a key. Returns
- * null for a section id no renderer implements.
+ * Factory records name the reusable renderer for each canonical section.
+ * Repeated section types intentionally reuse a key; `PageCompositionSection`
+ * keeps their copy/media namespaces distinct through `instanceId`.
  */
 export function assignSolutionsSectionKeys(
   sectionIds: readonly string[]
 ): (SolutionsSectionKey | null)[] {
-  const used = new Set<string>();
   return sectionIds.map(sectionId => {
-    const key = (
-      Object.keys(SOLUTIONS_SECTION_KEYS) as SolutionsSectionKey[]
-    ).find(
-      candidate =>
-        SOLUTIONS_SECTION_KEYS[candidate] === sectionId && !used.has(candidate)
-    );
-    if (!key) return null;
-    used.add(key);
-    return key;
+    const key = `factory-${sectionId}` as FactorySolutionsSectionKey;
+    return Object.hasOwn(FACTORY_SOLUTIONS_SECTION_KEYS, key) ? key : null;
   });
 }
