@@ -4083,7 +4083,7 @@ function assertInterviewSummaryContractCovered(output) {
       'interview summary contract did not inspect summarizer entrypoint'
     );
   }
-  if (payload.modelId !== 'claude-haiku-4-5-20251001') {
+  if (payload.modelId !== 'zai/glm-5.3-flash') {
     return fail(
       `unexpected interview summary model: ${String(payload.modelId)}`
     );
@@ -4091,9 +4091,9 @@ function assertInterviewSummaryContractCovered(output) {
   if (payload.maxTokens !== 800) {
     return fail(`expected max tokens 800, got ${String(payload.maxTokens)}`);
   }
-  if (payload.anthropicRequestTimeoutMs !== 30000) {
+  if (payload.requestTimeoutMs !== 30000) {
     return fail(
-      `expected Anthropic timeout 30000, got ${String(payload.anthropicRequestTimeoutMs)}`
+      `expected request timeout 30000, got ${String(payload.requestTimeoutMs)}`
     );
   }
   if (payload.wrapperTimeoutMs !== 31000) {
@@ -4206,12 +4206,12 @@ function assertPlaylistGenerationContractCovered(output) {
   }
 
   const modelIds = payload.modelIds ?? {};
-  if (modelIds.concept !== 'claude-haiku-4-5-20251001') {
+  if (modelIds.concept !== 'zai/glm-5.3-flash') {
     return fail(
       `unexpected playlist concept model: ${String(modelIds.concept)}`
     );
   }
-  if (modelIds.curation !== 'claude-sonnet-4-20250514') {
+  if (modelIds.curation !== 'zai/glm-5.3') {
     return fail(
       `unexpected playlist curation model: ${String(modelIds.curation)}`
     );
@@ -4228,9 +4228,9 @@ function assertPlaylistGenerationContractCovered(output) {
       `expected playlist curation max tokens 1500, got ${String(maxTokens.curation)}`
     );
   }
-  if (payload.anthropicRequestTimeoutMs !== 30000) {
+  if (payload.requestTimeoutMs !== 30000) {
     return fail(
-      `expected Anthropic timeout 30000, got ${String(payload.anthropicRequestTimeoutMs)}`
+      `expected request timeout 30000, got ${String(payload.requestTimeoutMs)}`
     );
   }
   if (payload.wrapperTimeoutMs !== 31000) {

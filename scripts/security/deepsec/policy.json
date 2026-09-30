@@ -26,10 +26,10 @@
   "gatewayTags": ["security-scan", "deepsec"],
   "models": {
     "cheap": {
-      "gatewayId": "openai/gpt-6-luna",
-      "agent": "codex",
-      "model": "gpt-6-luna",
-      "reasoning": "xhigh"
+      "gatewayId": "zai/glm-5.3-flash",
+      "agent": "pi",
+      "model": "zai/glm-5.3-flash",
+      "reasoning": "high"
     },
     "frontierSource": "https://vercel.com/ai-gateway/leaderboards/deepsecbench/results.json",
     "frontierTopN": 3,
