@@ -356,6 +356,13 @@ export async function inspectRouteDom(
         );
         const nestedPairs = new Set<Element>();
         for (const inner of surfaces) {
+          // Canonical device anatomy (components/marketing/device/
+          // deviceBezels.ts): a PhoneFrame bezel (`[data-device]`) and its
+          // direct screen child are ONE intentional composed visual — the
+          // bezel is the surface, the screen is its contents. Only that
+          // direct pair merges; a decorative surface wrapping the phone, or
+          // anything deeper inside the screen, is still examined.
+          if (inner.parentElement?.matches('[data-device]')) continue;
           const outer = surfaces.find(
             candidate => candidate !== inner && candidate.contains(inner)
           );
@@ -401,12 +408,24 @@ export async function inspectRouteDom(
           });
         }
 
-        // 3. A section heading must not out-scale the page headline.
+        // 3. A section heading must not out-scale the page headline — the
+        //    route recipe's hierarchy contract (data/marketing/recipes.ts,
+        //    emphasisBudget.maxDisplayScaleMoments) grants the page exactly
+        //    one display-scale moment, the hero. The same contract sanctions
+        //    one full-bleed closing break: the terminal CTA (ctaCadence
+        //    'hero-and-close'), which ships as the shell.footerCta /
+        //    shell.finalCta / section.cta Pen-contract sections or a
+        //    [data-rhythm="close"] close section. A heading inside that
+        //    declared terminal beat is deliberate competing display — font
+        //    ordering there is a review signal, not a defect. Everywhere
+        //    else, the contract requires the hero to dominate.
+        const terminalCta =
+          '[data-pen-contract="LCLXI"], [data-pen-contract="iY5Lp"], [data-pen-contract="y8oKXI"], [data-rhythm="close"]';
         const h1 = Array.from(root.querySelectorAll('h1')).find(visibleIn);
         if (h1) {
           const h1Size = px(getComputedStyle(h1).fontSize);
           for (const heading of Array.from(root.querySelectorAll('h2, h3'))) {
-            if (!visibleIn(heading)) continue;
+            if (!visibleIn(heading) || heading.closest(terminalCta)) continue;
             const size = px(getComputedStyle(heading).fontSize);
             if (size <= h1Size + 1) continue;
             findings.push({
@@ -520,7 +539,61 @@ export async function inspectRouteDom(
 
         // 7. Line-break quality (ui.md): a single word alone on the last
         //    rendered line of a headline, lede, or CTA label is a design bug.
-        const wordLines = (element: Element): string[][] => {
+        //    Only PAINTED words count: a word a -webkit-line-clamp or an
+        //    overflow clip hides below the fold is a clipped-heading failure,
+        //    not a visible orphan.
+        type ClipRect = {
+          top: number;
+          right: number;
+          bottom: number;
+          left: number;
+        };
+        const clipRectOf = (element: Element): ClipRect | null => {
+          let clip: ClipRect | null = null;
+          for (
+            let node: Element | null = element;
+            node;
+            node = node.parentElement
+          ) {
+            const style = getComputedStyle(node);
+            const lineClamps =
+              node === element &&
+              (style.getPropertyValue('-webkit-line-clamp') || 'none') !==
+                'none';
+            if (
+              style.overflowX === 'visible' &&
+              style.overflowY === 'visible' &&
+              !lineClamps
+            ) {
+              continue;
+            }
+            const rect = node.getBoundingClientRect();
+            clip = clip
+              ? {
+                  top: Math.max(clip.top, rect.top),
+                  right: Math.min(clip.right, rect.right),
+                  bottom: Math.min(clip.bottom, rect.bottom),
+                  left: Math.max(clip.left, rect.left),
+                }
+              : {
+                  top: rect.top,
+                  right: rect.right,
+                  bottom: rect.bottom,
+                  left: rect.left,
+                };
+          }
+          return clip;
+        };
+        const painted = (rect: DOMRect, clip: ClipRect | null): boolean =>
+          !clip ||
+          (rect.right > clip.left + 1 &&
+            rect.left < clip.right - 1 &&
+            rect.bottom > clip.top + 1 &&
+            rect.top < clip.bottom - 1);
+        const wordLines = (
+          element: Element,
+          clip: ClipRect | null
+        ): string[][] => {
           const walker = document.createTreeWalker(
             element,
             NodeFilter.SHOW_TEXT
@@ -533,7 +606,7 @@ export async function inspectRouteDom(
               range.setStart(node, match.index ?? 0);
               range.setEnd(node, (match.index ?? 0) + match[0].length);
               const rect = range.getClientRects()[0];
-              if (rect && rect.width > 0) {
+              if (rect && rect.width > 0 && painted(rect, clip)) {
                 words.push({ word: match[0], top: Math.round(rect.top) });
               }
             }
@@ -560,7 +633,7 @@ export async function inspectRouteDom(
             normalizedText(element.textContent).split(' ').length >= 3
         );
         for (const element of lineBreakTargets) {
-          const lines = wordLines(element);
+          const lines = wordLines(element, clipRectOf(element));
           const last = lines.at(-1);
           if (lines.length < 2 || !last || last.length !== 1) continue;
           findings.push({
