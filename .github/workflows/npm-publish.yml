@@ -4,6 +4,12 @@ name: Publish @jovie/cli to npm
 # a main push or pull request must never acquire npm publish authority.
 on:
   workflow_dispatch:
+    inputs:
+      publish_mcp_only:
+        description: Verify the byte-identical published npm artifact and publish its MCP listing.
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -47,6 +53,7 @@ jobs:
         env:
           PACKAGE_NAME: '@jovie/cli'
           REGISTRY_URL: https://registry.npmjs.org
+          PUBLISH_MCP_ONLY: ${{ inputs.publish_mcp_only }}
         run: |
           set -euo pipefail
 
@@ -123,11 +130,19 @@ jobs:
             "$REGISTRY_URL/$version_path/$release_version")"
           case "$registry_status" in
             404)
+              test "$PUBLISH_MCP_ONLY" = false || {
+                echo "::error::MCP-only publication requires an existing npm release."
+                exit 1
+              }
               echo "@jovie/cli@$release_version is not published; continuing."
               ;;
             200)
-              echo "::error::@jovie/cli@$release_version is already published."
-              exit 1
+              if test "$PUBLISH_MCP_ONLY" = true; then
+                echo "Existing npm release will be verified before MCP publication."
+              else
+                echo "::error::@jovie/cli@$release_version is already published."
+                exit 1
+              fi
               ;;
             *)
               echo "::error::Could not prove @jovie/cli@$release_version is unpublished (HTTP $registry_status)."
@@ -200,6 +215,7 @@ jobs:
       # short-lived publish credential. No long-lived npm token exists.
       # Requires npm >= 11.5.1; Node 22 bundles npm 10.
       - name: Use npm with trusted publishing support
+        if: ${{ !inputs.publish_mcp_only }}
         shell: bash
         run: |
           set -euo pipefail
@@ -207,6 +223,7 @@ jobs:
           node -e 'const [a,b,c]=process.argv[1].split(".").map(Number); if (a<11||(a===11&&(b<5||(b===5&&c<1)))) { console.error("::error::npm >= 11.5.1 is required for trusted publishing"); process.exit(1) }' "$(npm --version)"
 
       - name: Publish with npm provenance
+        if: ${{ !inputs.publish_mcp_only }}
         shell: bash
         env:
           PACKAGE_DIR: ${{ steps.package.outputs.path }}
@@ -228,6 +245,7 @@ jobs:
           npm publish --provenance --access public "$PACKAGE_DIR"
 
       - name: Prove public registry release
+        id: public_release
         shell: bash
         env:
           PACKAGE_NAME: '@jovie/cli'
@@ -284,6 +302,7 @@ jobs:
             --package-lock=false \
             --registry "$REGISTRY_URL" \
             "$PACKAGE_NAME@$RELEASE_VERSION"
+          printf 'install_root=%s\n' "$install_root" >> "$GITHUB_OUTPUT"
           installed_cli="$install_root/node_modules/.bin/jovie"
           test -x "$installed_cli"
           test "$("$installed_cli" --version)" = "$RELEASE_VERSION"
@@ -308,3 +327,55 @@ jobs:
 
           echo "Public npm registry, provenance, ownership, fresh install, and runtime receipts passed." \
             >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify exact staged bytes and prepare MCP manifest
+        if: ${{ inputs.publish_mcp_only }}
+        shell: bash
+        env:
+          STAGING_DIR: ${{ steps.package.outputs.path }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          export MCP_PACK_PATH="$RUNNER_TEMP/jovie-mcp-pack.json"
+          export METADATA_PATH="$RUNNER_TEMP/jovie-cli-public-metadata.json"
+          export MCP_MANIFEST_PATH="$RUNNER_TEMP/jovie-mcp-server.json"
+          (
+            cd "$STAGING_DIR"
+            npm pack --ignore-scripts --json > "$MCP_PACK_PATH"
+          )
+          node packages/jovie-cli/scripts/verify-published-package.mjs
+          npm audit signatures --prefix '${{ steps.public_release.outputs.install_root }}'
+
+      - name: Publish exact MCP listing using GitHub OIDC
+        if: ${{ inputs.publish_mcp_only }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" || {
+            echo "::error::Main advanced before MCP publication."
+            exit 1
+          }
+          publisher_archive="$RUNNER_TEMP/mcp-publisher.tar.gz"
+          curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 \
+            https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz \
+            --output "$publisher_archive"
+          echo "a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc  $publisher_archive" | sha256sum --check
+          publisher_dir="$RUNNER_TEMP/mcp-publisher"
+          mkdir -p "$publisher_dir"
+          tar -xzf "$publisher_archive" -C "$publisher_dir" mcp-publisher
+          "$publisher_dir/mcp-publisher" validate "$RUNNER_TEMP/jovie-mcp-server.json"
+          "$publisher_dir/mcp-publisher" login github-oidc
+          "$publisher_dir/mcp-publisher" publish "$RUNNER_TEMP/jovie-mcp-server.json"
+          registry_result="$RUNNER_TEMP/jovie-mcp-registry-readback.json"
+          curl --fail --silent --show-error --connect-timeout 10 --max-time 30 \
+            https://registry.modelcontextprotocol.io/v0.1/servers/io.github.JovieInc%2Fjovie/versions/latest \
+            --output "$registry_result"
+          export REGISTRY_RESULT="$registry_result"
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const expected = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/jovie-mcp-server.json`, 'utf8'));
+          const actual = JSON.parse(readFileSync(process.env.REGISTRY_RESULT, 'utf8'));
+          const { verifyRegistryReadback } = await import('./packages/jovie-cli/scripts/verify-published-package.mjs');
+          verifyRegistryReadback(actual, expected);
+          NODE
