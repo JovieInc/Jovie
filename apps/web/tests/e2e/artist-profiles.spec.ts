@@ -90,17 +90,31 @@ async function getGeometrySnapshot(
 
 // Diagnosis only: observe the original two-click entry without settling,
 // recentering, changing focus, or changing the 400ms/1px oracle.
-async function observeOriginalEntry(page: import('@playwright/test').Page) {
+async function observeOriginalEntry(
+  page: import('@playwright/test').Page,
+  identity: { title: string; retry: number; project: string }
+) {
   page.on('console', message => {
     if (message.text().startsWith('ORIGINAL_ENTRY_TRACE ')) {
       console.log(message.text());
     }
   });
-  await page.addInitScript(() => {
+  await page.addInitScript(identity => {
     let sequence = 0;
     let frames = 0;
     let omittedEvents = 0;
     let lastScrollY = window.scrollY;
+    let readinessKey = '';
+    let readyDeliveredAt: number | null = null;
+    let readyDeliveredFrame: number | null = null;
+    let firstPointerSurfaces: Record<string, unknown> | null = null;
+    const controlPointers: {
+      phase: string;
+      ready: string | null;
+      disabled: boolean;
+      focus: unknown;
+      scrollY: number;
+    }[] = [];
     const rect = (element: Element | null) => {
       if (!element) return null;
       const box = element.getBoundingClientRect();
@@ -136,13 +150,71 @@ async function observeOriginalEntry(page: import('@playwright/test').Page) {
       const tabList = section?.querySelector('[role="tablist"]') ?? null;
       const image = section?.querySelector('img');
       const pointer = event instanceof MouseEvent ? event : null;
+      const surfaces = {
+        section: rect(section),
+        phone: rect(image ?? null),
+        tabList: rect(tabList),
+        panel: rect(tabList?.nextElementSibling ?? null),
+      };
+      if (
+        phase === 'pointerdown' &&
+        !firstPointerSurfaces &&
+        tabList?.contains(event?.target as Node)
+      ) {
+        firstPointerSurfaces = surfaces;
+      }
+      (
+        window as unknown as { __jovieFirstPointerSurfaces: unknown }
+      ).__jovieFirstPointerSurfaces = firstPointerSurfaces;
+      const targetTab =
+        event?.target instanceof Element
+          ? event.target.closest('[role="tab"]')
+          : null;
+      if (
+        targetTab &&
+        ['pointerdown', 'pointerup', 'click'].includes(phase) &&
+        controlPointers.length < 12
+      ) {
+        controlPointers.push({
+          phase,
+          ready:
+            section
+              ?.querySelector('[data-interactive-ready]')
+              ?.getAttribute('data-interactive-ready') ?? null,
+          disabled: targetTab.hasAttribute('disabled'),
+          focus: describe(document.activeElement),
+          scrollY: window.scrollY,
+        });
+      }
+      (
+        window as unknown as { __jovieControlPointers: unknown }
+      ).__jovieControlPointers = controlPointers;
       console.info(
         'ORIGINAL_ENTRY_TRACE ' +
           JSON.stringify({
+            identity,
+            documentId: performance.timeOrigin,
+            path: location.pathname,
             sequence,
             phase,
             at: performance.now(),
             frames,
+            readyDeliveredAt,
+            readyDeliveredFrame,
+            sinceReadyMs:
+              readyDeliveredAt === null
+                ? null
+                : performance.now() - readyDeliveredAt,
+            sinceReadyFrames:
+              readyDeliveredFrame === null
+                ? null
+                : frames - readyDeliveredFrame,
+            hasFocus: document.hasFocus(),
+            visibility: document.visibilityState,
+            dpr: window.devicePixelRatio,
+            htmlScrollBehavior: getComputedStyle(document.documentElement)
+              .scrollBehavior,
+            htmlOverflowY: getComputedStyle(document.documentElement).overflowY,
             omittedEvents,
             scrollY: window.scrollY,
             maxScroll:
@@ -153,6 +225,7 @@ async function observeOriginalEntry(page: import('@playwright/test').Page) {
               ?.getAttribute('data-interactive-ready'),
             selected: tabList?.querySelector('[aria-selected="true"]')
               ?.textContent,
+            panelText: tabList?.nextElementSibling?.textContent?.slice(0, 600),
             documentReady: document.readyState,
             fonts: document.fonts.status,
             image: image
@@ -175,12 +248,7 @@ async function observeOriginalEntry(page: import('@playwright/test').Page) {
                   ),
                 }
               : null,
-            surfaces: {
-              section: rect(section),
-              phone: rect(image ?? null),
-              tabList: rect(tabList),
-              panel: rect(tabList?.nextElementSibling ?? null),
-            },
+            surfaces,
             tabs: Array.from(
               tabList?.querySelectorAll('[role="tab"]') ?? []
             ).map(tab => ({
@@ -207,6 +275,35 @@ async function observeOriginalEntry(page: import('@playwright/test').Page) {
         passive: true,
       });
     }
+    new MutationObserver(() => {
+      const section = document.querySelector(
+        '[data-testid="artist-profile-section-adaptive"]'
+      );
+      const ready = section
+        ?.querySelector('[data-interactive-ready]')
+        ?.getAttribute('data-interactive-ready');
+      const disabled = Array.from(
+        section?.querySelectorAll('[role="tab"]') ?? []
+      ).map(tab => tab.hasAttribute('disabled'));
+      const key = JSON.stringify([ready, disabled]);
+      if (key === readinessKey) return;
+      readinessKey = key;
+      if (
+        ready === 'true' &&
+        disabled.length === 4 &&
+        disabled.every(value => !value) &&
+        readyDeliveredAt === null
+      ) {
+        readyDeliveredAt = performance.now();
+        readyDeliveredFrame = frames;
+      }
+      record('readiness-mutation-delivery');
+    }).observe(document, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['data-interactive-ready', 'disabled'],
+    });
     const frame = () => {
       frames++;
       if (window.scrollY !== lastScrollY) {
@@ -216,7 +313,7 @@ async function observeOriginalEntry(page: import('@playwright/test').Page) {
       requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
-  });
+  }, identity);
 }
 
 async function markOriginalEntry(
@@ -249,9 +346,14 @@ test.describe('Artist Profiles Landing', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     if (
       testInfo.title ===
-      'adaptive mode changes preserve desktop and mobile geometry'
+        'adaptive mode changes preserve desktop and mobile geometry' ||
+      testInfo.title.startsWith('entry discriminator:')
     ) {
-      await observeOriginalEntry(page);
+      await observeOriginalEntry(page, {
+        title: testInfo.title,
+        retry: testInfo.retry,
+        project: testInfo.project.name,
+      });
     }
     await interceptAnalytics(page);
     await page.goto('/artist-profiles', { waitUntil: 'domcontentloaded' });
@@ -261,7 +363,8 @@ test.describe('Artist Profiles Landing', () => {
   test.afterEach(async ({ page }, testInfo) => {
     if (
       testInfo.title ===
-      'adaptive mode changes preserve desktop and mobile geometry'
+        'adaptive mode changes preserve desktop and mobile geometry' ||
+      testInfo.title.startsWith('entry discriminator:')
     ) {
       try {
         await markOriginalEntry(page, `finally:${testInfo.status}`);
@@ -533,6 +636,166 @@ test.describe('Artist Profiles Landing', () => {
       ).toHaveAttribute('aria-selected', 'true');
     }
   });
+
+  // Mechanistic controls only. The original subject above remains unchanged.
+  for (const mechanism of [
+    'ready-before-entry locator',
+    'earliest-ready coordinate',
+    'disabled pending coordinate',
+  ] as const) {
+    test(`entry discriminator: ${mechanism}`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 960 });
+      await page.goto('/artist-profiles', { waitUntil: 'domcontentloaded' });
+      await waitForHydration(page);
+      const section = page.getByTestId('artist-profile-section-adaptive');
+      const phone = section.getByRole('img').first();
+      const tabList = section.getByRole('tablist', { name: 'Profile Modes' });
+      const panel = tabList.locator('xpath=following-sibling::*[1]');
+      const preSave = section.getByRole('tab', { name: 'Pre-save' });
+      const ready = section.locator('[data-interactive-ready]');
+      const readSurfaces = async () => ({
+        section: await getGeometrySnapshot(section),
+        phone: await getGeometrySnapshot(phone),
+        tabList: await getGeometrySnapshot(tabList),
+        panel: await getGeometrySnapshot(panel),
+      });
+      const clickCoordinate = async (
+        tab: import('@playwright/test').Locator
+      ) => {
+        const point = await tab.evaluate(element => {
+          const rect = element.getBoundingClientRect();
+          const x = rect.x + rect.width / 2;
+          const y = rect.y + rect.height / 2;
+          return {
+            x,
+            y,
+            fullyVisible:
+              rect.y >= 0 &&
+              rect.bottom <= innerHeight &&
+              rect.x >= 0 &&
+              rect.right <= innerWidth,
+            hit: element.contains(document.elementFromPoint(x, y)),
+          };
+        });
+        expect(
+          point.fullyVisible,
+          'native target fully visible without recentering'
+        ).toBe(true);
+        expect(point.hit, 'native coordinate hit matches target').toBe(true);
+        await page.mouse.click(point.x, point.y);
+      };
+      if (mechanism === 'ready-before-entry locator') {
+        await expect(ready).toHaveAttribute('data-interactive-ready', 'true');
+        await expect(preSave).toBeEnabled();
+      }
+      await markOriginalEntry(page, `${mechanism}:entry-before-scroll`);
+      await tabList.scrollIntoViewIfNeeded();
+      await markOriginalEntry(page, `${mechanism}:entry-after-scroll`);
+      await expect(phone).toBeVisible();
+      await expect(tabList).toBeVisible();
+      await expect(panel).toBeVisible();
+      if (mechanism === 'disabled pending coordinate') {
+        const outNow = section.getByRole('tab', { name: 'Out now' });
+        const naturallyPending = await outNow.isDisabled();
+        await markOriginalEntry(
+          page,
+          `disabled-control:naturally-pending:${naturallyPending}`
+        );
+        test.skip(
+          !naturallyPending,
+          'No naturally pending control; inconclusive, no forced hydration delay'
+        );
+        await clickCoordinate(outNow);
+        await markOriginalEntry(page, 'disabled-control:pointer-resolved');
+        const observed = await page.evaluate(
+          () =>
+            (
+              window as unknown as {
+                __jovieControlPointers: {
+                  phase: string;
+                  ready: string | null;
+                  disabled: boolean;
+                  focus: { tag: string } | null;
+                }[];
+              }
+            ).__jovieControlPointers
+        );
+        const down = observed.find(event => event.phase === 'pointerdown');
+        const up = observed.find(event => event.phase === 'pointerup');
+        const disabledThroughout =
+          down?.ready === 'false' &&
+          up?.ready === 'false' &&
+          down.disabled &&
+          up.disabled;
+        await markOriginalEntry(
+          page,
+          `disabled-control:observed-disabled-throughout:${disabledThroughout}`
+        );
+        test.skip(
+          !disabledThroughout,
+          'Pointer crossed ready transition or was not observed disabled; inconclusive'
+        );
+        expect(
+          down?.focus?.tag,
+          'disabled pointer keeps original BODY focus'
+        ).toBe('BODY');
+        expect(up?.focus?.tag, 'disabled pointer does not accept focus').toBe(
+          'BODY'
+        );
+        await expect(ready).toHaveAttribute('data-interactive-ready', 'true');
+        await page.waitForTimeout(MODE_TRANSITION_SETTLE_MS);
+        await markOriginalEntry(
+          page,
+          'disabled-control:natural-ready-plus-400ms'
+        );
+        await expect(preSave).toHaveAttribute('aria-selected', 'true');
+        return;
+      }
+      if (mechanism === 'earliest-ready coordinate') {
+        await expect(ready).toHaveAttribute('data-interactive-ready', 'true');
+        await expect(preSave).toBeEnabled();
+      }
+      await markOriginalEntry(page, `${mechanism}:first-presave-invoke`);
+      if (mechanism === 'ready-before-entry locator') await preSave.click();
+      else await clickCoordinate(preSave);
+      await markOriginalEntry(page, `${mechanism}:first-presave-resolved`);
+      await expect(preSave).toHaveAttribute('aria-selected', 'true');
+      await page.waitForTimeout(MODE_TRANSITION_SETTLE_MS);
+      const baseline = await readSurfaces();
+      const firstPointer = await page.evaluate(
+        () =>
+          (
+            window as unknown as {
+              __jovieFirstPointerSurfaces: Record<
+                string,
+                GeometrySnapshot
+              > | null;
+            }
+          ).__jovieFirstPointerSurfaces
+      );
+      expect(firstPointer, 'observed first accepted pointer').not.toBeNull();
+      await markOriginalEntry(page, `${mechanism}:second-presave-invoke`);
+      if (mechanism === 'ready-before-entry locator') await preSave.click();
+      else await clickCoordinate(preSave);
+      await expect(preSave).toHaveAttribute('aria-selected', 'true');
+      await page.waitForTimeout(MODE_TRANSITION_SETTLE_MS);
+      const current = await readSurfaces();
+      await markOriginalEntry(page, `${mechanism}:second-400ms`);
+      for (const surface of ['section', 'phone', 'tabList', 'panel'] as const) {
+        expectStableGeometry(
+          firstPointer![surface],
+          baseline[surface],
+          `${mechanism} FIRST ${surface}`
+        );
+        expectStableGeometry(
+          baseline[surface],
+          current[surface],
+          `${mechanism} SECOND ${surface}`
+        );
+      }
+      await expectNoHorizontalOverflow(page);
+    });
+  }
 
   test('canonical sections render in order and proof remains gated', async ({
     page,
