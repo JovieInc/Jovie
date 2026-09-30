@@ -25,6 +25,7 @@ import {
   isRegisteredMarketingCapture,
   resolveCapture,
 } from '../marketing-media/capture-adapter';
+import { buildFactoryPageRecord } from './page-record';
 import {
   artifactOf,
   Checks,
@@ -201,30 +202,10 @@ async function assetStage(ctx: StageContext): Promise<StageResult> {
   return result(checks, { pageId: ctx.pageId, assets });
 }
 
-/** Minimal local page record; reconciled with JOV-7275 pageRecord.ts. */
-export function buildPageRecord(ctx: StageContext) {
-  const copy = artifactOf(ctx, 'copy');
-  return {
-    schema: 'jovie.factory-page-record/v0',
-    pageId: ctx.pageId,
-    family: ctx.brief.family,
-    slug: ctx.brief.slug,
-    route: ctx.brief.route,
-    status: 'shadow' as const,
-    claimIds: artifactOf(ctx, 'truth').claims.map(claim => claim.id),
-    composition: artifactOf(ctx, 'layout'),
-    hero: artifactOf(ctx, 'hero-variant'),
-    copy: copy.slots,
-    proof: artifactOf(ctx, 'proof'),
-    sectionRequests: artifactOf(ctx, 'gap-detection').sectionRequests,
-    media: artifactOf(ctx, 'media-decision').sections,
-    assets: artifactOf(ctx, 'asset').assets,
-  };
-}
-
 async function renderStage(ctx: StageContext): Promise<StageResult> {
   const checks = new Checks();
-  const record = buildPageRecord(ctx);
+  const { record, issues } = buildFactoryPageRecord(ctx, null);
+  checks.check('page-record-schema', issues.length === 0, issues.join('; '));
   const measured = await ctx.providers.measureRender(ctx.brief.route);
   if (measured.status !== 'ok') {
     return result(checks, null, {
@@ -418,12 +399,21 @@ async function trustStage(ctx: StageContext): Promise<StageResult> {
 
 async function publishStage(ctx: StageContext): Promise<StageResult> {
   const checks = new Checks();
-  checks.check('ramp-shadow-only', true);
-  return result(checks, {
-    pageId: ctx.pageId,
-    rampState: 'shadow',
-    batchId: null,
-  });
+  const { record, issues } = buildFactoryPageRecord(
+    ctx,
+    artifactOf(ctx, 'adversarial-trust').score
+  );
+  checks.check('page-record-schema', issues.length === 0, issues.join('; '));
+  checks.check(
+    'ramp-shadow-only',
+    (record as { status?: string }).status === 'shadow',
+    'publish only writes shadow records until the ramp ships'
+  );
+  return result(
+    checks,
+    { pageId: ctx.pageId, rampState: 'shadow', batchId: null },
+    { notes: { record } }
+  );
 }
 
 export const PAGE_STAGE_RUNNERS = {
