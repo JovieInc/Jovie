@@ -21,6 +21,13 @@
 
 import { z } from 'zod';
 import { assertMarketingComposition } from './compositionValidation';
+import {
+  dedupeSectionRequests,
+  resolveSectionRequests,
+  type SectionJobNeed,
+  type SectionRequest,
+  SectionRequestSchema,
+} from './factory/sectionRequest';
 import { getMarketingRecipe, type RecipeId } from './recipes';
 import {
   getMarketingSection,
@@ -160,8 +167,17 @@ export const MarketingCompositionSchema = z.object({
       reason: z.string(),
     })
   ),
+  /** Present when the factory supplied explicit section jobs. */
+  degraded: z.boolean().optional(),
+  /** Deduplicated gaps awaiting the canonical design-gap workflow. */
+  sectionRequests: z.array(SectionRequestSchema).optional(),
 });
 export type MarketingComposition = z.infer<typeof MarketingCompositionSchema>;
+
+export interface ResolveCompositionOptions {
+  readonly sectionJobs?: readonly SectionJobNeed[];
+  readonly existingSectionRequests?: readonly SectionRequest[];
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Decision table — deterministic recipe selection (charter P6)
@@ -722,14 +738,34 @@ function matchesVariant(
  *   5. Ordering legality: drop sections whose illegalAfter/requiresPrior are violated.
  *   6. Variant selection: per section, walk variants; first match wins; no-match → defaultVariant.
  *   7. CTA position assignment: hero=primary, cta section=primary (terminal), mid-page after proof=secondary.
- *   8. Trace: record every step for the AGENT_GUIDE worked example + failure messages.
+ *   8. Gap detection: emit deduplicated section requests and mark the composition degraded.
+ *   9. Trace: record every step for the AGENT_GUIDE worked example + failure messages.
  *
  * Deterministic: same Brief → same Composition, every time (E9 tuple equality).
  * Bounded taste (imagery within degradation rung, copy, density) is NOT in the tuple.
  */
-export function resolveComposition(input: unknown): MarketingComposition {
+export function resolveComposition(
+  input: unknown,
+  options: ResolveCompositionOptions = {}
+): MarketingComposition {
   const brief = MarketingBriefSchema.parse(input);
   const trace: { step: string; decision: string; reason: string }[] = [];
+  const newSectionRequests = resolveSectionRequests(options.sectionJobs ?? []);
+  const sectionRequests = dedupeSectionRequests([
+    ...(options.existingSectionRequests ?? []),
+    ...newSectionRequests,
+  ]);
+  const hasFactoryContext =
+    options.sectionJobs !== undefined ||
+    options.existingSectionRequests !== undefined;
+  for (const request of newSectionRequests) {
+    trace.push({
+      step: 'composition-degradation',
+      decision: `omit ${request.job}; emit ${request.dedupeKey}`,
+      reason:
+        'No certified family or active variant fits; preserve the registry composition and route the gap through DESIGN_GAPS.md.',
+    });
+  }
 
   // 1. Recipe selection
   const recipeMatch = RECIPE_DECISION_TABLE.find(entry => entry.when(brief));
@@ -968,6 +1004,12 @@ export function resolveComposition(input: unknown): MarketingComposition {
     secondaryCtaLabel: recipe.ctaCadence.secondaryLabel,
     ctaCadence: recipe.ctaCadence.cadence,
     trace,
+    ...(hasFactoryContext
+      ? {
+          degraded: newSectionRequests.length > 0,
+          sectionRequests,
+        }
+      : {}),
   });
 }
 

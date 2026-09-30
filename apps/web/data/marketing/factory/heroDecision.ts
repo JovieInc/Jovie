@@ -115,3 +115,222 @@ export function selectHeroDecision(
       return contractFor('mobile-390');
   }
 }
+
+/**
+ * Code side of each locked Pen variant. `sectionVariantId` is the hero
+ * variant id in `MARKETING_SECTIONS` (sections.ts) that route manifests bind;
+ * null means the code has no variant for this Pen hero yet and a section
+ * request (plan §1c) must build it before a route may select it.
+ */
+export interface HeroCodeBinding {
+  readonly component: 'components/marketing/MarketingHero';
+  readonly sectionVariantId: string | null;
+  /** How MarketingHero renders it, so a builder knows the target shape. */
+  readonly implementation: string;
+}
+
+export const HERO_CODE_BINDING_BY_VARIANT = {
+  'split-link-claim': {
+    component: 'components/marketing/MarketingHero',
+    sectionVariantId: 'split-claim-card',
+    implementation: "shell variant='split' with a claim card beside the copy",
+  },
+  'left-content': {
+    component: 'components/marketing/MarketingHero',
+    sectionVariantId: 'left-none',
+    implementation: "shell variant='left', copy only",
+  },
+  'left-buttons': {
+    component: 'components/marketing/MarketingHero',
+    sectionVariantId: null,
+    implementation:
+      "content mode align='left' with primaryCta and secondaryCta",
+  },
+  'centered-homepage': {
+    component: 'components/marketing/MarketingHero',
+    sectionVariantId: null,
+    implementation:
+      "content mode align='center' on / only (JOV-5085 name search)",
+  },
+  'npm-copy': {
+    component: 'components/marketing/MarketingHero',
+    sectionVariantId: null,
+    implementation: 'content mode with a copy-command primary action',
+  },
+  'f-layout-desktop-screenshot': {
+    component: 'components/marketing/MarketingHero',
+    sectionVariantId: 'split-screenshot-right',
+    implementation: 'content mode with an aha capture as media',
+  },
+  'mobile-390': {
+    component: 'components/marketing/MarketingHero',
+    sectionVariantId: null,
+    implementation: 'responsive projection of the chosen desktop variant',
+  },
+} as const satisfies Readonly<Record<HeroVariantName, HeroCodeBinding>>;
+
+/**
+ * Code hero variants with no locked N8WMP counterpart. Routes bound to these
+ * converge on a locked variant; the list only shrinks.
+ */
+export const UNLOCKED_HERO_CODE_VARIANTS = [
+  'centered-handle-claim',
+  'centered-phone',
+  'centered-none',
+] as const;
+
+export function heroVariantForCodeVariant(
+  sectionVariantId: string
+): HeroVariantName | null {
+  const match = HERO_VARIANT_NAMES.find(
+    name =>
+      HERO_CODE_BINDING_BY_VARIANT[name].sectionVariantId === sectionVariantId
+  );
+  return match ?? null;
+}
+
+export type HeroRouteMismatch =
+  /** The manifest hero binding carries no variant id. */
+  | 'unbound'
+  /** Bound to a code variant with no locked Pen counterpart. */
+  | 'unlocked-code-variant'
+  /** Bound to a locked variant other than the one the table selects. */
+  | 'wrong-variant';
+
+export interface HeroRouteIntent {
+  readonly url: string;
+  readonly input: HeroDecisionInput;
+  readonly why: string;
+}
+
+/**
+ * The hero job of every active manifest route that renders a hero. The
+ * table in `selectHeroDecision` turns each job into exactly one variant.
+ */
+export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
+  { url: '/', input: { useCase: 'homepage', route: '/' }, why: 'homepage' },
+  {
+    url: '/new',
+    input: { useCase: 'two-actions', actionCount: 2 },
+    why: 'homepage v2 front door offers start and a second path',
+  },
+  {
+    url: '/pricing',
+    input: { useCase: 'two-actions', actionCount: 2 },
+    why: 'primary and secondary pricing CTAs',
+  },
+  ...['/artist-profiles', '/artist-profile', '/solutions/artists'].map(
+    (url): HeroRouteIntent => ({
+      url,
+      input: { useCase: 'claim-conversion', conversion: 'claim-profile' },
+      why: 'artist landing page converts by claiming a profile',
+    })
+  ),
+  {
+    url: '/artist-notifications',
+    input: { useCase: 'claim-conversion', conversion: 'claim-profile' },
+    why: 'single primary CTA into profile claim',
+  },
+  {
+    url: '/download',
+    input: { useCase: 'two-actions', actionCount: 2 },
+    why: 'desktop download plus iPhone alpha',
+  },
+  {
+    url: '/pay',
+    input: { useCase: 'claim-conversion', conversion: 'claim-handle' },
+    why: 'hero renders ClaimHandleForm',
+  },
+  {
+    url: '/voice',
+    input: { useCase: 'two-actions', actionCount: 2 },
+    why: 'landing hero with primary and secondary CTA',
+  },
+  {
+    url: '/instant-merch',
+    input: { useCase: 'two-actions', actionCount: 2 },
+    why: 'create merch plus see the flow',
+  },
+  {
+    url: '/youtube-thumbnails',
+    input: { useCase: 'informational' },
+    why: 'paste-first form sits below a copy-only hero',
+  },
+  {
+    url: '/product',
+    input: { useCase: 'claim-conversion', conversion: 'claim-handle' },
+    why: 'hero renders ProductClaimCard',
+  },
+  {
+    url: '/card',
+    input: { useCase: 'aha-capture', captureId: 'jovie-card-preview' },
+    why: 'product evidence is a framed screenshot',
+  },
+  {
+    url: '/smart-links',
+    input: { useCase: 'two-actions', actionCount: 2 },
+    why: 'primary and secondary buttons',
+  },
+  {
+    url: '/launch',
+    input: { useCase: 'two-actions', actionCount: 2 },
+    why: 'primary and secondary launch links',
+  },
+  ...[
+    '/about',
+    '/support',
+    '/compare/*',
+    '/alternatives/*',
+    '/blog',
+    '/blog/category/*',
+    '/waitlist',
+  ].map(
+    (url): HeroRouteIntent => ({
+      url,
+      input: { useCase: 'informational' },
+      why: 'informational route, no hero conversion',
+    })
+  ),
+  {
+    url: '/cli',
+    input: {
+      useCase: 'copy-command',
+      audience: 'developer',
+      action: 'copy-command',
+    },
+    why: 'developer page whose first action is installing the CLI',
+  },
+];
+
+export interface HeroRouteAuditRow {
+  readonly url: string;
+  readonly observedCodeVariant: string | null;
+  readonly observed: HeroVariantName | null;
+  readonly expected: HeroVariantName;
+  readonly mismatch: HeroRouteMismatch | null;
+}
+
+/** Compares each route's bound code hero with the variant the table picks. */
+export function auditHeroRoutes(
+  boundCodeVariantByUrl: ReadonlyMap<string, string | null>,
+  intents: readonly HeroRouteIntent[] = HERO_ROUTE_INTENTS
+): readonly HeroRouteAuditRow[] {
+  return intents.map(intent => {
+    const observedCodeVariant = boundCodeVariantByUrl.get(intent.url) ?? null;
+    const observed = observedCodeVariant
+      ? heroVariantForCodeVariant(observedCodeVariant)
+      : null;
+    const expected = selectHeroDecision(intent.input).variant;
+    let mismatch: HeroRouteMismatch | null = null;
+    if (!observedCodeVariant) mismatch = 'unbound';
+    else if (!observed) mismatch = 'unlocked-code-variant';
+    else if (observed !== expected) mismatch = 'wrong-variant';
+    return {
+      url: intent.url,
+      observedCodeVariant,
+      observed,
+      expected,
+      mismatch,
+    };
+  });
+}

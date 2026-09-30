@@ -4,7 +4,7 @@ export const ABOUT_COPY = {
   kicker: 'About',
   headline: COMPANY_IDENTITY.headline,
   support: `${COMPANY_IDENTITY.support} ${COMPANY_IDENTITY.seoDescription}`,
-  metadataTitle: `About — ${COMPANY_IDENTITY.headline.replace(/\.$/, '')}`,
+  metadataTitle: `About Jovie: ${COMPANY_IDENTITY.headline.replace(/\.$/, '')}`,
   metadataDescription: `${COMPANY_IDENTITY.definition} Founded by Tim White. Not affiliated with Jovie childcare.`,
   openGraphDescription: `${COMPANY_IDENTITY.definition} Founded by Tim White.`,
   organizationDescription: COMPANY_IDENTITY.definition,
@@ -22,9 +22,9 @@ export const ABOUT_COPY = {
     paragraphs: [
       'I spent 15 years in music marketing. Worked with Armada Music and Universal Music, ran digital campaigns for recording artists, and drove campaigns for brands like Google and the NFL.',
       'The whole time, I saw the same problem: the people who needed infrastructure the most were the ones who could never afford it. Labels have teams coordinating releases, managing fan data, planning rollouts. Independent artists have themselves and maybe a friend who is decent at Instagram.',
-      'Jovie is what I wish existed when I was an artist: one product for presence, relationships, and growth, without reducing you to a category. For musicians, that still means smart links that route fans to the right streaming platform, a profile that converts visitors, audience intelligence, and AI that knows your career data — stream counts, tour dates, collaborations — not a blank prompt.',
+      'Jovie is what I wish existed when I was an artist: one product for presence, relationships, and growth, without reducing you to a category. For musicians, Jovie routes fans to the right streaming platform, turns profile visits into relationships, surfaces audience signals, and gives AI the context of stream counts, tour dates, and collaborations.',
     ],
-    signoff: '— Tim White, Founder',
+    signoff: 'Tim White, Founder',
   },
   featuresHeading: 'What Jovie Does',
   features: [
@@ -36,7 +36,7 @@ export const ABOUT_COPY = {
     {
       title: 'Relationships',
       description:
-        'Give each person a next step — follow, subscribe, listen, buy, book, or reach out — without one funnel for everyone.',
+        'Give each person the next step that fits: follow, subscribe, listen, buy, book, or reach out.',
     },
     {
       title: 'Audience',
@@ -57,7 +57,7 @@ export const ABOUT_COPY = {
       title: 'Payments',
       description:
         // ui-casing-allow: feature list copy with brand name
-        'Let people support you directly with tips via Stripe — on your profile or through QR codes.',
+        'Let people tip you directly through your profile or a QR code, with payments handled by Stripe.',
     },
   ],
 } as const;
@@ -85,11 +85,11 @@ export const ABOUT_FAQ_ITEMS = [
   {
     question: 'Is Jovie free?',
     answer:
-      'Yes, Jovie offers a free tier that lets you create a profile and start from your name. Paid plans unlock advanced analytics, notifications, contact export, and more.',
+      'Yes, Jovie offers a free tier that lets you create a profile and start with your name. Paid plans add advanced analytics, notifications, and contact export.',
   },
   {
     question: 'How is Jovie different from Linktree?',
     answer:
-      'Linktree is a general-purpose link list. Jovie is a living profile for presence and relationships — work, links, and a next step in one place. For artists, that includes smart links for releases, fan capture, and notifications when new music drops.',
+      'Linktree is a general-purpose link list. Jovie keeps your work, links, and a clear next step in one living profile. For artists, that includes smart links for releases, fan capture, and notifications when new music drops.',
   },
 ] as const;

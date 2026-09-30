@@ -20,6 +20,10 @@ export function ArtistProfileAdaptiveSection({
 }: Readonly<ArtistProfileAdaptiveSectionProps>) {
   return (
     <ArtistProfileSectionShell
+      sectionId='feature-split'
+      sectionVariant='phone-right'
+      sectionOwner='apps/web/components/marketing/artist-profile/ArtistProfileAdaptiveSection.tsx'
+      sectionOccurrence='adaptive'
       id='adaptive'
       className='ap-hero-intro__adaptive border-b border-subtle'
       penContractId={MARKETING_PEN_CONTRACT_IDS.section.featureSplit}

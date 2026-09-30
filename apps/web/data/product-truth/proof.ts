@@ -11,6 +11,10 @@ export const PROOF_KINDS = [
 
 export type ProofKind = (typeof PROOF_KINDS)[number];
 
+export const PROOF_STRENGTHS = ['strong', 'moderate', 'weak'] as const;
+
+export type ProofStrength = (typeof PROOF_STRENGTHS)[number];
+
 interface ProofBase {
   readonly recordType: 'proof';
   readonly id: string;
@@ -18,6 +22,10 @@ interface ProofBase {
   readonly claimId: string;
   /** Omit to make the proof eligible for every section with this claim. */
   readonly sectionIds?: readonly string[];
+  /** Audiences the proof speaks to. Omit for audience-neutral proof. */
+  readonly audiences?: readonly string[];
+  /** Editorial strength, the last ranking key before the stable id. */
+  readonly strength?: ProofStrength;
 }
 
 export interface LogoPermissionRecord {
@@ -27,10 +35,14 @@ export interface LogoPermissionRecord {
   readonly scope: string;
 }
 
+export const LOGO_RELATIONSHIPS = ['customer', 'integration', 'press'] as const;
+
+export type LogoRelationship = (typeof LOGO_RELATIONSHIPS)[number];
+
 export interface LogoProof extends ProofBase {
   readonly kind: 'logo';
   readonly brand: string;
-  readonly relationship: string;
+  readonly relationship: LogoRelationship;
   readonly permissionRecord: LogoPermissionRecord;
   readonly assetId: string;
   readonly source: typeof LOGO_ASSET_SOURCE;
@@ -70,6 +82,8 @@ export type ProductProofArtifact =
       readonly kind: 'screenshot-scenario';
       readonly scenarioId: string;
       readonly route: string;
+      /** When the capture was last rendered; drives freshness ranking. */
+      readonly capturedAt?: string;
     }
   | { readonly kind: 'route'; readonly route: string }
   | {
@@ -185,12 +199,14 @@ function validateLogo(
       issue(candidate, 'missing-logo-brand', 'Logo brand is required.')
     );
   }
-  if (!hasText(candidate.relationship)) {
+  if (
+    !LOGO_RELATIONSHIPS.includes(candidate.relationship as LogoRelationship)
+  ) {
     issues.push(
       issue(
         candidate,
         'missing-logo-relationship',
-        'Logo relationship is required.'
+        `Logo relationship must be one of ${LOGO_RELATIONSHIPS.join(', ')}.`
       )
     );
   }
@@ -452,7 +468,7 @@ const VERIFIED_PRODUCT_PROOF = [
     recordType: 'proof',
     id: 'product-profile-subscribe-capture',
     kind: 'product-proof',
-    claimId: 'capture-fans',
+    claimId: 'capability.artist-profiles.audience-capture',
     sectionIds: ['relationships', 'feature-split'],
     artifact: {
       kind: 'screenshot-scenario',
@@ -464,7 +480,7 @@ const VERIFIED_PRODUCT_PROOF = [
     recordType: 'proof',
     id: 'product-profile-pay-capture',
     kind: 'product-proof',
-    claimId: 'get-paid',
+    claimId: 'capability.pay.artist-payment-surface',
     sectionIds: ['relationships', 'feature-split'],
     artifact: {
       kind: 'screenshot-scenario',
@@ -476,7 +492,7 @@ const VERIFIED_PRODUCT_PROOF = [
     recordType: 'proof',
     id: 'product-profile-tour-capture',
     kind: 'product-proof',
-    claimId: 'sell-out',
+    claimId: 'capability.artist-profiles.public-artist-profile',
     sectionIds: ['feature-split'],
     artifact: {
       kind: 'screenshot-scenario',
@@ -496,6 +512,20 @@ for (const proof of VERIFIED_PRODUCT_PROOF) {
 }
 
 export const PROOF_REGISTRY: readonly ProofItem[] = VERIFIED_PRODUCT_PROOF;
+
+/**
+ * Claim-registry adapter: returns the proof items whose claimId is missing
+ * from the given set of registered claim ids (the product-truth Claim
+ * registry). Empty means every proof links to a real claim.
+ */
+export function findUnresolvedProofClaims(
+  registeredClaimIds: ReadonlySet<string>,
+  registry: readonly Pick<ProofItem, 'id' | 'claimId'>[] = PROOF_REGISTRY
+): readonly { readonly proofId: string; readonly claimId: string }[] {
+  return registry
+    .filter(proof => !registeredClaimIds.has(proof.claimId))
+    .map(proof => ({ proofId: proof.id, claimId: proof.claimId }));
+}
 
 export type ProofRequestLane =
   | 'brand-permission-outreach'
@@ -577,6 +607,8 @@ export interface ProofSection {
   readonly page: ProofPageContext;
   readonly kind: ProofKind;
   readonly fallbackKinds?: readonly ProofKind[];
+  /** Audience of the page section; proof aimed at it outranks neutral proof. */
+  readonly audience?: string;
 }
 
 export function createProofPageContext(
@@ -594,6 +626,74 @@ export function createProofPageContext(
 function compareText(left: string, right: string): number {
   if (left === right) return 0;
   return left < right ? -1 : 1;
+}
+
+/** The date a proof was last true: permission, consent, measurement, capture. */
+export function proofFreshnessDate(
+  candidate: ProofCandidate
+): string | undefined {
+  switch (candidate.kind) {
+    case 'logo':
+      return candidate.permissionRecord?.grantedAt;
+    case 'quote':
+      return candidate.consent?.grantedAt;
+    case 'metric':
+      return candidate.measuredAt;
+    case 'third-party':
+      return candidate.date;
+    case 'product-proof':
+      return candidate.artifact?.kind === 'screenshot-scenario'
+        ? candidate.artifact.capturedAt
+        : undefined;
+  }
+}
+
+function freshnessTime(candidate: ProofCandidate): number {
+  const date = proofFreshnessDate(candidate);
+  return date && isIsoDate(date) ? Date.parse(date) : 0;
+}
+
+/** 0 = aimed at this section, 1 = eligible for every section of the claim. */
+function sectionRelevance(
+  candidate: ProofCandidate,
+  section: ProofSection
+): number {
+  return candidate.sectionIds?.includes(section.id) ? 0 : 1;
+}
+
+/** 0 = aimed at this audience, 1 = audience-neutral, 2 = aimed elsewhere. */
+function audienceRank(
+  candidate: ProofCandidate,
+  section: ProofSection
+): number {
+  if (!candidate.audiences || candidate.audiences.length === 0) return 1;
+  if (section.audience && candidate.audiences.includes(section.audience)) {
+    return 0;
+  }
+  return 2;
+}
+
+function strengthRank(candidate: ProofCandidate): number {
+  return PROOF_STRENGTHS.indexOf(candidate.strength ?? 'moderate');
+}
+
+/**
+ * Deterministic proof order for one section: requested kind, then claim
+ * relevance to the section, then audience match, then freshness (newest
+ * first), then strength, then id so ties never depend on registry order.
+ */
+export function compareProofForSection(
+  section: ProofSection,
+  kindRank: ReadonlyMap<ProofKind, number>
+): (left: ProofCandidate, right: ProofCandidate) => number {
+  return (left, right) =>
+    (kindRank.get(left.kind) ?? Number.MAX_SAFE_INTEGER) -
+      (kindRank.get(right.kind) ?? Number.MAX_SAFE_INTEGER) ||
+    sectionRelevance(left, section) - sectionRelevance(right, section) ||
+    audienceRank(left, section) - audienceRank(right, section) ||
+    freshnessTime(right) - freshnessTime(left) ||
+    strengthRank(left) - strengthRank(right) ||
+    compareText(left.id, right.id);
 }
 
 export function selectProof(
@@ -614,12 +714,7 @@ export function selectProof(
     )
     .filter(candidate => preferredKinds.includes(candidate.kind))
     .filter(candidate => validateProof(candidate, section.page.asOf).valid)
-    .sort((left, right) => {
-      const rank =
-        (kindRank.get(left.kind) ?? Number.MAX_SAFE_INTEGER) -
-        (kindRank.get(right.kind) ?? Number.MAX_SAFE_INTEGER);
-      return rank === 0 ? compareText(left.id, right.id) : rank;
-    });
+    .sort(compareProofForSection(section, kindRank));
 
   const selected = eligible[0];
   if (!selected) {

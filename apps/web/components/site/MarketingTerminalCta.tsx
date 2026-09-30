@@ -9,6 +9,7 @@ import type { MarketingPenContractId } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 
 export interface MarketingTerminalCtaProps {
+  readonly sectionVariant?: string;
   readonly title: string;
   readonly body?: string;
   readonly ctaLabel: string;
@@ -134,6 +135,7 @@ export function MarketingTerminalCta({
   ctaSignUp,
   variant = 'standard',
   penContractId,
+  sectionVariant,
 }: Readonly<MarketingTerminalCtaProps>) {
   const variantStyles = styles[variant];
 
@@ -196,7 +198,13 @@ export function MarketingTerminalCta({
   return (
     <MarketingCtaSection
       data-pen-contract={penContractId}
-      data-testid={testId}
+      data-testid={sectionVariant ? 'marketing-section-cta' : testId}
+      data-marketing-owner={
+        sectionVariant
+          ? 'apps/web/components/site/MarketingTerminalCta.tsx'
+          : undefined
+      }
+      data-marketing-variant={sectionVariant}
       className={cn(variantStyles.section, className)}
     >
       {decoration}

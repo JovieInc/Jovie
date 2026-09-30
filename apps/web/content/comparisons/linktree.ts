@@ -86,7 +86,7 @@ export const linktreeComparison: ComparisonData = {
         'For most people, yes. Linktree is a static list of links. Jovie is a profile that adapts to what you share, captures visitor contacts, sends automatic update notifications, and includes AI tools that understand your actual data. Jovie does what Linktree does, plus everything else you need to grow an audience.',
     },
     {
-      question: 'Can I switch from Linktree to Jovie?',
+      question: 'How do I replace Linktree with Jovie?',
       answer:
         'Yes. Create a Jovie profile, add your links, and update your bio link. Your Jovie profile at jov.ie/username replaces your Linktree, with contact capture and automatic update notifications built in.',
     },

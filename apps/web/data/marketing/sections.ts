@@ -40,6 +40,7 @@ export type MarketingSectionId =
   | 'faq'
   | 'cta'
   // ── Jovie deltas (no clean industry equivalent) ─────────────────────────────
+  | 'product-gallery'
   | 'spec-wall' // dense compact feature grid; "Details That Matter"
   | 'capture' // fan-capture product demo (not just an email form)
   | 'monetization' // monetization pitch + take-rate transparency
@@ -48,7 +49,7 @@ export type MarketingSectionId =
   | 'content-prose' // article body / long-form prose (SEO, founder-letter, release-notes)
   | 'blog-feed'; // featured post + grid (blog-landing, blog-category)
 
-/** 17 sections. Asserted by the manifest gate (count floor). */
+/** 18 sections. Asserted by the manifest gate (count floor). */
 export const MARKETING_SECTION_IDS: readonly MarketingSectionId[] = [
   'hero',
   'logo-cloud',
@@ -61,6 +62,7 @@ export const MARKETING_SECTION_IDS: readonly MarketingSectionId[] = [
   'comparison',
   'faq',
   'cta',
+  'product-gallery',
   'spec-wall',
   'capture',
   'monetization',
@@ -782,6 +784,17 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         status: 'active',
       },
       {
+        id: 'phone-left',
+        layout: 'split',
+        media: 'phone',
+        mediaPosition: 'left',
+        alignment: 'left',
+        chooseWhen:
+          'explicit source-owned annotated profile with media left; no automatic selection',
+        exemplar: { route: '/artist-profiles', section: 'annotated-truth' },
+        status: 'active',
+      },
+      {
         id: 'screenshot-right',
         layout: 'split',
         media: 'screenshot',
@@ -872,6 +885,17 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     requiredInputs: ['steps'],
     optionalInputs: ['eyebrow', 'title', 'lede'],
     variants: [
+      {
+        id: 'split-setup',
+        layout: 'split',
+        media: 'screenshot',
+        mediaPosition: 'right',
+        alignment: 'left',
+        chooseWhen:
+          'explicit source-owned setup copy with screenshot rail right; no automatic selection',
+        exemplar: { route: '/artist-profiles', section: 'how-it-works' },
+        status: 'active',
+      },
       {
         id: '3-step-strip',
         layout: 'contained',
@@ -1437,6 +1461,16 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         status: 'active',
       },
       {
+        id: 'plan-actions',
+        layout: 'contained',
+        media: 'none',
+        alignment: 'centered',
+        chooseWhen:
+          'explicit PricingRecipeBody source binding: free claim, limited Pro request, and Enterprise contact; no automatic selection',
+        exemplar: { route: '/pricing', section: 'get-started' },
+        status: 'active',
+      },
+      {
         id: 'included-single',
         layout: 'contained',
         media: 'none',
@@ -1492,6 +1526,70 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       'Immediately after hero (illegalAfter; hero owns the first CTA)',
       'Before any proof beat (mid-page CTAs only after proof — B2B C6)',
       'With multiple distinct primary CTA verbs on one page (one primary label repeated — B2B C6 invariant)',
+    ],
+    status: 'approved',
+  },
+
+  {
+    id: 'product-gallery',
+    label: 'Product Gallery',
+    requiredInputs: ['items'],
+    optionalInputs: ['title', 'lede'],
+    variants: [
+      {
+        id: 'profile-grid',
+        layout: 'contained',
+        media: 'screenshot',
+        columns: 3,
+        density: 'large',
+        alignment: 'left',
+        chooseWhen:
+          'explicit source-owned demonstration gallery; no automatic selection',
+        exemplar: { route: '/artist-profiles', section: 'product-examples' },
+        status: 'active',
+      },
+      {
+        id: 'release-rail',
+        layout: 'contained',
+        media: 'screenshot',
+        columns: 3,
+        density: 'large',
+        alignment: 'left',
+        chooseWhen:
+          'explicit three-moment source-owned demonstration rail; no automatic selection',
+        exemplar: { route: '/artist-profiles', section: 'release-cycle' },
+        status: 'active',
+      },
+    ],
+    defaultVariant: 'profile-grid',
+    proofClass: 'none',
+    audienceLegality: [{ legal: true }],
+    requiresPrior: ['hero'],
+    contentBudgets: [
+      {
+        slot: 'title',
+        maxCharsDesktop: 60,
+        maxCharsMobile: 44,
+        overflowStrategy: 'shrink-tier',
+      },
+    ],
+    responsiveContract:
+      'profile-grid: 3 columns at xl, 2 at sm, 1 narrow; release-rail: three large figures, narrow horizontal snap with reversible controls',
+    accessibility: {
+      keyboard:
+        'Real links; rail controls and keyboard navigation remain reversible.',
+      contrast: 'Captions meet AA against the canonical surface.',
+      touchTarget: 'Rail controls and links expose 44px hit areas.',
+      reducedMotion: 'Scroll resolves immediately under reduced motion.',
+    },
+    component: 'components/marketing/MarketingShippedSitesShowcase',
+    failureModes: [
+      'Unloaded or broken captures',
+      'Demo captures presented as live customer or adoption evidence',
+      'Links assigned to a different identity',
+    ],
+    neverUse: [
+      'As social proof, revenue lift, account persistence, or current customer outcome certification.',
     ],
     status: 'approved',
   },
@@ -1604,7 +1702,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         alignment: 'centered',
         chooseWhen:
           'audience=general OR recipe=waitlist OR recipe=blog-landing OR recipe=newsletter-signup (newsletter signup)',
-        status: 'unproven',
+        exemplar: { route: '/pricing', section: 'product-updates' },
+        status: 'active',
       },
     ],
     defaultVariant: 'product-demo',

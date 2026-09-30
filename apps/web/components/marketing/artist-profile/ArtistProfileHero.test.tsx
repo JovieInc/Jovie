@@ -44,8 +44,19 @@ describe('ArtistProfileHero', () => {
     ).toBeInTheDocument();
 
     const productStage = screen.getByTestId('artist-profile-hero-product');
+    expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
+      'data-marketing-variant',
+      'centered-phone'
+    );
+    expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
+      'data-marketing-owner',
+      'apps/web/components/marketing/MarketingPosterHero.tsx'
+    );
     expect(productStage).toHaveClass('ap-hero__product-stage');
     expect(productStage.querySelector('img')).toBeInTheDocument();
+    expect(productStage.querySelector('img')?.getAttribute('alt')).toMatch(
+      /Demo/i
+    );
   });
 
   it('keeps the adjacent Storybook receipt bound to the production fixture', () => {
