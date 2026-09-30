@@ -1,4 +1,3 @@
-import type { ReactElement } from 'react';
 import {
   afterEach,
   beforeAll,
@@ -161,7 +160,7 @@ describe('smartlink screen-cert fixture branch (JOV-7127)', () => {
       });
       const renderContentBody = contentBody.type as (
         props: Record<string, unknown>
-      ) => ReactElement<Record<string, unknown>>;
+      ) => { type: unknown; props: Record<string, unknown> };
       const rendered = renderContentBody(contentBody.props);
       expect(rendered.type).toBe(hoisted.ReleaseLandingPage);
       expect(rendered.props).toMatchObject({
