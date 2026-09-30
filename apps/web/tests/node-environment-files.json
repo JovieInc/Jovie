@@ -1090,7 +1090,6 @@
   "tests/unit/ovie/ingest.test.ts",
   "tests/unit/ovie/isolation.test.ts",
   "tests/unit/ovie/linear-coordination.test.ts",
-  "tests/unit/ovie/mcp-handler.test.ts",
   "tests/unit/ovie/mcp-http-capture.test.ts",
   "tests/unit/ovie/operational-memory.test.ts",
   "tests/unit/ovie/persist.test.ts",
