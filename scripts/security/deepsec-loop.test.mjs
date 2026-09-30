@@ -95,15 +95,13 @@ test('maps DeepSecBench rows to harness model names like deepsec does', () => {
   assert.equal(harnessModel(null), null);
 });
 
-test('frontier models are the best config of each top-N distinct model', () => {
+test('frontier models are the best config of each top-N distinct model, gateway-approved only (JOV-7119)', () => {
   const top = frontierModels(BENCH, 3);
+  // openai/* and anthropic/* leaderboard entries are banned on the gateway and
+  // must never become scan candidates.
   assert.deepEqual(
     top.map(model => `${model.gatewayId}@${model.reasoning}`),
-    [
-      'openai/gpt-6-sol@xhigh',
-      'openai/gpt-6-astra@xhigh',
-      'anthropic/claude-opus-5@xhigh',
-    ]
+    ['zai/glm-5.3@high']
   );
   assert.deepEqual(frontierModels(undefined, 3), []);
 });
@@ -113,24 +111,24 @@ test('ledger scans each frontier model exactly once, even when the budget cut it
   assert.deepEqual(ledger, emptyLedger());
   assert.equal(
     pendingFrontierModels(BENCH, ledger, 3)[0].gatewayId,
-    'openai/gpt-6-sol'
+    'zai/glm-5.3'
   );
   ledger = applyRun(ledger, {
     kind: 'frontier',
-    gatewayId: 'openai/gpt-6-sol',
+    gatewayId: 'zai/glm-5.3',
     headSha: 'abc',
     status: 'partial-budget',
     costUsd: 74.5,
     filesAnalyzed: 600,
     finishedAt: '2026-09-27T01:00:00Z',
   });
-  assert.equal(hasScannedModel(ledger, 'openai/gpt-6-sol'), true);
-  assert.equal(ledger.models['openai/gpt-6-sol'].status, 'partial-budget');
+  assert.equal(hasScannedModel(ledger, 'zai/glm-5.3'), true);
+  assert.equal(ledger.models['zai/glm-5.3'].status, 'partial-budget');
   assert.deepEqual(
     pendingFrontierModels(BENCH, ledger, 3).map(model => model.gatewayId),
-    ['openai/gpt-6-astra', 'anthropic/claude-opus-5']
+    []
   );
-  // A new model entering the top N is the next pending one.
+  // A banned-provider release never becomes pending, even at the top score.
   const released = [
     {
       modelId: 'openai/gpt-7',
@@ -141,9 +139,9 @@ test('ledger scans each frontier model exactly once, even when the budget cut it
     },
     ...BENCH,
   ];
-  assert.equal(
-    pendingFrontierModels(released, ledger, 3)[0].gatewayId,
-    'openai/gpt-7'
+  assert.deepEqual(
+    pendingFrontierModels(released, ledger, 3).map(model => model.gatewayId),
+    []
   );
   assert.deepEqual(parseLedger(JSON.stringify(ledger)), ledger);
 });
@@ -174,24 +172,27 @@ test('ledger accumulates monthly spend for every run kind and bounds history', (
 test('seeding marks existing models known without spend, except the baseline model', () => {
   const seeded = seedLedger(
     emptyLedger(),
-    frontierModels(BENCH, 3),
+    [
+      harnessModel(BENCH[4]),
+      harnessModel({ modelId: 'zai/glm-5.3-flash', harness: 'pi', score: 9 }),
+    ],
     'now',
-    'openai/gpt-6-sol'
+    'zai/glm-5.3-flash'
   );
-  assert.equal(hasScannedModel(seeded, 'openai/gpt-6-sol'), false);
-  assert.equal(seeded.models['openai/gpt-6-astra'].status, 'seeded-skip');
+  assert.equal(hasScannedModel(seeded, 'zai/glm-5.3-flash'), false);
+  assert.equal(seeded.models['zai/glm-5.3'].status, 'seeded-skip');
   const again = seedLedger(
     {
       ...seeded,
       models: {
         ...seeded.models,
-        'openai/gpt-6-astra': { status: 'complete' },
+        'zai/glm-5.3': { status: 'complete' },
       },
     },
-    [null, harnessModel(BENCH[2])],
+    [null, harnessModel(BENCH[4])],
     'later'
   );
-  assert.equal(again.models['openai/gpt-6-astra'].status, 'complete');
+  assert.equal(again.models['zai/glm-5.3'].status, 'complete');
 });
 
 test('rejects a ledger with an unknown shape', () => {
@@ -689,10 +690,10 @@ test('verification targets group unverified, uncanceled issue files by their fin
       description: writeMarker('', { fp: 'dsec-x', path: 'z.ts', model: 'm' }),
     },
   ]);
+  // Markers naming banned providers (or unknown ids) re-scan on the approved
+  // cheap model — banned ids are never returned as targets (JOV-7119).
   assert.deepEqual(targets, [
-    { gatewayId: 'openai/gpt-6-sol', files: ['a.ts'] },
-    { gatewayId: 'openai/gpt-6-luna', files: ['b.ts'] },
-    { gatewayId: 'm', files: ['z.ts'] },
+    { gatewayId: 'zai/glm-5.3-flash', files: ['a.ts', 'b.ts', 'z.ts'] },
   ]);
 });
 
