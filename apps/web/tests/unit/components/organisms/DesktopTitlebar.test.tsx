@@ -15,7 +15,8 @@ const electronRuntimeMock = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/desktop/electron-bridge', async importOriginal => {
-  const actual = await importOriginal();
+  const actual =
+    await importOriginal<typeof import('@/lib/desktop/electron-bridge')>();
   return {
     ...actual,
     useIsElectronRuntime: () => electronRuntimeMock.isElectronRuntime,
