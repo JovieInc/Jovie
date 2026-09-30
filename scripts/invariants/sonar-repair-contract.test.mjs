@@ -77,4 +77,19 @@ describe('JOV-INV-036 Sonar repair contract', () => {
     );
     assert.ok(errors.some(error => error.includes('without a scan')));
   });
+
+  it('rejects a scan that cannot recover from Automatic Analysis being on', () => {
+    const errors = validateSonarRepairSources(
+      fixture({
+        command: '',
+        workflow:
+          'echo "SONAR_TOKEN is not configured; SonarCloud analysis did not run." >&2\nexit 1\nuses: SonarSource/sonarqube-scan-action',
+        properties: 'sonar.sources=apps/web/app\nsonar.exclusions=\\\n\n',
+      })
+    );
+    assert.ok(
+      errors.some(error => error.includes('Automatic Analysis')),
+      errors.join('\n')
+    );
+  });
 });

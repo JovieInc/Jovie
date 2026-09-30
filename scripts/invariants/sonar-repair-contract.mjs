@@ -55,6 +55,17 @@ export function validateSonarRepairSources(repoRoot = DEFAULT_ROOT) {
     errors.push('Sonar workflow can report green without a scan');
   }
 
+  // SonarQube Cloud rejects CI analysis while project Automatic Analysis is
+  // enabled. The workflow must disable it via api/autoscan/activation before
+  // scanning, or a UI toggle re-enabling it fails main again (JOV-7287).
+  const disablesAutomaticAnalysis =
+    /autoscan\/activation/.test(workflow) && /enable=false/.test(workflow);
+  if (!disablesAutomaticAnalysis) {
+    errors.push(
+      'Sonar workflow does not disable Automatic Analysis before the CI scan'
+    );
+  }
+
   for (const propertyFile of propertyFiles) {
     const properties = read(repoRoot, propertyFile);
     const sources = properties.match(/^sonar\.sources=(.+)$/m)?.[1] ?? '';
