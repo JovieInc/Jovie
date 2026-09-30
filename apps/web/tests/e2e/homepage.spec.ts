@@ -396,3 +396,109 @@ test.describe('Homepage', () => {
     }
   });
 });
+
+// User input must survive the transition from native SSR form to client owner.
+test.describe('Homepage claim readiness', () => {
+  for (const entry of ['fill', 'keyboard'] as const) {
+    test(`preserves server-entered handles through readiness (${entry})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await interceptAnalytics(page);
+      await page.route('**/api/journey/step', route =>
+        route.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/handle/check?**', route =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: '{"available":true}',
+        })
+      );
+      let releaseAssets = () => {};
+      const assetsReleased = new Promise<void>(resolve => {
+        releaseAssets = resolve;
+      });
+      await page.route('**/_next/static/**', async route => {
+        if (route.request().resourceType() === 'script') await assetsReleased;
+        await route.continue();
+      });
+      try {
+        await page.goto('/', {
+          waitUntil: 'commit',
+          timeout: HOMEPAGE_NAVIGATION_TIMEOUT,
+        });
+        const input = page.locator('#homepage-claim-handle');
+        await expect(input).toBeEditable();
+        const draft =
+          entry === 'fill' ? 'Jov6220EarlyFill' : 'jov6220earlykeys';
+        if (entry === 'fill') await input.fill(draft);
+        else await input.pressSequentially(draft);
+        await expect(input).toHaveValue(draft);
+        const normalized = draft.toLowerCase();
+        const availability = page.waitForResponse(response => {
+          const url = new URL(response.url());
+          return (
+            url.pathname === '/api/handle/check' &&
+            url.searchParams.get('handle') === normalized
+          );
+        });
+        releaseAssets();
+        expect((await availability).status()).toBe(200);
+        await expect(input).toHaveValue(normalized);
+        await expect(page.getByTestId('homepage-handle-status')).toContainText(
+          `@${normalized} is available`
+        );
+        const handoff = page.waitForRequest(request => {
+          const url = new URL(request.url());
+          return (
+            ['/start', '/signup'].includes(url.pathname) &&
+            url.searchParams.get('handle') === normalized
+          );
+        });
+        if (entry === 'fill')
+          await page.getByTestId('homepage-primary-cta').click();
+        else await input.press('Enter');
+        await handoff;
+      } finally {
+        releaseAssets();
+      }
+    });
+  }
+
+  test('preserves the native GET handle handoff without JavaScript', async ({
+    browser,
+    baseURL,
+  }) => {
+    const context = await browser.newContext({
+      baseURL,
+      javaScriptEnabled: false,
+      viewport: { width: 390, height: 844 },
+    });
+    try {
+      const page = await context.newPage();
+      await page.goto('/', {
+        waitUntil: 'domcontentloaded',
+        timeout: HOMEPAGE_NAVIGATION_TIMEOUT,
+      });
+      const form = page.getByTestId('homepage-claim-form');
+      await expect(form).toHaveAttribute('action', '/start');
+      await expect(form).toHaveAttribute('method', 'get');
+      const input = page.locator('#homepage-claim-handle');
+      await expect(input).toHaveAttribute('name', 'handle');
+      await input.fill('jov6220native');
+      const handoff = page.waitForRequest(request => {
+        const url = new URL(request.url());
+        return (
+          request.method() === 'GET' &&
+          url.pathname === '/start' &&
+          url.searchParams.get('handle') === 'jov6220native'
+        );
+      });
+      await page.getByTestId('homepage-primary-cta').click();
+      await handoff;
+    } finally {
+      await context.close();
+    }
+  });
+});
