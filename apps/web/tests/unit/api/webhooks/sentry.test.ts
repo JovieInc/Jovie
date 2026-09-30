@@ -329,6 +329,43 @@ describe('POST /api/webhooks/sentry', () => {
     expect(mockServerFetch).not.toHaveBeenCalled();
   });
 
+  it('skips autofix for client-disconnect stream abort (JOV-7319)', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+
+    const { POST } = await import('@/app/api/webhooks/sentry/route');
+    const payload = {
+      data: {
+        issue: {
+          id: '7319',
+          title: 'Error: The destination stream closed early.',
+          culprit: 'GET /start',
+        },
+      },
+    };
+    const body = JSON.stringify(payload);
+    const request = new Request('https://example.com/api/webhooks/sentry', {
+      method: 'POST',
+      headers: {
+        'sentry-hook-signature': sign(body),
+      },
+      body,
+    });
+
+    const response = await POST(request as never);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      received: true,
+      skipped: true,
+      reason: 'destination-stream-closed',
+    });
+    expect(mockServerFetch).not.toHaveBeenCalled();
+  });
+
   it('skips autofix for Better Auth loopback host rejection (JOV-5843)', async () => {
     mockAcquireRecentDispatch.mockResolvedValue({
       acquired: true,

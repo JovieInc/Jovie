@@ -81,6 +81,18 @@ export const VERCEL_IPC_SOCK_IGNORE_ERRORS: ReadonlyArray<RegExp> = [
 ];
 
 /**
+ * React Fizz aborts an in-flight render with `Error: The destination stream
+ * closed early.` (or `... errored while writing data.`) when the client
+ * socket closes before the streamed response finishes — tab close,
+ * navigation, prefetch cancel. Same client-disconnect class as EPIPE /
+ * ECONNRESET (JOV-7319). Not an application defect; drop at capture and
+ * webhook so it does not file Linear.
+ */
+export const DESTINATION_STREAM_CLOSED_IGNORE_ERRORS: ReadonlyArray<RegExp> = [
+  /The destination stream (?:closed early|errored while writing data)\./,
+];
+
+/**
  * Better Auth host allowlist throws when a loopback Host header is not in
  * the frozen list (JOV-5843 / JOV-4381 / JOV-4384). That is local/synthetic
  * traffic, including requests that reach prod Sentry with a localhost Host
@@ -383,6 +395,38 @@ export function isNonActionableVercelIpcEvent(
 ): boolean {
   return collectSentryEventCaptureValues(event).some(
     value => typeof value === 'string' && isVercelIpcSockText(value)
+  );
+}
+
+function isDestinationStreamClosedText(
+  value: string | null | undefined
+): boolean {
+  if (!value) return false;
+  return DESTINATION_STREAM_CLOSED_IGNORE_ERRORS.some(pattern =>
+    pattern.test(value)
+  );
+}
+
+/**
+ * True when a Sentry/Linear title is the JOV-7319 client-disconnect abort.
+ */
+export function isNonActionableDestinationStreamIssue(
+  issue: SentryIssueSummary
+): boolean {
+  return (
+    isDestinationStreamClosedText(issue.title) ||
+    isDestinationStreamClosedText(issue.culprit)
+  );
+}
+
+/**
+ * True when a Sentry event is the JOV-7319 client-disconnect abort.
+ */
+export function isNonActionableDestinationStreamEvent(
+  event: SentryExceptionLike
+): boolean {
+  return collectSentryEventCaptureValues(event).some(
+    value => typeof value === 'string' && isDestinationStreamClosedText(value)
   );
 }
 
