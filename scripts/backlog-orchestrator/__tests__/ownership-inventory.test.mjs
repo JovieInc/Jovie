@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { beforeEach, describe, it } from 'node:test';
 
 import * as admissionGate from '../admission-gate.mjs';
 import * as deterministicGates from '../deterministic-gates.mjs';
@@ -85,6 +85,12 @@ Change the Summer runtime manifest in JovieInc/summer-config. No Jovie product f
 }
 
 describe('JOV-5278 ownership inventory', () => {
+  beforeEach(context => {
+    // Admission fixtures must use the same clock as their existing receipts.
+    assert.ok('mock' in context, 'fixture clock needs a test context');
+    context.mock.timers.enable({ apis: ['Date'], now: new Date(NOW) });
+  });
+
   it('loads one owner each for Summer, company-state, and shipping', () => {
     const inventory = loadOwnershipInventory();
     assert.equal(inventory.schema, 'jovie-ownership-inventory/v1');
