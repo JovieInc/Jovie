@@ -16,12 +16,15 @@
  * deterministic row's enforcement consumer once (deduped across rows that
  * share a consumer file), records real pass/fail with evidence, and fans
  * that result out to every applicable unit — no per-unit rerun. Visual,
- * Jev, and human cells stay `insufficient` with the reason stated; no
- * dispatcher exists for them yet (see design-ci-judge-router-evaluation.test.ts
- * for proof that each of those judges' *real* mechanisms can genuinely
- * fail, independent of this file).
+ * Jev, and human cells then go through `design-ci-judge-dispatch.ts`
+ * (JOV-7248): classifier-first judges for jev/visual, a non-blocking
+ * post-ship taste item for human. A judge without credentials, curated
+ * text or a rendered capture leaves the cell `insufficient` with that
+ * reason in its evidence; nothing is guessed.
  *
  *   tsx scripts/design-ci-judge-router.ts [--json] [--persist [--base-url <url>]]
+ *     [--no-dispatch] [--judge-mode live|dry|fixture] [--judge-fixture <json>]
+ *     [--judge-inputs <json>] [--judge-max-calls <n>] [--generator-model <id>]
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -33,6 +36,18 @@ import {
   APP_SCREEN_REGISTRY,
 } from '../data/appScreens/registry';
 import { MARKETING_COMPONENT_REGISTRY } from '../data/marketing/componentRegistry';
+import {
+  buildLiveJudges,
+  type DispatchDeps,
+  type DispatchResult,
+  dispatchJudgeCells,
+  fixtureJudges,
+  formatDispatchReport,
+  type JudgeFixture,
+  type JudgeInputs,
+  readJsonFile,
+  resolversFromInputs,
+} from './design-ci-judge-dispatch';
 
 /**
  * `fileURLToPath(import.meta.url)` takes the plain string `import.meta.url`
@@ -120,6 +135,8 @@ export interface MatrixCell {
   readonly route: JudgeRoute;
   readonly state: CellState;
   readonly insufficientReason: InsufficientReason | null;
+  /** Per-cell judge evidence added by the dispatcher (jev/visual/human only). */
+  readonly evidence?: readonly string[];
 }
 
 export interface DesignCiJudgeMatrix {
@@ -920,14 +937,20 @@ export async function fingerprintCells(
       );
     }
     const rubricFingerprint = computeRubricFingerprint(row);
+    const cellEvidence = cell.evidence ?? [];
+    // State and judge evidence are part of the input so a cell that moves
+    // from `credentials-unavailable` to a real verdict is rewritten, not
+    // skipped as unchanged.
     const inputFingerprint = sha256Fingerprint({
       artifactHash,
       rubricFingerprint,
       route: cell.route,
+      state: cell.state,
+      evidence: cellEvidence,
     });
     return {
       ...cell,
-      evidence: row.routeEvidence,
+      evidence: [...row.routeEvidence, ...cellEvidence],
       artifactHash,
       rubricFingerprint,
       inputFingerprint,
@@ -1123,6 +1146,51 @@ function argValue(flag: string): string | undefined {
   return index === -1 ? undefined : process.argv[index + 1];
 }
 
+function currentSourceSha(): string {
+  return execFileSync('git', ['rev-parse', 'HEAD'], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  }).trim();
+}
+
+/**
+ * Live mode reads credentials from the environment only (Doppler wrapper).
+ * Without them every jev/visual cell reports `credentials-unavailable`.
+ */
+async function dispatchFromCli(
+  matrix: DesignCiJudgeMatrix
+): Promise<DispatchResult> {
+  const mode = (argValue('--judge-mode') ?? 'live') as DispatchDeps['mode'];
+  if (!['live', 'dry', 'fixture'].includes(mode)) {
+    throw new Error(`--judge-mode must be live, dry or fixture (got ${mode})`);
+  }
+  const inputsPath = argValue('--judge-inputs');
+  const resolvers = resolversFromInputs(
+    inputsPath ? readJsonFile<JudgeInputs>(inputsPath) : {}
+  );
+  const maxCalls = argValue('--judge-max-calls');
+  let judges: Pick<DispatchDeps, 'jev' | 'visual'>;
+  if (mode === 'fixture') {
+    const fixturePath = argValue('--judge-fixture');
+    if (!fixturePath)
+      throw new Error('--judge-mode fixture needs --judge-fixture <json>');
+    const route = fixtureJudges(readJsonFile<JudgeFixture>(fixturePath));
+    judges = { jev: route, visual: route };
+  } else {
+    judges = await buildLiveJudges({
+      env: process.env,
+      sourceSha: currentSourceSha(),
+      generatorModel: argValue('--generator-model') ?? null,
+    });
+  }
+  return dispatchJudgeCells(matrix, {
+    mode,
+    ...judges,
+    ...resolvers,
+    ...(maxCalls ? { maxJudgeCalls: Number(maxCalls) } : {}),
+  });
+}
+
 async function main(): Promise<void> {
   const routed = await buildDesignCiJudgeMatrix();
   if (routed.rows.length === 0 || routed.units.length === 0) {
@@ -1137,16 +1205,32 @@ async function main(): Promise<void> {
   // skips running the deterministic checks and reports routing only (fast,
   // useful for debugging the matrix shape itself).
   const shouldEvaluate = !process.argv.includes('--no-evaluate');
-  const { matrix, rowEvaluations } = shouldEvaluate
+  const { matrix: evaluated, rowEvaluations } = shouldEvaluate
     ? evaluateDesignCiJudgeMatrix(routed, REPO_ROOT)
     : { matrix: routed, rowEvaluations: [] as readonly RowEvaluation[] };
 
+  const dispatchResult = process.argv.includes('--no-dispatch')
+    ? null
+    : await dispatchFromCli(evaluated);
+  const matrix = dispatchResult?.matrix ?? evaluated;
+
   if (process.argv.includes('--json')) {
     process.stdout.write(
-      `${JSON.stringify({ ...matrix, rowEvaluations }, null, 2)}\n`
+      `${JSON.stringify(
+        {
+          ...matrix,
+          rowEvaluations,
+          tasteQueue: dispatchResult?.tasteQueue ?? [],
+        },
+        null,
+        2
+      )}\n`
     );
   } else {
     process.stdout.write(`${formatMatrixReport(matrix, rowEvaluations)}\n`);
+    if (dispatchResult) {
+      process.stdout.write(`\n${formatDispatchReport(dispatchResult)}\n`);
+    }
   }
 
   // Read-only by default. Nothing below this line runs unless --persist is
