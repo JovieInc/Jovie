@@ -34,7 +34,7 @@ The harness, not the model, owns:
 | Disabled-lane drafts: closed when superseded or done, else adopted; closed and the issue returned to Todo once their fix attempts run out | `pr_events.retire_orphan()`, `return_to_pool()` |
 | Held and failed records carry `reason` + `next_action`; the status feed publishes `held_by_reason` | `pr_events.held_reason()`, `doctor.status_feed()` |
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
-| Disk-pressure guard on the tick and each worker spawn: under 15% free it sweeps idle DerivedData (>5h), clean idle worktrees (>12h, branches kept), `.next`/`test-results`, and dead simulators while preserving the active shared pnpm store; under 5% the doctor pages Summer | `disk_guard.py`, `dispatch()`, `worker()` |
+| Disk admission on the tick and before installs: critical (at or below 5%) or unknown free space blocks work. Only a worker holding a slot may sweep under 15%, under one host-wide cleanup lock; cleanup preserves the shared pnpm store, unrelated checkouts and cancelled repair source | `disk_guard.py`, `dispatch()`, `worker()` |
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
 | Codex accounts: lease one per run; a burst 429 backs off 2 min and rotates, a spent plan (usage limit / quota) banks until its reset, and only a failed run's closing lines can bank an account | `codex_lane.py` |
 | Provider throughput: matched-work offers, accepts, starts, productive/PR/first-pass rates, remediation, issue→PR→merge time, landed output, idle qualified capacity and failure reasons; landed attribution comes from receipts, never a branch prefix | `provider_throughput()`, `doctor.status_feed()`, `hud.py` |

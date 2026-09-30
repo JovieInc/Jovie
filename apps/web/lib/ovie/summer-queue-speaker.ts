@@ -13,6 +13,8 @@ import {
   getBoundSummerSpeaker,
   type SummerSpeaker,
 } from '@/lib/ovie/summer-transport';
+import { buildProofBriefOpsCard } from '@/lib/proof-briefs/chat-card';
+import { resolveLatestCertifiedProofBrief } from '@/lib/proof-briefs/resolve';
 
 const SUMMER_RESPONSE_TIMEOUT_MS = 45_000;
 
@@ -23,6 +25,13 @@ const SUMMER_RESPONSE_TIMEOUT_MS = 45_000;
  * emitted; a missing projection yields no card rather than invented data.
  */
 function liveOpsCardData(toolName: string): unknown {
+  // Deterministic fallback for the proof-brief dogfood path (JOV-7213): when
+  // the worker did not attach a card payload, resolve the latest certified
+  // investor brief so the chat still renders the editorial card.
+  if (toolName === 'get_proof_brief') {
+    const brief = resolveLatestCertifiedProofBrief('investor');
+    return brief ? buildProofBriefOpsCard(brief) : undefined;
+  }
   if (toolName !== 'inspect_kanban' && toolName !== 'get_org_state') {
     return undefined;
   }
