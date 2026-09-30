@@ -124,7 +124,6 @@ describe('VirtualizedTableBody', () => {
           rows={rows}
           shouldVirtualize
           virtualRows={virtualRows}
-          totalSize={880}
           paddingTop={44}
           paddingBottom={792}
         />

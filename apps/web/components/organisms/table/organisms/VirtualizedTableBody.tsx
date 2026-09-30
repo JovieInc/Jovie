@@ -28,11 +28,6 @@ export interface VirtualizedTableBodyProps<TData extends RowData> {
   readonly virtualRows?: VirtualItem[];
 
   /**
-   * Total height of virtualized content
-   */
-  readonly totalSize?: number;
-
-  /**
    * Top padding for virtualization
    */
   readonly paddingTop?: number;
