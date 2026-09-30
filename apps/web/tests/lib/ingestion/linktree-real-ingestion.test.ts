@@ -17,8 +17,8 @@ import { setupDatabaseBeforeAll } from '../../setup-db';
 
 type TestDb = NeonDatabase<typeof schema>;
 
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: vi.fn(async () => ({
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  getOvieOperatorEntitlements: vi.fn(async () => ({
     userId: 'admin_user',
     email: 'admin@example.com',
     isAuthenticated: true,
