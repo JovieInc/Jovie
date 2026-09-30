@@ -63,6 +63,7 @@ describe('server analytics contract', () => {
     mocks.onConflictDoNothing.mockReturnValue({ returning: mocks.returning });
     mocks.values.mockReturnValue({
       onConflictDoNothing: mocks.onConflictDoNothing,
+      returning: mocks.returning,
     });
     mocks.insert.mockReturnValue({ values: mocks.values });
   });
@@ -146,6 +147,19 @@ describe('server analytics contract', () => {
     expect(JSON.stringify(mocks.values.mock.calls[0])).not.toContain(
       'must-not-persist@example.com'
     );
+  });
+
+  it('keeps non-idempotent events independent of the identity index', async () => {
+    await trackServerEvent('funnel_step', {
+      funnel_id: 'artist_signup',
+      step: 'cta_click',
+      outcome: 'reached',
+      surface: 'homepage',
+    });
+
+    expect(mocks.values.mock.calls[0][0]).not.toHaveProperty('eventIdentity');
+    expect(mocks.onConflictDoNothing).not.toHaveBeenCalled();
+    expect(mocks.returning).toHaveBeenCalledWith({ id: expect.anything() });
   });
 
   it('keeps attribution groupings without storing public query text', async () => {
