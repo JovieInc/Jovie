@@ -1,21 +1,123 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { RightPanelProvider } from '@/contexts/RightPanelContext';
-import type { FounderReviewItem } from '@/lib/admin/types';
-import { founderReviewItemFixture } from '@/tests/fixtures/founder-review-item';
+import {
+  RightPanelProvider,
+  useRightPanel,
+} from '@/contexts/RightPanelContext';
+import type { FounderReviewItem, FounderReviewMedia } from '@/lib/admin/types';
 import { FounderReviewRegistry } from './FounderReviewRegistry';
 
+// Built inline: the shared fixture hashes with node:crypto, which cannot load
+// in the browser. The digest only has to be stable, not real.
+function storyItem(
+  overrides: Partial<FounderReviewItem> &
+    Pick<FounderReviewItem, 'id' | 'title' | 'readiness'>
+): FounderReviewItem {
+  const certificationPacket = {
+    contract: 'jovie.certification/v1' as const,
+    subject: {
+      id: overrides.id,
+      kind: 'feature' as const,
+      title: overrides.title,
+    },
+    source: null,
+    canonicalReferences: [],
+    invariantEvaluation: [],
+    testsCoverage: [],
+    visualProof: [],
+    requiredVariants: [],
+    itemMedia: [],
+  };
+  return {
+    registry: 'feature',
+    eyebrow: 'Smart Links',
+    scope: 'capability',
+    description: 'A source-backed capability with dedicated evidence.',
+    status: 'Shipped',
+    access: 'Free+',
+    source: 'docs/FEATURE_REGISTRY.md',
+    gate: 'None',
+    readinessReason: 'The review packet is complete.',
+    media: [],
+    certificationPacket,
+    decisionEvidenceDigest: `sha256:story-${overrides.id}`,
+    certificationState:
+      overrides.readiness === 'ready' ? 'review_ready' : 'working',
+    ...overrides,
+  };
+}
+
+const evidence: readonly FounderReviewMedia[] = [
+  {
+    kind: 'image',
+    src: '/product-screenshots/artist-spec-geo-insights-desktop.png',
+    alt: 'Geo insights desktop capture',
+    label: 'Dedicated product capture',
+    dedicated: true,
+  },
+  {
+    kind: 'video',
+    src: '/demo/jovie-demo.mp4',
+    poster: '/demo/jovie-demo-poster.jpg',
+    alt: 'Product walkthrough',
+    label: 'Walkthrough recording',
+    dedicated: true,
+  },
+  {
+    kind: 'image',
+    src: '/product-screenshots/artist-spec-creator-menu-mobile.png',
+    alt: 'Creator menu mobile capture',
+    label: 'Mobile capture',
+    dedicated: false,
+  },
+];
+
 const items: readonly FounderReviewItem[] = [
-  founderReviewItemFixture({
-    id: 'feature.ready',
-    title: 'Ready feature',
+  storyItem({
+    id: 'feature.smart-link-editing',
+    title: 'Smart link editing and customization',
     readiness: 'ready',
+    description:
+      'Artists edit smart link titles, artwork, destinations and UTM presets from the release row without leaving the table.',
+    media: evidence,
   }),
-  founderReviewItemFixture({
-    id: 'feature.collecting',
-    title: 'Collecting feature',
+  storyItem({
+    id: 'feature.ab-testing',
+    title: 'A/B testing',
     readiness: 'collecting',
+    eyebrow: 'Growth (Coming Soon)',
+    status: 'Planned',
+    description:
+      'Split traffic between two profile variants and report the winner once the sample is significant.',
+  }),
+  storyItem({
+    id: 'feature.spotify-oauth',
+    title: 'Spotify OAuth sign-in method',
+    readiness: 'collecting',
+    eyebrow: 'Integrations',
+    status: 'Shipped (internal v1 default-on)',
+    description:
+      'A sign-in method that links the Spotify artist account during onboarding and backfills the catalog.',
+  }),
+  storyItem({
+    id: 'feature.pac-variant-slots',
+    title:
+      'Public profile PAC variant slots with a deliberately long registry title',
+    readiness: 'collecting',
+    eyebrow: 'Public Profile',
+    status: 'In rollout',
+    description:
+      'First-last CTA slot variants for the public profile, gated by the rollout flag and measured against the control.',
   }),
 ];
+
+function RightPanelSlot() {
+  const panel = useRightPanel();
+  return (
+    <aside className='w-95 shrink-0 border-l border-(--app-shell-border)'>
+      {panel}
+    </aside>
+  );
+}
 
 const meta = {
   title: 'Features/Admin/FounderReviewRegistry',
@@ -27,7 +129,12 @@ const meta = {
   decorators: [
     Story => (
       <RightPanelProvider>
-        <Story />
+        <div className='flex h-screen bg-(--app-shell-content-surface)'>
+          <main className='min-w-0 flex-1 overflow-auto p-4'>
+            <Story />
+          </main>
+          <RightPanelSlot />
+        </div>
       </RightPanelProvider>
     ),
   ],

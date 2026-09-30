@@ -24,6 +24,7 @@ import type {
   MarketingNarrativePlan,
 } from '../generation';
 import type { LandingPagePipelineStage } from '../landingPageGrammar';
+import { SectionRequestSchema } from './sectionRequest';
 
 export const FACTORY_SPINE_VERSION = '1.0.0';
 
@@ -227,14 +228,7 @@ export const FactoryProofPlanSchema = z.object({
 
 export const FactoryGapReportSchema = z.object({
   pageId: Id,
-  sectionRequests: z.array(
-    z.object({
-      job: z.string().min(1),
-      contentShape: z.string().min(1),
-      mediaNeed: z.string().min(1),
-      evidence: z.array(z.string().min(1)).min(1),
-    })
-  ),
+  sectionRequests: z.array(SectionRequestSchema),
 });
 
 export const FACTORY_MEDIA_KINDS = [
