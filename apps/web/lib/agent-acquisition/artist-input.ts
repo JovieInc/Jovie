@@ -58,9 +58,9 @@ export function parseAgentArtistInput(value: unknown): ParsedArtistInput {
       return { kind: 'invalid', code: 'UNSUPPORTED_INPUT' };
     }
     if (url.hostname === 'open.spotify.com') {
-      const match = /^\/(?:intl-[a-z]{2}\/)?artist\/([A-Za-z0-9]{22})\/?$/.exec(
-        url.pathname
-      );
+      // Normalize the optional locale before validating the artist resource.
+      const pathname = url.pathname.replace(/^\/intl-([a-z]{2})\//, '/');
+      const match = /^\/artist\/([A-Za-z0-9]{22})\/?$/.exec(pathname);
       return match
         ? exact('spotify', match[1]!, provider)
         : { kind: 'invalid', code: 'UNSUPPORTED_INPUT' };
