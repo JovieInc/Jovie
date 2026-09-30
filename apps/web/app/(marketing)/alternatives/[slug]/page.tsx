@@ -98,7 +98,7 @@ export default async function AlternativesPage({
             {data.whySwitch.map(reason => (
               <li
                 key={reason}
-                className='flex gap-3 text-base leading-relaxed text-secondary-token'
+                className='flex gap-3 text-lg leading-relaxed text-secondary-token'
               >
                 <span className='mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent-token' />
                 {reason}

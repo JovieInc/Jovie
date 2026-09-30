@@ -127,7 +127,7 @@ describe('Input', () => {
         const input = screen.getByTestId('input');
 
         expect(input.className).toContain('h-11');
-        expect(input.className).toContain('text-base');
+        expect(input.className).toContain('text-(length:--text-base)');
         expect(input.className).toContain(desktopHeight);
         expect(input.className).toContain(desktopText);
       }

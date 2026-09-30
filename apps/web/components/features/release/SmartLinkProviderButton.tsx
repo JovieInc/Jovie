@@ -73,7 +73,7 @@ export function SmartLinkProviderButton({
           primary
             ? 'text-btn-primary-foreground flex-none'
             : 'text-foreground flex-1',
-          'text-base font-semibold'
+          'text-lg font-semibold'
         )}
       >
         {label}

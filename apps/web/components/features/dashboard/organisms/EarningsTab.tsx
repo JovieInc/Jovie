@@ -280,7 +280,7 @@ export function EarningsTab() {
           >
             <QrCode className='h-6 w-6 text-tertiary-token' />
           </div>
-          <h2 className='text-base font-semibold text-primary-token'>
+          <h2 className='text-lg font-semibold text-primary-token'>
             No Handle Set
           </h2>
           <p className='max-w-sm text-app text-secondary-token'>

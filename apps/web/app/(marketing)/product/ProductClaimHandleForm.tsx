@@ -79,7 +79,7 @@ export function ProductClaimHandleForm({
           <label htmlFor={inputId} className='sr-only'>
             Choose Your Handle
           </label>
-          <span className='shrink-0 select-none text-base text-secondary-token'>
+          <span className='shrink-0 select-none text-lg text-secondary-token'>
             {domain}
           </span>
           <input
@@ -105,7 +105,7 @@ export function ProductClaimHandleForm({
               // width on this bare input to make a color change visible.
               // focus-ring-themed is the shared box-shadow-based ring the
               // rest of the app uses for exactly this reason.
-              'product-claim-card__handle-input min-w-0 flex-1 bg-transparent text-base text-primary-token focus-ring-themed',
+              'product-claim-card__handle-input min-w-0 flex-1 bg-transparent text-lg text-primary-token focus-ring-themed',
               unavailable && 'text-error'
             )}
           />

@@ -7,7 +7,7 @@ export function SocialProofSection() {
           <p className='text-(--linear-label-size) font-medium uppercase tracking-[0.1em] text-tertiary-token'>
             Built by a musician
           </p>
-          <p className='max-w-120 text-base leading-relaxed text-secondary-token'>
+          <p className='max-w-120 text-lg leading-relaxed text-secondary-token'>
             Created by{' '}
             <span className='font-medium text-primary-token'>Tim White</span>
             {', '}

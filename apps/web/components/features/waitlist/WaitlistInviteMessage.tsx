@@ -15,7 +15,7 @@ export function WaitlistInviteMessage({
         <h1 className='text-title font-semibold tracking-normal text-primary-token'>
           {title}
         </h1>
-        <p className='text-base leading-7 text-secondary-token'>{body}</p>
+        <p className='text-lg leading-7 text-secondary-token'>{body}</p>
         <Link
           href='/waitlist'
           className='inline-flex rounded-md border border-subtle px-3 py-2 text-sm font-medium text-primary-token outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent'

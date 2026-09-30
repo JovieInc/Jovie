@@ -126,7 +126,7 @@ export function ComparisonPageContent({
           <h2 className='text-2xl font-semibold text-primary-token'>
             The Bottom Line
           </h2>
-          <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+          <p className='mt-4 text-lg leading-relaxed text-secondary-token'>
             {data.bottomLine}
           </p>
           <div className='mt-8'>

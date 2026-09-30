@@ -200,7 +200,7 @@ describe('EmptyState (canonical molecule API)', () => {
     expect(heading.className).toContain('font-semibold');
     expect(heading.className).toContain('tracking-tight');
     expect(heading.className).toContain('text-primary-token');
-    expect(description.className).toContain('text-base');
+    expect(description.className).toContain('text-lg');
     expect(description.className).toContain('max-w-md');
     expect(description.className).toContain('text-secondary-token');
     expect(description.className).toContain('mb-0');

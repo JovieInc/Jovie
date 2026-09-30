@@ -87,7 +87,7 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
 
       {/* Mobile header bar */}
       <header className='fixed left-0 right-0 top-0 z-40 flex items-center justify-between border-b border-subtle bg-base px-4 py-3 lg:hidden'>
-        <span className='text-base font-bold text-primary-token'>Jovie</span>
+        <span className='text-lg font-bold text-primary-token'>Jovie</span>
         <div className='flex items-center gap-3'>
           {investorName && (
             <span className='text-[length:var(--text-xs)] text-tertiary-token'>

@@ -98,7 +98,7 @@ export function InvestorBrief({ investorName = null }: InvestorBriefProps) {
             <h2 className='font-display text-3xl font-semibold tracking-tight sm:text-5xl'>
               {registry.demo.title}
             </h2>
-            <p className='mt-4 text-balance text-base leading-relaxed text-secondary-token sm:text-lg'>
+            <p className='mt-4 text-balance text-lg leading-relaxed text-secondary-token sm:text-lg'>
               {registry.demo.description}
             </p>
           </div>
@@ -153,7 +153,7 @@ export function InvestorBrief({ investorName = null }: InvestorBriefProps) {
                 </h3>
                 {slide.support.map(line => (
                   <p
-                    className='mt-4 max-w-2xl text-base leading-relaxed text-secondary-token'
+                    className='mt-4 max-w-2xl text-lg leading-relaxed text-secondary-token'
                     key={line}
                   >
                     {line}
@@ -171,7 +171,7 @@ export function InvestorBrief({ investorName = null }: InvestorBriefProps) {
             <h2 className='font-display text-3xl font-semibold tracking-tight sm:text-5xl'>
               The Operating Loop, Honestly
             </h2>
-            <p className='mt-4 text-base leading-relaxed text-secondary-token sm:text-lg'>
+            <p className='mt-4 text-lg leading-relaxed text-secondary-token sm:text-lg'>
               The workflow is the thesis. The labels are the current evidence
               boundary.
             </p>
@@ -211,7 +211,7 @@ export function InvestorBrief({ investorName = null }: InvestorBriefProps) {
               aria-hidden='true'
             />
           </summary>
-          <div className='mt-10 space-y-6 text-base leading-relaxed text-secondary-token sm:text-lg'>
+          <div className='mt-10 space-y-6 text-lg leading-relaxed text-secondary-token sm:text-lg'>
             {registry.founderLetter.map(paragraph => (
               <p key={paragraph}>{paragraph}</p>
             ))}

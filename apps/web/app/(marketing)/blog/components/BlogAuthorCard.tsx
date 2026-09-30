@@ -29,7 +29,7 @@ export function BlogAuthorCard({
             <p className='mt-2 text-lg text-secondary-token'>{author.title}</p>
           )}
           {author.bio && (
-            <p className='mt-3 text-base text-tertiary-token max-w-lg leading-relaxed'>
+            <p className='mt-3 text-lg text-tertiary-token max-w-lg leading-relaxed'>
               {author.bio}
             </p>
           )}

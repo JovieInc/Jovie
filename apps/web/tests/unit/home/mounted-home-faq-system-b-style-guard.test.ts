@@ -152,7 +152,7 @@ describe('mounted homepage FAQ System B source contract', () => {
     }
 
     expect(source).toContain('text-lg font-semibold leading-snug');
-    expect(source).toContain('text-base leading-7 text-secondary-token');
+    expect(source).toContain('text-lg leading-7 text-secondary-token');
     expect(source).toContain('hidden={!isOpen}');
     expect(source).toContain('aria-hidden={!isOpen}');
     expect(source).toContain(

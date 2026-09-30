@@ -22,7 +22,7 @@ export function NewPreFooterCTA() {
               <span className='text-accent-token'>your @handle</span>?
             </h2>
 
-            <p className='mt-3 text-sm sm:text-base text-secondary-token'>
+            <p className='mt-3 text-sm sm:text-lg text-secondary-token'>
               Create your profile in 60 seconds. Start converting today.
             </p>
 

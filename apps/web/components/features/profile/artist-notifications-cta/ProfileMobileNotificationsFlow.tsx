@@ -285,7 +285,7 @@ function LabeledInput({
         onChange={event => onChange(event.target.value)}
         onKeyDown={onKeyDown}
         disabled={disabled}
-        className='h-12 w-full touch-manipulation rounded-3xl border border-white/10 bg-white/[0.03] px-4 text-base font-medium tracking-[-0.005em] dark:text-white placeholder:text-white/28 focus:border-white/18 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
+        className='h-12 w-full touch-manipulation rounded-3xl border border-white/10 bg-white/[0.03] px-4 text-lg font-medium tracking-[-0.005em] dark:text-white placeholder:text-white/28 focus:border-white/18 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
       />
     </label>
   );
@@ -345,7 +345,7 @@ function InlineCaptureField({
           }}
           disabled={isSubmitting}
           aria-label={channel === 'sms' ? 'Phone Number' : 'Email Address'}
-          className='h-11 min-w-0 flex-1 bg-transparent px-1 text-base font-medium tracking-[-0.005em] dark:text-white placeholder:text-white/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
+          className='h-11 min-w-0 flex-1 bg-transparent px-1 text-lg font-medium tracking-[-0.005em] dark:text-white placeholder:text-white/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
         />
         <button
           type='button'

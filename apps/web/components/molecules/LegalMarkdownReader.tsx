@@ -9,7 +9,7 @@ const LEGAL_MARKDOWN_STYLES = cn(
   'max-w-none min-w-0 text-mid leading-7 text-neutral-900 dark:text-white',
   '[&_h1]:scroll-mt-24 [&_h1]:mb-4 [&_h1]:text-2xl [&_h1]:font-semibold [&_h1]:text-neutral-950 dark:[&_h1]:text-white',
   '[&_h2]:scroll-mt-24 [&_h2]:mt-12 [&_h2]:mb-4 [&_h2]:border-b [&_h2]:border-neutral-200 [&_h2]:pb-3 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:text-neutral-950 dark:[&_h2]:border-white/10 dark:[&_h2]:text-white',
-  '[&_h3]:scroll-mt-24 [&_h3]:mt-8 [&_h3]:mb-3 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-neutral-950 dark:[&_h3]:text-white',
+  '[&_h3]:scroll-mt-24 [&_h3]:mt-8 [&_h3]:mb-3 [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-neutral-950 dark:[&_h3]:text-white',
   '[&_h4]:scroll-mt-24 [&_h4]:mt-7 [&_h4]:mb-2 [&_h4]:text-mid [&_h4]:font-semibold [&_h4]:text-neutral-950 dark:[&_h4]:text-white',
   '[&_p]:mb-5 [&_p]:text-mid [&_p]:leading-7 [&_p]:text-neutral-600 dark:[&_p]:text-neutral-400',
   '[&_a]:break-words [&_a]:font-medium [&_a]:text-neutral-950 [&_a]:underline [&_a]:decoration-neutral-300 [&_a]:underline-offset-4 hover:[&_a]:decoration-neutral-600 dark:[&_a]:text-white dark:[&_a]:decoration-neutral-600 dark:hover:[&_a]:decoration-neutral-300',

@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, ProgressBar } from '@jovie/ui';
+import { Button, LoadingSkeleton, ProgressBar } from '@jovie/ui';
 import { useEffect, useState } from 'react';
 import {
   Dialog,
@@ -25,6 +25,8 @@ type ActionableState = Extract<
 export interface DesktopUpdateModalViewProps {
   readonly open: boolean;
   readonly state: ActionableState;
+  /** Version being installed; kept through the download, which carries none. */
+  readonly version?: string | null;
   readonly notes: DesktopUpdateReleaseNotes | null;
   readonly loading: boolean;
   readonly onDownload: () => void;
@@ -36,15 +38,26 @@ export interface DesktopUpdateModalViewProps {
 
 const COPY = DESKTOP_UPDATE_COPY.modal;
 
-const TITLES = {
-  downloading: COPY.downloadingTitle,
-  ready: COPY.readyTitle,
-  error: COPY.errorTitle,
-} as const;
+const MB = 1024 * 1024;
+function formatMegabytes(bytes: number): string {
+  return `${Math.round(bytes / MB)} MB`;
+}
+
+function formatReleaseDate(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime())
+    ? iso.slice(0, 10)
+    : date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        timeZone: 'UTC',
+      });
+}
 
 export function DesktopUpdateModalView({
   open,
   state,
+  version = null,
   notes,
   loading,
   onDownload,
@@ -58,32 +71,58 @@ export function DesktopUpdateModalView({
       ? { label: COPY.downloadAction, onClick: onDownload }
       : state.state === 'ready'
         ? { label: COPY.restartAction, onClick: onInstall }
-        : state.state === 'error'
+        : state.state === 'error' && state.retryable
           ? { label: COPY.retryAction, onClick: onRetry }
           : null;
 
+  const title =
+    state.state === 'available'
+      ? COPY.availableTitle(state.version)
+      : state.state === 'downloading'
+        ? COPY.downloadingTitle(version)
+        : state.state === 'ready'
+          ? COPY.readyTitle(state.version)
+          : COPY.errorTitle;
+
+  const description =
+    state.state === 'available'
+      ? state.releaseDate
+        ? COPY.released(formatReleaseDate(state.releaseDate))
+        : null
+      : state.state === 'downloading'
+        ? COPY.downloadingDescription
+        : state.state === 'ready'
+          ? COPY.readyDescription
+          : state.retryable
+            ? COPY.errorDescription
+            : COPY.errorFinalDescription;
+
   return (
-    <Dialog open={open} onClose={onLater} size='md'>
-      <DialogTitle>
-        {state.state === 'available'
-          ? COPY.title(state.version)
-          : TITLES[state.state]}
-      </DialogTitle>
-      {state.state === 'available' && state.releaseDate ? (
-        <DialogDescription>{state.releaseDate.slice(0, 10)}</DialogDescription>
+    <Dialog open={open} onClose={onLater} size='sm'>
+      <DialogTitle>{title}</DialogTitle>
+      {description ? (
+        <DialogDescription>{description}</DialogDescription>
       ) : null}
-      <DialogBody>
-        {state.state === 'available' ? (
-          loading ? null : notes && (notes.summary || notes.items.length) ? (
+
+      {state.state === 'available' ? (
+        <DialogBody data-testid='desktop-update-notes'>
+          {loading ? (
+            // Reserve the notes block so the dialog does not grow on load.
+            <div aria-hidden='true'>
+              <LoadingSkeleton lines={3} height='h-3' />
+            </div>
+          ) : notes && (notes.summary || notes.items.length) ? (
             <div className='space-y-2'>
-              <h3 className='text-sm font-medium text-primary-token'>
+              <h3 className='text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
                 {COPY.notesHeading}
               </h3>
               {notes.summary ? (
-                <p className='text-sm text-secondary-token'>{notes.summary}</p>
+                <p className='text-app leading-relaxed text-secondary-token'>
+                  {notes.summary}
+                </p>
               ) : null}
               {notes.items.length > 0 ? (
-                <ul className='list-disc space-y-1 pl-5 text-sm text-secondary-token'>
+                <ul className='max-h-48 list-disc space-y-1 overflow-y-auto pl-4 text-app leading-relaxed text-secondary-token marker:text-tertiary-token'>
                   {notes.items.map(item => (
                     <li key={item}>{item}</li>
                   ))}
@@ -95,33 +134,40 @@ export function DesktopUpdateModalView({
               href={state.notesUrl}
               target='_blank'
               rel='noreferrer'
-              className='text-sm text-accent underline underline-offset-2'
+              className='text-app text-secondary-token underline underline-offset-2 hover:text-primary-token'
             >
               {COPY.notesFallbackLabel}
             </a>
-          )
-        ) : null}
-        {state.state === 'downloading' ? (
-          <ProgressBar
-            value={state.percent}
-            aria-label={COPY.progressLabel}
-            showValue
-          />
-        ) : null}
-        {state.state === 'ready' || state.state === 'error' ? (
-          <p className='text-sm text-secondary-token'>
-            {state.state === 'ready'
-              ? COPY.readyDescription
-              : COPY.errorDescription}
-          </p>
-        ) : null}
-      </DialogBody>
+          )}
+        </DialogBody>
+      ) : null}
+
+      {state.state === 'downloading' ? (
+        <DialogBody className='space-y-1.5'>
+          <ProgressBar value={state.percent} aria-label={COPY.progressLabel} />
+          <div className='flex items-center justify-between gap-3 text-2xs tabular-nums text-tertiary-token'>
+            <span>
+              {state.totalBytes > 0
+                ? COPY.transferred(
+                    formatMegabytes(state.transferredBytes),
+                    formatMegabytes(state.totalBytes)
+                  )
+                : `${Math.round(state.percent)}%`}
+            </span>
+            {state.bytesPerSecond > 0 ? (
+              <span>{COPY.speed(formatMegabytes(state.bytesPerSecond))}</span>
+            ) : null}
+          </div>
+        </DialogBody>
+      ) : null}
+
       <DialogActions>
         <Button variant='secondary' onClick={onLater}>
-          {COPY.laterAction}
+          {state.state === 'downloading' ? COPY.hideAction : COPY.laterAction}
         </Button>
         {primary ? (
-          <Button variant='primary' onClick={primary.onClick}>
+          // Focus the one primary action so Return confirms it.
+          <Button variant='primary' onClick={primary.onClick} autoFocus>
             {primary.label}
           </Button>
         ) : null}
@@ -184,6 +230,14 @@ export function DesktopUpdateModal({
 }) {
   const version = state.state === 'available' ? state.version : null;
   const { notes, loading } = useReleaseNotes(version, open);
+  // The download phase carries no version; keep the one the user accepted.
+  const [lastVersion, setLastVersion] = useState<string | null>(null);
+  const knownVersion =
+    state.state === 'available' || state.state === 'ready'
+      ? state.version
+      : null;
+  if (knownVersion && knownVersion !== lastVersion)
+    setLastVersion(knownVersion);
 
   if (
     state.state !== 'available' &&
@@ -198,6 +252,7 @@ export function DesktopUpdateModal({
     <DesktopUpdateModalView
       open={open}
       state={state}
+      version={lastVersion}
       notes={notes}
       loading={loading}
       onDownload={onDownload}

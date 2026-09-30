@@ -1063,7 +1063,7 @@ body {
     font-variation-settings: "opsz" 28;
     letter-spacing: -0.011em;
     line-height: 1.6;
-    @apply text-base sm:text-lg;
+    @apply text-lg;
   }
   .marketing-card {
     @apply relative p-6 rounded-2xl border transition-colors;
@@ -2070,7 +2070,7 @@ body {
     @apply text-lg lg:text-xl;
   }
   h6 {
-    @apply text-base lg:text-lg;
+    @apply text-lg;
   }
 }
 

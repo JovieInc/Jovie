@@ -97,7 +97,7 @@ export function SupportCta() {
         <h2 className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'>
           Still Need Help?
         </h2>
-        <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+        <p className='mt-4 text-lg leading-relaxed text-secondary-token'>
           If the Help Center did not solve it, contact our team directly.
         </p>
         <Button

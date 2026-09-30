@@ -198,7 +198,7 @@ function ReleaseSectionBlock({
               />
               <div className='min-w-0 flex-1 space-y-1.5'>
                 {title && (
-                  <p className='text-base font-semibold text-primary-token'>
+                  <p className='text-lg font-semibold text-primary-token'>
                     {renderInlineMarkdown(title, `${itemKey}-title`)}
                   </p>
                 )}

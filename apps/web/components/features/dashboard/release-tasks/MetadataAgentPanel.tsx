@@ -334,7 +334,7 @@ export function MetadataAgentPanel({
           <p className='text-2xs font-medium text-tertiary-token'>
             Metadata Agent
           </p>
-          <h2 className='mt-1 text-base font-semibold text-primary-token'>
+          <h2 className='mt-1 text-lg font-semibold text-primary-token'>
             Xperi Submission Ops For {releaseTitle}
           </h2>
           <p className='mt-1 max-w-2xl text-sm text-secondary-token'>

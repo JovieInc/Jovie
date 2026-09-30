@@ -80,7 +80,7 @@ function DrawerHandle() {
 
 function DrawerTitle({ title }: Readonly<{ title: string }>) {
   return (
-    <p className='ap-outcome-tracking mb-4 px-1 text-base font-semibold text-primary-token'>
+    <p className='ap-outcome-tracking mb-4 px-1 text-lg font-semibold text-primary-token'>
       {title}
     </p>
   );
@@ -106,7 +106,7 @@ function PayDrawerPreview({
                   : 'ap-outcome-drawer__row'
               )}
             >
-              <span className='ap-outcome-tracking text-base font-semibold text-primary-token'>
+              <span className='ap-outcome-tracking text-lg font-semibold text-primary-token'>
                 {row.amount}
               </span>
               <span
