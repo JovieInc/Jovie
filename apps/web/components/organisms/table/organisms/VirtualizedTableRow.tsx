@@ -182,10 +182,16 @@ function VirtualizedTableRowComponent<TData extends RowData>({
       style={
         shouldVirtualize && virtualStart !== undefined
           ? {
+              // An absolutely positioned <tr> leaves the table's column grid
+              // and sizes its cells by content, so each row drifts from the
+              // header. A fixed-layout table box per row keeps the declared
+              // column widths identical to the header's.
               position: 'absolute',
               top: 0,
               left: 0,
               width: '100%',
+              display: 'table',
+              tableLayout: 'fixed',
               transform: `translateY(${virtualStart}px)`,
             }
           : undefined

@@ -69,6 +69,29 @@ describe('VirtualizedTableRow', () => {
     expect(row).toHaveAttribute('aria-label', 'test row');
   });
 
+  it('lays virtualized rows out on the declared column grid', () => {
+    // An absolute <tr> sizes cells by content unless it is its own
+    // fixed-layout table box; without this, columns drift per row.
+    render(
+      <table>
+        <tbody>
+          <VirtualizedTableRow
+            {...baseProps}
+            shouldVirtualize
+            virtualStart={96}
+            measureElement={vi.fn()}
+          />
+        </tbody>
+      </table>
+    );
+
+    const row = screen.getByRole('row');
+    expect(row.style.position).toBe('absolute');
+    expect(row.style.display).toBe('table');
+    expect(row.style.tableLayout).toBe('fixed');
+    expect(row.style.transform).toBe('translateY(96px)');
+  });
+
   it('calls both the forwarded onContextMenu and the internal handler on right-click', () => {
     const forwardedContextMenu = vi.fn();
     const onRowClick = vi.fn();
