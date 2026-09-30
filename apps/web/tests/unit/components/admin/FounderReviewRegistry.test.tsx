@@ -1,4 +1,10 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FounderReviewRegistry } from '@/components/features/admin/FounderReviewRegistry';
@@ -89,7 +95,20 @@ describe('FounderReviewRegistry', () => {
     expect(
       media.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
-    expect(within(rail).getByAltText('Ready feature evidence')).toBeVisible();
+    const open = within(rail).getByRole('button', {
+      name: 'Open Ready feature evidence',
+    });
+    expect(open).toBeVisible();
+    // jsdom lacks the native dialog API the viewer opens with.
+    const showModal = HTMLDialogElement.prototype.showModal;
+    HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
+      this.setAttribute('open', '');
+    };
+    fireEvent.click(open);
+    HTMLDialogElement.prototype.showModal = showModal;
+    expect(screen.getByTestId('media-canvas-viewer')).toHaveAccessibleName(
+      'Ready feature evidence (1 of 1)'
+    );
     expect(within(rail).getByTestId('certify-review-item')).toBeEnabled();
   });
 

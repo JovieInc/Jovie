@@ -88,6 +88,7 @@ interface HomepageV2FinalCtaProps {
   readonly ctaLabel?: string;
   readonly ctaHref?: string;
   readonly sectionTestId?: string;
+  readonly sectionVariant?: string;
   readonly headingTestId?: string;
   readonly actionTestId?: string;
   readonly analyticsEventName?: string;
@@ -99,6 +100,7 @@ export function HomepageV2FinalCta({
   ctaLabel = HOMEPAGE_V2_COPY.finalCta.primaryCtaLabel,
   ctaHref = HOMEPAGE_FRONT_DOOR_CTA.primary.href,
   sectionTestId = 'homepage-v2-final-cta',
+  sectionVariant,
   headingTestId = 'homepage-v2-final-cta-heading',
   actionTestId = 'homepage-v2-final-cta-primary',
   analyticsEventName,
@@ -109,6 +111,7 @@ export function HomepageV2FinalCta({
       variant='homepage-v2'
       penContractId={MARKETING_PEN_CONTRACT_IDS.shell.footerCta}
       testId={sectionTestId}
+      sectionVariant={sectionVariant}
       headingTestId={headingTestId}
       actionTestId={actionTestId}
       title={headline}

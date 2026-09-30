@@ -255,7 +255,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
     {
       question: 'Who is Jovie for?',
       answer:
-        'Artists with a catalog already out and the team around them. Built for the work between drops, not just launch week.',
+        'Artists with a catalog already out and the team around them. Built for the work between drops and during launch week.',
     },
   ],
 } as const;

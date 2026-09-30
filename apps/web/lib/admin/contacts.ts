@@ -19,6 +19,7 @@ import { leads } from '@/lib/db/schema/leads';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { captureError } from '@/lib/error-tracking';
+import { isInternalOrTestAccountEmail } from '@/lib/utils/email';
 
 /**
  * Canonical customer/prospect read model (JOV-6888).
@@ -231,11 +232,12 @@ type UserRow = {
 };
 
 function userSourceRow(user: UserRow): CanonicalContactSourceRow | null {
+  // Paying means an external customer with a Stripe subscription. A Pro plan
+  // flag alone is set by comps/admin grants, and team/dogfood/QA accounts are
+  // never revenue (Tim 2026-09-30: nobody is paying yet).
   const isPaying =
-    user.isPro === true ||
-    user.plan === 'pro' ||
-    user.plan === 'max' ||
-    user.stripeSubscriptionId != null;
+    user.stripeSubscriptionId != null &&
+    !isInternalOrTestAccountEmail(user.email);
   return sourceRow({
     stage: deriveContactStage({
       userStatus: user.userStatus,

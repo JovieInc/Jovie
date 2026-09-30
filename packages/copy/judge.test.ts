@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   type CopyBrief,
+  excludeGeneratorFamily,
   gateCopy,
   gatewayTransport,
   type JudgeTransport,
+  modelFamily,
   selectJudges,
   writeUntilPass,
 } from './judge';
@@ -43,6 +45,18 @@ describe('tiered judge panel', () => {
     expect(selectJudges('standard', 'zai/glm-5.3-flash')[0]).not.toMatch(
       /^zai\//
     );
+  });
+
+  it('excludeGeneratorFamily keeps order and drops the generator family and unreachable models', () => {
+    const roster = ['anthropic/a', 'openai/b', 'zai/c', 'openai/d'];
+    expect(excludeGeneratorFamily(roster, 'openai/x')).toEqual([
+      'anthropic/a',
+      'zai/c',
+    ]);
+    expect(
+      excludeGeneratorFamily(roster, undefined, model => model !== 'zai/c')
+    ).toEqual(['anthropic/a', 'openai/b', 'openai/d']);
+    expect(modelFamily('anthropic/claude-opus-5.5')).toBe('anthropic');
   });
 
   it('an unseatable panel blocks instead of passing', async () => {

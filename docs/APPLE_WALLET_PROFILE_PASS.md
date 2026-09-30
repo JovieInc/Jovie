@@ -75,6 +75,48 @@ release operator supplies production signing, database, real-account, and
 exact-current-main receipts. Then: unblock JOV-6239 certification; only its
 success may unblock the JOV-6240 internal TestFlight release.
 
+### JOV-6239 machine-certification run
+
+Observed 2026-09-30 from lane revision
+`14829382df19dd467f9c2e407c77b576a011d145` (`origin/main`, clean tree).
+Lane environment: Linux, Node v22.23.2, pnpm 9.15.4. The repo pins Node
+`24.21.0` in `.nvmrc`; the engine mismatch is recorded, not waived. Linear and
+gBrain were unreachable from this lane, so dependency states rest on the
+JOV-6235 receipt table above plus merge history (`b9e71540b6`).
+
+Verified from this lane:
+
+| Check | Command / target | Result |
+| --- | --- | --- |
+| Focused Wallet, API, and source-link tests | `pnpm exec vitest run tests/unit/api/wallet/apple-profile-pass-route.test.ts tests/unit/api/wallet/apple-update-service.test.ts lib/wallet/apple/profile-pass.pem.test.ts tests/unit/lib/wallet/apple-profile-pass-visual.test.ts tests/unit/app/s-code-route.test.ts tests/unit/api/mobile/v1/me.test.ts tests/unit/lib/audience/source-link-code.test.ts` in `apps/web` | 7 files, 38 tests, all pass at `14829382` |
+| Web typecheck | `pnpm run typecheck` in `apps/web` (`tsc -p tsconfig.typecheck.json --noEmit`) | exit 0 |
+| Release signing preflight contract | `node --test apps/ios/scripts/validate-wallet-release-env.test.mjs` | 8/8 pass |
+| Logged-out canonical profile | `pnpm --filter @jovie/web exec tsx scripts/certify-artist-profile.ts` against production | Pass on the deployed build: HTTP 200, canonical `https://jov.ie/tim`, all profile checks pass, 0 broken internal links |
+| Unauthenticated pass issuance | `GET https://jov.ie/api/wallet/apple/profile-pass` | 401; the route fails closed |
+| Unauthenticated mobile session | `GET https://jov.ie/api/mobile/v1/me` | 401 |
+| Unknown source-link code | `GET https://jov.ie/s/<invalid>` | 404; no fallback issuance |
+
+Blocked — certification cannot complete from this lane:
+
+| Requirement | Current evidence | Owner | Next action |
+| --- | --- | --- | --- |
+| Exact-current-main production | `/api/health/build-info` serves `cbfcf5ce54ae65c8b3f3162916e0e87bcd39caef`, 20 commits behind `origin/main` `14829382`. Every production observation above is on that older build | Production controller | Deploy current main, obtain Production Verified, then re-run this receipt |
+| Real signed pass through the authenticated path | Requires a founder session plus production signing config; this lane holds no Doppler `prd` token and the JOV-6235 signing preflight receipt is still open | Release operator / Tim | Run the redacted preflight above, then issue through `GET /api/wallet/apple/profile-pass` on the exact deployed build |
+| Repeated installation/issuance and serial/source-link continuity | No production DB read is available from this lane | Release operator / DB owner | `scripts/db/prod-read.mjs` under `jovie-web/prd`; record booleans/counts only |
+| Profile rename, privacy, deletion, reassignment | Requires an authenticated founder session on the current-main build; the stale-card-to-wrong-profile path cannot be exercised anonymously | Auth owner / Tim | Exercise on the exact deployed build after the current-main deploy |
+| Native add-pass errors and update push | No macOS/Xcode or device in this lane; the JOV-6236 receipt governs that behavior | iOS release owner | Device-level verification after the current-main deploy |
+| Source attribution (`wallet_pass` classification; no mislabeled marketing/demo traffic) | Unit tests cover the classification path; production attribution rows are not readable here | DB owner | Redacted prod read for recent `wallet_pass` rows |
+
+Conclusion: **not certified.** The runnable evidence passes at
+`14829382`, but the certification requires the exact-current-main deploy, the
+JOV-6235 signing receipt, and the founder-session/device receipts above. This
+run does not simulate issuance, does not treat source presence or the public
+profile check as a shipped card, and captures no signing material.
+
+Ship now: this receipt. Re-evaluate when the release operator supplies the
+current-main Production Verified, signing, founder-session, and device
+receipts. Then: certify JOV-6239 and unblock JOV-6240.
+
 ## Product Contract
 
 Ship now: first-party generic PassKit profile card with update service.

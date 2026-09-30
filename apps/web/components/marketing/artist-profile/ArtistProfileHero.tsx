@@ -26,7 +26,7 @@ function ArtistProfileHeroMedia() {
           fill
           priority
           src={HERO_PROFILE.publicUrl}
-          alt="Tim White's Jovie artist profile leading with his latest release and a Listen action."
+          alt="Demonstration of Tim White's Jovie artist profile with a release and a Listen action."
           className='object-cover object-top'
           sizes='(min-width: 768px) 19rem, 15rem'
         />
@@ -42,6 +42,8 @@ export function ArtistProfileHero({ hero }: Readonly<ArtistProfileHeroProps>) {
     <div className='ap-hero'>
       <HomepagePosterHero
         headingId='artist-profile-hero-heading'
+        sectionVariant='centered-phone'
+        sectionOwner='apps/web/components/marketing/MarketingPosterHero.tsx'
         headline={hero.headline}
         subtitle={hero.subhead}
         primaryCta={{

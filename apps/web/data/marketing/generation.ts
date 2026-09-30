@@ -8,6 +8,7 @@
  * character system, Scene Palette v1, and approved media recipes.
  */
 
+import { excludeGeneratorFamily } from '@jovie/copy';
 import {
   formatMarketingCharacterSystemForPrompt,
   JOVIE_MARKETING_CHARACTER_SYSTEM,
@@ -22,9 +23,17 @@ import {
   JOVIE_MARKETING_MEDIA_RECIPE_VERSION,
   MARKETING_MEDIA_RECIPE_IDS,
 } from './mediaRecipes';
+import {
+  MARKETING_MODEL_CHANNEL_ORDER,
+  MARKETING_ROLE_MODEL_CANDIDATES,
+  type MarketingModelChannel,
+  type MarketingModelModality,
+  type MarketingModelRole,
+} from './modelRoles';
 
 export const MARKETING_GENERATION_SPEC_VERSION = '1.0.0';
 
+/** Alias of the factory stage spine; see factory/spine.ts for the mapping. */
 export const MARKETING_GENERATION_STAGES = [
   'truth',
   'narrative',
@@ -159,42 +168,168 @@ export interface MarketingModelCandidate {
   readonly costRank: number;
   /** Lower is faster. */
   readonly latencyRank: number;
+  /** Registry quality (0-100); breaks ties within a cost rank. */
+  readonly quality?: number;
+  readonly channel?: MarketingModelChannel;
+  readonly pool?: string;
 }
 
-export function selectMarketingModelCandidate(input: {
+/** Which registry role (model-registry.json `marketing_roles`) staffs each creative role. */
+export const MARKETING_CREATIVE_ROLE_MODEL_ROLE: Readonly<
+  Record<MarketingCreativeRole, MarketingModelRole>
+> = {
+  'truth-curator': 'strategist',
+  'narrative-architect': 'strategist',
+  'copy-compiler': 'copywriter',
+  'section-designer': 'layout-chooser',
+  'asset-generator': 'image-gen',
+  'adversarial-reviewer': 'judge-flagship',
+  'final-polisher': 'art-director',
+};
+
+/** Capabilities a registry modality actually provides. Nothing is assumed beyond these. */
+const MODALITY_CAPABILITIES: Readonly<
+  Record<MarketingModelModality, readonly MarketingModelCapability[]>
+> = {
+  text: [
+    'structured-output',
+    'long-context-planning',
+    'narrative-sequencing',
+    'editorial-compression',
+    'truth-review',
+  ],
+  vision: ['visual-ui-reasoning', 'vision-review'],
+  image: ['image-generation', 'reference-image-fidelity'],
+  video: [],
+};
+
+/**
+ * Projects registry candidates for a creative role into selector candidates.
+ * Cost rank is the channel preference (subscription first); capabilities come
+ * only from declared modalities, so a text-only model never seats a vision role.
+ */
+export function marketingModelCandidatesForRole(
+  role: MarketingCreativeRole,
+  isHealthy: (id: string) => boolean = () => true
+): MarketingModelCandidate[] {
+  return MARKETING_ROLE_MODEL_CANDIDATES[
+    MARKETING_CREATIVE_ROLE_MODEL_ROLE[role]
+  ].map(candidate => ({
+    id: candidate.id,
+    provider: candidate.family,
+    model: candidate.id.slice(candidate.id.indexOf('/') + 1),
+    healthy: isHealthy(candidate.id),
+    capabilities: [
+      ...new Set(
+        candidate.modalities.flatMap(
+          modality => MODALITY_CAPABILITIES[modality]
+        )
+      ),
+    ],
+    costRank: MARKETING_MODEL_CHANNEL_ORDER.indexOf(candidate.channel),
+    latencyRank: 0,
+    quality: candidate.quality,
+    channel: candidate.channel,
+    pool: candidate.pool,
+  }));
+}
+
+export interface MarketingModelSelectionInput {
   readonly role: MarketingCreativeRole;
-  readonly candidates: readonly MarketingModelCandidate[];
+  /** Defaults to the registry projection for this role. */
+  readonly candidates?: readonly MarketingModelCandidate[];
   readonly excludedModelIds?: readonly string[];
-}): MarketingModelCandidate | null {
+  /** The model whose output is being judged; its family is never selected. */
+  readonly generatorModel?: string;
+}
+
+export function selectMarketingModelCandidate(
+  input: MarketingModelSelectionInput
+): MarketingModelCandidate | null {
+  return selectMarketingModelWithReceipt(input).candidate;
+}
+
+export interface MarketingModelSelectionReceipt {
+  readonly role: MarketingCreativeRole;
+  readonly modelRole: MarketingModelRole;
+  readonly source: 'registry' | 'caller';
+  readonly selectedId: string | null;
+  readonly channel: MarketingModelChannel | null;
+  readonly considered: readonly string[];
+  readonly rejected: readonly {
+    readonly id: string;
+    readonly reason:
+      | 'unhealthy'
+      | 'excluded'
+      | 'generator-family'
+      | 'missing-capability';
+  }[];
+}
+
+/** Same choice as `selectMarketingModelCandidate`, plus the receipt a run records. */
+export function selectMarketingModelWithReceipt(
+  input: MarketingModelSelectionInput
+): {
+  readonly candidate: MarketingModelCandidate | null;
+  readonly receipt: MarketingModelSelectionReceipt;
+} {
   const required = MARKETING_ROLE_REQUIREMENTS[input.role];
   const excluded = new Set(input.excludedModelIds ?? []);
-
-  return (
-    input.candidates
-      .filter(candidate => {
-        const capabilities = new Set(candidate.capabilities);
-        return (
-          candidate.healthy &&
-          !excluded.has(candidate.id) &&
-          required.every(capability => capabilities.has(capability))
-        );
-      })
-      .toSorted((a, b) => {
-        const scoreDelta =
-          (b.roleScores?.[input.role] ?? 0) - (a.roleScores?.[input.role] ?? 0);
-        if (scoreDelta !== 0) return scoreDelta;
-
-        const tasteDelta =
-          (b.tasteAcceptanceRate ?? 0) - (a.tasteAcceptanceRate ?? 0);
-        if (tasteDelta !== 0) return tasteDelta;
-
-        if (a.costRank !== b.costRank) return a.costRank - b.costRank;
-        if (a.latencyRank !== b.latencyRank) {
-          return a.latencyRank - b.latencyRank;
-        }
-        return a.id.localeCompare(b.id);
-      })[0] ?? null
+  const candidates =
+    input.candidates ?? marketingModelCandidatesForRole(input.role);
+  const independent = new Set(
+    excludeGeneratorFamily(
+      candidates.map(candidate => candidate.id),
+      input.generatorModel
+    )
   );
+  const rejected: MarketingModelSelectionReceipt['rejected'][number][] = [];
+  const eligible = candidates.filter(candidate => {
+    const capabilities = new Set(candidate.capabilities);
+    const reason = !candidate.healthy
+      ? 'unhealthy'
+      : excluded.has(candidate.id)
+        ? 'excluded'
+        : !independent.has(candidate.id)
+          ? 'generator-family'
+          : required.every(capability => capabilities.has(capability))
+            ? null
+            : 'missing-capability';
+    if (reason) rejected.push({ id: candidate.id, reason });
+    return reason === null;
+  });
+
+  const candidate =
+    eligible.toSorted((a, b) => {
+      const scoreDelta =
+        (b.roleScores?.[input.role] ?? 0) - (a.roleScores?.[input.role] ?? 0);
+      if (scoreDelta !== 0) return scoreDelta;
+
+      const tasteDelta =
+        (b.tasteAcceptanceRate ?? 0) - (a.tasteAcceptanceRate ?? 0);
+      if (tasteDelta !== 0) return tasteDelta;
+
+      if (a.costRank !== b.costRank) return a.costRank - b.costRank;
+      const qualityDelta = (b.quality ?? 0) - (a.quality ?? 0);
+      if (qualityDelta !== 0) return qualityDelta;
+      if (a.latencyRank !== b.latencyRank) {
+        return a.latencyRank - b.latencyRank;
+      }
+      return a.id.localeCompare(b.id);
+    })[0] ?? null;
+
+  return {
+    candidate,
+    receipt: {
+      role: input.role,
+      modelRole: MARKETING_CREATIVE_ROLE_MODEL_ROLE[input.role],
+      source: input.candidates ? 'caller' : 'registry',
+      selectedId: candidate?.id ?? null,
+      channel: candidate?.channel ?? null,
+      considered: candidates.map(item => item.id),
+      rejected,
+    },
+  };
 }
 
 export interface MarketingNarrativeSectionPlan {

@@ -41,6 +41,8 @@ interface MarketingHeroBaseProps {
   /** Id applied to the hero heading and referenced by `aria-labelledby`. */
   readonly headingId?: string;
   readonly testId?: string;
+  /** Actual route owner when this shared root delegates its content. */
+  readonly sectionOwner?: string;
 }
 
 /**
@@ -152,12 +154,14 @@ function MarketingHeroFrame({
   headingId,
   testId,
   sectionVariant,
+  sectionOwner,
   children,
 }: Readonly<{
   className: string;
   headingId?: string;
   testId?: string;
   sectionVariant?: string;
+  sectionOwner?: string;
   children: ReactNode;
 }>) {
   return (
@@ -168,7 +172,7 @@ function MarketingHeroFrame({
       data-testid={testId}
       data-marketing-owner={
         sectionVariant
-          ? 'apps/web/components/marketing/MarketingHero.tsx'
+          ? (sectionOwner ?? 'apps/web/components/marketing/MarketingHero.tsx')
           : undefined
       }
       data-marketing-variant={sectionVariant}
@@ -236,12 +240,14 @@ function MarketingHeroShell({
   headingId,
   testId,
   sectionVariant,
+  sectionOwner,
 }: MarketingHeroShellProps) {
   return (
     <MarketingHeroFrame
       headingId={headingId}
       testId={testId}
       sectionVariant={sectionVariant}
+      sectionOwner={sectionOwner}
       className={cn(
         variant !== 'unstyled' && 'relative w-full',
         variant !== 'unstyled' &&
@@ -305,6 +311,7 @@ function MarketingHeroContent({
   testId,
   className,
   sectionVariant,
+  sectionOwner,
   headlineMaxLines = 2,
   linkComponent = Link,
   photo,
@@ -322,6 +329,7 @@ function MarketingHeroContent({
       headingId={headingId}
       testId={testId}
       sectionVariant={sectionVariant}
+      sectionOwner={sectionOwner}
     >
       {photo ? <MarketingHeroPhoto {...photo} /> : null}
       <MarketingContainer width='page'>
