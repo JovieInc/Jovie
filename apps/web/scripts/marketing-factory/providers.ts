@@ -58,6 +58,11 @@ export interface FactoryProviders {
   readonly mode: 'dry' | 'live';
   /** Judge (and live generation) transport; null when nothing is reachable. */
   readonly transport: JudgeTransport | null;
+  /** What this provider set can do, read by the preflight before any model call. */
+  readonly capabilities: {
+    readonly renderMeasurer: boolean;
+    readonly imageGeneration: boolean;
+  };
   generate(request: GenerateRequest): Promise<Generated | Unavailable>;
   measureRender(
     route: string,
@@ -113,6 +118,7 @@ export function dryProviders(
   const dry = brief.dry;
   return {
     mode: 'dry',
+    capabilities: { renderMeasurer: Boolean(dry), imageGeneration: true },
     transport: fixtureTransport(),
     async generate(request) {
       if (!dry) {
@@ -202,6 +208,7 @@ export function liveProviders(
 ): FactoryProviders {
   return {
     mode: 'live',
+    capabilities: { renderMeasurer: false, imageGeneration: false },
     transport,
     async generate(request) {
       if (!transport || !(transport.available?.(request.model) ?? true)) {

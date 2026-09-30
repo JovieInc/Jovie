@@ -86,6 +86,32 @@ describe('factory:run --dry end to end', () => {
     });
   });
 
+  it('fails render when a section has no /solutions renderer', async () => {
+    const narrative = brief.dry?.narrative as {
+      sections: { sectionId: string }[];
+    };
+    const manifest = await run({
+      providers: dryProviders(brief, {
+        async generate(request) {
+          const value =
+            request.stage === 'narrative'
+              ? {
+                  sections: narrative.sections.map((section, index) =>
+                    index === 1 ? { ...section, sectionId: 'pricing' } : section
+                  ),
+                }
+              : brief.dry?.[request.stage];
+          return { status: 'ok', value };
+        },
+      }),
+    });
+
+    expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'render' });
+    expect(record('12-render.attempt-2.json').feedbackIn).toContain(
+      'page-record-schema: no solutions renderer for pricing'
+    );
+  });
+
   it('fails render when the run cannot form a valid page record', async () => {
     const manifest = await run({
       brief: {
@@ -148,6 +174,7 @@ describe('page stage gates', () => {
         : entry
     );
     const manifest = await run({
+      allowPartial: true,
       brief: { ...brief, media },
       providers: liveProviders(fixtureTransport(), {
         generate: dryProviders(brief).generate,
@@ -251,6 +278,7 @@ describe('page stage gates', () => {
     await run();
     const resumed = await run({
       fromStage: 'adversarial-trust',
+      allowPartial: true,
       providers: dryProviders(brief, {
         transport: null,
         reviewVisual: async () => ({
@@ -290,11 +318,11 @@ describe('page stage gates', () => {
     ).toMatch(/same-family-judge/);
   });
 
-  it('stops live runs at render when no production build is served', async () => {
+  it('with --allow-partial, live runs still stop at render without a measurer', async () => {
     const live = liveProviders(fixtureTransport(), {
       generate: dryProviders(brief).generate,
     });
-    const manifest = await run({ providers: live });
+    const manifest = await run({ providers: live, allowPartial: true });
 
     expect(manifest).toMatchObject({
       status: 'credentials-unavailable',
