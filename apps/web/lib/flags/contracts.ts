@@ -73,6 +73,14 @@ export const APP_FLAG_DEFAULTS = {
    * for the public CLI/MCP write path; default on.
    */
   AGENT_PROFILE_CREATE: true,
+  /**
+   * Creator Financial Health surfaces (JOV-4621). Default OFF and excluded
+   * from the admin default-true set — this gate is release-blocking and must
+   * stay dark until the privacy/correctness matrix is certified. An
+   * additional env kill switch (`FINANCE_DISABLE`) forces off immediately,
+   * independent of flag-resolution latency.
+   */
+  CREATOR_FINANCE: false,
 } as const;
 
 export type AppFlagName = keyof typeof APP_FLAG_DEFAULTS;
@@ -103,6 +111,7 @@ export const APP_FLAG_KEYS = {
   PAID_WELCOME_EMAIL: 'paid_welcome_email',
   MERCH_QA_GATE: 'merch_qa_gate',
   AGENT_PROFILE_CREATE: 'agent_profile_create',
+  CREATOR_FINANCE: 'creator_finance',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_OVERRIDE_KEYS = {
@@ -128,6 +137,7 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   PAID_WELCOME_EMAIL: 'code:PAID_WELCOME_EMAIL',
   MERCH_QA_GATE: 'code:MERCH_QA_GATE',
   AGENT_PROFILE_CREATE: 'code:AGENT_PROFILE_CREATE',
+  CREATOR_FINANCE: 'code:CREATOR_FINANCE',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_TO_STATSIG_GATE = {
@@ -182,6 +192,8 @@ export const APP_FLAG_DESCRIPTIONS = {
     'Merch pre-publish visual QA gate: persisted receipts, quarantine queue, fail-closed publish evidence (JOV-4739). Default off until a real visual reviewer replaces the stub.',
   AGENT_PROFILE_CREATE:
     'Anonymous agent profile creation via POST /api/agents/profiles (public CLI/MCP write path).',
+  CREATOR_FINANCE:
+    'Creator Financial Health owner-only surfaces (JOV-4621). Release-blocking gate — stays off until the privacy/correctness matrix is certified.',
 } as const satisfies Record<AppFlagName, string>;
 
 /**
@@ -232,6 +244,8 @@ export const APP_FLAG_REMOVAL_CONDITIONS = {
     'Remove when the real visual reviewer is mandatory and the stub path is deleted.',
   AGENT_PROFILE_CREATE:
     'Retain while the anonymous public write path needs an abuse stop control.',
+  CREATOR_FINANCE:
+    'Remove when the JOV-4621 release gate is certified and financial access no longer needs a fleet-wide stop control.',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_AUDIT_OWNER = '@itstimwhite' as const;
@@ -298,4 +312,5 @@ export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
   'PAID_WELCOME_EMAIL', // JOV-6445 external-recipient send; founder-gated default off, no Statsig gate
   'MERCH_QA_GATE', // JOV-4739 publish gate; default off until a real visual reviewer replaces the stub — no Statsig gate
   'AGENT_PROFILE_CREATE', // public agent write-path kill switch; env/admin override, no Statsig gate
+  'CREATOR_FINANCE', // JOV-4621 release gate; env/admin override + FINANCE_DISABLE kill switch, no Statsig gate
 ]);
