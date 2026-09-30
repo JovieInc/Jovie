@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui/atoms/button';
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { HandleStatusIcon } from '@/components/features/home/claim-handle/HandleStatusIcon';
 import { useHandleValidation } from '@/components/features/home/claim-handle/useHandleValidation';
 import { InputAuraFrame } from '@/components/features/home/InputAuraFrame';
@@ -35,6 +35,13 @@ export function ProductClaimHandleForm({
   const [navigating, setNavigating] = useState(false);
   const { handleError, checkingAvail, available, availError } =
     useHandleValidation(handle);
+
+  useLayoutEffect(() => {
+    // Retain edits accepted by the native SSR input before client handlers attach.
+    // Capture before passive validation updates can render the empty initial draft.
+    const earlyDraft = inputRef.current?.value;
+    if (earlyDraft) setHandle(earlyDraft.toLowerCase());
+  }, []);
 
   const unavailable = Boolean(handleError || availError || available === false);
   const statusVisible = Boolean(handle || formSubmitted);

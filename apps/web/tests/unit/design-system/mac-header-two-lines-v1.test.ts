@@ -48,6 +48,8 @@ const NON_PRODUCT = /\.(test|spec|stories)\.[jt]sx?$/;
  */
 const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
   'apps/web/components/marketing/FaqSection.tsx',
+  // Artist Profiles section value propositions stay complete at phone widths.
+  'apps/web/components/marketing/artist-profile/ArtistProfileSectionHeader.tsx',
   'apps/web/components/marketing/artist-notifications/ArtistNotificationsHero.tsx',
   // Terminal CTA headlines are the page's closing value proposition; a
   // two-line clamp truncated /product's at 390px ("…people searc…").
@@ -109,6 +111,24 @@ function shellSurfaceFiles(): string[] {
 }
 
 describe('mac-header-two-lines-v1', () => {
+  it('requires the complete-title contract on the Artist Profiles section heading', () => {
+    const file =
+      'apps/web/components/marketing/artist-profile/ArtistProfileSectionHeader.tsx';
+    const attrs = "data-wrap='editorial-title'";
+    expect(hasEditorialTitleContract(file, attrs, '')).toBe(true);
+    expect(hasEditorialTitleContract(file, '', '')).toBe(false);
+    expect(
+      hasEditorialTitleContract(file, `${attrs} className='line-clamp-2'`, '')
+    ).toBe(false);
+    expect(
+      hasEditorialTitleContract(
+        'apps/web/components/shell/Header.tsx',
+        attrs,
+        ''
+      )
+    ).toBe(false);
+  });
+
   it('requires the full-title marker and both shared grid tracks only on the editorial card', () => {
     const file = 'apps/web/app/(marketing)/blog/components/BlogCard.tsx';
     const attrs = "data-wrap='editorial-title'";
