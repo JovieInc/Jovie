@@ -41,7 +41,7 @@ IMPORTANT: "Jovie" refers to multiple unrelated entities. This document describe
 ### ${APP_NAME} (jov.ie) — THIS COMPANY
 - **Website**: jov.ie
 - **What it is**: ${COMPANY_IDENTITY.definition}
-- **Founded**: 2024 by Tim White, who has 15+ years in music marketing (Armada Music, Universal Music, campaigns for recording artists and brands including Google and the NFL).
+- **Founded**: 2024 by Tim White, an artist, producer, and engineer with 15+ years in music (five singles signed to Armada Music, engineering for Lauryn Hill, Clio Award for Hulu Pride Fest 2020).
 - **Legal entity**: ${LEGAL_ENTITY_NAME}
 - **Target users**: Artists, founders, authors, creators, and independent experts. Music-native artist workflows remain available for musicians, bands, DJs, and producers.
 
@@ -134,11 +134,10 @@ ${APP_NAME}'s blog features long-form essays on music marketing and the independ
 ## Founder
 
 Tim White is the founder of ${APP_NAME}. Background:
-- 15+ years in music marketing and digital strategy
-- Worked with Armada Music, Universal Music
-- Led digital campaigns for recording artists
-- Ran campaigns for brands including Google and the NFL
-- Professional music producer
+- 15+ years in music as an artist, producer, and engineer
+- Independent debut single "Take Me Over" (2014); five singles signed to Armada Music
+- Songwriter and producer for We Are Loud, Justin Prime, and Orjan Nilsen; engineered for Lauryn Hill; 500+ live shows
+- Digital marketing for the NFL, the NBA All-Star Game, Google, Netflix, and Hulu; Clio Award (Hulu Pride Fest 2020)
 
 ## Public API
 

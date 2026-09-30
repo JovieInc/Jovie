@@ -20,8 +20,8 @@ export const ABOUT_COPY = {
   origin: {
     heading: 'Why Jovie Exists',
     paragraphs: [
-      'I spent 15 years in music marketing. Worked with Armada Music and Universal Music, ran digital campaigns for recording artists, and drove campaigns for brands like Google and the NFL.',
-      'The whole time, I saw the same problem: the people who needed infrastructure the most were the ones who could never afford it. Labels have teams coordinating releases, managing fan data, planning rollouts. Independent artists have themselves and maybe a friend who is decent at Instagram.',
+      'I spent 15 years in music. My first single, "Take Me Over," came out independently in 2014 and went viral. Five singles signed to Armada Music. "The Deep End" with Cosmic Gate premiered on A State of Trance. Along the way I wrote and produced for We Are Loud, Justin Prime, and Orjan Nilsen, engineered for Lauryn Hill, and played more than 500 shows, opening for The Disco Biscuits and playing the final nights at Pacha NYC.',
+      'I also ran digital marketing for the NFL, the NBA All-Star Game, Google, Netflix, and Hulu, work that won a Clio Award. The whole time, the same problem kept showing up: the people who needed infrastructure the most were the ones who could never afford it. Labels have teams coordinating releases, managing fan data, planning rollouts. Independent artists have themselves and maybe a friend who is decent at Instagram.',
       'Jovie is what I wish existed when I was an artist: one product for presence, relationships, and growth, without reducing you to a category. For musicians, Jovie routes fans to the right streaming platform, turns profile visits into relationships, surfaces audience signals, and gives AI the context of stream counts, tour dates, and collaborations.',
     ],
     signoff: 'Tim White, Founder',
@@ -75,7 +75,7 @@ export const ABOUT_FAQ_ITEMS = [
   {
     question: 'Who founded Jovie?',
     answer:
-      'Jovie was founded by Tim White, a music marketing veteran with 15+ years of experience working with labels like Armada Music and Universal Music, and running digital campaigns for recording artists and brands like Google and the NFL.',
+      'Jovie was founded by Tim White, an artist, producer, and engineer with 15+ years in music: 500+ live shows, five singles signed to Armada Music, songwriting and production for We Are Loud, Justin Prime, and Orjan Nilsen, engineering for Lauryn Hill, and a Clio Award for Hulu Pride Fest 2020.',
   },
   {
     question: 'What does Jovie do?',
