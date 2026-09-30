@@ -66,7 +66,7 @@ function MobileFeatureRow({
     <tr className='system-b-pricing-chart-row'>
       <th
         scope='row'
-        className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature whitespace-nowrap'
+        className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature'
       >
         {feature.name}
       </th>
@@ -135,6 +135,7 @@ export function PricingComparisonChart() {
   ];
   const selectedPlanOption =
     planOptions.find(option => option.id === selectedPlan) ?? planOptions[0];
+  const selectedPlanClaim = selectedPlan === 'free' ? freeClaim : proClaim;
 
   return (
     <div
@@ -237,7 +238,10 @@ export function PricingComparisonChart() {
                   {selectedPlanOption.name}
                 </div>
                 <div className='system-b-pricing-plan-price'>
-                  {selectedPlanOption.price}
+                  {selectedPlanClaim.priceLabel}
+                  {selectedPlanClaim.cadence ? (
+                    <span>{selectedPlanClaim.cadence}</span>
+                  ) : null}
                 </div>
               </th>
             </tr>
