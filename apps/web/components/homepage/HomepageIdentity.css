@@ -379,6 +379,14 @@
   text-wrap: pretty;
 }
 
+/* Connected Pen narrow instances use the 24px lead role so the complete
+   presence phrase fits at 320px without an orphaned final word. */
+@media (max-width: 767px) {
+  .homepage-identity-section--presence .homepage-identity-section__headline {
+    font-size: 1.5rem;
+  }
+}
+
 .homepage-identity-presence__material {
   position: relative;
   overflow: hidden;

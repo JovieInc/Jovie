@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
@@ -77,6 +78,155 @@ test.describe('Pricing Page', () => {
       0
     );
   });
+
+  for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+    test(`keeps comparison text readable and plan selection coherent (${reducedMotion})`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ reducedMotion });
+      for (const width of [320, 375, 390, 430, 720, 767, 768, 1024, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        await page.evaluate(() => document.fonts.ready);
+        const chart = page.locator('.system-b-pricing-chart');
+        const table = chart.getByRole('table');
+        await expect(table).toHaveCount(1);
+        const assertReadableCells = async () => {
+          const collisions = await table.evaluate(element => {
+            const failures: string[] = [];
+            for (const cell of element.querySelectorAll('th, td')) {
+              const bounds = cell.getBoundingClientRect();
+              const walker = document.createTreeWalker(
+                cell,
+                NodeFilter.SHOW_TEXT
+              );
+              for (
+                let node = walker.nextNode();
+                node;
+                node = walker.nextNode()
+              ) {
+                if (
+                  !node.textContent?.trim() ||
+                  node.parentElement?.closest('.sr-only')
+                ) {
+                  continue;
+                }
+                const range = document.createRange();
+                range.selectNodeContents(node);
+                for (const ink of range.getClientRects()) {
+                  if (
+                    ink.left < bounds.left - 1 ||
+                    ink.right > bounds.right + 1
+                  ) {
+                    failures.push(node.textContent.trim());
+                  }
+                }
+              }
+            }
+            return failures;
+          });
+          expect(collisions, `comparison painted text at ${width}px`).toEqual(
+            []
+          );
+          expect(
+            await table.evaluate(element => {
+              const shell = element.parentElement;
+              return !!shell && shell.scrollWidth <= shell.clientWidth + 1;
+            }),
+            `complete comparison fits its visible region at ${width}px`
+          ).toBe(true);
+        };
+
+        await assertReadableCells();
+        if (width < 768) {
+          const selector = chart.getByRole('combobox', {
+            name: 'Select Plan To Compare',
+          });
+          await selector.selectOption('free');
+          await expect(
+            table.getByRole('columnheader', { name: /Free/ })
+          ).toContainText('$0');
+          await expect(
+            table
+              .getByRole('rowheader', { name: 'Contact / subscriber capture' })
+              .locator('..')
+              .getByRole('cell')
+          ).toHaveText('Up to 100');
+          await assertReadableCells();
+          await selector.focus();
+          await selector.press('p');
+          await expect(selector).toBeFocused();
+          await expect(selector).toHaveValue('pro');
+          await expect(
+            table.getByRole('columnheader', { name: /Pro/ })
+          ).toContainText('$199/mo');
+          await expect(
+            table
+              .getByRole('rowheader', { name: 'Contact / subscriber capture' })
+              .locator('..')
+              .getByRole('cell')
+          ).toHaveText('Unlimited');
+          await assertReadableCells();
+          await selector.press('Tab');
+          await expect(page.locator(':focus')).toHaveText(
+            'Claim my free profile'
+          );
+          await page.keyboard.press('Shift+Tab');
+          await expect(selector).toBeFocused();
+          await selector.press('f');
+          await expect(selector).toBeFocused();
+          await expect(selector).toHaveValue('free');
+          await expect(
+            table.getByRole('columnheader', { name: /Free/ })
+          ).toContainText('$0');
+          await expect(
+            table
+              .getByRole('rowheader', { name: 'Contact / subscriber capture' })
+              .locator('..')
+              .getByRole('cell')
+          ).toHaveText('Up to 100');
+          await assertReadableCells();
+          await selector.press('Tab');
+          await expect(page.locator(':focus')).toHaveText(
+            'Claim my free profile'
+          );
+          await page.keyboard.press('Shift+Tab');
+          await expect(selector).toBeFocused();
+          await selector.press('p');
+          await expect(selector).toBeFocused();
+          await expect(selector).toHaveValue('pro');
+          await expect(
+            table.getByRole('columnheader', { name: /Pro/ })
+          ).toContainText('$199/mo');
+          await expect(
+            table
+              .getByRole('rowheader', { name: 'Contact / subscriber capture' })
+              .locator('..')
+              .getByRole('cell')
+          ).toHaveText('Unlimited');
+          await selector.press('Tab');
+          await expect(selector).not.toBeFocused();
+          await expect(page.locator(':focus')).toHaveText(
+            'Claim my free profile'
+          );
+        } else {
+          await expect(chart.getByRole('combobox')).toHaveCount(0);
+          await expect(
+            table.getByRole('columnheader', { name: /Free/ })
+          ).toContainText('$0');
+          await expect(
+            table.getByRole('columnheader', { name: /Pro/ })
+          ).toContainText('$199/mo');
+        }
+        if (width === 320) {
+          const accessibility = await new AxeBuilder({ page })
+            .include('.system-b-pricing-chart')
+            .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+            .analyze();
+          expect(accessibility.violations).toEqual([]);
+        }
+      }
+    });
+  }
 
   test('keeps centered pricing and plan features readable at narrow and wide widths', async ({
     page,

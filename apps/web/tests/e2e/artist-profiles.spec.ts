@@ -169,6 +169,41 @@ test.describe('Artist Profiles Landing', () => {
     await expectFullyInViewport(page, claimLink);
   });
 
+  test('keeps mode choices pending before JavaScript attaches their handlers', async ({
+    browser,
+    page,
+  }) => {
+    const context = await browser.newContext({
+      javaScriptEnabled: false,
+      viewport: { width: 390, height: 900 },
+    });
+    try {
+      const pendingPage = await context.newPage();
+      await interceptAnalytics(pendingPage);
+      await pendingPage.goto(new URL('/artist-profiles', page.url()).href, {
+        waitUntil: 'domcontentloaded',
+      });
+      const adaptive = pendingPage.getByTestId(
+        'artist-profile-section-adaptive'
+      );
+      await adaptive.scrollIntoViewIfNeeded();
+      await expect(
+        adaptive.locator('[data-interactive-ready]')
+      ).toHaveAttribute('aria-busy', 'true');
+      const choices = adaptive.getByRole('tab');
+      await expect(choices).toHaveCount(4);
+      for (const choice of await choices.all()) {
+        await expect(choice).toBeDisabled();
+        expect(
+          await choice.evaluate(element => getComputedStyle(element).opacity)
+        ).toBe('0.5');
+      }
+      await expectNoHorizontalOverflow(pendingPage);
+    } finally {
+      await context.close();
+    }
+  });
+
   test('adaptive profile exposes four moment-based modes without layout shift', async ({
     page,
   }) => {
@@ -181,6 +216,9 @@ test.describe('Artist Profiles Landing', () => {
       })
     ).toBeVisible();
     await expect(adaptiveSection.getByRole('tab')).toHaveCount(4);
+    await expect(
+      adaptiveSection.locator('[data-interactive-ready]')
+    ).toHaveAttribute('data-interactive-ready', 'true');
 
     const initialHeight = await adaptiveSection.evaluate(
       element => element.getBoundingClientRect().height

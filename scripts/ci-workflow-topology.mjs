@@ -7,6 +7,12 @@ import { dump as yamlDump, load as yamlLoad } from 'js-yaml';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outputPath = path.join(root, '.github/workflow-topology.gen.yml');
 const policy = JSON.parse(String.raw`{"schema":"jovie-workflow-topology/v1","measuredBaseline":{"sha":"06fe003f7e3c2cf4919aa2a115749bafa0bf0196","capturedAt":"2026-09-29","workflowRuns":293,"checkRecords":487},"budgets":{"blockingPrChecks":12,"normalPrCheckRecords":25,"normalPrExternalAllowance":8,"mainShaWorkflowRuns":72},"authoritativeOwners":[{"category":"source-validation","workflow":"Source Validation"},{"category":"release-orchestration","workflow":"Production Controller"},{"category":"production-verification","workflow":"Production Controller"},{"category":"telemetry-aggregation","workflow":"Delivery Control Receipts"},{"category":"remediation-dispatch","workflow":"Lane Fix Relay"}],"authoritySurfaces":[{"surface":"staging","workflow":"Staging Controller"},{"surface":"production","workflow":"Production Controller"},{"surface":"rollback","workflow":"Production Release"},{"surface":"queue-admission","workflow":"Merge Queue Green Enroll"},{"surface":"release-truth","workflow":"Production Controller"}],"blockingPrChecks":["PR Ready","Migration Guard","Fork PR Gate","PR Size Guard","PR targets main","llm-review"],"normalPrWorkflows":["Source Validation","Auto-Merge Default","Fork PR Gate","PR Size Guard","PR targets main","Repository documentation shadow","Summer Eve identity check"],"inactiveWorkflows":["Agent Pipeline","Agent Tick","Auto-PR on Agent Push","Auto-Ready Agent Drafts","GitHub AI Dispatcher","GitHub AI Orchestrator (retired)","Main CI health monitor","PR Conflict Handler","Real-Model Eval Lane","Rolling CI Dispatch","Stuck Draft Auto-Close","Taste Classifier","Taste Label Guard"]}`);
+/**
+ * @typedef {object} WorkflowYaml
+ * @property {string} [name]
+ * @property {any} [on]
+ * @property {Record<string, any>} [jobs]
+ */
 const categories = policy.authoritativeOwners.map(owner => owner.category);
 const array = value => value == null ? [] : Array.isArray(value) ? value : [value];
 const events = value => value && typeof value === 'object' ? Object.keys(value) : array(value);
@@ -54,7 +60,7 @@ export function buildTopology(repoRoot = root, suppliedPolicy = structuredClone(
     .filter(file => /\.ya?ml$/.test(file))
     .sort()
     .map(file => {
-      const parsed = yamlLoad(fs.readFileSync(path.join(dir, file), 'utf8')) ?? {};
+      const parsed = /** @type {WorkflowYaml} */ (yamlLoad(fs.readFileSync(path.join(dir, file), 'utf8')) ?? {});
       return { file, parsed, name: parsed.name };
     });
   const active = item => !suppliedPolicy.inactiveWorkflows.includes(item.name);
