@@ -446,7 +446,9 @@ async function trustStage(ctx: StageContext): Promise<StageResult> {
     {
       evaluators,
       feedback: [...checks.feedback, ...verdict.critique],
-      unavailable: verdict.unavailable ?? visual.unavailable,
+      unavailable:
+        [verdict.unavailable, visual.unavailable].filter(Boolean).join('; ') ||
+        null,
       notes: { tasteReceipts: visual.receipts },
     }
   );

@@ -162,14 +162,23 @@ export async function runVisualReview(
     decisions.push({ capture, decision });
   }
   const all = decisions.flatMap(({ decision }) => decision.judges);
-  const deciding = all.at(-1);
+  // Each viewport is decided by its last judge (the flagship when that
+  // viewport escalated). A failing viewport's decider names the review.
+  const deciders = decisions.map(({ decision }) => ({
+    state: decision.state,
+    judge: decision.judges.at(-1),
+  }));
+  const decisive =
+    deciders.find(({ state }) => state === 'fail') ??
+    deciders.find(({ judge }) => judge?.judge !== judges.cheap.id) ??
+    deciders[0];
   return {
     status: 'reviewed',
-    judgeModel: deciding?.judge ?? judges.cheap.id,
+    judgeModel: decisive?.judge?.judge ?? judges.cheap.id,
     verdict: decisions.every(({ decision }) => decision.state === 'pass')
       ? 'pass'
       : 'fail',
-    score: Math.min(...all.map(judge => judge.score ?? 0)),
+    score: Math.min(...deciders.map(({ judge }) => judge?.score ?? 0)),
     findings: decisions
       .filter(({ decision }) => decision.state === 'fail')
       .flatMap(({ capture, decision }) =>
@@ -221,6 +230,9 @@ export function buildVisualGateReceipts(input: {
       review.judgeModel,
       input.producerModel
     );
+    const flagged = review.findings.some(finding =>
+      finding.startsWith('same-family-judge:')
+    );
     receipts.push({
       gateId: 'visual-review',
       verdict: review.verdict === 'pass' && !sameFamily ? 'pass' : 'fail',
@@ -229,7 +241,7 @@ export function buildVisualGateReceipts(input: {
       reviewerModelId: review.judgeModel,
       findings: [
         ...review.findings,
-        ...(sameFamily ? [`same-family-judge: ${sameFamily}`] : []),
+        ...(sameFamily && !flagged ? [`same-family-judge: ${sameFamily}`] : []),
       ],
     });
   }

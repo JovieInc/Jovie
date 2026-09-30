@@ -90,6 +90,29 @@ describe('runVisualReview', () => {
     expect(admit(review)).toEqual(['failed-taste-gate']);
   });
 
+  it('names the flagship when only one viewport escalated to it', async () => {
+    const cheap = stage('openai/gpt-5.6-luna', 0.9);
+    let calls = 0;
+    cheap.run = vi.fn(async () => ({
+      judge: 'openai/gpt-5.6-luna',
+      score: calls++ === 0 ? 0.5 : 0.9,
+      verdict: 'pass' as const,
+      reason: null,
+      notes: '',
+    }));
+    const review = await runVisualReview(request, {
+      cheap,
+      flagship: stage('zai/glm-5.3', 0.8),
+    });
+
+    expect(review).toMatchObject({
+      status: 'reviewed',
+      verdict: 'pass',
+      judgeModel: 'zai/glm-5.3',
+      score: 0.8,
+    });
+  });
+
   it('rejects a judge from the producer family before judging', async () => {
     const pair = {
       cheap: stage('anthropic/claude-sonnet-5', 0.99),
@@ -99,6 +122,13 @@ describe('runVisualReview', () => {
 
     expect(review).toMatchObject({ status: 'reviewed', verdict: 'fail' });
     expect(pair.cheap.run).not.toHaveBeenCalled();
+    const receipt = buildVisualGateReceipts({
+      candidateDigest: DIGEST,
+      captures,
+      review,
+      producerModel: PRODUCER,
+    }).find(r => r.gateId === 'visual-review');
+    expect(receipt?.findings).toHaveLength(1);
     expect(admit(review)).toEqual(['failed-taste-gate']);
   });
 
