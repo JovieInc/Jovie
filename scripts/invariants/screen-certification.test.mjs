@@ -23,6 +23,7 @@ import {
   evaluateScreenProof,
   PROTECTED_REVENUE_SCREEN_SOURCES,
   RETAINED_SWEEP_WORKFLOWS,
+  resolveDiffBase,
   routeArtifactRequests,
   runScreenCertification,
   runScreenCertificationFromArtifact,
@@ -2618,6 +2619,66 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.equal(result.ok, false);
     assert.equal(result.receipt.certified, false);
     assert.match(result.receipt.issues.join('\n'), /missing exact-head proof/);
+  });
+
+  it('audits the landed head commit when the implicit base is the checkout tip (JOV-7293)', () => {
+    // workflow_dispatch/push runs on main have no PR base or event.before;
+    // the implicit origin/main fallback resolves to HEAD itself and used to
+    // fail closed. ci-fast's changedFiles() convention for non-PR events is
+    // HEAD^1, so the gate follows it.
+    const repo = mkdtempSync(join(tmpdir(), 'screen-cert-diff-base-'));
+    const runGit = args =>
+      spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+    const savedEnv = {
+      SCREEN_CERT_DIFF_BASE: process.env.SCREEN_CERT_DIFF_BASE,
+      COMPONENT_SHIP_DIFF_BASE: process.env.COMPONENT_SHIP_DIFF_BASE,
+      TURBO_SCM_BASE: process.env.TURBO_SCM_BASE,
+    };
+    try {
+      delete process.env.SCREEN_CERT_DIFF_BASE;
+      delete process.env.COMPONENT_SHIP_DIFF_BASE;
+      delete process.env.TURBO_SCM_BASE;
+      assert.equal(runGit(['init', '--initial-branch=main']).status, 0);
+      assert.equal(
+        runGit(['config', 'user.email', 'ci-contract@jov.ie']).status,
+        0
+      );
+      assert.equal(runGit(['config', 'user.name', 'CI Contract']).status, 0);
+      writeFileSync(join(repo, 'a.txt'), 'a\n');
+      assert.equal(runGit(['add', '.']).status, 0);
+      assert.equal(runGit(['commit', '-m', 'base']).status, 0);
+      const baseSha = runGit(['rev-parse', 'HEAD']).stdout.trim();
+      writeFileSync(join(repo, 'b.txt'), 'b\n');
+      assert.equal(runGit(['add', '.']).status, 0);
+      assert.equal(runGit(['commit', '-m', 'tip']).status, 0);
+
+      // Base tip checkout: origin/main == HEAD must not self-diff.
+      assert.equal(
+        runGit(['update-ref', 'refs/remotes/origin/main', 'HEAD']).status,
+        0
+      );
+      assert.equal(resolveDiffBase(undefined, repo), 'HEAD^1');
+
+      // A real ancestor base still resolves to origin/main.
+      assert.equal(
+        runGit(['update-ref', 'refs/remotes/origin/main', baseSha]).status,
+        0
+      );
+      assert.equal(resolveDiffBase(undefined, repo), 'origin/main');
+
+      // No base ref fails closed as before.
+      assert.equal(
+        runGit(['update-ref', '-d', 'refs/remotes/origin/main']).status,
+        0
+      );
+      assert.equal(resolveDiffBase(undefined, repo), null);
+    } finally {
+      for (const [key, value] of Object.entries(savedEnv)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 
   it('rejects self or missing diff bases in registration-only mode', () => {
