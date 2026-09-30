@@ -197,8 +197,15 @@ describe('product-truth claims', () => {
   });
 
   it('no metric claims exist without evidence', () => {
-    expect(EVIDENCED_CLAIMS).toEqual([]);
-    expect(claims.filter(claim => claim.kind === 'metric')).toEqual([]);
+    const metrics = claims.filter(
+      claim => claim.kind === 'metric' || claim.kind === 'comparison'
+    );
+    expect(metrics.length).toBe(EVIDENCED_CLAIMS.length);
+    for (const claim of metrics) {
+      expect(claim.citation, claim.id).toBeTruthy();
+      expect(claim.validUntil, claim.id).toBeTruthy();
+      expect(['external-cited', 'measured'], claim.id).toContain(claim.source);
+    }
   });
 
   it('a metric claim without a measured or cited source fails', () => {

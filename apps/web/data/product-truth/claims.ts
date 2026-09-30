@@ -141,10 +141,22 @@ function deriveFeatureClaims(): Claim[] {
 }
 
 /**
- * Hand-authored metric and comparison claims. Empty until a measured or
- * externally cited number is approved: never invent metrics.
+ * Hand-authored metric and comparison claims. Each entry needs a measured
+ * or externally cited source, a citation, and a validUntil date:
+ * never invent metrics.
  */
-export const EVIDENCED_CLAIMS: readonly Claim[] = [];
+export const EVIDENCED_CLAIMS: readonly Claim[] = [
+  {
+    id: 'about.founder.live-shows',
+    capabilityId: 'artist-profiles',
+    statement: 'played more than 500 shows',
+    kind: 'metric',
+    source: 'external-cited',
+    citation:
+      'Linear JOV-7164 founder-history canon comment (Tim White, 2026-09-30)',
+    validUntil: '2027-09-30',
+  },
+];
 
 let cachedClaims: readonly Claim[] | null = null;
 
