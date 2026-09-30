@@ -8,7 +8,10 @@ const { getState, updateState, lock, ensureReady } = vi.hoisted(() => ({
   ensureReady: vi.fn(),
 }));
 
-vi.mock('@/lib/workspace-lock/workspace-lock', () => ({
+vi.mock('@/lib/workspace-lock/workspace-lock', async () => ({
+  ...(await vi.importActual<
+    typeof import('@/lib/workspace-lock/workspace-lock')
+  >('@/lib/workspace-lock/workspace-lock')),
   getWorkspacePrivacyLockState: getState,
   updateWorkspacePrivacyLock: updateState,
   lockWorkspace: lock,

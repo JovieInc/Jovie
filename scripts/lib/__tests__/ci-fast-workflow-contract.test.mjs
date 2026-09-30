@@ -518,6 +518,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/app/app/(shell)/DashboardShellPrivacyBoundary.tsx',
       'apps/web/app/app/(shell)/DashboardShellPrivacyBoundary.test.tsx',
       'apps/web/lib/workspace-lock/workspace-lock.ts',
+      'apps/web/components/organisms/user-button/OviePrivacyLockControl.tsx',
+      'apps/web/components/organisms/user-button/OviePrivacyLockControl.test.tsx',
       'apps/web/.storybook/main.ts',
       'apps/web/tests/unit/storybook/dashboard-layout-client-mock.test.tsx',
       'apps/web/.storybook/stories/ovie-privacy-boundary.stories.tsx',

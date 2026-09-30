@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useLayoutEffect } from 'react';
 import { DashboardShellPrivacyBoundary } from '@/app/app/(shell)/DashboardShellPrivacyBoundary';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { OviePrivacyLockControl } from '@/components/organisms/user-button/OviePrivacyLockControl';
 import { DEFAULT_DASHBOARD_DATA } from '../dashboard-fixtures';
 import { createSignedInApiMock } from '../signed-in-session';
 
@@ -35,6 +36,10 @@ function RecoveryFixture() {
     new Date(Date.now() + 3_600_000).toISOString();
   sessionStorage.setItem(DEADLINE_KEY, deadline);
   const mode = sessionStorage.getItem(MODE_KEY) ?? 'unlocked';
+  const enabled =
+    mode !== 'disabled' &&
+    mode !== 'enable-locked' &&
+    mode !== 'enable-unlocked';
   useLayoutEffect(() => {
     const target = window as FixtureWindow;
     const previous = target.__jovieApiMock;
@@ -51,12 +56,38 @@ function RecoveryFixture() {
         'ovie-privacy-fixture-calls',
         JSON.stringify([...calls, method])
       );
+      if (method === 'POST') {
+        const action = (
+          JSON.parse(String(request.init?.body ?? '{}')) as {
+            action?: string;
+          }
+        ).action;
+        if (
+          action === 'enable' &&
+          (current === 'enable-locked' || current === 'enable-unlocked')
+        ) {
+          const next =
+            current === 'enable-locked'
+              ? 'locked-after-enable'
+              : 'unlocked-after-enable';
+          sessionStorage.setItem(MODE_KEY, next);
+          return Response.json({
+            enabled: true,
+            locked: next === 'locked-after-enable',
+            unlockedUntil: next === 'unlocked-after-enable' ? deadline : null,
+          });
+        }
+        throw new Error('The recovery fixture rejects this privacy mutation');
+      }
       if (method !== 'GET')
-        throw new Error('The recovery fixture forbids privacy mutations');
+        throw new Error('The recovery fixture does not support this method');
       if (current === 'offline')
         throw new TypeError('Fixture transport unavailable');
-      const enabled = current !== 'disabled';
-      const locked = current === 'locked';
+      const enabled =
+        current !== 'disabled' &&
+        current !== 'enable-locked' &&
+        current !== 'enable-unlocked';
+      const locked = current === 'locked' || current === 'locked-after-enable';
       return Response.json({
         enabled,
         locked,
@@ -72,9 +103,13 @@ function RecoveryFixture() {
       mode='ov'
       userId={fixtureUserId}
       dashboardData={{ ...DEFAULT_DASHBOARD_DATA, isAdmin: true }}
-      initiallyLocked={mode === 'locked'}
-      privacyEnabled={mode !== 'disabled'}
-      lockedUntil={mode === 'locked' || mode === 'disabled' ? null : deadline}
+      initiallyLocked={mode === 'locked' || mode === 'locked-after-enable'}
+      privacyEnabled={enabled}
+      lockedUntil={
+        !enabled || mode === 'locked' || mode === 'locked-after-enable'
+          ? null
+          : deadline
+      }
       sidebarDefaultOpen
       previewPanelDefaultOpen={false}
       persistSidebarCollapsed={async () => {}}
@@ -84,7 +119,14 @@ function RecoveryFixture() {
         </span>
       }
     >
-      <PrivatePayload />
+      <>
+        <PrivatePayload />
+        {mode === 'enable-locked' || mode === 'enable-unlocked' ? (
+          <OviePrivacyLockControl
+            ensurePrivacyLockCanBeEnabled={async () => {}}
+          />
+        ) : null}
+      </>
     </DashboardShellPrivacyBoundary>
   );
 }

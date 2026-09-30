@@ -8,6 +8,8 @@ import {
 
 const STORY =
   '/iframe.html?id=guardrails-ovie-privacy-boundary--recovery&viewMode=story';
+const LOCK_TRANSITION_KEY = 'ovie-privacy-lock-transition';
+const LOCK_TRANSITION_ENDED_KEY = 'ovie-privacy-lock-transition-ended';
 const VIEWPORTS = [
   { name: 'desktop', width: 1280, height: 800 },
   { name: 'compact', width: 390, height: 844 },
@@ -77,7 +79,7 @@ for (const viewport of VIEWPORTS)
       await expect(reconnecting).toBeVisible();
       await redacted(page);
       await expect(
-        page.getByRole('button', { name: 'Unlock to continue' })
+        page.getByRole('button', { name: 'Unlock with passkey' })
       ).toHaveCount(0);
       const retry = page.getByRole('button', { name: 'Retry', exact: true });
       const retryBox = await fit(page, retry);
@@ -197,7 +199,10 @@ for (const viewport of VIEWPORTS)
         page.getByRole('button', { name: 'Retry', exact: true })
       ).toHaveCount(0);
       await redacted(page);
-      await fit(page, page.getByRole('button', { name: 'Unlock to continue' }));
+      await fit(
+        page,
+        page.getByRole('button', { name: 'Unlock with passkey' })
+      );
       await screenshot(page, info, 'confirmed-locked');
       expect(
         await page.evaluate(() =>
@@ -208,3 +213,145 @@ for (const viewport of VIEWPORTS)
       ).toEqual(['GET', 'GET', 'GET', 'GET', 'GET']);
     });
   }
+
+for (const scenario of ['enable-locked', 'enable-unlocked'] as const) {
+  test(`real settings enable flow preserves the confirmed Ovie boundary (${scenario})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(VIEWPORTS[0]);
+    await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'light' });
+    await page.addInitScript(
+      ({ key, value }) => {
+        if (!sessionStorage.getItem(key)) sessionStorage.setItem(key, value);
+      },
+      { key: 'ovie-privacy-fixture-mode', value: scenario }
+    );
+    await page.goto(STORY, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('private-payload')).toBeVisible();
+    await expect(page.getByTestId('private-chrome')).toHaveCount(1);
+    await expect(
+      page.getByRole('button', { name: 'Enable Ovie privacy lock' })
+    ).toBeVisible();
+    const originalDeadline = await page.evaluate(() =>
+      sessionStorage.getItem('ovie-privacy-fixture-deadline')
+    );
+    const oldTimeOrigin = await page.evaluate(() => performance.timeOrigin);
+
+    await page.evaluate(
+      ({ transitionKey, endedKey }) => {
+        sessionStorage.removeItem(transitionKey);
+        sessionStorage.removeItem(endedKey);
+        const sample = (phase: string) => {
+          const previous = JSON.parse(
+            sessionStorage.getItem(transitionKey) ?? '[]'
+          ) as Array<{ phase: string; privateCount: number }>;
+          sessionStorage.setItem(
+            transitionKey,
+            JSON.stringify([
+              ...previous,
+              {
+                phase,
+                privateCount: document.querySelectorAll(
+                  '[data-testid="private-payload"], [data-testid="private-chrome"]'
+                ).length,
+              },
+            ])
+          );
+        };
+        sample('initial');
+        window.addEventListener(
+          'ovie:privacy-lock-confirmed',
+          () => sample('confirmed'),
+          { once: true }
+        );
+        const observer = new MutationObserver(() => sample('mutation'));
+        observer.observe(document.body, {
+          childList: true,
+          subtree: true,
+          characterData: true,
+        });
+        window.addEventListener(
+          'pagehide',
+          () => {
+            sample('pagehide');
+            sessionStorage.setItem(endedKey, 'pagehide');
+            observer.disconnect();
+          },
+          { once: true }
+        );
+      },
+      {
+        transitionKey: LOCK_TRANSITION_KEY,
+        endedKey: LOCK_TRANSITION_ENDED_KEY,
+      }
+    );
+
+    const navigation = page.waitForEvent(
+      'framenavigated',
+      frame => frame === page.mainFrame()
+    );
+    await page
+      .getByRole('button', { name: 'Enable Ovie privacy lock' })
+      .click();
+    await navigation;
+
+    const oldDocument = await page.evaluate(
+      key =>
+        JSON.parse(sessionStorage.getItem(key) ?? '[]') as Array<{
+          phase: string;
+          privateCount: number;
+        }>,
+      LOCK_TRANSITION_KEY
+    );
+    expect(
+      await page.evaluate(
+        key => sessionStorage.getItem(key),
+        LOCK_TRANSITION_ENDED_KEY
+      )
+    ).toBe('pagehide');
+    expect(oldDocument[0]).toEqual({ phase: 'initial', privateCount: 2 });
+    expect(oldDocument.some(sample => sample.phase === 'confirmed')).toBe(
+      scenario === 'enable-locked'
+    );
+    if (scenario === 'enable-locked') {
+      const confirmedIndex = oldDocument.findIndex(
+        sample => sample.phase === 'confirmed'
+      );
+      const redactedIndex = oldDocument.findIndex(
+        (sample, index) => index > confirmedIndex && sample.privateCount === 0
+      );
+      const pagehideIndex = oldDocument.findIndex(
+        sample => sample.phase === 'pagehide'
+      );
+      expect(confirmedIndex).toBeGreaterThan(0);
+      expect(redactedIndex).toBeGreaterThan(confirmedIndex);
+      expect(redactedIndex).toBeLessThan(pagehideIndex);
+      expect(
+        oldDocument
+          .slice(redactedIndex)
+          .every(sample => sample.privateCount === 0)
+      ).toBe(true);
+      await expect(page.locator('[data-workspace-lock="true"]')).toBeVisible();
+      await expect(page.getByTestId('private-payload')).toHaveCount(0);
+      await expect(page.getByTestId('private-chrome')).toHaveCount(0);
+    } else {
+      expect(oldDocument.every(sample => sample.privateCount === 2)).toBe(true);
+      await expect(page.getByTestId('private-payload')).toBeVisible();
+      await expect(page.getByTestId('private-chrome')).toHaveCount(1);
+      await expect(page.locator('[data-workspace-lock="true"]')).toHaveCount(0);
+      expect(
+        await page.evaluate(() =>
+          sessionStorage.getItem('ovie-privacy-fixture-deadline')
+        )
+      ).toBe(originalDeadline);
+    }
+    expect(await page.evaluate(() => performance.timeOrigin)).not.toBe(
+      oldTimeOrigin
+    );
+    expect(
+      await page.evaluate(() =>
+        JSON.parse(sessionStorage.getItem('ovie-privacy-fixture-calls') ?? '[]')
+      )
+    ).toEqual(['GET', 'POST']);
+  });
+}

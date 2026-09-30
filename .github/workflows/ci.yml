@@ -1848,7 +1848,7 @@ jobs:
           # Overlay primitives, their layer tokens, and the
           # collision harness re-prove stacking, focus, and viewport fit.
           OVERLAY_STORYBOOK_PATTERN='^(packages/ui/atoms/(dialog|alert-dialog|sheet|popover|dropdown-menu|context-menu|select|tooltip)\.tsx|packages/ui/lib/(overlay-styles|overlay-focus|dropdown-styles|utils)\.ts|apps/web/styles/tailwind-foundation\.css|apps/web/\.storybook/stories/overlay-collisions\.stories\.tsx|apps/web/tests/e2e/storybook-overlay-collisions\.spec\.ts)$'
-          PRIVACY_STORYBOOK_PATTERN='^apps/web/(app/app/\(shell\)/DashboardShellPrivacyBoundary(\.test)?\.tsx|lib/workspace-lock/workspace-lock\.ts|components/features/workspace-lock/WorkspaceLockScreen\.tsx|\.storybook/main\.ts|tests/unit/storybook/dashboard-layout-client-mock\.test\.tsx|\.storybook/stories/ovie-privacy-boundary\.stories\.tsx|tests/e2e/storybook-ovie-privacy-boundary\.spec\.ts)$'
+          PRIVACY_STORYBOOK_PATTERN='^apps/web/(app/app/\(shell\)/DashboardShellPrivacyBoundary(\.test)?\.tsx|lib/workspace-lock/workspace-lock\.ts|components/features/workspace-lock/WorkspaceLockScreen\.tsx|components/organisms/user-button/OviePrivacyLockControl(\.test)?\.tsx|\.storybook/main\.ts|tests/unit/storybook/dashboard-layout-client-mock\.test\.tsx|\.storybook/stories/ovie-privacy-boundary\.stories\.tsx|tests/e2e/storybook-ovie-privacy-boundary\.spec\.ts)$'
           changed_files="$RUNNER_TEMP/storybook-changed-files.txt"
           git diff --name-only "origin/${{ github.base_ref }}" HEAD > "$changed_files"
           if grep -qE "$SPOTIFY_STORYBOOK_PATTERN" "$changed_files"; then

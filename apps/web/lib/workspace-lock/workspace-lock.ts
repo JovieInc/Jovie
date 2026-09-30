@@ -180,6 +180,17 @@ export async function updateWorkspacePrivacyLock(
   });
 }
 
+/** Notify mounted Ovie boundaries only after the server confirms a lock. */
+export function confirmWorkspacePrivacyLock(state: WorkspacePrivacyLockState) {
+  if (!state.enabled || !state.locked || typeof window === 'undefined') return;
+  window.dispatchEvent(
+    new CustomEvent<WorkspacePrivacyLockState>(
+      WORKSPACE_PRIVACY_LOCK_CONFIRMED_EVENT,
+      { detail: state }
+    )
+  );
+}
+
 /** Lock Ovie through its server-owned privacy state and re-render on confirmation. */
 export async function lockWorkspace() {
   const state = await updateWorkspacePrivacyLock('lock');
@@ -188,14 +199,7 @@ export async function lockWorkspace() {
       'Ovie did not confirm the privacy lock. Try again.'
     );
   }
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(
-      new CustomEvent<WorkspacePrivacyLockState>(
-        WORKSPACE_PRIVACY_LOCK_CONFIRMED_EVENT,
-        { detail: state }
-      )
-    );
-  }
+  confirmWorkspacePrivacyLock(state);
   clearWorkspaceLock();
   globalThis.location?.reload();
 }

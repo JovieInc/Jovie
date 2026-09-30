@@ -1,13 +1,24 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { privacyState } = vi.hoisted(() => ({ privacyState: vi.fn() }));
+const { privacyState, updatePrivacyState, lockWorkspaceMock, ensureReady } =
+  vi.hoisted(() => ({
+    privacyState: vi.fn(),
+    updatePrivacyState: vi.fn(),
+    lockWorkspaceMock: vi.fn(),
+    ensureReady: vi.fn(),
+  }));
 vi.mock('@/lib/workspace-lock/workspace-lock', async () => ({
   ...(await vi.importActual<
     typeof import('@/lib/workspace-lock/workspace-lock')
   >('@/lib/workspace-lock/workspace-lock')),
   getWorkspacePrivacyLockState: privacyState,
+  updateWorkspacePrivacyLock: updatePrivacyState,
+  lockWorkspace: lockWorkspaceMock,
   WORKSPACE_PRIVACY_LOCK_CONFIRMED_EVENT: 'ovie:privacy-lock-confirmed',
+}));
+vi.mock('@/lib/workspace-lock/unlock-with-passkey', () => ({
+  ensurePrivacyLockCanBeEnabled: ensureReady,
 }));
 vi.mock('@/components/organisms/AuthShellWrapper', () => ({
   AuthShellWrapper: ({
@@ -38,6 +49,7 @@ vi.mock('@/features/workspace-lock/WorkspaceLockScreen', () => ({
   WorkspaceLockScreen: () => <div>Unlock Ovie</div>,
 }));
 
+import { OviePrivacyLockControl } from '@/components/organisms/user-button/OviePrivacyLockControl';
 import { WorkspacePrivacyLockError } from '@/lib/workspace-lock/workspace-lock';
 import { DashboardShellPrivacyBoundary } from './DashboardShellPrivacyBoundary';
 import type { DashboardData } from './dashboard/actions/dashboard-data';
@@ -78,11 +90,13 @@ function renderBoundary({
   initiallyLocked = false,
   privacyEnabled = mode === 'ov',
   lockedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  children = <div>Private page content</div>,
 }: {
   mode?: 'ov' | 'customer';
   initiallyLocked?: boolean;
   privacyEnabled?: boolean;
   lockedUntil?: string | null;
+  children?: React.ReactNode;
 } = {}) {
   return render(
     <DashboardShellPrivacyBoundary
@@ -97,7 +111,7 @@ function renderBoundary({
       persistSidebarCollapsed={async () => {}}
       unlockedShellChrome={<div>Private shell chrome</div>}
     >
-      <div>Private page content</div>
+      {children}
     </DashboardShellPrivacyBoundary>
   );
 }
@@ -106,6 +120,9 @@ describe('DashboardShellPrivacyBoundary', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     privacyState.mockReset();
+    updatePrivacyState.mockReset();
+    lockWorkspaceMock.mockReset();
+    ensureReady.mockReset();
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -122,6 +139,103 @@ describe('DashboardShellPrivacyBoundary', () => {
     expect(
       document.querySelector('[data-profile-count="0"][data-selected="false"]')
     ).toBeTruthy();
+  });
+
+  it('redacts mounted shell content before reloading after confirmed enable-lock', async () => {
+    let contentVisibleAtReload = false;
+    let chromeVisibleAtReload = false;
+    const reload = vi.fn(() => {
+      contentVisibleAtReload =
+        screen.queryByText('Private page content') !== null;
+      chromeVisibleAtReload =
+        screen.queryByText('Private shell chrome') !== null;
+    });
+    vi.stubGlobal('location', { reload });
+    privacyState.mockResolvedValue({
+      enabled: false,
+      locked: false,
+      unlockedUntil: null,
+    });
+    updatePrivacyState.mockResolvedValue({
+      enabled: true,
+      locked: true,
+      unlockedUntil: null,
+    });
+    ensureReady.mockResolvedValue(undefined);
+
+    renderBoundary({
+      privacyEnabled: false,
+      lockedUntil: null,
+      children: (
+        <>
+          <div>Private page content</div>
+          <OviePrivacyLockControl ensurePrivacyLockCanBeEnabled={ensureReady} />
+        </>
+      ),
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Enable Ovie privacy lock' })
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText('Unlock Ovie')).toBeInTheDocument();
+    expect(screen.queryByText('Private page content')).not.toBeInTheDocument();
+    expect(screen.queryByText('Private shell chrome')).not.toBeInTheDocument();
+    expect(contentVisibleAtReload).toBe(false);
+    expect(chromeVisibleAtReload).toBe(false);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
+  it('retains private data for idempotent enable with a confirmed valid receipt', async () => {
+    const reload = vi.fn();
+    vi.stubGlobal('location', { reload });
+    const unlockedUntil = new Date(Date.now() + 60_000).toISOString();
+    privacyState.mockResolvedValue({
+      enabled: false,
+      locked: false,
+      unlockedUntil: null,
+    });
+    updatePrivacyState.mockResolvedValue({
+      enabled: true,
+      locked: false,
+      unlockedUntil,
+    });
+    ensureReady.mockResolvedValue(undefined);
+
+    renderBoundary({
+      privacyEnabled: false,
+      lockedUntil: null,
+      children: (
+        <>
+          <div>Private page content</div>
+          <OviePrivacyLockControl ensurePrivacyLockCanBeEnabled={ensureReady} />
+        </>
+      ),
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Enable Ovie privacy lock' })
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(
+      screen.getByText('On · unlocked for up to 24 hours')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Private page content')).toBeInTheDocument();
+    expect(screen.getByText('Private shell chrome')).toBeInTheDocument();
+    expect(reload).toHaveBeenCalledOnce();
   });
 
   it('keeps default-off Ovie available after failed revalidation despite expired legacy policy', async () => {

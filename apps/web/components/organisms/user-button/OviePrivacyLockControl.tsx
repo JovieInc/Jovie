@@ -3,6 +3,7 @@
 import { Button } from '@jovie/ui';
 import { useEffect, useState } from 'react';
 import {
+  confirmWorkspacePrivacyLock,
   getWorkspacePrivacyLockState,
   lockWorkspace,
   updateWorkspacePrivacyLock,
@@ -94,6 +95,7 @@ export function OviePrivacyLockControl({
           );
         }
         setState(enabled);
+        confirmWorkspacePrivacyLock(enabled);
         globalThis.location?.reload();
         return;
       }
