@@ -589,6 +589,58 @@ jobs:
             incident controller_completed_without_marker
           fi
 
+          # Production starts only after exact staging completion. A live
+          # staging FIFO generation is evidence of delivery, not a dropped CI event.
+          staging_workflow="$(gh api "repos/$REPOSITORY/actions/workflows/staging-controller.yml")"
+          jq -e '.id > 0 and .name == "Staging Controller" and
+            .path == ".github/workflows/staging-controller.yml" and .state == "active"' \
+            >/dev/null <<<"$staging_workflow" || incident invalid_staging_workflow
+          staging_workflow_id="$(jq -r '.id' <<<"$staging_workflow")"
+          staging_runs="$(gh api "repos/$REPOSITORY/actions/workflows/staging-controller.yml/runs?branch=main&event=workflow_run&head_sha=$current_sha&per_page=100")"
+          jq -e 'type == "object" and (.workflow_runs | type == "array") and
+            (.total_count | type == "number") and .total_count == (.workflow_runs | length)' \
+            >/dev/null <<<"$staging_runs" || incident incomplete_staging_listing
+          staging_title="$current_sha from CI $source_ci_id attempt $source_ci_attempt"
+          staging_matches="$(jq -c --arg title "$staging_title" --arg sha "$current_sha" \
+            --arg repo "$REPOSITORY" --argjson workflow "$staging_workflow_id" '
+            [.workflow_runs[] | select(.display_title == $title and .workflow_id == $workflow and
+              .path == ".github/workflows/staging-controller.yml" and .head_sha == $sha and
+              .head_branch == "main" and .head_repository.full_name == $repo and
+              .event == "workflow_run")] | unique_by(.id)' <<<"$staging_runs")"
+          staging_count="$(jq 'length' <<<"$staging_matches")"
+          [ "$staging_count" -le 1 ] || incident duplicate_staging_generation
+          if [ "$staging_count" = 1 ]; then
+            staging_id="$(jq -r '.[0].id' <<<"$staging_matches")"
+            [[ "$staging_id" =~ ^[1-9][0-9]*$ ]] || incident malformed_staging_generation
+            live_staging="$(gh api "repos/$REPOSITORY/actions/runs/$staging_id")"
+            jq -e --argjson id "$staging_id" --arg title "$staging_title" \
+              --arg sha "$current_sha" --arg repo "$REPOSITORY" --argjson workflow "$staging_workflow_id" '
+              .id == $id and .display_title == $title and .workflow_id == $workflow and
+              .path == ".github/workflows/staging-controller.yml" and .head_sha == $sha and
+              .head_branch == "main" and .head_repository.full_name == $repo and
+              .event == "workflow_run" and (.run_attempt | type == "number" and . > 0) and
+              (.updated_at | type == "string" and length > 0)' \
+              >/dev/null <<<"$live_staging" || incident changed_staging_run
+            staging_status="$(jq -r '.status' <<<"$live_staging")"
+            case "$staging_status" in
+              queued|in_progress|pending|requested|waiting)
+                echo "recovery_reason=staging_pending" >> "$GITHUB_OUTPUT"
+                echo "Exact staging generation $staging_id remains $staging_status; production awaits completion."
+                exit 0
+                ;;
+              completed)
+                [ "$(jq -r '.conclusion' <<<"$live_staging")" = success ] || incident staging_failed
+                staging_epoch="$(date -u -d "$(jq -r '.updated_at' <<<"$live_staging")" +%s)"
+                if [ "$(($(date +%s) - staging_epoch))" -lt 900 ]; then
+                  echo "recovery_reason=staging_completion_delivery_grace" >> "$GITHUB_OUTPUT"
+                  exit 0
+                fi
+                incident staging_completed_without_controller
+                ;;
+              *) incident malformed_staging_status ;;
+            esac
+          fi
+
           source_epoch="$(date -u -d "$source_ci_updated" +%s)"
           age_seconds=$(($(date +%s) - source_epoch))
           if [ "$age_seconds" -lt 900 ]; then

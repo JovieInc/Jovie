@@ -95,6 +95,24 @@ function fixture() {
     },
     [`repos/${repository}/actions/runs/${ciId}/attempts/2`]: ci,
   };
+  const producerJobs = {
+    total_count: 1,
+    jobs: [
+      {
+        id: 700,
+        run_id: stageId,
+        run_attempt: 1,
+        head_sha: sha,
+        head_branch: 'main',
+        name: 'staging-release / Preserve exact staging deployment receipt',
+        status: 'completed',
+        conclusion: 'success',
+      },
+    ],
+  };
+  routes[
+    `repos/${repository}/actions/runs/${stageId}/attempts/1/jobs?per_page=100`
+  ] = producerJobs;
   const reads = [];
   const input = {
     repository,
@@ -123,6 +141,7 @@ function fixture() {
     deployment,
     artifacts,
     reads,
+    producerJobs,
   };
 }
 
@@ -134,12 +153,90 @@ test('completed staging authorizes the original exact CI attempt after the measu
   assert.equal(result.ci.id, ciId);
   assert.equal(result.ci.run_attempt, 2);
   assert.equal(result.stagingArtifactId, '102');
-  assert.equal(f.reads.length, 4);
+  assert.equal(f.reads.length, 6);
   assert.ok(
     f.reads.every(
       route => !route.includes('/runs?') && !route.endsWith(`/runs/${ciId}`)
     )
   );
+});
+
+test('failed-only completion rerun authenticates the retained successful deployment producer attempt', () => {
+  const f = fixture();
+  f.trigger.run_attempt = 2;
+  f.completion.controllerRunAttempt = '2';
+  f.artifacts[0].name = 'staging-completion-2';
+  f.routes[`repos/${repository}/actions/runs/${stageId}/attempts/2`] =
+    structuredClone(f.trigger);
+  f.routes[
+    `repos/${repository}/actions/runs/${stageId}/attempts/1`
+  ].conclusion = 'failure';
+  assert.equal(resolveStagingReleaseSource(f.input).stagingArtifactId, '102');
+  for (const mutate of [
+    x => {
+      x.deployment.controllerRunAttempt = '3';
+    },
+    x => {
+      x.routes[
+        `repos/${repository}/actions/runs/${stageId}/attempts/1`
+      ].head_sha = 'a'.repeat(40);
+    },
+    x => {
+      x.routes[
+        `repos/${repository}/actions/runs/${stageId}/attempts/1`
+      ].status = 'in_progress';
+    },
+    x => {
+      x.producerJobs.jobs = null;
+    },
+    x => {
+      delete x.routes[`repos/${repository}/actions/runs/${stageId}/attempts/1`]
+        .repository;
+    },
+    x => {
+      x.producerJobs.jobs[0].status = 'queued';
+    },
+    x => {
+      x.producerJobs.jobs[0].id = 0;
+    },
+    x => {
+      x.producerJobs.jobs[0].run_id++;
+    },
+    x => {
+      x.producerJobs.jobs[0].head_branch = 'feature';
+    },
+    x => {
+      x.producerJobs.jobs.push({
+        ...x.producerJobs.jobs[0],
+        id: 701,
+        conclusion: 'failure',
+      });
+      x.producerJobs.total_count = 2;
+    },
+    x => {
+      x.producerJobs.total_count = 2;
+    },
+    x => {
+      x.producerJobs.jobs[0].run_attempt = 2;
+    },
+    x => {
+      x.producerJobs.jobs[0].head_sha = 'a'.repeat(40);
+    },
+    x => {
+      x.producerJobs.jobs[0].name = 'other receipt';
+    },
+    x => {
+      x.producerJobs.jobs[0].conclusion = 'failure';
+    },
+    x => {
+      x.producerJobs.jobs.push({ ...x.producerJobs.jobs[0], id: 701 });
+      x.producerJobs.total_count = 2;
+    },
+  ]) {
+    const invalid = fixture();
+    mutate(invalid);
+    assert.throws(() => resolveStagingReleaseSource(invalid.input));
+  }
 });
 
 test('non-Web not-applicable completion still reaches cumulative production range planning; superseded does not', () => {
@@ -407,4 +504,157 @@ test('actual terminal staging publisher handles non-Web, both supersession bound
       assert.equal(receipt.controllerRunId, String(stageId));
     }
   }
+});
+
+function healthRun(
+  stageStatus,
+  {
+    ciAttempt = 1,
+    stageTitleAttempt = ciAttempt,
+    age = 1400,
+    malformed = false,
+    conclusion,
+    liveMismatch = false,
+  } = {}
+) {
+  const root = mkdtempSync(join(tmpdir(), 'staging-health-test-'));
+  roots.push(root);
+  const f = fixture();
+  const title = `${sha} from CI ${ciId} attempt ${stageTitleAttempt}`;
+  const stage = {
+    ...f.trigger,
+    display_title: title,
+    status: stageStatus,
+    conclusion: conclusion ?? (stageStatus === 'completed' ? 'success' : null),
+    updated_at: '2026-09-30T19:55:00Z',
+  };
+  const routes = {
+    [`repos/${repository}/actions/workflows/production-controller.yml/runs?branch=main&event=workflow_run&head_sha=${sha}&per_page=100`]:
+      { total_count: 0, workflow_runs: [] },
+    [`repos/${repository}/actions/workflows/staging-controller.yml`]: {
+      id: 31,
+      name: 'Staging Controller',
+      path: stage.path,
+      state: 'active',
+    },
+    [`repos/${repository}/actions/workflows/staging-controller.yml/runs?branch=main&event=workflow_run&head_sha=${sha}&per_page=100`]:
+      {
+        total_count: malformed ? 2 : stageStatus ? 1 : 0,
+        workflow_runs: stageStatus ? [stage] : [],
+      },
+    [`repos/${repository}/actions/runs/${stageId}`]: liveMismatch
+      ? { ...stage, display_title: 'foreign source attempt' }
+      : stage,
+    [`repos/${repository}/actions/runs/${ciId}/attempts/1`]: {
+      ...f.ci,
+      run_attempt: 1,
+    },
+    [`repos/${repository}/commits/main`]: { sha },
+  };
+  const data = join(root, 'routes.json'),
+    calls = join(root, 'calls'),
+    output = join(root, 'output');
+  writeFileSync(data, JSON.stringify(routes));
+  writeFileSync(
+    join(root, 'gh'),
+    `#!/usr/bin/env node\nconst fs=require('node:fs');const a=process.argv.slice(2);fs.appendFileSync(${JSON.stringify(calls)}, JSON.stringify(a)+'\\n');if(a[0]==='run')process.exit(0);const r=JSON.parse(fs.readFileSync(${JSON.stringify(data)},'utf8'))[a[1]];if(!r)process.exit(9);process.stdout.write(a.includes('--jq')?r.sha:JSON.stringify(r));\n`
+  );
+  chmodSync(join(root, 'gh'), 0o755);
+  writeFileSync(
+    join(root, 'date'),
+    `#!/bin/bash\nif [ "$1" = +%s ]; then echo ${1790799500 + age}; elif [ "$1" = -u ]; then echo 1790799500; else exit 9; fi\n`
+  );
+  chmodSync(join(root, 'date'), 0o755);
+  const workflow = readFileSync(
+    new URL('../workflows/production-controller-health.yml', import.meta.url),
+    'utf8'
+  );
+  const script = workflow
+    .slice(
+      workflow.indexOf('          replay_source_ci_once() {'),
+      workflow.indexOf('\n      - name: Open one manual-recovery incident')
+    )
+    .split('\n')
+    .map(l => l.slice(10))
+    .join('\n');
+  const result = spawnSync(
+    'bash',
+    [
+      '-c',
+      `set -euo pipefail\nincident() { echo "recovery_reason=$1" >> "$GITHUB_OUTPUT"; exit 0; }\n${script}`,
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${root}${delimiter}${process.env.PATH}`,
+        REPOSITORY: repository,
+        current_sha: sha,
+        source_ci_id: String(ciId),
+        source_ci_attempt: String(ciAttempt),
+        source_ci_updated: '2026-09-30T19:55:00Z',
+        ci_workflow_id: '30',
+        controller_workflow_id: '32',
+        GITHUB_OUTPUT: output,
+      },
+    }
+  );
+  assert.equal(result.status, 0, result.stderr);
+  return {
+    stdout: result.stdout,
+    output: readFileSync(output, 'utf8'),
+    calls: readFileSync(calls, 'utf8'),
+  };
+}
+
+test('actual health shell recognizes exact live staging FIFO over 15 minutes before CI replay', () => {
+  for (const status of [
+    'queued',
+    'in_progress',
+    'pending',
+    'requested',
+    'waiting',
+  ]) {
+    const f = healthRun(status, { ciAttempt: 2 });
+    assert.match(f.output, /staging_pending/);
+    assert.doesNotMatch(f.calls, /"run","rerun"/);
+  }
+});
+
+test('actual health shell preserves absent, mismatched, terminal and exhausted recovery decisions', () => {
+  for (const args of [
+    [null, {}],
+    ['queued', { stageTitleAttempt: 2 }],
+  ]) {
+    const f = healthRun(...args);
+    assert.match(f.output, /ci_event_replayed/);
+    assert.match(f.calls, /"run","rerun"/);
+  }
+  const exhausted = healthRun(null, { ciAttempt: 2 });
+  assert.match(exhausted.output, /ci_event_replay_exhausted/);
+  assert.doesNotMatch(exhausted.calls, /"run","rerun"/);
+  assert.match(
+    healthRun('completed').output,
+    /staging_completed_without_controller/
+  );
+  assert.match(
+    healthRun('queued', { malformed: true }).output,
+    /incomplete_staging_listing/
+  );
+});
+
+test('actual health shell fails closed on failed or changed staging and grants only completion delivery grace', () => {
+  assert.match(
+    healthRun('completed', { conclusion: 'failure' }).output,
+    /staging_failed/
+  );
+  assert.match(
+    healthRun('queued', { liveMismatch: true }).output,
+    /changed_staging_run/
+  );
+  assert.match(
+    healthRun('completed', { age: 600 }).output,
+    /staging_completion_delivery_grace/
+  );
+  assert.match(healthRun('queued', { ciAttempt: 1 }).output, /staging_pending/);
 });

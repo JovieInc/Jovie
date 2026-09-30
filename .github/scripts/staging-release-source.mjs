@@ -137,7 +137,8 @@ export function resolveStagingReleaseSource({
         receipt.sourceCiRunId === completion.sourceCiRunId &&
         receipt.sourceCiRunAttempt === completion.sourceCiRunAttempt &&
         receipt.controllerRunId === completion.controllerRunId &&
-        receipt.controllerRunAttempt === completion.controllerRunAttempt &&
+        ID.test(receipt.controllerRunAttempt) &&
+        Number(receipt.controllerRunAttempt) <= trigger.run_attempt &&
         /^dpl_[A-Za-z0-9]+$/.test(receipt.deploymentId) &&
         receipt.alias === 'staging.jov.ie' &&
         receipt.environment === 'preview' &&
@@ -145,6 +146,57 @@ export function resolveStagingReleaseSource({
         receipt.routeSmoke === 'passed' &&
         receipt.privacy === 'robots-block-all-and-http-noindex',
       'staging deployment binding mismatch'
+    );
+    // A failed-only publisher rerun retains successful deployment jobs from
+    // an earlier attempt. Authenticate that producer rather than rebinding it
+    // to the completion publisher's newer attempt.
+    const producer = api(
+      `repos/${repository}/actions/runs/${trigger.id}/attempts/${receipt.controllerRunAttempt}`
+    );
+    requireEvidence(
+      producer?.id === stage.id &&
+        String(producer.run_attempt) === receipt.controllerRunAttempt &&
+        producer.workflow_id === stage.workflow_id &&
+        producer.path === STAGING_PATH &&
+        producer.event === 'workflow_run' &&
+        producer.head_branch === 'main' &&
+        producer.head_sha === stage.head_sha &&
+        producer.repository?.id === stage.repository.id &&
+        producer.repository.full_name === repository &&
+        producer.head_repository?.id === stage.head_repository.id &&
+        producer.head_repository.full_name === repository &&
+        producer.status === 'completed' &&
+        ['success', 'failure', 'cancelled', 'timed_out'].includes(
+          producer.conclusion
+        ),
+      'staging deployment producer attempt mismatch'
+    );
+    const jobs = api(
+      `repos/${repository}/actions/runs/${trigger.id}/attempts/${receipt.controllerRunAttempt}/jobs?per_page=100`
+    );
+    requireEvidence(
+      Array.isArray(jobs?.jobs) &&
+        jobs.total_count === jobs.jobs.length &&
+        jobs.jobs.every(
+          job =>
+            ID.test(String(job.id)) &&
+            job.run_id === producer.id &&
+            job.run_attempt === producer.run_attempt &&
+            job.head_sha === producer.head_sha &&
+            job.head_branch === 'main'
+        ),
+      'staging deployment producer job listing mismatch'
+    );
+    const receiptJobs = jobs.jobs.filter(
+      job =>
+        job.name ===
+        'staging-release / Preserve exact staging deployment receipt'
+    );
+    requireEvidence(
+      receiptJobs.length === 1 &&
+        receiptJobs[0].status === 'completed' &&
+        receiptJobs[0].conclusion === 'success',
+      'staging deployment producer job mismatch'
     );
     stagingArtifactId = String(artifact.id);
   }
