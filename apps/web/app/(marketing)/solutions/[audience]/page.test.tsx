@@ -11,7 +11,10 @@ import {
 } from '@/content/pages/solutions';
 import { solutionsArtistsPage } from '@/content/pages/solutions/artists';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
-import { definePage } from '@/data/marketing/factory/pageRecord';
+import {
+  definePage,
+  type PageRecord,
+} from '@/data/marketing/factory/pageRecord';
 import { getMarketingSection } from '@/data/marketing/sections';
 import SolutionsAudiencePage, {
   dynamicParams,
@@ -23,6 +26,7 @@ import {
   assertRenderableSolutionsRecord,
   SOLUTIONS_SECTION_RENDERERS,
   SolutionsRecordBody,
+  SolutionsRecordJsonLd,
 } from './sections';
 
 const notFoundMock = vi.hoisted(() =>
@@ -80,6 +84,25 @@ describe('/solutions/[audience] family renderer (JOV-7275)', () => {
     const schema = JSON.parse(script?.textContent ?? '{}');
     expect(schema['@type']).toBe('SoftwareApplication');
     expect(schema.description).toBe(ARTIST_PROFILE_COPY.seo.description);
+  });
+
+  it('emits FAQPage JSON-LD only when the record declares seo.faq', async () => {
+    const withFaq = definePage({
+      ...solutionsArtistsPage,
+      seo: {
+        ...solutionsArtistsPage.seo,
+        faq: [{ question: 'Is it free?', answer: 'Yes, profiles are free.' }],
+      },
+    });
+    const schemaTypes = (record: PageRecord) => {
+      const { container } = render(<SolutionsRecordJsonLd record={record} />);
+      return Array.from(
+        container.querySelectorAll('script[type="application/ld+json"]')
+      ).map(node => JSON.parse(node.textContent ?? '{}')['@type']);
+    };
+
+    expect(schemaTypes(solutionsArtistsPage)).toEqual(['SoftwareApplication']);
+    expect(schemaTypes(withFaq)).toEqual(['SoftwareApplication', 'FAQPage']);
   });
 
   it('keeps the migrated canonical, Open Graph, and Twitter metadata', async () => {
