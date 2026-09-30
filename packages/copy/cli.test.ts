@@ -1,5 +1,9 @@
+import { execFileSync, spawnSync } from 'node:child_process';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { extractCopy, registerFor } from './cli';
+
+const REPO_ROOT = resolve(import.meta.dirname, '../..');
 
 describe('PR delta gate extraction', () => {
   it('maps only customer-facing paths', () => {
@@ -23,5 +27,29 @@ describe('PR delta gate extraction', () => {
     expect(extractCopy(`<p>Out now everywhere</p>`, 'x.tsx')).toContain(
       'Out now everywhere'
     );
+  });
+
+  it('keeps the full customer-facing copy surface clean', () => {
+    const files = execFileSync(
+      'git',
+      [
+        'ls-files',
+        'apps/web/content/**',
+        'apps/web/data/*Copy.ts',
+        'apps/web/lib/email/templates/**',
+      ],
+      { cwd: REPO_ROOT, encoding: 'utf8' }
+    )
+      .trim()
+      .split('\n')
+      .filter(path => path && !path.endsWith('.json'));
+
+    const result = spawnSync('pnpm', ['copy:check', ...files], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+
+    expect(`${result.stdout}${result.stderr}`).toContain('copy-gate: clean');
+    expect(result.status).toBe(0);
   });
 });

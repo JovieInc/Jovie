@@ -176,7 +176,7 @@ function BenefitsSection() {
             <div>
               <p className='marketing-kicker'>Why it matters</p>
               {/* ui-casing-allow: marketing display headline */}
-              <h2 className='marketing-h2-linear mt-6 max-w-[11ch] text-primary-token'>
+              <h2 className='marketing-h2-linear mt-6 max-w-[11ch] text-primary-token xl:leading-tight'>
                 Payments are just the beginning.
               </h2>
             </div>

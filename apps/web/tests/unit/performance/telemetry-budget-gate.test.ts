@@ -1,8 +1,15 @@
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   evaluateTelemetryBudgets,
@@ -162,13 +169,28 @@ describe('compare-chunks CLI gate (JOV-6585)', () => {
     const root = repoRoot();
     const script = join(root, 'apps/web/scripts/compare-chunks.ts');
     expect(existsSync(script)).toBe(true);
-    const result = spawnSync('node', ['--experimental-strip-types', script], {
-      cwd: join(root, 'apps/web'),
-      encoding: 'utf8',
-      env: { ...process.env, NODE_OPTIONS: '' },
-    });
-    const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
-    expect(result.status).toBe(1);
-    expect(output).toContain('No build output found');
+    // Run a copy from an isolated dir: the script resolves .next relative to
+    // its own location, and a real build output in apps/web/.next (e.g. a lane
+    // that built earlier) would let compare() run instead of failing closed.
+    const isolated = mkdtempSync(join(tmpdir(), 'jov-6585-cli-'));
+    const isolatedScript = join(isolated, 'scripts', 'compare-chunks.ts');
+    try {
+      mkdirSync(dirname(isolatedScript), { recursive: true });
+      writeFileSync(isolatedScript, readFileSync(script, 'utf-8'));
+      const result = spawnSync(
+        'node',
+        ['--experimental-strip-types', isolatedScript],
+        {
+          cwd: isolated,
+          encoding: 'utf8',
+          env: { ...process.env, NODE_OPTIONS: '' },
+        }
+      );
+      const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+      expect(result.status).toBe(1);
+      expect(output).toContain('No build output found');
+    } finally {
+      rmSync(isolated, { recursive: true, force: true });
+    }
   }, 60_000);
 });

@@ -82,12 +82,12 @@ struct MobileActionLoopResponseTests {
       "pendingReviewCount": 1,
       "upcomingEvents": [
         {
-          "id": "event-1",
-          "title": "Brooklyn show",
-          "subtitle": "Brooklyn, NY · Bandsintown",
-          "eventDate": "2026-07-10T20:00:00.000Z",
-          "eventType": "tour",
-          "confirmationStatus": "pending"
+          "id": "event-2",
+          "title": "Listening party",
+          "subtitle": "New York, NY · Manual",
+          "eventDate": "2026-07-15T20:00:00.000Z",
+          "eventType": "livestream",
+          "confirmationStatus": "confirmed"
         }
       ],
       "pendingEvents": [
@@ -119,6 +119,10 @@ struct MobileActionLoopResponseTests {
     )
 
     #expect(response.pendingReviewCount == 1)
+    #expect(
+      Set(response.upcomingEvents.map(\.id))
+        .isDisjoint(with: Set(response.pendingEvents.map(\.id)))
+    )
     #expect(response.upcomingReleases.first?.title == "Midnight Drive")
   }
 
@@ -129,10 +133,15 @@ struct MobileActionLoopResponseTests {
     #expect(preview.chatPrompt.isEmpty == false)
   }
 
-  @Test func previewCalendarExposesUpcomingRangeAndCachedEvents() {
+  @Test func previewCalendarPartitionsPendingAndUpcomingEvents() {
     let preview = MobileActionLoopCalendarResponse.preview
     #expect(preview.rangeLabel == "Upcoming")
     #expect(preview.upcomingEvents.isEmpty == false)
+    #expect(preview.pendingEvents.isEmpty == false)
+    #expect(
+      Set(preview.upcomingEvents.map(\.id))
+        .isDisjoint(with: Set(preview.pendingEvents.map(\.id)))
+    )
     #expect(preview.chatPrompt.isEmpty == false)
   }
 }

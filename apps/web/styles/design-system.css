@@ -768,15 +768,17 @@
    static DOM, but out of mobile layout so it cannot add page scroll below the
    compact profile. Desktop keeps the readable AEO section. */
 @media (max-width: 767px) {
-  /* The consent card mounts lazily after geo/cookie checks. Keep it in the
-     safe-area top overlay on phones: the bottom region contains both the
-     profile's primary conversion action and the canonical glass dock. */
+  /* The consent card mounts lazily after geo/cookie checks. On phones it
+     sits at the bottom, directly above the dock stack (and the proof claim
+     bar, which grows --profile-bottom-nav-height), so it never covers the
+     profile identity or the dock (Tim 2026-09-29, JOV-7114). */
   .cookie-banner-card--above-public-profile-dock {
-    top: max(env(safe-area-inset-top), 8px);
-    bottom: auto;
+    top: auto;
+    bottom: var(--profile-bottom-nav-height);
     left: min(50vw, calc(var(--profile-shell-max-width) / 2));
     right: auto !important;
-    width: min(254px, calc(100vw - 136px)) !important;
+    /* Same edges as the claim bar and dock below it. */
+    width: min(358px, calc(100vw - 32px)) !important;
     max-width: none;
     transform: translateX(-50%);
   }

@@ -1,3 +1,4 @@
+// @coverage-via apps/web/components/marketing/artist-profile/ArtistProfileSectionBindings.test.tsx
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { ARTIST_PROFILE_SECTION_TEST_IDS } from '@/data/artistProfilePageOrder';
@@ -25,6 +26,7 @@ export function ArtistProfileHeroAdaptiveIntro({
           ariaLabel='Artist distribution across leading music companies'
           label='Built For Artists And Teams Releasing Through'
           presentation='inline-strip'
+          sectionVariant='inline-strip'
         />
       </div>
 

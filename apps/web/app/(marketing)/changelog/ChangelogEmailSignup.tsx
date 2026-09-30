@@ -54,10 +54,12 @@ export function ChangelogEmailSignup({
   source = 'changelog_page',
   initialEmail = '',
   copy = DEFAULT_COPY,
+  marketingSection = false,
 }: {
   readonly source?: string;
   readonly initialEmail?: string;
   readonly copy?: ChangelogEmailSignupCopy;
+  readonly marketingSection?: boolean;
 }) {
   const formId = useId();
   const statusRef = useRef<HTMLDivElement>(null);
@@ -204,6 +206,16 @@ export function ChangelogEmailSignup({
   return (
     <section
       id={source === 'changelog_page' ? 'changelog-subscribe' : undefined}
+      data-testid={marketingSection ? 'marketing-section-capture' : undefined}
+      data-marketing-owner={
+        marketingSection
+          ? 'apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx'
+          : undefined
+      }
+      data-marketing-variant={marketingSection ? 'email-only' : undefined}
+      data-marketing-occurrence={
+        marketingSection ? 'product-updates' : undefined
+      }
       aria-labelledby={`${formId}-heading`}
       data-pen-source='qKrDn'
       data-visual-state={status}
