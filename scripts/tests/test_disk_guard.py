@@ -150,7 +150,7 @@ class CheckTest(unittest.TestCase):
             self.assertEqual((report["low"], report["critical"], report["actions"]), (False, False, []))
             self.assertEqual(json.loads((Path(tmp) / "disk-pressure.json").read_text())["freePct"], 60.0)
 
-    def test_low_disk_runs_every_sweep_and_reports_pressure(self):
+    def test_low_disk_preserves_shared_store_while_sweeping_host_tools(self):
         saved = (guard.free_pct, guard.shutil.which)
         guard.free_pct = lambda path: 10.0
         guard.shutil.which = lambda name: "/bin/" + name if name in ("xcrun", "pnpm") else None
@@ -169,8 +169,9 @@ class CheckTest(unittest.TestCase):
             self.assertTrue(report["low"])
             self.assertFalse(report["critical"])
             self.assertIn("xcrun", ran)
-            self.assertIn("pnpm", ran)
-            self.assertEqual(cwds["pnpm"], Path.home())
+            self.assertNotIn("pnpm", ran, "an active shared store must never be pruned")
+            self.assertEqual(cwds["xcrun"], Path.home())
+            self.assertIn("preserved shared pnpm store", report["actions"])
 
     def _porcelain_empty(self):
         return SimpleNamespace(returncode=0, stdout="worktree /repo\nHEAD x\nbranch refs/heads/main\n", stderr="")
