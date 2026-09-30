@@ -113,7 +113,7 @@ const items: readonly FounderReviewItem[] = [
 function RightPanelSlot() {
   const panel = useRightPanel();
   return (
-    <aside className='w-[380px] shrink-0 border-l border-(--app-shell-border)'>
+    <aside className='w-95 shrink-0 border-l border-(--app-shell-border)'>
       {panel}
     </aside>
   );

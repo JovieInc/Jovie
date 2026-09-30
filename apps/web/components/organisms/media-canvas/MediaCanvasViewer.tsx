@@ -77,7 +77,7 @@ export function MediaCanvasViewer({
       data-testid='media-canvas-viewer'
       onKeyDown={onKeyDown}
       onClose={onClose}
-      className='fixed inset-0 m-0 h-dvh max-h-dvh w-[100dvw] max-w-none border-0 bg-black p-0 text-white dark:bg-black dark:text-white backdrop:bg-black/70'
+      className='fixed inset-0 m-0 h-dvh max-h-dvh w-dvw max-w-none border-0 bg-black p-0 text-white dark:bg-black dark:text-white backdrop:bg-black/70'
     >
       {current ? (
         <div className='flex h-full flex-col'>
