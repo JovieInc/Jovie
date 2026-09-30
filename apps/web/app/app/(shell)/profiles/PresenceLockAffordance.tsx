@@ -3,7 +3,7 @@
 import { Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import { LockKeyhole } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
@@ -17,6 +17,7 @@ export function PresenceLockAffordance({
   className,
 }: PresenceLockAffordanceProps) {
   const [open, setOpen] = useState(false);
+  const pointerActivationRef = useRef(false);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -32,9 +33,22 @@ export function PresenceLockAffordance({
             className
           )}
           onClick={event => event.stopPropagation()}
-          onPointerDown={event => event.stopPropagation()}
+          onPointerDown={event => {
+            pointerActivationRef.current = true;
+            event.stopPropagation();
+          }}
+          onPointerUp={() => {
+            pointerActivationRef.current = false;
+          }}
+          onPointerCancel={() => {
+            pointerActivationRef.current = false;
+          }}
           onKeyDown={event => event.stopPropagation()}
-          onFocus={() => setOpen(true)}
+          onFocus={() => {
+            // Pointer focus precedes click. Let Radix handle that click once;
+            // opening here would make the same click toggle the popover shut.
+            if (!pointerActivationRef.current) setOpen(true);
+          }}
         >
           <LockKeyhole className='h-3.5 w-3.5' aria-hidden />
         </button>

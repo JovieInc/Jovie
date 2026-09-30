@@ -1237,4 +1237,27 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       within(explanation).getByRole('link', { name: 'Upgrade' })
     ).toHaveAttribute('href', '/app/settings/billing');
   });
+
+  it('keeps the monitoring restriction explanation open after a click', async () => {
+    const user = userEvent.setup();
+    renderWorkspace(data);
+
+    const lock = screen.getAllByTestId('presence-lock')[0];
+    expect(lock).toBeDefined();
+    await user.click(lock as HTMLElement);
+
+    expect(lock).toHaveAttribute('aria-expanded', 'true');
+    const explanation = await screen.findByTestId('presence-lock-explanation');
+    expect(explanation).toHaveTextContent(
+      'Upgrade required to monitor this page.'
+    );
+    expect(
+      within(explanation).getByRole('link', { name: 'Upgrade' })
+    ).toHaveAttribute('href', '/app/settings/billing');
+
+    await user.keyboard('{Escape}');
+    expect(
+      screen.queryByTestId('presence-lock-explanation')
+    ).not.toBeInTheDocument();
+  });
 });
