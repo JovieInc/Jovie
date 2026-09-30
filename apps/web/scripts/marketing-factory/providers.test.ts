@@ -6,6 +6,7 @@ import {
   fixtureTransport,
   liveProviders,
 } from './providers';
+import { fixtureCaptures } from './render-measurer';
 
 const brief = loadFactoryBrief('solutions', 'founders');
 const request = {
@@ -30,6 +31,7 @@ describe('dryProviders', () => {
       status: 'ok',
       cls: 0,
       lcpMs: 1200,
+      captures: fixtureCaptures('/x', { cls: 0, lcpMs: 1200 }),
     });
     expect(dry.label('openai/gpt-5.5')).toBe('fixture:openai/gpt-5.5');
     expect(dry.now().toISOString()).toBe('2026-09-30T00:00:00.000Z');

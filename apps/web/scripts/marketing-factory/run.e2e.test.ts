@@ -15,6 +15,7 @@ import {
   verifyFactoryRun,
   writeJson,
 } from './receipts';
+import { fixtureCaptures } from './render-measurer';
 import { runFactory } from './run';
 
 const PAGE_ID = 'solutions-founders';
@@ -207,17 +208,72 @@ describe('page stage gates', () => {
   it('fails render when CLS or LCP is over budget', async () => {
     const manifest = await run({
       providers: dryProviders(brief, {
-        measureRender: async () => ({ status: 'ok', cls: 0.2, lcpMs: 3100 }),
+        measureRender: async route => ({
+          status: 'ok',
+          cls: 0.2,
+          lcpMs: 3100,
+          captures: fixtureCaptures(route, { cls: 0.2, lcpMs: 3100 }),
+        }),
       }),
     });
 
     expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'render' });
     expect(record('12-render.attempt-1.json').receipt.invariantsFailed).toEqual(
-      ['render-cls', 'render-lcp']
+      [
+        'render-cls:mobile',
+        'render-lcp:mobile',
+        'render-cls:desktop',
+        'render-lcp:desktop',
+      ]
     );
   });
 
-  it('stops live runs at render until a render measurer is wired', async () => {
+  it('blocks trust when no visual-review receipt can be produced', async () => {
+    const manifest = await run({
+      providers: dryProviders(brief, {
+        reviewVisual: async () => ({
+          status: 'credentials-unavailable',
+          reason: 'no cross-family vision judge is reachable from this machine',
+        }),
+      }),
+    });
+
+    expect(manifest).toMatchObject({
+      status: 'credentials-unavailable',
+      stoppedAt: 'adversarial-trust',
+    });
+    expect(
+      record('14-adversarial-trust.attempt-1.json').notes.tasteReceipts
+    ).toMatchObject([{ gateId: 'responsive-accessibility', verdict: 'pass' }]);
+  });
+
+  it('fails trust when the visual reviewer shares the producer family', async () => {
+    const manifest = await run({
+      providers: dryProviders(brief, {
+        reviewVisual: async () => ({
+          status: 'reviewed',
+          judgeModel: 'fixture:anthropic/claude-sonnet-5',
+          verdict: 'pass',
+          score: 1,
+          findings: [],
+          judges: [],
+        }),
+      }),
+    });
+
+    expect(manifest).toMatchObject({
+      status: 'failed',
+      stoppedAt: 'adversarial-trust',
+    });
+    expect(
+      record('14-adversarial-trust.attempt-1.json').receipt.invariantsFailed
+    ).toContain('visual-taste-admission');
+    expect(
+      record('14-adversarial-trust.attempt-2.json').feedbackIn.join(' ')
+    ).toMatch(/same-family-judge/);
+  });
+
+  it('stops live runs at render when no production build is served', async () => {
     const live = liveProviders(fixtureTransport(), {
       generate: dryProviders(brief).generate,
     });

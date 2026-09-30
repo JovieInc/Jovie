@@ -5,12 +5,27 @@
  * `credentials-unavailable` instead of faking an answer.
  */
 
+import { join } from 'node:path';
 import { type CopyTier, type JudgeTransport, selectJudges } from '@jovie/copy';
+import { pickRoleModel, visionAvailability } from '../design-ci-judge-dispatch';
 import type {
   ImageGenerationOutcome,
   ImageGenerationRequest,
 } from '../marketing-media/image-adapter';
 import type { FactoryPageBrief } from './brief';
+import { FACTORY_RUNS_DIR } from './receipts';
+import {
+  fixtureCaptures,
+  liveRenderMeasurer,
+  type RenderCapture,
+  renderOptionsFromEnv,
+} from './render-measurer';
+import {
+  liveVisualJudges,
+  runVisualReview,
+  type VisualReviewOutcome,
+  type VisualReviewRequest,
+} from './visual-review';
 
 export type GeneratedStage = 'outcomes' | 'narrative' | 'copy';
 
@@ -33,8 +48,10 @@ export type Generated = { readonly status: 'ok'; readonly value: unknown };
 
 export type RenderMeasurement = {
   readonly status: 'ok';
+  /** Worst case across viewports. */
   readonly cls: number;
   readonly lcpMs: number;
+  readonly captures: readonly RenderCapture[];
 };
 
 export interface FactoryProviders {
@@ -42,7 +59,12 @@ export interface FactoryProviders {
   /** Judge (and live generation) transport; null when nothing is reachable. */
   readonly transport: JudgeTransport | null;
   generate(request: GenerateRequest): Promise<Generated | Unavailable>;
-  measureRender(route: string): Promise<RenderMeasurement | Unavailable>;
+  measureRender(
+    route: string,
+    at?: { readonly outDir?: string }
+  ): Promise<RenderMeasurement | Unavailable>;
+  /** Cross-family vision review of the render stage's screenshots. */
+  reviewVisual(request: VisualReviewRequest): Promise<VisualReviewOutcome>;
   generateAsset(
     request: ImageGenerationRequest
   ): Promise<ImageGenerationOutcome>;
@@ -101,14 +123,35 @@ export function dryProviders(
       }
       return { status: 'ok', value: dry[request.stage] };
     },
-    async measureRender() {
+    async measureRender(route) {
       if (!dry) {
         return {
           status: 'credentials-unavailable',
           reason: 'brief has no dry render fixture',
         };
       }
-      return { status: 'ok', ...dry.render };
+      return {
+        status: 'ok',
+        ...dry.render,
+        captures: fixtureCaptures(route, dry.render),
+      };
+    },
+    async reviewVisual(request) {
+      const judgeModel = fixtureVisionJudge(request.producerModel);
+      if (!judgeModel) {
+        return {
+          status: 'credentials-unavailable',
+          reason: 'no fixture vision judge outside the producer family',
+        };
+      }
+      return {
+        status: 'reviewed',
+        judgeModel: `fixture:${judgeModel}`,
+        verdict: 'pass',
+        score: 0.9,
+        findings: [],
+        judges: [],
+      };
     },
     async generateAsset(request) {
       return {
@@ -135,10 +178,23 @@ function parseJsonReply(raw: string): unknown {
   return JSON.parse(raw.slice(start, end + 1));
 }
 
+const WEB_APP_DIR = join(import.meta.dirname, '../..');
+const FACTORY_RENDER_OUT_DIR = join(FACTORY_RUNS_DIR, 'render');
+
+/** First vision judge outside the producer family, for dry runs. */
+function fixtureVisionJudge(producerModel: string): string | null {
+  return pickRoleModel('vision-judge', {
+    available: visionAvailability(() => true),
+    modality: 'vision',
+    excludeFamilyOf: producerModel.replace(/^fixture:/u, ''),
+  });
+}
+
 /**
  * Live wiring: subscription CLIs for anthropic/openai, the AI Gateway for
- * allowlisted families. Render measurement and image generation are not
- * wired in this issue, so they report credentials-unavailable.
+ * allowlisted families. Render measurement needs a served production build
+ * (render-measurer.ts); image generation is not wired, so it reports
+ * credentials-unavailable.
  */
 export function liveProviders(
   transport: JudgeTransport | null,
@@ -161,11 +217,14 @@ export function liveProviders(
       });
       return { status: 'ok', value: parseJsonReply(raw) };
     },
-    async measureRender(route) {
-      return {
-        status: 'credentials-unavailable',
-        reason: `no render measurer for ${route}; screen-cert CLS/LCP capture is not wired yet`,
-      };
+    measureRender: liveRenderMeasurer(
+      renderOptionsFromEnv(process.env, FACTORY_RENDER_OUT_DIR, WEB_APP_DIR)
+    ),
+    async reviewVisual(request) {
+      return runVisualReview(
+        request,
+        await liveVisualJudges(transport, request.producerModel)
+      );
     },
     async generateAsset() {
       return {
