@@ -311,6 +311,67 @@ describe('release.prepare_launch', () => {
     });
   });
 
+  it('accepts partial manual metadata supplementing an identified release', async () => {
+    mocks.resolve.mockResolvedValueOnce({
+      status: 'resolved',
+      facts: [
+        { ...completeFacts, source: 'release_url', artwork_url: null },
+        {
+          source: 'release_metadata',
+          content_type: null,
+          title: null,
+          artist_name: null,
+          release_date: null,
+          upc: null,
+          artwork_url: completeFacts.artwork_url,
+          dsp_links: {},
+          artists: [],
+        },
+      ],
+    });
+    expect(await prepareReleaseLaunch(input)).toMatchObject({
+      status: 'launch_draft_ready',
+      conflicts: [],
+      release: { artwork_url: completeFacts.artwork_url },
+    });
+  });
+
+  it('treats artwork identity query parameters as conflicting facts', async () => {
+    mocks.resolve.mockResolvedValueOnce({
+      status: 'resolved',
+      facts: ['releaseA', 'releaseB'].map(id => ({
+        ...completeFacts,
+        artwork_url: `https://images.example/cover?id=${id}`,
+      })),
+    });
+    expect(await prepareReleaseLaunch(input)).toMatchObject({
+      status: 'draft_needs_input',
+      release: { artwork_url: null },
+      conflicts: [{ field: 'artwork_url' }],
+    });
+  });
+
+  it('keeps hash-routed release identities distinct', async () => {
+    mocks.resolve.mockResolvedValueOnce({
+      status: 'resolved',
+      facts: ['123', '456'].map(id => ({
+        ...completeFacts,
+        dsp_links: {
+          netease: `https://music.163.com/#/song?id=${id}`,
+          line_music: `https://music.line.me/webapp/#/track/${id}`,
+        },
+      })),
+    });
+    const result = await prepareReleaseLaunch(input);
+    expect(result).toMatchObject({ status: 'draft_needs_input' });
+    if (result.status === 'error') throw new Error('Expected a draft');
+    expect(result.conflicts.map(conflict => conflict.field)).toEqual(
+      expect.arrayContaining(['dsp_links.netease', 'dsp_links.line_music'])
+    );
+    expect(result.release.dsp_links.netease).toBeUndefined();
+    expect(result.release.dsp_links.line_music).toBeUndefined();
+  });
+
   it('rejects wrong, substring and non-Latin artist identities and accepts credited collaborators', async () => {
     const withArtists = (
       artists: ReadonlyArray<{ name: string; ids: Record<string, string> }>
@@ -321,6 +382,7 @@ describe('release.prepare_launch', () => {
     };
 
     // Substring collision: "Ann" is contained in "Joanne" but is not her.
+    row.preview.display_name = 'Ann';
     mocks.resolve.mockResolvedValueOnce({
       status: 'resolved',
       facts: [withArtists([{ name: 'Joanne', ids: {} }])],
@@ -331,6 +393,7 @@ describe('release.prepare_launch', () => {
     });
 
     // Non-Latin credited artist still mismatches the draft artist.
+    row.preview.display_name = 'The Artist';
     resetLaunch();
     mocks.resolve.mockResolvedValueOnce({
       status: 'resolved',

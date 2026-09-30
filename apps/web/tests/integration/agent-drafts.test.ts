@@ -1,7 +1,15 @@
 import { eq, inArray } from 'drizzle-orm';
 /* eslint-disable no-restricted-imports -- Integration proof uses the real migrated database. */
 import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { mintDraftCapability } from '@/lib/agent-acquisition/draft-capability';
 import {
   createAgentDraft,
@@ -38,12 +46,17 @@ const artist = {
   bio: null,
   genres: [],
 };
+const acquisition = {
+  agent_source: 'integration',
+  client: 'integration-runner',
+  installation_id: 'draft-installation',
+  referral_token: 'draft-referral',
+  session_or_run_id: 'draft-concurrency',
+  intent: 'release_launch',
+  first_touch: { source: 'agent' },
+};
 const grant = () => {
-  const value = mintDraftCapability(artistId, {
-    agent_source: 'integration',
-    session_or_run_id: 'draft-concurrency',
-    first_touch: { source: 'agent' },
-  });
+  const value = mintDraftCapability(artistId, acquisition);
   ids.add(value.capability.draft_id);
   return { ...value, input: { artist_id: artistId, draft_token: value.token } };
 };
@@ -67,7 +80,7 @@ afterEach(async () => {
       .where(inArray(agentVisibilityDrafts.id, [...ids]));
   ids.clear();
   mocks.resolve.mockClear();
-  mocks.release.mockClear();
+  mocks.release.mockReset();
 });
 describe('agent drafts real persistence and access isolation', () => {
   it('racing retries persist one stable draft and independent capabilities stay isolated', async () => {
@@ -173,8 +186,27 @@ const launchFacts = {
   artists: [{ name: artist.display_name, ids: { spotify: artistId.slice(8) } }],
 } as const;
 
+function signal() {
+  let resolve!: () => void;
+  const promise = new Promise<void>(done => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+// All callers must finish loading the same version before any provider returns.
+function raceProvider(participants: number) {
+  const ready = signal();
+  let arrived = 0;
+  mocks.release.mockImplementation(async () => {
+    if (++arrived === participants) ready.resolve();
+    await ready.promise;
+    return { status: 'resolved', facts: [launchFacts] };
+  });
+}
+
 describe('agent release launch real persistence', () => {
-  beforeAll(() => {
+  beforeEach(() => {
     mocks.release.mockImplementation(async () => ({
       status: 'resolved',
       facts: [launchFacts],
@@ -194,7 +226,8 @@ describe('agent release launch real persistence', () => {
         artist_name: artist.display_name,
       },
     };
-    const [first, second] = await Promise.all([
+    raceProvider(3);
+    const [first, second, third] = await Promise.all([
       prepareReleaseLaunch(input),
       prepareReleaseLaunch(input),
       prepareReleaseLaunch(input),
@@ -206,14 +239,16 @@ describe('agent release launch real persistence', () => {
       published_url: null,
     });
     expect(second).toEqual(first);
-    // Racing identical inputs resolve once and store one launch.
-    expect(mocks.release).toHaveBeenCalledTimes(1);
+    expect(third).toEqual(first);
+    // Resolution may run concurrently; CAS must persist one stable result.
+    expect(mocks.release).toHaveBeenCalledTimes(3);
     const replay = await prepareReleaseLaunch(input);
     expect(replay).toEqual(first);
-    expect(mocks.release).toHaveBeenCalledTimes(1);
+    expect(mocks.release).toHaveBeenCalledTimes(3);
     const presented = await readAgentDraft(g.capability.draft_id, g.token);
     expect(presented).toMatchObject({
-      launch: { status: 'launch_draft_ready' },
+      launch: { status: 'launch_draft_ready', acquisition },
+      acquisition,
     });
     expect(JSON.stringify(presented)).not.toContain('inputFingerprint');
     const [stored] = await db
@@ -224,6 +259,7 @@ describe('agent release launch real persistence', () => {
       status: 'launch_draft_ready',
     });
     expect(stored?.preview.launch?.inputFingerprint).toBeTruthy();
+    expect(stored?.acquisition).toEqual(acquisition);
   });
   it('keeps concurrent different inputs compare-and-set with a retryable loser', async () => {
     const g = grant();
@@ -238,6 +274,7 @@ describe('agent release launch real persistence', () => {
         artist_name: artist.display_name,
       },
     };
+    raceProvider(2);
     const [a, b] = await Promise.all([
       prepareReleaseLaunch({ ...base, goal: 'goal A' }),
       prepareReleaseLaunch({ ...base, goal: 'goal B' }),
@@ -250,6 +287,8 @@ describe('agent release launch real persistence', () => {
     // Exactly one of the racing writes owns the stored launch.
     expect(winner).toBeDefined();
     expect(loser).toMatchObject({ retryable: true });
+    const persisted = await readAgentDraft(g.capability.draft_id, g.token);
+    expect(persisted).toMatchObject({ launch: winner, acquisition });
     const retried = await prepareReleaseLaunch({
       ...base,
       goal: loser === a ? 'goal A' : 'goal B',
@@ -266,7 +305,7 @@ describe('agent release launch real persistence', () => {
       status: 'launch_draft_ready',
     });
   });
-  it('denies expired and claimed capabilities before and during launch writes', async () => {
+  it('denies expired and claimed capabilities before provider resolution', async () => {
     for (const change of [
       { expiresAt: new Date(0) },
       { claimedAt: new Date() },
@@ -297,6 +336,49 @@ describe('agent release launch real persistence', () => {
         .where(eq(agentVisibilityDrafts.id, g.capability.draft_id));
       expect(stored?.preview.launch).toBeUndefined();
       expect(mocks.release).not.toHaveBeenCalled();
+    }
+  });
+  it('rejects capability revocation while provider resolution is in flight', async () => {
+    for (const change of [
+      { expiresAt: new Date(0) },
+      { claimedAt: new Date() },
+      { capabilityHash: 'revoked-during-provider-call' },
+      { artistId: 'apple_music:657515' },
+    ]) {
+      const g = grant();
+      expect(await createAgentDraft(g.input)).toMatchObject({
+        status: 'draft_ready',
+      });
+      const started = signal();
+      const finish = signal();
+      mocks.release.mockImplementationOnce(async () => {
+        started.resolve();
+        await finish.promise;
+        return { status: 'resolved', facts: [launchFacts] };
+      });
+      const pending = prepareReleaseLaunch({
+        draft_id: g.capability.draft_id,
+        draft_token: g.token,
+        goal: 'Launch during revocation',
+        release_metadata: { title: launchFacts.title },
+      });
+      await started.promise;
+      try {
+        await db
+          .update(agentVisibilityDrafts)
+          .set(change)
+          .where(eq(agentVisibilityDrafts.id, g.capability.draft_id));
+      } finally {
+        finish.resolve();
+      }
+      expect(await pending).toMatchObject({ code: 'DRAFT_UNAVAILABLE' });
+      const [stored] = await db
+        .select()
+        .from(agentVisibilityDrafts)
+        .where(eq(agentVisibilityDrafts.id, g.capability.draft_id));
+      expect(stored).toMatchObject(change);
+      expect(stored?.preview.launch).toBeUndefined();
+      expect(stored?.acquisition).toEqual(acquisition);
     }
   });
 });

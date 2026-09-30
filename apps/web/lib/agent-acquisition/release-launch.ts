@@ -143,24 +143,27 @@ const TRACKING_PARAMS = new Set([
 /**
  * Canonicalize a link for identity comparison. Identity-bearing parameters
  * (YouTube `v`, Apple `i`, …) are preserved; only tracking parameters and the
- * fragment are stripped, so two different releases never compare equal.
+ * navigation fragments are stripped. Hash-routed DSP identities are retained.
  */
-function comparableUrl(value: string, keepSearch: boolean): string {
+function comparableUrl(value: string, stripTracking: boolean): string {
   const url = new URL(value);
-  url.hash = '';
+  if (
+    !['music.163.com', 'y.music.163.com', 'music.line.me'].includes(
+      url.hostname
+    )
+  ) {
+    url.hash = '';
+  }
   url.hostname = url.hostname.toLowerCase();
-  if (!keepSearch) {
-    url.search = '';
-  } else {
-    const kept = [...url.searchParams.entries()].filter(
-      ([key]) =>
-        !TRACKING_PARAMS.has(key.toLowerCase()) &&
-        !key.toLowerCase().startsWith('utm_')
-    );
-    url.search = '';
-    for (const [key, val] of kept.sort(([a], [b]) => a.localeCompare(b))) {
-      url.searchParams.append(key, val);
-    }
+  const kept = [...url.searchParams.entries()].filter(
+    ([key]) =>
+      !stripTracking ||
+      (!TRACKING_PARAMS.has(key.toLowerCase()) &&
+        !key.toLowerCase().startsWith('utm_'))
+  );
+  url.search = '';
+  for (const [key, val] of kept.sort(([a], [b]) => a.localeCompare(b))) {
+    url.searchParams.append(key, val);
   }
   return url.href.replace(/\/$/, '');
 }
@@ -220,6 +223,16 @@ function artistIdentityConflict(
 ): ReleaseFactConflict | null {
   const draftName = comparable('artist_name', artist.display_name);
   for (const fact of facts) {
+    // Optional manual fields supplement an identified release; omitting an
+    // artist from that supplement is not a contradictory artist assertion.
+    if (
+      fact.source === 'release_metadata' &&
+      !fact.artist_name &&
+      fact.artists.length === 0 &&
+      facts.some(other => other.artists.length > 0)
+    ) {
+      continue;
+    }
     const conflict = (value: string): ReleaseFactConflict => ({
       field: 'artist_identity',
       values: [
