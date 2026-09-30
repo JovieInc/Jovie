@@ -10,7 +10,8 @@ const createRow = (
   name: string,
   isSelected = false,
   actionVisibility?: 'always' | 'contextual',
-  meta?: { align?: 'left' | 'center' | 'right'; className?: string }
+  meta?: { align?: 'left' | 'center' | 'right'; className?: string },
+  cellSize = 150
 ): Row<TestRow> =>
   ({
     id,
@@ -21,7 +22,7 @@ const createRow = (
             {
               id: `${id}-actions`,
               column: {
-                getSize: () => 150,
+                getSize: () => cellSize,
                 columnDef: {
                   meta: { actionVisibility, ...meta },
                   cell: () =>
@@ -70,26 +71,27 @@ describe('VirtualizedTableRow', () => {
   });
 
   it('lays virtualized rows out on the declared column grid', () => {
-    // An absolute <tr> sizes cells by content unless it is its own
-    // fixed-layout table box; without this, columns drift per row.
+    // Virtualized rows stay in normal table flow so their cells share the
+    // table's column widths; non-default column sizes are pinned explicitly
+    // so every row matches the header's grid.
+    const row = createRow('1', 'One', false, undefined, {}, 240);
+
     render(
       <table>
         <tbody>
           <VirtualizedTableRow
             {...baseProps}
+            row={row}
             shouldVirtualize
-            virtualStart={96}
             measureElement={vi.fn()}
           />
         </tbody>
       </table>
     );
 
-    const row = screen.getByRole('row');
-    expect(row.style.position).toBe('absolute');
-    expect(row.style.display).toBe('table');
-    expect(row.style.tableLayout).toBe('fixed');
-    expect(row.style.transform).toBe('translateY(96px)');
+    const tr = screen.getByRole('row');
+    expect(tr.style.position).toBe('');
+    expect(screen.getByRole('cell').style.width).toBe('240px');
   });
 
   it('calls both the forwarded onContextMenu and the internal handler on right-click', () => {
