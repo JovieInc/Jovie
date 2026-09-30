@@ -1,11 +1,15 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Codex
+# necessary-trust-boundary: The existing audit publishes only generated reports through the existing Jovie Bot installation token after coverage; its read-only checkout token cannot trigger normal PR checks. No merge, deploy, or founder-decision authority is added.
+# revisit-trigger: Remove the report publication hop if the canonical coverage baseline becomes artifact-backed and no longer requires committed report files.
 # Test Coverage Audit
 #
 # PURPOSE: Regenerate docs/TEST_COVERAGE_HEATMAP.md when source, tests, or the
 # hand-curated docs/TEST_RISK_REGISTER.md changes.
 #
-# Output: commits an updated heatmap to main only when values change and uploads
-# resulting unit coverage to Codecov.
-# Also commits apps/web/reports/test-coverage-snapshot.json (machine-readable
+# Output: opens a draft report PR when values change and uploads resulting
+# unit coverage to Codecov. Normal CI and the native queue govern publication.
+# Includes apps/web/reports/test-coverage-snapshot.json (machine-readable
 # baseline) so `pnpm run test:coverage:diff` (and local
 # `test:coverage:diff`) can compare to the canonical baseline from main.
 # Failures notify Slack. GitHub Issues are not a backlog destination.
@@ -24,6 +28,7 @@ on:
       - 'packages/**'
       - 'docs/TEST_RISK_REGISTER.md'
       - 'scripts/audit-test-coverage.ts'
+      - 'scripts/lib/publish-coverage-report.mjs'
       - 'sonar-project.properties'
       - '.github/workflows/sonarcloud.yml'
       - '.github/workflows/test-coverage-audit.yml'
@@ -32,7 +37,7 @@ on:
   workflow_dispatch:
     inputs:
       commit:
-        description: 'Commit the regenerated heatmap if it changed'
+        description: 'Open a draft PR for the regenerated heatmap if it changed'
         type: boolean
         default: true
 
@@ -52,14 +57,14 @@ jobs:
     # emitting passing tests. Reserve time for its tail and publication steps.
     timeout-minutes: 90
     permissions:
-      contents: write
+      contents: read
     env:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
 
@@ -92,29 +97,24 @@ jobs:
           fail_ci_if_error: false
           verbose: true
 
-      - name: Commit if changed
+      # Mint after the long coverage run so the installation token is fresh.
+      # App-authored pushes trigger normal PR checks; GITHUB_TOKEN pushes do not.
+      - name: Generate report publication token
         if: ${{ github.event_name == 'push' || inputs.commit }}
+        id: report-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Open coverage report PR
+        if: ${{ github.event_name == 'push' || inputs.commit }}
+        env:
+          GH_TOKEN: ${{ steps.report-token.outputs.token }}
         run: |
-          if git diff --quiet docs/TEST_COVERAGE_HEATMAP.md apps/web/reports/test-coverage-snapshot.json 2>/dev/null; then
-            echo "No heatmap changes."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Pull before push to avoid races with concurrent merges.
-          git pull --rebase --autostash origin main || {
-            echo "Rebase failed — exiting without push."
-            exit 1
-          }
-          git add docs/TEST_COVERAGE_HEATMAP.md apps/web/reports/test-coverage-snapshot.json
-          if git diff --staged --quiet; then
-            echo "Nothing staged after rebase."
-            exit 0
-          fi
-          git commit -m "chore(testing): refresh changed-evidence heatmap" \
-            -m "Generated from the risk register and current V8 coverage." \
-            -m "Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
-          git push
+          node --input-type=module -e "import { publishCoverageReport } from './scripts/lib/publish-coverage-report.mjs'; console.log(publishCoverageReport());"
 
       - name: Slack alert on failure
         if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}

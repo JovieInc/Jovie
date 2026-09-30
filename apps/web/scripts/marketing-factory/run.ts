@@ -30,6 +30,7 @@ import {
   factoryPageId,
   loadFactoryBrief,
 } from './brief';
+import { preflightFactoryRun } from './preflight';
 import {
   dryProviders,
   type FactoryProviders,
@@ -63,6 +64,8 @@ export interface RunFactoryOptions {
   readonly runsDir?: string;
   /** Stage runners; defaults to FACTORY_STAGE_RUNNERS. Missing = incomplete. */
   readonly runners?: Partial<Record<FactoryStage, StageRunner>>;
+  /** Development only: skip the preflight and stop at the first gap instead. */
+  readonly allowPartial?: boolean;
 }
 
 async function runStage(
@@ -181,6 +184,28 @@ export async function runFactory(
     chain: [],
     attempts: [],
   };
+
+  if (!options.allowPartial) {
+    const issues = preflightFactoryRun({
+      brief,
+      providers,
+      runners,
+      fromStage: options.fromStage ?? 'truth',
+    });
+    const [first] = issues;
+    // Refuse before any model call, and leave any earlier run untouched.
+    if (first) {
+      return {
+        ...manifest,
+        status: issues.some(i => i.code === 'credentials-unavailable')
+          ? 'credentials-unavailable'
+          : 'incomplete',
+        stoppedAt: first.stage,
+        reason: `preflight: ${issues.map(i => `${i.stage}: ${i.reason}`).join('; ')}`,
+        preflight: issues,
+      };
+    }
+  }
 
   if (options.fromStage && options.fromStage !== 'truth') {
     const prior = loadPriorChain(runDir, briefDigest, options.fromStage);
@@ -313,12 +338,13 @@ async function main(): Promise<void> {
       slug: { type: 'string' },
       dry: { type: 'boolean', default: false },
       'from-stage': { type: 'string' },
+      'allow-partial': { type: 'boolean', default: false },
     },
   });
   const fromStage = values['from-stage'];
   if (!values.family || !values.slug) {
     throw new Error(
-      'usage: factory:run --family <f> --slug <s> [--dry] [--from-stage <stage>]'
+      'usage: factory:run --family <f> --slug <s> [--dry] [--from-stage <stage>] [--allow-partial]'
     );
   }
   if (fromStage && !(FACTORY_STAGES as readonly string[]).includes(fromStage)) {
@@ -329,12 +355,19 @@ async function main(): Promise<void> {
     slug: values.slug,
     dry: values.dry,
     fromStage: fromStage as FactoryStage | undefined,
+    allowPartial: values['allow-partial'],
   });
   console.log(
     `factory:run ${manifest.pageId} [${manifest.mode}] ${manifest.status}: ${manifest.chain.length}/${FACTORY_STAGES.length} stages passed`
   );
-  if (manifest.reason)
+  if (manifest.preflight) {
+    console.log('  preflight refused the run; no model was called:');
+    for (const issue of manifest.preflight) {
+      console.log(`  - ${issue.stage} [${issue.code}]: ${issue.reason}`);
+    }
+  } else if (manifest.reason) {
     console.log(`  ${manifest.stoppedAt}: ${manifest.reason}`);
+  }
   console.log(`  receipts: ${join(FACTORY_RUNS_DIR, manifest.pageId)}`);
   process.exitCode = EXIT_CODES[manifest.status];
 }

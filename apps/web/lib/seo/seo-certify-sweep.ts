@@ -14,6 +14,11 @@
  * from the baseline so it cannot silently come back.
  */
 import { createHash } from 'node:crypto';
+import { findForbiddenTerms } from '@/data/marketing/factory/pageRecord';
+import {
+  getPageRecordContracts,
+  type PageRecordPageContract,
+} from '@/data/marketing/factory/pageRecordContract';
 import {
   applyStagePassedBit,
   FACTORY_CERTIFIER_HARNESS,
@@ -61,35 +66,85 @@ export interface SeoSweepTarget {
   readonly recipeId: string | undefined;
   readonly inSitemap: boolean;
   readonly family: GeoPageFamily;
+  /** Per-record contract when the path is a routed page record (JOV-7283). */
+  readonly recordContract?: PageRecordPageContract;
+}
+
+function recordFamilyPrefix(url: string): string | null {
+  const match = /^(\/[a-z0-9-]+)\/[a-z0-9-]+$/u.exec(url);
+  return match ? `${match[1]}/*` : null;
 }
 
 /**
- * Active manifest routes that render a page. Wildcards resolve through their
- * health-check fixture path; redirects, not-found fixtures and render fixtures
- * are not pages and are skipped.
+ * Active manifest routes that render a page. A family wildcard with page
+ * records sweeps every routed record path; other wildcards resolve through
+ * their health-check fixture path. Redirects, not-found fixtures and render
+ * fixtures are not pages and are skipped.
  */
 export function sweepTargets(
-  manifest: readonly RouteManifestEntry[] = MARKETING_ROUTE_MANIFEST
+  manifest: readonly RouteManifestEntry[] = MARKETING_ROUTE_MANIFEST,
+  recordContracts: readonly PageRecordPageContract[] = getPageRecordContracts()
 ): SeoSweepTarget[] {
   const targets: SeoSweepTarget[] = [];
   for (const entry of manifest) {
     if (entry.status !== 'active') continue;
     if ((entry.healthCheck?.expected ?? 'page') !== 'page') continue;
-    const pathname = entry.url.includes('*')
-      ? entry.healthCheck?.path
-      : entry.url;
-    if (!pathname || pathname.includes('*')) continue;
-    if (isRenderFixturePathname(pathname)) continue;
-    if (targets.some(target => target.pathname === pathname)) continue;
-    targets.push({
-      pathname,
-      manifestUrl: entry.url,
-      recipeId: entry.recipeId,
-      inSitemap: isSitemapIndexableMarketingRoute(entry),
-      family: geoFamilyFor(pathname, entry.recipeId),
-    });
+    const records = entry.url.includes('*')
+      ? recordContracts.filter(c => recordFamilyPrefix(c.url) === entry.url)
+      : [];
+    const paths: [string | undefined, PageRecordPageContract | undefined][] =
+      records.length > 0
+        ? records.map(contract => [contract.url, contract])
+        : [
+            [
+              entry.url.includes('*') ? entry.healthCheck?.path : entry.url,
+              undefined,
+            ],
+          ];
+    for (const [pathname, recordContract] of paths) {
+      if (!pathname || pathname.includes('*')) continue;
+      if (isRenderFixturePathname(pathname)) continue;
+      if (targets.some(target => target.pathname === pathname)) continue;
+      targets.push({
+        pathname,
+        manifestUrl: entry.url,
+        recipeId: entry.recipeId,
+        inSitemap: isSitemapIndexableMarketingRoute(entry),
+        family: geoFamilyFor(pathname, entry.recipeId),
+        ...(recordContract ? { recordContract } : {}),
+      });
+    }
   }
   return targets;
+}
+
+/**
+ * Per-record copy scope: the rendered title, description and page-owned text
+ * must not use a term the record's brief forbids.
+ */
+export function auditRecordCopyScope(
+  contract: PageRecordPageContract,
+  head: ReturnType<typeof extractSeoHead>
+): SeoCheck {
+  const text = [head.title, head.description, head.visibleText]
+    .filter(Boolean)
+    .join('\n');
+  const found = findForbiddenTerms(text, contract.forbiddenTerms);
+  return found.length === 0
+    ? {
+        dimension: 'copy',
+        id: 'copy-scope',
+        status: 'passed',
+        summary: `${contract.recordId}: ${contract.copyScope} scope holds`,
+      }
+    : {
+        dimension: 'copy',
+        id: 'copy-scope',
+        status: 'failed',
+        summary: `${contract.recordId}: ${contract.copyScope} scope uses ${found.slice(0, 5).join(', ')}`,
+        remediation:
+          'Rewrite the copy for the record audience, or name the term in brief.allowedTerms (docs/marketing/LANGUAGE.md).',
+      };
 }
 
 /** Sibling-link targets: sitemap-published manifest pages (wildcards by prefix). */
@@ -243,7 +298,13 @@ export function certifySweep(input: SeoSweepInput): SeoSweepRouteResult[] {
                 : []),
             ]
           : [];
-      const checks = [...base.checks, ...geoChecks];
+      const checks = [
+        ...base.checks,
+        ...geoChecks,
+        ...(target.recordContract
+          ? [auditRecordCopyScope(target.recordContract, head)]
+          : []),
+      ];
       certification = {
         ...base,
         checks,
