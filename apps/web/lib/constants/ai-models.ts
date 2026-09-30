@@ -9,14 +9,41 @@
  */
 
 /**
- * Founder gateway policy (Tim STRICT 2026-09-17): the Jovie AI Gateway allowlist is
- * zai/glm-5.3 and zai/glm-5.3-flash. Anything else is rejected `forbidden`, which
- * surfaced as empty chat turns (JOV-6533). Keep every runtime model on the allowlist.
+ * Founder gateway policy (Tim STRICT 2026-09-17, extended 2026-09-28): the Jovie
+ * AI Gateway allowlist is zai/glm-5.3 and zai/glm-5.3-flash. Anything else is
+ * rejected `forbidden`, which surfaced as empty chat turns (JOV-6533). Keep
+ * every runtime model on the allowlist.
  */
 export const GATEWAY_ALLOWED_MODELS: readonly string[] = [
   'zai/glm-5.3',
   'zai/glm-5.3-flash',
 ];
+
+/**
+ * Providers banned on the Vercel AI Gateway (Tim directive 2026-09-28,
+ * JOV-7119): per-token API billing for OpenAI or Anthropic is not allowed under
+ * any path. GPT-6-class usage is permitted only on founder-owned subscriptions
+ * (e.g. the Codex lane), never through the gateway. Callers must fail fast —
+ * never silently fall back to another model on these providers.
+ */
+export const GATEWAY_BANNED_PROVIDERS: readonly string[] = [
+  'openai',
+  'anthropic',
+];
+
+export function isGatewayBannedModel(modelId: string): boolean {
+  const provider = modelId.split('/', 1)[0];
+  return GATEWAY_BANNED_PROVIDERS.includes(provider);
+}
+
+/** Throws when a gateway model id uses a banned provider (JOV-7119). */
+export function assertGatewayModelAllowed(modelId: string): void {
+  if (isGatewayBannedModel(modelId)) {
+    throw new Error(
+      `AI Gateway model "${modelId}" uses a banned provider (${GATEWAY_BANNED_PROVIDERS.join('/')}) — OpenAI and Anthropic are not billed through the gateway (JOV-7119).`
+    );
+  }
+}
 
 /** Stable operator-facing name for the founder-owned Gateway model policy. */
 export const GATEWAY_ALLOWLIST_NAME = 'founder-strict-2026-09-17';
@@ -69,8 +96,8 @@ export const TITLE_MODEL = 'zai/glm-5.3-flash';
 /** Model used for YouTube packaging intelligence extraction */
 export const PACKAGING_INTELLIGENCE_MODEL = 'zai/glm-5.3-flash';
 
-/** Vision-capable model used for the golden-journey design-taste sweep */
-export const DESIGN_TASTE_SWEEP_MODEL = 'anthropic/claude-haiku-4-5-20251001';
+/** Model used for the golden-journey design-taste sweep */
+export const DESIGN_TASTE_SWEEP_MODEL = 'zai/glm-5.3';
 
 /**
  * Album-art background model for AI SDK `generateImage` via the Gateway.

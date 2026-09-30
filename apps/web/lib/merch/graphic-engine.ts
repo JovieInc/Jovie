@@ -17,8 +17,8 @@ import 'server-only';
  * @see @/lib/merch/mockup-engine — composites this graphic onto Printful blanks
  */
 
-import { gateway } from '@ai-sdk/gateway';
 import { generateImage } from 'ai';
+import { gateway } from '@/lib/ai/sdk';
 import { logger } from '@/lib/utils/logger';
 import {
   type MerchContentReview,
@@ -51,10 +51,12 @@ export interface MerchImageModelConfig {
 
 export const MERCH_IMAGE_MODELS: readonly MerchImageModelConfig[] = [
   {
+    // openai/* is banned on the gateway (JOV-7119) — kept disabled; the
+    // key stays so historical feedback scores still resolve.
     id: 'openai/gpt-image-1.5',
     key: 'gpt-image-1.5',
     alpha: 'native',
-    enabled: true,
+    enabled: false,
   },
   {
     // Native transparent output, distinct clean-illustration aesthetic.
@@ -200,7 +202,7 @@ export function alphaProviderOptions(
  * Opaque output → alpha. Not yet implemented; `knockout` models stay disabled
  * until this lands so the roster never emits a white-boxed (non-alpha) graphic.
  */
-// ponytail: native-transparent (gpt-image) is the only alpha path today; add a
+// ponytail: native-transparent (recraft) is the only alpha path today; add a
 // background-removal step here (local @imgly/background-removal or a Bria model)
 // to enable flux/grok/imagen in the A/B. Tracked as the next merch task.
 function knockoutBackground(_opaquePng: Buffer): never {
