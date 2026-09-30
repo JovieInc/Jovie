@@ -313,6 +313,47 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(completed["execution"]["fencingToken"], before["fencingToken"])
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
 
+    def test_generated_remote_draft_is_discovered_adopted_and_counts_toward_wip(self):
+        from unittest.mock import patch
+        self.run_entry()
+        draft = {**self.pr, "isDraft": True, "mergeStateStatus": "CLEAN"}
+        dated = {**draft, "number": 9, "headRefName": "hyperagent/jov-9-20260930t123000"}
+        providers = {"hyperagent": {"enabled": False}, "devin": {"enabled": True}}
+        lane = self.lane
+        with patch.object(lane, "open_prs_summary", return_value=[draft, dated]):
+            found = lane.lane_prs("hyperagent", providers)
+            self.assertEqual(found, [draft, dated])
+            self.assertEqual(lane.lane_prs("devin", providers), [draft, dated], "disabled lane's orphan remains owned")
+            with patch.object(lane, "load_providers", return_value=providers), patch.object(lane, "repo_prs", return_value=[]):
+                self.assertEqual(lane.fix_candidates("hyperagent"), [draft, dated])
+        with patch.object(lane, "sh", return_value=type("Read", (), {"stdout": json.dumps([draft, dated]), "returncode": 0})()):
+            light = lane.lane_prs("hyperagent", providers, fields=lane.LIGHT_PR_FIELDS)
+            self.assertTrue(lane.over_budget("hyperagent", light, slots=1))
+            self.assertFalse(lane.over_budget("hyperagent", light[:1], slots=1))
+            self.assertIn("JOV-6871", lane.in_flight_issues())
+        with patch.object(lane, "claimed_elsewhere", return_value=False), patch.object(lane, "post_claim"):
+            self.assertEqual(lane.claim_adoptable_pr(self.host, "hyperagent", found), draft)
+            self.assertEqual(lane.claim_adoptable_pr(self.host, "hyperagent", found), dated)
+            self.assertIsNone(lane.claim_adoptable_pr(self.host, "hyperagent", found))
+        older = {**draft, "number": 5, "headRefName": "hyperagent/jov-6871-20260929t100000"}
+        self.assertEqual(lane.best_per_issue([older, draft]), [draft])
+        self.assertEqual(lane.sweep_plan([older, draft], now=100, pushes={7: 100}), ([(older, 7)], []))
+
+    def test_generated_digest_ownership_is_exact_and_only_extends_hyperagent(self):
+        from unittest.mock import patch
+        lane = self.lane
+        branches = [self.branch, "hyperagent/jov-6871-20260930t123000", self.branch + "0",
+                    self.branch[:-1], self.branch + "-extra", self.branch.replace("hyperagent/", "devin/"),
+                    self.branch.upper(), "hyperagent/jov-6871-arbitrary"]
+        prs = [{**self.pr, "number": n, "headRefName": branch, "body": ""} for n, branch in enumerate(branches)]
+        with patch.object(lane, "open_prs_summary", return_value=prs):
+            self.assertEqual(lane.lane_prs("hyperagent", {"hyperagent": {}}), prs[:2])
+        found = lane.LANE_BRANCH.match(self.branch)
+        self.assertIsNotNone(found)
+        self.assertEqual((found.group("lane"), found.group("issue")), ("hyperagent", "jov-6871"))
+        with patch.object(lane, "sh", return_value=type("Read", (), {"stdout": json.dumps(prs), "returncode": 0})()):
+            self.assertEqual(lane.in_flight_issues(), frozenset({"JOV-6871"}))
+
     def test_actual_entry_unknown_metadata_never_reads_transport_or_changes_provider(self):
         self.spec.pop("verifiedRemote")
         result = self.run_entry()
