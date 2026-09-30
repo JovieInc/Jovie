@@ -18,6 +18,7 @@ import { env } from '@/lib/env';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import {
+  isNonActionableDestinationStreamIssue,
   isNonActionableLoopbackBetterAuthHostIssue,
   isNonActionableSpotifyReleaseCreditBoundIssue,
   isNonActionableUpstashErrorBag,
@@ -286,6 +287,21 @@ export async function POST(request: NextRequest) {
       );
       return NextResponse.json(
         { received: true, skipped: true, reason: 'vercel-ipc-sock' },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (isNonActionableDestinationStreamIssue({ title, culprit })) {
+      logger.info(
+        '[Sentry Webhook] Skipping autofix for client-disconnect stream abort',
+        { issueId, title, culprit }
+      );
+      return NextResponse.json(
+        {
+          received: true,
+          skipped: true,
+          reason: 'destination-stream-closed',
+        },
         { headers: NO_STORE_HEADERS }
       );
     }
