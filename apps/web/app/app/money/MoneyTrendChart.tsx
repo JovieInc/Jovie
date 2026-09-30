@@ -23,7 +23,7 @@ const SERIES = [
   {
     key: 'income',
     label: 'Income',
-    color: 'var(--linear-accent-green, #2f9e44)',
+    color: 'var(--color-accent-green, #2f9e44)',
   },
   { key: 'personalExpenses', label: 'Personal Spend', color: '#e8590c' },
   { key: 'creatorExpenses', label: 'Creator Spend', color: '#7048e8' },
@@ -175,7 +175,7 @@ export function MoneyTrendChart({
             <text
               x={PAD.left}
               y={H - 6}
-              className='fill-current text-[10px] text-tertiary-token'
+              className='fill-current text-3xs text-tertiary-token'
             >
               {data[0].date}
             </text>
@@ -183,7 +183,7 @@ export function MoneyTrendChart({
               x={W - PAD.right}
               y={H - 6}
               textAnchor='end'
-              className='fill-current text-[10px] text-tertiary-token'
+              className='fill-current text-3xs text-tertiary-token'
             >
               {data[data.length - 1].date}
             </text>
