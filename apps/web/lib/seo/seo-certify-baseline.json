@@ -2,11 +2,7 @@
   "schema": "jovie.seo-certify-baseline/v1",
   "failures": {
     "/": ["geo:geo-sibling-links"],
-    "/about": [
-      "copy:copy-lint",
-      "geo:geo-sibling-links",
-      "technical:open-graph"
-    ],
+    "/about": ["geo:geo-sibling-links", "technical:open-graph"],
     "/ai": ["agentic:structured-data"],
     "/alternatives": [
       "copy:copy-lint",
@@ -26,15 +22,12 @@
     ],
     "/artist-notifications": [
       "agentic:structured-data",
-      "copy:copy-lint",
       "geo:geo-jsonld-type",
-      "geo:geo-sibling-links",
-      "technical:indexability"
+      "geo:geo-sibling-links"
     ],
-    "/artist-profile": ["agentic:structured-data", "copy:copy-lint"],
+    "/artist-profile": ["agentic:structured-data"],
     "/artist-profiles": [
       "agentic:structured-data",
-      "copy:copy-lint",
       "geo:geo-jsonld-type",
       "geo:geo-sibling-links"
     ],
@@ -50,10 +43,8 @@
       "geo:geo-sibling-links",
       "technical:open-graph"
     ],
-    "/blog/the-contact-problem": ["copy:copy-lint"],
     "/card": [
       "agentic:structured-data",
-      "copy:copy-lint",
       "geo:geo-jsonld-type",
       "geo:geo-sibling-links"
     ],
@@ -72,7 +63,6 @@
       "technical:open-graph"
     ],
     "/compare/linktree": [
-      "copy:copy-lint",
       "geo:geo-last-updated",
       "geo:geo-sibling-links",
       "technical:open-graph"
@@ -103,11 +93,11 @@
     "/instant-merch": [
       "agentic:structured-data",
       "copy:copy-lint",
+      "geo:geo-direct-answer",
       "geo:geo-jsonld-type",
       "geo:geo-sibling-links"
     ],
     "/launch": ["copy:copy-lint", "geo:geo-sibling-links"],
-    "/new": ["copy:copy-lint"],
     "/pay": [
       "agentic:structured-data",
       "geo:geo-jsonld-type",
@@ -121,11 +111,7 @@
       "geo:geo-jsonld-type",
       "geo:geo-sibling-links"
     ],
-    "/solutions/artists": [
-      "copy:copy-lint",
-      "geo:geo-orphan",
-      "geo:geo-sibling-links"
-    ],
+    "/solutions/artists": ["geo:geo-orphan", "geo:geo-sibling-links"],
     "/support": [
       "geo:geo-jsonld-type",
       "geo:geo-sibling-links",

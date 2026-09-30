@@ -1,0 +1,177 @@
+{
+  "family": "solutions",
+  "slug": "founders",
+  "route": "/solutions/founders",
+  "asOf": "2026-09-30",
+  "brief": {
+    "businessObjective": "Founders claim a public profile that captures an audience they own.",
+    "targetAudience": "general",
+    "desiredConversion": "claim-profile",
+    "trafficSource": "search",
+    "intent": "feature"
+  },
+  "icp": "Founders who want one public page that grows an audience they own",
+  "jobsToBeDone": [
+    "Claim a public profile page",
+    "Capture subscribers from that page",
+    "Notify subscribers when there is news"
+  ],
+  "claimIds": [
+    "capability.public-profile.claimable-public-profile-page",
+    "capability.artist-profiles.audience-capture",
+    "capability.artist-notifications.opt-in-fan-notifications",
+    "offer.free.price"
+  ],
+  "hero": { "useCase": "claim-conversion", "conversion": "claim-profile" },
+  "proof": [
+    {
+      "sectionInstanceId": "capture-1",
+      "kind": "product-proof",
+      "claimId": "capability.artist-profiles.audience-capture"
+    }
+  ],
+  "media": [
+    {
+      "sectionInstanceId": "hero-1",
+      "input": {
+        "sectionJob": "hero",
+        "family": "artist-lp",
+        "audience": "general",
+        "evidence": { "captureScenario": "public-profile-desktop" },
+        "fold": "above"
+      }
+    },
+    {
+      "sectionInstanceId": "capture-1",
+      "input": {
+        "sectionJob": "feature",
+        "family": "artist-lp",
+        "audience": "general",
+        "evidence": { "captureScenario": "tim-white-profile-subscribe-mobile" },
+        "fold": "below"
+      }
+    },
+    {
+      "sectionInstanceId": "cta-1",
+      "input": {
+        "sectionJob": "cta",
+        "family": "artist-lp",
+        "audience": "general",
+        "evidence": {},
+        "fold": "below"
+      }
+    }
+  ],
+  "seo": {
+    "siblingLinks": ["/pricing", "/artist-profiles", "/artist-notifications"],
+    "jsonLdTypes": ["WebPage", "SoftwareApplication"]
+  },
+  "dry": {
+    "outcomes": {
+      "outcomes": [
+        {
+          "id": "outcome.own-page",
+          "statement": "You get one public page you control.",
+          "claimIds": [
+            "capability.public-profile.claimable-public-profile-page"
+          ]
+        },
+        {
+          "id": "outcome.own-audience",
+          "statement": "Visitors become subscribers you can reach again.",
+          "claimIds": [
+            "capability.artist-profiles.audience-capture",
+            "capability.artist-notifications.opt-in-fan-notifications"
+          ]
+        }
+      ],
+      "dataPoints": [
+        {
+          "statement": "The public profile page is claimable.",
+          "sourceRef": "capability.public-profile.claimable-public-profile-page"
+        },
+        {
+          "statement": "The profile captures subscribers.",
+          "sourceRef": "capability.artist-profiles.audience-capture"
+        },
+        {
+          "statement": "The free plan costs $0.",
+          "sourceRef": "offer.free.price"
+        }
+      ]
+    },
+    "narrative": {
+      "sections": [
+        {
+          "sectionInstanceId": "hero-1",
+          "sectionId": "hero",
+          "question": "What do I get?",
+          "sectionJob": "Name the outcome and the claim action",
+          "primaryResponsibility": "Convert to a profile claim",
+          "newInformation": "A claimable public page",
+          "customerBelief": "I can own my page today",
+          "evidenceRefs": [
+            "capability.public-profile.claimable-public-profile-page"
+          ],
+          "mustNotRepeat": []
+        },
+        {
+          "sectionInstanceId": "capture-1",
+          "sectionId": "feature-split",
+          "question": "Why does the page matter?",
+          "sectionJob": "Show audience capture",
+          "primaryResponsibility": "Prove the page grows an owned audience",
+          "newInformation": "Visitors subscribe and hear from you again",
+          "customerBelief": "My audience stays mine",
+          "evidenceRefs": ["outcome.own-audience"],
+          "mustNotRepeat": ["claimable"]
+        },
+        {
+          "sectionInstanceId": "cta-1",
+          "sectionId": "cta",
+          "question": "What does it cost to start?",
+          "sectionJob": "Close with the free start",
+          "primaryResponsibility": "Remove price risk",
+          "newInformation": "Starting is free",
+          "customerBelief": "Trying it costs nothing",
+          "evidenceRefs": ["offer.free.price"],
+          "mustNotRepeat": []
+        }
+      ]
+    },
+    "copy": {
+      "slots": [
+        {
+          "sectionInstanceId": "hero-1",
+          "slot": "headline",
+          "text": "Claim your public profile",
+          "claimIds": [
+            "capability.public-profile.claimable-public-profile-page"
+          ]
+        },
+        {
+          "sectionInstanceId": "hero-1",
+          "slot": "subhead",
+          "text": "Jovie gives founders one public page that turns visitors into subscribers you can reach again.",
+          "claimIds": ["capability.artist-profiles.audience-capture"]
+        },
+        {
+          "sectionInstanceId": "capture-1",
+          "slot": "body",
+          "text": "Visitors subscribe from your page. When you have news, they get a notification they opted into.",
+          "claimIds": [
+            "capability.artist-profiles.audience-capture",
+            "capability.artist-notifications.opt-in-fan-notifications"
+          ]
+        },
+        {
+          "sectionInstanceId": "cta-1",
+          "slot": "headline",
+          "text": "Start free. It costs $0.",
+          "claimIds": ["offer.free.price"]
+        }
+      ]
+    },
+    "render": { "cls": 0, "lcpMs": 1200 }
+  }
+}
