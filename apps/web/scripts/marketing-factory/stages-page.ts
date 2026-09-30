@@ -6,6 +6,7 @@
 
 import { existsSync, statSync } from 'node:fs';
 import { extname, join } from 'node:path';
+import { modelFamily } from '@jovie/copy';
 import {
   decideMedium,
   resolveMediaSourcing,
@@ -26,9 +27,12 @@ import {
   resolveCapture,
 } from '../marketing-media/capture-adapter';
 import { buildFactoryPageRecord } from './page-record';
+import { digestOf } from './receipts';
+import { evaluateRenderCaptures } from './render-measurer';
 import {
   artifactOf,
   Checks,
+  type Evaluator,
   judge,
   result,
   type StageContext,
@@ -36,6 +40,7 @@ import {
   type StageRunner,
   sectionIdsOf,
 } from './stage-kit';
+import { auditVisualAdmission, buildVisualGateReceipts } from './visual-review';
 
 function mediaDecisions(ctx: StageContext) {
   return ctx.brief.media.map(entry => ({
@@ -206,23 +211,18 @@ async function renderStage(ctx: StageContext): Promise<StageResult> {
   const checks = new Checks();
   const { record, issues } = buildFactoryPageRecord(ctx, null);
   checks.check('page-record-schema', issues.length === 0, issues.join('; '));
-  const measured = await ctx.providers.measureRender(ctx.brief.route);
+  const measured = await ctx.providers.measureRender(ctx.brief.route, {
+    outDir: join(ctx.runDir, 'render'),
+  });
   if (measured.status !== 'ok') {
     return result(checks, null, {
       unavailable: measured.reason,
       notes: { record },
     });
   }
-  checks.check(
-    'render-cls',
-    measured.cls <= 0.05,
-    `CLS ${measured.cls} > 0.05`
-  );
-  checks.check(
-    'render-lcp',
-    measured.lcpMs < 2500,
-    `LCP ${measured.lcpMs}ms >= 2500ms`
-  );
+  for (const check of evaluateRenderCaptures(measured.captures)) {
+    checks.check(check.id, check.ok, check.message);
+  }
   return result(
     checks,
     {
@@ -230,6 +230,7 @@ async function renderStage(ctx: StageContext): Promise<StageResult> {
       route: ctx.brief.route,
       cls: measured.cls,
       lcpMs: measured.lcpMs,
+      captures: measured.captures,
     },
     { notes: { record } }
   );
@@ -339,6 +340,57 @@ async function seoStage(ctx: StageContext): Promise<StageResult> {
   );
 }
 
+/**
+ * Visual taste admission: cross-family vision review of the render stage's
+ * screenshots, bound to the candidate record's digest, then the visual
+ * gates of auditMarketingTasteAdmission.
+ */
+async function visualAdmission(
+  ctx: StageContext,
+  checks: Checks,
+  producerModel: string
+) {
+  const captures = artifactOf(ctx, 'render').captures ?? [];
+  // The record the render stage measured, before the trust score lands.
+  const candidateDigest = digestOf(buildFactoryPageRecord(ctx, null).record);
+  const review = await ctx.providers.reviewVisual({
+    pageId: ctx.pageId,
+    captures,
+    producerModel,
+  });
+  const receipts = buildVisualGateReceipts({
+    candidateDigest,
+    captures,
+    review,
+    producerModel,
+  });
+  if (review.status !== 'reviewed') {
+    return { evaluators: [], receipts, unavailable: review.reason };
+  }
+  const admission = auditVisualAdmission({
+    candidateDigest,
+    generatorModelId: producerModel,
+    receipts,
+  });
+  checks.check(
+    'visual-taste-admission',
+    admission.length === 0,
+    admission.map(finding => finding.message).join('; ')
+  );
+  const judgeModel = review.judgeModel.replace(/^fixture:/u, '');
+  const evaluators: Evaluator[] = [
+    {
+      id: ctx.providers.label(judgeModel),
+      family: modelFamily(judgeModel),
+      kind: 'vision',
+      verdict: review.verdict,
+      score: review.score,
+      rubricVersion: 'factory-visual-review/1',
+    },
+  ];
+  return { evaluators, receipts, unavailable: null };
+}
+
 async function trustStage(ctx: StageContext): Promise<StageResult> {
   const checks = new Checks();
   const upstream = FACTORY_STAGES.slice(
@@ -379,7 +431,9 @@ async function trustStage(ctx: StageContext): Promise<StageResult> {
       verdict.unsupportedClaims.join('; ')
     );
   }
-  const scores = verdict.evaluators.map(e => e.score);
+  const visual = await visualAdmission(ctx, checks, copyProducer ?? '');
+  const evaluators = [...verdict.evaluators, ...visual.evaluators];
+  const scores = evaluators.map(e => e.score);
   return result(
     checks,
     {
@@ -390,9 +444,12 @@ async function trustStage(ctx: StageContext): Promise<StageResult> {
       unsupportedClaims: verdict.unsupportedClaims,
     },
     {
-      evaluators: verdict.evaluators,
+      evaluators,
       feedback: [...checks.feedback, ...verdict.critique],
-      unavailable: verdict.unavailable,
+      unavailable:
+        [verdict.unavailable, visual.unavailable].filter(Boolean).join('; ') ||
+        null,
+      notes: { tasteReceipts: visual.receipts },
     }
   );
 }
