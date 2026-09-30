@@ -454,39 +454,53 @@ export function JovieChat({
     hasMessages || conversationId || activeConversationId
   );
   const conversationInProgress = isLoading || isSubmitting || isStreaming;
+  // Once a deep-linked pin is applied (or dismissed) it stays handled so
+  // unpinning can't re-pin the same card while the param is still in the URL.
+  // Reset for each URL change so returning to the same link can pin it again.
+  const [handledDeepLinkId, setHandledDeepLinkId] = useState<string | null>(
+    null
+  );
+  const deepLinkHandled =
+    deepLinkOpportunityId !== null &&
+    handledDeepLinkId === deepLinkOpportunityId;
   const shouldLoadOpportunityCards = Boolean(
-    chatMode !== 'ov' && deepLinkOpportunityId && !pinnedOpportunity
+    chatMode !== 'ov' &&
+      deepLinkOpportunityId &&
+      !pinnedOpportunity &&
+      !deepLinkHandled
   );
   const { data: pendingOpportunityCards = [] } =
     usePendingOpportunityCardsQuery({
       enabled: shouldLoadOpportunityCards,
     });
 
-  // Once a deep-linked pin is applied (or dismissed) it stays handled so
-  // unpinning can't re-pin the same card while the param is still in the URL.
-  const deepLinkPinHandledRef = useRef(false);
   const handleUnpinOpportunity = useCallback(() => {
-    deepLinkPinHandledRef.current = true;
+    setHandledDeepLinkId(deepLinkOpportunityId);
     setPinnedOpportunity(null);
-  }, []);
+  }, [deepLinkOpportunityId]);
+
+  useEffect(() => {
+    setHandledDeepLinkId(null);
+  }, [deepLinkOpportunityId]);
 
   // Deep-link: /app/chat?opportunityId=<uuid> pins the matching card.
   useEffect(() => {
-    if (
-      !deepLinkOpportunityId ||
-      pinnedOpportunity ||
-      deepLinkPinHandledRef.current
-    ) {
+    if (!deepLinkOpportunityId || pinnedOpportunity || deepLinkHandled) {
       return;
     }
     const match = pendingOpportunityCards.find(
       card => card.id === deepLinkOpportunityId
     );
     if (match) {
-      deepLinkPinHandledRef.current = true;
+      setHandledDeepLinkId(deepLinkOpportunityId);
       setPinnedOpportunity(match);
     }
-  }, [deepLinkOpportunityId, pendingOpportunityCards, pinnedOpportunity]);
+  }, [
+    deepLinkOpportunityId,
+    deepLinkHandled,
+    pendingOpportunityCards,
+    pinnedOpportunity,
+  ]);
 
   // Clear pin when navigating to a different conversation (not for new empty threads).
   useEffect(() => {
