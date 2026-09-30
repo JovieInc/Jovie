@@ -106,6 +106,7 @@ export const FACTORY_MEDIA_JOB_BY_SECTION_ID: Readonly<
   comparison: 'comparison',
   faq: 'faq',
   cta: 'cta',
+  'product-gallery': 'feature',
   'spec-wall': 'feature',
   capture: 'feature',
   monetization: 'feature',
