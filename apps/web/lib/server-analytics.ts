@@ -664,7 +664,9 @@ function prepareServerAnalyticsInsert(
       sourceEntityType: definition.source?.type ?? null,
       sourceEntityId:
         typeof sourceEntityId === 'string' ? sourceEntityId : null,
-      eventIdentity: options?.eventIdentity ?? null,
+      ...(options?.eventIdentity === undefined
+        ? {}
+        : { eventIdentity: options.eventIdentity }),
       properties: sanitized,
       occurredAt: options?.occurredAt ?? new Date(),
     },
@@ -675,11 +677,15 @@ async function insertServerAnalyticsRow(
   client: DbOrTransaction,
   prepared: Extract<PreparedInsert, { ok: true }>
 ): Promise<ServerAnalyticsDelivery> {
-  const [stored] = await client
-    .insert(serverAnalyticsEvents)
-    .values(prepared.values)
-    .onConflictDoNothing({ target: serverAnalyticsEvents.eventIdentity })
-    .returning({ id: serverAnalyticsEvents.id });
+  const insert = client.insert(serverAnalyticsEvents).values(prepared.values);
+  // Ordinary events do not need deduplication and must not depend on the
+  // optional identity column's unique index being available.
+  const query = prepared.values.eventIdentity
+    ? insert.onConflictDoNothing({
+        target: serverAnalyticsEvents.eventIdentity,
+      })
+    : insert;
+  const [stored] = await query.returning({ id: serverAnalyticsEvents.id });
 
   if (!stored) {
     // The event_identity unique constraint deduplicated this emission; the

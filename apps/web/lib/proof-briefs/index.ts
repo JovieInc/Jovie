@@ -24,6 +24,22 @@ export {
 } from './delivery';
 export { type ProofBriefEmail, renderProofBriefEmail } from './email';
 export {
+  type AttributionClass,
+  DEFAULT_WINDOW_DAYS,
+  type EvidenceType,
+  type ExclusionReason,
+  feedRequestToBriefRequest,
+  type LedgerDisposition,
+  type LedgerEntry,
+  type ProofCandidateSet,
+  type ProofFeedEntry,
+  type ProofProvenance,
+  type RollingFeedRequest,
+  type RollingWindow,
+  rollingWindow,
+  selectProofCandidates,
+} from './feed';
+export {
   buildCustomerWeeklyRecap,
   CERTIFIED_PROOF_BRIEF,
   type CustomerRecapUpdate,
