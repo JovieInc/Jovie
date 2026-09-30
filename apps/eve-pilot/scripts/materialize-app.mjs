@@ -105,7 +105,6 @@ export function materializeApp(identity, destination, source = pilot) {
   );
   const put = (path, text) => files.set(path, text);
   const manifest = JSON.parse(files.get('package.json'));
-  delete manifest.dependencies['@jovie/agent-transport-contracts'];
   manifest.name =
     identity === 'summer' ? '@jovieinc/summer-runtime' : '@jovie/jovie-agent';
   manifest.private = true;
@@ -182,8 +181,8 @@ export default defineChannel({ routes: [GET('/runtime/v1/health', async () => {
       files
         .get('agent/lib/summer-bottleneck-loop.ts')
         .replace(
-          '@jovie/agent-transport-contracts',
-          '../../vendor/agent-transport-contracts/index'
+          '../../../../packages/agent-transport-contracts/prediction-receipt',
+          '../../vendor/agent-transport-contracts/prediction-receipt.js'
         )
     );
     put(
@@ -294,12 +293,17 @@ The source export is preparatory; deployment and commissioning require separate 
     for (const path of [
       'index.ts',
       'prediction-outcome.ts',
+      'prediction-receipt.ts',
       'symphony-outage.ts',
       'package.json',
     ]) {
       let contents = readFileSync(
         resolve(pilot, '../../packages/agent-transport-contracts', path),
         'utf8'
+      );
+      contents = contents.replaceAll(
+        "from './prediction-receipt';",
+        "from './prediction-receipt.js';"
       );
       if (
         path === 'index.ts' &&
@@ -327,6 +331,7 @@ The source export is preparatory; deployment and commissioning require separate 
     'scripts/templates/application-boundary.test.ts',
     '../../packages/agent-transport-contracts/index.ts',
     '../../packages/agent-transport-contracts/prediction-outcome.ts',
+    '../../packages/agent-transport-contracts/prediction-receipt.ts',
     '../../packages/agent-transport-contracts/symphony-outage.ts',
     '../../packages/agent-transport-contracts/package.json',
   ];

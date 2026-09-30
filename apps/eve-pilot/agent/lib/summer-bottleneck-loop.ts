@@ -5,11 +5,11 @@ import {
   verify as nodeVerify,
   timingSafeEqual,
 } from 'node:crypto';
+import { z } from 'zod';
 import {
   DecisionPredictionReceiptSchema,
   PREDICTION_RECEIPT_SCHEMA,
-} from '@jovie/agent-transport-contracts';
-import { z } from 'zod';
+} from '../../../../packages/agent-transport-contracts/prediction-receipt';
 
 const SHA = /^[0-9a-f]{40}$/u;
 const DIGEST = /^[0-9a-f]{64}$/u;

@@ -20,7 +20,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@jovie/agent-transport-contracts": "file:../../packages/agent-transport-contracts",
     "@opentelemetry/api": "1.9.1",
     "@vercel/blob": "2.8.0",
     "ai": "7.0.122",

@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@jovie/agent-transport-contracts':
-        specifier: file:../../packages/agent-transport-contracts
-        version: file:../../packages/agent-transport-contracts
       '@opentelemetry/api':
         specifier: 1.9.1
         version: 1.9.1
@@ -513,9 +510,6 @@ packages:
 
   '@jitl/quickjs-wasmfile-release-sync@0.32.0':
     resolution: {integrity: sha512-BKNDI/TPBfGlLNGYpLrhcDGXmIk4xHm4MRAisOBnOzpXVn9HZWsfmMAc9WMBrAHjvvds6HOikKeaOBKdPdpVrg==}
-
-  '@jovie/agent-transport-contracts@file:../../packages/agent-transport-contracts':
-    resolution: {directory: ../../packages/agent-transport-contracts, type: directory}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -3539,10 +3533,6 @@ snapshots:
   '@jitl/quickjs-wasmfile-release-sync@0.32.0':
     dependencies:
       '@jitl/quickjs-ffi-types': 0.32.0
-
-  '@jovie/agent-transport-contracts@file:../../packages/agent-transport-contracts':
-    dependencies:
-      zod: 4.6.5
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:

@@ -1,14 +1,15 @@
 import { z } from 'zod';
+import {
+  type DecisionPredictionReceipt,
+  DecisionPredictionReceiptSchema,
+} from './prediction-receipt';
 
-export const PREDICTION_RECEIPT_SCHEMA =
-  'jovie.prediction-outcome/prediction/v1' as const;
+export * from './prediction-receipt';
 
 const id = z.string().trim().min(1).max(200);
 const ref = z.string().trim().min(1).max(600);
 const nullableRef = ref.nullable();
 const timestamp = z.iso.datetime({ offset: true });
-const digest = z.string().regex(/^[a-f0-9]{64}$/u);
-const sha = z.string().regex(/^[a-f0-9]{40}$/u);
 const unknownNumber = z.number().finite().nullable();
 const scope = z.strictObject({ tenantId: id, scopeId: id, entityId: id });
 // biome-ignore format: this finite contract enum is clearer on one line.
@@ -23,121 +24,6 @@ function containsSecret(value: unknown): boolean {
   // biome-ignore format: keep the bounded secret detector auditable as one expression.
   return /(?:-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:sk|ghp|lin_api)_[A-Za-z0-9_-]{12,}|["']?(?:secret|token|password|apiKey)["']?\s*[=:]\s*["']?\S+)/iu.test(JSON.stringify(value));
 }
-
-export const DecisionPredictionReceiptSchema = z
-  .strictObject({
-    schema: z.literal(PREDICTION_RECEIPT_SCHEMA),
-    predictionId: id,
-    identity: z.strictObject({
-      decisionId: id,
-      taskRunId: id.nullable(),
-      experimentId: id.nullable(),
-      variantId: id.nullable(),
-      ...scope.shape,
-    }),
-    links: z.strictObject({
-      issueRef: nullableRef,
-      commitRef: nullableRef,
-      deploymentRef: nullableRef,
-      certificationRef: nullableRef,
-    }),
-    decisionAt: timestamp,
-    predictedAt: timestamp,
-    temporalClass: z.enum(['prospective', 'retrospective']),
-    input: z.strictObject({
-      snapshotRef: ref,
-      snapshotDigest: digest,
-      capturedAt: timestamp,
-      freshness: z.enum(['fresh', 'stale', 'unknown']),
-      provenanceRefs: z.array(ref).min(1),
-    }),
-    target: z.strictObject({
-      stage: z.enum(['engineering', 'customer', 'business']),
-      name: id,
-      units: id,
-      horizonEndsAt: timestamp,
-      baseline: unknownNumber,
-    }),
-    action: z.strictObject({
-      eligibleActionsRef: ref,
-      selectedAction: id,
-      // biome-ignore format: keep the guarded contract compact.
-      selectionMethod: z.enum(['deterministic', 'randomized', 'historical-unknown']),
-      selectionProbability: z.number().positive().max(1).nullable(),
-    }),
-    prediction: z.strictObject({
-      expected: z.union([z.string().trim().min(1), unknownNumber]),
-      lower: unknownNumber,
-      upper: unknownNumber,
-      confidence: z.enum(['unknown', 'low', 'medium', 'high']),
-    }),
-    versions: z.strictObject({
-      model: nullableRef,
-      provider: nullableRef,
-      prompt: nullableRef,
-      policy: nullableRef,
-      codeRevision: sha.nullable(),
-      executionTupleRef: nullableRef,
-    }),
-    disclosure: z.strictObject({
-      providerData: z.enum(['authorized', 'withheld']),
-      consent: z.enum(['valid', 'not-required']),
-      consentRef: nullableRef,
-      consentValidUntil: timestamp.nullable(),
-    }),
-    management: z.strictObject({
-      strategyVersionRef: nullableRef,
-      opportunityRef: nullableRef,
-      alternativesRef: ref,
-      hypothesis: id,
-      authorityRef: ref,
-      outcomeOwner: id,
-      reviewAt: timestamp,
-    }),
-  })
-  .superRefine((receipt, context) => {
-    const captured = Date.parse(receipt.input.capturedAt);
-    const predicted = Date.parse(receipt.predictedAt);
-    const decided = Date.parse(receipt.decisionAt);
-    const randomized = receipt.action.selectionMethod === 'randomized';
-    const checks = [
-      [
-        receipt.temporalClass === 'prospective' &&
-          (captured > predicted || predicted > decided),
-        'prospective timing is invalid',
-      ],
-      [
-        randomized !== (receipt.action.selectionProbability !== null),
-        'selection probability is invalid',
-      ],
-      [
-        receipt.disclosure.providerData === 'withheld' &&
-          (receipt.versions.provider !== null ||
-            receipt.versions.model !== null),
-        'provider disclosure is unauthorized',
-      ],
-      [
-        (receipt.disclosure.providerData === 'authorized' &&
-          receipt.disclosure.consent !== 'valid') ||
-          (receipt.disclosure.consent === 'valid' &&
-            (!receipt.disclosure.consentRef ||
-              !receipt.disclosure.consentValidUntil ||
-              Date.parse(receipt.disclosure.consentValidUntil) < decided)),
-        'consent is missing or expired',
-      ],
-      [
-        (receipt.versions.codeRevision === null) !==
-          (receipt.links.commitRef === null) ||
-          (receipt.versions.codeRevision !== null &&
-            receipt.versions.codeRevision !== receipt.links.commitRef),
-        'exact revision requires evidence',
-      ],
-      [containsSecret(receipt), 'receipt contains secret material'],
-    ] as const;
-    for (const [invalid, message] of checks) {
-      if (invalid) context.addIssue({ code: 'custom', message });
-    }
-  });
 
 export const MeasuredOutcomeReceiptSchema = z
   .strictObject({
@@ -215,8 +101,6 @@ export const MeasuredOutcomeReceiptSchema = z
     }
   });
 
-// biome-ignore format: compact exported schema type.
-export type DecisionPredictionReceipt = z.infer<typeof DecisionPredictionReceiptSchema>;
 // biome-ignore format: compact exported schema type.
 export type MeasuredOutcomeReceipt = z.infer<typeof MeasuredOutcomeReceiptSchema>;
 
