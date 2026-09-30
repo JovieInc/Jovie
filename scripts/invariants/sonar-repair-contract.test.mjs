@@ -24,6 +24,74 @@ function fixture({ command, workflow, properties }) {
 }
 
 describe('JOV-INV-036 Sonar repair contract', () => {
+  for (const [
+    name,
+    mutate,
+  ] of /** @type {Array<[string, (source: string) => string]>} */ ([
+    [
+      'missing scanner revision',
+      source => source.replace(/^\s+args: -Dsonar\.scm\.revision=.*$/m, ''),
+    ],
+    [
+      'wrapper revision',
+      source =>
+        source.replace(
+          'args: -Dsonar.scm.revision=${{ github.event.workflow_run.head_sha || github.sha }}',
+          'args: -Dsonar.scm.revision=${{ github.sha }}'
+        ),
+    ],
+    [
+      'missing manual fallback',
+      source =>
+        source.replace(
+          'args: -Dsonar.scm.revision=${{ github.event.workflow_run.head_sha || github.sha }}',
+          'args: -Dsonar.scm.revision=${{ github.event.workflow_run.head_sha }}'
+        ),
+    ],
+    [
+      'wrong checkout revision',
+      source =>
+        source.replace(
+          'ref: ${{ github.event.workflow_run.head_sha || github.sha }}',
+          'ref: ${{ github.sha }}'
+        ),
+    ],
+    [
+      'commented revision',
+      source =>
+        source.replace(
+          'args: -Dsonar.scm.revision=',
+          '# args: -Dsonar.scm.revision='
+        ),
+    ],
+    [
+      'later argument override',
+      source =>
+        source.replace(
+          'args: -Dsonar.scm.revision=${{ github.event.workflow_run.head_sha || github.sha }}',
+          'args: -Dsonar.scm.revision=${{ github.event.workflow_run.head_sha || github.sha }} -Dsonar.scm.revision=wrong'
+        ),
+    ],
+    ['malformed YAML', () => 'jobs: ['],
+  ])) {
+    it(`rejects ${name}`, () => {
+      const readSource = path =>
+        readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
+      const errors = validateSonarRepairSources(
+        fixture({
+          command: readSource('.claude/commands/sonar-fix.md'),
+          workflow: mutate(readSource('.github/workflows/sonarcloud.yml')),
+          properties: readSource('sonar-project.properties'),
+        })
+      );
+      assert.ok(
+        errors.includes(
+          'Sonar scan revision must match the producer checkout with a workflow SHA fallback'
+        )
+      );
+    });
+  }
+
   for (const [name, setting] of [
     ['missing heap override', ''],
     ['original exhausted heap', 'sonar.javascript.node.maxspace=4096'],

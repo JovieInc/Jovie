@@ -4,12 +4,18 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import yaml from 'js-yaml';
 
 import { readInvariantRegistry } from './registry.mjs';
 
 export const SONAR_REPAIR_INVARIANT_ID = 'JOV-INV-036';
 export const SONAR_REPAIR_SCHEMA = 'jovie-sonar-repair-contract/v1';
 const DEFAULT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+
+/**
+ * @typedef {{ uses?: string, with?: { ref?: string, args?: string } }} ScanStep
+ * @typedef {{ jobs?: Record<string, { steps?: ScanStep[] }> }} ScanWorkflow
+ */
 
 function read(repoRoot, path) {
   return readFileSync(resolve(repoRoot, path), 'utf8');
@@ -63,6 +69,42 @@ export function validateSonarRepairSources(repoRoot = DEFAULT_ROOT) {
   if (!disablesAutomaticAnalysis) {
     errors.push(
       'Sonar workflow does not disable Automatic Analysis before the CI scan'
+    );
+  }
+
+  // The scanner otherwise auto-detects the workflow_run wrapper's GITHUB_SHA.
+  // Bind its published revision to the same producer/fallback as checkout.
+  const revision = '${{ github.event.workflow_run.head_sha || github.sha }}';
+  let revisionBound = false;
+  try {
+    const parsed = /** @type {ScanWorkflow} */ (yaml.load(workflow));
+    const jobs = Object.values(parsed?.jobs ?? {});
+    const scans = jobs.flatMap(job =>
+      (job.steps ?? [])
+        .filter(step =>
+          step.uses?.startsWith('SonarSource/sonarqube-scan-action@')
+        )
+        .map(scan => ({ job, scan }))
+    );
+    revisionBound =
+      scans.length > 0 &&
+      scans.every(({ job, scan }) => {
+        const checkout = (job.steps ?? []).find(step =>
+          step.uses?.startsWith('actions/checkout@')
+        );
+        const args = scan.with?.args;
+        return (
+          checkout?.with?.ref === revision &&
+          typeof args === 'string' &&
+          args.trim() === `-Dsonar.scm.revision=${revision}`
+        );
+      });
+  } catch {
+    // Invalid workflow YAML cannot certify a scan's source identity.
+  }
+  if (!revisionBound) {
+    errors.push(
+      'Sonar scan revision must match the producer checkout with a workflow SHA fallback'
     );
   }
 
