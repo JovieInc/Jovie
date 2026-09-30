@@ -475,6 +475,15 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
       '--test-coverage-functions=90',
     ],
   ],
+  [
+    'scripts/coverage-surface-files.test.mjs',
+    'scripts/lib/coverage-surface-files.mjs',
+    [
+      '--test-coverage-lines=100',
+      '--test-coverage-branches=100',
+      '--test-coverage-functions=100',
+    ],
+  ],
 ];
 const CI_CONTROL_WEB_TESTS = [
   'apps/web/tests/unit/ci/test-coverage-audit-workflow.test.ts',

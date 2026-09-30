@@ -1,3 +1,4 @@
+import { Children, isValidElement } from 'react';
 import {
   afterEach,
   beforeAll,
@@ -7,6 +8,8 @@ import {
   it,
   vi,
 } from 'vitest';
+import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
+import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 
 const hoisted = vi.hoisted(() => ({
   getCreatorByUsername: vi.fn(),
@@ -16,6 +19,13 @@ const hoisted = vi.hoisted(() => ({
   getTrackBySlugInRelease: vi.fn(),
   resolveOpaqueInternalProfileUsername: vi.fn(),
   getArtistEntitySameAs: vi.fn(),
+}));
+
+vi.mock('@/app/r/[slug]/ReleaseLandingPage', () => ({
+  ReleaseLandingPage: () => null,
+}));
+vi.mock('@/app/[username]/[slug]/PreferredDspRedirect', () => ({
+  PreferredDspRedirect: () => null,
 }));
 
 vi.mock('../_lib/data', () => ({
@@ -158,5 +168,125 @@ describe('smartlink-track screen-cert fixture branch (JOV-7127)', () => {
     expect(hoisted.getCreatorByUsername).toHaveBeenCalledWith(
       'jovie-screen-fixture'
     );
+  });
+});
+
+describe('published track metadata and access', () => {
+  const params = () =>
+    Promise.resolve({
+      username: 'TestArtist',
+      slug: 'album',
+      trackSlug: 'song',
+    });
+  const track = () => ({
+    id: 'track-1',
+    type: 'track',
+    title: 'Song',
+    slug: 'song',
+    artworkUrl: null,
+    releaseDate: new Date('2026-01-01'),
+    providerLinks: [
+      { providerId: 'spotify', url: 'https://open.spotify.com/track/1' },
+    ],
+    durationMs: 123456,
+  });
+  beforeEach(() => {
+    vi.resetAllMocks();
+    hoisted.resolveOpaqueInternalProfileUsername.mockResolvedValue({
+      action: 'serve',
+    });
+    hoisted.getCreatorByUsername.mockResolvedValue({
+      id: 'creator-1',
+      username: 'testartist',
+      usernameNormalized: 'testartist',
+      displayName: 'Artist',
+      settings: {},
+    });
+    hoisted.getContentBySlug.mockResolvedValue({
+      id: 'release-1',
+      type: 'release',
+      title: 'Album',
+    });
+    hoisted.getTrackBySlugInRelease.mockResolvedValue(track());
+    hoisted.getArtistEntitySameAs.mockResolvedValue([]);
+    hoisted.getCreatorPlan.mockResolvedValue({
+      canAccessFutureReleases: false,
+    });
+  });
+
+  it('uses the nested canonical URL and measured track duration', async () => {
+    const { generateMetadata } = await import('./page');
+    const metadata = await generateMetadata({ params: params() });
+    expect(metadata).toMatchObject({
+      title: 'Song by Artist',
+      alternates: { canonical: 'https://jov.ie/testartist/album/song' },
+      other: {
+        'music:duration': '123',
+        'music:album': 'https://jov.ie/testartist/album',
+      },
+      openGraph: { images: [{ url: 'https://jov.ie/og/default.png' }] },
+    });
+    expect(hoisted.getTrackBySlugInRelease).toHaveBeenCalledWith(
+      'release-1',
+      'song'
+    );
+  });
+
+  it.each(['creator', 'release', 'track'])(
+    'does not publish metadata when the %s is missing',
+    async missing => {
+      if (missing === 'creator')
+        hoisted.getCreatorByUsername.mockResolvedValue(null);
+      if (missing === 'release')
+        hoisted.getContentBySlug.mockResolvedValue({ type: 'track' });
+      if (missing === 'track')
+        hoisted.getTrackBySlugInRelease.mockResolvedValue(null);
+      const { generateMetadata, default: Page } = await import('./page');
+      expect(await generateMetadata({ params: params() })).toEqual({
+        title: 'Not Found',
+      });
+      await expect(Page({ params: params() })).rejects.toThrow('notFound');
+    }
+  );
+
+  it('enforces future-release entitlement on both metadata and page content', async () => {
+    hoisted.getTrackBySlugInRelease.mockResolvedValue({
+      ...track(),
+      releaseDate: new Date('2099-01-01'),
+    });
+    const { generateMetadata, default: Page } = await import('./page');
+    expect(await generateMetadata({ params: params() })).toEqual({
+      title: 'Not Found',
+    });
+    await expect(Page({ params: params() })).rejects.toThrow('notFound');
+    hoisted.getCreatorPlan.mockResolvedValue({ canAccessFutureReleases: true });
+    expect(await generateMetadata({ params: params() })).toMatchObject({
+      title: 'Song by Artist',
+    });
+    const page = await Page({ params: params() });
+    const children = Children.toArray(page.props.children);
+    expect(
+      children.some(
+        child => isValidElement(child) && child.type === PreferredDspRedirect
+      )
+    ).toBe(false);
+    expect(
+      children.find(
+        child => isValidElement(child) && child.type === ReleaseLandingPage
+      )
+    ).toMatchObject({ props: { release: { title: 'Song' } } });
+  });
+
+  it('noindexes opaque identities before reading public data', async () => {
+    hoisted.resolveOpaqueInternalProfileUsername.mockResolvedValue({
+      action: 'not_found',
+    });
+    const { generateMetadata, default: Page } = await import('./page');
+    expect(await generateMetadata({ params: params() })).toEqual({
+      title: 'Not Found',
+      robots: { index: false, follow: false },
+    });
+    await expect(Page({ params: params() })).rejects.toThrow('notFound');
+    expect(hoisted.getCreatorByUsername).not.toHaveBeenCalled();
   });
 });
