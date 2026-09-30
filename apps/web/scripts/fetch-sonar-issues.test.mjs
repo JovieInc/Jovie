@@ -107,6 +107,7 @@ function world({
   newCodeTotal = 0,
   analyses = ['A1'],
   revision = 'abc123',
+  date = '2026-09-20T00:00:00+0000',
   componentStatus = 200,
   measureMetrics = {},
   measures = null,
@@ -140,9 +141,7 @@ function world({
       const key = analyses[Math.min(analysisIndex++, analyses.length - 1)];
       return ok({
         paging: { pageIndex: 1, pageSize: 1, total: key ? 1 : 0 },
-        analyses: key
-          ? [{ key, date: '2026-09-20T00:00:00+0000', revision }]
-          : [],
+        analyses: key ? [{ key, date, revision }] : [],
       });
     }
     if (parsed.pathname === '/api/issues/search') {
@@ -392,6 +391,62 @@ describe('collectInventory', () => {
     expect(
       result.inventory.warnings.some(w => w.includes('lags observed commit'))
     ).toBe(true);
+  });
+
+  it('invalidates an analysis missing identity fields (revision/date)', async () => {
+    const noRevision = await collect({ revision: null }).promise;
+    expect(noRevision.status).toBe('INCOMPLETE');
+    expect(noRevision.atomic).toBe(false);
+    expect(noRevision.inventory.incompleteness).toContainEqual({
+      partition: 'project-analysis',
+      reason: 'analysis_identity_incomplete',
+      analysisKey: 'A1',
+      missing: ['revision'],
+    });
+
+    const noDate = await collect({ date: null }).promise;
+    expect(noDate.status).toBe('INCOMPLETE');
+    expect(noDate.atomic).toBe(false);
+    expect(noDate.inventory.incompleteness).toContainEqual({
+      partition: 'project-analysis',
+      reason: 'analysis_identity_incomplete',
+      analysisKey: 'A1',
+      missing: ['date'],
+    });
+    expect(
+      noDate.inventory.warnings.some(w =>
+        w.includes('missing identity field(s)')
+      )
+    ).toBe(true);
+  });
+
+  it('invalidates an unverifiable before/after snapshot pair', async () => {
+    // Before present, after missing — the delta cannot be verified.
+    const afterMissing = await collect({ analyses: ['A1', null] }).promise;
+    expect(afterMissing.status).toBe('INCOMPLETE');
+    expect(afterMissing.atomic).toBe(false);
+    expect(afterMissing.inventory.incompleteness).toContainEqual({
+      partition: 'project-analysis',
+      reason: 'analysis_snapshot_unverifiable',
+      beforeKey: 'A1',
+      afterKey: null,
+    });
+    expect(
+      afterMissing.inventory.warnings.some(w =>
+        w.includes('not provably atomic')
+      )
+    ).toBe(true);
+
+    // Before missing, after present — equally unverifiable.
+    const beforeMissing = await collect({ analyses: [null, 'A1'] }).promise;
+    expect(beforeMissing.status).toBe('INCOMPLETE');
+    expect(beforeMissing.atomic).toBe(false);
+    expect(beforeMissing.inventory.incompleteness).toContainEqual({
+      partition: 'project-analysis',
+      reason: 'analysis_snapshot_unverifiable',
+      beforeKey: null,
+      afterKey: 'A1',
+    });
   });
 
   it('partitions capped queries on createdAt months, then rules', async () => {
@@ -674,6 +729,26 @@ describe('main', () => {
         worldOptions: { revision: 'old-revision' },
         env: { GITHUB_SHA: 'new-sha' },
         reason: 'analysis_revision_stale',
+      },
+      {
+        worldOptions: { revision: null },
+        env: { GITHUB_SHA: 'abc123' },
+        reason: 'analysis_identity_incomplete',
+      },
+      {
+        worldOptions: { date: null },
+        env: { GITHUB_SHA: 'abc123' },
+        reason: 'analysis_identity_incomplete',
+      },
+      {
+        worldOptions: { analyses: ['A1', null] },
+        env: { GITHUB_SHA: 'abc123' },
+        reason: 'analysis_snapshot_unverifiable',
+      },
+      {
+        worldOptions: { analyses: [null, 'A1'] },
+        env: { GITHUB_SHA: 'abc123' },
+        reason: 'analysis_snapshot_unverifiable',
       },
     ]) {
       const { fetchImpl } = world(worldOptions);

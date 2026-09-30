@@ -378,6 +378,57 @@ describe('OnboardingChat Turnstile gating', () => {
     ).toHaveAttribute('data-dictation-enabled', 'false');
   });
 
+  it('auto-submits a queued first message once verification resolves', async () => {
+    function DeferredTokenHarness() {
+      const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+      const [instruction, setInstruction] = useState<string | null>(null);
+
+      return (
+        <>
+          <button
+            type='button'
+            onClick={() => setTurnstileToken('fresh-token')}
+          >
+            Resolve verification
+          </button>
+          <OnboardingChat
+            turnstileToken={turnstileToken}
+            turnstileStatus={turnstileToken ? 'verified' : 'interactive'}
+            turnstilePanel={
+              instruction ? (
+                <div data-testid='test-turnstile-panel'>{instruction}</div>
+              ) : null
+            }
+            turnstilePanelVisible={Boolean(instruction)}
+            onTurnstileRequired={message => {
+              setInstruction(message ?? null);
+            }}
+          />
+        </>
+      );
+    }
+
+    render(<DeferredTokenHarness />);
+
+    const input = screen.getByLabelText('Chat Message Input');
+    fireEvent.change(input, { target: { value: 'help me launch a song' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Resolve verification' })
+    );
+
+    await waitFor(() => {
+      expect(chatMocks.sendMessage).toHaveBeenCalledWith({
+        text: 'help me launch a song',
+      });
+    });
+    expect(chatMocks.sendMessage).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Chat Message Input')).toHaveValue('');
+  });
+
   it('auto-submits a starter prompt once when verification is ready', async () => {
     render(
       <TurnstileHarness
@@ -642,9 +693,9 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(chatMocks.setMessages).toHaveBeenCalled();
     expect(chatMocks.messages).toEqual([]);
     expect(onTurnstileRejected).toHaveBeenCalledTimes(1);
-    expect(
-      screen.queryByTestId('onboarding-message-recovery')
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('onboarding-message-recovery')).toHaveTextContent(
+      'Complete the security check to send your message.'
+    );
     expect(screen.getByTestId('onboarding-flow-status')).toHaveTextContent(
       'One quick check before we send'
     );

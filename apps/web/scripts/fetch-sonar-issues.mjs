@@ -556,12 +556,14 @@ export async function collectInventory({
   // Snapshot → collect → verify binds the inventory to one analysis. On drift,
   // retry once then flag non-atomic rather than mixing versions.
   let bundle;
+  let before = null;
+  let after = null;
   let boundAnalysis = null;
   let atomic = true;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
-    const before = await latestAnalysis(ctx);
+    before = await latestAnalysis(ctx);
     bundle = await collectAll(ctx);
-    const after = await latestAnalysis(ctx);
+    after = await latestAnalysis(ctx);
     boundAnalysis = after ?? before;
     const drifted = Boolean(
       before?.key && after?.key && before.key !== after.key
@@ -664,6 +666,41 @@ export async function collectInventory({
     });
     warnings.push(
       `no project analysis is available for branch ${branch} — findings cannot be bound to a Sonar analysis`
+    );
+  }
+  // The before/after pair must both be present with a matching analysis key,
+  // otherwise the collection window cannot be verified as atomic.
+  if (
+    boundAnalysis &&
+    !(before?.key && after?.key && before.key === after.key)
+  ) {
+    atomic = false;
+    incompleteness.push({
+      partition: 'project-analysis',
+      reason: 'analysis_snapshot_unverifiable',
+      beforeKey: before?.key ?? null,
+      afterKey: after?.key ?? null,
+    });
+    warnings.push(
+      `before/after analysis snapshots could not be verified (before=${before?.key ?? 'missing'}, after=${after?.key ?? 'missing'}) — the collection window is not provably atomic`
+    );
+  }
+  // A bound analysis must carry full identity: key + revision + date. An
+  // absent field leaves staleness/age unverifiable, so it cannot be COMPLETE.
+  if (boundAnalysis && (!boundAnalysis.revision || !boundAnalysis.date)) {
+    atomic = false;
+    const missing = [
+      ...(!boundAnalysis.revision ? ['revision'] : []),
+      ...(!boundAnalysis.date ? ['date'] : []),
+    ];
+    incompleteness.push({
+      partition: 'project-analysis',
+      reason: 'analysis_identity_incomplete',
+      analysisKey: boundAnalysis.key,
+      missing,
+    });
+    warnings.push(
+      `bound analysis ${boundAnalysis.key} is missing identity field(s) [${missing.join(', ')}] — findings cannot be fully bound to a Sonar analysis`
     );
   }
   if (stale) {
