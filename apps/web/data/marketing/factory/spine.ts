@@ -288,11 +288,34 @@ export const FactoryAssetManifestSchema = z.object({
   ),
 });
 
+/** One viewport of the render measurer (JOV-7282). */
+export const FactoryRenderCaptureSchema = z.object({
+  viewport: z.enum(['mobile', 'desktop']),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  httpStatus: z.number().int(),
+  screenshot: z.object({
+    path: z.string().min(1),
+    digest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+  }),
+  cls: z.number().min(0),
+  /** Null when the browser reported no LCP entry; that fails, never passes. */
+  lcpMs: z.number().min(0).nullable(),
+  domFindings: z.array(
+    z.object({
+      kind: z.string().min(1),
+      message: z.string(),
+      elements: z.array(z.string()),
+    })
+  ),
+});
+
 export const FactoryRenderSchema = z.object({
   pageId: Id,
   route: z.string().startsWith('/'),
   cls: z.number().min(0),
   lcpMs: z.number().min(0),
+  captures: z.array(FactoryRenderCaptureSchema).optional(),
 });
 
 export const FactorySeoAgentSchema = z.object({
