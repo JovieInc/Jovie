@@ -1130,6 +1130,10 @@ class FixRedTest(unittest.TestCase):
             git("commit", "--allow-empty", "-qm", "repair")
             repair = git("rev-parse", "HEAD")
             self.assertTrue(lane.repair_created_head(path, repair))
+            git("commit", "--allow-empty", "-qm", "next local repair")
+            self.assertTrue(lane.repair_created_head(path, repair, allow_local_progress=True),
+                            "an earlier own push remains valid while the agent prepares its next commit")
+            self.assertFalse(lane.repair_created_head(path, repair), "completion must preserve unpushed follow-up")
             self.assertFalse(lane.repair_created_head(path, initial))
             external = git("commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "external writer")
             git("reset", "--hard", external)
@@ -1170,7 +1174,7 @@ class FixRedTest(unittest.TestCase):
         with patch.object(lane, "reconcile_fix_target", return_value={**self.pr(), "state": "OPEN", "headRefOid": "h2"}), \
                 patch.object(lane, "repair_created_head", return_value=True) as owned:
             self.assertEqual(lane.require_fix_target(self.pr(), "agent-running", worktree=Path("repair"))["headRefOid"], "h2")
-            owned.assert_called_once_with(Path("repair"), "h2")
+            owned.assert_called_once_with(Path("repair"), "h2", allow_local_progress=True)
         with patch.object(lane, "reconcile_fix_target", return_value={**self.pr(), "state": "OPEN", "headRefOid": "h2"}), \
                 patch.object(lane, "repair_created_head", return_value=False):
             with self.assertRaises(lane.RepairStopped):

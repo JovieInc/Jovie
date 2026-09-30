@@ -1500,7 +1500,7 @@ class RepairStopped(RuntimeError):
         self.live, self.stage = live, stage
 
 
-def repair_created_head(worktree: Path, head: str) -> bool:
+def repair_created_head(worktree: Path, head: str, *, allow_local_progress: bool = False) -> bool:
     """Only accept a new remote head created in this attempt's fresh checkout.
 
     A fetch/reset/checkout of another writer's commit is not repair provenance.
@@ -1508,8 +1508,12 @@ def repair_created_head(worktree: Path, head: str) -> bool:
     """
     try:
         local = sh(["git", "rev-parse", "HEAD"], cwd=worktree, timeout=30)
-        if local.returncode != 0 or local.stdout.strip() != head:
+        if local.returncode != 0:
             return False
+        if local.stdout.strip() != head:
+            if not allow_local_progress or sh(["git", "merge-base", "--is-ancestor", head, "HEAD"],
+                                              cwd=worktree, timeout=30).returncode != 0:
+                return False
         log = sh(["git", "reflog", "show", "--format=%H%x00%gs", "HEAD"], cwd=worktree, timeout=30)
     except (OSError, subprocess.SubprocessError):
         return False
@@ -1529,7 +1533,8 @@ def require_fix_target(pr: dict, stage: str, *, worktree: Path | None = None) ->
     if state != "OPEN":
         raise RepairStopped("target-pr-merged" if state == "MERGED" else "target-pr-closed", live, stage)
     if live.get("headRefOid") != pr["headRefOid"]:
-        if worktree is None or not repair_created_head(worktree, live["headRefOid"]):
+        if worktree is None or not repair_created_head(worktree, live["headRefOid"],
+                                                       allow_local_progress=stage == "agent-running"):
             raise RepairStopped("target-head-superseded", live, stage)
     return live
 
