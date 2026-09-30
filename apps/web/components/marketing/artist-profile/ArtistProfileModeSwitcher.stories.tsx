@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { ArtistProfileModeSwitcher } from './ArtistProfileModeSwitcher';
 
@@ -41,5 +42,15 @@ export const Compact: Story = {
     phoneCaption: 'Profile preview',
     phoneSubcaption: 'Release, video, shows, and shop modes',
     showIntroHeading: false,
+  },
+};
+
+export const Readiness: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const choice = canvas.getByRole('tab', { name: 'Out now' });
+    await waitFor(() => expect(choice).toBeEnabled());
+    await userEvent.click(choice);
+    await expect(choice).toHaveAttribute('aria-selected', 'true');
   },
 };
