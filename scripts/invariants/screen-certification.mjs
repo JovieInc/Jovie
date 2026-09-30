@@ -877,18 +877,43 @@ function resolveHeadSha(explicit, repoRoot = REPO_ROOT) {
   return sha.toLowerCase();
 }
 
-function resolveDiffBase(explicit, repoRoot = REPO_ROOT) {
+export function resolveDiffBase(explicit, repoRoot = REPO_ROOT) {
   if (explicit) return explicit;
   if (process.env.SCREEN_CERT_DIFF_BASE)
     return process.env.SCREEN_CERT_DIFF_BASE;
   if (process.env.COMPONENT_SHIP_DIFF_BASE)
     return process.env.COMPONENT_SHIP_DIFF_BASE;
   if (process.env.TURBO_SCM_BASE) return process.env.TURBO_SCM_BASE;
-  const probe = spawnSync('git', ['rev-parse', '--verify', 'origin/main'], {
+  const probe = spawnSync(
+    'git',
+    ['rev-parse', '--verify', 'origin/main^{commit}'],
+    {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    }
+  );
+  if (probe.status !== 0) return null;
+  // A checkout on the base tip (main push or workflow_dispatch, which carry
+  // no PR base or event.before) would self-diff and fail closed. Audit the
+  // landed head commit instead — the same HEAD^1 convention ci-fast's
+  // changedFiles() uses for non-PR events.
+  const head = spawnSync('git', ['rev-parse', '--verify', 'HEAD^{commit}'], {
     cwd: repoRoot,
     encoding: 'utf8',
   });
-  return probe.status === 0 ? 'origin/main' : null;
+  if (
+    head.status === 0 &&
+    head.stdout?.trim() &&
+    head.stdout.trim() === probe.stdout?.trim()
+  ) {
+    const parent = spawnSync(
+      'git',
+      ['rev-parse', '--verify', 'HEAD^1^{commit}'],
+      { cwd: repoRoot, encoding: 'utf8' }
+    );
+    if (parent.status === 0) return 'HEAD^1';
+  }
+  return 'origin/main';
 }
 
 function resolveCommitSha(ref, repoRoot = REPO_ROOT) {

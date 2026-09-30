@@ -1,6 +1,6 @@
 'use client';
 
-// @coverage-via apps/web/tests/unit/components/atoms/DesktopTitlebar.test.tsx
+// @coverage-via apps/web/tests/unit/components/organisms/DesktopTitlebar.test.tsx
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { CSSProperties } from 'react';
@@ -148,6 +148,9 @@ export function DesktopTitlebar() {
   const sidebarOpen = sidebarCtx?.state === 'open';
   const toggleSidebar = sidebarCtx?.toggleSidebar;
   const isMobile = sidebarCtx?.isMobile === true;
+  const sidebarToggleOpen = isMobile
+    ? sidebarCtx?.openMobile === true
+    : sidebarOpen;
 
   return (
     <div
@@ -175,7 +178,7 @@ export function DesktopTitlebar() {
               no-drag via the Electron drag-region CSS. */}
           <RailToggleButton
             side='left'
-            open={sidebarOpen}
+            open={sidebarToggleOpen}
             openLabel='Collapse sidebar'
             closedLabel='Expand sidebar'
             onToggle={() => toggleSidebar?.()}

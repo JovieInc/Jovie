@@ -37,7 +37,6 @@ const HEADLINE_CLAMP_BASELINE: Readonly<Record<string, number>> = {
   'components/marketing/artist-profile/ArtistProfileMonetizationSection.tsx': 1,
   'components/marketing/artist-profile/ArtistProfileOpinionatedSection.tsx': 1,
   'components/marketing/artist-profile/ArtistProfileOutcomeDuo.tsx': 1,
-  'components/marketing/artist-profile/ArtistProfileSectionHeader.tsx': 1,
   'components/marketing/changelog/ChangelogTimeline.tsx': 1,
   'components/marketing/engineering/EngineeringPublication.tsx': 3,
   'components/marketing/friday-rhythm-section.tsx': 1,
@@ -124,9 +123,14 @@ describe('marketing headline line-clamp guard', () => {
     ).toBeUndefined();
   });
 
-  it('keeps the JOV-6906 fixed owners free of clamped headings', () => {
+  it('keeps repaired shared owners free of clamped headings', () => {
     const counts = collectClampedHeadlineCounts();
     expect(counts.has('components/marketing/FaqSection.tsx')).toBe(false);
+    expect(
+      counts.has(
+        'components/marketing/artist-profile/ArtistProfileSectionHeader.tsx'
+      )
+    ).toBe(false);
     expect(
       counts.has(
         'components/marketing/artist-notifications/ArtistNotificationsHero.tsx'

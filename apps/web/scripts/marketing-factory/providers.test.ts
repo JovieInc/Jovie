@@ -6,6 +6,7 @@ import {
   fixtureTransport,
   liveProviders,
 } from './providers';
+import { fixtureCaptures } from './render-measurer';
 
 const brief = loadFactoryBrief('solutions', 'founders');
 const request = {
@@ -30,6 +31,7 @@ describe('dryProviders', () => {
       status: 'ok',
       cls: 0,
       lcpMs: 1200,
+      captures: fixtureCaptures('/x', { cls: 0, lcpMs: 1200 }),
     });
     expect(dry.label('openai/gpt-5.5')).toBe('fixture:openai/gpt-5.5');
     expect(dry.now().toISOString()).toBe('2026-09-30T00:00:00.000Z');
@@ -73,6 +75,19 @@ describe('liveProviders', () => {
       })
     ).resolves.toMatchObject({ status: 'credentials-unavailable' });
     expect(live.label('openai/gpt-5.5')).toBe('openai/gpt-5.5');
+  });
+
+  it('reports the render measurer only when a production build is configured', () => {
+    const saved = process.env.FACTORY_RENDER_BASE_URL;
+    try {
+      delete process.env.FACTORY_RENDER_BASE_URL;
+      expect(liveProviders(null).capabilities.renderMeasurer).toBe(false);
+      process.env.FACTORY_RENDER_BASE_URL = 'http://127.0.0.1:3100';
+      expect(liveProviders(null).capabilities.renderMeasurer).toBe(true);
+    } finally {
+      if (saved === undefined) delete process.env.FACTORY_RENDER_BASE_URL;
+      else process.env.FACTORY_RENDER_BASE_URL = saved;
+    }
   });
 
   it('parses the JSON a reachable model returns', async () => {

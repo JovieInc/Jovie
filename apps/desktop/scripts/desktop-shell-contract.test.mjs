@@ -1350,7 +1350,7 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   const rootLayout = await readFile(join(webRoot, 'app/layout.tsx'), 'utf8');
   const globalsCss = await readFile(join(webRoot, 'app/globals.css'), 'utf8');
   const titlebarSource = await readFile(
-    join(webRoot, 'components/atoms/DesktopTitlebar.tsx'),
+    join(webRoot, 'components/organisms/DesktopTitlebar.tsx'),
     'utf8'
   );
   const runtimeInit = await readFile(

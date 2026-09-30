@@ -50,7 +50,7 @@ describe('affected-test selector inventory', () => {
 describe('structural control stage execution', () => {
   it('starts registry, project, control coverage, Dependabot coverage, CLI coverage, web, continuity, and FX stages in order', async () => {
     const stages = buildControlTestCommands();
-    expect(stages).toHaveLength(19);
+    expect(stages).toHaveLength(20);
     expect(stages[0]).toEqual(buildCompanyRegistryTestCommand());
     expect(stages[1]).toEqual(buildProjectCreationTestCommand());
     expect(stages[2][1]).toContain('lib/__tests__/pr-conflict-event.test.mjs');
@@ -171,6 +171,18 @@ describe('structural control stage execution', () => {
       ],
     ]);
     expect(stages[18]).toEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
+        '--test-coverage-include=scripts/invariants/sonar-repair-contract.mjs',
+        '--test-coverage-lines=95',
+        '--test-coverage-branches=80',
+        '--test-coverage-functions=95',
+        'scripts/invariants/sonar-repair-contract.test.mjs',
+      ],
+    ]);
+    expect(stages[19]).toEqual([
       'pnpm',
       ['run', 'test:rolling-ci-fx:coverage'],
     ]);

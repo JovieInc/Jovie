@@ -39,8 +39,11 @@ export interface DesktopUpdateModalViewProps {
 const COPY = DESKTOP_UPDATE_COPY.modal;
 
 const MB = 1024 * 1024;
-function formatMegabytes(bytes: number): string {
-  return `${Math.round(bytes / MB)} MB`;
+function formatDownloadSize(bytes: number): string {
+  if (bytes >= MB) return `${Math.round(bytes / MB)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  if (bytes > 0 && bytes < 1) return '<1 B';
+  return `${Math.round(bytes)} B`;
 }
 
 function formatReleaseDate(iso: string): string {
@@ -105,9 +108,12 @@ export function DesktopUpdateModalView({
       ) : null}
 
       {state.state === 'available' ? (
-        <DialogBody data-testid='desktop-update-notes'>
+        <DialogBody
+          data-testid='desktop-update-notes'
+          className='h-48 overflow-y-auto'
+        >
           {loading ? (
-            // Reserve the notes block so the dialog does not grow on load.
+            // The same scroll region bounds loading, notes and fallback content.
             <div aria-hidden='true'>
               <LoadingSkeleton lines={3} height='h-3' />
             </div>
@@ -122,7 +128,7 @@ export function DesktopUpdateModalView({
                 </p>
               ) : null}
               {notes.items.length > 0 ? (
-                <ul className='max-h-48 list-disc space-y-1 overflow-y-auto pl-4 text-app leading-relaxed text-secondary-token marker:text-tertiary-token'>
+                <ul className='list-disc space-y-1 pl-4 text-app leading-relaxed text-secondary-token marker:text-tertiary-token'>
                   {notes.items.map(item => (
                     <li key={item}>{item}</li>
                   ))}
@@ -149,13 +155,15 @@ export function DesktopUpdateModalView({
             <span>
               {state.totalBytes > 0
                 ? COPY.transferred(
-                    formatMegabytes(state.transferredBytes),
-                    formatMegabytes(state.totalBytes)
+                    formatDownloadSize(state.transferredBytes),
+                    formatDownloadSize(state.totalBytes)
                   )
                 : `${Math.round(state.percent)}%`}
             </span>
             {state.bytesPerSecond > 0 ? (
-              <span>{COPY.speed(formatMegabytes(state.bytesPerSecond))}</span>
+              <span>
+                {COPY.speed(formatDownloadSize(state.bytesPerSecond))}
+              </span>
             ) : null}
           </div>
         </DialogBody>

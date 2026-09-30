@@ -81,6 +81,17 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("workers exit on claim", doctor.judge(obs(**idle, lastWorkAge=301))["spawn-exit"])
         self.assertIn("spawn-exit", doctor.judge(obs(**idle, lastWorkAge=None)))
 
+    def test_spawn_exit_ignores_workers_that_reached_the_claim_scan_cleanly(self):
+        """Workers spawning and exiting because the pool held nothing claimable is not the
+        deadlock: a fresh per-provider idle exit suppresses the alert, a stale one does not."""
+        idle = {"tick": {"at": "x", "unhealthy": [], "error": None, "spawned": ["devin", "codex"]},
+                "worktrees": 0, "lastWorkAge": 301}
+        self.assertNotIn("spawn-exit", doctor.judge(
+            obs(**idle, idleExitAge={"devin": 30, "codex": 200})))
+        self.assertIn("spawn-exit", doctor.judge(
+            obs(**idle, idleExitAge={"devin": 30, "codex": 301})))
+        self.assertIn("spawn-exit", doctor.judge(obs(**idle, idleExitAge={"devin": 30})))
+
     def test_available_provider_capacity_with_compatible_work_and_no_starts_is_p0(self):
         idle = {"tick": {"at": "x", "unhealthy": [], "error": None,
                          "spawned": ["devin"] * 4 + ["codex"] * 3},

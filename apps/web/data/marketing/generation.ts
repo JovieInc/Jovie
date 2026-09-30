@@ -484,10 +484,12 @@ export function auditMarketingTasteAdmission(input: {
   readonly candidateDigest: string;
   readonly generatorModelId: string;
   readonly receipts: readonly MarketingGateReceipt[];
+  /** Audit only these gates, for a stage that owns a subset. Defaults to all. */
+  readonly gateIds?: readonly MarketingTasteGateId[];
 }): readonly MarketingGenerationFinding[] {
   const findings: MarketingGenerationFinding[] = [];
 
-  for (const gateId of MARKETING_TASTE_GATE_IDS) {
+  for (const gateId of input.gateIds ?? MARKETING_TASTE_GATE_IDS) {
     const receipts = input.receipts.filter(
       receipt => receipt.gateId === gateId
     );

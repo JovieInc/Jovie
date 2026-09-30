@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { DesktopTitlebar } from './DesktopTitlebar';
 
 const meta = {
-  title: 'Atoms/DesktopTitlebar',
+  title: 'Organisms/DesktopTitlebar',
   component: DesktopTitlebar,
   parameters: {
     layout: 'fullscreen',

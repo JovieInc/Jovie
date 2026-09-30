@@ -261,7 +261,10 @@ function ShowcaseSurface({
   );
 
   return (
-    <div className='homepage-showcase-surface' style={profileAccentStyle}>
+    <div
+      className='homepage-showcase-surface absolute inset-0'
+      style={profileAccentStyle}
+    >
       <ProfileCompactSurface
         dataTestId='homepage-profile-preview'
         renderMode='preview'

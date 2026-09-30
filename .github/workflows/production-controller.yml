@@ -1079,7 +1079,7 @@ jobs:
           if [ "$current_sha" != "$EXPECTED_SHA" ]; then
             echo "::warning::Post-deploy verification for $EXPECTED_SHA was superseded by $current_sha; exact production bind will be proven before marker preservation."
             if [ "$RUN_WEB" != true ]; then
-              node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha"
+              node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha" --allow-in-flight-supersede
             fi
             echo "is_current=false" >> "$GITHUB_OUTPUT"
             echo "superseded_before_marker=true" >> "$GITHUB_OUTPUT"

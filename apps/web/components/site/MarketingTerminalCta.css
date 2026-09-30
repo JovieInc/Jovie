@@ -57,3 +57,17 @@
     padding-inline: var(--space-4);
   }
 }
+
+/* K4ar1 narrow closing scale: the artist claim variant must keep its
+   complete three-word headline together without changing the homepage. */
+@media (max-width: 767px) {
+  .system-b-mounted-home-footer-cta[data-marketing-variant="final-single-claim"]
+    .system-b-mounted-home-footer-cta-copy {
+    padding-inline: 0;
+  }
+
+  .system-b-mounted-home-footer-cta[data-marketing-variant="final-single-claim"]
+    .system-b-mounted-home-footer-cta-heading {
+    font-size: var(--text-3xl);
+  }
+}

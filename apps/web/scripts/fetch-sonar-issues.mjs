@@ -650,18 +650,35 @@ export async function collectInventory({
     );
   }
 
-  const status = incompleteness.length === 0 ? 'COMPLETE' : 'INCOMPLETE';
   const usesImpacts = open.records.some(issue => Array.isArray(issue?.impacts));
 
   const sha = ctx.env?.GITHUB_SHA || gitOut(['rev-parse', 'HEAD'], ctx.cwd);
   const stale = Boolean(
     boundAnalysis?.revision && sha && boundAnalysis.revision !== sha
   );
+  if (!boundAnalysis) {
+    atomic = false;
+    incompleteness.push({
+      partition: 'project-analysis',
+      reason: 'analysis_missing',
+    });
+    warnings.push(
+      `no project analysis is available for branch ${branch} — findings cannot be bound to a Sonar analysis`
+    );
+  }
   if (stale) {
+    atomic = false;
+    incompleteness.push({
+      partition: 'project-analysis',
+      reason: 'analysis_revision_stale',
+      analysisRevision: boundAnalysis.revision,
+      observedSha: sha,
+    });
     warnings.push(
       `bound analysis revision ${boundAnalysis.revision} lags observed commit ${sha} — findings may not reflect current ${branch}`
     );
   }
+  const status = incompleteness.length === 0 ? 'COMPLETE' : 'INCOMPLETE';
 
   const inventory = {
     schema: 'jovie-sonar-inventory/v1',

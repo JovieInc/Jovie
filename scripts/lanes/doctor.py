@@ -113,6 +113,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         merged_error = "merged-pr-attribution-unreadable"
     held = read_json(state / "held.json", {})
     failures = read_json(state / "failures.json", {})
+    idle_exit = read_json(state / "worker-idle.json", {})
     disk = shutil.disk_usage("/")
     capacity_by_provider: dict[str, dict[str, int]] = {}
     for path in (state / "slots").glob("*.lock"):
@@ -139,6 +140,10 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "failed24h": sum(1 for r in receipts if r.get("verdict") == "failed"),
         "lastLandingAge": min(landings) if landings else None, "runs24h": len(receipts),
         "lastWorkAge": min((age_s(r.get("endedAt"), now) for r in receipts if r.get("kind") != "sync-main"), default=None),
+        # Per-provider age of the last clean claim-scan exit: proves spawned workers reach the
+        # scan, so their exit is 'nothing claimable', not the spawn-exit deadlock.
+        "idleExitAge": {name: age_s((row or {}).get("at"), now)
+                        for name, row in idle_exit.items() if isinstance(row, dict)},
         "worktrees": len(list((state / "worktrees").glob("*"))),
         "busy": len([p for p in (state / "slots").glob("*.lock") if not p.name.startswith("gate.") and _locked(p)]),
         "capacityByProvider": capacity_by_provider,
@@ -252,9 +257,14 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     if pool and busy and obs.get("runs24h") and (obs.get("lastLandingAge") is None or obs["lastLandingAge"] > NO_LANDING_S):
         last = "never in 24h" if obs.get("lastLandingAge") is None else f"{int(obs['lastLandingAge'] // 3600)}h ago"
         alerts["no-landing"] = f"{busy} slots busy with {pool} issues waiting but nothing passed the gate ({last})"
-    spawned = len((obs.get("tick") or {}).get("spawned") or [])
-    if pool and spawned and not obs.get("worktrees", 1) and (obs.get("lastWorkAge") or NO_WORK_S + 1) > NO_WORK_S:
-        alerts["spawn-exit"] = (f"{spawned} workers spawn each tick but no agent run started or ended in "
+    spawned = (obs.get("tick") or {}).get("spawned") or []
+    idle_ages = obs.get("idleExitAge") or {}
+    clean_exit = bool(spawned) and all(
+        (idle_ages.get(provider) if idle_ages.get(provider) is not None else NO_WORK_S + 1) <= NO_WORK_S
+        for provider in set(spawned))
+    if pool and spawned and not clean_exit and not obs.get("worktrees", 1) \
+            and (obs.get("lastWorkAge") or NO_WORK_S + 1) > NO_WORK_S:
+        alerts["spawn-exit"] = (f"{len(spawned)} workers spawn each tick but no agent run started or ended in "
                                 f"{NO_WORK_S // 60}m with {pool} issues waiting; workers exit on claim")
     for provider, idle_since in ((previous or {}).get("providerIdleSince") or {}).items():
         if not provider_idle_with_qualified_work(obs, provider) or obs["now"] - idle_since < PROVIDER_IDLE_S:

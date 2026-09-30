@@ -35,6 +35,7 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
+| `/api/ovie/privacy-lock` | GET/POST | Fresh Better Auth + admin role; same-origin POST | Read `{enabled,locked,unlockedUntil}` or `enable`, `disable`, `lock`, `unlock`. Default off. Unlock requires a recent verified admin-capable passkey on the current session and lasts 24 hours from verification. Explicit relock invalidates receipts; disabling requires an active privacy unlock. |
 
 The optional per-user Ovie privacy gate protects operator data and actions server-side. It is independent of ordinary Jovie access and existing privileged-action/passkey-management authorization. A client cookie never grants operator access. Independent signed machine/service tokens and anonymous kiosk signage retain their existing authority; a valid kiosk token used in an authenticated browser still obeys that user's privacy policy. Credential-bearing claim-token exports and kiosk-secret retrieval retain privileged MFA even when privacy is unlocked.
 

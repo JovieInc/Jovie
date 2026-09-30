@@ -416,7 +416,10 @@ describe('ci-fast bounded parallel workflow', () => {
         spotify: 'false',
         kbd: 'false',
         crawler: 'true',
+        desktop_update: 'false',
         overlay: 'false',
+        privacy: 'false',
+        tasks: 'false',
       });
 
       const runner = remaining
@@ -437,6 +440,8 @@ describe('ci-fast bounded parallel workflow', () => {
             RUN_KBD: 'false',
             RUN_CRAWLER: 'true',
             RUN_OVERLAY: 'false',
+            RUN_TASKS: 'false',
+            RUN_PRIVACY: 'false',
           },
         }
       );
@@ -504,6 +509,249 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(chosen.stdout.trim().split('\n')).toEqual([
       'tests/e2e/storybook-overlay-collisions.spec.ts',
     ]);
+  });
+
+  it('selects the desktop updater geometry proof for modal changes', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(
+      /DESKTOP_UPDATE_STORYBOOK_PATTERN='([^']+)'/
+    )?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'apps/web/components/organisms/desktop-update/DesktopUpdateModal.tsx',
+      'apps/web/components/organisms/desktop-update/DesktopUpdateModal.stories.tsx',
+      'apps/web/tests/e2e/storybook-desktop-update-modal.spec.ts',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern ?? 'a^'], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(
+      spawnSync('grep', ['-qE', pattern ?? 'a^'], {
+        input: 'apps/web/components/organisms/Other.tsx\n',
+        encoding: 'utf8',
+      }).status
+    ).not.toBe(0);
+    expect(remaining).toContain(
+      'RUN_DESKTOP_UPDATE: ${{ steps.storybook-browser.outputs.desktop_update }}'
+    );
+    expect(remaining).toContain(
+      'specs+=(tests/e2e/storybook-desktop-update-modal.spec.ts)'
+    );
+    expect(
+      jobBlock('ci-storybook-surfaces', 'ci-cross-product-integration')
+    ).toContain('tests/e2e/storybook-desktop-update-modal.spec.ts');
+  });
+
+  it('selects the Tasks row geometry proof for its shared cell and feature surfaces', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(/TASKS_STORYBOOK_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'apps/web/components/features/dashboard/tasks/TaskDataTable.tsx',
+      'apps/web/components/features/dashboard/tasks/TaskDataTable.stories.tsx',
+      'apps/web/components/features/dashboard/tasks/TaskListRow.tsx',
+      'apps/web/components/features/dashboard/tasks/TasksPageClient.tsx',
+      'apps/web/components/organisms/table/atoms/TableCell.tsx',
+      'apps/web/components/organisms/table/table.types.ts',
+      'apps/web/components/organisms/table/organisms/VirtualizedTableRow.tsx',
+      'apps/web/components/organisms/table/molecules/TaskProjectionListRow.tsx',
+      'apps/web/tests/e2e/storybook-task-row-geometry.spec.ts',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(
+      spawnSync('grep', ['-qE', pattern], {
+        input:
+          'apps/web/components/features/dashboard/releases/ReleaseList.tsx\n',
+        encoding: 'utf8',
+      }).status
+    ).not.toBe(0);
+
+    const selector = remaining
+      .split('id: storybook-browser\n')[1]
+      .split('      - name: Start ci-fast lanes')[0];
+    const command = selector
+      .split('run: |\n')[1]
+      .replaceAll('${{ github.event_name }}', 'pull_request')
+      .replaceAll('${{ github.base_ref }}', 'main');
+    const root = mkdtempSync(join(tmpdir(), 'tasks-storybook-selection-'));
+    try {
+      const output = join(root, 'output');
+      const result = spawnSync(
+        'bash',
+        ['-c', 'git() { printf "%s\\n" "$CHANGED_PATHS"; }\n' + command],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CHANGED_PATHS:
+              'apps/web/components/organisms/table/organisms/VirtualizedTableRow.tsx',
+            RUNNER_TEMP: root,
+            GITHUB_OUTPUT: output,
+          },
+        }
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(
+        Object.fromEntries(
+          readFileSync(output, 'utf8')
+            .trim()
+            .split('\n')
+            .map(line => line.split('='))
+        )
+      ).toEqual({
+        run: 'true',
+        spotify: 'false',
+        kbd: 'false',
+        crawler: 'false',
+        overlay: 'false',
+        tasks: 'true',
+        desktop_update: 'false',
+        privacy: 'false',
+      });
+
+      const runner = remaining
+        .split('id: storybook-browser-test')[1]
+        .split('      - name: Upload Storybook browser evidence')[0];
+      const selection = runner.slice(
+        runner.indexOf('          specs=()'),
+        runner.indexOf('          pnpm exec storybook dev')
+      );
+      const chosen = spawnSync(
+        'bash',
+        ['-c', selection + '\nprintf "%s\\n" "${specs[@]}"'],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            RUN_SPOTIFY: 'false',
+            RUN_KBD: 'false',
+            RUN_CRAWLER: 'false',
+            RUN_OVERLAY: 'false',
+            RUN_TASKS: 'true',
+            RUN_PRIVACY: 'false',
+          },
+        }
+      );
+      expect(chosen.status, chosen.stderr).toBe(0);
+      expect(chosen.stdout.trim().split('\n')).toEqual([
+        'tests/e2e/storybook-task-row-geometry.spec.ts',
+      ]);
+      expect(
+        jobBlock('ci-storybook-surfaces', 'ci-cross-product-integration')
+      ).toContain('tests/e2e/storybook-task-row-geometry.spec.ts');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('selects real Ovie privacy browser proof for its boundary and keeps combined coverage', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(/PRIVACY_STORYBOOK_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'apps/web/app/app/(shell)/DashboardShellPrivacyBoundary.tsx',
+      'apps/web/app/app/(shell)/DashboardShellPrivacyBoundary.test.tsx',
+      'apps/web/lib/workspace-lock/workspace-lock.ts',
+      'apps/web/components/organisms/user-button/OviePrivacyLockControl.tsx',
+      'apps/web/components/organisms/user-button/OviePrivacyLockControl.test.tsx',
+      'apps/web/.storybook/main.ts',
+      'apps/web/tests/unit/storybook/dashboard-layout-client-mock.test.tsx',
+      'apps/web/.storybook/stories/ovie-privacy-boundary.stories.tsx',
+      'apps/web/tests/e2e/storybook-ovie-privacy-boundary.spec.ts',
+    ])
+      expect(
+        spawnSync('grep', ['-qE', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    expect(
+      spawnSync('grep', ['-qE', pattern], {
+        input: 'apps/web/components/Other.tsx\n',
+        encoding: 'utf8',
+      }).status
+    ).not.toBe(0);
+    const selector = remaining
+      .split('id: storybook-browser\n')[1]
+      .split('      - name: Start ci-fast lanes')[0];
+    const command = selector
+      .split('run: |\n')[1]
+      .replaceAll('${{ github.event_name }}', 'pull_request')
+      .replaceAll('${{ github.base_ref }}', 'main');
+    const root = mkdtempSync(join(tmpdir(), 'privacy-storybook-selection-'));
+    try {
+      const output = join(root, 'output');
+      const result = spawnSync(
+        'bash',
+        ['-c', 'git() { printf "%s\\n" "$CHANGED_PATHS"; }\n' + command],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CHANGED_PATHS:
+              'apps/web/app/app/(shell)/DashboardShellPrivacyBoundary.tsx',
+            RUNNER_TEMP: root,
+            GITHUB_OUTPUT: output,
+          },
+        }
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(readFileSync(output, 'utf8')).toContain('privacy=true\nrun=true');
+      const runner = remaining
+        .split('id: storybook-browser-test')[1]
+        .split('      - name: Upload Storybook browser evidence')[0];
+      const selection = runner.slice(
+        runner.indexOf('          specs=()'),
+        runner.indexOf('          pnpm exec storybook dev')
+      );
+      const chosen = spawnSync(
+        'bash',
+        ['-c', selection + '\nprintf "%s\\n" "${specs[@]}"'],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            RUN_SPOTIFY: 'false',
+            RUN_KBD: 'false',
+            RUN_CRAWLER: 'false',
+            RUN_OVERLAY: 'false',
+            RUN_PRIVACY: 'true',
+            RUN_TASKS: 'false',
+          },
+        }
+      );
+      expect(chosen.status, chosen.stderr).toBe(0);
+      expect(chosen.stdout.trim()).toBe(
+        'tests/e2e/storybook-ovie-privacy-boundary.spec.ts'
+      );
+      expect(
+        jobBlock('ci-storybook-surfaces', 'ci-cross-product-integration')
+      ).toContain('tests/e2e/storybook-ovie-privacy-boundary.spec.ts');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('runs existing Kbd and Spotify Storybook specs through the scanned evidence path', () => {
