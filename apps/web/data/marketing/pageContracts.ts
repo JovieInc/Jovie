@@ -97,7 +97,8 @@ export const MARKETING_PAGE_CONTRACTS = {
   '(marketing)/solutions/[audience]/page.tsx': {
     routeGlob: '(marketing)/solutions/[audience]/page.tsx',
     copyScope: 'music',
-    url: APP_ROUTES.SOLUTIONS_ARTISTS,
+    // Family route; artists is the only routed record (JOV-7275).
+    url: '/solutions/*',
     job: 'show artists how profiles connect music, links, and permissioned fan updates',
     proof: 'profile gallery, capture flow, and conversion sections',
     successEvent: 'artist claims a profile',

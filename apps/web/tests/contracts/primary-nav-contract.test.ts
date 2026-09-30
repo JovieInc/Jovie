@@ -2,6 +2,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { getRoutedSolutionsPages } from '@/content/pages/solutions';
+import { pageRecordPath } from '@/data/marketing/factory/pageRecord';
 import {
   MARKETING_CUSTOMERS_FLYOUT,
   MARKETING_NAV_LINKS,
@@ -46,7 +48,12 @@ function routeFileExistsFor(href: string) {
   }
 
   visit(appRoot);
-  return actualRoutes.has(href);
+  // Record-backed family routes serve each routed record's path (JOV-7275).
+  const recordRoutes = new Set(getRoutedSolutionsPages().map(pageRecordPath));
+  return (
+    actualRoutes.has(href) ||
+    (recordRoutes.has(href) && actualRoutes.has('/solutions/[audience]'))
+  );
 }
 
 describe('primary marketing navigation contract', () => {
