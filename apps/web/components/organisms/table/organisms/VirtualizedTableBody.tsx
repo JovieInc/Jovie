@@ -28,11 +28,6 @@ export interface VirtualizedTableBodyProps<TData extends RowData> {
   readonly virtualRows?: VirtualItem[];
 
   /**
-   * Total height of virtualized content
-   */
-  readonly totalSize?: number;
-
-  /**
    * Top padding for virtualization
    */
   readonly paddingTop?: number;
@@ -178,7 +173,6 @@ export function VirtualizedTableBody<TData extends RowData>({
   rows,
   shouldVirtualize,
   virtualRows,
-  totalSize,
   paddingTop,
   paddingBottom,
   rowVirtualizer,
@@ -211,12 +205,11 @@ export function VirtualizedTableBody<TData extends RowData>({
   const items = useVirtual ? virtualRows! : rows;
 
   return (
-    <tbody
-      style={{
-        position: useVirtual ? 'relative' : undefined,
-        height: useVirtual && totalSize ? `${totalSize}px` : undefined,
-      }}
-    >
+    // Virtualized rows stay in normal table flow between the top and bottom
+    // spacer rows. Absolutely positioned rows need <tbody> as their containing
+    // block, and WebKit never makes a table row group one: rows escaped to the
+    // page origin and painted over the page chrome in Safari.
+    <tbody>
       {/* Top padding for virtualization */}
       {useVirtual && paddingTop !== undefined && paddingTop > 0 && (
         <tr>
@@ -261,7 +254,6 @@ export function VirtualizedTableBody<TData extends RowData>({
             rowRefsMap={rowRefsMap}
             shouldEnableKeyboardNav={shouldEnableKeyboardNav}
             shouldVirtualize={useVirtual}
-            virtualStart={virtualItem?.start}
             focusedIndex={focusedIndex}
             isSelected={isRowSelected?.(rowData, rowIndex)}
             onRowClick={onRowClick}
