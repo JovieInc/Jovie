@@ -43,7 +43,7 @@ function TipsHero() {
         {/* eslint-disable @jovie/canonical-ui-label-casing -- Preserve approved sentence-case marketing copy while adding binding evidence. */}
         <h1
           id='pay-hero-heading'
-          className='marketing-h1-linear mt-6 max-w-[12ch] text-primary-token'
+          className='marketing-h1-linear mt-6 max-w-2xl text-primary-token'
         >
           Turn every payment into a follower.
         </h1>
@@ -113,7 +113,7 @@ function HowItWorksSection() {
             </div>
           </div>
 
-          <div className='homepage-section-stack mt-0 grid grid-cols-1 gap-6 md:grid-cols-3'>
+          <div className='homepage-section-stack grid grid-cols-1 gap-6 md:grid-cols-3'>
             {STEPS.map((step, i) => (
               <div
                 key={step.title}
@@ -188,7 +188,7 @@ function BenefitsSection() {
             </div>
           </div>
 
-          <div className='homepage-section-stack mt-0 grid grid-cols-1 gap-6 md:grid-cols-3'>
+          <div className='homepage-section-stack grid grid-cols-1 gap-6 md:grid-cols-3'>
             {BENEFITS.map(benefit => (
               <div
                 key={benefit.title}
@@ -250,7 +250,7 @@ function SocialProofSection() {
             </div>
           </div>
 
-          <div className='homepage-section-stack mt-0 grid grid-cols-2 gap-4 sm:grid-cols-4'>
+          <div className='homepage-section-stack grid grid-cols-2 gap-4 sm:grid-cols-4'>
             {USE_CASES.map(uc => (
               <div
                 key={uc.label}
