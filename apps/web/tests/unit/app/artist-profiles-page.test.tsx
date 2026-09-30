@@ -3,7 +3,10 @@ import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import type { ImgHTMLAttributes, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { ArtistProfileLandingPage } from '@/components/marketing/artist-profile/ArtistProfileLandingPage';
+import {
+  ArtistProfileAnnotatedTruth,
+  ArtistProfileLandingPage,
+} from '@/components/marketing/artist-profile/ArtistProfileLandingPage';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import {
   ARTIST_PROFILE_SECTION_ORDER,
@@ -397,6 +400,19 @@ describe('ArtistProfilesPage', () => {
     expect(
       screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.finalCta)
     ).toBeInTheDocument();
+  });
+
+  it('exports the annotated truth section for record composition (JOV-7275)', () => {
+    render(
+      <ArtistProfileAnnotatedTruth specWall={ARTIST_PROFILE_COPY.specWall} />
+    );
+
+    expect(
+      screen.getByText(ARTIST_PROFILE_COPY.specWall.headline)
+    ).toBeInTheDocument();
+    expect(screen.getAllByTestId('artist-profile-truth-tile')).toHaveLength(
+      ARTIST_PROFILE_COPY.specWall.callouts?.length ?? 4
+    );
   });
 
   it('renders only the hero when the full page flag is off', async () => {

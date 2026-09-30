@@ -219,7 +219,7 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
     input: { useCase: 'two-actions', actionCount: 2 },
     why: 'primary and secondary pricing CTAs',
   },
-  ...['/artist-profiles', '/artist-profile', '/solutions/artists'].map(
+  ...['/artist-profiles', '/artist-profile', '/solutions/*'].map(
     (url): HeroRouteIntent => ({
       url,
       input: { useCase: 'claim-conversion', conversion: 'claim-profile' },

@@ -503,7 +503,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     aliasOf: '/artist-profiles',
   },
   {
-    glob: '(marketing)/solutions/artists/page.tsx',
+    glob: '(marketing)/solutions/[audience]/page.tsx',
     recipeId: 'artist-lp',
     renderedSections: approvedBindings(
       'components/marketing/artist-profile/ArtistProfileLandingRoute.tsx',
@@ -521,13 +521,18 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     ),
     bindingEvidence: {
       status: 'verified',
-      source: 'route audit 2026-09-26 (JOV-5861)',
+      source:
+        'route audit 2026-09-26 (JOV-5861); page record 2026-09-30 (JOV-7275)',
       notes:
-        'Real artist solution route; renders the same artist-lp component and chrome as /artist-profiles. /artists remains the directory. Release-cycle gallery is product evidence, not social proof.',
+        'Family renderer for content/pages/solutions records. The artists record composes the same artist-lp sections as /artist-profiles (zero pixel diff at 390 and 1440). /artists remains the directory. Release-cycle gallery is product evidence, not social proof.',
     },
     status: 'active',
-    specVersion: '1.4.0',
-    url: '/solutions/artists',
+    specVersion: '1.5.0',
+    url: '/solutions/*',
+    healthCheck: {
+      path: '/solutions/artists',
+      expected: 'page',
+    },
     productEvidence: {
       kind: 'framed-screenshot',
       componentPath:
