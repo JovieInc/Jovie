@@ -24,7 +24,7 @@
     "@tailwindcss/postcss": "^4.3.3",
     "tailwindcss": "^4.3.3",
     "autoprefixer": "^10.6.1",
-    "@statsig/statsig-node-core": "^0.23.0",
+    "@statsig/statsig-node-core": "^0.23.1",
     "workflow": "4.8.9"
   },
   "devDependencies": {
