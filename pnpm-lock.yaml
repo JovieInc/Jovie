@@ -1010,8 +1010,8 @@ importers:
   workers/canary-otp:
     dependencies:
       postal-mime:
-        specifier: 2.7.6
-        version: 2.7.6
+        specifier: 3.0.0
+        version: 3.0.0
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^5.20260926.1
@@ -14070,6 +14070,9 @@ packages:
 
   postal-mime@2.7.6:
     resolution: {integrity: sha512-UUlyE2KlxmvwMGq060onF/VWU3zD6dVW31FwokQ5v26jWd35fbs2MoTFzh+jXnPwAyV2MULMKXcBInGOl5TO6Q==}
+
+  postal-mime@3.0.0:
+    resolution: {integrity: sha512-Z4a9ar2Bv3YpK3IXag+Yda30k7bMZfpRuUGyqtHnZ2pjHG8Bl62EhZIk4n1dzv00gfzP9g+94e9kd8+XmjVWLA==}
 
   postcss-value-parser@4.2.0:
     resolution: {integrity: sha512-1NNCs6uurfkVbeXG4S8JFT9t19m45ICnif8zWLd5oPSZ50QnwMfK+H3jv408d4jw/7Bttv5axS5IiHoLaVNHeQ==}
@@ -31862,6 +31865,8 @@ snapshots:
   possible-typed-array-names@1.1.0: {}
 
   postal-mime@2.7.6: {}
+
+  postal-mime@3.0.0: {}
 
   postcss-value-parser@4.2.0: {}
 
