@@ -111,6 +111,25 @@ class SelectionTest(unittest.TestCase):
         pricing.description = "Change live pricing for annual plans"
         self.assertIsNone(lane.pick_issue([secret, pricing], {}, provider="codex"))
 
+    def test_pricing_page_fixture_is_not_a_live_price_change(self):
+        task = issue("JOV-7259", labels=["agent-ready"])
+        task.title = "Validate public JSON-LD certification"
+        task.description = "The live `/pricing` schema fixture retains its nested Product/Offer graph."
+        self.assertEqual(lane.pick_issue([task], {}, provider="devin"), task)
+        for instruction in (
+            "Change live pricing for annual plans",
+            "Change live `/pricing` to $199",
+            "Rotate production credentials",
+            "Revoke production API keys",
+        ):
+            with self.subTest(instruction=instruction):
+                task.description = f"{instruction}.\nThe live `/pricing` schema fixture must match."
+                self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
+                task.description = f"The live `/pricing` schema fixture must match.\n{instruction}."
+                self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
+        task.description = "Change live `/pricing` schema fixture and pricing to $199"
+        self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
+
 
 class PromptTest(unittest.TestCase):
     def test_contract_names_branch_issue_and_independent_gate(self):

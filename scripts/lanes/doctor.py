@@ -66,6 +66,35 @@ def age_s(stamp: str | None, now: float) -> float | None:
 
 # ---------------------------------------------------------------- observations
 
+def host_capacity(host, lane) -> dict:
+    """Configured seats, including draining workers but not stale lock files."""
+    capacity = {}
+    for name, spec in lane.load_providers().items():
+        slots = max(0, host.slots(name, spec.get("slots", 1))) if spec.get("enabled", True) else 0
+        running = sum(_locked(path) for path in (host.state / "slots").glob(f"{name}.*.lock"))
+        capacity[name] = {"slots": slots, "running": running}
+    return capacity
+
+
+def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int]:
+    """Apply the worker predicate instead of treating label inventory as runnable."""
+    linear = lane.Linear(host.linear_env)
+    failures = read_json(host.state / "failures.json", {})
+    lane.load_github_env()
+    in_flight = lane.in_flight_issues()
+    if in_flight is None:
+        raise RuntimeError("in-flight PR ownership unreadable; runnable pool unknown")
+    specs = lane.load_providers()
+    candidates = {name: linear.lane_issues(specs[name]["label"])
+                  for name, seats in capacity.items() if seats["slots"] > 0}
+    qualified = {
+        name: [issue for issue in candidates.get(name, [])
+               if lane.pick_issue([issue], failures, now=now, in_flight=in_flight, provider=name)]
+        for name in capacity
+    }
+    return qualified, len({issue.identifier for issues in candidates.values() for issue in issues})
+
+
 def observe(host, lane, codex, now: float | None = None) -> dict:
     """Everything the doctor judges, gathered once (cheap: local files plus two API reads)."""
     now = time.time() if now is None else now
@@ -90,17 +119,16 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         accounts = codex.status()
     except Exception as error:
         accounts = {"error": str(error)[:80], "accounts": {}, "available": []}
+    capacity_by_provider = host_capacity(host, lane)
     try:
-        linear = lane.Linear(host.linear_env)
-        qualified_by_provider = {name: linear.lane_issues(name) for name, spec in lane.load_providers().items()
-                                 if spec.get("enabled", True)}
+        qualified_by_provider, candidate_pool = qualified_pool(host, lane, capacity_by_provider, now)
         pool_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
         qualified_jobs = {name: [issue.identifier for issue in issues]
                           for name, issues in qualified_by_provider.items()}
-        pool = sum(pool_by_provider.values())
+        pool = len({issue.identifier for issues in qualified_by_provider.values() for issue in issues})
         linear_error = None
     except Exception as error:
-        pool, pool_by_provider, qualified_jobs, linear_error = None, {}, {}, f"{type(error).__name__}: {error}"[:100]
+        pool, candidate_pool, pool_by_provider, qualified_jobs, linear_error = None, None, {}, {}, f"{type(error).__name__}: {error}"[:100]
     github = None
     merged, merged_error = [], None
     try:
@@ -115,14 +143,6 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     failures = read_json(state / "failures.json", {})
     idle_exit = read_json(state / "worker-idle.json", {})
     disk = shutil.disk_usage("/")
-    capacity_by_provider: dict[str, dict[str, int]] = {}
-    for path in (state / "slots").glob("*.lock"):
-        if path.name.startswith("gate."):
-            continue
-        provider = path.name.split(".")[0]
-        capacity = capacity_by_provider.setdefault(provider, {"running": 0, "slots": 0})
-        capacity["slots"] += 1
-        capacity["running"] += 1 if _locked(path) else 0
     hud_beat = None
     try:
         hud_beat = now - (state / "hud.heartbeat").stat().st_mtime
@@ -145,9 +165,9 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "idleExitAge": {name: age_s((row or {}).get("at"), now)
                         for name, row in idle_exit.items() if isinstance(row, dict)},
         "worktrees": len(list((state / "worktrees").glob("*"))),
-        "busy": len([p for p in (state / "slots").glob("*.lock") if not p.name.startswith("gate.") and _locked(p)]),
+        "busy": sum(seats["running"] for seats in capacity_by_provider.values()),
         "capacityByProvider": capacity_by_provider,
-        "codex": accounts, "pool": pool, "poolByProvider": pool_by_provider,
+        "codex": accounts, "pool": pool, "candidatePool": candidate_pool, "poolByProvider": pool_by_provider,
         "qualifiedJobsByProvider": qualified_jobs,
         "linearError": linear_error, "githubRemaining": github,
         "merged24h": merged, "mergedAttributionError": merged_error,
@@ -253,7 +273,7 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     elif pool == 0:
         since = (previous or {}).get("poolEmptySince") or obs["now"]
         if obs["now"] - since >= POOL_EMPTY_S:
-            alerts["pool-empty"] = "no Todo issues carry agent-ready/devin/codex; Summer: route work to the lanes"
+            alerts["pool-empty"] = "no runnable Todo issues after admission checks; Summer: route work to the lanes"
     if pool and busy and obs.get("runs24h") and (obs.get("lastLandingAge") is None or obs["lastLandingAge"] > NO_LANDING_S):
         last = "never in 24h" if obs.get("lastLandingAge") is None else f"{int(obs['lastLandingAge'] // 3600)}h ago"
         alerts["no-landing"] = f"{busy} slots busy with {pool} issues waiting but nothing passed the gate ({last})"
@@ -530,14 +550,7 @@ def fetch_slo(host, lane) -> dict | None:
 def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict | None = None,
                 conditions: dict[str, dict] | None = None) -> dict:
     """The few numbers Summer and other agents need, in one small JSON."""
-    counts = {}
-    for path in (host.state / "slots").glob("*.lock"):
-        if path.name.startswith("gate."):
-            continue
-        provider = path.name.split(".")[0]
-        counts.setdefault(provider, {"running": 0, "slots": 0})
-        counts[provider]["slots"] += 1
-        counts[provider]["running"] += 1 if _locked(path) else 0
+    counts = obs.get("capacityByProvider") or {}
     throughput = lane.provider_throughput(
         obs.get("_receipts24h") or [],
         counts,
@@ -580,8 +593,8 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
                              "founderJudgmentRequired": False, "controls": "show-only"}
     return {"schema": "symphony-lanes-status/v1", "at": now_iso(), "host": lane.HOST, "release": tick.get("release"),
             "lanes": counts, "running": sum(c["running"] for c in counts.values()),
-            "idle": sum(c["slots"] - c["running"] for c in counts.values()),
-            "pool": obs.get("pool"), "lastLandingAgeS": obs.get("lastLandingAge"),
+            "idle": sum(max(0, c["slots"] - c["running"]) for c in counts.values()),
+            "pool": obs.get("pool"), "candidatePool": obs.get("candidatePool"), "lastLandingAgeS": obs.get("lastLandingAge"),
             "gateWaits24h": obs.get("gateWaits24h"),
             "gateWaitMedianS24h": obs.get("gateWaitMedianS24h"),
             "gateWaitMaxS24h": obs.get("gateWaitMaxS24h"),
