@@ -18,14 +18,34 @@ export const PROFILE_QUALIFICATION_STATUSES = [
 export type ProfileQualificationStatus =
   (typeof PROFILE_QUALIFICATION_STATUSES)[number];
 
+const DURABLE_QUALIFICATION_STATUSES = new Set<ProfileQualificationStatus>([
+  'qualified',
+  'conflicting',
+  'rejected',
+]);
+
+/** Owner decisions and resolved conflicts outrank a repeated discovery claim. */
+export function reconcileQualificationStatus(
+  existingStatus: ProfileQualificationStatus | null | undefined,
+  discoveredStatus: ProfileQualificationStatus
+): ProfileQualificationStatus {
+  return existingStatus && DURABLE_QUALIFICATION_STATUSES.has(existingStatus)
+    ? existingStatus
+    : discoveredStatus;
+}
+
 export function selectRetirableSurfaceIds(
   knownSurfaceIds: readonly string[],
   currentSurfaceIds: readonly string[],
-  liveSourceSurfaceIds: readonly string[]
+  liveSourceSurfaceIds: readonly string[],
+  retainedSurfaceIds: readonly string[] = []
 ): string[] {
   const current = new Set(currentSurfaceIds);
   const live = new Set(liveSourceSurfaceIds);
-  return knownSurfaceIds.filter(id => !current.has(id) && !live.has(id));
+  const retained = new Set(retainedSurfaceIds);
+  return knownSurfaceIds.filter(
+    id => !current.has(id) && !live.has(id) && !retained.has(id)
+  );
 }
 
 export interface SurfaceSourceState {

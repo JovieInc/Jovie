@@ -383,6 +383,11 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
           qualificationStatus: 'suggested',
           monitoringState: 'locked',
           rank: null,
+          identityEvidence: {
+            sourceCount: 2,
+            sourceTypes: ['identity_link', 'social_link'],
+            confidence: 0.83,
+          },
         },
         {
           ...base,
@@ -421,9 +426,15 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(
       screen.queryByRole('link', { name: 'Review' })
     ).not.toBeInTheDocument();
+    expect(screen.getByText('Is this you?')).toBeInTheDocument();
     expect(
-      screen.getByText(/Identity confirmation is not yet available here/)
+      screen.getByText(
+        '2 live sources · public identity link, linked social profile · 83% match'
+      )
     ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Yes' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'No' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Unsure' })).toBeEnabled();
     rail.unmount();
     await user.click(screen.getByRole('button', { name: 'All Pages' }));
     expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(
@@ -441,6 +452,64 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(
       screen.queryByRole('button', { name: 'Search Outcome' })
     ).not.toBeInTheDocument();
+  });
+
+  it('persists an identity rejection and refreshes the canonical workspace', async () => {
+    const user = userEvent.setup();
+    const surfaceId = '22222222-2222-4222-8222-222222222222';
+    const base = data.rows[0];
+    if (base?.rowType !== 'surface') throw new Error('Missing surface fixture');
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock.mockImplementation(async (input, init) => {
+      if ((init?.method ?? 'GET') === 'POST') {
+        return jsonResponse({ ok: true, changed: true, status: 'rejected' });
+      }
+      return jsonResponse(suggestionsResponse([]));
+    });
+    renderWorkspace({
+      ...data,
+      rows: [
+        {
+          ...base,
+          id: surfaceId,
+          label: 'Possible 7Digital Page',
+          platform: 'seven_digital',
+          qualificationStatus: 'suggested',
+          identityEvidence: {
+            sourceCount: 1,
+            sourceTypes: ['identity_link'],
+            confidence: 0.61,
+          },
+        },
+      ],
+    });
+
+    fireEvent.click(
+      screen.getByRole('row', { name: /Possible 7Digital Page/ })
+    );
+    await waitFor(() =>
+      expect(vi.mocked(useRegisterRightPanel)).not.toHaveBeenLastCalledWith(
+        null
+      )
+    );
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    const rail = render(
+      <TooltipProvider>{panel as ReactElement}</TooltipProvider>
+    );
+    await user.click(screen.getByRole('button', { name: 'No' }));
+
+    await waitFor(() => expect(navigationMock.refresh).toHaveBeenCalled());
+    const mutation = fetchMock.mock.calls.find(
+      ([input, init]) =>
+        String(input) === `/api/profile-surfaces/${surfaceId}/qualification` &&
+        init?.method === 'POST'
+    );
+    expect(mutation?.[1]).toMatchObject({
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'no' }),
+    });
+    expect(vi.mocked(useRegisterRightPanel)).toHaveBeenLastCalledWith(null);
+    rail.unmount();
   });
 
   it('retains a useful inventory destination when the review queue is empty', async () => {
