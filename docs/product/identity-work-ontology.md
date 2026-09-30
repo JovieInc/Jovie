@@ -64,7 +64,7 @@ Current first-party documentation was checked on 2026-09-30:
 | --- | --- |
 | [Behance profile guide](https://help.behance.net/hc/en-us/articles/360034538213-Guide-Fill-Out-Your-Profile) | A person's profile can separate identity fields from a Work tab containing projects. This is the closest direct support for the pair. |
 | [YouTube Studio Content](https://support.google.com/youtube/answer/7548152?hl=en-419) | A broad output area can group videos, live content, posts, and playlists without making links the organizing noun. |
-| [Shopify products](https://help.shopify.com/en/manual/products) and [Spotify for Artists music](https://support.spotify.com/eg-en/artists/article/label-teams/) | Specialists use concrete subtype nouns. Work therefore needs visible type filters and plain empty-state examples. |
+| [Shopify products](https://help.shopify.com/en/manual/products) and [Bandcamp music](https://bandcamp.com/help/guides/artists) | Specialists use concrete subtype nouns. Work therefore needs visible type filters and plain empty-state examples. |
 | [Notion workspaces](https://www.notion.com/help/intro-to-workspaces) | Library commonly means a place to browse and manage stored workspace content, which reinforces the storage mental model we are leaving. |
 | [Asana hierarchy](https://help.asana.com/s/article/how-asana-works?language=en_US) | Work commonly includes goals, portfolios, projects, and tasks. Jovie must guard against that competing meaning. |
 
