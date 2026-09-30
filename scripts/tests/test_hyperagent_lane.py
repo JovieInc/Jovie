@@ -61,6 +61,7 @@ class HyperagentLaneTest(unittest.TestCase):
         self.assertEqual(len(self.gates), 1)
         self.assertEqual(self.gates[0]["headRefOid"], "a" * 40)
         self.assertIn("hyperagent-attempt-id", self.calls[1][1]["message"])
+        self.assertNotIn("attempt-1", self.calls[1][1]["namingHint"])
 
     def test_missing_pr_is_a_hold(self):
         self.payload["messages"] = [{"role": "assistant", "content": "Finished the plan"}]

@@ -105,7 +105,7 @@ def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
                     created = call("create_thread", {"agentId": proof["agentId"],
                         "message": prompt + f"\nUse branch {branch}. Include <!-- linear-issue-id:{issue} --> and "
                         f"{marker} in the PR body. Return the PR URL and head: FULL_SHA.",
-                        "namingHint": f"{issue} {attempt}"[:80]})
+                        "namingHint": f"{issue} {hashlib.sha256(attempt.encode()).hexdigest()[:16]}"})
                     thread = created.get("threadId") or created.get("thread_id") or (created.get("thread") or {}).get("id")
                     if not isinstance(thread, str) or not thread:
                         return held("remote-create-outcome-unknown")
