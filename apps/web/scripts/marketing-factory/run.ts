@@ -272,7 +272,7 @@ export async function runFactory(
             { stage, attempt, file, outputDigest: receipt.outputDigest },
           ],
         };
-        if (stage === 'render' && result.notes.record) {
+        if (result.notes.record) {
           writeJson(join(runDir, 'page-record.json'), result.notes.record);
         }
         finish({});

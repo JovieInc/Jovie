@@ -2,6 +2,10 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  isRoutedPageRecord,
+  PageRecordSchema,
+} from '../../data/marketing/factory/pageRecord';
 import { FACTORY_STAGES } from '../../data/marketing/factory/spine';
 import { loadFactoryBrief } from './brief';
 import { dryProviders, fixtureTransport, liveProviders } from './providers';
@@ -60,9 +64,39 @@ describe('factory:run --dry end to end', () => {
     expect(record('15-publish.attempt-1.json').artifact).toMatchObject({
       rampState: 'shadow',
     });
+    const pageRecord = PageRecordSchema.parse(
+      readJson(join(runDir(), 'page-record.json'))
+    );
+    expect(pageRecord).toMatchObject({
+      id: 'solutions.founders',
+      status: 'shadow',
+      heroVariant: 'split-link-claim',
+      proof: ['product-profile-subscribe-capture'],
+      seo: { title: 'Claim your public profile', hub: null },
+    });
+    expect(isRoutedPageRecord(pageRecord)).toBe(false);
+    expect(pageRecord.trust).toBe(0.9);
+    expect(pageRecord.receipts.map(r => r.stage)).toEqual(
+      FACTORY_STAGES.slice(0, -1)
+    );
+    expect(pageRecord.media['hero-1']).toMatchObject({
+      kind: 'screenshot-registry',
+      id: 'public-profile-desktop',
+    });
+  });
+
+  it('fails render when the run cannot form a valid page record', async () => {
+    const manifest = await run({
+      brief: {
+        ...brief,
+        seo: { ...brief.seo, jsonLdTypes: ['WebPage'] },
+      },
+    });
+
+    expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'render' });
     expect(
-      readJson<{ status: string }>(join(runDir(), 'page-record.json')).status
-    ).toBe('shadow');
+      record('12-render.attempt-1.json').receipt.invariantsFailed
+    ).toContain('page-record-schema');
   });
 
   it('resumes from a later stage on top of verified receipts', async () => {
