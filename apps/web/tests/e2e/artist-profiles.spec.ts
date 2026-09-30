@@ -109,6 +109,41 @@ async function observeMarketingScroll(page: import('@playwright/test').Page) {
     }
   });
   const installObserver = () => {
+    const recordNativeCall = (
+      api: string,
+      target: Element | Window,
+      args: unknown[]
+    ) => {
+      console.info(
+        'MARKETING_SCROLL_DIAGNOSTIC ' +
+          JSON.stringify({
+            event: 'native-api',
+            api,
+            at: performance.now(),
+            scrollY: window.scrollY,
+            args,
+            targetTag: target instanceof Element ? target.tagName : null,
+            targetRole:
+              target instanceof Element ? target.getAttribute('role') : null,
+            stack: new Error('scroll caller').stack,
+          })
+      );
+    };
+    const nativeFocus = HTMLElement.prototype.focus;
+    HTMLElement.prototype.focus = function (...args) {
+      recordNativeCall('focus', this, args);
+      return Reflect.apply(nativeFocus, this, args);
+    };
+    const nativeScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (...args) {
+      recordNativeCall('scrollIntoView', this, args);
+      return Reflect.apply(nativeScrollIntoView, this, args);
+    };
+    const nativeScrollTo = window.scrollTo;
+    window.scrollTo = function (...args) {
+      recordNativeCall('scrollTo', window, args);
+      return Reflect.apply(nativeScrollTo, this, args);
+    };
     const record = (event: Event) => {
       const adaptive = document.querySelector(
         '[data-testid="artist-profile-section-adaptive"]'
