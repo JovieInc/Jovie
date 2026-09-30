@@ -1,8 +1,14 @@
 // @vitest-environment node
+import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { CertificationRecordBackend } from '../lib/agent-os/certification-cas';
 import { DesignCiJudgeCertificationStore } from '../lib/agent-os/design-ci-judge-certification';
+import type {
+  CellDispatchEvaluation,
+  JudgeDispatchInput,
+} from './design-ci-judge-dispatch';
 import {
+  createDefaultJudgeDispatchDependencies,
   dispatchDesignCiJudgeMatrix,
   shouldEscalateJudgeScore,
   writeDesignCiJudgeDispatchResults,
@@ -12,6 +18,31 @@ import type {
   FingerprintedCell,
   JudgeRoute,
 } from './design-ci-judge-router';
+import { formatMatrixReport } from './design-ci-judge-router';
+
+vi.mock('../../../scripts/invariants/jev-gateway.mjs', () => ({
+  prepareJevRequest: vi.fn((request: unknown) => request),
+  evaluateThroughGateway: vi.fn(async () => ({
+    answers: {
+      alignment: {
+        choice: 'supported',
+        probabilities: { supported: 0.95 },
+      },
+    },
+  })),
+}));
+
+vi.mock('../../../scripts/vision/art-evaluator.mjs', () => ({
+  evaluateArt: vi.fn(async () => ({ ok: true })),
+  subscriptionVisionTransport: vi.fn(
+    () => async () => '{"state":"pass","score":0.9,"reason":"ok"}'
+  ),
+}));
+
+vi.mock('../lib/agent-os/design-taste-jury/jury', () => ({
+  buildDeterministicJurorVerdicts: vi.fn(() => []),
+  buildDesignTasteJuryConsensus: vi.fn(() => ({ findings: [] })),
+}));
 
 function matrix(routes: readonly JudgeRoute[]): DesignCiJudgeMatrix {
   const rows = routes.map((route, index) => ({
@@ -140,6 +171,145 @@ describe('design-ci judge dispatch', () => {
     expect(result.evaluations[0]?.evidence.join('\n')).toContain(
       'gateway unavailable'
     );
+  });
+
+  it('fails closed when a classifier returns an out-of-band score', async () => {
+    const result = await dispatchDesignCiJudgeMatrix(matrix(['jev']), {
+      runJev: vi.fn().mockResolvedValue({
+        state: 'pass',
+        score: 1.7,
+        evidence: ['jev'],
+      }),
+      runVisual: vi.fn(),
+      runFlagship: vi.fn(),
+    });
+    expect(result.matrix.cells[0]?.state).toBe('fail');
+    expect(result.evaluations[0]?.evidence.join('\n')).toContain(
+      'invalid classifier score'
+    );
+  });
+
+  it('rejects cells whose row or unit is missing from the matrix', async () => {
+    const broken = matrix(['jev']);
+    broken.cells = [{ ...broken.cells[0]!, rowId: 'ROW-MISSING' }];
+    await expect(
+      dispatchDesignCiJudgeMatrix(broken, {
+        runJev: vi.fn(),
+        runVisual: vi.fn(),
+        runFlagship: vi.fn(),
+      })
+    ).rejects.toThrow('references a missing row or unit');
+  });
+
+  it('leaves deterministic and insufficient cells untouched', async () => {
+    const result = await dispatchDesignCiJudgeMatrix(
+      matrix(['deterministic', 'insufficient']),
+      {
+        runJev: vi.fn(),
+        runVisual: vi.fn(),
+        runFlagship: vi.fn(),
+      }
+    );
+    expect(result.matrix.cells.map(cell => cell.state)).toEqual([
+      'insufficient',
+      'insufficient',
+    ]);
+    expect(result.evaluations).toHaveLength(0);
+    expect(result.postShipTasteItems).toHaveLength(0);
+  });
+
+  it('reports failed judge cells in the matrix report', () => {
+    const evaluations: CellDispatchEvaluation[] = [
+      {
+        cellId: 'ROW-0::screen:web.homepage',
+        route: 'visual',
+        state: 'fail',
+        score: 0.1,
+        evidence: ['classifier:vision:score=0.1'],
+        detail: 'layout drift',
+        escalated: true,
+        modelId: 'openai/gpt-5.6-sol',
+      },
+      {
+        cellId: 'ROW-1::screen:web.homepage',
+        route: 'jev',
+        state: 'pass',
+        score: 0.9,
+        evidence: [],
+        detail: null,
+        escalated: false,
+        modelId: 'judge-bulk',
+      },
+    ];
+    const report = formatMatrixReport(matrix(['jev']), [], evaluations);
+    expect(report).toContain('FAILED JUDGE CELLS (1):');
+    expect(report).toContain('ROW-0::screen:web.homepage');
+    expect(report).toContain('model=openai/gpt-5.6-sol');
+    expect(report).not.toContain('ROW-1::screen:web.homepage (');
+  });
+});
+
+describe('default judge dispatch dependencies', () => {
+  const repoRoot = resolve(process.cwd(), '..', '..');
+  const fixture = matrix(['jev']);
+  const input: JudgeDispatchInput = {
+    cell: fixture.cells[0]!,
+    row: fixture.rows[0]!,
+    unit: {
+      ...fixture.units[0]!,
+      sources: ['apps/web/scripts/design-ci-judge-dispatch.ts'],
+    },
+    model: {
+      id: 'fixture/model',
+      family: 'fixture',
+      channel: 'subscription',
+      pool: 'fixture',
+      quality: 1,
+    },
+  };
+  const dependencies = createDefaultJudgeDispatchDependencies({ repoRoot });
+
+  it('runs the Jev classifier through the gateway adapter', async () => {
+    const verdict = await dependencies.runJev(input);
+    expect(verdict).toMatchObject({
+      state: 'pass',
+      score: 0.95,
+      judgeId: 'typesafe-ai/jev',
+    });
+    expect(verdict.evidence).toContain('scripts/invariants/jev-gateway.mjs');
+  });
+
+  it('runs the visual classifier on image artifacts', async () => {
+    const verdict = await dependencies.runVisual({
+      ...input,
+      unit: {
+        ...input.unit,
+        sources: [
+          'apps/web/public/favicon-16x16.png',
+          'apps/web/scripts/design-ci-judge-dispatch.ts',
+        ],
+      },
+    });
+    expect(verdict.state).toBe('pass');
+    expect(verdict.evidence.join('\n')).toContain('favicon-16x16.png');
+  });
+
+  it('falls back to the deterministic taste jury without image artifacts', async () => {
+    const verdict = await dependencies.runVisual(input);
+    expect(verdict).toMatchObject({
+      state: 'pass',
+      score: 0.9,
+      judgeId: 'design-taste-jury',
+    });
+  });
+
+  it('runs the flagship judge through the subscription transport', async () => {
+    const verdict = await dependencies.runFlagship(input);
+    expect(verdict).toMatchObject({
+      state: 'pass',
+      score: 0.9,
+      judgeId: 'fixture/model',
+    });
   });
 });
 

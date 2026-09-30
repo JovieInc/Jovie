@@ -81,6 +81,24 @@ vi.mock('@/lib/analytics', async importOriginal => ({
   track: vi.fn(),
 }));
 
+// JovieCardInterestCapture mounts JovieAuthValuesProvider → authClient.useSession(),
+// whose nanostores cleanup timer can fire after the jsdom environment is torn
+// down (`window is not defined` unhandled error in coverage shards). The
+// evidence contract only cares about product surfaces, so render through the
+// signed-out defaults instead of subscribing to the real session atom.
+vi.mock('@/hooks/useJovieAuth', async importOriginal => {
+  const original =
+    await importOriginal<typeof import('@/hooks/useJovieAuth')>();
+  return {
+    ...original,
+    JovieAuthValuesProvider: ({
+      children,
+    }: {
+      readonly children?: React.ReactNode;
+    }) => children,
+  };
+});
+
 import { JovieCardLanding } from '@/app/(marketing)/card/JovieCardLanding';
 import DownloadPage from '@/app/(marketing)/download/page';
 import { InstantMerchLanding } from '@/app/(marketing)/instant-merch/InstantMerchLanding';
