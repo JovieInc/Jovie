@@ -6,6 +6,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -108,7 +109,9 @@ printf '%s' "$production_deploy_json"
 });
 
 function fixture(t) {
-  const base = mkdtempSync(resolve(tmpdir(), 'jovie-input-proof-'));
+  const base = realpathSync(
+    mkdtempSync(resolve(tmpdir(), 'jovie-input-proof-'))
+  );
   const root = resolve(base, 'repo');
   mkdirSync(root);
   t.after(() => rmSync(base, { recursive: true, force: true }));
@@ -189,6 +192,25 @@ function fixture(t) {
     captureInputs: capture,
   };
 }
+
+test('captures dependency evidence through a symlinked checkout without accepting escapes', t => {
+  const f = fixture(t);
+  const alias = resolve(f.base, 'repo-alias');
+  symlinkSync(f.root, alias, 'dir');
+  const receipt = captureInputs(alias, f.sha, f.input, f.sbom);
+  assert.equal(receipt.source.head, f.sha);
+  assert.equal(receipt.supplyChain.lockfile.path, 'pnpm-lock.yaml');
+  const outside = resolve(f.base, 'outside-lock.yaml');
+  writeFileSync(outside, 'outside');
+  rmSync(resolve(f.root, 'pnpm-lock.yaml'));
+  symlinkSync(outside, resolve(f.root, 'pnpm-lock.yaml'));
+  const escapedReceipt = resolve(f.base, 'escaped.json');
+  assert.throws(
+    () => captureInputs(alias, f.sha, escapedReceipt, f.sbom),
+    /Missing build input file/
+  );
+  assert.equal(existsSync(escapedReceipt), false);
+});
 
 test('records clean baseline, dirty paths and artifact/deployment binding without leaking file bodies', t => {
   const f = fixture(t);
