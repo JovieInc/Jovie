@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 import { MarketingContainer } from '@/components/marketing/MarketingContainer';
 import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
 import type { MarketingPenContractId } from '@/data/marketing/penContracts';
-import { cn } from '@/lib/utils';
+import { cn, widont } from '@/lib/utils';
 
 export interface MarketingTerminalCtaProps {
   readonly title: string;
@@ -147,7 +147,7 @@ export function MarketingTerminalCta({
           variant === 'homepage-v2' ? true : undefined
         }
       >
-        {title}
+        {widont(title)}
       </h2>
       {body ? <p className={variantStyles.body}>{body}</p> : null}
       <div className={variantStyles.actions}>

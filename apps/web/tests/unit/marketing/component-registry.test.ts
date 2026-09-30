@@ -709,6 +709,9 @@ describe('canonical marketing component registry', () => {
     expect(source.match(/variant='primary'/g)).toHaveLength(2);
     expect(source.match(/variant='tertiary'/g)).toHaveLength(1);
     expect(source).toContain('line-clamp-2');
+    // Closing headlines must not leave a single word alone on the last line
+    // (route DOM taste ratchet: orphaned-line).
+    expect(source).toContain('widont(title)');
     expect(source).toContain("import './MarketingTerminalCta.css';");
     expect(source).toContain('marketing-terminal-cta--cinematic');
     expect(source).toContain("data-wrap='editorial-title'");
@@ -807,6 +810,15 @@ describe('canonical marketing component registry', () => {
         'utf8'
       )
     ).toContain('export function ArtistProfileSocialProof');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('widont(releaseCycle.headline)');
     expect(
       fs.readFileSync(
         path.join(

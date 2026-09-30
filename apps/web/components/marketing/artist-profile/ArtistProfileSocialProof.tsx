@@ -4,6 +4,7 @@ import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import type { ArtistProfileSocialProofData } from '@/data/socialProof';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
+import { widont } from '@/lib/utils';
 import { MarketingSnapRail } from '../MarketingSnapRail';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
@@ -85,7 +86,7 @@ export function ArtistProfileReleaseCycleGallery({
       <div className='mx-auto max-w-public-content'>
         <ArtistProfileSectionHeader
           align='left'
-          headline={releaseCycle.headline}
+          headline={widont(releaseCycle.headline)}
           body={releaseCycle.intro}
           className='max-w-3xl'
           bodyClassName='max-w-xl'

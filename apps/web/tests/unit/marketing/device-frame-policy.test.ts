@@ -115,4 +115,25 @@ describe('device frame policy', () => {
     );
     expect(component).toContain("readonly platform: 'ios-native'");
   });
+
+  it('renders mobile web surfaces through the shared bezel-free screen', () => {
+    const deviceScreen = readFileSync(
+      resolve(WEB_ROOT, 'components/marketing/device/DeviceScreen.tsx'),
+      'utf8'
+    );
+    expect(deviceScreen).toContain("data-device='mobile-web'");
+    expect(deviceScreen).toContain("data-device='official-iphone'");
+
+    const homePhoneFrame = readFileSync(
+      resolve(WEB_ROOT, 'components/features/home/HomePhoneFrame.tsx'),
+      'utf8'
+    );
+    expect(homePhoneFrame).toContain('MobileWebScreen');
+
+    const phoneFrame = readFileSync(
+      resolve(WEB_ROOT, 'components/molecules/PhoneFrame.tsx'),
+      'utf8'
+    );
+    expect(phoneFrame).toContain('MobileWebScreen');
+  });
 });

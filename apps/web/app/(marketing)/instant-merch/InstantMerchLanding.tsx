@@ -119,7 +119,7 @@ export function InstantMerchLanding() {
               <p className='homepage-section-eyebrow'>{copy.flow.eyebrow}</p>
               <h2
                 id='instant-merch-flow-heading'
-                className='mt-3 text-balance text-2xl font-semibold tracking-tight text-primary-token sm:text-3xl line-clamp-2'
+                className='mt-3 text-pretty text-2xl font-semibold tracking-tight text-primary-token sm:text-3xl line-clamp-2'
               >
                 {copy.flow.title}
               </h2>

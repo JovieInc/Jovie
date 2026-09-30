@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/marketing/device-frame-policy.test.ts
 import type { ReactNode } from 'react';
 import { MobileWebScreen } from '@/components/marketing/device/DeviceScreen';
 import { cn } from '@/lib/utils';

@@ -88,6 +88,32 @@ describe('ProductScreenshotFrame — dark-glass product frame (JOV-6247)', () =>
   });
 });
 
+describe('ProductScreenshotFrame — phone device policy (JOV-7238)', () => {
+  it('renders phone captures bezel-free: no simulated device or shadow', () => {
+    render(
+      <ProductScreenshotFrame
+        scenarioId={FOCUS_SCENARIO}
+        device='phone'
+        sizes={SIZES}
+      />
+    );
+
+    const el = frame(FOCUS_SCENARIO);
+    expect(el).toHaveClass('mobile-web-screen');
+    expect(el.className).not.toMatch(/shadow-|rounded-|border /);
+  });
+
+  it('keeps the desktop frame treatment for desktop captures', () => {
+    render(
+      <ProductScreenshotFrame scenarioId={DESKTOP_SCENARIO} sizes={SIZES} />
+    );
+
+    const el = frame();
+    expect(el).not.toHaveClass('mobile-web-screen');
+    expect(el.className).toContain('rounded-xl');
+  });
+});
+
 describe('ProductScreenshotFrame — feature focus', () => {
   it('exposes the registry-declared feature focus for the pay capture', () => {
     const focus = getScreenshotFeatureFocus(FOCUS_SCENARIO);

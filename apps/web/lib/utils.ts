@@ -7,6 +7,15 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Replaces the last whitespace before the final word with a non-breaking
+ * space so a rendered heading never ends on a single-word last line
+ * (orphaned-line taste invariant).
+ */
+export function widont(text: string): string {
+  return text.replace(/\s+(\S+)\s*$/, '\u00a0$1');
+}
+
+/**
  * Creates a debounced function using TanStack Pacer.
  *
  * @deprecated Prefer using TanStack Pacer hooks directly in React components:
