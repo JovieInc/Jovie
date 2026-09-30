@@ -8,6 +8,7 @@
 // comment for the full story). The Node environment keeps the real
 // global `URL`, so every import here loads cleanly.
 import { describe, expect, it } from 'vitest';
+import { dispatchDesignCiJudgeMatrix } from './design-ci-judge-dispatch';
 import { buildCells } from './design-ci-judge-router';
 
 /**
@@ -107,7 +108,7 @@ describe('design-ci-judge-router: evaluation-path reds (JOV-6944 slice 3)', () =
     expect(result.certified).toBe(false);
   });
 
-  it('human: a human-routed cell can never resolve to anything but insufficient', () => {
+  it('human: a human-routed cell becomes a non-blocking post-ship taste item', async () => {
     const humanRow = {
       rowId: 'FIXTURE-HUMAN-TASTE',
       invariantId: 'FIXTURE-HUMAN-TASTE',
@@ -126,9 +127,29 @@ describe('design-ci-judge-router: evaluation-path reds (JOV-6944 slice 3)', () =
       products: ['Jovie'],
       surfaceTags: ['web', 'marketing', 'public-web'],
     };
-    const [cell] = buildCells([humanRow], [unit]);
-    expect(cell?.route).toBe('human');
-    expect(cell?.state).toBe('insufficient');
-    expect(cell?.insufficientReason).toBe('not-yet-evaluated');
+    const cells = buildCells([humanRow], [unit]);
+    const dispatched = await dispatchDesignCiJudgeMatrix(
+      {
+        generatedAt: '2026-09-30T00:00:00.000Z',
+        rows: [humanRow],
+        units: [unit],
+        cells,
+      },
+      {
+        runJev: async () => {
+          throw new Error('not called');
+        },
+        runVisual: async () => {
+          throw new Error('not called');
+        },
+        runFlagship: async () => {
+          throw new Error('not called');
+        },
+      }
+    );
+    expect(dispatched.matrix.cells[0]?.route).toBe('human');
+    expect(dispatched.matrix.cells[0]?.state).toBe('pass');
+    expect(dispatched.matrix.cells[0]?.insufficientReason).toBeNull();
+    expect(dispatched.postShipTasteItems[0]?.blocking).toBe(false);
   });
 });

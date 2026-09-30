@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-09-09",
+  "updated_at": "2026-09-30",
   "deterministic_first": true,
   "state_file_env": "GEM_MODEL_ROUTER_STATE",
   "routing_policy": {
@@ -17,6 +17,15 @@
       "no_claude",
       "no_composer",
       "no_on_demand_overage"
+    ],
+    "scoped_exceptions": [
+      {
+        "rule": "no_claude",
+        "scope": "marketing_roles",
+        "approved_by": "Tim",
+        "approved_at": "2026-09-29",
+        "reason": "Marketing strategy, copy, art direction, and taste judging may use the included Claude subscription lane."
+      }
     ],
     "api_burn_fraction_of_sub": 0.15,
     "job_token_estimates": {
@@ -570,6 +579,138 @@
       ]
     }
   ],
+  "marketing_roles": {
+    "strategist": [
+      {
+        "id": "anthropic/claude-opus-5.5",
+        "family": "claude",
+        "channel": "subscription",
+        "pool": "claude-code",
+        "quality": 99
+      },
+      {
+        "id": "openai/gpt-5.6-sol",
+        "family": "gpt-5.6",
+        "channel": "subscription",
+        "pool": "codex",
+        "quality": 95
+      }
+    ],
+    "copywriter": [
+      {
+        "id": "anthropic/claude-opus-5.5",
+        "family": "claude",
+        "channel": "subscription",
+        "pool": "claude-code",
+        "quality": 99
+      },
+      {
+        "id": "openai/gpt-5.6-terra",
+        "family": "gpt-5.6",
+        "channel": "subscription",
+        "pool": "codex",
+        "quality": 92
+      }
+    ],
+    "layout-chooser": [
+      {
+        "id": "anthropic/claude-opus-5.5",
+        "family": "claude",
+        "channel": "subscription",
+        "pool": "claude-code",
+        "quality": 99
+      },
+      {
+        "id": "openai/gpt-5.6-sol",
+        "family": "gpt-5.6",
+        "channel": "subscription",
+        "pool": "codex",
+        "quality": 95
+      }
+    ],
+    "art-director": [
+      {
+        "id": "anthropic/claude-opus-5.5",
+        "family": "claude",
+        "channel": "subscription",
+        "pool": "claude-code",
+        "quality": 100
+      },
+      {
+        "id": "openai/gpt-5.6-sol",
+        "family": "gpt-5.6",
+        "channel": "subscription",
+        "pool": "codex",
+        "quality": 95
+      }
+    ],
+    "image-gen": [
+      {
+        "id": "openai/gpt-image-1.5",
+        "family": "gpt-image",
+        "channel": "api",
+        "pool": "vercel-gateway",
+        "quality": 96
+      },
+      {
+        "id": "bfl/flux-2-pro",
+        "family": "flux",
+        "channel": "api",
+        "pool": "vercel-gateway",
+        "quality": 90
+      }
+    ],
+    "video-gen": [
+      {
+        "id": "google/veo-3.1-generate-001",
+        "family": "veo",
+        "channel": "api",
+        "pool": "vercel-gateway",
+        "quality": 96
+      }
+    ],
+    "judge-flagship": [
+      {
+        "id": "anthropic/claude-opus-5.5",
+        "family": "claude",
+        "channel": "subscription",
+        "pool": "claude-code",
+        "quality": 100
+      },
+      {
+        "id": "openai/gpt-5.6-sol",
+        "family": "gpt-5.6",
+        "channel": "subscription",
+        "pool": "codex",
+        "quality": 96
+      }
+    ],
+    "judge-bulk": [
+      {
+        "id": "openai/gpt-5.6-luna",
+        "family": "gpt-5.6",
+        "channel": "subscription",
+        "pool": "codex",
+        "quality": 78
+      },
+      {
+        "id": "zai/glm-5.3-flash",
+        "family": "glm",
+        "channel": "api",
+        "pool": "vercel-gateway",
+        "quality": 65
+      }
+    ],
+    "vision-judge": [
+      {
+        "id": "openai/gpt-5.6-luna",
+        "family": "gpt-5.6",
+        "channel": "subscription",
+        "pool": "codex",
+        "quality": 84
+      }
+    ]
+  },
   "route_chains": {
     "remediation": [
       "grok-4.6",
@@ -622,6 +763,6 @@
     "pay-api-while-family-sub-remaining",
     "pay-sol-api-instead-of-codex-renew"
   ],
-  "research_applied_at": "2026-08-17T19:13:12Z",
-  "research_source": "gbrain:central-model-registry+symphony-model-routing-economics-2026-08-15+cursor-docs-models-and-pricing"
+  "research_applied_at": "2026-09-30T04:15:00Z",
+  "research_source": "gbrain:central-model-registry+symphony-model-routing-economics-2026-08-15+cursor-docs-models-and-pricing+vercel-ai-gateway-model-catalog-2026-09-30"
 }

@@ -12,14 +12,10 @@
  *
  * `buildDesignCiJudgeMatrix` stays pure routing (no execution, every cell
  * `insufficient`) so its own callers/tests keep a stable, cheap contract.
- * `evaluateDesignCiJudgeMatrix` is the real payoff: it actually runs each
- * deterministic row's enforcement consumer once (deduped across rows that
- * share a consumer file), records real pass/fail with evidence, and fans
- * that result out to every applicable unit — no per-unit rerun. Visual,
- * Jev, and human cells stay `insufficient` with the reason stated; no
- * dispatcher exists for them yet (see design-ci-judge-router-evaluation.test.ts
- * for proof that each of those judges' *real* mechanisms can genuinely
- * fail, independent of this file).
+ * `evaluateDesignCiJudgeMatrix` runs deterministic enforcement consumers.
+ * The CLI then hands Jev, visual, and human cells to the classifier-first
+ * dispatcher: machine judges record real pass/fail evidence, while explicit
+ * human cells become non-blocking post-ship taste items.
  *
  *   tsx scripts/design-ci-judge-router.ts [--json] [--persist [--base-url <url>]]
  */
@@ -33,6 +29,14 @@ import {
   APP_SCREEN_REGISTRY,
 } from '../data/appScreens/registry';
 import { MARKETING_COMPONENT_REGISTRY } from '../data/marketing/componentRegistry';
+import {
+  type CellDispatchEvaluation,
+  createDefaultJudgeDispatchDependencies,
+  DESIGN_CI_JUDGE_DISPATCH_SCHEMA,
+  dispatchDesignCiJudgeMatrix,
+  type PostShipTasteItem,
+  toDesignCiJudgeCertificationInputs,
+} from './design-ci-judge-dispatch';
 
 /**
  * `fileURLToPath(import.meta.url)` takes the plain string `import.meta.url`
@@ -120,6 +124,7 @@ export interface MatrixCell {
   readonly route: JudgeRoute;
   readonly state: CellState;
   readonly insufficientReason: InsufficientReason | null;
+  readonly evidence?: readonly string[];
 }
 
 export interface DesignCiJudgeMatrix {
@@ -424,6 +429,12 @@ export function routeFromRuleClassification(rule: InvariantDesignRule): {
     );
     return { route: 'visual', evidence };
   }
+  if (rule.classification === 'human') {
+    const evidence = [rule.evaluator, rule.evaluatorReceipt].filter(
+      (value): value is string => typeof value === 'string'
+    );
+    return { route: 'human', evidence };
+  }
   return { route: 'insufficient', evidence: [] };
 }
 
@@ -517,10 +528,9 @@ export async function buildDesignCiJudgeMatrix(): Promise<DesignCiJudgeMatrix> {
 }
 
 // ---------------------------------------------------------------------------
-// Real evaluation: run each deterministic row's enforcement consumer once,
-// fan the result out to every applicable unit. Visual/Jev/human rows are
-// left exactly as buildDesignCiJudgeMatrix produced them — no dispatcher
-// exists for those routes yet (see the module doc comment).
+// Deterministic evaluation runs each row's enforcement consumer once and
+// fans the result out to applicable units. The async machine/human routes
+// are handled by design-ci-judge-dispatch.ts after this pass.
 // ---------------------------------------------------------------------------
 
 export type ConsumerExecutionKind =
@@ -924,10 +934,11 @@ export async function fingerprintCells(
       artifactHash,
       rubricFingerprint,
       route: cell.route,
+      judgePipeline: DESIGN_CI_JUDGE_DISPATCH_SCHEMA,
     });
     return {
       ...cell,
-      evidence: row.routeEvidence,
+      evidence: cell.evidence ?? row.routeEvidence,
       artifactHash,
       rubricFingerprint,
       inputFingerprint,
@@ -965,17 +976,9 @@ export async function persistCells(
   let written = 0;
   let skippedUnchanged = 0;
   for (let i = 0; i < cells.length; i += PERSIST_BATCH_SIZE) {
-    const batch = cells.slice(i, i + PERSIST_BATCH_SIZE).map(cell => ({
-      cellId: `${cell.rowId}::${cell.unitId}`,
-      rowId: cell.rowId,
-      unitId: cell.unitId,
-      route: cell.route,
-      state: cell.state,
-      evidence: cell.evidence,
-      artifactHash: cell.artifactHash,
-      rubricFingerprint: cell.rubricFingerprint,
-      inputFingerprint: cell.inputFingerprint,
-    }));
+    const batch = toDesignCiJudgeCertificationInputs(
+      cells.slice(i, i + PERSIST_BATCH_SIZE)
+    );
     let response: Response;
     try {
       response = await fetch(
@@ -1023,7 +1026,8 @@ function countBy<T, K extends string>(
 
 export function formatMatrixReport(
   matrix: DesignCiJudgeMatrix,
-  rowEvaluations: readonly RowEvaluation[] = []
+  rowEvaluations: readonly RowEvaluation[] = [],
+  dispatchEvaluations: readonly CellDispatchEvaluation[] = []
 ): string {
   const lines: string[] = [];
 
@@ -1050,6 +1054,22 @@ export function formatMatrixReport(
           lines.push(`      ${detailLine}`);
         }
       }
+    }
+    lines.push('');
+  }
+
+  const dispatchFailures = dispatchEvaluations.filter(
+    evaluation => evaluation.state === 'fail'
+  );
+  if (dispatchFailures.length > 0) {
+    lines.push(`FAILED JUDGE CELLS (${dispatchFailures.length}):`);
+    for (const evaluation of dispatchFailures.slice(0, 20)) {
+      lines.push(
+        `  ✖ ${evaluation.cellId} (${evaluation.route}, score=${evaluation.score}, model=${evaluation.modelId ?? 'none'})`
+      );
+    }
+    if (dispatchFailures.length > 20) {
+      lines.push(`  … ${dispatchFailures.length - 20} more`);
     }
     lines.push('');
   }
@@ -1137,16 +1157,37 @@ async function main(): Promise<void> {
   // skips running the deterministic checks and reports routing only (fast,
   // useful for debugging the matrix shape itself).
   const shouldEvaluate = !process.argv.includes('--no-evaluate');
-  const { matrix, rowEvaluations } = shouldEvaluate
-    ? evaluateDesignCiJudgeMatrix(routed, REPO_ROOT)
-    : { matrix: routed, rowEvaluations: [] as readonly RowEvaluation[] };
+  let matrix = routed;
+  let rowEvaluations: readonly RowEvaluation[] = [];
+  let dispatchEvaluations: readonly CellDispatchEvaluation[] = [];
+  let postShipTasteItems: readonly PostShipTasteItem[] = [];
+  if (shouldEvaluate) {
+    const deterministic = evaluateDesignCiJudgeMatrix(routed, REPO_ROOT);
+    rowEvaluations = deterministic.rowEvaluations;
+    const dispatched = await dispatchDesignCiJudgeMatrix(
+      deterministic.matrix,
+      createDefaultJudgeDispatchDependencies({
+        repoRoot: REPO_ROOT,
+        gatewayCredential: process.env.AI_GATEWAY_API_KEY,
+      })
+    );
+    matrix = dispatched.matrix;
+    dispatchEvaluations = dispatched.evaluations;
+    postShipTasteItems = dispatched.postShipTasteItems;
+  }
 
   if (process.argv.includes('--json')) {
     process.stdout.write(
-      `${JSON.stringify({ ...matrix, rowEvaluations }, null, 2)}\n`
+      `${JSON.stringify(
+        { ...matrix, rowEvaluations, dispatchEvaluations, postShipTasteItems },
+        null,
+        2
+      )}\n`
     );
   } else {
-    process.stdout.write(`${formatMatrixReport(matrix, rowEvaluations)}\n`);
+    process.stdout.write(
+      `${formatMatrixReport(matrix, rowEvaluations, dispatchEvaluations)}\n`
+    );
   }
 
   // Read-only by default. Nothing below this line runs unless --persist is

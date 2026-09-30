@@ -22,6 +22,7 @@ import {
   MARKETING_ASSET_GENERATION_CHARACTER_CONTRACT,
   MARKETING_ASSET_GENERATION_COLOR_CONTRACT,
   MARKETING_GENERATION_STAGES,
+  MARKETING_MODEL_ROLES,
   MARKETING_STAGE_ATTEMPT_LIMITS,
   MARKETING_TASTE_GATE_IDS,
   MARKETING_VISUAL_REVIEW_CHARACTER_CONTRACT,
@@ -217,6 +218,59 @@ describe('marketing generation pipeline', () => {
         candidates,
       })
     ).toBeNull();
+  });
+
+  it('loads every marketing model role from the central registry and prefers subscriptions', () => {
+    const registry = JSON.parse(
+      readRepoSource('scripts/backlog-orchestrator/config/model-registry.json')
+    ) as {
+      marketing_roles: Record<string, Array<{ channel: string; pool: string }>>;
+    };
+    for (const role of MARKETING_MODEL_ROLES) {
+      const selected = selectMarketingModelCandidate({ role });
+      expect(selected).toMatchObject({
+        id: expect.any(String),
+        family: expect.any(String),
+        channel: expect.any(String),
+        pool: expect.any(String),
+        quality: expect.any(Number),
+      });
+      const candidates = registry.marketing_roles[role] ?? [];
+      if (candidates.some(candidate => candidate.channel === 'subscription')) {
+        expect(selected?.channel).toBe('subscription');
+      } else {
+        expect(selected?.pool).toBe('vercel-gateway');
+      }
+    }
+
+    expect(
+      selectMarketingModelCandidate({
+        role: 'judge-flagship',
+        excludedModelIds: ['anthropic/claude-opus-5.5'],
+      })?.id
+    ).toBe('openai/gpt-5.6-sol');
+  });
+
+  it('keeps Claude permission scoped to marketing roles with Tim approval', () => {
+    const registry = JSON.parse(
+      readRepoSource('scripts/backlog-orchestrator/config/model-registry.json')
+    ) as {
+      routing_policy: {
+        scoped_exceptions: Array<Record<string, unknown>>;
+      };
+      marketing_roles: Record<string, unknown[]>;
+    };
+    expect(Object.keys(registry.marketing_roles).toSorted()).toEqual(
+      [...MARKETING_MODEL_ROLES].toSorted()
+    );
+    expect(registry.routing_policy.scoped_exceptions).toContainEqual(
+      expect.objectContaining({
+        rule: 'no_claude',
+        scope: 'marketing_roles',
+        approved_by: 'Tim',
+        approved_at: '2026-09-29',
+      })
+    );
   });
 
   it('rejects repeated narrative responsibilities before copy begins', () => {

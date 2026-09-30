@@ -8,6 +8,7 @@
  * character system, Scene Palette v1, and approved media recipes.
  */
 
+import modelRegistry from '../../../../scripts/backlog-orchestrator/config/model-registry.json';
 import {
   formatMarketingCharacterSystemForPrompt,
   JOVIE_MARKETING_CHARACTER_SYSTEM,
@@ -76,6 +77,69 @@ export const MARKETING_MODEL_CAPABILITIES = [
 
 export type MarketingModelCapability =
   (typeof MARKETING_MODEL_CAPABILITIES)[number];
+
+export const MARKETING_MODEL_ROLES = [
+  'strategist',
+  'copywriter',
+  'layout-chooser',
+  'art-director',
+  'image-gen',
+  'video-gen',
+  'judge-flagship',
+  'judge-bulk',
+  'vision-judge',
+] as const;
+
+export type MarketingModelRole = (typeof MARKETING_MODEL_ROLES)[number];
+
+export interface MarketingRegistryModelCandidate {
+  readonly id: string;
+  readonly family: string;
+  readonly channel: string;
+  readonly pool: string;
+  readonly quality: number;
+}
+
+const CREATIVE_ROLE_TO_MODEL_ROLE: Readonly<
+  Record<MarketingCreativeRole, MarketingModelRole>
+> = {
+  'truth-curator': 'strategist',
+  'narrative-architect': 'strategist',
+  'copy-compiler': 'copywriter',
+  'section-designer': 'layout-chooser',
+  'asset-generator': 'image-gen',
+  'adversarial-reviewer': 'judge-bulk',
+  'final-polisher': 'copywriter',
+};
+
+function isRegistryModelCandidate(
+  value: unknown
+): value is MarketingRegistryModelCandidate {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.family === 'string' &&
+    typeof candidate.channel === 'string' &&
+    typeof candidate.pool === 'string' &&
+    typeof candidate.quality === 'number' &&
+    Number.isFinite(candidate.quality)
+  );
+}
+
+function registryCandidatesForRole(
+  role: MarketingModelRole
+): readonly MarketingRegistryModelCandidate[] {
+  const roles = modelRegistry.marketing_roles as Record<string, unknown>;
+  const candidates = roles[role];
+  if (
+    !Array.isArray(candidates) ||
+    !candidates.every(isRegistryModelCandidate)
+  ) {
+    throw new Error(`Invalid marketing model registry role: ${role}`);
+  }
+  return candidates;
+}
 
 export const MARKETING_ROLE_REQUIREMENTS: Readonly<
   Record<MarketingCreativeRole, readonly MarketingModelCapability[]>
@@ -165,9 +229,40 @@ export function selectMarketingModelCandidate(input: {
   readonly role: MarketingCreativeRole;
   readonly candidates: readonly MarketingModelCandidate[];
   readonly excludedModelIds?: readonly string[];
-}): MarketingModelCandidate | null {
-  const required = MARKETING_ROLE_REQUIREMENTS[input.role];
+}): MarketingModelCandidate | null;
+export function selectMarketingModelCandidate(input: {
+  readonly role: MarketingModelRole | MarketingCreativeRole;
+  readonly candidates?: undefined;
+  readonly excludedModelIds?: readonly string[];
+}): MarketingRegistryModelCandidate | null;
+export function selectMarketingModelCandidate(input: {
+  readonly role: MarketingModelRole | MarketingCreativeRole;
+  readonly candidates?: readonly MarketingModelCandidate[];
+  readonly excludedModelIds?: readonly string[];
+}): MarketingModelCandidate | MarketingRegistryModelCandidate | null {
   const excluded = new Set(input.excludedModelIds ?? []);
+  if (!input.candidates) {
+    const registryRole = MARKETING_MODEL_ROLES.includes(
+      input.role as MarketingModelRole
+    )
+      ? (input.role as MarketingModelRole)
+      : CREATIVE_ROLE_TO_MODEL_ROLE[input.role as MarketingCreativeRole];
+    return (
+      registryCandidatesForRole(registryRole)
+        .filter(candidate => !excluded.has(candidate.id))
+        .toSorted((a, b) => {
+          const channelDelta =
+            Number(b.channel === 'subscription') -
+            Number(a.channel === 'subscription');
+          if (channelDelta !== 0) return channelDelta;
+          if (a.quality !== b.quality) return b.quality - a.quality;
+          return a.id.localeCompare(b.id);
+        })[0] ?? null
+    );
+  }
+
+  const creativeRole = input.role as MarketingCreativeRole;
+  const required = MARKETING_ROLE_REQUIREMENTS[creativeRole];
 
   return (
     input.candidates
@@ -181,7 +276,8 @@ export function selectMarketingModelCandidate(input: {
       })
       .toSorted((a, b) => {
         const scoreDelta =
-          (b.roleScores?.[input.role] ?? 0) - (a.roleScores?.[input.role] ?? 0);
+          (b.roleScores?.[creativeRole] ?? 0) -
+          (a.roleScores?.[creativeRole] ?? 0);
         if (scoreDelta !== 0) return scoreDelta;
 
         const tasteDelta =

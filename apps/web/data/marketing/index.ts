@@ -173,8 +173,10 @@ export type {
   MarketingGenerationStage,
   MarketingModelCandidate,
   MarketingModelCapability,
+  MarketingModelRole,
   MarketingNarrativePlan,
   MarketingNarrativeSectionPlan,
+  MarketingRegistryModelCandidate,
   MarketingTasteGateId,
 } from './generation';
 export {
@@ -187,6 +189,7 @@ export {
   MARKETING_GENERATION_SPEC_VERSION,
   MARKETING_GENERATION_STAGES,
   MARKETING_MODEL_CAPABILITIES,
+  MARKETING_MODEL_ROLES,
   MARKETING_ROLE_REQUIREMENTS,
   MARKETING_STAGE_ATTEMPT_LIMITS,
   MARKETING_TASTE_GATE_IDS,

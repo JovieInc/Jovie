@@ -87,14 +87,10 @@ describe('design-ci-judge-router: routing does not guess', () => {
     });
   });
 
-  it('deliberate red (human): nothing today auto-routes human — no heuristic invents it', () => {
-    // A rule with an unrecognized classification (e.g. a hypothetical
-    // "taste-only" or "human" string) must fall to insufficient, not be
-    // guessed toward human. The human route only exists as a supported enum
-    // value for a future explicit marker; this router never infers it.
+  it('routes an explicit human classification without guessing taste synonyms', () => {
     expect(
       routeFromRuleClassification({ id: 'x', classification: 'human' })
-    ).toEqual({ route: 'insufficient', evidence: [] });
+    ).toEqual({ route: 'human', evidence: [] });
     expect(
       routeFromRuleClassification({ id: 'x', classification: 'taste-only' })
     ).toEqual({ route: 'insufficient', evidence: [] });
