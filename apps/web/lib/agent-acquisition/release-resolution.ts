@@ -128,7 +128,7 @@ function providerForUrl(value: string) {
 // Resource shapes are provider-specific: a known domain alone is not evidence
 // of a release. Unknown shapes fail closed, including provider short links.
 const RELEASE_PATHS: Readonly<Record<string, RegExp>> = {
-  spotify: /^\/(?:intl-[a-z]{2}\/)?(?:album|track)\/[A-Za-z0-9]{22}\/?$/,
+  spotify: /^\/(?:intl-(?:[a-z]{2})\/)?(?:album|track)\/[A-Za-z0-9]{22}\/?$/,
   apple_music: /^\/[a-z]{2}\/(?:album|song|music-video)\/(?:[^/]+\/)?\d+\/?$/,
   deezer: /^\/(?:[a-z]{2}\/)?(?:album|track)\/\d+\/?$/,
   tidal: /^\/(?:browse\/)?(?:album|track)\/\d+\/?$/,
