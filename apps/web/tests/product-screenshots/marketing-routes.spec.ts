@@ -139,3 +139,34 @@ test.describe('Exact marketing route screenshots', () => {
     }
   }
 });
+
+test.describe('Marketing auth-entry prefetch boundary', () => {
+  test.describe.configure({ retries: 0 });
+  for (const route of ['/new', '/voice', '/support']) {
+    test(`auth-entry waits for visitor intent on ${route}`, async ({
+      page,
+    }) => {
+      const speculativeAuthRequests: string[] = [];
+      page.on('request', request => {
+        const url = new URL(request.url());
+        if (
+          ['/signup', '/signin', '/start'].includes(url.pathname) &&
+          request.headers()['next-router-prefetch'] === '1'
+        ) {
+          speculativeAuthRequests.push(url.pathname);
+        }
+      });
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(route, { waitUntil: 'domcontentloaded' });
+      const authLink = page
+        .locator('a[href="/signup"], a[href="/signin"], a[href="/start"]')
+        .first();
+      await expect(authLink).toBeVisible();
+      await authLink.focus();
+      await waitForSettle(page, 1_000);
+      expect(speculativeAuthRequests, `${route} speculative auth work`).toEqual(
+        []
+      );
+    });
+  }
+});
