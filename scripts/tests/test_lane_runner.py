@@ -890,6 +890,42 @@ class WorkerTest(unittest.TestCase):
 
 
 class RunAgentTest(unittest.TestCase):
+    def test_permission_denied_group_check_requires_membership_evidence(self):
+        with patch.object(lane.os, "killpg", side_effect=PermissionError):
+            for listing, expected in (("99 S\n", True), ("99 Z\n", False), ("100 S\n", False)):
+                with patch.object(lane.subprocess, "run", return_value=SimpleNamespace(returncode=0, stdout=listing)):
+                    self.assertEqual(lane.process_group_alive(99), expected)
+            with patch.object(lane.subprocess, "run", return_value=SimpleNamespace(returncode=1)):
+                with self.assertRaises(PermissionError):
+                    lane.process_group_alive(99)
+
+    def test_guard_cancellation_kills_child_even_when_leader_exits_on_term(self):
+        with tempfile.TemporaryDirectory() as tmp, open(os.devnull, "w") as log:
+            child_script = Path(tmp) / "child.py"
+            child_script.write_text("import os,signal,time,pathlib\n"
+                                    "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+                                    "pathlib.Path('child.pid').write_text(str(os.getpid()))\n"
+                                    "while True:\n pathlib.Path('heartbeat').write_text(str(time.monotonic())); time.sleep(.01)\n")
+            pidfile = Path(tmp) / "child.pid"
+            command = [sys.executable, "-c", "import subprocess,sys,time; subprocess.Popen([sys.executable,'child.py']); time.sleep(60)"]
+            def guard():
+                if pidfile.exists():
+                    raise lane.DiskAdmissionError("disk-critical")
+            try:
+                with self.assertRaises(lane.DiskAdmissionError):
+                    lane.run_agent(command, Path(tmp), log, timeout=30, guard=guard, guard_interval=.05)
+                heartbeat = (Path(tmp) / "heartbeat").read_text()
+                time.sleep(.15)
+                self.assertEqual((Path(tmp) / "heartbeat").read_text(), heartbeat,
+                                 "the SIGTERM-resistant child must stop even after the leader exits")
+            finally:
+                if pidfile.exists():
+                    import signal
+                    try:
+                        os.kill(int(pidfile.read_text()), signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+
     def test_mid_run_guard_stops_the_process_and_propagates_the_hold(self):
         with tempfile.TemporaryDirectory() as tmp, open(os.devnull, "w") as log:
             pidfile = Path(tmp) / "pid"
@@ -1080,6 +1116,66 @@ class FixRedTest(unittest.TestCase):
         with patch.object(lane, "sh", side_effect=subprocess.TimeoutExpired("gh", 30)):
             self.assertIsNone(self.real_reconcile_fix_target(self.pr()))
 
+    def test_repair_head_requires_creation_in_its_own_checkout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)
+            def git(*args):
+                return subprocess.run(["git", *args], cwd=path, check=True, capture_output=True, text=True).stdout.strip()
+            git("init", "-q")
+            git("config", "user.name", "Lane regression")
+            git("config", "user.email", "lane@example.test")
+            git("config", "commit.gpgsign", "false")
+            git("commit", "--allow-empty", "-qm", "initial")
+            initial = git("rev-parse", "HEAD")
+            git("commit", "--allow-empty", "-qm", "repair")
+            repair = git("rev-parse", "HEAD")
+            self.assertTrue(lane.repair_created_head(path, repair))
+            self.assertFalse(lane.repair_created_head(path, initial))
+            external = git("commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "external writer")
+            git("reset", "--hard", external)
+            self.assertFalse(lane.repair_created_head(path, external), "resetting to external work is not provenance")
+            with patch.object(lane, "sh", side_effect=subprocess.TimeoutExpired("git", 30)):
+                self.assertFalse(lane.repair_created_head(path, external))
+
+    def test_external_push_during_or_after_agent_cancels_without_claiming_the_push(self):
+        for stage in ("agent-running", "after-agent", "after-remote-read"):
+            with self.subTest(stage=stage), tempfile.TemporaryDirectory() as tmp:
+                host = lane.Host(state=Path(tmp), repo=Path(tmp))
+                changed, calls = [], []
+                def live(pr):
+                    return {**pr, "state": "OPEN", "headRefOid": "external" if changed and stage != "after-remote-read" else "h1"}
+                def shell(args, **kwargs):
+                    calls.append(args)
+                    if args[:3] == ["git", "worktree", "add"]:
+                        Path(args[-2]).mkdir(parents=True)
+                    output = "external\trefs/heads/devin/jov-1\n" if args[:2] == ["git", "ls-remote"] else ""
+                    return SimpleNamespace(returncode=0, stdout=output, stderr="")
+                def agent(cmd, cwd, log, timeout, **kwargs):
+                    (cwd / "distinct.py").write_text("retain this repair")
+                    changed.append(True)
+                    if stage == "agent-running":
+                        kwargs["guard"]()
+                    return SimpleNamespace(returncode=0)
+                with patch.object(lane, "reconcile_fix_target", side_effect=live), \
+                        patch.object(lane, "sh", side_effect=shell), patch.object(lane, "run_agent", side_effect=agent), \
+                        patch.object(lane, "failure_excerpt", return_value=""), \
+                        patch.object(lane.disk_guard, "free_pct", return_value=50.0):
+                    receipt = lane.fix_red_pr(host, "codex", {"cmd": ["true"]}, self.pr())
+                self.assertEqual(receipt["verdict"], "cancelled")
+                self.assertEqual(receipt["cancellation"]["stage"], stage)
+                self.assertEqual((Path(receipt["preservedWorktree"]) / "distinct.py").read_text(), "retain this repair")
+                self.assertFalse(any(cmd[:3] == ["gh", "pr", "merge"] or "DELETE" in cmd for cmd in calls))
+
+    def test_own_pushed_head_is_accepted_but_external_head_is_not(self):
+        with patch.object(lane, "reconcile_fix_target", return_value={**self.pr(), "state": "OPEN", "headRefOid": "h2"}), \
+                patch.object(lane, "repair_created_head", return_value=True) as owned:
+            self.assertEqual(lane.require_fix_target(self.pr(), "agent-running", worktree=Path("repair"))["headRefOid"], "h2")
+            owned.assert_called_once_with(Path("repair"), "h2")
+        with patch.object(lane, "reconcile_fix_target", return_value={**self.pr(), "state": "OPEN", "headRefOid": "h2"}), \
+                patch.object(lane, "repair_created_head", return_value=False):
+            with self.assertRaises(lane.RepairStopped):
+                lane.require_fix_target(self.pr(), "after-agent", worktree=Path("repair"))
+
     def test_target_merging_after_checkout_cancels_before_install_and_preserves_source(self):
         for terminal in ("MERGED", "CLOSED", "UNKNOWN", "SUPERSEDED"):
             with self.subTest(terminal=terminal), tempfile.TemporaryDirectory() as tmp:
@@ -1217,6 +1313,10 @@ class FixRedTest(unittest.TestCase):
 
         def fake(args, cwd=None, timeout=600, env=None, log=None):
             calls.append(args)
+            if args[:2] == ["git", "rev-parse"]:
+                return SimpleNamespace(returncode=0, stdout="h9\n")
+            if args[:2] == ["git", "reflog"]:
+                return SimpleNamespace(returncode=0, stdout="h9\0commit: repair\n")
             if args[:2] == ["git", "ls-remote"]:
                 return SimpleNamespace(returncode=0, stderr="", stdout="h9\trefs/heads/devin/jov-1\n")
             if args[:3] == ["git", "worktree", "add"]:
@@ -1271,6 +1371,10 @@ class FixRedTest(unittest.TestCase):
 
         def fake(args, cwd=None, timeout=600, env=None, log=None):
             calls.append(args)
+            if args[:2] == ["git", "rev-parse"]:
+                return SimpleNamespace(returncode=0, stdout="h9\n")
+            if args[:2] == ["git", "reflog"]:
+                return SimpleNamespace(returncode=0, stdout="h9\0commit: repair\n")
             if args[:2] == ["git", "ls-remote"]:
                 return SimpleNamespace(returncode=0, stderr="", stdout="h9\trefs/heads/devin/jov-1\n")
             return SimpleNamespace(returncode=0, stderr="", stdout="")
@@ -1551,6 +1655,10 @@ class FixRedTest(unittest.TestCase):
 
         def fake(args, cwd=None, timeout=600, env=None, log=None):
             calls.append(args)
+            if args[:2] == ["git", "rev-parse"]:
+                return SimpleNamespace(returncode=0, stdout="h2\n")
+            if args[:2] == ["git", "reflog"]:
+                return SimpleNamespace(returncode=0, stdout="h2\0commit: repair\n")
             if args[:2] == ["git", "ls-remote"]:
                 return SimpleNamespace(returncode=0, stderr="", stdout="h2\trefs/heads/devin/jov-1\n")
             if args[:3] == ["git", "worktree", "add"]:

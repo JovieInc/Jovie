@@ -786,6 +786,22 @@ def template(args: list[str], values: dict) -> list[str]:
     return [arg.format(**{"here": str(HERE), **values}) for arg in args]
 
 
+def process_group_alive(group: int) -> bool:
+    try:
+        os.killpg(group, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # Darwin can report EPERM for an empty group after its leader is reaped.
+        # Verify membership instead of treating a real permission denial as success.
+        members = subprocess.run(["ps", "-axo", "pgid=,stat="], capture_output=True, text=True, timeout=5)
+        if members.returncode != 0:
+            raise
+        return any(fields[0] == str(group) and not fields[1].startswith("Z")
+                   for line in members.stdout.splitlines() if len(fields := line.split()) == 2)
+
+
 def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
               guard_interval: float = 30) -> subprocess.CompletedProcess:
     """The provider and every child it spawns live in one process group, so a timeout kills
@@ -817,11 +833,19 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
                 os.killpg(proc.pid, sig)
             except ProcessLookupError:
                 break
-            try:
-                proc.wait(timeout=grace)
-                break
-            except subprocess.TimeoutExpired:
+            except PermissionError:
+                if not process_group_alive(proc.pid):
+                    break
+                raise
+            deadline = time.monotonic() + grace
+            while time.monotonic() < deadline:
+                proc.poll()  # Reap the leader; its exit does not prove its children exited.
+                if not process_group_alive(proc.pid):
+                    break
+                time.sleep(0.05)
+            else:
                 continue
+            break
         raise
     return subprocess.CompletedProcess(cmd, code)
 
@@ -1476,15 +1500,37 @@ class RepairStopped(RuntimeError):
         self.live, self.stage = live, stage
 
 
-def require_fix_target(pr: dict, stage: str, *, check_head: bool = True) -> dict:
+def repair_created_head(worktree: Path, head: str) -> bool:
+    """Only accept a new remote head created in this attempt's fresh checkout.
+
+    A fetch/reset/checkout of another writer's commit is not repair provenance.
+    Unreadable or pruned reflogs fail closed and retain the worktree for review.
+    """
+    try:
+        local = sh(["git", "rev-parse", "HEAD"], cwd=worktree, timeout=30)
+        if local.returncode != 0 or local.stdout.strip() != head:
+            return False
+        log = sh(["git", "reflog", "show", "--format=%H%x00%gs", "HEAD"], cwd=worktree, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return log.returncode == 0 and any(
+        sha == head and re.match(
+            r"(?:commit(?: \([^)]*\))?:|merge[^:]*: Merge made by |rebase \((?:pick|reword|squash|fixup|continue)\):|am:)",
+            action)
+        for line in log.stdout.splitlines() if "\0" in line
+        for sha, action in [line.split("\0", 1)])
+
+
+def require_fix_target(pr: dict, stage: str, *, worktree: Path | None = None) -> dict:
     live = reconcile_fix_target(pr)
     if live is None:
         raise RepairStopped("target-state-unavailable", live, stage)
     state = str(live.get("state") or "").upper()
     if state != "OPEN":
         raise RepairStopped("target-pr-merged" if state == "MERGED" else "target-pr-closed", live, stage)
-    if check_head and live.get("headRefOid") != pr["headRefOid"]:
-        raise RepairStopped("target-head-superseded", live, stage)
+    if live.get("headRefOid") != pr["headRefOid"]:
+        if worktree is None or not repair_created_head(worktree, live["headRefOid"]):
+            raise RepairStopped("target-head-superseded", live, stage)
     return live
 
 
@@ -1514,6 +1560,7 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
                "headBefore": pr["headRefOid"], "requestSource": fix_request_source(pr),
                "startedAt": now_iso()}
     live = reconcile_fix_target(pr)
+    receipt["targetStateReads"] = 1
     state = str((live or {}).get("state") or "").upper()
     changed_head = state == "OPEN" and live.get("headRefOid") != pr["headRefOid"] if live else False
     if live is None or state != "OPEN" or changed_head:
@@ -1572,14 +1619,17 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
         return receipt
     with open(runs / f"{run_id}.log", "w") as log:
         try:
+            def verify_target(target, stage, *, worktree=None):
+                receipt["targetStateReads"] += 1
+                return require_fix_target(target, stage, worktree=worktree)
             require_disk(host, "repair-checkout")
-            require_fix_target(pr, "before-checkout")
+            verify_target(pr, "before-checkout")
             sh(["git", "fetch", "-q", "origin", "main", pr["headRefName"]], cwd=host.repo, log=log)
-            require_fix_target(pr, "after-fetch")
+            verify_target(pr, "after-fetch")
             add_worktree(host, ["-B", pr["headRefName"], str(worktree), f"origin/{pr['headRefName']}"], log)
-            def boundary(stage="repair-command", check_head=True):
+            def boundary(stage="repair-command", allow_local_push=False):
                 require_disk(host, stage)
-                require_fix_target(pr, stage, check_head=check_head)
+                verify_target(pr, stage, worktree=worktree if allow_local_push else None)
             lockfile_only = False
             if pr.get("mergeStateStatus") == "DIRTY":
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
@@ -1601,21 +1651,25 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
                                                          "cwd": str(worktree),
                                                          "provider_receipt": str(provider_evidence)}),
                                   worktree, log, host.agent_timeout,
-                                  guard=lambda: boundary("agent-running", check_head=False))
-            require_fix_target(pr, "after-agent", check_head=False)
+                                  guard=lambda: boundary("agent-running", allow_local_push=True))
+            verify_target(pr, "after-agent", worktree=worktree)
             head = sh(["git", "ls-remote", "origin", f"refs/heads/{pr['headRefName']}"], cwd=host.repo).stdout.split()
             after = head[0] if head else ""
             pushed = bool(after) and after != pr["headRefOid"]
+            if pushed and not repair_created_head(worktree, after):
+                raise RepairStopped("target-head-superseded", {**pr, "state": "OPEN", "headRefOid": after},
+                                    "after-remote-read")
             receipt.update(agentExit=agent.returncode if agent else None, headAfter=after,
                            verdict="fix-pushed" if pushed else "fix-no-change")
             if pushed:
+                verify_target({**pr, "headRefOid": after}, "before-push-effects")
                 # A new fix head earns another queue try; a repeat failure re-marks it. The PR
                 # summary carries no labels, so delete unconditionally (404 when absent).
                 sh(["gh", "api", "-X", "DELETE",
                     f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/{pr_events.POISON_LABEL}"], log=log)
             if pushed and not pr.get("isDraft"):
                 # Conflicts and failures can drop auto-merge; re-arm it so the fix actually lands.
-                require_fix_target({**pr, "headRefOid": after}, "before-merge-intent")
+                verify_target({**pr, "headRefOid": after}, "before-merge-intent")
                 sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto"], log=log)
         except RepairStopped as error:
             live = error.live or {}
