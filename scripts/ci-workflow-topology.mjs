@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import yaml from 'js-yaml';
+import { dump as yamlDump, load as yamlLoad } from 'js-yaml';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outputPath = path.join(root, '.github/workflow-topology.gen.yml');
@@ -54,7 +54,7 @@ export function buildTopology(repoRoot = root, suppliedPolicy = structuredClone(
     .filter(file => /\.ya?ml$/.test(file))
     .sort()
     .map(file => {
-      const parsed = yaml.load(fs.readFileSync(path.join(dir, file), 'utf8')) ?? {};
+      const parsed = yamlLoad(fs.readFileSync(path.join(dir, file), 'utf8')) ?? {};
       return { file, parsed, name: parsed.name };
     });
   const active = item => !suppliedPolicy.inactiveWorkflows.includes(item.name);
@@ -134,7 +134,7 @@ export function validateTopology({ policy: rules, nodes, edges }) {
 function main() {
   const topology = buildTopology();
   const result = validateTopology(topology);
-  const serialized = yaml.dump({ ...topology.policy, generatedAt: 'deterministic', normalPrCheckRecords: result.normalPrCheckRecords, nodes: topology.nodes, edges: topology.edges }, { lineWidth: -1, noRefs: true });
+  const serialized = yamlDump({ ...topology.policy, generatedAt: 'deterministic', normalPrCheckRecords: result.normalPrCheckRecords, nodes: topology.nodes, edges: topology.edges }, { lineWidth: -1, noRefs: true });
   if (process.argv.includes('--write')) fs.writeFileSync(outputPath, serialized);
   else if (!fs.existsSync(outputPath) || fs.readFileSync(outputPath, 'utf8') !== serialized)
     result.errors.push('generated workflow DAG is stale; run pnpm ci:topology:write');
