@@ -42,6 +42,19 @@ export function storybookAddonsForEnvironment(
   ];
 }
 
+// Pinned Vite 8 supports importer-aware alias resolution. Revisit at Vite 9.
+export function resolvePrivacyBoundaryShellAlias(
+  updatedId: string,
+  importer?: string
+) {
+  const boundary = require
+    .resolve('../app/app/(shell)/DashboardShellPrivacyBoundary.tsx')
+    .replaceAll('\\', '/');
+  return importer?.split('?')[0].replaceAll('\\', '/') === boundary
+    ? require.resolve('../components/organisms/AuthShellWrapper.tsx')
+    : updatedId;
+}
+
 const config: StorybookConfig = {
   stories:
     process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
@@ -134,6 +147,7 @@ const config: StorybookConfig = {
         {
           find: '@/components/organisms/AuthShellWrapper',
           replacement: require.resolve('./dashboard-layout-client-mock.tsx'),
+          customResolver: resolvePrivacyBoundaryShellAlias,
         },
         {
           // lib/docs/getMarkdownDocument imports node:fs at module scope

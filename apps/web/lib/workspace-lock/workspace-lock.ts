@@ -13,6 +13,8 @@ export const MONEY_HIDDEN_COOKIE = 'jovie_money_hidden';
 const COOKIE_ON = '1';
 const PRIVACY_LOCK_PATH = '/api/ovie/privacy-lock';
 const PRIVACY_LOCK_REQUEST_TIMEOUT_MS = 10_000;
+export const WORKSPACE_PRIVACY_LOCK_CONFIRMED_EVENT =
+  'ovie:privacy-lock-confirmed';
 
 function readCookie(name: string): string | null {
   if (typeof document === 'undefined') return null;
