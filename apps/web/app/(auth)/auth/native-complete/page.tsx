@@ -171,9 +171,10 @@ function NativeCompleteContent() {
     }
   }, [enrollState, offerReturnTo, openWorkspace]);
 
-  const skipTouchId = useCallback(async () => {
+  const skipTouchId = useCallback(() => {
     if (!offerReturnTo) return;
-    await setDesktopPasskeyState('dismissed').catch(() => undefined);
+    // This optional local preference must not delay the completed sign-in.
+    void setDesktopPasskeyState('dismissed').catch(() => undefined);
     openWorkspace(offerReturnTo);
   }, [offerReturnTo, openWorkspace]);
 
