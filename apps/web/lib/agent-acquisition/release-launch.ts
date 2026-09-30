@@ -84,7 +84,7 @@ function comparable(field: ScalarField, value: string): string {
     .normalize('NFKD')
     .replaceAll(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, ' ')
+    .replaceAll(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
 }
 
@@ -108,10 +108,60 @@ function scalar(
   return values[0]?.value ?? null;
 }
 
-function comparableUrl(value: string): string {
+/** Query keys that never identify a different release. */
+const TRACKING_PARAMS = new Set([
+  'si',
+  'feature',
+  'context',
+  'ref',
+  'ref_src',
+  'src',
+  'source',
+  'origin',
+  'fbclid',
+  'gclid',
+  'dclid',
+  'msclkid',
+  'ttclid',
+  'igshid',
+  'igsh',
+  'spm',
+  'at',
+  'ct',
+  'ls',
+  'mt',
+  'app',
+  'itscg',
+  'itsct',
+  'mttnagencyid',
+  'mttnsiteid',
+  'mttnsubad',
+  'mc_cid',
+  'mc_eid',
+]);
+
+/**
+ * Canonicalize a link for identity comparison. Identity-bearing parameters
+ * (YouTube `v`, Apple `i`, …) are preserved; only tracking parameters and the
+ * fragment are stripped, so two different releases never compare equal.
+ */
+function comparableUrl(value: string, keepSearch: boolean): string {
   const url = new URL(value);
   url.hash = '';
-  url.search = '';
+  url.hostname = url.hostname.toLowerCase();
+  if (!keepSearch) {
+    url.search = '';
+  } else {
+    const kept = [...url.searchParams.entries()].filter(
+      ([key]) =>
+        !TRACKING_PARAMS.has(key.toLowerCase()) &&
+        !key.toLowerCase().startsWith('utm_')
+    );
+    url.search = '';
+    for (const [key, val] of kept.sort(([a], [b]) => a.localeCompare(b))) {
+      url.searchParams.append(key, val);
+    }
+  }
   return url.href.replace(/\/$/, '');
 }
 
@@ -122,7 +172,9 @@ function artwork(
   const values = facts.flatMap(fact =>
     fact.artwork_url ? [{ source: fact.source, value: fact.artwork_url }] : []
   );
-  if (new Set(values.map(value => comparableUrl(value.value))).size > 1) {
+  if (
+    new Set(values.map(value => comparableUrl(value.value, false))).size > 1
+  ) {
     conflicts.push({ field: 'artwork_url', values });
     return null;
   }
@@ -146,7 +198,9 @@ function mergeLinks(
   }
   const merged: Record<string, string> = {};
   for (const [provider, values] of byProvider) {
-    const distinct = new Set(values.map(value => comparableUrl(value.value)));
+    const distinct = new Set(
+      values.map(value => comparableUrl(value.value, true))
+    );
     if (distinct.size > 1) {
       conflicts.push({ field: `dsp_links.${provider}`, values });
     } else if (values[0]) {
@@ -164,40 +218,47 @@ function artistIdentityConflict(
   },
   facts: readonly ReleaseFacts[]
 ): ReleaseFactConflict | null {
-  for (const fact of facts) {
-    const providerId = fact.artist_ids[artist.provider];
-    if (providerId && providerId !== artist.external_id) {
-      return {
-        field: 'artist_identity',
-        values: [
-          { source: 'artist_draft', value: artist.external_id },
-          { source: fact.source, value: providerId },
-        ],
-      };
-    }
-  }
   const draftName = comparable('artist_name', artist.display_name);
-  const releaseNames = facts
-    .filter(fact => fact.artist_name)
-    .map(fact => ({
-      source: fact.source,
-      value: fact.artist_name!,
-      normalized: comparable('artist_name', fact.artist_name!),
-    }));
-  const mismatch = releaseNames.find(
-    value =>
-      !value.normalized.includes(draftName) &&
-      !draftName.includes(value.normalized)
-  );
-  return mismatch
-    ? {
-        field: 'artist_identity',
-        values: [
-          { source: 'artist_draft', value: artist.display_name },
-          { source: mismatch.source, value: mismatch.value },
-        ],
+  for (const fact of facts) {
+    const conflict = (value: string): ReleaseFactConflict => ({
+      field: 'artist_identity',
+      values: [
+        { source: 'artist_draft', value: artist.display_name },
+        { source: fact.source, value },
+      ],
+    });
+    // Exact provider IDs are authoritative when any credited artist has one.
+    const withProviderId = fact.artists.filter(
+      credited => credited.ids[artist.provider]
+    );
+    if (withProviderId.length > 0) {
+      if (
+        !withProviderId.some(
+          credited => credited.ids[artist.provider] === artist.external_id
+        )
+      ) {
+        return conflict(withProviderId[0]!.ids[artist.provider]!);
       }
-    : null;
+      continue;
+    }
+    const names = fact.artists
+      .map(credited => credited.name)
+      .filter((name): name is string => Boolean(name));
+    if (names.length > 0) {
+      // Exact normalized-name match only: substring matching approves
+      // "Ann" vs "Joanne", and empty normalized names match everything.
+      if (
+        !draftName ||
+        !names.some(name => comparable('artist_name', name) === draftName)
+      ) {
+        return conflict(names[0]!);
+      }
+      continue;
+    }
+    // A fact with no verifiable artist identity stays unresolved.
+    return conflict(fact.artist_name ?? '(uncredited artist)');
+  }
+  return null;
 }
 
 const missingPrompts: Record<string, string> = {

@@ -75,7 +75,7 @@ describe('agent release resolution', () => {
             spotify: 'https://open.spotify.com/album/release-id',
             apple_music: 'https://music.apple.com/us/album/signal-fire/1234',
           },
-          artist_ids: { spotify: 'artist-id' },
+          artists: [{ name: 'The Artist', ids: { spotify: 'artist-id' } }],
         },
       ],
     });
@@ -140,6 +140,99 @@ describe('agent release resolution', () => {
       code: 'INVALID_INPUT',
     });
     expect(request).not.toHaveBeenCalled();
+  });
+
+  it('rejects search, artist and playlist pages as release links on every input path', async () => {
+    const nonRelease = [
+      'https://open.spotify.com/search/anything',
+      'https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb',
+      'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M',
+      'https://music.apple.com/us/artist/the-artist/1234',
+      'https://soundcloud.com/the-artist',
+    ];
+    for (const url of nonRelease) {
+      const metadata = prepareReleaseLaunchSchema.parse({
+        ...draft,
+        release_metadata: {
+          title: 'Signal Fire',
+          artist_name: 'The Artist',
+          dsp_links: {
+            [url.includes('spotify')
+              ? 'spotify'
+              : url.includes('apple')
+                ? 'apple_music'
+                : 'soundcloud']: url,
+          },
+        },
+      });
+      expect(await resolveAgentRelease(metadata)).toMatchObject({
+        status: 'error',
+        code: 'INVALID_INPUT',
+      });
+      const direct = prepareReleaseLaunchSchema.parse({
+        ...draft,
+        release_url: url,
+      });
+      expect(await resolveAgentRelease(direct)).toMatchObject({
+        status: 'error',
+        code: 'UNSUPPORTED_RELEASE',
+      });
+    }
+    expect(request).not.toHaveBeenCalled();
+
+    for (const url of [
+      'https://open.spotify.com/album/release-id',
+      'https://open.spotify.com/track/track-id',
+      'https://music.apple.com/us/album/signal-fire/1234?i=5678',
+      'https://music.youtube.com/watch?v=video-id',
+      'https://soundcloud.com/the-artist/signal-fire',
+    ]) {
+      request.mockResolvedValueOnce({
+        result: {
+          type: 'track',
+          name: 'Signal Fire',
+          artists: [{ name: 'The Artist' }],
+          services: {},
+        },
+      });
+      const input = prepareReleaseLaunchSchema.parse({
+        ...draft,
+        release_url: url,
+      });
+      expect(await resolveAgentRelease(input)).toMatchObject({
+        status: 'resolved',
+      });
+    }
+  });
+
+  it('drops non-release upstream and source links from smart-link facts', async () => {
+    request.mockResolvedValue({
+      result: {
+        type: 'album',
+        name: 'Signal Fire',
+        artists: [{ name: 'The Artist' }],
+        services: {
+          spotify: { url: 'https://open.spotify.com/search/anything' },
+          deezer: { url: 'https://www.deezer.com/album/1234' },
+        },
+      },
+    });
+    const input = prepareReleaseLaunchSchema.parse({
+      ...draft,
+      release_url: 'https://open.spotify.com/album/release-id',
+    });
+    const result = await resolveAgentRelease(input);
+    expect(result).toMatchObject({
+      status: 'resolved',
+      facts: [
+        {
+          dsp_links: {
+            deezer: 'https://www.deezer.com/album/1234',
+            spotify: 'https://open.spotify.com/album/release-id',
+          },
+        },
+      ],
+    });
   });
 
   it('rejects unsupported URLs and separates permanent from retryable provider failures', async () => {
