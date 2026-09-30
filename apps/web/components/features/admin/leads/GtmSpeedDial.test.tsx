@@ -6,10 +6,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockSettingsQuery = vi.fn();
 const mockUpdateSettingsMutation = vi.fn();
 
-vi.mock('@/lib/queries', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/queries')>();
+vi.mock('@/lib/queries', async () => {
+  const [fetchQueries, { queryKeys }] = await Promise.all([
+    vi.importActual<typeof import('@/lib/queries/fetch')>(
+      '@/lib/queries/fetch'
+    ),
+    vi.importActual<typeof import('@/lib/queries/keys')>('@/lib/queries/keys'),
+  ]);
+
   return {
-    ...actual,
+    isForbiddenError: fetchQueries.isForbiddenError,
+    queryKeys,
     useLeadPipelineSettingsQuery: (...args: unknown[]) =>
       mockSettingsQuery(...args),
     useUpdateLeadPipelineSettingsMutation: () => mockUpdateSettingsMutation(),
