@@ -153,7 +153,7 @@ export const EVIDENCED_CLAIMS: readonly Claim[] = [
     kind: 'metric',
     source: 'external-cited',
     citation:
-      'Linear JOV-7164 founder-history canon comment (Tim White, 2026-09-30)',
+      'Linear JOV-7164 founder-history canon comment 23a2eb64-426e-43ff-a9c5-5311a40a99e9 (Tim White, 2026-09-29T17:15:42Z)',
     validUntil: '2027-09-30',
   },
 ];
