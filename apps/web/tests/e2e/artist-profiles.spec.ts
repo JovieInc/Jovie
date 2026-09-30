@@ -68,6 +68,17 @@ const actionTraceDirectories = new WeakMap<
   string
 >();
 const allowedActionMessages = new Set([
+  'attempting click action',
+  'attempting click action (trial run)',
+  'retrying click action',
+  'retrying click action (trial run)',
+  'element is not enabled',
+  'element is not stable',
+  'element is not visible',
+  'element is outside of the viewport',
+  'waiting 20ms',
+  'waiting 100ms',
+  'waiting 500ms',
   'waiting for element to be visible, enabled and stable',
   'element is visible, enabled and stable',
   'waiting for element to be visible and stable',
@@ -96,6 +107,107 @@ async function boundedTraceText(entry: JSZip.JSZipObject): Promise<string> {
   }
   return Buffer.concat(pieces).toString('utf8');
 }
+
+type RetryTraceState = {
+  ambiguity?: 'repeated-start' | 'missing-start';
+  attempts: Map<Record<string, unknown>, number>;
+};
+
+function clickRetryTraceStates(
+  events: Record<string, unknown>[],
+  calls: Map<string, string>
+): Map<string, RetryTraceState> {
+  const states = new Map<string, RetryTraceState>();
+  const ordinals = new Map<string, number>();
+  for (const event of events) {
+    const id = event.callId;
+    if (typeof id !== 'string' || calls.get(id) !== 'click') continue;
+    const state: RetryTraceState = states.get(id) ?? { attempts: new Map() };
+    states.set(id, state);
+    const message =
+      typeof event.message === 'string' ? event.message.trim() : null;
+    if (event.type === 'log') {
+      if (
+        message === 'attempting click action' ||
+        message === 'attempting click action (trial run)'
+      ) {
+        if (ordinals.has(id)) state.ambiguity = 'repeated-start';
+        ordinals.set(id, 0);
+      } else if (
+        message === 'retrying click action' ||
+        message === 'retrying click action (trial run)'
+      ) {
+        const ordinal = ordinals.get(id);
+        if (ordinal === undefined) state.ambiguity ??= 'missing-start';
+        else ordinals.set(id, ordinal + 1);
+      }
+    }
+    const ordinal = ordinals.get(id);
+    if (ordinal !== undefined) state.attempts.set(event, ordinal);
+  }
+  return states;
+}
+
+function retryTraceFields(
+  state: RetryTraceState | undefined,
+  event: Record<string, unknown>
+) {
+  if (state?.ambiguity) return { alignmentAmbiguity: state.ambiguity };
+  const ordinal = state?.attempts.get(event);
+  if (ordinal === undefined) return {};
+  // Installed core 1.60.0 derives this cycle from the retry ordinal. This is
+  // source-derived, not an observed browser protocol command or its effect.
+  return {
+    retryAttempt: ordinal,
+    alignmentCandidate: ['protocol', 'end', 'center', 'start'][ordinal % 4],
+  };
+}
+
+test('diagnostic retry sequence rejects ambiguous alignment', () => {
+  const fields = (messages: string[]) => {
+    const events = messages.map(message => ({
+      type: 'log',
+      callId: 'synthetic-click',
+      message,
+    }));
+    const states = clickRetryTraceStates(
+      events,
+      new Map([['synthetic-click', 'click']])
+    );
+    return events.map(event =>
+      retryTraceFields(states.get('synthetic-click'), event)
+    );
+  };
+  expect(
+    fields([
+      'attempting click action',
+      'retrying click action',
+      'retrying click action',
+      'retrying click action',
+    ]).map(field => field.alignmentCandidate)
+  ).toEqual(['protocol', 'end', 'center', 'start']);
+  for (const [messages, reason] of [
+    [
+      [
+        'attempting click action',
+        'retrying click action',
+        'attempting click action',
+      ],
+      'repeated-start',
+    ],
+    [['retrying click action', 'attempting click action'], 'missing-start'],
+  ] as const) {
+    expect(fields([...messages])).toEqual(
+      messages.map(() => ({ alignmentAmbiguity: reason }))
+    );
+  }
+  expect(
+    fields(['attempting click action unapproved', 'retrying click action'])
+  ).toEqual([
+    { alignmentAmbiguity: 'missing-start' },
+    { alignmentAmbiguity: 'missing-start' },
+  ]);
+});
 
 async function finishActionTimingTrace(
   page: import('@playwright/test').Page,
@@ -151,6 +263,7 @@ async function finishActionTimingTrace(
     }
     let retained = 0;
     let omitted = 0;
+    const retryStates = clickRetryTraceStates(events, calls);
     for (const event of events) {
       if (typeof event.callId !== 'string' || !calls.has(event.callId))
         continue;
@@ -185,6 +298,7 @@ async function finishActionTimingTrace(
             wallTime:
               typeof at === 'number' ? wallTime + at - monotonicTime : null,
             ...(event.type === 'log' ? { message } : {}),
+            ...retryTraceFields(retryStates.get(event.callId), event),
             ...(event.type === 'after' ? { failed: !!event.error } : {}),
           })
       );
