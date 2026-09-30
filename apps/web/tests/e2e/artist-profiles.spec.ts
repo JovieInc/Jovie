@@ -331,8 +331,8 @@ async function observeOriginalEntry(
       };
       if (phase.endsWith(':first-trial-invoke')) {
         (
-          window as unknown as { __jovieTrialEntrySurfaces: unknown }
-        ).__jovieTrialEntrySurfaces = surfaces;
+          window as unknown as { __jovieTrialEntry: unknown }
+        ).__jovieTrialEntry = { surfaces, source: image?.getAttribute('src') };
       }
       if (
         phase === 'pointerdown' &&
@@ -860,7 +860,6 @@ test.describe('Artist Profiles Landing', () => {
     await expect(phone).toBeVisible();
     await expect(tabList).toBeVisible();
     await expect(panel).toBeVisible();
-    const sourceBefore = await phone.getAttribute('src');
     await markOriginalEntry(page, 'desktop:first-trial-invoke');
     await preSave.click({ trial: true });
     await markOriginalEntry(page, 'desktop:first-trial-resolved');
@@ -871,9 +870,12 @@ test.describe('Artist Profiles Landing', () => {
       () =>
         (
           window as unknown as {
-            __jovieTrialEntrySurfaces: Record<string, GeometrySnapshot>;
+            __jovieTrialEntry: {
+              surfaces: Record<string, GeometrySnapshot>;
+              source: string;
+            };
           }
-        ).__jovieTrialEntrySurfaces
+        ).__jovieTrialEntry
     );
     expect(entry).toBeTruthy();
     const read = async () => ({
@@ -891,7 +893,7 @@ test.describe('Artist Profiles Landing', () => {
       expect(state.focus, 'trial keeps BODY focus').toBe('BODY');
       expect(state.focusChanges, 'trial has no dispatched focus').toBe(0);
       await expect(preSave).toHaveAttribute('aria-selected', 'true');
-      await expect(phone).toHaveAttribute('src', sourceBefore!);
+      await expect(phone).toHaveAttribute('src', entry.source);
     };
     await assertNoDispatchedFocus();
     const first = await read();
@@ -899,7 +901,7 @@ test.describe('Artist Profiles Landing', () => {
       for (const key of ['documentTop', 'height', 'width', 'x', 'y'] as const) {
         expect
           .soft(
-            Math.abs(first[surface][key] - entry[surface][key]),
+            Math.abs(first[surface][key] - entry.surfaces[surface][key]),
             `trial first ${surface} ${key} shifted without focus`
           )
           .toBeLessThanOrEqual(GEOMETRY_TOLERANCE_PX);
