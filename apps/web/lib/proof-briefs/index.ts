@@ -1,4 +1,8 @@
 export {
+  buildProofBriefOpsCard,
+  proofBriefImagePath,
+} from './chat-card';
+export {
   assertProofBriefRenderable,
   type CertifiedProofBrief,
   JOVIE_PROOF_BRIEF_BRAND,
@@ -6,6 +10,7 @@ export {
   MAX_SUPPORTING_POINTS,
   PROOF_BRIEF_SCHEMA,
   type ProofBriefAttribution,
+  type ProofBriefAudience,
   type ProofBriefBrand,
   ProofBriefError,
   type ProofBriefEvidence,
@@ -40,10 +45,14 @@ export {
   selectProofCandidates,
 } from './feed';
 export {
+  buildCompanyProgressBrief,
   buildCustomerWeeklyRecap,
   CERTIFIED_PROOF_BRIEF,
+  type CompanyProgressBriefInput,
   type CustomerRecapUpdate,
   INSUFFICIENT_EVIDENCE_PROOF_BRIEF,
+  INVESTOR_PROOF_BRIEF,
+  INVESTOR_PROOF_BRIEF_BRAND,
 } from './fixture';
 export {
   buildLybProgressBrief,
@@ -52,6 +61,10 @@ export {
   type LybProgressMeasurement,
   type LybReading,
 } from './lyb';
+export {
+  resolveCertifiedProofBrief,
+  resolveLatestCertifiedProofBrief,
+} from './resolve';
 export {
   type ProofBriefSocialDraft,
   renderProofBriefSocialDraft,

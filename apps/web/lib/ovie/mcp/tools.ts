@@ -9,6 +9,18 @@ import {
   type OperationalMemoryRecord,
 } from '@/lib/ovie/operational-memory';
 import { initiativeAckView } from '@/lib/ovie/persist';
+import { buildProofBriefOpsCard } from '@/lib/proof-briefs/chat-card';
+import {
+  assertProofBriefRenderable,
+  PROOF_BRIEF_AUDIENCES,
+  type ProofBriefAudience,
+  proofBriefProvenance,
+} from '@/lib/proof-briefs/contract';
+import {
+  resolveCertifiedProofBrief,
+  resolveLatestCertifiedProofBrief,
+} from '@/lib/proof-briefs/resolve';
+import { renderProofBriefText } from '@/lib/proof-briefs/text';
 import { getPage, putPage, searchPages } from '@/lib/wiki/gbrain-client';
 import { CreateWorkflowCaptureRequestSchema } from '@/lib/workflow-capture/contract';
 import {
@@ -177,6 +189,35 @@ function toolInputSchema(name: OvieMcpToolName): Record<string, unknown> {
       },
     };
   }
+  if (name === 'get_proof_brief') {
+    return {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        audience: {
+          type: 'string',
+          enum: [...PROOF_BRIEF_AUDIENCES],
+          description:
+            'Who the brief is for. Defaults to investor; selects the most recent certified brief for that audience.',
+        },
+        brief_id: {
+          type: 'string',
+          minLength: 1,
+          maxLength: 64,
+          description:
+            'Pin an exact certified brief instead of resolving latest.',
+        },
+        product: {
+          type: 'string',
+          minLength: 1,
+          maxLength: 64,
+          description:
+            "Product the brief is about ('Jovie', 'LogYourBody'). Defaults to Jovie.",
+        },
+        rev: { type: 'integer', minimum: 1 },
+      },
+    };
+  }
   return { type: 'object', additionalProperties: true };
 }
 
@@ -208,6 +249,8 @@ function toolDescription(name: OvieMcpToolName): string {
       return 'Create or update a Linear issue under explicit founder intent, then read it back. Never claims execution completion or delivery acceptance.';
     case 'record_operational_memory':
       return 'Append a Summer-owned operational-memory record under ops/summer/* with provenance. Buffers when GBrain is unavailable. Not authority/policy writes, not Linear acceptance, not execution completion.';
+    case 'get_proof_brief':
+      return 'Resolve the most recent certified proof brief for an audience (default: investor). Returns the share-image path, copy-ready text, and a chat card. Prepares content only; never sends.';
   }
 }
 
@@ -280,9 +323,80 @@ export async function callOvieMcpTool(
         ok: true,
         result: await coordinateLinearWorkTool(args),
       };
+    case 'get_proof_brief':
+      return { ok: true, result: getProofBrief(args) };
     default:
       return { ok: false, message: `Unknown tool: ${name}` };
   }
+}
+
+const PROOF_BRIEF_TOOL_SCHEMA = 'summer.proof-brief.v1' as const;
+
+/**
+ * The phone dogfood path (JOV-7213): 'send me an investor card' resolves the
+ * most recent certified 7-day brief for the requested audience and returns
+ * everything needed to render and share it — image path, plain text, and the
+ * ops-card payload. Preparation only; nothing is sent.
+ */
+function getProofBrief(args: Record<string, unknown>) {
+  const audienceRaw = stringOpt(args.audience) ?? 'investor';
+  if (!(PROOF_BRIEF_AUDIENCES as readonly string[]).includes(audienceRaw)) {
+    throw new Error(
+      `audience must be one of: ${PROOF_BRIEF_AUDIENCES.join(', ')}`
+    );
+  }
+  const audience = audienceRaw as ProofBriefAudience;
+  const briefId = stringOpt(args.brief_id);
+  const revRaw = args.rev;
+  const revision =
+    typeof revRaw === 'number' && Number.isInteger(revRaw) ? revRaw : undefined;
+
+  const product = stringOpt(args.product) ?? 'Jovie';
+  const brief = briefId
+    ? resolveCertifiedProofBrief(briefId, revision)
+    : resolveLatestCertifiedProofBrief(audience, { product });
+  if (!brief) {
+    return {
+      schema: PROOF_BRIEF_TOOL_SCHEMA,
+      found: false,
+      audience,
+      ...(briefId ? { briefId } : {}),
+      reason: briefId
+        ? 'no certified brief matches that id/revision'
+        : 'no certified brief is available for this audience',
+    };
+  }
+  assertProofBriefRenderable(brief);
+
+  if (
+    !(brief.audiences ?? ['customer', 'manager']).includes(audience) &&
+    !briefId
+  ) {
+    throw new Error(`brief ${brief.briefId} is not certified for ${audience}`);
+  }
+
+  return {
+    schema: PROOF_BRIEF_TOOL_SCHEMA,
+    found: true,
+    audience,
+    briefId: brief.briefId,
+    revision: brief.revision,
+    subject: brief.subject,
+    window: brief.window,
+    status: brief.status,
+    privacy: brief.privacy,
+    provenance: proofBriefProvenance(brief),
+    hero: brief.hero.sentence,
+    text: renderProofBriefText(brief),
+    imageUrl:
+      brief.privacy === 'public'
+        ? `/api/share/proof-brief?brief=${encodeURIComponent(brief.briefId)}&rev=${brief.revision}`
+        : null,
+    card: buildProofBriefOpsCard(brief),
+    delivery: 'prepared-for-founder',
+    sent: false,
+    note: 'Prepared for the founder to review and forward; this tool never sends investor or customer communications.',
+  };
 }
 
 function principalUserId(principal: OvieMcpPrincipal): string {
