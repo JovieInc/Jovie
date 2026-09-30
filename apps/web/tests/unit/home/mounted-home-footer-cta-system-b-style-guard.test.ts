@@ -67,7 +67,12 @@ describe('homepage terminal CTA and canonical footer source contract', () => {
     expect(homeCss).toContain('min-height: calc(var(--space-24) * 3.25)');
     expect(homeCss).toContain('margin-top: var(--space-8)');
     expect(css).toMatch(
-      /(?=.*var\(--system-b-bg-page\))(?=.*var\(--color-text-primary-token\))(?=.*var\(--color-text-tertiary-token\))(?=.*var\(--system-b-app-frame-seam\))(?=.*var\(--homepage-page-gutter\))(?=.*var\(--ds-public-content-max\))(?=.*var\(--text-4xl\))(?=.*var\(--text-xs\))(?=.*var\(--space-)(?=.*\.home-viewport \.system-b-mounted-home-footer)(?=.*@media \(max-width: 767px\))(?=.*letter-spacing: 0;)/s
+      /(?=.*var\(--system-b-bg-page\))(?=.*var\(--color-text-primary-token\))(?=.*var\(--color-text-tertiary-token\))(?=.*var\(--system-b-app-frame-seam\))(?=.*var\(--homepage-page-gutter\))(?=.*var\(--ds-public-content-max\))(?=.*var\(--ds-marketing-title-size\))(?=.*var\(--text-xs\))(?=.*var\(--space-)(?=.*\.home-viewport \.system-b-mounted-home-footer)(?=.*@media \(max-width: 767px\))(?=.*letter-spacing: 0;)/s
+    );
+    // The closing heading stays on the section-title ramp so it never
+    // out-scales the page h1 (heading-hierarchy-inversion).
+    expect(css).toMatch(
+      /\.system-b-mounted-home-footer-cta-heading \{[^}]*font-size: var\(--ds-marketing-title-size\);/
     );
     // Content column: footer locks onto the shared homepage grid
     // (--ds-public-content-max), not the legacy 90rem --homepage-section-max.

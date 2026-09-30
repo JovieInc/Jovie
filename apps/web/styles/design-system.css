@@ -68,10 +68,14 @@
   --ds-marketing-display-size: clamp(4rem, 6.9vw, 6.25rem);
   --ds-marketing-display-leading: 0.94;
   --ds-marketing-display-tracking: -0.045em;
+  /* Section titles must never out-scale the page headline they sit under.
+     The smallest page headlines that host them are the shared MarketingHero
+     (56px desktop / 40px mobile, fixed by MKT-D03) and the mobile poster hero
+     (38.4px floor), so the title ramp tops out at 52px and floors at 32px. */
   --ds-marketing-title-size: clamp(
-    var(--text-4xl),
-    4.6vw,
-    calc(var(--text-5xl) + var(--space-4))
+    var(--text-3xl),
+    3.6vw,
+    calc(var(--text-5xl) + var(--space-1))
   );
   --ds-marketing-title-leading: 1.08;
   --ds-marketing-title-tracking: 0;

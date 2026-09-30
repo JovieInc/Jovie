@@ -85,11 +85,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
     3.6vw,
     calc(var(--text-5xl) + var(--space-1))
   );
-  --homepage-section-display-size: clamp(
-    var(--text-4xl),
-    4.4vw,
-    calc(var(--text-5xl) + var(--space-4))
-  );
   --homepage-section-copy-size: var(--text-lg);
   --homepage-surface-bg: linear-gradient(
     180deg,
@@ -4547,15 +4542,16 @@ body:has(.home-viewport)::-webkit-scrollbar {
   text-align: center;
 }
 
-/* Closing beat: hero-scale Satoshi display so the page ends on the same
-   typographic register it opened with. */
+/* Closing beat: Satoshi display on the canonical section-title ramp. It sits
+   one step below whichever headline opened the page (poster display, the
+   /new hero, or the shared MarketingHero) at every viewport. */
 .system-b-mounted-home-footer-cta-heading {
   max-width: 14ch;
   margin: 0;
   color: var(--color-text-primary-token);
   font-family:
     var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
-  font-size: var(--homepage-section-display-size);
+  font-size: var(--ds-marketing-title-size);
   font-weight: 600;
   letter-spacing: var(--ds-marketing-display-tracking);
   line-height: var(--ds-marketing-title-leading);
@@ -4671,11 +4667,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 @media (max-width: 767px) {
-  .system-b-mounted-home-footer-cta-heading {
-    font-size: var(--text-4xl);
-    line-height: var(--ds-marketing-title-leading);
-  }
-
   .system-b-mounted-home-footer-cta-lede {
     margin-top: var(--space-5);
   }
