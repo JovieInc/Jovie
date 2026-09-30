@@ -325,7 +325,7 @@ async function launchChromium(): Promise<Browser> {
 
 /** Live options from the environment (Doppler wrapper); no secrets involved. */
 export function renderOptionsFromEnv(
-  env: NodeJS.ProcessEnv,
+  env: Readonly<Record<string, string | undefined>>,
   outDir: string,
   appDir: string
 ): LiveRenderOptions {
