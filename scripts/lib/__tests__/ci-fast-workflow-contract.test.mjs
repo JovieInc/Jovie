@@ -1521,6 +1521,24 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
+  it('selects coverage publication execution tests for helper-only changes', () => {
+    const pattern = new RegExp(structuralControlPattern());
+    expect(pattern.test('scripts/lib/publish-coverage-report.mjs')).toBe(true);
+    expect(pattern.test('scripts/publish-coverage-report.test.mjs')).toBe(true);
+    expect(buildControlTestCommands()).toContainEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
+        '--test-coverage-include=scripts/lib/publish-coverage-report.mjs',
+        '--test-coverage-lines=95',
+        '--test-coverage-branches=90',
+        '--test-coverage-functions=90',
+        'scripts/publish-coverage-report.test.mjs',
+      ],
+    ]);
+  });
+
   it('keeps workflow contracts in the bounded CI control suite', () => {
     expect(PACKAGE_JSON.scripts['ci:control:test']).toBe(
       'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs && node scripts/ci-workflow-topology.mjs'
