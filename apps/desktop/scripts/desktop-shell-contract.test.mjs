@@ -163,7 +163,7 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /NAVIGATION_ABORTED_ERROR_CODE/);
   assert.match(
     mainSource,
-    /maybeShowDesktopAuthHandoff\(resolveNavigationUrl\(validatedURL\)\)/
+    /interceptMainWindowAuthNavigation\(win, resolveNavigationUrl\(validatedURL\)\)/
   );
   assert.match(mainSource, /showDesktopLoadFailure\(win\)/);
   // JOV-3595: blank/crashed-renderer recovery (beyond network did-fail-load).
