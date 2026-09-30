@@ -18,7 +18,7 @@ Instagram bio. Spotify profile. My website. Press kits I'd sent to hundreds of b
 
 And now that email went to someone who no longer worked for me.
 
-I spent the next two weeks updating everything I could find. Changed Instagram. Updated Spotify for Artists. Rewrote the website. Emailed every blog and playlist curator I had a relationship with. But it didn't matter. The scraped databases were out of my control. Agencies had already pulled my manager's email into their CRMs months ago. Festival submission portals had it cached. Industry databases had it indexed.
+I spent the next two weeks updating everything I could find. Changed Instagram. Updated my Spotify profile. Rewrote the website. Emailed every blog and playlist curator I had a relationship with. But it didn't matter. The scraped databases were out of my control. Agencies had already pulled my manager's email into their CRMs months ago. Festival submission portals had it cached. Industry databases had it indexed.
 
 For the next year, opportunities went to an inbox I couldn't see. I'll never know how many I missed.
 
