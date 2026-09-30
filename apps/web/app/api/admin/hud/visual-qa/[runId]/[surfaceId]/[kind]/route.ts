@@ -5,8 +5,8 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { resolveVisualQaRunRelativePath } from '@/lib/agent-os/visual-qa/paths';
 import { getVisualQaReviewRun } from '@/lib/agent-os/visual-qa/review';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 export const runtime = 'nodejs';
 
@@ -43,7 +43,7 @@ export async function GET(
     params: Promise<{ runId: string; surfaceId: string; kind: string }>;
   }
 ): Promise<Response> {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },

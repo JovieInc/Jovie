@@ -10,8 +10,8 @@ vi.mock('@/lib/acquisition/proof-claim-funnel.server', () => ({
   getProofClaimFunnelReport: mockReport,
 }));
 
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: mockEntitlements,
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  getOvieOperatorEntitlements: mockEntitlements,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({

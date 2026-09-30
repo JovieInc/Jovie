@@ -26,6 +26,11 @@ export const PRODUCT_COPY = {
     proof: 'Free · Spotify verified',
     cta: 'Claim',
   },
+  close: {
+    // Pen dClrT/DbI9f: two-line close headline with an explicit break.
+    headlineLine1: 'See what shows up',
+    headlineLine2: 'when people search for you.',
+  },
 } as const;
 
 export const PRODUCT_CLAIM_HREF = buildClaimProfileStartHref(
