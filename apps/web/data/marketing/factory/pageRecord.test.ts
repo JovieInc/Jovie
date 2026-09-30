@@ -106,6 +106,61 @@ describe('PageRecordSchema', () => {
     ).toContain('composition renderers must be unique');
   });
 
+  it('allows a generic renderer to serve unique section instances', () => {
+    expect(
+      issuesFor(
+        baseInput({
+          composition: {
+            recipeId: 'artist-lp',
+            penContractId: 'DRJv9',
+            sections: [
+              {
+                renderer: 'factory-hero',
+                instanceId: 'hero-1',
+                sectionId: 'hero',
+              },
+              {
+                renderer: 'factory-feature-split',
+                instanceId: 'feature-split-1',
+                sectionId: 'feature-split',
+              },
+              {
+                renderer: 'factory-feature-split',
+                instanceId: 'feature-split-2',
+                sectionId: 'feature-split',
+              },
+            ],
+          },
+        })
+      )
+    ).toEqual([]);
+  });
+
+  it('rejects duplicate generic section instance ids', () => {
+    expect(
+      issuesFor(
+        baseInput({
+          composition: {
+            recipeId: 'artist-lp',
+            penContractId: 'DRJv9',
+            sections: [
+              {
+                renderer: 'factory-hero',
+                instanceId: 'section-1',
+                sectionId: 'hero',
+              },
+              {
+                renderer: 'factory-cta',
+                instanceId: 'section-1',
+                sectionId: 'cta',
+              },
+            ],
+          },
+        })
+      )
+    ).toContain('composition instance ids must be unique');
+  });
+
   it('rejects claim-backed copy whose claim is not declared', () => {
     expect(
       issuesFor(

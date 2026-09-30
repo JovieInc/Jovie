@@ -6,11 +6,11 @@
  * they stay in the run and are bound by their digests in `receipts`.
  *
  * Renderer keys come from the /solutions renderer map (via the data-only
- * SOLUTIONS_SECTION_KEYS), one per narrative section in order, and the
+ * SOLUTIONS_SECTION_KEYS), one per canonical section, and the
  * record is held to the same checks as assertRenderableSolutionsRecord:
- * claims resolve, copy resolves, every section has a renderer. Today's
- * renderers are artist-specific and read their own copy, not record.copy,
- * so a factory record stays in shadow until data-driven sections exist.
+ * claims resolve, copy resolves, and every section has a renderer. Narrative
+ * ids stay in `instanceId`, the namespace for record-owned copy and media, so
+ * repeated canonical sections share a renderer without sharing content.
  */
 
 import { HERO_DECISION_TABLE } from '../../data/marketing/factory/heroDecision';
@@ -80,6 +80,7 @@ export function buildFactoryPageRecord(
       penContractId: PEN_CONTRACT_BY_RECIPE[recipeId],
       sections: sections.map((section, index) => ({
         renderer: rendererKeys[index] ?? section.sectionInstanceId,
+        instanceId: section.sectionInstanceId,
         sectionId: section.sectionId,
       })),
     },

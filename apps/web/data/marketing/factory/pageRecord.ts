@@ -109,6 +109,11 @@ export type PageAssetRef = z.infer<typeof PageAssetRefSchema>;
 export const PageCompositionSectionSchema = z.strictObject({
   /** Renderer key: one entry in the family renderer's closed section map. */
   renderer: Slug,
+  /**
+   * Instance namespace for record-owned copy and media. Factory records keep
+   * narrative ids here while repeated sections share one generic renderer.
+   */
+  instanceId: Slug.optional(),
   /** Canonical section id (sections.ts) the renderer implements. */
   sectionId: z.enum(MARKETING_SECTION_IDS as [MarketingSectionId]),
 });
@@ -197,11 +202,23 @@ export const PageRecordSchema = z
         path: ['composition', 'sections', 0],
       });
     }
-    const renderers = record.composition.sections.map(s => s.renderer);
-    if (new Set(renderers).size !== renderers.length) {
+    const legacyRenderers = record.composition.sections
+      .filter(section => section.instanceId === undefined)
+      .map(section => section.renderer);
+    if (new Set(legacyRenderers).size !== legacyRenderers.length) {
       ctx.addIssue({
         code: 'custom',
         message: 'composition renderers must be unique',
+        path: ['composition', 'sections'],
+      });
+    }
+    const instanceIds = record.composition.sections.flatMap(section =>
+      section.instanceId ? [section.instanceId] : []
+    );
+    if (new Set(instanceIds).size !== instanceIds.length) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'composition instance ids must be unique',
         path: ['composition', 'sections'],
       });
     }

@@ -50,9 +50,21 @@ describe('factory page records vs the /solutions build gate', () => {
       )
     );
     expect(record.composition.sections).toEqual([
-      { renderer: 'artist-hero-adaptive-intro', sectionId: 'hero' },
-      { renderer: 'artist-opinionated', sectionId: 'feature-split' },
-      { renderer: 'artist-final-cta', sectionId: 'cta' },
+      {
+        renderer: 'factory-hero',
+        instanceId: 'hero-1',
+        sectionId: 'hero',
+      },
+      {
+        renderer: 'factory-feature-split',
+        instanceId: 'capture-1',
+        sectionId: 'feature-split',
+      },
+      {
+        renderer: 'factory-cta',
+        instanceId: 'cta-1',
+        sectionId: 'cta',
+      },
     ]);
     expect(() => assertRenderableSolutionsRecord(record)).not.toThrow();
   });
