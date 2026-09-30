@@ -81,7 +81,15 @@ export function ArtistProfileReleaseCycleGallery({
   releaseCycle,
 }: Readonly<ArtistProfileReleaseCycleGalleryProps>) {
   return (
-    <ArtistProfileSectionShell>
+    <ArtistProfileSectionShell
+      sectionId='product-gallery'
+      sectionVariant='release-rail'
+      sectionOwner='apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx'
+      sectionOccurrence='release-cycle'
+      penContractId={
+        MARKETING_PEN_CONTRACT_IDS.section.productGalleryReleaseRail
+      }
+    >
       <div className='mx-auto max-w-public-content'>
         <ArtistProfileSectionHeader
           align='left'
@@ -92,7 +100,7 @@ export function ArtistProfileReleaseCycleGallery({
         />
 
         <p className='mt-8 font-mono text-xs text-tertiary-token'>
-          One profile across three moments.
+          Three demonstration views of one profile.
         </p>
 
         <MarketingSnapRail

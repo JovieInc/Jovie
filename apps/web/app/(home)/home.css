@@ -6424,7 +6424,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   .system-b-mounted-home-pricing
   .marketing-pricing-plan-card__features
   li {
-  grid-template-columns: var(--space-4) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
   color: var(--color-text-secondary-token);
   font-size: var(--text-sm);

@@ -45,7 +45,7 @@ test.describe('Pricing Page', () => {
       page.getByRole('heading', {
         name: 'Public Jovie profile and audience capture',
       })
-    ).toBeVisible();
+    ).toHaveCount(0);
 
     // Check that the canonical pricing tiers are visible
     await expect(page.getByTestId('marketing-pricing-plan-free')).toContainText(
@@ -76,6 +76,45 @@ test.describe('Pricing Page', () => {
     await expect(page.getByTestId('marketing-pricing-plan-team')).toHaveCount(
       0
     );
+  });
+
+  test('keeps centered pricing and plan features readable at narrow and wide widths', async ({
+    page,
+  }) => {
+    for (const width of [390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      const hero = page.getByTestId('marketing-section-hero');
+      await expect(hero.locator('img')).toHaveCount(0);
+      await expect(hero.locator('h1')).toHaveText('Pricing');
+      await expect
+        .poll(() =>
+          page
+            .locator('.marketing-pricing-plan-card__features li')
+            .evaluateAll(items =>
+              items.every(item => {
+                const text = item.querySelector('span');
+                return (
+                  !!text &&
+                  text.getBoundingClientRect().width >=
+                    item.getBoundingClientRect().width - 2
+                );
+              })
+            )
+        )
+        .toBe(true);
+      await expect(
+        page.locator('.marketing-pricing-plan-card__features li svg')
+      ).toHaveCount(0);
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () =>
+              document.documentElement.scrollWidth <=
+              document.documentElement.clientWidth
+          )
+        )
+        .toBe(true);
+    }
   });
 
   test('keeps campaign attribution when legacy launch pricing links redirect', async ({
@@ -144,12 +183,21 @@ test.describe('Pricing Page', () => {
     expect(bodyText && bodyText.length > 500).toBe(true);
   });
 
-  test('renders every logo-bar asset inside its card (JOV-6849, JOV-7233)', async ({
+  test('keeps the pricing explanation free of unsupported distribution-logo proof', async ({
     page,
   }) => {
-    const logoBar = page.locator(
-      '.marketing-hero-logos [data-testid="homepage-trust"]'
-    );
+    await expect(page.locator('.marketing-hero-logos')).toHaveCount(0);
+    await expect(
+      page.locator('main [data-testid="homepage-trust"]')
+    ).toHaveCount(0);
+  });
+
+  test('keeps shared logo-bar assets inside the notification trust card (JOV-6849, JOV-7233)', async ({
+    page,
+  }) => {
+    await page.goto('/artist-notifications', { waitUntil: 'domcontentloaded' });
+    await waitForHydration(page);
+    const logoBar = page.locator('main [data-testid="homepage-trust"]');
     await expect(logoBar).toBeVisible();
     const brokenImages = await logoBar
       .locator('img')
