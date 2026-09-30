@@ -44,18 +44,25 @@ describe('test coverage audit workflow', () => {
     );
   });
 
-  it('keeps generated commit message lines within commitlint limits', () => {
+  it('publishes through an app-authored draft PR after coverage, without a main push', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
-    const commitStep = getStepBlock(workflow, 'Commit if changed');
-    const messageLines = Array.from(
-      commitStep.matchAll(/-m "([^"]+)"/g),
-      match => match[1]!
+    const publishStep = getStepBlock(workflow, 'Open coverage report PR');
+    const tokenStep = getStepBlock(
+      workflow,
+      'Generate report publication token'
     );
 
-    expect(messageLines.length).toBeGreaterThanOrEqual(2);
-    for (const line of messageLines) {
-      expect(line.length).toBeLessThanOrEqual(100);
-    }
+    expect(publishStep).toContain('publishCoverageReport');
+    expect(publishStep).toContain('steps.report-token.outputs.token');
+    expect(tokenStep).toContain('vars.JOVIE_BOT_APP_ID');
+    expect(tokenStep).toContain('permission-pull-requests: write');
+    expect(
+      workflow.indexOf('- name: Generate report publication token')
+    ).toBeGreaterThan(workflow.indexOf('- name: Generate heatmap'));
+    expect(workflow).toContain('persist-credentials: false');
+    expect(workflow).toContain('contents: read');
+    expect(workflow).not.toContain('git push');
+    expect(workflow).not.toContain('git pull --rebase');
   });
 
   it('gates RED-surface decay against the committed snapshot before rewriting it', () => {
