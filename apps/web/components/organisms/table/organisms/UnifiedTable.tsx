@@ -1,6 +1,6 @@
 'use client';
 
-// @coverage-via apps/web/components/organisms/table/organisms/UnifiedTable.keyboard.test.tsx
+// @coverage-via apps/web/components/organisms/table/organisms/UnifiedTable.sorting.test.tsx
 
 import { Spinner as LoadingSpinner } from '@jovie/ui';
 import React, {
@@ -513,7 +513,7 @@ export function UnifiedTable<TData extends RowData>({
     columns,
     state: tableState,
     onRowSelectionChange,
-    onSortingChange,
+    ...(onSortingChange ? { onSortingChange } : {}),
     onGlobalFilterChange,
     onColumnVisibilityChange,
     getCoreRowModel: coreRowModel,
