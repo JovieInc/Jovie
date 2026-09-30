@@ -393,16 +393,14 @@ export async function resolveAgentRelease(
       ? { status: 'resolved', facts }
       : { status: 'error', code: 'RELEASE_NOT_FOUND', retryable: false };
   } catch (error) {
-    const permanent =
-      error instanceof MusicfetchRequestError &&
-      error.statusCode !== undefined &&
-      error.statusCode >= 400 &&
-      error.statusCode < 500 &&
-      error.statusCode !== 429;
+    // Only a catalog miss says anything about the supplied release. Auth,
+    // subscription and request-contract failures belong to the provider path.
+    const notFound =
+      error instanceof MusicfetchRequestError && error.statusCode === 404;
     return {
       status: 'error',
-      code: permanent ? 'RELEASE_NOT_FOUND' : 'UPSTREAM_FAILURE',
-      retryable: !permanent,
+      code: notFound ? 'RELEASE_NOT_FOUND' : 'UPSTREAM_FAILURE',
+      retryable: !notFound,
     };
   }
 }
