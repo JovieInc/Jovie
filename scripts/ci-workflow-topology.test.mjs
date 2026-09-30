@@ -1,5 +1,6 @@
 // biome-ignore-all format: compact regression controls keep the guarded PR under 500 lines.
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import test from 'node:test';
 import { buildTopology, findCycle, validateTopology } from './ci-workflow-topology.mjs';
 
@@ -22,4 +23,10 @@ test('rejects cycles, duplicate owners, and budget regressions', () => {
   assert.match(errors, /authority surfaces must have exactly one owner/);
   assert.match(errors, /normal PR check budget exceeded/);
   assert.match(errors, /did not fall by at least 75%/);
+});
+
+test('yaml parse result is narrowed before property access (JOV-7290)', () => {
+  const source = fs.readFileSync(new URL('./ci-workflow-topology.mjs', import.meta.url), 'utf8');
+  assert.match(source, /@typedef \{object\} WorkflowYaml/);
+  assert.match(source, /@type \{WorkflowYaml\} \*\/ \(yaml\.load/);
 });
