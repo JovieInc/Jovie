@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
 import { ONBOARDING_ENTRY_TITLE } from '@/lib/onboarding/empty-state';
@@ -13,6 +13,8 @@ const chatMocks = vi.hoisted(() => ({
   setMessages: vi.fn(),
   status: 'ready' as 'ready' | 'submitted' | 'streaming',
   stop: vi.fn(),
+  onError: undefined as undefined | ((error: Error) => void),
+  errorMetadata: {} as Record<string, unknown>,
 }));
 
 vi.mock('ai', () => ({
@@ -22,13 +24,16 @@ vi.mock('ai', () => ({
 }));
 
 vi.mock('@ai-sdk/react', () => ({
-  useChat: () => ({
-    messages: chatMocks.messages,
-    sendMessage: chatMocks.sendMessage,
-    setMessages: chatMocks.setMessages,
-    status: chatMocks.status,
-    stop: chatMocks.stop,
-  }),
+  useChat: (options: { onError?: (error: Error) => void }) => {
+    chatMocks.onError = options.onError;
+    return {
+      messages: chatMocks.messages,
+      sendMessage: chatMocks.sendMessage,
+      setMessages: chatMocks.setMessages,
+      status: chatMocks.status,
+      stop: chatMocks.stop,
+    };
+  },
 }));
 
 vi.mock('@/lib/analytics', () => ({
@@ -66,7 +71,7 @@ vi.mock('@/components/jovie/tool-ui', () => ({
 }));
 
 vi.mock('@/components/jovie/utils', () => ({
-  extractErrorMetadata: () => ({}),
+  extractErrorMetadata: () => chatMocks.errorMetadata,
   getErrorType: () => 'server',
   getPreferredErrorMessage: (error: Error) => error.message,
 }));
@@ -105,6 +110,8 @@ describe('OnboardingChat empty intro', () => {
     vi.clearAllMocks();
     chatMocks.messages = [];
     chatMocks.status = 'ready';
+    chatMocks.onError = undefined;
+    chatMocks.errorMetadata = {};
     process.env.NODE_ENV = 'development';
   });
 
@@ -174,4 +181,21 @@ describe('OnboardingChat empty intro', () => {
       expect(scrollRegion).toHaveClass(expected);
     }
   );
+
+  it('surfaces a turnstile recovery row instead of swallowing the error (JOV-7294)', async () => {
+    chatMocks.errorMetadata = { errorCode: 'TURNSTILE_REQUIRED' };
+    render(
+      <OnboardingChat turnstileToken='token' turnstileStatus='verified' />
+    );
+
+    act(() => {
+      chatMocks.onError?.(new Error('Forbidden'));
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('onboarding-message-recovery')
+      ).toHaveTextContent('Complete the security check to send your message.');
+    });
+  });
 });

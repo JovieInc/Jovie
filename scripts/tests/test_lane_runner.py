@@ -883,6 +883,15 @@ class RunAgentTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, open(Path(tmp) / "log", "w") as log:
             self.assertEqual(lane.run_agent(["sh", "-c", "echo hi; exit 3"], Path(tmp), log, timeout=10).returncode, 3)
 
+    def test_run_agent_forces_shared_store_hardlink_imports(self):
+        with tempfile.TemporaryDirectory() as tmp, open(Path(tmp) / "log", "w") as log:
+            output = Path(tmp) / "import-method"
+            command = [sys.executable, "-c",
+                       "import os, pathlib; pathlib.Path('import-method').write_text("
+                       "os.environ.get('npm_config_package_import_method', ''))"]
+            self.assertEqual(lane.run_agent(command, Path(tmp), log, timeout=10).returncode, 0)
+            self.assertEqual(output.read_text(), "hardlink")
+
 
 class DispatchTest(unittest.TestCase):
     def test_spawns_one_worker_per_slot_of_healthy_enabled_providers_and_prunes(self):
@@ -992,6 +1001,11 @@ class DispatchTest(unittest.TestCase):
 
 
 class FixRedTest(unittest.TestCase):
+    def setUp(self):
+        self.real_reconcile_fix_target = lane.reconcile_fix_target
+        lane.reconcile_fix_target = lambda pr: {**pr, "state": "OPEN", "mergedAt": None}
+        self.addCleanup(setattr, lane, "reconcile_fix_target", self.real_reconcile_fix_target)
+
     def pr(self, number=5, sha="h1", checks=None):
         return {"number": number, "title": "t", "headRefName": "devin/jov-1", "headRefOid": sha,
                 "statusCheckRollup": checks if checks is not None else [
@@ -1088,23 +1102,37 @@ class FixRedTest(unittest.TestCase):
                 lane.sh, lane.failure_excerpt = real, real_excerpt
         self.assertIn(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto"], calls)
 
-    def test_a_pr_merged_before_its_fix_run_is_skipped_not_failed(self):
-        real = lane.sh
+    def test_a_pr_merged_before_its_fix_run_installs_nothing_and_records_cancellation(self):
+        real_sh, real_agent = lane.sh, lane.run_agent
+        calls = []
+        lane.reconcile_fix_target = self.real_reconcile_fix_target
 
-        def fake(args, cwd=None, timeout=600, env=None, log=None):
-            if args[:3] == ["git", "worktree", "add"]:
-                return SimpleNamespace(returncode=128, stdout="",
-                                       stderr="fatal: invalid reference: origin/devin/jov-1")
-            return SimpleNamespace(returncode=0, stderr="", stdout="")
+        def fake(args, **kw):
+            calls.append(args)
+            payload = {"state": "MERGED", "mergedAt": "2026-09-30T17:42:50Z",
+                       "headRefName": "devin/jov-1", "headRefOid": "h1", "url": "https://x/pr/5",
+                       "statusCheckRollup": []}
+            return SimpleNamespace(returncode=0, stdout=json.dumps(payload), stderr="")
         lane.sh = fake
+        lane.run_agent = lambda *a, **kw: self.fail("a merged target must not start an agent")
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp), repo=Path(tmp))
             try:
-                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, self.pr())
+                request = {**self.pr(), "eventKinds": ["dequeued"],
+                           "gateEvidence": ["check-failed:ci-fast"],
+                           "queueFailure": "source merge-group failure"}
+                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, request)
             finally:
-                lane.sh = real
-        self.assertEqual(receipt["verdict"], "skipped")
-        self.assertIn("invalid reference", receipt["reasons"][0])
+                lane.sh, lane.run_agent = real_sh, real_agent
+            ledger = [json.loads(line) for line in (host.state / "runs/ledger.jsonl").read_text().splitlines()]
+        self.assertEqual((receipt["verdict"], receipt["reasons"]), ("cancelled", ["target-pr-merged"]))
+        self.assertEqual(receipt["cancellation"]["mergedAt"], "2026-09-30T17:42:50Z")
+        self.assertEqual(receipt["cancellation"]["requestSource"]["eventKinds"], ["dequeued"])
+        self.assertEqual(receipt["cancellation"]["requestSource"]["queueFailure"], "source merge-group failure")
+        self.assertEqual(ledger, [json.loads(json.dumps(receipt))],
+                         "the cancellation and its original source are durable")
+        self.assertFalse(any(cmd and cmd[0] in {"git", "pnpm"} for cmd in calls),
+                         "a merged target performs zero checkout, install, or push work")
 
     def test_a_lockfile_only_conflict_skips_the_agent_and_re_arms(self):
         real, real_resolve, real_agent = lane.sh, lane.resolve_lockfile_conflict, lane.run_agent
@@ -1390,8 +1418,10 @@ class FixRedTest(unittest.TestCase):
     def test_fix_run_reports_a_pushed_head_and_leaves_a_receipt(self):
         real, real_excerpt = lane.sh, lane.failure_excerpt
         lane.failure_excerpt = lambda pr: "err"
+        calls = []
 
         def fake(args, cwd=None, timeout=600, env=None, log=None):
+            calls.append(args)
             if args[:2] == ["git", "ls-remote"]:
                 return SimpleNamespace(returncode=0, stderr="", stdout="h2\trefs/heads/devin/jov-1\n")
             if args[:3] == ["git", "worktree", "add"]:
@@ -1406,6 +1436,8 @@ class FixRedTest(unittest.TestCase):
                 lane.sh, lane.failure_excerpt = real, real_excerpt
             self.assertEqual((receipt["verdict"], receipt["headAfter"]), ("fix-pushed", "h2"))
             self.assertIn("fix-red", (host.state / "runs/ledger.jsonl").read_text())
+        self.assertIn(lane.WORKTREE_INSTALL, calls)
+        self.assertIn("--package-import-method=hardlink", lane.WORKTREE_INSTALL)
     def test_non_pushing_fix_runs_the_configured_second_attempt(self):
         real, real_excerpt = lane.sh, lane.failure_excerpt
         def fake(args, cwd=None, timeout=600, env=None, log=None):
