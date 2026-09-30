@@ -35,6 +35,27 @@ import {
   structuralLocks,
   webCiContractTestsCommand,
 } from '../../ci-fast-lanes.mjs';
+
+describe('Hyperagent remote lane coverage contract', () => {
+  it('runs remote lifecycle and existing fenced-attempt regressions in the real structural selector', () => {
+    const command = STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0];
+    expect(command).toContain('scripts/tests/test_hyperagent_lane.py');
+    expect(command).toContain('scripts/tests/test_execution_attempt.py');
+    expect(command).toContain('scripts/tests/test_lane_runner.py');
+    expect(command).toContain('coverage run --branch -m pytest');
+  });
+  it('preserves the existing lane floor and enforces meaningful remote adapter coverage', () => {
+    const command = STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0];
+    expect(command).toContain(
+      'lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/doctor.py" --fail-under=85'
+    );
+    expect(command).toContain(
+      '*/scripts/lanes/hyperagent_lane.py" --fail-under=95'
+    );
+    expect(command).toContain(' && ');
+  });
+});
+
 import {
   ALLOWLIST_PATH as LATENCY_ALLOWLIST_PATH,
   RUNTIME_ROOTS as LATENCY_RUNTIME_ROOTS,
