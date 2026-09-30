@@ -3,8 +3,8 @@ import { NextResponse } from 'next/server';
 
 import { db } from '@/lib/db';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { getRedis } from '@/lib/redis';
 import { logger } from '@/lib/utils/logger';
 
@@ -23,7 +23,7 @@ interface AdminOverviewResponse {
 
 export async function GET() {
   try {
-    const entitlements = await getCurrentUserEntitlements();
+    const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
 
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(

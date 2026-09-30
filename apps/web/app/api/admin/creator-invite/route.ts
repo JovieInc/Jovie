@@ -5,10 +5,10 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema/profiles';
 import { enqueueClaimInviteJob } from '@/lib/email/jobs/enqueue';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { requireOvieApiAccess } from '@/lib/ovie/privacy-lock/access';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -30,20 +30,8 @@ const createInviteSchema = z.object({
  */
 export async function POST(request: Request) {
   try {
-    const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
-    if (!entitlements.isAuthenticated) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    if (!entitlements.isAdmin) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403, headers: NO_STORE_HEADERS }
-      );
-    }
+    const denied = await requireOvieApiAccess({ privileged: true });
+    if (denied) return denied;
 
     const parsedBody = await parseJsonBody<unknown>(request, {
       route: 'POST /api/admin/creator-invite',

@@ -15,7 +15,6 @@ import { db } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
 import { campaignSettings } from '@/lib/db/schema/admin';
 import { leads } from '@/lib/db/schema/leads';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   captureError,
   captureWarning,
@@ -26,6 +25,7 @@ import {
   OUTREACH_QUEUE_CLAIM_TTL_MS,
   processOutreachBatch,
 } from '@/lib/leads/outreach-batch';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { outreachListQuerySchema } from '@/lib/validation/lead-schemas';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -43,8 +43,11 @@ function jsonError(message: string, status: number) {
   );
 }
 
-async function requireAdminAccess(session: 'cookie' | 'fresh' = 'cookie') {
-  const entitlements = await getCurrentUserEntitlements({ session });
+async function requireAdminAccess(
+  session: 'cookie' | 'fresh' = 'cookie',
+  purpose?: 'read'
+) {
+  const entitlements = await getOvieOperatorEntitlements({ session, purpose });
 
   if (!entitlements.isAuthenticated) {
     return jsonError('Unauthorized', 401);
@@ -124,7 +127,7 @@ function isMissingLeadSchemaColumnError(error: unknown): boolean {
  * GET /api/admin/outreach — List outreach leads by queue.
  */
 export async function GET(request: NextRequest) {
-  const authError = await requireAdminAccess();
+  const authError = await requireAdminAccess('fresh');
   if (authError) {
     return authError;
   }

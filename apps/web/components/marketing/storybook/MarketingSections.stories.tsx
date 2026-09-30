@@ -469,6 +469,18 @@ export const artistProfileCalloutSystem: Story = {
   ),
 };
 
+export const productGallery: Story = {
+  name: 'product-gallery',
+  render: () => (
+    <SectionFrame sectionId='product-gallery'>
+      <MarketingShippedSitesShowcase />
+      <ArtistProfileReleaseCycleGallery
+        releaseCycle={ARTIST_PROFILE_COPY.releaseCycle}
+      />
+    </SectionFrame>
+  ),
+};
+
 export const monetization: Story = {
   name: 'monetization',
   render: () => (

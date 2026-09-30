@@ -5,6 +5,7 @@ import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import MarketingLayout from '@/app/(marketing)/layout';
 import { ArtistProfileLandingRoute } from '@/components/marketing/artist-profile/ArtistProfileLandingRoute';
+import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/artist-profiles',
@@ -56,6 +57,34 @@ describe('ArtistProfileLandingRoute runtime composition', () => {
       { timeout: 1_000 }
     );
     expect(screen.getByRole('main')).toBeInTheDocument();
+    const route = MARKETING_ROUTE_MANIFEST.find(
+      entry => entry.url === '/artist-profiles'
+    );
+    const roots = Array.from(
+      document.querySelectorAll('section[data-testid^="marketing-section-"]')
+    );
+    const expected =
+      route?.renderedSections.filter(
+        entry => entry.kind === 'approved-section'
+      ) ?? [];
+    expect(
+      roots.map(root => ({
+        sectionId: root
+          .getAttribute('data-testid')
+          ?.replace('marketing-section-', ''),
+        variantId: root.getAttribute('data-marketing-variant'),
+        componentPath: root.getAttribute('data-marketing-owner'),
+        occurrenceId:
+          root.getAttribute('data-marketing-occurrence') ?? undefined,
+      }))
+    ).toEqual(
+      expected.map(({ sectionId, variantId, componentPath, occurrenceId }) => ({
+        sectionId,
+        variantId,
+        componentPath,
+        occurrenceId,
+      }))
+    );
     expect(
       screen.getByTestId('artist-profile-adaptive-sequence')
     ).toBeInTheDocument();

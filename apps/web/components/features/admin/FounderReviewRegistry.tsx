@@ -9,13 +9,16 @@ import {
   Search,
   XCircle,
 } from 'lucide-react';
-import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import {
   DrawerSection,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
+import {
+  MediaCanvasViewer,
+  MediaThumb,
+} from '@/components/organisms/media-canvas/MediaCanvasViewer';
 import { TableEmptyState } from '@/components/organisms/table';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
@@ -126,6 +129,7 @@ export function FounderReviewRegistry({
   );
   const [decisions, setDecisions] = useState<ReviewDecisionMap>({});
   const [note, setNote] = useState('');
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const persistDecisions = useCallback((next: ReviewDecisionMap) => {
     setDecisions(next);
@@ -233,14 +237,12 @@ export function FounderReviewRegistry({
         header: 'Registry Item',
         size: 310,
         cell: ({ row }) => (
-          <div className='min-w-0 py-0.5'>
-            <div className='truncate text-xs font-medium text-primary-token'>
-              {row.original.title}
-            </div>
-            <div className='truncate text-2xs text-tertiary-token'>
-              {row.original.description}
-            </div>
-          </div>
+          <span
+            className='truncate text-xs font-medium text-primary-token'
+            title={row.original.description}
+          >
+            {row.original.title}
+          </span>
         ),
       },
       text('scope', 'Level', 90, scopeLabel),
@@ -332,41 +334,49 @@ export function FounderReviewRegistry({
           </div>
         }
       >
-        <div className='space-y-3'>
+        <div className='space-y-3 px-3 pt-3'>
           <div data-testid='founder-review-evidence-media'>
-            <div className='overflow-hidden rounded-lg border border-(--app-shell-border) bg-base'>
-              {media?.kind === 'video' ? (
-                <video
-                  key={media.src}
-                  controls
-                  preload='metadata'
-                  poster={media.poster}
-                  className='aspect-video w-full object-contain'
+            {selected.media.length > 0 ? (
+              <>
+                <button
+                  type='button'
+                  onClick={() => setViewerIndex(0)}
+                  aria-label={`Open ${media?.alt ?? selected.title}`}
+                  className='relative block aspect-video w-full overflow-hidden rounded-lg border border-(--app-shell-border) bg-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
                 >
-                  <source src={media.src} type='video/mp4' />
-                  <track
-                    kind='captions'
-                    src='/demo/jovie-demo.vtt'
-                    srcLang='en'
-                    label='English'
-                  />
-                </video>
-              ) : (
-                <Image
-                  key={media?.src}
-                  src={media?.src ?? '/og/default.png'}
-                  alt={media?.alt ?? selected.title}
-                  width={1600}
-                  height={900}
-                  className='aspect-video w-full object-contain'
-                  priority
-                />
-              )}
-            </div>
-            <div className='mt-1.5 flex items-center justify-between gap-2 text-2xs text-tertiary-token'>
-              <span>{media?.label}</span>
-              <span>{media?.dedicated ? 'Item-specific' : 'Context only'}</span>
-            </div>
+                  {media ? <MediaThumb item={media} fit='contain' /> : null}
+                </button>
+                {selected.media.length > 1 ? (
+                  <div className='mt-2 grid grid-cols-4 gap-1.5'>
+                    {selected.media.map((item, i) => (
+                      <button
+                        key={item.src}
+                        type='button'
+                        onClick={() => setViewerIndex(i)}
+                        aria-label={`Open ${item.alt}`}
+                        className='relative aspect-video overflow-hidden rounded-md border border-(--app-shell-border) bg-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                      >
+                        <MediaThumb item={item} />
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                <div className='mt-1.5 flex items-center justify-between gap-2 text-2xs text-tertiary-token'>
+                  <span className='min-w-0 truncate'>{media?.label}</span>
+                  <span className='shrink-0'>
+                    {selected.media.length > 1
+                      ? `${selected.media.length} items`
+                      : media?.dedicated
+                        ? 'Item-specific'
+                        : 'Context only'}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <p className='rounded-lg border border-dashed border-(--app-shell-border) px-3 py-6 text-center text-2xs text-tertiary-token'>
+                No evidence captured yet
+              </p>
+            )}
           </div>
 
           <div>
@@ -468,10 +478,10 @@ export function FounderReviewRegistry({
             onRowClick={item => {
               setSelectedId(item.id);
               setNote('');
+              setViewerIndex(null);
             }}
             isRowSelected={item => item.id === selected?.id}
             getRowTestId={item => `founder-review-row-${item.id}`}
-            rowHeight={48}
             minWidth='720px'
             className='system-b-founder-review-table'
             containerClassName='h-full'
@@ -485,6 +495,13 @@ export function FounderReviewRegistry({
           />
         )}
       </AdminTableShell>
+
+      <MediaCanvasViewer
+        items={selected?.media ?? []}
+        index={viewerIndex}
+        onIndexChange={setViewerIndex}
+        onClose={() => setViewerIndex(null)}
+      />
     </div>
   );
 }

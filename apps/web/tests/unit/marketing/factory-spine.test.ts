@@ -1,73 +1,75 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { LANDING_STAGE_TO_FACTORY_STAGE, LANDING_STAGES } from '@jovie/copy';
+import { LANDING_STAGES } from '@jovie/copy';
 import { describe, expect, it } from 'vitest';
+import type { StageReceipt } from '@/data/marketing';
 import {
-  FACTORY_RECEIPT_SCHEMA,
-  FACTORY_STAGE_ARTIFACT_SCHEMA_IDS,
+  applyStagePassedBit,
+  COPY_LANDING_STAGE_TO_FACTORY,
+  FACTORY_CERTIFIER_HARNESS,
   FACTORY_STAGE_ARTIFACT_SCHEMAS,
-  FACTORY_STAGE_ATTEMPT_LIMIT,
   FACTORY_STAGES,
-  LANDING_PAGE_PIPELINE_STAGE_TO_FACTORY_STAGE,
+  LANDING_PAGE_PIPELINE_STAGE_TO_FACTORY,
   LANDING_PAGE_PIPELINE_STAGES,
-  MARKETING_GENERATION_STAGE_TO_FACTORY_STAGE,
+  MARKETING_GENERATION_STAGE_TO_FACTORY,
   MARKETING_GENERATION_STAGES,
-  type StageReceipt,
   StageReceiptSchema,
-  stageReceiptPassed,
+  validateStageReceipt,
 } from '@/data/marketing';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const WEB_ROOT = resolve(__dirname, '..', '..', '..');
-const REPO_ROOT = resolve(WEB_ROOT, '..', '..');
-const MARKETING_DATA_DIR = join(WEB_ROOT, 'data', 'marketing');
-const COPY_PACKAGE_DIR = join(REPO_ROOT, 'packages', 'copy');
+const repoRoot = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../../../..'
+);
 
-function listSourceFiles(dir: string): readonly string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) return listSourceFiles(path);
-    return entry.isFile() && entry.name.endsWith('.ts') ? [path] : [];
-  });
-}
+const digest = (char: string) => `sha256:${char.repeat(64)}`;
 
-function declaredStageEnums(dir: string): readonly string[] {
-  return listSourceFiles(dir).flatMap(path =>
-    Array.from(
-      readFileSync(path, 'utf8').matchAll(/export const ([A-Z_]*STAGES)\b/g),
-      match => match[1]
-    )
-  );
-}
-
-const receipt = (overrides: Record<string, unknown> = {}) => ({
-  schema: FACTORY_RECEIPT_SCHEMA,
-  pageId: 'artist-profiles',
-  stage: 'copy',
-  attempt: 1,
-  inputDigest: 'sha256:input',
-  outputDigest: 'sha256:output',
-  producer: {
-    modelId: 'copy-large',
-    family: 'family-a',
-    channel: 'router-primary',
-  },
-  evaluators: [
-    {
-      family: 'family-b',
-      kind: 'rubric-judge',
-      verdict: 'pass',
-      score: 0.9,
-      rubricVersion: 'copy-rubric-v3',
+function receipt(overrides: Partial<StageReceipt> = {}): StageReceipt {
+  return {
+    schema: 'jovie.factory-receipt/v1',
+    pageId: 'solutions-artists',
+    stage: 'copy',
+    attempt: 1,
+    inputDigest: digest('a'),
+    outputDigest: digest('b'),
+    producer: {
+      modelId: 'anthropic/claude-opus-5-5',
+      family: 'anthropic',
+      channel: 'subscription-cli',
     },
-  ],
-  invariants: { passed: ['one-job-per-section'], failed: [] },
-  ...overrides,
-});
+    evaluators: [
+      {
+        id: 'copy-judge-gpt',
+        family: 'openai',
+        kind: 'llm',
+        verdict: 'pass',
+        score: 0.9,
+        rubricVersion: 'copy-rubric/1',
+      },
+    ],
+    invariantsPassed: ['copy-lint'],
+    invariantsFailed: [],
+    certifier: FACTORY_CERTIFIER_HARNESS,
+    passed: true,
+    at: '2026-09-29T12:00:00.000Z',
+    ...overrides,
+  };
+}
 
-describe('factory spine', () => {
-  it('defines the single canonical stage order', () => {
+function unpassed(
+  overrides: Partial<StageReceipt> = {}
+): Omit<StageReceipt, 'passed' | 'certifier'> {
+  const {
+    passed: _passed,
+    certifier: _certifier,
+    ...rest
+  } = receipt(overrides);
+  return rest;
+}
+
+describe('factory stage spine', () => {
+  it('orders the stages exactly as the plan', () => {
     expect(FACTORY_STAGES).toEqual([
       'truth',
       'outcomes',
@@ -85,115 +87,268 @@ describe('factory spine', () => {
       'adversarial-trust',
       'publish',
     ]);
-  });
-
-  it('fails if a fourth stage enum is introduced', () => {
-    const enums = [
-      ...declaredStageEnums(MARKETING_DATA_DIR),
-      ...declaredStageEnums(COPY_PACKAGE_DIR),
-    ];
-    expect(new Set(enums)).toEqual(
-      new Set([
-        'FACTORY_STAGES',
-        'MARKETING_GENERATION_STAGES',
-        'LANDING_PAGE_PIPELINE_STAGES',
-        'LANDING_STAGES',
-      ])
+    expect(Object.keys(FACTORY_STAGE_ARTIFACT_SCHEMAS).sort()).toEqual(
+      [...FACTORY_STAGES].sort()
     );
   });
 
-  it('maps every legacy stage list onto canonical factory stages', () => {
-    const maps = [
-      [
-        MARKETING_GENERATION_STAGES,
-        MARKETING_GENERATION_STAGE_TO_FACTORY_STAGE,
-      ],
-      [
-        LANDING_PAGE_PIPELINE_STAGES,
-        LANDING_PAGE_PIPELINE_STAGE_TO_FACTORY_STAGE,
-      ],
-      [LANDING_STAGES, LANDING_STAGE_TO_FACTORY_STAGE],
-    ] as const;
-
-    for (const [stages, map] of maps) {
-      expect(Object.keys(map).sort()).toEqual([...stages].sort());
-      for (const stage of stages) {
-        expect(FACTORY_STAGES).toContain(
-          map[stage as keyof typeof map] as string
-        );
+  it.each([
+    [
+      'generation',
+      MARKETING_GENERATION_STAGES,
+      MARKETING_GENERATION_STAGE_TO_FACTORY,
+    ],
+    [
+      'landing grammar',
+      LANDING_PAGE_PIPELINE_STAGES,
+      LANDING_PAGE_PIPELINE_STAGE_TO_FACTORY,
+    ],
+    ['@jovie/copy', LANDING_STAGES, COPY_LANDING_STAGE_TO_FACTORY],
+  ] as const)(
+    'maps every %s stage onto a spine stage',
+    (_name, stages, mapping) => {
+      expect(Object.keys(mapping).sort()).toEqual([...stages].sort());
+      for (const target of Object.values(mapping)) {
+        expect(FACTORY_STAGES).toContain(target);
       }
     }
+  );
+
+  it('keeps the generation alias order monotonic on the spine', () => {
+    const positions = MARKETING_GENERATION_STAGES.map(stage =>
+      FACTORY_STAGES.indexOf(MARKETING_GENERATION_STAGE_TO_FACTORY[stage])
+    );
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
   });
 
-  it('declares a tagged artifact schema for every stage', () => {
-    for (const stage of FACTORY_STAGES) {
-      const schemaId = FACTORY_STAGE_ARTIFACT_SCHEMA_IDS[stage];
-      expect(schemaId).toBe(`jovie.factory-artifact/${stage}/v1`);
-      expect(
-        FACTORY_STAGE_ARTIFACT_SCHEMAS[stage].safeParse({ schema: schemaId })
-          .success
-      ).toBe(true);
-      expect(
-        FACTORY_STAGE_ARTIFACT_SCHEMAS[stage].safeParse({
-          schema: 'jovie.factory-artifact/other/v1',
-        }).success
-      ).toBe(false);
-    }
+  it('fails when a new marketing stage list appears outside the spine', () => {
+    const allowed = new Set([
+      'apps/web/data/marketing/factory/spine.ts:FACTORY_STAGES',
+      'apps/web/data/marketing/generation.ts:MARKETING_GENERATION_STAGES',
+      'apps/web/data/marketing/landingPageGrammar.ts:LANDING_PAGE_PIPELINE_STAGES',
+      'packages/copy/landing.ts:LANDING_STAGES',
+    ]);
+    const roots = ['apps/web/data/marketing', 'packages/copy'];
+    const found: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        if (name === 'node_modules') continue;
+        const path = join(dir, name);
+        if (statSync(path).isDirectory()) {
+          walk(path);
+          continue;
+        }
+        if (!/\.(ts|tsx|mjs|js)$/.test(name) || /\.test\./.test(name)) continue;
+        const source = readFileSync(path, 'utf8');
+        for (const match of source.matchAll(
+          /\bconst\s+([A-Z][A-Z0-9_]*STAGES)\s*(?::[^=]+)?=\s*\[/g
+        )) {
+          found.push(`${relative(repoRoot, path)}:${match[1]}`);
+        }
+      }
+    };
+    for (const root of roots) walk(join(repoRoot, root));
+
+    expect(found.filter(entry => !allowed.has(entry))).toEqual([]);
+    expect(found.sort()).toEqual([...allowed].sort());
+  });
+});
+
+describe('stage artifact schemas', () => {
+  it('rejects copy with em dashes or untagged claims', () => {
+    const schema = FACTORY_STAGE_ARTIFACT_SCHEMAS.copy;
+    const slot = {
+      sectionInstanceId: 'hero',
+      slot: 'headline',
+      text: 'Your music, one link.',
+      claimIds: ['claim-smart-link'],
+    };
+    expect(schema.safeParse({ pageId: 'p', slots: [slot] }).success).toBe(true);
+    expect(
+      schema.safeParse({
+        pageId: 'p',
+        slots: [{ ...slot, text: 'One link — everywhere.' }],
+      }).success
+    ).toBe(false);
+    expect(
+      schema.safeParse({ pageId: 'p', slots: [{ ...slot, claimIds: [] }] })
+        .success
+    ).toBe(false);
+    expect(
+      schema.safeParse({
+        pageId: 'p',
+        slots: [{ ...slot, claimIds: [], nonClaim: true }],
+      }).success
+    ).toBe(true);
   });
 
-  it('validates a well-formed stage receipt', () => {
-    const parsed = StageReceiptSchema.safeParse(receipt());
-    expect(parsed.success).toBe(true);
-    if (parsed.success) {
-      expect(stageReceiptPassed(parsed.data)).toBe(true);
-    }
+  it('requires three unique data points in the outcome brief', () => {
+    const base = {
+      pageId: 'p',
+      brief: {
+        businessObjective: 'Get artists to claim a handle',
+        targetAudience: 'artist',
+        desiredConversion: 'claim-handle',
+        intent: 'category',
+      },
+      icp: 'independent artist',
+      jobsToBeDone: ['share every release from one link'],
+      outcomes: [{ id: 'o1', statement: 'One link', claimIds: ['c1'] }],
+    };
+    const point = (statement: string) => ({ statement, sourceRef: 'src-1' });
+    const schema = FACTORY_STAGE_ARTIFACT_SCHEMAS.outcomes;
+    expect(
+      schema.safeParse({
+        ...base,
+        dataPoints: [point('a'), point('b'), point('c')],
+      }).success
+    ).toBe(true);
+    expect(
+      schema.safeParse({
+        ...base,
+        dataPoints: [point('a'), point('a'), point('c')],
+      }).success
+    ).toBe(false);
+    expect(
+      schema.safeParse({ ...base, dataPoints: [point('a'), point('b')] })
+        .success
+    ).toBe(false);
   });
 
-  it('bounds attempts to three', () => {
-    expect(StageReceiptSchema.safeParse(receipt({ attempt: 4 })).success).toBe(
+  it('only accepts locked hero variants and the locked header', () => {
+    const schema = FACTORY_STAGE_ARTIFACT_SCHEMAS['hero-variant'];
+    const choice = {
+      pageId: 'p',
+      variantId: 'xm2iz',
+      headerId: 'eoUUU',
+      headerState: 'docked',
+    };
+    expect(schema.safeParse(choice).success).toBe(true);
+    expect(schema.safeParse({ ...choice, variantId: 'qENyP' }).success).toBe(
       false
     );
-    expect(FACTORY_STAGE_ATTEMPT_LIMIT).toBe(3);
+    expect(schema.safeParse({ ...choice, headerId: 'other' }).success).toBe(
+      false
+    );
   });
 
-  it('rejects an evaluator from the producer family', () => {
-    const selfGraded = receipt({
+  it('bounds SEO sibling links to three to five', () => {
+    const schema = FACTORY_STAGE_ARTIFACT_SCHEMAS['seo-agent'];
+    const seo = {
+      pageId: 'p',
+      canonical: 'https://jov.ie/solutions/artists',
+      title: 'Artists',
+      description: 'For artists',
+      jsonLdTypes: ['WebPage'],
+      siblingLinks: ['/a', '/b', '/c'],
+      llmsEntry: true,
+    };
+    expect(schema.safeParse(seo).success).toBe(true);
+    expect(
+      schema.safeParse({ ...seo, siblingLinks: ['/a', '/b'] }).success
+    ).toBe(false);
+  });
+});
+
+describe('stage receipts', () => {
+  it('accepts a cross-family harness-certified receipt', () => {
+    expect(StageReceiptSchema.safeParse(receipt()).success).toBe(true);
+    expect(validateStageReceipt(receipt())).toEqual([]);
+  });
+
+  it('rejects malformed receipts and attempts beyond three', () => {
+    expect(validateStageReceipt(receipt({ attempt: 4 }))[0]).toMatch(
+      /^attempt:/
+    );
+    expect(validateStageReceipt({ schema: 'other' }).length).toBeGreaterThan(0);
+  });
+
+  it('rejects same-family llm and vision evaluators', () => {
+    for (const kind of ['llm', 'vision'] as const) {
+      const issues = validateStageReceipt(
+        receipt({
+          evaluators: [
+            {
+              id: 'self-judge',
+              family: 'anthropic',
+              kind,
+              verdict: 'pass',
+              score: 1,
+              rubricVersion: 'r/1',
+            },
+          ],
+        })
+      );
+      expect(issues).toContain(
+        'evaluator self-judge shares family anthropic with the producer'
+      );
+    }
+  });
+
+  it('allows same-family deterministic evaluators and producerless stages', () => {
+    const deterministic = receipt({
       evaluators: [
         {
-          family: 'family-a',
-          kind: 'rubric-judge',
+          id: 'copy-lint',
+          family: 'anthropic',
+          kind: 'deterministic',
           verdict: 'pass',
           score: 1,
-          rubricVersion: 'copy-rubric-v3',
+          rubricVersion: 'lint/1',
         },
       ],
     });
-    expect(StageReceiptSchema.safeParse(selfGraded).success).toBe(false);
+    expect(validateStageReceipt(deterministic)).toEqual([]);
+    expect(
+      validateStageReceipt(receipt({ producer: null, stage: 'truth' }))
+    ).toEqual([]);
   });
 
-  it('rejects a producer-set passed flag; only the harness computes it', () => {
+  it('rejects passed receipts not set by the harness or with failures', () => {
+    expect(validateStageReceipt(receipt({ certifier: 'jev' }))).toContain(
+      'only the harness may set passed, got jev'
+    );
     expect(
-      StageReceiptSchema.safeParse(receipt({ passed: true })).success
+      validateStageReceipt(receipt({ invariantsFailed: ['em-dash'] }))
+    ).toContain('passed receipt cannot list failed invariants');
+    const revise = receipt().evaluators.map(e => ({
+      ...e,
+      verdict: 'revise' as const,
+    }));
+    expect(validateStageReceipt(receipt({ evaluators: revise }))).toContain(
+      'passed receipt needs a pass verdict from every evaluator'
+    );
+    expect(
+      validateStageReceipt(receipt({ certifier: 'jev', passed: false }))
+    ).toEqual([]);
+  });
+
+  it('lets only the harness mark a receipt passed', () => {
+    expect(
+      applyStagePassedBit(unpassed(), { certifier: 'harness' }).passed
+    ).toBe(true);
+    expect(applyStagePassedBit(unpassed(), { certifier: 'jev' }).passed).toBe(
+      false
+    );
+    expect(
+      applyStagePassedBit(unpassed({ invariantsFailed: ['cls'] }), {
+        certifier: 'harness',
+      }).passed
     ).toBe(false);
-
-    const failing: StageReceipt = StageReceiptSchema.parse(
-      receipt({
-        evaluators: [
-          {
-            family: 'family-b',
-            kind: 'rubric-judge',
-            verdict: 'fail',
-            score: 0.2,
-            rubricVersion: 'copy-rubric-v3',
-          },
-        ],
-      })
-    );
-    expect(stageReceiptPassed(failing)).toBe(false);
-
-    const invariantFailure = StageReceiptSchema.parse(
-      receipt({ invariants: { passed: [], failed: ['one-hero'] } })
-    );
-    expect(stageReceiptPassed(invariantFailure)).toBe(false);
+    const selfJudged = unpassed({
+      evaluators: [
+        {
+          id: 'self',
+          family: 'anthropic',
+          kind: 'vision',
+          verdict: 'pass',
+          score: 1,
+          rubricVersion: 'r/1',
+        },
+      ],
+    });
+    expect(
+      applyStagePassedBit(selfJudged, { certifier: 'harness' }).passed
+    ).toBe(false);
   });
 });

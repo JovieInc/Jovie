@@ -18,5 +18,15 @@ describe('MarketingPricingPlans', () => {
     expect(screen.getByText('$199')).toBeInTheDocument();
     expect(screen.queryByText('Max')).not.toBeInTheDocument();
     expect(screen.queryByText('$149')).not.toBeInTheDocument();
+    const features = container.querySelectorAll(
+      '.marketing-pricing-plan-card__features li'
+    );
+    expect(features.length).toBeGreaterThan(0);
+    for (const feature of features) {
+      expect(feature.textContent).toBe(
+        'Public Jovie profile and audience capture'
+      );
+      expect(feature.querySelector('svg')).toBeNull();
+    }
   });
 });

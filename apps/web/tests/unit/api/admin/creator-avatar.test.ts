@@ -3,18 +3,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { POST } from '@/app/api/admin/creator-avatar/route';
 
 const entitlementsMock = vi.hoisted(() => ({
-  getCurrentUserEntitlements: vi.fn(),
+  getOvieOperatorEntitlements: vi.fn(),
 }));
 
 const adminActionsMock = vi.hoisted(() => ({
   updateCreatorAvatarAsAdmin: vi.fn(),
 }));
 
-vi.mock('@/lib/entitlements/server', () => entitlementsMock);
+vi.mock('@/lib/ovie/privacy-lock/access', () => entitlementsMock);
 vi.mock('@/app/app/(shell)/admin/actions', () => adminActionsMock);
 
 describe('POST /api/admin/creator-avatar', () => {
-  const { getCurrentUserEntitlements } = entitlementsMock;
+  const { getOvieOperatorEntitlements } = entitlementsMock;
   const { updateCreatorAvatarAsAdmin } = adminActionsMock;
 
   beforeEach(() => {
@@ -22,7 +22,7 @@ describe('POST /api/admin/creator-avatar', () => {
   });
 
   it('returns 401 when unauthenticated', async () => {
-    getCurrentUserEntitlements.mockResolvedValue({
+    getOvieOperatorEntitlements.mockResolvedValue({
       isAuthenticated: false,
       isAdmin: false,
     });
@@ -48,7 +48,7 @@ describe('POST /api/admin/creator-avatar', () => {
   });
 
   it('returns 403 when non-admin', async () => {
-    getCurrentUserEntitlements.mockResolvedValue({
+    getOvieOperatorEntitlements.mockResolvedValue({
       isAuthenticated: true,
       isAdmin: false,
     });
@@ -74,7 +74,7 @@ describe('POST /api/admin/creator-avatar', () => {
   });
 
   it('updates the avatar for admin users', async () => {
-    getCurrentUserEntitlements.mockResolvedValue({
+    getOvieOperatorEntitlements.mockResolvedValue({
       isAuthenticated: true,
       isAdmin: true,
     });
