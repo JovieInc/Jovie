@@ -28,7 +28,7 @@ function ArtistProfileHeroMedia() {
           src={HERO_PROFILE.publicUrl}
           alt="Demonstration of Tim White's Jovie artist profile with a release and a Listen action."
           className='object-cover object-top'
-          sizes='(min-width: 768px) 19rem, 15rem'
+          sizes='(min-width: 768px) 19rem, (min-width: 440px) 17.5rem, 74vw'
         />
       </ArtistProfilePhoneFrame>
     </div>
