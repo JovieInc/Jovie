@@ -268,7 +268,7 @@ it.each(['marketing-glass', 'default'] as const)(
   'keeps auth prefetch off and public navigation defaults in the %s header',
   presentation => {
     const view = render(
-      createElement(HeaderNav, {
+      createElement<HeaderNavProps>(HeaderNav, {
         authMode: 'public-static',
         presentation,
         publicCta: { href: '/signup', label: 'Get started' },
@@ -283,7 +283,7 @@ it.each(['marketing-glass', 'default'] as const)(
       'false'
     );
     view.rerender(
-      createElement(HeaderNav, {
+      createElement<HeaderNavProps>(HeaderNav, {
         authMode: 'public-static',
         presentation,
         publicCta: { href: '/pricing', label: 'See plans' },
