@@ -906,7 +906,7 @@ export function CreatorDocumentsWorkspace({
                 setTitle(event.target.value);
               }}
               placeholder='What is the idea?'
-              className='bg-transparent text-lg font-medium outline-none focus-visible:outline-2 focus-visible:outline-offset-2'
+              className='bg-transparent text-base font-medium outline-none focus-visible:outline-2 focus-visible:outline-offset-2'
             />
             <textarea
               aria-label='Idea Details'

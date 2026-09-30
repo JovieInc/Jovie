@@ -186,7 +186,7 @@ function ReleaseCard({
         <div className='relative z-10 flex min-h-50 flex-col justify-end p-4 [@media(max-height:880px)]:min-h-43 [@media(max-height:880px)]:p-3.5 [@media(max-height:760px)]:min-h-39 [@media(max-height:760px)]:p-3'>
           <div className='flex min-w-0 items-end justify-between gap-3'>
             <div className='min-w-0 flex-1'>
-              <p className='line-clamp-2 text-lg font-semibold leading-[1.08] text-white dark:text-white [overflow-wrap:anywhere] [@media(max-height:880px)]:text-lg [@media(max-height:760px)]:text-mid'>
+              <p className='line-clamp-2 text-base font-semibold leading-[1.08] text-white dark:text-white [overflow-wrap:anywhere] [@media(max-height:880px)]:text-base [@media(max-height:760px)]:text-mid'>
                 {state.release.title}
               </p>
               <div className='mt-1 space-y-0.5'>

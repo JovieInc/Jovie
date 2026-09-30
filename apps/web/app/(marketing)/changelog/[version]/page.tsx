@@ -283,7 +283,7 @@ export default async function ChangelogReleasePage({
                       className='size-3.5 text-quaternary-token transition-colors duration-subtle group-hover:text-secondary-token'
                     />
                   </span>
-                  <span className='text-lg font-semibold text-primary-token'>
+                  <span className='text-base font-semibold text-primary-token'>
                     {resource.label}
                   </span>
                   <span className='font-mono text-2xs leading-normal text-quaternary-token'>

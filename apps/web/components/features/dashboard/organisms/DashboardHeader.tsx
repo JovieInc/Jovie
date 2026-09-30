@@ -61,7 +61,7 @@ function HeaderTitle({
       <h1
         className={cn(
           'min-w-0 truncate font-semibold text-primary-token',
-          'text-lg leading-tight tracking-[-0.018em]',
+          'text-base leading-tight tracking-[-0.018em]',
           'sm:text-xs sm:leading-normal sm:tracking-tight'
         )}
       >

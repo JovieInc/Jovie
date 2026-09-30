@@ -87,7 +87,7 @@ export function LibraryShareAssetCard({
           <p className='text-2xs font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
             {asset.releaseType}
           </p>
-          <h2 className='mt-1 truncate text-lg font-semibold text-primary-token'>
+          <h2 className='mt-1 truncate text-base font-semibold text-primary-token'>
             {asset.title}
           </h2>
           <p className='mt-1 text-sm text-secondary-token'>

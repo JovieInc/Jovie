@@ -54,7 +54,7 @@ export function HomeLoopDiagramSection() {
             <br />
             Momentum Decay.
           </h2>
-          <p className='mt-5 mb-7 max-w-[32ch] font-(--marketing-font-body) text-lg leading-[1.5] text-tertiary-token'>
+          <p className='mt-5 mb-7 max-w-[32ch] font-(--marketing-font-body) text-base leading-[1.5] text-tertiary-token'>
             Jovie shortens the time between fan signal and next action.
           </p>
         </div>

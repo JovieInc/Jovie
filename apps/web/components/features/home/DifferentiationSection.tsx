@@ -18,7 +18,7 @@ export function DifferentiationSection() {
             <h3 className='text-xl font-medium text-primary-token mb-6'>
               Traditional link pages
             </h3>
-            <ul className='space-y-3 text-lg text-secondary-token'>
+            <ul className='space-y-3 text-base text-secondary-token'>
               <li>Static links</li>
               <li>Same experience for everyone</li>
               <li>No learning</li>
@@ -31,7 +31,7 @@ export function DifferentiationSection() {
             <h3 className='text-xl font-medium text-primary-token mb-6'>
               Jovie
             </h3>
-            <ul className='space-y-3 text-lg text-secondary-token'>
+            <ul className='space-y-3 text-base text-secondary-token'>
               <li>One guided action</li>
               <li>Adapts per fan</li>
               <li>Improves automatically</li>

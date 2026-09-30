@@ -91,7 +91,7 @@ export function HomepageIdentityHero({
                 width={112}
               />
               <div className='min-w-0'>
-                <p className='text-lg text-primary-token'>{preview.name}</p>
+                <p className='text-base text-primary-token'>{preview.name}</p>
                 <p className='whitespace-nowrap text-sm text-tertiary-token'>
                   {preview.role}
                 </p>

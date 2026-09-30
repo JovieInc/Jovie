@@ -171,7 +171,7 @@ export function ImpersonationBanner({
             size='sm'
             onClick={handleEndImpersonation}
             disabled={ending}
-            className='text-lg'
+            className='text-base'
           >
             {ending ? (
               'Ending...'

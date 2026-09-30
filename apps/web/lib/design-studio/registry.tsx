@@ -185,7 +185,7 @@ function PublicProfileMerchFixturePreview() {
             </div>
             <div className='min-w-0 py-1'>
               <p className='text-xs font-semibold text-white/45'>Merch Drop</p>
-              <p className='mt-1 text-lg font-[650] leading-5 tracking-[-0.03em] text-white dark:text-white [overflow-wrap:anywhere]'>
+              <p className='mt-1 text-base font-[650] leading-5 tracking-[-0.03em] text-white dark:text-white [overflow-wrap:anywhere]'>
                 Tour Tee
               </p>
               <p className='mt-1 text-xs leading-5 text-white/55'>
@@ -427,7 +427,7 @@ function ThreadMediaPreview() {
     <StudioFrame className='p-4'>
       <div className='mb-4 flex items-center justify-between'>
         <div>
-          <p className='text-lg font-semibold'>Thread Media Cards</p>
+          <p className='text-base font-semibold'>Thread Media Cards</p>
           <p className='mt-1 text-xs text-white/45'>
             Release context with audio, image, and video attachments.
           </p>

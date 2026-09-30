@@ -27,7 +27,7 @@ export function AuthLinkPreviewCard({
         {label}
       </p>
       <div className='mt-1 flex items-start justify-center gap-2'>
-        <p className='font-sans text-primary-token text-lg sm:text-lg break-all max-w-full font-semibold text-center'>
+        <p className='font-sans text-primary-token text-base sm:text-lg break-all max-w-full font-semibold text-center'>
           {hrefText}
         </p>
         {trailing ? <div className='shrink-0'>{trailing}</div> : null}

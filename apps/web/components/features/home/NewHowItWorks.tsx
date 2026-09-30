@@ -68,7 +68,7 @@ export function NewHowItWorks() {
                   <div className='space-y-2'>
                     <div className='flex items-center justify-center gap-2'>
                       <Icon className='h-4 w-4 text-tertiary-token' />
-                      <h3 className='text-lg font-medium text-primary-token'>
+                      <h3 className='text-base font-medium text-primary-token'>
                         {step.title}
                       </h3>
                     </div>

@@ -31,7 +31,7 @@ function ProductClaimCard() {
         <span className='text-tertiary-token'>{claimCard.domain}</span>
         <span>{claimCard.handle}</span>
       </p>
-      <p className='max-w-sm text-lg leading-relaxed text-secondary-token'>
+      <p className='max-w-sm text-base leading-relaxed text-secondary-token'>
         {claimCard.outcome}
       </p>
       <p className='text-sm text-tertiary-token'>{claimCard.proof}</p>

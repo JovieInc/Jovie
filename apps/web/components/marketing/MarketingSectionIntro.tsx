@@ -47,7 +47,7 @@ export function MarketingSectionIntro({
         </h2>
         <div
           className={cn(
-            'mt-4 max-w-[34rem] text-mid leading-[1.65] text-secondary-token sm:text-lg',
+            'mt-4 max-w-[34rem] text-mid leading-[1.65] text-secondary-token sm:text-base',
             descriptionClassName
           )}
         >

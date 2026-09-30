@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import storybookConfig, {
   storybookAddonsForEnvironment,
+  storybookFrameworkForEnvironment,
+  storybookStyleAliasesForEnvironment,
 } from '../../../.storybook/main';
 
 describe('Storybook next-themes resolution', () => {
@@ -12,9 +14,7 @@ describe('Storybook next-themes resolution', () => {
     expect(storybookAddonsForEnvironment(false, false)).toContain(
       '@storybook/addon-a11y'
     );
-    expect(storybookAddonsForEnvironment(true, false)).not.toContain(
-      '@storybook/addon-a11y'
-    );
+    expect(storybookAddonsForEnvironment(true, false)).toEqual([]);
     expect(storybookAddonsForEnvironment(false, true)).not.toContain(
       '@storybook/addon-a11y'
     );
@@ -46,6 +46,27 @@ describe('Storybook next-themes resolution', () => {
       '../components/**/*.stories.@(js|jsx|ts|tsx|mdx)',
       '../../../packages/ui/**/*.stories.@(js|jsx|ts|tsx|mdx)',
     ]);
+  });
+
+  it('uses the bounded production-token stylesheet only for live certification', () => {
+    expect(storybookStyleAliasesForEnvironment(false)).toEqual([]);
+    expect(storybookStyleAliasesForEnvironment(true)).toEqual([
+      {
+        find: '../app/globals.css',
+        replacement: expect.stringMatching(/\.storybook\/live-cert\.css$/),
+      },
+    ]);
+  });
+
+  it('uses the React-only framework only for live certification', () => {
+    expect(storybookFrameworkForEnvironment(false)).toEqual({
+      name: '@storybook/nextjs-vite',
+      options: { builder: { viteConfigPath: undefined } },
+    });
+    expect(storybookFrameworkForEnvironment(true)).toEqual({
+      name: '@storybook/react-vite',
+      options: {},
+    });
   });
 
   it('resolves the bare package import to the script-free mock', async () => {
