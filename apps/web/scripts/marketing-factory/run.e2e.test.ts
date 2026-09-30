@@ -278,6 +278,7 @@ describe('page stage gates', () => {
     await run();
     const resumed = await run({
       fromStage: 'adversarial-trust',
+      allowPartial: true,
       providers: dryProviders(brief, {
         transport: null,
         reviewVisual: async () => ({
