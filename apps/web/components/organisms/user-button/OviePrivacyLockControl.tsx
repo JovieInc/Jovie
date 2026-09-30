@@ -160,7 +160,7 @@ export function OviePrivacyLockControl({
         {busy ? 'Updating…' : actionLabel}
       </Button>
       {error ? (
-        <p className='mt-1 text-2xs text-destructive' role='alert'>
+        <p className='mt-1 text-2xs text-error' role='alert'>
           {error}
         </p>
       ) : null}
