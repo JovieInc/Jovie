@@ -1922,8 +1922,21 @@ export function TasksPageClient() {
       nextDescription !== currentDescription ||
       contentChanged;
 
+    if (!hasChanges) {
+      // Editor initialization and reverted drafts can emit updates without a
+      // change to the saved document. Never clear an in-flight or stale save.
+      if (
+        editorSaveStatus === 'dirty' &&
+        !editorSavingTaskIds.has(selectedTaskEditorId) &&
+        editorExpectedMutationVersionRef.current ===
+          (selectedTask?.mutationVersion ?? null)
+      ) {
+        setEditorSaveStatus('idle');
+      }
+      return;
+    }
+
     if (
-      !hasChanges ||
       !nextTitle ||
       editorSaveStatus !== 'dirty' ||
       editorSavingTaskIds.has(selectedTaskEditorId)
@@ -2010,6 +2023,7 @@ export function TasksPageClient() {
     selectedTaskEditorId,
     selectedTaskEditorContent,
     selectedTaskEditorTitle,
+    selectedTask?.mutationVersion,
     updateTaskAsync,
   ]);
 
@@ -2460,11 +2474,19 @@ export function TasksPageClient() {
                     }
                     saveStatus={editorSaveStatus}
                     onTitleChange={value => {
+                      if (value === editorTitle) return;
                       editorRevisionRef.current += 1;
                       setEditorTitle(value);
                       setEditorSaveStatus('dirty');
                     }}
                     onDescriptionChange={change => {
+                      if (
+                        change.plainText === editorDescription &&
+                        JSON.stringify(change.content) ===
+                          JSON.stringify(editorDescriptionContent)
+                      ) {
+                        return;
+                      }
                       editorRevisionRef.current += 1;
                       setEditorDescription(change.plainText);
                       setEditorDescriptionContent(change.content);

@@ -15,6 +15,7 @@ const {
   mockUseTaskBoardQuery,
   mockUseTasksQuery,
   mockEntitySidebarShell,
+  editorTestState,
 } = vi.hoisted(() => ({
   mockRouterPush: vi.fn(),
   mockRegisterRightPanel: vi.fn(),
@@ -23,6 +24,7 @@ const {
   mockUseTaskBoardQuery: vi.fn(),
   mockUseTasksQuery: vi.fn(),
   mockEntitySidebarShell: vi.fn(),
+  editorTestState: { real: false },
 }));
 
 vi.mock('next/navigation', () => ({
@@ -31,8 +33,11 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('@/components/organisms/RichTextEditor', () => ({
-  RichTextEditor: React.forwardRef(function MockRichTextEditor(
+vi.mock('@/components/organisms/RichTextEditor', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/components/organisms/RichTextEditor')
+  >('@/components/organisms/RichTextEditor');
+  const MockEditor = React.forwardRef(function MockRichTextEditor(
     {
       ariaLabel,
       content,
@@ -104,6 +109,17 @@ vi.mock('@/components/organisms/RichTextEditor', () => ({
           className='focus-visible:bg-surface-1'
           style={{ boxShadow: 'none' }}
         />
+        <button
+          type='button'
+          onClick={() =>
+            onChange({
+              content: { ...content, content: content.content ?? [] },
+              plainText,
+            })
+          }
+        >
+          Emit unchanged editor update
+        </button>
         <span>{statusLabel}</span>
         {statusAction ? (
           <button type='button' onClick={statusAction.onClick}>
@@ -112,8 +128,20 @@ vi.mock('@/components/organisms/RichTextEditor', () => ({
         ) : null}
       </div>
     );
-  }),
-}));
+  });
+  return {
+    RichTextEditor: React.forwardRef<
+      import('@/components/organisms/RichTextEditor').RichTextEditorHandle,
+      React.ComponentProps<typeof actual.RichTextEditor>
+    >(function TestRichTextEditor(props, ref) {
+      return editorTestState.real ? (
+        <actual.RichTextEditor {...props} ref={ref} />
+      ) : (
+        <MockEditor {...props} ref={ref} />
+      );
+    }),
+  };
+});
 
 vi.mock('@jovie/ui', async () => {
   const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
@@ -759,6 +787,7 @@ function getLatestTableProps() {
 describe('TasksPageClient', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    editorTestState.real = false;
     latestHeaderSearchAdapter = null;
     mockCreateTask.mockReset();
     mockDeleteTask.mockReset();
@@ -1456,6 +1485,16 @@ describe('TasksPageClient', () => {
     expect(
       screen.getByText('Conflict · reload task changes')
     ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Emit unchanged editor update' })
+    );
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(
+      screen.getByText('Conflict · reload task changes')
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Task Title')).toHaveValue(
+      'Unsaved metadata-safe title'
+    );
     act(() => vi.advanceTimersByTime(500));
     expect(mockUpdateTaskAsync).not.toHaveBeenCalled();
 
@@ -1903,6 +1942,175 @@ describe('TasksPageClient', () => {
     fireEvent.keyDown(window, { key: 'j' });
 
     expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
+  });
+
+  it('mounts the real rich text editor with saved content without marking it edited', async () => {
+    vi.useRealTimers();
+    editorTestState.real = true;
+    const rangeDescriptors = ['getClientRects', 'getBoundingClientRect'].map(
+      name => ({
+        name,
+        descriptor: Object.getOwnPropertyDescriptor(Range.prototype, name),
+      })
+    );
+    try {
+      Object.defineProperty(Range.prototype, 'getClientRects', {
+        configurable: true,
+        value: () => [],
+      });
+      Object.defineProperty(Range.prototype, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => new DOMRect(0, 0, 0, 0),
+      });
+      renderPage();
+      openTask();
+      await act(async () => {});
+      expect(screen.getByLabelText('Task Description')).toHaveTextContent(
+        mockTaskTwo.description!
+      );
+      expect(screen.queryByText('Edited')).not.toBeInTheDocument();
+      expect(mockUpdateTaskAsync).not.toHaveBeenCalled();
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
+    } finally {
+      for (const { name, descriptor } of rangeDescriptors) {
+        if (descriptor) {
+          Object.defineProperty(Range.prototype, name, descriptor);
+        } else {
+          Reflect.deleteProperty(Range.prototype, name);
+        }
+      }
+    }
+  });
+
+  it('closes after an unchanged editor callback without attempting a save', () => {
+    renderPage();
+    openTask();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Emit unchanged editor update' })
+    );
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(mockUpdateTaskAsync).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
+  });
+
+  it('closes after reverting a title before autosave without writing the task', () => {
+    renderPage();
+    openTask();
+    fireEvent.change(screen.getByLabelText('Task Title'), {
+      target: { value: 'Temporary draft' },
+    });
+    fireEvent.change(screen.getByLabelText('Task Title'), {
+      target: { value: mockTaskTwo.title },
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(mockUpdateTaskAsync).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
+  });
+
+  it('blocks Escape for a genuinely changed draft before autosave starts', () => {
+    renderPage();
+    openTask();
+    fireEvent.change(screen.getByLabelText('Task Title'), {
+      target: { value: 'Unsaved title' },
+    });
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByLabelText('Task Title')).toHaveValue('Unsaved title');
+    expect(screen.getByText('Edited')).toBeInTheDocument();
+    expect(mockUpdateTaskAsync).not.toHaveBeenCalled();
+  });
+
+  it('does not clear an active save when optimistic cache values match the local editor', () => {
+    mockUpdateTaskAsync.mockImplementationOnce(
+      () => new Promise<TaskView>(() => {})
+    );
+    const view = renderPage();
+    openTask();
+    fireEvent.change(screen.getByLabelText('Task Title'), {
+      target: { value: 'Optimistic title' },
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    mockTasksData = [{ ...mockTaskTwo, title: 'Optimistic title' }, mockTask];
+    view.rerender(
+      <TooltipProvider>
+        <HeaderActionsProvider>
+          <HeaderActionsHost />
+          <TasksPageClient />
+        </HeaderActionsProvider>
+      </TooltipProvider>
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Emit unchanged editor update' })
+    );
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByLabelText('Task Title')).toHaveValue('Optimistic title');
+    expect(screen.getByText('Saving…')).toBeInTheDocument();
+    expect(mockUpdateTaskAsync).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a reverted draft open while its earlier save is active or not yet reflected in the task cache', async () => {
+    let finishSave: ((task: TaskView) => void) | undefined;
+    mockUpdateTaskAsync.mockImplementationOnce(
+      () =>
+        new Promise<TaskView>(resolve => {
+          finishSave = resolve;
+        })
+    );
+    renderPage();
+    openTask();
+    const title = screen.getByLabelText('Task Title');
+    fireEvent.change(title, { target: { value: 'In-flight title' } });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    fireEvent.change(title, { target: { value: mockTaskTwo.title } });
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
+    expect(mockUpdateTaskAsync).toHaveBeenCalledOnce();
+    await act(async () => {
+      finishSave?.({
+        ...mockTaskTwo,
+        title: 'In-flight title',
+        mutationVersion: 8,
+      });
+    });
+    expect(screen.getByText('Edited')).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
+    expect(mockUpdateTaskAsync).toHaveBeenCalledOnce();
+  });
+
+  it('preserves a failed save and draft when the editor emits an unchanged callback', async () => {
+    mockUpdateTaskAsync.mockRejectedValueOnce(new Error('save failed'));
+    renderPage();
+    openTask();
+    fireEvent.change(screen.getByLabelText('Task Description'), {
+      target: { value: 'Unsaved draft' },
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.getByText('Not saved')).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Emit unchanged editor update' })
+    );
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.getByText('Not saved')).toBeInTheDocument();
+    expect(mockUpdateTaskAsync).toHaveBeenCalledOnce();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByLabelText('Task Description')).toHaveValue(
+      'Unsaved draft'
+    );
   });
 
   it('closes the canonical task detail with Escape from the ambient task surface', () => {
