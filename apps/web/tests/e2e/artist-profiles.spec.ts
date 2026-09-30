@@ -659,24 +659,33 @@ test.describe('Artist Profiles Landing', () => {
         tabList: await getGeometrySnapshot(tabList),
         panel: await getGeometrySnapshot(panel),
       });
+      type NativePoint = {
+        x: number;
+        y: number;
+        fullyVisible: boolean;
+        hit: boolean;
+      };
       const clickCoordinate = async (
-        tab: import('@playwright/test').Locator
+        tab: import('@playwright/test').Locator,
+        alreadyMeasured?: NativePoint
       ) => {
-        const point = await tab.evaluate(element => {
-          const rect = element.getBoundingClientRect();
-          const x = rect.x + rect.width / 2;
-          const y = rect.y + rect.height / 2;
-          return {
-            x,
-            y,
-            fullyVisible:
-              rect.y >= 0 &&
-              rect.bottom <= innerHeight &&
-              rect.x >= 0 &&
-              rect.right <= innerWidth,
-            hit: element.contains(document.elementFromPoint(x, y)),
-          };
-        });
+        const point =
+          alreadyMeasured ??
+          (await tab.evaluate(element => {
+            const rect = element.getBoundingClientRect();
+            const x = rect.x + rect.width / 2;
+            const y = rect.y + rect.height / 2;
+            return {
+              x,
+              y,
+              fullyVisible:
+                rect.y >= 0 &&
+                rect.bottom <= innerHeight &&
+                rect.x >= 0 &&
+                rect.right <= innerWidth,
+              hit: element.contains(document.elementFromPoint(x, y)),
+            };
+          }));
         expect(
           point.fullyVisible,
           'native target fully visible without recentering'
@@ -751,13 +760,62 @@ test.describe('Artist Profiles Landing', () => {
         await expect(preSave).toHaveAttribute('aria-selected', 'true');
         return;
       }
+      let enabledPoint: NativePoint | undefined;
       if (mechanism === 'earliest-ready coordinate') {
-        await expect(ready).toHaveAttribute('data-interactive-ready', 'true');
-        await expect(preSave).toBeEnabled();
+        // Read-only transition observation avoids expect polling and extra
+        // measurement round trips. Actual pointer latency remains in the trace.
+        enabledPoint = await page.evaluate(
+          () =>
+            new Promise<NativePoint>(resolve => {
+              const observer = new MutationObserver(check);
+              function check() {
+                const section = document.querySelector(
+                  '[data-testid="artist-profile-section-adaptive"]'
+                );
+                const ready = section
+                  ?.querySelector('[data-interactive-ready]')
+                  ?.getAttribute('data-interactive-ready');
+                const tab = Array.from(
+                  section?.querySelectorAll('[role="tab"]') ?? []
+                ).find(element => element.textContent === 'Pre-save');
+                if (ready !== 'true' || !tab || tab.hasAttribute('disabled'))
+                  return;
+                observer.disconnect();
+                const rect = tab.getBoundingClientRect();
+                const x = rect.x + rect.width / 2;
+                const y = rect.y + rect.height / 2;
+                (
+                  window as unknown as {
+                    __jovieOriginalEntryMark?: (phase: string) => void;
+                  }
+                ).__jovieOriginalEntryMark?.(
+                  'phase:earliest-ready coordinate:first-presave-invoke'
+                );
+                resolve({
+                  x,
+                  y,
+                  fullyVisible:
+                    rect.y >= 0 &&
+                    rect.bottom <= innerHeight &&
+                    rect.x >= 0 &&
+                    rect.right <= innerWidth,
+                  hit: tab.contains(document.elementFromPoint(x, y)),
+                });
+              }
+              observer.observe(document, {
+                subtree: true,
+                childList: true,
+                attributes: true,
+                attributeFilter: ['data-interactive-ready', 'disabled'],
+              });
+              check();
+            })
+        );
+      } else {
+        await markOriginalEntry(page, `${mechanism}:first-presave-invoke`);
       }
-      await markOriginalEntry(page, `${mechanism}:first-presave-invoke`);
       if (mechanism === 'ready-before-entry locator') await preSave.click();
-      else await clickCoordinate(preSave);
+      else await clickCoordinate(preSave, enabledPoint);
       await markOriginalEntry(page, `${mechanism}:first-presave-resolved`);
       await expect(preSave).toHaveAttribute('aria-selected', 'true');
       await page.waitForTimeout(MODE_TRANSITION_SETTLE_MS);
