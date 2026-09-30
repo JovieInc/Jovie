@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { MarketingPageContractMarkers } from '@/components/site/MarketingPageContractMarkers';
 import {
   getRoutedSolutionsPages,
   getSolutionsPage,
 } from '@/content/pages/solutions';
 import type { PageRecord } from '@/data/marketing/factory/pageRecord';
+import { derivePageRecordContract } from '@/data/marketing/factory/pageRecordContract';
 import { buildPageRecordMetadata } from '@/data/marketing/factory/pageRecordMetadata';
 import {
   assertRenderableSolutionsRecord,
@@ -45,6 +47,9 @@ export default async function SolutionsAudiencePage({
 
   return (
     <>
+      <MarketingPageContractMarkers
+        contract={derivePageRecordContract(record)}
+      />
       <SolutionsRecordJsonLd record={record} />
       <SolutionsRecordBody record={record} />
     </>
