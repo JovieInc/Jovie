@@ -144,7 +144,7 @@ test.describe('Pricing Page', () => {
     expect(bodyText && bodyText.length > 500).toBe(true);
   });
 
-  test('renders every logo-bar image without broken assets (JOV-6849)', async ({
+  test('renders every logo-bar asset inside its card (JOV-6849, JOV-7233)', async ({
     page,
   }) => {
     const logoBar = page.locator(
@@ -159,5 +159,38 @@ test.describe('Pricing Page', () => {
           .map(img => img.getAttribute('src') ?? img.alt)
       );
     expect(brokenImages).toEqual([]);
+    const logoCard = logoBar.locator(':scope > div');
+    const logoFrames = logoCard.locator('[data-logo-asset]');
+
+    for (const width of [375, 390, 768]) {
+      await page.setViewportSize({ width, height: 844 });
+      await expect(logoCard).toBeVisible();
+
+      const cardBox = await logoCard.boundingBox();
+      const logoBoxes = await logoFrames.evaluateAll(frames =>
+        frames.map(frame => {
+          const rect = frame.getBoundingClientRect();
+          return {
+            id: frame.getAttribute('data-logo-asset'),
+            left: rect.left,
+            right: rect.right,
+            width: rect.width,
+          };
+        })
+      );
+
+      expect(cardBox).not.toBeNull();
+      for (const logoBox of logoBoxes) {
+        expect
+          .soft(logoBox.width, `${logoBox.id} width at ${width}px`)
+          .toBeGreaterThan(0);
+        expect
+          .soft(logoBox.left, `${logoBox.id} left at ${width}px`)
+          .toBeGreaterThanOrEqual(cardBox!.x);
+        expect
+          .soft(logoBox.right, `${logoBox.id} right at ${width}px`)
+          .toBeLessThanOrEqual(cardBox!.x + cardBox!.width);
+      }
+    }
   });
 });
