@@ -14,6 +14,7 @@ const mockReconcileReleaseWorkflowRunOutcomes = vi.hoisted(() => vi.fn());
 const mockCleanupFounderReviewUploadLeases = vi.hoisted(() => vi.fn());
 const mockGetLybDailyMrr = vi.hoisted(() => vi.fn());
 const mockRecordDailyGatewaySpend = vi.hoisted(() => vi.fn());
+const mockRunMusicResolverParityCorpus = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/ai/gateway-spend', () => ({
   recordDailyGatewaySpend: mockRecordDailyGatewaySpend,
@@ -80,6 +81,9 @@ vi.mock('@/app/api/cron/sync-ai-crawler-analytics/route', () => ({
 
 vi.mock('@/lib/release-to-revenue/outcome-reconciliation', () => ({
   reconcileReleaseWorkflowRunOutcomes: mockReconcileReleaseWorkflowRunOutcomes,
+}));
+vi.mock('@/lib/music-resolver/shadow', () => ({
+  runMusicResolverParityCorpus: mockRunMusicResolverParityCorpus,
 }));
 
 describe('GET /api/cron/daily-maintenance', () => {
@@ -167,6 +171,7 @@ describe('GET /api/cron/daily-maintenance', () => {
       byModel: [],
       alerts: [],
     });
+    mockRunMusicResolverParityCorpus.mockResolvedValue([{ version: 1 }]);
   });
 
   afterEach(() => {
@@ -257,6 +262,7 @@ describe('GET /api/cron/daily-maintenance', () => {
         alerts: [],
       },
     });
+    expect(data.results.musicResolverParity.success).toBe(true);
     expect(data.results.dataRetention.success).toBe(true);
   });
 
