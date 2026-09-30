@@ -51,7 +51,6 @@ const HEADLINE_CLAMP_BASELINE: Readonly<Record<string, number>> = {
   [join('app', '(marketing)', 'blog', 'BlogFeed.tsx')]: 2,
   [join('app', '(marketing)', 'blog', 'components', 'BlogAuthorCard.tsx')]: 1,
   [join('app', '(marketing)', 'blog', 'components', 'BlogRelatedPosts.tsx')]: 1,
-  [join('app', '(marketing)', 'card', 'JovieCardLanding.tsx')]: 3,
   [join('app', '(marketing)', 'changelog', 'ChangelogEmailSignup.tsx')]: 1,
   [join('app', '(marketing)', 'changelog', '[version]', 'page.tsx')]: 2,
   [join('app', '(marketing)', 'changelog', 'page.tsx')]: 1,
