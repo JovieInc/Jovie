@@ -91,7 +91,7 @@ describe('performance route manifest', () => {
     for (const entityOrRetiredId of [
       'calendar',
       'contacts',
-      'library',
+      'links',
       'products',
       'releases',
       'tasks',
