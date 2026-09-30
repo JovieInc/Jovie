@@ -24,6 +24,9 @@ const { execFileSync } = require('node:child_process');
 const COMMENT_MARKER = '<!-- auto-merge-stuck-triage -->';
 const ISSUE_MARKER = '<!-- auto-merge-stuck-tracker -->';
 const TRACKING_ISSUE_TITLE = 'Auto-merge stuck PRs — diagnostic tracker';
+const FAILURE_HOLD_CONTEXT = 'jovie-queue-failure-hold/v1';
+const FAILURE_DESCRIPTION =
+  /^class=(deterministic-source|retryable-product|transient-infrastructure|unclassified);n=[1-9][0-9]*;run=([1-9][0-9]*);try=[1-9][0-9]*$/;
 
 function gh(args) {
   return execFileSync('gh', args, {
@@ -117,6 +120,37 @@ function listCheckRuns(repo, sha) {
     page += 1;
   }
   return runs;
+}
+
+function listCommitStatuses(repo, sha) {
+  const statuses = [];
+  for (let page = 1; page <= 30; page += 1) {
+    const batch = ghJson([
+      'api',
+      `repos/${repo}/commits/${sha}/statuses?per_page=100&page=${page}`,
+    ]);
+    if (!Array.isArray(batch))
+      throw new Error('Commit statuses are malformed.');
+    statuses.push(...batch);
+    if (batch.length < 100) return statuses;
+  }
+  throw new Error('Commit status pagination exceeded the safety limit.');
+}
+
+function hasRevisionFailureHold(statuses, repo) {
+  const prefix = `https://github.com/${repo}/actions/runs/`;
+  return statuses.some(status => {
+    if (
+      status?.context !== FAILURE_HOLD_CONTEXT ||
+      status.state !== 'success' ||
+      status.creator?.type !== 'Bot' ||
+      status.creator?.login !== 'jovie-bot[bot]'
+    ) {
+      return false;
+    }
+    const match = FAILURE_DESCRIPTION.exec(status.description ?? '');
+    return Boolean(match && status.target_url === `${prefix}${match[2]}`);
+  });
 }
 
 // Pure: given a PR node and its head check runs, explain why it has not merged.
@@ -300,16 +334,24 @@ const BLOCKING_LABELS = new Set([
 // Pure: a PR needs the enable pass when it is open, not a draft, lives in
 // this repo (fork tokens are read-only), carries no blocking label, and has no
 // autoMergeRequest yet.
-function needsAutoMergeEnable(pr) {
+function needsAutoMergeEnable(pr, statuses = [], repo = '') {
   const held = (pr.labels?.nodes ?? []).some(l =>
     BLOCKING_LABELS.has(l.name.toLowerCase())
   );
-  return !pr.isDraft && !pr.isCrossRepository && !held && !pr.autoMergeRequest;
+  return (
+    !pr.isDraft &&
+    !pr.isCrossRepository &&
+    !held &&
+    !pr.autoMergeRequest &&
+    !hasRevisionFailureHold(statuses, repo)
+  );
 }
 
 function enableMissingAutoMerge(repo, prs, dryRun) {
   for (const pr of prs) {
-    if (!needsAutoMergeEnable(pr)) continue;
+    if (pr.isDraft || pr.isCrossRepository || pr.autoMergeRequest) continue;
+    const statuses = listCommitStatuses(repo, pr.headRefOid);
+    if (!needsAutoMergeEnable(pr, statuses, repo)) continue;
     if (dryRun) {
       console.log(`[dry-run] would enable auto-merge on PR #${pr.number}`);
       continue;
@@ -399,5 +441,6 @@ module.exports = {
   buildCommentBody,
   buildIssueBody,
   findMarkerComment,
+  hasRevisionFailureHold,
   needsAutoMergeEnable,
 };

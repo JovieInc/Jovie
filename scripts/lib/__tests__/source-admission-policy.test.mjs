@@ -41,12 +41,15 @@ function review(state, id = 1, extra = {}) {
   };
 }
 function tombstone(context = 'jovie-queue-product-failure/v1') {
+  const failureHold = context === 'jovie-queue-failure-hold/v1';
   return {
     context,
     state: 'success',
-    description: context.includes('product')
-      ? 'blocked:merge-group-product-failure'
-      : 'ejected:UNMERGEABLE',
+    description: failureHold
+      ? 'class=deterministic-source;n=1;run=123;try=1'
+      : context.includes('product')
+        ? 'blocked:merge-group-product-failure'
+        : 'ejected:UNMERGEABLE',
     creator: { login: 'jovie-bot[bot]', type: 'Bot' },
     target_url: `https://github.com/${repository}/actions/runs/123`,
   };
@@ -179,8 +182,9 @@ test('pre-land changelog collision preserves existing release branch exception',
     evaluateSourceAdmission(input).blockers.includes('pre-land-changelog')
   );
 });
-test('both trusted exact-head tombstones block even with later success; spoofed unrelated actors do not', () => {
+test('every trusted exact-head tombstone blocks even with later success; spoofed unrelated actors do not', () => {
   for (const context of [
+    'jovie-queue-failure-hold/v1',
     'jovie-queue-product-failure/v1',
     'jovie-native-unmergeable/v1',
   ]) {

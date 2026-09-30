@@ -7,6 +7,7 @@ const {
   buildIssueBody,
   diagnoseStuckPr,
   findMarkerComment,
+  hasRevisionFailureHold,
   needsAutoMergeEnable,
 } = require('./auto-merge-stuck-triage');
 
@@ -116,6 +117,22 @@ test('needsAutoMergeEnable: only same-repo non-draft PRs without auto-merge', ()
       labels: { nodes: [{ name: 'codex' }] },
     }),
     true
+  );
+  const revisionHold = {
+    context: 'jovie-queue-failure-hold/v1',
+    state: 'success',
+    description: 'class=deterministic-source;n=1;run=123;try=1',
+    creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+    target_url: 'https://github.com/o/r/actions/runs/123',
+  };
+  assert.equal(hasRevisionFailureHold([revisionHold], 'o/r'), true);
+  assert.equal(needsAutoMergeEnable(eligible, [revisionHold], 'o/r'), false);
+  assert.equal(
+    hasRevisionFailureHold(
+      [{ ...revisionHold, creator: { type: 'User', login: 'spoof' } }],
+      'o/r'
+    ),
+    false
   );
 });
 

@@ -238,6 +238,7 @@ nodes:
       - Agent Pipeline
       - Auto-Ready Agent Drafts
       - iOS CI
+      - Merge Queue Green Enroll
       - PR Conflict Handler
       - Production Controller
       - Rolling CI Dispatch
@@ -700,8 +701,9 @@ nodes:
     triggeringStateTransition:
       - pull_request_target
       - workflow_dispatch
+      - workflow_run
     terminalReceipt: job:enroll
-    jobCount: 1
+    jobCount: 2
   - name: Merge Queue Ruleset Verify
     path: .github/workflows/merge-queue-ruleset-verify.yml
     active: true
@@ -1365,6 +1367,9 @@ edges:
   - from: iOS TestFlight
     to: iOS CI
     type: workflow_call
+  - from: CI
+    to: Merge Queue Green Enroll
+    type: workflow_run
   - from: CI
     to: Production Controller
     type: workflow_run

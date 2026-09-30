@@ -19,6 +19,9 @@ name: Merge Queue Green Enroll
 on:
   pull_request_target:
     types: [unlabeled]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
   workflow_dispatch:
     inputs:
       dry_run:
@@ -33,19 +36,89 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  hold-failed-revision:
+    name: Hold failed source revision
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.workflow_id == 178737329 &&
+      github.event.workflow_run.event == 'merge_group' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      contains(fromJSON('["failure","timed_out","action_required","startup_failure","stale"]'), github.event.workflow_run.conclusion)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+      statuses: write
+    steps:
+      - name: Checkout trusted failure policy
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            scripts/merge-group-failure-hold.mjs
+            scripts/lib/merge-queue-guard.mjs
+            scripts/lib/pre-land-changelog.mjs
+            scripts/version-fanout-guard.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Generate Jovie Bot failure-hold token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
+          permission-pull-requests: write
+          permission-statuses: write
+
+      - name: Persist exact-head failure hold and remove merge intent
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: node scripts/merge-group-failure-hold.mjs --event-path "$GITHUB_EVENT_PATH"
+
   enroll:
     name: Enqueue green PRs
+    needs: [hold-failed-revision]
+    if: >-
+      always() &&
+      (github.event_name != 'workflow_run' || needs.hold-failed-revision.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
     steps:
+      - name: Checkout trusted failure policy
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            scripts/merge-group-failure-hold.mjs
+            scripts/lib/merge-queue-guard.mjs
+            scripts/lib/pre-land-changelog.mjs
+            scripts/version-fanout-guard.mjs
+          sparse-checkout-cone-mode: false
+
       - name: Generate Jovie Bot token
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: read
+          permission-pull-requests: write
+          permission-statuses: write
 
       - name: Enqueue CLEAN PRs
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -54,6 +127,10 @@ jobs:
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
+            const { pathToFileURL } = require('node:url');
+            const failurePolicy = await import(pathToFileURL(
+              `${process.env.GITHUB_WORKSPACE}/scripts/merge-group-failure-hold.mjs`
+            ));
             // queue-poison: ejected twice in 24 h (scripts/lanes/pr_events.py, JOV-6904);
             // the lanes remove it with their fix.
             const BLOCKING = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'queue-poison']);
@@ -73,9 +150,13 @@ jobs:
                       id number isDraft headRefOid mergeStateStatus
                       isInMergeQueue isCrossRepository
                       labels(first: 30) { nodes { name } }
-                      commits(last: 1) { nodes { commit { committedDate } } }
-                      timelineItems(last: 1, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT]) {
-                        nodes { ... on RemovedFromMergeQueueEvent { createdAt } }
+                      timelineItems(last: 1, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT, PULL_REQUEST_COMMIT, HEAD_REF_FORCE_PUSHED_EVENT]) {
+                        nodes {
+                          __typename
+                          ... on RemovedFromMergeQueueEvent { createdAt reason }
+                          ... on PullRequestCommit { commit { oid } }
+                          ... on HeadRefForcePushedEvent { afterCommit { oid } }
+                        }
                       }
                     }
                   }
@@ -92,15 +173,42 @@ jobs:
               if (pr.mergeStateStatus !== 'CLEAN') continue;
               const labels = pr.labels.nodes.map(l => l.name.toLowerCase());
               if (labels.some(l => BLOCKING.has(l))) continue;
-              // The queue already rejected this exact head; wait for a new push.
-              const removedAt = pr.timelineItems.nodes[0]?.createdAt;
-              const committedAt = pr.commits.nodes[0]?.commit.committedDate;
-              if (removedAt && committedAt && removedAt > committedAt) continue;
+              const statuses = await github.paginate(
+                github.rest.repos.listCommitStatusesForRef,
+                { owner, repo, ref: pr.headRefOid, per_page: 100 }
+              );
+              const failure = failurePolicy.revisionFailureDisposition({
+                statuses,
+                repository: `${owner}/${repo}`,
+              });
+              if (failure.action === 'block') {
+                core.notice(`HELD #${pr.number}@${pr.headRefOid}: ${failure.reason}`);
+                continue;
+              }
+              // Native history is revision-scoped: a commit/force-push after
+              // the removal clears the old hold. Only this controller may
+              // consume the one typed non-deterministic retry.
+              const newestQueueEvent = pr.timelineItems.nodes[0];
+              const removedUnchangedHead =
+                newestQueueEvent?.__typename === 'RemovedFromMergeQueueEvent';
+              if (removedUnchangedHead && failure.action !== 'retry-once') continue;
               if (process.env.DRY_RUN === 'true') {
                 core.notice(`[dry run] would enqueue #${pr.number}`);
                 continue;
               }
               try {
+                if (failure.action === 'retry-once') {
+                  await github.rest.repos.createCommitStatus({
+                    owner,
+                    repo,
+                    sha: pr.headRefOid,
+                    state: 'success',
+                    context: failurePolicy.FAILURE_RETRY_CONTEXT,
+                    description: failurePolicy.retrySpentDescription(failure.latest),
+                    target_url: failure.latest.targetUrl,
+                  });
+                  core.notice(`SPENT bounded retry for #${pr.number}@${pr.headRefOid}`);
+                }
                 const r = await github.graphql(`
                   mutation($id: ID!, $oid: GitObjectID!) {
                     enqueuePullRequest(input: { pullRequestId: $id, expectedHeadOid: $oid }) {
