@@ -503,6 +503,15 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
       '--test-coverage-functions=100',
     ],
   ],
+  [
+    'scripts/invariants/sonar-repair-contract.test.mjs',
+    'scripts/invariants/sonar-repair-contract.mjs',
+    [
+      '--test-coverage-lines=95',
+      '--test-coverage-branches=80',
+      '--test-coverage-functions=95',
+    ],
+  ],
 ];
 const CI_CONTROL_WEB_TESTS = [
   'apps/web/tests/unit/ci/test-coverage-audit-workflow.test.ts',
