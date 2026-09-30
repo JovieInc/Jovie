@@ -75,6 +75,23 @@ describe('factory:run --dry end to end', () => {
       proof: ['product-profile-subscribe-capture'],
       seo: { title: 'Claim your public profile', hub: null },
     });
+    expect(pageRecord.composition.sections).toEqual([
+      {
+        renderer: 'factory-hero',
+        instanceId: 'hero-1',
+        sectionId: 'hero',
+      },
+      {
+        renderer: 'factory-feature-split',
+        instanceId: 'capture-1',
+        sectionId: 'feature-split',
+      },
+      {
+        renderer: 'factory-cta',
+        instanceId: 'cta-1',
+        sectionId: 'cta',
+      },
+    ]);
     expect(isRoutedPageRecord(pageRecord)).toBe(false);
     expect(pageRecord.trust).toBe(0.9);
     expect(pageRecord.receipts.map(r => r.stage)).toEqual(
@@ -97,7 +114,9 @@ describe('factory:run --dry end to end', () => {
             request.stage === 'narrative'
               ? {
                   sections: narrative.sections.map((section, index) =>
-                    index === 1 ? { ...section, sectionId: 'pricing' } : section
+                    index === 1
+                      ? { ...section, sectionId: 'not-a-section' }
+                      : section
                   ),
                 }
               : brief.dry?.[request.stage];
@@ -107,8 +126,8 @@ describe('factory:run --dry end to end', () => {
     });
 
     expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'render' });
-    expect(record('12-render.attempt-2.json').feedbackIn).toContain(
-      'page-record-schema: no solutions renderer for pricing'
+    expect(record('12-render.attempt-2.json').feedbackIn.join('; ')).toContain(
+      'no solutions renderer for not-a-section'
     );
   });
 

@@ -15,7 +15,10 @@ import {
   definePage,
   type PageRecord,
 } from '@/data/marketing/factory/pageRecord';
-import { getMarketingSection } from '@/data/marketing/sections';
+import {
+  getMarketingSection,
+  MARKETING_SECTION_IDS,
+} from '@/data/marketing/sections';
 import SolutionsAudiencePage, {
   dynamicParams,
   generateMetadata,
@@ -56,6 +59,73 @@ const params = (audience: string) => ({
   params: Promise.resolve({ audience }),
 });
 
+function factoryRecord(copyOverrides: PageRecord['copy'] = {}) {
+  return definePage({
+    ...solutionsArtistsPage,
+    id: 'solutions.founders',
+    slug: 'founders',
+    status: 'shadow',
+    brief: {
+      audience: 'founders building an owned audience',
+      job: 'show founders how a public profile captures subscribers',
+      successEvent: 'claim-profile',
+      copyScope: 'shared',
+    },
+    composition: {
+      ...solutionsArtistsPage.composition,
+      shellClassName: undefined,
+      sections: [
+        {
+          renderer: 'factory-hero',
+          instanceId: 'hero-1',
+          sectionId: 'hero',
+        },
+        {
+          renderer: 'factory-feature-split',
+          instanceId: 'capture-1',
+          sectionId: 'feature-split',
+        },
+        {
+          renderer: 'factory-cta',
+          instanceId: 'cta-1',
+          sectionId: 'cta',
+        },
+      ],
+    },
+    copy: {
+      'hero-1.headline': { text: 'Claim your public profile' },
+      'hero-1.subhead': {
+        text: 'Turn visitors into subscribers you can reach again.',
+      },
+      'capture-1.body': {
+        text: 'Visitors subscribe from your page and opt into updates.',
+      },
+      'cta-1.headline': { text: 'Start free today' },
+      ...copyOverrides,
+    },
+    media: {
+      'hero-1': {
+        kind: 'public-path',
+        id: '/og/default.png',
+        alt: 'Public profile preview',
+      },
+      'capture-1': {
+        kind: 'public-path',
+        id: '/og/default.png',
+        alt: 'Subscriber capture preview',
+      },
+    },
+    proof: [],
+    seo: {
+      ...solutionsArtistsPage.seo,
+      title: 'Public profiles for founders',
+      socialTitle: 'Public profiles for founders',
+      description: 'Claim a public profile and capture subscribers.',
+      keywords: [],
+    },
+  });
+}
+
 describe('/solutions/[audience] family renderer (JOV-7275)', () => {
   it('is fully static over the routed records', () => {
     expect(revalidate).toBe(false);
@@ -72,6 +142,34 @@ describe('/solutions/[audience] family renderer (JOV-7275)', () => {
         <SolutionsRecordBody record={solutionsArtistsPage} />
       )
     ).toBe(renderToStaticMarkup(<ArtistProfileLandingRoute />));
+  });
+
+  it('renders a factory-shaped record from instance-scoped copy and media', () => {
+    const record = factoryRecord();
+
+    expect(() => assertRenderableSolutionsRecord(record)).not.toThrow();
+    const { container } = render(<SolutionsRecordBody record={record} />);
+    expect(container).toHaveTextContent('Claim your public profile');
+    expect(container).toHaveTextContent(
+      'Turn visitors into subscribers you can reach again.'
+    );
+    expect(container).toHaveTextContent(
+      'Visitors subscribe from your page and opt into updates.'
+    );
+    expect(container).toHaveTextContent('Start free today');
+    expect(
+      container.querySelector('[data-factory-media="/og/default.png"]')
+    ).toBeInTheDocument();
+  });
+
+  it('fails the build gate when a factory section is missing a required copy slot', () => {
+    const valid = factoryRecord();
+    const { 'hero-1.headline': _missing, ...copyWithoutHeadline } = valid.copy;
+    const record = definePage({ ...valid, copy: copyWithoutHeadline });
+
+    expect(() => assertRenderableSolutionsRecord(record)).toThrowError(
+      /missing copy slot hero-1\.headline/u
+    );
   });
 
   it('emits SoftwareApplication JSON-LD from record.seo', async () => {
@@ -96,6 +194,10 @@ describe('/solutions/[audience] family renderer (JOV-7275)', () => {
     expect(markers[0]).toHaveAttribute(
       'data-page-job',
       solutionsArtistsPage.brief.job
+    );
+    expect(markers[0]).toHaveAttribute(
+      'data-success-event',
+      solutionsArtistsPage.brief.successEvent
     );
   });
 
@@ -189,6 +291,11 @@ describe('/solutions/[audience] family renderer (JOV-7275)', () => {
     }
     for (const renderer of Object.values(SOLUTIONS_SECTION_RENDERERS)) {
       expect(getMarketingSection(renderer.sectionId).status).toBe('approved');
+    }
+    for (const sectionId of MARKETING_SECTION_IDS) {
+      expect(SOLUTIONS_SECTION_RENDERERS[`factory-${sectionId}`]).toMatchObject(
+        { sectionId }
+      );
     }
   });
 
