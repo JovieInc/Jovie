@@ -77,9 +77,11 @@ test.describe('Admin GTM Health @smoke', () => {
       await expect(page.getByTestId('gtm-pipeline-status')).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
-      await expect(
-        page.getByRole('button', { name: 'Search leads' })
-      ).toBeVisible({
+      // The surface path carries ?q=<FILTERED_SEARCH>, so HeaderSearchAction
+      // mounts expanded (type="search" input). getByLabel matches the
+      // 'Search leads' control in either the collapsed button or open field
+      // state, whichever the mounted contract renders.
+      await expect(page.getByLabel('Search leads')).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
       await assertNoCriticalErrors(getContext(), testInfo);
