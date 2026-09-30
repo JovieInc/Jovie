@@ -460,7 +460,15 @@ def issue_is_sensitive(issue: Issue) -> bool:
 
 
 def issue_hits_red_line(issue: Issue) -> bool:
-    return SENSITIVE_RED_LINES.search(f"{issue.title}\n{issue.description}") is not None
+    text = f"{issue.title}\n{issue.description}"
+    for match in SENSITIVE_RED_LINES.finditer(text):
+        # Public-page schema fixtures are test data, not live plan prices.
+        # Only exempt this complete reference, never the whole issue.
+        if (re.fullmatch(r"live\s+`/pricing", match.group(0), re.IGNORECASE)
+                and re.match(r"`\s+schema\s+fixture\b", text[match.end():], re.IGNORECASE)):
+            continue
+        return True
+    return False
 
 
 def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
