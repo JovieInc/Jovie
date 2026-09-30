@@ -231,13 +231,17 @@ export const FactoryGapReportSchema = z.object({
   sectionRequests: z.array(SectionRequestSchema),
 });
 
+/** Owned by factory/mediaDecision.ts, which picks one per section. */
 export const FACTORY_MEDIA_KINDS = [
   'product-shot',
+  'phone',
+  'video',
+  'lottie',
+  'illustration',
   'photo',
   'callout',
-  'lottie',
-  'video',
-  'illustration',
+  'table',
+  'code',
   'none',
 ] as const;
 
