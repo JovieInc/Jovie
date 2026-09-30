@@ -43,6 +43,52 @@ export const createAgentDraftSchema = z
   })
   .strict();
 
+const releaseField = z.string().trim().min(1).max(300);
+const httpsUrl = z
+  .url()
+  .max(1000)
+  .refine(value => {
+    const url = new URL(value);
+    return (
+      url.protocol === 'https:' && !url.username && !url.password && !url.port
+    );
+  }, 'A standard HTTPS URL is required');
+const upc = z
+  .string()
+  .trim()
+  .regex(/^\d{8,20}$/, 'UPC must contain 8 to 20 digits');
+
+export const releaseMetadataSchema = z
+  .object({
+    title: releaseField.optional(),
+    artist_name: releaseField.optional(),
+    release_date: z.iso.date().optional(),
+    artwork_url: httpsUrl.optional(),
+    upc: upc.optional(),
+    dsp_links: z.record(z.string().min(1).max(50), httpsUrl).optional(),
+  })
+  .strict()
+  .refine(value => Object.keys(value).length > 0, 'Release metadata is empty');
+
+export const prepareReleaseLaunchSchema = z
+  .object({
+    draft_id: z.uuid(),
+    draft_token: z.string().min(1).max(8192),
+    release_url: httpsUrl.optional(),
+    upc: upc.optional(),
+    release_metadata: releaseMetadataSchema.optional(),
+    goal: z.string().trim().min(1).max(500),
+  })
+  .strict()
+  .refine(
+    value => value.release_url || value.upc || value.release_metadata,
+    'A release URL, UPC, or release metadata is required'
+  );
+
+export type PrepareReleaseLaunchInput = z.output<
+  typeof prepareReleaseLaunchSchema
+>;
+
 export const AGENT_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const draftCapabilitySchema = z

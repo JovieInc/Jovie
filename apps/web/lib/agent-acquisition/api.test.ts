@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   flag: vi.fn(),
   resolve: vi.fn(),
   create: vi.fn(),
+  prepare: vi.fn(),
   read: vi.fn(),
   capture: vi.fn(),
 }));
@@ -21,6 +22,9 @@ vi.mock('./artist-resolution', () => ({ resolveAgentArtist: mocks.resolve }));
 vi.mock('./draft-store', () => ({
   createAgentDraft: mocks.create,
   readAgentDraft: mocks.read,
+}));
+vi.mock('./release-launch', () => ({
+  prepareReleaseLaunch: mocks.prepare,
 }));
 
 import { GET as mcpGet, POST as mcpPost } from '@/app/api/mcp/route';
@@ -60,6 +64,12 @@ beforeEach(() => {
     status: 'draft_ready',
     draft_id: 'draft',
     ownership: 'unverified',
+  });
+  mocks.prepare.mockResolvedValue({
+    status: 'launch_draft_ready',
+    draft_id: 'draft',
+    ownership: 'unverified',
+    published_url: null,
   });
   mocks.read.mockResolvedValue({ status: 'draft_ready', draft_id: 'draft' });
 });
@@ -240,7 +250,11 @@ describe('shared anonymous REST/MCP draft boundary', () => {
       (await list.json()).result.tools.map(
         (tool: { name: string }) => tool.name
       )
-    ).toEqual(['artist.search_or_import', 'workspace.create_draft']);
+    ).toEqual([
+      'artist.search_or_import',
+      'workspace.create_draft',
+      'release.prepare_launch',
+    ]);
     const ping = await mcpPost(request(rpc('ping', undefined, 0)));
     expect(await ping.json()).toEqual({ jsonrpc: '2.0', id: 0, result: {} });
     const notification = await mcpPost(
@@ -295,7 +309,21 @@ describe('shared anonymous REST/MCP draft boundary', () => {
       request({ tool: 'workspace.create_draft', arguments: input })
     );
     expect(mocks.create).toHaveBeenLastCalledWith(input);
-    for (const code of ['DRAFT_UNAVAILABLE', 'ARTIST_NOT_FOUND']) {
+    const launchInput = {
+      draft_id: '9efebd98-39b7-4a77-8965-04b5aafad9ad',
+      draft_token: 'private.token',
+      release_url: 'https://open.spotify.com/album/release-id',
+      goal: 'Launch the single',
+    };
+    await handleAgentDraftPost(
+      request({ tool: 'release.prepare_launch', arguments: launchInput })
+    );
+    expect(mocks.prepare).toHaveBeenLastCalledWith(launchInput);
+    for (const code of [
+      'DRAFT_UNAVAILABLE',
+      'ARTIST_NOT_FOUND',
+      'RELEASE_NOT_FOUND',
+    ]) {
       mocks.create.mockResolvedValueOnce({
         status: 'error',
         code,
