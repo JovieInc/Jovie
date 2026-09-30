@@ -18,6 +18,7 @@
 import { usePathname } from 'next/navigation';
 import { useContext, useEffect } from 'react';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { getFeedbackErrorMessage, toast } from '@/components/feedback';
 import { useThemeToggle } from '@/components/site/theme-toggle/useThemeToggle';
 import { useFounderDoor } from '@/contexts/FounderDoorContext';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
@@ -78,7 +79,11 @@ export function useGlobalShortcutActions() {
       if (e.code !== 'KeyL' && e.key.toLowerCase() !== 'l') return;
       if (isFormElement(e.target)) return;
       e.preventDefault();
-      lockWorkspace();
+      void lockWorkspace().catch(error =>
+        toast.error(
+          getFeedbackErrorMessage(error, 'Could not lock Ovie. Try again.')
+        )
+      );
     }
     globalThis.addEventListener('keydown', onKey);
     return () => globalThis.removeEventListener('keydown', onKey);

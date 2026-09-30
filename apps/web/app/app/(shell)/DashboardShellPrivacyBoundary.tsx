@@ -2,6 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 import { WorkspaceLockScreen } from '@/features/workspace-lock/WorkspaceLockScreen';
 import {
@@ -192,10 +193,12 @@ export function DashboardShellPrivacyBoundary({
     const onConfirmedLock = (event: Event) => {
       const state = (event as CustomEvent<WorkspacePrivacyLockState>).detail;
       if (!state?.enabled || !state.locked) return;
-      revalidationGeneration.current += 1;
-      recoveryDeadline.current = null;
-      setRecovery(null);
-      setPrivacyState(state);
+      flushSync(() => {
+        revalidationGeneration.current += 1;
+        recoveryDeadline.current = null;
+        setRecovery(null);
+        setPrivacyState(state);
+      });
     };
     const onVisible = () => {
       if (document.visibilityState === 'visible') void revalidate();
