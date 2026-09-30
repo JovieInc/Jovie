@@ -1,6 +1,6 @@
 'use client';
 
-import * as Tabs from '@radix-ui/react-tabs';
+import * as RadixTabs from '@radix-ui/react-tabs';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
@@ -12,6 +12,24 @@ import {
   linearPillSurfaceClassName,
 } from '../lib/linear-pill';
 import { cn } from '../lib/utils';
+
+// Advanced tab compositions share the canonical pending appearance while
+// retaining Radix semantics and leaving their layout to the composition.
+const TabsTrigger = React.forwardRef<
+  React.ElementRef<typeof RadixTabs.Trigger>,
+  React.ComponentPropsWithoutRef<typeof RadixTabs.Trigger>
+>(({ className, ...props }, ref) => (
+  <RadixTabs.Trigger
+    ref={ref}
+    className={cn('disabled:opacity-(--state-disabled-opacity)', className)}
+    {...props}
+  />
+));
+TabsTrigger.displayName = 'TabsTrigger';
+
+const Tabs: Omit<typeof RadixTabs, 'Trigger'> & {
+  Trigger: typeof TabsTrigger;
+} = { ...RadixTabs, Trigger: TabsTrigger };
 
 const segmentControlVariants = cva('inline-flex items-center rounded-full', {
   variants: {
@@ -260,7 +278,7 @@ export function SegmentControl<T extends string = string>({
     resolvedVariant === 'linear-pill' ? linearPillSizeClassNames[size] : null;
 
   return (
-    <Tabs.Root
+    <RadixTabs.Root
       value={value}
       onValueChange={onValueChange as (value: string) => void}
       data-layout={layout}
@@ -275,7 +293,7 @@ export function SegmentControl<T extends string = string>({
         className
       )}
     >
-      <Tabs.List
+      <RadixTabs.List
         ref={listRef}
         aria-label={ariaLabel}
         className={cn(
@@ -295,7 +313,7 @@ export function SegmentControl<T extends string = string>({
           />
         ) : null}
         {options.map(option => (
-          <Tabs.Trigger
+          <RadixTabs.Trigger
             key={option.value}
             value={option.value}
             disabled={option.disabled}
@@ -319,12 +337,12 @@ export function SegmentControl<T extends string = string>({
             <span className='min-w-0 overflow-hidden text-ellipsis whitespace-nowrap'>
               {option.label}
             </span>
-          </Tabs.Trigger>
+          </RadixTabs.Trigger>
         ))}
-      </Tabs.List>
+      </RadixTabs.List>
       {renderHiddenPanels
         ? options.map(option => (
-            <Tabs.Content
+            <RadixTabs.Content
               key={`${option.value}-panel`}
               value={option.value}
               forceMount
@@ -333,7 +351,7 @@ export function SegmentControl<T extends string = string>({
             />
           ))
         : null}
-    </Tabs.Root>
+    </RadixTabs.Root>
   );
 }
 

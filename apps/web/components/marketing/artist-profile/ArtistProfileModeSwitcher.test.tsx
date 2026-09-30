@@ -23,6 +23,10 @@ describe('ArtistProfileModeSwitcher', () => {
       expect(choices).toHaveLength(4);
       for (const choice of choices) {
         expect(choice).toHaveAttribute('disabled');
+        expect(choice).toHaveClass(
+          'disabled:opacity-(--state-disabled-opacity)'
+        );
+        expect(choice).not.toHaveClass('ap-mode-switcher__tab');
       }
       expect(
         server.querySelector('[data-interactive-ready="false"]')

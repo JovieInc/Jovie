@@ -144,7 +144,7 @@ export function ArtistProfileModeSwitcher({
                   disabled={!interactiveReady}
                   className={cn(
                     'relative flex min-w-0 items-center justify-center whitespace-nowrap px-2 text-center text-2xs font-semibold leading-none text-tertiary-token transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus data-[state=active]:text-primary-token sm:text-xs',
-                    'ap-mode-switcher__tab disabled:cursor-wait',
+                    'disabled:cursor-wait',
                     showIntroHeading
                       ? 'min-h-12 rounded-lg'
                       : 'min-h-11 rounded-full'
