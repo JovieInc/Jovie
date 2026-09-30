@@ -17,6 +17,7 @@ export const solutionsArtistsPage = definePage({
     audience: 'independent artists',
     job: 'show artists how profiles connect music, links, and permissioned fan updates',
     successEvent: 'artist claims a profile',
+    copyScope: 'music',
   },
   claims: [
     'capability.artist-profiles.public-artist-profile',
