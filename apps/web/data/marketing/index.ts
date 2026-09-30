@@ -167,6 +167,28 @@ export {
   MARKETING_EDITORIAL_BACKGROUNDS,
 } from './editorialBackgrounds';
 export type {
+  FactoryFold,
+  FactoryMediaAudience,
+  FactoryMediaDecision,
+  FactoryMediaDecisionInput,
+  FactoryMediaDecisionTraceEntry,
+  FactoryMediaEvidence,
+  FactoryMediaSource,
+  FactoryMedium,
+  FactorySectionFamily,
+  FactorySectionJob,
+} from './factory/mediaDecision';
+export {
+  decideMedium,
+  FACTORY_MEDIA_DECISION_SCHEMA,
+  FACTORY_MEDIA_SOURCING_ORDER,
+  FACTORY_MEDIUM_RECIPES,
+  FACTORY_MEDIUMS,
+  FACTORY_SECTION_FAMILIES,
+  FACTORY_SECTION_JOBS,
+  factoryMediumToVariantMedia,
+} from './factory/mediaDecision';
+export type {
   MarketingCreativeRole,
   MarketingGateReceipt,
   MarketingGenerationFinding,

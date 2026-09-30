@@ -1,0 +1,662 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`decideMedium decision table (JOV-7250) > locks the decision table with a snapshot across every rule 1`] = `
+{
+  "comparison → table": {
+    "medium": "table",
+    "rationale": "Comparison renders as a table — structured beats generated.",
+    "recipeId": null,
+    "source": "native",
+    "trace": [
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r1-hero-capture",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r2-proof-or-feature",
+      },
+      {
+        "detail": "Comparison renders as a table — structured beats generated.",
+        "matched": true,
+        "rule": "r3-number-or-comparison",
+      },
+    ],
+  },
+  "concept above fold → ladder (not illustration)": {
+    "medium": "illustration",
+    "rationale": "Degradation ladder: illustration from a Pen ref, or generation when authorized.",
+    "recipeId": "soft-editorial-background",
+    "source": "pen-ref",
+    "trace": [
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r1-hero-capture",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r2-proof-or-feature",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r3-number-or-comparison",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r4-concept-below-fold",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r5-identity-or-person",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r6-developer-audience",
+      },
+      {
+        "detail": "Degradation ladder: illustration from a Pen ref, or generation when authorized.",
+        "matched": true,
+        "rule": "r7-degradation-ladder",
+      },
+    ],
+  },
+  "concept below fold + generation → illustration": {
+    "medium": "illustration",
+    "rationale": "An abstract concept below the fold gets an illustration.",
+    "recipeId": "soft-editorial-background",
+    "source": "generation",
+    "trace": [
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r1-hero-capture",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r2-proof-or-feature",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r3-number-or-comparison",
+      },
+      {
+        "detail": "An abstract concept below the fold gets an illustration.",
+        "matched": true,
+        "rule": "r4-concept-below-fold",
+      },
+    ],
+  },
+  "concept below fold + pen ref → illustration": {
+    "medium": "illustration",
+    "rationale": "An abstract concept below the fold gets an illustration.",
+    "recipeId": "soft-editorial-background",
+    "source": "pen-ref",
+    "trace": [
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r1-hero-capture",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r2-proof-or-feature",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r3-number-or-comparison",
+      },
+      {
+        "detail": "An abstract concept below the fold gets an illustration.",
+        "matched": true,
+        "rule": "r4-concept-below-fold",
+      },
+    ],
+  },
+  "developer audience → code": {
+    "medium": "code",
+    "rationale": "Developer audiences get a real code sample, not a picture of the product.",
+    "recipeId": null,
+    "source": "native",
+    "trace": [
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r1-hero-capture",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r2-proof-or-feature",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r3-number-or-comparison",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r4-concept-below-fold",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r5-identity-or-person",
+      },
+      {
+        "detail": "Developer audiences get a real code sample, not a picture of the product.",
+        "matched": true,
+        "rule": "r6-developer-audience",
+      },
+    ],
+  },
+  "developer hero + capture → product-shot (r1 first)": {
+    "medium": "product-shot",
+    "rationale": "Hero with capture design-studio-shell-library-desktop renders a product-shot from the screenshot registry.",
+    "recipeId": "dark-glass",
+    "source": "screenshot-registry",
+    "trace": [
+      {
+        "detail": "Hero with capture design-studio-shell-library-desktop renders a product-shot from the screenshot registry.",
+        "matched": true,
+        "rule": "r1-hero-capture",
+      },
+    ],
+  },
+  "feature + video only → video (never autoplay)": {
+    "medium": "video",
+    "rationale": "feature section uses the approved demo video behind "watch demo"; it never autoplays.",
+    "recipeId": "dark-glass",
+    "source": "screenshot-registry",
+    "trace": [
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r1-hero-capture",
+      },
+      {
+        "detail": "feature section uses the approved demo video behind "watch demo"; it never autoplays.",
+        "matched": true,
+        "rule": "r2-proof-or-feature",
+      },
+    ],
+  },
+  "feature without assets → ladder omit": {
+    "medium": "none",
+    "rationale": "Degradation ladder bottom: no truthful asset, omit media.",
+    "recipeId": null,
+    "source": "omitted",
+    "trace": [
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r1-hero-capture",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r2-proof-or-feature",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r3-number-or-comparison",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r4-concept-below-fold",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r5-identity-or-person",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r6-developer-audience",
+      },
+      {
+        "detail": "Degradation ladder bottom: no truthful asset, omit media.",
+        "matched": true,
+        "rule": "r7-degradation-ladder",
+      },
+    ],
+  },
+  "hero + capture + creator family → phone": {
+    "medium": "phone",
+    "rationale": "Hero with capture artist-profile-hero-section-desktop renders a phone from the screenshot registry.",
+    "recipeId": "compact-glass",
+    "source": "screenshot-registry",
+    "trace": [
+      {
+        "detail": "Hero with capture artist-profile-hero-section-desktop renders a phone from the screenshot registry.",
+        "matched": true,
+        "rule": "r1-hero-capture",
+      },
+    ],
+  },
+  "hero + capture + default family → product-shot": {
+    "medium": "product-shot",
+    "rationale": "Hero with capture homepage-hero-desktop renders a product-shot from the screenshot registry.",
+    "recipeId": "dark-glass",
+    "source": "screenshot-registry",
+    "trace": [
+      {
+        "detail": "Hero with capture homepage-hero-desktop renders a product-shot from the screenshot registry.",
+        "matched": true,
+        "rule": "r1-hero-capture",
+      },
+    ],
+  },
+  "hero + capture + mobile family → phone": {
+    "medium": "phone",
+    "rationale": "Hero with capture artist-spec-creator-menu-mobile renders a phone from the screenshot registry.",
+    "recipeId": "compact-glass",
+    "source": "screenshot-registry",
+    "trace": [
+      {
+        "detail": "Hero with capture artist-spec-creator-menu-mobile renders a phone from the screenshot registry.",
+        "matched": true,
+        "rule": "r1-hero-capture",
+      },
+    ],
+  },
+  "hero without capture → ladder omit": {
+    "medium": "none",
+    "rationale": "Degradation ladder bottom: no truthful asset, omit media.",
+    "recipeId": null,
+    "source": "omitted",
+    "trace": [
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r1-hero-capture",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r2-proof-or-feature",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r3-number-or-comparison",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r4-concept-below-fold",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r5-identity-or-person",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r6-developer-audience",
+      },
+      {
+        "detail": "Degradation ladder bottom: no truthful asset, omit media.",
+        "matched": true,
+        "rule": "r7-degradation-ladder",
+      },
+    ],
+  },
+  "identity + real photo → photo": {
+    "medium": "photo",
+    "rationale": "Identity renders a real or licensed photo of the subject.",
+    "recipeId": "soft-editorial-background",
+    "source": "licensed-photo",
+    "trace": [
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r1-hero-capture",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r2-proof-or-feature",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r3-number-or-comparison",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r4-concept-below-fold",
+      },
+      {
+        "detail": "Identity renders a real or licensed photo of the subject.",
+        "matched": true,
+        "rule": "r5-identity-or-person",
+      },
+    ],
+  },
+  "identity with no imagery → none (never stock)": {
+    "medium": "none",
+    "rationale": "No real, licensed, or character-system imagery exists; stock is never substituted, so media is omitted.",
+    "recipeId": null,
+    "source": "omitted",
+    "trace": [
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r1-hero-capture",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r2-proof-or-feature",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r3-number-or-comparison",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r4-concept-below-fold",
+      },
+      {
+        "detail": "No real, licensed, or character-system imagery exists; stock is never substituted, so media is omitted.",
+        "matched": true,
+        "rule": "r5-identity-or-person",
+      },
+    ],
+  },
+  "ladder: capture → product-shot": {
+    "medium": "product-shot",
+    "rationale": "Degradation ladder rung 1: registered product capture.",
+    "recipeId": "dark-glass",
+    "source": "screenshot-registry",
+    "trace": [
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r1-hero-capture",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r2-proof-or-feature",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r3-number-or-comparison",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r4-concept-below-fold",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r5-identity-or-person",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r6-developer-audience",
+      },
+      {
+        "detail": "Degradation ladder rung 1: registered product capture.",
+        "matched": true,
+        "rule": "r7-degradation-ladder",
+      },
+    ],
+  },
+  "ladder: generation authorized → illustration": {
+    "medium": "illustration",
+    "rationale": "Degradation ladder: illustration from a Pen ref, or generation when authorized.",
+    "recipeId": "soft-editorial-background",
+    "source": "generation",
+    "trace": [
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r1-hero-capture",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r2-proof-or-feature",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r3-number-or-comparison",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r4-concept-below-fold",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r5-identity-or-person",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r6-developer-audience",
+      },
+      {
+        "detail": "Degradation ladder: illustration from a Pen ref, or generation when authorized.",
+        "matched": true,
+        "rule": "r7-degradation-ladder",
+      },
+    ],
+  },
+  "ladder: nothing → none": {
+    "medium": "none",
+    "rationale": "Degradation ladder bottom: no truthful asset, omit media.",
+    "recipeId": null,
+    "source": "omitted",
+    "trace": [
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r1-hero-capture",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r2-proof-or-feature",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r3-number-or-comparison",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r4-concept-below-fold",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r5-identity-or-person",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r6-developer-audience",
+      },
+      {
+        "detail": "Degradation ladder bottom: no truthful asset, omit media.",
+        "matched": true,
+        "rule": "r7-degradation-ladder",
+      },
+    ],
+  },
+  "ladder: pen ref → illustration": {
+    "medium": "illustration",
+    "rationale": "Degradation ladder: illustration from a Pen ref, or generation when authorized.",
+    "recipeId": "soft-editorial-background",
+    "source": "pen-ref",
+    "trace": [
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r1-hero-capture",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r2-proof-or-feature",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r3-number-or-comparison",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r4-concept-below-fold",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r5-identity-or-person",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r6-developer-audience",
+      },
+      {
+        "detail": "Degradation ladder: illustration from a Pen ref, or generation when authorized.",
+        "matched": true,
+        "rule": "r7-degradation-ladder",
+      },
+    ],
+  },
+  "number → callout": {
+    "medium": "callout",
+    "rationale": "A number job renders as a callout — the figure is the media.",
+    "recipeId": null,
+    "source": "native",
+    "trace": [
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r1-hero-capture",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r2-proof-or-feature",
+      },
+      {
+        "detail": "A number job renders as a callout — the figure is the media.",
+        "matched": true,
+        "rule": "r3-number-or-comparison",
+      },
+    ],
+  },
+  "person + character model → photo": {
+    "medium": "photo",
+    "rationale": "Identity renders characterSystem model imani.",
+    "recipeId": "soft-editorial-background",
+    "source": "character-system",
+    "trace": [
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r1-hero-capture",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r2-proof-or-feature",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r3-number-or-comparison",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r4-concept-below-fold",
+      },
+      {
+        "detail": "Identity renders characterSystem model imani.",
+        "matched": true,
+        "rule": "r5-identity-or-person",
+      },
+    ],
+  },
+  "proof + capture → product-shot": {
+    "medium": "product-shot",
+    "rationale": "proof section takes the registered product shot dashboard-analytics-desktop.",
+    "recipeId": "dark-glass",
+    "source": "screenshot-registry",
+    "trace": [
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r1-hero-capture",
+      },
+      {
+        "detail": "proof section takes the registered product shot dashboard-analytics-desktop.",
+        "matched": true,
+        "rule": "r2-proof-or-feature",
+      },
+    ],
+  },
+  "steps below fold → lottie": {
+    "medium": "lottie",
+    "rationale": "A steps explanation below the fold animates as Lottie.",
+    "recipeId": "flowing-accent",
+    "source": "pen-ref",
+    "trace": [
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r1-hero-capture",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r2-proof-or-feature",
+      },
+      {
+        "detail": "no match",
+        "matched": false,
+        "rule": "r3-number-or-comparison",
+      },
+      {
+        "detail": "A steps explanation below the fold animates as Lottie.",
+        "matched": true,
+        "rule": "r4-concept-below-fold",
+      },
+    ],
+  },
+}
+`;
