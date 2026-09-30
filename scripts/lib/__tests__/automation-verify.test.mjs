@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -1620,10 +1620,55 @@ describe('automation-verify affected scope', () => {
     }
   );
 
+  it.each([
+    ['full', 'apps/web/lib/desktop/electron-bridge.ts'],
+    ['selected', 'apps/web/lib/ovie/summer-deployment-pin-guard.test.ts'],
+  ])('stops the %s qualifier before web tests when the mandatory pin scan fails', async (_, file) => {
+    const dir = mkdtempSync(resolve(tmpdir(), 'pin-qualification-'));
+    const marker = resolve(dir, 'web-started');
+    try {
+      writeFileSync(resolve(dir, 'node'), '#!/bin/sh\ncase "$*" in *scripts/summer-deployment-pin-guard.test.mjs*) exit 37;; esac\nexit 0\n', { mode: 0o755 });
+      writeFileSync(resolve(dir, 'pnpm'), '#!/bin/sh\ntouch "$PIN_WEB_MARKER"\n', { mode: 0o755 });
+      const child = spawn(process.execPath, [
+        resolve(import.meta.dirname, '../../run-affected-tests.mjs'),
+        '--changed-files-json', JSON.stringify([file]),
+        '--shard-concurrency', '1',
+      ], {
+        env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, PIN_WEB_MARKER: marker },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      const status = await new Promise((resolveExit, reject) => {
+        child.once('error', reject);
+        child.once('exit', resolveExit);
+      });
+      expect(status).toBe(37);
+      expect(existsSync(marker)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the unfiltered pin scan mandatory when only its web fixture is selected', () => {
+    const plan = buildAffectedTestPlan([
+      'apps/web/lib/ovie/summer-deployment-pin-guard.test.ts',
+    ]);
+    expect(plan.mode).toBe('selected');
+    const commands = buildSelectedTestCommands(plan, '1');
+    expect(commands[0]).toEqual([
+      'node',
+      ['--test', 'scripts/summer-deployment-pin-guard.test.mjs'],
+    ]);
+    expect(commands[1][1]).toContain('lib/ovie/summer-deployment-pin-guard.test.ts');
+  });
+
   it('splits the full web suite into bounded-memory shards', () => {
     const commands = buildFullSuiteCommands('2', 2);
     expect(commands.shift()).toEqual(buildCompanyRegistryTestCommand());
     expect(commands.shift()).toEqual(buildProjectCreationTestCommand());
+    expect(commands.shift()).toEqual([
+      'node',
+      ['--test', 'scripts/summer-deployment-pin-guard.test.mjs'],
+    ]);
 
     expect(commands).toEqual([
       [
