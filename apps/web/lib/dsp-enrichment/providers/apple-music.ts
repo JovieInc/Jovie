@@ -16,6 +16,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
+import { CallerCancellationError } from '@/lib/resilience/caller-cancellation';
 import { executeWithRetry } from '@/lib/resilience/primitives';
 import {
   getCachedArtistProfile,
@@ -97,6 +98,7 @@ interface MusicKitResponse<T> {
 interface AppleMusicProviderOptions {
   storefront?: string;
   fetcher?: typeof fetch;
+  signal?: AbortSignal;
 }
 
 // ============================================================================
@@ -137,9 +139,17 @@ const DEFAULT_BASE_DELAY_MS = 1000;
  * Check if an error should not be retried.
  */
 function isNonRetryableError(error: unknown): boolean {
-  if (error instanceof AppleMusicNotConfiguredError) return true;
+  if (
+    error instanceof CallerCancellationError ||
+    error instanceof AppleMusicNotConfiguredError
+  )
+    return true;
   if (error instanceof AppleMusicError) {
-    return error.statusCode === 401 || error.statusCode === 404;
+    return (
+      error.errorCode === 'CANCELLED' ||
+      error.statusCode === 401 ||
+      error.statusCode === 404
+    );
   }
   return false;
 }
@@ -174,6 +184,9 @@ async function musicKitRequest<T>(
   options: AppleMusicProviderOptions = {},
   isRetry = false
 ): Promise<MusicKitResponse<T>> {
+  if (options.signal?.aborted) {
+    throw new CallerCancellationError();
+  }
   if (!isAppleMusicConfigured()) {
     throw new AppleMusicNotConfiguredError();
   }
@@ -192,10 +205,10 @@ async function musicKitRequest<T>(
         ...headers,
         'Content-Type': 'application/json',
       },
-      signal: controller.signal,
+      signal: options.signal
+        ? AbortSignal.any([controller.signal, options.signal])
+        : controller.signal,
     });
-
-    clearTimeout(timeoutId);
 
     // Handle auth errors - clear token cache and retry once
     if (response.status === 401) {
@@ -229,8 +242,9 @@ async function musicKitRequest<T>(
 
     return (await response.json()) as MusicKitResponse<T>;
   } catch (error) {
-    clearTimeout(timeoutId);
-
+    if (options.signal?.aborted) {
+      throw new CallerCancellationError();
+    }
     if (error instanceof AppleMusicError) {
       throw error;
     }
@@ -242,6 +256,8 @@ async function musicKitRequest<T>(
     throw new AppleMusicError(
       `MusicKit request failed: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -391,13 +407,14 @@ export async function getArtist(
   artistId: string,
   options: AppleMusicProviderOptions = {}
 ): Promise<AppleMusicArtist | null> {
-  // Check cache first
-  const cached = getCachedArtistProfile<AppleMusicArtist>(artistId);
+  options.signal?.throwIfAborted();
+  // Storefront affects both availability and provenance; isolate regional caches.
+  const storefront = options.storefront ?? DEFAULT_STOREFRONT;
+  const cacheKey = `apple_music:${storefront}:${artistId}`;
+  const cached = getCachedArtistProfile<AppleMusicArtist>(cacheKey);
   if (cached) {
     return cached;
   }
-
-  const storefront = options.storefront ?? DEFAULT_STOREFRONT;
 
   const result = await executeWithCircuitBreaker(async () => {
     // Include albums relationship for additional data
@@ -412,7 +429,7 @@ export async function getArtist(
 
   // Cache the result for future lookups
   if (artist) {
-    setCachedArtistProfile(artistId, artist);
+    setCachedArtistProfile(cacheKey, artist);
   }
 
   return artist;

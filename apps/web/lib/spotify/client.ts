@@ -20,6 +20,7 @@ import 'server-only';
 import * as Sentry from '@sentry/nextjs';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { type IngestErrorCode, spotifyApiError } from '@/lib/errors/ingest';
+import { CallerCancellationError } from '@/lib/resilience/caller-cancellation';
 import { spotifyCircuitBreaker } from './circuit-breaker';
 import {
   getSpotifyEnv,
@@ -215,6 +216,7 @@ class SpotifyClientManager {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
+    if (options.signal?.aborted) throw new CallerCancellationError();
     // Check circuit breaker before attempting request
     if (!spotifyCircuitBreaker.canExecute()) {
       const stats = spotifyCircuitBreaker.getStats();
@@ -253,7 +255,12 @@ class SpotifyClientManager {
 
           const result = await retryAsync(
             () => this.executeRequest<T>(url, token, options, span),
-            SPOTIFY_RETRY_CONFIG
+            {
+              ...SPOTIFY_RETRY_CONFIG,
+              isRetryable: error =>
+                !options.signal?.aborted &&
+                (SPOTIFY_RETRY_CONFIG.isRetryable?.(error) ?? false),
+            }
           );
 
           return result;
@@ -284,6 +291,7 @@ class SpotifyClientManager {
     options: RequestInit,
     span: { setAttribute: (key: string, value: string | number) => void }
   ): Promise<T> {
+    if (options.signal?.aborted) throw new CallerCancellationError();
     const { controller, cleanup } = createAbortWithTimeout(
       SPOTIFY_DEFAULT_TIMEOUT_MS
     );
@@ -295,15 +303,20 @@ class SpotifyClientManager {
           Authorization: `Bearer ${token}`,
           ...options.headers,
         },
-        signal: controller.signal,
+        signal: options.signal
+          ? AbortSignal.any([controller.signal, options.signal])
+          : controller.signal,
       });
 
       if (!response.ok) {
-        return this.handleErrorResponse<T>(response, span);
+        return await this.handleErrorResponse<T>(response, span);
       }
 
       span.setAttribute('spotify.status', response.status);
-      return response.json() as Promise<T>;
+      return (await response.json()) as T;
+    } catch (error) {
+      if (options.signal?.aborted) throw new CallerCancellationError();
+      throw error;
     } finally {
       cleanup();
     }
@@ -332,6 +345,8 @@ class SpotifyClientManager {
 
     const retryAfter = response.headers.get('Retry-After');
     const error = spotifyApiError(errorDetails, errorCode);
+    // Preserve status for the canonical retry predicate (especially vendor 5xx).
+    Object.assign(error, { status: response.status });
     if (retryAfter) {
       Object.assign(error, { retryAfter: Number.parseInt(retryAfter, 10) });
     }
@@ -381,7 +396,8 @@ class SpotifyClientManager {
   async searchArtists(
     query: string,
     limit: number = 5,
-    offset: number = 0
+    offset: number = 0,
+    options: RequestInit = {}
   ): Promise<SearchArtistResult[]> {
     const params = new URLSearchParams({
       q: query,
@@ -391,7 +407,8 @@ class SpotifyClientManager {
     });
 
     const response = await this.request<SpotifySearchResponse>(
-      `/search?${params}`
+      `/search?${params}`,
+      options
     );
 
     // Filter blacklisted artists before sanitization and caching
@@ -407,9 +424,13 @@ class SpotifyClientManager {
    * @param artistId - Spotify artist ID (already validated)
    * @returns Sanitized artist data
    */
-  async getArtist(artistId: string): Promise<SanitizedArtist> {
+  async getArtist(
+    artistId: string,
+    options: RequestInit = {}
+  ): Promise<SanitizedArtist> {
     const response = await this.request<RawSpotifyArtist>(
-      `/artists/${artistId}`
+      `/artists/${artistId}`,
+      options
     );
 
     // Sanitize before returning
