@@ -9,7 +9,9 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardShellPrivacyBoundary } from '@/app/app/(shell)/DashboardShellPrivacyBoundary';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
+import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { useHeaderActions } from '@/contexts/HeaderActionsContext';
+import { AuthShellWrapper } from './AuthShellWrapper';
 
 const { route, lifecycle, routeEscape, privacyState } = vi.hoisted(() => ({
   route: { pathname: '/app/tasks' },
@@ -213,6 +215,27 @@ afterEach(() => {
 });
 
 describe('main-plane Search route recovery', () => {
+  it('preserves the ordinary Jovie route independently of the optional Ovie boundary', () => {
+    render(
+      <DashboardDataProvider value={dashboard}>
+        <AuthShellWrapper mode='customer'>
+          <RouteDocument />
+        </AuthShellWrapper>
+      </DashboardDataProvider>
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Select synthetic task' })
+    );
+    const selectedDocument = screen.getByLabelText('Synthetic draft');
+    openSearch();
+    expect(selectedDocument).not.toBeVisible();
+    closeSearch();
+    expect(screen.getByLabelText('Synthetic draft')).toBe(selectedDocument);
+    expect(selectedDocument).toBeVisible();
+    expect(routeEscape).not.toHaveBeenCalled();
+    expect(screen.queryByText('Unlock Ovie')).not.toBeInTheDocument();
+  });
+
   it('restores the selected document, draft, DOM and focus after Search Escape', async () => {
     render(
       <Boundary>
