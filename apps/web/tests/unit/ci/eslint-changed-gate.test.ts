@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { type PathLike, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { changedWebFiles, run } from '../../../scripts/lint-eslint-changed.mjs';
@@ -39,7 +39,7 @@ describe('changedWebFiles', () => {
       'apps/web/deleted.ts',
       '',
     ].join('\n');
-    const exists = (file: string) => !file.endsWith('deleted.ts');
+    const exists = (file: PathLike) => !String(file).endsWith('deleted.ts');
 
     expect(changedWebFiles(diff, { exists })).toEqual([
       'app/page.tsx',
