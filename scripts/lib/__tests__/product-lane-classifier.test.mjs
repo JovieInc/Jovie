@@ -21,6 +21,24 @@ const pkg = (before, after) =>
   });
 
 describe('product lane classifier', () => {
+  it('routes all canary OTP worker artifacts through the web gate and rejects unknown workers', () => {
+    const receipt = classifyProductLanes([
+      'workers/canary-otp/src/index.ts',
+      'workers/canary-otp/src/index.test.mjs',
+      'workers/canary-otp/package.json',
+      'workers/canary-otp/tsconfig.json',
+      'workers/canary-otp/wrangler.example.toml',
+      'workers/canary-otp/README.md',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web']);
+    expect(
+      receipt.classifications.every(item => item.rule === 'web-product')
+    ).toBe(true);
+    expect(() =>
+      classifyProductLanes(['workers/canary-otp-other/src/index.ts'])
+    ).toThrow(ProductLaneClassificationError);
+  });
+
   it('maps shared Jev evaluator-only edits to the consuming web and contract lanes', () => {
     const receipt = classifyProductLanes([
       'packages/jev-evaluation/gateway.mjs',
