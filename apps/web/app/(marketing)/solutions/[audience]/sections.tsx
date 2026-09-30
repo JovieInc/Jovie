@@ -177,6 +177,7 @@ function FactoryGenericSection({
             {headline ? (
               <h2
                 id={headingId}
+                data-wrap='editorial-title'
                 data-copy-slot={omitted[0]}
                 className='text-balance text-3xl font-semibold tracking-tight text-primary-token sm:text-4xl'
               >
@@ -244,7 +245,10 @@ function FactoryFeatureGrid({
     >
       <MarketingContainer width='page'>
         {heading ? (
-          <h2 className='text-balance text-3xl font-semibold tracking-tight text-primary-token sm:text-4xl'>
+          <h2
+            data-wrap='editorial-title'
+            className='text-balance text-3xl font-semibold tracking-tight text-primary-token sm:text-4xl'
+          >
             {heading}
           </h2>
         ) : null}
