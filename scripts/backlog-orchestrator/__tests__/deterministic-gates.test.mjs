@@ -1,6 +1,6 @@
 // biome-ignore-all format: Preserve legacy fixture formatting.
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { beforeEach, describe, it } from 'node:test';
 import { validateOptimizationContract } from '../../invariants/optimization-contract.mjs';
 import * as admissionGate from '../admission-gate.mjs';
 import * as admitter from '../admitter.mjs';
@@ -81,6 +81,12 @@ function plannedIssue(overrides = {}) {
 }
 
 describe('deterministic no-model gates', () => {
+  beforeEach(context => {
+    // Use the existing pre-lease receipt date, independently of wall-clock time.
+    assert.ok('mock' in context, 'fixture clock needs a test context');
+    context.mock.timers.enable({ apis: ['Date'], now: new Date('2026-08-22T12:00:00.000Z') });
+  });
+
   it('builds complete bounded plan evidence only from an allowlisted issue', () => {
     const result = deterministicGates.buildDeterministicPlanEvidence(issue());
     assert.equal(result.reason, null);
