@@ -271,6 +271,7 @@ async function observeOriginalEntry(
     let sequence = 0;
     let frames = 0;
     let omittedEvents = 0;
+    let focusChanges = 0;
     let lastScrollY = window.scrollY;
     let readinessKey = '';
     let readyDeliveredAt: number | null = null;
@@ -303,6 +304,10 @@ async function observeOriginalEntry(
           }
         : null;
     const record = (phase: string, event?: Event) => {
+      if (phase === 'focusin') focusChanges++;
+      (
+        window as unknown as { __jovieFocusChanges: number }
+      ).__jovieFocusChanges = focusChanges;
       // Bound console lines and observer work; keep all explicit phase marks.
       if (
         ++sequence > 240 &&
@@ -324,6 +329,11 @@ async function observeOriginalEntry(
         tabList: rect(tabList),
         panel: rect(tabList?.nextElementSibling ?? null),
       };
+      if (phase.endsWith(':first-trial-invoke')) {
+        (
+          window as unknown as { __jovieTrialEntrySurfaces: unknown }
+        ).__jovieTrialEntrySurfaces = surfaces;
+      }
       if (
         phase === 'pointerdown' &&
         !firstPointerSurfaces &&
@@ -368,6 +378,7 @@ async function observeOriginalEntry(
             at: performance.now(),
             wallTime: Date.now(),
             frames,
+            focusChanges,
             readyDeliveredAt,
             readyDeliveredFrame,
             sinceReadyMs:
@@ -515,7 +526,8 @@ test.describe('Artist Profiles Landing', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     if (
       testInfo.title ===
-      'adaptive mode changes preserve desktop and mobile geometry'
+        'adaptive mode changes preserve desktop and mobile geometry' ||
+      testInfo.title === 'entry discriminator: actionability-only trial'
     ) {
       const directory = await mkdtemp(
         path.join(tmpdir(), 'jovie-action-timing-')
@@ -833,6 +845,78 @@ test.describe('Artist Profiles Landing', () => {
   });
 
   // Mechanistic controls only. The original subject above remains unchanged.
+  test('entry discriminator: actionability-only trial', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await page.goto('/artist-profiles', { waitUntil: 'domcontentloaded' });
+    await waitForHydration(page);
+    const section = page.getByTestId('artist-profile-section-adaptive');
+    const phone = section.getByRole('img').first();
+    const tabList = section.getByRole('tablist', { name: 'Profile Modes' });
+    const panel = tabList.locator('xpath=following-sibling::*[1]');
+    const preSave = section.getByRole('tab', { name: 'Pre-save' });
+    await markOriginalEntry(page, 'desktop:entry-before-scroll');
+    await tabList.scrollIntoViewIfNeeded();
+    await markOriginalEntry(page, 'desktop:entry-after-scroll');
+    await expect(phone).toBeVisible();
+    await expect(tabList).toBeVisible();
+    await expect(panel).toBeVisible();
+    const sourceBefore = await phone.getAttribute('src');
+    await markOriginalEntry(page, 'desktop:first-trial-invoke');
+    await preSave.click({ trial: true });
+    await markOriginalEntry(page, 'desktop:first-trial-resolved');
+    await expect(preSave).toHaveAttribute('aria-selected', 'true');
+    await page.waitForTimeout(MODE_TRANSITION_SETTLE_MS);
+
+    const entry = await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            __jovieTrialEntrySurfaces: Record<string, GeometrySnapshot>;
+          }
+        ).__jovieTrialEntrySurfaces
+    );
+    expect(entry).toBeTruthy();
+    const read = async () => ({
+      section: await getGeometrySnapshot(section),
+      phone: await getGeometrySnapshot(phone),
+      tabList: await getGeometrySnapshot(tabList),
+      panel: await getGeometrySnapshot(panel),
+    });
+    const assertNoDispatchedFocus = async () => {
+      const state = await page.evaluate(() => ({
+        focus: document.activeElement?.tagName,
+        focusChanges: (window as unknown as { __jovieFocusChanges: number })
+          .__jovieFocusChanges,
+      }));
+      expect(state.focus, 'trial keeps BODY focus').toBe('BODY');
+      expect(state.focusChanges, 'trial has no dispatched focus').toBe(0);
+      await expect(preSave).toHaveAttribute('aria-selected', 'true');
+      await expect(phone).toHaveAttribute('src', sourceBefore!);
+    };
+    await assertNoDispatchedFocus();
+    const first = await read();
+    for (const surface of ['section', 'phone', 'tabList', 'panel'] as const) {
+      for (const key of ['documentTop', 'height', 'width', 'x', 'y'] as const) {
+        expect
+          .soft(
+            Math.abs(first[surface][key] - entry[surface][key]),
+            `trial first ${surface} ${key} shifted without focus`
+          )
+          .toBeLessThanOrEqual(GEOMETRY_TOLERANCE_PX);
+      }
+    }
+    await markOriginalEntry(page, 'desktop:repeated-trial-invoke');
+    await preSave.click({ trial: true });
+    await markOriginalEntry(page, 'desktop:repeated-trial-resolved');
+    await page.waitForTimeout(MODE_TRANSITION_SETTLE_MS);
+    await assertNoDispatchedFocus();
+    const second = await read();
+    for (const surface of ['section', 'phone', 'tabList', 'panel'] as const) {
+      expectStableGeometry(first[surface], second[surface], `trial ${surface}`);
+    }
+    await expectNoHorizontalOverflow(page);
+  });
+
   for (const mechanism of [
     'ready-before-entry locator',
     'earliest-ready coordinate',
