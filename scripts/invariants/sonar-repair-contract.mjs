@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import yaml from 'js-yaml';
+import { load as loadYaml } from 'js-yaml';
 
 import { readInvariantRegistry } from './registry.mjs';
 
@@ -77,7 +77,7 @@ export function validateSonarRepairSources(repoRoot = DEFAULT_ROOT) {
   const revision = '${{ github.event.workflow_run.head_sha || github.sha }}';
   let revisionBound = false;
   try {
-    const parsed = /** @type {ScanWorkflow} */ (yaml.load(workflow));
+    const parsed = /** @type {ScanWorkflow} */ (loadYaml(workflow));
     const jobs = Object.values(parsed?.jobs ?? {});
     const scans = jobs.flatMap(job =>
       (job.steps ?? [])
