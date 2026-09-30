@@ -142,7 +142,7 @@ test.describe('Exact marketing route screenshots', () => {
 
 test.describe('Marketing auth-entry prefetch boundary', () => {
   test.describe.configure({ retries: 0 });
-  for (const route of ['/new', '/voice', '/support']) {
+  for (const route of ['/new', '/voice', '/support', '/artist-profiles']) {
     test(`auth-entry waits for visitor intent on ${route}`, async ({
       page,
     }) => {
@@ -156,11 +156,18 @@ test.describe('Marketing auth-entry prefetch boundary', () => {
           speculativeAuthRequests.push(url.pathname);
         }
       });
-      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.setViewportSize(
+        route === '/artist-profiles'
+          ? { width: 390, height: 844 }
+          : { width: 1440, height: 900 }
+      );
       await page.goto(route, { waitUntil: 'domcontentloaded' });
-      const authLink = page
-        .locator('a[href="/signup"], a[href="/signin"], a[href="/start"]')
-        .first();
+      const authLink =
+        route === '/artist-profiles'
+          ? page.getByTestId('homepage-primary-cta')
+          : page
+              .locator('a[href="/signup"], a[href="/signin"], a[href="/start"]')
+              .first();
       await expect(authLink).toBeVisible();
       await authLink.focus();
       await waitForSettle(page, 1_000);
