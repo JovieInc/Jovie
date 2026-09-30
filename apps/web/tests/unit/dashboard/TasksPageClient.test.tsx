@@ -768,6 +768,30 @@ function renderPage() {
   );
 }
 
+function TasksSearchActivityFixture() {
+  const [searchOpen, setSearchOpen] = React.useState(false);
+  return (
+    <>
+      <button type='button' onClick={() => setSearchOpen(current => !current)}>
+        {searchOpen ? 'Return to tasks' : 'Open main Search'}
+      </button>
+      <React.Activity mode={searchOpen ? 'hidden' : 'visible'}>
+        <TasksPageClient />
+      </React.Activity>
+    </>
+  );
+}
+function renderPageInActivity() {
+  return render(
+    <TooltipProvider>
+      <HeaderActionsProvider>
+        <HeaderActionsHost />
+        <TasksSearchActivityFixture />
+      </HeaderActionsProvider>
+    </TooltipProvider>
+  );
+}
+
 function getLatestTableProps() {
   return mockUnifiedTable.mock.calls.at(-1)?.[0] as
     | {
@@ -1421,6 +1445,115 @@ describe('TasksPageClient', () => {
     expect(screen.getByText('Edited')).toBeInTheDocument();
     act(() => vi.advanceTimersByTime(500));
     expect(mockUpdateTaskAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('resumes a debounced task draft after Search without a hidden write or discarded content', async () => {
+    renderPageInActivity();
+    openTask();
+    const description = screen.getByLabelText('Task Description');
+    fireEvent.change(description, {
+      target: { value: 'Synthetic paused draft' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open main Search' }));
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(mockUpdateTaskAsync).not.toHaveBeenCalled();
+    expect(description).not.toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Return to tasks' }));
+    expect(screen.getByLabelText('Task Description')).toBe(description);
+    expect(description).toHaveValue('Synthetic paused draft');
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(mockUpdateTaskAsync).toHaveBeenCalledOnce();
+    expect(mockUpdateTaskAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          description: 'Synthetic paused draft',
+        }),
+      })
+    );
+    expect(screen.getByText('Saved')).toBeInTheDocument();
+  });
+
+  it('keeps a newer task draft when an in-flight save completes while Search hides the route', async () => {
+    let completeSave: ((task: TaskView) => void) | undefined;
+    mockUpdateTaskAsync.mockImplementationOnce(
+      () =>
+        new Promise<TaskView>(resolve => {
+          completeSave = resolve;
+        })
+    );
+    renderPageInActivity();
+    openTask();
+    fireEvent.change(screen.getByLabelText('Task Description'), {
+      target: { value: 'First synthetic draft' },
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    fireEvent.change(screen.getByLabelText('Task Description'), {
+      target: { value: 'Newer synthetic draft' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open main Search' }));
+    await act(async () => {
+      completeSave?.({
+        ...mockTaskTwo,
+        description: 'First synthetic draft',
+        mutationVersion: 8,
+      });
+    });
+    expect(mockUpdateTaskAsync).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', { name: 'Return to tasks' }));
+    expect(screen.getByLabelText('Task Description')).toHaveValue(
+      'Newer synthetic draft'
+    );
+    expect(screen.getByText('Edited')).toBeInTheDocument();
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(mockUpdateTaskAsync).toHaveBeenCalledTimes(2);
+    expect(mockUpdateTaskAsync).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          description: 'Newer synthetic draft',
+          expectedMutationVersion: 8,
+        }),
+      })
+    );
+  });
+
+  it('preserves a save failure that settles while Search hides the task route', async () => {
+    let rejectSave: ((error: Error) => void) | undefined;
+    mockUpdateTaskAsync.mockImplementationOnce(
+      () =>
+        new Promise<TaskView>((_resolve, reject) => {
+          rejectSave = reject;
+        })
+    );
+    renderPageInActivity();
+    openTask();
+    fireEvent.change(screen.getByLabelText('Task Description'), {
+      target: { value: 'Synthetic failed draft' },
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open main Search' }));
+    await act(async () => {
+      rejectSave?.(new Error('save failed'));
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Return to tasks' }));
+    expect(screen.getByLabelText('Task Description')).toHaveValue(
+      'Synthetic failed draft'
+    );
+    expect(screen.getByText('Not saved')).toBeInTheDocument();
+    expect(mockUpdateTaskAsync).toHaveBeenCalledOnce();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByLabelText('Task Description')).toHaveValue(
+      'Synthetic failed draft'
+    );
   });
 
   it('blocks task switching until the active autosave finishes', async () => {

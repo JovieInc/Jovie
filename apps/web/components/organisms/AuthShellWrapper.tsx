@@ -5,6 +5,7 @@ import { TooltipProvider } from '@jovie/ui';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import {
+  Activity,
   useCallback,
   useEffect,
   useMemo,
@@ -202,10 +203,21 @@ function AuthShellWrapperInner({
   );
   const shellChildren = (
     <div className='relative flex h-full min-h-0 flex-col'>
-      {!isWorkspaceLocked && headerActions.isCommandPaletteOpen ? (
-        <CommandPaletteMainSurface />
-      ) : (
+      {isWorkspaceLocked ? (
         children
+      ) : (
+        <>
+          {/* Search hides the route and suspends its effects without losing
+              selection/drafts. Locking removes this entire retained boundary. */}
+          <Activity
+            mode={headerActions.isCommandPaletteOpen ? 'hidden' : 'visible'}
+          >
+            {children}
+          </Activity>
+          {headerActions.isCommandPaletteOpen ? (
+            <CommandPaletteMainSurface />
+          ) : null}
+        </>
       )}
       {pendingShellRoute === 'releases' ? (
         <div
