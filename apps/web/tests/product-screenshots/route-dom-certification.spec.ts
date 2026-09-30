@@ -235,6 +235,29 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     await expectDeliberateRed(page, 'marketing', 'nested-decorative-surface');
   });
 
+  test('passes canonical PhoneFrame bezel and its direct screen', async ({
+    page,
+  }) => {
+    // ArtistProfilePhoneFrame anatomy: the [data-device] bezel surface and
+    // its direct screen child are one composed visual, not nested carding.
+    await page.setContent(
+      '<main><section><h1>Hero</h1><div data-device="mobile-web" style="border:1px solid #333;border-radius:40px;width:280px;height:560px;margin:0 auto"><div style="border:1px solid #333;border-radius:24px;margin:10px;height:520px">Screen</div></div></section></main>'
+    );
+    const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
+    expect(snapshot.findings.map(finding => finding.kind)).not.toContain(
+      'nested-decorative-surface'
+    );
+  });
+
+  test('rejects a decorative card wrapped around the phone', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<main><section><h1>Hero</h1><div style="border:1px solid #333;border-radius:24px;padding:16px;width:340px"><div data-device="mobile-web" style="border:1px solid #333;border-radius:40px;width:280px;height:560px;margin:0 auto"><div style="margin:10px;height:520px">Screen</div></div></div></section></main>'
+    );
+    await expectDeliberateRed(page, 'marketing', 'nested-decorative-surface');
+  });
+
   test('rejects copy stranded outside any section (/card "Coming soon")', async ({
     page,
   }) => {
@@ -247,6 +270,30 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
   test('rejects a section heading larger than the h1', async ({ page }) => {
     await page.setContent(
       '<main><section><h1 style="font-size:56px">Hero</h1></section><section><h2 style="font-size:64px">Section</h2></section></main>'
+    );
+    await expectDeliberateRed(page, 'marketing', 'heading-hierarchy-inversion');
+  });
+
+  test('passes the terminal CTA display beat near hero scale', async ({
+    page,
+  }) => {
+    // The recipe hierarchy contract sanctions one closing display break
+    // (ctaCadence 'hero-and-close'): the terminal CTA may compete with the
+    // hero — font ordering there is a review signal, not a defect.
+    await page.setContent(
+      '<main><section><h1 style="font-size:38.4px">Hero</h1></section><section data-rhythm="close"><h2 style="font-size:40px">Claim your profile.</h2><a href="/start">Claim your profile</a></section></main>'
+    );
+    const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
+    expect(snapshot.findings.map(finding => finding.kind)).not.toContain(
+      'heading-hierarchy-inversion'
+    );
+  });
+
+  test('rejects a mid-section heading that out-scales the hero', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<main><section><h1 style="font-size:38.4px">Hero</h1></section><section><h2 style="font-size:40px">Competing section.</h2></section><section data-rhythm="close"><h2 style="font-size:40px">Claim your profile.</h2></section></main>'
     );
     await expectDeliberateRed(page, 'marketing', 'heading-hierarchy-inversion');
   });
@@ -281,6 +328,20 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
       '<main><section><h1 style="font:20px/1.2 monospace;width:12ch">aa bb cc dd ee</h1></section></main>'
     );
     await expectDeliberateRed(page, 'marketing', 'orphaned-line');
+  });
+
+  test('does not count a clamp-hidden final word as a visible orphan', async ({
+    page,
+  }) => {
+    // The third line is clamped away: the painted words are balanced, so the
+    // only finding is the clipped heading — not an orphaned-line.
+    await page.setContent(
+      '<main><section><h1 style="font:20px/1 monospace;width:5.5ch;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden">aa bb cc dd ee ff</h1></section></main>'
+    );
+    const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
+    const kinds = snapshot.findings.map(finding => finding.kind);
+    expect(kinds).toContain('clipped-heading');
+    expect(kinds).not.toContain('orphaned-line');
   });
 
   test('passes a balanced headline', async ({ page }) => {
