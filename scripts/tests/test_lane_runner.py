@@ -13,6 +13,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch, Mock
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -733,6 +734,33 @@ class WorkerTest(unittest.TestCase):
         self.assertIn("passed the lane gate", self.linear.comments[-1][1])
         self.assertEqual(self.execs[0][-3:], ["worker", "--provider", "devin"])
 
+    def test_disk_cleanup_requires_a_slot_and_denial_releases_it_without_claiming(self):
+        held = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
+        with patch.object(lane.disk_guard, "check") as check:
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+            check.assert_not_called()
+        held.release()
+        def deny(host, *, sweep=False):
+            self.assertTrue(sweep)
+            contender = lane.Locked(host.state / "slots/devin.0.lock", blocking=False)
+            self.assertFalse(contender.held, "the worker already owns its slot before cleanup")
+            contender.release()
+            return {"admitted": False, "reason": "disk-critical"}
+        with patch.object(lane.disk_guard, "check", side_effect=deny):
+            self.assertEqual(lane.worker(self.host, "devin"), 1)
+        self.assertEqual(self.linear.moves, [])
+        self.assertEqual(self.execs, [])
+        lock = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
+        self.assertTrue(lock.held)
+        lock.release()
+
+    def test_disk_failure_does_not_spend_issue_retries_or_reexec(self):
+        lane.run_issue = lambda *args: {"verdict": "disk-held", "reasons": ["disk-critical"]}
+        lane.worker(self.host, "devin")
+        self.assertEqual(self.linear.moves[-1], ("id-JOV-3", "Todo"))
+        self.assertFalse(lane.failures_path(self.host).exists())
+        self.assertEqual(self.execs, [])
+
     def test_failures_retry_then_return_to_triage(self):
         lane.run_issue = lambda *a: {"verdict": "held", "reasons": ["code-change-without-test"]}
         for _ in range(3):
@@ -862,6 +890,17 @@ class WorkerTest(unittest.TestCase):
 
 
 class RunAgentTest(unittest.TestCase):
+    def test_mid_run_guard_stops_the_process_and_propagates_the_hold(self):
+        with tempfile.TemporaryDirectory() as tmp, open(os.devnull, "w") as log:
+            pidfile = Path(tmp) / "pid"
+            command = [sys.executable, "-c", "import os,time,pathlib; pathlib.Path('pid').write_text(str(os.getpid())); time.sleep(30)"]
+            def guard():
+                if pidfile.exists():
+                    raise lane.DiskAdmissionError("disk-critical")
+            with self.assertRaises(lane.DiskAdmissionError):
+                lane.run_agent(command, Path(tmp), log, timeout=10, guard=guard, guard_interval=0.05)
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int(pidfile.read_text()), 0)
     def test_run_agent_kills_the_whole_process_group_on_timeout(self):
         with tempfile.TemporaryDirectory() as tmp, open(Path(tmp) / "log", "w") as log:
             script = Path(tmp) / "agent.sh"
@@ -894,7 +933,29 @@ class RunAgentTest(unittest.TestCase):
 
 
 class DispatchTest(unittest.TestCase):
-    def test_spawns_one_worker_per_slot_of_healthy_enabled_providers_and_prunes(self):
+    def test_critical_or_unknown_disk_blocks_all_dispatch_and_installs(self):
+        for pct in (None, 4.0):
+            with self.subTest(pct=pct), tempfile.TemporaryDirectory() as tmp, \
+                    patch.object(lane.disk_guard, "free_pct", return_value=pct), \
+                    patch.object(lane, "ensure_full_history") as history, \
+                    patch.object(lane.subprocess, "Popen") as spawn, \
+                    patch.object(lane.pr_events, "tick") as events, \
+                    patch.object(lane.reason_lane, "tick") as reasoning, \
+                    patch.object(lane.doctor, "run") as doctor, \
+                    patch.object(lane, "sh") as shell:
+                host = lane.Host(state=Path(tmp), repo=Path(tmp))
+                self.assertEqual(lane.dispatch(host), 1)
+                history.assert_not_called()
+                spawn.assert_not_called()
+                events.assert_not_called()
+                reasoning.assert_not_called()
+                doctor.assert_called_once()
+                with self.assertRaises(lane.DiskAdmissionError):
+                    lane.install_dependencies(host, Path(tmp), None)
+                shell.assert_not_called()
+                tick = json.loads((host.state / "tick.json").read_text())
+                self.assertFalse(tick["disk"]["admitted"])
+    def test_spawns_one_worker_per_slot_without_cleanup_on_the_dispatch_tick(self):
         saved = (lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run,
                  lane.disk_guard.check)
         spawned = []
@@ -903,7 +964,7 @@ class DispatchTest(unittest.TestCase):
         lane.subprocess.Popen = lambda args, **kw: spawned.append(args[-1])
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stdout="", stderr="")
         lane.doctor.run = lambda *a, **k: {}
-        lane.disk_guard.check = lambda host: {"freePct": 50.0, "low": False, "critical": False}
+        lane.disk_guard.check = lambda host: {"freePct": 50.0, "low": False, "critical": False, "admitted": True}
         with tempfile.TemporaryDirectory() as tmp:
             old = Path(tmp) / "worktrees/old"
             old.mkdir(parents=True)
@@ -916,7 +977,7 @@ class DispatchTest(unittest.TestCase):
                 os.environ.pop("LANES_SLOTS_D", None)
                 (lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run,
                  lane.disk_guard.check) = saved
-            self.assertFalse(old.exists())
+            self.assertTrue(old.exists(), "cleanup belongs after slot acquisition, not on each dispatch tick")
             tick = json.loads((host.state / "tick.json").read_text())
             self.assertEqual((tick["unhealthy"], tick["spawned"], tick["error"]), (["b"], ["a", "a"], None))
         self.assertEqual(spawned, ["a", "a"])
@@ -1011,6 +1072,74 @@ class FixRedTest(unittest.TestCase):
                 "statusCheckRollup": checks if checks is not None else [
                     {"name": "ci-fast (remaining)", "status": "COMPLETED", "conclusion": "FAILURE",
                      "detailsUrl": "https://github.com/x/actions/runs/1/job/42"}]}
+
+    def test_unreadable_or_partial_open_state_is_not_treated_as_an_authorized_target(self):
+        for payload in ("not json", "[]", '{"state":"OPEN"}', '{"state":"OPEN","headRefOid":"h1","headRefName":""}'):
+            with self.subTest(payload=payload), patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stdout=payload)):
+                self.assertIsNone(self.real_reconcile_fix_target(self.pr()))
+        with patch.object(lane, "sh", side_effect=subprocess.TimeoutExpired("gh", 30)):
+            self.assertIsNone(self.real_reconcile_fix_target(self.pr()))
+
+    def test_target_merging_after_checkout_cancels_before_install_and_preserves_source(self):
+        for terminal in ("MERGED", "CLOSED", "UNKNOWN", "SUPERSEDED"):
+            with self.subTest(terminal=terminal), tempfile.TemporaryDirectory() as tmp:
+                host = lane.Host(state=Path(tmp), repo=Path(tmp))
+                checked_out, calls = [], []
+                def live(pr):
+                    if not checked_out:
+                        return {**pr, "state": "OPEN"}
+                    if terminal == "UNKNOWN":
+                        return None
+                    return {**pr, "state": "OPEN" if terminal == "SUPERSEDED" else terminal,
+                            "headRefOid": "other" if terminal == "SUPERSEDED" else pr["headRefOid"]}
+                def shell(args, **kwargs):
+                    calls.append(args)
+                    if args[:3] == ["git", "worktree", "add"]:
+                        path = Path(args[-2])
+                        path.mkdir(parents=True)
+                        (path / "follow-up.py").write_text("distinct source")
+                        checked_out.append(path)
+                    return SimpleNamespace(returncode=0, stdout="", stderr="")
+                with patch.object(lane, "reconcile_fix_target", side_effect=live), \
+                        patch.object(lane, "sh", side_effect=shell), \
+                        patch.object(lane, "run_agent") as agent, \
+                        patch.object(lane.disk_guard, "free_pct", return_value=50.0):
+                    receipt = lane.fix_red_pr(host, "codex", {"cmd": ["true"]}, self.pr())
+                    self.assertEqual(receipt["cancellation"]["stage"], "before-install")
+                    self.assertEqual(receipt["verdict"], "reconcile-unavailable" if terminal == "UNKNOWN" else "cancelled")
+                    self.assertEqual((checked_out[0] / "follow-up.py").read_text(), "distinct source")
+                    self.assertTrue((checked_out[0] / lane.disk_guard.PRESERVED_REPAIR).exists())
+                    os.utime(checked_out[0], (0, 0))
+                    lane.prune_worktrees(host)
+                    self.assertTrue(checked_out[0].exists(), "later garbage collection must retain cancelled source")
+                    agent.assert_not_called()
+                self.assertFalse(any(cmd[:2] == ["pnpm", "install"] or cmd[:2] == ["git", "push"] for cmd in calls))
+                ledger = [json.loads(line) for line in (host.state / "runs/ledger.jsonl").read_text().splitlines()]
+                self.assertEqual(ledger[-1]["preservedWorktree"], str(checked_out[0]))
+
+    def test_merge_after_agent_preserves_its_patch_and_never_rearms(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            merged, calls = [], []
+            def live(pr):
+                return {**pr, "state": "MERGED" if merged else "OPEN"}
+            def shell(args, **kwargs):
+                calls.append(args)
+                if args[:3] == ["git", "worktree", "add"]:
+                    Path(args[-2]).mkdir(parents=True)
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            def agent(cmd, cwd, log, timeout, **kwargs):
+                (cwd / "distinct.py").write_text("keep me")
+                merged.append(True)
+                return SimpleNamespace(returncode=0)
+            with patch.object(lane, "reconcile_fix_target", side_effect=live), \
+                    patch.object(lane, "sh", side_effect=shell), patch.object(lane, "run_agent", side_effect=agent), \
+                    patch.object(lane, "failure_excerpt", return_value=""), \
+                    patch.object(lane.disk_guard, "free_pct", return_value=50.0):
+                receipt = lane.fix_red_pr(host, "codex", {"cmd": ["true"]}, self.pr())
+            self.assertEqual(receipt["cancellation"]["stage"], "after-agent")
+            self.assertEqual((Path(receipt["preservedWorktree"]) / "distinct.py").read_text(), "keep me")
+            self.assertFalse(any(cmd[:3] == ["gh", "pr", "merge"] for cmd in calls))
 
     def test_red_pr_waits_for_settled_checks_and_caps_attempts(self):
         pending = self.pr(checks=[{"status": "IN_PROGRESS"}, {"conclusion": "FAILURE"}])
@@ -1136,7 +1265,7 @@ class FixRedTest(unittest.TestCase):
 
     def test_a_lockfile_only_conflict_skips_the_agent_and_re_arms(self):
         real, real_resolve, real_agent = lane.sh, lane.resolve_lockfile_conflict, lane.run_agent
-        lane.resolve_lockfile_conflict = lambda worktree, branch, log: True
+        lane.resolve_lockfile_conflict = lambda worktree, branch, log, **kwargs: True
         lane.run_agent = lambda *a, **k: self.fail("a lockfile-only conflict needs no model")
         calls = []
 
@@ -1627,6 +1756,19 @@ class OnePrPerIssueTest(unittest.TestCase):
 
 class LockfileConflictTest(unittest.TestCase):
     """JOV-6837: a lockfile-only conflict is resolved without a model; anything else is not."""
+
+    def test_rechecks_target_immediately_before_runner_owned_install_and_push(self):
+        for conflict in (True, False):
+            calls = []
+            def shell(args, **kwargs):
+                calls.append(args)
+                return SimpleNamespace(returncode=1 if args[:2] == ["git", "merge"] and conflict else 0,
+                                       stdout="pnpm-lock.yaml\n" if args[:2] == ["git", "diff"] else "", stderr="")
+            guard = Mock(side_effect=[None, lane.RepairStopped("target-pr-merged", {"state": "MERGED"}, "command")])
+            with self.subTest(conflict=conflict), patch.object(lane, "sh", side_effect=shell):
+                with self.assertRaises(lane.RepairStopped):
+                    lane.resolve_lockfile_conflict(Path("/not-used"), "branch", None, guard=guard)
+            self.assertFalse(any(cmd[:2] == ["pnpm", "install"] or cmd[:2] == ["git", "push"] for cmd in calls))
 
     def git(self, *args, cwd):
         return subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", *args], cwd=cwd,
