@@ -15,7 +15,6 @@ vi.mock('next/image', () => ({
         blurDataURL: _b,
         placeholder: _ph,
         quality: _q,
-        sizes: _s,
         unoptimized: _u,
         ...rest
       }: Record<string, unknown>) => (
@@ -56,6 +55,9 @@ describe('ArtistProfileHero', () => {
     expect(productStage.querySelector('img')).toBeInTheDocument();
     expect(productStage.querySelector('img')?.getAttribute('alt')).toMatch(
       /Demo/i
+    );
+    expect(productStage.querySelector('img')?.getAttribute('sizes')).toBe(
+      '(min-width: 768px) 19rem, (min-width: 440px) 17.5rem, 74vw'
     );
   });
 
