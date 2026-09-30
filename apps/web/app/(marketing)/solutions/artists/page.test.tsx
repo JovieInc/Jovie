@@ -23,6 +23,17 @@ describe('SolutionsArtistsPage (JOV-5861)', () => {
     ).toBeInTheDocument();
   });
 
+  it('declares the product as SoftwareApplication JSON-LD', () => {
+    const { container } = render(<SolutionsArtistsPage />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const schema = JSON.parse(script?.textContent ?? '{}');
+
+    expect(schema['@type']).toBe('SoftwareApplication');
+    expect(schema.description).toBe(ARTIST_PROFILE_COPY.seo.description);
+  });
+
   it('publishes canonical, Open Graph, and Twitter metadata for /solutions/artists', () => {
     const canonicalUrl = `${BASE_URL}${APP_ROUTES.SOLUTIONS_ARTISTS}`;
 

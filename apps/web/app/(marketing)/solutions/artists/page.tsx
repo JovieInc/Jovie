@@ -3,6 +3,7 @@ import { ArtistProfileLandingRoute } from '@/components/marketing/artist-profile
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
+import { buildSoftwareSchema } from '@/lib/constants/schemas';
 
 export const revalidate = false;
 
@@ -46,6 +47,13 @@ export const metadata: Metadata = {
   },
 };
 
+const SOFTWARE_SCHEMA = buildSoftwareSchema(PAGE_DESCRIPTION);
+
 export default function SolutionsArtistsPage() {
-  return <ArtistProfileLandingRoute />;
+  return (
+    <>
+      <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
+      <ArtistProfileLandingRoute />
+    </>
+  );
 }

@@ -433,6 +433,31 @@ export async function fileDefects(
   return defects.length;
 }
 
+/**
+ * Posts one packet to the evidence ingest route. The store decides state; the
+ * caller only learns whether the post was accepted. Shared with seo:certify.
+ */
+export async function postCertificationPacket(
+  baseUrl: string,
+  secret: string,
+  packet: CertificationReviewPacket,
+  fetchImpl: typeof fetch = fetch
+): Promise<{ ok: boolean; summary: string }> {
+  const response = await fetchImpl(new URL(INGEST_PATH, baseUrl), {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${secret}`,
+    },
+    body: JSON.stringify({ evaluatedAt: new Date().toISOString(), packet }),
+  });
+  const body = await response.text();
+  return {
+    ok: response.ok,
+    summary: `${response.status} ${body.slice(0, 300)}`,
+  };
+}
+
 async function main() {
   const { values } = parseArgs({
     options: {
@@ -514,19 +539,13 @@ async function main() {
     console.log(`[marketing-cert] ${item.entry.id} ${tiers}`);
     if (values['dry-run']) continue;
     if (!secret) throw new Error('CRON_SECRET is required to post evidence');
-    const response = await fetch(new URL(INGEST_PATH, values['base-url']), {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${secret}`,
-      },
-      body: JSON.stringify({ evaluatedAt: new Date().toISOString(), packet }),
-    });
-    const body = await response.text();
-    console.log(
-      `[marketing-cert] ${item.entry.id} -> ${response.status} ${body.slice(0, 300)}`
+    const posted = await postCertificationPacket(
+      values['base-url'] ?? 'https://jov.ie',
+      secret,
+      packet
     );
-    if (!response.ok) failures += 1;
+    console.log(`[marketing-cert] ${item.entry.id} -> ${posted.summary}`);
+    if (!posted.ok) failures += 1;
     await fileDefects(packet, sha);
   }
   if (failures > 0) process.exit(1);

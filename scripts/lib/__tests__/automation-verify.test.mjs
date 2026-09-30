@@ -2500,6 +2500,72 @@ describe('automation-verify affected scope', () => {
     );
   });
 
+  describe('marketing Pen contract bindings', () => {
+    const source = 'apps/web/data/marketing/penContracts.ts';
+    const bindingTests = [
+      'apps/web/tests/unit/marketing/component-registry.test.ts',
+      'apps/web/tests/unit/marketing/locked-pen-chrome-contract.test.ts',
+      'apps/web/tests/unit/marketing/artist-profile/ArtistProfileAdaptiveSection.test.tsx',
+      'apps/web/tests/unit/marketing/artist-profile/ArtistProfileOutcomesLedger.test.tsx',
+      'apps/web/tests/unit/marketing/MarketingTerminalCta.test.tsx',
+    ];
+
+    it('requires all real binding tests for the exact contract source', () => {
+      const plan = buildAffectedTestPlan([source]);
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toEqual(bindingTests);
+      expect(plan.selectedTests).toEqual(bindingTests);
+      expect(buildSelectedTestCommands(plan, '2')).toEqual([
+        [
+          'pnpm',
+          [
+            '--filter',
+            '@jovie/web',
+            'exec',
+            'vitest',
+            'run',
+            ...bindingTests.map(file => file.replace('apps/web/', '')),
+            '--passWithNoTests',
+            '--maxWorkers',
+            '2',
+          ],
+        ],
+      ]);
+    });
+
+    it.each(bindingTests)(
+      'fails closed when binding test %s is missing',
+      missing => {
+        const plan = buildAffectedTestPlan([source], {
+          isFileAvailable: file => file !== missing,
+        });
+        expect(plan.mode).toBe('full');
+        expect(plan.fallbackReason).toContain(source);
+      }
+    );
+
+    it.each([
+      ['apps/web/data/marketing/penContracts-neighbor.ts'],
+      [source, 'apps/web/data/marketing/penContracts-neighbor.ts'],
+      [
+        source,
+        'apps/web/data/marketing/penContracts-neighbor.ts',
+        bindingTests[0],
+      ],
+      [source, 'apps/web/tests/setup.ts'],
+      [
+        source,
+        'scripts/run-affected-tests.mjs',
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+      ],
+    ])(
+      'preserves full fallback for unknown, global or mixed inputs %j',
+      (...files) => {
+        expect(buildAffectedTestPlan(files).mode).toBe('full');
+      }
+    );
+  });
+
   it('fails closed when an unknown source is mixed with a direct test', () => {
     expect(
       buildAffectedTestPlan([
