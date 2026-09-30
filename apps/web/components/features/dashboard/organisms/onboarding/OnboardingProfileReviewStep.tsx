@@ -426,7 +426,7 @@ export function OnboardingProfileReviewStep({
                         className='group cursor-pointer'
                         aria-label='Edit Display Name'
                       >
-                        <span className='text-base font-semibold text-primary-token transition-colors group-hover:text-accent'>
+                        <span className='text-lg font-semibold text-primary-token transition-colors group-hover:text-accent'>
                           {editableDisplayName}
                         </span>
                       </button>

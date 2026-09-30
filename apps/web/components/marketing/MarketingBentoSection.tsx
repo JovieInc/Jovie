@@ -126,7 +126,7 @@ function MarketingBentoCardView({
           </h3>
           <div
             id={bodyId}
-            className='marketing-bento-section__secondary mt-3 max-w-prose text-sm leading-relaxed sm:text-base'
+            className='marketing-bento-section__secondary mt-3 max-w-prose text-sm leading-relaxed sm:text-lg'
           >
             {card.body}
           </div>
@@ -188,7 +188,7 @@ export function MarketingBentoSection({
           >
             {title}
           </h2>
-          <div className='marketing-bento-section__secondary mx-auto mt-5 max-w-2xl text-pretty text-mid leading-relaxed sm:text-base'>
+          <div className='marketing-bento-section__secondary mx-auto mt-5 max-w-2xl text-pretty text-mid leading-relaxed sm:text-lg'>
             {description}
           </div>
         </header>

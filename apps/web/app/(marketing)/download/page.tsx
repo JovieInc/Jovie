@@ -287,7 +287,7 @@ export default function DownloadPage() {
                       {platform.title}
                     </h2>
                     <p
-                      className={`mt-4 max-w-lg text-base leading-relaxed ${muted}`}
+                      className={`mt-4 max-w-lg text-lg leading-relaxed ${muted}`}
                     >
                       {platform.body}
                     </p>

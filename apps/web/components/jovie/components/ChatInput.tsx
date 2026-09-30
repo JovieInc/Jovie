@@ -1317,7 +1317,7 @@ function InputRow({
             className={cn(
               'system-b-chat-composer-input min-w-[min(13rem,100%)] flex-1 resize-none bg-transparent px-1 py-1 placeholder:text-quaternary-token',
               isHero
-                ? 'min-h-7 text-mid font-book leading-6 text-primary-token sm:text-base'
+                ? 'min-h-7 text-mid font-book leading-6 text-primary-token sm:text-lg'
                 : 'min-h-6 text-mid leading-6 text-primary-token',
               // Remove the browser's default focus outline. The surrounding
               // surface provides the focus affordance (border glow via

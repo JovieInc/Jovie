@@ -236,7 +236,7 @@ function DesktopSurfaceCard({
       data-testid={testId}
     >
       <div className='mb-4 flex items-center justify-between gap-4'>
-        <h2 className='text-base font-semibold tracking-tighter text-white dark:text-white'>
+        <h2 className='text-lg font-semibold tracking-tighter text-white dark:text-white'>
           {title}
         </h2>
         {actionLabel && onAction ? (
@@ -536,7 +536,7 @@ export function ProfileDesktopSurface({
                     />
                   ) : null}
                 </Link>
-                <p className='line-clamp-2 max-w-[34rem] text-base leading-8 text-white/76'>
+                <p className='line-clamp-2 max-w-[34rem] text-lg leading-8 text-white/76'>
                   {heroSubtitle}
                 </p>
               </div>
@@ -678,7 +678,7 @@ export function ProfileDesktopSurface({
                       />
                     </div>
                     <div className='min-w-0'>
-                      <p className='truncate text-base font-medium tracking-[-0.03em] text-white dark:text-white'>
+                      <p className='truncate text-lg font-medium tracking-[-0.03em] text-white dark:text-white'>
                         {release.title}
                       </p>
                       <p className='truncate text-app text-white/44'>

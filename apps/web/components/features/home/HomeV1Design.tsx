@@ -95,7 +95,7 @@ export function HomeV1Design() {
             >
               Release Work, Finally Organized.
             </h1>
-            <p className='mt-6 max-w-[40rem] text-base leading-7 text-white/62 sm:text-lg'>
+            <p className='mt-6 max-w-[40rem] text-lg leading-7 text-white/62 sm:text-lg'>
               Request access to the private launch. Tell Jovie what you are
               working on, and we will save the context before opening the app.
             </p>

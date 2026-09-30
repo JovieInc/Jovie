@@ -94,7 +94,7 @@ export default function ApiVersioningPage() {
             >
               Versioning
             </h2>
-            <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+            <p className='mt-4 text-lg leading-relaxed text-secondary-token'>
               Jovie uses URL versioning. The current public artist API is{' '}
               <code>/api/v{PUBLIC_ARTIST_API_VERSION.split('.')[0]}</code>,
               served from <code>{BASE_URL}</code>. Additive fields and
@@ -111,14 +111,14 @@ export default function ApiVersioningPage() {
             >
               Deprecation And Sunset Signals
             </h2>
-            <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+            <p className='mt-4 text-lg leading-relaxed text-secondary-token'>
               Version <code>v1</code> is active and is not deprecated. No
               retirement date is scheduled. Current v1 responses intentionally
               omit <code>Deprecation</code> and <code>Sunset</code> headers; the
               discovery link to this page is policy documentation only and does
               not retire the active version.
             </p>
-            <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+            <p className='mt-4 text-lg leading-relaxed text-secondary-token'>
               Before a genuinely deprecated version is removed, Jovie will
               publish migration guidance on this page and signal the change with
               the RFC 9745 <code>Deprecation</code> header and a{' '}
@@ -136,7 +136,7 @@ export default function ApiVersioningPage() {
             >
               Machine-readable Contract
             </h2>
-            <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+            <p className='mt-4 text-lg leading-relaxed text-secondary-token'>
               The{' '}
               <Link
                 href={PUBLIC_ARTIST_API_OPENAPI_URL}

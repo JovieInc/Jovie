@@ -8,7 +8,7 @@ import { cn } from '../lib/utils';
 const inputVariants = cva(
   [
     'flex w-full rounded-full border border-subtle bg-surface-1 px-3',
-    'text-base font-normal tracking-normal text-primary-token sm:text-app',
+    'text-(length:--text-base) font-normal tracking-normal text-primary-token sm:text-app',
     'file:border-0 file:bg-transparent file:text-sm file:font-medium',
     'placeholder:text-tertiary-token',
     'hover:border-default',

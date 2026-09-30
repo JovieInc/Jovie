@@ -153,7 +153,7 @@ export function CliLandingPage() {
             >
               Install
             </h2>
-            <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+            <p className='mt-4 text-lg leading-relaxed text-secondary-token'>
               Install globally, or run it with npx from any agent. The CLI is
               anonymous.
             </p>
@@ -178,7 +178,7 @@ export function CliLandingPage() {
             <div className='mt-6 space-y-8'>
               {CLI_JOBS.map(item => (
                 <article key={item.title}>
-                  <h3 className='text-base font-semibold text-primary-token'>
+                  <h3 className='text-lg font-semibold text-primary-token'>
                     {item.title}
                   </h3>
                   <section
@@ -206,7 +206,7 @@ export function CliLandingPage() {
             >
               CLI Reference
             </h2>
-            <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+            <p className='mt-4 text-lg leading-relaxed text-secondary-token'>
               Every command accepts <code>--base-url</code> and{' '}
               <code>--json</code>. <code>--json</code> emits JSON for API
               responses and wraps text resources as{' '}

@@ -441,7 +441,7 @@ function MarketingHeroLanding({
               >
                 {title}
               </MarketingHeroTitle>
-              <div className='mt-5 max-w-[34rem] text-base leading-[1.7] text-secondary-token sm:text-lg'>
+              <div className='mt-5 max-w-[34rem] text-lg leading-[1.7] text-secondary-token sm:text-lg'>
                 {body}
               </div>
 

@@ -42,7 +42,7 @@ export function YoutubeThumbnailsLanding() {
             >
               {copy.hero.title}
             </h1>
-            <p className='mt-5 max-w-2xl text-base leading-7 text-secondary-token sm:text-lg'>
+            <p className='mt-5 max-w-2xl text-lg leading-7 text-secondary-token sm:text-lg'>
               {copy.hero.body}
             </p>
             <YoutubeThumbnailPasteForm

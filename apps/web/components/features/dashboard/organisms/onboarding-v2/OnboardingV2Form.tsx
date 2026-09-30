@@ -1825,7 +1825,7 @@ export function OnboardingV2Form({
                       <p className='text-2xs font-semibold text-tertiary-token'>
                         {item.providerLabel}
                       </p>
-                      <p className='truncate text-base font-semibold text-primary-token'>
+                      <p className='truncate text-lg font-semibold text-primary-token'>
                         {item.externalArtistName || 'Suggested artist'}
                       </p>
                       <p className='text-sm text-secondary-token'>
@@ -1916,7 +1916,7 @@ export function OnboardingV2Form({
                         <p className='text-2xs font-semibold text-tertiary-token'>
                           {item.platformLabel}
                         </p>
-                        <p className='truncate text-base font-semibold text-primary-token'>
+                        <p className='truncate text-lg font-semibold text-primary-token'>
                           {item.username || item.url}
                         </p>
                         <p className='text-sm text-secondary-token'>
@@ -2011,7 +2011,7 @@ export function OnboardingV2Form({
                       </div>
                     )}
                     <div className='min-w-0'>
-                      <p className='truncate text-base font-semibold text-primary-token'>
+                      <p className='truncate text-lg font-semibold text-primary-token'>
                         {release.title}
                       </p>
                       <p className='text-sm text-secondary-token'>
@@ -2052,7 +2052,7 @@ export function OnboardingV2Form({
                 <p className='text-2xs font-semibold text-tertiary-token'>
                   {item.subtitle}
                 </p>
-                <p className='mt-1 text-base font-semibold text-primary-token'>
+                <p className='mt-1 text-lg font-semibold text-primary-token'>
                   {item.title}
                 </p>
               </FlatPanel>
@@ -2090,7 +2090,7 @@ export function OnboardingV2Form({
                   <p className='text-2xs font-semibold text-tertiary-token'>
                     Your public link
                   </p>
-                  <p className='mt-1 text-base font-semibold text-primary-token'>
+                  <p className='mt-1 text-lg font-semibold text-primary-token'>
                     {publicProfileUrl ?? 'Your Jovie link will appear here'}
                   </p>
                   <p className='mt-2 text-sm leading-6 text-secondary-token'>

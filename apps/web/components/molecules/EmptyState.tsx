@@ -292,7 +292,7 @@ export function EmptyState({
             styles.descriptionClassName,
             isWorkspacePresentation &&
               cn(
-                'max-w-md text-base leading-6 text-secondary-token',
+                'max-w-md text-lg leading-6 text-secondary-token',
                 !hasActions && 'mb-0'
               )
           )}

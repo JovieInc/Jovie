@@ -368,7 +368,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             }
             actions={headerActions}
             className='px-2 py-2'
-            titleClassName='text-base leading-5 tracking-[-0.02em]'
+            titleClassName='text-lg leading-5 tracking-[-0.02em]'
             data-testid='contact-detail-entity-header'
           />
         ) : undefined
