@@ -184,11 +184,22 @@ describe('liveRenderMeasurer', () => {
       },
     });
 
-    await expect(measure('/x')).resolves.toEqual({
+    await expect(
+      measure('/x', {
+        preview: { recordId: 'solutions.founders', runsDir: '/runs' },
+      })
+    ).resolves.toEqual({
       status: 'credentials-unavailable',
       reason: 'render measurer could not run: chromium is not installed',
     });
-    expect(serve).toHaveBeenCalledWith({ appDir: '/app', port: 3999 });
+    expect(serve).toHaveBeenCalledWith({
+      appDir: '/app',
+      port: 3999,
+      env: {
+        FACTORY_PREVIEW_RECORD: 'solutions.founders',
+        FACTORY_PREVIEW_RUNS_DIR: '/runs',
+      },
+    });
     expect(stop).toHaveBeenCalledOnce();
   });
 });

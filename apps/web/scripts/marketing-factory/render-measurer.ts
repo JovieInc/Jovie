@@ -220,9 +220,14 @@ function killTree(child: ChildProcess): Promise<void> {
   });
 }
 
-function runToExit(command: string, args: string[], cwd: string) {
+function runToExit(
+  command: string,
+  args: string[],
+  cwd: string,
+  env: NodeJS.ProcessEnv
+) {
   return new Promise<void>((resolve, reject) => {
-    const child = spawn(command, args, { cwd, stdio: 'inherit' });
+    const child = spawn(command, args, { cwd, stdio: 'inherit', env });
     child.once('error', reject);
     child.once('exit', code =>
       code === 0
@@ -238,14 +243,17 @@ export async function serveProductionBuild(options: {
   readonly port: number;
   readonly skipBuild?: boolean;
   readonly readyTimeoutMs?: number;
+  /** Extra env for this build and server only, e.g. the factory preview. */
+  readonly env?: Readonly<Record<string, string>>;
 }): Promise<ServedBuild> {
+  const env = { ...process.env, ...options.env };
   if (!options.skipBuild) {
-    await runToExit('pnpm', ['run', 'build'], options.appDir);
+    await runToExit('pnpm', ['run', 'build'], options.appDir, env);
   }
   const server = spawn(
     'pnpm',
     ['exec', 'next', 'start', '-p', String(options.port)],
-    { cwd: options.appDir, stdio: 'ignore', detached: true }
+    { cwd: options.appDir, stdio: 'ignore', detached: true, env }
   );
   const baseUrl = `http://127.0.0.1:${options.port}`;
   const deadline = Date.now() + (options.readyTimeoutMs ?? 60_000);
@@ -273,11 +281,26 @@ export interface LiveRenderOptions {
   readonly serve?: typeof serveProductionBuild;
 }
 
+/**
+ * A shadow candidate for the measurer's own local build: the solutions
+ * route serves it noindex,nofollow (content/pages/solutions/preview.ts).
+ */
+export interface RenderPreview {
+  readonly recordId: string;
+  /** Holds `<family>-<slug>/page-record.json`. */
+  readonly runsDir: string;
+}
+
+export interface RenderRequestOptions {
+  readonly outDir?: string;
+  readonly preview?: RenderPreview;
+}
+
 /** Live `measureRender`: fails closed to credentials-unavailable. */
 export function liveRenderMeasurer(options: LiveRenderOptions) {
   return async (
     route: string,
-    at: { readonly outDir?: string } = {}
+    at: RenderRequestOptions = {}
   ): Promise<RenderMeasurement | Unavailable> => {
     if (!options.baseUrl && !options.build) {
       return {
@@ -293,6 +316,14 @@ export function liveRenderMeasurer(options: LiveRenderOptions) {
         (served = await (options.serve ?? serveProductionBuild)({
           appDir: options.build?.appDir ?? '.',
           port: options.build?.port ?? 3100,
+          ...(at.preview
+            ? {
+                env: {
+                  FACTORY_PREVIEW_RECORD: at.preview.recordId,
+                  FACTORY_PREVIEW_RUNS_DIR: at.preview.runsDir,
+                },
+              }
+            : {}),
         })).baseUrl;
       browser = await (options.launch ?? launchChromium)();
       const captures = await measureRoute({
