@@ -69,7 +69,7 @@ describe('AboutPageContent', () => {
       {
         question: 'Who founded Jovie?',
         answer:
-          'Jovie was founded by Tim White, a music marketing veteran with 15+ years of experience working with labels like Armada Music and Universal Music, and running digital campaigns for recording artists and brands like Google and the NFL.',
+          'Jovie was founded by Tim White, an artist, producer, and engineer with 15+ years in music: 500+ live shows, five singles signed to Armada Music, songwriting and production for We Are Loud, Justin Prime, and Orjan Nilsen, engineering for Lauryn Hill, and a Clio Award for Hulu Pride Fest 2020.',
       },
       {
         question: 'What does Jovie do?',

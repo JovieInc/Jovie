@@ -38,6 +38,7 @@ export {
   selectCampaignSettingsSchema,
 } from './admin';
 // Agent Registry (Skills Catalog, Tools Catalog, Retouch Jobs)
+export { agentVisibilityDrafts } from './agent-drafts';
 export {
   insertRetouchJobSchema,
   insertSkillsCatalogSchema,
