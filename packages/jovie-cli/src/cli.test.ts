@@ -44,7 +44,7 @@ describe('jovie CLI', () => {
     expect(result).toBe(0);
     expect(stdout.read()).toContain('artist get <username>');
     expect(stdout.read()).toContain('profile create <url>');
-    expect(stdout.read()).toContain('No login or API key');
+    expect(stdout.read()).toContain('Public commands need no login');
   });
 
   it('prints the source fallback version before command validation', async () => {
@@ -295,15 +295,16 @@ describe('jovie CLI', () => {
     expect(stderr.read()).toContain('--full is only supported by docs llms');
   });
 
-  it('keeps an unexpected response-body failure distinct from request failures', async () => {
+  it('reports response stream failure with a stable request code', async () => {
     const stdout = createOutput();
     const fetchImpl: FetchImplementation = async () =>
-      ({
-        ok: true,
-        text: async () => {
-          throw new Error('body stream unavailable');
-        },
-      }) as unknown as Response;
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.error(new Error('body stream unavailable'));
+          },
+        })
+      );
 
     await expect(
       runCli(['docs', 'llms', '--json'], {
@@ -313,8 +314,9 @@ describe('jovie CLI', () => {
     ).resolves.toBe(1);
     expect(JSON.parse(stdout.read())).toEqual({
       error: {
-        code: 'CLI_ERROR',
+        code: 'REQUEST_FAILED',
         message: 'body stream unavailable',
+        status: 200,
       },
     });
   });

@@ -19,6 +19,26 @@ describe('generated artifact parity', () => {
     expect(second).toEqual(first);
     expect(Object.keys(first).length).toBeGreaterThan(0);
   });
+  it('preserves work.next routing and resolves every discovery/OpenAPI schema reference', () => {
+    const discovery = JSON.parse(artifacts['manifest.json']);
+    for (const action of discovery.actions)
+      for (const ref of Object.values(action.schemas))
+        expect(artifacts[String(ref)], String(ref)).toBeDefined();
+    const api = JSON.parse(artifacts['openapi.json']);
+    expect(
+      api.paths['/api/v1/actions/work.next/invoke'].post.requestBody.content[
+        'application/json'
+      ].schema.$ref
+    ).toBe('./schemas/work-next.invocation.json');
+    expect(
+      discovery.actions.find(
+        (action: { id: string }) => action.id === 'work.next'
+      ).schemas.input
+    ).toBe('schemas/work-next.input.json');
+    expect(Object.keys(artifacts).some(path => path.includes('.next.'))).toBe(
+      false
+    );
+  });
 
   it('committed artifacts match regeneration exactly', () => {
     const drifted: string[] = [];

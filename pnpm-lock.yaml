@@ -819,6 +819,9 @@ importers:
       tsx:
         specifier: ^4.23.15
         version: 4.23.15
+      postgres:
+        specifier: 3.4.8
+        version: 3.4.8
       typescript:
         specifier: ^6.0.3
         version: 6.0.3

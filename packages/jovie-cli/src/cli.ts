@@ -64,6 +64,7 @@ export interface CliDependencies {
   readonly stderr?: CliOutput;
   readonly stdin?: NodeJS.ReadableStream;
   readonly homeDir?: string;
+  readonly workerToken?: string;
 }
 
 type CliValues = {
@@ -95,7 +96,8 @@ function usage(): string {
   return `Usage: jovie <command> [options]
 
 Jovie for agents: create artist profiles from Spotify and read public artist
-data. No login or API key. Every command supports --json.
+data. Public commands need no login. Internal fleet commands require a scoped
+JOVIE_WORKER_TOKEN supplied by the operator. Every command supports --json.
 
 Commands:
 ${lines.join('\n')}
@@ -215,6 +217,14 @@ async function execute(
   const baseUrl = normalizeBaseUrl(values.baseUrl);
   const [first] = positionals;
 
+  if (positionals.length === 1 && ['skill', 'init'].includes(first ?? '')) {
+    if (
+      values.full ||
+      Object.keys(values.flags).length ||
+      (first === 'skill' && values.dir)
+    )
+      throw new UsageError('Unsupported option for this command.');
+  }
   if (positionals.length === 1 && first === 'skill') return SKILL_MD;
   if (positionals.length === 1 && first === 'init') {
     return installSkill(dependencies.homeDir ?? homedir(), values.dir);
@@ -252,6 +262,7 @@ async function execute(
     },
     {
       baseUrl,
+      workerToken: dependencies.workerToken ?? process.env.JOVIE_WORKER_TOKEN,
       fetchImpl: dependencies.fetchImpl,
       userAgent: `jovie-cli/${CLI_VERSION}`,
     }
@@ -285,19 +296,31 @@ export async function runCli(
 
   const { values, positionals } = parsed;
   if (values.version) {
-    writeLine(stdout, CLI_VERSION);
+    writeLine(
+      stdout,
+      values.json ? JSON.stringify({ version: CLI_VERSION }) : CLI_VERSION
+    );
     return 0;
   }
 
   if (values.help || positionals.length === 0) {
-    writeText(stdout, usage());
+    if (values.json) writeLine(stdout, JSON.stringify({ content: usage() }));
+    else writeText(stdout, usage());
     return 0;
   }
 
   if (positionals.length === 1 && positionals[0] === 'mcp') {
     try {
+      if (
+        values.full ||
+        values.json ||
+        values.dir ||
+        Object.keys(values.flags).length
+      )
+        throw new UsageError('Unsupported option for mcp.');
       await serveMcp((dependencies.stdin ?? process.stdin) as never, stdout, {
         version: CLI_VERSION,
+        workerToken: dependencies.workerToken ?? process.env.JOVIE_WORKER_TOKEN,
         baseUrl: normalizeBaseUrl(values.baseUrl),
         fetchImpl: dependencies.fetchImpl,
       });
@@ -318,6 +341,14 @@ export async function runCli(
       }
     } else {
       writeLine(stdout, JSON.stringify(result, null, values.json ? 0 : 2));
+    }
+    if (result && typeof result === 'object' && 'status' in result) {
+      const status = (result as { status: string }).status;
+      return status === 'completed' || status === 'handoff'
+        ? 0
+        : status === 'in_progress'
+          ? 3
+          : 1;
     }
     return 0;
   } catch (error) {
