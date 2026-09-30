@@ -57,7 +57,7 @@ describe('section.pricing variant contract', () => {
 
   it('binds /pricing to neutral and /new to Pro-recommended', () => {
     expect(pricingBinding('/pricing')).toMatchObject({
-      componentPath: 'apps/web/app/(marketing)/pricing/page.tsx',
+      componentPath: 'apps/web/components/organisms/PricingRecipeBody.tsx',
       variantId: 'tier-cards-neutral',
     });
     expect(pricingBinding('/new')).toMatchObject({
@@ -67,10 +67,17 @@ describe('section.pricing variant contract', () => {
     });
 
     const pricingRoute = readSource('app/(marketing)/pricing/page.tsx');
+    const pricingBody = readSource(
+      'components/organisms/PricingRecipeBody.tsx'
+    );
     const homepagePricing = readSource(
       'components/marketing/homepage-v2/HomepageV2Ctas.tsx'
     );
+    expect(pricingRoute).toContain('<PricingRecipeBody');
     expect(pricingRoute).toContain("variant='tier-cards-neutral'");
+    expect(pricingBody).toContain(
+      "data-marketing-variant='tier-cards-neutral'"
+    );
     expect(pricingRoute).not.toContain("variant='tier-cards-recommended'");
     expect(homepagePricing).toContain("variant='tier-cards-recommended'");
   });
@@ -157,6 +164,9 @@ describe('section.pricing variant contract', () => {
       entry => entry.id === 'section.pricing'
     );
     const route = readSource('app/(marketing)/pricing/page.tsx');
+    const pricingBody = readSource(
+      'components/organisms/PricingRecipeBody.tsx'
+    );
     const sectionStory = readSource(
       'components/marketing/storybook/MarketingSections.stories.tsx'
     );
@@ -164,8 +174,12 @@ describe('section.pricing variant contract', () => {
     expect(registry?.source).toBe(
       'components/features/pricing/MarketingPricingPlans'
     );
+    expect(route).toContain('<PricingRecipeBody');
     expect(route).toContain(
       "<MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />"
+    );
+    expect(pricingBody).toContain(
+      "data-marketing-variant='tier-cards-neutral'"
     );
     expect(sectionStory).toContain(
       "<MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />"

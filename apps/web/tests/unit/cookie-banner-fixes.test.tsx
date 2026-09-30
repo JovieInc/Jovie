@@ -80,6 +80,20 @@ describe('CookieBannerSection consent sync', () => {
     );
   });
 
+  it('anchors the phone profile consent card above the dock stack, not over the identity (JOV-7114)', () => {
+    const css = readFileSync(
+      resolve(process.cwd(), 'styles/design-system.css'),
+      'utf8'
+    );
+    const phoneRule =
+      /@media \(max-width: 767px\)[\s\S]*?\.cookie-banner-card--above-public-profile-dock \{([^}]*)\}/.exec(
+        css
+      )?.[1];
+
+    expect(phoneRule).toContain('top: auto;');
+    expect(phoneRule).toContain('bottom: var(--profile-bottom-nav-height);');
+  });
+
   it('calls setConsentState accepted on acceptAll', async () => {
     const { setConsentState } = await import('@/lib/tracking/consent');
     const mod = await import('@/components/organisms/CookieBannerSection');

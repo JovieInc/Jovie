@@ -39,6 +39,8 @@ on:
 permissions: {}
 
 concurrency:
+  # GitHub replaces an older pending member when a newer main push arrives.
+  # cancel-in-progress: false protects the active coverage producer.
   group: test-coverage-audit
   cancel-in-progress: false
 
@@ -46,7 +48,9 @@ jobs:
   audit:
     name: Regenerate coverage heatmap
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Run 36656398589 exhausted 60 minutes while the full suite was still
+    # emitting passing tests. Reserve time for its tail and publication steps.
+    timeout-minutes: 90
     permissions:
       contents: write
     env:

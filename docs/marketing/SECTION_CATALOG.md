@@ -1,5 +1,5 @@
 <!--
-spec-version: 1.3.0
+spec-version: 1.4.0
 doc-freshness: docs/marketing/SECTION_CATALOG.md
 -->
 # Marketing Section Catalog
@@ -9,7 +9,7 @@ doc-freshness: docs/marketing/SECTION_CATALOG.md
 > modes, neverUse) live in `apps/web/data/marketing/sections.ts`. Anchors
 > `#section-{id}` are parity-asserted against the registry by the manifest gate.
 
-17 sections. Nav / Footer / Subfooter excluded (charter delta #9 — layout-owned
+18 sections. Nav / Footer / Subfooter excluded (charter delta #9 — layout-owned
 chrome, not page-composable).
 
 ## Industry stable core (≥6/7 prior-art systems)
@@ -257,3 +257,7 @@ section), benefits (as a section), workflow (as a section). Add only via the
 Extension Rules (ARCHITECTURE.md §12) when a recipe requires one. Problem,
 solution, benefits are COPY PATTERNS inside feature sections, not section
 types (prior-art §2).
+
+### #section-product-gallery
+
+**Purpose:** Show labelled product demonstrations from registered captures. The existing profile grid and release rail are variants of one gallery family, with native owners `NGW0P` and `EnK3s`. Demo routes cannot establish live customer adoption, fan capture, payments, revenue, or account persistence. Link only to the identity actually shown. Variant, accessibility and responsive contracts live in `sections.ts`; runtime certification still requires loaded images and observed interactions.

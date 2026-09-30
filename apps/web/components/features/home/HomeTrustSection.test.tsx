@@ -5,6 +5,25 @@ import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { HomeTrustSection } from './HomeTrustSection';
 
 describe('HomeTrustSection', () => {
+  it.each(['card', 'inline-strip'] as const)(
+    'binds the declared %s logo section on its actual root',
+    presentation => {
+      render(
+        <HomeTrustSection
+          presentation={presentation}
+          sectionVariant='inline-strip'
+        />
+      );
+      const root = screen.getByTestId('marketing-section-logo-cloud');
+      expect(root.tagName).toBe('SECTION');
+      expect(root).toHaveAttribute(
+        'data-marketing-owner',
+        'apps/web/components/features/home/HomeTrustSection.tsx'
+      );
+      expect(root).toHaveAttribute('data-marketing-variant', 'inline-strip');
+      expect(screen.queryByTestId('homepage-trust')).toBeNull();
+    }
+  );
   it('renders one logo slot per trust asset, black hole secondary on mobile', () => {
     const { container } = render(<HomeTrustSection />);
     expect(container.querySelectorAll('.homepage-trust-logo')).toHaveLength(

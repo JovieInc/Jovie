@@ -18,6 +18,16 @@
       "no_composer",
       "no_on_demand_overage"
     ],
+    "scoped_exceptions": [
+      {
+        "rule": "no_claude",
+        "scope": "marketing_roles",
+        "reason": "Marketing factory roles may route to Claude on the Claude Code subscription. Engineering routes (models, route_chains) keep no_claude.",
+        "approved_by": "Tim White",
+        "approved_at": "2026-09-29",
+        "ref": "JOV-7248"
+      }
+    ],
     "api_burn_fraction_of_sub": 0.15,
     "job_token_estimates": {
       "mechanical": {
@@ -570,6 +580,232 @@
       ]
     }
   ],
+  "marketing_roles": {
+    "channel_order": ["subscription", "local", "gateway", "api"],
+    "roles": {
+      "strategist": {
+        "description": "Positioning, audience and page narrative plans.",
+        "candidates": [
+          {
+            "id": "anthropic/claude-opus-5.5",
+            "family": "anthropic",
+            "channel": "subscription",
+            "pool": "claude-code",
+            "quality": 96,
+            "modalities": ["text", "vision"]
+          },
+          {
+            "id": "openai/gpt-5.6-sol",
+            "family": "openai",
+            "channel": "subscription",
+            "pool": "codex",
+            "quality": 88,
+            "modalities": ["text", "vision"]
+          },
+          {
+            "id": "zai/glm-5.3",
+            "family": "zai",
+            "channel": "gateway",
+            "pool": "vercel-gateway",
+            "quality": 80,
+            "modalities": ["text"]
+          }
+        ]
+      },
+      "copywriter": {
+        "description": "Section copy drafts gated by @jovie/copy.",
+        "candidates": [
+          {
+            "id": "anthropic/claude-opus-5.5",
+            "family": "anthropic",
+            "channel": "subscription",
+            "pool": "claude-code",
+            "quality": 96,
+            "modalities": ["text", "vision"]
+          },
+          {
+            "id": "openai/gpt-5.6-sol",
+            "family": "openai",
+            "channel": "subscription",
+            "pool": "codex",
+            "quality": 88,
+            "modalities": ["text", "vision"]
+          },
+          {
+            "id": "zai/glm-5.3",
+            "family": "zai",
+            "channel": "gateway",
+            "pool": "vercel-gateway",
+            "quality": 80,
+            "modalities": ["text"]
+          }
+        ]
+      },
+      "layout-chooser": {
+        "description": "Picks registered section and hero variants; never invents layout.",
+        "candidates": [
+          {
+            "id": "anthropic/claude-sonnet-5",
+            "family": "anthropic",
+            "channel": "subscription",
+            "pool": "claude-code",
+            "quality": 86,
+            "modalities": ["text", "vision"]
+          },
+          {
+            "id": "openai/gpt-5.6-terra",
+            "family": "openai",
+            "channel": "subscription",
+            "pool": "codex",
+            "quality": 82,
+            "modalities": ["text", "vision"]
+          },
+          {
+            "id": "zai/glm-5.3-flash",
+            "family": "zai",
+            "channel": "gateway",
+            "pool": "vercel-gateway",
+            "quality": 65,
+            "modalities": ["text"]
+          }
+        ]
+      },
+      "art-director": {
+        "description": "Media briefs, casting and composition review before generation.",
+        "candidates": [
+          {
+            "id": "anthropic/claude-opus-5.5",
+            "family": "anthropic",
+            "channel": "subscription",
+            "pool": "claude-code",
+            "quality": 96,
+            "modalities": ["text", "vision"]
+          },
+          {
+            "id": "openai/gpt-5.6-sol",
+            "family": "openai",
+            "channel": "subscription",
+            "pool": "codex",
+            "quality": 88,
+            "modalities": ["text", "vision"]
+          }
+        ]
+      },
+      "image-gen": {
+        "description": "Editorial and hero image generation from approved media recipes.",
+        "candidates": [
+          {
+            "id": "openai/gpt-image-1.5",
+            "family": "openai",
+            "channel": "subscription",
+            "pool": "codex",
+            "quality": 88,
+            "modalities": ["image"]
+          },
+          {
+            "id": "recraft/recraft-v3",
+            "family": "recraft",
+            "channel": "gateway",
+            "pool": "vercel-gateway",
+            "quality": 74,
+            "modalities": ["image"]
+          }
+        ]
+      },
+      "video-gen": {
+        "description": "Deterministic HTML motion compositions rendered locally.",
+        "candidates": [
+          {
+            "id": "hyperframes/composition",
+            "family": "hyperframes",
+            "channel": "local",
+            "pool": "local",
+            "quality": 70,
+            "modalities": ["video"]
+          }
+        ]
+      },
+      "judge-flagship": {
+        "description": "Borderline escalation judge; only runs for 0.4-0.7 cheap-judge scores.",
+        "candidates": [
+          {
+            "id": "anthropic/claude-opus-5.5",
+            "family": "anthropic",
+            "channel": "subscription",
+            "pool": "claude-code",
+            "quality": 96,
+            "modalities": ["text", "vision"]
+          },
+          {
+            "id": "openai/gpt-5.6-sol",
+            "family": "openai",
+            "channel": "subscription",
+            "pool": "codex",
+            "quality": 88,
+            "modalities": ["text", "vision"]
+          },
+          {
+            "id": "zai/glm-5.3",
+            "family": "zai",
+            "channel": "gateway",
+            "pool": "vercel-gateway",
+            "quality": 82,
+            "modalities": ["text"]
+          }
+        ]
+      },
+      "judge-bulk": {
+        "description": "Cheap first-pass text judge for high-volume cells.",
+        "candidates": [
+          {
+            "id": "openai/gpt-5.6-luna",
+            "family": "openai",
+            "channel": "subscription",
+            "pool": "codex",
+            "quality": 74,
+            "modalities": ["text"]
+          },
+          {
+            "id": "typesafe-ai/jev",
+            "family": "typesafe-ai",
+            "channel": "gateway",
+            "pool": "vercel-gateway",
+            "quality": 70,
+            "modalities": ["text"]
+          },
+          {
+            "id": "zai/glm-5.3-flash",
+            "family": "zai",
+            "channel": "gateway",
+            "pool": "vercel-gateway",
+            "quality": 65,
+            "modalities": ["text"]
+          }
+        ]
+      },
+      "vision-judge": {
+        "description": "Cheap first-pass judge for rendered captures.",
+        "candidates": [
+          {
+            "id": "anthropic/claude-sonnet-5",
+            "family": "anthropic",
+            "channel": "subscription",
+            "pool": "claude-code",
+            "quality": 86,
+            "modalities": ["text", "vision"]
+          },
+          {
+            "id": "openai/gpt-5.6-luna",
+            "family": "openai",
+            "channel": "subscription",
+            "pool": "codex",
+            "quality": 74,
+            "modalities": ["text", "vision"]
+          }
+        ]
+      }
+    }
+  },
   "route_chains": {
     "remediation": [
       "grok-4.6",

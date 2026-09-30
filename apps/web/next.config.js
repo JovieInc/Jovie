@@ -539,6 +539,14 @@ const nextConfig = {
         destination: '/artists',
         permanent: true,
       },
+      // No /solutions index page exists; send it to the shipped solutions
+      // route instead of falling through to profile resolution ("Profile
+      // not found").
+      {
+        source: '/solutions',
+        destination: '/solutions/artists',
+        permanent: true,
+      },
       {
         source: '/engagement-engine',
         destination: '/artist-notifications',
