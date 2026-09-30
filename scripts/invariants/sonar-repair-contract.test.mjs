@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -24,6 +24,49 @@ function fixture({ command, workflow, properties }) {
 }
 
 describe('JOV-INV-036 Sonar repair contract', () => {
+  for (const [name, setting] of [
+    ['missing heap override', ''],
+    ['original exhausted heap', 'sonar.javascript.node.maxspace=4096'],
+    ['commented override', '# sonar.javascript.node.maxspace=8192'],
+    ['invalid unit suffix', 'sonar.javascript.node.maxspace=8192MB'],
+    [
+      'later undersized override',
+      'sonar.javascript.node.maxspace=8192\nsonar.javascript.node.maxspace=4096',
+    ],
+    ['unbounded runner allocation', 'sonar.javascript.node.maxspace=16384'],
+    [
+      'indented later override',
+      'sonar.javascript.node.maxspace=8192\n sonar.javascript.node.maxspace=4096',
+    ],
+    [
+      'colon later override',
+      'sonar.javascript.node.maxspace=8192\nsonar.javascript.node.maxspace:4096',
+    ],
+    [
+      'whitespace later override',
+      'sonar.javascript.node.maxspace=8192\nsonar.javascript.node.maxspace 4096',
+    ],
+  ]) {
+    it(`rejects ${name}`, () => {
+      const readSource = path =>
+        readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
+      const properties = readSource('sonar-project.properties').replace(
+        /^sonar\.javascript\.node\.maxspace=.*\n?/gm,
+        ''
+      );
+      const errors = validateSonarRepairSources(
+        fixture({
+          command: readSource('.claude/commands/sonar-fix.md'),
+          workflow: readSource('.github/workflows/sonarcloud.yml'),
+          properties: `${properties}\n${setting}\n`,
+        })
+      );
+      assert.deepEqual(errors, [
+        'Sonar CI analyzer heap must use the configured 8192 MB budget',
+      ]);
+    });
+  }
+
   it('accepts the checked-in Sonar prevention path', () => {
     assert.deepEqual(validateSonarRepairContract(), []);
     const invariant = readInvariantRegistry().invariants.find(

@@ -66,6 +66,22 @@ export function validateSonarRepairSources(repoRoot = DEFAULT_ROOT) {
     );
   }
 
+  // JOV-6817: the default 4 GiB analyzer heap exhausted twice on the
+  // 16 GiB hosted runner. Reserve 8 GiB for Node and leave the remainder
+  // for the scanner JVM and OS; changing that budget requires revalidation.
+  const analyzerHeap = [
+    ...read(repoRoot, 'sonar-project.properties').matchAll(
+      /^[\t ]*sonar\.javascript\.node\.maxspace(?:[\t ]*[=:][\t ]*|[\t ]+)([^\r\n]*)$/gm
+    ),
+  ]
+    .at(-1)?.[1]
+    .trim();
+  if (analyzerHeap !== '8192') {
+    errors.push(
+      'Sonar CI analyzer heap must use the configured 8192 MB budget'
+    );
+  }
+
   for (const propertyFile of propertyFiles) {
     const properties = read(repoRoot, propertyFile);
     const sources = properties.match(/^sonar\.sources=(.+)$/m)?.[1] ?? '';
