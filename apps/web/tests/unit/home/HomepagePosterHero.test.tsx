@@ -50,6 +50,7 @@ describe('MarketingPosterHero', () => {
         subtitle='Your public profile.'
         primaryCta={primaryCta}
         media={<div>Product</div>}
+        seam={null}
         sectionVariant='centered-phone'
         sectionOwner='apps/web/components/marketing/MarketingPosterHero.tsx'
       />
