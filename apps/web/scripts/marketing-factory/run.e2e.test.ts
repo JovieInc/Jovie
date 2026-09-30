@@ -251,6 +251,32 @@ describe('page stage gates', () => {
     );
   });
 
+  it('hands the render measurer the candidate record to preview', async () => {
+    const seen: unknown[] = [];
+    const dry = dryProviders(brief);
+    await run({
+      providers: dryProviders(brief, {
+        measureRender: async (route, at) => {
+          seen.push(at);
+          return dry.measureRender(route, at);
+        },
+      }),
+    });
+
+    const runsDir = join(runDir(), 'render', 'preview-records');
+    expect(seen).toEqual([
+      {
+        outDir: join(runDir(), 'render'),
+        preview: { recordId: 'solutions.founders', runsDir },
+      },
+    ]);
+    expect(
+      readJson<{ id: string; status: string }>(
+        join(runsDir, 'solutions-founders', 'page-record.json')
+      )
+    ).toMatchObject({ id: 'solutions.founders', status: 'shadow' });
+  });
+
   it('fails render when CLS or LCP is over budget', async () => {
     const manifest = await run({
       providers: dryProviders(brief, {

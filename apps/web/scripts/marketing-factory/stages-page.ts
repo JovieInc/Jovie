@@ -27,7 +27,7 @@ import {
   resolveCapture,
 } from '../marketing-media/capture-adapter';
 import { buildFactoryPageRecord } from './page-record';
-import { digestOf } from './receipts';
+import { digestOf, writeJson } from './receipts';
 import { evaluateRenderCaptures } from './render-measurer';
 import {
   artifactOf,
@@ -211,8 +211,20 @@ async function renderStage(ctx: StageContext): Promise<StageResult> {
   const checks = new Checks();
   const { record, issues } = buildFactoryPageRecord(ctx, null);
   checks.check('page-record-schema', issues.length === 0, issues.join('; '));
+  // The candidate the local build previews (FACTORY_PREVIEW_RECORD).
+  const previewDir = join(ctx.runDir, 'render', 'preview-records');
+  const recordId = `${ctx.brief.family}.${ctx.brief.slug}`;
+  if (issues.length === 0) {
+    writeJson(
+      join(previewDir, recordId.replace('.', '-'), 'page-record.json'),
+      record
+    );
+  }
   const measured = await ctx.providers.measureRender(ctx.brief.route, {
     outDir: join(ctx.runDir, 'render'),
+    ...(issues.length === 0
+      ? { preview: { recordId, runsDir: previewDir } }
+      : {}),
   });
   if (measured.status !== 'ok') {
     return result(checks, null, {
