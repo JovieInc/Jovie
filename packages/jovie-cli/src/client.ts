@@ -41,8 +41,57 @@ export class JovieRequestError extends Error {
   }
 }
 
+export function safeDiagnostic(value: string): string {
+  return value.replace(
+    /(?:Bearer\s+[^\s"']+|jwf\.[A-Za-z0-9._-]+|sk-[A-Za-z0-9_-]{16,})/gi,
+    '[redacted]'
+  );
+}
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return safeDiagnostic(error instanceof Error ? error.message : String(error));
+}
+/** Response consumption shares the request deadline and has a hard byte cap. */
+export async function readResponseBody(
+  response: Response,
+  signal: AbortSignal
+): Promise<string> {
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  if (signal.aborted) {
+    void reader.cancel().catch(() => {});
+    reader.releaseLock();
+    throw new Error('Response deadline exceeded or canceled.');
+  }
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  let rejectAbort: (reason: unknown) => void = () => {};
+  const aborted = new Promise<never>((_resolve, reject) => {
+    rejectAbort = reject;
+  });
+  const onAbort = () => {
+    rejectAbort(new Error('Response deadline exceeded or canceled.'));
+    void reader.cancel().catch(() => {});
+  };
+  signal.addEventListener('abort', onAbort, { once: true });
+  if (signal.aborted) onAbort();
+  try {
+    for (;;) {
+      const part = await Promise.race([reader.read(), aborted]);
+      if (signal.aborted)
+        throw new Error('Response deadline exceeded or canceled.');
+      if (part.done) break;
+      size += part.value.length;
+      if (size > 1_048_576) {
+        void reader.cancel().catch(() => {});
+        throw new Error('Response body exceeds 1 MiB.');
+      }
+      chunks.push(part.value);
+    }
+    return new TextDecoder('utf-8').decode(Buffer.concat(chunks));
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+    reader.releaseLock();
+  }
 }
 
 /** Normalize a deployment root without accepting credentials or query state. */
@@ -105,8 +154,11 @@ function parseRetryAfterSeconds(
 
 function parseApiCode(body: string): string | undefined {
   try {
-    const code = (JSON.parse(body) as { error?: { code?: unknown } }).error
-      ?.code;
+    const parsed = JSON.parse(body) as {
+      error?: { code?: unknown };
+      code?: unknown;
+    };
+    const code = parsed?.error?.code ?? parsed?.code;
     return typeof code === 'string' ? code : undefined;
   } catch {
     return undefined;
@@ -124,11 +176,17 @@ async function request(
   const method = jsonBody === undefined ? 'GET' : 'POST';
   let response: Response | undefined;
   let lastError: unknown;
+  let signal = requestSignal(options);
 
-  // One retry absorbs transient transport failures and cold-start timeouts;
-  // each attempt gets a fresh timeout signal. A caller abort never retries.
-  for (let attempt = 0; attempt < 2 && !options.signal?.aborted; attempt++) {
+  // Only reads retry transport failures. A timed-out write may have committed;
+  // retrying without a server idempotency key can create duplicate reports.
+  for (
+    let attempt = 0;
+    attempt < (method === 'GET' ? 2 : 1) && !options.signal?.aborted;
+    attempt++
+  ) {
     try {
+      signal = requestSignal(options);
       response = await getFetch(options)(url, {
         method,
         headers: {
@@ -139,7 +197,8 @@ async function request(
             : { 'Content-Type': 'application/json' }),
         },
         ...(jsonBody === undefined ? {} : { body: JSON.stringify(jsonBody) }),
-        signal: requestSignal(options),
+        signal,
+        redirect: 'error',
       });
       break;
     } catch (error) {
@@ -154,13 +213,18 @@ async function request(
     );
   }
 
-  const body = await response.text();
+  let body: string;
+  try {
+    body = await readResponseBody(response, signal);
+  } catch (error) {
+    throw new JovieRequestError(errorMessage(error), url, response.status);
+  }
   if (!response.ok) {
     throw new JovieRequestError(
       `${method} ${url} returned HTTP ${response.status}`,
       url,
       response.status,
-      body.slice(0, 1_000),
+      safeDiagnostic(body.slice(0, 1_000)),
       parseRetryAfterSeconds(response.headers.get('retry-after')),
       parseApiCode(body)
     );
