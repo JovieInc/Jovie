@@ -94,8 +94,8 @@ export const MARKETING_PAGE_CONTRACTS = {
     successEvent: 'artist claims a profile from the alias',
     primaryCta: CLAIM_PROFILE_CTA,
   },
-  '(marketing)/solutions/artists/page.tsx': {
-    routeGlob: '(marketing)/solutions/artists/page.tsx',
+  '(marketing)/solutions/[audience]/page.tsx': {
+    routeGlob: '(marketing)/solutions/[audience]/page.tsx',
     copyScope: 'music',
     url: APP_ROUTES.SOLUTIONS_ARTISTS,
     job: 'show artists how profiles connect music, links, and permissioned fan updates',
