@@ -2,7 +2,6 @@ import { render, screen } from '@testing-library/react';
 import Link from 'next/link';
 import { describe, expect, it } from 'vitest';
 import { HomePhoneFrame } from '@/components/features/home/HomePhoneFrame';
-import { PhoneFrame } from '@/components/molecules/PhoneFrame';
 import { MobileWebScreen, OfficialIPhoneFrame } from './DeviceScreen';
 import { OFFICIAL_IPHONE_BEZEL } from './deviceBezels';
 
@@ -79,7 +78,7 @@ describe('device screen content and accessibility', () => {
     ).toBeNull();
   });
 
-  it('preserves content through compact homepage and generic preview wrappers', () => {
+  it('preserves content through regular and compact homepage wrappers', () => {
     const { container, rerender } = render(
       <HomePhoneFrame className='preview-placement'>
         <button type='button'>Play release</button>
@@ -101,16 +100,6 @@ describe('device screen content and accessibility', () => {
       screen.getByRole('button', { name: 'Play release' })
     ).toBeInTheDocument();
 
-    rerender(
-      <PhoneFrame className='preview-placement'>
-        <Link href='/artist'>View artist</Link>
-      </PhoneFrame>
-    );
-    expect(screen.getByRole('link', { name: 'View artist' })).toHaveAttribute(
-      'href',
-      '/artist'
-    );
-    expect(container.firstElementChild).toHaveClass('preview-placement');
     expect(screen.queryByRole('img', { hidden: true })).toBeNull();
   });
 });

@@ -16,12 +16,21 @@ const WEB_ROOT = process.cwd();
 const DEVICE_MODULE = 'components/marketing/device/';
 const SCAN_ROOTS = ['app', 'components', 'styles'] as const;
 const NON_PRODUCT = /\.(test|spec|stories)\.[jt]sx?$/;
+const NON_SOURCE_DIRECTORIES = new Set([
+  'node_modules',
+  '__generated__',
+  '.next',
+  '.cache',
+  'coverage',
+  'dist',
+]);
 
 const SIMULATED_HARDWARE =
   /dynamic[-_ ]?island|phone[-_]notch|__notch\b|phone[-_]status[-_]bar|home[-_]indicator|>\s*9:41\s*</i;
 
 function walk(dir: string, out: string[]) {
   for (const name of readdirSync(dir)) {
+    if (NON_SOURCE_DIRECTORIES.has(name)) continue;
     const full = join(dir, name);
     if (statSync(full).isDirectory()) walk(full, out);
     else if (/\.(tsx|ts|css)$/.test(name) && !NON_PRODUCT.test(name)) {

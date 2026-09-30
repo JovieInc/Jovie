@@ -27,17 +27,3 @@ export const OFFICIAL_IPHONE_BEZEL = {
   /** Apple guideline minimum on-screen height. */
   minRenderedHeightPx: 200,
 } as const;
-
-/** iPhone 18 Pro logical screen, used for bezel-free mobile web captures. */
-export const MOBILE_WEB_SCREEN_ASPECT = '402 / 874';
-
-export function officialBezelScreenInset() {
-  const { width, height, screen } = OFFICIAL_IPHONE_BEZEL;
-  const pct = (value: number, of: number) => `${(value / of) * 100}%`;
-  return {
-    left: pct(screen.x, width),
-    top: pct(screen.y, height),
-    width: pct(screen.width, width),
-    height: pct(screen.height, height),
-  } as const;
-}
