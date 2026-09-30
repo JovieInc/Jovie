@@ -45,7 +45,7 @@ describe('Identity and Work product ontology', () => {
       expect(fixture.identity.length).toBeGreaterThan(0);
       expect(fixture.work.length).toBeGreaterThan(0);
       expect(fixture.work).not.toEqual(
-        expect.arrayContaining(WORK_AMBIGUITY_GUARDRAILS.excludedMeanings)
+        expect.arrayContaining([...WORK_AMBIGUITY_GUARDRAILS.excludedMeanings])
       );
     }
   });
