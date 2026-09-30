@@ -101,7 +101,13 @@ export function materializeApp(identity, destination, source = pilot) {
     `identities/${identity}/instructions.md`,
   ];
   const files = new Map(
-    paths.map(path => [path, readFileSync(resolve(source, path), 'utf8')])
+    paths.map(path => [
+      path,
+      readFileSync(resolve(source, path), 'utf8').replace(
+        '../../../../packages/agent-transport-contracts/prediction-outcome',
+        '../../vendor/agent-transport-contracts/prediction-outcome'
+      ),
+    ])
   );
   const put = (path, text) => files.set(path, text);
   const manifest = JSON.parse(files.get('package.json'));
@@ -281,7 +287,12 @@ The source export is preparatory; deployment and commissioning require separate 
           '../vendor/agent-transport-contracts/index'
         )
     );
-    for (const path of ['index.ts', 'symphony-outage.ts', 'package.json']) {
+    for (const path of [
+      'index.ts',
+      'prediction-outcome.ts',
+      'symphony-outage.ts',
+      'package.json',
+    ]) {
       let contents = readFileSync(
         resolve(pilot, '../../packages/agent-transport-contracts', path),
         'utf8'
@@ -311,6 +322,7 @@ The source export is preparatory; deployment and commissioning require separate 
     'scripts/templates/application-boundary.ts',
     'scripts/templates/application-boundary.test.ts',
     '../../packages/agent-transport-contracts/index.ts',
+    '../../packages/agent-transport-contracts/prediction-outcome.ts',
     '../../packages/agent-transport-contracts/symphony-outage.ts',
     '../../packages/agent-transport-contracts/package.json',
   ];
