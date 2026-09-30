@@ -15,7 +15,7 @@ export const revalidate = false;
 const VISIBLE_PRICING_PLANS = getVisibleMarketingPricingPlans();
 const PRO_MONTHLY_PRICE = `${getPublicPriceClaim('pro').priceLabel}/month`;
 const PRICING_OG_IMAGE = `${BASE_URL}/og/default.png`;
-const PRICING_TITLE = `Pricing | ${APP_NAME} Profiles and Artist Visibility Pro`;
+const PRICING_TITLE = `Pricing | ${APP_NAME}`;
 const requestAccessCopy = `Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access. Request access.`;
 
 export const metadata: Metadata = {

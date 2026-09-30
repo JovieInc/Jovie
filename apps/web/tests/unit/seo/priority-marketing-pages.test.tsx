@@ -6,7 +6,7 @@ import ArtistProfilesPage, {
 import PricingPage, {
   metadata as pricingMetadata,
 } from '@/app/(marketing)/pricing/page';
-import { BASE_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 
 vi.mock(
@@ -25,7 +25,7 @@ vi.mock('@/components/organisms/PricingRecipeBody', () => ({
 
 describe('priority marketing page crawler contracts', () => {
   it('publishes a usable pricing title and the existing real social image', () => {
-    expect(String(pricingMetadata.title).length).toBeGreaterThan(15);
+    expect(pricingMetadata.title).toBe(`Pricing | ${APP_NAME}`);
     expect(pricingMetadata.openGraph).toMatchObject({
       url: `${BASE_URL}/pricing`,
       images: [{ url: `${BASE_URL}/og/default.png`, width: 1200, height: 630 }],
