@@ -1989,6 +1989,30 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
   padding: var(--space-3) var(--space-5);
 }
 
+:where(
+  .system-b-pricing-table-shell[data-variant="mobile"]
+    .system-b-pricing-chart-cell
+) {
+  padding: var(--space-3);
+}
+
+:where(
+  .system-b-pricing-table-shell[data-variant="mobile"]
+    .system-b-pricing-chart-cell--feature
+) {
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+:where(
+  .system-b-pricing-table-shell[data-variant="mobile"]
+    .system-b-pricing-plan-price
+) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
 :where(.system-b-pricing-chart-cell--feature),
 :where(.system-b-pricing-chart-cell--feature-heading) {
   width: 40%;

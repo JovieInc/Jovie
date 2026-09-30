@@ -64,5 +64,19 @@ describe('PricingComparisonChart', () => {
     fireEvent.change(selector, { target: { value: 'free' } });
     expect(selector).toHaveValue('free');
     expect(within(mobileTable).getByText('Free')).toBeInTheDocument();
+    expect(within(mobileTable).getByText('$0')).toBeInTheDocument();
+    expect(within(mobileTable).getByText('Up to 100')).toBeInTheDocument();
+    expect(within(mobileTable).queryByText('/mo')).not.toBeInTheDocument();
+
+    fireEvent.change(selector, { target: { value: 'unknown-plan' } });
+    expect(selector).toHaveValue('free');
+    expect(within(mobileTable).getByText('$0')).toBeInTheDocument();
+
+    fireEvent.change(selector, { target: { value: 'pro' } });
+    expect(selector).toHaveValue('pro');
+    expect(within(mobileTable).getByText('Pro')).toBeInTheDocument();
+    expect(within(mobileTable).getByText('$199')).toBeInTheDocument();
+    expect(within(mobileTable).getByText('/mo')).toBeInTheDocument();
+    expect(within(mobileTable).getByText('Unlimited')).toBeInTheDocument();
   });
 });
