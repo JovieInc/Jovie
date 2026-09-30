@@ -1688,12 +1688,14 @@ jobs:
           PUBLISHER_ATTEMPT: ${{ needs.build.outputs.publisher_attempt }}
           REPOSITORY: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
+          WORKFLOW_SHA: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
           [[ "$PUBLISHED_SHA" =~ ^[0-9a-f]{40}$ ]] &&
             [[ "$PUBLISHER_ATTEMPT" =~ ^[1-9][0-9]*$ ]] &&
-            [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]] || {
+            [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
+            [[ "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Desktop publisher identity is malformed."
             exit 1
           }
@@ -1703,17 +1705,18 @@ jobs:
             --arg repo "$REPOSITORY" \
             --arg run "$RUN_ID" \
             --arg attempt "$PUBLISHER_ATTEMPT" \
-            --arg sha "$PUBLISHED_SHA" '
+            --arg published_sha "$PUBLISHED_SHA" \
+            --arg workflow_sha "$WORKFLOW_SHA" '
               type == "object" and
               (.id | tostring) == $run and
               (.run_attempt | tostring) == $attempt and
               (.workflow_id | type == "number") and
-              (.head_sha | test("^[0-9a-f]{40}$")) and
+              .head_sha == $workflow_sha and
               .head_branch == "main" and
               .head_repository.full_name == $repo and
               .path == ".github/workflows/desktop-release.yml" and
               (.event == "workflow_run" or .event == "workflow_dispatch") and
-              .display_title == ("Desktop release " + $sha)
+              .display_title == ("Desktop release " + $published_sha)
             ' >/dev/null <<<"$run_record" || {
             echo "::error::Exact desktop publisher run was not proven."
             exit 1
@@ -1742,11 +1745,14 @@ jobs:
             echo "::error::GitHub returned malformed desktop publisher jobs."
             exit 1
           }
-          publisher="$(jq -c --arg sha "$run_head_sha" '[
+          publisher="$(jq -c \
+            --arg sha "$run_head_sha" \
+            --arg workflow_sha "$WORKFLOW_SHA" '[
             .[].jobs[]?
             | select(
                 .name == "Publish production desktop release" and
                 .head_sha == $sha and
+                .head_sha == $workflow_sha and
                 .status == "completed" and
                 .conclusion == "success" and
                 ([.steps[]? | select(

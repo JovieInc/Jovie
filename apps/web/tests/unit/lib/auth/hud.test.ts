@@ -7,6 +7,15 @@ const { mockEnv, mockGetCurrentUserEntitlements } = vi.hoisted(() => ({
   mockGetCurrentUserEntitlements: vi.fn(),
 }));
 
+const { mockFreshAuth, mockPrivacy } = vi.hoisted(() => ({
+  mockFreshAuth: vi.fn(),
+  mockPrivacy: vi.fn(),
+}));
+vi.mock('@/lib/auth/cached', () => ({ getFreshAuth: mockFreshAuth }));
+vi.mock('@/lib/ovie/privacy-lock/server', () => ({
+  assertOviePrivacyUnlocked: mockPrivacy,
+}));
+
 const { mockIsAdmin } = vi.hoisted(() => ({
   mockIsAdmin: vi.fn(),
 }));
@@ -15,8 +24,15 @@ vi.mock('@/lib/env-server', () => ({
   env: mockEnv,
 }));
 
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  requireOvieApiAccess: async (options?: { privileged?: boolean }) => {
+    // This fixture represents expired admin MFA with an active privacy unlock.
+    if (options?.privileged) return new Response(null, { status: 403 });
+    const ent = await mockGetCurrentUserEntitlements();
+    return ent.isAuthenticated && ent.userId && (await mockIsAdmin(ent.userId))
+      ? null
+      : new Response(null, { status: 403 });
+  },
 }));
 
 vi.mock('@/lib/admin/roles', () => ({
@@ -34,6 +50,8 @@ describe('authorizeHud', () => {
       userId: null,
     });
     mockIsAdmin.mockResolvedValue(false);
+    mockFreshAuth.mockResolvedValue({ userId: null, sessionId: null });
+    mockPrivacy.mockResolvedValue(undefined);
   });
 
   it('allows a valid kiosk token without loading Clerk entitlements', async () => {
@@ -46,6 +64,18 @@ describe('authorizeHud', () => {
       mode: 'kiosk',
     });
     expect(mockGetCurrentUserEntitlements).not.toHaveBeenCalled();
+  });
+
+  it('denies valid kiosk token for a signed-in locked browser', async () => {
+    mockEnv.HUD_KIOSK_TOKEN = 'kiosk-secret';
+    mockFreshAuth.mockResolvedValue({ userId: 'u1', sessionId: 's1' });
+    mockPrivacy.mockRejectedValue(Error('privacy locked'));
+    const { authorizeHud } = await import('@/lib/auth/hud');
+    await expect(authorizeHud('kiosk-secret')).resolves.toEqual({
+      ok: false,
+      reason: 'unauthorized',
+    });
+    expect(mockPrivacy).toHaveBeenCalledWith({ userId: 'u1', sessionId: 's1' });
   });
 
   it('falls back to not configured when Clerk context is unavailable and no kiosk token is configured', async () => {
@@ -75,7 +105,7 @@ describe('authorizeHud', () => {
     });
   });
 
-  it('allows the raw admin role even when fresh MFA is unavailable', async () => {
+  it('allows fresh read identity even when admin MFA expired', async () => {
     mockGetCurrentUserEntitlements.mockResolvedValue({
       isAuthenticated: true,
       isAdmin: false,
@@ -85,7 +115,7 @@ describe('authorizeHud', () => {
 
     const { authorizeHud } = await import('@/lib/auth/hud');
 
-    await expect(authorizeHud(null)).resolves.toEqual({
+    await expect(authorizeHud(null, { session: 'fresh' })).resolves.toEqual({
       ok: true,
       mode: 'admin',
     });

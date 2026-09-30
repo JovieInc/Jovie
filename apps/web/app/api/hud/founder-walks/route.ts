@@ -21,7 +21,10 @@ const confirmSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const denied = await requireAdminHudApiAccess({ session: 'fresh' });
+  const denied = await requireAdminHudApiAccess({
+    session: 'fresh',
+    privileged: true,
+  });
   if (denied) return denied;
 
   let json: unknown;

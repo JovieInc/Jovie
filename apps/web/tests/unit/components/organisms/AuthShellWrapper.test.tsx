@@ -9,10 +9,15 @@ import { useFounderDoor } from '@/contexts/FounderDoorContext';
 
 // Short-circuit heavy import chains that this test doesn't exercise.
 
-const { previewPanelProviderMock, useAuthRouteConfigMock } = vi.hoisted(() => ({
+const {
+  previewPanelProviderMock,
+  useAuthRouteConfigMock,
+  commandPaletteState,
+} = vi.hoisted(() => ({
   previewPanelProviderMock: vi.fn(
     ({ children }: { children: ReactNode }) => children
   ),
+  commandPaletteState: { open: false },
   useAuthRouteConfigMock: vi.fn(() => ({
     section: 'dashboard',
     isArtistProfileSettings: false,
@@ -54,7 +59,7 @@ vi.mock('@/contexts/HeaderActionsContext', () => ({
     headerBadge: null,
     headerSearchAdapter: null,
     isSearchOpen: false,
-    isCommandPaletteOpen: false,
+    isCommandPaletteOpen: commandPaletteState.open,
     commandPaletteHeader: null,
     setHeaderActions: vi.fn(),
     setHeaderBadge: vi.fn(),
@@ -120,6 +125,11 @@ vi.mock('@/components/organisms/AuthShell', () => ({
   ),
 }));
 
+vi.mock('@/components/organisms/CommandPalette', () => ({
+  CommandPalette: () => <div data-testid='command-palette-controller' />,
+  CommandPaletteMainSurface: () => <div data-testid='command-palette-main' />,
+}));
+
 vi.mock('@/features/dashboard/organisms/profile-contact-sidebar', () => ({
   ProfileContactSidebar: () => null,
 }));
@@ -169,6 +179,7 @@ function PendingShellControls() {
 
 describe('AuthShellWrapper', () => {
   beforeEach(() => {
+    commandPaletteState.open = false;
     previewPanelProviderMock.mockClear();
     useAuthRouteConfigMock.mockClear();
     useAuthRouteConfigMock.mockReturnValue({
@@ -257,6 +268,23 @@ describe('AuthShellWrapper', () => {
     );
 
     expect(useAuthRouteConfigMock).toHaveBeenCalledWith('ov');
+  });
+
+  it('keeps a locked Ovie screen in the content plane even if Cmd+K was already open', () => {
+    commandPaletteState.open = true;
+    render(
+      <AuthShellWrapper mode='ov' isWorkspaceLocked>
+        <div>Ovie lock screen</div>
+      </AuthShellWrapper>
+    );
+
+    expect(screen.getByText('Ovie lock screen')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('command-palette-main')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('command-palette-controller')
+    ).not.toBeInTheDocument();
   });
 
   it('passes preview panel default-open state through to provider on dashboard routes', () => {

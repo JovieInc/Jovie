@@ -2,6 +2,7 @@ import { THEME } from '@/lib/share/image-utils';
 import {
   assertProofBriefRenderable,
   type CertifiedProofBrief,
+  proofBriefBrand,
   proofBriefProvenance,
 } from './contract';
 
@@ -76,7 +77,7 @@ export function ProofBriefCard({
           color: THEME.textMuted,
         }}
       >
-        <div style={{ display: 'flex' }}>Your week with Jovie</div>
+        <div style={{ display: 'flex' }}>{proofBriefBrand(brief).eyebrow}</div>
         <div style={{ display: 'flex' }}>
           {clampProofBriefText(
             brief.window.label,
@@ -236,7 +237,7 @@ export function ProofBriefCard({
             color: 'rgba(255, 255, 255, 0.3)',
           }}
         >
-          Jovie
+          {proofBriefBrand(brief).product}
         </div>
       </div>
     </div>

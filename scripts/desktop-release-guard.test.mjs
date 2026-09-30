@@ -1568,6 +1568,7 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /contents: read/,
     /Verify exact published release assets/,
     /Cross-prove exact production publisher/,
+    /WORKFLOW_SHA: \$\{\{ github\.sha \}\}/,
     /publisherJobId/,
     /Upload production desktop publish marker/,
     /overwrite: true/,
@@ -1583,6 +1584,111 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /electron-builder publish|--publish always/
   );
   assert.match(desktopReleaseAssets, /releases\?per_page=100/);
+});
+
+test('production publish proof separates the released generation from its workflow transport', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-publish-proof-'));
+  t.after(() => rm(root, { force: true, recursive: true }));
+  const releaseSha = 'a'.repeat(40);
+  const workflowSha = 'b'.repeat(40);
+  const repository = 'JovieInc/Jovie';
+  const runId = 101;
+  const workflowId = 202;
+  const publisherJobId = 303;
+  const mockBin = join(root, 'bin');
+  await mkdir(mockBin);
+  await writeFile(
+    join(mockBin, 'gh'),
+    `#!/usr/bin/env bash
+set -euo pipefail
+endpoint=""
+for arg in "$@"; do
+  case "$arg" in repos/*) endpoint="$arg" ;; esac
+done
+case "$endpoint" in
+  *"actions/runs/$MOCK_RUN_ID/attempts/$MOCK_RUN_ATTEMPT/jobs"*) printf '%s' "$MOCK_JOBS_JSON" ;;
+  *"actions/runs/$MOCK_RUN_ID/attempts/$MOCK_RUN_ATTEMPT") printf '%s' "$MOCK_RUN_JSON" ;;
+  *"actions/workflows/$MOCK_WORKFLOW_ID") printf '%s' "$MOCK_WORKFLOW_JSON" ;;
+  *) printf 'unexpected gh endpoint: %s\\n' "$endpoint" >&2; exit 64 ;;
+esac
+`
+  );
+  await chmod(join(mockBin, 'gh'), 0o755);
+
+  const result = spawnSync(
+    'bash',
+    [
+      '-c',
+      shellStepBody(desktopWorkflow, 'Cross-prove exact production publisher'),
+    ],
+    {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        MOCK_JOBS_JSON: JSON.stringify([
+          {
+            jobs: [
+              {
+                id: publisherJobId,
+                name: 'Publish production desktop release',
+                head_sha: workflowSha,
+                status: 'completed',
+                conclusion: 'success',
+                steps: [
+                  {
+                    name: 'Publish production desktop release',
+                    status: 'completed',
+                    conclusion: 'success',
+                  },
+                ],
+              },
+            ],
+          },
+        ]),
+        MOCK_RUN_ATTEMPT: '1',
+        MOCK_RUN_ID: String(runId),
+        MOCK_RUN_JSON: JSON.stringify({
+          id: runId,
+          run_attempt: 1,
+          workflow_id: workflowId,
+          head_sha: workflowSha,
+          head_branch: 'main',
+          head_repository: { full_name: repository },
+          path: '.github/workflows/desktop-release.yml',
+          event: 'workflow_run',
+          display_title: `Desktop release ${releaseSha}`,
+        }),
+        MOCK_WORKFLOW_ID: String(workflowId),
+        MOCK_WORKFLOW_JSON: JSON.stringify({
+          id: workflowId,
+          name: 'desktop-release',
+          path: '.github/workflows/desktop-release.yml',
+        }),
+        PATH: `${mockBin}:${process.env.PATH}`,
+        PUBLISHED_SHA: releaseSha,
+        PUBLISHER_ATTEMPT: '1',
+        REPOSITORY: repository,
+        RUN_ID: String(runId),
+        RUNNER_TEMP: root,
+        WORKFLOW_SHA: workflowSha,
+      },
+    }
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(
+    JSON.parse(
+      await readFile(join(root, 'desktop-production-published.json'), 'utf8')
+    ),
+    {
+      schema: 1,
+      environment: 'production',
+      sha: releaseSha,
+      runId: String(runId),
+      publisherAttempt: '1',
+      publisherJobId: String(publisherJobId),
+    }
+  );
 });
 
 test('scheduled staging reconciliation publishes only unpublished desktop changes', async () => {

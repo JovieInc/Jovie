@@ -2319,7 +2319,17 @@ describe('iOS stage contract', () => {
     );
     expect(iosWorkflow).not.toMatch(/^  pull_request:/m);
     expect(iosWorkflow).not.toMatch(/^  push:/m);
-    expect(iosWorkflow).toContain('runs-on: macos-26');
+    // Hosted macOS stays the fallback; the self-hosted Mac is heartbeat-gated
+    // and never probed for release regressions.
+    expect(iosWorkflow).toContain(
+      `runs-on: \${{ needs.mac-runner-route.outputs.runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-26' }}`
+    );
+    expect(iosWorkflow).toContain(
+      'HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml'
+    );
+    expect(iosWorkflow).toContain(
+      "if: ${{ !inputs.full-regression && vars.JOVIE_MAC_RUNNER != 'off' }}"
+    );
     expect(pathChanges).toContain(
       "run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}"
     );
@@ -2624,10 +2634,10 @@ describe('canary health gate workflow', () => {
     expect(prove).toContain('for attempt in $(seq 1 15)');
     expect(prove).toContain('(.id | type == "string")');
     expect(prove).toContain('(.readyState | type == "string")');
-    expect(prove).toContain('(.target | type == "string")');
     expect(prove).toContain('[ "$alias_id" = "$EXPECTED_DEPLOYMENT_ID" ]');
     expect(prove).toContain('[ "$alias_state" = "READY" ]');
-    expect(prove).toContain('[ "$alias_target" = "preview" ]');
+    expect(prove).not.toContain('alias_target');
+    expect(prove).not.toContain('.target');
     expect(prove).toContain('[ "$attempt" -eq 15 ]');
     expect(prove).toContain('sleep 4');
     expect(prove).toContain('https://staging.jov.ie/api/health/build-info');
@@ -2781,7 +2791,7 @@ if [ "$attempt" -eq 1 ]; then
   printf '%s\\n' '{"id":42,"readyState":null,"target":{"unexpected":true}}'
 else
   jq -n --arg id "$EXPECTED_DEPLOYMENT_ID" \
-    '{id: $id, readyState: "READY", target: "preview"}'
+    '{id: $id, readyState: "READY"}'
 fi
 `,
           { mode: 0o700 }
@@ -2972,7 +2982,7 @@ esac
         ).toThrow();
         expect(readFileSync(counter, 'utf8')).toBe('2');
         expect(result.stdout).toContain(
-          `staging.jov.ie owns exact READY preview ${expectedDeploymentId}.`
+          `staging.jov.ie owns exact READY deployment ${expectedDeploymentId}.`
         );
       } finally {
         rmSync(root, { force: true, recursive: true });

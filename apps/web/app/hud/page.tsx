@@ -12,6 +12,7 @@ import { authorizeHud } from '@/lib/auth/hud';
 import { env } from '@/lib/env-server';
 import { getHudMetrics } from '@/lib/hud/metrics';
 import { OVIE_OPS_PRODUCT_NAME } from '@/lib/ovie/ops-entrypoint';
+import { assertOviePrivacyUnlocked } from '@/lib/ovie/privacy-lock/server';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const runtime = 'nodejs';
@@ -47,6 +48,7 @@ export default async function HudPage({
 
   if (!tokenOk) {
     const adminAccess = await getCurrentAdminPageAccess();
+    if (adminAccess.hasAdminRole) await assertOviePrivacyUnlocked();
     if (!adminAccess.isAuthenticated) unauthorized();
     if (!adminAccess.hasAdminRole) forbidden();
     if (requestedKiosk) redirect(APP_ROUTES.HUD);

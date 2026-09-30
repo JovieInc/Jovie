@@ -709,6 +709,9 @@ describe('canonical marketing component registry', () => {
     expect(source.match(/variant='primary'/g)).toHaveLength(2);
     expect(source.match(/variant='tertiary'/g)).toHaveLength(1);
     expect(source).toContain('line-clamp-2');
+    expect(source).toContain("import './MarketingTerminalCta.css';");
+    expect(source).toContain('marketing-terminal-cta--cinematic');
+    expect(source).toContain("data-wrap='editorial-title'");
     expect(source).toContain("variant='primary'");
     expect(source).toContain("variant='tertiary'");
     expect(source).toContain("size='lg'");

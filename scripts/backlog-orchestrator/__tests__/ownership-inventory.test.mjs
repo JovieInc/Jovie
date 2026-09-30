@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { beforeEach, describe, it } from 'node:test';
 
 import * as admissionGate from '../admission-gate.mjs';
 import * as deterministicGates from '../deterministic-gates.mjs';
@@ -16,7 +16,7 @@ import {
 import * as planGate from '../plan-gate.mjs';
 import { planEvidenceFor, withPreLeaseReceipts } from './pre-lease.mjs';
 
-const NOW = '2026-08-22T12:00:00.000Z';
+const NOW = new Date().toISOString();
 
 function issue(overrides = {}) {
   return {
@@ -46,7 +46,7 @@ Keep repository-aware admission in scripts/backlog-orchestrator/admission-gate.m
 
 ## Acceptance criteria
 * New packets name target fields.`,
-    createdAt: '2026-08-01T00:00:00.000Z',
+    createdAt: new Date(Date.now() - 21 * 86_400_000).toISOString(),
     priority: 2,
     estimate: 2,
     state: { name: 'Todo' },
@@ -85,6 +85,12 @@ Change the Summer runtime manifest in JovieInc/summer-config. No Jovie product f
 }
 
 describe('JOV-5278 ownership inventory', () => {
+  beforeEach(context => {
+    // Admission fixtures must use the same clock as their existing receipts.
+    assert.ok('mock' in context, 'fixture clock needs a test context');
+    context.mock.timers.enable({ apis: ['Date'], now: new Date(NOW) });
+  });
+
   it('loads one owner each for Summer, company-state, and shipping', () => {
     const inventory = loadOwnershipInventory();
     assert.equal(inventory.schema, 'jovie-ownership-inventory/v1');
