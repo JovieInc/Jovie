@@ -91,6 +91,10 @@ const SIGNAL_TYPE_FILTERS: readonly {
     value: 'brand_deal',
     label: OPPORTUNITY_SIGNAL_TYPE_META.brand_deal.filterLabel,
   },
+  {
+    value: 'fan_reply',
+    label: OPPORTUNITY_SIGNAL_TYPE_META.fan_reply.filterLabel,
+  },
 ];
 
 function sortByStartDate(
@@ -141,6 +145,7 @@ export function OpportunityInboxPageClient({
     approveMutation,
     dismissMutation,
     feedbackMutation,
+    reviseMutation,
     nextStepMutation,
   } = useOpportunityInboxMutations();
   const { confirmMutation, rejectMutation, undoRejectMutation } =
@@ -163,6 +168,10 @@ export function OpportunityInboxPageClient({
 
   const pendingFeedbackId = feedbackMutation.isPending
     ? (feedbackMutation.variables?.suggestedActionId ?? null)
+    : null;
+
+  const pendingReviseId = reviseMutation.isPending
+    ? (reviseMutation.variables?.id ?? null)
     : null;
 
   const pendingNextStepId = nextStepMutation.isPending
@@ -268,6 +277,29 @@ export function OpportunityInboxPageClient({
   const handleCaptureCompleted = useCallback((id: string) => {
     setCards(current => current.filter(card => card.id !== id));
   }, []);
+
+  /**
+   * Comment-for-revision (JOV-5128): supersede the draft optimistically; the
+   * server writes a new pending draft carrying the feedback history.
+   */
+  const handleRevise = useCallback(
+    (id: string, comment: string) => {
+      const card = cards.find(candidate => candidate.id === id);
+      setCards(current => current.filter(candidate => candidate.id !== id));
+      reviseMutation.mutate(
+        { id, comment },
+        {
+          onError: () => {
+            if (card) {
+              setCards(current => [card, ...current]);
+            }
+            scheduleStackFocusRecovery(id);
+          },
+        }
+      );
+    },
+    [cards, reviseMutation, scheduleStackFocusRecovery]
+  );
 
   /** Open chat with the card pinned (JOV-3932/3933). */
   const handleOpen = useCallback(
@@ -522,8 +554,10 @@ export function OpportunityInboxPageClient({
                 onOpen={handleOpen}
                 onFeedback={handleFeedback}
                 onNextStep={handleNextStep}
+                onRevise={handleRevise}
                 pendingActionId={pendingActionId}
                 pendingFeedbackId={pendingFeedbackId}
+                pendingReviseId={pendingReviseId}
                 pendingNextStepId={pendingNextStepId}
                 enableStackInteractions={inboxHomeEnabled}
                 stackKeyboardControlRef={stackKeyboardControlRef}

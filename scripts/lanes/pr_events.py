@@ -693,6 +693,9 @@ def ready_green(host, lane, pr: dict, held: dict, now: float) -> str:
         updated = iso_ts(pr.get("updatedAt"))
         expired = pr.get("mergeStateStatus") == "DIRTY" or (updated is not None and now - updated > GREEN_TTL_S)
         return "not-clean" if expired else "wait"
+    revoked = lane.publication_revocation(host, pr.get("headRefName"))
+    if revoked:
+        return f"revoked:{revoked.get('reason', '?')}"
     lane.sh(["gh", "pr", "ready", str(pr["number"]), "--repo", lane.REPO_SLUG])
     queued = lane.sh(["gh", "pr", "merge", str(pr["number"]), "--repo", lane.REPO_SLUG, "--auto"])
     if queued.returncode != 0:
@@ -765,6 +768,9 @@ def sync_main(host, lane, pr: dict, now: float) -> str:
     (exact head, no force), so the PR gets a new head, fresh CI and a fresh enroll. The queue
     never takes a rejected head twice (JOV-INV-022), so this is the one sanctioned re-enqueue.
     Once per PR per stuck episode; a second removal goes to a model with the queue's log."""
+    revoked = lane.publication_revocation(host, pr.get("headRefName"))
+    if revoked:
+        return f"revoked:{revoked.get('reason', '?')}"
     result = lane.sh(["gh", "api", "-X", "PUT", f"repos/{lane.REPO_SLUG}/pulls/{pr['number']}/update-branch",
                       "-f", f"expected_head_sha={pr['headRefOid']}"])
     ok = result.returncode == 0

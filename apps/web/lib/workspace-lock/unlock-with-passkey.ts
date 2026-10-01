@@ -238,19 +238,27 @@ export async function ensurePrivacyLockCanBeEnabled(): Promise<void> {
 export interface UnlockWithPasskeyOptions {
   /** Defaults to the existing Ovie admin step-up contract. */
   purpose?: 'admin' | 'privacy';
+  /** Recovery flows can require an existing credential without enrolling one. */
+  allowEnrollment?: boolean;
 }
 
 export async function unlockWithPasskey({
   purpose = 'admin',
+  allowEnrollment = true,
 }: UnlockWithPasskeyOptions = {}): Promise<void> {
   await assertCeremonyCanRun();
 
   const listed = await withTimeout(authClient.passkey.listUserPasskeys());
   if (listed.error) throw new Error(listed.error.message);
-  if ((listed.data ?? []).length === 0 && purpose === 'privacy') {
+  if (
+    (listed.data ?? []).length === 0 &&
+    (purpose === 'privacy' || !allowEnrollment)
+  ) {
     throw new PasskeyStepUpError(
       'setup-required',
-      PRIVACY_PASSKEY_REQUIRED_MESSAGE
+      purpose === 'privacy'
+        ? PRIVACY_PASSKEY_REQUIRED_MESSAGE
+        : 'No passkey is registered for this account. Set one up in Jovie before reconnecting Ovie.'
     );
   }
   if ((listed.data ?? []).length === 0) {

@@ -190,6 +190,13 @@ function formatDay(
   );
 }
 
+// JOV-4429: each Tickets link needs a unique accessible name — tour lists
+// often reuse one ticketing URL for every date, which otherwise renders as
+// a duplicate CTA cluster to assistive tech and the copy-regression guard.
+function ticketLinkLabel(tourDate: TourDateViewModel) {
+  return `Tickets for ${tourDate.venueName} on ${formatMonth(tourDate.startDate, tourDate.timezone)} ${formatDay(tourDate.startDate, tourDate.timezone)}`;
+}
+
 function formatReleaseMeta(
   releaseType: string | null | undefined,
   releaseDate: string | Date | null | undefined
@@ -621,6 +628,7 @@ export function ProfileDesktopSurface({
                     {tourDate.ticketUrl ? (
                       <a
                         href={tourDate.ticketUrl}
+                        aria-label={ticketLinkLabel(tourDate)}
                         className='inline-flex h-11 items-center rounded-full border border-white/12 px-3 text-xs font-medium text-white/82 transition-colors duration-subtle hover:bg-white/[0.04]'
                       >
                         Tickets
@@ -937,6 +945,7 @@ export function ProfileDesktopSurface({
                 {tourDate.ticketUrl ? (
                   <a
                     href={tourDate.ticketUrl}
+                    aria-label={ticketLinkLabel(tourDate)}
                     className='inline-flex h-11 items-center rounded-full border border-white/12 px-4 text-sm font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
                   >
                     Tickets

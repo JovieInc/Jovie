@@ -15,6 +15,7 @@ export {
 } from './artist-crud';
 // Import operations
 export {
+  processProviderRecordingArtistCredits,
   processRecordingArtistCredits,
   processReleaseArtistCredits,
   processTrackArtistCredits,
@@ -28,8 +29,10 @@ export {
 } from './artist-search';
 // Recording-artist operations
 export {
+  deleteRecordingArtistRole,
   deleteRecordingArtists,
   getArtistsForRecording,
+  getRecordingArtistCreditEdges,
   getRecordingsByArtist,
   upsertRecordingArtist,
 } from './recording-artists';
