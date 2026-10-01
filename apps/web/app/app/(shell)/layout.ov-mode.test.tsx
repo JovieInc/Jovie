@@ -50,6 +50,9 @@ vi.mock('@/components/organisms/PersistentAudioBar', () => ({
 vi.mock('@/components/providers/NuqsProvider', () => ({
   NuqsProvider: ({ children }: { children: ReactNode }) => children,
 }));
+vi.mock('@/components/shell/OpenInAppBanner', () => ({
+  OpenInAppBanner: () => null,
+}));
 vi.mock('@/components/shell/LyricsRouteSkeleton', () => ({
   LyricsRouteSkeleton: () => null,
 }));

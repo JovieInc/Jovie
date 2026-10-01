@@ -7,6 +7,7 @@ import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
 import { PersistentAudioBar } from '@/components/organisms/PersistentAudioBar';
 import { NuqsProvider } from '@/components/providers/NuqsProvider';
 import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
+import { OpenInAppBanner } from '@/components/shell/OpenInAppBanner';
 import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
@@ -154,6 +155,7 @@ export default async function AppShellLayout({
     // during SSR and hydration, regardless of how CoreProviders resolves above.
     return (
       <NuqsProvider>
+        <OpenInAppBanner />
         <Suspense fallback={shellFallback}>
           <DashboardShellContent
             userId={auth.userId}
