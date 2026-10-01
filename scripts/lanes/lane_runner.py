@@ -843,14 +843,14 @@ class Linear:
     def comment(self, issue_id: str, body: str) -> None:
         result = self.gql('mutation($id:String!,$b:String!){commentCreate(input:{issueId:$id,body:$b}){success}}',
                           {"id": issue_id, "b": body})
-        if result.get("commentCreate", {}).get("success") is not True: raise RuntimeError("linear: comment not delivered")
+        if not isinstance(result, dict) or not isinstance(result.get("commentCreate"), dict) or result["commentCreate"].get("success") is not True: raise RuntimeError("linear: comment not delivered")
 
 
 def notify_issue_claim(linear: Linear, issue: Issue, name: str, spec: dict) -> None:
     """An informational comment cannot prevent durable ownership from being recorded."""
     try:
         linear.comment(issue.id, f"🤖 lane `{name}` claimed this issue (model `{spec.get('model')}`).")
-    except (OSError, RuntimeError, ValueError) as error:
+    except Exception as error:
         print(f"lane claim comment unavailable: {type(error).__name__}", file=sys.stderr)
 
 
@@ -1477,14 +1477,17 @@ def requeue_verified(host: Host, prs: list[dict]) -> None:
     path = host.state / "requeue.json"
     if not path.exists():
         return
-    heads = {str(pr["number"]): pr["headRefOid"] for pr in prs}
-    branches = {str(pr["number"]): pr.get("headRefName") for pr in prs}
+    inventory = {str(pr["number"]): pr for pr in prs}
     def retry(requeue: dict) -> None:
         for number, head in list(requeue.items()):
-            if heads.get(number) != head:
+            if number not in inventory:
+                live = reconcile_fix_target({"number": int(number), "headRefOid": head})
+                if live is None: continue
+                inventory[number] = live
+            if inventory[number].get("state", "OPEN") != "OPEN" or inventory[number].get("headRefOid") != head:
                 del requeue[number]  # merged, closed, or a new head that the gate owns again
                 continue
-            if publication_revocation(host, branches.get(number)):
+            if publication_revocation(host, inventory[number].get("headRefName")):
                 del requeue[number]  # revoked branches never re-enroll
                 continue
             sh(["gh", "pr", "ready", number, "--repo", REPO_SLUG])
