@@ -2741,6 +2741,47 @@ class DeferredRequeueTest(unittest.TestCase):
             lane.update_json(host.state / "requeue.json", lambda rows: rows.update(values))
         finally: claim.release()
 
+
+    def test_deferred_dispositions_yield_transient_holds_and_retain_exact_terminal_history(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp)); queue = host.state / "requeue.json"
+            prs = [{"number": n, "headRefOid": "head-A", "headRefName": f"devin/jov-{n}"} for n in (5, 6)]
+            queue.write_text(json.dumps({"5": "head-A", "6": "head-A"}))
+            context = {"active": True, "digest": "generation-A"}
+            for pr, terminal in zip(prs, (False, True)):
+                lane.record_idle_exit(host, "devin", "fixture", deferred={"pr": pr, "issue": f"JOV-{pr['number']}", "context": context, "terminal": terminal})
+            inactive = lambda pr: {"active": False, "digest": "generation-A"} if pr["number"] == 6 else context
+            self.assertEqual(set(lane.deferred_requeue_blocks(host, "devin", inactive)), {"5", "6"})
+            self.assertEqual(set(lane.deferred_requeue_blocks(host, "devin", lambda pr: context)), {"5"})
+            self.assertEqual(set(lane.deferred_requeue_blocks(host, "devin", lambda pr: {"active": True, "digest": "generation-B"})), set())
+            lock = lane.Locked(host.state / "claim.lock", blocking=True)
+            try: lane.yield_deferred_requeues(host, "devin")
+            finally: lock.release()
+            self.assertEqual(set(lane.deferred_requeue_blocks(host, "devin", inactive)), {"6"})
+            queue.write_text(json.dumps({"6": "head-B"}))
+            self.assertFalse(lane.deferred_requeue_blocks(host, "devin", inactive))
+            self.assertEqual(json.loads((host.state / "worker-idle.json").read_text())["devin"]["deferredRequeue"]["6"]["pr"]["headRefOid"], "head-A")
+
+    def test_deferred_held_errors_and_operator_stop_release_the_slot_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp)); pr = {"number": 5, "state": "OPEN", "headRefOid": "head-A", "headRefName": "devin/jov-5-20260930t123000"}
+            (host.state / "requeue.json").write_text(json.dumps({"5": "head-A"}))
+            for result in (None, {"verdict": "remote-held"}, RuntimeError("fixture"), KeyboardInterrupt()):
+                with self.subTest(result=type(result).__name__), patch.object(lane, "reconcile_fix_target", return_value=pr), patch.object(lane, "sh") as command:
+                    slot = lane.Locked(host.state / "slots/devin.0.lock", blocking=False)
+                    with patch.object(slot, "release", wraps=slot.release) as release:
+                        retry = Mock(side_effect=result) if isinstance(result, BaseException) else Mock(return_value=(issue("JOV-5"), result))
+                        if isinstance(result, KeyboardInterrupt):
+                            with self.assertRaises(KeyboardInterrupt): lane.finish_deferred_retry(host, "devin", pr, retry, lambda pr: {"active": True}, slot=slot)
+                        else:
+                            self.assertIsNone(lane.finish_deferred_retry(host, "devin", pr, retry, lambda pr: {"active": True}, slot=slot))
+                            self.assertEqual(json.loads((host.state / "worker-idle.json").read_text())["devin"]["reason"], "deferred-held")
+                        release.assert_called_once()
+                    command.assert_not_called(); self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {"5": "head-A"})
+                    contender = lane.Locked(host.state / "slots/devin.0.lock", blocking=False)
+                    try: self.assertTrue(contender.held)
+                    finally: contender.release()
+
     def test_selects_one_exact_target_and_removes_only_unchanged_landed_head(self):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp)); path = host.state / "requeue.json"
