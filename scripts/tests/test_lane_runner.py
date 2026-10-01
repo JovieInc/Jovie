@@ -1047,6 +1047,139 @@ class RunAgentTest(unittest.TestCase):
             self.assertEqual(output.read_text(), "hardlink")
 
 
+class PublicationRevocationTest(unittest.TestCase):
+    """JOV-5060: a stopped run writes an immutable revocation receipt before the kill is
+    acked, and every publication boundary revalidates it."""
+
+    def test_receipt_is_written_before_the_owned_tree_is_killed(self):
+        with tempfile.TemporaryDirectory() as tmp, open(os.devnull, "w") as log:
+            root = Path(tmp)
+            host = lane.Host(state=root)
+            pidfile = root / "pid"
+            command = [sys.executable, "-c",
+                       "import os,time,pathlib; pathlib.Path('pid').write_text(str(os.getpid())); time.sleep(30)"]
+
+            def guard():
+                if pidfile.exists():
+                    raise lane.DiskAdmissionError("disk-critical")
+
+            observed = []
+
+            def on_kill(error):
+                # The agent must still be alive when the revocation lands: receipt first,
+                # then the kill is acknowledged.
+                os.kill(int(pidfile.read_text()), 0)
+                observed.append(type(error).__name__)
+                lane.revoke_publication(host, branch="devin/jov-1-1", run_id="run-1",
+                                        issue="JOV-1", reason="test-stop")
+
+            with self.assertRaises(lane.DiskAdmissionError):
+                lane.run_agent(command, root, log, timeout=10, guard=guard,
+                               guard_interval=0.05, on_kill=on_kill)
+            self.assertEqual(observed, ["DiskAdmissionError"])
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int(pidfile.read_text()), 0)
+            revoked = lane.publication_revocation(host, "devin/jov-1-1")
+            self.assertEqual(revoked["schema"], lane.PUBLICATION_REVOCATION_SCHEMA)
+            self.assertEqual(revoked["reason"], "test-stop")
+            self.assertEqual(revoked["runId"], "run-1")
+
+    def test_sigterm_is_a_stop_that_revokes_before_kill(self):
+        import signal
+        import threading
+        with tempfile.TemporaryDirectory() as tmp, open(os.devnull, "w") as log:
+            root = Path(tmp)
+            host = lane.Host(state=root)
+            pidfile = root / "pid"
+            command = [sys.executable, "-c",
+                       "import os,time,pathlib; pathlib.Path('pid').write_text(str(os.getpid())); time.sleep(30)"]
+            timer = threading.Timer(0.5, lambda: os.kill(os.getpid(), signal.SIGTERM))
+            try:
+                timer.start()
+                with self.assertRaises(lane.RunStopped):
+                    lane.run_agent(command, root, log, timeout=30,
+                                   on_kill=lambda error: lane.revoke_publication(
+                                       host, branch="devin/jov-9-1", reason="run-stopped"))
+            finally:
+                timer.cancel()
+            self.assertIsNotNone(lane.publication_revocation(host, "devin/jov-9-1"))
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int(pidfile.read_text()), 0)
+
+    def test_unreadable_ledger_fails_closed_as_revoked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            self.assertIsNone(lane.publication_revocation(host, "devin/jov-1-1"))
+            lane.revocations_path(host).parent.mkdir(parents=True)
+            lane.revocations_path(host).write_text("not-json\n")
+            self.assertEqual(lane.publication_revocation(host, "devin/jov-1-1")["reason"],
+                             "revocation-ledger-corrupt")
+            with self.assertRaises(lane.PublicationRevoked):
+                lane.require_publishable(host, "devin/jov-1-1", "before-push")
+
+
+class VerifyAndLandRevocationTest(unittest.TestCase):
+    def setUp(self):
+        self.real = lane.sh
+
+    def tearDown(self):
+        lane.sh = self.real
+
+    def test_revoked_branch_never_pushes_or_opens_a_pr(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            lane.revoke_publication(host, branch="devin/jov-1", reason="run-stopped")
+            fake = FakeShell([], ahead="2")
+            lane.sh = fake
+            with self.assertRaises(lane.PublicationRevoked):
+                lane.verify_and_land(host, issue(), "devin/jov-1", Path("/tmp"), None, 0)
+            self.assertFalse(any(call[:2] == ["git", "push"] for call in fake.calls))
+            self.assertFalse(any(call[:3] == ["gh", "pr", "create"] for call in fake.calls))
+
+    def test_a_stop_during_long_pre_push_hooks_still_bars_the_pr_open(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            fake = FakeShell([], ahead="2")
+
+            def push_revokes(args, **kwargs):
+                if args[:2] == ["git", "push"]:  # the stop lands while the hooks run
+                    lane.revoke_publication(host, branch="devin/jov-1", reason="run-stopped")
+                return fake(args, **kwargs)
+
+            lane.sh = push_revokes
+            with self.assertRaises(lane.PublicationRevoked):
+                lane.verify_and_land(host, issue(), "devin/jov-1", Path("/tmp"), None, 0)
+            self.assertTrue(any(call[:2] == ["git", "push"] for call in fake.calls))
+            self.assertFalse(any(call[:3] == ["gh", "pr", "create"] for call in fake.calls))
+
+    def test_gate_never_marks_a_revoked_branch_ready_or_enqueues_it(self):
+        started = datetime(2026, 9, 25, 21, 0, tzinfo=timezone.utc).timestamp()
+        pr = {"number": 7, "headRefName": "devin/jov-1", "headRefOid": "abc", "url": "u",
+              "createdAt": "2026-09-25T21:05:00Z", "isDraft": True}
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            lane.revoke_publication(host, branch="devin/jov-1", reason="run-stopped")
+            fake = FakeShell([pr])
+            lane.sh = fake
+            self.assertEqual(lane.gate_pr(host, pr, Path("/tmp"), None)["verdict"], "revoked")
+            self.assertFalse(any(call[:3] == ["gh", "pr", "ready"] for call in fake.calls))
+            self.assertFalse(any(call[:3] == ["gh", "pr", "merge"] for call in fake.calls))
+        self.assertIsInstance(started, float)
+
+    def test_requeue_verified_drops_revoked_entries_without_enrolling(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            lane.revoke_publication(host, branch="devin/jov-1", reason="run-stopped")
+            lane.update_json(host.state / "requeue.json",
+                             lambda requeue: requeue.update({"7": "abc"}))
+            fake = FakeShell([])
+            lane.sh = fake
+            lane.requeue_verified(host, [{"number": 7, "headRefOid": "abc",
+                                          "headRefName": "devin/jov-1"}])
+            self.assertFalse(any(call[:3] == ["gh", "pr", "ready"] for call in fake.calls))
+            self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {})
+
+
 class DispatchTest(unittest.TestCase):
     def test_critical_or_unknown_disk_blocks_all_dispatch_and_installs(self):
         for pct in (None, 4.0):
@@ -1328,6 +1461,16 @@ class PreservedRecoveryTest(unittest.TestCase):
 
     def test_disk_hold_resumes_dirty_work_in_the_same_budget(self):
         self.assert_resume("disk-held")
+
+    def test_a_revoked_branch_is_never_repaired_or_enrolled(self):
+        lane.revoke_publication(self.host, branch=self.pr["headRefName"], reason="run-stopped")
+        with patch.object(lane, "run_agent", side_effect=AssertionError("agent must not run")):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(receipt["verdict"], "revoked")
+        self.assertTrue(any("before-checkout" in reason or "publication-revoked" in reason
+                            for reason in receipt["reasons"]))
+        self.assertFalse(any(call[:3] == ["gh", "pr", "merge"] for call in self.calls))
+        self.assertFalse(any(call[:2] == ["git", "push"] for call in self.calls))
 
     def test_transient_read_hold_resumes_dirty_work_in_the_same_budget(self):
         self.assert_resume("reconcile-unavailable")
