@@ -5,13 +5,18 @@ import { join, resolve } from 'node:path';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 
-const workflow = load(
-  readFileSync(
-    resolve(
-      import.meta.dirname,
-      '../../../.github/workflows/nightly-testing-agent.yml'
-    ),
-    'utf8'
+/** @typedef {{ name?: string, id?: string, run?: string, with?: Record<string, unknown>, env?: Record<string, string> }} WorkflowStep */
+/** @typedef {{ steps: WorkflowStep[], strategy?: { 'fail-fast': boolean, matrix: { shard: number[] } }, 'timeout-minutes'?: number }} WorkflowJob */
+
+const workflow = /** @type {{ jobs: Record<string, WorkflowJob> }} */ (
+  load(
+    readFileSync(
+      resolve(
+        import.meta.dirname,
+        '../../../.github/workflows/nightly-testing-agent.yml'
+      ),
+      'utf8'
+    )
   )
 );
 const report = workflow.jobs.report;
