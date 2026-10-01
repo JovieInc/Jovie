@@ -7,7 +7,6 @@ import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelCo
 import { ArtistRulesSheet } from '@/app/app/(shell)/library/ArtistRulesSheet';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { SettingsPaySection } from '@/features/dashboard/organisms/SettingsPaySection';
-import { SettingsRiderSection } from '@/features/dashboard/organisms/SettingsRiderSection';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
 import { SettingsProfileSection } from '@/features/dashboard/organisms/settings-profile-section';
 import {
@@ -16,6 +15,7 @@ import {
 } from '@/features/dashboard/organisms/shopify/ShopifyStoreCard';
 import { useSettingsContext } from '@/features/dashboard/organisms/useSettingsContext';
 import type { ArtistRuleView } from '@/lib/artist-rules/types';
+import { SettingsRiderSection } from './SettingsRiderSection';
 
 function MobileProfilePanelTrigger() {
   const { open } = usePreviewPanelState();
