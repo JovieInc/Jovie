@@ -1105,22 +1105,30 @@ class PublicationRevocationTest(unittest.TestCase):
 
     def test_sigterm_is_a_stop_that_revokes_before_kill(self):
         import signal
-        import threading
         with tempfile.TemporaryDirectory() as tmp, open(os.devnull, "w") as log:
             root = Path(tmp)
             host = lane.Host(state=root)
             pidfile = root / "pid"
+            # Startup may exceed the old 0.5s timer on a loaded installer host.
             command = [sys.executable, "-c",
-                       "import os,time,pathlib; pathlib.Path('pid').write_text(str(os.getpid())); time.sleep(30)"]
-            timer = threading.Timer(0.5, lambda: os.kill(os.getpid(), signal.SIGTERM))
-            try:
-                timer.start()
-                with self.assertRaises(lane.RunStopped):
-                    lane.run_agent(command, root, log, timeout=30,
-                                   on_kill=lambda error: lane.revoke_publication(
-                                       host, branch="devin/jov-9-1", reason="run-stopped"))
-            finally:
-                timer.cancel()
+                       "import os,time,pathlib; time.sleep(0.75); pathlib.Path('pid').write_text(str(os.getpid())); time.sleep(30)"]
+
+            def signal_when_ready():
+                if pidfile.exists():
+                    os.kill(os.getpid(), signal.SIGTERM)
+
+            observed = []
+
+            def on_kill(error):
+                # Preserve receipt-before-kill proof for a real SIGTERM too.
+                os.kill(int(pidfile.read_text()), 0)
+                observed.append(type(error).__name__)
+                lane.revoke_publication(host, branch="devin/jov-9-1", reason="run-stopped")
+
+            with self.assertRaises(lane.RunStopped):
+                lane.run_agent(command, root, log, timeout=30,
+                               guard=signal_when_ready, guard_interval=0.05, on_kill=on_kill)
+            self.assertEqual(observed, ["RunStopped"])
             self.assertIsNotNone(lane.publication_revocation(host, "devin/jov-9-1"))
             with self.assertRaises(ProcessLookupError):
                 os.kill(int(pidfile.read_text()), 0)
