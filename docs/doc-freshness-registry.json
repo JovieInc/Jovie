@@ -429,7 +429,7 @@
     "docs/PR_FLOW.md": {
       "owner": "@itstimwhite",
       "claim": "Native queue authority is represented in the checked-in ruleset; live operation needs separate receipts.",
-      "documentSha256": "92932b414a9f5ec1a6b679e012439b2872840f7cddbde675d1509d5f7cd34e4e",
+      "documentSha256": "86719983ab97b7497a9428a050642beb58049cd27d613144bf6bb0276b913dc9",
       "sources": [
         {
           "path": ".github/rulesets/branch-protection.yml",

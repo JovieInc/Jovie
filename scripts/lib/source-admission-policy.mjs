@@ -1,4 +1,6 @@
 // JOV-INV-011: retain exact-head failure memory. JOV-INV-028: legacy human labels are inert.
+
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import {
   evaluateForkMemberPolicy,
@@ -23,9 +25,27 @@ const TOMBSTONES = new Set([
   'jovie-native-unmergeable/v1',
 ]);
 
+/** Native Linear ignores negation around closing magic words. Inspect the whole
+ * title/body, including caveats after an explicit non-closing relation.
+ * @param {{title: string, body: string | null}} text
+ */
+export function evaluateLinearReferencePolicy({ title, body }) {
+  const closing =
+    /\b(?:close[sd]?|closing|fix(?:es|ed|ing)?|resolve[sd]?|resolving|complete[sd]?|completing|implement(?:s|ed|ing)?|linear issue)\s+[*_`\[]*(?:https:\/\/linear\.app\/[^\s/]+\/issue\/)?([a-z][a-z0-9]*-\d+)\b(?![\w-])/gi;
+  const identifiers = new Set(
+    [...`${title}\n${body ?? ''}`.matchAll(closing)].map(match =>
+      match[1].toUpperCase()
+    )
+  );
+  const blockers = [...identifiers].map(id => `linear-closing-reference:${id}`);
+  return { allowed: blockers.length === 0, blockers };
+}
+
 /**
  * @typedef {Object} AdmissionPullRequest
  * @property {number} [number]
+ * @property {string} [title]
+ * @property {string | null} [body]
  * @property {string} [state]
  * @property {boolean} [draft]
  * @property {{sha?: string, ref?: string, repo?: {fork?: boolean}}} [head]
@@ -91,6 +111,8 @@ export function evaluateSourceAdmission({
     !SHA.test(expectedHead ?? '') ||
     !Number.isInteger(pr?.number) ||
     pr.number < 1 ||
+    typeof pr.title !== 'string' ||
+    (pr.body !== null && typeof pr.body !== 'string') ||
     typeof pr?.draft !== 'boolean' ||
     !['open', 'closed'].includes(pr?.state) ||
     !Array.isArray(pr?.labels) ||
@@ -114,6 +136,12 @@ export function evaluateSourceAdmission({
   if (pr.draft) blockers.push('draft');
   if (pr.base.ref !== 'main') blockers.push('wrong-base');
   if (pr.mergeable === false) blockers.push('conflict');
+  blockers.push(
+    ...evaluateLinearReferencePolicy({
+      title: pr.title,
+      body: pr.body,
+    }).blockers
+  );
   for (const label of pr.labels)
     if (HOLDS.has(label.name)) blockers.push(`hold:${label.name}`);
   try {
@@ -248,11 +276,21 @@ if (
     const value = name =>
       args.find(arg => arg.startsWith(`${name}=`))?.slice(name.length + 1) ??
       args[args.indexOf(name) + 1];
-    const receipt = await runSourceAdmission({
-      repository: value('--repo'),
-      prNumber: Number(value('--pr')),
-      expectedHead: value('--head'),
-    });
+    const has = name =>
+      args.some(arg => arg === name || arg.startsWith(`${name}=`));
+    const bodyFile = has('--body-file') ? value('--body-file') : null;
+    const title = has('--title') ? value('--title') : null;
+    if (bodyFile && !title) throw new Error('--body-file requires --title');
+    const receipt = bodyFile
+      ? evaluateLinearReferencePolicy({
+          title,
+          body: readFileSync(bodyFile, 'utf8'),
+        })
+      : await runSourceAdmission({
+          repository: value('--repo'),
+          prNumber: Number(value('--pr')),
+          expectedHead: value('--head'),
+        });
     console.log(JSON.stringify(receipt));
     process.exitCode = receipt.allowed ? 0 : 1;
   } catch (error) {
