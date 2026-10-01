@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createFounderWorkReader } from './founder-work';
 
+type TestRequestOptions = RequestInit & {
+  readonly timeoutMs?: number;
+  readonly retry?: { readonly maxRetries: number };
+};
+
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -10,27 +15,28 @@ function jsonResponse(body: unknown): Response {
 
 describe('Ovie founder work providers', () => {
   it('lists only JOV Linear issues through the bounded provider request', async () => {
-    const request = vi.fn(async () =>
-      jsonResponse({
-        data: {
-          issues: {
-            nodes: [
-              {
-                id: 'linear-1',
-                identifier: 'JOV-5223',
-                title: 'Expose founder work',
-                url: 'https://linear.app/jovie/issue/JOV-5223',
-                priority: 2,
-                priorityLabel: 'High',
-                state: { name: 'In Progress', type: 'started' },
-                assignee: { name: 'Symphony' },
-                createdAt: '2026-09-01T00:00:00.000Z',
-                updatedAt: '2026-10-01T00:00:00.000Z',
-              },
-            ],
+    const request = vi.fn(
+      async (_input: RequestInfo | URL, _options?: TestRequestOptions) =>
+        jsonResponse({
+          data: {
+            issues: {
+              nodes: [
+                {
+                  id: 'linear-1',
+                  identifier: 'JOV-5223',
+                  title: 'Expose founder work',
+                  url: 'https://linear.app/jovie/issue/JOV-5223',
+                  priority: 2,
+                  priorityLabel: 'High',
+                  state: { name: 'In Progress', type: 'started' },
+                  assignee: { name: 'Symphony' },
+                  createdAt: '2026-09-01T00:00:00.000Z',
+                  updatedAt: '2026-10-01T00:00:00.000Z',
+                },
+              ],
+            },
           },
-        },
-      })
+        })
     );
     const reader = createFounderWorkReader({
       linearApiKey: () => 'linear-secret',
@@ -64,61 +70,60 @@ describe('Ovie founder work providers', () => {
   });
 
   it('lists and reads GitHub work only from JovieInc/Jovie', async () => {
-    const request = vi
-      .fn()
-      .mockResolvedValueOnce(
-        jsonResponse([
-          {
-            number: 42,
-            title: 'A pull request',
-            html_url: 'https://github.com/JovieInc/Jovie/pull/42',
-            state: 'open',
-            draft: false,
-            user: { login: 'agent' },
-            labels: [{ name: 'ci' }],
-            head: { ref: 'codex/jov-42' },
-            base: { ref: 'main' },
-            created_at: '2026-09-01T00:00:00.000Z',
-            updated_at: '2026-10-01T00:00:00.000Z',
-            merged_at: null,
-          },
-        ])
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({
+    const responses = [
+      jsonResponse([
+        {
           number: 42,
           title: 'A pull request',
           html_url: 'https://github.com/JovieInc/Jovie/pull/42',
           state: 'open',
           draft: false,
-          body: 'PR body',
+          user: { login: 'agent' },
+          labels: [{ name: 'ci' }],
           head: { ref: 'codex/jov-42' },
           base: { ref: 'main' },
-        })
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({
-          items: [
-            {
-              number: 7,
-              title: 'An issue',
-              html_url: 'https://github.com/JovieInc/Jovie/issues/7',
-              state: 'closed',
-              state_reason: 'completed',
-            },
-          ],
-        })
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({
-          number: 7,
-          title: 'An issue',
-          html_url: 'https://github.com/JovieInc/Jovie/issues/7',
-          state: 'closed',
-          state_reason: 'completed',
-          body: 'Issue body',
-        })
-      );
+          created_at: '2026-09-01T00:00:00.000Z',
+          updated_at: '2026-10-01T00:00:00.000Z',
+          merged_at: null,
+        },
+      ]),
+      jsonResponse({
+        number: 42,
+        title: 'A pull request',
+        html_url: 'https://github.com/JovieInc/Jovie/pull/42',
+        state: 'open',
+        draft: false,
+        body: 'PR body',
+        head: { ref: 'codex/jov-42' },
+        base: { ref: 'main' },
+      }),
+      jsonResponse({
+        items: [
+          {
+            number: 7,
+            title: 'An issue',
+            html_url: 'https://github.com/JovieInc/Jovie/issues/7',
+            state: 'closed',
+            state_reason: 'completed',
+          },
+        ],
+      }),
+      jsonResponse({
+        number: 7,
+        title: 'An issue',
+        html_url: 'https://github.com/JovieInc/Jovie/issues/7',
+        state: 'closed',
+        state_reason: 'completed',
+        body: 'Issue body',
+      }),
+    ];
+    const request = vi.fn(
+      async (_input: RequestInfo | URL, _options?: TestRequestOptions) => {
+        const response = responses.shift();
+        if (!response) throw new Error('unexpected provider request');
+        return response;
+      }
+    );
     const reader = createFounderWorkReader({
       linearApiKey: () => 'linear-secret',
       githubToken: async () => 'github-secret',
