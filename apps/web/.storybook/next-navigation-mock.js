@@ -22,7 +22,7 @@ export const useRouter = () => ({
   },
 });
 
-export const usePathname = () => '/test';
+export const usePathname = () => globalThis.__JOVIE_MOCK_PATHNAME__ ?? '/test';
 export const useSearchParams = () => new URLSearchParams();
 export const useParams = () => ({});
 export function redirect() {}
