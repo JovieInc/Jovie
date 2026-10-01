@@ -138,6 +138,9 @@ function TourDateRow({
       {canBuyTickets ? (
         <a
           href={item.date.ticketUrl ?? undefined}
+          // JOV-4429: unique accessible name per date — a shared ticketing
+          // URL would otherwise render as a duplicate "Tickets" CTA cluster.
+          aria-label={`Tickets for ${item.date.venueName} — ${location}`}
           onClick={event => {
             track('event_click', {
               artist_id: artistId,

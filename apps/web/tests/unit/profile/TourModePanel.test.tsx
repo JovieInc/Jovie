@@ -136,7 +136,9 @@ describe('TourModePanel', () => {
   it('renders a clickable ticket link for available dates', () => {
     render(<TourModePanel artist={artist} tourDates={[londonDate]} />);
 
-    const ticketLink = screen.getByRole('link', { name: 'Tickets' });
+    const ticketLink = screen.getByRole('link', {
+      name: 'Tickets for The O2 — London, UK',
+    });
     expect(ticketLink).toHaveAttribute('href', londonDate.ticketUrl);
 
     ticketLink.addEventListener('click', event => event.preventDefault());
