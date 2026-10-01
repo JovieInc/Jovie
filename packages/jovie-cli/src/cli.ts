@@ -64,6 +64,7 @@ export interface CliDependencies {
   readonly stderr?: CliOutput;
   readonly stdin?: NodeJS.ReadableStream;
   readonly homeDir?: string;
+  readonly workerToken?: string;
 }
 
 type CliValues = {
@@ -95,7 +96,8 @@ function usage(): string {
   return `Usage: jovie <command> [options]
 
 Jovie for agents: create artist profiles from Spotify and read public artist
-data. No login or API key is needed. Every command supports --json.
+data. Public commands need no login. Internal fleet commands require a scoped
+JOVIE_WORKER_TOKEN supplied by the operator. Every command supports --json.
 
 Commands:
 ${lines.join('\n')}
@@ -158,6 +160,22 @@ function errorPayload(error: unknown): Record<string, unknown> {
 const COMMAND_FLAG_NAMES = [
   ...new Set(COMMANDS.flatMap(command => command.flags ?? []).map(f => f.name)),
 ];
+
+function commandFamily(argv: readonly string[]): string | undefined {
+  const stringOptions = new Set(['base-url', 'dir', ...COMMAND_FLAG_NAMES]);
+  for (let index = 0; index < argv.length; index++) {
+    const token = argv[index];
+    if (token === '--') return argv[index + 1];
+    if (!token.startsWith('-') || token === '-') return token;
+    if (
+      token.startsWith('--') &&
+      !token.includes('=') &&
+      stringOptions.has(token.slice(2))
+    )
+      index++;
+  }
+  return undefined;
+}
 
 function parseCliArgs(argv: readonly string[]): {
   readonly values: CliValues;
@@ -260,6 +278,7 @@ async function execute(
     },
     {
       baseUrl,
+      workerToken: dependencies.workerToken ?? process.env.JOVIE_WORKER_TOKEN,
       fetchImpl: dependencies.fetchImpl,
       userAgent: `jovie-cli/${CLI_VERSION}`,
     }
@@ -273,6 +292,9 @@ export async function runCli(
   const stdout = dependencies.stdout ?? process.stdout;
   const stderr = dependencies.stderr ?? process.stderr;
   const requestedJson = argv.includes('--json');
+  let internalInvocation = COMMANDS.some(
+    command => command.internal && command.path[0] === commandFamily(argv)
+  );
   let parsed: ReturnType<typeof parseCliArgs>;
 
   try {
@@ -288,10 +310,13 @@ export async function runCli(
       writeLine(stderr, `${payload.message}`);
       writeLine(stderr, 'Run `jovie --help` for usage.');
     }
-    return 2;
+    return internalInvocation ? 3 : 2;
   }
 
   const { values, positionals } = parsed;
+  internalInvocation = COMMANDS.some(
+    command => command.internal && command.path[0] === positionals[0]
+  );
   if (values.version) {
     writeLine(
       stdout,
@@ -317,6 +342,7 @@ export async function runCli(
         throw new UsageError('Unsupported option for mcp.');
       await serveMcp((dependencies.stdin ?? process.stdin) as never, stdout, {
         version: CLI_VERSION,
+        workerToken: dependencies.workerToken ?? process.env.JOVIE_WORKER_TOKEN,
         baseUrl: normalizeBaseUrl(values.baseUrl),
         fetchImpl: dependencies.fetchImpl,
       });
@@ -338,6 +364,16 @@ export async function runCli(
     } else {
       writeLine(stdout, JSON.stringify(result, null, values.json ? 0 : 2));
     }
+    if (result && typeof result === 'object' && 'status' in result) {
+      const status = (result as { status: string }).status;
+      return status === 'completed' || status === 'handoff'
+        ? 0
+        : status === 'unavailable'
+          ? 2
+          : status === 'in_progress'
+            ? 3
+            : 1;
+    }
     return 0;
   } catch (error) {
     const payload = errorPayload(error);
@@ -346,6 +382,7 @@ export async function runCli(
     } else {
       writeLine(stderr, payload.message as string);
     }
+    if (internalInvocation) return 3;
     return error instanceof UsageError || error instanceof JovieInputError
       ? 2
       : 1;

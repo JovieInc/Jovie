@@ -44,7 +44,7 @@ describe('jovie CLI', () => {
     expect(result).toBe(0);
     expect(stdout.read()).toContain('artist get <username>');
     expect(stdout.read()).toContain('profile create <url>');
-    expect(stdout.read()).toContain('No login or API key');
+    expect(stdout.read()).toContain('Public commands need no login');
   });
 
   it('prints the source fallback version before command validation', async () => {

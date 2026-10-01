@@ -8,6 +8,7 @@ export type FetchImplementation = (
 ) => Promise<Response>;
 
 export type ResourceOptions = {
+  readonly workerToken?: string;
   readonly baseUrl?: string;
   readonly fetchImpl?: FetchImplementation;
   readonly signal?: AbortSignal;
