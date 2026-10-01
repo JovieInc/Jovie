@@ -897,7 +897,7 @@ export function ChatUiPlayground() {
   return (
     <div className='space-y-6' data-testid='chat-ui-playground'>
       <div className='max-w-3xl'>
-        <h2 className='text-base font-medium text-primary-token'>
+        <h2 className='line-clamp-2 text-base font-medium text-primary-token'>
           Scenario Catalog
         </h2>
         <p className='mt-1 text-xs leading-5 text-secondary-token'>
@@ -1019,7 +1019,7 @@ export function ChatUiPlayground() {
       >
         <h2
           id='chat-playground-improvements-title'
-          className='text-sm font-medium text-primary-token'
+          className='line-clamp-2 text-sm font-medium text-primary-token'
         >
           Cleanup Proposal
         </h2>
