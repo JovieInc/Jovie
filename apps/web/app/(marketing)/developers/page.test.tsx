@@ -118,7 +118,7 @@ describe('developer guide contract vs llms guidance (JOV-6265)', () => {
   it('states the error behavior from the actual OpenAPI contract', () => {
     render(<DevelopersPage />);
 
-    expect(screen.getByText(/JSON 404/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/JSON 404/i).length).toBeGreaterThan(0);
     expect(
       screen.getByText(/429 with a Retry-After header/i)
     ).toBeInTheDocument();
