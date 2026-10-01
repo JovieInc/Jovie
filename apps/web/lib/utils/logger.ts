@@ -35,7 +35,9 @@ function safeConsole() {
 
 function formatMsg(scope: string | undefined, msg: unknown) {
   const identity = getWorktreeIdentity();
-  const prefix = identity ? `[worktree:${identity.id}:${identity.boot}] ` : '';
+  const prefix = identity
+    ? `[worktree ${identity.id} boot=${identity.boot}] `
+    : '';
   return prefix + (scope ? `[${scope}] ${String(msg)}` : String(msg));
 }
 
