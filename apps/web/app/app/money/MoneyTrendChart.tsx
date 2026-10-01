@@ -111,7 +111,7 @@ export function MoneyTrendChart({
               type='button'
               aria-pressed={windowId === w.id}
               onClick={() => setWindowId(w.id)}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+              className={`rounded-md px-3 py-1 text-xs font-medium ${
                 windowId === w.id
                   ? 'bg-surface-2 text-primary-token'
                   : 'text-tertiary-token hover:text-secondary-token'

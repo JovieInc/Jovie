@@ -1,3 +1,4 @@
+import { computeRatePercent } from '@/lib/analytics/metrics';
 import type {
   FinanceAccount,
   FinanceTransaction,
@@ -188,7 +189,7 @@ function makeMetric(
     value !== null && previous !== null ? value - previous : null;
   const deltaPct =
     deltaAbs !== null && previous !== 0
-      ? (deltaAbs / Math.abs(previous!)) * 100
+      ? computeRatePercent(deltaAbs, Math.abs(previous!))
       : null;
   const favorable =
     deltaAbs === null

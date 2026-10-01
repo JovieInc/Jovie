@@ -142,7 +142,9 @@ function ScopeSection({
 }) {
   return (
     <section aria-label={title} className='mt-6'>
-      <h2 className='text-sm font-semibold text-secondary-token'>{title}</h2>
+      <h2 className='line-clamp-2 text-sm font-semibold text-secondary-token'>
+        {title}
+      </h2>
       {note && <p className='mt-0.5 text-xs text-tertiary-token'>{note}</p>}
       <div className='mt-2 grid gap-3 sm:grid-cols-3'>
         {metrics.map(m => (
@@ -201,7 +203,9 @@ export function MoneyOverviewClient({
   return (
     <div data-testid='money-overview'>
       <header>
-        <h1 className='text-xl font-semibold text-primary-token'>Money</h1>
+        <h1 className='line-clamp-2 text-xl font-semibold text-primary-token'>
+          Money
+        </h1>
         <p className='mt-1 text-xs text-tertiary-token'>
           Private to you · Last reconciled {o.reconciledAt ?? 'never'}
           {o.counts.excludedAccounts > 0 &&
@@ -245,7 +249,7 @@ export function MoneyOverviewClient({
       )}
 
       <section aria-label='Combined' className='mt-6'>
-        <h2 className='text-sm font-semibold text-secondary-token'>
+        <h2 className='line-clamp-2 text-sm font-semibold text-secondary-token'>
           Sustainability
         </h2>
         <div className='mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-5'>
@@ -272,7 +276,9 @@ export function MoneyOverviewClient({
       />
 
       <section aria-label='Trend' className='mt-6'>
-        <h2 className='text-sm font-semibold text-secondary-token'>Trend</h2>
+        <h2 className='line-clamp-2 text-sm font-semibold text-secondary-token'>
+          Trend
+        </h2>
         {o.trend.length > 1 ? (
           <MoneyTrendChart points={o.trend} />
         ) : (
