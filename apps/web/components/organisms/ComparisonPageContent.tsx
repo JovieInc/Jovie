@@ -35,7 +35,7 @@ export function ComparisonPageContent({
             alt={data.heroImage.alt}
             className='object-cover opacity-25'
           />
-          <div className='absolute inset-0 bg-gradient-to-b from-base via-base/70 to-base' />
+          <div className='absolute inset-0 bg-gradient-to-b from-base via-(--color-bg-base)/70 to-base' />
         </div>
         <p className='text-sm font-medium text-tertiary-token'>Compare</p>
         <h1 className='mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>

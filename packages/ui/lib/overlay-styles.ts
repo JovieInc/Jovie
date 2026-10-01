@@ -84,7 +84,7 @@ export const footerStyles = {
  * Title styles for modal components.
  */
 export const titleStyles = {
-  base: 'text-base font-medium leading-snug tracking-tight text-primary-token',
+  base: 'text-(length:--text-base) font-medium leading-snug tracking-tight text-primary-token',
 } as const;
 
 /**
