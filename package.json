@@ -24,6 +24,7 @@
       "protobufjs": "7.6.5",
       "@opentelemetry/core": "2.8.0",
       "@babel/core": "7.29.6",
+      "@stryker-mutator/instrumenter>@babel/core": "~8.0.0",
       "cookie": ">=1.0.0",
       "tmp": ">=0.2.6",
       "vite": "8.3.1",

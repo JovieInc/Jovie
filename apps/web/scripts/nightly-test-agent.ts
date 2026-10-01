@@ -1039,6 +1039,13 @@ function commandEmitDelta(
       '',
       `Repo: ${repo}`,
       `Generated: ${new Date().toISOString()}`,
+      `Workflow conclusion: ${args['workflow-conclusion'] ?? 'unknown'}`,
+      '',
+      '## Evidence warnings',
+      '',
+      ...reports.flatMap(report =>
+        report.warnings.map(warning => `- ${warning.replaceAll('\n', ' ')}`)
+      ),
       '',
       '## Suites',
       '',
