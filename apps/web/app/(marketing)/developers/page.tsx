@@ -48,7 +48,7 @@ const RESOURCE_LINKS = [
   },
   {
     href: '/cli',
-    label: 'Jovie CLI and MCP server',
+    label: 'Jovie CLI And MCP Server',
     description:
       'Anonymous `jovie` commands for agents: read public artist data and create claimable artist profiles.',
   },
