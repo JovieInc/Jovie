@@ -928,10 +928,10 @@ describe('DevToolbar', () => {
       renderToolbar();
       fireEvent.click(screen.getByRole('button', { name: 'Test Persona' }));
 
-      expect(await screen.findByText('Pro Creator')).toBeInTheDocument();
       expect(
-        screen.getByText('Active: browse-ready+clerk_test@jov.ie')
+        await screen.findByText('Active: browse-ready+clerk_test@jov.ie')
       ).toBeInTheDocument();
+      expect(screen.getByText('Pro Creator')).toBeInTheDocument();
       expect(screen.getByText('/browse-ready-user')).toBeInTheDocument();
       expect(
         screen.getByRole('menuitem', { name: /Pro Creator/ })
