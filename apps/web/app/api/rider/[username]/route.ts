@@ -63,11 +63,7 @@ async function loadProfileWithRider(usernameNormalized: string) {
   return row ?? null;
 }
 
-/**
- * Public rider read + export, kept out of the ISR loader since it serves
- * password- and token-gated reads that must never be page-cached.
- * `private`/`link_only`-without-token/private-profile → generic 404.
- */
+/** Public gated rider read/export; `private`/bad-token/private-profile → 404. */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ username: string }> }
@@ -179,10 +175,7 @@ export async function GET(
   }
 }
 
-/**
- * Rider password unlock → short-lived HttpOnly cookie scoped to `/api/rider`.
- * Durably rate-limited; generic failures; plaintext/hash never logged.
- */
+/** Password unlock → short-lived HttpOnly cookie; durably rate-limited. */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ username: string }> }

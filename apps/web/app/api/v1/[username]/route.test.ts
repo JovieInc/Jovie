@@ -41,9 +41,7 @@ vi.mock('@/lib/rate-limit', () => ({
 vi.mock('@/lib/db', () => ({
   db: {
     select: () => ({
-      from: () => ({
-        where: () => ({ limit: () => Promise.resolve([]) }),
-      }),
+      from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
     }),
   },
 }));

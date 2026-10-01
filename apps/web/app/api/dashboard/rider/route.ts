@@ -87,8 +87,7 @@ async function loadRider(profileId: string) {
 }
 
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const profileId = url.searchParams.get('profileId');
+  const profileId = new URL(request.url).searchParams.get('profileId');
   if (!isCanonicalUuid(profileId)) {
     return json({ error: 'A valid profileId is required' }, 400);
   }

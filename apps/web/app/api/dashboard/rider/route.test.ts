@@ -10,9 +10,7 @@ const hoisted = vi.hoisted(() => ({
 vi.mock('@/lib/db', () => ({
   db: {
     select: () => ({
-      from: () => ({
-        where: () => ({ limit: () => hoisted.selectRows() }),
-      }),
+      from: () => ({ where: () => ({ limit: () => hoisted.selectRows() }) }),
     }),
     update: () => ({
       set: () => ({ where: () => ({ returning: hoisted.updateReturning }) }),
@@ -49,6 +47,7 @@ const riderRow = (version = 3, overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+let PUT: typeof import('./route')['PUT'];
 const put = (body: unknown) =>
   new Request('https://jov.ie/api/dashboard/rider', {
     method: 'PUT',
@@ -57,7 +56,8 @@ const put = (body: unknown) =>
   });
 
 describe('PUT /api/dashboard/rider', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    ({ PUT } = await import('./route'));
     vi.clearAllMocks();
     hoisted.getCachedAuth.mockResolvedValue({ userId: 'user-1' });
     hoisted.getExactProfileAccess.mockResolvedValue({ ok: true });
@@ -65,14 +65,12 @@ describe('PUT /api/dashboard/rider', () => {
 
   it('rejects non-owner/manager access', async () => {
     hoisted.getExactProfileAccess.mockResolvedValue({ ok: false });
-    const { PUT } = await import('./route');
     const res = await PUT(put({ profileId: PROFILE_ID, rider: RIDER_INPUT }));
     expect(res.status).toBe(403);
   });
 
   it('returns VERSION_CONFLICT when expectedVersion is stale', async () => {
     hoisted.selectRows.mockResolvedValue([riderRow(3)]);
-    const { PUT } = await import('./route');
     const res = await PUT(
       put({ profileId: PROFILE_ID, expectedVersion: 1, rider: RIDER_INPUT })
     );
@@ -88,7 +86,6 @@ describe('PUT /api/dashboard/rider', () => {
     hoisted.updateReturning.mockResolvedValue([
       riderRow(4, { technical: RIDER_INPUT.technical, passwordHash: 's:h' }),
     ]);
-    const { PUT } = await import('./route');
     const res = await PUT(
       put({ profileId: PROFILE_ID, expectedVersion: 3, rider: RIDER_INPUT })
     );

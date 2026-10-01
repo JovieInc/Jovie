@@ -202,7 +202,6 @@ export function SettingsRiderSection({
       .then(() => toast.success('Share link copied'))
       .catch(() => toast.error('Could not copy. Please copy manually.'));
 
-  // Preview and export share the deterministic renderer (lib/rider/render).
   const handleExport = (format: 'markdown' | 'html') => {
     const isMarkdown = format === 'markdown';
     const body = isMarkdown

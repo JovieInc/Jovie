@@ -12,9 +12,7 @@ vi.mock('@/lib/db', () => ({
   db: {
     select: () => ({
       from: () => ({
-        leftJoin: () => ({
-          where: () => ({ limit: () => hoisted.rows() }),
-        }),
+        leftJoin: () => ({ where: () => ({ limit: () => hoisted.rows() }) }),
       }),
     }),
   },
@@ -56,7 +54,16 @@ const params = (username: string) => ({
 });
 let GET: typeof import('./route')['GET'];
 let POST: typeof import('./route')['POST'];
+let access: typeof import('@/lib/rider/access.server');
 const get = (url: string) => GET(req(url), params(TIM));
+const post = (password: string) =>
+  POST(
+    req(`https://jov.ie/api/rider/${TIM}`, {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
+    params(TIM)
+  );
 const okLimit = (limit: number, ms: number) => ({
   success: true,
   limit,
@@ -67,6 +74,7 @@ const okLimit = (limit: number, ms: number) => ({
 describe('/api/rider/[username] — visibility contract', () => {
   beforeEach(async () => {
     ({ GET, POST } = await import('./route'));
+    access = await import('@/lib/rider/access.server');
     vi.clearAllMocks();
     hoisted.publicAccessLimit.mockResolvedValue(okLimit(30, 60_000));
     hoisted.unlockLimit.mockResolvedValue(okLimit(10, 600_000));
@@ -120,16 +128,14 @@ describe('/api/rider/[username] — visibility contract', () => {
       ).status
     ).toBe(404);
 
-    const { createRiderLinkToken } = await import('@/lib/rider/access.server');
-    const token = createRiderLinkToken(PROFILE_ID);
+    const token = access.createRiderLinkToken(PROFILE_ID);
     const res = await get(`https://jov.ie/api/rider/${TIM}?token=${token}`);
     expect(res.status).toBe(200);
   });
 
   it('gates a password-protected rider behind a short-lived HttpOnly cookie', async () => {
-    const { hashRiderPassword } = await import('@/lib/rider/access.server');
     hoisted.rows.mockResolvedValue([
-      riderRow({ passwordHash: hashRiderPassword('backline') }),
+      riderRow({ passwordHash: access.hashRiderPassword('backline') }),
     ]);
 
     // Locked read → generic 401 challenge.
@@ -141,24 +147,12 @@ describe('/api/rider/[username] — visibility contract', () => {
     });
 
     // Wrong password → generic failure, no hash/plaintext in the payload.
-    const wrong = await POST(
-      req(`https://jov.ie/api/rider/${TIM}`, {
-        method: 'POST',
-        body: JSON.stringify({ password: 'nope' }),
-      }),
-      params(TIM)
-    );
+    const wrong = await post('nope');
     expect(wrong.status).toBe(401);
     expect(await wrong.json()).toEqual({ error: 'Invalid password' });
 
     // Right password → unlock cookie.
-    const unlocked = await POST(
-      req(`https://jov.ie/api/rider/${TIM}`, {
-        method: 'POST',
-        body: JSON.stringify({ password: 'backline' }),
-      }),
-      params(TIM)
-    );
+    const unlocked = await post('backline');
     expect(unlocked.status).toBe(200);
     const setCookie = unlocked.headers.get('set-cookie') ?? '';
     expect(setCookie).toContain('HttpOnly');
@@ -178,27 +172,18 @@ describe('/api/rider/[username] — visibility contract', () => {
 
   it('durably rate limits reads and password attempts before the database', async () => {
     hoisted.publicAccessLimit.mockResolvedValueOnce({
+      ...okLimit(30, 60_000),
       success: false,
-      limit: 30,
       remaining: 0,
-      reset: new Date(Date.now() + 60_000),
     });
     expect((await get(`https://jov.ie/api/rider/${TIM}`)).status).toBe(429);
 
     hoisted.unlockLimit.mockResolvedValueOnce({
+      ...okLimit(10, 600_000),
       success: false,
-      limit: 10,
       remaining: 0,
-      reset: new Date(Date.now() + 600_000),
     });
-    const res = await POST(
-      req(`https://jov.ie/api/rider/${TIM}`, {
-        method: 'POST',
-        body: JSON.stringify({ password: 'x' }),
-      }),
-      params(TIM)
-    );
-    expect(res.status).toBe(429);
+    expect((await post('x')).status).toBe(429);
     expect(hoisted.rows).not.toHaveBeenCalled();
   });
 });

@@ -175,8 +175,7 @@ export async function GET(
       _links: {
         self: `${BASE_URL}/api/v1/${profile.username}`,
         profile: profileUrl,
-        // Advertised only when the rider is world-readable; private and
-        // link_only riders stay undiscoverable from the public contract.
+        // Advertised only when world-readable; private/link_only stay hidden.
         ...(riderVisibility === 'profile_public'
           ? { rider: `${BASE_URL}/api/rider/${profile.username}` }
           : {}),
