@@ -112,6 +112,17 @@ describe('developer guide contract vs llms guidance (JOV-6265)', () => {
     expect(pageSource).not.toContain(falseWriteClaim);
   });
 
+  it('states the error behavior from the actual OpenAPI contract', () => {
+    render(<DevelopersPage />);
+
+    expect(screen.getByText(/JSON 404/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/429 with a Retry-After header/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/503 with Retry-After/i)).toBeInTheDocument();
+    expect(screen.getByText(/never\s+gain write access/i)).toBeInTheDocument();
+  });
+
   it('keeps /cli command documentation aligned with the actual CLI surface', () => {
     const cliSource = [
       '../../packages/jovie-cli/src/cli.ts',

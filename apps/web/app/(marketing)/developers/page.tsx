@@ -246,6 +246,14 @@ export default function DevelopersPage() {
               for the current RateLimit and Retry-After response contract.
             </p>
             <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+              Error behavior matches the OpenAPI contract: unknown or non-public
+              artists return a JSON 404; a client that exceeds the profile limit
+              receives 429 with a Retry-After header; and a temporarily
+              unavailable limiter yields 503 with Retry-After rather than a
+              silent change in scope. Successful requests never gain write
+              access — the public surface is read-only.
+            </p>
+            <p className='mt-4 text-base leading-relaxed text-secondary-token'>
               Version v1 is active. A policy Link relation points to lifecycle
               guidance; active v1 responses do not claim Deprecation or Sunset.
             </p>
