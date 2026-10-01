@@ -1,7 +1,10 @@
 import { ImageResponse } from 'next/og';
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getBlogPost } from '@/lib/blog/getBlogPosts';
+import {
+  getBlogPost,
+  isBlogPostUnavailableError,
+} from '@/lib/blog/getBlogPosts';
 import { buildBlogShareContext } from '@/lib/share/context';
 import { loadShareFonts, STORY_SIZE } from '@/lib/share/image-utils';
 import { renderBlogStoryCard } from '@/lib/share/story-renderers';
@@ -33,10 +36,7 @@ export async function GET(req: NextRequest) {
       excerpt: post.excerpt,
     });
   } catch (error: unknown) {
-    const isNotFound =
-      error instanceof Error &&
-      'code' in error &&
-      (error as NodeJS.ErrnoException).code === 'ENOENT';
+    const isNotFound = isBlogPostUnavailableError(error);
     const status = isNotFound ? 404 : 500;
     return NextResponse.json(
       { error: isNotFound ? 'Blog post not found' : 'Internal error' },
