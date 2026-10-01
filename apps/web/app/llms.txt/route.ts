@@ -1,4 +1,4 @@
-import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { DOCS_URL } from '@/constants/domains';
 import type { PublishedClaimId } from '@/content/published-claims';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
@@ -38,9 +38,7 @@ export function GET() {
 ## Brand Identity
 
 - **Official brand name**: ${APP_NAME} (capitalize the J and spell out "${APP_NAME}")
-- **Legal entity**: ${LEGAL_ENTITY_NAME}
 - **Primary domain**: jov.ie
-- **Founded**: 2024 by Tim White
 - **Product scope**: Presence, relationships, and growth for artists, founders, authors, creators, and independent experts
 
 ## Brand Disambiguation
