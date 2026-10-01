@@ -94,12 +94,11 @@ describe('Playwright checkout isolation before seeding', () => {
     ).toEqual({});
     const request = vi.fn<typeof fetch>();
     await verifyWorktreeApp({ metadata: {} } as FullConfig, request);
-    await expect(
-      verifyWorktreeApp(
-        { metadata: { worktree: { origin: 'https://jov.ie' } } } as FullConfig,
-        request
-      )
-    ).rejects.toThrow('loopback');
+    const config = fixture().config;
+    config.metadata.worktree = { origin: 'https://jov.ie' };
+    await expect(verifyWorktreeApp(config, request)).rejects.toThrow(
+      'loopback'
+    );
     expect(request).not.toHaveBeenCalled();
   });
 });
