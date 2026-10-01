@@ -439,6 +439,20 @@ class FakeLinear:
 
 
 class LinearClientTest(unittest.TestCase):
+    def test_comment_rejects_malformed_success_payloads_as_known_failure(self):
+        for payload in (None, {"commentCreate": None}, {"commentCreate": []}, {"commentCreate": {"success": None}}):
+            with self.subTest(payload=payload), patch.object(lane.Linear, "gql", return_value=payload):
+                with self.assertRaises(RuntimeError): lane.Linear.__new__(lane.Linear).comment("id-JOV-3", "held")
+
+    def test_claim_comment_shape_errors_are_diagnostic_and_operator_stop_propagates(self):
+        import io
+        client = lane.Linear.__new__(lane.Linear)
+        with patch.object(client, "comment", side_effect=AttributeError("private-shape-message")), patch("sys.stderr", new_callable=io.StringIO) as diagnostic:
+            lane.notify_issue_claim(client, issue(), "devin", {"model": "m"})
+            self.assertEqual(diagnostic.getvalue(), "lane claim comment unavailable: AttributeError\n")
+        with patch.object(client, "comment", side_effect=KeyboardInterrupt("operator-stop")):
+            with self.assertRaises(KeyboardInterrupt): lane.notify_issue_claim(client, issue(), "devin", {"model": "m"})
+
     def test_comment_rejects_false_success(self):
         with patch.object(lane.Linear, "gql", return_value={"commentCreate": {"success": False}}):
             with self.assertRaises(RuntimeError): lane.Linear.__new__(lane.Linear).comment("id-JOV-3", "held")
@@ -2444,6 +2458,22 @@ class UpdateBackoffTest(unittest.TestCase):
 
 
 class RequeueTest(unittest.TestCase):
+    def test_partial_inventory_retains_unknown_and_reconciles_exact_publishable_head(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp)); path = host.state / "requeue.json"
+            pr = {"number": 5, "state": "OPEN", "headRefOid": "head-A", "headRefName": "devin/jov-3-retry"}
+            for live in (None, {**pr, "state": "CLOSED"}, {**pr, "headRefOid": "head-B"}, pr):
+                with self.subTest(live=live), patch.object(lane, "reconcile_fix_target", return_value=live), patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0)) as command:
+                    path.write_text(json.dumps({"5": "head-A"})); lane.requeue_verified(host, [])
+                    self.assertEqual(json.loads(path.read_text()), {"5": "head-A"} if live is None else {})
+                    if live == pr:
+                        self.assertEqual(command.call_args_list, [unittest.mock.call(["gh", "pr", "ready", "5", "--repo", lane.REPO_SLUG]), unittest.mock.call(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto", "--match-head-commit", "head-A"])])
+                    else: command.assert_not_called()
+            lane.revoke_publication(host, branch=pr["headRefName"], reason="run-stopped")
+            with patch.object(lane, "reconcile_fix_target", return_value=pr), patch.object(lane, "sh") as command:
+                path.write_text(json.dumps({"5": "head-A"})); lane.requeue_verified(host, []); command.assert_not_called()
+                self.assertEqual(json.loads(path.read_text()), {})
+
     def test_a_failed_enqueue_is_retried_until_queued_and_dropped_when_the_head_moves(self):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))
