@@ -14,8 +14,8 @@ import {
 
 const CANONICAL_NAVIGATION = [
   ['home', 'Home', APP_ROUTES.DASHBOARD],
-  ['presence', 'Presence', APP_ROUTES.PRESENCE],
-  ['links', 'Links', APP_ROUTES.CHAT_PROFILE_PANEL],
+  ['presence', 'Identity', APP_ROUTES.PRESENCE],
+  ['library', 'Work', APP_ROUTES.LIBRARY],
   ['audience', 'Audience', APP_ROUTES.CONTACTS_AUDIENCE],
 ] as const;
 
@@ -88,7 +88,7 @@ describe('canonical customer shell navigation', () => {
       'chat',
       'contacts',
       'events',
-      'library',
+      'links',
       'products',
       'releases',
       'tasks',
@@ -101,6 +101,7 @@ describe('canonical customer shell navigation', () => {
       'Contacts',
       'Events',
       'Library',
+      'Links',
       'Products',
       'Releases',
       'Tasks',

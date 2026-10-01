@@ -3,6 +3,11 @@ import {
   buildSpotifyCatalogConnectionRoute,
 } from '@/constants/routes';
 import {
+  parseSocialReplyDraft,
+  type SocialReplyAuthorKind,
+} from '@/lib/connectors/social-reply-draft';
+import {
+  SOCIAL_REPLY_DRAFT_KIND,
   WORKFLOW_CAPTURE_REQUEST_KIND,
   YOUTUBE_THUMBNAIL_CANDIDATE_KIND,
 } from '@/lib/connectors/suggested-action-kinds';
@@ -47,6 +52,19 @@ const PRIMARY_ACTION_LABEL_BY_KIND: Readonly<Record<string, string>> = {
   'calendar.create_event': 'Add to calendar',
   'brand_deal.opportunity': 'Approve buyer',
   [WORKFLOW_CAPTURE_REQUEST_KIND]: 'Record',
+  [SOCIAL_REPLY_DRAFT_KIND]: 'Approve Reply',
+};
+
+const SOCIAL_REPLY_TYPE_LABEL_BY_AUTHOR_KIND: Readonly<
+  Record<SocialReplyAuthorKind, string>
+> = {
+  fan: 'Fan Reply',
+  collab: 'Collab Request',
+  booking: 'Booking Inquiry',
+  sponsorship: 'Sponsorship Offer',
+  press: 'Press',
+  playlist: 'Playlist',
+  anonymous: 'Fan Reply',
 };
 
 function primaryActionLabelFor(
@@ -139,11 +157,13 @@ export function mapSuggestedActionToInboxCard(
     row.kind,
     row.payload
   );
+  const socialReply = parseSocialReplyDraft(row.kind, row.payload);
   const signalType = classifyOpportunitySignalType(row);
   let category: OpportunityInboxCardCategory;
   if (report) category = 'report';
   else if (brandDeal) category = 'brand_deal';
   else if (youtubeThumbnail) category = 'youtube_thumbnail';
+  else if (socialReply) category = 'social_reply';
   else if (workflowCapturePayload?.success) category = 'workflow_capture';
   else category = classifySuggestedActionCategory(row);
   const title = titleFromPayload(row.payload, category);
@@ -153,10 +173,14 @@ export function mapSuggestedActionToInboxCard(
   else if (category === 'workflow_capture') typeLabel = 'Workflow';
   else if (category === 'youtube_thumbnail') typeLabel = 'YouTube Thumbnail';
   else if (category === 'brand_deal') typeLabel = 'Brand Deal';
-  else typeLabel = OPPORTUNITY_SIGNAL_TYPE_META[signalType].label;
+  else if (socialReply) {
+    typeLabel = SOCIAL_REPLY_TYPE_LABEL_BY_AUTHOR_KIND[socialReply.authorKind];
+  } else typeLabel = OPPORTUNITY_SIGNAL_TYPE_META[signalType].label;
   let why: string;
   if (brandDeal) why = formatBrandDealOpportunityMetadata(brandDeal);
-  else if (youtubeThumbnail) {
+  else if (socialReply) {
+    why = `Inbound ${socialReply.platform} message from ${socialReply.authorLabel} awaiting your reply.`;
+  } else if (youtubeThumbnail) {
     why = `YouTube API snapshot captured ${youtubeThumbnail.apiMetrics.capturedAt}. Approval records intent; publication stays blocked pending a native Studio experiment and provider readback.`;
   } else why = whyFromRow(row, category);
   return {
@@ -191,6 +215,21 @@ export function mapSuggestedActionToInboxCard(
               workflowCaptureResult.data.state === 'uploaded_needs_review'
                 ? ('uploaded_needs_review' as const)
                 : ('pending' as const),
+          },
+        }
+      : {}),
+    ...(socialReply
+      ? {
+          socialReply: {
+            platform: socialReply.platform,
+            authorLabel: socialReply.authorLabel,
+            typeLabel:
+              SOCIAL_REPLY_TYPE_LABEL_BY_AUTHOR_KIND[socialReply.authorKind],
+            inboundText: socialReply.inboundText,
+            draftedText: socialReply.draftedText,
+            sourceUrl: socialReply.sourceUrl,
+            executionState: socialReply.executionState,
+            revisionCount: socialReply.revisions.length,
           },
         }
       : {}),
@@ -255,6 +294,12 @@ export function buildOpportunityInboxData(
     if (
       row.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND &&
       !parseYouTubeThumbnailCandidate(row.kind, row.payload)
+    ) {
+      return [];
+    }
+    if (
+      row.kind === SOCIAL_REPLY_DRAFT_KIND &&
+      !parseSocialReplyDraft(row.kind, row.payload)
     ) {
       return [];
     }

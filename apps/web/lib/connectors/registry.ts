@@ -112,7 +112,7 @@ export const CONNECTOR_REGISTRY = {
     id: CONNECTOR_PROVIDERS.youtube,
     label: 'YouTube',
     description:
-      'Import channel videos into Library and verify approved thumbnail changes.',
+      'Import channel videos into Work, verify approved thumbnail changes, and post approved comment replies.',
     iconKey: 'youtube',
     oauthBundle: 'youtube',
     oauthScopes: YOUTUBE_OAUTH_SCOPES,
@@ -120,6 +120,7 @@ export const CONNECTOR_REGISTRY = {
       'Read Channel Data',
       'Manage Videos',
       'View Channel Analytics',
+      'Post Approved Replies',
     ],
     tokenHandler: 'shared_token_vault',
     syncRunner: CONNECTOR_PROVIDERS.youtube,

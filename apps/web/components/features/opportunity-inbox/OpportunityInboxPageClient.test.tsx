@@ -117,6 +117,12 @@ vi.mock('@/lib/queries/useOpportunityInboxMutations', () => ({
       mutate: mutateMock,
       mutateAsync: mutateAsyncMock,
     },
+    reviseMutation: {
+      isPending: false,
+      variables: undefined,
+      mutate: mutateMock,
+      mutateAsync: mutateAsyncMock,
+    },
     nextStepMutation: {
       isPending: false,
       variables: undefined,
@@ -431,6 +437,7 @@ describe('OpportunityInboxPageClient', () => {
     const all = screen.getByRole('button', { name: 'All' });
     const newSong = screen.getByRole('button', { name: 'Songs' });
     const brandDeals = screen.getByRole('button', { name: 'Brand Deals' });
+    const fanReplies = screen.getByRole('button', { name: 'Fan Replies' });
 
     all.focus();
     await user.keyboard('{ArrowRight}');
@@ -448,7 +455,7 @@ describe('OpportunityInboxPageClient', () => {
     ).not.toBeInTheDocument();
 
     await user.keyboard('{End}');
-    expect(brandDeals).toHaveFocus();
+    expect(fanReplies).toHaveFocus();
     expect(newSong).toHaveAttribute('aria-pressed', 'true');
 
     await user.keyboard('{Home}');

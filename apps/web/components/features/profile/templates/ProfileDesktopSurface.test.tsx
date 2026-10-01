@@ -752,6 +752,71 @@ describe('ProfileDesktopSurface', () => {
     }
   );
 
+  // JOV-4429: tour lists often reuse one ticketing URL for every date, so
+  // each Tickets link needs a unique accessible name (WCAG 2.4.4).
+  it.each(['profile', 'tour'] as const)(
+    'gives per-event Tickets links unique accessible names in %s mode',
+    activeMode => {
+      const makeShow = (
+        id: string,
+        venueName: string,
+        startDate: string
+      ): TourDateViewModel => ({
+        id,
+        profileId: artist.id,
+        externalId: null,
+        provider: 'manual',
+        eventType: 'tour',
+        confirmationStatus: 'confirmed',
+        reviewedAt: '2026-01-01T00:00:00.000Z',
+        title: null,
+        venueName,
+        city: 'Los Angeles',
+        region: 'CA',
+        country: 'US',
+        startDate,
+        startTime: null,
+        timezone: 'America/Chicago',
+        latitude: null,
+        longitude: null,
+        ticketUrl: 'https://tickets.example.com/tour',
+        ticketStatus: 'available',
+        lastSyncedAt: null,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      });
+
+      render(
+        <ProfileDesktopSurface
+          artist={artist}
+          socialLinks={[]}
+          contacts={contacts}
+          photoDownloadSizes={[]}
+          tourDates={[
+            makeShow('show-1', 'The Echo', '2030-09-24T03:00:00Z'),
+            makeShow('show-2', 'The Wiltern', '2030-09-26T03:00:00Z'),
+          ]}
+          drawerOpen={false}
+          drawerView='menu'
+          activeMode={activeMode}
+          onModeSelect={vi.fn()}
+          onDrawerOpenChange={vi.fn()}
+          onDrawerViewChange={vi.fn()}
+          onOpenMenu={vi.fn()}
+          onPlayClick={vi.fn()}
+          profileHref='/timwhite'
+        />
+      );
+
+      expect(
+        screen.getByRole('link', { name: 'Tickets for The Echo on Sep 23' })
+      ).toHaveAttribute('href', 'https://tickets.example.com/tour');
+      expect(
+        screen.getByRole('link', { name: 'Tickets for The Wiltern on Sep 25' })
+      ).toHaveAttribute('href', 'https://tickets.example.com/tour');
+    }
+  );
+
   it('offers View Events only when upcoming dates exist', () => {
     const onModeSelect = vi.fn();
     const upcomingShow = {

@@ -8,6 +8,7 @@ import {
   type ResolverOutput,
   runMusicResolverParityCorpus,
   runMusicResolverShadow,
+  SHADOW_RECEIPT_VERSION,
 } from './shadow';
 
 vi.mock('server-only', () => ({}));
@@ -17,10 +18,9 @@ const selectDistinctQueue = vi.hoisted(() => ({ rows: [] as unknown[][] }));
 const mockSelect = vi.hoisted(() => vi.fn());
 const mockSelectDistinct = vi.hoisted(() => vi.fn());
 const mockInsert = vi.hoisted(() => vi.fn());
-const mockResolveAgentRelease = vi.hoisted(() => vi.fn());
-const mockMusicfetchLookupByIsrc = vi.hoisted(() => vi.fn());
 const mockLookupAppleMusicByIsrc = vi.hoisted(() => vi.fn());
 const mockLookupDeezerByIsrc = vi.hoisted(() => vi.fn());
+const mockLookupSpotifyByIsrc = vi.hoisted(() => vi.fn());
 const mockGetReleaseById = vi.hoisted(() => vi.fn());
 const mockValidateProviderUrl = vi.hoisted(() => vi.fn());
 const mockGetRegistryEntry = vi.hoisted(() => vi.fn());
@@ -32,20 +32,22 @@ vi.mock('@/lib/db', () => ({
     insert: mockInsert,
   },
 }));
-vi.mock('@/lib/agent-acquisition/release-resolution', () => ({
-  resolveAgentRelease: mockResolveAgentRelease,
-}));
-vi.mock('@/lib/discography/musicfetch', () => ({
-  lookupByIsrc: mockMusicfetchLookupByIsrc,
-}));
 vi.mock('@/lib/discography/provider-links', () => ({
   lookupAppleMusicByIsrc: mockLookupAppleMusicByIsrc,
   lookupDeezerByIsrc: mockLookupDeezerByIsrc,
+  lookupSpotifyByIsrc: mockLookupSpotifyByIsrc,
 }));
 vi.mock('@/lib/discography/queries', () => ({
   getReleaseById: mockGetReleaseById,
 }));
 vi.mock('@/lib/discography/provider-domains', () => ({
+  PROVIDER_DOMAINS: {
+    spotify: ['open.spotify.com', 'spotify.com'],
+    apple_music: ['music.apple.com'],
+    deezer: ['deezer.com', 'www.deezer.com'],
+    beatport: ['beatport.com', 'www.beatport.com'],
+    youtube: ['youtube.com', 'www.youtube.com', 'youtu.be'],
+  },
   validateProviderUrl: mockValidateProviderUrl,
 }));
 vi.mock('@/lib/dsp-registry', () => ({
@@ -70,10 +72,10 @@ const urlInput = {
 type ShadowReceipt = {
   version: number;
   corpusSeedId: string | null;
-  failureBehavior: { jovie: string; musicfetch: string };
+  failureBehavior: { jovie: string; reference: string };
   comparison: ReturnType<typeof compareResolverResults>;
-  cost: { jovie: number; musicfetch: number };
-  results: { jovie: ResolverOutput; musicfetch: ResolverOutput };
+  cost: { jovie: number; reference: number };
+  results: { jovie: ResolverOutput; reference: ResolverOutput };
 };
 
 const runShadow = (input: MusicResolverInput, corpusSeedId?: string) =>
@@ -100,12 +102,7 @@ beforeEach(() => {
       onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
     })),
   }));
-  mockResolveAgentRelease.mockResolvedValue({
-    status: 'error',
-    code: 'RELEASE_NOT_FOUND',
-    retryable: false,
-  });
-  mockMusicfetchLookupByIsrc.mockResolvedValue(null);
+  mockLookupSpotifyByIsrc.mockResolvedValue(null);
   mockLookupAppleMusicByIsrc.mockResolvedValue(null);
   mockLookupDeezerByIsrc.mockResolvedValue(null);
   mockGetReleaseById.mockResolvedValue(null);
@@ -127,16 +124,16 @@ describe('music resolver shadow contract', () => {
     expect(parsed[1]).toMatchObject({ isrc: 'USAAA2600001', territory: 'US' });
   });
 
-  it('preserves URL disagreements for adjudication without choosing Musicfetch as truth', () => {
+  it('preserves URL disagreements for adjudication without choosing the reference as truth', () => {
     const comparison = compareResolverResults(
       resolved({ spotify: 'https://open.spotify.com/track/jovie' }),
-      resolved({ spotify: 'https://open.spotify.com/track/musicfetch' })
+      resolved({ spotify: 'https://open.spotify.com/track/reference' })
     );
     expect(comparison).toMatchObject({
       status: 'disagreement',
       adjudication: 'pending',
       falsePositiveRate: null,
-      providerCoverage: { jovie: 1, musicfetch: 1, overlap: 0 },
+      providerCoverage: { jovie: 1, reference: 1, overlap: 0 },
     });
     expect(comparison.urlDisagreements).toHaveLength(1);
   });
@@ -178,7 +175,7 @@ describe('music resolver shadow contract', () => {
 
 describe('runMusicResolverShadow', () => {
   it('serves a cached receipt without resolving or writing', async () => {
-    const receipt = { cached: true };
+    const receipt = { version: SHADOW_RECEIPT_VERSION, cached: true };
     selectQueue.rows.push([{ receipt }]);
 
     const result = await runMusicResolverShadow({ input: urlInput });
@@ -186,6 +183,22 @@ describe('runMusicResolverShadow', () => {
     expect(result).toBe(receipt);
     expect(mockSelectDistinct).not.toHaveBeenCalled();
     expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it('treats a stale receipt version as a cache miss and recomputes', async () => {
+    selectQueue.rows.push([{ receipt: { version: 1, stale: true } }]);
+    selectDistinctQueue.rows.push([]);
+
+    const receipt = await runShadow({
+      kind: 'metadata',
+      artist: 'Tim White',
+      title: 'Unknown',
+      territory: 'US',
+    });
+
+    expect(receipt.version).toBe(SHADOW_RECEIPT_VERSION);
+    expect(mockSelectDistinct).toHaveBeenCalled();
+    expect(mockInsert).toHaveBeenCalledOnce();
   });
 
   it('records no_match when no exact entity exists', async () => {
@@ -196,7 +209,13 @@ describe('runMusicResolverShadow', () => {
 
     expect(receipt.failureBehavior).toEqual({
       jovie: 'no_match',
-      musicfetch: 'no_match',
+      reference: 'resolved',
+    });
+    expect(receipt.results.reference.providers).toEqual({
+      spotify: urlInput.url,
+    });
+    expect(receipt.results.reference.provenance).toEqual({
+      spotify: 'input_url',
     });
     expect(receipt.results.jovie.negativeEvidence).toMatchObject({
       reason: 'no_exact_entity',
@@ -260,16 +279,10 @@ describe('runMusicResolverShadow', () => {
       url: 'https://deezer.com/track/1',
       albumUrl: 'https://deezer.com/album/1',
     });
-    mockResolveAgentRelease.mockResolvedValue({
-      status: 'resolved',
-      facts: [
-        {
-          title: 'Take Me Over',
-          artist_name: 'Tim White',
-          upc: '00123456789012',
-          dsp_links: { spotify: 'https://open.spotify.com/track/mf' },
-        },
-      ],
+    mockLookupAppleMusicByIsrc.mockResolvedValue({
+      url: 'https://music.apple.com/track/ref',
+      trackName: 'Take Me Over',
+      artistName: 'Tim White',
     });
 
     const receipt = await runShadow(urlInput);
@@ -291,19 +304,28 @@ describe('runMusicResolverShadow', () => {
       spotify: 'provider_links:ingested',
       deezer: 'deezer_isrc',
     });
-    // apple_music already covered by provider links; only deezer fetched.
-    expect(mockLookupAppleMusicByIsrc).not.toHaveBeenCalled();
-    expect(mockLookupDeezerByIsrc).toHaveBeenCalledWith('USAAA2600001');
     expect(receipt.cost.jovie).toBe(1);
-    expect(receipt.results.musicfetch.entity).toMatchObject({
+    // Reference resolves independently: the input URL identifies spotify and
+    // every ISRC lookup runs against the official DSP APIs.
+    expect(receipt.results.reference.providers).toMatchObject({
+      spotify: urlInput.url,
+      apple_music: 'https://music.apple.com/track/ref',
+      deezer: 'https://deezer.com/album/1',
+    });
+    expect(receipt.results.reference.provenance).toMatchObject({
+      spotify: 'input_url',
+      apple_music: 'apple_music_isrc',
+    });
+    expect(receipt.results.reference.entity).toMatchObject({
       title: 'Take Me Over',
       artist: 'Tim White',
-      upc: '00123456789012',
+      isrc: 'USAAA2600001',
     });
+    expect(receipt.cost.reference).toBe(3);
     expect(receipt.comparison.urlDisagreements).toContainEqual({
       provider: 'spotify',
       jovie: 'https://open.spotify.com/track/jovie',
-      musicfetch: 'https://open.spotify.com/track/mf',
+      reference: urlInput.url,
     });
     expect(receipt.comparison.status).toBe('disagreement');
   });
@@ -341,15 +363,19 @@ describe('runMusicResolverShadow', () => {
     });
     expect(receipt.cost.jovie).toBe(2);
     expect(receipt.results.jovie.entity?.artist).toBeNull();
-    // musicfetch resolves by ISRC and returns null -> no_match
-    expect(mockMusicfetchLookupByIsrc).toHaveBeenCalledWith('USAAA2600001');
-    expect(receipt.results.musicfetch.status).toBe('no_match');
-    expect(receipt.results.musicfetch.negativeEvidence?.reason).toBe(
-      'musicfetch_no_match'
-    );
+    // reference resolves the same ISRC through official DSP APIs
+    expect(mockLookupSpotifyByIsrc).toHaveBeenCalledWith('USAAA2600001', {
+      market: 'US',
+    });
+    expect(receipt.results.reference.status).toBe('resolved');
+    expect(receipt.results.reference.providers).toMatchObject({
+      apple_music: 'https://music.apple.com/track/x',
+      deezer: 'https://deezer.com/track/1',
+    });
+    expect(receipt.cost.reference).toBe(3);
   });
 
-  it('resolves musicfetch by ISRC for metadata inputs when jovie found one', async () => {
+  it('resolves the reference by ISRC for metadata inputs when jovie found one', async () => {
     selectQueue.rows.push([], [{ isrc: 'USAAA2600001' }]);
     selectDistinctQueue.rows.push([{ id: 'r1' }]);
     mockGetReleaseById.mockResolvedValue({
@@ -359,13 +385,13 @@ describe('runMusicResolverShadow', () => {
       upc: null,
       providerLinks: [],
     });
-    mockMusicfetchLookupByIsrc.mockResolvedValue({
-      links: { spotify: 'https://open.spotify.com/track/mf' },
-      raw: {
-        name: 'Take Me Over',
-        artists: [{ name: 'Tim White' }],
-        isrc: 'USAAA2600001',
-      },
+    mockLookupAppleMusicByIsrc.mockResolvedValue({
+      url: 'https://music.apple.com/track/ref',
+      trackName: 'Take Me Over',
+      artistName: 'Tim White',
+    });
+    mockLookupSpotifyByIsrc.mockResolvedValue({
+      url: 'https://open.spotify.com/track/ref',
     });
 
     const receipt = await runShadow({
@@ -375,18 +401,19 @@ describe('runMusicResolverShadow', () => {
       territory: 'US',
     });
 
-    expect(receipt.results.musicfetch.status).toBe('resolved');
-    expect(receipt.results.musicfetch.entity).toMatchObject({
+    expect(receipt.results.reference.status).toBe('resolved');
+    expect(receipt.results.reference.entity).toMatchObject({
       title: 'Take Me Over',
       artist: 'Tim White',
       isrc: 'USAAA2600001',
     });
-    expect(receipt.results.musicfetch.provenance).toEqual({
-      spotify: 'musicfetch',
+    expect(receipt.results.reference.provenance).toEqual({
+      apple_music: 'apple_music_isrc',
+      spotify: 'spotify_isrc',
     });
   });
 
-  it('skips musicfetch when no exact identifier exists', async () => {
+  it('skips the reference lookups when no exact identifier exists', async () => {
     selectQueue.rows.push([]);
     selectDistinctQueue.rows.push([]);
 
@@ -397,51 +424,44 @@ describe('runMusicResolverShadow', () => {
       territory: 'US',
     });
 
-    expect(receipt.results.musicfetch.negativeEvidence?.reason).toBe(
-      'no_musicfetch_exact_identifier'
+    expect(receipt.results.reference.negativeEvidence?.reason).toBe(
+      'no_reference_exact_identifier'
     );
-    expect(receipt.results.musicfetch.requestCount).toBe(0);
+    expect(receipt.results.reference.requestCount).toBe(0);
+    expect(mockLookupSpotifyByIsrc).not.toHaveBeenCalled();
   });
 
-  it('maps musicfetch error codes to resolver statuses', async () => {
-    mockResolveAgentRelease.mockResolvedValue({
-      status: 'error',
-      code: 'UPSTREAM_FAILURE',
-      retryable: true,
-    });
+  it('records reference no_match when every DSP lookup misses', async () => {
     selectQueue.rows.push([]);
     selectDistinctQueue.rows.push([]);
 
-    const receipt = await runShadow(urlInput);
-    expect(receipt.results.musicfetch.status).toBe('upstream_error');
-    expect(receipt.results.musicfetch.requestCount).toBe(1);
-
-    mockResolveAgentRelease.mockResolvedValue({
-      status: 'error',
-      code: 'UNSUPPORTED_RELEASE',
-      retryable: false,
-    });
-    selectQueue.rows.push([]);
-    selectDistinctQueue.rows.push([]);
-    const unsupported = await runShadow({
-      kind: 'upc',
-      upc: '00123456789012',
+    const receipt = await runShadow({
+      kind: 'isrc',
+      isrc: 'USAAA2600001',
       territory: 'US',
     });
-    expect(unsupported.results.musicfetch.status).toBe('no_match');
-    expect(unsupported.results.musicfetch.requestCount).toBe(0);
+
+    expect(receipt.results.reference.status).toBe('no_match');
+    expect(receipt.results.reference.negativeEvidence?.reason).toBe(
+      'reference_no_match'
+    );
+    expect(receipt.results.reference.requestCount).toBe(3);
   });
 
-  it('records upstream_error when a provider call throws', async () => {
+  it('records upstream_error when a DSP lookup throws', async () => {
     selectQueue.rows.push([]);
     selectDistinctQueue.rows.push([]);
-    mockResolveAgentRelease.mockRejectedValue(new Error('boom'));
+    mockLookupSpotifyByIsrc.mockRejectedValue(new Error('boom'));
 
-    const receipt = await runShadow(urlInput);
+    const receipt = await runShadow({
+      kind: 'isrc',
+      isrc: 'USAAA2600001',
+      territory: 'US',
+    });
 
-    expect(receipt.results.musicfetch.status).toBe('upstream_error');
-    expect(receipt.results.musicfetch.negativeEvidence?.reason).toBe(
-      'musicfetch_upstream_error'
+    expect(receipt.results.reference.status).toBe('upstream_error');
+    expect(receipt.results.reference.negativeEvidence?.reason).toBe(
+      'reference_upstream_error'
     );
   });
 
@@ -449,7 +469,7 @@ describe('runMusicResolverShadow', () => {
     const receipts = (await runMusicResolverParityCorpus()) as ShadowReceipt[];
     expect(receipts).toHaveLength(MUSIC_RESOLVER_PARITY_CORPUS.length);
     expect(receipts[0]).toMatchObject({
-      version: 1,
+      version: SHADOW_RECEIPT_VERSION,
       corpusSeedId: MUSIC_RESOLVER_PARITY_CORPUS[0].id,
     });
   });

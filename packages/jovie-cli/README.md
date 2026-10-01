@@ -6,15 +6,15 @@ URL, then hand the artist a claim link. No login or API key is required.
 
 ## Install
 
-Install an exact public release globally from npm:
+Requires Node.js `>=24.21.0 <25`. Install an exact public release globally from npm:
 
 ```sh
-npm install --global @jovie/cli
+npm install --global @jovie/cli@26.9.16
 jovie --help
 jovie --version
 ```
 
-Or run without installing: `npx -y @jovie/cli --help`.
+Or run without installing: `npx -y @jovie/cli@26.9.16 --help`.
 
 Use `npm view @jovie/cli version` to confirm registry availability before an
 automated install. A repository build is not proof that npm has the package.
@@ -43,6 +43,12 @@ Creation is anonymous and rate limited per IP.
 `{"content":"..."}`. Failures print `{"error":{...}}`, and API failures carry
 the server's stable `apiCode` (for example `RATE_LIMITED`). Successful commands
 exit `0`, request/response failures exit `1`, and invalid usage exits `2`.
+
+`--help --json` returns `{ "content": "..." }`; `--version --json` returns `{ "version": "..." }`.
+
+Reads retry one transport failure. Writes never retry automatically: a timeout may
+have occurred after the server committed. Report tools therefore do not advertise
+idempotency. Responses share a 30-second request deadline and a 1 MiB body limit.
 
 Every command accepts `--base-url <url>` for a compatible deployment origin.
 The value must be an `http` or `https` origin without a path, credentials, or

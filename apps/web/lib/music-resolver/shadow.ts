@@ -3,7 +3,6 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { and, sql as drizzleSql, eq, gt, or } from 'drizzle-orm';
 import { z } from 'zod';
-import { resolveAgentRelease } from '@/lib/agent-acquisition/release-resolution';
 import { db } from '@/lib/db';
 import {
   discogRecordings,
@@ -13,11 +12,14 @@ import {
 } from '@/lib/db/schema/content';
 import { musicResolverReceipts } from '@/lib/db/schema/music-resolver';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { lookupByIsrc as musicfetchLookupByIsrc } from '@/lib/discography/musicfetch';
-import { validateProviderUrl } from '@/lib/discography/provider-domains';
+import {
+  PROVIDER_DOMAINS,
+  validateProviderUrl,
+} from '@/lib/discography/provider-domains';
 import {
   lookupAppleMusicByIsrc,
   lookupDeezerByIsrc,
+  lookupSpotifyByIsrc,
 } from '@/lib/discography/provider-links';
 import { getReleaseById } from '@/lib/discography/queries';
 import type { ProviderKey } from '@/lib/discography/types';
@@ -76,7 +78,7 @@ export const MUSIC_RESOLVER_PARITY_CORPUS: ReadonlyArray<{
   input: MusicResolverInput;
   covers: string[];
 }> = JSON.parse(
-  '[{"id":"tim-take-me-over-spotify","input":{"kind":"url","url":"https://open.spotify.com/track/4bc0TJNIiGEJjFYDwHuOjX","territory":"US"},"covers":["tim_catalog","collaboration","musicfetch_success"]},{"id":"tim-take-me-over-youtube","input":{"kind":"url","url":"https://www.youtube.com/watch?v=LtDL1HHq954","territory":"US"},"covers":["long_tail_provider","provider_coverage"]},{"id":"tim-same-name-remix","input":{"kind":"metadata","artist":"Tim White","title":"Take Me Over (Austin Leeds Remix)","territory":"US"},"covers":["ambiguous_artist","feature_or_remix","split_provider_identity"]},{"id":"tim-regional-storefront","input":{"kind":"url","url":"https://open.spotify.com/track/4bc0TJNIiGEJjFYDwHuOjX","territory":"GB"},"covers":["regional_storefront"]},{"id":"tim-wrong-beatport-identity","input":{"kind":"url","url":"https://www.beatport.com/artist/tim-white/406847","territory":"US"},"covers":["ambiguous_artist","split_provider_identity","musicfetch_failure"]},{"id":"tim-stale-legacy-link","input":{"kind":"url","url":"https://jov.ie/tim/take-me-over","territory":"US"},"covers":["stale_or_broken_link","musicfetch_failure"]}]'
+  '[{"id":"tim-take-me-over-spotify","input":{"kind":"url","url":"https://open.spotify.com/track/4bc0TJNIiGEJjFYDwHuOjX","territory":"US"},"covers":["tim_catalog","collaboration","reference_success"]},{"id":"tim-take-me-over-youtube","input":{"kind":"url","url":"https://www.youtube.com/watch?v=LtDL1HHq954","territory":"US"},"covers":["long_tail_provider","provider_coverage"]},{"id":"tim-same-name-remix","input":{"kind":"metadata","artist":"Tim White","title":"Take Me Over (Austin Leeds Remix)","territory":"US"},"covers":["ambiguous_artist","feature_or_remix","split_provider_identity"]},{"id":"tim-regional-storefront","input":{"kind":"url","url":"https://open.spotify.com/track/4bc0TJNIiGEJjFYDwHuOjX","territory":"GB"},"covers":["regional_storefront"]},{"id":"tim-wrong-beatport-identity","input":{"kind":"url","url":"https://www.beatport.com/artist/tim-white/406847","territory":"US"},"covers":["ambiguous_artist","split_provider_identity","reference_failure"]},{"id":"tim-stale-legacy-link","input":{"kind":"url","url":"https://jov.ie/tim/take-me-over","territory":"US"},"covers":["stale_or_broken_link","reference_failure"]}]'
 );
 
 export function musicResolverInputKey(input: MusicResolverInput): string {
@@ -220,102 +222,121 @@ async function resolveJovie(
   };
 }
 
-async function resolveMusicfetch(
+function providerForUrl(url: string): ProviderKey | null {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    for (const [provider, domains] of Object.entries(PROVIDER_DOMAINS)) {
+      if (
+        domains.some(
+          domain => hostname === domain || hostname.endsWith(`.${domain}`)
+        )
+      )
+        return provider as ProviderKey;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+// Independent parity reference built from official DSP APIs only (JOV-7369
+// benchmark-source gate: no third-party vendor oracle without written
+// permission covering comparison, caching, and retention).
+const REFERENCE_ISRC_PROVIDERS = ['spotify', 'apple_music', 'deezer'] as const;
+
+async function resolveReference(
   input: MusicResolverInput,
   jovie: ResolverOutput
 ): Promise<ResolverOutput> {
-  const lookup =
-    input.kind === 'jovie' || input.kind === 'metadata'
-      ? jovie.entity?.isrc
-        ? { field: 'isrc', value: jovie.entity.isrc }
-        : null
-      : {
-          field: input.kind,
-          value:
-            input.kind === 'url'
-              ? input.url
-              : input.kind === 'isrc'
-                ? input.isrc
-                : input.upc,
-        };
-  if (!lookup) return emptyResult('no_match', 'no_musicfetch_exact_identifier');
-  try {
-    let providers: Record<string, string>;
-    let entity: ResolverOutput['entity'];
-    if (lookup.field === 'isrc') {
-      const result = await musicfetchLookupByIsrc(lookup.value);
-      if (!result) return emptyResult('no_match', 'musicfetch_no_match', 0, 1);
-      providers = result.links;
-      entity = {
-        id: '',
-        title: result.raw.name,
-        artist: result.raw.artists?.[0]?.name ?? null,
-        upc: null,
-        isrc: result.raw.isrc,
-      };
-    } else {
-      const result = await resolveAgentRelease({
-        draft_id: '00000000-0000-4000-8000-000000000000',
-        draft_token: 'shadow',
-        goal: 'resolver parity',
-        ...(lookup.field === 'url'
-          ? { release_url: lookup.value }
-          : { upc: lookup.value }),
-      });
-      if (result.status === 'error')
-        return emptyResult(
-          result.code === 'UPSTREAM_FAILURE' ? 'upstream_error' : 'no_match',
-          `musicfetch_${result.code.toLowerCase()}`,
-          0,
-          result.code === 'UNSUPPORTED_RELEASE' ? 0 : 1
-        );
-      providers = Object.assign(
-        {},
-        ...result.facts.map(fact => fact.dsp_links)
-      );
-      const fact = result.facts[0];
-      entity = fact && {
-        id: '',
-        title: fact.title ?? '',
-        artist: fact.artist_name,
-        upc: fact.upc,
-        isrc: null,
-      };
+  const providers: Record<string, string> = {};
+  const provenance: Record<string, string> = {};
+  if (input.kind === 'url') {
+    const provider = providerForUrl(input.url);
+    if (provider) {
+      providers[provider] = input.url;
+      provenance[provider] = 'input_url';
     }
+  }
+  const isrc =
+    input.kind === 'isrc' ? input.isrc : (jovie.entity?.isrc ?? null);
+  if (!isrc)
+    return Object.keys(providers).length
+      ? {
+          status: 'resolved',
+          providers,
+          provenance,
+          confidence: 0.9,
+          requestCount: 0,
+        }
+      : emptyResult('no_match', 'no_reference_exact_identifier');
+  const requestCount = REFERENCE_ISRC_PROVIDERS.length;
+  try {
+    const [spotify, apple, deezer] = await Promise.all([
+      lookupSpotifyByIsrc(isrc, { market: input.territory }),
+      lookupAppleMusicByIsrc(isrc, {
+        storefront: input.territory.toLowerCase(),
+      }),
+      lookupDeezerByIsrc(isrc),
+    ]);
+    if (spotify) {
+      providers.spotify = spotify.url;
+      provenance.spotify = 'spotify_isrc';
+    }
+    if (apple) {
+      providers.apple_music = apple.url;
+      provenance.apple_music = 'apple_music_isrc';
+    }
+    if (deezer) {
+      providers.deezer = deezer.albumUrl ?? deezer.url;
+      provenance.deezer = 'deezer_isrc';
+    }
+    if (!Object.keys(providers).length)
+      return emptyResult('no_match', 'reference_no_match', 0, requestCount);
     return {
       status: 'resolved',
-      entity,
+      entity: apple
+        ? {
+            id: '',
+            title: apple.trackName ?? '',
+            artist: apple.artistName,
+            upc: null,
+            isrc,
+          }
+        : undefined,
       providers: Object.fromEntries(
         Object.entries(providers).sort(([a], [b]) => a.localeCompare(b))
       ),
-      provenance: Object.fromEntries(
-        Object.keys(providers).map(provider => [provider, 'musicfetch'])
-      ),
-      confidence: 0.99,
-      requestCount: 1,
+      provenance,
+      confidence: 0.9,
+      requestCount,
     };
   } catch {
-    return emptyResult('upstream_error', 'musicfetch_upstream_error', 0, 1);
+    return emptyResult(
+      'upstream_error',
+      'reference_upstream_error',
+      0,
+      requestCount
+    );
   }
 }
 
 export function compareResolverResults(
   jovie: ResolverOutput,
-  musicfetch: ResolverOutput
+  reference: ResolverOutput
 ) {
   const providers = [
     ...new Set(
-      Object.keys(jovie.providers).concat(Object.keys(musicfetch.providers))
+      Object.keys(jovie.providers).concat(Object.keys(reference.providers))
     ),
   ].sort();
   const disagreements = providers
     .filter(
-      provider => jovie.providers[provider] !== musicfetch.providers[provider]
+      provider => jovie.providers[provider] !== reference.providers[provider]
     )
     .map(provider => ({
       provider,
       jovie: jovie.providers[provider] ?? null,
-      musicfetch: musicfetch.providers[provider] ?? null,
+      reference: reference.providers[provider] ?? null,
     }));
   const summarize = (result: ResolverOutput) => ({
     identifiers: {
@@ -331,36 +352,38 @@ export function compareResolverResults(
       ].filter(Boolean).length / 4,
   });
   const jovieSummary = summarize(jovie);
-  const musicfetchSummary = summarize(musicfetch);
+  const referenceSummary = summarize(reference);
   const agrees = (field: 'upc' | 'isrc') => {
     const left = jovieSummary.identifiers[field];
-    const right = musicfetchSummary.identifiers[field];
+    const right = referenceSummary.identifiers[field];
     return left && right ? left === right : null;
   };
   return {
     status:
-      !disagreements.length && jovie.status === musicfetch.status
+      !disagreements.length && jovie.status === reference.status
         ? 'match'
         : 'disagreement',
     providerCoverage: {
       jovie: Object.keys(jovie.providers).length,
-      musicfetch: Object.keys(musicfetch.providers).length,
+      reference: Object.keys(reference.providers).length,
       overlap: providers.length - disagreements.length,
     },
     urlDisagreements: disagreements,
     identifierAccuracy: {
       jovie: jovieSummary.identifiers,
-      musicfetch: musicfetchSummary.identifiers,
+      reference: referenceSummary.identifiers,
       agreement: { upc: agrees('upc'), isrc: agrees('isrc') },
     },
     falsePositiveRate: null,
     metadataCompleteness: {
       jovie: jovieSummary.completeness,
-      musicfetch: musicfetchSummary.completeness,
+      reference: referenceSummary.completeness,
     },
     adjudication: disagreements.length ? 'pending' : 'not_required',
   };
 }
+
+export const SHADOW_RECEIPT_VERSION = 2;
 
 export const musicResolverShadowPayloadSchema = z.object({
   corpusSeedId: z.string().max(100).optional(),
@@ -383,31 +406,35 @@ export async function runMusicResolverShadow(
       )
     )
     .limit(1);
-  if (cached) return cached.receipt;
+  if (
+    (cached?.receipt as { version?: number } | undefined)?.version ===
+    SHADOW_RECEIPT_VERSION
+  )
+    return cached.receipt;
   const jovieStart = Date.now();
   const jovie = await resolveJovie(parsed.input);
   const jovieLatencyMs = Date.now() - jovieStart;
-  const musicfetchStart = Date.now();
-  const musicfetch = await resolveMusicfetch(parsed.input, jovie);
-  const musicfetchLatencyMs = Date.now() - musicfetchStart;
+  const referenceStart = Date.now();
+  const reference = await resolveReference(parsed.input, jovie);
+  const referenceLatencyMs = Date.now() - referenceStart;
   const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const receipt = {
-    version: 1,
+    version: SHADOW_RECEIPT_VERSION,
     inputKey: key,
     corpusSeedId: parsed.corpusSeedId ?? null,
     territory: parsed.input.territory,
     observedAt: now.toISOString(),
     expiresAt: expiresAt.toISOString(),
-    comparison: compareResolverResults(jovie, musicfetch),
-    latencyMs: { jovie: jovieLatencyMs, musicfetch: musicfetchLatencyMs },
+    comparison: compareResolverResults(jovie, reference),
+    latencyMs: { jovie: jovieLatencyMs, reference: referenceLatencyMs },
     cost: {
       unit: 'requests',
       jovie: jovie.requestCount,
-      musicfetch: musicfetch.requestCount,
+      reference: reference.requestCount,
     },
-    failureBehavior: { jovie: jovie.status, musicfetch: musicfetch.status },
+    failureBehavior: { jovie: jovie.status, reference: reference.status },
     input: parsed.input,
-    results: { jovie, musicfetch },
+    results: { jovie, reference },
   };
   const row = {
     inputKey: key,

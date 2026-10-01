@@ -45,7 +45,7 @@ vi.mock('@/lib/tracking/navigation-telemetry', () => ({
     mockTrackNavigationImpressions(...args),
 }));
 
-const EXPANDED_LABELS = ['Home', 'Presence', 'Links', 'Audience'] as const;
+const EXPANDED_LABELS = ['Home', 'Identity', 'Work', 'Audience'] as const;
 
 describe('DashboardMobileTabs', () => {
   beforeEach(() => {
@@ -70,8 +70,8 @@ describe('DashboardMobileTabs', () => {
 
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([
       'Home',
-      'Presence',
-      'Links',
+      'Identity',
+      'Work',
     ]);
     expect(
       within(tabs).getByRole('button', { name: 'More options' })
@@ -86,11 +86,11 @@ describe('DashboardMobileTabs', () => {
     render(<DashboardMobileTabs />);
 
     expect(mockTrackNavigationImpressions).toHaveBeenCalledWith(
-      ['home', 'presence', 'links'],
+      ['home', 'presence', 'library'],
       APP_ROUTES.CHAT,
       expect.objectContaining({
         isMobile: true,
-        navVariant: 'canonical_customer_ia_v1',
+        navVariant: 'canonical_identity_work_v1',
       })
     );
     await user.click(screen.getByRole('button', { name: 'More options' }));
@@ -105,7 +105,7 @@ describe('DashboardMobileTabs', () => {
       context: {
         isElectron: false,
         isMobile: true,
-        navVariant: 'canonical_customer_ia_v1',
+        navVariant: 'canonical_identity_work_v1',
       },
     });
   });
@@ -126,7 +126,7 @@ describe('DashboardMobileTabs', () => {
     expect(links.slice(0, 4).map(link => link.getAttribute('href'))).toEqual([
       APP_ROUTES.DASHBOARD,
       APP_ROUTES.PRESENCE,
-      APP_ROUTES.CHAT_PROFILE_PANEL,
+      APP_ROUTES.LIBRARY,
       APP_ROUTES.CONTACTS_AUDIENCE,
     ]);
     expect(links.at(4)).toHaveTextContent('Public Profile');
@@ -137,6 +137,7 @@ describe('DashboardMobileTabs', () => {
     for (const label of [
       'Events',
       'Library',
+      'Links',
       'Products',
       'Releases',
       'Tasks',
@@ -261,7 +262,7 @@ describe('DashboardMobileTabs', () => {
     const directLinks = within(tabs).getAllByRole('link');
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([
       'Home',
-      'Presence',
+      'Identity',
       'Audience',
     ]);
     expect(
