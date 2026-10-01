@@ -640,6 +640,7 @@
   "tests/unit/ci/vercel-config.test.ts",
   "tests/unit/ci/visual-a11y-workflow.test.ts",
   "tests/unit/ci/vitest-coverage-thresholds.test.ts",
+  "tests/unit/cloudflare/",
   "tests/unit/components/admin/ShippingVelocityChart.source.test.ts",
   "tests/unit/components/admin/TimActionRequiredSection.tokens.test.ts",
   "tests/unit/components/admin/admin-user-actions.test.ts",
