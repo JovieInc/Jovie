@@ -2773,20 +2773,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     );
     writeFileSync(
       resolve(dir, 'gh'),
-      `#!/usr/bin/env node
-      const fs = require('node:fs');
-      const args = process.argv.slice(2);
-      fs.appendFileSync(process.env.STAMP_CALLS, JSON.stringify(args) + String.fromCharCode(10));
-      if (args[0] === 'api' && args[1] === 'graphql' && args.some(arg => arg.includes('MergeQueueOpenPullRequestStates'))) {
-        if (!args.includes('--paginate') || !args.includes('--slurp')) process.exit(9);
-        console.log(process.env.STAMP_PAGES);
-        if (process.env.STAMP_INVENTORY_FAILURE === '1') process.exit(1);
-      } else if (args[0] === 'pr' && args[1] === 'view' && args.includes('files')) {
-        const files = JSON.parse(process.env.STAMP_FILES)[args[2]];
-        if (files == null) process.exit(1);
-        console.log(JSON.stringify(files));
-      } else { console.error('Unexpected gh invocation'); process.exit(9); }
-    `,
+      "#!/bin/sh\nset -eu\njq -cn --args '$ARGS.positional' -- \"$@\" >> \"$STAMP_CALLS\"\nquery=0\npaginate=0\nslurp=0\nfiles_arg=0\nfor arg do\n  case \"$arg\" in *MergeQueueOpenPullRequestStates*) query=1;; esac\n  case \"$arg\" in\n    --paginate) paginate=1;;\n    --slurp) slurp=1;;\n    files) files_arg=1;;\n  esac\ndone\nif [ \"${1:-}\" = api ] && [ \"${2:-}\" = graphql ] && [ \"$query\" = 1 ]; then\n  [ \"$paginate\" = 1 ] && [ \"$slurp\" = 1 ] || exit 9\n  printf '%s\\n' \"$STAMP_PAGES\"\n  [ \"$STAMP_INVENTORY_FAILURE\" != 1 ] || exit 1\nelif [ \"${1:-}\" = pr ] && [ \"${2:-}\" = view ] && [ \"$files_arg\" = 1 ]; then\n  files=$(printf '%s' \"$STAMP_FILES\" | jq -c --arg number \"${3:-}\" '.[$number]')\n  [ \"$files\" != null ] || exit 1\n  printf '%s\\n' \"$files\"\nelse\n  printf '%s\\n' 'Unexpected gh invocation' >&2\n  exit 9\nfi\n",
       { mode: 0o755 }
     );
     try {

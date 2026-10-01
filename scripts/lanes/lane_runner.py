@@ -995,7 +995,7 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
                 fence = state["binding"]["attempt"]
                 claimed = execution_attempt.resume(runs / "execution-attempts.jsonl", ident, fence, owner,
                                                    coordination=coordination)
-            else:
+            if claimed is None or not claimed["admitted"]:
                 claimed = execution_attempt.claim(runs / "execution-attempts.jsonl", ident, owner, policy,
                     {"triggerId": run_id, "correlationId": issue.identifier, "causationId": issue.id}, coordination=coordination)
             receipt["execution"] = claimed

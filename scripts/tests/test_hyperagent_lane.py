@@ -298,9 +298,52 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(sum(r["event"] == "attempt_started" for r in rows), 1)
         self.assertEqual(sum(r["event"] == "attempt_finished" for r in rows), 1)
         self.assertEqual(sum(r.get("reservation", {}).get("spend", 0) for r in rows), 1)
-        self.assertEqual(self.run_entry()["verdict"], "remote-held")
+        terminal_ledger = (self.host.state / "runs/execution-attempts.jsonl").read_text()
+        repeated = self.run_entry()
+        self.assertEqual(repeated["verdict"], "remote-held")
+        self.assertEqual(repeated["reasons"], ["generation_terminal"])
+        self.assertEqual((self.host.state / "runs/execution-attempts.jsonl").read_text(), terminal_ledger)
         self.assertEqual(len(self.gates), 1)
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
+
+    def test_expired_remote_attempt_is_reconciled_without_another_dispatch(self):
+        from unittest.mock import patch
+        self.approval = True
+        held = self.run_entry()
+        self.assertEqual(held["reasons"], ["remote-approval-required"])
+        expired_at = held["execution"]["leaseExpiresAt"]
+        self.spec["verifiedRemote"].update(verifiedAt=expired_at, expiresAt=expired_at + 120)
+        calls_before = list(self.calls)
+        journal = next((self.host.state / "runs").glob("*.provider.jsonl"))
+        journal_before = journal.read_text()
+        with patch("time.time", return_value=expired_at):
+            reconciled = self.run_entry()
+            repeated = self.run_entry()
+        self.assertEqual(reconciled["reasons"], ["expired_attempt_reconciled"])
+        self.assertEqual(repeated["reasons"], ["generation_terminal"])
+        rows = [json.loads(line) for line in
+                (self.host.state / "runs/execution-attempts.jsonl").read_text().splitlines()]
+        self.assertEqual(sum(row["event"] == "attempt_started" for row in rows), 1)
+        self.assertEqual(sum(row["event"] == "attempt_finished" for row in rows), 1)
+        self.assertEqual(rows[-1]["failureClass"], "lost_worker")
+        self.assertEqual(rows[-1]["terminalState"], "failed_unknown")
+        self.assertEqual(self.calls, calls_before)
+        self.assertEqual(journal.read_text(), journal_before)
+        self.assertFalse(self.gates)
+
+    def test_live_remote_attempt_keeps_foreign_owner_out_without_renewal(self):
+        from unittest.mock import patch
+        self.approval = True
+        held = self.run_entry()
+        path = self.host.state / "runs/execution-attempts.jsonl"
+        ledger_before, calls_before = path.read_text(), list(self.calls)
+        with patch.object(self.lane, "HOST", "another-worker"):
+            duplicate = self.run_entry()
+        self.assertEqual(duplicate["reasons"], ["duplicate_active"])
+        self.assertEqual(duplicate["execution"]["fencingToken"], held["execution"]["fencingToken"])
+        self.assertEqual(path.read_text(), ledger_before)
+        self.assertEqual(self.calls, calls_before)
+        self.assertFalse(self.gates)
 
     def test_actual_entry_restart_keeps_live_fence_and_resumes_approval_hold(self):
         self.approval = True
@@ -379,7 +422,7 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.spec["verifiedRemote"].update(verifiedAt=expired, expiresAt=expired + 120)
         with patch.object(self.lane.time, "time", return_value=expired):
             result = self.run_entry()
-        self.assertEqual(result["reasons"], ["resume_not_admitted"])
+        self.assertEqual(result["reasons"], ["expired_attempt_reconciled"])
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
 
 
