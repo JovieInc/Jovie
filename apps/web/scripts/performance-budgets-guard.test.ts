@@ -1150,7 +1150,7 @@ describe('performance budgets guard', () => {
     expect(queriedSelectors).not.toContain('[data-testid="persistent-shell"]');
   });
 
-  it('records warm shell response before waiting for destination content', async () => {
+  it('records the shell acknowledgment before waiting for destination content', async () => {
     const fixture = createInteractivePage({
       contentSelector: '[data-testid="destination-content"]',
       finalUrl: 'http://127.0.0.1:4100/app/library',
@@ -1159,6 +1159,7 @@ describe('performance budgets guard', () => {
     const route = {
       id: 'warm-navigation-fixture',
       path: '/app/library',
+      navigationItemId: 'library',
       warmNavigationStartPath: '/app',
       measureMode: 'warm-navigation',
       readySelectors: {
@@ -1185,6 +1186,11 @@ describe('performance budgets guard', () => {
     expect(fixture.events.indexOf('goto')).toBeLessThan(
       fixture.events.indexOf('click')
     );
+    const acknowledgmentSelector =
+      '[data-navigation-item-id="library"][data-navigation-pending="true"]';
+    expect(
+      fixture.events.indexOf(`visible:${acknowledgmentSelector}`)
+    ).toBeLessThan(fixture.events.indexOf('elapsed:12'));
     expect(fixture.events.indexOf('elapsed:12')).toBeLessThan(
       fixture.events.indexOf(`visible:${fixture.contentSelector}`)
     );
