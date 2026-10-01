@@ -802,52 +802,118 @@ def process_group_alive(group: int) -> bool:
                    for line in members.stdout.splitlines() if len(fields := line.split()) == 2)
 
 
+def process_snapshot() -> dict:
+    """Only process identity/parent/group metadata; never commands or environments."""
+    result = subprocess.run(["ps", "-axo", "pid=,ppid=,pgid=,stat=,lstart="],
+                            capture_output=True, text=True, timeout=5)
+    if result.returncode:
+        raise RuntimeError("process-ownership-unavailable")
+    return {int(parts[0]): (int(parts[1]), int(parts[2]), parts[3], parts[4])
+            for line in result.stdout.splitlines() if len(parts := line.split(None, 4)) == 5}
+
+
+class AgentProcesses:
+    """Remember observed descendants across setsid/reparenting; reject reused PIDs."""
+    def __init__(self, pid):
+        self.pid, self.owned = pid, {}
+
+    def observe(self):
+        rows = process_snapshot()
+        live = {pid for pid, start in self.owned.items() if pid in rows and rows[pid][3] == start}
+        if not self.owned and self.pid in rows:
+            live.add(self.pid)
+        group_owned = self.pid not in rows or self.pid not in self.owned or rows[self.pid][3] == self.owned[self.pid]
+        while True:
+            children = {pid for pid, row in rows.items() if row[0] in live or (group_owned and row[1] == self.pid)}
+            if children <= live:
+                break
+            live |= children
+        self.owned.update({pid: rows[pid][3] for pid in live})
+        return {pid: rows[pid] for pid in live if not rows[pid][2].startswith("Z")}
+
+    def stop(self, proc):
+        import signal
+        for sig, grace in ((signal.SIGTERM, 15), (signal.SIGKILL, 5)):
+            rows = self.observe()
+            # Signal individual proven identities: a detached child's group may also
+            # contain unrelated processes. Refresh identity immediately before each kill.
+            for pid, row in rows.items():
+                current = process_snapshot().get(pid)
+                if current and current[3] == row[3]:
+                    try:
+                        os.kill(pid, sig)
+                    except ProcessLookupError:
+                        pass
+            deadline = time.monotonic() + grace
+            while time.monotonic() < deadline:
+                proc.poll()
+                if not self.observe():
+                    return
+                time.sleep(.05)
+        raise RuntimeError("owned-processes-still-running")
+
+
 def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
               guard_interval: float = 30) -> subprocess.CompletedProcess:
-    """The provider and every child it spawns live in one process group, so a timeout kills
-    all of them instead of leaving an agent editing a worktree the runner already gave up on.
-    Agent-started pnpm installs must also reuse the shared store instead of copying it."""
+    """Track descendants while the provider runs, including detached test sessions.
+    Observation cannot recover a child that daemonizes before its first snapshot;
+    preserved checkout admission therefore also refuses live working directories.
+    """
     import signal
     if guard:
         guard()
     env = {**os.environ, "npm_config_package_import_method": "hardlink"}
     proc = subprocess.Popen(cmd, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True,
                             start_new_session=True, env=env)
+    owned = AgentProcesses(proc.pid)
     try:
+        owned.observe()
         deadline = time.monotonic() + timeout
+        next_guard = time.monotonic() + guard_interval
         while True:
+            owned.observe()
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise subprocess.TimeoutExpired(cmd, timeout)
             try:
-                code = proc.wait(timeout=min(guard_interval, remaining) if guard else remaining)
+                code = proc.wait(timeout=min(1, guard_interval, remaining))
                 break
             except subprocess.TimeoutExpired:
-                if guard:
+                owned.observe()
+                if guard and time.monotonic() >= next_guard:
                     guard()
-                if not guard or time.monotonic() >= deadline:
+                    next_guard = time.monotonic() + guard_interval
+                if time.monotonic() >= deadline:
                     raise
+        owned.stop(proc)
+        return subprocess.CompletedProcess(cmd, code)
     except BaseException:
-        for sig, grace in ((signal.SIGTERM, 15), (signal.SIGKILL, 5)):
-            try:
-                os.killpg(proc.pid, sig)
-            except ProcessLookupError:
+        try:
+            owned.stop(proc)
+        finally:
+            for sig, grace in ((signal.SIGTERM, 15), (signal.SIGKILL, 5)):
+                # A reaped leader's PID/PGID may now belong to an unrelated job.
+                # Observed descendants are handled by their start identities above.
+                if proc.poll() is not None:
+                    break
+                try:
+                    os.killpg(proc.pid, sig)
+                except ProcessLookupError:
+                    break
+                except PermissionError:
+                    if not process_group_alive(proc.pid):
+                        break
+                    raise
+                deadline = time.monotonic() + grace
+                while time.monotonic() < deadline:
+                    proc.poll()  # Reap the leader; its exit does not prove its children exited.
+                    if not process_group_alive(proc.pid):
+                        break
+                    time.sleep(0.05)
+                else:
+                    continue
                 break
-            except PermissionError:
-                if not process_group_alive(proc.pid):
-                    break
-                raise
-            deadline = time.monotonic() + grace
-            while time.monotonic() < deadline:
-                proc.poll()  # Reap the leader; its exit does not prove its children exited.
-                if not process_group_alive(proc.pid):
-                    break
-                time.sleep(0.05)
-            else:
-                continue
-            break
         raise
-    return subprocess.CompletedProcess(cmd, code)
 
 
 PROVIDER_HANDOFFS = 2
@@ -908,6 +974,16 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     ident = execution_attempt.identity("linear-work", {"issue": issue.identifier, "outcome": "draft-pr"},
                                        {"title": issue.title, "description": issue.description})
     coordination = execution_coordination(execution_attempt.GITHUB_LEDGER_ANCHOR)
+    try:
+        preserved = preserved_run(host, issue=issue.identifier)
+        if preserved:
+            raise RecoveryHandoff("preserved-issue-needs-execution-reconciliation", preserved[0], issue.identifier)
+    except RecoveryHandoff as error:
+        receipt.update(verdict="recovery-handoff", reasons=[str(error)], recovery=error.evidence,
+                       endedAt=now_iso(), result={"verdict": "recovery-handoff", "pr": None, "commit": None})
+        with open(runs / "ledger.jsonl", "a") as ledger:
+            ledger.write(json.dumps(receipt) + "\n")
+        return receipt
     policy = {"attempts": MAX_FAILURES, "concurrency": 1, "wallSeconds": host.agent_timeout * MAX_FAILURES,
               "spend": MAX_FAILURES, "mutations": MAX_FAILURES,
               "leaseSeconds": host.agent_timeout + 900, "version": "lanes-v1"}
@@ -1539,12 +1615,115 @@ def require_fix_target(pr: dict, stage: str, *, worktree: Path | None = None) ->
     return live
 
 
+class RecoveryHandoff(RuntimeError):
+    def __init__(self, reason, path, owner=None):
+        super().__init__(reason)
+        self.evidence = {"schema": "jovie-repair-handoff/v1", "reason": reason,
+                         "worktree": str(path), "owner": owner or HOST,
+                         "nextAction": "Reconcile the preserved run, target and execution lease before resuming; retain all source."}
+
+
+def preserved_run(host: Host, *, pr=None, issue=None):
+    """Recover only from an ended ledger receipt; a marker alone is not ownership."""
+    root = host.state / "worktrees"
+    matches = []
+    for marker_path in root.glob(f"*/{disk_guard.PRESERVED_REPAIR}"):
+        try:
+            marker = json.loads(marker_path.read_text())
+            if not isinstance(marker, dict):
+                raise ValueError("marker-not-object")
+        except (OSError, ValueError):
+            # A damaged marker must not halt every unrelated lane on this host.
+            # The ended ledger or canonical run name can identify the target for
+            # a refusal, but neither substitutes for a valid recovery marker.
+            try:
+                lines = (host.state / "runs/ledger.jsonl").read_text().splitlines()
+            except OSError:
+                lines = []
+            rows = []
+            for line in lines:
+                try:
+                    rows.append(json.loads(line))
+                except ValueError:
+                    continue  # Keep readable bindings for refusal, never for admission.
+            bound = any(isinstance(row, dict) and row.get("preservedWorktree") == str(marker_path.parent)
+                        and ((pr is not None and row.get("pr") == pr) or (issue and row.get("issue") == issue))
+                        for row in rows)
+            run_target = f"-PR{pr}-" if pr is not None else f"-{issue}-"
+            if bound or run_target in marker_path.parent.name:
+                raise RecoveryHandoff("preserved-marker-unreadable", marker_path.parent)
+            print(json.dumps({"schema": "jovie-repair-handoff/v1", "reason": "preserved-marker-unreadable",
+                              "worktree": str(marker_path.parent), "owner": HOST,
+                              "nextAction": "Reconcile this unidentified marker; source retained."}), file=sys.stderr)
+            continue
+        if (pr is not None and marker.get("pr") == pr) or (issue and marker.get("issue") == issue):
+            matches.append((marker_path.parent, marker))
+    if not matches:
+        return None
+    path, marker = matches[0]
+    if len(matches) != 1 or path.resolve().parent != root.resolve():
+        raise RecoveryHandoff("ambiguous-preserved-work", path)
+    try:
+        rows = [json.loads(line) for line in (host.state / "runs/ledger.jsonl").read_text().splitlines()]
+        if any(not isinstance(row, dict) for row in rows):
+            raise ValueError("ledger-record-not-object")
+    except (OSError, ValueError):
+        raise RecoveryHandoff("preserved-ledger-unreadable", path)
+    prior = next((row for row in reversed(rows) if row.get("runId") == marker.get("runId")), None)
+    if not prior or not prior.get("endedAt") or prior.get("preservedWorktree") != str(path):
+        raise RecoveryHandoff("preserved-owner-not-terminal", path)
+    execution = prior.get("execution", {})
+    if not isinstance(execution, dict) or execution.get("event") != "attempt_finished" or not all(execution.get(key) for key in
+            ("identityDigest", "executionGeneration", "workKey", "fencingToken")):
+        raise RecoveryHandoff("preserved-execution-unverified", path)
+    if prior.get("verdict") not in {"disk-held", "reconcile-unavailable"}:
+        raise RecoveryHandoff("preserved-target-needs-reconciliation", path)
+    return path, prior
+
+
+def qualify_preserved_pr(host: Host, pr: dict, preserved):
+    try:
+        return _qualify_preserved_pr(host, pr, preserved)
+    except (OSError, subprocess.SubprocessError) as error:
+        raise RecoveryHandoff(f"preserved-read-unavailable:{type(error).__name__}", preserved[0]) from error
+
+
+def require_idle_worktree(path: Path):
+    # Warnings can mean an incomplete process inventory, so remain fail-closed.
+    active = sh(["lsof", "-nP", "-a", "-d", "cwd", "-F", "pn"], timeout=30)
+    if active.returncode not in (0, 1) or active.stderr:
+        raise RecoveryHandoff("preserved-process-state-unavailable", path)
+    if any(line.startswith("n") and (Path(line[1:]).resolve() == path.resolve()
+                                    or path.resolve() in Path(line[1:]).resolve().parents)
+           for line in active.stdout.splitlines()):
+        raise RecoveryHandoff("preserved-process-still-running", path)
+
+
+def _qualify_preserved_pr(host: Host, pr: dict, preserved):
+    path, prior = preserved
+    if prior.get("branch") != pr["headRefName"] or prior.get("headBefore") != pr["headRefOid"]:
+        raise RecoveryHandoff("preserved-head-superseded", path)
+    registered = sh(["git", "worktree", "list", "--porcelain"], cwd=host.repo, timeout=30)
+    entries = [dict(line.split(" ", 1) for line in entry.splitlines() if " " in line)
+               for entry in registered.stdout.split("\n\n")]
+    if registered.returncode or not any(Path(entry.get("worktree", "/")).resolve() == path.resolve()
+                                        and entry.get("branch") == f"refs/heads/{pr['headRefName']}"
+                                        for entry in entries):
+        raise RecoveryHandoff("preserved-worktree-unregistered", path)
+    require_idle_worktree(path)
+    ancestor = sh(["git", "merge-base", "--is-ancestor", pr["headRefOid"], "HEAD"], cwd=path, timeout=30)
+    if ancestor.returncode:
+        raise RecoveryHandoff("preserved-head-diverged", path)
+    return {key: prior["execution"][key] for key in ("workKey", "executionGeneration", "identityDigest")}
+
+
 def preserve_repair(worktree: Path, receipt: dict) -> None:
     """A cancelled run's local work is evidence, including uncommitted follow-up."""
     if worktree.exists():
         marker = {"schema": "jovie-preserved-repair/v1", "runId": receipt["runId"],
                   "pr": receipt.get("pr"), "issue": receipt.get("issue"),
-                  "reason": receipt.get("reasons"), "at": now_iso()}
+                  "reason": receipt.get("reasons"), "branch": receipt.get("branch"),
+                  "headBefore": receipt.get("headBefore"), "at": now_iso()}
         receipt["preservedWorktree"] = str(worktree)
         try:
             (worktree / disk_guard.PRESERVED_REPAIR).write_text(json.dumps(marker, indent=1))
@@ -1552,7 +1731,38 @@ def preserve_repair(worktree: Path, receipt: dict) -> None:
             receipt["preservationError"] = str(error)[:200]
 
 
+def retire_completed_repair(host: Host, worktree: Path, receipt: dict) -> bool:
+    """Clear a recovery marker only for idle, clean, already-published source."""
+    if receipt.get("verdict") not in {"fix-pushed", "fix-no-change"} or not receipt.get("headAfter"):
+        return False
+    try:
+        require_idle_worktree(worktree)
+        status = sh(["git", "status", "--porcelain", "--untracked-files=all", "--", ".",
+                     f":(exclude){disk_guard.PRESERVED_REPAIR}"], cwd=worktree, timeout=30)
+        head = sh(["git", "rev-parse", "HEAD"], cwd=worktree, timeout=30)
+        if status.returncode or status.stdout.strip() or head.returncode or head.stdout.strip() != receipt["headAfter"]:
+            return False
+        (worktree / disk_guard.PRESERVED_REPAIR).unlink()
+        remove_worktree(host, worktree)
+        if not worktree.exists():
+            receipt["recoveryCleanup"] = {"status": "removed", "publishedHead": receipt["headAfter"]}
+            return True
+    except (OSError, subprocess.SubprocessError, RecoveryHandoff):
+        pass
+    # Failed removal or newly observed edits must regain cleanup protection.
+    preserve_repair(worktree, receipt)
+    return False
+
+
 def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
+    lock = Locked(host.state / "locks" / f"repair-pr-{pr['number']}.lock", blocking=False)
+    try:
+        return _fix_red_pr(host, name, spec, pr, branch_held=lock.held)
+    finally:
+        lock.release()
+
+
+def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True) -> dict:
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-PR{pr['number']}-{name}-fix-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
     runs.mkdir(parents=True, exist_ok=True)
@@ -1587,7 +1797,8 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
             endedAt=now_iso(),
             result={"verdict": verdict, "commit": None, "pr": pr["number"]},
         )
-        end_local_fix_attempt(host, pr, receipt)
+        if branch_held:
+            end_local_fix_attempt(host, pr, receipt)
         with open(runs / "ledger.jsonl", "a") as ledger:
             ledger.write(json.dumps(receipt) + "\n")
         return receipt
@@ -1598,6 +1809,21 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
                                        {"repository": REPO_SLUG, "pr": pr["number"], "failure": failure},
                                        {"headSha": pr["headRefOid"]})
     coordination = execution_coordination(pr["headRefOid"])
+    preserved = None
+    try:
+        if not branch_held:
+            raise RecoveryHandoff("repair-owner-active", worktree)
+        preserved = preserved_run(host, pr=pr["number"])
+        if preserved:
+            ident = qualify_preserved_pr(host, pr, preserved)
+    except RecoveryHandoff as error:
+        receipt.update(verdict="recovery-handoff", reasons=[str(error)], recovery=error.evidence,
+                       endedAt=now_iso(), result={"verdict": "recovery-handoff", "pr": pr["number"], "commit": None})
+        if branch_held:
+            end_local_fix_attempt(host, pr, receipt)
+        with open(runs / "ledger.jsonl", "a") as ledger:
+            ledger.write(json.dumps(receipt) + "\n")
+        return receipt
     try:
         claimed = execution_attempt.claim(runs / "execution-attempts.jsonl", ident,
                                           {"owner": HOST, "runtime": "symphony-lanes", "provider": name,
@@ -1617,11 +1843,16 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
         receipt.update(verdict="duplicate-active" if claimed["reason"] == "duplicate_active" else "quarantined",
                        reasons=[claimed["reason"]])
     if receipt.get("verdict"):
+        if preserved:
+            receipt["recovery"] = RecoveryHandoff(receipt["reasons"][0], preserved[0]).evidence
         receipt.update(endedAt=now_iso(),
                        result={"verdict": receipt["verdict"], "commit": None, "pr": pr["number"]})
         with open(runs / "ledger.jsonl", "a") as ledger:
             ledger.write(json.dumps(receipt) + "\n")
         return receipt
+    if preserved:
+        worktree, prior = preserved
+        receipt.update(worktree=str(worktree), resumedFrom=prior["runId"])
     with open(runs / f"{run_id}.log", "w") as log:
         try:
             def verify_target(target, stage, *, worktree=None):
@@ -1631,7 +1862,10 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
             verify_target(pr, "before-checkout")
             sh(["git", "fetch", "-q", "origin", "main", pr["headRefName"]], cwd=host.repo, log=log)
             verify_target(pr, "after-fetch")
-            add_worktree(host, ["-B", pr["headRefName"], str(worktree), f"origin/{pr['headRefName']}"], log)
+            if preserved:
+                qualify_preserved_pr(host, pr, preserved)
+            else:
+                add_worktree(host, ["-B", pr["headRefName"], str(worktree), f"origin/{pr['headRefName']}"], log)
             def boundary(stage="repair-command", allow_local_push=False):
                 require_disk(host, stage)
                 verify_target(pr, stage, worktree=worktree if allow_local_push else None)
@@ -1647,6 +1881,9 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
                 boundary("before-install")
                 install_dependencies(host, worktree, log)
                 prompt = render_fix_prompt(pr, failure_excerpt(pr))
+                if preserved:
+                    prompt = ("Resume the preserved repair in this checkout. Inspect git status, diff and local commits; "
+                              "retain existing edits and finish verification/publication. Never reset or start over.\n\n" + prompt)
                 prompt_file = runs / f"{run_id}.prompt.md"
                 prompt_file.write_text(prompt)
                 boundary("before-agent")
@@ -1686,6 +1923,8 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
                                "requestSource": receipt["requestSource"]})
         except DiskAdmissionError as error:
             receipt.update(verdict="disk-held", reasons=[str(error)])
+        except RecoveryHandoff as error:
+            receipt.update(verdict="recovery-handoff", reasons=[str(error)], recovery=error.evidence)
         except subprocess.TimeoutExpired:
             receipt.update(verdict="failed", reasons=["timeout"])
         except WorktreeUnavailable as error:
@@ -1694,7 +1933,10 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
         except Exception as error:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
-            if receipt.get("verdict") in {"cancelled", "reconcile-unavailable", "disk-held"}:
+            if preserved:
+                if not retire_completed_repair(host, worktree, receipt):
+                    preserve_repair(worktree, receipt)
+            elif receipt.get("verdict") in {"cancelled", "reconcile-unavailable", "disk-held", "recovery-handoff"}:
                 preserve_repair(worktree, receipt)
             else:
                 remove_worktree(host, worktree)
@@ -2116,6 +2358,14 @@ def worker(host: Host, name: str) -> int:
         linear.comment(issue.id, "🤖 lane claim reconciled to the existing durable attempt; no second provider call ran.")
         slot.release()
         return reexec(host, name)
+    if verdict == "recovery-handoff":
+        linear.move(issue.id, "Backlog")
+        handoff = receipt["recovery"]
+        linear.comment(issue.id, f"Preserved work retained at `{handoff['worktree']}`. "
+                                 f"Recovery owner: {handoff['owner']}; reason: {handoff['reason']}. "
+                                 f"{handoff['nextAction']}")
+        slot.release()
+        return reexec(host, name)
     if verdict == "quarantined":
         # A terminal generation must not sit in a generic work queue (JOV-7089): Backlog is the
         # explicit human-decision disposition, out of Todo/Triage until a valid re-entry.
@@ -2274,9 +2524,13 @@ def add_worktree(host: Host, args: list[str], log) -> None:
 
 
 def remove_worktree(host: Host, worktree: Path) -> None:
-    """Kill whatever still runs from the worktree first: a normal agent exit leaves its
-    backgrounded children (storybook on :6006, esbuild) holding ports for later gates."""
-    sh(["pkill", "-f", str(worktree)])
+    """Protected source is never cleanup; process ownership belongs to run_agent."""
+    if not worktree.exists() or (worktree / disk_guard.PRESERVED_REPAIR).exists():
+        return
+    status = sh(["git", "status", "--porcelain"], cwd=worktree)
+    if status.returncode or status.stdout.strip():
+        preserve_repair(worktree, {"runId": worktree.name, "reasons": ["cleanup-source-unverified"]})
+        return
     sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
 
 
@@ -2294,7 +2548,8 @@ def prune_worktrees(host: Host, max_age_s: int = 6 * 3600) -> None:
             continue  # a worker removed it between listing and stat
         if stale:
             remove_worktree(host, path)
-            shutil.rmtree(path, ignore_errors=True)
+            if not (path / disk_guard.PRESERVED_REPAIR).exists():
+                shutil.rmtree(path, ignore_errors=True)
     sh(["git", "worktree", "prune"], cwd=host.repo)
 
 
