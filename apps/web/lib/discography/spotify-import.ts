@@ -794,6 +794,14 @@ async function processTracksForRelease(
 
     const trackNumber = sanitizeBoundedInteger(track.track_number, 1, 999, 1);
     const discNumber = sanitizeBoundedInteger(track.disc_number, 1, 99, 1);
+    const trackArtistInputs: SpotifyArtistInput[] = track.artists.map(a => ({
+      id: a.id,
+      name: sanitizeName(a.name),
+    }));
+    const trackArtistCredits = parseArtistCredits(
+      track.name,
+      trackArtistInputs
+    );
 
     // New model: upsert recording (canonical audio entity)
     const createdRecording = await upsertRecording({
@@ -814,6 +822,8 @@ async function processTracksForRelease(
       metadata: {
         spotifyId: track.id,
         spotifyUri: track.uri,
+        spotifyArtists: trackArtistInputs,
+        spotifyCredits: trackArtistCredits,
       },
     });
 
@@ -846,21 +856,14 @@ async function processTracksForRelease(
       },
     });
 
-    const trackArtistInputs: SpotifyArtistInput[] = track.artists.map(a => ({
-      id: a.id,
-      name: sanitizeName(a.name),
-    }));
-
-    const trackArtistCredits = parseArtistCredits(
-      track.name,
-      trackArtistInputs
-    );
     await processRecordingArtistCredits(
       createdRecording.id,
       trackArtistCredits,
       {
-        deleteExisting: true,
+        deleteExisting: false,
         sourceType: 'ingested',
+        provider: 'spotify',
+        sourceEntityId: track.id,
       }
     );
   }
@@ -938,6 +941,8 @@ async function importSingleRelease(
       existingRelease?.id,
       { year: releaseYear }
     ));
+  const releaseArtistInputs = parseAlbumArtistInputs(album, fullAlbum);
+  const releaseArtistCredits = parseMainArtists(releaseArtistInputs);
 
   // Upsert the release with sanitized data
   const release = await upsertRelease({
@@ -963,6 +968,7 @@ async function importSingleRelease(
         id: a.id,
         name: sanitizeName(a.name),
       })),
+      spotifyCredits: releaseArtistCredits,
       importedAt: new Date().toISOString(),
     },
   });
@@ -981,11 +987,11 @@ async function importSingleRelease(
   });
 
   // Process release-level artist credits
-  const releaseArtistInputs = parseAlbumArtistInputs(album, fullAlbum);
-  const releaseArtistCredits = parseMainArtists(releaseArtistInputs);
   await processReleaseArtistCredits(release.id, releaseArtistCredits, {
-    deleteExisting: true,
+    deleteExisting: false,
     sourceType: 'ingested',
+    provider: 'spotify',
+    sourceEntityId: album.id,
   });
 
   // Import tracks if we have full album data

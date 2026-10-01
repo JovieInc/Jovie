@@ -521,6 +521,56 @@ describe('generateMusicStructuredData', () => {
       expect(featuredSchema).toHaveProperty('contributor');
     });
 
+    it('projects featured and remixer credits from the same canonical groups', () => {
+      const data = generateMusicStructuredData(
+        {
+          type: 'track',
+          title: 'Take Me Over (Austin Leeds Remix)',
+          slug: 'take-me-over-austin-leeds-remix',
+          artworkUrl: null,
+          releaseDate: null,
+          providerLinks: [],
+          primaryArtists: [{ name: 'Tim White', handle: 'tim' }],
+          credits: [
+            {
+              role: 'featured_artist',
+              label: 'Featured artist',
+              entries: [
+                {
+                  artistId: 'erica',
+                  name: 'Erica Gibson',
+                  handle: null,
+                  role: 'featured_artist',
+                  position: 1,
+                },
+              ],
+            },
+            {
+              role: 'remixer',
+              label: 'Remixer',
+              entries: [
+                {
+                  artistId: 'austin',
+                  name: 'Austin Leeds',
+                  handle: null,
+                  role: 'remixer',
+                  position: 2,
+                },
+              ],
+            },
+          ],
+        },
+        ownerCreator
+      );
+
+      const musicSchema = data['@graph'][0] as Record<string, unknown>;
+      expect(musicSchema.contributor).toEqual([
+        { '@type': 'Person', name: 'Erica Gibson' },
+        { '@type': 'Person', name: 'Austin Leeds' },
+      ]);
+      expect(musicSchema.byArtist).toMatchObject({ name: 'Tim White' });
+    });
+
     it('never links an opaque machine handle from a credited artist', () => {
       const data = generateMusicStructuredData(
         {

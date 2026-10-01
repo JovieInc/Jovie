@@ -5,6 +5,11 @@ name: Publish @jovie/cli to npm
 on:
   workflow_dispatch:
     inputs:
+      release_version:
+        description: Optional stable CLI YY.M.PATCH release; blank uses the desktop VERSION.
+        type: string
+        required: false
+        default: ''
       publish_mcp_only:
         description: Verify the byte-identical published npm artifact and publish its MCP listing.
         type: boolean
@@ -54,6 +59,7 @@ jobs:
           PACKAGE_NAME: '@jovie/cli'
           REGISTRY_URL: https://registry.npmjs.org
           PUBLISH_MCP_ONLY: ${{ inputs.publish_mcp_only }}
+          CLI_RELEASE_VERSION: ${{ inputs.release_version }}
         run: |
           set -euo pipefail
 
@@ -75,11 +81,14 @@ jobs:
             exit 1
           }
 
-          release_version="$(tr -d '[:space:]' < VERSION)"
-          [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
-            echo "::error::VERSION is not a valid release version."
-            exit 1
-          }
+          release_version="$(node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { resolveReleaseVersion } from './packages/jovie-cli/scripts/pack-manifest.ts';
+          process.stdout.write(resolveReleaseVersion(
+            readFileSync('VERSION', 'utf8'), process.env.CLI_RELEASE_VERSION
+          ));
+          NODE
+          )"
           export RELEASE_VERSION="$release_version"
           node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs';
@@ -110,9 +119,9 @@ jobs:
           for (const [field, valid] of required) {
             if (!valid) throw new Error(`Invalid @jovie/cli publication field: ${field}`);
           }
-          if (manifest.version && manifest.version !== expectedVersion) {
+          if (Object.hasOwn(manifest, 'version') && manifest.version !== expectedVersion) {
             throw new Error(
-              `Package version ${manifest.version} does not match VERSION ${expectedVersion}.`
+              `Package version ${manifest.version} does not match CLI release ${expectedVersion}.`
             );
           }
           NODE
@@ -164,6 +173,8 @@ jobs:
         run: pnpm --filter @jovie/cli run build
 
       - name: Run @jovie/cli package smoke
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: pnpm --filter @jovie/cli run pack:dry
 
       - name: Stage the versioned package

@@ -20,3 +20,6 @@ export const OVIE_OAUTH_DISCOVERY_HEADERS = {
   'access-control-allow-origin': '*',
   'cache-control': 'no-store',
 } as const;
+
+/** Browser recovery surface for the existing founder OAuth door. */
+export const OVIE_OAUTH_VERIFY_PATH = '/ovie/connect';

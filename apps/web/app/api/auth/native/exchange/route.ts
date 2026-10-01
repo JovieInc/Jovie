@@ -4,6 +4,7 @@ import {
   isAuthClient,
   type NativeAuthClient,
 } from '@jovie/auth-routing';
+import { APIError } from 'better-auth/api';
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/better-auth';
 import { consumeStoredNativeExchangeCode } from '@/lib/auth/routing-state.server';
@@ -209,12 +210,11 @@ export async function POST(request: Request) {
         request
       );
 
-      // OTT resolved to a different user than the exchange record. This is an
-      // auth rejection, not a server fault: the guard stays (the exchange is
-      // refused) but the client gets a handled 401 so it can restart
-      // finalization instead of surfacing a bare 500 (JOV-4278). The OTT is
-      // single-use and already consumed by `verifyOneTimeToken`, so it cannot
-      // be replayed after this rejection.
+      // Handled auth rejections, not server faults: the guard stays (the
+      // exchange is refused) but the client gets a typed 401 so it can
+      // restart finalization instead of surfacing a bare 500 (JOV-4278,
+      // JOV-4853). The OTT is single-use and already consumed by
+      // `verifyOneTimeToken`, so it cannot be replayed after this rejection.
       if (!iosExchange.ok) {
         await trackAuthEvent('auth_exchange_failed', {
           client,
@@ -225,7 +225,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json(
           {
-            error: 'Native auth exchange user mismatch',
+            error: 'Native auth exchange verification failed',
             reason: iosExchange.reason,
           },
           { status: 401, headers: NO_STORE_HEADERS }
@@ -287,23 +287,42 @@ export async function POST(request: Request) {
  * rather than thrown: the binding is correct-by-construction, so a
  * mismatch means identity mutated inside the OTT window — an expected
  * auth rejection (401), not an unhandled server error (JOV-4278).
+ *
+ * `verifyOneTimeToken` itself throws `APIError` (BAD_REQUEST) when the OTT
+ * is invalid or expired, or when the completing browser's session row is
+ * gone. Those are auth rejections too — they mean the exchange must be
+ * restarted from a fresh sign-in — so they join the same handled-401
+ * taxonomy as `ott_invalid` instead of escaping as an untyped 500
+ * (JOV-4853). Non-API errors (adapter/DB faults) still propagate to the
+ * route's 500 + capture path.
  */
 type IosNativeExchangeResult =
   | { readonly ok: true; readonly payload: NativeExchangePayload }
-  | { readonly ok: false; readonly reason: 'ott_user_mismatch' };
+  | {
+      readonly ok: false;
+      readonly reason: 'ott_user_mismatch' | 'ott_invalid';
+    };
 
 async function createIosNativeExchangePayload(
   ott: string,
   expectedUserId: string,
   request: Request
 ): Promise<IosNativeExchangeResult> {
-  const verification = await auth.api.verifyOneTimeToken({
-    body: { token: ott },
-    request,
-    // A full Request makes Better Auth return a raw Response by default.
-    // Keep the direct API's parsed-result and thrown-error behavior here.
-    asResponse: false,
-  });
+  let verification;
+  try {
+    verification = await auth.api.verifyOneTimeToken({
+      body: { token: ott },
+      request,
+      // A full Request makes Better Auth return a raw Response by default.
+      // Keep the direct API's parsed-result and thrown-error behavior here.
+      asResponse: false,
+    });
+  } catch (error) {
+    if (error instanceof APIError) {
+      return { ok: false, reason: 'ott_invalid' };
+    }
+    throw error;
+  }
 
   const verifiedUserId = verification?.user?.id ?? null;
   if (!verifiedUserId || verifiedUserId !== expectedUserId) {

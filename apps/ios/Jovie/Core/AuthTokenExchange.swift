@@ -3,7 +3,7 @@ import Foundation
 enum NativeAuthExchangeError: Error, Equatable, LocalizedError {
   case decodingFailed
   case invalidResponse
-  case requestFailed(statusCode: Int)
+  case requestFailed(statusCode: Int, reason: String? = nil)
   case transportFailed(code: Int)
 
   var errorDescription: String? {
@@ -12,7 +12,10 @@ enum NativeAuthExchangeError: Error, Equatable, LocalizedError {
       return "The auth response could not be decoded."
     case .invalidResponse:
       return "The auth server returned an invalid response."
-    case let .requestFailed(statusCode):
+    case let .requestFailed(statusCode, reason):
+      if let reason, !reason.isEmpty {
+        return "The auth exchange failed with status code \(statusCode) (\(reason))."
+      }
       return "The auth exchange failed with status code \(statusCode)."
     case let .transportFailed(code):
       return "The auth exchange network request failed with code \(code)."
@@ -80,11 +83,18 @@ struct NativeAuthExchangeClient: Sendable {
     }
 
     guard (200 ... 299).contains(httpResponse.statusCode) else {
+      // The route returns a typed `reason` for handled rejections
+      // (missing/expired/wrong_verifier/ott_missing/ott_invalid/…). Carry it
+      // through so a bare "401" in telemetry is attributable (JOV-4853).
+      let reason = Self.exchangeFailureReason(from: data)
       MobileAuthDiagnostics.record(
         "native_exchange_failed",
-        detail: "status=\(httpResponse.statusCode)"
+        detail: "status=\(httpResponse.statusCode)\(reason.map { " reason=\($0)" } ?? "")"
       )
-      throw NativeAuthExchangeError.requestFailed(statusCode: httpResponse.statusCode)
+      throw NativeAuthExchangeError.requestFailed(
+        statusCode: httpResponse.statusCode,
+        reason: reason
+      )
     }
 
     do {
@@ -94,6 +104,19 @@ struct NativeAuthExchangeClient: Sendable {
       MobileAuthDiagnostics.record("native_exchange_decode_failed")
       throw NativeAuthExchangeError.decodingFailed
     }
+  }
+
+  private static func exchangeFailureReason(from data: Data) -> String? {
+    guard
+      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+      let reason = (object["reason"] as? String)?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+      !reason.isEmpty
+    else {
+      return nil
+    }
+
+    return reason
   }
 }
 

@@ -5,11 +5,16 @@
  * All operations are wrapped in transactions for atomicity.
  */
 
+import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { discogRecordings } from '@/lib/db/schema/content';
+import { captureWarning } from '@/lib/error-tracking';
 import type { ParsedArtistCredit } from '../artist-parser';
 import { findOrCreateArtist } from './artist-crud';
 import {
+  deleteRecordingArtistRole,
   deleteRecordingArtists,
+  getRecordingArtistCreditEdges,
   upsertRecordingArtist,
 } from './recording-artists';
 import { deleteReleaseArtists, upsertReleaseArtist } from './release-artists';
@@ -21,7 +26,49 @@ type ArtistImportSourceType = 'manual' | 'admin' | 'ingested';
 type ArtistImportOptions = {
   deleteExisting?: boolean;
   sourceType?: ArtistImportSourceType;
+  provider?: 'spotify' | 'apple_music' | 'musicbrainz' | 'deezer';
+  sourceEntityId?: string | null;
 };
+
+function providerCreditMetadata(
+  credit: ParsedArtistCredit,
+  options: ArtistImportOptions
+): Record<string, unknown> | undefined {
+  if (!options.provider) return undefined;
+
+  return {
+    [options.provider]: {
+      sourceEntityId: options.sourceEntityId ?? null,
+      providerArtistId:
+        options.provider === 'spotify'
+          ? (credit.spotifyId ?? null)
+          : options.provider === 'apple_music'
+            ? (credit.appleMusicId ?? null)
+            : null,
+      observedRole: credit.observedRole ?? credit.role,
+      canonicalRole: credit.role,
+      authority:
+        credit.roleSource === 'title'
+          ? 'explicit_title'
+          : 'provider_presentation',
+      conflict:
+        credit.observedRole && credit.observedRole !== credit.role
+          ? 'role_mismatch'
+          : null,
+    },
+  };
+}
+
+function hasExplicitTitleAuthority(
+  metadata: Record<string, unknown> | null
+): boolean {
+  return Object.values(metadata ?? {}).some(value => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      return false;
+    }
+    return (value as Record<string, unknown>).authority === 'explicit_title';
+  });
+}
 
 /**
  * Process parsed artist credits for a track
@@ -49,6 +96,7 @@ export async function processTrackArtistCredits(
       {
         name: credit.name,
         spotifyId: credit.spotifyId,
+        appleMusicId: credit.appleMusicId,
         imageUrl: credit.imageUrl,
         isAutoCreated: sourceType === 'ingested',
       },
@@ -65,6 +113,7 @@ export async function processTrackArtistCredits(
         position: credit.position,
         isPrimary: credit.isPrimary,
         sourceType,
+        metadata: providerCreditMetadata(credit, options ?? {}),
       },
       db
     );
@@ -105,6 +154,7 @@ export async function processReleaseArtistCredits(
       {
         name: credit.name,
         spotifyId: credit.spotifyId,
+        appleMusicId: credit.appleMusicId,
         imageUrl: credit.imageUrl,
         isAutoCreated: sourceType === 'ingested',
       },
@@ -120,6 +170,7 @@ export async function processReleaseArtistCredits(
         position: credit.position,
         isPrimary: credit.isPrimary,
         sourceType,
+        metadata: providerCreditMetadata(credit, options ?? {}),
       },
       db
     );
@@ -161,11 +212,104 @@ export async function processRecordingArtistCredits(
       {
         name: credit.name,
         spotifyId: credit.spotifyId,
+        appleMusicId: credit.appleMusicId,
         imageUrl: credit.imageUrl,
         isAutoCreated: sourceType === 'ingested',
       },
       db
     );
+
+    const existingEdges = options?.provider
+      ? await getRecordingArtistCreditEdges(recordingId, artist.id, db)
+      : [];
+    const existingMainEdge = existingEdges.find(
+      edge => edge.role === 'main_artist'
+    );
+    const explicitRole = existingEdges.find(
+      edge =>
+        edge.role !== 'main_artist' && hasExplicitTitleAuthority(edge.metadata)
+    )?.role;
+
+    if (credit.role === 'main_artist' && explicitRole) {
+      await upsertRecordingArtist(
+        {
+          recordingId,
+          artistId: artist.id,
+          role: explicitRole,
+          joinPhrase: credit.joinPhrase,
+          position: credit.position,
+          isPrimary: false,
+          sourceType,
+          metadata: providerCreditMetadata(
+            {
+              ...credit,
+              role: explicitRole,
+              observedRole: 'main_artist',
+            },
+            options ?? {}
+          ),
+        },
+        db
+      );
+      void captureWarning('Artist credit provider role mismatch', {
+        source: 'artist_credit_reconciliation',
+        recordingId,
+        artistId: artist.id,
+        artistName: artist.name,
+        provider: options?.provider ?? 'unknown',
+        observedRole: credit.role,
+        canonicalRole: explicitRole,
+      });
+      continue;
+    }
+
+    if (
+      credit.role !== 'main_artist' &&
+      credit.observedRole === 'main_artist'
+    ) {
+      if (existingMainEdge) {
+        await upsertRecordingArtist(
+          {
+            recordingId,
+            artistId: artist.id,
+            role: credit.role,
+            joinPhrase: credit.joinPhrase,
+            position: credit.position,
+            isPrimary: credit.isPrimary,
+            sourceType,
+            metadata: {
+              ...(existingMainEdge.metadata ?? {}),
+              ...(providerCreditMetadata(credit, options ?? {}) ?? {}),
+            },
+          },
+          db
+        );
+        await deleteRecordingArtistRole(
+          recordingId,
+          artist.id,
+          'main_artist',
+          db
+        );
+        results.push({
+          ...artist,
+          role: credit.role,
+          creditName: null,
+          joinPhrase: credit.joinPhrase,
+          position: credit.position,
+          isPrimary: credit.isPrimary,
+        });
+      }
+      void captureWarning('Artist credit provider role mismatch', {
+        source: 'artist_credit_reconciliation',
+        recordingId,
+        artistId: artist.id,
+        artistName: artist.name,
+        provider: options?.provider ?? 'unknown',
+        observedRole: credit.observedRole,
+        canonicalRole: credit.role,
+      });
+      if (existingMainEdge) continue;
+    }
 
     await upsertRecordingArtist(
       {
@@ -176,6 +320,7 @@ export async function processRecordingArtistCredits(
         position: credit.position,
         isPrimary: credit.isPrimary,
         sourceType,
+        metadata: providerCreditMetadata(credit, options ?? {}),
       },
       db
     );
@@ -191,4 +336,33 @@ export async function processRecordingArtistCredits(
   }
 
   return results;
+}
+
+export async function processProviderRecordingArtistCredits(input: {
+  readonly creatorProfileId: string;
+  readonly isrc: string;
+  readonly provider: NonNullable<ArtistImportOptions['provider']>;
+  readonly sourceEntityId?: string | null;
+  readonly credits: ParsedArtistCredit[];
+}): Promise<boolean> {
+  const [recording] = await db
+    .select({ id: discogRecordings.id })
+    .from(discogRecordings)
+    .where(
+      and(
+        eq(discogRecordings.creatorProfileId, input.creatorProfileId),
+        eq(discogRecordings.isrc, input.isrc)
+      )
+    )
+    .limit(1);
+
+  if (!recording) return false;
+
+  await processRecordingArtistCredits(recording.id, input.credits, {
+    deleteExisting: false,
+    sourceType: 'ingested',
+    provider: input.provider,
+    sourceEntityId: input.sourceEntityId,
+  });
+  return true;
 }

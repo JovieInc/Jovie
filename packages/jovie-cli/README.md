@@ -99,12 +99,16 @@ The package directory is licensed under Apache-2.0 (see `LICENSE`); the
 repository root and unrelated packages remain proprietary. Its manifest is
 configured with `private: false` and public npm `publishConfig` for the
 `https://registry.npmjs.org` registry, including provenance. It intentionally
-has no source-manifest `version`; the manual main-only release workflow stamps
-the root `VERSION` into a temporary publication directory. A local build or
+has no source-manifest `version`; the manual main-only release workflow writes
+the selected CLI release into a temporary publication directory. Its optional
+`release_version` input accepts stable `YY.M.PATCH` (for example, `26.10.0`);
+leaving it blank uses the root `VERSION`. A CLI release can therefore proceed
+without changing the desktop stamp or the monorepo version fan-out. Invalid
+versions and conflicting source-manifest versions fail before registry access.
+A local build or
 merged source change does not claim that npm publication succeeded.
 
-The release-path smoke sequence, after the approval gate and a main-only
-version stamp, is:
+The release-path smoke sequence for an approved manual publication is:
 
 ```sh
 pnpm --filter @jovie/cli run typecheck
@@ -112,6 +116,11 @@ pnpm --filter @jovie/cli run test:coverage
 pnpm --filter @jovie/cli run build
 pnpm --filter @jovie/cli run pack:dry
 ```
+
+To smoke-test an independent version without publishing, set `RELEASE_VERSION`
+for the pack command (for example,
+`RELEASE_VERSION=26.10.0 pnpm --filter @jovie/cli run pack:dry`). The workflow
+passes its selected version to the same smoke path.
 
 `pack:dry` builds a temporary versioned package, checks its metadata,
 declarations, and contents, installs that tarball into a clean temporary

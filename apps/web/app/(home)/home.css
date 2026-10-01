@@ -5177,24 +5177,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
   scrollbar-width: none;
 }
 
-.homepage-artist-profiles__keyboard-scroll-control:focus-visible {
-  background: var(--system-b-bg-surface-0);
-  border: var(--space-px) solid var(--system-b-border-strong);
-  border-radius: var(--radius-full);
-  clip: auto;
-  clip-path: none;
-  color: var(--system-b-text-primary);
-  height: auto;
-  left: var(--space-2);
-  margin: 0;
+.homepage-artist-profiles__row:focus-visible {
   outline: var(--space-px) solid var(--system-b-text-primary);
-  outline-offset: var(--space-2);
-  overflow: visible;
-  padding: var(--space-2) var(--space-3);
-  top: var(--space-2);
-  white-space: normal;
-  width: auto;
-  z-index: 2;
+  outline-offset: var(--space-1);
 }
 
 .homepage-artist-profiles__row::-webkit-scrollbar {

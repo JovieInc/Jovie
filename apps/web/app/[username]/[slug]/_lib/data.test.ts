@@ -167,6 +167,60 @@ describe('published smart-link content', () => {
     expect(parentFilter.sql).toContain('"deleted_at" is null');
   });
 
+  it('keeps recording roles complete without leaking them onto the release', async () => {
+    const erica = {
+      ...credit,
+      artistId: 'artist-erica',
+      artistName: 'Erica Gibson',
+      handle: null,
+      role: 'featured_artist' as const,
+      position: 1,
+      appleMusicId: 'apple-erica',
+      isPrimary: false,
+    };
+    const austin = {
+      ...credit,
+      artistId: 'artist-austin',
+      artistName: 'Austin Leeds',
+      handle: null,
+      role: 'remixer' as const,
+      position: 2,
+      spotifyId: 'spotify-austin',
+      isPrimary: false,
+    };
+
+    queries(
+      [release],
+      [spotify],
+      [credit],
+      [],
+      [],
+      [recording],
+      [{ id: 'rt-1', releaseId: 'release-1', trackNumber: 1 }],
+      [release],
+      [spotify],
+      [credit, erica, austin]
+    );
+
+    const releaseContent = await getContentBySlug('profile-1', 'album');
+    const recordingContent = await getContentBySlug('profile-1', 'song');
+
+    expect(releaseContent?.credits?.map(group => group.role)).toEqual([
+      'main_artist',
+    ]);
+    expect(recordingContent?.credits).toMatchObject([
+      { role: 'main_artist', entries: [{ name: 'Artist' }] },
+      {
+        role: 'featured_artist',
+        entries: [{ name: 'Erica Gibson', appleMusicId: 'apple-erica' }],
+      },
+      {
+        role: 'remixer',
+        entries: [{ name: 'Austin Leeds', spotifyId: 'spotify-austin' }],
+      },
+    ]);
+  });
+
   it('hides an orphan recording instead of exposing it without a public release', async () => {
     queries([], [recording], [], [credit]);
     expect(await getContentBySlug('profile-1', 'song')).toBeNull();
@@ -251,6 +305,42 @@ describe('published smart-link content', () => {
     });
     expect(await getContentBySlug('profile-1', 'album')).toBeNull();
     expect(await getCreatorByUsername('testartist')).toBeNull();
+  });
+
+  it('preserves every canonical role through the production cache round trip', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const roleCredits = [
+      credit,
+      {
+        ...credit,
+        artistId: 'artist-erica',
+        artistName: 'Erica Gibson',
+        role: 'featured_artist' as const,
+        position: 1,
+      },
+      {
+        ...credit,
+        artistId: 'artist-austin',
+        artistName: 'Austin Leeds',
+        role: 'remixer' as const,
+        position: 2,
+      },
+    ];
+    queries([release], [spotify], roleCredits, []);
+    mocks.cache.mockImplementation(
+      (fn: () => unknown) => async () => JSON.parse(JSON.stringify(await fn()))
+    );
+
+    const result = await getContentBySlug('profile-1', 'album');
+
+    expect(result?.credits?.map(group => group.role)).toEqual([
+      'main_artist',
+      'featured_artist',
+      'remixer',
+    ]);
+    expect(
+      result?.credits?.flatMap(group => group.entries.map(entry => entry.name))
+    ).toEqual(['Artist', 'Erica Gibson', 'Austin Leeds']);
   });
 });
 

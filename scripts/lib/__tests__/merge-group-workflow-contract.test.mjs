@@ -2001,6 +2001,39 @@ ${selectedGateScript}`,
     );
   });
 
+  it('avoids redundant SwiftPM uploads on persistent Mac runners (JOV-7346)', () => {
+    const iosGate = getJobBlock(IOS_CI_WORKFLOW, 'test');
+    const cache = getStepBlock(iosGate, 'Restore Swift package cache');
+    const resolvePackages = getStepBlock(
+      iosGate,
+      'Resolve Swift package dependencies'
+    );
+    const fastGate = getStepBlock(iosGate, 'Run fast unit and coverage gate');
+    const fullGate = getStepBlock(iosGate, 'Run full simulator regression');
+
+    // actions/cache saves in its post step too. Gating the action itself keeps
+    // both remote restore and upload off persistent runners, while hosted VMs
+    // still receive the lockfile- and toolchain-scoped package cache.
+    expect(cache).toContain("if: ${{ runner.environment == 'github-hosted' }}");
+    expect(cache).toContain('uses: actions/cache@');
+    expect(cache).toContain('.build/ios-ci/SourcePackages');
+    expect(cache).toContain('~/Library/Caches/org.swift.swiftpm');
+    expect(cache).toContain('steps.xcode-version.outputs.cache_key');
+    expect(cache).toContain('Package.resolved');
+    expect(cache).toContain('restore-keys:');
+
+    // Only remote caching is conditional on runner ownership. Both runner
+    // classes must resolve dependencies and execute their selected test gate.
+    expect(resolvePackages).not.toMatch(/^\s+if:/m);
+    expect(fastGate).toContain('if: ${{ !inputs.full-regression }}');
+    expect(fastGate).toContain('bash apps/ios/scripts/run-unit-tests.sh');
+    expect(fastGate).toContain('bash apps/ios/scripts/check_coverage.sh');
+    expect(fullGate).toContain('if: ${{ inputs.full-regression }}');
+    expect(iosGate).toContain(
+      'timeout-minutes: ${{ inputs.full-regression && 55 || 18 }}'
+    );
+  });
+
   it('keeps merge-group iOS fast while TestFlight requires the full regression', () => {
     const iosHeader = IOS_CI_WORKFLOW.slice(
       0,
