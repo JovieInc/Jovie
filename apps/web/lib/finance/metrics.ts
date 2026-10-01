@@ -103,9 +103,7 @@ export function classifyTransactionScope(
   category: string | null | undefined
 ): MoneyScope {
   const c = (category ?? '').trim().toLowerCase();
-  if (c === 'creator' || c === 'business') return 'creator';
-  if (c.startsWith('creator:') || c.startsWith('business:')) return 'creator';
-  return 'personal';
+  return /^(creator|business)(:|$)/.test(c) ? 'creator' : 'personal';
 }
 
 export function transactionNeedsReview(
@@ -123,13 +121,7 @@ function isExcludedAccount(account: FinanceAccount): boolean {
 function isCashAccount(account: FinanceAccount): boolean {
   if (isExcludedAccount(account)) return false;
   const t = (account.accountType ?? '').toLowerCase();
-  return (
-    t === '' ||
-    t === 'checking' ||
-    t === 'savings' ||
-    t === 'depository' ||
-    t === 'cash'
-  );
+  return ['', 'checking', 'savings', 'depository', 'cash'].includes(t);
 }
 
 function toNumber(value: string | null | undefined): number | null {
