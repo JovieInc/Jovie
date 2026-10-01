@@ -33,6 +33,7 @@ import {
   startNavigationTelemetry,
   trackNavigationImpressions,
 } from '@/lib/tracking/navigation-telemetry';
+import { cn } from '@/lib/utils';
 import {
   artistSettingsNavigation,
   canonicalSidebarNavigation,
@@ -383,7 +384,11 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                 data-navigation-pending={
                   pendingNavigationItemId === inboxNavItem.id || undefined
                 }
-                className='relative flex size-7 shrink-0 items-center justify-center rounded-full text-secondary-token transition-colors duration-subtle ease-subtle hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[navigation-pending=true]:bg-sidebar-accent-active data-[navigation-pending=true]:text-primary-token after:absolute after:-inset-2 after:lg:hidden'
+                className={cn(
+                  'relative flex size-7 shrink-0 items-center justify-center rounded-full text-secondary-token transition-colors duration-subtle ease-subtle hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2 after:lg:hidden',
+                  pendingNavigationItemId === inboxNavItem.id &&
+                    'bg-sidebar-accent-active text-primary-token'
+                )}
               >
                 <Bell
                   className='size-(--app-shell-sidebar-icon-size)'
@@ -424,7 +429,10 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                 data-navigation-pending={
                   pendingNavigationItemId === chatNavItem.id || undefined
                 }
-                className='relative flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-(--color-bg-base) transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[navigation-pending=true]:opacity-70 after:absolute after:-inset-2.5 after:lg:hidden'
+                className={cn(
+                  'relative flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-(--color-bg-base) transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2.5 after:lg:hidden',
+                  pendingNavigationItemId === chatNavItem.id && 'opacity-70'
+                )}
               >
                 <Plus className='size-3.5' aria-hidden='true' />
               </Link>

@@ -90,10 +90,7 @@ describe('DashboardNav route warming', () => {
     expect(newChat).toHaveAttribute('aria-busy', 'true');
     expect(newChat).toHaveAttribute('data-navigation-item-id', 'chat');
     expect(newChat).toHaveAttribute('data-navigation-pending', 'true');
-    expect(newChat).toHaveClass('size-6', 'rounded-full');
-    expect(newChat.className).toContain(
-      'data-[navigation-pending=true]:opacity-70'
-    );
+    expect(newChat).toHaveClass('size-6', 'rounded-full', 'opacity-70');
     expect(screen.getByTestId('authenticated-route-content')).toHaveTextContent(
       'Current route'
     );
