@@ -63,8 +63,9 @@ promotion, record correctness/pass rate, p95, throughput/cost, failure isolation
 owner and rollback under the existing engineering canon. No numeric promotion
 threshold or H-EX-09 closure is established here.
 
-Verification uses the existing `invariants:check` Node test selector, including
+Verification uses `invariants:check`: the existing scanner-heavy screen and
+latency suites stay outside V8 coverage. A separate small routing suite measures
 real screen-gate positive/negative cases, CLI JSON/receipt paths and deliberate
-stale/forged/missing input cases. That selector enforces helper coverage at
+stale/forged/missing input cases. Its selector enforces helper coverage at
 95% lines, 90% branches and 100% functions. These are local mechanism tests,
 not live founder-delivery or platform runtime certification.
