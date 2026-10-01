@@ -391,7 +391,7 @@ const MARKETING_SURFACES = [
           lighthouse: false,
           perfGroups: ['marketing-public'],
           interactions: GLOBAL_INTERACTIONS,
-        },
+        } as const satisfies PublicSurfaceSpec,
       ]
     : []),
   {
