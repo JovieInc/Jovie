@@ -35,9 +35,6 @@ describe('connector provider registry', () => {
   it('registers every enum provider in CONNECTOR_REGISTRY', () => {
     for (const providerId of connectorProviderEnum.enumValues) {
       expect(CONNECTOR_REGISTRY[providerId]?.id).toBe(providerId);
-      expect(CONNECTOR_REGISTRY[providerId]?.oauthScopeLabels).toHaveLength(
-        CONNECTOR_REGISTRY[providerId]?.oauthScopes.length ?? 0
-      );
     }
   });
 

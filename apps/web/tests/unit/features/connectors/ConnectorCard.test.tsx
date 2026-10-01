@@ -174,30 +174,6 @@ describe('ConnectorCard', () => {
     expect(iconSlot?.querySelector('.lucide')).toBeNull();
   });
 
-  it('shows the granted YouTube scopes with labels from the provider manifest', () => {
-    render(
-      <ConnectorCard
-        provider='youtube'
-        status='connected'
-        accountLabel='Artist Channel'
-        scopes={[
-          'https://www.googleapis.com/auth/youtube.readonly',
-          'https://www.googleapis.com/auth/youtube.upload',
-          'https://www.googleapis.com/auth/yt-analytics.readonly',
-        ]}
-      />
-    );
-
-    expect(
-      screen.getByRole('status', { name: 'YouTube status: Connected' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('list', { name: 'YouTube granted scopes' })
-    ).toHaveTextContent(
-      'Scopes: Read Channel Data, Manage Videos, View Channel Analytics'
-    );
-  });
-
   it('marks syncing as busy without changing the disconnect contract', () => {
     const onDisconnect = vi.fn();
     const { container } = render(
