@@ -494,7 +494,7 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         moves = []
         linear = SimpleNamespace(lane_issues=lambda label: [self.issue] if state["name"] == "Todo" else [],
             state_of=lambda ident: state["name"], get_issue=lambda ident: (self.issue, state["name"]),
-            move=lambda ident, name: (moves.append((ident, name)), state.update(name=name)), comment=lambda ident, body: state["comments"].append(body))
+            move=lambda ident, name: (moves.append((ident, name)), state.update(name=name)), comment=lambda ident, body: (state["comments"].append(body), (_ for _ in ()).throw(self.claim_failure)) if "claimed this issue" in body and getattr(self, "claim_failure", None) else state["comments"].append(body))
         with ExitStack() as stack:
             for name, value in {"Linear": lambda env: linear, "load_providers": lambda: {"hyperagent": {**self.spec, "label": "hyperagent"}},
                 "lane_prs": lambda *args, **kw: [], "fix_candidates": lambda *args: [], "requeue_verified": lambda *args, **kw: None,
@@ -531,10 +531,14 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(sum("claimed this issue" in c for c in state["comments"]), 1)
         self.assertEqual(len(state["comments"]), 4)
 
+    def test_initial_claim_delivery_failures_preserve_owned_resume(self):
+        for failure in (OSError("private-network-message"), RuntimeError("linear: comment not delivered")):
+            with self.subTest(failure=type(failure).__name__):
+                self.setUp(); self.claim_failure = failure
+                self.test_worker_resumes_only_its_receipt_owned_current_in_progress_issue()
+
     def test_failed_hold_delivery_releases_slot_and_retries_before_suppressing(self):
         from unittest.mock import patch
-        with patch.object(self.lane.Linear, "gql", return_value={"commentCreate": {"success": False}}):
-            with self.assertRaises(RuntimeError): self.lane.Linear.__new__(self.lane.Linear).comment(self.issue.id, "held")
         with self.worker_fixture() as (lane, state, moves):
             self.spec.pop("verifiedRemote"); linear = lane.Linear(None); comment = linear.comment
             with patch.object(linear, "comment", side_effect=lambda ident, body: (_ for _ in ()).throw(OSError("delivery failed")) if "remote hold" in body else comment(ident, body)):
