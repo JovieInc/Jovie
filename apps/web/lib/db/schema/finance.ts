@@ -5,6 +5,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { users } from './auth';
@@ -143,6 +144,65 @@ export const financeExports = pgTable(
   })
 );
 
+/**
+ * Budget targets (JOV-4620).
+ *
+ * One row per (owner, category, month). `month` is the literal string
+ * `'YYYY-MM'` for a month-specific override or the sentinel `'baseline'`
+ * for the recurring default. Override resolution is deterministic:
+ * a row whose `month` equals the requested month wins; otherwise the
+ * `'baseline'` row applies. History is stable because overrides are rows,
+ * not mutations of the baseline.
+ */
+export const financeBudgetTargets = pgTable(
+  'finance_budget_targets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    category: text('category').notNull(),
+    month: text('month').notNull().default('baseline'),
+    targetAmount: numeric('target_amount', {
+      precision: 19,
+      scale: 4,
+    }).notNull(),
+    currency: text('currency').notNull().default('USD'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    ownerIdx: index('finance_budget_targets_owner_idx').on(table.ownerUserId),
+    ownerCategoryMonthIdx: uniqueIndex(
+      'finance_budget_targets_owner_category_month_idx'
+    ).on(table.ownerUserId, table.category, table.month),
+  })
+);
+
+/**
+ * Per-owner budget inclusion settings (JOV-4620).
+ *
+ * `included_account_ids` limits which finance accounts feed budget actuals;
+ * NULL means all of the owner's accounts are included — the same default the
+ * ledger queries use.
+ */
+export const financeBudgetSettings = pgTable('finance_budget_settings', {
+  ownerUserId: uuid('owner_user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  includedAccountIds: jsonb('included_account_ids').$type<string[]>(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
 export type FinanceInstitution = typeof financeInstitutions.$inferSelect;
 export type NewFinanceInstitution = typeof financeInstitutions.$inferInsert;
 export type FinanceAccount = typeof financeAccounts.$inferSelect;
@@ -151,3 +211,8 @@ export type FinanceTransaction = typeof financeTransactions.$inferSelect;
 export type NewFinanceTransaction = typeof financeTransactions.$inferInsert;
 export type FinanceExport = typeof financeExports.$inferSelect;
 export type NewFinanceExport = typeof financeExports.$inferInsert;
+export type FinanceBudgetTarget = typeof financeBudgetTargets.$inferSelect;
+export type NewFinanceBudgetTarget = typeof financeBudgetTargets.$inferInsert;
+export type FinanceBudgetSettings = typeof financeBudgetSettings.$inferSelect;
+export type NewFinanceBudgetSettings =
+  typeof financeBudgetSettings.$inferInsert;

@@ -88,7 +88,12 @@ export interface SmartLinkCreditEntry {
   role: SmartLinkCreditRole;
   position: number;
   spotifyId?: string | null;
+  appleMusicId?: string | null;
+  musicbrainzId?: string | null;
+  deezerId?: string | null;
   isPrimary?: boolean;
+  sourceType?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface SmartLinkCreditGroup {
@@ -106,7 +111,12 @@ export function groupReleaseCredits(
     role: ArtistRole;
     position: number;
     spotifyId?: string | null;
+    appleMusicId?: string | null;
+    musicbrainzId?: string | null;
+    deezerId?: string | null;
     isPrimary?: boolean;
+    sourceType?: string | null;
+    metadata?: Record<string, unknown> | null;
   }>
 ): SmartLinkCreditGroup[] {
   const groups = new Map<SmartLinkCreditRole, SmartLinkCreditEntry[]>();
@@ -141,7 +151,12 @@ export function groupReleaseCredits(
       role,
       position: row.position,
       spotifyId: row.spotifyId ?? null,
+      appleMusicId: row.appleMusicId ?? null,
+      musicbrainzId: row.musicbrainzId ?? null,
+      deezerId: row.deezerId ?? null,
       isPrimary: row.isPrimary ?? role === 'main_artist',
+      sourceType: row.sourceType ?? null,
+      metadata: row.metadata ?? null,
     });
     groups.set(role, entries);
   }
@@ -164,11 +179,16 @@ function flattenCreditGroups(
     group.entries.map(entry => ({
       artistId: entry.artistId,
       spotifyId: entry.spotifyId ?? null,
+      appleMusicId: entry.appleMusicId ?? null,
+      musicbrainzId: entry.musicbrainzId ?? null,
+      deezerId: entry.deezerId ?? null,
       name: entry.name,
       handle: entry.handle,
       role: group.role,
       position: entry.position,
       isPrimary: entry.isPrimary ?? group.role === 'main_artist',
+      sourceType: entry.sourceType ?? null,
+      metadata: entry.metadata ?? null,
     }))
   );
 }
@@ -177,13 +197,20 @@ function toSmartLinkPrimaryEntries(
   credits: readonly CanonicalReleaseCredit[]
 ): SmartLinkCreditEntry[] {
   return credits.map(credit => ({
-    artistId: credit.artistId ?? `provider:${credit.spotifyId ?? credit.name}`,
+    artistId:
+      credit.artistId ??
+      `provider:${credit.spotifyId ?? credit.appleMusicId ?? credit.musicbrainzId ?? credit.deezerId ?? credit.name}`,
     name: credit.name,
     handle: credit.handle,
     role: 'main_artist',
     position: credit.position,
     spotifyId: credit.spotifyId ?? null,
+    appleMusicId: credit.appleMusicId ?? null,
+    musicbrainzId: credit.musicbrainzId ?? null,
+    deezerId: credit.deezerId ?? null,
     isPrimary: true,
+    sourceType: credit.sourceType ?? null,
+    metadata: credit.metadata ?? null,
   }));
 }
 
@@ -255,7 +282,12 @@ async function fetchReleaseCredits(
       role: releaseArtists.role,
       position: releaseArtists.position,
       spotifyId: artists.spotifyId,
+      appleMusicId: artists.appleMusicId,
+      musicbrainzId: artists.musicbrainzId,
+      deezerId: artists.deezerId,
       isPrimary: releaseArtists.isPrimary,
+      sourceType: releaseArtists.sourceType,
+      metadata: releaseArtists.metadata,
     })
     .from(releaseArtists)
     .innerJoin(artists, eq(releaseArtists.artistId, artists.id))
@@ -278,7 +310,12 @@ async function fetchRecordingCredits(
       role: recordingArtists.role,
       position: recordingArtists.position,
       spotifyId: artists.spotifyId,
+      appleMusicId: artists.appleMusicId,
+      musicbrainzId: artists.musicbrainzId,
+      deezerId: artists.deezerId,
       isPrimary: recordingArtists.isPrimary,
+      sourceType: recordingArtists.sourceType,
+      metadata: recordingArtists.metadata,
     })
     .from(recordingArtists)
     .innerJoin(artists, eq(recordingArtists.artistId, artists.id))

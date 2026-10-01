@@ -37,8 +37,13 @@ export function invalidateReleaseCaches(
   profileId: string
 ): void {
   revalidateTag(createReleasesTag(userId, profileId), 'max');
-  revalidateTag(createSmartLinkContentTag(profileId), 'max');
+  invalidateSmartLinkContentCache(profileId);
   revalidateTag(createPublicReleasesTag(profileId), 'max');
   revalidateTag(CACHE_TAGS.PUBLIC_PROFILE, 'max');
   revalidateTag(CACHE_TAGS.SITEMAP_CATALOG, 'max');
+}
+
+/** Invalidate a public SmartLink after a recording-credit-only mutation. */
+export function invalidateSmartLinkContentCache(profileId: string): void {
+  revalidateTag(createSmartLinkContentTag(profileId), 'max');
 }
