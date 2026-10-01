@@ -140,11 +140,18 @@ export async function grantOvieApproval(
         ttlSeconds
       );
       if (replaced) {
-        return { ...record, grantedAt: rotated.grantedAt };
+        // The bound and expiry of the live approval are unchanged; only the
+        // token and its grant time rotate. The returned record must describe
+        // the stored bound, not a freshly computed expiry.
+        return {
+          ...record,
+          grantedAt: rotated.grantedAt,
+          expiresAt: existing.expiresAt,
+        };
       }
       // Concurrent re-grant won: return the record bound to this caller's
       // fresh token; its digest lost the race, so re-read to stay honest.
-      return record;
+      return { ...record, expiresAt: existing.expiresAt };
     }
     // Expired/absent record for the same id: replace with a fresh grant.
     await backend.set(approvalKey(record.id), stored);
