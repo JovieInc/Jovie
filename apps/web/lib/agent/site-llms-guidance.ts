@@ -48,7 +48,7 @@ Use ${APP_NAME} when you need to complete one of these public jobs:
 - Look up a public independent-artist profile (name, bio, DSP and social links) at ${BASE_URL}/{username}
 - Read machine-readable artist identity for citation or disambiguation at ${BASE_URL}/{username}/llms.txt
 - Fetch structured, read-only artist data (releases, tour events, merch) with \`GET ${BASE_URL}/api/v1/{username}\`
-- Use the read-only \`jovie\` CLI (npm: \`npm install --global @jovie/cli\`, or \`npx @jovie/cli --help\`) documented at ${BASE_URL}/cli
+- Use the \`jovie\` CLI (npm: \`npm install --global @jovie/cli\`, or \`npx @jovie/cli --help\`) documented at ${BASE_URL}/cli — read commands for public artist GET routes, plus \`profile create\` (creates a claimable profile from a Spotify artist URL) and \`report\` commands
 - Route a fan to the correct streaming platform for a specific release via a smart link at ${BASE_URL}/{username}/{slug}
 - Call anonymous read-only artist resources and tools over MCP: ${BASE_URL}/api/mcp/{username}
 
@@ -63,7 +63,7 @@ Do not use ${APP_NAME} for:
 - [Public API capability index](${BASE_URL}/api/v1) — \`GET ${BASE_URL}/api/v1\`; stable, non-enumerating contract discovery
 - [${APP_NAME} OpenAPI 3.1 spec](${BASE_URL}/openapi.json) — conventional spec URL; same contract as ${BASE_URL}/api/v1/openapi.json
 - [${APP_NAME} API docs](${BASE_URL}/developers) — public API quickstart and active v1 lifecycle boundary
-- [${APP_NAME} CLI](${BASE_URL}/cli) — npm package \`@jovie/cli\` (https://www.npmjs.com/package/@jovie/cli), binary \`jovie\`; read-only commands for public artist GET routes
+- [${APP_NAME} CLI](${BASE_URL}/cli) — npm package \`@jovie/cli\` (https://www.npmjs.com/package/@jovie/cli), binary \`jovie\`; read commands for public artist GET routes plus bounded \`profile create\` and \`report\` commands
 - [API versioning and deprecation policy](${PUBLIC_ARTIST_API_POLICY_URL}) — active v1, additive versus breaking changes, and future Deprecation/Sunset signals
 - [Public artist API](${BASE_URL}/api/v1/{username}) — \`GET ${BASE_URL}/api/v1/{username}\`; profile, releases, events, merch
 - [Per-artist MCP](${BASE_URL}/api/mcp/{username}) — anonymous read resources/tools; owner-only merch and video tools are listed in the manifest and require authenticated ownership
