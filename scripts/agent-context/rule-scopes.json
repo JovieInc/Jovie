@@ -30,7 +30,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "7f1face547e59ffda17d07013083a9e53e16c70cbd3c8e367c665ef429646bde"
+    "bodySha256": "1a774604c907fa87740624ea5e9d0af3d6d65029437de56dd9df70b899c9a836"
   },
   {
     "file": ".claude/rules/gstack.md",
@@ -136,7 +136,7 @@
       "**/vitest.config.*",
       "**/playwright.config.*"
     ],
-    "bodySha256": "db9e655787d8cb9b4500a66d14e8419185a362b3cf3913e4b32459ad3bcc4bc6"
+    "bodySha256": "bb2d6eacdd0a036124803cd36a17404d048fcd45ef780b0b3612d667b1aa5f55"
   },
   {
     "file": ".claude/rules/ui.md",
@@ -147,6 +147,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "f888b7c0a2f120391392b7f67bbd656e21bc32958d2515a24715b900e33784d6"
+    "bodySha256": "bd51a598658a675f387b87581a44f6c06a32223396b9a75cef86ea21a727447a"
   }
 ]
