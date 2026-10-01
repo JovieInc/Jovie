@@ -1,7 +1,17 @@
 # Lessons Learned — Jovie Codebase
 
 Recurring mistakes and how to avoid them. Updated whenever a correction is made.
-See `AGENTS.md` guardrail #10 for the self-improvement loop process.
+See [the self-improvement loop](.claude/rules/code-style.md#self-improvement-loop).
+
+[LESSONS.guards.json](LESSONS.guards.json) links every lesson fingerprint (its exact
+level-three heading) to a named regression test or scoped rule, with a reason and
+a SHA-256 of the reviewed lesson. When adding or changing a lesson, review its
+prevention and update that entry together. Do not refresh hashes without review.
+The existing `scripts/invariants/harness-contract.test.mjs` audit checks exhaustive
+coverage, reviewed text, local paths and exact guard anchors. Its linkage receipt
+proves those references exist; it does not prove all linked tests ran or certify
+runtime behavior. Scoped rules are policy guards, not automated regression tests.
+No lesson is declared unable to recur in this inventory.
 
 ---
 
@@ -72,7 +82,7 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 **Mistake:** Staging auth routes were allowed to resolve production Clerk keys when `CLERK_PUBLISHABLE_KEY_STAGING` / `CLERK_SECRET_KEY_STAGING` were missing at runtime. That produced `500`s on `staging.jov.ie/signin` and `staging.jov.ie/signup` while `main` kept passing earlier checks.
 
-**Rule:** Treat `staging.jov.ie` and `main.jov.ie` as strict staging hosts. They must use only the staging Clerk pair. If the staging pair is incomplete during deploys or cold starts, fail closed: public auth routes should render the auth-unavailable UI, and protected routes should return `503`, instead of silently falling back to production keys.
+**Rule (reviewed 2026-10-01):** This incident is historical: Clerk is retired. Follow `.claude/rules/auth.md` for Better Auth and active-host configuration. Never restore Clerk imports or environment variables to implement this old remediation. Environment isolation remains relevant; retirement is not evidence that all staging-auth failures are impossible.
 
 ### Stale test mocks after UI removal
 **Mistake:** Tests for `ClaimHandleForm` were asserting behavior for a "suggestions" UI that had been removed from the component. Tests failed with cryptic errors rather than cleanly.
@@ -89,7 +99,7 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 **Mistake:** Local perf auth bootstrap assumed the test-auth bypass was broken when `/api/dev/test-auth/enter` redirected a `127.0.0.1` request to `localhost`. The bypass cookies were host-only, so the redirected `/app` request arrived signed out and bounced to `/signin`.
 
-**Rule:** For local authenticated testing, keep test-auth redirects app-relative so bypass cookies survive on the original loopback host. When debugging local auth, verify whether the failure is a host mismatch (`localhost` vs `127.0.0.1`) before blaming Clerk or missing test users.
+**Rule:** For local authenticated testing, keep test-auth redirects app-relative so bypass cookies survive on the original loopback host. When debugging local auth, verify whether the failure is a host mismatch (`localhost` vs `127.0.0.1`) before blaming Better Auth or missing test users.
 
 ### Next cache invalidation must stay Node-safe in shared test helpers
 
@@ -120,7 +130,7 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 **Mistake:** Homepage demos mixed old local Tim White images with a different blob-hosted avatar and used the wrong Spotify artist identifier in mock links.
 
-**Rule:** If the homepage uses Tim White, use a single canonical source for founder identity data across all homepage demos and mocks. Do not guess or hardcode alternate photos. Tim White's Spotify artist ID is `4u`, and sibling homepage references must be updated together.
+**Rule:** If the homepage uses Tim White, use a single canonical source for founder identity data across all homepage demos and mocks. Do not guess or hardcode alternate photos. Use `TIM_WHITE_PROFILE` from `apps/web/lib/tim-white.ts` and its canonical `TIM_WHITE_SPOTIFY_ID` from `apps/web/lib/spotify/blacklist.ts`; sibling homepage references must be updated together. The former `4u` value was truncated and must not be copied.
 
 ### Calvin Harris demo content must avoid founder-name collisions
 
@@ -208,9 +218,9 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 **Rule:** Existing migration SQL and snapshot files are immutable once they exist on the base branch. New generated migration artifacts are allowed to add one new SQL file, one new snapshot, and the corresponding `_journal.json` entry.
 
 ### `pnpm vitest --run --changed` exits 0 with no test files
-**Situation:** When no changed test files exist, `vitest --run --changed` exits with code 0 and prints "No test files found." This is not a failure — it means all affected tests are implicitly passing (no files changed to test).
+**Situation:** A changed-test selector can execute zero tests; its exit status depends on the runner configuration. A successful exit without executed tests is not a passing test receipt.
 
-**Don't:** Treat this as a CI failure. Don't retry or investigate.
+**Rule:** Record zero tests as no execution evidence. For executable changes, run the relevant repository/CI selector and report actual test counts and coverage. Documentation-only changes may justify no tests; never describe unexecuted tests as implicitly passing.
 
 ### `/claim` route gating in sentry route-detector
 **Situation:** `lib/sentry/route-detector.ts` references `/claim` as a known public route for Sentry performance tracking. This is intentional — the route exists for artist profile claiming. Don't confuse this with marketing CTAs that should link to `/signup`.

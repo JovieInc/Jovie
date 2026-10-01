@@ -226,6 +226,10 @@ export function classifyChangedFile(file) {
   }
   const matched = matchPrefixes(normalized);
   if (matched.length > 0) return matched;
+  // Lessons and scoped rules are executable harness inputs, not inert prose.
+  if (normalized === 'LESSONS.md' || normalized.startsWith('.claude/rules/')) {
+    return [CI_LANES.SYMPHONY_CONTROL];
+  }
   if (DOC_FILE.test(normalized) && !normalized.startsWith('.github/')) {
     return [];
   }

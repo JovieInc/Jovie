@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
+import { readFileSync, realpathSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
-
+import { fileURLToPath } from 'node:url';
+import {
+  lessonFingerprints,
+  verifyFeedbackLinkage,
+} from './feedback-linkage.mjs';
 import {
   buildHarnessReceipt,
   HARNESS_CONTRACT_INVARIANT_ID,
@@ -197,5 +203,161 @@ describe('JOV-INV-024 harness contract', () => {
         error.includes('harness-exception-owner:H-02')
       )
     );
+  });
+});
+
+const repoRoot = realpathSync(
+  fileURLToPath(new URL('../../', import.meta.url))
+);
+function readLocalGuard(path) {
+  const absolute = resolve(repoRoot, path);
+  assert.equal(
+    realpathSync(absolute),
+    absolute,
+    'guard path must not traverse a symlink'
+  );
+  return readFileSync(absolute, 'utf8');
+}
+const lessonSource = readFileSync(resolve(repoRoot, 'LESSONS.md'), 'utf8');
+const feedbackRegistry = JSON.parse(
+  readFileSync(resolve(repoRoot, 'LESSONS.guards.json'), 'utf8')
+);
+
+describe('H-06 repeated-feedback linkage', () => {
+  it('links every reviewed lesson fingerprint to a concrete test or scoped rule', t => {
+    const lessons = verifyFeedbackLinkage(
+      lessonSource,
+      feedbackRegistry,
+      readLocalGuard
+    );
+    t.diagnostic(
+      JSON.stringify({
+        schema: 'jovie.feedback-linkage-receipt/v1',
+        lessonCount: lessons.length,
+        testLinks: lessons
+          .flatMap(item => item.guards)
+          .filter(item => item.kind === 'test').length,
+        ruleLinks: lessons
+          .flatMap(item => item.guards)
+          .filter(item => item.kind === 'scoped-rule').length,
+        cannotRecur: 0,
+        proof: 'reviewed-source-linkage-only',
+        lessons,
+      })
+    );
+  });
+
+  it('deliberate red H-06: new, removed, duplicated or edited lessons require review', () => {
+    for (const source of [
+      `${lessonSource}\n### Newly repeated mistake\nNeeds prevention.\n`,
+      lessonSource.replace(/^### .+\n/mu, ''),
+      `${lessonSource}\n${lessonSource}`,
+      lessonSource.replace('**Mistake:**', '**Mistake:** newly corrected'),
+    ]) {
+      assert.throws(() =>
+        verifyFeedbackLinkage(source, feedbackRegistry, readLocalGuard)
+      );
+    }
+    assert.throws(
+      () => verifyFeedbackLinkage('', feedbackRegistry, readLocalGuard),
+      /no lesson/
+    );
+  });
+
+  it('deliberate red H-06: stale, missing, circular or nominal guards cannot pass', () => {
+    const mutations = [
+      entry => {
+        entry.guards = [];
+      },
+      entry => {
+        entry.guards[0].anchor = 'a nonexistent test or rule anchor';
+      },
+      entry => {
+        entry.guards[0].anchor = 'test';
+      },
+      entry => {
+        entry.guards[0].reason = '';
+      },
+      entry => {
+        entry.guards[0].kind = 'cannot-recur';
+      },
+      entry => {
+        entry.guards[0].path = '../outside.test.ts';
+      },
+      entry => {
+        entry.guards[0].path = '/outside.test.ts';
+      },
+      entry => {
+        entry.guards[0].path = 'apps/../outside.test.ts';
+      },
+      entry => {
+        entry.guards[0].path = 'C:\\outside.test.ts';
+      },
+      entry => {
+        entry.guards[0].path = 'LESSONS.md';
+      },
+      entry => {
+        entry.guards[0].path = 'scripts/invariants/harness-contract.test.mjs';
+      },
+      entry => {
+        entry.guards[0].kind = 'scoped-rule';
+      },
+      entry => {
+        entry.guards.push(entry.guards[0]);
+      },
+    ];
+    for (const mutate of mutations) {
+      const registry = structuredClone(feedbackRegistry);
+      mutate(registry.lessons[0]);
+      assert.throws(() =>
+        verifyFeedbackLinkage(lessonSource, registry, readLocalGuard)
+      );
+    }
+    assert.throws(
+      () =>
+        verifyFeedbackLinkage(lessonSource, feedbackRegistry, () => {
+          throw new Error('missing file');
+        }),
+      /missing file/
+    );
+  });
+
+  it('deliberate red H-06: duplicate and orphaned registry entries fail', () => {
+    const duplicate = structuredClone(feedbackRegistry);
+    duplicate.lessons.push(duplicate.lessons[0]);
+    assert.throws(
+      () => verifyFeedbackLinkage(lessonSource, duplicate, readLocalGuard),
+      /duplicate linkage/
+    );
+    const orphan = structuredClone(feedbackRegistry);
+    orphan.lessons[0].fingerprint = 'Removed lesson';
+    assert.throws(
+      () => verifyFeedbackLinkage(lessonSource, orphan, readLocalGuard),
+      /non-exhaustive/
+    );
+  });
+
+  it('handles CRLF and fenced example headings without dropping real lessons', () => {
+    assert.deepEqual(
+      lessonFingerprints(lessonSource.replaceAll('\n', '\r\n')),
+      lessonFingerprints(lessonSource)
+    );
+    assert.deepEqual(
+      lessonFingerprints('   ### Indented lesson\nBody.').map(
+        item => item.fingerprint
+      ),
+      ['Indented lesson']
+    );
+    for (const fence of ['```', '~~~~']) {
+      const source = `### Real lesson\nBefore.\n${fence}md\n### Example only\n${fence}\nAfter.\n## Category\n### Next lesson\nBody.\n`;
+      assert.deepEqual(
+        lessonFingerprints(source).map(item => item.fingerprint),
+        ['Real lesson', 'Next lesson']
+      );
+      assert.throws(
+        () => lessonFingerprints(`### Real\n${fence}\nnever closed`),
+        /unclosed/
+      );
+    }
   });
 });
