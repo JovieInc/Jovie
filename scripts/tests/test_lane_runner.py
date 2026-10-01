@@ -139,6 +139,14 @@ class PromptTest(unittest.TestCase):
                        "Do not mark it ready or merge it", "NOT-SHIPPABLE"):
             self.assertIn(needle, prompt)
 
+    def test_native_issue_link_is_nonclosing_before_the_agent_opens_a_pr(self):
+        for labels in ([], ["commissioning"], ["parent"]):
+            with self.subTest(labels=labels):
+                prompt = lane.render_prompt(issue("JOV-42", labels=labels), "devin/jov-42-x", "")
+                self.assertIn("Refs JOV-42.", prompt)
+                self.assertIn("linear-issue-identifier:JOV-42", prompt)
+                self.assertIn("normal implementation", prompt)
+
     def test_contract_forbids_interactive_skill_workflows(self):
         prompt = lane.render_prompt(issue(), "codex/jov-1", "")
         self.assertIn("Never stop to ask", prompt)
@@ -342,6 +350,17 @@ class VerifyAndLandTest(unittest.TestCase):
     def test_older_prs_for_the_same_issue_are_ignored(self):
         stale = {**self.pr, "createdAt": "2026-09-20T00:00:00Z"}
         self.assertEqual(self.run_gate(FakeShell([stale]))["verdict"], "no-change")
+
+    def test_fallback_pr_is_nonclosing_from_creation_and_retains_merge_sync_identity(self):
+        fake = FakeShell([], ahead="2")
+        self.run_gate(fake)
+        creations = [call for call in fake.calls if call[:3] == ["gh", "pr", "create"]]
+        self.assertEqual(len(creations), 1)
+        body = creations[0][creations[0].index("--body") + 1]
+        self.assertTrue(body.startswith("Refs JOV-1.\n"))
+        self.assertIn("<!-- linear-issue-id:id-JOV-1 -->", body)
+        self.assertIn("<!-- linear-issue-identifier:JOV-1 -->", body)
+        self.assertNotIn("Closes", body)
 
     def test_pr_creation_failure_does_not_loop(self):
         result = self.run_gate(FakeShell([], ahead="2"))
@@ -1086,22 +1105,30 @@ class PublicationRevocationTest(unittest.TestCase):
 
     def test_sigterm_is_a_stop_that_revokes_before_kill(self):
         import signal
-        import threading
         with tempfile.TemporaryDirectory() as tmp, open(os.devnull, "w") as log:
             root = Path(tmp)
             host = lane.Host(state=root)
             pidfile = root / "pid"
+            # Startup may exceed the old 0.5s timer on a loaded installer host.
             command = [sys.executable, "-c",
-                       "import os,time,pathlib; pathlib.Path('pid').write_text(str(os.getpid())); time.sleep(30)"]
-            timer = threading.Timer(0.5, lambda: os.kill(os.getpid(), signal.SIGTERM))
-            try:
-                timer.start()
-                with self.assertRaises(lane.RunStopped):
-                    lane.run_agent(command, root, log, timeout=30,
-                                   on_kill=lambda error: lane.revoke_publication(
-                                       host, branch="devin/jov-9-1", reason="run-stopped"))
-            finally:
-                timer.cancel()
+                       "import os,time,pathlib; time.sleep(0.75); pathlib.Path('pid').write_text(str(os.getpid())); time.sleep(30)"]
+
+            def signal_when_ready():
+                if pidfile.exists():
+                    os.kill(os.getpid(), signal.SIGTERM)
+
+            observed = []
+
+            def on_kill(error):
+                # Preserve receipt-before-kill proof for a real SIGTERM too.
+                os.kill(int(pidfile.read_text()), 0)
+                observed.append(type(error).__name__)
+                lane.revoke_publication(host, branch="devin/jov-9-1", reason="run-stopped")
+
+            with self.assertRaises(lane.RunStopped):
+                lane.run_agent(command, root, log, timeout=30,
+                               guard=signal_when_ready, guard_interval=0.05, on_kill=on_kill)
+            self.assertEqual(observed, ["RunStopped"])
             self.assertIsNotNone(lane.publication_revocation(host, "devin/jov-9-1"))
             with self.assertRaises(ProcessLookupError):
                 os.kill(int(pidfile.read_text()), 0)

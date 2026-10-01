@@ -554,6 +554,12 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
         "  --no-verify or weaken a check.",
         f"- Push `{branch}` and open ONE draft PR against main whose title contains {issue.identifier}.",
         "  Do not mark it ready or merge it: an independent gate does that after verifying.",
+        f"- Start the PR body with `Refs {issue.identifier}.` and retain",
+        f"  `<!-- linear-issue-id:{issue.id} -->` and",
+        f"  `<!-- linear-issue-identifier:{issue.identifier} -->`.",
+        "  Do not use closing keywords for issue links: native Linear merge automation",
+        "  cannot inspect commissioning acceptance. The repository merge sync closes",
+        "  normal implementation issues and retains commissioning/parent work.",
         "- If the issue is not code-shippable or already fixed, open no PR and end with a",
         "  line `NOT-SHIPPABLE: <reason>`.",
         "- You are unattended: nobody will answer a question. Never stop to ask; choose the",
@@ -1243,7 +1249,11 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
         require_publishable(host, branch, "before-pr-create")
         sh(["gh", "pr", "create", "--repo", REPO_SLUG, "--draft", "--head", branch,
             "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
-            "--body", f"Lane run for {issue.identifier}. Verification by the lane gate."], cwd=worktree, log=log)
+            "--body", f"Refs {issue.identifier}.\n\n"
+            f"<!-- linear-issue-id:{issue.id} -->\n"
+            f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
+            "Lane implementation; verification by the lane gate. "
+            "Runtime and commissioning acceptance remain with the issue owner."], cwd=worktree, log=log)
         return verify_and_land(host, issue, branch, worktree, log, started, opened=True, sensitive=sensitive)
     pr = max(prs, key=lambda item: item["createdAt"])
     if sensitive:

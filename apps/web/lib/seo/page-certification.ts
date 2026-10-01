@@ -52,8 +52,8 @@ export const DESCRIPTION_LENGTH = { min: 50, max: 170 } as const;
  */
 export const MIN_SERVER_RENDERED_WORDS = 40;
 export const MIN_LINK_PAGE_WORDS = 10;
-/** Domain-level `is-agentic` floor. jov.ie scored 100 on 2026-09-14. */
-export const IS_AGENTIC_SCORE_FLOOR = 90;
+/** Domain-level `is-agentic` floor. The weekly loop closes only at 100/100. */
+export const IS_AGENTIC_SCORE_FLOOR = 100;
 
 /** Pages whose copy runs the flagship judge panel in the authoring loop. */
 export const FLAGSHIP_PATHS: ReadonlySet<string> = new Set([
@@ -78,7 +78,11 @@ export interface ExtractedSeoHead {
   readonly jsonLdTypes: readonly string[];
   /** Every `@type` at any depth, e.g. an Offer nested in `mainEntity`. */
   readonly jsonLdNestedTypes: readonly string[];
+  /** Parsed JSON-LD documents (roots only; `@graph` stays nested inside). */
+  readonly jsonLdDocuments: readonly unknown[];
   readonly jsonLdErrors: number;
+  /** `href` of a `<link rel="alternate" type="text/markdown">`, when present. */
+  readonly markdownAlternate: string | null;
   readonly h1Count: number;
   readonly visibleText: string;
 }
@@ -278,10 +282,12 @@ function collectNestedJsonLdTypes(node: unknown, types: string[]): void {
 function jsonLdBlocks(html: string): {
   types: string[];
   nestedTypes: string[];
+  documents: unknown[];
   errors: number;
 } {
   const types: string[] = [];
   const nestedTypes: string[] = [];
+  const documents: unknown[] = [];
   let errors = 0;
   const lower = html.toLowerCase();
   let cursor = lower.indexOf('<script');
@@ -293,6 +299,7 @@ function jsonLdBlocks(html: string): {
     if (attributes.type?.toLowerCase() === 'application/ld+json') {
       try {
         const parsed: unknown = JSON.parse(html.slice(start + 1, end));
+        documents.push(parsed);
         collectJsonLdTypes(parsed, types);
         collectNestedJsonLdTypes(parsed, nestedTypes);
       } catch {
@@ -301,7 +308,7 @@ function jsonLdBlocks(html: string): {
     }
     cursor = lower.indexOf('<script', end);
   }
-  return { types, nestedTypes, errors };
+  return { types, nestedTypes, documents, errors };
 }
 
 export function extractSeoHead(html: string): ExtractedSeoHead {
@@ -312,6 +319,11 @@ export function extractSeoHead(html: string): ExtractedSeoHead {
     link.rel?.toLowerCase().split(/\s+/).includes('canonical')
   );
   const jsonLd = jsonLdBlocks(html);
+  const markdownAlternate = links.find(
+    link =>
+      link.rel?.toLowerCase().split(/\s+/).includes('alternate') &&
+      link.type?.toLowerCase().split(';')[0]?.trim() === 'text/markdown'
+  );
   return {
     lang: findTags(html, 'html')[0]?.lang?.trim() || null,
     title: titleText ? decodeEntities(titleText).trim() || null : null,
@@ -330,7 +342,9 @@ export function extractSeoHead(html: string): ExtractedSeoHead {
       .map(link => ({ lang: link.hreflang ?? '', href: link.href ?? '' })),
     jsonLdTypes: jsonLd.types,
     jsonLdNestedTypes: [...new Set(jsonLd.nestedTypes)],
+    jsonLdDocuments: jsonLd.documents,
     jsonLdErrors: jsonLd.errors,
+    markdownAlternate: markdownAlternate?.href?.trim() || null,
     h1Count: findTags(html, 'h1').length,
     visibleText: extractVisibleText(html),
   };
@@ -651,6 +665,254 @@ export function auditTechnicalSeo(
   return checks;
 }
 
+// ---------------------------------------------------------------------------
+// JSON-LD property validation + rendered-copy parity (JOV-7259)
+// Deterministic subset of the claude-seo rubric: parse-ability and type
+// presence were already covered by `structured-data`; these checks cover what
+// the graph actually claims.
+// ---------------------------------------------------------------------------
+
+/** Node types whose `name`/`description` must mirror the rendered metadata. */
+const JSONLD_PAGE_ENTITY_TYPES = new Set([
+  'WebPage',
+  'AboutPage',
+  'ContactPage',
+  'CollectionPage',
+  'FAQPage',
+  'Article',
+  'BlogPosting',
+  'NewsArticle',
+  'TechArticle',
+]);
+
+/** Minimum property checks for Jovie certification, not all schema.org constraints. */
+const JSONLD_REQUIRED_PROPS: Readonly<Record<string, readonly string[]>> = {
+  Offer: ['url'],
+  Product: ['name'],
+  ItemList: ['itemListElement'],
+  BreadcrumbList: ['itemListElement'],
+  FAQPage: ['mainEntity'],
+};
+
+interface JsonLdNodeEntry {
+  readonly node: Record<string, unknown>;
+  readonly path: string;
+}
+
+function* walkJsonLd(node: unknown, path: string): Generator<JsonLdNodeEntry> {
+  if (Array.isArray(node)) {
+    for (const [index, item] of node.entries())
+      yield* walkJsonLd(item, `${path}[${index}]`);
+    return;
+  }
+  if (!node || typeof node !== 'object') return;
+  const record = node as Record<string, unknown>;
+  yield { node: record, path };
+  for (const [key, value] of Object.entries(record)) {
+    if (key === '@context') continue;
+    yield* walkJsonLd(value, `${path}.${key}`);
+  }
+}
+
+function nodeTypes(node: Record<string, unknown>): string[] {
+  const type = node['@type'];
+  if (typeof type === 'string') return type.trim() ? [type] : [];
+  if (Array.isArray(type))
+    return type.filter(
+      (item): item is string =>
+        typeof item === 'string' && item.trim().length > 0
+    );
+  return [];
+}
+
+/** Common document shapes emitted by Jovie: typed roots, arrays, and graphs. */
+function graphMembers(document: unknown, path = '$'): JsonLdNodeEntry[] {
+  if (Array.isArray(document)) {
+    if (document.length === 0) return [{ node: {}, path }];
+    return document.flatMap((member, index) =>
+      graphMembers(member, `${path}[${index}]`)
+    );
+  }
+  if (!document || typeof document !== 'object') return [{ node: {}, path }];
+  const node = document as Record<string, unknown>;
+  if ('@graph' in node) {
+    return [
+      ...(nodeTypes(node).length > 0 ? [{ node, path }] : []),
+      ...graphMembers(node['@graph'], `${path}.@graph`),
+    ];
+  }
+  return [{ node, path }];
+}
+
+function absoluteSchemaUrl(value: unknown): boolean {
+  if (Array.isArray(value))
+    return value.length > 0 && value.every(absoluteSchemaUrl);
+  if (value && typeof value === 'object') {
+    return absoluteSchemaUrl((value as Record<string, unknown>)['@id']);
+  }
+  if (typeof value !== 'string' || !value.trim()) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+function validSchemaProperty(prop: string, value: unknown): boolean {
+  if (prop === 'url') return absoluteSchemaUrl(value);
+  if (prop === 'name')
+    return typeof value === 'string' && value.trim().length > 0;
+  // Item lists and FAQ entities can be a single node or a nonempty node array.
+  const members = Array.isArray(value) ? value : [value];
+  return (
+    members.length > 0 &&
+    members.every(
+      member =>
+        member !== null &&
+        typeof member === 'object' &&
+        !Array.isArray(member) &&
+        Object.keys(member).length > 0
+    )
+  );
+}
+
+function normalizeForParity(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+function parityMatch(claim: string, rendered: string | null): boolean {
+  if (!rendered) return false;
+  const a = normalizeForParity(claim);
+  const b = normalizeForParity(rendered);
+  return a.length > 0 && b.includes(a);
+}
+
+export function auditJsonLdSemantics(head: ExtractedSeoHead): SeoCheck[] {
+  if (head.jsonLdDocuments.length === 0) return [];
+  const checks: SeoCheck[] = [];
+
+  // This is Jovie's typed-entity contract, not a complete JSON-LD validator.
+  const untyped: string[] = [];
+  for (const document of head.jsonLdDocuments) {
+    for (const member of graphMembers(document)) {
+      if (nodeTypes(member.node).length === 0) untyped.push(member.path);
+    }
+  }
+  checks.push(
+    untyped.length === 0
+      ? check('agentic', 'jsonld-type', 'passed', 'every JSON-LD entity typed')
+      : check(
+          'agentic',
+          'jsonld-type',
+          'failed',
+          `JSON-LD entities missing @type: ${untyped.slice(0, 5).join(', ')}`,
+          'Emit typed entities in a root object, document array, or @graph container.'
+        )
+  );
+
+  // Jovie certification requires absolute http(s) URL values so extracted
+  // evidence remains unambiguous without carrying the originating document.
+  const relativeUrls: string[] = [];
+  for (const document of head.jsonLdDocuments) {
+    for (const { node, path } of walkJsonLd(document, '$')) {
+      if ('url' in node && !absoluteSchemaUrl(node.url)) {
+        relativeUrls.push(`${path}.url`);
+      }
+    }
+  }
+  checks.push(
+    relativeUrls.length === 0
+      ? check(
+          'agentic',
+          'jsonld-absolute-url',
+          'passed',
+          'all JSON-LD url properties are absolute http(s)'
+        )
+      : check(
+          'agentic',
+          'jsonld-absolute-url',
+          'failed',
+          `non-absolute JSON-LD url at ${relativeUrls.slice(0, 5).join(', ')}`,
+          'Emit absolute https://jov.ie URLs for schema.org url properties; certification requires unambiguous URLs.'
+        )
+  );
+
+  const missingProps: string[] = [];
+  for (const document of head.jsonLdDocuments) {
+    for (const { node, path } of walkJsonLd(document, '$')) {
+      for (const type of nodeTypes(node)) {
+        for (const prop of JSONLD_REQUIRED_PROPS[type] ?? []) {
+          const value = node[prop];
+          if (!validSchemaProperty(prop, value))
+            missingProps.push(`${type} ${path} missing or invalid ${prop}`);
+        }
+      }
+    }
+  }
+  checks.push(
+    missingProps.length === 0
+      ? check(
+          'agentic',
+          'jsonld-required-props',
+          'passed',
+          'required JSON-LD properties present'
+        )
+      : check(
+          'agentic',
+          'jsonld-required-props',
+          'warn',
+          missingProps.slice(0, 5).join('; '),
+          'Populate the required property; rich-result parsers skip incomplete nodes.'
+        )
+  );
+
+  // Rendered-copy parity: a page-entity node that names or describes something
+  // the rendered title/description never said is schema/body drift.
+  const drifted: string[] = [];
+  for (const document of head.jsonLdDocuments) {
+    for (const { node, path } of graphMembers(document)) {
+      if (!nodeTypes(node).some(type => JSONLD_PAGE_ENTITY_TYPES.has(type)))
+        continue;
+      if (
+        typeof node.name === 'string' &&
+        !parityMatch(node.name, head.title) &&
+        !parityMatch(node.name, head.visibleText)
+      ) {
+        drifted.push(`${path} name "${node.name}" not in rendered copy`);
+      }
+      if (
+        typeof node.description === 'string' &&
+        !parityMatch(node.description, head.description) &&
+        !parityMatch(node.description, head.visibleText)
+      ) {
+        drifted.push(`${path} description not in rendered copy`);
+      }
+    }
+  }
+  checks.push(
+    drifted.length === 0
+      ? check(
+          'agentic',
+          'jsonld-rendered-parity',
+          'passed',
+          'JSON-LD page entities match rendered metadata'
+        )
+      : check(
+          'agentic',
+          'jsonld-rendered-parity',
+          'warn',
+          `schema/body drift: ${drifted.slice(0, 3).join('; ')}`,
+          'Align the JSON-LD page entity with the rendered title and meta description.'
+        )
+  );
+
+  return checks;
+}
+
 export function auditAgentReadiness(
   head: ExtractedSeoHead,
   surface: SeoPageSurface
@@ -682,7 +944,7 @@ export function auditAgentReadiness(
         'agentic',
         'structured-data',
         'passed',
-        `JSON-LD types: ${[...new Set(head.jsonLdTypes)].slice(0, 6).join(', ')}`
+        `JSON-LD types (including nested): ${[...new Set(head.jsonLdNestedTypes)].slice(0, 8).join(', ')}`
       )
     );
   }
@@ -705,6 +967,25 @@ export function auditAgentReadiness(
           'failed',
           `${words} server-rendered words`,
           'Render the page content on the server; agents and crawlers do not run client JS.'
+        )
+  );
+  checks.push(...auditJsonLdSemantics(head));
+  // Advisory only (JOV-7259): Markdown delivery is recorded until outcome
+  // data justifies a gate.
+  checks.push(
+    head.markdownAlternate
+      ? check(
+          'agentic',
+          'markdown-delivery',
+          'passed',
+          `markdown alternate advertised: ${head.markdownAlternate}`
+        )
+      : check(
+          'agentic',
+          'markdown-delivery',
+          'warn',
+          'no text/markdown alternate advertised; Accept negotiation and .md siblings not probed',
+          'Advertise a Markdown representation via <link rel="alternate" type="text/markdown"> or Accept-header negotiation when the route serves one.'
         )
   );
   return checks;
@@ -812,7 +1093,9 @@ export function auditIsAgentic(
     ];
   }
   const essentialFailures = (report.issues ?? []).filter(
-    issue => issue.tier === 'essential' && issue.result === 'fail'
+    issue =>
+      issue.tier === 'essential' &&
+      (issue.result === 'fail' || issue.result === 'failed')
   );
   const checks: SeoCheck[] = [
     report.score >= floor
@@ -845,7 +1128,11 @@ export function auditIsAgentic(
         ),
   ];
   for (const issue of report.issues ?? []) {
-    if (issue.tier === 'essential' && issue.result === 'fail') continue;
+    if (
+      issue.tier === 'essential' &&
+      (issue.result === 'fail' || issue.result === 'failed')
+    )
+      continue;
     checks.push(
       check(
         'agentic',
