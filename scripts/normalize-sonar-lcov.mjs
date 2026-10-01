@@ -33,6 +33,20 @@ export function prepareSonarSources(repoRoot) {
   }
   const path = resolve(repoRoot, 'sonar-project.properties');
   let text = readFileSync(path, 'utf8');
+  // Accept the repository's canonical key=value syntax, not a partial Java
+  // properties parser: escaped or alternative keys could override our roots.
+  let continued = false;
+  for (const line of text.split('\n')) {
+    if (!continued && /^[ \t]*(?:[#!].*)?$/.test(line)) continue;
+    if (!continued && !/^[A-Za-z][A-Za-z0-9_.-]*=/.test(line)) {
+      throw new Error(
+        'Unexpected property syntax; expected canonical key=value'
+      );
+    }
+    const trailing = /\\+$/.exec(line);
+    continued = trailing !== null && trailing[0].length % 2 === 1;
+  }
+  if (continued) throw new Error('Unterminated property continuation');
   for (const key of ['sonar.sources', 'sonar.tests']) {
     const pattern = new RegExp(
       `^[ \t]*${key.replace('.', '\\.')}(?:[ \t]*[=:][ \t]*|[ \t]+|$)(.*)$`,

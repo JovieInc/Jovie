@@ -223,11 +223,30 @@ test('ambiguous Java property overrides cannot survive source preparation', t =>
     'sonar.tests apps/web/lib',
     'sonar.sources',
     'sonar.tests',
+    String.raw`sonar\.sources=apps/web/lib`,
+    String.raw`sonar\u002etests=apps/web/tests`,
+    '\fsonar.sources=apps/web/lib',
   ]) {
     write(
       'sonar-project.properties',
       `sonar.sources=apps/web,packages/ui\nsonar.tests=apps/web,packages/ui\n${override}\n`
     );
-    assert.throws(() => prepareSonarSources(root), /Unexpected sonar/);
+    assert.throws(() => prepareSonarSources(root), /Unexpected/);
   }
+});
+
+test('canonical property validation preserves comments and continued exclusion values', t => {
+  const { root, write } = fixture(t);
+  const suffix =
+    '# comment ending in a backslash\\\n! another comment\nsonar.exclusions=\\\n  **/.storybook/**,\\\n  **/node_modules/**\nother.value=two\\\\\n';
+  write(
+    'sonar-project.properties',
+    `sonar.sources=apps/web,packages/ui\nsonar.tests=apps/web,packages/ui\n${suffix}`
+  );
+  assert.ok(prepareSonarSources(root).text.endsWith(suffix));
+  write(
+    'sonar-project.properties',
+    'sonar.sources=apps/web,packages/ui\nsonar.tests=apps/web,packages/ui\nother.value=unfinished\\'
+  );
+  assert.throws(() => prepareSonarSources(root), /Unterminated/);
 });
