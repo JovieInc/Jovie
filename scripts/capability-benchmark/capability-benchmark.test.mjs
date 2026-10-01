@@ -171,6 +171,13 @@ test('JOV-7341 fails closed on cohort drift, hidden calls, or missing resume eve
   const rolledUp = structuredClone(report);
   rolledUp.aggregateScore = 0.99;
   assert.throws(() => validateDecisionRoutingBenchmark(rolledUp), /aggregate/);
+
+  const wrongIssue = structuredClone(report);
+  wrongIssue.issue = 'JOV-2966';
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(wrongIssue),
+    /must be JOV-7341/
+  );
 });
 
 test('JOV-7341 fails closed on contradictory candidate status and counts', () => {
@@ -212,6 +219,31 @@ test('JOV-7341 fails closed on contradictory candidate status and counts', () =>
   assert.throws(
     () => validateDecisionRoutingBenchmark(missingCount),
     /executedComparisons: 0/
+  );
+
+  const duplicated = structuredClone(report);
+  duplicated.workloads[0].candidates.push(
+    structuredClone(duplicated.workloads[0].candidates[1])
+  );
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(duplicated),
+    /duplicate ids/
+  );
+
+  const completedWithoutEvidence = structuredClone(report);
+  const completedJev = completedWithoutEvidence.workloads[0].candidates.find(
+    candidate => candidate.id === 'typesafe-jev'
+  );
+  completedJev.status = 'complete';
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(completedWithoutEvidence),
+    /positive integer/
+  );
+
+  completedJev.executedComparisons = 1;
+  assert.equal(
+    validateDecisionRoutingBenchmark(completedWithoutEvidence),
+    true
   );
 });
 

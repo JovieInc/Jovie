@@ -1154,6 +1154,11 @@ export function buildAffectedTestPlan(
       nodeTests: CAPABILITY_BENCHMARK_NODE_TESTS,
     };
   }
+  if (files.some(file => CAPABILITY_BENCHMARK_PRIMARY_INPUTS.has(file))) {
+    return fullSuitePlan(
+      'Capability benchmark change exceeds its focused lane'
+    );
+  }
   const isBoundedSummerCommissioningChange =
     files.some(file => SUMMER_COMMISSIONING_PRIMARY_INPUTS.has(file)) &&
     files.every(file => SUMMER_COMMISSIONING_LANE.has(file));

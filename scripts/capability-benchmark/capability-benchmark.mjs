@@ -387,7 +387,9 @@ export function validateDecisionRoutingBenchmark(report) {
   if (report.schema !== DECISION_ROUTING_BENCHMARK_SCHEMA) {
     throw new Error(`schema must be ${DECISION_ROUTING_BENCHMARK_SCHEMA}`);
   }
-  requireString(report.issue, 'report.issue');
+  if (report.issue !== 'JOV-7341') {
+    throw new Error('report.issue must be JOV-7341');
+  }
   requireIsoTimestamp(report.observedAt, 'report.observedAt');
   if (Object.hasOwn(report, 'aggregateScore') || report.companyWinner) {
     throw new Error('company-wide winner and aggregate score are forbidden');
@@ -430,8 +432,15 @@ export function validateDecisionRoutingBenchmark(report) {
         throw new Error(`${field}.bypass.${bypass} must make zero calls`);
       }
     }
+    if (!Array.isArray(workload.candidates)) {
+      throw new Error(`${field}.candidates must be an array`);
+    }
+    const candidateIds = workload.candidates.map(candidate => candidate?.id);
+    if (new Set(candidateIds).size !== candidateIds.length) {
+      throw new Error(`${field}.candidates must not contain duplicate ids`);
+    }
     const candidates = new Map(
-      (workload.candidates ?? []).map(candidate => [candidate.id, candidate])
+      workload.candidates.map(candidate => [candidate.id, candidate])
     );
     for (const id of [
       'deterministic-baseline',
@@ -457,6 +466,14 @@ export function validateDecisionRoutingBenchmark(report) {
             `${field}.candidate.${id} with status ${candidate.status} must record executedComparisons: 0`
           );
         }
+      } else if (
+        id !== 'deterministic-baseline' &&
+        (!Number.isInteger(candidate.executedComparisons) ||
+          candidate.executedComparisons <= 0)
+      ) {
+        throw new Error(
+          `${field}.candidate.${id}.executedComparisons must be a positive integer when status is complete`
+        );
       } else if (
         candidate.executedComparisons !== undefined &&
         (!Number.isInteger(candidate.executedComparisons) ||
