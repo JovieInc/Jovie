@@ -549,29 +549,46 @@ def context_manifest_matches(path: Path) -> bool:
 
 def write_agent_prompt(path: Path, prompt: str, kind: str, provider: str,
                        inputs: dict[str, str]) -> dict:
-    """Fail closed before spawn if the checked-in contract or its required inputs drift."""
-    contract = context_manifest_json().encode("utf-8")
-    if not context_manifest_matches(HERE / "context-manifest.json"):
-        raise ValueError("context-manifest-drift: regenerate the checked-in preflight contract")
-    if kind not in CONTEXT_INPUTS or set(inputs) != set(CONTEXT_INPUTS[kind]):
-        raise ValueError(f"context-inputs:{kind}")
-
-    def fingerprint(text: str) -> dict:
-        value = text.encode("utf-8")
-        return {"sha256": hashlib.sha256(value).hexdigest(), "bytes": len(value),
-                "status": "present" if value else "unavailable"}
-
+    """Write the required prompt; qualify new context diagnostics without stopping delivery."""
     content = prompt.encode("utf-8")
-    manifest = {"schema": "jovie-lane-context/v1", "kind": kind, "provider": provider,
-                "contractSha256": hashlib.sha256(contract).hexdigest(),
-                "inputs": {key: fingerprint(inputs[key]) for key in CONTEXT_INPUTS[kind]},
-                "prompt": {"sha256": hashlib.sha256(content).hexdigest(), "bytes": len(content)}}
-    manifest_bytes = (json.dumps(manifest, sort_keys=True, indent=2) + "\n").encode("utf-8")
-    manifest_path = path.with_name(path.name + ".context.json")
-    path.write_bytes(content)
-    manifest_path.write_bytes(manifest_bytes)
-    return {"path": str(manifest_path), "sha256": hashlib.sha256(manifest_bytes).hexdigest(),
-            "promptSha256": manifest["prompt"]["sha256"], "kind": kind}
+    path.write_bytes(content)  # Original prompt persistence remains required before spawn.
+    started = time.perf_counter()
+    qualification = {"schema": "jovie-lane-context-qualification/v1",
+                     "mode": "qualification-only", "ok": False, "findings": []}
+    result = {"path": None, "sha256": None,
+              "promptSha256": hashlib.sha256(content).hexdigest(), "kind": kind}
+    try:
+        contract = context_manifest_json().encode("utf-8")
+        if not context_manifest_matches(HERE / "context-manifest.json"):
+            raise ValueError("context-manifest-drift: regenerate the checked-in preflight contract")
+        if kind not in CONTEXT_INPUTS or set(inputs) != set(CONTEXT_INPUTS[kind]):
+            raise ValueError(f"context-inputs:{kind}")
+
+        def fingerprint(text: str) -> dict:
+            value = text.encode("utf-8")
+            return {"sha256": hashlib.sha256(value).hexdigest(), "bytes": len(value),
+                    "status": "present" if value else "unavailable"}
+
+        manifest = {"schema": "jovie-lane-context/v1", "mode": "qualification-only",
+                    "kind": kind, "provider": provider,
+                    "contractSha256": hashlib.sha256(contract).hexdigest(),
+                    "inputs": {key: fingerprint(inputs[key]) for key in CONTEXT_INPUTS[kind]},
+                    "prompt": {"sha256": result["promptSha256"], "bytes": len(content)}}
+        manifest_bytes = (json.dumps(manifest, sort_keys=True, indent=2) + "\n").encode("utf-8")
+        manifest_path = path.with_name(path.name + ".context.json")
+        manifest_path.write_bytes(manifest_bytes)
+        result.update(path=str(manifest_path), sha256=hashlib.sha256(manifest_bytes).hexdigest())
+        qualification["ok"] = True
+    except Exception as error:
+        # Only the new diagnostics are isolated; prompt/security/spend gates are outside this block.
+        qualification["findings"].append(f"{type(error).__name__}:{error}"[:300])
+    qualification["durationMs"] = (time.perf_counter() - started) * 1000
+    if not qualification["ok"]:
+        try:
+            sys.stderr.write("context-qualification: " + json.dumps(qualification) + "\n")
+        except OSError:
+            pass  # The caller's existing run receipt still carries the finding.
+    return {**result, "qualification": qualification}
 
 
 def provider_may_run(provider: str, kind: str) -> bool:
