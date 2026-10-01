@@ -1633,7 +1633,23 @@ def preserved_run(host: Host, *, pr=None, issue=None):
             if not isinstance(marker, dict):
                 raise ValueError("marker-not-object")
         except (OSError, ValueError):
-            raise RecoveryHandoff("preserved-marker-unreadable", marker_path.parent)
+            # A damaged marker must not halt every unrelated lane on this host.
+            # The ended ledger or canonical run name can identify the target for
+            # a refusal, but neither substitutes for a valid recovery marker.
+            try:
+                rows = [json.loads(line) for line in (host.state / "runs/ledger.jsonl").read_text().splitlines()]
+            except (OSError, ValueError):
+                rows = []
+            bound = any(isinstance(row, dict) and row.get("preservedWorktree") == str(marker_path.parent)
+                        and ((pr is not None and row.get("pr") == pr) or (issue and row.get("issue") == issue))
+                        for row in rows)
+            run_target = f"-PR{pr}-" if pr is not None else f"-{issue}-"
+            if bound or run_target in marker_path.parent.name:
+                raise RecoveryHandoff("preserved-marker-unreadable", marker_path.parent)
+            print(json.dumps({"schema": "jovie-repair-handoff/v1", "reason": "preserved-marker-unreadable",
+                              "worktree": str(marker_path.parent), "owner": HOST,
+                              "nextAction": "Reconcile this unidentified marker; source retained."}), file=sys.stderr)
+            continue
         if (pr is not None and marker.get("pr") == pr) or (issue and marker.get("issue") == issue):
             matches.append((marker_path.parent, marker))
     if not matches:
@@ -1643,13 +1659,15 @@ def preserved_run(host: Host, *, pr=None, issue=None):
         raise RecoveryHandoff("ambiguous-preserved-work", path)
     try:
         rows = [json.loads(line) for line in (host.state / "runs/ledger.jsonl").read_text().splitlines()]
+        if any(not isinstance(row, dict) for row in rows):
+            raise ValueError("ledger-record-not-object")
     except (OSError, ValueError):
         raise RecoveryHandoff("preserved-ledger-unreadable", path)
     prior = next((row for row in reversed(rows) if row.get("runId") == marker.get("runId")), None)
     if not prior or not prior.get("endedAt") or prior.get("preservedWorktree") != str(path):
         raise RecoveryHandoff("preserved-owner-not-terminal", path)
     execution = prior.get("execution", {})
-    if execution.get("event") != "attempt_finished" or not all(execution.get(key) for key in
+    if not isinstance(execution, dict) or execution.get("event") != "attempt_finished" or not all(execution.get(key) for key in
             ("identityDigest", "executionGeneration", "workKey", "fencingToken")):
         raise RecoveryHandoff("preserved-execution-unverified", path)
     if prior.get("verdict") not in {"disk-held", "reconcile-unavailable"}:
@@ -1664,6 +1682,17 @@ def qualify_preserved_pr(host: Host, pr: dict, preserved):
         raise RecoveryHandoff(f"preserved-read-unavailable:{type(error).__name__}", preserved[0]) from error
 
 
+def require_idle_worktree(path: Path):
+    # Warnings can mean an incomplete process inventory, so remain fail-closed.
+    active = sh(["lsof", "-nP", "-a", "-d", "cwd", "-F", "pn"], timeout=30)
+    if active.returncode not in (0, 1) or active.stderr:
+        raise RecoveryHandoff("preserved-process-state-unavailable", path)
+    if any(line.startswith("n") and (Path(line[1:]).resolve() == path.resolve()
+                                    or path.resolve() in Path(line[1:]).resolve().parents)
+           for line in active.stdout.splitlines()):
+        raise RecoveryHandoff("preserved-process-still-running", path)
+
+
 def _qualify_preserved_pr(host: Host, pr: dict, preserved):
     path, prior = preserved
     if prior.get("branch") != pr["headRefName"] or prior.get("headBefore") != pr["headRefOid"]:
@@ -1675,14 +1704,7 @@ def _qualify_preserved_pr(host: Host, pr: dict, preserved):
                                         and entry.get("branch") == f"refs/heads/{pr['headRefName']}"
                                         for entry in entries):
         raise RecoveryHandoff("preserved-worktree-unregistered", path)
-    # Metadata only, not process command lines, secrets or environment variables.
-    active = sh(["lsof", "-nP", "-a", "-d", "cwd", "-F", "pn"], timeout=30)
-    if active.returncode not in (0, 1) or active.stderr:
-        raise RecoveryHandoff("preserved-process-state-unavailable", path)
-    if any(line.startswith("n") and (Path(line[1:]).resolve() == path.resolve()
-                                    or path.resolve() in Path(line[1:]).resolve().parents)
-           for line in active.stdout.splitlines()):
-        raise RecoveryHandoff("preserved-process-still-running", path)
+    require_idle_worktree(path)
     ancestor = sh(["git", "merge-base", "--is-ancestor", pr["headRefOid"], "HEAD"], cwd=path, timeout=30)
     if ancestor.returncode:
         raise RecoveryHandoff("preserved-head-diverged", path)
@@ -1701,6 +1723,29 @@ def preserve_repair(worktree: Path, receipt: dict) -> None:
             (worktree / disk_guard.PRESERVED_REPAIR).write_text(json.dumps(marker, indent=1))
         except OSError as error:
             receipt["preservationError"] = str(error)[:200]
+
+
+def retire_completed_repair(host: Host, worktree: Path, receipt: dict) -> bool:
+    """Clear a recovery marker only for idle, clean, already-published source."""
+    if receipt.get("verdict") not in {"fix-pushed", "fix-no-change"} or not receipt.get("headAfter"):
+        return False
+    try:
+        require_idle_worktree(worktree)
+        status = sh(["git", "status", "--porcelain", "--untracked-files=all", "--", ".",
+                     f":(exclude){disk_guard.PRESERVED_REPAIR}"], cwd=worktree, timeout=30)
+        head = sh(["git", "rev-parse", "HEAD"], cwd=worktree, timeout=30)
+        if status.returncode or status.stdout.strip() or head.returncode or head.stdout.strip() != receipt["headAfter"]:
+            return False
+        (worktree / disk_guard.PRESERVED_REPAIR).unlink()
+        remove_worktree(host, worktree)
+        if not worktree.exists():
+            receipt["recoveryCleanup"] = {"status": "removed", "publishedHead": receipt["headAfter"]}
+            return True
+    except (OSError, subprocess.SubprocessError, RecoveryHandoff):
+        pass
+    # Failed removal or newly observed edits must regain cleanup protection.
+    preserve_repair(worktree, receipt)
+    return False
 
 
 def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
@@ -1872,6 +1917,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                "requestSource": receipt["requestSource"]})
         except DiskAdmissionError as error:
             receipt.update(verdict="disk-held", reasons=[str(error)])
+        except RecoveryHandoff as error:
+            receipt.update(verdict="recovery-handoff", reasons=[str(error)], recovery=error.evidence)
         except subprocess.TimeoutExpired:
             receipt.update(verdict="failed", reasons=["timeout"])
         except WorktreeUnavailable as error:
@@ -1880,7 +1927,10 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
         except Exception as error:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
-            if preserved or receipt.get("verdict") in {"cancelled", "reconcile-unavailable", "disk-held"}:
+            if preserved:
+                if not retire_completed_repair(host, worktree, receipt):
+                    preserve_repair(worktree, receipt)
+            elif receipt.get("verdict") in {"cancelled", "reconcile-unavailable", "disk-held", "recovery-handoff"}:
                 preserve_repair(worktree, receipt)
             else:
                 remove_worktree(host, worktree)

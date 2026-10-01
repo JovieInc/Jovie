@@ -192,6 +192,11 @@ execution identity, current target head, ancestry and idle process state agree.
 The existing coordinator still enforces the live lease and original retry budget;
 changing check failures does not grant a fresh budget. A host-local PR lock spans
 failure identities. Unverifiable or superseded work emits a recovery handoff.
+Damaged markers matched to the requested target still require a handoff;
+unidentified markers are logged for host reconciliation without blocking unrelated
+targets. Completed recovery clears its marker and checkout only when the source
+is clean, matches the verified remote head, and has no live working directory.
+Unpublished edits, unreadable evidence, and failed cleanup retain protection.
 Preserved issue implementations require execution reconciliation and remain on
 Backlog with their source and accountable issue reference intact.
 

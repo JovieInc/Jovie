@@ -1272,7 +1272,115 @@ class PreservedRecoveryTest(unittest.TestCase):
         self.assertEqual(resumed["execution"]["identityDigest"], prior["execution"]["identityDigest"])
         self.assertEqual(resumed["execution"]["attempt"], 2)
         self.assertFalse(any(args[:3] == ["git", "worktree", "add"] for args in self.calls))
-        self.assertEqual(self.git(self.path, "show", "HEAD:repair.txt"), "preserved useful edit")
+        self.assertEqual(self.git(self.host.repo, "show", f"{self.live['headRefOid']}:repair.txt"), "preserved useful edit")
+        self.assertFalse(self.path.exists(), "published clean recovery must not leave a stale blocking marker")
+        self.assertEqual(resumed["recoveryCleanup"]["status"], "removed")
+        self.git(self.host.repo, "update-ref", "refs/remotes/origin/devin/jov-1", self.live["headRefOid"])
+        with patch.object(lane, "run_agent", return_value=SimpleNamespace(returncode=0)):
+            later = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, dict(self.live))
+        self.assertNotEqual(later["verdict"], "recovery-handoff")
+
+    def test_unrelated_corrupt_marker_does_not_block_recovery(self):
+        import io
+        damaged = self.host.state / "worktrees/unknown-unrelated"
+        damaged.mkdir(parents=True)
+        (damaged / lane.disk_guard.PRESERVED_REPAIR).write_text("{")
+        (damaged / "source.py").write_text("retain unrelated source")
+        with patch.object(lane.sys, "stderr", new_callable=io.StringIO) as warnings:
+            self.assert_resume("disk-held")
+        self.assertIn("preserved-marker-unreadable", warnings.getvalue())
+        self.assertEqual((damaged / "source.py").read_text(), "retain unrelated source")
+
+    def test_corrupt_target_marker_keeps_its_handoff_from_ledger_or_run_name(self):
+        prior = self.hold()
+        canonical = self.path
+        self.path = self.path.parent / "renamed-preserved-work"
+        self.git(self.host.repo, "worktree", "move", str(canonical), str(self.path))
+        prior["preservedWorktree"] = str(self.path)
+        (self.host.state / "runs/ledger.jsonl").write_text(json.dumps(prior) + "\n")
+        (self.path / lane.disk_guard.PRESERVED_REPAIR).write_text("{")
+        for ledger_available in (True, False):
+            if not ledger_available:
+                self.git(self.host.repo, "worktree", "move", str(self.path), str(canonical))
+                self.path = canonical
+                (self.host.state / "runs/ledger.jsonl").unlink()
+            with patch.object(lane.execution_attempt, "claim") as claim:
+                receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+            self.assertEqual(receipt["verdict"], "recovery-handoff")
+            self.assertEqual(receipt["recovery"]["reason"], "preserved-marker-unreadable")
+            claim.assert_not_called()
+            self.assertTrue(self.path.exists())
+
+    def test_recovery_race_after_claim_preserves_the_handoff_evidence(self):
+        self.hold()
+        qualify = lane.qualify_preserved_pr
+        calls = []
+        def recheck(*args):
+            calls.append(1)
+            if len(calls) == 2:
+                raise lane.RecoveryHandoff("preserved-process-still-running", self.path)
+            return qualify(*args)
+        with patch.object(lane, "qualify_preserved_pr", side_effect=recheck), patch.object(lane, "run_agent") as agent:
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(receipt["verdict"], "recovery-handoff")
+        self.assertEqual(receipt["recovery"]["reason"], "preserved-process-still-running")
+        self.assertEqual((self.path / "repair.txt").read_text(), "preserved useful edit")
+        agent.assert_not_called()
+
+    def test_successful_push_keeps_unpublished_followup(self):
+        self.hold()
+        def agent(cmd, cwd, log, timeout, **kwargs):
+            self.git(cwd, "add", "repair.txt")
+            self.git(cwd, "commit", "-qm", "published repair")
+            self.live["headRefOid"] = self.git(cwd, "rev-parse", "HEAD")
+            (cwd / "followup.py").write_text("unpublished followup")
+            return SimpleNamespace(returncode=0)
+        with patch.object(lane, "run_agent", side_effect=agent):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(receipt["verdict"], "fix-pushed")
+        self.assertEqual((self.path / "followup.py").read_text(), "unpublished followup")
+        self.assertTrue((self.path / lane.disk_guard.PRESERVED_REPAIR).exists())
+
+    def test_completed_recovery_cleanup_requires_idle_clean_and_published_source(self):
+        self.hold()
+        self.git(self.path, "add", "repair.txt")
+        self.git(self.path, "commit", "-qm", "repair")
+        head = self.git(self.path, "rev-parse", "HEAD")
+        shell = lane.sh
+        for mode in ("live", "warning", "status-error", "unpublished-commit", "remove-failed"):
+            with self.subTest(mode=mode):
+                receipt = {"runId": "cleanup", "verdict": "fix-pushed", "headAfter": head}
+                self.active = f"p123\nn{self.path}\n" if mode == "live" else ""
+                if mode == "unpublished-commit":
+                    receipt["headAfter"] = self.pr["headRefOid"]
+                def guarded(args, **kwargs):
+                    if mode == "warning" and args[0] == "lsof":
+                        return SimpleNamespace(returncode=0, stdout="", stderr="WARNING: cannot stat mount")
+                    if mode == "status-error" and args[:2] == ["git", "status"]:
+                        return SimpleNamespace(returncode=1, stdout="", stderr="unavailable")
+                    if mode == "remove-failed" and args[:3] == ["git", "worktree", "remove"]:
+                        return SimpleNamespace(returncode=1, stdout="", stderr="busy")
+                    return shell(args, **kwargs)
+                with patch.object(lane, "sh", side_effect=guarded):
+                    self.assertFalse(lane.retire_completed_repair(self.host, self.path, receipt))
+                self.assertTrue((self.path / lane.disk_guard.PRESERVED_REPAIR).exists())
+                self.assertEqual((self.path / "repair.txt").read_text(), "preserved useful edit")
+
+    def test_malformed_ledger_records_produce_a_handoff_instead_of_crashing(self):
+        prior = self.hold()
+        for record in (None, [], "invalid"):
+            (self.host.state / "runs/ledger.jsonl").write_text(json.dumps(record) + "\n")
+            with patch.object(lane.execution_attempt, "claim") as claim:
+                receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+            self.assertEqual(receipt["verdict"], "recovery-handoff")
+            self.assertEqual(receipt["recovery"]["reason"], "preserved-ledger-unreadable")
+            claim.assert_not_called()
+        prior["execution"] = None
+        (self.host.state / "runs/ledger.jsonl").write_text(json.dumps(prior) + "\n")
+        with patch.object(lane.execution_attempt, "claim") as claim:
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(receipt["recovery"]["reason"], "preserved-execution-unverified")
+        claim.assert_not_called()
 
 
     def test_active_process_changed_head_and_missing_terminal_receipt_are_handoffs(self):
