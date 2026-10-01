@@ -560,17 +560,32 @@ export {
 // Finance (Owner-only personal financial data — JOV-4609)
 export {
   type FinanceAccount,
+  type FinanceBudgetSettings,
+  type FinanceBudgetTarget,
+  type FinanceClassificationRule,
   type FinanceExport,
   type FinanceInstitution,
   type FinanceTransaction,
+  type FinanceTransactionClassification,
+  type FinanceTransactionSplit,
   financeAccounts,
+  financeBudgetSettings,
+  financeBudgetTargets,
+  financeClassificationRules,
   financeExports,
   financeInstitutions,
+  financeTransactionClassifications,
+  financeTransactionSplits,
   financeTransactions,
   type NewFinanceAccount,
+  type NewFinanceBudgetSettings,
+  type NewFinanceBudgetTarget,
+  type NewFinanceClassificationRule,
   type NewFinanceExport,
   type NewFinanceInstitution,
   type NewFinanceTransaction,
+  type NewFinanceTransactionClassification,
+  type NewFinanceTransactionSplit,
 } from './finance';
 // Identity (Cross-platform artist identity links)
 export {

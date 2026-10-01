@@ -93,12 +93,20 @@ const INTERNAL_ACCOUNT_EMAIL_DOMAINS = [
 ] as const;
 
 /**
+ * Dogfood/QA mailbox domains (JOV-7362). Accounts on these domains are created
+ * exclusively for internal dogfooding and QA (e.g. `*@test.jovie.com` E2E and
+ * auth-surface QA accounts) and must never count as customers in cohort,
+ * revenue, or growth metrics.
+ */
+const DOGFOOD_ACCOUNT_EMAIL_DOMAINS = ['test.jovie.com'] as const;
+
+/**
  * Local-part prefixes used by seeded QA/E2E accounts. Written as a POSIX-safe
  * alternation so the same source can drive both the JS RegExp below and the
  * SQL pattern (`auth[-_]?qa` covers both `auth-qa` and `auth_qa`).
  */
 const TEST_ACCOUNT_LOCAL_PART_PREFIXES =
-  '(e2e|browse|auth[-_]?qa|qa|smoke|staging|test|demo|seed|fixture|autotest)';
+  '(e2e|browse|auth[-_]?qa|qa|smoke|staging|test|demo|dogfood|seed|fixture|autotest)';
 
 const TEST_ACCOUNT_LOCAL_PART_PATTERN = new RegExp(
   `^${TEST_ACCOUNT_LOCAL_PART_PREFIXES}([-_.+]|$)`
@@ -119,6 +127,10 @@ export const INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN = [
   `@(.*\\.)?(${INTERNAL_ACCOUNT_EMAIL_DOMAINS.map(domain =>
     domain.replaceAll('.', '\\.')
   ).join('|')})$`,
+  // Dogfood/QA mailbox domains (test.jovie.com), incl. subdomains
+  `@(.*\\.)?(${DOGFOOD_ACCOUNT_EMAIL_DOMAINS.map(domain =>
+    domain.replaceAll('.', '\\.')
+  ).join('|')})$`,
   // Reserved/test-only domains (+ subdomains)
   '@(.*\\.)?(example\\.(com|net|org)|invalid|localhost|test)$',
   // Clerk test-address tag anywhere in the local part
@@ -131,10 +143,11 @@ export const INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN = [
 
 /**
  * True when the email belongs to an internal or test/demo account rather than
- * a real external customer: team domains (jov.ie, admin domain), reserved test
- * domains, Clerk `+clerk_test` tags, `*-public` demo placeholders, and seeded
- * QA local-part prefixes (e2e, browse, qa, auth-qa, smoke, staging, test,
- * demo, seed, fixture, autotest).
+ * a real external customer: team domains (jov.ie, admin domain), dogfood/QA
+ * mailbox domains (test.jovie.com), reserved test domains, Clerk `+clerk_test`
+ * tags, `*-public` demo placeholders, and seeded QA local-part prefixes (e2e,
+ * browse, qa, auth-qa, smoke, staging, test, demo, dogfood, seed, fixture,
+ * autotest).
  */
 export function isInternalOrTestAccountEmail(
   email: string | null | undefined
@@ -148,7 +161,7 @@ export function isInternalOrTestAccountEmail(
   const domain = normalized.slice(atIndex + 1);
 
   if (
-    INTERNAL_ACCOUNT_EMAIL_DOMAINS.some(
+    [...INTERNAL_ACCOUNT_EMAIL_DOMAINS, ...DOGFOOD_ACCOUNT_EMAIL_DOMAINS].some(
       internalDomain =>
         domain === internalDomain || domain.endsWith(`.${internalDomain}`)
     )

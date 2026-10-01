@@ -534,8 +534,11 @@ struct LiveRootContainer: View {
 
     if let error = error as? NativeAuthExchangeError {
       switch error {
-      case let .requestFailed(statusCode):
+      case let .requestFailed(statusCode, reason):
         context["status_code"] = statusCode
+        if let reason, !reason.isEmpty {
+          context["reason"] = reason
+        }
       case let .transportFailed(code):
         context["transport_code"] = code
       case .decodingFailed, .invalidResponse:

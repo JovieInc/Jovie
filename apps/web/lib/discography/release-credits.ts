@@ -27,6 +27,8 @@ export interface CanonicalReleaseCredit extends ReleaseCreditIdentity {
   readonly role: ArtistRole;
   readonly position: number;
   readonly isPrimary: boolean;
+  readonly sourceType?: string | null;
+  readonly metadata?: Record<string, unknown> | null;
 }
 
 export interface ProviderPrimaryArtist {
@@ -48,6 +50,10 @@ export interface ReconciledPrimaryCredits {
   readonly mismatch: CreditProviderMismatch | null;
 }
 
+export interface CanonicalContributorPayload extends ReconciledPrimaryCredits {
+  readonly credits: CanonicalReleaseCredit[];
+}
+
 export interface SmartLinkArtistByline {
   readonly entries: ReadonlyArray<{
     readonly name: string;
@@ -61,6 +67,16 @@ export const WHEELS_UP_MULTI_PRIMARY_FIXTURE = {
   sourceArtists: [
     { id: 'spotify-tim-white', name: 'Tim White' },
     { id: 'spotify-lynx', name: 'LYNX' },
+  ],
+} as const;
+
+export const TAKE_ME_OVER_ROLE_COMPLETE_FIXTURE = {
+  title: 'Take Me Over (feat. Erica Gibson) [Austin Leeds Remix]',
+  artistLine: 'Tim White & Austin Leeds',
+  expected: [
+    { name: 'Tim White', role: 'main_artist' },
+    { name: 'Erica Gibson', role: 'featured_artist' },
+    { name: 'Austin Leeds', role: 'remixer' },
   ],
 } as const;
 
@@ -251,7 +267,7 @@ export function reconcilePrimaryArtists(input: {
   };
 }
 
-export function serializePrimaryArtists(
+export function serializeContributorCredits(
   credits: readonly CanonicalReleaseCredit[]
 ): CanonicalReleaseCredit[] {
   return credits.map(credit => ({
@@ -265,16 +281,61 @@ export function serializePrimaryArtists(
     role: credit.role,
     position: credit.position,
     isPrimary: credit.isPrimary,
+    sourceType: credit.sourceType ?? null,
+    metadata: credit.metadata ?? null,
   }));
+}
+
+export const serializePrimaryArtists = serializeContributorCredits;
+
+export function dedupeCanonicalContributorCredits(
+  credits: readonly CanonicalReleaseCredit[]
+): CanonicalReleaseCredit[] {
+  const kept: CanonicalReleaseCredit[] = [];
+  for (const credit of credits) {
+    const duplicate = kept.some(
+      existing =>
+        existing.role === credit.role &&
+        creditsResolveToSameArtist(existing, credit)
+    );
+    if (!duplicate) kept.push(credit);
+  }
+  return kept;
+}
+
+export function materializeContributorCreditPayload(input: {
+  readonly storedCredits: readonly CanonicalReleaseCredit[];
+  readonly providerArtists?: readonly ProviderPrimaryArtist[];
+}): CanonicalContributorPayload {
+  const credits = serializeContributorCredits(
+    dedupeCanonicalContributorCredits(
+      [...input.storedCredits].sort(
+        (left, right) => left.position - right.position
+      )
+    )
+  );
+  const reconciled = reconcilePrimaryArtists({
+    storedCredits: credits,
+    providerArtists: input.providerArtists,
+  });
+  const nonPrimaryCredits = credits.filter(
+    credit => !isPrimaryArtistRole(credit.role)
+  );
+
+  return {
+    credits: [...reconciled.primaryArtists, ...nonPrimaryCredits],
+    primaryArtists: serializeContributorCredits(reconciled.primaryArtists),
+    mismatch: reconciled.mismatch,
+  };
 }
 
 export function materializeReleaseCreditPayload(input: {
   readonly storedCredits: readonly CanonicalReleaseCredit[];
   readonly providerArtists?: readonly ProviderPrimaryArtist[];
 }): ReconciledPrimaryCredits {
-  const reconciled = reconcilePrimaryArtists(input);
+  const reconciled = materializeContributorCreditPayload(input);
   return {
-    primaryArtists: serializePrimaryArtists(reconciled.primaryArtists),
+    primaryArtists: reconciled.primaryArtists,
     mismatch: reconciled.mismatch,
   };
 }
