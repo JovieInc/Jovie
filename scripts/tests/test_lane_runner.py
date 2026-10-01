@@ -439,6 +439,10 @@ class FakeLinear:
 
 
 class LinearClientTest(unittest.TestCase):
+    def test_comment_rejects_false_success(self):
+        with patch.object(lane.Linear, "gql", return_value={"commentCreate": {"success": False}}):
+            with self.assertRaises(RuntimeError): lane.Linear.__new__(lane.Linear).comment("id-JOV-3", "held")
+
     def test_reads_key_and_maps_lane_issues(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = Path(tmp) / "linear.env"
@@ -751,6 +755,18 @@ class WorkerTest(unittest.TestCase):
          lane.fix_candidates, lane.escalate_exhausted, lane.pr_events.queued_prs,
          lane.pr_events.claim_event_pr, lane.sweep_lane_prs) = self.saved
         self.tmp.cleanup()
+
+    def test_initial_claim_failure_is_nonfatal_without_fabricating_delivery(self):
+        import io
+        client = self.saved[0].__new__(self.saved[0]); comment = self.linear.comment
+        for failure in (None, OSError("private-network-message")):
+            with self.subTest(failure=type(failure).__name__), patch.object(client, "gql", side_effect=failure, return_value={"commentCreate": {"success": False}}), patch.object(self.linear, "comment", side_effect=lambda ident, body: client.comment(ident, body) if "claimed this issue" in body else comment(ident, body)), patch.object(lane, "run_issue", return_value={"verdict": "landing", "prUrl": "u"}) as run, patch("sys.stderr", new_callable=io.StringIO) as diagnostic:
+                lane.worker(self.host, "devin"); run.assert_called_once()
+                self.assertEqual(diagnostic.getvalue(), f"lane claim comment unavailable: {'OSError' if failure else 'RuntimeError'}\n")
+                self.assertFalse(any("claimed this issue" in body for _, body in self.linear.comments))
+                slot = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
+                try: self.assertTrue(slot.held)
+                finally: slot.release()
 
     def test_landing_claims_comments_and_pulls_the_next_issue(self):
         lane.run_issue = lambda *a: {"verdict": "landing", "prUrl": "u"}
