@@ -743,6 +743,11 @@ class ProductionRemoteEntryTest(unittest.TestCase):
             self.lane.requeue_verified(self.host, [self.pr])
         command.assert_not_called()
         self.assertEqual(json.loads(path.read_text()), {"7": self.pr["headRefOid"]})
+        lane = self.lane; lane.revoke_publication(self.host, branch=self.branch, reason="run-stopped")
+        with patch.object(lane, "reconcile_fix_target", return_value=self.pr), patch.object(lane, "reconcile_hyperagent_completion") as continuation, patch.object(lane, "adopt_pr") as qualifier, patch("runpy.run_path") as transport, patch.object(lane, "sh") as command:
+            lane.requeue_verified(self.host, [], remote_retry=lambda pr: continuation(self.host, self.spec, None, self.issue, expected_pr=pr, enqueue=True))
+            continuation.assert_not_called(); qualifier.assert_not_called(); transport.assert_not_called(); command.assert_not_called()
+            self.assertEqual(json.loads(path.read_text()), {}); self.assertFalse(self.calls)
 
     def test_completed_verified_not_queued_retries_exact_enqueue_with_local_zero_spend_fence(self):
         from unittest.mock import patch
