@@ -44,6 +44,18 @@ export const RetryableServer: Story = {
   },
 };
 
+export const RateLimitedWithDraft: Story = {
+  args: {
+    ...RateLimited.args,
+    chatError: {
+      type: 'rate_limit',
+      message: 'Please wait a moment before sending another message.',
+      retryAfter: 5,
+      failedMessage: 'Help me claim my artist profile.',
+    },
+  },
+};
+
 export const Busy: Story = {
   args: {
     chatError: {

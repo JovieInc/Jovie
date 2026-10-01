@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ChatError } from '@/components/jovie/types';
@@ -162,10 +162,111 @@ describe('OnboardingMessageRecoveryRow', () => {
           isSubmitted={false}
         />
       );
-      expect(screen.getByText('Try again in now.')).toBeInTheDocument();
+      expect(screen.getByText('Try again now.')).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('makes the preserved message retryable when the wait expires while idle', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+      const handleRetry = vi.fn();
+      render(
+        <OnboardingMessageRecoveryRow
+          chatError={makeChatError({
+            type: 'rate_limit',
+            retryAfter: 2,
+            failedMessage: 'Keep my artist link and draft',
+          })}
+          handleRetry={handleRetry}
+          isBusy={false}
+          isSubmitted={false}
+        />
+      );
+
+      const retry = screen.getByRole('button', { name: 'Retry message' });
+      expect(retry).toBeDisabled();
+      act(() => vi.advanceTimersByTime(2000));
+      expect(retry).toBeEnabled();
+      expect(screen.getByText('Try again now.')).toBeInTheDocument();
+      fireEvent.click(retry);
+      expect(handleRetry).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('starts a new wait for a new failed request and clears its timer on unmount', () => {
+    vi.useFakeTimers();
+    try {
+      const props = {
+        handleRetry: noop,
+        isBusy: false,
+        isSubmitted: false,
+      };
+      const { rerender, unmount } = render(
+        <OnboardingMessageRecoveryRow
+          {...props}
+          chatError={makeChatError({
+            requestId: 'first',
+            retryAfter: 1,
+            failedMessage: 'my draft',
+          })}
+        />
+      );
+      act(() => vi.advanceTimersByTime(1000));
+      expect(
+        screen.getByRole('button', { name: 'Retry message' })
+      ).toBeEnabled();
+      expect(vi.getTimerCount()).toBe(0);
+
+      rerender(
+        <OnboardingMessageRecoveryRow
+          {...props}
+          chatError={makeChatError({
+            requestId: 'second',
+            retryAfter: 1,
+            failedMessage: 'my draft',
+          })}
+        />
+      );
+      expect(
+        screen.getByRole('button', { name: 'Retry message' })
+      ).toBeDisabled();
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('honors busy and submitted state after expiry and allows zero-second waits', () => {
+    const props = {
+      chatError: makeChatError({ retryAfter: 0, failedMessage: 'my draft' }),
+      handleRetry: noop,
+    };
+    const { rerender } = render(
+      <OnboardingMessageRecoveryRow {...props} isBusy isSubmitted={false} />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Retry message' })
+    ).toBeDisabled();
+    rerender(
+      <OnboardingMessageRecoveryRow {...props} isBusy={false} isSubmitted />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Retry message' })
+    ).toBeDisabled();
+    rerender(
+      <OnboardingMessageRecoveryRow
+        {...props}
+        isBusy={false}
+        isSubmitted={false}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Retry message' })).toBeEnabled();
   });
 
   it('omits the signup link for non-rate-limit errors', () => {

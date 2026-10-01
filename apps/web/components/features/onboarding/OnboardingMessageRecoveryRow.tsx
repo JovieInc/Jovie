@@ -2,7 +2,7 @@
 
 import { RefreshCw, WifiOff } from 'lucide-react';
 import Link from 'next/link';
-import { useRef } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import type { ChatError } from '@/components/jovie/types';
 import { APP_ROUTES } from '@/constants/routes';
 import { formatTimeRemaining } from '@/lib/utils/date-formatting';
@@ -21,28 +21,43 @@ export function OnboardingMessageRecoveryRow({
   isSubmitted,
 }: OnboardingMessageRecoveryRowProps) {
   // `retryAfter` is a DURATION (seconds) captured when the request failed.
-  // Convert it to an absolute deadline once per error (refs capture during
-  // render) so re-renders count down toward a fixed point instead of re-adding
-  // the duration to the current time — which previously kept retry hidden
-  // permanently and restarted the wait label from the full duration on every
-  // render (PR #18095 review follow-up).
-  const retryAfterDeadlineRef = useRef<number | null>(null);
-  const retryAfterKeyRef = useRef<string | null>(null);
+  // Keep an absolute deadline in state so parent renders cannot restart the
+  // wait. A new failed request gets its own deadline (PR #18095 follow-up).
   const retryAfterKey =
     chatError.retryAfter != null
       ? `${chatError.type}:${chatError.requestId ?? ''}:${chatError.retryAfter}`
       : null;
-  if (retryAfterKey !== retryAfterKeyRef.current) {
-    retryAfterKeyRef.current = retryAfterKey;
-    retryAfterDeadlineRef.current =
+  const [retryWindow, setRetryWindow] = useState(() => ({
+    key: retryAfterKey,
+    deadline:
       chatError.retryAfter != null
         ? Date.now() + chatError.retryAfter * 1000
-        : null;
+        : null,
+  }));
+  if (retryAfterKey !== retryWindow.key) {
+    setRetryWindow({
+      key: retryAfterKey,
+      deadline:
+        chatError.retryAfter != null
+          ? Date.now() + chatError.retryAfter * 1000
+          : null,
+    });
   }
-  const retryAfterDeadline = retryAfterDeadlineRef.current;
+  const retryAfterDeadline = retryWindow.deadline;
+  const [, refreshCountdown] = useReducer((tick: number) => tick + 1, 0);
+  useEffect(() => {
+    if (retryAfterDeadline === null || retryAfterDeadline <= Date.now()) {
+      return;
+    }
+    const timer = setInterval(() => {
+      refreshCountdown();
+      if (Date.now() >= retryAfterDeadline) clearInterval(timer);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [retryAfterDeadline]);
 
   const canRetry =
-    Boolean(chatError.failedMessage) && retryAfterDeadline === null;
+    retryAfterDeadline === null || retryAfterDeadline <= Date.now();
   const isRateLimited = chatError.type === 'rate_limit';
   const waitLabel =
     retryAfterDeadline !== null
@@ -67,13 +82,15 @@ export function OnboardingMessageRecoveryRow({
         </p>
         <p className='text-secondary-token'>{chatError.message}</p>
         {waitLabel ? (
-          <p className='text-secondary-token'>Try again in {waitLabel}.</p>
+          <p className='text-secondary-token' aria-live='off'>
+            {canRetry ? 'Try again now.' : `Try again in ${waitLabel}.`}
+          </p>
         ) : null}
-        {canRetry ? (
+        {chatError.failedMessage ? (
           <button
             type='button'
             onClick={handleRetry}
-            disabled={isBusy || isSubmitted}
+            disabled={!canRetry || isBusy || isSubmitted}
             className='mt-1.5 inline-flex items-center gap-1.5 text-2xs font-medium text-secondary-token underline-offset-4 transition-colors duration-fast hover:text-primary-token hover:underline focus-visible:text-primary-token focus-visible:underline focus-visible:outline-none disabled:opacity-50'
           >
             <RefreshCw className='size-3.5' aria-hidden='true' />
