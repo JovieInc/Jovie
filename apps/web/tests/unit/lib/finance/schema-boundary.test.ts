@@ -4,8 +4,12 @@ import { getTableColumns, getTableName } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import {
   financeAccounts,
+  financeAnomalies,
+  financeBalanceSnapshots,
   financeExports,
   financeInstitutions,
+  financeLedgerEvents,
+  financeSyncStates,
   financeTransactions,
 } from '@/lib/db/schema/finance';
 
@@ -16,9 +20,21 @@ const FINANCE_TABLES = [
   financeExports,
 ];
 
+const LEDGER_TABLES = [
+  financeSyncStates,
+  financeBalanceSnapshots,
+  financeLedgerEvents,
+  financeAnomalies,
+];
+
 const MIGRATION_PATH = path.join(
   process.cwd(),
   'drizzle/migrations/0110_fancy_wolverine.sql'
+);
+
+const LEDGER_MIGRATION_PATH = path.join(
+  process.cwd(),
+  'drizzle/migrations/0127_plain_the_leader.sql'
 );
 
 describe('finance schema owner boundary (JOV-4609)', () => {
@@ -79,5 +95,41 @@ describe('finance RLS migration (JOV-4609)', () => {
     expect(financeSection).not.toContain('is_system_rls_session');
     expect(financeSection).not.toContain('is_rls_table_owner');
     expect(financeSection).not.toContain('is_rls_session_unset');
+  });
+});
+
+describe('finance ledger schema owner boundary (JOV-4612)', () => {
+  const sql = readFileSync(LEDGER_MIGRATION_PATH, 'utf8');
+
+  it.each(LEDGER_TABLES.map(t => [getTableName(t), t] as const))(
+    '%s keys rows by owner_user_id',
+    (_name, table) => {
+      const columnNames = Object.values(getTableColumns(table)).map(
+        c => c.name
+      );
+      expect(columnNames).toContain('owner_user_id');
+      for (const col of columnNames) {
+        expect(col).not.toMatch(/creator|workspace|member|profile|org/i);
+      }
+    }
+  );
+
+  it.each(LEDGER_TABLES.map(t => getTableName(t)))(
+    '%s has FORCE RLS and an owner-only policy',
+    tableName => {
+      expect(sql).toContain(
+        `ALTER TABLE "${tableName}" ENABLE ROW LEVEL SECURITY`
+      );
+      expect(sql).toContain(
+        `ALTER TABLE "${tableName}" FORCE ROW LEVEL SECURITY`
+      );
+      expect(sql).toContain(`CREATE POLICY "${tableName}_owner_all"`);
+    }
+  );
+
+  it('grants no system or owner-bridge bypass on ledger tables', () => {
+    const section = sql.slice(sql.indexOf('JOV-4612'));
+    expect(section).not.toContain('is_system_rls_session');
+    expect(section).not.toContain('is_rls_table_owner');
   });
 });

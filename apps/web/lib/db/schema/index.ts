@@ -557,19 +557,31 @@ export {
   type NewFeedbackItem,
   selectFeedbackItemSchema,
 } from './feedback';
-// Finance (Owner-only personal financial data — JOV-4609)
+// Finance (Owner-only personal financial data — JOV-4609, JOV-4612)
 export {
   type FinanceAccount,
+  type FinanceAnomaly,
+  type FinanceBalanceSnapshot,
   type FinanceExport,
   type FinanceInstitution,
+  type FinanceLedgerEvent,
+  type FinanceSyncState,
   type FinanceTransaction,
   financeAccounts,
+  financeAnomalies,
+  financeBalanceSnapshots,
   financeExports,
   financeInstitutions,
+  financeLedgerEvents,
+  financeSyncStates,
   financeTransactions,
   type NewFinanceAccount,
+  type NewFinanceAnomaly,
+  type NewFinanceBalanceSnapshot,
   type NewFinanceExport,
   type NewFinanceInstitution,
+  type NewFinanceLedgerEvent,
+  type NewFinanceSyncState,
   type NewFinanceTransaction,
 } from './finance';
 // Identity (Cross-platform artist identity links)
