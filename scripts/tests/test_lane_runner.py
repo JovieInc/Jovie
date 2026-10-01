@@ -2566,7 +2566,24 @@ class RequeueTest(unittest.TestCase):
                 lane.sh = real
             self.assertEqual(json.loads(path.read_text()), {"6": "h1"})
             self.assertNotIn("7", [c[3] for c in calls])
-            self.assertIn(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto"], calls)
+            self.assertIn(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto", "--match-head-commit", "h1"], calls)
+
+
+    def test_retained_head_push_race_retains_retry_without_queueing_unverified_head(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp)); path = host.state / "requeue.json"
+            path.write_text(json.dumps({"5": "head-A"})); live = {"head": "head-A"}; queued = []
+            def command(cmd, **kwargs):
+                if cmd[:3] == ["gh", "pr", "ready"]: live["head"] = "head-B"
+                pin = cmd[cmd.index("--match-head-commit") + 1] if "--match-head-commit" in cmd else None
+                rejected = cmd[:3] == ["gh", "pr", "merge"] and pin != live["head"] and pin is not None
+                if cmd[:3] == ["gh", "pr", "merge"] and not rejected: queued.append(live["head"])
+                return SimpleNamespace(returncode=int(rejected), stdout="", stderr="")
+            with patch.object(lane, "sh", side_effect=command):
+                lane.requeue_verified(host, [{"number": 5, "headRefOid": live["head"]}])
+            self.assertEqual(live["head"], "head-B"); self.assertEqual(queued, [])
+            self.assertEqual(json.loads(path.read_text()), {"5": "head-A"})
 
 
 if __name__ == "__main__":

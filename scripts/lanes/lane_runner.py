@@ -1479,7 +1479,7 @@ def requeue_verified(host: Host, prs: list[dict]) -> None:
                 del requeue[number]  # revoked branches never re-enroll
                 continue
             sh(["gh", "pr", "ready", number, "--repo", REPO_SLUG])
-            if sh(["gh", "pr", "merge", number, "--repo", REPO_SLUG, "--auto"]).returncode == 0:
+            if sh(["gh", "pr", "merge", number, "--repo", REPO_SLUG, "--auto", "--match-head-commit", head]).returncode == 0:
                 del requeue[number]
     update_json(path, retry)
 

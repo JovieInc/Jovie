@@ -2689,6 +2689,9 @@ describe('native merge-queue cohort (JOV-5047)', () => {
   // Execute production shell and real admission/collision CLIs as needed.
   // Only the gh transport is a fixture. SNAP is deliberately target-only.
   const realJq = execFileSync('which', ['jq'], { encoding: 'utf8' }).trim();
+  const realInventoryTools = Object.fromEntries(['mktemp', 'cat'].map(tool =>
+    [tool, execFileSync('which', [tool], { encoding: 'utf8' }).trim()]
+  ));
 
   function runDrainChangelogDecision({
     branch = stampBranch,
@@ -2775,6 +2778,11 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     writeFileSync(callsPath, '');
     writeFileSync(nodeCallsPath, '');
     writeFileSync(jqCallsPath, '');
+    const inventoryToolsPath = resolve(dir, 'inventory-tools.tsv');
+    writeFileSync(inventoryToolsPath, '');
+    for (const [tool, executable] of Object.entries(realInventoryTools)) {
+      writeFileSync(resolve(dir, tool), `#!/bin/sh\nprintf '%s\\n' '${tool}' >> \"$STAMP_INVENTORY_TOOLS\"\nexec '${executable}' \"$@\"\n`, { mode: 0o755 });
+    }
     writeFileSync(resolve(dir, 'jq'), "#!/bin/sh\nhas_n=0\nhas_files=0\nprevious=''\nfor arg do\n  if [ \"$previous\" = --argjson ]; then\n    case \"$arg\" in n) has_n=1;; changedFiles) has_files=1;; esac\n  fi\n  previous=$arg\ndone\nif [ \"$has_n\" = 1 ] && [ \"$has_files\" = 1 ]; then tag=fusedPayload\nelif [ \"$has_n\" = 1 ]; then tag=branchLookup\nelse tag=other\nfi\nprintf '%s\\n' \"$tag\" >> \"$STAMP_JQ_CALLS\"\nexec \"$STAMP_REAL_JQ\" \"$@\"\n", { mode: 0o755 });
     writeFileSync(
       resolve(dir, 'node'),
@@ -2814,6 +2822,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
               STAMP_CALLS: callsPath,
               STAMP_NODE_CALLS: nodeCallsPath,
               STAMP_JQ_CALLS: jqCallsPath,
+              STAMP_INVENTORY_TOOLS: inventoryToolsPath,
               STAMP_REAL_JQ: realJq,
               STAMP_RECOVERY_SNAPSHOT: recoverySnapshotRaw,
               STAMP_REAL_NODE: process.execPath,
@@ -2858,6 +2867,9 @@ describe('native merge-queue cohort (JOV-5047)', () => {
         );
         expect(inventoryCalls[0].some(arg => /^number=/.test(arg))).toBe(false);
       }
+      const inventoryTools = readFileSync(inventoryToolsPath, 'utf8').trim().split('\n');
+      expect(inventoryTools.filter(tool => tool === 'mktemp')).toHaveLength(expectedInventoryCount > 0 ? 1 : 0);
+      expect(inventoryTools.filter(tool => tool === 'cat')).toHaveLength(0);
       return result;
     } finally {
       rmSync(dir, { recursive: true, force: true });

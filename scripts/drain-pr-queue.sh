@@ -143,14 +143,13 @@ inventory_native_queue_state() {
   local base_delay="${GH_RETRY_BASE_DELAY:-2}"
   local max_delay="${GH_INVENTORY_RETRY_MAX_DELAY:-15}"
   local attempt=1
-  local out_file err_file err delay
-  out_file="$(mktemp)"
+  local out err_file err delay
   err_file="$(mktemp)"
   # shellcheck disable=SC2064
-  trap "rm -f '$out_file' '$err_file'" RETURN
+  trap "rm -f '$err_file'" RETURN
   while [[ "$attempt" -le "$attempts" ]]; do
-    if node scripts/merge-queue-backend.mjs list-state "$@" >"$out_file" 2>"$err_file"; then
-      cat "$out_file"
+    if out="$(node scripts/merge-queue-backend.mjs list-state "$@" 2>"$err_file")"; then
+      printf '%s\n' "$out"
       return 0
     fi
     err="$(<"$err_file")"
