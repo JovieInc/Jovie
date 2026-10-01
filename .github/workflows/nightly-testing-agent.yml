@@ -96,6 +96,8 @@ jobs:
 
       - name: Normalize unit telemetry
         if: always()
+        env:
+          PLAYWRIGHT_ARTIFACT_PATHS: apps/web/test-results/nightly-agent/deterministic/normalized-results.json
         run: |
           test -s apps/web/test-results/nightly-agent/unit-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}.junit.xml
           node .github/scripts/guard-playwright-artifacts.mjs --run -- \

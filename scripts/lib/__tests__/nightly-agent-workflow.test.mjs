@@ -1,5 +1,15 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { load } from 'js-yaml';
@@ -100,6 +110,90 @@ describe('Nightly Testing Agent evidence flow', () => {
       'matrix.shard'
     );
   });
+
+  it.each([false, true])(
+    'stages only normalized unit telemetry and rejects leaked output (leak=%s)',
+    leak => {
+      const root = realpathSync(
+        mkdtempSync(join(tmpdir(), 'nightly-artifacts-'))
+      );
+      const runner = join(root, 'runner');
+      const output =
+        'apps/web/test-results/nightly-agent/deterministic/normalized-results.json';
+      const raw = 'apps/web/test-results/nightly-agent/unit-42-1-4.junit.xml';
+      mkdirSync(runner);
+      mkdirSync(
+        join(root, 'apps/web/test-results/nightly-agent/deterministic'),
+        { recursive: true }
+      );
+      writeFileSync(join(root, raw), '<testsuites tests="1" failures="0"/>');
+      const normalize = step(
+        workflow.jobs.deterministic,
+        'Normalize unit telemetry'
+      );
+      const guard = resolve(
+        import.meta.dirname,
+        '../../../.github/scripts/guard-playwright-artifacts.mjs'
+      );
+      try {
+        const result = spawnSync(
+          process.execPath,
+          [
+            guard,
+            '--run',
+            '--',
+            process.execPath,
+            '-e',
+            `require('node:fs').writeFileSync(${JSON.stringify(output)}, JSON.stringify({schema:'nightly-test-agent.normalized.v1', results:[], note:process.env.LEAK_OUTPUT === 'true' ? process.env.NIGHTLY_FIXTURE_SECRET : 'safe'}))`,
+          ],
+          {
+            cwd: root,
+            encoding: 'utf8',
+            env: {
+              PATH: process.env.PATH,
+              GITHUB_WORKSPACE: root,
+              RUNNER_TEMP: runner,
+              GITHUB_RUN_ID: '42',
+              GITHUB_RUN_ATTEMPT: '1',
+              GITHUB_JOB: 'deterministic',
+              NIGHTLY_FIXTURE_SECRET: 'synthetic-nightly-artifact-sentinel',
+              LEAK_OUTPUT: String(leak),
+              ...normalize.env,
+            },
+          }
+        );
+        const producer = join(runner, 'safe-playwright-producer');
+        if (leak) {
+          expect(result.status).toBe(1);
+          expect(result.stderr).toContain('credential-text');
+          expect(existsSync(join(producer, 'blocked'))).toBe(true);
+          expect(existsSync(join(producer, 'current'))).toBe(false);
+        } else {
+          expect(result.status, result.stderr).toBe(0);
+          const [binding, stage] = readFileSync(
+            join(producer, 'current'),
+            'utf8'
+          )
+            .trim()
+            .split('|');
+          expect(binding).toBe('42:1:deterministic');
+          expect(
+            JSON.parse(readFileSync(join(producer, stage, output), 'utf8')).note
+          ).toBe('safe');
+          expect(existsSync(join(producer, stage, raw))).toBe(false);
+          expect(readFileSync(join(root, raw), 'utf8')).toContain('testsuites');
+        }
+      } finally {
+        const writable = directory => {
+          chmodSync(directory, 0o700);
+          for (const entry of readdirSync(directory, { withFileTypes: true }))
+            if (entry.isDirectory()) writable(join(directory, entry.name));
+        };
+        writable(root);
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  );
 
   it('binds the compact report to the resolved workflow conclusion', () => {
     const resolveIndex = report.steps.findIndex(
