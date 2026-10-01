@@ -17,7 +17,7 @@ interface McpResponse {
   error?: { code: number; message: string };
 }
 
-async function mcpCall<T>(
+export async function mcpCall<T>(
   method: string,
   params: Record<string, unknown>
 ): Promise<{ ok: true; data: T } | { ok: false; reason: string }> {
