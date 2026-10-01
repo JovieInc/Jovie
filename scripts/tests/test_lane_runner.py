@@ -2886,7 +2886,7 @@ class DeferredRequeueTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp)); pr = {"number": 5, "state": "OPEN", "headRefOid": "head-A", "headRefName": "devin/jov-5-20260930t123000"}
             (host.state / "requeue.json").write_text(json.dumps({"5": "head-A"}))
-            for result in (None, {"verdict": "remote-held"}, RuntimeError("fixture"), KeyboardInterrupt()):
+            for result in (None, {"verdict": "remote-held"}, RuntimeError("fixture"), KeyboardInterrupt(), lane.subprocess.TimeoutExpired("gh", 600), lane.subprocess.CalledProcessError(1, "gh")):
                 with self.subTest(result=type(result).__name__), patch.object(lane, "reconcile_fix_target", return_value=pr), patch.object(lane, "sh") as command:
                     slot = lane.Locked(host.state / "slots/devin.0.lock", blocking=False)
                     with patch.object(slot, "release", wraps=slot.release) as release:
