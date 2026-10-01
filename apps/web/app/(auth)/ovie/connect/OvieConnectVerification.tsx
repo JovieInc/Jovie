@@ -38,7 +38,7 @@ export function OvieConnectVerification({
       showFooterPrompt={false}
       layoutVariant='stack'
     >
-      <div className='flex flex-col gap-4'>
+      <div className='flex w-90 max-w-full flex-col gap-4'>
         <p className='text-sm text-secondary-token'>
           {purpose === 'privacy'
             ? 'Unlock Ovie with your passkey to finish connecting.'
