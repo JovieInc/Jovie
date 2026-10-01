@@ -47,6 +47,7 @@ function latencyAllowlistEntries() {
 
 // H-06 audits the companion inventory plus the named test/rule anchors.
 // Compose its inputs here so a guard-only edit cannot skip the existing audit.
+/** @param {(path: string, encoding: 'utf8') => string} [read] */
 export function readFeedbackGuardPaths(read = readFileSync) {
   try {
     return JSON.parse(read(`${REPO_ROOT}LESSONS.guards.json`, 'utf8'))
