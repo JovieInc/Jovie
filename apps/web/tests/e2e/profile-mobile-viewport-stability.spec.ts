@@ -1208,13 +1208,8 @@ test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
         after.banner,
         `${viewport.label} consent card must render for overlap verification`
       ).not.toBeNull();
-      expect(
-        after.primaryAction,
-        `${viewport.label} primary profile action must render for overlap verification`
-      ).not.toBeNull();
       const banner = after.banner;
-      const primaryAction = after.primaryAction;
-      if (!banner || !primaryAction) {
+      if (!banner) {
         throw new Error(
           `${viewport.label} overlap prerequisites disappeared after assertion`
         );
@@ -1320,14 +1315,31 @@ test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
           `${viewport.label} Customize spans the action row`
         ).toBe(after.actions.right);
       }
-      const overlapsHorizontally =
-        banner.left < primaryAction.right && banner.right > primaryAction.left;
-      const overlapsVertically =
-        banner.top < primaryAction.bottom && banner.bottom > primaryAction.top;
-      expect(
-        overlapsHorizontally && overlapsVertically,
-        `${viewport.label} consent card must not cover the primary profile action`
-      ).toBe(false);
+      // JOV-7114 intentionally lets the phone consent card cover the featured
+      // action until consent is resolved. Tablet and desktop placements still
+      // keep the primary action clear.
+      if (viewport.width >= 768) {
+        expect(
+          after.primaryAction,
+          `${viewport.label} primary profile action must render for overlap verification`
+        ).not.toBeNull();
+        const primaryAction = after.primaryAction;
+        if (!primaryAction) {
+          throw new Error(
+            `${viewport.label} primary profile action disappeared after assertion`
+          );
+        }
+        const overlapsHorizontally =
+          banner.left < primaryAction.right &&
+          banner.right > primaryAction.left;
+        const overlapsVertically =
+          banner.top < primaryAction.bottom &&
+          banner.bottom > primaryAction.top;
+        expect(
+          overlapsHorizontally && overlapsVertically,
+          `${viewport.label} consent card must not cover the primary profile action`
+        ).toBe(false);
+      }
 
       await page.evaluate(() => {
         document.documentElement.style.removeProperty('--cookie-banner-h');
