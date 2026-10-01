@@ -18,7 +18,7 @@
  * @see https://docs.sentry.io/platforms/javascript/guides/nextjs/
  *
  * PII Collection Notice:
- * When sendDefaultPii is enabled, Sentry may collect:
+ * When user data collection is enabled, Sentry may collect:
  * - User IP addresses (anonymized via beforeSend)
  * - User IDs (Clerk user IDs only, no emails)
  *
