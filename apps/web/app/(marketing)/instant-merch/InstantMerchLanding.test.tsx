@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { INSTANT_MERCH_COPY as copy } from '@/data/instantMerchCopy';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
@@ -21,20 +22,17 @@ vi.mock('@/lib/queries/useConfirmChatMerchActionMutation', () => ({
   }),
 }));
 
-vi.mock('next/link', () => ({
-  default: ({
-    href,
-    children,
-    ...props
-  }: {
-    href: string;
-    children: React.ReactNode;
-  }) => (
-    <a href={href} {...props}>
-      {children}
-    </a>
-  ),
-}));
+vi.mock('next/link', async () => {
+  const { forwardRef } = await import('react');
+  return {
+    default: forwardRef<
+      HTMLAnchorElement,
+      ComponentProps<'a'> & { prefetch?: boolean }
+    >(function PrefetchObservedLink({ prefetch, ...props }, ref) {
+      return <a {...props} ref={ref} data-test-prefetch={String(prefetch)} />;
+    }),
+  };
+});
 
 describe('InstantMerchLanding', () => {
   it('routes both CTAs into the authenticated merch conversation', () => {
@@ -50,6 +48,20 @@ describe('InstantMerchLanding', () => {
     );
     expect(CREATE_MERCH_HREF).toBe('/app/chat?q=Make%20me%20merch');
   });
+
+  it.each(['instant-merch-primary-cta', 'instant-merch-final-cta'])(
+    'waits for visitor intent on the protected %s action',
+    testId => {
+      render(<InstantMerchLanding />);
+      const action = screen.getByTestId(testId);
+      expect(action).toHaveAttribute('href', '/app/chat?q=Make%20me%20merch');
+      expect(action).toHaveAttribute('data-test-prefetch', 'false');
+      fireEvent.focus(action);
+      fireEvent.mouseEnter(action);
+      expect(action).toHaveAttribute('href', CREATE_MERCH_HREF);
+      expect(action).toHaveAttribute('data-test-prefetch', 'false');
+    }
+  );
 
   it('never clamps the hero headline (JOV-7154)', () => {
     render(<InstantMerchLanding />);

@@ -43,6 +43,10 @@ describe('LandingCTAButton navigation contract', () => {
     ['/start', 'false'],
     ['/signup', 'false'],
     ['/signin', 'false'],
+    ['/app/chat?q=Make%20me%20merch', 'false'],
+    ['/waitlist?from=invite', 'false'],
+    ['/app/chat-other', 'undefined'],
+    ['/waitlist/invite', 'undefined'],
     ['/pricing', 'undefined'],
     ['/support', 'undefined'],
   ])('preserves %s navigation and its prefetch boundary', (href, prefetch) => {

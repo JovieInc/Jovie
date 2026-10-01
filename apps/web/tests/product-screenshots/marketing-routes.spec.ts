@@ -150,6 +150,8 @@ test.describe('Marketing auth-entry prefetch boundary', () => {
     '/artist-notifications',
     '/smart-links',
     '/launch',
+    '/instant-merch',
+    '/waitlist/invite',
   ]) {
     test(`auth-entry waits for visitor intent on ${route}`, async ({
       page,
@@ -159,7 +161,9 @@ test.describe('Marketing auth-entry prefetch boundary', () => {
       page.on('request', request => {
         const url = new URL(request.url());
         if (
-          ['/signup', '/signin', '/start'].includes(url.pathname) &&
+          ['/signup', '/signin', '/start', '/app/chat', '/waitlist'].includes(
+            url.pathname
+          ) &&
           request.headers()['next-router-prefetch'] === '1'
         ) {
           speculativeAuthRequests.push(url.pathname);
@@ -167,20 +171,26 @@ test.describe('Marketing auth-entry prefetch boundary', () => {
       });
       page.on('requestfailed', request => {
         const url = new URL(request.url());
-        if (['/signup', '/signin', '/start'].includes(url.pathname)) {
+        if (
+          ['/signup', '/signin', '/start', '/app/chat', '/waitlist'].includes(
+            url.pathname
+          )
+        ) {
           authRequestFailures.push(
             `${url.pathname} ${request.failure()?.errorText ?? 'unknown'}`
           );
         }
       });
       await page.setViewportSize(
-        route === '/artist-profiles'
+        ['/artist-profiles', '/instant-merch', '/waitlist/invite'].includes(
+          route
+        )
           ? { width: 390, height: 844 }
           : { width: 1440, height: 900 }
       );
       await page.goto(route, { waitUntil: 'domcontentloaded' });
       const authLinks = page.locator(
-        'a[href="/signup"]:visible, a[href^="/signup?"]:visible, a[href="/signin"]:visible, a[href^="/signin?"]:visible, a[href="/start"]:visible, a[href^="/start?"]:visible'
+        'a[href="/signup"]:visible, a[href^="/signup?"]:visible, a[href="/signin"]:visible, a[href^="/signin?"]:visible, a[href="/start"]:visible, a[href^="/start?"]:visible, a[href="/app/chat"]:visible, a[href^="/app/chat?"]:visible, a[href="/waitlist"]:visible, a[href^="/waitlist?"]:visible'
       );
       expect(await authLinks.count(), `${route} auth actions`).toBeGreaterThan(
         0
