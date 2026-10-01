@@ -38,6 +38,7 @@ describe('buildHeaderSearchGroups', () => {
     expect(groups[0]?.items[0]?.href).toBe('/app/chat/thread-1');
     expect(groups[1]?.items[0]?.href).toBe('/midnight-artist');
     expect(groups[2]?.items[0]?.href).toBe('/midnight-artist/midnight-drive');
+    expect(groups[2]?.label).toBe('Work');
     expect(groups[0]?.items[0]).toMatchObject({
       label: 'Midnight rollout',
       description: 'Chat thread',

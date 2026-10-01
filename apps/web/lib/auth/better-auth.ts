@@ -147,7 +147,15 @@ function resolveLocalBetterAuthUrl(): URL | undefined {
 }
 
 function isNonVercelRuntime(): boolean {
-  return env.VERCEL_ENV !== 'preview' && env.VERCEL_ENV !== 'production';
+  if (env.VERCEL_ENV !== 'preview' && env.VERCEL_ENV !== 'production') {
+    return true;
+  }
+  // VERCEL_ENV alone is not proof of a Vercel runtime: Doppler env pulls and
+  // local dogfood/QA runners can carry a leaked VERCEL_ENV while the process
+  // still serves loopback ports (JOV-4382: Host "127.0.0.1:32117" rejected
+  // with only the static allowed hosts). Real Vercel deployments always set
+  // VERCEL=1, so only trust VERCEL_ENV when it is present.
+  return process.env.VERCEL !== '1';
 }
 
 /**

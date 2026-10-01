@@ -183,9 +183,6 @@ export JOVIE_AGENT_PROFILE=coder
 ./scripts/setup.sh
 pnpm install --frozen-lockfile
 
-# Drop stale lint-staged backup stashes (prevents pre-commit hook false failures)
-git stash list | grep "lint-staged automatic backup" | cut -d: -f1 | xargs -r -n1 git stash drop || true
-
 git status  # confirm clean
 
 # 2. Discovery
@@ -226,12 +223,10 @@ mcp__ruflo__claims_release({ id: "<chunk-slug>", swarmId: "<swarm-id>" })
 | Banned | Why |
 |--------|-----|
 | `git commit --no-verify` | Bypasses hooks. Never. Fix the hook failure instead. |
-| `git stash` without dropping lint-staged backup stashes first | Causes stash races across worktrees; symptom is "lint-staged automatic backup is missing" |
 | `git worktree add` in parallel | Races on upstream branch config; always sequential in the lead |
 | Agent editing files outside its HOT ZONE | Creates merge conflicts and makes reviews impossible; each agent owns its declared files |
 | Skipping `/qa --exhaustive` | The `--exhaustive` flag is required; `/qa` alone runs a shorter path that misses regression coverage |
 | `isolation: "worktree"` in Agent tool | Strips Bash + MCP permissions; use pre-created worktrees instead |
-| Parallel `git commit` across worktrees | Stash races; lead must serialize commit windows or use separate push windows |
 
 ## Reference Implementation
 

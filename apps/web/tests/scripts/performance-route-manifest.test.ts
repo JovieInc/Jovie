@@ -61,9 +61,10 @@ const CREATOR_SHELL_SLICE_ROUTES = [
   {
     id: 'creator-library',
     path: APP_ROUTES.LIBRARY,
-    measureMode: 'page-load',
-    warmupStrategy: 'authenticated-route',
-    primaryMetric: 'skeleton-to-content',
+    measureMode: 'warm-navigation',
+    warmupStrategy: 'authenticated-shell',
+    primaryMetric: 'warm-shell-response',
+    navTrigger: `a[href="${APP_ROUTES.LIBRARY}"]`,
   },
   {
     id: 'creator-contacts',
@@ -76,10 +77,9 @@ const CREATOR_SHELL_SLICE_ROUTES = [
   {
     id: 'creator-links',
     path: APP_ROUTES.CHAT_PROFILE_PANEL,
-    measureMode: 'warm-navigation',
-    warmupStrategy: 'authenticated-shell',
-    primaryMetric: 'warm-shell-response',
-    navTrigger: `a[href="${APP_ROUTES.CHAT_PROFILE_PANEL}"]`,
+    measureMode: 'page-load',
+    warmupStrategy: 'authenticated-route',
+    primaryMetric: 'skeleton-to-content',
   },
   {
     id: 'creator-presence',

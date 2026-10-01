@@ -460,7 +460,7 @@ describe('ChatMessage', () => {
     }
   });
 
-  it('renders merch selection artifacts with a Library destination', () => {
+  it('renders merch selection artifacts with a Work destination', () => {
     const messageProps = {
       id: 'assistant-merch-2',
       role: 'assistant' as const,
@@ -487,7 +487,7 @@ describe('ChatMessage', () => {
     expect(screen.getByTestId('chat-merch-selection-card')).toHaveTextContent(
       'Merch card created'
     );
-    expect(screen.getByRole('link', { name: 'Open Library' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Open Work' })).toHaveAttribute(
       'href',
       '/app/library?view=merch'
     );
