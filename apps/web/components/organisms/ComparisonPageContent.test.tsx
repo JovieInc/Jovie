@@ -38,8 +38,8 @@ describe('ComparisonPageContent', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(data.bottomLine)).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: 'Try Jovie Free' })
-    ).toHaveAttribute('href', '/signup');
+      screen.getByRole('link', { name: 'Claim my free profile' })
+    ).toHaveAttribute('href', '/signup?plan=free');
     expect(screen.getAllByRole('button')).toHaveLength(data.faq.length);
   });
 
