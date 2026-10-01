@@ -42,12 +42,13 @@ describe('Hyperagent remote lane coverage contract', () => {
     expect(command).toContain('scripts/tests/test_hyperagent_lane.py');
     expect(command).toContain('scripts/tests/test_execution_attempt.py');
     expect(command).toContain('scripts/tests/test_lane_runner.py');
+    expect(command).toContain('scripts/tests/test_disk_guard.py');
     expect(command).toContain('coverage run --branch -m pytest');
   });
   it('preserves the existing lane floor and enforces meaningful remote adapter coverage', () => {
     const command = STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0];
     expect(command).toContain(
-      'lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/doctor.py" --fail-under=85'
+      'lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py" --fail-under=85'
     );
     expect(command).toContain(
       '*/scripts/lanes/hyperagent_lane.py" --fail-under=95'
