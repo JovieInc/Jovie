@@ -6,6 +6,7 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import os
 import subprocess
@@ -28,6 +29,61 @@ SPEC.loader.exec_module(lane)
 
 def issue(identifier="JOV-1", priority=2, created="2026-09-01T00:00:00Z", labels=()):
     return lane.Issue("id-" + identifier, identifier, "Tab indicator collapses", "body", priority, created, list(labels))
+
+
+class ContextManifestTest(unittest.TestCase):
+    def test_checked_in_manifest_is_generated_by_the_existing_preflight(self):
+        self.assertEqual(json.loads((lane.HERE / "context-manifest.json").read_text()),
+                         json.loads(lane.context_manifest_json()))
+
+    def test_repository_formatting_is_accepted_but_malformed_or_missing_contract_is_not(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "context-manifest.json"
+            self.assertFalse(lane.context_manifest_matches(path))
+            path.write_text(json.dumps(json.loads(lane.context_manifest_json()), separators=(",", ":")))
+            self.assertTrue(lane.context_manifest_matches(path))
+            path.write_text("not JSON")
+            self.assertFalse(lane.context_manifest_matches(path))
+
+    def test_manifest_binds_exact_prompt_and_inputs_without_copying_private_content(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "issue.prompt.md"
+            inputs = {"issue": "private issue", "gbrain": "prior private decision", "branch": "devin/jov-1"}
+            first = lane.write_agent_prompt(path, "exact prompt\n", "issue", "devin", inputs)
+            body = Path(first["path"]).read_bytes()
+            receipt = json.loads(body)
+            self.assertEqual(path.read_text(), "exact prompt\n")
+            self.assertEqual(receipt["prompt"]["sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
+            self.assertNotIn(b"private", body)
+            self.assertEqual(receipt["inputs"]["gbrain"]["sha256"], hashlib.sha256(inputs["gbrain"].encode()).hexdigest())
+            self.assertEqual(receipt["inputs"]["gbrain"]["status"], "present")
+            self.assertEqual(first, lane.write_agent_prompt(path, "exact prompt\n", "issue", "devin", inputs))
+            self.assertEqual(body, Path(first["path"]).read_bytes())
+            changed = lane.write_agent_prompt(path, "different prompt", "issue", "devin", inputs)
+            self.assertNotEqual(first["sha256"], changed["sha256"])
+
+    def test_missing_context_is_explicit_and_manifest_drift_stops_before_prompt_write(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "issue.prompt.md"
+            inputs = {"issue": "task", "gbrain": "", "branch": "codex/jov-1"}
+            receipt = lane.write_agent_prompt(path, "prompt", "issue", "codex", inputs)
+            self.assertEqual(json.loads(Path(receipt["path"]).read_text())["inputs"]["gbrain"]["status"], "unavailable")
+            path.unlink()
+            with patch.object(lane, "HERE", Path(tmp)):
+                (Path(tmp) / "context-manifest.json").write_text('{}')
+                with self.assertRaisesRegex(ValueError, "context-manifest-drift"):
+                    lane.write_agent_prompt(path, "must not spawn", "issue", "codex", inputs)
+                self.assertFalse(path.exists())
+            with self.assertRaisesRegex(ValueError, "context-inputs"):
+                lane.write_agent_prompt(path, "invalid", "issue", "codex", {"gbrain": ""})
+
+    def test_generator_does_not_load_credentials_or_query_services(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(lane, "HERE", Path(tmp)), \
+                patch.object(lane, "load_github_env", side_effect=AssertionError("credential access")):
+            self.assertEqual(lane.main(["context-manifest", "--write"]), 0)
+            self.assertEqual(lane.main(["context-manifest"]), 0)
+            (Path(tmp) / "context-manifest.json").write_text('{}')
+            self.assertEqual(lane.main(["context-manifest"]), 1)
 
 
 class SelectionTest(unittest.TestCase):
@@ -506,6 +562,37 @@ class RunIssueTest(unittest.TestCase):
         self.assertTrue(receipt["branch"].startswith("devin/jov-8-"))
         self.assertIn(receipt["runId"], receipt["worktree"])
         self.assertEqual(receipt["result"], {"verdict": "landing", "commit": None, "pr": 9, "prUrl": None})
+        manifest = receipt["contextManifests"][0]
+        body = Path(manifest["path"]).read_bytes()
+        context = json.loads(body)
+        self.assertEqual(manifest["sha256"], hashlib.sha256(body).hexdigest())
+        self.assertEqual(context["provider"], "devin")
+        self.assertEqual(context["prompt"]["sha256"], hashlib.sha256(prompt.encode()).hexdigest())
+        self.assertEqual(self.ledger()[0]["contextManifests"], receipt["contextManifests"])
+
+    def test_context_contract_drift_prevents_agent_execution(self):
+        with patch.object(lane, "context_manifest_json", return_value="drift"), \
+                patch.object(lane, "run_agent") as agent, \
+                patch.object(lane.execution_attempt, "boundary") as spend:
+            receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]), issue())
+        self.assertEqual(receipt["verdict"], "failed")
+        self.assertIn("context-manifest-drift", receipt["reasons"][0])
+        agent.assert_not_called()
+        spend.assert_not_called()
+
+    def test_context_receipt_write_failure_prevents_agent_execution(self):
+        original = Path.write_bytes
+
+        def write(path, data):
+            if path.name.endswith(".context.json"):
+                raise OSError("receipt volume unavailable")
+            return original(path, data)
+
+        with patch.object(Path, "write_bytes", write), patch.object(lane, "run_agent") as agent:
+            receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]), issue())
+        self.assertEqual(receipt["verdict"], "failed")
+        self.assertIn("receipt volume unavailable", receipt["reasons"][0])
+        agent.assert_not_called()
 
     def test_agent_that_never_worked_is_a_provider_error(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}
@@ -532,6 +619,10 @@ class RunIssueTest(unittest.TestCase):
         handoff = next((self.host.state / "runs").glob("*.handoff1.prompt.md")).read_text()
         self.assertIn("Do not start over", handoff)
         self.assertIn("ctx", handoff)
+        self.assertEqual(len(receipt["contextManifests"]), 2)
+        context = json.loads(Path(receipt["contextManifests"][1]["path"]).read_text())
+        self.assertEqual((context["kind"], context["provider"]), ("handoff", "devin"))
+        self.assertEqual(context["prompt"]["sha256"], hashlib.sha256(handoff.encode()).hexdigest())
 
     def test_next_provider_takes_the_cheapest_enabled_healthy_uncooled_lane(self):
         providers = {
