@@ -870,8 +870,8 @@ enum WhatsNewCatalog {
         ),
         WhatsNewItem(
           id: "sidebar-destinations",
-          title: "Library, Calendar, and Inbox live in the sidebar",
-          testHint: "Open the sidebar and tap Library, Calendar, Inbox, Profile, Audience, and Talk. None of these should be bottom tabs."
+          title: "Work, Calendar, and Inbox live in the sidebar",
+          testHint: "Open the sidebar and tap Work, Calendar, Inbox, Profile, Audience, and Talk. None of these should be bottom tabs."
         ),
         WhatsNewItem(
           id: "chat-quality",

@@ -911,6 +911,13 @@
       "when": 1790849819399,
       "tag": "0129_glossy_champions",
       "breakpoints": true
+    },
+    {
+      "idx": 130,
+      "version": "7",
+      "when": 1790857330315,
+      "tag": "0130_tearful_korath",
+      "breakpoints": true
     }
   ]
 }

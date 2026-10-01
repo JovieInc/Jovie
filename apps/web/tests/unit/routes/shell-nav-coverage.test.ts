@@ -26,9 +26,9 @@ const CONTACTS_CLIENT_PATH = path.join(
 const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app': 'Shell root entry page',
   '/app/chats': 'Canonical chat index reached from the sidebar link',
+  '/app/chat': 'New Chat utility and contextual Identity link editor',
   '/app/chat/[id]': 'Thread detail is reached from chat history',
-  '/app/library':
-    'Contextual asset workspace reached from identity, search, and entity links',
+  '/app/library': 'Canonical Work surface with stable library route ownership',
   '/app/calendar':
     'Contextual moments workspace reached from event and release links',
   '/app/tasks':

@@ -63,7 +63,7 @@ export const GOLDEN_JOURNEY_ROUTES: readonly GoldenJourneyRoute[] = [
     id: 'library',
     path: APP_ROUTES.LIBRARY,
     authState: 'creator-ready',
-    description: 'Library with the seeded creator fixture data.',
+    description: 'Work with the seeded creator fixture data.',
   },
   {
     id: 'releases',
