@@ -248,3 +248,17 @@ Sensitive changes are classified deterministically on source PRs. Smoke and prev
 | Environment and runtime config | high | yes | yes | no |
 | Public UI and profile surfaces | medium | no | yes | no |
 <!-- ci-harness:end -->
+
+## Internal PR Review (advisory)
+
+`internal-review.yml` (JOV-7400) is the internal, advisory-only replacement for
+CodeRabbit. On every PR open/synchronize it posts one upserted comment covering
+correctness risks, test gaps, and migration hazards via the Vercel AI Gateway
+(`zai/glm-5.3-flash`, existing `AI_GATEWAY_API_KEY` secret — no new vendors).
+
+Non-blocking by construction: it is not a required check, never requests
+changes, and the script always exits 0 — a missing key, rate limit, or
+oversized diff degrades to an annotated comment, never merge delay. Merge
+correctness remains owned by the required gates above. It runs on
+`pull_request_target` against the trusted base ref; the PR diff is read through
+the GitHub API as data only, so no PR-controlled code executes.

@@ -551,6 +551,17 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:worker
     jobCount: 1
+  - name: Internal PR Review (advisory)
+    path: .github/workflows/internal-review.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+    terminalReceipt: job:review
+    jobCount: 1
   - name: iOS CI
     path: .github/workflows/ios-ci.yml
     active: true
