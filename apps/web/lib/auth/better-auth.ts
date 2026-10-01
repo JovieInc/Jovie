@@ -39,7 +39,9 @@ import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { adminPasskeyStepUp } from './admin-passkey-step-up';
 import { generateAppleClientSecret } from './apple-client-secret';
+import { mcpOAuthRedirectGuard } from './mcp-redirect-guard';
 import { oauthProviderErrorReturn } from './oauth-provider-error-return';
+import { OAUTH_PROVIDER_TRUSTED_CLIENT_IDS } from './oauth-trusted-clients';
 import { resolveOvieWebOrigin } from './ovie-web-origin';
 import { resolvePasskeyRpId } from './passkey-rp-id';
 import { provisionAppUser } from './provision';
@@ -338,6 +340,7 @@ function buildPlugins() {
         gracePeriod: 60 * 60 * 24 * 30,
       },
     }),
+    mcpOAuthRedirectGuard(),
     oauthProvider({
       loginPage: '/identity',
       consentPage: '/identity',
@@ -350,7 +353,7 @@ function buildPlugins() {
       refreshTokenExpiresIn: 60 * 60 * 24 * 30,
       storeClientSecret: 'hashed',
       storeTokens: 'hashed',
-      cachedTrustedClients: new Set(['logyourbody-ios', 'logyourbody-web']),
+      cachedTrustedClients: new Set(OAUTH_PROVIDER_TRUSTED_CLIENT_IDS),
     }) as BetterAuthPlugin,
     oauthProviderErrorReturn(),
     oneTimeToken({
