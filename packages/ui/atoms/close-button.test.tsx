@@ -91,9 +91,11 @@ describe('closeButtonStyles', () => {
   it('has focus styles', () => {
     expect(closeButtonStyles.focus).toContain('focus-visible:outline-none');
     expect(closeButtonStyles.focus).toContain('focus-visible:ring-2');
+    expect(closeButtonStyles.focus).toContain('focus-visible:ring-focus/55');
     expect(closeButtonStyles.focus).toContain(
-      'focus-visible:ring-(--linear-border-focus)'
+      'focus-visible:ring-offset-surface-page'
     );
+    expect(closeButtonStyles.focus).not.toContain('--linear-');
   });
 
   it('has disabled styles', () => {
@@ -106,9 +108,8 @@ describe('closeButtonStyles', () => {
   });
 
   it('has offset styles', () => {
-    expect(closeButtonStyles.offset).toContain(
-      'ring-offset-(--linear-bg-page)'
-    );
+    expect(closeButtonStyles.offset).toContain('ring-offset-surface-page');
+    expect(closeButtonStyles.offset).not.toContain('--linear-');
   });
 });
 
@@ -118,7 +119,8 @@ describe('closeButtonClassName', () => {
     expect(closeButtonClassName).toContain('hover:bg-interactive-hover');
     expect(closeButtonClassName).toContain('focus-visible:ring-2');
     expect(closeButtonClassName).toContain('disabled:pointer-events-none');
-    expect(closeButtonClassName).toContain('ring-offset-(--linear-bg-page)');
+    expect(closeButtonClassName).toContain('ring-offset-surface-page');
+    expect(closeButtonClassName).not.toContain('--linear-');
   });
 
   it('uses the shared pill close button shape', () => {
