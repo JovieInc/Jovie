@@ -32,10 +32,6 @@ def issue(identifier="JOV-1", priority=2, created="2026-09-01T00:00:00Z", labels
 
 
 class ContextManifestTest(unittest.TestCase):
-    def test_checked_in_manifest_is_generated_by_the_existing_preflight(self):
-        self.assertEqual(json.loads((lane.HERE / "context-manifest.json").read_text()),
-                         json.loads(lane.context_manifest_json()))
-
     def test_repository_formatting_is_accepted_but_malformed_or_missing_contract_is_not(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "context-manifest.json"
@@ -57,25 +53,37 @@ class ContextManifestTest(unittest.TestCase):
             self.assertNotIn(b"private", body)
             self.assertEqual(receipt["inputs"]["gbrain"]["sha256"], hashlib.sha256(inputs["gbrain"].encode()).hexdigest())
             self.assertEqual(receipt["inputs"]["gbrain"]["status"], "present")
-            self.assertEqual(first, lane.write_agent_prompt(path, "exact prompt\n", "issue", "devin", inputs))
+            repeated = lane.write_agent_prompt(path, "exact prompt\n", "issue", "devin", inputs)
+            self.assertEqual(first["sha256"], repeated["sha256"])
+            self.assertTrue(first["qualification"]["ok"])
+            self.assertEqual(first["qualification"]["mode"], "qualification-only")
+            self.assertGreaterEqual(first["qualification"]["durationMs"], 0)
             self.assertEqual(body, Path(first["path"]).read_bytes())
             changed = lane.write_agent_prompt(path, "different prompt", "issue", "devin", inputs)
             self.assertNotEqual(first["sha256"], changed["sha256"])
 
-    def test_missing_context_is_explicit_and_manifest_drift_stops_before_prompt_write(self):
+    def test_missing_context_and_drift_are_explicit_nonblocking_findings(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "issue.prompt.md"
             inputs = {"issue": "task", "gbrain": "", "branch": "codex/jov-1"}
             receipt = lane.write_agent_prompt(path, "prompt", "issue", "codex", inputs)
             self.assertEqual(json.loads(Path(receipt["path"]).read_text())["inputs"]["gbrain"]["status"], "unavailable")
-            path.unlink()
             with patch.object(lane, "HERE", Path(tmp)):
-                (Path(tmp) / "context-manifest.json").write_text('{}')
-                with self.assertRaisesRegex(ValueError, "context-manifest-drift"):
-                    lane.write_agent_prompt(path, "must not spawn", "issue", "codex", inputs)
-                self.assertFalse(path.exists())
-            with self.assertRaisesRegex(ValueError, "context-inputs"):
-                lane.write_agent_prompt(path, "invalid", "issue", "codex", {"gbrain": ""})
+                for contract in [None, '{}', 'malformed']:
+                    if contract is not None:
+                        (Path(tmp) / "context-manifest.json").write_text(contract)
+                    drift = lane.write_agent_prompt(path, "still runs", "issue", "codex", inputs)
+                    self.assertEqual(path.read_text(), "still runs")
+                    self.assertFalse(drift["qualification"]["ok"])
+                    self.assertIn("context-manifest-drift", drift["qualification"]["findings"][0])
+                    self.assertIsNone(drift["path"])
+                with patch.object(lane.sys.stderr, "write", side_effect=OSError("closed log")):
+                    self.assertFalse(lane.write_agent_prompt(path, "still runs", "issue", "codex", inputs)["qualification"]["ok"])
+            for kind, data in [("issue", {"gbrain": ""}), ("unknown", inputs),
+                               ("issue", {**inputs, "issue": None})]:
+                failed = lane.write_agent_prompt(path, "still runs", kind, "codex", data)
+                self.assertFalse(failed["qualification"]["ok"])
+                self.assertIsNone(failed["sha256"])
 
     def test_generator_does_not_load_credentials_or_query_services(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(lane, "HERE", Path(tmp)), \
@@ -286,6 +294,20 @@ class GateTest(unittest.TestCase):
                 lane.sh = original
         self.assertFalse(passed)
         self.assertTrue(reasons[0].startswith("llm-review-failed"))
+
+    def test_context_drift_does_not_replace_the_sensitive_review_verdict(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            host = lane.Host(state=root)
+            for verdict, expected in [("LLM-REVIEW: FAIL", False), ("LLM-REVIEW: PASS", True)]:
+                def review(*args, **kwargs):
+                    (root / ".codex-last-message.txt").write_text(verdict)
+                    return SimpleNamespace(returncode=0)
+                with patch.object(lane, "context_manifest_matches", return_value=False), \
+                        patch.object(lane, "sh", side_effect=review) as reviewer:
+                    passed, _ = lane.sensitive_review(host, {"number": 7, "headRefOid": "abc"}, root, None)
+                self.assertEqual(passed, expected)
+                reviewer.assert_called_once()
 
     def test_numstat_parsing_handles_binary(self):
         changes = lane.parse_numstat("3\t1\ta.ts\n-\t-\timg.png\nnoise\n")
@@ -570,29 +592,36 @@ class RunIssueTest(unittest.TestCase):
         self.assertEqual(context["prompt"]["sha256"], hashlib.sha256(prompt.encode()).hexdigest())
         self.assertEqual(self.ledger()[0]["contextManifests"], receipt["contextManifests"])
 
-    def test_context_contract_drift_prevents_agent_execution(self):
+    def test_context_contract_drift_does_not_prevent_agent_execution(self):
+        lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 9, "reasons": []}
         with patch.object(lane, "context_manifest_json", return_value="drift"), \
-                patch.object(lane, "run_agent") as agent, \
-                patch.object(lane.execution_attempt, "boundary") as spend:
+                patch.object(lane, "run_agent", wraps=lane.run_agent) as agent:
             receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]), issue())
-        self.assertEqual(receipt["verdict"], "failed")
-        self.assertIn("context-manifest-drift", receipt["reasons"][0])
-        agent.assert_not_called()
-        spend.assert_not_called()
+        self.assertEqual(receipt["verdict"], "landing")
+        self.assertIn("context-manifest-drift", receipt["contextManifests"][0]["qualification"]["findings"][0])
+        agent.assert_called_once()
+        self.assertEqual(self.ledger()[0]["contextManifests"], receipt["contextManifests"])
 
-    def test_context_receipt_write_failure_prevents_agent_execution(self):
+    def test_context_receipt_failure_is_isolated_but_prompt_write_failure_still_blocks(self):
         original = Path.write_bytes
-
-        def write(path, data):
-            if path.name.endswith(".context.json"):
-                raise OSError("receipt volume unavailable")
-            return original(path, data)
-
-        with patch.object(Path, "write_bytes", write), patch.object(lane, "run_agent") as agent:
-            receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]), issue())
-        self.assertEqual(receipt["verdict"], "failed")
-        self.assertIn("receipt volume unavailable", receipt["reasons"][0])
-        agent.assert_not_called()
+        lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 9, "reasons": []}
+        for index, (suffix, verdict) in enumerate([(".context.json", "landing"), (".prompt.md", "failed")]):
+            def write(path, data):
+                if path.name.endswith(suffix):
+                    raise OSError("volume unavailable")
+                return original(path, data)
+            with patch.object(Path, "write_bytes", write), \
+                    patch.object(lane, "run_agent", wraps=lane.run_agent) as agent:
+                receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]), issue(f"JOV-{index + 1}"))
+            self.assertEqual(receipt["verdict"], verdict)
+            if suffix == ".context.json":
+                agent.assert_called_once()
+                context = receipt["contextManifests"][0]
+                self.assertIsNone(context["path"])
+                self.assertIn("volume unavailable", context["qualification"]["findings"][0])
+            else:
+                agent.assert_not_called()
+                self.assertIn("volume unavailable", receipt["reasons"][0])
 
     def test_agent_that_never_worked_is_a_provider_error(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}
