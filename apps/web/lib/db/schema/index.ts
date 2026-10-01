@@ -1301,6 +1301,14 @@ export {
   type NewArtistRevenueCohortRow,
   selectArtistRevenueCohortSchema,
 } from './revenue-cohorts';
+export {
+  type CreatorProfileRider,
+  creatorProfileRiders,
+  type NewCreatorProfileRider,
+  RIDER_VISIBILITIES,
+  type RiderSection,
+  type RiderVisibility,
+} from './riders';
 // Sender (Email Quotas, Sending Reputation, Send Attribution)
 export {
   type CreatorEmailQuota,

@@ -904,6 +904,13 @@
       "when": 1790834323639,
       "tag": "0128_finance_classification",
       "breakpoints": true
+    },
+    {
+      "idx": 129,
+      "version": "7",
+      "when": 1790849819399,
+      "tag": "0129_glossy_champions",
+      "breakpoints": true
     }
   ]
 }
