@@ -88,8 +88,8 @@
     },
     ".claude/rules/environment.md": {
       "owner": "@itstimwhite",
-      "claim": "Node minimum is the checked-in runtime pin; package-manager version comes from the manifest.",
-      "documentSha256": "61d6bf9435076bab277f7801f52f96d25e958ee1e1069b5681bbb765ab1850ab",
+      "claim": "Runtime versions follow the checked-in pins. Branch switches stop the local dev server; competing editor writes are resolved before committing, as recorded in the corresponding lessons.",
+      "documentSha256": "05cf43adb22321fcf70cff341154d3224d082533dde122784b4bd524a86de9ea",
       "sources": [
         {
           "path": ".nvmrc",
@@ -100,6 +100,16 @@
           "path": "package.json",
           "pointer": "/packageManager",
           "sha256": "ff888b93ec153abe0268e99b431fc1fe7315d1be262e72b52e14c69a93bc4d25"
+        },
+        {
+          "path": "LESSONS.md",
+          "section": "### CSS cache corruption after git worktree switches",
+          "sha256": "0f18ff315cf35e5c45d18bd7b68f4b8fdd5d15959b706081f892a4e68ed1c3ba"
+        },
+        {
+          "path": "LESSONS.md",
+          "section": "### Windsurf IDE silently reverts external file edits",
+          "sha256": "e1baa9950547534fedcdd46395050557661eb2abe0caef9578e8174fe6614e49"
         }
       ]
     },
@@ -243,24 +253,59 @@
     },
     ".claude/rules/testing.md": {
       "owner": "@itstimwhite",
-      "claim": "Reliability detector coverage uses the existing source registry.",
-      "documentSha256": "e267ab89bb1594c7adef04c4eae3433556a4636c78386f926fb5eb2bfb67f38b",
+      "claim": "Reliability detector coverage follows its source registry. Removed UI assertions, complete hook mock types and actual executed-test evidence follow the corresponding lessons.",
+      "documentSha256": "eac05ce7047704de99f8eb27c5b43d0c9013ba49176b7f32719b07b13f0a3336",
       "sources": [
         {
           "path": "apps/web/lib/testing/reliability-detectors.ts",
           "sha256": "37c6c3578ed01de6f12c88bbc6f22110290beae1d755ce2141c301d50b743246"
+        },
+        {
+          "path": "LESSONS.md",
+          "section": "### Stale test mocks after UI removal",
+          "sha256": "7780867ee400b3ad3194025568de09d1e715f6cda0b1bd6181530abee79e8e3d"
+        },
+        {
+          "path": "LESSONS.md",
+          "section": "### Mock return types must match full hook return type",
+          "sha256": "ae9fb0287cec96d784fcda36065f8ee4c090172547267dc2c3d43ff7c96542ff"
+        },
+        {
+          "path": "LESSONS.md",
+          "section": "### `pnpm vitest --run --changed` exits 0 with no test files",
+          "sha256": "c90b1224f0b0ec1f224257c16c2a3ac405b0b0637da56d3cfe08cf274bca9e41"
         }
       ]
     },
     ".claude/rules/ui.md": {
       "owner": "@itstimwhite",
-      "claim": "Operational UI policy inherits the explicit design authority chain.",
-      "documentSha256": "01d64f5286ce8dbb835d662148e720dce7204d987204296a49dfa463284a6bc2",
+      "claim": "Operational UI policy inherits the design authority chain. Canonical founder identity, Tailwind utility registration, signup intent and visible opening proof follow their lesson contracts.",
+      "documentSha256": "269feca43a3956c3a353ae21c7e3dcfe7b4867388de86960e86cdfa2ce7ac590",
       "sources": [
         {
           "path": "DESIGN.md",
           "section": "## Authority and precedence",
           "sha256": "c057c93caa3d21106882df68cb96d2386a214662f82c18b929543466404e639f"
+        },
+        {
+          "path": "LESSONS.md",
+          "section": "### Tim White homepage identity must come from one canonical source",
+          "sha256": "ce9631ad5935e8245c14ce017574df9908f8b9edc21c5dbe29d7277fc0dde345"
+        },
+        {
+          "path": "LESSONS.md",
+          "section": "### CSS variables in `:root` don't auto-register as Tailwind utilities",
+          "sha256": "e7a3d28e613f1af86f3face0e9192e317006e944c9827f6e174d1815f3a83bbe"
+        },
+        {
+          "path": "LESSONS.md",
+          "section": "### Never link to `/claim` from CTAs",
+          "sha256": "e565fb0035442f733ca0644314b31bb0a415bc4c98bf8e832fc858a601b3cd93"
+        },
+        {
+          "path": "LESSONS.md",
+          "section": "### Premium homepage heroes cannot hide proof below the fold",
+          "sha256": "f028f370a739dfaf6f27b13ba2eb85741e64e15668a5dc85d26b0d291b28f898"
         }
       ]
     },
