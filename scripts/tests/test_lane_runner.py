@@ -1181,6 +1181,12 @@ class VerifyAndLandRevocationTest(unittest.TestCase):
 
 
 class DispatchTest(unittest.TestCase):
+    def setUp(self):
+        # Host-independent tests must never contact production from Gem's test gate.
+        clock = patch.object(lane.continuity_clock, "tick", return_value={"status": "current"})
+        clock.start()
+        self.addCleanup(clock.stop)
+
     def test_critical_or_unknown_disk_blocks_all_dispatch_and_installs(self):
         for pct in (None, 4.0):
             with self.subTest(pct=pct), tempfile.TemporaryDirectory() as tmp, \
