@@ -1048,6 +1048,7 @@
   "tests/unit/marketing/landing-pipeline.test.ts",
   "tests/unit/marketing/launch-system-b-style-guard.test.ts",
   "tests/unit/marketing/legal-system-b-style-guard.test.ts",
+  "tests/unit/marketing/llms-cli-parity.test.ts",
   "tests/unit/marketing/marketing-cta-intents.test.ts",
   "tests/unit/marketing/marketing-h1-two-line-contract.test.ts",
   "tests/unit/marketing/marketing-not-found-system-b-style-guard.test.ts",
