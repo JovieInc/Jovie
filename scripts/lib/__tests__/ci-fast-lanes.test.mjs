@@ -1821,3 +1821,29 @@ describe('source-read guard selection', () => {
     }
   });
 });
+
+describe('document review coverage contract', () => {
+  it('runs the same document behavior tests with enforced coverage in existing script contracts', async () => {
+    const { SCRIPT_CONTRACT_VITEST_COMMAND } = await import(
+      '../../ci-fast-lanes.mjs'
+    );
+    expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
+      'lib/__tests__/doc-freshness.test.mjs'
+    );
+    expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
+      '--coverage.include=lib/doc-review.mjs'
+    );
+    expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
+      '--coverage.include=lib/doc-freshness.mjs'
+    );
+    expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
+      '--coverage.thresholds.perFile=true'
+    );
+    expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
+      '--coverage.thresholds.lines=90'
+    );
+    expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
+      '--coverage.thresholds.branches=80'
+    );
+  });
+});
