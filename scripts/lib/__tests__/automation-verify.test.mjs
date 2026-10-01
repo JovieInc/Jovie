@@ -141,6 +141,22 @@ describe('affected-test selector inventory', () => {
 });
 
 describe('structural control stage execution', () => {
+  it('enforces coverage for public CLI artifact routing in the canonical control stage', () => {
+    const [nativeControl] = buildControlCoverageCommands();
+    expect(nativeControl[1]).toContain(
+      'lib/__tests__/product-lane-classifier.test.mjs'
+    );
+    expect(nativeControl[1]).toEqual(
+      expect.arrayContaining([
+        '--coverage.include=lib/product-lane-classifier.mjs',
+        '--coverage.thresholds.perFile=true',
+        '--coverage.thresholds.lines=85',
+        '--coverage.thresholds.branches=75',
+        '--coverage.thresholds.functions=82',
+      ])
+    );
+  });
+
   it('starts registry, project, control coverage, Dependabot coverage, CLI coverage, web, continuity, and FX stages in order', async () => {
     const stages = buildControlTestCommands();
     expect(stages).toHaveLength(23);

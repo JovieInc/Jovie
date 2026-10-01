@@ -21,6 +21,28 @@ const pkg = (before, after) =>
   });
 
 describe('product lane classifier', () => {
+  it('routes the published CLI skill artifacts through the CLI web gate and rejects unknown skill paths', () => {
+    const receipt = classifyProductLanes([
+      'skills/jovie/SKILL.md',
+      'skills/jovie/README.md',
+      'skills/jovie/LICENSE',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web']);
+    expect(
+      receipt.classifications.every(item => item.rule === 'web-product')
+    ).toBe(true);
+    for (const path of [
+      'skills/other/SKILL.md',
+      'skills/jovie/setup.sh',
+      'skills/jovie/../private.md',
+      'skills/jovie/SKILL.md.extra',
+    ]) {
+      expect(() => classifyProductLanes([path])).toThrow(
+        ProductLaneClassificationError
+      );
+    }
+  });
+
   it('routes all canary OTP worker artifacts through the web gate and rejects unknown workers', () => {
     const receipt = classifyProductLanes([
       'workers/canary-otp/src/index.ts',

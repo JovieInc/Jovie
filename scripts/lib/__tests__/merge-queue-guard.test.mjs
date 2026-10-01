@@ -2688,6 +2688,8 @@ describe('native merge-queue cohort (JOV-5047)', () => {
 
   // Execute production shell and real admission/collision CLIs as needed.
   // Only the gh transport is a fixture. SNAP is deliberately target-only.
+  const realJq = execFileSync('which', ['jq'], { encoding: 'utf8' }).trim();
+
   function runDrainChangelogDecision({
     branch = stampBranch,
     members = [],
@@ -2696,6 +2698,11 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     malformedInventory = false,
     expectedFinalCliCalls = 1,
     admissionReceipt,
+    snapshotRaw,
+    recoverySnapshotRaw = '',
+    expectedBranchLookups = expectedFinalCliCalls,
+    expectedFusedPayloads = 1,
+    expectedInventoryCalls,
   } = {}) {
     const drain = readFileSync(
       resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
@@ -2764,8 +2771,11 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     const dir = mkdtempSync(resolve(tmpdir(), 'stamp-drain-'));
     const callsPath = resolve(dir, 'calls.jsonl');
     const nodeCallsPath = resolve(dir, 'node-calls.tsv');
+    const jqCallsPath = resolve(dir, 'jq-calls.tsv');
     writeFileSync(callsPath, '');
     writeFileSync(nodeCallsPath, '');
+    writeFileSync(jqCallsPath, '');
+    writeFileSync(resolve(dir, 'jq'), "#!/bin/sh\nhas_n=0\nhas_files=0\nprevious=''\nfor arg do\n  if [ \"$previous\" = --argjson ]; then\n    case \"$arg\" in n) has_n=1;; changedFiles) has_files=1;; esac\n  fi\n  previous=$arg\ndone\nif [ \"$has_n\" = 1 ] && [ \"$has_files\" = 1 ]; then tag=fusedPayload\nelif [ \"$has_n\" = 1 ]; then tag=branchLookup\nelse tag=other\nfi\nprintf '%s\\n' \"$tag\" >> \"$STAMP_JQ_CALLS\"\nexec \"$STAMP_REAL_JQ\" \"$@\"\n", { mode: 0o755 });
     writeFileSync(
       resolve(dir, 'node'),
       "#!/bin/sh\nprintf '%s\\t%s\\n' \"${1##*/}\" \"${2:-}\" >> \"$STAMP_NODE_CALLS\"\nexec \"$STAMP_REAL_NODE\" \"$@\"\n",
@@ -2786,6 +2796,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
         set -euo pipefail
         REPO=fixture/repo
         SNAP="$STAMP_SNAPSHOT"
+        RECOVERY_SNAP="$STAMP_RECOVERY_SNAPSHOT"
         gh_retry() { gh "$@"; }
         gh_retry_is_transient_error() { return 1; }
         ${functions}
@@ -2802,9 +2813,12 @@ describe('native merge-queue cohort (JOV-5047)', () => {
               GH_INVENTORY_RETRY_ATTEMPTS: '1',
               STAMP_CALLS: callsPath,
               STAMP_NODE_CALLS: nodeCallsPath,
+              STAMP_JQ_CALLS: jqCallsPath,
+              STAMP_REAL_JQ: realJq,
+              STAMP_RECOVERY_SNAPSHOT: recoverySnapshotRaw,
               STAMP_REAL_NODE: process.execPath,
               STAMP_ADMISSION_RECEIPT: admissionReceipt ?? '',
-              STAMP_SNAPSHOT: JSON.stringify(snapshot),
+              STAMP_SNAPSHOT: snapshotRaw ?? JSON.stringify(snapshot),
               STAMP_FILES: JSON.stringify(files),
               STAMP_PAGES: JSON.stringify(pages),
               STAMP_INVENTORY_FAILURE: inventoryFailure ? '1' : '0',
@@ -2830,11 +2844,15 @@ describe('native merge-queue cohort (JOV-5047)', () => {
           script === 'ci-merge-queue-check.mjs' && command === 'changelog-collision'
         )
       ).toHaveLength(expectedFinalCliCalls);
+      const jqCalls = readFileSync(jqCallsPath, 'utf8').trim().split('\n');
+      expect(jqCalls.filter(tag => tag === 'branchLookup')).toHaveLength(expectedBranchLookups);
+      expect(jqCalls.filter(tag => tag === 'fusedPayload')).toHaveLength(expectedFusedPayloads);
       const inventoryCalls = calls.filter(args => args[0] === 'api');
       const needsInventory =
         branch === stampBranch && candidateFiles?.includes('CHANGELOG.md');
-      expect(inventoryCalls).toHaveLength(needsInventory ? 1 : 0);
-      if (needsInventory) {
+      const expectedInventoryCount = expectedInventoryCalls ?? (needsInventory ? 1 : 0);
+      expect(inventoryCalls).toHaveLength(expectedInventoryCount);
+      if (expectedInventoryCount > 0) {
         expect(inventoryCalls[0]).toEqual(
           expect.arrayContaining(['--paginate', '--slurp'])
         );
@@ -2881,6 +2899,36 @@ describe('native merge-queue cohort (JOV-5047)', () => {
       branch: 'codex/implementation', admissionReceipt,
     })).toEqual({ action: 'skip', reason: 'pre-land-changelog' });
   });
+
+  it.each([
+    ['duplicate stamp heads', { snapshotRaw: JSON.stringify([{ n: 17463, head: stampBranch }, { n: 17463, head: stampBranch }]), expectedFinalCliCalls: 0, expectedInventoryCalls: 0 }, { action: 'skip', reason: 'pre-land-changelog' }],
+    ['trailing newlines', { branch: `${stampBranch}\n\n`, expectedInventoryCalls: 1 }, { action: 'allow', reason: 'no-changelog-collision' }],
+    ['embedded newlines', { branch: `${stampBranch}\nother`, expectedFinalCliCalls: 0 }, { action: 'skip', reason: 'pre-land-changelog' }],
+    ['null and false heads', { snapshotRaw: JSON.stringify([{ n: 17463, head: null }, { n: 17463, head: false }]), expectedFinalCliCalls: 0, expectedInventoryCalls: 0 }, { action: 'skip', reason: 'pre-land-changelog' }],
+    ['missing candidate', { snapshotRaw: '[]', expectedFinalCliCalls: 0, expectedInventoryCalls: 0 }, { action: 'skip', reason: 'pre-land-changelog' }],
+    ['recovery takes precedence', { recoverySnapshotRaw: JSON.stringify([{ n: 17463, head: 'codex/implementation' }]), expectedFinalCliCalls: 0, expectedInventoryCalls: 0 }, { action: 'skip', reason: 'pre-land-changelog' }],
+    ['empty recovery uses snapshot', { recoverySnapshotRaw: '' }, { action: 'allow', reason: 'no-changelog-collision' }],
+    ['unknown candidate takes precedence', { candidateFiles: null, expectedFinalCliCalls: 0 }, { action: 'unknown', reason: 'changelog-evidence-unavailable' }],
+  ])('preserves fused snapshot semantics for %s', (_, options, expected) => {
+    expect(runDrainChangelogDecision(options)).toEqual(expected);
+  });
+
+  it.each([
+    ['number head', JSON.stringify([{ n: 17463, head: 42 }])],
+    ['object head', JSON.stringify([{ n: 17463, head: { value: stampBranch } }])],
+    ['array head', JSON.stringify([{ n: 17463, head: [stampBranch] }])],
+    ['true head', JSON.stringify([{ n: 17463, head: true }])],
+    ['multiple documents', `${JSON.stringify([{ n: 17463, head: stampBranch }])}\n${JSON.stringify([{ n: 17463, head: stampBranch }])}`],
+  ])('retains the original raw branch fallback for %s', (_, snapshotRaw) => {
+    expect(runDrainChangelogDecision({ snapshotRaw, expectedBranchLookups: 1,
+      expectedFinalCliCalls: 0, expectedInventoryCalls: 0 })).toEqual({ action: 'skip', reason: 'pre-land-changelog' });
+  });
+
+  it.each(['not-json', 'null', '42', `${JSON.stringify([{ n: 17463, head: 'codex/implementation' }])}\n42`])(
+    'preserves the original failing snapshot read for %s', snapshotRaw => {
+      expect(() => runDrainChangelogDecision({ snapshotRaw })).toThrow();
+    }
+  );
 
   it('ignores self and nonqueued changelogs in the separate complete inventory', () => {
     expect(

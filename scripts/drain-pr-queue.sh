@@ -1297,11 +1297,25 @@ pr_changed_paths_json() {  # <num> → JSON string array or null
 }
 
 changelog_collision_decision_for_pr() {  # <num>
-  local n="$1" candidate queued members='[]' files branch admission terminal queue_state queue_snap
+  local n="$1" candidate queued members='[]' files branch payload admission terminal queue_state queue_snap fused=0
   candidate="$(pr_changed_paths_json "$n")"
-  branch="$(echo "${RECOVERY_SNAP:-$SNAP}" | jq -r --argjson n "$n" '.[] | select(.n == $n) | .head // empty')"
-  admission="$(PRE_LAND_CHANGELOG_JSON="$(jq -nc --argjson changedFiles "$candidate" --arg branch "$branch" \
-    '{changedFiles:$changedFiles, branch:$branch}')" \
+  # Fuse only the string-head snapshot contract. Other shapes keep the original
+  # raw jq branch read; duplicate heads and shell newline stripping stay exact.
+  if payload="$(jq -cse --argjson n "$n" --argjson changedFiles "$candidate" '
+    if length == 1 and (.[0] | type == "array") then
+      [.[0][] | select(.n == $n) | .head // empty] as $heads
+      | if all($heads[]; type == "string") then
+          {changedFiles:$changedFiles, branch:($heads | join("\n") | sub("\n+$"; ""))}
+        else empty end
+    else empty end
+  ' <<<"${RECOVERY_SNAP:-$SNAP}" 2>/dev/null)"; then
+    fused=1
+  else
+    branch="$(echo "${RECOVERY_SNAP:-$SNAP}" | jq -r --argjson n "$n" '.[] | select(.n == $n) | .head // empty')"
+    payload="$(jq -nc --argjson changedFiles "$candidate" --arg branch "$branch" \
+      '{changedFiles:$changedFiles, branch:$branch}')"
+  fi
+  admission="$(PRE_LAND_CHANGELOG_JSON="$payload" \
     node scripts/lib/pre-land-changelog.mjs admission)"
   # Canonical admission already settles these negative paths. Avoid a second
   # Node bootstrap and repeated policy evaluation; stamp inventory stays below.
@@ -1318,6 +1332,9 @@ changelog_collision_decision_for_pr() {  # <num>
   ' <<<"$admission" 2>/dev/null)"; then
     printf '%s\n' "$terminal"
     return 0
+  fi
+  if [[ "$fused" == 1 ]]; then
+    branch="$(echo "${RECOVERY_SNAP:-$SNAP}" | jq -r --argjson n "$n" '.[] | select(.n == $n) | .head // empty')"
   fi
   if [[ "$(jq -r '.reason' <<<"$admission")" == "stamp-path" ]]; then
     # Targeted enrollment SNAP contains only the candidate. Read the existing
