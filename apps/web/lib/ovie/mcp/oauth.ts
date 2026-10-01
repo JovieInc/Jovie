@@ -103,6 +103,20 @@ export class OvieOAuthIssuer {
     };
   }
 
+  /** Validate the registered callback before any browser authentication handoff. */
+  validateClientRedirect(clientId: string, redirectUri: string): void {
+    const client = verifyPayload<ClientClaims>(this.secret, clientId);
+    if (
+      !client ||
+      client.t !== 'c' ||
+      !Array.isArray(client.u) ||
+      !isAllowedRedirect(redirectUri) ||
+      !client.u.includes(redirectUri)
+    ) {
+      throw new Error('invalid client or redirect_uri');
+    }
+  }
+
   issueCode(input: {
     clientId: string;
     redirectUri: string;
@@ -112,10 +126,7 @@ export class OvieOAuthIssuer {
     isAdmin: boolean;
     scopes?: readonly string[];
   }): string {
-    const client = verifyPayload<ClientClaims>(this.secret, input.clientId);
-    if (!client || client.t !== 'c' || !client.u.includes(input.redirectUri)) {
-      throw new Error('invalid client or redirect_uri');
-    }
+    this.validateClientRedirect(input.clientId, input.redirectUri);
     const gate = authorizeSummerControl({
       authenticated: true,
       isAdmin: input.isAdmin,
