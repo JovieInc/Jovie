@@ -1525,8 +1525,9 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /\.behind_by == 0/,
     /desktop-release-assets\.mjs upload-and-publish/,
     /--environment staging/,
-    /--version "\$\{\{ steps\.staging-version\.outputs\.version \}\}"/,
+    /--version="\$\{\{ steps\.staging-version\.outputs\.version \}\}"/,
   ]);
+  assert.doesNotMatch(stagingPublish, /--version "/);
   assertPatterns(stagingVerify, [
     /codesign --verify --deep --strict/,
     /spctl --assess --type execute/,
