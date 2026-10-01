@@ -1207,7 +1207,7 @@ def reconcile_hyperagent_completion(host: Host, spec: dict, linear: Linear, issu
                 or f"<!-- linear-issue-id:{issue.identifier} -->" not in pr.get("body", "") or marker not in pr.get("body", "")
                 or (expected_pr and (expected_pr.get("number"), expected_pr.get("headRefOid"), expected_pr.get("headRefName")) != (pr["number"], pr["headRefOid"], branch))): return held
             if state.get("completionIntent") and not state.get("completionResult"): return held
-            result = state.get("completionResult") or original
+            result = gate_outcome(state.get("completionResult") or original)
             qual_owner = {**owner, "tool": "hyperagent-qualification"}
             if state.get("qualification"):
                 q = state["qualification"]
@@ -1244,13 +1244,14 @@ def reconcile_hyperagent_completion(host: Host, spec: dict, linear: Linear, issu
             if not claim["admitted"]: return {**held, "reasons": ["remote-qualification-" + claim["reason"]]}
             state.update(completionIntent={"head": pr["headRefOid"], "operation": operation, "sensitive": sensitive}, qualification={"identity": qualification, "fencingToken": claim["fencingToken"]})
             state.pop("completionResult", None); save()
+            require_publishable(host, branch, "remote-qualification")
             execution_attempt.boundary(ledger, qualification, claim["fencingToken"], {"spend": 0, "mutations": 1}, coordination=coordination)
             if operation == "enqueue":
                 ready = sh(["gh", "pr", "ready", str(pr["number"]), "--repo", REPO_SLUG])
                 queued = sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto", "--match-head-commit", pr["headRefOid"]]) if ready.returncode == 0 else ready
                 outcome = {**result, "verdict": "landing" if queued.returncode == 0 else "verified-not-queued"}
             else:
-                outcome = {**adopt_pr(host, "hyperagent", pr, sensitive=sensitive), "gateSensitive": sensitive}
+                outcome = {**gate_outcome(adopt_pr(host, "hyperagent", pr, sensitive=sensitive)), "gateSensitive": sensitive}
             retry = outcome.get("verdict") in ("gate-timeout", "verified-not-queued")
             failed = outcome.get("verdict") in ("failed", "skipped")
             finished = execution_attempt.finish(ledger, qualification, claim["fencingToken"], "failed_known" if retry or failed else "succeeded",
@@ -1284,7 +1285,7 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear=None) -> d
     claimed = None
     completion = reconcile_hyperagent_completion(host, spec, linear, issue) if linear and evidence.exists() else None
     if completion is not None:
-        receipt.update(completion)
+        receipt.update(gate_outcome(completion))
     elif not hyperagent_lane.verified(spec, time.time()):
         receipt.update(hold("remote-preflight-unverified"))
     else:
@@ -1325,7 +1326,7 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear=None) -> d
                     boundary(int(sensitive), 1)
                     # Existing adoption owns its isolated checkout, diff policy,
                     # canonical checks and native queue; no second PR is created.
-                    return {**adopt_pr(host, "hyperagent", pr, sensitive=sensitive), "gateSensitive": sensitive}
+                    return {**gate_outcome(adopt_pr(host, "hyperagent", pr, sensitive=sensitive)), "gateSensitive": sensitive}
                 def unreserved(fence, retry=False):
                     def inspect(rows):
                         rows = execution_attempt._for(rows, ident)
@@ -1348,10 +1349,10 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear=None) -> d
                         "failureFingerprint": reason, "dependencies": ["hyperagent"], "mutationsPerformed": [], "owner": owner}, coordination=coordination)
                     return True
                 receipt["offer"]["accepted"] = True
-                receipt.update(hyperagent_lane.run(spec, issue.identifier, claimed["fencingToken"], branch, prompt,
+                receipt.update(gate_outcome(hyperagent_lane.run(spec, issue.identifier, claimed["fencingToken"], branch, prompt,
                     evidence, api["mcp_call"], find_pr, gate, timeout=host.agent_timeout,
                     before_dispatch=lambda: boundary(1, 1), known_failure=known_failure,
-                    retry_binding=lambda fence: unreserved(fence, retry=True)))
+                    retry_binding=lambda fence: unreserved(fence, retry=True))))
                 if receipt["verdict"] != "remote-held":
                     result = "succeeded" if receipt["verdict"] in ("landing", "verified-not-queued", "held", "gate-timeout") else "failed_unknown"
                     receipt["execution"] = execution_attempt.finish(runs / "execution-attempts.jsonl", ident,
@@ -1746,7 +1747,7 @@ def run_deferred_requeue(host: Host, pr: dict, retry, *, slot=None):
         if slot is not None: slot.release()
         raise
 
-def requeue_verified(host: Host, prs: list[dict], *, defer=None) -> dict | None:
+def requeue_verified(host: Host, prs: list[dict], remote_retry=None, *, defer=None) -> dict | None:
     """Retry enqueueing gate-verified PRs whose enqueue failed; drop them once queued or moved."""
     path = host.state / "requeue.json"
     if not path.exists():
@@ -1770,6 +1771,9 @@ def requeue_verified(host: Host, prs: list[dict], *, defer=None) -> dict | None:
                 if selected is None:
                     selected = dict(inventory[number])
                 continue
+            if remote_digest_pr(inventory[number]):
+                if remote_retry and remote_retry(inventory[number]): del requeue[number]
+                continue  # withheld exact entries retain their retry evidence
             sh(["gh", "pr", "ready", number, "--repo", REPO_SLUG])
             if sh(["gh", "pr", "merge", number, "--repo", REPO_SLUG, "--auto", "--match-head-commit", head]).returncode == 0:
                 del requeue[number]
@@ -2889,7 +2893,20 @@ def record_idle_exit(host: Host, name: str, reason: str, *, deferred=None) -> No
         lock.release()
 
 
-def pending_hyperagent_issue(host: Host, spec: dict, linear: Linear, *, with_receipt=False) -> Issue | tuple[Issue, dict] | None:
+def hyperagent_retry_context(host: Host, spec: dict, linear: Linear, pr: dict) -> dict:
+    try:
+        issue, state = linear.get_issue(LANE_BRANCH.match(pr["headRefName"]).group("issue").upper())
+        ident = execution_attempt.identity("linear-work", {"issue": issue.identifier, "outcome": "draft-pr"},
+                                           {"title": issue.title, "description": issue.description})
+        journal = host.state / "runs" / f"{ident['identityDigest']}.provider.jsonl"
+        evidence = journal.read_text() if journal.exists() else None
+        return {"active": state == "In Progress", "digest": execution_attempt.digest({"issue": vars(issue),
+                "state": state, "spec": spec, "journal": evidence})}
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, RuntimeError):
+        return {}
+
+
+def pending_hyperagent_issue(host: Host, spec: dict, linear: Linear, *, with_receipt=False, exclude=()) -> Issue | tuple[Issue, dict] | None:
     """Resume only locally retained ownership; never scan arbitrary In Progress work."""
     path = host.state / "runs/ledger.jsonl"
     try:
@@ -2904,6 +2921,7 @@ def pending_hyperagent_issue(host: Host, spec: dict, linear: Linear, *, with_rec
                     row = {**row, "execution": prior}
                 latest[row["issue"]] = row
         for row in latest.values():
+            if row["issue"] in exclude: continue
             try:
                 execution = row.get("execution") or row.get("pendingBinding") or {}
                 owner = {"owner": HOST, "runtime": "symphony-lanes", "provider": "hyperagent", "model": spec.get("model"),
@@ -2957,6 +2975,8 @@ def worker(host: Host, name: str) -> int:
         slot.release()
         return 1
     linear = Linear(host.linear_env)
+    retry_context = lambda pr: hyperagent_retry_context(host, spec, linear, pr)
+    blocked = deferred_requeue_blocks(host, name, retry_context) if name == "hyperagent" else {}
     claim = Locked(host.state / "claim.lock", blocking=True)
     try:
         # Finish before starting: PRs a GitHub event queued, red PRs (any open PR in the repo),
@@ -2964,32 +2984,19 @@ def worker(host: Host, name: str) -> int:
         prs = lane_prs(name)
         candidates = [pr for pr in fix_candidates(name) if not remote_digest_pr(pr)]
         events = [pr for pr in pr_events.queued_prs(THIS, pr_events.FIX_KINDS) if not remote_digest_pr(pr)]
-        continuation = None
-        def remote_retry(pr):
-            nonlocal continuation
-            if continuation: return False
-            try:
-                issue, _ = linear.get_issue(LANE_BRANCH.match(pr["headRefName"]).group("issue").upper())
-                result = reconcile_hyperagent_completion(host, spec, linear, issue, expected_pr=pr, enqueue=True)
-                if result and result.get("verdict") in ("landing", "verified-not-queued", "gate-timeout", "remote-repair-required"):
-                    receipt = {**result, "provider": name, "issue": issue.identifier, "linearIssueId": issue.id, "endedAt": now_iso()}
-                    with (host.state / "runs/ledger.jsonl").open("a") as ledger: ledger.write(json.dumps(receipt) + "\n")
-                    continuation = (issue, receipt)
-                return result and result.get("verdict") == "landing"
-            except (OSError, ValueError, KeyError, TypeError, RuntimeError): return False
-        requeue_verified(host, prs, remote_retry=remote_retry if name == "hyperagent" else None)
+        continuation = requeue_verified(host, prs, defer=lambda pr: name == "hyperagent" and remote_digest_pr(pr) and str(pr["number"]) not in blocked)
         escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
         red = None if continuation else pr_events.claim_event_pr(host, THIS, name, events) or claim_red_pr(host, name, candidates)
         adopt = None if red or continuation or not provider_may_run(name, "adopt") else claim_adoptable_pr(host, name, prs)
-        issue = continuation[0] if continuation else None
+        issue = None
         prior_receipt = {}; new_claim = False
         sweep_lane_prs(host, name, linear)
         full = not (red or adopt) and over_budget(name, lane_prs(name, fields=LIGHT_PR_FIELDS),
                                                   host.slots(name, spec.get("slots", 1)))
         in_flight = None if red or adopt or full else in_flight_issues()
-        if issue is None and not (red or adopt) and name == "hyperagent":
-            issue, prior_receipt = pending_hyperagent_issue(host, spec, linear, with_receipt=True) or (None, {})
-        if in_flight is not None and issue is None:
+        if issue is None and not (red or adopt or continuation) and name == "hyperagent":
+            issue, prior_receipt = pending_hyperagent_issue(host, spec, linear, with_receipt=True, exclude={row["issue"] for row in blocked.values()}) or (None, {})
+        if in_flight is not None and issue is None and not continuation:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
             issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
                                provider=name)
@@ -3000,7 +3007,15 @@ def worker(host: Host, name: str) -> int:
                 new_claim = True
     finally:
         claim.release()
-    if red is not None or adopt is not None or issue is not None:
+    if continuation:
+        def remote_retry(pr):
+            nonlocal issue
+            issue, _ = linear.get_issue(LANE_BRANCH.match(pr["headRefName"]).group("issue").upper())
+            return issue, reconcile_hyperagent_completion(host, spec, linear, issue, expected_pr=pr, enqueue=True)
+        receipt = finish_deferred_retry(host, name, continuation, remote_retry, retry_context, slot=slot)
+        if receipt is None: return 0
+        continuation = (issue, receipt)
+    else:
         claim = Locked(host.state / "claim.lock", blocking=True)
         try: yield_deferred_requeues(host, name)
         finally: claim.release()
