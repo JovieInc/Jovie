@@ -2889,7 +2889,7 @@ def record_idle_exit(host: Host, name: str, reason: str, *, deferred=None) -> No
         lock.release()
 
 
-def pending_hyperagent_issue(host: Host, spec: dict, linear: Linear) -> Issue | None:
+def pending_hyperagent_issue(host: Host, spec: dict, linear: Linear, *, with_receipt=False) -> Issue | tuple[Issue, dict] | None:
     """Resume only locally retained ownership; never scan arbitrary In Progress work."""
     path = host.state / "runs/ledger.jsonl"
     try:
@@ -2926,7 +2926,7 @@ def pending_hyperagent_issue(host: Host, spec: dict, linear: Linear) -> Issue | 
                 if (state == "In Progress" and issue.identifier == row["issue"] and issue.id == row["linearIssueId"]
                     and ident["identityDigest"] == execution.get("identityDigest")
                     and binding_matches):
-                    return issue
+                    return (issue, row) if with_receipt else issue
             except (OSError, ValueError, KeyError, TypeError, IndexError, AttributeError): continue
     except (OSError, ValueError, KeyError, TypeError):
         return None
@@ -2982,12 +2982,13 @@ def worker(host: Host, name: str) -> int:
         red = None if continuation else pr_events.claim_event_pr(host, THIS, name, events) or claim_red_pr(host, name, candidates)
         adopt = None if red or continuation or not provider_may_run(name, "adopt") else claim_adoptable_pr(host, name, prs)
         issue = continuation[0] if continuation else None
+        prior_receipt = {}; new_claim = False
         sweep_lane_prs(host, name, linear)
         full = not (red or adopt) and over_budget(name, lane_prs(name, fields=LIGHT_PR_FIELDS),
                                                   host.slots(name, spec.get("slots", 1)))
         in_flight = None if red or adopt or full else in_flight_issues()
         if issue is None and not (red or adopt) and name == "hyperagent":
-            issue = pending_hyperagent_issue(host, spec, linear)
+            issue, prior_receipt = pending_hyperagent_issue(host, spec, linear, with_receipt=True) or (None, {})
         if in_flight is not None and issue is None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
             issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
@@ -2996,6 +2997,7 @@ def worker(host: Host, name: str) -> int:
                 issue = None  # another host claimed it between our read and now
             if issue:
                 linear.move(issue.id, "In Progress")
+                new_claim = True
     finally:
         claim.release()
     if red is not None or adopt is not None or issue is not None:
@@ -3014,7 +3016,7 @@ def worker(host: Host, name: str) -> int:
                          "in-flight-unknown" if in_flight is None else "none-eligible")
         slot.release()
         return 0
-    notify_issue_claim(linear, issue, name, spec)
+    if new_claim: notify_issue_claim(linear, issue, name, spec)
     receipt = continuation[1] if continuation else run_issue(host, name, spec, linear, issue)
     verdict = receipt.get("verdict")
     if verdict == "disk-held":
@@ -3060,9 +3062,18 @@ def worker(host: Host, name: str) -> int:
     if verdict == "remote-held":
         # Leave remote ownership In Progress. Retrying a local worktree or
         # another model would duplicate a live/unknown paid remote attempt.
-        linear.comment(issue.id, f"🤖 lane `{name}` remote hold ({', '.join(receipt.get('reasons', []))}); "
-                                 "resume/reconcile the existing thread; no provider failover ran.")
-        slot.release()
+        execution = receipt.get("execution") or {}
+        notification = {"reasons": sorted(set(receipt.get("reasons", []))), **{k: receipt.get(k) for k in ("pendingBinding", "remoteThreadId", "headSha")}}
+        notification["fence"] = {k: execution.get(k) for k in ("identityDigest", "fencingToken")}
+        try:
+            if prior_receipt.get("remoteHoldNotified") != notification:
+                linear.comment(issue.id, f"🤖 lane `{name}` remote hold ({', '.join(receipt.get('reasons', []))}); "
+                    f"thread `{receipt.get('remoteThreadId')}` head `{receipt.get('headSha')}` fence `{execution.get('fencingToken')}`; "
+                    "resume/reconcile the existing thread; no provider failover ran.")
+            # Comment then marker is at-least-once across a crash between these writes.
+            with (host.state / "runs/ledger.jsonl").open("a") as ledger:
+                ledger.write(json.dumps({**receipt, "remoteHoldNotified": notification}) + "\n")
+        finally: slot.release()
         return 1
     if verdict == "not-shippable":
         linear.move(issue.id, "Backlog")

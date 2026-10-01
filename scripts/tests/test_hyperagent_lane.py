@@ -490,11 +490,11 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         from contextlib import ExitStack
         from types import SimpleNamespace
         lane = self.lane
-        state = {"name": "Todo"}
+        state = {"name": "Todo", "comments": []}
         moves = []
         linear = SimpleNamespace(lane_issues=lambda label: [self.issue] if state["name"] == "Todo" else [],
             state_of=lambda ident: state["name"], get_issue=lambda ident: (self.issue, state["name"]),
-            move=lambda ident, name: (moves.append((ident, name)), state.update(name=name)), comment=lambda *args: None)
+            move=lambda ident, name: (moves.append((ident, name)), state.update(name=name)), comment=lambda ident, body: state["comments"].append(body))
         with ExitStack() as stack:
             for name, value in {"Linear": lambda env: linear, "load_providers": lambda: {"hyperagent": {**self.spec, "label": "hyperagent"}},
                 "lane_prs": lambda *args, **kw: [], "fix_candidates": lambda *args: [], "requeue_verified": lambda *args, **kw: None,
@@ -511,10 +511,14 @@ class ProductionRemoteEntryTest(unittest.TestCase):
             proof = self.spec.pop("verifiedRemote")
             self.assertEqual(lane.worker(self.host, "hyperagent"), 1)
             self.assertFalse(self.calls)
+            self.assertEqual(lane.worker(self.host, "hyperagent"), 1)
+            self.assertEqual(len(state["comments"]), 2)
             self.spec["verifiedRemote"] = proof
             self.approval = True
             self.assertEqual(lane.worker(self.host, "hyperagent"), 1)
             before = [json.loads(x) for x in (self.host.state / "runs/ledger.jsonl").read_text().splitlines()][-1]
+            self.assertEqual(lane.worker(self.host, "hyperagent"), 1)
+            self.assertEqual(len(state["comments"]), 3)
             with (self.host.state / "runs/ledger.jsonl").open("a") as ledger:
                 ledger.write(json.dumps({"provider": "hyperagent", "kind": "adopt", "pr": 99}) + "\n")
             self.approval = False
@@ -524,6 +528,24 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(after["execution"]["fencingToken"], before["execution"]["fencingToken"])
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
         self.assertEqual(moves, [(self.issue.id, "In Progress")])
+        self.assertEqual(sum("claimed this issue" in c for c in state["comments"]), 1)
+        self.assertEqual(len(state["comments"]), 4)
+
+    def test_failed_hold_delivery_releases_slot_and_retries_before_suppressing(self):
+        from unittest.mock import patch
+        with patch.object(self.lane.Linear, "gql", return_value={"commentCreate": {"success": False}}):
+            with self.assertRaises(RuntimeError): self.lane.Linear.__new__(self.lane.Linear).comment(self.issue.id, "held")
+        with self.worker_fixture() as (lane, state, moves):
+            self.spec.pop("verifiedRemote"); linear = lane.Linear(None); comment = linear.comment
+            with patch.object(linear, "comment", side_effect=lambda ident, body: (_ for _ in ()).throw(OSError("delivery failed")) if "remote hold" in body else comment(ident, body)):
+                with self.assertRaises(OSError): lane.worker(self.host, "hyperagent")
+            self.assertNotIn("remoteHoldNotified", json.loads((self.host.state / "runs/ledger.jsonl").read_text().splitlines()[-1]))
+            slot = lane.Locked(self.host.state / "slots/hyperagent.0.lock", blocking=False)
+            try: self.assertTrue(slot.held)
+            finally: slot.release()
+            lane.worker(self.host, "hyperagent"); lane.worker(self.host, "hyperagent"); run = lane.run_issue
+            self.assertEqual(len(state["comments"]), 2); self.assertFalse(self.calls)
+            with patch.object(lane, "run_issue", side_effect=lambda *args: {**run(*args), "headSha": "head-B", "remoteThreadId": "thread-B"}): lane.worker(self.host, "hyperagent"); lane.worker(self.host, "hyperagent"); self.assertEqual(len(state["comments"]), 3)
 
     def test_known_predispatch_failure_retries_without_unknown_creation_or_renewal(self):
         from unittest.mock import patch
@@ -884,7 +906,7 @@ class ProductionRemoteEntryTest(unittest.TestCase):
                     self.assertEqual(state["name"], "Backlog"); run.assert_not_called(); gate.assert_not_called()
                 receipt = json.loads((self.host.state / "runs/ledger.jsonl").read_text().splitlines()[-1]); dependency = "automatic-hyper-repair-unavailable" if condition == "exhausted" else "automatic-guarded-review-budget-unavailable"
                 self.assertEqual(receipt["verdict"], "remote-repair-required"); self.assertEqual(receipt["issue"], self.issue.identifier)
-                self.assertEqual(receipt["dependencies"], [dependency]); self.assertIn(dependency, comments[-1]); self.assertFalse(any("queued;" in text for text in comments))
+                self.assertEqual(receipt["dependencies"], [dependency]); self.assertIn(dependency, comments[-1]); self.assertFalse(any("queued;" in text for text in comments)); self.assertFalse(any("claimed this issue" in text for text in comments))
                 self.assertEqual(json.loads(path.read_text()), {"7": self.pr["headRefOid"]})
                 journal = json.loads(next((self.host.state / "runs").glob("*.provider.jsonl")).read_text().splitlines()[-1]); self.assertEqual(journal["completionResult"]["verdict"], "remote-repair-required")
                 self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
