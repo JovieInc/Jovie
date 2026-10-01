@@ -32,4 +32,9 @@ export interface RealEvalRangeReport {
   readonly failed: number;
   readonly passRange: { readonly min: number; readonly max: number };
   readonly withinRange: boolean;
+  /**
+   * Spend provenance (JOV-6234): the authorized BUDGET_CAP_USD that governed
+   * the run. 0 means the report is provenance for a no-spend run.
+   */
+  readonly capUsd: number;
 }
