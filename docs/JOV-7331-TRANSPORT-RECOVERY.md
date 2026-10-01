@@ -19,9 +19,12 @@ Automatic mutation retries are absent.
 The opt-in disposable Postgres canary covers concurrent lease/report calls,
 REST receipt replay, restart durability and revocation. It refuses remote
 database hosts and database names other than `jov7331_canary`. It remains
-skipped when `FLEET_LOCAL_DB_URL` is absent. This recovery did not start a
-database or rerun that canary; prior full-checkpoint evidence does not certify
-this new source head.
+skipped when `FLEET_LOCAL_DB_URL` is absent. The unchanged recovered transport
+commit passed a subsequent disposable PostgreSQL 18 canary on October 1: one
+test passed, zero failed and zero skipped. It proved actual CAS contention, REST
+receipt replay, restart durability, revocation and absence of raw-token
+persistence. The isolated cluster was stopped and removed. This local proof
+does not establish deployed runtime acceptance.
 
 Focused recovery checks:
 
@@ -44,12 +47,14 @@ help/version regressions and existing publication verification scripts.
 
 The isolated CLI proof combines that final safety source with the binding patch:
 79 source tests, its package typecheck and touched-source Biome checks pass.
-Apply the binding patch only after the safety prerequisite and contracts/core
-parents are present, then repeat checks against the resulting real branch.
+Safety PR 19742 merged as `8a07cf59663d7afd51aeaca3530f01819577f0e9`.
+Apply the binding patch only after that prerequisite and contracts/core parents
+are present, then repeat checks against the resulting real branch.
 
 Remaining qualification, release readback, worker commissioning and real Summer
-canary acceptance are tracked by JOV-7331. Global qualification and publication
-remain held while the existing expired invariant exceptions are unresolved
-(JOV-7350 through JOV-7355). Independent review of the final recovered diff is
-required before promotion. No production flag, credential or Linear mutation
+canary acceptance are tracked by JOV-7331. The independently reviewed recovered source
+remains subject to current exact-head qualification and native queue checks.
+Canonical Summer-owned exceptions expire October 31 and are enforced normally.
+Approval provenance is a separate audit, not an additional source admission
+gate. No exception or policy file is changed by this recovery. No production flag, credential or Linear mutation
 was performed during recovery.
