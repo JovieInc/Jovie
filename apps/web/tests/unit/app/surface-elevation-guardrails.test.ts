@@ -364,7 +364,7 @@ describe('surface elevation guardrails', () => {
 
     expect(librarySurface).toContain('useRegisterHeaderSearch');
     expect(librarySurface).toContain("key: 'library'");
-    expect(librarySurface).toContain('Filter Library');
+    expect(librarySurface).toContain('Filter Work');
     expect(librarySurface).not.toContain('OPEN_COMMAND_PALETTE_EVENT');
     expect(appShellLayout).toContain('isLibraryShellRoute');
     expect(appShellLayout).toContain('LibraryLoadingState');

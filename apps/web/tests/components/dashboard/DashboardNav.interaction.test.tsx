@@ -10,7 +10,6 @@ import {
   mockToastInfo,
   mockUseChatConversationsQuery,
   mockUsePathname,
-  mockUseSearchParams,
   renderDashboardNav,
   resetDashboardNavTestMocks,
 } from '@/tests/utils/dashboard-nav-test-support';
@@ -27,8 +26,8 @@ const PRIMARY_LABELS = [
   'Inbox',
   'New Chat',
   'Home',
-  'Presence',
-  'Links',
+  'Identity',
+  'Work',
   'Audience',
 ] as const;
 
@@ -78,19 +77,19 @@ describe('DashboardNav interactions', () => {
     const user = userEvent.setup();
     renderDashboardNav({ renderFn: render });
 
-    const linksLink = screen.getByRole('link', { name: 'Links' });
-    linksLink.addEventListener('click', event => event.preventDefault());
-    await user.click(linksLink);
+    const workLink = screen.getByRole('link', { name: 'Work' });
+    workLink.addEventListener('click', event => event.preventDefault());
+    await user.click(workLink);
 
     expect(mockStartNavigationTelemetry).toHaveBeenCalledExactlyOnceWith({
-      itemId: 'links',
+      itemId: 'library',
       sourcePathname: APP_ROUTES.CHAT,
-      destinationHref: APP_ROUTES.CHAT_PROFILE_PANEL,
+      destinationHref: APP_ROUTES.LIBRARY,
       inputMethod: 'pointer',
       context: {
         isElectron: false,
         isMobile: false,
-        navVariant: 'canonical_customer_ia_v1',
+        navVariant: 'canonical_identity_work_v1',
       },
     });
   });
@@ -103,6 +102,7 @@ describe('DashboardNav interactions', () => {
       'Contacts',
       'Events',
       'Library',
+      'Links',
       'Products',
       'Releases',
       'Tasks',
@@ -113,7 +113,7 @@ describe('DashboardNav interactions', () => {
     }
   });
 
-  it('routes Presence through root navigation without a duplicate avatar button', () => {
+  it('routes Identity through root navigation without a duplicate avatar button', () => {
     renderDashboardNav({
       renderFn: render,
       overrides: {
@@ -126,7 +126,7 @@ describe('DashboardNav interactions', () => {
       },
     });
 
-    expect(screen.getByRole('link', { name: 'Presence' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Identity' })).toHaveAttribute(
       'href',
       APP_ROUTES.PRESENCE
     );
@@ -137,12 +137,11 @@ describe('DashboardNav interactions', () => {
     expect(mockOpenPreviewPanel).not.toHaveBeenCalled();
   });
 
-  it('marks Links active only inside the identity panel context', () => {
-    mockUsePathname.mockReturnValue(APP_ROUTES.CHAT);
-    mockUseSearchParams.mockReturnValue(new URLSearchParams('panel=profile'));
+  it('marks Work active on the canonical library route', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.LIBRARY);
     renderDashboardNav({ renderFn: render });
 
-    expect(screen.getByRole('link', { name: 'Links' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Work' })).toHaveAttribute(
       'aria-current',
       'page'
     );
@@ -244,7 +243,7 @@ describe('DashboardNav interactions', () => {
       },
     });
 
-    fireEvent.mouseEnter(screen.getByRole('link', { name: 'Presence' }));
+    fireEvent.mouseEnter(screen.getByRole('link', { name: 'Identity' }));
     expect(prefetchForRouteMock).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(150);
 
@@ -255,7 +254,7 @@ describe('DashboardNav interactions', () => {
     );
   });
 
-  it('does not warm removed entity roots without an interaction', async () => {
+  it('does not warm Work without an interaction', async () => {
     vi.useFakeTimers();
     renderDashboardNav({
       renderFn: render,
@@ -283,12 +282,12 @@ describe('DashboardNav interactions', () => {
     mockUsePathname.mockReturnValue('/demo/showcase/settings');
     renderDashboardNav({ renderFn: render });
 
-    const linksLink = screen.getByRole('link', { name: 'Links' });
-    expect(linksLink).toHaveAttribute('href', APP_ROUTES.CHAT_PROFILE_PANEL);
-    await user.click(linksLink);
+    const identityLink = screen.getByRole('link', { name: 'Identity' });
+    expect(identityLink).toHaveAttribute('href', APP_ROUTES.PRESENCE);
+    await user.click(identityLink);
 
     expect(mockToastInfo).toHaveBeenCalledWith(
-      'Links is not available in demo mode'
+      'Identity is not available in demo mode'
     );
   });
 });

@@ -3,6 +3,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import {
   audienceNavItem,
   homeNavItem,
+  libraryNavItem,
   linksNavItem,
   presenceNavItem,
 } from './config';
@@ -62,5 +63,22 @@ describe('isNavigationItemActive', () => {
         new URLSearchParams()
       )
     ).toBe(true);
+  });
+
+  it('matches Work throughout canonical and compatible routes', () => {
+    for (const route of [
+      APP_ROUTES.LIBRARY,
+      APP_ROUTES.LEGACY_DASHBOARD_LIBRARY,
+      APP_ROUTES.RELEASES,
+      APP_ROUTES.DASHBOARD_RELEASES,
+    ]) {
+      expect(
+        isNavigationItemActive(
+          libraryNavItem,
+          `${route}/nested`,
+          new URLSearchParams()
+        )
+      ).toBe(true);
+    }
   });
 });

@@ -9,7 +9,7 @@ import type { ColumnDef } from '@/lib/tanstack-table';
 import type { LibraryReleaseAsset, LibraryView } from './library-data';
 
 /**
- * Library loading skeleton.
+ * Work loading skeleton.
  *
  * The app shell layout renders this as the first-boot fallback for every
  * authed route, so it must not import `LibrarySurface`: that module is the
@@ -117,7 +117,7 @@ export function LibraryLoadingState() {
   return (
     <WorkspacePage
       aria-busy='true'
-      aria-label='Loading Library'
+      aria-label='Loading Work'
       frame='content-container'
       contentPadding='none'
       surfaceMode='table'

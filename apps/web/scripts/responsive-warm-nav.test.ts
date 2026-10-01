@@ -28,13 +28,13 @@ describe('resolveResponsiveWarmNavMeasurement', () => {
     expect(canonicalSidebarNavigation.map(item => item.id)).toEqual([
       'home',
       'presence',
-      'links',
+      'library',
       'audience',
     ]);
     expect(canonicalSidebarNavigation.map(item => item.href)).toEqual([
       APP_ROUTES.DASHBOARD,
       APP_ROUTES.PRESENCE,
-      APP_ROUTES.CHAT_PROFILE_PANEL,
+      APP_ROUTES.LIBRARY,
       APP_ROUTES.CONTACTS_AUDIENCE,
     ]);
   });
@@ -94,6 +94,18 @@ describe('resolveResponsiveWarmNavMeasurement', () => {
     ) as PerfRouteDefinition;
 
     expect(route.path).toBe(APP_ROUTES.TASKS);
+    expect(route.measureMode).toBe('page-load');
+    expect(route.warmupStrategy).toBe('authenticated-route');
+    expect(route.readySelectors.navTrigger).toBeUndefined();
+    expect(route.warmNavigationStartPath).toBeUndefined();
+  });
+
+  it('keeps Links reachable under its non-root route-load contract', () => {
+    const route = getEndUserPerfRouteById(
+      'creator-links'
+    ) as PerfRouteDefinition;
+
+    expect(route.path).toBe(APP_ROUTES.CHAT_PROFILE_PANEL);
     expect(route.measureMode).toBe('page-load');
     expect(route.warmupStrategy).toBe('authenticated-route');
     expect(route.readySelectors.navTrigger).toBeUndefined();

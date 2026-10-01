@@ -27,6 +27,18 @@ const VALID_PAYLOAD = {
 } as const;
 
 describe('navigation telemetry contract', () => {
+  it('accepts the Identity and Work rollout variant without dropping the baseline', () => {
+    expect(
+      navigationTelemetryPayloadSchema.safeParse({
+        ...VALID_PAYLOAD,
+        nav_variant: 'canonical_identity_work_v1',
+      }).success
+    ).toBe(true);
+    expect(
+      navigationTelemetryPayloadSchema.safeParse(VALID_PAYLOAD).success
+    ).toBe(true);
+  });
+
   it('buckets routes without preserving dynamic IDs, queries, or fragments', () => {
     expect(
       bucketNavigationRoute(
