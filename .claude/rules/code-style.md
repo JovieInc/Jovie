@@ -433,14 +433,43 @@ Before merging any PR that introduces background/scheduled work, verify:
 
 ## Build Before You Build (Prior-Art Gate)
 
-Before scoping infrastructure, tooling, or re-implementing a known software category (visual regression, scheduling, queues, auth, parsing, charts, date handling, state management, etc.), run the prior-art gate (gstack ETHOS §2):
+The single authority for capability-level sourcing decisions is the
+**Capability-Level Sourcing Policy** in
+[`canon/ENGINEERING.md`](../../canon/ENGINEERING.md#capability-level-sourcing-policy)
+(JOV-6212, invariant JOV-INV-041). This section routes to it — do not
+duplicate the policy here.
 
-1. **Name the category** ("this is a visual-regression differ").
-2. **Scan prior art (~5 min):** existing stack feature? standard OSS lib? SaaS/API? Note licenses.
-3. **Decide adopt > wrap > build.** Build only for core differentiation or when every candidate fails a stated hard requirement.
-4. **Record on the issue/plan:** category · candidates + links + license · adopt/wrap/build + why. Infra/tooling without this section is not ready.
+Before scoping infrastructure, tooling, or a new/materially expanded
+commodity capability (visual regression, scheduling, queues, auth, parsing,
+charts, date handling, state management, etc.):
 
-**Precedence:** §2 (Search Before Building) runs before §1 (Boil the Lake). Completeness governs how thoroughly you finish what you've *decided* to build — never justifies rebuilding off-the-shelf solutions.
+1. **Name the category and classify it** — differentiating product logic,
+   necessary integration, or commodity mechanism — and identify the
+   canonical implementation and owner.
+2. **Scan prior art (~5 min):** existing stack feature? platform/standard
+   library? standard OSS lib? official vendor integration index? SaaS/API?
+   Record exact versions, authoritative sources, and checked dates.
+3. **Decide reuse > configure > adopt > buy > extend > fork > build.**
+   Custom/fork only for core differentiation or a demonstrated unmet hard
+   requirement; the decision must consider lifetime integration,
+   maintenance, security-update, and migration costs, and no protected
+   safety/quality floor may regress.
+4. **Record the sourcing receipt on the issue/plan** (minimal receipt shape
+   in the canon section): outcome · capability · candidates + links +
+   license + version + checked date · disposition + why · hard requirements
+   and rejected alternatives for custom/fork · rollback triggers · policy
+   and source binding. Infra/tooling without this section is not ready.
+
+Missing network or package permissions route to research — they never
+establish that no library exists or justify a rewrite. The implementation
+author cannot approve their own exception or weaken this policy to
+authorize the same change. Enforcement is shadow-first: the deterministic
+validator (`scripts/invariants/capability-sourcing.mjs`) is diagnostic
+evidence, not a shipping gate, until shadow-qualified per the canon rule.
+
+**Precedence:** gstack ETHOS §2 (Search Before Building) runs before §1
+(Boil the Lake). Completeness governs how thoroughly you finish what you've
+*decided* to build — never justifies rebuilding off-the-shelf solutions.
 
 ## Documentation Index
 

@@ -2,7 +2,7 @@
 
 Status: Canon
 Inherits: [`OPERATING_SYSTEM.md`](./OPERATING_SYSTEM.md)
-Last updated: 2026-07-17
+Last updated: 2026-10-01
 
 Engineering exists to increase company throughput by making the product correct, shippable, reliable, and easy to change.
 
@@ -54,6 +54,88 @@ Default stack remains:
 Use upstream/open-source projects when they compound our work and reduce maintenance, but only through a bounded, reversible adoption path with evidence. Track upstream when that lets Jovie benefit from others' development work without surrendering control of the bottleneck.
 
 ---
+
+## Capability-Level Sourcing Policy
+
+EVENT: Founder direction, 2026-09-12 (JOV-6212), recorded 2026-10-01.
+Single authority: this section. Projections: `.claude/rules/code-style.md`
+(Prior-Art Gate), `canon/invariants.jsonl` JOV-INV-041 and
+`scripts/invariants/capability-sourcing.mjs` (deterministic receipt
+validation), `.claude/skills/tool-discovery/SKILL.md` (capability-first mode).
+Lower-level rules that conflict with this section escalate to
+[OPERATING_SYSTEM.md](./OPERATING_SYSTEM.md).
+
+Minimize lifetime ownership of undifferentiated mechanisms, subject to
+required correctness, security, reliability, privacy, performance, and user
+experience. Custom product behavior is expected; custom commodity mechanisms
+are an evidence-earned exception. More dependencies or fewer lines are not
+goals.
+
+1. State the user outcome and classify each consequential capability as
+   differentiating product logic, necessary integration, or commodity
+   mechanism, and identify its canonical implementation and owner. Renaming
+   auth as proprietary does not change its classification.
+2. Before new or materially expanded commodity work, inspect existing
+   code/dependencies, platform/standard-library features, official vendor
+   integration indexes, and credible maintained OSS or services. Record exact
+   versions, authoritative sources, and checked dates. The search order is a
+   heuristic, not a blanket preference for vendors or new dependencies. Do
+   not require three candidates when the current canonical implementation
+   clearly suffices.
+3. Reuse an applicable current sourcing decision without repeating research;
+   renew it when requirements, versions, workload, security posture,
+   operating cost, or material regressions change. A framework decision
+   cannot grandfather a bespoke sub-capability indefinitely.
+4. Custom/fork decisions must identify a concrete unmet hard requirement or a
+   demonstrated material net advantage over the best credible alternative,
+   after considering configuration, narrow adaptation, or an upstream
+   contribution, and must include lifetime integration, maintenance,
+   security-update, infrastructure, review/incident, migration, and
+   opportunity costs. No protected safety or quality floor may regress.
+   Forks record upstream and license, patch scope, update owner, and exit
+   trigger.
+5. One authoritative implementation per capability and scope. Adapters
+   implement Jovie's actual contract only — no automatic universal
+   abstraction or SDK replica. Temporary compatibility for installed clients
+   records version scope and retirement criteria. Small pure helpers do not
+   need a package or a full sourcing exercise.
+6. Routine adoption within existing security/license/budget authority is
+   autonomous. Paid commitments, new data disclosure, credentials, and
+   material external authority still require applicable authorization.
+   Missing network/package permissions route to the existing research or
+   trusted dependency-preparation path; they never establish that no library
+   exists or justify a rewrite.
+7. Verify behavior and failure/security contracts, not merely dependency
+   presence or implementation strings; the same outcome suite should test
+   incumbent and candidate. A dependency does not remove Jovie's integration
+   accountability.
+8. Evidence, exceptions, and review receipts bind requirements, dependency and
+   config versions, policy version, repository, and relevant diff/head. The
+   implementation author cannot approve their own exception, weaken a guard,
+   relabel protected infrastructure, or enlarge an allowlist to authorize the
+   same change; the existing independent review and trusted base-policy
+   execution apply. No blanket founder merge gate.
+9. Apply proportionately to new or expanded capability decisions: do not
+   halt unrelated delivery or mandate a rewrite of legacy infrastructure.
+   Incident fixes remain possible under existing emergency authority without
+   relaxing baseline security, with a bounded follow-up where needed.
+
+**Minimal sourcing receipt** (extend an existing receipt, not a parallel
+ledger): outcome; capability and scope; canonical owner/runtime; hard
+requirements; existing implementation or decision reference; alternatives
+with authoritative evidence, version, and checked date; selected disposition;
+bounded custom delta and rejected alternatives with demonstrated reasons;
+lifetime cost/risk assessment; tests; rollback/retirement/re-evaluation
+triggers; policy and source binding; independent review for exceptions.
+Unverified facts remain unverified.
+
+**Enforcement is shadow-first** (Founder rule, 2026-09-09 — "Qualify delivery
+gates in shadow before enforcement" above). The deterministic validator checks
+policy shape and declared receipts nonblocking; hosted promotion to a
+blocking gate is a separate qualification decision requiring representative
+ships, pass-rate and p95 evidence, and tested rollback. No live web search
+runs in a synchronous PR gate. LLM/source classification stays advisory
+until specifically qualified.
 
 ## Shipping Rules
 
@@ -120,3 +202,4 @@ Concrete implementation lives in `../CLAUDE.md`, `../CODEX.md`, `.claude/rules/*
 | Date | Change | Source |
 |---|---|---|
 | 2026-07-17 | Created as domain canon under `/canon`. | Tim White |
+| 2026-10-01 | Added capability-level sourcing policy (JOV-6212, JOV-INV-041), shadow-first, projected to `.claude/rules/code-style.md`, the invariant registry, and the tool-discovery skill. | Tim White |

@@ -2,9 +2,11 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  evaluateSourcingReadiness,
   evaluateVerificationBoundary,
   PUBLICATION_GATES,
   REMOTE_DRAFT_GATES,
+  SOURCING_READY_STATES,
 } from '../draft-verification-boundary.mjs';
 import {
   DEFAULT_POLICY_GATES,
@@ -308,5 +310,79 @@ describe('draft-first rolling CI policy wiring', () => {
     expect(publication).not.toMatch(
       /automation-verify|run_affected|typecheck|biome|coverage/
     );
+  });
+});
+
+describe('capability sourcing readiness (JOV-6212)', () => {
+  it('routes missing sourcing evidence to a bounded research task, not a deadlock', () => {
+    const missing = evaluateSourcingReadiness({});
+    expect(missing.state).toBe('research-ready');
+    expect(missing.requiresResearchTask).toBe(true);
+    expect(missing.reason).toBe('sourcing-decision-missing');
+  });
+
+  it('keeps non-commodity capabilities implementation-ready without a receipt', () => {
+    const product = evaluateSourcingReadiness({ commodityCapability: false });
+    expect(product.state).toBe('implementation-ready');
+    expect(product.requiresResearchTask).toBe(false);
+    expect(product.reason).toBe('not-a-commodity-capability');
+  });
+
+  it('accepts a current head-bound sourcing decision as implementation-ready', () => {
+    const ready = evaluateSourcingReadiness({
+      sourcingDecisionReference: {
+        repository: 'JovieInc/Jovie',
+        headSha: head,
+      },
+      repository: 'JovieInc/Jovie',
+      headSha: head,
+      liveHead: head,
+    });
+    expect(ready.state).toBe('implementation-ready');
+    expect(ready.revalidatedHead).toBe(head);
+    expect(ready.requiresResearchTask).toBe(false);
+  });
+
+  it('deliberate red: stale head, wrong repository, and unbound decisions require renewal', () => {
+    const stale = evaluateSourcingReadiness({
+      sourcingDecisionReference: {
+        repository: 'JovieInc/Jovie',
+        headSha: head,
+      },
+      repository: 'JovieInc/Jovie',
+      headSha: head,
+      liveHead: nextHead,
+    });
+    expect(stale.state).toBe('research-ready');
+    expect(stale.reason).toBe('sourcing-decision-stale-head');
+    expect(stale.revalidatedHead).toBe(nextHead);
+    const wrongRepo = evaluateSourcingReadiness({
+      sourcingDecisionReference: {
+        repository: 'JovieInc/other',
+        headSha: head,
+      },
+      repository: 'JovieInc/Jovie',
+      headSha: head,
+      liveHead: head,
+    });
+    expect(wrongRepo.reason).toBe('sourcing-decision-repository-mismatch');
+    const unbound = evaluateSourcingReadiness({
+      sourcingDecisionReference: {
+        repository: 'JovieInc/Jovie',
+        headSha: 'short',
+      },
+      repository: 'JovieInc/Jovie',
+      headSha: 'short',
+      liveHead: 'short',
+    });
+    expect(unbound.reason).toBe('sourcing-decision-head-unbound');
+    expect(unbound.state).toBe('research-ready');
+  });
+
+  it('exposes the two ready states as a frozen contract', () => {
+    expect([...SOURCING_READY_STATES]).toEqual([
+      'implementation-ready',
+      'research-ready',
+    ]);
   });
 });

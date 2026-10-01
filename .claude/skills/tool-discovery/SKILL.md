@@ -7,6 +7,9 @@ description: |
   "what does this do", a bare link with no context. Extracts search terms, finds
   the GitHub repo and docs/pricing/reviews via gh search + WebSearch/WebFetch, and
   returns a structured evaluation instead of asking Tim to fetch info first.
+  Also provides the capability-first mode for JOV-6212: before implementing or
+  materially expanding a commodity capability, run the same bounded research pass
+  and record the sourcing decision receipt instead of jumping straight to a build.
 ---
 
 # Tool Discovery
@@ -23,6 +26,47 @@ anything to unlock a link — search around the gap instead.
   is, what it costs, and whether it's worth adopting.
 - Any time the honest next step would be "let me ask Tim for more details" —
   try search first, only ask if search genuinely comes up empty.
+
+## Capability-first mode (JOV-6212)
+
+Before an agent implements or materially expands a **commodity capability**
+(auth handoff, PDF rendering, scheduling, parsing, visual diffing, state
+management, any known software category), run the same research pass from the
+other direction — not "what is this tool?" but "should Jovie reuse, configure,
+adopt, buy, extend, fork, or build this?" The single authority is the
+**Capability-Level Sourcing Policy** in
+[`canon/ENGINEERING.md`](../../../canon/ENGINEERING.md#capability-level-sourcing-policy)
+(invariant JOV-INV-041); `.claude/rules/code-style.md` "Build Before You Build"
+routes to it. This skill is the reactive research arm — it never replaces that
+policy, adds a second skill tree, or gates shipping.
+
+1. **Classify the capability** — differentiating product logic, necessary
+   integration, or commodity mechanism — and name the canonical
+   implementation/owner if one exists in the repo.
+2. **Check the existing decision first**: search gbrain and the repo for an
+   applicable current sourcing decision; reuse it without repeating research
+   (renew only when requirements, versions, workload, or security posture
+   changed).
+3. **Run Steps 1–3 above** (repo/docs search) against the incumbent
+   implementation, the platform/standard library, official vendor integration
+   indexes, and credible maintained OSS — recording exact versions and checked
+   dates. Official integration indexes (e.g. a vendor's documented Electron
+   integration) must be checked before recommending a bespoke mechanism.
+4. **Return the sourcing receipt**, not just an evaluation: outcome ·
+   capability and scope · canonical owner · hard requirements · alternatives
+   with evidence/version/date · disposition (reuse/configure/adopt/buy/
+   extend/fork/build) + why · custom delta and rejected alternatives for
+   custom/fork · lifetime cost/risk · tests · rollback triggers · policy and
+   source binding · independent review when an exception is requested.
+5. **Feed the receipt through the existing task packets** for the worker that
+   ships the change — do not assume this skill is callable by every runtime.
+   Missing evidence produces a bounded executable research task, never a
+   rewrite and never a dead end ("we couldn't browse, therefore no SDK exists"
+   is not a verdict).
+
+Unverified facts stay unverified in the receipt. The implementation author
+cannot self-approve an exception over the policy, a checker, or an allowlist —
+that requires the existing independent review path.
 
 ## Workflow
 

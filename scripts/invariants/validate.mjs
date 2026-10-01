@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { validateAssuranceMatrixPolicy } from './assurance-matrix.mjs';
+import { validateCapabilitySourcing } from './capability-sourcing.mjs';
 import { validateDeliveryModelPolicy } from './delivery-model.mjs';
 import { evaluateDesignCiJudgeRouterContract } from './design-ci-judge-router-contract.mjs';
 import {
@@ -45,6 +46,8 @@ import {
 // JOV-INV-040 is composed here as a structural wiring check only: the
 // Design CI judge router itself is TypeScript under apps/web/scripts and
 // runs via `pnpm design-ci:judge-matrix`, not from this plain-node process.
+// JOV-INV-041 is composed here so every CI invariant run validates the
+// capability-level sourcing policy and any declared sourcing receipts.
 
 import {
   readInvariantRegistry,
@@ -80,6 +83,7 @@ const doneSprintErrors = await validateDoneSprintInvariants({
   mode: 'source',
 });
 const gateIntegrityErrors = validateGateIntegrityPolicy(registry);
+const capabilitySourcingErrors = validateCapabilitySourcing(registry);
 const assuranceErrors = validateAssuranceMatrixPolicy(registry);
 const deliveryModelErrors = validateDeliveryModelPolicy(registry);
 const sonarRepairErrors = validateSonarRepairContract(registry);
@@ -100,6 +104,7 @@ const errors = [
   ...latencyErrors.map(error => `latency-sensitive: ${error}`),
   ...iosScrollErrors.map(error => `ios-web-no-scroll-jank: ${error}`),
   ...doneSprintErrors.map(error => `done-sprint: ${error}`),
+  ...capabilitySourcingErrors,
   ...gateIntegrityErrors.map(error => `gate-integrity: ${error}`),
   ...assuranceErrors.map(error => `assurance-matrix: ${error}`),
   ...deliveryModelErrors.map(error => `delivery-model: ${error}`),
