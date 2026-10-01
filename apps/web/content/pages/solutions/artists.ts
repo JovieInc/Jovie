@@ -45,9 +45,10 @@ export const solutionsArtistsPage = definePage({
   heroVariant: 'split-link-claim',
   proof: ['product-profile-subscribe-capture'],
   seo: {
-    title: ARTIST_PROFILE_COPY.seo.title,
+    title: 'Music links and fan updates for artists',
     socialTitle: `For Artists | ${APP_NAME}`,
-    description: ARTIST_PROFILE_COPY.seo.description,
+    description:
+      'Bring your music, tour dates, and fan subscriptions together on Jovie. Give listeners one artist link for releases, shows, and updates they choose to receive.',
     keywords: [...ARTIST_PROFILE_COPY.seo.keywords],
     schema: ['SoftwareApplication'],
     siblings: [],
@@ -55,5 +56,5 @@ export const solutionsArtistsPage = definePage({
     ogImage: '/og/default.png',
   },
   trust: null,
-  updatedAt: '2026-09-30',
+  updatedAt: '2026-10-01',
 });

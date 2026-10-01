@@ -347,16 +347,18 @@ describe('JovieChat styling regressions', () => {
     );
   });
 
-  it("gates the What's New card to the bare empty state (JOV-7113)", () => {
+  it("keeps What's New above starter actions and out of the composer dock (JOV-5350)", () => {
     // Asserted node:fs read of the exact component source — the
-    // FeatureIntroHost must only dock above the composer when no other
-    // empty-state affordance owns the slot, or it covers the starter-action
-    // cards' CTA on first dashboard view.
+    // FeatureIntroHost must join the scrollable starter-action slot rather
+    // than crowding the fixed composer dock and covering the card CTA.
     const jovieChatSource = readFileSync(
       resolve(process.cwd(), 'components/jovie/JovieChat.tsx'),
       'utf8'
     );
 
+    expect(jovieChatSource).toMatch(
+      /data-testid='chat-empty-state-action-card-slot'[\s\S]{0,300}<FeatureIntroHost/
+    );
     expect(jovieChatSource).toMatch(
       /!composerHasIntent && emptyStateAffordance === 'none'[\s\S]{0,200}<FeatureIntroHost/
     );
