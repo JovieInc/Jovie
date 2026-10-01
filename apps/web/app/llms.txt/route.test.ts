@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { auditLlmsTxtStructure } from '@/lib/seo/agent-site-readiness';
 
 vi.mock('@/constants/app', () => ({
   APP_NAME: 'Jovie',
@@ -49,6 +50,14 @@ describe('GET /llms.txt', () => {
     expect(body).toContain(
       'https://jov.ie/.well-known/oauth-authorization-server/api/ovie/oauth'
     );
+  });
+
+  it('satisfies the seo:certify llms.txt structure audit (JOV-7259)', async () => {
+    const body = await GET().text();
+    const failed = auditLlmsTxtStructure(body).filter(
+      check => check.status === 'failed'
+    );
+    expect(failed).toEqual([]);
   });
 
   it('keeps public developer access read-only and does not invent extra surfaces', async () => {
