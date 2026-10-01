@@ -119,6 +119,7 @@ describe('linear sync on merge', () => {
           PR_NUMBER: '19587',
           PR_URL: MERGE_URL,
           HEAD_REF: 'codex/jov-7227-repair',
+          PR_BODY: 'Refs JOV-7227.\n\n<!-- linear-issue-id:uuid -->\n<!-- linear-issue-identifier:JOV-7227 -->',
           MERGE_SHA,
         },
         log: () => {},
