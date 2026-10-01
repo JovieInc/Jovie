@@ -55,7 +55,7 @@ const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
   )
 );
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 const SUMMER_BRIDGE_COVERAGE_COMMAND =
   'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts';
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -651,6 +651,28 @@ describe('invariant-scanned structural selection', () => {
       LATENCY_ALLOWLIST_PATH,
     ]) {
       expect(isInvariantScannedPath(path), path).toBe(true);
+    }
+  });
+
+  it('routes every feedback inventory and linked guard edit through invariants', async () => {
+    const registry = JSON.parse(
+      readFileSync(join(REPO_ROOT, 'LESSONS.guards.json'), 'utf8')
+    );
+    const paths = new Set([
+      'LESSONS.md',
+      'LESSONS.guards.json',
+      ...registry.lessons.flatMap(lesson =>
+        lesson.guards.map(guard => guard.path)
+      ),
+    ]);
+    for (const path of paths) {
+      expect(isInvariantScannedPath(path), path).toBe(true);
+      const { execute } = await runFor(
+        'pull_request',
+        [path],
+        classifyProductLanes([path]).selectedLanes
+      );
+      expect(invariantRuns(execute), path).toBe(1);
     }
   });
 
