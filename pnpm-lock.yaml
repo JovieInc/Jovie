@@ -363,8 +363,8 @@ importers:
   apps/web:
     dependencies:
       '@ai-sdk/gateway':
-        specifier: ^4.0.100
-        version: 4.0.100(zod@4.6.5)
+        specifier: ^4.0.101
+        version: 4.0.101(zod@4.6.5)
       '@ai-sdk/react':
         specifier: ^4.0.121
         version: 4.0.125(react@19.2.8)(zod@4.6.5)
@@ -1052,6 +1052,12 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
+  '@ai-sdk/gateway@4.0.101':
+    resolution: {integrity: sha512-lBMXWbNSAb3eQD/F8ja9Egi32PsL9lLajC4DUvionnWO8V+X0nYw9hWJVBJdZ0SftfE/OyKySkoHRfIg/UafYg==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/gateway@4.0.85':
     resolution: {integrity: sha512-c8ztST/CslupqO3p7izsAuG3TlKg9mhE6mGJ42iUADsSMJIV5IOKd9AsLG33QCAY7SWs6NDO2giM/rq7bUTNlQ==}
     engines: {node: '>=22'}
@@ -1082,6 +1088,12 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
+  '@ai-sdk/provider-utils@5.0.52':
+    resolution: {integrity: sha512-PWWa14kVJlBj/G4E85D+IMM28H9W9SC3cQ/yyRHTMzRmtLkNgmDOLhSYBJ9ZT+w83a+DQ9+QIcCaY36iuD89mw==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/provider@3.0.16':
     resolution: {integrity: sha512-9Av6kg0t/IN/dcYAAmEJ4B9OPhcEJqwSR+GfHEA8olRkindXpUHadc3p3cyvgFUQFTVm1G5thtsmgZ9yVb2w3A==}
     engines: {node: '>=18'}
@@ -1092,6 +1104,10 @@ packages:
 
   '@ai-sdk/provider@4.0.19':
     resolution: {integrity: sha512-ryVZSSfmpEsr4bM8rbt9cSBWal+KGYRrm57C+k/hiPQHMiMahaqg2bPF0MpxSUWY8mGpt7s/ajM6PAqNTMKqPQ==}
+    engines: {node: '>=22'}
+
+  '@ai-sdk/provider@4.0.20':
+    resolution: {integrity: sha512-daWW1Jxnvcn6+VhUuPqR7i5DtbdontcPCC5pH3QYU2r/x0hl31AIGiejWThGU499pJYA9DzwnBm+tc3EMKQeLQ==}
     engines: {node: '>=22'}
 
   '@ai-sdk/react@4.0.125':
@@ -13941,6 +13957,9 @@ packages:
   pg-protocol@1.16.0:
     resolution: {integrity: sha512-sILXutLVjCLjcDuOmvhX5e2Z4cS5qG/6Bu3VkpFwdf/633ElGLpEh9bgmuI5I4sqKqkifQiGyiCcx1HdtrK7tg==}
 
+  pg-protocol@1.16.1:
+    resolution: {integrity: sha512-p9VOFMiHB/ZbJATetbg+99PxssTVSQRnyuPSQ67mN1+1KBOjZaZ83ZQzltnxPhJwSsC3nwVjJ10DVJlerbFzLg==}
+
   pg-types@2.2.0:
     resolution: {integrity: sha512-qTAAlrEsl8s4OiEQY69wDvcMIdQN6wdz5ojQiOy6YRMuynxenON0O5oCpJI6lshc6scgAY8qvJ2On/p+CXY0GA==}
     engines: {node: '>=4'}
@@ -15665,6 +15684,10 @@ packages:
     resolution: {integrity: sha512-yau8yJdTt989Mm0Bd/236QnzEiPf2xLLTqUZRUJOo/3CB078LSwzei343DgtJVmfJKJE3TMINY1u42SQsP6mXw==}
     engines: {node: '>=14.0.0'}
 
+  tinyrainbow@3.2.0:
+    resolution: {integrity: sha512-LgO3D9yZJjApUiuUfl9iFAwrtaX4+lok3wJIqttGoKCHlWUqHqbQpnxCf82L8FjgKsh4iGo78hqJwgL8F6To2A==}
+    engines: {node: '>=14.0.0'}
+
   tinyspy@4.0.6:
     resolution: {integrity: sha512-u8KszXvGfU68hVcZpRHKG28T0krMuv2G5nDhiHaMLen/gIuFEgIJhaJuO69qjnXg5paSrbPMFfx3brNuN8eVSg==}
     engines: {node: '>=14.0.0'}
@@ -16761,6 +16784,13 @@ snapshots:
       '@vercel/oidc': 3.2.0
       zod: 4.6.5
 
+  '@ai-sdk/gateway@4.0.101(zod@4.6.5)':
+    dependencies:
+      '@ai-sdk/provider': 4.0.20
+      '@ai-sdk/provider-utils': 5.0.52(zod@4.6.5)
+      '@vercel/oidc': 3.2.0
+      zod: 4.6.5
+
   '@ai-sdk/gateway@4.0.85(zod@4.6.5)':
     dependencies:
       '@ai-sdk/provider': 4.0.17
@@ -16802,6 +16832,15 @@ snapshots:
       undici: 8.11.2
       zod: 4.6.5
 
+  '@ai-sdk/provider-utils@5.0.52(zod@4.6.5)':
+    dependencies:
+      '@ai-sdk/provider': 4.0.20
+      '@standard-schema/spec': 1.1.0
+      '@workflow/serde': 4.1.0
+      eventsource-parser: 3.1.1
+      undici: 8.11.2
+      zod: 4.6.5
+
   '@ai-sdk/provider@3.0.16':
     dependencies:
       json-schema: 0.4.0
@@ -16811,6 +16850,10 @@ snapshots:
       json-schema: 0.4.0
 
   '@ai-sdk/provider@4.0.19':
+    dependencies:
+      json-schema: 0.4.0
+
+  '@ai-sdk/provider@4.0.20':
     dependencies:
       json-schema: 0.4.0
 
@@ -18680,7 +18723,6 @@ snapshots:
   '@hono/node-server@2.0.11(hono@4.13.8)':
     dependencies:
       hono: 4.13.8
-    optional: true
 
   '@huggingface/jinja@0.5.10':
     optional: true
@@ -19328,7 +19370,6 @@ snapshots:
       zod-to-json-schema: 3.25.2(zod@4.6.5)
     transitivePeerDependencies:
       - supports-color
-    optional: true
 
   '@mongodb-js/saslprep@1.5.4':
     dependencies:
@@ -23380,7 +23421,7 @@ snapshots:
   '@types/pg@8.20.0':
     dependencies:
       '@types/node': 26.6.3
-      pg-protocol: 1.16.0
+      pg-protocol: 1.16.1
       pg-types: 2.2.0
     optional: true
 
@@ -24216,7 +24257,7 @@ snapshots:
 
   '@vitest/pretty-format@4.1.10':
     dependencies:
-      tinyrainbow: 3.1.1
+      tinyrainbow: 3.2.0
     optional: true
 
   '@vitest/pretty-format@5.0.2':
@@ -24255,7 +24296,7 @@ snapshots:
     dependencies:
       '@vitest/pretty-format': 4.1.10
       convert-source-map: 2.0.0
-      tinyrainbow: 3.1.1
+      tinyrainbow: 3.2.0
     optional: true
 
   '@vitest/utils@5.0.2':
@@ -27466,7 +27507,6 @@ snapshots:
   eventsource@3.0.7:
     dependencies:
       eventsource-parser: 3.1.1
-    optional: true
 
   exceljs@4.4.0:
     dependencies:
@@ -27550,7 +27590,6 @@ snapshots:
       ip-address: 10.7.2
     transitivePeerDependencies:
       - supports-color
-    optional: true
 
   express@4.22.1:
     dependencies:
@@ -28558,8 +28597,7 @@ snapshots:
     dependencies:
       parse-passwd: 1.0.0
 
-  hono@4.13.8:
-    optional: true
+  hono@4.13.8: {}
 
   hookified@1.15.1: {}
 
@@ -28715,7 +28753,7 @@ snapshots:
       jsonwebtoken: 9.0.3
       load-esm: 1.0.3
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.20.0)
+      retry-axios: 2.6.0(axios@1.20.0(debug@4.4.3))
       tough-cookie: 4.1.4
     transitivePeerDependencies:
       - supports-color
@@ -29270,8 +29308,7 @@ snapshots:
 
   json-schema-traverse@1.0.0: {}
 
-  json-schema-typed@8.0.2:
-    optional: true
+  json-schema-typed@8.0.2: {}
 
   json-schema@0.4.0: {}
 
@@ -31697,6 +31734,9 @@ snapshots:
   pg-protocol@1.16.0:
     optional: true
 
+  pg-protocol@1.16.1:
+    optional: true
+
   pg-types@2.2.0:
     dependencies:
       pg-int8: 1.0.1
@@ -32903,7 +32943,7 @@ snapshots:
       retext-stringify: 4.0.0
       unified: 11.0.5
 
-  retry-axios@2.6.0(axios@1.20.0):
+  retry-axios@2.6.0(axios@1.20.0(debug@4.4.3)):
     dependencies:
       axios: 1.20.0(debug@4.4.3)
     optional: true
@@ -34051,6 +34091,9 @@ snapshots:
   tinyrainbow@2.0.0: {}
 
   tinyrainbow@3.1.1: {}
+
+  tinyrainbow@3.2.0:
+    optional: true
 
   tinyspy@4.0.6: {}
 
@@ -35269,7 +35312,6 @@ snapshots:
   zod-to-json-schema@3.25.2(zod@4.6.5):
     dependencies:
       zod: 4.6.5
-    optional: true
 
   zod-validation-error@4.0.2(zod@4.6.5):
     dependencies:
