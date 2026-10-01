@@ -489,6 +489,9 @@ class LinearClientTest(unittest.TestCase):
 
 class RunIssueTest(unittest.TestCase):
     def setUp(self):
+        disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+        disk.start()
+        self.addCleanup(disk.stop)
         self.real_sh, self.real_verify, self.real_pack = lane.sh, lane.verify_and_land, lane.context_pack
         self.real_next = lane.next_provider
         lane.next_provider = lambda *a, **k: None  # no live provider health checks in unit tests
@@ -718,6 +721,9 @@ class AttributionAndThroughputTest(unittest.TestCase):
 
 class WorkerTest(unittest.TestCase):
     def setUp(self):
+        disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+        disk.start()
+        self.addCleanup(disk.stop)
         self.saved = (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
                       lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues,
                       lane.fix_candidates, lane.escalate_exhausted, lane.pr_events.queued_prs,
@@ -1105,22 +1111,30 @@ class PublicationRevocationTest(unittest.TestCase):
 
     def test_sigterm_is_a_stop_that_revokes_before_kill(self):
         import signal
-        import threading
         with tempfile.TemporaryDirectory() as tmp, open(os.devnull, "w") as log:
             root = Path(tmp)
             host = lane.Host(state=root)
             pidfile = root / "pid"
+            # Startup may exceed the old 0.5s timer on a loaded installer host.
             command = [sys.executable, "-c",
-                       "import os,time,pathlib; pathlib.Path('pid').write_text(str(os.getpid())); time.sleep(30)"]
-            timer = threading.Timer(0.5, lambda: os.kill(os.getpid(), signal.SIGTERM))
-            try:
-                timer.start()
-                with self.assertRaises(lane.RunStopped):
-                    lane.run_agent(command, root, log, timeout=30,
-                                   on_kill=lambda error: lane.revoke_publication(
-                                       host, branch="devin/jov-9-1", reason="run-stopped"))
-            finally:
-                timer.cancel()
+                       "import os,time,pathlib; time.sleep(0.75); pathlib.Path('pid').write_text(str(os.getpid())); time.sleep(30)"]
+
+            def signal_when_ready():
+                if pidfile.exists():
+                    os.kill(os.getpid(), signal.SIGTERM)
+
+            observed = []
+
+            def on_kill(error):
+                # Preserve receipt-before-kill proof for a real SIGTERM too.
+                os.kill(int(pidfile.read_text()), 0)
+                observed.append(type(error).__name__)
+                lane.revoke_publication(host, branch="devin/jov-9-1", reason="run-stopped")
+
+            with self.assertRaises(lane.RunStopped):
+                lane.run_agent(command, root, log, timeout=30,
+                               guard=signal_when_ready, guard_interval=0.05, on_kill=on_kill)
+            self.assertEqual(observed, ["RunStopped"])
             self.assertIsNotNone(lane.publication_revocation(host, "devin/jov-9-1"))
             with self.assertRaises(ProcessLookupError):
                 os.kill(int(pidfile.read_text()), 0)
@@ -1201,6 +1215,9 @@ class VerifyAndLandRevocationTest(unittest.TestCase):
 
 class DispatchTest(unittest.TestCase):
     def setUp(self):
+        disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+        disk.start()
+        self.addCleanup(disk.stop)
         # Host-independent tests must never contact production from Gem's test gate.
         clock = patch.object(lane.continuity_clock, "tick", return_value={"status": "current"})
         clock.start()
@@ -1731,6 +1748,9 @@ class PreservedRecoveryTest(unittest.TestCase):
 
 class FixRedTest(unittest.TestCase):
     def setUp(self):
+        disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+        disk.start()
+        self.addCleanup(disk.stop)
         self.real_reconcile_fix_target = lane.reconcile_fix_target
         lane.reconcile_fix_target = lambda pr: {**pr, "state": "OPEN", "mergedAt": None}
         self.addCleanup(setattr, lane, "reconcile_fix_target", self.real_reconcile_fix_target)
