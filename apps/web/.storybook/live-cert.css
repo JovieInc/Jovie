@@ -1,0 +1,40 @@
+/**
+ * Bounded Tailwind context for the fail-closed live primitive certificate.
+ * It projects the production token sources but scans only the components and
+ * stories inside the certificate's declared claim boundary.
+ */
+
+@layer theme, base, clerk, components, utilities;
+
+@import "tailwindcss" source(none);
+@import "../styles/design-system.css";
+@import "../styles/theme.css";
+@import "../styles/tailwind-foundation.css";
+
+@source "./preview.tsx";
+@source "../../../packages/ui/atoms/badge.stories.tsx";
+@source "../../../packages/ui/atoms/button.stories.tsx";
+@source "../../../packages/ui/atoms/Card.stories.tsx";
+@source "../../../packages/ui/atoms/switch.stories.tsx";
+@source "../../../packages/ui/atoms/badge.tsx";
+@source "../../../packages/ui/atoms/button.tsx";
+@source "../../../packages/ui/atoms/card.tsx";
+@source "../../../packages/ui/atoms/inline-offline.tsx";
+@source "../../../packages/ui/atoms/label.tsx";
+@source "../../../packages/ui/atoms/spinner.tsx";
+@source "../../../packages/ui/atoms/switch.tsx";
+@source "../../../packages/ui/lib/badge-geometry-contract.ts";
+
+@layer base {
+  html,
+  body,
+  #storybook-root {
+    min-height: 100%;
+  }
+
+  body {
+    background: var(--color-bg-base);
+    color: var(--color-text-primary-token);
+    font-family: var(--font-sans);
+  }
+}
