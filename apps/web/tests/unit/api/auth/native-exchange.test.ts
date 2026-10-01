@@ -244,6 +244,68 @@ describe('native auth exchange route (Better Auth)', () => {
     expect(mockCaptureError).not.toHaveBeenCalled();
   });
 
+  it('returns 401 ott_invalid when OTT verification rejects the token', async () => {
+    setupSuccessfulExchange();
+    setupIosSessionCreation();
+    const { APIError } = await import('better-auth/api');
+    mockVerifyOneTimeToken.mockRejectedValue(
+      new APIError('BAD_REQUEST', { message: 'Invalid token' })
+    );
+
+    const { POST } = await import('@/app/api/auth/native/exchange/route');
+    const response = await POST(createExchangeRequest('ios'));
+    const data = await response.json();
+
+    // An unverifiable OTT is an auth rejection, not a server fault: the
+    // client restarts sign-in from a handled 401 (JOV-4853).
+    expect(response.status).toBe(401);
+    expect(data.reason).toBe('ott_invalid');
+    expect(mockInternalAdapterCreateSession).not.toHaveBeenCalled();
+    expect(mockCaptureError).not.toHaveBeenCalled();
+    expect(mockCreateAuthAnalyticsEvent).toHaveBeenCalledWith(
+      'auth_exchange_failed',
+      {
+        client: 'ios',
+        intent: 'sign_in',
+        result: 'failed',
+        reason: 'ott_invalid',
+      }
+    );
+  });
+
+  it('returns 401 ott_invalid when the OTT browser session is gone', async () => {
+    setupSuccessfulExchange();
+    setupIosSessionCreation();
+    const { APIError } = await import('better-auth/api');
+    mockVerifyOneTimeToken.mockRejectedValue(
+      new APIError('BAD_REQUEST', { message: 'Session not found' })
+    );
+
+    const { POST } = await import('@/app/api/auth/native/exchange/route');
+    const response = await POST(createExchangeRequest('ios'));
+    const data = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(data.reason).toBe('ott_invalid');
+    expect(mockInternalAdapterCreateSession).not.toHaveBeenCalled();
+    expect(mockCaptureError).not.toHaveBeenCalled();
+  });
+
+  it('keeps a non-API OTT verification failure as a captured 500', async () => {
+    setupSuccessfulExchange();
+    setupIosSessionCreation();
+    mockVerifyOneTimeToken.mockRejectedValue(new Error('adapter down'));
+    mockCaptureError.mockResolvedValue(undefined);
+
+    const { POST } = await import('@/app/api/auth/native/exchange/route');
+    const response = await POST(createExchangeRequest('ios'));
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe('Native auth exchange failed');
+    expect(mockCaptureError).toHaveBeenCalled();
+  });
+
   it('keeps a genuine session-creation failure as a captured 500', async () => {
     setupSuccessfulExchange();
     setupIosSessionCreation();
