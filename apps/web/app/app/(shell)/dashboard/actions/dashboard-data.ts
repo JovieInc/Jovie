@@ -1114,15 +1114,18 @@ async function fetchTippingStatsWithSession(
       monthReceivedCents: Number(tipTotalsRaw?.monthReceived ?? 0),
     };
   } catch (error) {
-    // Query timeouts are expected during Neon cold starts — downgrade to warning.
-    // The dashboard degrades gracefully by showing empty tipping stats.
-    const level =
-      error instanceof Error &&
-      (error.name === 'QueryTimeoutError' || isPostgresTimeoutError(error))
-        ? 'warning'
-        : 'error';
+    // This supplementary read already degrades safely to empty stats. Expected
+    // Neon cold-start timeouts are infrastructure noise, not actionable Sentry
+    // issues; Drizzle's wrapper otherwise groups them by the aggregate SQL.
+    if (isQueryTimeoutError(error) || isPostgresTimeoutError(error)) {
+      logger.warn(
+        '[tipping-stats] tipping stats query timed out; degrading to empty stats'
+      );
+      return createEmptyTippingStats();
+    }
+
     Sentry.captureException(error, {
-      level,
+      level: 'error',
       tags: { query: 'tipping_stats', context: 'dashboard_data' },
     });
     return createEmptyTippingStats();
