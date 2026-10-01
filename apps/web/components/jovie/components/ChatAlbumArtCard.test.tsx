@@ -78,4 +78,28 @@ describe('ChatAlbumArtCard', () => {
       screen.queryByText('Could not apply artwork. Try again.')
     ).toBeNull();
   });
+
+  it('keeps candidate labels off the artwork and never crops album art', () => {
+    mockUseApplyGeneratedAlbumArtMutation.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      isError: false,
+    });
+    mockUseCreateReleaseWithGeneratedAlbumArtMutation.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      isError: false,
+    });
+
+    render(
+      <ChatAlbumArtCard result={GENERATED_RESULT} profileId='profile-123' />
+    );
+
+    const artwork = screen.getByAltText(
+      'Skyline Dreams album art in Dream Pop style'
+    );
+    expect(artwork).toHaveClass('object-contain');
+    expect(artwork).not.toHaveClass('object-cover');
+    expect(screen.getByText('Dream Pop')).not.toHaveClass('absolute');
+  });
 });

@@ -170,7 +170,7 @@ function ChatAlbumArtCardSuccess({
               type='button'
               onClick={() => setSelectedCandidateId(candidate.id)}
               className={cn(
-                'group relative aspect-square min-w-24 overflow-hidden rounded-lg border bg-surface-2 text-left transition-colors',
+                'group min-w-24 overflow-hidden rounded-lg border bg-surface-2 text-left transition-colors',
                 isSelected
                   ? 'border-cyan-400/60 shadow-[inset_0_0_0_1px_rgb(103_232_249_/_0.18)]'
                   : 'border-subtle hover:border-secondary-token'
@@ -178,15 +178,17 @@ function ChatAlbumArtCardSuccess({
               aria-pressed={isSelected}
               aria-label={`Select ${candidate.styleLabel} artwork for ${result.releaseTitle}`}
             >
-              <Image
-                src={candidate.previewUrl}
-                alt={`${result.releaseTitle} album art in ${candidate.styleLabel} style`}
-                fill
-                className='object-cover'
-                sizes='160px'
-                unoptimized
-              />
-              <span className='absolute inset-x-1 bottom-1 rounded bg-black/55 px-1.5 py-1 text-3xs font-medium text-white dark:text-white backdrop-blur'>
+              <span className='relative block aspect-square w-full bg-surface-1'>
+                <Image
+                  src={candidate.previewUrl}
+                  alt={`${result.releaseTitle} album art in ${candidate.styleLabel} style`}
+                  fill
+                  className='object-contain'
+                  sizes='160px'
+                  unoptimized
+                />
+              </span>
+              <span className='block border-t border-subtle px-2 py-1.5 text-3xs font-medium text-secondary-token'>
                 {candidate.styleLabel}
               </span>
             </button>
