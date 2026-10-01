@@ -33,6 +33,7 @@ import { sweepUnderEnrichedProfilesForCron } from '@/lib/discography/re-enrich';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { cleanupFounderReviewUploadLeases } from '@/lib/founder-review/server';
+import { runMusicResolverParityCorpus } from '@/lib/music-resolver/shadow';
 import { runOnboardingScriptAggregation } from '@/lib/onboarding/script-aggregation';
 import { getLybDailyMrr } from '@/lib/ovie/lyb-mrr.server';
 import { runProfileSearchMonitoring } from '@/lib/profile-search/runner';
@@ -205,6 +206,12 @@ export async function GET(request: Request) {
       alerts: spend.alerts,
     };
   });
+
+  // Shadow-only resolver parity: durable cache, no product reads.
+  results.musicResolverParity = await runSubJob(
+    'musicResolverParity',
+    runMusicResolverParityCorpus
+  );
 
   // 13. Data retention — Sundays only (heavy operation)
   const isSunday = new Date().getDay() === 0;
