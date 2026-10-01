@@ -74,3 +74,95 @@ test('contract replay cannot claim a live run or production authority', () => {
   assert.ok(errors.some(error => error.includes('live provider run')));
   assert.ok(errors.some(error => error.includes('production promotion')));
 });
+
+test('retained Jovie controls cannot be delegated or disowned', () => {
+  for (const capability of ['retries-recovery', 'product-specific-behavior']) {
+    const delegated = receipt();
+    const slice = delegated.slices.find(
+      entry => entry.capability === capability
+    );
+    slice.jovieOwned = false;
+    slice.disposition = 'ADOPT';
+    const errors = validateComputerUseDecision(delegated);
+    assert.ok(
+      errors.some(error =>
+        error.includes(`${capability} must remain Jovie-owned`)
+      )
+    );
+    assert.ok(
+      errors.some(error => error.includes(`${capability} cannot be delegated`))
+    );
+  }
+});
+
+test('placeholder sources fail validation', () => {
+  const value = receipt();
+  value.sources[0] = { url: '', evidence: 'TODO' };
+  value.sources[1] = { url: 'not-a-url', evidence: 'see docs' };
+  const errors = validateComputerUseDecision(value);
+  assert.ok(errors.some(error => error.includes('material https source')));
+  assert.ok(errors.some(error => error.includes('material evidence')));
+});
+
+test('work entries cannot map to bogus capabilities or lack evidence', () => {
+  const value = receipt();
+  value.affectedWork[0].capabilities = ['invented-capability'];
+  value.affectedWork[0].evidence = '';
+  const errors = validateComputerUseDecision(value);
+  assert.ok(
+    errors.some(error =>
+      error.includes('unknown capability invented-capability')
+    )
+  );
+  assert.ok(errors.some(error => error.includes('material evidence')));
+});
+
+test('slices cannot introduce unknown capabilities or empty reasons', () => {
+  const value = receipt();
+  value.slices.push({ capability: 'uncontrolled-slice', disposition: 'KEEP' });
+  const errors = validateComputerUseDecision(value);
+  assert.ok(errors.some(error => error.includes('unknown capability slice')));
+  assert.ok(
+    errors.some(error =>
+      error.includes('uncontrolled-slice must record a reason')
+    )
+  );
+});
+
+test('replay fails closed on empty or unapproved origins and empty oracle', () => {
+  const emptyOrigins = receipt();
+  emptyOrigins.replay.approvedOrigins = [];
+  assert.ok(
+    validateComputerUseDecision(emptyOrigins).some(error =>
+      error.includes('approved origins')
+    )
+  );
+
+  const hostile = receipt();
+  hostile.replay.approvedOrigins = ['http://evil.example', ''];
+  hostile.replay.oracle = '';
+  const errors = validateComputerUseDecision(hostile);
+  assert.ok(
+    errors.filter(error => error.includes('not an approved https origin'))
+      .length === 2
+  );
+  assert.ok(errors.some(error => error.includes('independent oracle')));
+});
+
+test('production promotion requires material requirements', () => {
+  const empty = receipt();
+  empty.productionPromotion.requirements = [];
+  assert.ok(
+    validateComputerUseDecision(empty).some(error =>
+      error.includes('promotion requirements')
+    )
+  );
+
+  const hollow = receipt();
+  hollow.productionPromotion.requirements = ['ok'];
+  assert.ok(
+    validateComputerUseDecision(hollow).some(error =>
+      error.includes('must be material')
+    )
+  );
+});

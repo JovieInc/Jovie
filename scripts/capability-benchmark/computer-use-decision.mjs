@@ -24,8 +24,26 @@ const CONTROL_CAPABILITIES = new Set([
   'deterministic-verification',
   'identity-tenant-control',
   'policy-safety',
+  'product-specific-behavior',
   'provenance',
+  'retries-recovery',
 ]);
+
+const ISSUE_ID_PATTERN = /^JOV-\d+$/;
+const MIN_EVIDENCE_LENGTH = 20;
+
+function isHttpsUrl(value) {
+  if (typeof value !== 'string') return false;
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function isMaterialText(value, minLength = MIN_EVIDENCE_LENGTH) {
+  return typeof value === 'string' && value.trim().length >= minLength;
+}
 
 const REQUIRED_CAPABILITIES = new Set([
   'approval-boundary',
@@ -110,6 +128,20 @@ export function validateComputerUseDecision(receipt) {
   }
   if (!Array.isArray(receipt.sources) || receipt.sources.length < 2) {
     errors.push('sources must include at least two current primary sources');
+  } else {
+    for (const [index, source] of receipt.sources.entries()) {
+      const label = `source[${index}]`;
+      if (!isRecord(source)) {
+        errors.push(`${label} must be an object`);
+        continue;
+      }
+      if (!isHttpsUrl(source.url)) {
+        errors.push(`${label} must cite a material https source`);
+      }
+      if (!isMaterialText(source.evidence)) {
+        errors.push(`${label} must record material evidence`);
+      }
+    }
   }
   if (
     !Array.isArray(receipt.assumptionsBroken) ||
@@ -128,6 +160,9 @@ export function validateComputerUseDecision(receipt) {
     if (ids.has(slice.capability))
       errors.push(`duplicate slice ${slice.capability}`);
     ids.add(slice.capability);
+    if (!REQUIRED_CAPABILITIES.has(slice.capability)) {
+      errors.push(`unknown capability slice ${slice.capability}`);
+    }
     if (!DISPOSITIONS.has(slice.disposition)) {
       errors.push(`unknown disposition for ${slice.capability}`);
     }
@@ -138,6 +173,9 @@ export function validateComputerUseDecision(receipt) {
       if (['ADOPT', 'REPLACE', 'RETIRE'].includes(slice.disposition)) {
         errors.push(`${slice.capability} cannot be delegated to a provider`);
       }
+    }
+    if (!isMaterialText(slice.reason, 10)) {
+      errors.push(`${slice.capability} must record a reason`);
     }
   }
   for (const capability of REQUIRED_CAPABILITIES) {
@@ -153,12 +191,33 @@ export function validateComputerUseDecision(receipt) {
     errors.push('affectedWork must enumerate linked Linear work');
   } else {
     for (const work of receipt.affectedWork) {
+      if (!isRecord(work)) {
+        errors.push('every affectedWork entry must be an object');
+        continue;
+      }
+      if (
+        typeof work.issue !== 'string' ||
+        !ISSUE_ID_PATTERN.test(work.issue)
+      ) {
+        errors.push('every affectedWork entry needs a JOV-* issue id');
+      }
       affectedIssueIds.add(work.issue);
       if (!DISPOSITIONS.has(work.disposition)) {
         errors.push(`unknown work disposition for ${work.issue}`);
       }
       if (!Array.isArray(work.capabilities) || work.capabilities.length === 0) {
         errors.push(`${work.issue} must map to capabilities`);
+      } else {
+        for (const capability of work.capabilities) {
+          if (!REQUIRED_CAPABILITIES.has(capability)) {
+            errors.push(
+              `${work.issue} maps to unknown capability ${capability}`
+            );
+          }
+        }
+      }
+      if (!isMaterialText(work.evidence)) {
+        errors.push(`${work.issue} must record material evidence`);
       }
     }
     if (!receipt.affectedWork.some(work => work.mutation === 'verified')) {
@@ -180,6 +239,26 @@ export function validateComputerUseDecision(receipt) {
     if (replay.risk !== 'public-read-only') {
       errors.push('first replay must be public-read-only');
     }
+    if (
+      !Array.isArray(replay.approvedOrigins) ||
+      replay.approvedOrigins.length === 0
+    ) {
+      errors.push('replay must enumerate approved origins');
+    } else {
+      for (const origin of replay.approvedOrigins) {
+        if (!isHttpsUrl(origin)) {
+          errors.push(
+            `replay origin is not an approved https origin: ${origin}`
+          );
+        }
+      }
+    }
+    if (!isMaterialText(replay.oracle)) {
+      errors.push('replay must name an independent oracle');
+    }
+    if (!isMaterialText(replay.task, 10)) {
+      errors.push('replay must describe its task');
+    }
     const steps = Array.isArray(replay.steps) ? replay.steps : [];
     let previous = -1;
     for (const step of REQUIRED_REPLAY_STEPS) {
@@ -195,6 +274,16 @@ export function validateComputerUseDecision(receipt) {
 
   if (receipt.productionPromotion?.allowed !== false) {
     errors.push('contract replay cannot authorize production promotion');
+  }
+  const requirements = receipt.productionPromotion?.requirements;
+  if (!Array.isArray(requirements) || requirements.length === 0) {
+    errors.push('productionPromotion must enumerate promotion requirements');
+  } else {
+    for (const requirement of requirements) {
+      if (!isMaterialText(requirement, 10)) {
+        errors.push('every promotion requirement must be material');
+      }
+    }
   }
   if (
     !Array.isArray(receipt.nextInvalidationTriggers) ||
