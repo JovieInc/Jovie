@@ -18,6 +18,7 @@ export const OVIE_MCP_TOOLS = [
   'get_gbrain_page',
   'record_operational_memory',
   'coordinate_linear_work',
+  'get_proof_brief',
 ] as const;
 
 export type OvieMcpToolName = (typeof OVIE_MCP_TOOLS)[number];
@@ -35,6 +36,7 @@ export const OVIE_WRITE_TOOLS = [
 export const OVIE_FOUNDER_TOOLS = [
   'get_invariant_stewardship',
   'get_workflow_capture',
+  'get_proof_brief',
 ] as const;
 
 export type CertLevel =
