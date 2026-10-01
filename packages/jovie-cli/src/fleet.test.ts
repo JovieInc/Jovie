@@ -19,6 +19,93 @@ const result = {
 };
 
 describe('scoped fleet adapters', () => {
+  it.each([
+    ['fleet', 'directory', 'fleet_directory', 'fleet.directory', {}],
+    [
+      'work',
+      'request',
+      'work_request',
+      'work.request',
+      {
+        requestId: '33333333-3333-4333-a333-333333333333',
+        kind: 'research',
+        proposal: {
+          issueId: 'JOV-7393',
+          title: 'Verify the public contract',
+          acceptanceCriteria: ['Return a public contract receipt'],
+          existingWorkRefs: ['urn:public:contract'],
+          command: 'api.openapi',
+          requiredTools: [],
+          requiredConnectors: [],
+          maxDurationSeconds: 60,
+          notAfter: '2026-10-01T19:00:00Z',
+        },
+      },
+    ],
+  ] as const)(
+    'routes %s %s through CLI and MCP with the exact bounded proposal',
+    async (group, command, tool, action, proposal) => {
+      const payload = { ...result, receipt: { actionId: action } };
+      const fetchImpl = vi.fn(async () => Response.json(payload));
+      let output = '';
+      expect(
+        await runCli(
+          [
+            group,
+            command,
+            '--profile',
+            profile,
+            '--idempotency-key',
+            input.key,
+            '--input',
+            JSON.stringify(proposal),
+            '--json',
+          ],
+          {
+            workerToken,
+            fetchImpl,
+            stdout: {
+              write: value => {
+                output += value;
+              },
+            },
+          }
+        )
+      ).toBe(0);
+      expect(JSON.parse(output)).toEqual(payload);
+      const response = await handleMcpMessage(
+        {
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: {
+            name: tool,
+            arguments: {
+              profile,
+              'idempotency-key': input.key,
+              input: JSON.stringify(proposal),
+            },
+          },
+        },
+        { workerToken, fetchImpl, version: 'test', baseUrl: 'https://jov.ie' }
+      );
+      expect(response?.result).toMatchObject({ structuredContent: payload });
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+      for (const [url, init] of fetchImpl.mock.calls as unknown as [
+        string,
+        RequestInit,
+      ][]) {
+        expect(url).toBe(`https://jov.ie/api/v1/actions/${action}/invoke`);
+        expect(JSON.parse(String(init.body))).toMatchObject({
+          idempotencyKey: input.key,
+          context: { profileId: profile },
+          input: proposal,
+        });
+      }
+      expect(output).not.toContain(workerToken);
+    }
+  );
+
   it('sends one bounded POST with a stable invocation key and scoped bearer', async () => {
     const fetchImpl = vi.fn(async () => Response.json(result));
     expect(
