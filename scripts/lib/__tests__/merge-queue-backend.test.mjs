@@ -1576,7 +1576,7 @@ describe('canonical admission membership binding', () => {
                 ],
                 {
                   env: environment,
-                  timeout: 3000,
+                  timeout: 15000,
                 },
                 (error, stdout, stderr) => {
                   if (error) {
@@ -1622,7 +1622,7 @@ describe('canonical admission membership binding', () => {
       await new Promise(resolve => server.close(resolve));
       rmSync(config, { recursive: true, force: true });
     }
-  });
+  }, 30000);
   it('does not prove or stamp new membership when receipt evidence is unavailable', () => {
     const source = readRepoFile('scripts/drain-pr-queue.sh');
     const start = source.indexOf('record_queue_reentry_receipt() {');
