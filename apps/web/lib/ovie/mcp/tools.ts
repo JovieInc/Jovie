@@ -1,3 +1,10 @@
+import {
+  getOvieBoundedApproval,
+  OVIE_APPROVAL_ACTIONS,
+  OVIE_APPROVAL_MAX_TTL_MINUTES,
+  recordOvieBoundedApproval,
+  verifyOvieBoundedApproval,
+} from '@/lib/ovie/approvals';
 import { authorizeSummerControl } from '@/lib/ovie/control';
 import { bindEveIdentityForTurn } from '@/lib/ovie/identity';
 import { normalizeLegacyEngineeringInitiativeForStore } from '@/lib/ovie/legacy-routing';
@@ -282,6 +289,40 @@ function toolInputSchema(name: OvieMcpToolName): Record<string, unknown> {
       },
     };
   }
+  if (name === 'record_bounded_approval') {
+    return {
+      type: 'object',
+      additionalProperties: false,
+      required: ['actor', 'action', 'repository', 'revision', 'diff_digest'],
+      properties: {
+        actor: { type: 'string', minLength: 1, maxLength: 200 },
+        action: { type: 'string', enum: [...OVIE_APPROVAL_ACTIONS] },
+        repository: { type: 'string', minLength: 1, maxLength: 200 },
+        revision: { type: 'string', minLength: 1, maxLength: 128 },
+        diff_digest: {
+          type: 'string',
+          pattern: '^sha256:[0-9a-f]{64}$',
+          description: 'sha256 digest of the material diff the approval covers',
+        },
+        ttl_minutes: { type: 'integer', minimum: 1, maximum: 60 },
+      },
+    };
+  }
+  if (name === 'get_bounded_approval') {
+    return {
+      type: 'object',
+      additionalProperties: false,
+      required: ['id'],
+      properties: {
+        id: { type: 'string', minLength: 1 },
+        actor: { type: 'string', minLength: 1 },
+        action: { type: 'string', minLength: 1 },
+        repository: { type: 'string', minLength: 1 },
+        revision: { type: 'string' },
+        diff_digest: { type: 'string' },
+      },
+    };
+  }
   return { type: 'object', additionalProperties: true };
 }
 
@@ -313,6 +354,10 @@ function toolDescription(name: OvieMcpToolName): string {
       return 'Create or update a Linear issue under explicit founder intent, then read it back. Never claims execution completion or delivery acceptance.';
     case 'record_operational_memory':
       return 'Append a Summer-owned operational-memory record under ops/summer/* with provenance. Buffers when GBrain is unavailable. Not authority/policy writes, not Linear acceptance, not execution completion.';
+    case 'record_bounded_approval':
+      return 'Record a bounded approval for actor, action, repository, revision and diff digest with expiry. Survives restart; a changed revision, actor, action, repository or expiry invalidates it. Does not execute the approved action.';
+    case 'get_bounded_approval':
+      return 'Read one bounded approval and verify it against actor, action, repository, revision and diff digest. Verification never confers authority; callers keep their own gates.';
     case 'get_proof_brief':
       return 'Resolve the most recent certified proof brief for an audience (default: investor). Returns the share-image path, copy-ready text, and a chat card. Prepares content only; never sends.';
     case 'list_linear_issues':
@@ -346,7 +391,8 @@ export async function callOvieMcpTool(
   if (
     isOvieWriteTool(name) &&
     name !== 'record_operational_memory' &&
-    name !== 'coordinate_linear_work'
+    name !== 'coordinate_linear_work' &&
+    name !== 'record_bounded_approval'
   ) {
     turn.require('ingest-ack');
   }
@@ -410,6 +456,16 @@ export async function callOvieMcpTool(
       return {
         ok: true,
         result: await coordinateLinearWorkTool(args),
+      };
+    case 'record_bounded_approval':
+      return {
+        ok: true,
+        result: await recordBoundedApprovalTool(store, principal, args),
+      };
+    case 'get_bounded_approval':
+      return {
+        ok: true,
+        result: await getBoundedApprovalTool(store, args),
       };
     case 'get_proof_brief':
       return { ok: true, result: getProofBrief(args) };
@@ -975,5 +1031,83 @@ async function recordOperationalMemory(
       linearAccepted: false,
       executionCompleted: false,
     },
+  };
+}
+
+async function recordBoundedApprovalTool(
+  store: OperatingStore,
+  principal: OvieMcpPrincipal,
+  args: Record<string, unknown>
+) {
+  const actor = stringOpt(args.actor) ?? '';
+  const revision = stringOpt(args.revision) ?? '';
+  const diffDigest = stringOpt(args.diff_digest) ?? '';
+  const ttlRaw = args.ttl_minutes;
+  const approval = await recordOvieBoundedApproval(store, {
+    actor,
+    action: stringOpt(args.action) ?? '',
+    repository: stringOpt(args.repository) ?? '',
+    revision,
+    diffDigest,
+    ttlMinutes:
+      typeof ttlRaw === 'number' && Number.isInteger(ttlRaw)
+        ? ttlRaw
+        : undefined,
+  });
+  return {
+    ...approval,
+    executed: false,
+    authority_conferred: false,
+    recorded_by: principal.subject ?? null,
+    max_ttl_minutes: OVIE_APPROVAL_MAX_TTL_MINUTES,
+    identities: {
+      approvalRecorded: true,
+      linearAccepted: false,
+      executionCompleted: false,
+      deliveryAccepted: false,
+    },
+  };
+}
+
+async function getBoundedApprovalTool(
+  store: OperatingStore,
+  args: Record<string, unknown>
+) {
+  const id = stringOpt(args.id) ?? '';
+  const actor = stringOpt(args.actor);
+  const action = stringOpt(args.action);
+  const repository = stringOpt(args.repository);
+  const revision = stringOpt(args.revision);
+  const diffDigest = stringOpt(args.diff_digest);
+  if (actor && (!action || !repository)) {
+    throw new Error(
+      'verification requires action and repository together with actor'
+    );
+  }
+  const approval = await getOvieBoundedApproval(store, id);
+  if (!approval) {
+    return { ok: false, found: false, message: `unknown approval ${id}` };
+  }
+  if (!actor || !action || !repository) {
+    return { ok: true, found: true, approval, verified: null };
+  }
+  const verdict = verifyOvieBoundedApproval(approval, {
+    actor,
+    action,
+    repository,
+    revision: revision || undefined,
+    diffDigest: diffDigest || undefined,
+  });
+  return {
+    ok: true,
+    found: true,
+    approval,
+    verified: verdict.valid
+      ? { valid: true, reason: null, authority_conferred: false }
+      : {
+          valid: false,
+          reason: verdict.reason,
+          authority_conferred: false,
+        },
   };
 }

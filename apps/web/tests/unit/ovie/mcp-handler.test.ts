@@ -244,6 +244,96 @@ describe('Ovie MCP handler', () => {
     expect(result.status).toBe(403);
   });
 
+  it('records and verifies a bounded approval without conferring authority', async () => {
+    const store = new MemoryOperatingStore();
+    const digest = `sha256:${'1'.padStart(64, '0')}`;
+    const recorded = await handleOvieMcpRequest({
+      store,
+      principal: founder,
+      body: rpc('tools/call', {
+        name: 'record_bounded_approval',
+        arguments: {
+          actor: 'founder_1',
+          action: 'merge',
+          repository: 'JovieInc/Jovie',
+          revision: 'a'.repeat(40),
+          diff_digest: digest,
+        },
+      }),
+    });
+    expect(recorded.status).toBe(200);
+    const approval = toolResult<{
+      id: string;
+      actor: string;
+      action: string;
+      executed: boolean;
+      authority_conferred: boolean;
+      identities: Record<string, boolean>;
+    }>(recorded.body);
+    expect(approval.executed).toBe(false);
+    expect(approval.authority_conferred).toBe(false);
+    expect(approval.identities.executionCompleted).toBe(false);
+
+    const verified = await handleOvieMcpRequest({
+      store,
+      principal: founder,
+      body: rpc('tools/call', {
+        name: 'get_bounded_approval',
+        arguments: {
+          id: approval.id,
+          actor: 'founder_1',
+          action: 'merge',
+          repository: 'JovieInc/Jovie',
+          revision: 'a'.repeat(40),
+          diff_digest: digest,
+        },
+      }),
+    });
+    expect(verified.status).toBe(200);
+    expect(
+      toolResult<{
+        verified: { valid: boolean; reason: string | null };
+      }>(verified.body).verified
+    ).toMatchObject({ valid: true, reason: null });
+
+    const stale = await handleOvieMcpRequest({
+      store,
+      principal: founder,
+      body: rpc('tools/call', {
+        name: 'get_bounded_approval',
+        arguments: {
+          id: approval.id,
+          actor: 'founder_1',
+          action: 'merge',
+          repository: 'JovieInc/Jovie',
+          revision: 'b'.repeat(40),
+        },
+      }),
+    });
+    expect(
+      toolResult<{
+        verified: { valid: boolean; reason: string };
+      }>(stale.body).verified
+    ).toMatchObject({ valid: false, reason: 'revision-mismatch' });
+  });
+
+  it('rejects non-founder bounded-approval writes', async () => {
+    const result = await handleOvieMcpRequest({
+      body: rpc('tools/call', {
+        name: 'record_bounded_approval',
+        arguments: {
+          actor: 'founder_1',
+          action: 'merge',
+          repository: 'JovieInc/Jovie',
+          revision: 'a'.repeat(40),
+          diff_digest: `sha256:${'1'.padStart(64, '0')}`,
+        },
+      }),
+      principal: user,
+    });
+    expect(result.status).toBe(403);
+  });
+
   it('founder-gates Linear and GitHub provider work', async () => {
     for (const name of ['list_linear_issues', 'list_github_issues']) {
       const result = await handleOvieMcpRequest({
