@@ -63,6 +63,53 @@ describe('shrink-only count ratchet (merge-group safe)', () => {
     expect(verdict.message).toContain('1607');
   });
 
+  it('passes an inherited stale floor on pull_request and local (JOV-5326)', () => {
+    // merge_group's sibling-shrink leniency let a removal land without the
+    // floor update, so the merge-base already measures 1607 < baseline 1609.
+    for (const event of [
+      SHRINK_ONLY_COUNT_EVENTS.PULL_REQUEST,
+      SHRINK_ONLY_COUNT_EVENTS.LOCAL,
+    ] as const) {
+      const verdict = evaluateShrinkOnlyCount({
+        count: 1607,
+        baseline: 1609,
+        baseCount: 1607,
+        event,
+        metric: '--linear-* usage',
+      });
+      expect(verdict).toMatchObject({
+        ok: true,
+        status: SHRINK_ONLY_COUNT_STATUSES.INHERITED_SHRINK,
+        event,
+      });
+      expect(verdict.message).toContain('inherited');
+      expect(verdict.message).toContain('1607');
+    }
+  });
+
+  it('still fails when this tree authored the below-baseline shrink (JOV-5326)', () => {
+    // The base was at the floor and this tree removed occurrences without
+    // lowering the baseline — authorship debt stays fail-closed.
+    for (const event of [
+      SHRINK_ONLY_COUNT_EVENTS.PULL_REQUEST,
+      SHRINK_ONLY_COUNT_EVENTS.LOCAL,
+    ] as const) {
+      const verdict = evaluateShrinkOnlyCount({
+        count: 1605,
+        baseline: 1609,
+        baseCount: 1607,
+        event,
+        metric: '--linear-* usage',
+      });
+      expect(verdict).toMatchObject({
+        ok: false,
+        status: SHRINK_ONLY_COUNT_STATUSES.UNBASELINED_SHRINK,
+        event,
+      });
+      expect(verdict.message).toContain('lower the baseline to 1605');
+    }
+  });
+
   it('still fail-closes unbaselined shrink on pull_request and local authorship', () => {
     for (const event of [
       SHRINK_ONLY_COUNT_EVENTS.PULL_REQUEST,
@@ -131,6 +178,13 @@ describe('shrink-only count ratchet (merge-group safe)', () => {
     ).toThrow(/finite numbers/);
     expect(() =>
       evaluateShrinkOnlyCount({ count: 1, baseline: Number.POSITIVE_INFINITY })
+    ).toThrow(/finite numbers/);
+    expect(() =>
+      evaluateShrinkOnlyCount({
+        count: 1,
+        baseline: 2,
+        baseCount: Number.NaN,
+      })
     ).toThrow(/finite numbers/);
   });
 
