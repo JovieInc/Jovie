@@ -560,6 +560,8 @@ export {
 // Finance (Owner-only personal financial data — JOV-4609)
 export {
   type FinanceAccount,
+  type FinanceBudgetSettings,
+  type FinanceBudgetTarget,
   type FinanceClassificationRule,
   type FinanceExport,
   type FinanceInstitution,
@@ -567,6 +569,8 @@ export {
   type FinanceTransactionClassification,
   type FinanceTransactionSplit,
   financeAccounts,
+  financeBudgetSettings,
+  financeBudgetTargets,
   financeClassificationRules,
   financeExports,
   financeInstitutions,
@@ -574,6 +578,8 @@ export {
   financeTransactionSplits,
   financeTransactions,
   type NewFinanceAccount,
+  type NewFinanceBudgetSettings,
+  type NewFinanceBudgetTarget,
   type NewFinanceClassificationRule,
   type NewFinanceExport,
   type NewFinanceInstitution,
@@ -1007,6 +1013,7 @@ export {
   type NewModelUsageEvent,
   selectModelExperimentSchema,
 } from './model-experiments';
+export { musicResolverReceipts } from './music-resolver';
 // Notifications (SMS subscribe intents, cross-artist contact identity)
 export {
   insertNotificationContactSchema,

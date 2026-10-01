@@ -4,12 +4,14 @@ import { parseMainArtists } from './artist-parser';
 import {
   type CanonicalReleaseCredit,
   collectOrderedPrimaryNames,
+  materializeContributorCreditPayload,
   materializeReleaseCreditPayload,
   parseProviderAlbumArtists,
   reconcilePrimaryArtists,
   resolveSmartLinkArtistByline,
   selectPrimaryArtistCredits,
   serializePrimaryArtists,
+  TAKE_ME_OVER_ROLE_COMPLETE_FIXTURE,
   WHEELS_UP_MULTI_PRIMARY_FIXTURE,
 } from './release-credits';
 
@@ -167,6 +169,50 @@ describe('release credit integrity', () => {
       first.primaryArtists.map(credit => credit.name)
     );
     expect(revalidated.mismatch).toBeNull();
+  });
+
+  it('serializes the complete Take Me Over contributor graph losslessly', () => {
+    const fixture = TAKE_ME_OVER_ROLE_COMPLETE_FIXTURE;
+    const credits: CanonicalReleaseCredit[] = fixture.expected.map(
+      (credit, position) => ({
+        artistId: `artist-${position}`,
+        spotifyId: credit.name === 'Austin Leeds' ? 'spotify-austin' : null,
+        appleMusicId: credit.name === 'Erica Gibson' ? 'apple-erica' : null,
+        name: credit.name,
+        handle: credit.name === 'Tim White' ? 'timwhite' : null,
+        role: credit.role,
+        position,
+        isPrimary: credit.role === 'main_artist',
+        sourceType: 'ingested',
+        metadata: {
+          apple_music: {
+            sourceEntityId: 'apple-track-take-me-over-remix',
+          },
+        },
+      })
+    );
+
+    const cached = JSON.parse(
+      JSON.stringify(
+        materializeContributorCreditPayload({ storedCredits: credits })
+      )
+    ) as ReturnType<typeof materializeContributorCreditPayload>;
+
+    expect(cached.credits.map(({ name, role }) => ({ name, role }))).toEqual(
+      fixture.expected
+    );
+    expect(cached.primaryArtists.map(credit => credit.name)).toEqual([
+      'Tim White',
+    ]);
+    expect(cached.credits[1]).toMatchObject({
+      appleMusicId: 'apple-erica',
+      role: 'featured_artist',
+      metadata: {
+        apple_music: {
+          sourceEntityId: 'apple-track-take-me-over-remix',
+        },
+      },
+    });
   });
 
   it('unions a missing provider primary and emits an observable mismatch', () => {
