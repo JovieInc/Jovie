@@ -18,7 +18,7 @@ const TITLE_ACCENT_CLASS: Record<JovieMarketingAccent, string> = {
   purple: 'm-spec-bento__title--purple',
 };
 
-interface MarketingPlatformSpecBentoProps {
+export interface MarketingPlatformSpecBentoProps {
   readonly testId?: string;
 }
 

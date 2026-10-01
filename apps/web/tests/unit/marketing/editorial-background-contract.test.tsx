@@ -15,7 +15,7 @@ function readWebSource(relativePath: string): string {
 describe('MarketingEditorialBackground (JOV-6249 shared background system)', () => {
   it('renders both variants as one family with data-variant identity', () => {
     for (const variant of ['soft', 'flowing'] as const) {
-      const { getByTestId, container } = render(
+      const { getByTestId, container, unmount } = render(
         <MarketingEditorialBackground variant={variant} />
       );
 
@@ -40,6 +40,7 @@ describe('MarketingEditorialBackground (JOV-6249 shared background system)', () 
         root.querySelectorAll('img, video, canvas, svg text')
       ).toHaveLength(0);
       expect(root.textContent).toBe('');
+      unmount();
     }
   });
 
@@ -116,7 +117,7 @@ describe('MarketingEditorialBackground (JOV-6249 shared background system)', () 
     expect(css.match(/radial-gradient\(/g)?.length).toBeLessThanOrEqual(9);
     const flowing = css.split('.marketing-editorial-background--flowing');
     // The dominant sweep enters left in both viewports.
-    expect(flowing[1]).toMatch(/at 2?0% 5?2%/);
+    expect(flowing[2]).toMatch(/at 2?0% 5?2%/);
     // Mobile crops preserve the same flow (left edge, same direction).
     expect(css).toMatch(/@media \(max-width: 767px\)/);
   });
