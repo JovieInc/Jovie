@@ -262,7 +262,12 @@ describe('GET /api/cron/daily-maintenance', () => {
         alerts: [],
       },
     });
-    expect(data.results.musicResolverParity.success).toBe(true);
+    expect(mockRunMusicResolverParityCorpus).not.toHaveBeenCalled();
+    expect(data.results.musicResolverParity).toEqual({
+      success: true,
+      skipped: true,
+      data: { reason: 'independent-benchmark-source-required' },
+    });
     expect(data.results.dataRetention.success).toBe(true);
   });
 
