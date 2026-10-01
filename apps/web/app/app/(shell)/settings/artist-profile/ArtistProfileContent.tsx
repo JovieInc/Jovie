@@ -7,6 +7,7 @@ import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelCo
 import { ArtistRulesSheet } from '@/app/app/(shell)/library/ArtistRulesSheet';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { SettingsPaySection } from '@/features/dashboard/organisms/SettingsPaySection';
+import { SettingsRiderSection } from '@/features/dashboard/organisms/SettingsRiderSection';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
 import { SettingsProfileSection } from '@/features/dashboard/organisms/settings-profile-section';
 import {
@@ -129,6 +130,10 @@ export function ArtistProfileContent({
           />
           <SettingsPaySection />
           <ShopifyStoreCard />
+          <SettingsRiderSection
+            profileId={artist.id}
+            username={artist.handle}
+          />
           <SettingsPanel
             title='Artist Rules'
             description='Confirmed rules guide every draft. Memory can suggest a rule, but it cannot activate one.'
