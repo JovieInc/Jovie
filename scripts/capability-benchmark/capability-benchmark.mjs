@@ -65,6 +65,17 @@ export const MATERIAL_TRIGGER_CLASSES = Object.freeze([
   'benchmark-evidence-expired',
 ]);
 
+/**
+ * Candidate dispositions for the JOV-7341 decision benchmark. No status may
+ * claim production promotion: that remains gated by JOV-6414, so labels like
+ * "production" are rejected outright rather than treated as free text.
+ */
+export const DECISION_CANDIDATE_STATUSES = Object.freeze([
+  'complete',
+  'shadow-only',
+  'access-blocked',
+]);
+
 const NON_MATERIAL_TRIGGER_CLASSES = new Set([
   'clock-sweep',
   'periodic-review',
@@ -432,7 +443,29 @@ export function validateDecisionRoutingBenchmark(report) {
       if (candidate.cohortSha256 !== workload.cohort.sha256) {
         throw new Error(`${field} candidate ${id} used a different cohort`);
       }
-      requireString(candidate.status, `${field}.candidate.${id}.status`);
+      if (!DECISION_CANDIDATE_STATUSES.includes(candidate.status)) {
+        throw new Error(
+          `${field}.candidate.${id}.status must be one of ${DECISION_CANDIDATE_STATUSES.join('|')}; promotion stays gated by JOV-6414`
+        );
+      }
+      if (candidate.status !== 'complete') {
+        if (
+          !Number.isInteger(candidate.executedComparisons) ||
+          candidate.executedComparisons !== 0
+        ) {
+          throw new Error(
+            `${field}.candidate.${id} with status ${candidate.status} must record executedComparisons: 0`
+          );
+        }
+      } else if (
+        candidate.executedComparisons !== undefined &&
+        (!Number.isInteger(candidate.executedComparisons) ||
+          candidate.executedComparisons < 0)
+      ) {
+        throw new Error(
+          `${field}.candidate.${id}.executedComparisons must be a non-negative integer`
+        );
+      }
     }
     if (
       report.access.status !== 'available' &&

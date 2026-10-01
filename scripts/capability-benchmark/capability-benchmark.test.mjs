@@ -134,6 +134,14 @@ test('JOV-7341 records workload-scoped dispositions on the pinned cohorts', () =
     assert.equal(baseline.evaluated, metrics.evaluated);
     assert.equal(baseline.macroF1, metrics.macroF1);
     assert.equal(baseline.abstentionRate, metrics.abstentionRate);
+    if (workload.id === 'release-task-clustering') {
+      assert.equal(
+        baseline.falseAutoAssignmentRate,
+        metrics.falseAutoAssignmentRate
+      );
+    } else {
+      assert.equal(baseline.highValueMissRate, metrics.highValueMissRate);
+    }
   }
 });
 
@@ -163,6 +171,48 @@ test('JOV-7341 fails closed on cohort drift, hidden calls, or missing resume eve
   const rolledUp = structuredClone(report);
   rolledUp.aggregateScore = 0.99;
   assert.throws(() => validateDecisionRoutingBenchmark(rolledUp), /aggregate/);
+});
+
+test('JOV-7341 fails closed on contradictory candidate status and counts', () => {
+  const report = loadDecisionRoutingBenchmark();
+
+  const promoted = structuredClone(report);
+  const promotedJev = promoted.workloads[0].candidates.find(
+    candidate => candidate.id === 'typesafe-jev'
+  );
+  promotedJev.status = 'production';
+  promotedJev.executedComparisons = 999;
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(promoted),
+    /status must be one of/
+  );
+
+  const blockedButRan = structuredClone(report);
+  blockedButRan.workloads[0].candidates.find(
+    candidate => candidate.id === 'openai-decisions'
+  ).executedComparisons = 3;
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(blockedButRan),
+    /executedComparisons: 0/
+  );
+
+  const shadowRan = structuredClone(report);
+  shadowRan.workloads[1].candidates.find(
+    candidate => candidate.id === 'typesafe-jev'
+  ).executedComparisons = 1;
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(shadowRan),
+    /executedComparisons: 0/
+  );
+
+  const missingCount = structuredClone(report);
+  delete missingCount.workloads[0].candidates.find(
+    candidate => candidate.id === 'typesafe-jev'
+  ).executedComparisons;
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(missingCount),
+    /executedComparisons: 0/
+  );
 });
 
 test('rejects wrong schema and second ledger', () => {
