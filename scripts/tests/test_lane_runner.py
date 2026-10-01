@@ -25,6 +25,15 @@ lane = importlib.util.module_from_spec(SPEC)
 sys.modules["lane_runner"] = lane
 SPEC.loader.exec_module(lane)
 
+# Positive flow fixtures declare healthy capacity. Real low/critical admission
+# remains exercised by the explicit free_pct overrides and test_disk_guard.py;
+# these unit tests must neither depend on host capacity nor sweep host caches.
+_disk_capacity_fixture = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+def setUpModule():
+    _disk_capacity_fixture.start()
+def tearDownModule():
+    _disk_capacity_fixture.stop()
+
 
 def issue(identifier="JOV-1", priority=2, created="2026-09-01T00:00:00Z", labels=()):
     return lane.Issue("id-" + identifier, identifier, "Tab indicator collapses", "body", priority, created, list(labels))

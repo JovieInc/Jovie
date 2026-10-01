@@ -52,6 +52,9 @@ describe('Hyperagent remote lane coverage contract', () => {
     expect(command).toContain(
       '*/scripts/lanes/hyperagent_lane.py" --fail-under=95'
     );
+    expect(command).toContain(
+      '*/scripts/lanes/execution_attempt.py\" --fail-under=85'
+    );
     expect(command).toContain(' && ');
   });
 });
