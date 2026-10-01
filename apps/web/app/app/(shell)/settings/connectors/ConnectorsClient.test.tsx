@@ -79,7 +79,7 @@ describe('ConnectorsClient', () => {
     expect(
       youtubeRow().getByRole('list', { name: 'YouTube granted scopes' })
     ).toHaveTextContent(
-      'Read Channel Data, Manage Videos, View Channel Analytics'
+      'Read Channel Data, Manage Videos, View Channel Analytics, Post Approved Replies'
     );
   });
 
