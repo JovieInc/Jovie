@@ -112,7 +112,7 @@ export const CONNECTOR_REGISTRY = {
     id: CONNECTOR_PROVIDERS.youtube,
     label: 'YouTube',
     description:
-      'Import channel videos, verify thumbnail changes, and post approved comment replies.',
+      'Import channel videos into Work, verify approved thumbnail changes, and post approved comment replies.',
     iconKey: 'youtube',
     oauthBundle: 'youtube',
     oauthScopes: YOUTUBE_OAUTH_SCOPES,

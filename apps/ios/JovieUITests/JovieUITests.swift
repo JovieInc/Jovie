@@ -507,7 +507,7 @@ final class JovieUITests: XCTestCase {
     )
     XCTAssertFalse(
       shellControlExists(app, identifier: "shell-tab-library"),
-      "Library must not be a bottom tab.\n\(app.debugDescription)"
+      "Work must not be a bottom tab.\n\(app.debugDescription)"
     )
     XCTAssertTrue(
       app.buttons["shell-actions-menu"].exists,
@@ -521,7 +521,7 @@ final class JovieUITests: XCTestCase {
     app.buttons["Open navigation drawer"].tap()
     XCTAssertTrue(
       app.buttons["shell-drawer-surface-shell-tab-library"].waitForExistence(timeout: 3),
-      "Sidebar must expose Library.\n\(app.debugDescription)"
+      "Sidebar must expose Work.\n\(app.debugDescription)"
     )
     XCTAssertTrue(app.buttons["shell-drawer-surface-shell-tab-calendar"].exists)
     XCTAssertTrue(app.buttons["shell-drawer-surface-shell-tab-inbox"].exists)
@@ -994,7 +994,7 @@ final class JovieUITests: XCTestCase {
     )
     XCTAssertTrue(
       app.buttons["shell-drawer-surface-shell-tab-library"].isHittable,
-      "Sidebar Library must be reachable after a leading swipe.\n\(app.debugDescription)"
+      "Sidebar Work must be reachable after a leading swipe.\n\(app.debugDescription)"
     )
     XCTAssertFalse(
       app.buttons["Copy URL"].exists,
@@ -2197,7 +2197,7 @@ final class JovieUITests: XCTestCase {
         "Chat message",
         "Send",
         "Chat",
-        "Library",
+        "Work",
         "Inbox",
         "Calendar",
         "Done",

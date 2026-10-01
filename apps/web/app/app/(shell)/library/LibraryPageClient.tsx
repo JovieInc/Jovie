@@ -190,7 +190,7 @@ export function LibraryPageClient({
   const stageTabs = (
     <div
       role='tablist'
-      aria-label='Library Stages'
+      aria-label='Work Stages'
       data-testid='library-stage-tabs'
       data-youtube-connected={youtubeConnected ? 'true' : 'false'}
       className='flex min-w-0 flex-1 items-center gap-1 overflow-x-auto p-0.5 -m-0.5'

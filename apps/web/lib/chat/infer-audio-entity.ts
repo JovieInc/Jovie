@@ -181,7 +181,7 @@ export function buildAudioUploadPrompt({
   if (inference.confidence === 'low' && inference.releaseTitle) {
     return [
       `I uploaded "${fileName}" for a track called "${title}".`,
-      `Jovie saved it as a draft single so the audio is in Library.`,
+      `Jovie saved it as a draft single so the audio is in Work.`,
       `It might belong on "${inference.releaseTitle}", but the match isn't certain.`,
       `Preview: ${previewUrl}`,
       `Should I attach this to "${inference.releaseTitle}", keep it as a new release, or use it as a reference?`,
