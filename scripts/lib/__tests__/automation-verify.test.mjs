@@ -29,6 +29,7 @@ describe('lane Python qualification coverage', () => {
   it.each([
     ['lane source', ['scripts/lanes/hyperagent_lane.py']],
     ['attempt regression', ['scripts/tests/test_execution_attempt.py']],
+    ['falsy inputs', [null, false, '', 'scripts/lanes/execution_attempt.py']],
     ['missing pinned dependencies', ['scripts/lanes/hyperagent_lane.py'], true],
     [
       'mixed full fallback',
