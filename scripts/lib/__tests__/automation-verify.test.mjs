@@ -1,14 +1,17 @@
 import { spawn } from 'node:child_process';
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import {
   buildAffectedTestPlan,
   buildCompanyRegistryTestCommand,
@@ -24,6 +27,451 @@ import {
   runCommandStatus,
   runControlTestCommands,
 } from '../../run-affected-tests.mjs';
+
+const CLI_QUALIFICATION_INPUTS = [
+  '.github/workflows/npm-publish.yml',
+  'packages/jovie-cli/README.md',
+  'packages/jovie-cli/scripts/npm-publish-workflow.test.ts',
+  'packages/jovie-cli/scripts/pack-dry.ts',
+  'packages/jovie-cli/scripts/pack-manifest.test.ts',
+  'packages/jovie-cli/scripts/pack-manifest.ts',
+  'packages/jovie-cli/vitest.config.mts',
+];
+const CLI_QUALIFICATION_STAGES = 'test:coverage typecheck build pack:dry'.split(
+  ' '
+);
+const CLI_QUALIFICATION_PROOFS = [
+  'packages/jovie-cli/package.json',
+  'packages/jovie-cli/vitest.config.mts',
+  'packages/jovie-cli/tsconfig.json',
+  'packages/jovie-cli/tsconfig.build.json',
+  'packages/jovie-cli/src/mcp.test.ts',
+  ...CLI_QUALIFICATION_INPUTS.filter(file => file.endsWith('.ts')),
+];
+const CLI_SELECTOR_PAIR = [
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+];
+const CLI_FIXTURE_CONFIG = `import { defineConfig } from 'vitest/config';
+export default defineConfig({ test: {
+  environment: 'node', include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
+  coverage: { provider: 'v8', reporter: ['text', 'json-summary'], include: ['src/**/*.ts', 'scripts/pack-manifest.ts', 'scripts/verify-published-package.mjs'],
+    exclude: ['src/**/*.test.ts'], thresholds: { branches: 90, functions: 90, lines: 90, statements: 90 } }
+}});`;
+function cliProofOptions({
+  missingProof = '',
+  malformedProof = '',
+  coverageCommand,
+  config = CLI_FIXTURE_CONFIG,
+} = {}) {
+  return {
+    isFileAvailable: file =>
+      file !== missingProof &&
+      existsSync(resolve(import.meta.dirname, '../../..', file)),
+    readFile: file => {
+      if (file === malformedProof) return '{}';
+      if (file === 'packages/jovie-cli/package.json' && coverageCommand) {
+        const manifest = JSON.parse(
+          readFileSync(resolve(import.meta.dirname, '../../..', file), 'utf8')
+        );
+        manifest.scripts['test:coverage'] = coverageCommand;
+        return JSON.stringify(manifest);
+      }
+      if (file.endsWith('vitest.config.mts')) return config;
+      try {
+        return readFileSync(
+          resolve(import.meta.dirname, '../../..', file),
+          'utf8'
+        );
+      } catch {
+        return '';
+      }
+    },
+  };
+}
+const cliFixturePlan = (files, options) =>
+  buildAffectedTestPlan(files, cliProofOptions(options));
+const cliFixtureBin = mkdtempSync(resolve(tmpdir(), 'cli-bin-'));
+afterAll(() => rmSync(cliFixtureBin, { recursive: true, force: true }));
+const stub = `#!/bin/bash
+binary=\${0##*/}; log="$JOVIE_QUALIFIER_FIXTURE_LOG"
+printf '["%s",[' "$binary" >> "$log"; sep=''
+for arg in "$@"; do
+  arg=\${arg//\\\\/\\\\\\\\}; arg=\${arg//\\"/\\\\\\"}
+  printf '%s"%s"' "$sep" "$arg" >> "$log"; sep=','
+done
+printf ']]\\n' >> "$log"
+stage=''
+case "$binary:$1:$2:$3" in pnpm:--filter:@jovie/cli:run) stage="$4";; python3:-c:*) stage=python-deps;; python3:-m:coverage:run) stage=python-coverage;; node:*) stage=full;; esac
+if [[ "$stage" = "$JOVIE_QUALIFIER_FIXTURE_FAILURE" && -n "$stage" ]]; then case "$stage" in python-deps) exit 1;; python-coverage) exit 73;; typecheck) exit 62;; build) exit 63;; pack:dry) exit 64;; *) exit 61;; esac; fi
+exit 0
+`;
+for (const binary of ['node', 'pnpm', 'python3']) {
+  writeFileSync(resolve(cliFixtureBin, binary), stub, { mode: 0o755 });
+}
+async function runCliQualificationFixture(files, options = {}) {
+  const dir = realpathSync(mkdtempSync(resolve(tmpdir(), 'cli-qual-')));
+  const repo = resolve(import.meta.dirname, '../../..');
+  const proof = cliProofOptions(options);
+  const log = resolve(dir, 'children.jsonl');
+  try {
+    mkdirSync(resolve(dir, 'scripts'));
+    if (!options.missingParser)
+      symlinkSync(resolve(repo, 'node_modules'), resolve(dir, 'node_modules'));
+    writeFileSync(
+      resolve(dir, 'scripts/run-affected-tests.mjs'),
+      readFileSync(resolve(repo, 'scripts/run-affected-tests.mjs'))
+    );
+    symlinkSync(
+      resolve(repo, 'scripts/ci-fast-lanes.mjs'),
+      resolve(dir, 'scripts/ci-fast-lanes.mjs')
+    );
+    for (const file of CLI_QUALIFICATION_PROOFS) {
+      if (!proof.isFileAvailable(file)) continue;
+      mkdirSync(resolve(dir, file, '..'), { recursive: true });
+      writeFileSync(resolve(dir, file), proof.readFile(file));
+    }
+    const child = spawn(
+      process.execPath,
+      [
+        resolve(dir, 'scripts/run-affected-tests.mjs'),
+        '--changed-files-json',
+        JSON.stringify(files),
+        '--shard-concurrency',
+        '1',
+      ],
+      {
+        cwd: dir,
+        env: {
+          ...process.env,
+          PATH: `${cliFixtureBin}:${process.env.PATH}`,
+          JOVIE_QUALIFIER_FIXTURE_LOG: log,
+          JOVIE_QUALIFIER_FIXTURE_FAILURE: options.failStage || '',
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }
+    );
+    let output = '';
+    child.stdout.on('data', chunk => {
+      output += chunk;
+    });
+    child.stderr.on('data', chunk => {
+      output += chunk;
+    });
+    const status = await new Promise((resolveExit, reject) => {
+      child.once('error', reject);
+      child.once('close', resolveExit);
+    });
+    return {
+      status,
+      output,
+      children: existsSync(log)
+        ? readFileSync(log, 'utf8')
+            .trim()
+            .split('\n')
+            .map(line => JSON.parse(line))
+        : [],
+    };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function expectCliStages(children, stages = CLI_QUALIFICATION_STAGES) {
+  expect(children.filter(([, args]) => args[1] === '@jovie/cli')).toEqual(
+    stages.map(stage => ['pnpm', ['--filter', '@jovie/cli', 'run', stage]])
+  );
+  expect(
+    children.filter(
+      ([, args]) =>
+        args[1] === '@jovie/web' &&
+        args.some(arg => arg.startsWith('packages/jovie-cli/'))
+    )
+  ).toEqual([]);
+}
+
+describe('CLI qualification routing', () => {
+  it('fails closed without the declared configuration parser', async () => {
+    const result = await runCliQualificationFixture(CLI_QUALIFICATION_INPUTS, {
+      missingParser: true,
+    });
+    expect(result.status, result.output).not.toBe(0);
+    expect(result.output).toContain("Cannot find module 'typescript'");
+    expect(result.children).toEqual([]);
+  });
+
+  it.each([
+    ...CLI_QUALIFICATION_INPUTS.map(file => [file, [file]]),
+    ['complete cadence diff', CLI_QUALIFICATION_INPUTS],
+    [
+      'unsorted duplicates',
+      [...CLI_QUALIFICATION_INPUTS].reverse().concat(CLI_QUALIFICATION_INPUTS),
+    ],
+    [
+      'safe empty test exclusion',
+      CLI_QUALIFICATION_INPUTS,
+      {
+        config: CLI_FIXTURE_CONFIG.replace(
+          "environment: 'node'",
+          "environment: 'node', exclude: []"
+        ),
+      },
+    ],
+  ])(
+    'runs canonical package proof for %s through the real entrypoint',
+    async (_, files, options) => {
+      const result = await runCliQualificationFixture(files, options);
+      expect(result.status, result.output).toBe(0);
+      expect(result.output).toContain('mode=selected');
+      expectCliStages(result.children);
+      expectCliStages(
+        buildSelectedTestCommands(cliFixturePlan(files, options), '2')
+      );
+      expect(result.children).toHaveLength(4);
+    }
+  );
+
+  it('retains routing regressions for the complete selector companion pair', async () => {
+    const result = await runCliQualificationFixture([
+      ...CLI_QUALIFICATION_INPUTS,
+      ...CLI_SELECTOR_PAIR,
+    ]);
+    expect(result.status, result.output).toBe(0);
+    expectCliStages(result.children);
+    expectCliStages(
+      buildSelectedTestCommands(
+        cliFixturePlan([...CLI_QUALIFICATION_INPUTS, ...CLI_SELECTOR_PAIR]),
+        '2'
+      )
+    );
+    expect(result.children[4]).toEqual([
+      'pnpm',
+      'exec vitest --root scripts --config vitest.config.mts run lib/__tests__/automation-verify.test.mjs --maxWorkers 2'.split(
+        ' '
+      ),
+    ]);
+  });
+
+  it.each(CLI_QUALIFICATION_STAGES)(
+    'propagates %s failure and stops later stages',
+    async stage => {
+      const result = await runCliQualificationFixture(
+        CLI_QUALIFICATION_INPUTS,
+        { failStage: stage }
+      );
+      expect(result.status, result.output).toBe(
+        61 + CLI_QUALIFICATION_STAGES.indexOf(stage)
+      );
+      expectCliStages(
+        result.children,
+        CLI_QUALIFICATION_STAGES.slice(
+          0,
+          CLI_QUALIFICATION_STAGES.indexOf(stage) + 1
+        )
+      );
+    }
+  );
+
+  it.each([
+    'apps/web/lib/unknown.ts',
+    'package.json',
+    'pnpm-lock.yaml',
+    'turbo.json',
+    'packages/jovie-cli/scripts/unknown-new.ts',
+    '.github/workflows/unknown-new.yml',
+    '.github/workflows/source-validation.yml',
+    'docs/unrelated.md',
+    ...CLI_SELECTOR_PAIR,
+  ])(
+    'retains all full commands plus mandatory CLI proof for mixed %s',
+    async peer => {
+      const result = await runCliQualificationFixture([
+        CLI_QUALIFICATION_INPUTS[0],
+        peer,
+      ]);
+      expect(result.status, result.output).toBe(0);
+      expect(cliFixturePlan([CLI_QUALIFICATION_INPUTS[0], peer]).mode).toBe(
+        'full'
+      );
+      expect(result.children.slice(0, 11)).toEqual(buildFullSuiteCommands('2'));
+      expectCliStages(result.children.slice(11));
+    }
+  );
+
+  it('requires CLI proof for the cross-cutting Source Validation workflow alone', async () => {
+    const result = await runCliQualificationFixture([
+      '.github/workflows/source-validation.yml',
+    ]);
+    expect(result.status, result.output).toBe(0);
+    expect(result.output).toContain('mode=full');
+    expect(result.children.slice(0, 11)).toEqual(buildFullSuiteCommands('2'));
+    expectCliStages(result.children.slice(11));
+  });
+
+  it('does not reach selected proof after a failed full command', async () => {
+    const result = await runCliQualificationFixture(
+      [CLI_QUALIFICATION_INPUTS[0], 'package.json'],
+      { failStage: 'full' }
+    );
+    expect(result.status, result.output).toBe(61);
+    expect(result.children).toEqual(buildFullSuiteCommands('2').slice(0, 1));
+  });
+
+  it.each(['', 'python-coverage', 'python-deps'])(
+    'reaches both required suites after full success and preserves Python %s status',
+    async failStage => {
+      const files = [
+        CLI_QUALIFICATION_INPUTS[0],
+        'scripts/lanes/hyperagent_lane.py',
+        'package.json',
+        'scripts/lanes/unknown-new.py',
+      ];
+      const result = await runCliQualificationFixture(files, { failStage });
+      expect(result.status, result.output).toBe(
+        failStage === 'python-deps' ? 1 : failStage ? 73 : 0
+      );
+      expect(result.children.slice(0, 11)).toEqual(buildFullSuiteCommands('2'));
+      expectCliStages(result.children.slice(11));
+      const python = result.children.filter(([binary]) => binary === 'python3');
+      expect(python[0]).toEqual([
+        'python3',
+        ['-c', 'import coverage, pytest, xdist'],
+      ]);
+      if (failStage === 'python-deps') expect(python).toHaveLength(1);
+      else {
+        expect(python[1][1]).toEqual(
+          expect.arrayContaining([
+            'coverage',
+            'run',
+            '--branch',
+            'scripts/tests/test_execution_attempt.py',
+          ])
+        );
+        if (failStage) expect(python).toHaveLength(2);
+        else
+          expect(python.slice(2).map(([, args]) => args.at(-1))).toEqual([
+            '--fail-under=85',
+            '--fail-under=95',
+            '--fail-under=85',
+          ]);
+      }
+    }
+  );
+
+  it.each([
+    ...[
+      'vitest run --coverage',
+      'vitest run --config vitest.config.ts --coverage',
+    ].map(coverageCommand => [{ coverageCommand }, 'malformed']),
+    ...CLI_QUALIFICATION_PROOFS.map(missingProof => [
+      { missingProof },
+      'unavailable',
+    ]),
+    ...[
+      'packages/jovie-cli/package.json',
+      'packages/jovie-cli/vitest.config.mts',
+    ].map(malformedProof => [{ malformedProof }, 'malformed']),
+    ...[
+      CLI_FIXTURE_CONFIG.replace(", 'scripts/pack-manifest.ts'", ''),
+      CLI_FIXTURE_CONFIG.replace(
+        ", 'scripts/verify-published-package.mjs'",
+        ''
+      ),
+      CLI_FIXTURE_CONFIG.replace(
+        "['src/**/*.test.ts'], thresholds",
+        "['scripts/pack-manifest.ts'], thresholds"
+      ),
+      CLI_FIXTURE_CONFIG.replace("provider: 'v8'", "provider: 'istanbul'") +
+        " // provider: 'v8'",
+      CLI_FIXTURE_CONFIG.replace('branches: 90', 'branches: 85') +
+        ' // branches: 90',
+      CLI_FIXTURE_CONFIG.replace(
+        "provider: 'v8'",
+        "provider: 'istanbul'"
+      ).replace("environment: 'node'", "environment: 'node', provider: 'v8'"),
+      CLI_FIXTURE_CONFIG.replace(
+        "include: ['src/**/*.ts', 'scripts/pack-manifest.ts', 'scripts/verify-published-package.mjs']",
+        "include: ['src/**/*.ts'], misleading: ['scripts/pack-manifest.ts']"
+      ),
+      CLI_FIXTURE_CONFIG.replace('thresholds:', 'misleading:').replace(
+        "environment: 'node'",
+        "environment: 'node', thresholds: { branches: 90, functions: 90, lines: 90, statements: 90 }"
+      ),
+      CLI_FIXTURE_CONFIG + "\nObject.assign({}, { provider: 'v8' });",
+      CLI_FIXTURE_CONFIG.replace(
+        "provider: 'v8'",
+        'provider: unresolvedProvider'
+      ),
+      CLI_FIXTURE_CONFIG.replace(
+        'coverage: {',
+        'coverage: { ...unresolvedCoverage,'
+      ),
+      CLI_FIXTURE_CONFIG.replace(
+        'branches: 90, functions: 90',
+        'branches: true, functions: false'
+      ),
+      CLI_FIXTURE_CONFIG.replace("provider: 'v8'", "['provider']: 'v8'"),
+      ...['scripts/npm-publish-workflow.test.ts', 'scripts/**/*.test.ts'].map(
+        file =>
+          CLI_FIXTURE_CONFIG.replace(
+            "environment: 'node'",
+            `environment: 'node', exclude: ['${file}']`
+          )
+      ),
+      ...[
+        "testNamePattern: 'does-not-match'",
+        'projects: []',
+        "root: '..'",
+        'passWithNoTests: true',
+        'typecheck: { only: true }',
+      ].map(option =>
+        CLI_FIXTURE_CONFIG.replace(
+          "environment: 'node'",
+          `environment: 'node', ${option}`
+        )
+      ),
+      ...["root: '..'", 'projects: []'].map(option =>
+        CLI_FIXTURE_CONFIG.replace('test: {', `${option}, test: {`)
+      ),
+      CLI_FIXTURE_CONFIG.replace('coverage: {', 'coverage: { enabled: false,'),
+      CLI_FIXTURE_CONFIG.replace("reporter: ['text', 'json-summary'], ", ''),
+      CLI_FIXTURE_CONFIG.replace(
+        'thresholds: {',
+        'thresholds: { perFile: false,'
+      ),
+      CLI_FIXTURE_CONFIG.replace(
+        "'scripts/**/*.test.ts'",
+        "'scripts/**/*.test.ts', '!scripts/npm-publish-workflow.test.ts'"
+      ),
+      CLI_FIXTURE_CONFIG.replace(
+        "'scripts/pack-manifest.ts'",
+        "'scripts/pack-manifest.ts', '!scripts/pack-manifest.ts'"
+      ),
+    ].map(config => [{ config }, 'malformed']),
+  ])('fails before execution for invalid proof %j', async (options, kind) => {
+    const result = await runCliQualificationFixture(
+      CLI_QUALIFICATION_INPUTS,
+      options
+    );
+    const message =
+      kind === 'unavailable'
+        ? 'CLI qualification proof is unavailable'
+        : 'CLI commands/coverage proof is malformed';
+    expect(result.status, result.output).not.toBe(0);
+    expect(result.output).toContain(message);
+    expect(result.children).toEqual([]);
+    expect(() => cliFixturePlan(CLI_QUALIFICATION_INPUTS, options)).toThrow(
+      message
+    );
+  });
+
+  it('leaves empty changes inert', async () => {
+    const result = await runCliQualificationFixture([]);
+    expect(result.status, result.output).toBe(0);
+    expect(result.output).toContain('mode=none');
+    expect(result.children).toEqual([]);
+  });
+});
 
 describe('lane Python qualification coverage', () => {
   it.each([

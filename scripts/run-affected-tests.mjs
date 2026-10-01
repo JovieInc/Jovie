@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -1038,8 +1039,205 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set(
   ])
 );
 
+const CLI_QUALIFICATION_INPUTS = new Set([
+  '.github/workflows/npm-publish.yml',
+  'packages/jovie-cli/README.md',
+  'packages/jovie-cli/scripts/npm-publish-workflow.test.ts',
+  'packages/jovie-cli/scripts/pack-dry.ts',
+  'packages/jovie-cli/scripts/pack-manifest.test.ts',
+  'packages/jovie-cli/scripts/pack-manifest.ts',
+  'packages/jovie-cli/vitest.config.mts',
+]);
+const CLI_QUALIFICATION_SCRIPTS = {
+  'test:coverage': 'vitest run --config vitest.config.mts --coverage',
+  typecheck: 'tsc -p tsconfig.json --noEmit',
+  build: 'tsc -p tsconfig.build.json',
+  'pack:dry': 'tsx scripts/pack-dry.ts',
+};
+const CLI_QUALIFICATION_PROOFS = [
+  'packages/jovie-cli/package.json',
+  'packages/jovie-cli/vitest.config.mts',
+  'packages/jovie-cli/tsconfig.json',
+  'packages/jovie-cli/tsconfig.build.json',
+  'packages/jovie-cli/src/mcp.test.ts',
+  ...[...CLI_QUALIFICATION_INPUTS].filter(file => file.endsWith('.ts')),
+];
+function cliConfigLiteral(node, ts) {
+  if (node && ts.isStringLiteral(node)) return node.text;
+  if (node && ts.isNumericLiteral(node)) return Number(node.text);
+  if (node?.kind === ts.SyntaxKind.TrueKeyword) return true;
+  if (node?.kind === ts.SyntaxKind.FalseKeyword) return false;
+  if (node && ts.isArrayLiteralExpression(node))
+    return node.elements.map(element => cliConfigLiteral(element, ts));
+  if (node && ts.isObjectLiteralExpression(node))
+    return Object.fromEntries(
+      node.properties.map(property => {
+        if (
+          !ts.isPropertyAssignment(property) ||
+          !(ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))
+        )
+          throw new Error('CLI commands/coverage proof is malformed');
+        return [property.name.text, cliConfigLiteral(property.initializer, ts)];
+      })
+    );
+  throw new Error('CLI commands/coverage proof is malformed');
+}
+function hasOnlyCliConfigKeys(value, keys) {
+  return (
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.keys(value).every(key => keys.includes(key))
+  );
+}
+function assertCliQualificationProof({
+  isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)),
+  readFile = readRepoFile,
+} = {}) {
+  if (
+    !CLI_QUALIFICATION_PROOFS.every(
+      file => isFileAvailable(file) && readFile(file).trim()
+    )
+  )
+    throw new Error('CLI qualification proof is unavailable');
+  const ts = createRequire(import.meta.url)('typescript');
+  const manifest = JSON.parse(readFile('packages/jovie-cli/package.json'));
+  const ast = ts.createSourceFile(
+    'vitest.config.mts',
+    readFile('packages/jovie-cli/vitest.config.mts'),
+    ts.ScriptTarget.Latest,
+    true
+  );
+  if (ast.parseDiagnostics.length)
+    throw new Error('CLI commands/coverage proof is malformed');
+  const [binding, exported] = ast.statements;
+  if (
+    ast.statements.length !== 2 ||
+    !ts.isImportDeclaration(binding) ||
+    binding.moduleSpecifier.text !== 'vitest/config' ||
+    binding.importClause?.isTypeOnly ||
+    !binding.importClause?.namedBindings?.elements?.some(
+      specifier =>
+        specifier.name.text === 'defineConfig' &&
+        !specifier.propertyName &&
+        !specifier.isTypeOnly
+    ) ||
+    !ts.isExportAssignment(exported) ||
+    exported.isExportEquals ||
+    !ts.isCallExpression(exported.expression) ||
+    exported.expression.expression.getText(ast) !== 'defineConfig' ||
+    exported.expression.arguments.length !== 1
+  )
+    throw new Error('CLI commands/coverage proof is malformed');
+  const config = cliConfigLiteral(exported.expression.arguments[0], ts);
+  const coverage = config.test?.coverage;
+  if (
+    !hasOnlyCliConfigKeys(config, ['test']) ||
+    !hasOnlyCliConfigKeys(config.test, [
+      'environment',
+      'include',
+      'exclude',
+      'coverage',
+    ]) ||
+    !hasOnlyCliConfigKeys(coverage, [
+      'provider',
+      'reporter',
+      'include',
+      'exclude',
+      'thresholds',
+    ]) ||
+    !hasOnlyCliConfigKeys(coverage.thresholds, [
+      'branches',
+      'functions',
+      'lines',
+      'statements',
+    ]) ||
+    config.test.environment !== 'node' ||
+    (config.test.exclude !== undefined &&
+      (!Array.isArray(config.test.exclude) ||
+        config.test.exclude.length !== 0)) ||
+    manifest.name !== '@jovie/cli' ||
+    !Object.entries(CLI_QUALIFICATION_SCRIPTS).every(
+      ([name, command]) => manifest.scripts?.[name] === command
+    ) ||
+    !Array.isArray(config.test?.include) ||
+    !config.test.include.every(value =>
+      ['src', 'scripts'].some(prefix => value === `${prefix}/**/*.test.ts`)
+    ) ||
+    !['src', 'scripts'].every(prefix =>
+      config.test?.include?.includes(`${prefix}/**/*.test.ts`)
+    ) ||
+    coverage.provider !== 'v8' ||
+    !Array.isArray(coverage.reporter) ||
+    !coverage.reporter.every(value =>
+      ['text', 'json-summary'].includes(value)
+    ) ||
+    !['text', 'json-summary'].every(value =>
+      coverage.reporter.includes(value)
+    ) ||
+    !Array.isArray(coverage.include) ||
+    !coverage.include.every(value =>
+      [
+        'src/**/*.ts',
+        'scripts/pack-manifest.ts',
+        'scripts/verify-published-package.mjs',
+      ].includes(value)
+    ) ||
+    ![
+      'src/**/*.ts',
+      'scripts/pack-manifest.ts',
+      'scripts/verify-published-package.mjs',
+    ].every(file => coverage.include.includes(file)) ||
+    !Array.isArray(coverage.exclude) ||
+    !coverage.exclude.every(file =>
+      ['src', 'scripts'].some(prefix => file === `${prefix}/**/*.test.ts`)
+    ) ||
+    !['branches', 'functions', 'lines', 'statements'].every(
+      name =>
+        Number.isFinite(coverage.thresholds?.[name]) &&
+        coverage.thresholds[name] >= 90
+    )
+  )
+    throw new Error('CLI commands/coverage proof is malformed');
+}
 export function buildAffectedTestPlan(changedFiles, options) {
-  const plan = planAffectedTests(changedFiles, options);
+  const files = unique(changedFiles.filter(Boolean)).sort();
+  const cliPackageProof = files.some(
+    file =>
+      file.startsWith('packages/jovie-cli/') ||
+      file === '.github/workflows/npm-publish.yml' ||
+      file === '.github/workflows/source-validation.yml'
+  );
+  const selectorCount = files.filter(file =>
+    AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+  ).length;
+  const focusedCli =
+    cliPackageProof &&
+    files.every(
+      file =>
+        CLI_QUALIFICATION_INPUTS.has(file) ||
+        AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+    ) &&
+    (selectorCount === 0 ||
+      selectorCount === AFFECTED_TEST_SELECTOR_MANIFEST.size);
+  if (cliPackageProof) assertCliQualificationProof(options);
+  const plan = focusedCli
+    ? {
+        ...fullSuitePlan(),
+        mode: 'selected',
+        scriptVitestTests: selectorCount ? AFFECTED_TEST_SELECTOR_TESTS : [],
+      }
+    : planAffectedTests(files, options);
+  if (cliPackageProof) {
+    plan.cliPackageProof = true;
+    plan.selectedTests = (plan.selectedTests || []).filter(
+      file => !file.startsWith('packages/jovie-cli/')
+    );
+    if (!focusedCli) {
+      plan.mode = 'full';
+      plan.fallbackReason ||= 'mixed or unmapped CLI qualification input';
+    }
+  }
   const lanePythonCoverage = changedFiles.some(file =>
     LANE_PYTHON_COVERAGE_INPUTS.has(file)
   );
@@ -2407,6 +2605,9 @@ export function buildSelectedTestCommands(
   head
 ) {
   const commands = [];
+  if (plan.cliPackageProof)
+    for (const name of Object.keys(CLI_QUALIFICATION_SCRIPTS))
+      commands.push(['pnpm', ['--filter', '@jovie/cli', 'run', name]]);
   if (plan.lanePythonCoverage) {
     // Qualification must fail when the CI-pinned Python dependencies are absent,
     // even on a local host; the structural wrapper's local skip is not proof.

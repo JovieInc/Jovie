@@ -57,7 +57,7 @@
     "pack:dry": "tsx scripts/pack-dry.ts",
     "test": "vitest run",
     "test:ci": "vitest run --passWithNoTests",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run --config vitest.config.mts --coverage",
     "test:fast": "node scripts/test-fast.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
