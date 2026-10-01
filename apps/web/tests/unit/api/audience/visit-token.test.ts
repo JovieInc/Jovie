@@ -120,6 +120,31 @@ describe('GET /api/audience/visit-token', () => {
     expect(mockGetClientTrackingToken).not.toHaveBeenCalled();
   });
 
+  it('returns 503, not 429, when the rate-limit backend is unavailable', async () => {
+    mockPublicVisitLimiterLimit.mockResolvedValue({
+      success: false,
+      limit: 100,
+      remaining: 0,
+      reset: new Date(Date.now() + 30_000),
+      reason: 'Public Visit rate limiter is temporarily unavailable',
+      unavailable: true,
+      backend: 'unavailable',
+    });
+
+    const response = await GET(buildRequest(VALID_UUID));
+
+    expect(response.status).toBe(503);
+    const body = await response.json();
+    expect(body.error).toBe('Visit tracking is temporarily unavailable.');
+    expect(body.reason).toBe(
+      'Public Visit rate limiter is temporarily unavailable'
+    );
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    // No DB lookup or token mint when the durable backend is down.
+    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(mockGetClientTrackingToken).not.toHaveBeenCalled();
+  });
+
   it('returns 404 when the profile UUID does not exist (closes Greptile P1: caller-supplied UUID minted tokens)', async () => {
     passingRateLimit();
     mockProfileLookup(null);

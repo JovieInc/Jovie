@@ -130,6 +130,65 @@ describe('POST /api/audience/visit', () => {
     expect(data.error).toBe('Rate limit exceeded');
   });
 
+  it('returns 503, not 429, when the IP rate-limit backend is unavailable', async () => {
+    mockPublicVisitLimiterLimit.mockResolvedValue({
+      success: false,
+      limit: 100,
+      remaining: 0,
+      reset: new Date(Date.now() + 60_000),
+      reason: 'Public Visit rate limiter is temporarily unavailable',
+      unavailable: true,
+      backend: 'unavailable',
+    });
+
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data.error).toBe('Visit tracking is temporarily unavailable.');
+    expect(data.reason).toBe(
+      'Public Visit rate limiter is temporarily unavailable'
+    );
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+  });
+
+  it('returns 503, not 429, when the per-profile rate-limit backend is unavailable', async () => {
+    mockPublicVisitLimiterLimit.mockResolvedValue({ success: true });
+    mockCheckVisitRateLimit.mockResolvedValue({
+      success: false,
+      limit: 50_000,
+      remaining: 0,
+      reset: new Date(Date.now() + 60_000),
+      reason:
+        'Tracking Visits (Creator) rate limiter is temporarily unavailable',
+      unavailable: true,
+      backend: 'unavailable',
+    });
+
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data.error).toBe('Visit tracking is temporarily unavailable.');
+    expect(mockRecordAudienceEvent).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when the request body is empty', async () => {
     const request = new NextRequest('http://localhost/api/audience/visit', {
       method: 'POST',
