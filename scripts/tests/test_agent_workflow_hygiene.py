@@ -880,6 +880,37 @@ def test_conflict_paths_preserve_native_queue_and_use_only_non_force_delivery() 
         assert forbidden not in workflow
 
 
+def test_real_model_eval_requires_explicit_cost_eligibility() -> None:
+    """Paid live-model evals need explicit cost eligibility, never automatic.
+
+    JOV-6234: the real-model lane must never spend automatically. In source,
+    the live suites only run when the operator sets the explicit eligibility
+    token (REAL_MODEL_EVAL_APPROVED) plus an explicit positive budget cap;
+    the flag + gateway keys that scheduled and manual runs already provide
+    are no longer sufficient to authorize a paid call.
+    """
+    gateway = (
+        REPO_ROOT / "apps/web/lib/eval/adversarial/helicone-gateway.ts"
+    ).read_text(encoding="utf-8")
+    eligibility = (
+        REPO_ROOT / "apps/web/lib/eval/adversarial/eligibility.ts"
+    ).read_text(encoding="utf-8")
+    golden = (
+        REPO_ROOT
+        / "apps/web/tests/eval/golden/golden-eval-set.real.test.ts"
+    ).read_text(encoding="utf-8")
+
+    # Explicit eligibility gate in the eval library.
+    assert "REAL_MODEL_EVAL_APPROVED" in eligibility
+    assert "REAL_EVAL_COST_ELIGIBILITY" in eligibility
+    assert "parseBudgetCapUsd(env.BUDGET_CAP_USD) > 0" in eligibility
+    # No automatic metered fallback: without the token the gate is closed.
+    assert "costEligible" in gateway
+    assert "isRealModelEvalCostEligible" in golden
+    # The paid suites consume the gate before any live call.
+    assert "const REAL_EVAL_ENABLED = isRealModelEvalEnabled(" in golden
+
+
 def test_standalone_health_monitors_have_independent_bounded_schedules() -> None:
     """Critical monitors must not depend on the disabled Agent Tick monolith."""
     schedules = {
@@ -1237,37 +1268,6 @@ def test_live_model_work_never_fans_out_from_pull_requests() -> None:
     assert "pull_request:" not in real_model
     assert "pnpm exec vitest run" in real_model
     assert "github.event_name == 'pull_request' && '0'" in deterministic
-
-
-def test_real_model_eval_requires_explicit_cost_eligibility() -> None:
-    """Paid live-model evals need explicit cost eligibility, never automatic.
-
-    JOV-6234: the real-model lane must never spend automatically. In source,
-    the live suites only run when the operator sets the explicit eligibility
-    token (REAL_MODEL_EVAL_APPROVED) plus an explicit positive budget cap;
-    the flag + gateway keys that scheduled and manual runs already provide
-    are no longer sufficient to authorize a paid call.
-    """
-    gateway = (
-        REPO_ROOT / "apps/web/lib/eval/adversarial/helicone-gateway.ts"
-    ).read_text(encoding="utf-8")
-    eligibility = (
-        REPO_ROOT / "apps/web/lib/eval/adversarial/eligibility.ts"
-    ).read_text(encoding="utf-8")
-    golden = (
-        REPO_ROOT
-        / "apps/web/tests/eval/golden/golden-eval-set.real.test.ts"
-    ).read_text(encoding="utf-8")
-
-    # Explicit eligibility gate in the eval library.
-    assert "REAL_MODEL_EVAL_APPROVED" in eligibility
-    assert "REAL_EVAL_COST_ELIGIBILITY" in eligibility
-    assert "parseBudgetCapUsd(env.BUDGET_CAP_USD) > 0" in eligibility
-    # No automatic metered fallback: without the token the gate is closed.
-    assert "costEligible" in gateway
-    assert "isRealModelEvalCostEligible" in golden
-    # The paid suites consume the gate before any live call.
-    assert "const REAL_EVAL_ENABLED = isRealModelEvalEnabled(" in golden
 
 
 def test_deep_lanes_are_event_driven_and_bounded() -> None:
