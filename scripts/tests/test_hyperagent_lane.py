@@ -757,9 +757,9 @@ class ProductionRemoteEntryTest(unittest.TestCase):
                 self.pr[field] = value
                 self.assertEqual(lane.reconcile_hyperagent_completion(self.host, self.spec, linear, self.issue, enqueue=True)["verdict"], "remote-held")
                 self.pr.update(original)
-        for target, value in (("owner", "foreign"), ("disabled", False), ("proof", False)):
+        for target, value in (("owner", "foreign"), ("disabled", False), ("proof", False), ("timeout", lane.subprocess.TimeoutExpired("gh", 600)), ("process", lane.subprocess.CalledProcessError(1, "gh"))):
             with self.subTest(target=target):
-                with patch.object(lane, "HOST", value if target == "owner" else lane.HOST):
+                with patch.object(lane, "HOST", value if target == "owner" else lane.HOST), patch.object(lane, "sh", side_effect=value if isinstance(value, lane.subprocess.SubprocessError) else self.read):
                     old = self.spec.get("enabled", True); self.spec["enabled"] = value if target == "disabled" else old
                     proof = self.spec["verifiedRemote"]["allInCap"]; self.spec["verifiedRemote"]["allInCap"] = value if target == "proof" else proof
                     self.assertEqual(lane.reconcile_hyperagent_completion(self.host, self.spec, linear, self.issue, enqueue=True)["verdict"], "remote-held")

@@ -1260,7 +1260,7 @@ def reconcile_hyperagent_completion(host: Host, spec: dict, linear: Linear, issu
                 outcome = {**outcome, "verdict": "remote-repair-required", "dependencies": ["automatic-hyper-repair-unavailable"], "reasons": outcome.get("reasons", []) + ([] if failed else ["local-qualification-budget-exhausted"])}
             state["completionResult"] = {**outcome, "headSha": pr["headRefOid"], "remoteThreadId": state["threadId"], "qualificationExecution": finished}; save()
             return {**base, **state["completionResult"]}
-    except (OSError, ValueError, KeyError, TypeError, IndexError, AttributeError, RuntimeError): return held
+    except (OSError, ValueError, KeyError, TypeError, IndexError, AttributeError, RuntimeError, subprocess.SubprocessError): return held
 
 
 def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear=None) -> dict:
