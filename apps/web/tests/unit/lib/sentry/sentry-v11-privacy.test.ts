@@ -13,10 +13,9 @@ describe('Sentry 11 collection policy', () => {
       defaultIntegrations: false,
       integrations: [sdk.requestDataIntegration()],
       enableOpenTelemetrySetup: false,
-      enableLogs: false,
       tracesSampleRate: 0,
       transport: () => ({
-        send: async envelope => {
+        send: async (envelope: unknown) => {
           envelopes.push(envelope);
           return { statusCode: 200 };
         },
@@ -50,9 +49,11 @@ describe('Sentry 11 collection policy', () => {
           ipAddress: '203.0.113.8',
         },
       });
+      sdk.logger.info('collection-policy-log');
       expect(await client.flush(2000)).toBe(true);
       const serialized = JSON.stringify(envelopes);
       expect(serialized).toContain('collection-policy-probe');
+      expect(serialized).toContain('collection-policy-log');
       expect(serialized).toContain('application/json');
       expect(serialized).not.toMatch(
         /private-query|private-cookie|private-header|203\.0\.113\.8/
@@ -70,7 +71,6 @@ describe('Sentry 11 collection policy', () => {
       dsn: 'https://public@example.com/1',
       defaultIntegrations: false,
       enableOpenTelemetrySetup: false,
-      enableLogs: false,
       tracesSampleRate: 0,
       transport: () => ({
         send: async () => ({ statusCode: 200 }),

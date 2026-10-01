@@ -580,7 +580,6 @@ export interface BaseSentryClientConfig {
   dsn: string | undefined;
   release: string | undefined;
   tracesSampleRate: number;
-  enableLogs: boolean;
   dataCollection: NonNullable<
     Parameters<typeof Sentry.init>[0]
   >['dataCollection'];
@@ -603,7 +602,7 @@ export interface BaseSentryClientConfig {
  *
  * - **DSN**: Uses `NEXT_PUBLIC_SENTRY_DSN` for client-side initialization
  * - **Trace Sampling**: Uses the shared `TRACES_SAMPLE_RATE` constant
- * - **Log Enablement**: Always enabled for error breadcrumbs
+ * - **Logs**: Captured when callers use the Sentry logging API
  * - **PII Handling**: explicit restrictive collection; user context set server-side only
  * - **Before Send**: Applies `scrubPii` to filter sensitive data and drop
  *   client object-capture UpstashError bags (JOV-5186 / JOV-5187)
@@ -634,7 +633,6 @@ export function getBaseClientConfig(): BaseSentryClientConfig {
     dsn: SENTRY_DSN_CLIENT,
     release: SENTRY_RELEASE,
     tracesSampleRate: TRACES_SAMPLE_RATE,
-    enableLogs: true,
     // Preserve the v10 sendDefaultPii:false boundary; v11 defaults collect more.
     dataCollection: {
       userInfo: false,
@@ -677,7 +675,6 @@ export interface BaseSentryServerConfig {
   dsn: string | undefined;
   release: string | undefined;
   tracesSampleRate: number;
-  enableLogs: boolean;
   dataCollection: NonNullable<
     Parameters<typeof Sentry.init>[0]
   >['dataCollection'];
@@ -710,7 +707,6 @@ export function getBaseServerConfig(): BaseSentryServerConfig {
     dsn: SENTRY_DSN_SERVER,
     release: SENTRY_RELEASE,
     tracesSampleRate: TRACES_SAMPLE_RATE,
-    enableLogs: true,
     // Retain server debugging context and keep prompts/model replies private.
     dataCollection: {
       userInfo: true,
