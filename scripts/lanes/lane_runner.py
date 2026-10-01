@@ -1451,11 +1451,11 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False) 
                 "reasons": [f"publication-revoked:{revoked.get('reason', '?')}"],
                 "revocation": revoked}
     sh(["gh", "pr", "ready", str(pr["number"]), "--repo", REPO_SLUG], log=log)
-    queued = sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto"], log=log)
+    queued = sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto", "--match-head-commit", pr["headRefOid"]], log=log)
     if queued.returncode != 0:
         # Verified heads are never re-gated, so a failed enqueue (e.g. a GraphQL rate limit)
         # would strand a green PR; each worker pass retries it via requeue_verified.
-        update_json(host.state / "requeue.json", lambda requeue: requeue.update({str(pr["number"]): pr["headRefOid"]}))
+        update_requeue_locked(host, lambda requeue: requeue.update({str(pr["number"]): pr["headRefOid"]}))
     return {**result, "verdict": "landing" if queued.returncode == 0 else "verified-not-queued"}
 
 
@@ -1472,13 +1472,68 @@ def update_json(path: Path, change) -> None:
     path.write_text(json.dumps(data))
 
 
-def requeue_verified(host: Host, prs: list[dict]) -> None:
+def gate_outcome(receipt: dict) -> dict:
+    """Project gate evidence without importing the producer's enclosing run identity."""
+    fields = ("verdict", "pr", "prUrl", "headSha", "reasons", "changedFiles", "gateWaitS", "revocation",
+              "gateSensitive", "dependencies", "next_action", "execution", "qualificationExecution",
+              "sourceFencingToken", "remoteThreadId", "remoteAgentId", "modelSettingsProof", "adoptRunId")
+    result = {key: receipt[key] for key in fields if key in receipt}
+    if receipt.get("kind") == "adopt" and receipt.get("runId"):
+        result["adoptRunId"] = receipt["runId"]
+    return result
+
+
+def qualification_receipt(name: str, issue: Issue, outcome: dict) -> dict:
+    """A continuation is a distinct ledger event linked to the source and gate receipts."""
+    return {**gate_outcome(outcome), "schema": "jovie-lane-run/v1", "runId": uuid.uuid4().hex,
+            "kind": "qualification", "provider": name, "issue": issue.identifier,
+            "linearIssueId": issue.id, "startedAt": now_iso(), "endedAt": now_iso()}
+
+
+def update_requeue_locked(host: Host, change) -> None:
+    """Gate writers and deferred removals share the worker's short inventory lock."""
+    lock = Locked(host.state / "claim.lock", blocking=True)
+    try:
+        update_json(host.state / "requeue.json", change)
+    finally:
+        lock.release()
+
+
+def remove_requeue_head(host: Host, pr: dict) -> None:
+    """Remove only a landed selection; other slots may have changed the inventory."""
+    def remove(rows):
+        number = str(pr["number"])
+        if rows.get(number) == pr["headRefOid"]:
+            del rows[number]
+    update_requeue_locked(host, remove)
+
+
+def run_deferred_requeue(host: Host, pr: dict, retry, *, slot=None):
+    """Outside claim.lock, refresh the exact target before expensive qualification."""
+    try:
+        live = reconcile_fix_target(pr)
+        if (not live or live.get("state") != "OPEN"
+            or (live.get("number"), live.get("headRefOid"), live.get("headRefName"))
+               != (pr.get("number"), pr.get("headRefOid"), pr.get("headRefName"))
+            or publication_revocation(host, live.get("headRefName"))):
+            return None
+        result = retry(live)
+        if result and result.get("verdict") == "landing":
+            remove_requeue_head(host, pr)
+        return result
+    except BaseException:
+        if slot is not None: slot.release()
+        raise
+
+def requeue_verified(host: Host, prs: list[dict], *, defer=None) -> dict | None:
     """Retry enqueueing gate-verified PRs whose enqueue failed; drop them once queued or moved."""
     path = host.state / "requeue.json"
     if not path.exists():
         return
+    selected = None
     inventory = {str(pr["number"]): pr for pr in prs}
     def retry(requeue: dict) -> None:
+        nonlocal selected
         for number, head in list(requeue.items()):
             if number not in inventory:
                 live = reconcile_fix_target({"number": int(number), "headRefOid": head})
@@ -1490,10 +1545,15 @@ def requeue_verified(host: Host, prs: list[dict]) -> None:
             if publication_revocation(host, inventory[number].get("headRefName")):
                 del requeue[number]  # revoked branches never re-enroll
                 continue
+            if defer and defer(inventory[number]):
+                if selected is None:
+                    selected = dict(inventory[number])
+                continue
             sh(["gh", "pr", "ready", number, "--repo", REPO_SLUG])
             if sh(["gh", "pr", "merge", number, "--repo", REPO_SLUG, "--auto", "--match-head-commit", head]).returncode == 0:
                 del requeue[number]
     update_json(path, retry)
+    return selected
 
 
 # ---------------------------------------------------------------- fix red first
@@ -2247,7 +2307,7 @@ def unverified_pr(prs: list[dict], verified: dict) -> dict | None:
     return None
 
 
-def adopt_pr(host: Host, name: str, pr: dict) -> dict:
+def adopt_pr(host: Host, name: str, pr: dict, *, sensitive: bool = False) -> dict:
     if not provider_may_run(name, "adopt"):
         return {"schema": "jovie-lane-run/v1", "provider": name, "kind": "adopt", "pr": pr["number"],
                 "verdict": "skipped", "reasons": ["implementation-only-lane:no-review-tasks"],
@@ -2267,7 +2327,7 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
             add_worktree(host, ["--detach", str(worktree), "origin/main"], log)
             install_dependencies(host, worktree, log)
             labels = {label["name"].lower() for label in pr.get("labels", [])}
-            receipt.update(gate_pr(host, pr, worktree, log, sensitive=SENSITIVE_PR_LABEL in labels))
+            receipt.update(gate_pr(host, pr, worktree, log, sensitive=sensitive or SENSITIVE_PR_LABEL in labels))
         except WorktreeUnavailable as error:
             receipt.update(verdict="skipped", reasons=[f"worktree-unavailable:{error}"[:300]])
         except Exception as error:
@@ -2652,7 +2712,7 @@ def worker(host: Host, name: str) -> int:
                                  "Disposition: obsolete/invalid — needs a human decision, not a work queue.")
     elif verdict in ("landing", "verified-not-queued"):
         linear.comment(issue.id, f"🤖 lane `{name}`: PR {receipt.get('prUrl')} passed the lane gate and is "
-                                 f"queued; required checks and the merge queue decide.")
+                                 f"{'queued' if verdict == 'landing' else 'verified; enqueue retry pending'}; required checks and the merge queue decide.")
     elif verdict == "held" and receipt.get("pr"):
         # One PR per issue: the fix loop repairs it on the same branch instead of a fresh attempt.
         linear.comment(issue.id, f"🤖 lane `{name}`: the lane gate held PR {receipt.get('prUrl')} "
