@@ -489,6 +489,9 @@ class LinearClientTest(unittest.TestCase):
 
 class RunIssueTest(unittest.TestCase):
     def setUp(self):
+        disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+        disk.start()
+        self.addCleanup(disk.stop)
         self.real_sh, self.real_verify, self.real_pack = lane.sh, lane.verify_and_land, lane.context_pack
         self.real_next = lane.next_provider
         lane.next_provider = lambda *a, **k: None  # no live provider health checks in unit tests
@@ -718,6 +721,9 @@ class AttributionAndThroughputTest(unittest.TestCase):
 
 class WorkerTest(unittest.TestCase):
     def setUp(self):
+        disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+        disk.start()
+        self.addCleanup(disk.stop)
         self.saved = (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
                       lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues,
                       lane.fix_candidates, lane.escalate_exhausted, lane.pr_events.queued_prs,
@@ -1209,6 +1215,9 @@ class VerifyAndLandRevocationTest(unittest.TestCase):
 
 class DispatchTest(unittest.TestCase):
     def setUp(self):
+        disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+        disk.start()
+        self.addCleanup(disk.stop)
         # Host-independent tests must never contact production from Gem's test gate.
         clock = patch.object(lane.continuity_clock, "tick", return_value={"status": "current"})
         clock.start()
@@ -1739,6 +1748,9 @@ class PreservedRecoveryTest(unittest.TestCase):
 
 class FixRedTest(unittest.TestCase):
     def setUp(self):
+        disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+        disk.start()
+        self.addCleanup(disk.stop)
         self.real_reconcile_fix_target = lane.reconcile_fix_target
         lane.reconcile_fix_target = lambda pr: {**pr, "state": "OPEN", "mergedAt": None}
         self.addCleanup(setattr, lane, "reconcile_fix_target", self.real_reconcile_fix_target)

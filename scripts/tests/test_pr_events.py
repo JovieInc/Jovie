@@ -12,6 +12,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -796,6 +797,11 @@ class GapTest(unittest.TestCase):
 
 class RunnerHookTest(unittest.TestCase):
     """The hook-in points in lane_runner.py: structured held records, exhausted orphans, the tick."""
+
+    def setUp(self):
+        disk = patch.object(runner.disk_guard, "free_pct", return_value=50.0)
+        disk.start()
+        self.addCleanup(disk.stop)
 
     def test_record_held_and_failures_are_structured(self):
         with tempfile.TemporaryDirectory() as tmp:
