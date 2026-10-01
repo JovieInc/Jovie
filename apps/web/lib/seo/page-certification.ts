@@ -52,8 +52,8 @@ export const DESCRIPTION_LENGTH = { min: 50, max: 170 } as const;
  */
 export const MIN_SERVER_RENDERED_WORDS = 40;
 export const MIN_LINK_PAGE_WORDS = 10;
-/** Domain-level `is-agentic` floor. jov.ie scored 100 on 2026-09-14. */
-export const IS_AGENTIC_SCORE_FLOOR = 90;
+/** Domain-level `is-agentic` floor. The weekly loop closes only at 100/100. */
+export const IS_AGENTIC_SCORE_FLOOR = 100;
 
 /** Pages whose copy runs the flagship judge panel in the authoring loop. */
 export const FLAGSHIP_PATHS: ReadonlySet<string> = new Set([
@@ -812,7 +812,9 @@ export function auditIsAgentic(
     ];
   }
   const essentialFailures = (report.issues ?? []).filter(
-    issue => issue.tier === 'essential' && issue.result === 'fail'
+    issue =>
+      issue.tier === 'essential' &&
+      (issue.result === 'fail' || issue.result === 'failed')
   );
   const checks: SeoCheck[] = [
     report.score >= floor
@@ -845,7 +847,11 @@ export function auditIsAgentic(
         ),
   ];
   for (const issue of report.issues ?? []) {
-    if (issue.tier === 'essential' && issue.result === 'fail') continue;
+    if (
+      issue.tier === 'essential' &&
+      (issue.result === 'fail' || issue.result === 'failed')
+    )
+      continue;
     checks.push(
       check(
         'agentic',
