@@ -4,6 +4,8 @@ import { getTableColumns, getTableName } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import {
   financeAccounts,
+  financeBudgetSettings,
+  financeBudgetTargets,
   financeExports,
   financeInstitutions,
   financeTransactions,
@@ -14,12 +16,14 @@ const FINANCE_TABLES = [
   financeAccounts,
   financeTransactions,
   financeExports,
+  financeBudgetTargets,
+  financeBudgetSettings,
 ];
 
-const MIGRATION_PATH = path.join(
-  process.cwd(),
-  'drizzle/migrations/0110_fancy_wolverine.sql'
-);
+const MIGRATION_PATHS = [
+  path.join(process.cwd(), 'drizzle/migrations/0110_fancy_wolverine.sql'),
+  path.join(process.cwd(), 'drizzle/migrations/0127_finance_budgets.sql'),
+];
 
 describe('finance schema owner boundary (JOV-4609)', () => {
   it.each(FINANCE_TABLES.map(t => [getTableName(t), t] as const))(
@@ -45,8 +49,8 @@ describe('finance schema owner boundary (JOV-4609)', () => {
   );
 });
 
-describe('finance RLS migration (JOV-4609)', () => {
-  const sql = readFileSync(MIGRATION_PATH, 'utf8');
+describe('finance RLS migrations (JOV-4609, JOV-4620)', () => {
+  const sql = MIGRATION_PATHS.map(p => readFileSync(p, 'utf8')).join('\n');
 
   it.each(FINANCE_TABLES.map(t => getTableName(t)))(
     '%s has FORCE RLS and an owner-only policy',
