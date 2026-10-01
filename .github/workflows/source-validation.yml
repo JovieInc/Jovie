@@ -39,6 +39,18 @@ jobs:
           ESLINT_CHANGED_BASE="origin/${{ github.base_ref }}" pnpm --filter @jovie/web run lint:eslint:changed
           pnpm component-ship-gate
           pnpm ci:control:test
+      - name: Verify changed CLI publication behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_sha="$(git merge-base 'origin/${{ github.base_ref }}' HEAD)"
+          changed_cli="$(git diff --name-only "$base_sha" HEAD -- packages/jovie-cli .github/workflows/npm-publish.yml .github/workflows/source-validation.yml)"
+          if [ -n "$changed_cli" ]; then
+            pnpm --filter @jovie/cli run test:coverage
+            pnpm --filter @jovie/cli run typecheck
+            pnpm --filter @jovie/cli run build
+            pnpm --filter @jovie/cli run pack:dry
+          fi
   security:
     name: Security Evidence
     runs-on: ubuntu-latest

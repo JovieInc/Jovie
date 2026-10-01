@@ -12,6 +12,8 @@ import sys
 import tempfile
 import time
 import unittest
+import fcntl
+from unittest.mock import patch
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -88,17 +90,19 @@ class WorktreeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp) / "repo"
             repo.mkdir()
-            clean = make_tree(repo.parent / "wt-clean", ["src/f.ts"], age_s=13 * 3600)
-            dirty = make_tree(repo.parent / "wt-dirty", ["src/f.ts"], age_s=13 * 3600)
+            clean = make_tree(repo.parent / "worktrees/wt-clean", ["src/f.ts"], age_s=13 * 3600)
+            dirty = make_tree(repo.parent / "worktrees/wt-dirty", ["src/f.ts"], age_s=13 * 3600)
             make_tree(dirty / "apps/web/.next", ["cache.bin"], age_s=13 * 3600)
             make_tree(dirty / "apps/web/test-results", ["r.xml"], age_s=13 * 3600)
-            young = make_tree(repo.parent / "wt-young", ["src/f.ts"], age_s=60)
+            young = make_tree(repo.parent / "worktrees/wt-young", ["src/f.ts"], age_s=60)
+            external = make_tree(repo.parent / "user-checkout", ["src/f.ts"], age_s=13 * 3600)
+            preserved = make_tree(repo.parent / "worktrees/preserved", [guard.PRESERVED_REPAIR], age_s=13 * 3600)
             removed, calls = [], []
 
             def run(args, **kw):
                 calls.append(args)
                 if args[:3] == ["git", "worktree", "list"]:
-                    return self.porcelain(str(repo), str(clean), str(dirty), str(young))
+                    return self.porcelain(str(repo), str(clean), str(dirty), str(young), str(external), str(preserved))
                 if args[3:4] == ["status"]:
                     return SimpleNamespace(returncode=0,
                                            stdout=" M dirty-file\n" if args[2] == str(dirty) else "", stderr="")
@@ -115,12 +119,14 @@ class WorktreeTest(unittest.TestCase):
             self.assertFalse((dirty / "apps/web/.next").exists())
             self.assertFalse((dirty / "apps/web/test-results").exists())
             self.assertTrue(young.exists(), "active worktrees are never touched")
+            self.assertTrue(external.exists(), "unrelated checkouts and dependency lenders are never swept")
+            self.assertTrue(preserved.exists(), "cancelled source remains preserved regardless of age")
 
     def test_failed_removal_is_recorded_not_raised(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp) / "repo"
             repo.mkdir()
-            stale = make_tree(repo.parent / "wt", ["f.ts"], age_s=20 * 3600)
+            stale = make_tree(repo.parent / "worktrees/wt", ["f.ts"], age_s=20 * 3600)
 
             def run(args, **kw):
                 if args[:3] == ["git", "worktree", "list"]:
@@ -130,7 +136,7 @@ class WorktreeTest(unittest.TestCase):
                 return SimpleNamespace(returncode=1, stdout="", stderr="locked")
 
             report = {"actions": [], "errors": []}
-            guard.sweep_worktrees(SimpleNamespace(repo=repo), run, NOW, report)
+            guard.sweep_worktrees(SimpleNamespace(repo=repo, state=Path(tmp)), run, NOW, report)
             self.assertTrue(stale.exists())
             self.assertTrue(report["errors"])
 
@@ -163,7 +169,7 @@ class CheckTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             try:
-                report = guard.check(self.host(tmp), run=run, now=NOW)
+                report = guard.check(self.host(tmp), run=run, now=NOW, sweep=True)
             finally:
                 guard.free_pct, guard.shutil.which = saved
             self.assertTrue(report["low"])
@@ -181,7 +187,7 @@ class CheckTest(unittest.TestCase):
         guard.free_pct = lambda path: 4.0
         with tempfile.TemporaryDirectory() as tmp:
             try:
-                report = guard.check(self.host(tmp), run=ok, now=NOW)
+                report = guard.check(self.host(tmp), run=ok, now=NOW, sweep=True)
             finally:
                 guard.free_pct = saved
             self.assertTrue(report["critical"])
@@ -193,10 +199,45 @@ class CheckTest(unittest.TestCase):
         guard.sweep_derived_data = lambda *a, **k: (_ for _ in ()).throw(OSError("ENOSPC mid-sweep"))
         with tempfile.TemporaryDirectory() as tmp:
             try:
-                report = guard.check(self.host(tmp), run=ok, now=NOW)
+                report = guard.check(self.host(tmp), run=ok, now=NOW, sweep=True)
             finally:
                 guard.free_pct, guard.sweep_derived_data = saved
             self.assertTrue(report["errors"])
+
+    def test_critical_unknown_and_observation_only_never_sweep(self):
+        for pct in (None, 0.1, 5.0, 10.0):
+            with self.subTest(pct=pct), tempfile.TemporaryDirectory() as tmp, \
+                    patch.object(guard, "free_pct", return_value=pct), \
+                    patch.object(guard, "sweep_derived_data") as sweep:
+                report = guard.check(self.host(tmp), sweep=pct != 10.0)
+                sweep.assert_not_called()
+                self.assertEqual(report["admitted"], pct == 10.0)
+                self.assertEqual(report["reason"], "disk-unobservable" if pct is None else
+                                 "disk-available" if pct == 10.0 else "disk-critical")
+
+    def test_cleanup_lock_serializes_workers_and_recovers_after_release(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(guard, "free_pct", return_value=10.0), \
+                patch.object(guard, "sweep_derived_data") as sweep, \
+                patch.object(guard, "sweep_worktrees"), patch.object(guard, "sweep_host_tools"):
+            host = self.host(tmp)
+            with open(host.state / "disk-cleanup.lock", "a") as held:
+                fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                report = guard.check(host, sweep=True)
+                self.assertEqual(report["cleanup"], "busy")
+                sweep.assert_not_called()
+            report = guard.check(host, sweep=True)
+            self.assertEqual(report["cleanup"], "acquired")
+            sweep.assert_called_once()
+
+    def test_cleanup_stops_if_disk_becomes_critical_between_steps(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(guard, "free_pct", side_effect=[10.0, 10.0, 4.0, 4.0]), \
+                patch.object(guard, "sweep_derived_data") as first, \
+                patch.object(guard, "sweep_worktrees") as second:
+            report = guard.check(self.host(tmp), sweep=True)
+            first.assert_called_once()
+            second.assert_not_called()
+            self.assertFalse(report["admitted"])
 
 
 if __name__ == "__main__":
