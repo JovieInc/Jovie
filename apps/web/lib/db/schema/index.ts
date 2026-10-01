@@ -998,6 +998,7 @@ export {
   type NewModelUsageEvent,
   selectModelExperimentSchema,
 } from './model-experiments';
+export { musicResolverReceipts } from './music-resolver';
 // Notifications (SMS subscribe intents, cross-artist contact identity)
 export {
   insertNotificationContactSchema,
