@@ -61,7 +61,7 @@ bounded custom delta and rejected alternatives; lifetime-cost/risk assessment;
 tests; rollback/retirement/re-evaluation triggers; independent review for
 exceptions. Unverified facts remain unverified.
 
-**Enforcement (JOV-INV-035):** a minimal deterministic validator
+**Enforcement (JOV-INV-041):** a minimal deterministic validator
 (`scripts/invariants/capability-sourcing.mjs`, composed into the existing
 `pnpm invariants:check` entrypoint) binds this policy to its router and
 skill surfaces. Per the 2026-09-09 founder rule above, this gate runs

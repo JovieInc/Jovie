@@ -1,5 +1,5 @@
 /**
- * JOV-INV-035: capability-level reuse-first sourcing decisions (JOV-6212).
+ * JOV-INV-041: capability-level reuse-first sourcing decisions (JOV-6212).
  *
  * Minimal deterministic validator for the capability sourcing policy locked in
  * canon/ENGINEERING.md. It composes into the existing invariant validation
@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 import { readInvariantRegistry } from './registry.mjs';
 
-export const CAPABILITY_SOURCING_INVARIANT_ID = 'JOV-INV-035';
+export const CAPABILITY_SOURCING_INVARIANT_ID = 'JOV-INV-041';
 export const CAPABILITY_SOURCING_SCHEMA = 'jovie-capability-sourcing/v1';
 export const CANON_ENGINEERING_PATH = 'canon/ENGINEERING.md';
 export const ROUTER_PATH = 'CLAUDE.md';
@@ -61,7 +61,7 @@ function policyValue(registry) {
 }
 
 /**
- * Validate the canonical policy surfaces for JOV-INV-035.
+ * Validate the canonical policy surfaces for JOV-INV-041.
  * @param {object} [options]
  * @param {string} [options.repoRoot]
  * @param {object} [options.registry] parsed canon/invariants.jsonl

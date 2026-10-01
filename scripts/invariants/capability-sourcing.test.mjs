@@ -26,8 +26,8 @@ function surfaces() {
   };
 }
 
-describe('JOV-INV-035 capability sourcing', () => {
-  it('binds JOV-INV-035 in the adopted registry', () => {
+describe('JOV-INV-041 capability sourcing', () => {
+  it('binds JOV-INV-041 in the adopted registry', () => {
     const invariant = REGISTRY.invariants.find(
       item => item.id === CAPABILITY_SOURCING_INVARIANT_ID
     );
@@ -55,7 +55,7 @@ describe('JOV-INV-035 capability sourcing', () => {
     });
     assert.ok(
       errors.some(
-        error => error.includes('JOV-INV-035') && error.includes('absent')
+        error => error.includes('JOV-INV-041') && error.includes('absent')
       )
     );
   });
