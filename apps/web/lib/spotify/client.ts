@@ -320,7 +320,18 @@ class SpotifyClientManager {
       span.setAttribute('spotify.status', response.status);
       return (await response.json()) as T;
     } catch (error) {
-      if (options.signal?.aborted) throw new CallerCancellationError();
+      // Only translate an abort actually caused by the caller signal. A
+      // provider error that races with a later caller abort must propagate so
+      // the circuit breaker still observes the upstream failure.
+      if (
+        options.signal?.aborted &&
+        !controller.signal.aborted &&
+        typeof error === 'object' &&
+        error !== null &&
+        (error as { name?: unknown }).name === 'AbortError'
+      ) {
+        throw new CallerCancellationError();
+      }
       throw error;
     } finally {
       cleanup();

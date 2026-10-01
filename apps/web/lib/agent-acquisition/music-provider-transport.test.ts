@@ -230,6 +230,78 @@ describe('canonical provider HTTP transport for public music reads', () => {
     }
   );
 
+  it.each(['spotify', 'apple'] as const)(
+    '%s preserves a provider failure that races with a caller abort',
+    async provider => {
+      const controller = new AbortController();
+      const fetcher = vi.fn(async () => {
+        controller.abort();
+        return Response.json(
+          { error: { message: 'Upstream outage' } },
+          { status: 503 }
+        );
+      });
+      vi.stubGlobal('fetch', fetcher);
+      const result =
+        provider === 'spotify'
+          ? spotifyClient.getArtist(ID, { signal: controller.signal })
+          : appleArtist('657515', { signal: controller.signal });
+      const error = await result.then(
+        () => null,
+        (e: unknown) => e
+      );
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).name).not.toBe('CallerCancellationError');
+      const breaker =
+        provider === 'spotify'
+          ? spotifyCircuitBreaker
+          : appleMusicCircuitBreaker;
+      expect(breaker.getStats().totalFailures).toBe(1);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each(['spotify', 'apple'] as const)(
+    '%s preserves a provider failure when the caller aborts mid-error-body',
+    async provider => {
+      const controller = new AbortController();
+      const fetcher = vi.fn(
+        async () =>
+          new Response(
+            new ReadableStream({
+              start(stream) {
+                stream.enqueue(
+                  new TextEncoder().encode(
+                    JSON.stringify({ error: { message: 'Upstream outage' } })
+                  )
+                );
+                controller.abort();
+                stream.close();
+              },
+            }),
+            { status: 503 }
+          )
+      );
+      vi.stubGlobal('fetch', fetcher);
+      const result =
+        provider === 'spotify'
+          ? spotifyClient.getArtist(ID, { signal: controller.signal })
+          : appleArtist('657515', { signal: controller.signal });
+      const error = await result.then(
+        () => null,
+        (e: unknown) => e
+      );
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).name).not.toBe('CallerCancellationError');
+      const breaker =
+        provider === 'spotify'
+          ? spotifyCircuitBreaker
+          : appleMusicCircuitBreaker;
+      expect(breaker.getStats().totalFailures).toBe(1);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    }
+  );
+
   it.each([429, 503])(
     'Spotify retries transient HTTP %s within the existing three-attempt cap',
     async status => {

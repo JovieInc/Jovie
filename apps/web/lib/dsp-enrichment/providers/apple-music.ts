@@ -161,13 +161,17 @@ function isNonRetryableError(error: unknown): boolean {
 async function withRetry<T>(
   fn: () => Promise<T>,
   maxRetries = DEFAULT_MAX_RETRIES,
-  baseDelayMs = DEFAULT_BASE_DELAY_MS
+  baseDelayMs = DEFAULT_BASE_DELAY_MS,
+  signal?: AbortSignal
 ): Promise<T> {
   return executeWithRetry(fn, {
     maxRetries,
     baseDelayMs,
     jitterRatio: 0.15,
-    isRetryable: error => !isNonRetryableError(error),
+    // An aborted caller signal must not trigger another attempt: the retry
+    // would hit the preflight cancellation check and mask an already
+    // classified provider error as caller cancellation.
+    isRetryable: error => !signal?.aborted && !isNonRetryableError(error),
   });
 }
 
@@ -242,7 +246,16 @@ async function musicKitRequest<T>(
 
     return (await response.json()) as MusicKitResponse<T>;
   } catch (error) {
-    if (options.signal?.aborted) {
+    // Only translate an abort actually caused by the caller signal. A
+    // provider error that races with a later caller abort must propagate so
+    // the circuit breaker still observes the upstream failure.
+    if (
+      options.signal?.aborted &&
+      !controller.signal.aborted &&
+      typeof error === 'object' &&
+      error !== null &&
+      (error as { name?: unknown }).name === 'AbortError'
+    ) {
       throw new CallerCancellationError();
     }
     if (error instanceof AppleMusicError) {
@@ -265,8 +278,13 @@ async function musicKitRequest<T>(
  * Execute a MusicKit request with circuit breaker protection and retry logic.
  * Retries transient failures with exponential backoff before opening circuit.
  */
-async function executeWithCircuitBreaker<T>(fn: () => Promise<T>): Promise<T> {
-  return appleMusicCircuitBreaker.execute(() => withRetry(fn));
+async function executeWithCircuitBreaker<T>(
+  fn: () => Promise<T>,
+  signal?: AbortSignal
+): Promise<T> {
+  return appleMusicCircuitBreaker.execute(() =>
+    withRetry(fn, DEFAULT_MAX_RETRIES, DEFAULT_BASE_DELAY_MS, signal)
+  );
 }
 
 // ============================================================================
@@ -293,7 +311,7 @@ export async function lookupByIsrc(
       options
     );
     return response;
-  });
+  }, options.signal);
 
   return result.data?.[0] ?? null;
 }
@@ -351,7 +369,7 @@ export async function bulkLookupByIsrc(
       options
     );
     return response;
-  });
+  }, options.signal);
 
   if (result.data) {
     for (const track of result.data) {
@@ -387,7 +405,7 @@ export async function lookupByUpc(
       options
     );
     return response;
-  });
+  }, options.signal);
 
   return result.data?.[0] ?? null;
 }
@@ -423,7 +441,7 @@ export async function getArtist(
       options
     );
     return response;
-  });
+  }, options.signal);
 
   const artist = result.data?.[0] ?? null;
 
@@ -457,7 +475,7 @@ export async function searchArtist(
       options
     );
     return response;
-  });
+  }, options.signal);
 
   return result.results?.artists?.data ?? [];
 }
@@ -481,7 +499,7 @@ export async function getAlbum(
       options
     );
     return response;
-  });
+  }, options.signal);
 
   return result.data?.[0] ?? null;
 }
@@ -507,7 +525,7 @@ export async function getArtistAlbums(
       options
     );
     return response;
-  });
+  }, options.signal);
 
   return result.data ?? [];
 }
