@@ -28,6 +28,9 @@ const shouldSkipManagedWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
 export default defineConfig({
   captureGitInfo: { commit: false, diff: false },
   testDir: './tests/e2e',
+  // Only collect Playwright specs. tests/e2e/utils contains node:test suites
+  // (*.test.mjs) that named-import TypeScript sources and break discovery.
+  testMatch: '**/*.spec.ts',
   fullyParallel: true,
   timeout: 120_000,
   expect: { timeout: 25_000 },
