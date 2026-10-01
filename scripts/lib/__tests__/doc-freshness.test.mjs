@@ -230,12 +230,31 @@ function reviewedRepo() {
 }
 
 function reviewKinds(registry, repoRoot) {
-  return runDocFreshnessLint(registry, { repoRoot }).violations.map(
-    v => v.kind
-  );
+  return runDocFreshnessLint(registry, {
+    repoRoot,
+  }).qualification.violations.map(v => v.kind);
 }
 
 describe('top-map source reviews', () => {
+  it('keeps new review findings nonblocking while existing map limits still fail', () => {
+    const { repoRoot, registry } = reviewedRepo();
+    delete registry.documentReviews;
+    const shadow = runDocFreshnessLint(registry, { repoRoot });
+    expect(shadow.ok).toBe(true);
+    expect(shadow.violations).toEqual([]);
+    expect(shadow.qualification.mode).toBe('qualification-only');
+    expect(shadow.qualification.ok).toBe(false);
+    expect(shadow.qualification.violations[0].kind).toBe(
+      'missing-document-reviews'
+    );
+    expect(shadow.qualification.durationMs).toBeGreaterThanOrEqual(0);
+    registry.agentsMap.maxLines = 0;
+    const blocked = runDocFreshnessLint(registry, { repoRoot });
+    expect(blocked.ok).toBe(false);
+    expect(blocked.violations[0].kind).toBe('agents-map-too-long');
+    expect(blocked.qualification.ok).toBe(false);
+  });
+
   it('derives the exact map, including scoped rules and added links', () => {
     const { repoRoot, registry } = reviewedRepo();
     expect(reviewKinds(registry, repoRoot)).toEqual([]);

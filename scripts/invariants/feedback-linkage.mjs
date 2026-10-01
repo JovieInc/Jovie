@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { posix } from 'node:path';
+import { readFileSync, realpathSync } from 'node:fs';
+import { posix, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // H-06 linkage belongs to the existing harness audit. This is source-reference
 // evidence, not a claim that every linked test ran or every policy is automated.
@@ -134,4 +136,57 @@ export function verifyFeedbackLinkage(markdown, registry, readGuard) {
     });
     return { ...lesson, guards };
   });
+}
+
+/** Source linkage qualification, never a replacement for existing gate errors. */
+export function auditFeedbackLinkage(
+  repoRoot = fileURLToPath(new URL('../../', import.meta.url))
+) {
+  const started = performance.now();
+  const receipt = {
+    schema: 'jovie.feedback-linkage-qualification/v1',
+    mode: 'qualification-only',
+    proof: 'reviewed-source-linkage-only',
+    cannotRecur: 0,
+    ok: false,
+    findings: [],
+    lessonCount: 0,
+    testLinks: 0,
+    ruleLinks: 0,
+    policyOnlyFingerprints: [],
+    lessons: [],
+  };
+  try {
+    const root = realpathSync(repoRoot);
+    const readLocal = path => {
+      const absolute = resolve(root, path);
+      assert.equal(
+        realpathSync(absolute),
+        absolute,
+        'guard path must not traverse a symlink'
+      );
+      return readFileSync(absolute, 'utf8');
+    };
+    const lessons = verifyFeedbackLinkage(
+      readLocal('LESSONS.md'),
+      JSON.parse(readLocal('LESSONS.guards.json')),
+      readLocal
+    );
+    const guards = lessons.flatMap(lesson => lesson.guards);
+    Object.assign(receipt, {
+      ok: true,
+      lessonCount: lessons.length,
+      testLinks: guards.filter(guard => guard.kind === 'test').length,
+      ruleLinks: guards.filter(guard => guard.kind === 'scoped-rule').length,
+      policyOnlyFingerprints: lessons
+        .filter(lesson =>
+          lesson.guards.every(guard => guard.kind === 'scoped-rule')
+        )
+        .map(lesson => lesson.fingerprint),
+      lessons,
+    });
+  } catch (error) {
+    receipt.findings.push(error.message);
+  }
+  return { ...receipt, durationMs: performance.now() - started };
 }

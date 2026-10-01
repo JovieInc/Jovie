@@ -53,8 +53,11 @@ promotion threshold is implied. No scheduler, new bot or paid service is added.
 `pnpm doc:freshness:check` also checks every Markdown document linked directly
 from `CLAUDE.md`, the router itself, and every scoped rule under `.claude/rules`.
 `AGENTS.md` remains the symlinked entry point. The lint derives that set on every
-run and requires an exact match with `documentReviews` in
-`docs/doc-freshness-registry.json`; additions and removed/orphaned entries fail.
+run and audits an exact match with `documentReviews` in
+`docs/doc-freshness-registry.json`. Findings are emitted as nonblocking
+`jovie-document-review-qualification/v1` receipts, including audit duration.
+Existing link, map-budget and freshness-marker failures still block. New review
+findings do not change the exit code before promotion.
 
 Each entry names its existing CODEOWNERS owner, a specific reviewed contract,
 the document digest, and local source evidence with digests. JSON pointers and
@@ -62,7 +65,7 @@ Markdown sections bind only the relevant source facts; whole package manifests
 and workflows are rejected to preserve the high-churn boundary above. Scalar
 `documentValue` claims additionally require the selected source and prose to
 agree. Changed prose, changed source, missing source, or missing ownership
-requires a new review in the same PR. CRLF and LF are equivalent.
+is reported for source review in the same PR. CRLF and LF are equivalent.
 
 Review the affected prose against the declared source before updating its
 SHA-256 values. Do not bulk-refresh hashes to clear the lint. Use
@@ -75,3 +78,6 @@ selector exercises missing/drifting review failures. No new job or service runs.
 These bindings detect when a source review must happen; they do not mechanically
 prove every sentence true, certify runtime, or renew a harness exception.
 Historical sections and live facts still require their dated/runtime evidence.
+H-EX-03 remains partial until representative ship-cohort and promotion receipts
+meet `canon/ENGINEERING.md`: correctness/pass rate, p95, throughput/cost, failure
+isolation, owner and rollback. No promotion threshold is invented by this audit.

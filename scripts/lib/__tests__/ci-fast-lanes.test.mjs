@@ -42,7 +42,9 @@ import {
 import {
   INVARIANT_SCANNED_PATHS,
   isInvariantScannedPath,
+  readFeedbackGuardPaths,
 } from '../../invariants/scanned-paths.mjs';
+import { classifyCiRepoLanes } from '../ci-repo-lanes.mjs';
 import { classifyProductLanes } from '../product-lane-classifier.mjs';
 
 const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
@@ -654,16 +656,35 @@ describe('invariant-scanned structural selection', () => {
     }
   });
 
-  it('routes every feedback inventory and linked guard edit through invariants', async () => {
-    const registry = JSON.parse(
-      readFileSync(join(REPO_ROOT, 'LESSONS.guards.json'), 'utf8')
+  it('isolates unavailable feedback qualification inputs from lane selection', () => {
+    const path = 'scripts/lib/__tests__/ci-fast-lanes.test.mjs';
+    const read = () =>
+      JSON.stringify({ lessons: [{ guards: [{ path }, { path: null }] }] });
+    expect(readFeedbackGuardPaths(read)).toEqual([path]);
+    for (const content of ['{', '{}', '{"lessons":[{}]}']) {
+      expect(readFeedbackGuardPaths(() => content)).toEqual([]);
+    }
+    expect(
+      readFeedbackGuardPaths(() => {
+        throw new Error('missing inventory');
+      })
+    ).toEqual([]);
+    expect(isInvariantScannedPath('scripts/invariants/validate.mjs')).toBe(
+      true
     );
+  });
+
+  it('routes the feedback inventory to the control lane', () => {
+    const plan = classifyCiRepoLanes(['LESSONS.guards.json']);
+    expect(plan.runSymphonyControl).toBe(true);
+    expect(plan.runJovieProduct).toBe(false);
+  });
+
+  it('routes every feedback inventory and linked guard edit through invariants', async () => {
     const paths = new Set([
       'LESSONS.md',
       'LESSONS.guards.json',
-      ...registry.lessons.flatMap(lesson =>
-        lesson.guards.map(guard => guard.path)
-      ),
+      ...readFeedbackGuardPaths(),
     ]);
     for (const path of paths) {
       expect(isInvariantScannedPath(path), path).toBe(true);
@@ -1852,6 +1873,15 @@ describe('document review coverage contract', () => {
     expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
       'lib/__tests__/doc-freshness.test.mjs'
     );
+    const [contracts, coverage] = SCRIPT_CONTRACT_VITEST_COMMAND.split(' && ');
+    expect(contracts).not.toContain('--coverage');
+    expect(contracts).toContain(
+      'lib/__tests__/component-rendered-certification.test.mjs'
+    );
+    expect(coverage).toMatch(
+      /run lib\/__tests__\/doc-freshness\.test\.mjs --coverage /u
+    );
+    expect(coverage).not.toContain('component-rendered-certification.test.mjs');
     expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
       '--coverage.include=lib/doc-review.mjs'
     );

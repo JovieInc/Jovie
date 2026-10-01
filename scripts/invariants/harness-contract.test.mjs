@@ -1,9 +1,16 @@
 import assert from 'node:assert/strict';
-import { readFileSync, realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { describe, it } from 'node:test';
-import { fileURLToPath } from 'node:url';
 import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { describe, it } from 'node:test';
+import {
+  auditFeedbackLinkage,
   lessonFingerprints,
   verifyFeedbackLinkage,
 } from './feedback-linkage.mjs';
@@ -206,45 +213,94 @@ describe('JOV-INV-024 harness contract', () => {
   });
 });
 
-const repoRoot = realpathSync(
-  fileURLToPath(new URL('../../', import.meta.url))
-);
-function readLocalGuard(path) {
-  const absolute = resolve(repoRoot, path);
-  assert.equal(
-    realpathSync(absolute),
-    absolute,
-    'guard path must not traverse a symlink'
-  );
-  return readFileSync(absolute, 'utf8');
-}
-const lessonSource = readFileSync(resolve(repoRoot, 'LESSONS.md'), 'utf8');
-const feedbackRegistry = JSON.parse(
-  readFileSync(resolve(repoRoot, 'LESSONS.guards.json'), 'utf8')
-);
+// Fixed fixtures exercise the verifier without turning the live ledger into a
+// new blocking delivery gate. The existing validate process emits its shadow audit.
+const lessonSource =
+  '### Executable guard\n**Mistake:** Repeated bug.\n### Policy guard\n**Mistake:** Repeated policy mistake.\n';
+const guardFixtures = {
+  'example.test.ts': 'it rejects the repeated failure deterministically',
+  '.claude/rules/example.md':
+    'Require a reviewed receipt before the external action',
+};
+const readLocalGuard = path => {
+  assert.ok(Object.hasOwn(guardFixtures, path), 'missing fixture guard');
+  return guardFixtures[path];
+};
+const feedbackRegistry = {
+  schema: 'jovie.feedback-guards/v1',
+  reviewedOn: '2026-10-01',
+  lessons: lessonFingerprints(lessonSource).map((lesson, index) => ({
+    ...lesson,
+    guards: [
+      {
+        kind: index === 0 ? 'test' : 'scoped-rule',
+        path: Object.keys(guardFixtures)[index],
+        anchor: Object.values(guardFixtures)[index],
+        reason:
+          'A reviewed and specific prevention reference for this fixture.',
+      },
+    ],
+  })),
+};
 
 describe('H-06 repeated-feedback linkage', () => {
-  it('links every reviewed lesson fingerprint to a concrete test or scoped rule', t => {
+  it('validates both executable and policy linkage without equating them', () => {
     const lessons = verifyFeedbackLinkage(
       lessonSource,
       feedbackRegistry,
       readLocalGuard
     );
-    t.diagnostic(
-      JSON.stringify({
-        schema: 'jovie.feedback-linkage-receipt/v1',
-        lessonCount: lessons.length,
-        testLinks: lessons
-          .flatMap(item => item.guards)
-          .filter(item => item.kind === 'test').length,
-        ruleLinks: lessons
-          .flatMap(item => item.guards)
-          .filter(item => item.kind === 'scoped-rule').length,
-        cannotRecur: 0,
-        proof: 'reviewed-source-linkage-only',
-        lessons,
-      })
+    assert.equal(lessons.length, 2);
+    assert.deepEqual(
+      lessons.map(lesson => lesson.guards[0].kind),
+      ['test', 'scoped-rule']
     );
+  });
+
+  it('reports live ledger failures in qualification without throwing or claiming prevention', () => {
+    const root = mkdtempSync(join(tmpdir(), 'feedback-qualification-'));
+    try {
+      writeFileSync(join(root, 'LESSONS.md'), lessonSource);
+      writeFileSync(
+        join(root, 'LESSONS.guards.json'),
+        JSON.stringify(feedbackRegistry)
+      );
+      for (const [path, content] of Object.entries(guardFixtures)) {
+        mkdirSync(dirname(join(root, path)), { recursive: true });
+        writeFileSync(join(root, path), content);
+      }
+      const good = auditFeedbackLinkage(root);
+      assert.equal(good.mode, 'qualification-only');
+      assert.equal(good.ok, true);
+      assert.equal(good.lessonCount, 2);
+      assert.equal(good.testLinks, 1);
+      assert.equal(good.ruleLinks, 1);
+      assert.deepEqual(good.policyOnlyFingerprints, ['Policy guard']);
+      assert.equal(good.cannotRecur, 0);
+      assert.ok(good.durationMs >= 0);
+      writeFileSync(
+        join(root, 'LESSONS.md'),
+        `${lessonSource}### Unreviewed lesson\nNew failure.\n`
+      );
+      const drift = auditFeedbackLinkage(root);
+      assert.equal(drift.ok, false);
+      assert.match(drift.findings[0], /non-exhaustive/);
+      assert.deepEqual(drift.lessons, []);
+      writeFileSync(join(root, 'LESSONS.md'), lessonSource);
+      rmSync(join(root, 'example.test.ts'));
+      const missing = auditFeedbackLinkage(root);
+      assert.equal(missing.ok, false);
+      assert.match(missing.findings[0], /ENOENT/);
+      symlinkSync(
+        join(root, '.claude/rules/example.md'),
+        join(root, 'example.test.ts')
+      );
+      assert.match(auditFeedbackLinkage(root).findings[0], /symlink/);
+      writeFileSync(join(root, 'LESSONS.guards.json'), '{');
+      assert.equal(auditFeedbackLinkage(root).ok, false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('deliberate red H-06: new, removed, duplicated or edited lessons require review', () => {
