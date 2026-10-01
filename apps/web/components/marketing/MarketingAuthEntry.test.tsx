@@ -1,11 +1,15 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import LaunchPage from '@/app/(marketing)/launch/page';
+import { SmartLinksLanding } from '@/app/(marketing)/smart-links/SmartLinksLanding';
 import { LandingCTAButton } from '@/components/features/landing/LandingCTAButton';
+import { ArtistNotificationsHero } from '@/components/marketing/artist-notifications/ArtistNotificationsHero';
 import { HomepageV2Route } from '@/components/marketing/homepage-v2/HomepageV2Route';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
 import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
 import { VoicePageContent } from '@/components/organisms/VoicePageContent';
+import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
 import { MarketingHero } from './MarketingHero';
 
 const { track } = vi.hoisted(() => ({ track: vi.fn() }));
@@ -46,6 +50,58 @@ function expectIntentOnly(link: HTMLElement, href: string) {
 }
 
 describe('marketing auth entry waits for intent', () => {
+  it('defers the notification trial destination while retaining ordinary public prefetch', () => {
+    const hero = ARTIST_NOTIFICATIONS_COPY.hero;
+    const view = render(<ArtistNotificationsHero hero={hero} />);
+    const link = screen.getByRole('link', { name: hero.primaryCtaLabel });
+    expectIntentOnly(link, '/signup?plan=pro');
+    fireEvent.focus(link);
+    fireEvent.mouseEnter(link);
+    expectIntentOnly(link, '/signup?plan=pro');
+    view.rerender(
+      <ArtistNotificationsHero hero={{ ...hero, primaryCtaHref: '/pricing' }} />
+    );
+    expect(
+      screen.getByRole('link', { name: hero.primaryCtaLabel })
+    ).toHaveAttribute('data-test-prefetch', 'undefined');
+  });
+
+  it('defers both smart-link auth actions and preserves their attribution and the public example', () => {
+    render(<SmartLinksLanding />);
+    const links = screen.getAllByRole('link', { name: 'Create a Smart Link' });
+    expect(links).toHaveLength(2);
+    for (const [index, href] of [
+      '/signup?source=smart-links',
+      '/signup?source=smart-links&intent=create',
+    ].entries()) {
+      const link = links[index]!;
+      expectIntentOnly(link, href);
+      fireEvent.focus(link);
+      fireEvent.click(link);
+      expectIntentOnly(link, href);
+    }
+    expectIntentOnly(
+      screen.getByRole('link', { name: 'Open the live example' }),
+      '/tim/never-say-a-word?noredirect=1'
+    );
+  });
+
+  it('defers both launch access actions without changing keyboard or click destinations', () => {
+    render(<LaunchPage />);
+    const links = screen.getAllByRole('link', { name: 'Request access' });
+    expect(links).toHaveLength(2);
+    for (const link of links) {
+      expectIntentOnly(link, '/signup');
+      fireEvent.focus(link);
+      fireEvent.click(link);
+      expectIntentOnly(link, '/signup');
+    }
+    expect(screen.getByRole('link', { name: 'Contact us' })).toHaveAttribute(
+      'href',
+      'mailto:hello@jov.ie'
+    );
+  });
+
   it.each(['marketing-glass', 'default'] as const)(
     'defers public header auth in %s',
     presentation => {
