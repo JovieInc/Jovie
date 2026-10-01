@@ -3,7 +3,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  startTransition,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { CookieActions } from '@/components/molecules/CookieActions';
 import { CookieModal } from '@/components/organisms/CookieModal';
 import { APP_ROUTES } from '@/constants/routes';
@@ -270,7 +276,7 @@ export function CookieBannerSection({
     globalThis.JVConsent?._emit(consent);
   };
 
-  const persistConsent = async (consent: {
+  const persistConsent = (consent: {
     essential: boolean;
     analytics: boolean;
     marketing: boolean;
@@ -282,15 +288,19 @@ export function CookieBannerSection({
         : null;
     setIsSavingConsent(true);
     setSaveError(null);
-    try {
-      await saveConsent(consent);
-      applyConsentLocally(consent);
-      setVisible(false);
-    } catch {
-      setSaveError(CONSENT_SAVE_ERROR);
-    } finally {
-      setIsSavingConsent(false);
-    }
+    // Cookie writes refresh the route. Keep its already rendered Suspense
+    // content visible while that refresh waits; consent feedback stays urgent.
+    startTransition(async () => {
+      try {
+        await saveConsent(consent);
+        applyConsentLocally(consent);
+        setVisible(false);
+      } catch {
+        setSaveError(CONSENT_SAVE_ERROR);
+      } finally {
+        setIsSavingConsent(false);
+      }
+    });
   };
 
   const acceptAll = () => {

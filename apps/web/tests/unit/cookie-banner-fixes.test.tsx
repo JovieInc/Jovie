@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { type ReactNode, Suspense, useLayoutEffect, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockMobile = vi.hoisted(() => ({ value: false }));
@@ -27,6 +28,41 @@ function setCookie(value: string) {
     writable: true,
     value,
   });
+}
+
+interface RefreshControl {
+  refresh: (gate: Promise<void> | null) => void;
+}
+
+function RefreshingProfileSurface({ gate }: { gate: Promise<void> | null }) {
+  if (gate) throw gate;
+  return (
+    <main>
+      <h1>Tim White</h1>
+      <button type='button'>Listen now</button>
+    </main>
+  );
+}
+
+function ConsentRefreshHarness({
+  banner,
+  onRefreshReady,
+}: {
+  banner: ReactNode;
+  onRefreshReady: (refresh: RefreshControl['refresh']) => void;
+}) {
+  const [gate, setGate] = useState<Promise<void> | null>(null);
+  useLayoutEffect(() => {
+    onRefreshReady(setGate);
+  }, [onRefreshReady]);
+  return (
+    <>
+      <Suspense fallback={<div role='status'>Loading profile</div>}>
+        <RefreshingProfileSurface gate={gate} />
+      </Suspense>
+      {banner}
+    </>
+  );
 }
 
 describe('cookie banner coverage receipts', () => {
@@ -66,6 +102,68 @@ describe('CookieBannerSection consent sync', () => {
     globalThis.JVConsent = undefined;
     vi.unstubAllEnvs();
   });
+
+  it.each([
+    ['Accept all', false],
+    ['Reject all', false],
+    ['Accept all', true],
+    ['Reject all', true],
+  ] as const)(
+    'keeps the rendered profile visible during %s cookie refresh (error=%s)',
+    async (actionName, fails) => {
+      const mod = await import('@/components/organisms/CookieBannerSection');
+      const control: RefreshControl = { refresh: () => {} };
+      let finish!: () => void;
+      const save = new Promise<void>((resolveSave, rejectSave) => {
+        finish = () => {
+          control.refresh(null);
+          if (fails) rejectSave(new Error('Controlled cookie save failure'));
+          else resolveSave();
+        };
+      });
+      mockSaveConsent.mockImplementationOnce(() => {
+        // Cookie writes refresh the route; use real React Suspense to exercise
+        // the previously rendered shell hiding, rather than changing CSS.
+        control.refresh(save);
+        return save;
+      });
+      setCookie('jv_cc_required=1');
+      render(
+        <ConsentRefreshHarness
+          onRefreshReady={refresh => {
+            control.refresh = refresh;
+          }}
+          banner={<mod.CookieBannerSection />}
+        />
+      );
+      const heading = screen.getByRole('heading', { name: 'Tim White' });
+      const origin = screen.getByRole('button', { name: 'Listen now' });
+      origin.focus();
+      const action = screen.getByRole('button', { name: actionName });
+      action.focus();
+      fireEvent.click(action);
+      try {
+        expect(action).toBeDisabled();
+        expect(heading).toBeVisible();
+        expect(origin).toBeVisible();
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      } finally {
+        await act(async () => finish());
+      }
+      if (fails) {
+        expect(screen.getByRole('alert')).toHaveTextContent(
+          /could not save preferences/i
+        );
+        expect(action).toBeEnabled();
+        expect(action).toHaveFocus();
+        expect(localStorage.getItem('jv_cc')).toBeNull();
+      } else {
+        expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument();
+        expect(origin).toHaveFocus();
+      }
+      expect(heading).toBeVisible();
+    }
+  );
 
   it('uses the E2E-only pathname override to clear the public profile dock', async () => {
     vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
