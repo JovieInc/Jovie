@@ -205,7 +205,10 @@ export {
   FOUNDER_PEN_ATOM_CONSUMERS,
   FOUNDER_PEN_ATOM_FAMILIES,
   FOUNDER_PEN_ATOM_IDS,
+  FOUNDER_PEN_VIDEO_ATOM_IDS,
+  FOUNDER_PEN_VIDEO_SURFACE_CONSUMERS,
   type FounderPenAtomFamily,
+  type FounderPenVideoAtomId,
 } from './atoms/founder-pen-atoms';
 // IconButton
 export type { IconButtonProps } from './atoms/icon-button';

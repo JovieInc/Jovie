@@ -55,7 +55,11 @@ describe('GET /llms-full.txt', () => {
     expect(body).not.toContain('$149');
     expect(body).toContain('Artist Visibility Pro ($199/mo)');
     expect(body).toContain('Enterprise (Custom)');
-    expect(body).toContain('Planned — not included today');
+    expect(body).toContain(
+      'Capability maturity and account access remain separate from a feature being described publicly.'
+    );
+    expect(body).toContain('Self-hosted Better Auth');
+    expect(body).not.toContain('**Authentication**: Clerk');
     expect(body).not.toContain('Max tier');
     expect(body).not.toContain('14-day Pro trial');
   });
