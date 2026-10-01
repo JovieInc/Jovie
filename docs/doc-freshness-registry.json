@@ -219,7 +219,7 @@
     ".claude/rules/release.md": {
       "owner": "@itstimwhite",
       "claim": "Draft publication and exact-head qualification are separate canonical phases.",
-      "documentSha256": "543f67bef47e2aa7d757759145aa530ea82072c65b383480075cf83bec6dd20c",
+      "documentSha256": "650a00c3a586814b757200e8b62652b33975f6602f88e393f6ba8e8d6dd4633b",
       "sources": [
         {
           "path": "docs/PR_FLOW.md",

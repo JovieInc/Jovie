@@ -5,6 +5,11 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DELIVERY_CONTROLLER_COVERAGE_ARGS } from './ci-fast-lanes.mjs';
+import {
+  BLOG_CERTIFICATION_PROOFS,
+  classifyBlogContentDiff,
+  isBlogContentCandidatePath,
+} from './lib/blog-content-ci.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -1029,12 +1034,39 @@ export function buildAffectedTestPlan(
   {
     isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)),
     readFile = readRepoFile,
+    blogContentReceipt,
   } = {}
 ) {
   const files = unique(changedFiles.filter(Boolean)).sort();
   const globalTestInput = files.find(file => GLOBAL_TEST_INPUTS.has(file));
   if (globalTestInput) {
     return fullSuitePlan(`global test input changed: ${globalTestInput}`);
+  }
+  if (files.some(isBlogContentCandidatePath)) {
+    if (
+      !blogContentReceipt?.contentOnly ||
+      files.length !== blogContentReceipt.changedPaths?.length ||
+      files.some(file => !blogContentReceipt.changedPaths.includes(file))
+    ) {
+      return fullSuitePlan(
+        'blog content diff was mixed, unsafe, or lacked status-aware qualification'
+      );
+    }
+    if (!BLOG_CERTIFICATION_PROOFS.every(isFileAvailable)) {
+      return fullSuitePlan('blog certification proof is unavailable');
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [...BLOG_CERTIFICATION_PROOFS],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: [],
+      nodeTests: [],
+      blogCandidateBuild: true,
+    };
   }
   const isLinearSyncOnMerge =
     files.some(file => LINEAR_SYNC_ON_MERGE_PRIMARY.has(file)) &&
@@ -2483,6 +2515,25 @@ export function buildSelectedTestCommands(
       ],
     ]);
   }
+  if (plan.blogCandidateBuild) {
+    commands.push([
+      'env',
+      [
+        'NEXT_PUBLIC_APP_URL=http://localhost:3100',
+        'NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3100',
+        'NEXT_PUBLIC_CLERK_MOCK=1',
+        'NEXT_PUBLIC_CLERK_PROXY_DISABLED=1',
+        'NEXT_PUBLIC_E2E_MODE=1',
+        'NEXT_IGNORE_ESLINT=1',
+        'NEXT_IGNORE_TYPECHECK=1',
+        'NEXT_PRIVATE_SKIP_SIZE_CHECK=true',
+        'pnpm',
+        'turbo',
+        'build',
+        '--filter=@jovie/web',
+      ],
+    ]);
+  }
   return commands;
 }
 
@@ -2645,9 +2696,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     DEFAULT_PROGRESS_INTERVAL_MS
   );
   const explicitFiles = argValue(args, '--changed-files-json', '');
-  const plan = buildAffectedTestPlan(
-    explicitFiles ? JSON.parse(explicitFiles) : changedFiles(base)
+  const files = explicitFiles ? JSON.parse(explicitFiles) : changedFiles(base);
+  const prerequisitesAvailable = BLOG_CERTIFICATION_PROOFS.every(file =>
+    existsSync(resolve(REPO_ROOT, file))
   );
+  const blogContentReceipt =
+    !explicitFiles && files.some(isBlogContentCandidatePath)
+      ? classifyBlogContentDiff(base, 'HEAD', { prerequisitesAvailable })
+      : undefined;
+  const plan = buildAffectedTestPlan(files, { blogContentReceipt });
   if (args.includes('--dry-run')) {
     console.log(JSON.stringify(plan, null, 2));
     process.exit(0);

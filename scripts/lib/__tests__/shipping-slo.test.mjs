@@ -65,6 +65,7 @@ describe('shipping SLO workflow credentials', () => {
     expect(WORKFLOW).toContain(
       'git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"'
     );
+    expect(WORKFLOW).toContain('docs/metrics/blog-publish-latency-latest.json');
   });
 });
 

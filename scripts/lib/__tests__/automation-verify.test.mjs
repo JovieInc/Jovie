@@ -24,8 +24,44 @@ import {
   runCommandStatus,
   runControlTestCommands,
 } from '../../run-affected-tests.mjs';
+import { classifyBlogContentChanges } from '../blog-content-ci.mjs';
 
 describe('affected-test selector inventory', () => {
+  it('selects publication, certification, and candidate-build proof for a status-qualified post', () => {
+    const path = 'apps/web/content/blog/a-safe-article.md';
+    const plan = buildAffectedTestPlan([path], {
+      blogContentReceipt: classifyBlogContentChanges([{ status: 'M', path }]),
+      isFileAvailable: () => true,
+    });
+
+    expect(plan).toMatchObject({
+      mode: 'selected',
+      blogCandidateBuild: true,
+      selectedTests: [
+        'apps/web/tests/unit/lib/blog/publication.test.ts',
+        'apps/web/scripts/marketing-factory/blog-adapter.test.ts',
+      ],
+    });
+    expect(buildSelectedTestCommands(plan, '1').at(-1)).toEqual([
+      'env',
+      expect.arrayContaining(['pnpm', 'build', '--filter=@jovie/web']),
+    ]);
+  });
+
+  it('fails closed without status evidence or with a mixed renderer change', () => {
+    const post = 'apps/web/content/blog/a-safe-article.md';
+    expect(buildAffectedTestPlan([post]).mode).toBe('full');
+    expect(
+      buildAffectedTestPlan([post, 'apps/web/lib/blog/getBlogPosts.ts'], {
+        blogContentReceipt: classifyBlogContentChanges([
+          { status: 'M', path: post },
+          { status: 'M', path: 'apps/web/lib/blog/getBlogPosts.ts' },
+        ]),
+        isFileAvailable: () => true,
+      }).mode
+    ).toBe('full');
+  });
+
   it('enforces real merge-sync writer coverage in its existing focused CI selector', () => {
     const plan = buildAffectedTestPlan([
       'scripts/lib/linear-sync-on-merge.mjs',
