@@ -328,6 +328,83 @@ describe('CookieBannerSection consent sync', () => {
     }
   );
 
+  it.each(['display', 'visibility'])(
+    'skips a prior action inside a CSS %s-hidden subtree',
+    async property => {
+      const mod = await import('@/components/organisms/CookieBannerSection');
+      setCookie('jv_cc_required=1');
+      render(
+        <>
+          <main>
+            <div data-testid='previous-surface'>
+              <button type='button'>Previous</button>
+            </div>
+            <button type='button'>Listen now</button>
+          </main>
+          <mod.CookieBannerSection />
+        </>
+      );
+      screen.getByRole('button', { name: 'Previous' }).focus();
+      const action = screen.getByRole('button', { name: 'Reject all' });
+      action.focus();
+      const surface = screen.getByTestId('previous-surface');
+      surface.style[property as 'display' | 'visibility'] =
+        property === 'display' ? 'none' : 'hidden';
+      fireEvent.click(action);
+      await vi.waitFor(() =>
+        expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument()
+      );
+      expect(screen.getByRole('button', { name: 'Listen now' })).toHaveFocus();
+    }
+  );
+
+  it.each([false, true])(
+    'waits for refreshed page actions without overriding a new focus choice (%s)',
+    async moveFocus => {
+      let finishSave!: () => void;
+      mockSaveConsent.mockImplementationOnce(
+        () =>
+          new Promise<void>(resolveSave => {
+            finishSave = resolveSave;
+          })
+      );
+      const mod = await import('@/components/organisms/CookieBannerSection');
+      setCookie('jv_cc_required=1');
+      render(
+        <>
+          <main data-testid='refreshing-surface'>
+            <button type='button'>Listen now</button>
+          </main>
+          <button type='button'>Visitor choice</button>
+          <mod.CookieBannerSection />
+        </>
+      );
+      const origin = screen.getByRole('button', { name: 'Listen now' });
+      const surface = screen.getByTestId('refreshing-surface');
+      const nativeFocus = origin.focus.bind(origin);
+      origin.focus();
+      // Match a browser refusing focus while React hides a pending subtree.
+      vi.spyOn(origin, 'focus').mockImplementation(options => {
+        if (surface.style.display !== 'none') nativeFocus(options);
+      });
+      const action = screen.getByRole('button', { name: 'Reject all' });
+      action.focus();
+      fireEvent.click(action);
+      action.blur();
+      surface.style.display = 'none';
+      await act(async () => {
+        finishSave();
+      });
+      expect(document.body).toHaveFocus();
+      const choice = screen.getByRole('button', { name: 'Visitor choice' });
+      if (moveFocus) choice.focus();
+      await act(async () => {
+        surface.style.display = '';
+      });
+      await vi.waitFor(() => expect(moveFocus ? choice : origin).toHaveFocus());
+    }
+  );
+
   it('leaves page focus unchanged for an unfocused pointer dismissal', async () => {
     const mod = await import('@/components/organisms/CookieBannerSection');
     setCookie('jv_cc_required=1');

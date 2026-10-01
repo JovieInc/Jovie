@@ -1688,15 +1688,16 @@ def qualify_preserved_pr(host: Host, pr: dict, preserved):
         raise RecoveryHandoff(f"preserved-read-unavailable:{type(error).__name__}", preserved[0]) from error
 
 
+def worktree_busy(path: Path) -> str | None:
+    """Why a worktree must not be destroyed now; None only when proven idle."""
+    return disk_guard.busy_reason(path, run=lambda cmd, **kw: sh(cmd, timeout=kw.get("timeout", 30)))
+
+
 def require_idle_worktree(path: Path):
     # Warnings can mean an incomplete process inventory, so remain fail-closed.
-    active = sh(["lsof", "-nP", "-a", "-d", "cwd", "-F", "pn"], timeout=30)
-    if active.returncode not in (0, 1) or active.stderr:
-        raise RecoveryHandoff("preserved-process-state-unavailable", path)
-    if any(line.startswith("n") and (Path(line[1:]).resolve() == path.resolve()
-                                    or path.resolve() in Path(line[1:]).resolve().parents)
-           for line in active.stdout.splitlines()):
-        raise RecoveryHandoff("preserved-process-still-running", path)
+    busy = worktree_busy(path)
+    if busy:
+        raise RecoveryHandoff(f"preserved-{busy}", path)
 
 
 def _qualify_preserved_pr(host: Host, pr: dict, preserved):
@@ -2523,14 +2524,39 @@ def add_worktree(host: Host, args: list[str], log) -> None:
         raise WorktreeUnavailable((added.stderr or f"git exit {added.returncode}").strip()[:200])
 
 
+def record_worktree_disposition(host: Host, worktree: Path, verdict: str, reason: str | None = None) -> None:
+    """Receipt for every cleanup decision — the journal is the audit, not the act."""
+    try:
+        runs = host.state / "runs"
+        runs.mkdir(parents=True, exist_ok=True)
+        with open(runs / "worktree-removals.jsonl", "a") as out:
+            out.write(json.dumps({"schema": "jovie-worktree-removal/v1", "worktree": str(worktree),
+                                  "verdict": verdict, "reason": reason, "owner": HOST,
+                                  "at": now_iso()}) + "\n")
+    except OSError:
+        pass
+
+
 def remove_worktree(host: Host, worktree: Path) -> None:
     """Protected source is never cleanup; process ownership belongs to run_agent."""
     if not worktree.exists() or (worktree / disk_guard.PRESERVED_REPAIR).exists():
         return
+    busy = worktree_busy(worktree)
+    if busy:
+        record_worktree_disposition(host, worktree, "preserved", busy)
+        preserve_repair(worktree, {"runId": worktree.name, "reasons": [f"cleanup-not-idle:{busy}"]})
+        return
     status = sh(["git", "status", "--porcelain"], cwd=worktree)
     if status.returncode or status.stdout.strip():
+        record_worktree_disposition(host, worktree, "preserved", "source-unverified")
         preserve_repair(worktree, {"runId": worktree.name, "reasons": ["cleanup-source-unverified"]})
         return
+    unpushed = sh(["git", "rev-list", "--count", "HEAD", "--not", "--all"], cwd=worktree)
+    if unpushed.returncode or unpushed.stdout.strip() != "0":
+        record_worktree_disposition(host, worktree, "preserved", "unpublished-work")
+        preserve_repair(worktree, {"runId": worktree.name, "reasons": ["cleanup-unpublished-work"]})
+        return
+    record_worktree_disposition(host, worktree, "removed")
     sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
 
 

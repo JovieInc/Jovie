@@ -26,6 +26,20 @@ CAPACITY_MAX_AGE = timedelta(hours=24)
 CAPACITY_MAX_TARGET = 40
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
+# JOV-4970: authoritative versioned main-health check contract. Promotion of
+# the exact main head binds to REQUIRED_MAIN_CHECKS plus the exact
+# production-generation-verified-<sha> marker — never to every check run
+# attached to the SHA. Optional/advisory lanes (e.g. Product Screenshots /
+# Generate Screenshots) stay observable in the receipt; a terminal optional
+# failure gates only the surfaces that name it in SURFACE_SCOPED_OPTIONAL_CHECKS.
+MAIN_HEALTH_CONTRACT_SCHEMA = "jovie-main-health/v1"
+MAIN_HEALTH_CONTRACT_VERSION = "2026-10-01.1"
+REQUIRED_MAIN_CHECKS = frozenset({"Main Release Ready"})
+GENERATION_MARKER_PREFIX = "production-generation-verified-"
+SURFACE_SCOPED_OPTIONAL_CHECKS = {
+    "production-web": frozenset({"Generate Screenshots"}),
+}
+
 
 class GateContractError(RuntimeError):
     pass

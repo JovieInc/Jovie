@@ -33,6 +33,7 @@ import { sweepUnderEnrichedProfilesForCron } from '@/lib/discography/re-enrich';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { cleanupFounderReviewUploadLeases } from '@/lib/founder-review/server';
+import { runMusicResolverParityCorpus } from '@/lib/music-resolver/shadow';
 import { runOnboardingScriptAggregation } from '@/lib/onboarding/script-aggregation';
 import { getLybDailyMrr } from '@/lib/ovie/lyb-mrr.server';
 import { runProfileSearchMonitoring } from '@/lib/profile-search/runner';
@@ -206,13 +207,13 @@ export async function GET(request: Request) {
     };
   });
 
-  // JOV-7320: vendor benchmarking needs permission for the intended use.
-  // Resume only with an independent corpus or verified benchmarking permission.
-  results.musicResolverParity = {
-    success: true,
-    skipped: true,
-    data: { reason: 'independent-benchmark-source-required' },
-  };
+  // Shadow-only resolver parity: durable cache, no product reads. The parity
+  // reference is built from official DSP APIs (Spotify/Apple Music/Deezer ISRC
+  // lookups); no third-party vendor is used as a benchmark oracle (JOV-7369).
+  results.musicResolverParity = await runSubJob(
+    'musicResolverParity',
+    runMusicResolverParityCorpus
+  );
 
   // 13. Data retention — Sundays only (heavy operation)
   const isSunday = new Date().getDay() === 0;
