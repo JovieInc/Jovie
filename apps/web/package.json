@@ -304,7 +304,7 @@
     "passkit-generator": "3.6.1",
     "qrcode": "^1.5.4",
     "react": "19.2.8",
-    "react-day-picker": "^10.0.1",
+    "react-day-picker": "^10.0.2",
     "react-dom": "19.2.8",
     "react-error-boundary": "^6.1.6",
     "recharts": "3.10.1",
