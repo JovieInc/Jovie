@@ -29,12 +29,21 @@ export const summerCardInputSchema = z
       .max(1_000_000_000)
       .optional()
       .transform(value => value ?? null),
+    preflightReceiptId: z
+      .string()
+      .regex(/^spf_[0-9a-f]{32}$/u)
+      .nullable()
+      .default(null),
     evidence: z
       .array(z.url({ protocol: /^https$/u }).max(2048))
       .max(16)
       .default([]),
   })
-  .strict();
+  .strict()
+  .refine(card => card.kind !== 'spend' || card.preflightReceiptId, {
+    path: ['preflightReceiptId'],
+    message: 'spend cards require a purchase-admission preflight receipt',
+  });
 
 export type SummerCardInput = z.infer<typeof summerCardInputSchema>;
 
@@ -64,6 +73,7 @@ export type SummerCard = {
   readonly defaultIfSilent: string | null;
   readonly recipient: string | null;
   readonly amountUsd: number | null;
+  readonly preflightReceiptId?: string | null;
   readonly evidence: readonly string[];
   readonly status: SummerCardStatus;
   readonly comment: string | null;
@@ -92,6 +102,7 @@ export function summerCardPayloadDigest(input: SummerCardInput): string {
     input.defaultIfSilent,
     input.recipient,
     input.amountUsd,
+    input.preflightReceiptId,
     input.evidence,
   ]);
   return createHash('sha256').update(canonical).digest('hex');

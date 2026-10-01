@@ -1041,6 +1041,17 @@ export function buildAffectedTestPlan(
         'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
         'scripts/lib/__tests__/automation-verify.test.mjs',
       ],
+      scriptVitestCoverageArgs: [
+        '--coverage',
+        '--coverage.include=lib/linear-sync-on-merge.mjs',
+        '--coverage.reporter=text',
+        '--coverage.reporter=json-summary',
+        '--coverage.thresholds.perFile=true',
+        '--coverage.thresholds.lines=85',
+        '--coverage.thresholds.statements=85',
+        '--coverage.thresholds.functions=80',
+        '--coverage.thresholds.branches=70',
+      ],
       nodeTests: [],
     };
   }
