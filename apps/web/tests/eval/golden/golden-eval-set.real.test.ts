@@ -23,10 +23,13 @@ import {
   createHeliconeGateway,
   EvalBudgetTracker,
   formatRangeReport,
+  formatRealEvalProvenance,
   isRealModelEvalEnabled,
   parseBudgetCapUsd,
   parseMinPassCount,
+  parseRealEvalEligibility,
   parseSampleSize,
+  resolveRealEvalEligibility,
   selectDeterministicSample,
 } from '@/lib/eval/adversarial';
 import {
@@ -82,6 +85,16 @@ describe.skipIf(!REAL_EVAL_ENABLED)(
       );
       expect(BATCH_SIZE).toBe(1);
       expect(sampledGoldenCases.length).toBe(SAMPLE_SIZE);
+      // Provenance: every live run logs the explicit cost eligibility
+      // (account/provider/cap) it was authorized under, and the applied
+      // budget cap matches the bounded eligibility cap (JOV-6234).
+      const eligibility = resolveRealEvalEligibility();
+      expect(eligibility).not.toBeNull();
+      console.log(formatRealEvalProvenance(eligibility!));
+      expect(budgetTracker).toBeInstanceOf(EvalBudgetTracker);
+      expect(eligibility!.capUsd).toBe(
+        parseBudgetCapUsd(String(eligibility!.declaredCapUsd))
+      );
     });
 
     for (const golden of sampledGoldenCases) {
@@ -201,12 +214,27 @@ describe.skipIf(!REAL_EVAL_ENABLED)(
 );
 
 describe('Golden eval-set real-model lane (disabled guard)', () => {
-  it('skips live provider calls unless JOVIE_RUN_REAL_MODEL_EVALS is enabled', () => {
+  it('skips live provider calls unless an explicit cost eligibility authorizes them', () => {
     if (REAL_EVAL_ENABLED) {
       expect(process.env.JOVIE_RUN_REAL_MODEL_EVALS).toBe('1');
+      expect(
+        parseRealEvalEligibility(process.env.REAL_EVAL_ELIGIBILITY)
+      ).not.toBeNull();
       return;
     }
 
-    expect(process.env.JOVIE_RUN_REAL_MODEL_EVALS).not.toBe('1');
+    // Default no-spend: without an explicit eligibility token the lane stays
+    // disabled even when the opt-in flag is set and provider keys exist.
+    expect(
+      isRealModelEvalEnabled({
+        ...process.env,
+        JOVIE_RUN_REAL_MODEL_EVALS: '1',
+        AI_GATEWAY_API_KEY: 'present-but-unauthorized',
+        HELICONE_API_KEY: 'present-but-unauthorized',
+      })
+    ).toBe(false);
+    expect(process.env.REAL_EVAL_ELIGIBILITY ?? '').not.toMatch(
+      /^\s*\{.*"account"/
+    );
   });
 });
