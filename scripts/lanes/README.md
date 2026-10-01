@@ -185,6 +185,23 @@ State and receipts live under `~/.local/state/jovie-lanes`. Every gated run reco
 `gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
 second host is decided on measured queue time, not on timeouts alone.
 
+## Preserved repairs (JOV-7347)
+
+Repair retries reuse a registered preserved checkout only after its ended run,
+execution identity, current target head, ancestry and idle process state agree.
+The existing coordinator still enforces the live lease and original retry budget;
+changing check failures does not grant a fresh budget. A host-local PR lock spans
+failure identities. Unverifiable or superseded work emits a recovery handoff.
+Preserved issue implementations require execution reconciliation and remain on
+Backlog with their source and accountable issue reference intact.
+
+The runner tracks observed descendants by PID and start time across detached
+sessions, cleans them up on completion/cancellation, and never kills by pathname.
+A child that fully daemonizes before its first snapshot cannot be attributed this
+way; preserved-work admission therefore also checks live working directories.
+Cleanup retains protected, dirty or unreadable source. Installed-runtime evidence
+is required before calling this commissioned.
+
 ## Tests
 
 ```sh
