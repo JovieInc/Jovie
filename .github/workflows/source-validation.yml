@@ -27,6 +27,10 @@ jobs:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
           TURBO_SCM_BASE: origin/${{ github.base_ref }}
           TURBO_SCM_HEAD: ${{ github.event.pull_request.head.sha }}
+          # Cold `tsc` on @jovie/web (no tsbuildinfo restore here) exceeds the
+          # ~4GB default Node heap on ubuntu-latest; ci-fast-typecheck survives
+          # only via its incremental cache. Match other lanes' heap headroom.
+          NODE_OPTIONS: --max-old-space-size=8192
         run: |
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           git fetch --no-tags origin "${{ github.base_ref }}"
