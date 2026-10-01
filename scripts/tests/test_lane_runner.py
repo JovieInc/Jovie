@@ -900,6 +900,33 @@ class WorkerTest(unittest.TestCase):
 
 
 class RunAgentTest(unittest.TestCase):
+    def test_cancellation_does_not_signal_a_reused_root_process_group(self):
+        original = {10: (1, 10, "S", "original")}
+        reused = {10: (1, 10, "S", "replacement"), 11: (10, 10, "S", "unrelated")}
+        proc = Mock(pid=10)
+        proc.wait.side_effect = subprocess.TimeoutExpired("agent", 0)
+        proc.poll.return_value = 0
+        guard = Mock(side_effect=[None, lane.DiskAdmissionError("disk-critical")])
+        with patch.object(lane.subprocess, "Popen", return_value=proc), \
+                patch.object(lane, "process_snapshot", side_effect=[original] + [reused] * 10), \
+                patch.object(lane.os, "kill") as kill, \
+                patch.object(lane.os, "killpg", side_effect=ProcessLookupError) as killpg:
+            with self.assertRaises(lane.DiskAdmissionError):
+                lane.run_agent(["agent"], Path("."), None, timeout=30, guard=guard, guard_interval=0)
+        kill.assert_not_called()
+        killpg.assert_not_called()
+
+    def test_snapshot_failure_still_signals_the_live_unreaped_leader(self):
+        proc = Mock(pid=10)
+        proc.poll.return_value = None
+        with patch.object(lane.subprocess, "Popen", return_value=proc), \
+                patch.object(lane, "process_snapshot", side_effect=RuntimeError("snapshot-unavailable")), \
+                patch.object(lane.os, "killpg", side_effect=ProcessLookupError) as killpg:
+            with self.assertRaisesRegex(RuntimeError, "snapshot-unavailable"):
+                lane.run_agent(["agent"], Path("."), None, timeout=30)
+        self.assertEqual(killpg.call_count, 1)
+        self.assertEqual(killpg.call_args.args[0], 10)
+
     def test_process_identity_survives_reparenting_but_reused_pids_are_not_owned(self):
         snapshots = [
             {10: (1, 10, "S", "start-a"), 11: (10, 11, "S", "start-b"), 99: (1, 99, "S", "other")},

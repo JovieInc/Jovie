@@ -892,6 +892,10 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
             owned.stop(proc)
         finally:
             for sig, grace in ((signal.SIGTERM, 15), (signal.SIGKILL, 5)):
+                # A reaped leader's PID/PGID may now belong to an unrelated job.
+                # Observed descendants are handled by their start identities above.
+                if proc.poll() is not None:
+                    break
                 try:
                     os.killpg(proc.pid, sig)
                 except ProcessLookupError:
