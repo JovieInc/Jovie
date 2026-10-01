@@ -125,12 +125,12 @@ describe('ConnectorCard', () => {
     expect(screen.getByRole('button', { name: 'Disconnect' })).toBeDisabled();
   });
 
-  it('shows connected email or recovery detail in one stable status slot', () => {
+  it('shows connected account or recovery detail in one stable status slot', () => {
     const { rerender } = render(
       <ConnectorCard
         provider='gmail'
         status='connected'
-        email='artist@example.com'
+        accountLabel='artist@example.com'
         errorMessage='This should stay hidden.'
       />
     );
@@ -143,7 +143,7 @@ describe('ConnectorCard', () => {
       <ConnectorCard
         provider='gmail'
         status='error'
-        email='artist@example.com'
+        accountLabel='artist@example.com'
         errorMessage='Google rejected the connection.'
       />
     );
@@ -172,6 +172,30 @@ describe('ConnectorCard', () => {
     const iconSlot = container.querySelector('div.mt-0\\.5');
     expect(iconSlot?.querySelector('svg[fill="currentColor"]')).not.toBeNull();
     expect(iconSlot?.querySelector('.lucide')).toBeNull();
+  });
+
+  it('shows the granted YouTube scopes with labels from the provider manifest', () => {
+    render(
+      <ConnectorCard
+        provider='youtube'
+        status='connected'
+        accountLabel='Artist Channel'
+        scopes={[
+          'https://www.googleapis.com/auth/youtube.readonly',
+          'https://www.googleapis.com/auth/youtube.upload',
+          'https://www.googleapis.com/auth/yt-analytics.readonly',
+        ]}
+      />
+    );
+
+    expect(
+      screen.getByRole('status', { name: 'YouTube status: Connected' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('list', { name: 'YouTube granted scopes' })
+    ).toHaveTextContent(
+      'Scopes: Read Channel Data, Manage Videos, View Channel Analytics'
+    );
   });
 
   it('marks syncing as busy without changing the disconnect contract', () => {
