@@ -1013,8 +1013,8 @@ importers:
   workers/canary-otp:
     dependencies:
       postal-mime:
-        specifier: 3.0.0
-        version: 3.0.0
+        specifier: 3.0.1
+        version: 3.0.1
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^5.20260927.1
@@ -13941,6 +13941,9 @@ packages:
   pg-protocol@1.16.0:
     resolution: {integrity: sha512-sILXutLVjCLjcDuOmvhX5e2Z4cS5qG/6Bu3VkpFwdf/633ElGLpEh9bgmuI5I4sqKqkifQiGyiCcx1HdtrK7tg==}
 
+  pg-protocol@1.16.1:
+    resolution: {integrity: sha512-p9VOFMiHB/ZbJATetbg+99PxssTVSQRnyuPSQ67mN1+1KBOjZaZ83ZQzltnxPhJwSsC3nwVjJ10DVJlerbFzLg==}
+
   pg-types@2.2.0:
     resolution: {integrity: sha512-qTAAlrEsl8s4OiEQY69wDvcMIdQN6wdz5ojQiOy6YRMuynxenON0O5oCpJI6lshc6scgAY8qvJ2On/p+CXY0GA==}
     engines: {node: '>=4'}
@@ -14046,8 +14049,8 @@ packages:
   postal-mime@2.7.6:
     resolution: {integrity: sha512-UUlyE2KlxmvwMGq060onF/VWU3zD6dVW31FwokQ5v26jWd35fbs2MoTFzh+jXnPwAyV2MULMKXcBInGOl5TO6Q==}
 
-  postal-mime@3.0.0:
-    resolution: {integrity: sha512-Z4a9ar2Bv3YpK3IXag+Yda30k7bMZfpRuUGyqtHnZ2pjHG8Bl62EhZIk4n1dzv00gfzP9g+94e9kd8+XmjVWLA==}
+  postal-mime@3.0.1:
+    resolution: {integrity: sha512-N86EnYOxZjW1uHQIgSXnnRdnJz+wxmtDsnk3C4R/9rQ1utj8A2znauXZ3Q3+stCHxG5ckY4/NrO09WiPU6rcdQ==}
 
   postcss-value-parser@4.2.0:
     resolution: {integrity: sha512-1NNCs6uurfkVbeXG4S8JFT9t19m45ICnif8zWLd5oPSZ50QnwMfK+H3jv408d4jw/7Bttv5axS5IiHoLaVNHeQ==}
@@ -15663,6 +15666,10 @@ packages:
 
   tinyrainbow@3.1.1:
     resolution: {integrity: sha512-yau8yJdTt989Mm0Bd/236QnzEiPf2xLLTqUZRUJOo/3CB078LSwzei343DgtJVmfJKJE3TMINY1u42SQsP6mXw==}
+    engines: {node: '>=14.0.0'}
+
+  tinyrainbow@3.2.0:
+    resolution: {integrity: sha512-LgO3D9yZJjApUiuUfl9iFAwrtaX4+lok3wJIqttGoKCHlWUqHqbQpnxCf82L8FjgKsh4iGo78hqJwgL8F6To2A==}
     engines: {node: '>=14.0.0'}
 
   tinyspy@4.0.6:
@@ -18680,7 +18687,6 @@ snapshots:
   '@hono/node-server@2.0.11(hono@4.13.8)':
     dependencies:
       hono: 4.13.8
-    optional: true
 
   '@huggingface/jinja@0.5.10':
     optional: true
@@ -19328,7 +19334,6 @@ snapshots:
       zod-to-json-schema: 3.25.2(zod@4.6.5)
     transitivePeerDependencies:
       - supports-color
-    optional: true
 
   '@mongodb-js/saslprep@1.5.4':
     dependencies:
@@ -23380,7 +23385,7 @@ snapshots:
   '@types/pg@8.20.0':
     dependencies:
       '@types/node': 26.6.3
-      pg-protocol: 1.16.0
+      pg-protocol: 1.16.1
       pg-types: 2.2.0
     optional: true
 
@@ -24216,7 +24221,7 @@ snapshots:
 
   '@vitest/pretty-format@4.1.10':
     dependencies:
-      tinyrainbow: 3.1.1
+      tinyrainbow: 3.2.0
     optional: true
 
   '@vitest/pretty-format@5.0.2':
@@ -24255,7 +24260,7 @@ snapshots:
     dependencies:
       '@vitest/pretty-format': 4.1.10
       convert-source-map: 2.0.0
-      tinyrainbow: 3.1.1
+      tinyrainbow: 3.2.0
     optional: true
 
   '@vitest/utils@5.0.2':
@@ -27466,7 +27471,6 @@ snapshots:
   eventsource@3.0.7:
     dependencies:
       eventsource-parser: 3.1.1
-    optional: true
 
   exceljs@4.4.0:
     dependencies:
@@ -27550,7 +27554,6 @@ snapshots:
       ip-address: 10.7.2
     transitivePeerDependencies:
       - supports-color
-    optional: true
 
   express@4.22.1:
     dependencies:
@@ -28558,8 +28561,7 @@ snapshots:
     dependencies:
       parse-passwd: 1.0.0
 
-  hono@4.13.8:
-    optional: true
+  hono@4.13.8: {}
 
   hookified@1.15.1: {}
 
@@ -29270,8 +29272,7 @@ snapshots:
 
   json-schema-traverse@1.0.0: {}
 
-  json-schema-typed@8.0.2:
-    optional: true
+  json-schema-typed@8.0.2: {}
 
   json-schema@0.4.0: {}
 
@@ -31697,6 +31698,9 @@ snapshots:
   pg-protocol@1.16.0:
     optional: true
 
+  pg-protocol@1.16.1:
+    optional: true
+
   pg-types@2.2.0:
     dependencies:
       pg-int8: 1.0.1
@@ -31813,7 +31817,7 @@ snapshots:
 
   postal-mime@2.7.6: {}
 
-  postal-mime@3.0.0: {}
+  postal-mime@3.0.1: {}
 
   postcss-value-parser@4.2.0: {}
 
@@ -34052,6 +34056,9 @@ snapshots:
 
   tinyrainbow@3.1.1: {}
 
+  tinyrainbow@3.2.0:
+    optional: true
+
   tinyspy@4.0.6: {}
 
   title-case@4.3.2: {}
@@ -35269,7 +35276,6 @@ snapshots:
   zod-to-json-schema@3.25.2(zod@4.6.5):
     dependencies:
       zod: 4.6.5
-    optional: true
 
   zod-validation-error@4.0.2(zod@4.6.5):
     dependencies:
