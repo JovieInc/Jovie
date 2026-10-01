@@ -285,13 +285,50 @@ describe('credited artist profile reconciliation', () => {
     expect(hoisted.invalidateProfileCache).toHaveBeenCalledWith('austinleeds');
   });
 
-  it('fails closed when the owner identity already belongs to another profile', async () => {
+  it('skips reconciliation when the owner identity already belongs to another profile', async () => {
     hoisted.dbSelectResults.push([{ usernameNormalized: 'owner-handle' }]);
     hoisted.txSelectResults.push([{ id: 'other-profile' }]);
 
-    await expect(
-      reconcileCreditedArtistProfiles('owner-profile', 'spotify-owner')
-    ).rejects.toThrow('explicit verified profile merge');
+    const result = await reconcileCreditedArtistProfiles(
+      'owner-profile',
+      'spotify-owner'
+    );
+
+    expect(result).toEqual({
+      candidates: 0,
+      created: 0,
+      deferred: false,
+      reused: 0,
+      conflicted: 1,
+      metadataUnavailable: 0,
+    });
+    expect(hoisted.captureWarning).toHaveBeenCalledWith(
+      'Owner identity requires an explicit verified profile merge',
+      undefined,
+      expect.objectContaining({
+        source: 'spotify_release_credit',
+        creatorProfileId: 'owner-profile',
+        collision: 'profile',
+      })
+    );
+    expect(hoisted.getSpotifyArtistsBatch).not.toHaveBeenCalled();
+  });
+
+  it('skips reconciliation when the owner registry identity is bound elsewhere', async () => {
+    hoisted.dbSelectResults.push([{ usernameNormalized: 'owner-handle' }]);
+    hoisted.txSelectResults.push([], [{ creatorProfileId: 'other-profile' }]);
+
+    const result = await reconcileCreditedArtistProfiles(
+      'owner-profile',
+      'spotify-owner'
+    );
+
+    expect(result.conflicted).toBe(1);
+    expect(hoisted.captureWarning).toHaveBeenCalledWith(
+      'Owner identity requires an explicit verified profile merge',
+      undefined,
+      expect.objectContaining({ collision: 'registry' })
+    );
     expect(hoisted.getSpotifyArtistsBatch).not.toHaveBeenCalled();
   });
 
