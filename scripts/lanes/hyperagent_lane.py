@@ -43,7 +43,8 @@ def failure(error):
 
 
 def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
-        timeout=1800, clock=time.time, pause=time.sleep, before_dispatch=lambda: None):
+        timeout=1800, clock=time.time, pause=time.sleep, before_dispatch=lambda: None,
+        known_failure=lambda reason: None, retry_binding=lambda fence: False):
     """One existing attempt: create once, read/resume its thread, gate its same PR.
 
     Settings proof must be refreshed even on resume. The file lock spans the
@@ -71,7 +72,14 @@ def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
             rows = [json.loads(line) for line in journal if line.strip()]
             state = rows[-1] if rows else {}
             if state and state.get("binding") != binding:
-                return held("remote-receipt-attribution-mismatch")
+                prior = state.get("binding") or {}
+                safe = not any(state.get(k) for k in ("intent", "threadId", "gateIntent", "result"))
+                if (not safe or not state.get("knownPreDispatchFailure")
+                    or {k: v for k, v in prior.items() if k != "attempt"} != {k: v for k, v in binding.items() if k != "attempt"}
+                    or not retry_binding(prior.get("attempt"))):
+                    return held("remote-receipt-attribution-mismatch")
+                state = {}  # append new binding; retain every prior journal row
+
         except (ValueError, AttributeError):
             return held("remote-receipt-unreadable")
 
@@ -92,10 +100,19 @@ def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
         try:
             if not state:
                 save()
-            agents = call("list_agents", {}).get("agents", [])
-            live = next((a for a in agents if a.get("id") == proof["agentId"]), {})
-            if live.get("executionMode") != proof["executionMode"]:
-                return held("remote-agent-identity-unverified", thread)
+            try:
+                agents = call("list_agents", {}).get("agents", [])
+                live = next((a for a in agents if a.get("id") == proof["agentId"]), {})
+                reason = None if live.get("executionMode") == proof["executionMode"] else "remote-agent-identity-unverified"
+            except Exception as error:
+                reason = failure(error)
+            if reason:
+                # Only a known, unreserved pre-dispatch failure can retire this
+                # fence. Creation intent and all unknown outcomes stay held.
+                if not any(state.get(k) for k in ("intent", "threadId", "gateIntent", "result")):
+                    if known_failure(reason):
+                        save(knownPreDispatchFailure=reason)
+                return held(reason, thread)
             if not thread:
                 # The intent is durable BEFORE transport. A lost response can
                 # therefore never turn into a second paid create_thread call.

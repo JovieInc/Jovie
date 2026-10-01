@@ -731,6 +731,12 @@ class Linear:
                       n["createdAt"], [l["name"] for l in n["labels"]["nodes"]])
                 for n in data["issues"]["nodes"]]
 
+    def get_issue(self, issue_id: str) -> tuple[Issue, str]:
+        n = self.gql('query($id:String!){issue(id:$id){id identifier title description priority createdAt '
+                     'state{name} labels{nodes{name}}}}', {"id": issue_id})["issue"]
+        return (Issue(n["id"], n["identifier"], n["title"], n.get("description") or "", n.get("priority") or 0,
+                      n["createdAt"], [l["name"] for l in n["labels"]["nodes"]]), n["state"]["name"])
+
     def create_triage(self, title: str, description: str, dedupe: str | None = None) -> str | None:
         """`dedupe`: a title fragment; an open issue already carrying it is returned instead of a new one."""
         if dedupe:
@@ -980,16 +986,24 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
                "attribution": {"category": "autonomous-created", "originProvider": "hyperagent", "finalProvider": "hyperagent"}}
     def hold(reason):
         return {"verdict": "remote-held", "reasons": [reason], "next_action": "reconcile-existing-remote-attempt"}
+    owner = {"owner": HOST, "runtime": "symphony-lanes", "provider": "hyperagent", "model": spec.get("model"),
+             "tool": "lane_runner", "accountPool": "hyperagent"}
+    receipt["pendingBinding"] = {**ident, "owner": owner}
     claimed = None
     if not hyperagent_lane.verified(spec, time.time()):
         receipt.update(hold("remote-preflight-unverified"))
     else:
-        owner = {"owner": HOST, "runtime": "symphony-lanes", "provider": "hyperagent", "model": spec.get("model"),
-                 "tool": "lane_runner", "accountPool": "hyperagent"}
         coordination = execution_coordination(execution_attempt.GITHUB_LEDGER_ANCHOR)
         policy = {"attempts": MAX_FAILURES, "concurrency": 1, "wallSeconds": host.agent_timeout * MAX_FAILURES,
                   "spend": MAX_FAILURES, "mutations": MAX_FAILURES, "leaseSeconds": host.agent_timeout + 900, "version": "lanes-v1"}
         try:
+            # Read-only setup cannot consume an execution fence or paid budget.
+            executable = shutil.which("hyperagent")
+            if not executable:
+                raise OSError("Hyperagent transport unavailable")
+            api = runpy.run_path(executable)
+            prompt = render_prompt(issue, branch, context_pack(issue), provider="hyperagent")
+            (runs / f"{run_id}.prompt.md").write_text(prompt)
             if evidence.exists():
                 state = json.loads(evidence.read_text().splitlines()[-1])
                 fence = state["binding"]["attempt"]
@@ -1002,12 +1016,6 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
             if not claimed["admitted"]:
                 receipt.update(hold(claimed["reason"]))
             else:
-                executable = shutil.which("hyperagent")
-                if not executable:
-                    raise OSError("Hyperagent transport unavailable")
-                api = runpy.run_path(executable)
-                prompt = render_prompt(issue, branch, context_pack(issue), provider="hyperagent")
-                (runs / f"{run_id}.prompt.md").write_text(prompt)
                 def boundary(spend, mutations):
                     execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                                {"spend": spend, "mutations": mutations}, coordination=coordination)
@@ -1022,10 +1030,32 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
                     # Existing adoption owns its isolated checkout, diff policy,
                     # canonical checks and native queue; no second PR is created.
                     return adopt_pr(host, "hyperagent", pr, sensitive=issue_is_sensitive(issue))
+                def unreserved(fence, retry=False):
+                    def inspect(rows):
+                        rows = execution_attempt._for(rows, ident)
+                        start = next((r for r in rows if r["event"] == "attempt_started" and r.get("fencingToken") == fence), None)
+                        finish = next((r for r in reversed(rows) if r["event"] == "attempt_finished" and r.get("fencingToken") == fence), None)
+                        safe = bool(start and start["owner"] == owner and not any(
+                            r["event"] == "boundary_admitted" and r.get("fencingToken") == fence for r in rows))
+                        if retry:
+                            safe = safe and bool(finish and finish["result"] == "failed_known" and finish.get("failureClass") == "provider_outage"
+                                and finish.get("retryDecision") == "retry" and not finish.get("terminalState"))
+                        else:
+                            safe = safe and not finish and start["leaseExpiresAt"] > time.time()
+                        return safe, []
+                    return execution_attempt._locked(runs / "execution-attempts.jsonl", ident, coordination, inspect)
+                def known_failure(reason):
+                    if not unreserved(claimed["fencingToken"]):
+                        return False
+                    receipt["execution"] = execution_attempt.finish(runs / "execution-attempts.jsonl", ident,
+                        claimed["fencingToken"], "failed_known", {"failureClass": "provider_outage",
+                        "failureFingerprint": reason, "dependencies": ["hyperagent"], "mutationsPerformed": [], "owner": owner}, coordination=coordination)
+                    return True
                 receipt["offer"]["accepted"] = True
                 receipt.update(hyperagent_lane.run(spec, issue.identifier, claimed["fencingToken"], branch, prompt,
                     evidence, api["mcp_call"], find_pr, gate, timeout=host.agent_timeout,
-                    before_dispatch=lambda: boundary(1, 1)))
+                    before_dispatch=lambda: boundary(1, 1), known_failure=known_failure,
+                    retry_binding=lambda fence: unreserved(fence, retry=True)))
                 if receipt["verdict"] != "remote-held":
                     result = "succeeded" if receipt["verdict"] in ("landing", "verified-not-queued", "held", "gate-timeout") else "failed_unknown"
                     receipt["execution"] = execution_attempt.finish(runs / "execution-attempts.jsonl", ident,
@@ -2373,6 +2403,40 @@ def record_idle_exit(host: Host, name: str, reason: str) -> None:
         lock.release()
 
 
+def pending_hyperagent_issue(host: Host, spec: dict, linear: Linear) -> Issue | None:
+    """Resume only locally retained ownership; never scan arbitrary In Progress work."""
+    path = host.state / "runs/ledger.jsonl"
+    try:
+        latest = {}
+        for row in (json.loads(line) for line in path.read_text().splitlines()):
+            if row.get("provider") == "hyperagent" and row.get("issue") and row.get("linearIssueId"):
+                prior = latest.get(row["issue"], {}).get("execution")
+                if not row.get("execution") and prior and prior.get("identityDigest") == row.get("pendingBinding", {}).get("identityDigest"):
+                    row = {**row, "execution": prior}
+                latest[row["issue"]] = row
+        for row in latest.values():
+            execution = row.get("execution") or row.get("pendingBinding") or {}
+            owner = {"owner": HOST, "runtime": "symphony-lanes", "provider": "hyperagent", "model": spec.get("model"),
+                     "tool": "lane_runner", "accountPool": "hyperagent"}
+            if row.get("verdict") != "remote-held" or execution.get("terminalState") or execution.get("owner") != owner:
+                continue
+            issue, state = linear.get_issue(row["linearIssueId"])
+            ident = execution_attempt.identity("linear-work", {"issue": issue.identifier, "outcome": "draft-pr"},
+                                               {"title": issue.title, "description": issue.description})
+            evidence = host.state / "runs" / f"{ident['identityDigest']}.provider.jsonl"
+            binding_matches = not evidence.exists() and not row.get("execution")
+            if row.get("execution"):
+                provider = json.loads(evidence.read_text().splitlines()[-1])
+                binding_matches = provider.get("binding", {}).get("attempt") == execution.get("fencingToken")
+            if (state == "In Progress" and issue.identifier == row["issue"] and issue.id == row["linearIssueId"]
+                and ident["identityDigest"] == execution.get("identityDigest")
+                and binding_matches):
+                return issue
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    return None
+
+
 def worker(host: Host, name: str) -> int:
     spec = load_providers()[name]
     if not spec.get("enabled", True):
@@ -2413,7 +2477,9 @@ def worker(host: Host, name: str) -> int:
         full = not (red or adopt) and over_budget(name, lane_prs(name, fields=LIGHT_PR_FIELDS),
                                                   host.slots(name, spec.get("slots", 1)))
         in_flight = None if red or adopt or full else in_flight_issues()
-        if in_flight is not None:
+        if not (red or adopt) and name == "hyperagent":
+            issue = pending_hyperagent_issue(host, spec, linear)
+        if in_flight is not None and issue is None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
             issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
                                provider=name)

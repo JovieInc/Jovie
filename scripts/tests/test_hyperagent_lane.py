@@ -466,6 +466,160 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(result["reasons"], ["expired_attempt_reconciled"])
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
 
+    def test_worker_resumes_only_its_receipt_owned_current_in_progress_issue(self):
+        from unittest.mock import patch
+        from contextlib import ExitStack
+        from types import SimpleNamespace
+        lane = self.lane
+        state = {"name": "Todo"}
+        moves = []
+        linear = SimpleNamespace(lane_issues=lambda label: [self.issue] if state["name"] == "Todo" else [],
+            state_of=lambda ident: state["name"], get_issue=lambda ident: (self.issue, state["name"]),
+            move=lambda ident, name: (moves.append((ident, name)), state.update(name=name)), comment=lambda *args: None)
+        with ExitStack() as stack:
+            for name, value in {"Linear": lambda env: linear, "load_providers": lambda: {"hyperagent": {**self.spec, "label": "hyperagent"}},
+                "lane_prs": lambda *args, **kw: [], "fix_candidates": lambda *args: [], "requeue_verified": lambda *args: None,
+                "escalate_exhausted": lambda *args: None, "claim_red_pr": lambda *args: None, "claim_adoptable_pr": lambda *args: None,
+                "sweep_lane_prs": lambda *args: None, "in_flight_issues": lambda: frozenset(), "reexec": lambda *args: 0}.items():
+                stack.enter_context(patch.object(lane, name, value))
+            stack.enter_context(patch.object(lane.disk_guard, "check", return_value={"admitted": True}))
+            stack.enter_context(patch.object(lane.pr_events, "queued_prs", return_value=[]))
+            stack.enter_context(patch.object(lane.pr_events, "claim_event_pr", return_value=None))
+            proof = self.spec.pop("verifiedRemote")
+            self.assertEqual(lane.worker(self.host, "hyperagent"), 1)
+            self.assertFalse(self.calls)
+            self.spec["verifiedRemote"] = proof
+            self.approval = True
+            self.assertEqual(lane.worker(self.host, "hyperagent"), 1)
+            before = [json.loads(x) for x in (self.host.state / "runs/ledger.jsonl").read_text().splitlines()][-1]
+            with (self.host.state / "runs/ledger.jsonl").open("a") as ledger:
+                ledger.write(json.dumps({"provider": "hyperagent", "kind": "adopt", "pr": 99}) + "\n")
+            self.approval = False
+            lane.worker(self.host, "hyperagent")
+            after = [json.loads(x) for x in (self.host.state / "runs/ledger.jsonl").read_text().splitlines()][-1]
+        self.assertEqual(after["verdict"], "verified-not-queued")
+        self.assertEqual(after["execution"]["fencingToken"], before["execution"]["fencingToken"])
+        self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
+        self.assertEqual(moves, [(self.issue.id, "In Progress")])
+
+    def test_known_predispatch_failure_retries_without_unknown_creation_or_renewal(self):
+        from unittest.mock import patch
+        original = self.call
+        def failing(name, args):
+            if name == "list_agents": raise OSError("read unavailable")
+            return original(name, args)
+        with patch("runpy.run_path", return_value={"mcp_call": failing}):
+            held = self.run_entry()
+        self.assertEqual(held["execution"]["result"], "failed_known")
+        self.assertEqual(held["execution"]["retryDecision"], "retry")
+        self.assertIsNone(held["execution"]["terminalState"])
+        completed = self.run_entry()
+        self.assertEqual(completed["verdict"], "verified-not-queued")
+        self.assertNotEqual(completed["execution"]["fencingToken"], held["execution"]["fencingToken"])
+
+    def test_repeated_known_mode_mismatch_quarantines_without_paid_dispatch(self):
+        from unittest.mock import patch
+        with patch("runpy.run_path", return_value={"mcp_call": lambda *args: {"agents": []}}):
+            results = [self.run_entry() for _ in range(self.lane.MAX_FAILURES)]
+            last = self.run_entry()
+        self.assertEqual(results[1]["execution"]["terminalState"], "quarantined")
+        self.assertEqual(last["reasons"], ["generation_terminal"])
+        self.assertFalse(self.calls)
+        self.assertFalse(self.gates)
+
+    def test_pending_selection_preserves_foreign_revision_and_terminal_ownership(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        self.approval = True
+        self.run_entry()
+        proof = self.spec.pop("verifiedRemote")
+        self.run_entry()  # retain prior ownership across temporarily missing settings
+        self.spec["verifiedRemote"] = proof
+        lane = self.lane
+        linear = SimpleNamespace(get_issue=lambda ident: (self.issue, "In Progress"))
+        self.assertEqual(lane.pending_hyperagent_issue(self.host, self.spec, linear), self.issue)
+        with patch.object(lane, "HOST", "foreign-owner"):
+            self.assertIsNone(lane.pending_hyperagent_issue(self.host, self.spec, linear))
+        self.issue.description += " changed revision"
+        self.assertIsNone(lane.pending_hyperagent_issue(self.host, self.spec, linear))
+        self.issue.description = self.issue.description.removesuffix(" changed revision")
+        linear.get_issue = lambda ident: (self.issue, "Todo")
+        self.assertIsNone(lane.pending_hyperagent_issue(self.host, self.spec, linear))
+        linear.get_issue = lambda ident: (self.issue, "Done")
+        self.assertIsNone(lane.pending_hyperagent_issue(self.host, self.spec, linear))
+        self.approval = False
+        self.run_entry()
+        linear.get_issue = lambda ident: (self.issue, "In Progress")
+        self.assertIsNone(lane.pending_hyperagent_issue(self.host, self.spec, linear))
+
+    def test_existing_thread_read_failure_cannot_become_retryable_no_dispatch(self):
+        from unittest.mock import patch
+        self.approval = True
+        held = self.run_entry()
+        ledger = self.host.state / "runs/execution-attempts.jsonl"
+        before = ledger.read_text()
+        with patch("runpy.run_path", return_value={"mcp_call": lambda *args: (_ for _ in ()).throw(OSError("read unavailable"))}):
+            result = self.run_entry()
+        self.assertEqual(result["verdict"], "remote-held")
+        self.assertEqual(result["execution"]["fencingToken"], held["execution"]["fencingToken"])
+        self.assertEqual(ledger.read_text(), before)
+        self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
+
+    def test_distinct_known_read_failures_exhaust_existing_attempt_budget(self):
+        from unittest.mock import patch
+        reasons = iter(("401", "402", "read unavailable"))
+        def failed_read(*args): raise OSError(next(reasons))
+        with patch("runpy.run_path", return_value={"mcp_call": failed_read}):
+            results = [self.run_entry() for _ in range(self.lane.MAX_FAILURES)]
+        self.assertEqual(results[-1]["execution"]["terminalState"], "budget_exhausted")
+        self.assertEqual(self.run_entry()["reasons"], ["generation_terminal"])
+        self.assertFalse(self.calls)
+
+    def test_reserved_boundary_without_create_intent_cannot_be_retired_or_rebound(self):
+        from unittest.mock import patch
+        self.approval = True
+        first = self.run_entry()
+        journal = next((self.host.state / "runs").glob("*.provider.jsonl"))
+        state = json.loads(journal.read_text().splitlines()[-1])
+        state.pop("intent"); state.pop("threadId")
+        journal.write_text(json.dumps(state) + "\n")
+        ledger = self.host.state / "runs/execution-attempts.jsonl"
+        before = ledger.read_text()
+        with patch("runpy.run_path", return_value={"mcp_call": lambda *args: {"agents": []}}):
+            held = self.run_entry()
+        self.assertEqual(held["execution"]["fencingToken"], first["execution"]["fencingToken"])
+        self.assertEqual(ledger.read_text(), before)
+        self.assertNotIn("knownPreDispatchFailure", journal.read_text())
+
+    def test_retry_journal_cannot_rebind_without_matching_known_finished_disposition(self):
+        from unittest.mock import patch
+        with patch("runpy.run_path", return_value={"mcp_call": lambda *args: {"agents": []}}):
+            self.run_entry()
+        ledger = self.host.state / "runs/execution-attempts.jsonl"
+        rows = [json.loads(x) for x in ledger.read_text().splitlines()]
+        rows[-1]["failureClass"] = "repair_incomplete"
+        ledger.write_text("".join(json.dumps(row) + "\n" for row in rows))
+        result = self.run_entry()
+        self.assertEqual(result["reasons"], ["remote-receipt-attribution-mismatch"])
+        self.assertFalse(self.calls)
+
+    def test_transport_setup_failure_keeps_local_pending_ownership_without_claim(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        with patch.object(self.lane.shutil, "which", return_value=None):
+            held = self.run_entry()
+        self.assertEqual(held["verdict"], "remote-held")
+        self.assertFalse((self.host.state / "runs/execution-attempts.jsonl").exists())
+        for target in ("transport", "context"):
+            patcher = patch("runpy.run_path", side_effect=OSError("unavailable")) if target == "transport" else patch.object(self.lane, "context_pack", side_effect=OSError("unavailable"))
+            with self.subTest(target=target), patcher:
+                self.assertEqual(self.run_entry()["verdict"], "remote-held")
+                self.assertFalse((self.host.state / "runs/execution-attempts.jsonl").exists())
+        linear = SimpleNamespace(get_issue=lambda ident: (self.issue, "In Progress"))
+        self.assertEqual(self.lane.pending_hyperagent_issue(self.host, self.spec, linear), self.issue)
+        self.assertEqual(self.run_entry()["verdict"], "verified-not-queued")
+        self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
