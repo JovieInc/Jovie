@@ -4,6 +4,8 @@
  * checks, markdown delivery, and cohort templated metadata.
  */
 import { describe, expect, it } from 'vitest';
+import { solutionsArtistsPage } from '@/content/pages/solutions/artists';
+import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import {
   auditCohortMetadata,
   auditLlmsTxtStructure,
@@ -337,6 +339,24 @@ describe('markdown-delivery (advisory)', () => {
 });
 
 describe('auditCohortMetadata', () => {
+  it('keeps indexed artist solution metadata distinct from the profile feature page', () => {
+    const findings = auditCohortMetadata([
+      {
+        pathname: '/solutions/artists',
+        ...solutionsArtistsPage.seo,
+        inSitemap: true,
+        isRecordPage: true,
+      },
+      {
+        pathname: '/artist-profiles',
+        ...ARTIST_PROFILE_COPY.seo,
+        inSitemap: true,
+        isRecordPage: false,
+      },
+    ]);
+    expect([...findings.values()]).toEqual([]);
+  });
+
   const page = (pathname: string, title: string, isRecordPage = false) => ({
     pathname,
     title,
