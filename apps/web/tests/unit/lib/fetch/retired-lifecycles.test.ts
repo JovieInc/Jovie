@@ -3,114 +3,51 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-/**
- * JOV-6189: one server-state lifecycle, one retry owner.
- *
- * TanStack Query (`lib/queries`) owns request-backed server state —
- * cache, same-scope dedupe, invalidation, and retries via the JOV-6185
- * classified policy. TanStack Pacer (`lib/pacer`) owns local
- * debounce/throttle scheduling. The parallel `lib/fetch/deduped-fetch`
- * in-flight request cache + TTL response cache lifecycle was retired as
- * a confirmed-dead alternative: at removal time it had zero live
- * consumers (only its own tests and doc references).
- *
- * This contract keeps it retired. Raw `fetch` remains legitimate inside
- * `lib/queries` transport, server-only code, streaming, uploads, and
- * one-shot imperative transport — nothing here bans it.
- */
+// JOV-6189: lib/queries owns server state; the retired lib/fetch
+// dedupe/cache lifecycle must not return. Raw `fetch` stays fine.
 
-const testDir = dirname(fileURLToPath(import.meta.url));
-const webRoot = resolve(testDir, '..', '..', '..', '..');
+const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+const RETIRED =
+  /@\/lib\/fetch['"/]|\b(?:dedupedFetch|dedupedFetchWithMeta|useDedupedFetch|useDedupedFetchAll)\b/;
+const SOURCE_DIRS = ['app', 'components', 'hooks', 'lib', 'scripts'];
+const SKIP_DIR = /^(?:node_modules|__tests__|dist|build|coverage|\..*)$/;
+const SOURCE_FILE = /\.(?:ts|tsx|js|jsx|mjs)$/;
+const TEST_FILE = /\.test\.tsx?$/;
 
-const SOURCE_DIRECTORIES = ['app', 'components', 'hooks', 'lib', 'scripts'];
-const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs']);
-
-const SKIP_DIRECTORIES = new Set([
-  'node_modules',
-  '__tests__',
-  '.next',
-  'dist',
-  'build',
-  'coverage',
-]);
-
-const REMOVED_MODULE_IMPORT_REGEX =
-  /from\s+['"]@\/lib\/fetch(?:\/(?:deduped-fetch|use-deduped-fetch))?['"]/;
-
-const REMOVED_SYMBOL_REGEX =
-  /\b(?:dedupedFetch|dedupedFetchWithMeta|useDedupedFetch|useDedupedFetchAll)\b/;
-
-function read(relativePath: string): string {
-  return readFileSync(resolve(webRoot, relativePath), 'utf8');
-}
-
-/** Collect production source files (tests excluded) under web root. */
-function collectSourceFiles(): string[] {
-  const files: string[] = [];
-
-  function walk(currentPath: string): void {
-    for (const entry of readdirSync(currentPath, { withFileTypes: true })) {
-      if (entry.name.startsWith('.')) continue;
-      if (SKIP_DIRECTORIES.has(entry.name)) continue;
-      if (/\.test\.tsx?$/.test(entry.name)) continue;
-
-      const fullPath = join(currentPath, entry.name);
-
-      if (entry.isDirectory()) {
-        walk(fullPath);
-        continue;
-      }
-
-      if (SOURCE_EXTENSIONS.has(entry.name.slice(-4))) {
-        files.push(fullPath);
-      }
+function sourceFiles(dir: string, out: string[] = []): string[] {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (!SKIP_DIR.test(entry.name)) sourceFiles(full, out);
+    } else if (SOURCE_FILE.test(entry.name) && !TEST_FILE.test(entry.name)) {
+      out.push(full);
     }
   }
-
-  for (const dir of SOURCE_DIRECTORIES) {
-    const absoluteDir = resolve(webRoot, dir);
-    if (!existsSync(absoluteDir)) continue;
-    walk(absoluteDir);
-  }
-
-  return files;
+  return out;
 }
+
+const read = (rel: string) => readFileSync(resolve(webRoot, rel), 'utf8');
 
 describe('retired fetch lifecycle contract (JOV-6189)', () => {
-  it('removes the lib/fetch dedupe/cache module', () => {
+  it('keeps lib/fetch removed and production source clean of it', () => {
     expect(existsSync(resolve(webRoot, 'lib/fetch'))).toBe(false);
-  });
-
-  it('keeps production source free of the removed module imports', () => {
-    for (const filePath of collectSourceFiles()) {
-      expect(
-        readFileSync(filePath, 'utf8').match(REMOVED_MODULE_IMPORT_REGEX)
-      ).toBeNull();
+    for (const dir of SOURCE_DIRS) {
+      const abs = resolve(webRoot, dir);
+      if (!existsSync(abs)) continue;
+      for (const file of sourceFiles(abs)) {
+        expect(readFileSync(file, 'utf8').match(RETIRED)).toBeNull();
+      }
     }
   });
 
-  it('keeps production source free of the removed symbols', () => {
-    for (const filePath of collectSourceFiles()) {
-      expect(
-        readFileSync(filePath, 'utf8').match(REMOVED_SYMBOL_REGEX)
-      ).toBeNull();
-    }
-  });
-
-  it('keeps the isolated-surface registry free of non-Query cache owners', () => {
-    // registerIsolatedCacheSurface existed solely so the retired
-    // deduped-fetch responseCache could clear itself on cache fences.
-    // With that sole registrant gone, the registry hook is retired too.
+  it('keeps queries free of the retired isolated-surface registry', () => {
     const cacheIsolation = read('lib/queries/cache-isolation.ts');
-    expect(cacheIsolation).not.toContain('registerIsolatedCacheSurface');
-    expect(cacheIsolation).not.toContain('isolatedSurfaces');
-
-    const queriesBarrel = read('lib/queries/index.ts');
-    expect(queriesBarrel).not.toContain('registerIsolatedCacheSurface');
-  });
-
-  it('keeps the transport decoder docblock free of removed-surface claims', () => {
-    const transport = read('lib/queries/fetch.ts');
-    expect(transport).not.toContain('dedupedFetch');
+    expect(cacheIsolation).not.toMatch(
+      /registerIsolatedCacheSurface|isolatedSurfaces/
+    );
+    expect(read('lib/queries/index.ts')).not.toContain(
+      'registerIsolatedCacheSurface'
+    );
+    expect(read('lib/queries/fetch.ts')).not.toContain('dedupedFetch');
   });
 });

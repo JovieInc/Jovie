@@ -190,11 +190,18 @@ const memberColumns = useMemo<ColumnDef<AudienceMember, any>[]>(
 
 ---
 
-## ~~Finding 13: `useDedupedFetchAll` creates unstable dependency causing infinite re-fetches (Medium — Stability)~~ (RESOLVED)
+## Finding 13: `useDedupedFetchAll` creates unstable dependency causing infinite re-fetches (Medium — Stability)
 
-**File:** `apps/web/lib/fetch/use-deduped-fetch.ts` (removed)
+**File:** `apps/web/lib/fetch/use-deduped-fetch.ts:320-369`
 
-**Update (2026-10-01):** The entire `lib/fetch` dedupe/cache lifecycle was retired with zero live consumers (JOV-6189) — server state is owned by TanStack Query in `lib/queries`. Verified 2026-10-01.
+```ts
+const { skip = false, ...fetchOptions } = options;
+const fetchAll = useCallback(async (forceRefresh = false) => { ... },
+  [urls, skip, fetchOptions] // fetchOptions is a new object every render
+);
+```
+
+The spread `...fetchOptions` creates a new object reference each render. It's in the `useCallback` deps, so `fetchAll` is recreated every render, which triggers the `useEffect` to re-fire, causing a potential infinite fetch loop.
 
 ---
 
@@ -306,7 +313,7 @@ Verified 2026-02-09.
 | 10 | Sequential Stripe calls (should be parallel) | High | Performance | **PARTIALLY RESOLVED** — GET parallel, POST sequential by necessity |
 | 11 | HeaderActionsProvider cascading re-renders | High | Performance | Open |
 | 12 | Audience table columns recreated on every click | High | Performance | Open |
-| 13 | ~~`useDedupedFetchAll` infinite re-fetch risk~~ | ~~Medium~~ | ~~Stability~~ | **RESOLVED** — `lib/fetch` lifecycle retired (JOV-6189) |
+| 13 | ~~`useDedupedFetchAll` infinite re-fetch risk~~ | ~~Medium~~ | ~~Stability~~ | **RESOLVED** — `lib/fetch` retired (JOV-6189) |
 | 14 | ~~Spotify token fetch has no timeout~~ | ~~Medium~~ | ~~Stability~~ | **RESOLVED** — has `AbortSignal.timeout()` |
 | 15 | Cron auth bypass in non-production | Medium | Security | Open |
 | 16 | ~~`useKeyboardShortcuts` re-subscribes every render~~ | ~~Medium~~ | ~~Performance~~ | **RESOLVED** — uses ref pattern + empty deps |
