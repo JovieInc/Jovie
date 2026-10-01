@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { worktreeMetadata } from './scripts/playwright-worktree';
 import { MOBILE_SMOKE_SPECS } from './tests/e2e/smoke-manifest';
 import { vercelAutomationHeaders } from './tests/e2e/utils/vercel-automation-headers';
 import { resolveWebServerWarmupProfile } from './tests/e2e/utils/warmup-profile';
@@ -45,6 +46,11 @@ function getWorkers(defaultWorkers: number): number {
 }
 
 export default defineConfig({
+  metadata: worktreeMetadata(
+    managedWebServerUrl.origin,
+    usesManagedLocalWebServer,
+    __dirname
+  ),
   captureGitInfo: { commit: false, diff: false },
   testDir: './tests/e2e',
   // Source of truth: tests/e2e/smoke-manifest.ts → MOBILE_SMOKE_SPECS.
