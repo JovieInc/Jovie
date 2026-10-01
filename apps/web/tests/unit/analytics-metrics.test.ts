@@ -30,7 +30,15 @@ describe('CANONICAL_METRICS', () => {
       Object.keys(CANONICAL_METRICS) as CanonicalMetricKey[]
     ).filter(key => CANONICAL_METRICS[key].valueType === 'rate');
 
-    expect(rateKeys.sort()).toEqual(['capture_rate', 'ctr']);
+    expect(rateKeys.sort()).toEqual([
+      'active_drop_purchase_rate',
+      'capture_rate',
+      'completed_card_signup_rate',
+      'completed_drop_profile_signup_rate',
+      'ctr',
+      'normal_item_purchase_rate',
+      'terminal_page_signup_rate',
+    ]);
     for (const key of rateKeys) {
       expect(CANONICAL_METRICS[key].unit).toBe('percent');
       expect(CANONICAL_METRICS[key].source).toContain('derived:');

@@ -67,7 +67,12 @@ export type CanonicalMetricKey =
   | 'subscribers'
   | 'identified_users'
   | 'ctr'
-  | 'capture_rate';
+  | 'capture_rate'
+  | 'normal_item_purchase_rate'
+  | 'active_drop_purchase_rate'
+  | 'terminal_page_signup_rate'
+  | 'completed_card_signup_rate'
+  | 'completed_drop_profile_signup_rate';
 
 export const CANONICAL_METRICS: Record<
   CanonicalMetricKey,
@@ -180,6 +185,56 @@ export const CANONICAL_METRICS: Record<
     definition:
       'Percentage of unique visitors who became followers (subscribers ÷ unique visitors).',
     source: 'derived: (subscribers / unique_users) * 100',
+    valueType: 'rate',
+    unit: 'percent',
+    version: METRICS_CONTRACT_VERSION,
+  },
+  normal_item_purchase_rate: {
+    label: 'Normal Item Purchase Rate',
+    definition:
+      'Percentage of unique normal-item asset visits that produced a completed purchase in the same reporting window.',
+    source:
+      "derived: limited-drop-funnel/v1 unique drop_purchase_completed sessions where item_mode = 'normal' / unique asset_page_viewed sessions where item_mode = 'normal'",
+    valueType: 'rate',
+    unit: 'percent',
+    version: METRICS_CONTRACT_VERSION,
+  },
+  active_drop_purchase_rate: {
+    label: 'Active Drop Purchase Rate',
+    definition:
+      'Percentage of unique active-drop asset visits that produced a completed purchase in the same reporting window.',
+    source:
+      "derived: limited-drop-funnel/v1 unique drop_purchase_completed sessions where item_mode = 'active_drop' / unique asset_page_viewed sessions where item_mode = 'active_drop'",
+    valueType: 'rate',
+    unit: 'percent',
+    version: METRICS_CONTRACT_VERSION,
+  },
+  terminal_page_signup_rate: {
+    label: 'Terminal Page Signup Rate',
+    definition:
+      'Percentage of unique visitors who reached an expired or sold-out drop page and then signed up on that terminal page.',
+    source:
+      "derived: limited-drop-funnel/v1 unique completed_drop_signup sessions where card_placement = 'terminal_page' / unique drop_terminal_reached sessions",
+    valueType: 'rate',
+    unit: 'percent',
+    version: METRICS_CONTRACT_VERSION,
+  },
+  completed_card_signup_rate: {
+    label: 'Completed Drop Card Signup Rate',
+    definition:
+      'Percentage of unique completed-drop profile-card exposures that produced a signup on that card.',
+    source:
+      "derived: limited-drop-funnel/v1 unique completed_drop_signup sessions where card_placement = 'completed_drop_profile' / unique completed_drop_card_exposure sessions",
+    valueType: 'rate',
+    unit: 'percent',
+    version: METRICS_CONTRACT_VERSION,
+  },
+  completed_drop_profile_signup_rate: {
+    label: 'Completed Drop Profile Signup Rate',
+    definition:
+      'Percentage of eligible profile-card impressions that produced a completed-drop signup; used to compare completed-card experiment arms.',
+    source:
+      "derived: limited-drop-funnel/v1 unique completed_drop_signup sessions where card_placement = 'completed_drop_profile' / unique profile_card_impression sessions",
     valueType: 'rate',
     unit: 'percent',
     version: METRICS_CONTRACT_VERSION,
