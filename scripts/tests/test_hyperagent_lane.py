@@ -245,6 +245,7 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name))
         self.calls, self.gates = [], []
+        self.real_adopt = lane.adopt_pr
         self.approval = False
         self.model = "z-ai/glm-5.3"
         self.spec = {"model": self.model, "verifiedRemote": {
@@ -261,8 +262,10 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         from unittest.mock import patch
         def read(args, **kwargs):
             self.assertEqual(args[:3], ["gh", "pr", "view"])
-            return type("Read", (), {"returncode": 0, "stdout": json.dumps(self.pr)})()
-        def adopt(host, provider, pr):
+            fields = args[args.index("--json") + 1].split(",")
+            return type("Read", (), {"returncode": 0, "stdout": json.dumps({k: v for k, v in self.pr.items() if k in fields})})()
+        self.read = read
+        def adopt(host, provider, pr, *, sensitive=False):
             self.gates.append((provider, pr))
             return {"verdict": "verified-not-queued", "pr": 7, "prUrl": pr["url"], "headSha": pr["headRefOid"]}
         for patcher in [patch.object(lane, "sh", side_effect=read),
@@ -305,6 +308,44 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual((self.host.state / "runs/execution-attempts.jsonl").read_text(), terminal_ledger)
         self.assertEqual(len(self.gates), 1)
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
+
+    def assert_sensitive_gate(self, lines, reasons, review_expected):
+        from unittest.mock import patch
+        from contextlib import ExitStack
+        from types import SimpleNamespace
+        lane = self.lane
+        commands = []
+        def command(args, **kwargs):
+            commands.append(args)
+            if args[:3] == ["gh", "pr", "view"]:
+                return self.read(args, **kwargs)
+            return SimpleNamespace(returncode=0, stdout=(
+                f"{lines - 1}\t0\tscripts/lanes/lane_runner.py\n1\t0\tscripts/tests/test_hyperagent_lane.py\n" if args[:3] == ["git", "diff", "--numstat"] else ""))
+        with ExitStack() as stack:
+            stack.enter_context(patch.object(lane, "adopt_pr", side_effect=self.real_adopt))
+            stack.enter_context(patch.object(lane, "sh", side_effect=command))
+            for name in ("require_disk", "add_worktree", "install_dependencies", "remove_worktree", "record_held"):
+                stack.enter_context(patch.object(lane, name))
+            stack.enter_context(patch.object(lane, "provider_may_run", return_value=True))
+            stack.enter_context(patch.object(lane, "check_commands", return_value=[]))
+            review = stack.enter_context(patch.object(lane, "sensitive_review", return_value=(False, ["sensitive-review-fixture"])))
+            result = self.run_entry()
+        self.assertEqual(result["verdict"], "held")
+        self.assertEqual(result["reasons"], reasons)
+        self.assertEqual(review.call_count, int(review_expected))
+        self.assertFalse(any(args[:3] in (["gh", "pr", "ready"], ["gh", "pr", "merge"]) for args in commands))
+
+    def test_sensitive_issue_remote_entry_enforces_existing_500_line_cap(self):
+        self.issue.labels = ["Area:Auth"]
+        self.assert_sensitive_gate(600, ["diff-too-large:600"], False)
+
+    def test_sensitive_issue_remote_entry_runs_independent_review(self):
+        self.issue.labels = ["Billing"]
+        self.assert_sensitive_gate(2, ["sensitive-review-fixture"], True)
+
+    def test_sensitive_pr_label_cannot_be_downgraded_by_ordinary_issue(self):
+        self.pr["labels"] = [{"name": "sensitive-surface"}]
+        self.assert_sensitive_gate(2, ["sensitive-review-fixture"], True)
 
     def test_expired_remote_attempt_is_reconciled_without_another_dispatch(self):
         from unittest.mock import patch

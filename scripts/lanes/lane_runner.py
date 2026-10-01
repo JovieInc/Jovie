@@ -1013,7 +1013,7 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
                                                {"spend": spend, "mutations": mutations}, coordination=coordination)
                 def find_pr(number):
                     result = sh(["gh", "pr", "view", str(number), "--repo", REPO_SLUG, "--json",
-                                 "number,url,state,title,body,headRefName,headRefOid"])
+                                 "number,url,state,title,body,headRefName,headRefOid,labels"])
                     if result.returncode:
                         raise RuntimeError("PR read unavailable")
                     return json.loads(result.stdout)
@@ -1021,7 +1021,7 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
                     boundary(0, 1)
                     # Existing adoption owns its isolated checkout, diff policy,
                     # canonical checks and native queue; no second PR is created.
-                    return adopt_pr(host, "hyperagent", pr)
+                    return adopt_pr(host, "hyperagent", pr, sensitive=issue_is_sensitive(issue))
                 receipt["offer"]["accepted"] = True
                 receipt.update(hyperagent_lane.run(spec, issue.identifier, claimed["fencingToken"], branch, prompt,
                     evidence, api["mcp_call"], find_pr, gate, timeout=host.agent_timeout,
@@ -2074,7 +2074,7 @@ def unverified_pr(prs: list[dict], verified: dict) -> dict | None:
     return None
 
 
-def adopt_pr(host: Host, name: str, pr: dict) -> dict:
+def adopt_pr(host: Host, name: str, pr: dict, *, sensitive: bool = False) -> dict:
     if not provider_may_run(name, "adopt"):
         return {"schema": "jovie-lane-run/v1", "provider": name, "kind": "adopt", "pr": pr["number"],
                 "verdict": "skipped", "reasons": ["implementation-only-lane:no-review-tasks"],
@@ -2094,7 +2094,7 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
             add_worktree(host, ["--detach", str(worktree), "origin/main"], log)
             install_dependencies(host, worktree, log)
             labels = {label["name"].lower() for label in pr.get("labels", [])}
-            receipt.update(gate_pr(host, pr, worktree, log, sensitive=SENSITIVE_PR_LABEL in labels))
+            receipt.update(gate_pr(host, pr, worktree, log, sensitive=sensitive or SENSITIVE_PR_LABEL in labels))
         except WorktreeUnavailable as error:
             receipt.update(verdict="skipped", reasons=[f"worktree-unavailable:{error}"[:300]])
         except Exception as error:
