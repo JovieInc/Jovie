@@ -179,12 +179,9 @@ test.describe('Marketing auth-entry prefetch boundary', () => {
           : { width: 1440, height: 900 }
       );
       await page.goto(route, { waitUntil: 'domcontentloaded' });
-      const authLinks =
-        route === '/artist-profiles'
-          ? page.getByTestId('homepage-primary-cta')
-          : page.locator(
-              'a[href="/signup"]:visible, a[href^="/signup?"]:visible, a[href="/signin"]:visible, a[href^="/signin?"]:visible, a[href="/start"]:visible, a[href^="/start?"]:visible'
-            );
+      const authLinks = page.locator(
+        'a[href="/signup"]:visible, a[href^="/signup?"]:visible, a[href="/signin"]:visible, a[href^="/signin?"]:visible, a[href="/start"]:visible, a[href^="/start?"]:visible'
+      );
       expect(await authLinks.count(), `${route} auth actions`).toBeGreaterThan(
         0
       );
