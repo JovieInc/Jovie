@@ -39,8 +39,34 @@ function cliCommandPaths(commandTable: string): string[] {
   return [
     ...commandTable.matchAll(/path:\s*\[\s*'([^']+)'\s*,\s*'([^']+)'\s*\]/g),
   ]
-    .map(match => `jovie ${match[1]} ${match[2]}`)
+    .map(match => `${match[1]} ${match[2]}`)
     .map(line => line.replace(/\s+/g, ' ').trim());
+}
+
+/** CLI command domains from the real command table. */
+function cliCommandDomains(commandTable: string): Set<string> {
+  return new Set(cliCommandPaths(commandTable).map(path => path.split(' ')[0]));
+}
+
+/**
+ * Backticked command references in guidance (`<domain> <action>` or
+ * `<domain> <action> <args>…`) whose domain is a real CLI command domain
+ * but whose domain+action path the CLI does not implement. Non-command
+ * backticked phrases (npm/GET/npx/…) never match because their first word
+ * is not a CLI command domain.
+ */
+function unrealCommandReferences(
+  guidanceText: string,
+  commandTable: string
+): string[] {
+  const domains = cliCommandDomains(commandTable);
+  const paths = cliCommandPaths(commandTable);
+  return [...guidanceText.matchAll(/`([a-z]+) ([a-z]+)(?:[ <`][^`]*)?`/g)]
+    .map(match => `${match[1]} ${match[2]}`)
+    .filter(reference => {
+      const domain = reference.split(' ')[0];
+      return domains.has(domain) && !paths.includes(reference);
+    });
 }
 
 describe('llms guidance CLI-claims parity (JOV-6265)', () => {
@@ -48,12 +74,10 @@ describe('llms guidance CLI-claims parity (JOV-6265)', () => {
   let llmsBody: string;
   let llmsFullBody: string;
   let commandTable: string;
-  let commandPaths: string[];
 
   beforeAll(() => {
     guidance = buildSiteLlmsGuidance();
     commandTable = readCliCommandTable();
-    commandPaths = cliCommandPaths(commandTable);
   });
 
   beforeAll(async () => {
@@ -93,21 +117,20 @@ describe('llms guidance CLI-claims parity (JOV-6265)', () => {
 
   it('names the write commands the CLI actually ships (red fixture)', () => {
     // Red fixture: guidance naming a command the CLI does not implement
-    // must be caught by the same cross-check.
-    expect(commandPaths).not.toContain('jovie artist delete');
+    // must be caught by the same cross-check — a hypothetical guidance
+    // line naming `artist delete` is an unpublished capability.
+    const redGuidance = `${guidance}\n- Use the CLI \`artist delete <username>\` to remove a profile`;
+    const redUnreal = unrealCommandReferences(redGuidance, commandTable);
+    expect(redUnreal).toContain('artist delete');
 
-    // Live: every command the guidance names exists in the CLI command
+    // Live: every backticked `<domain> <action>` command reference in
+    // guidance (e.g. `profile create`) must exist in the CLI command
     // table, and the bounded write commands (profile create, report) are
     // described as writes, not folded into a read-only claim.
-    for (const command of commandPaths) {
-      if (
-        guidance.includes(`\`${command.split(' ').slice(0, 2).join(' ')}\``)
-      ) {
-        // A two-word command prefix named in backticks must be real.
-        expect(commandPaths).toContain(command);
-      }
-    }
-    expect(guidance).toContain('profile create');
+    const unreal = unrealCommandReferences(guidance, commandTable);
+    expect(unreal, unreal.join(', ')).toEqual([]);
+
+    expect(guidance).toContain('`profile create`');
     expect(guidance).toContain('`report` commands');
     expect(llmsBody).toContain('profile create');
     expect(llmsFullBody).toContain('profile create');
