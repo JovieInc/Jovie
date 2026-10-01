@@ -15,7 +15,7 @@ describe('GET /llms.txt', () => {
     expect(body).toContain('https://jov.ie/developers');
     expect(body).toContain('active v1 lifecycle boundary');
     expect(body).toContain(
-      '**API versioning and deprecation policy**: https://jov.ie/api-versioning'
+      '[API versioning and deprecation policy](https://jov.ie/api-versioning)'
     );
     expect(body).toContain('## Jovie developer resources');
     expect(body).toContain('https://jov.ie/llms.txt');

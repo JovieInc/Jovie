@@ -62,22 +62,22 @@ ${COMPANY_IDENTITY.definition}
 
 ## Key Page Types
 
-- **Public profiles**: ${BASE_URL}/{username}
-- **Artist release smart links**: ${BASE_URL}/{username}/{slug}
-- **Homepage**: ${BASE_URL}
-- **About**: ${BASE_URL}/about
-- **Pricing**: ${BASE_URL}/pricing
-- **Help Center**: ${DOCS_URL}/docs
-- **Support**: ${BASE_URL}/support
-- **OpenAPI**: ${BASE_URL}/openapi.json (canonical contract: ${BASE_URL}/api/v1/openapi.json)
+- [Public profiles](${BASE_URL}/{username})
+- [Artist release smart links](${BASE_URL}/{username}/{slug})
+- [Homepage](${BASE_URL})
+- [About](${BASE_URL}/about)
+- [Pricing](${BASE_URL}/pricing)
+- [Help Center](${DOCS_URL}/docs)
+- [Support](${BASE_URL}/support)
+- [OpenAPI](${BASE_URL}/openapi.json) (canonical contract: ${BASE_URL}/api/v1/openapi.json)
 
 ${buildSiteLlmsGuidance()}
 
 ## Contact
 
-- Website: ${BASE_URL}
-- Help Center: ${DOCS_URL}/docs
-- Support: ${BASE_URL}/support
+- [Website](${BASE_URL})
+- [Help Center](${DOCS_URL}/docs)
+- [Support](${BASE_URL}/support)
 `;
 
   return new Response(content, {
