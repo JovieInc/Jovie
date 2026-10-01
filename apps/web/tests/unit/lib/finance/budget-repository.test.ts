@@ -5,7 +5,9 @@ const mocks = vi.hoisted(() => {
   const from = vi.fn(() => ({ where }));
   const select = vi.fn(() => ({ from }));
   const onConflictDoUpdate = vi.fn();
-  const values = vi.fn(() => ({ onConflictDoUpdate }));
+  const values = vi.fn((_payload: Record<string, unknown>) => ({
+    onConflictDoUpdate,
+  }));
   const insert = vi.fn(() => ({ values }));
   const delWhere = vi.fn();
   const del = vi.fn(() => ({ where: delWhere }));
