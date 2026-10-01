@@ -89,6 +89,28 @@ Skip silently if gbrain is unreachable — this is a nice-to-have persistence
 step, not a blocker (same "gracefully degrade" rule as the coordination
 preflight in `AGENTS.md`).
 
+## Capability-first mode (JOV-6212)
+
+The same workflow evaluates a *capability you are about to build*, not just a
+named tool someone shared. When a plan would implement or materially expand a
+commodity capability (auth handoff, PDF export, scheduling, parsing, …):
+
+1. Run Steps 1–3 against the capability: existing stack feature → official
+   vendor integration index → credible maintained OSS. Prefer official
+   integration docs (e.g. `better-auth.com/docs/integrations/electron` for an
+   Electron auth handoff) over assuming none exists.
+2. Return the Step-4 evaluation **plus a sourcing disposition**
+   (reuse / configure / adopt / buy / extend / fork / build) with the
+   authoritative source and checked date for every alternative considered.
+3. Record the decision as a receipt in `canon/sourcing-receipts.jsonl`
+   (schema `jovie-capability-sourcing-receipt/v1`, see
+   `canon/ENGINEERING.md` → "Capability-level reuse-first sourcing").
+   Bounded research when evidence is missing — never conclude "no library
+   exists" from an unavailable fetch.
+
+If browsing is unavailable, say exactly that in the evaluation and route to
+a bounded research task; do not treat a blocked fetch as proof of absence.
+
 ## What this skill does NOT do
 
 - Does not ask Tim for credentials, logins, or manual unlock actions (posting

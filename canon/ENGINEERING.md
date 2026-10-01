@@ -2,7 +2,7 @@
 
 Status: Canon
 Inherits: [`OPERATING_SYSTEM.md`](./OPERATING_SYSTEM.md)
-Last updated: 2026-07-17
+Last updated: 2026-09-26
 
 Engineering exists to increase company throughput by making the product correct, shippable, reliable, and easy to change.
 
@@ -63,6 +63,58 @@ Use upstream/open-source projects when they compound our work and reduce mainten
 - Merged is not done until production outcome is verified.
 - A green local check is evidence, not completion.
 - CI, migration guards, security gates, and production verification are not optional.
+
+---
+
+## Capability-level reuse-first sourcing (JOV-6212)
+
+EVENT: Founder direction, 2026-09-12. Minimize lifetime ownership of
+undifferentiated mechanisms, subject to correctness, security, reliability,
+privacy, performance, and user experience. Custom product behavior is
+expected; custom commodity mechanisms are an evidence-earned exception.
+More dependencies or fewer lines are not goals.
+
+Before implementing or materially expanding a commodity capability:
+
+1. State the user outcome and classify the capability: differentiating
+   product logic, necessary integration, or commodity mechanism. Identify
+   its canonical implementation/owner. Renaming auth (or anything) as
+   proprietary does not change its classification.
+2. Inspect existing code/dependencies, platform/standard-library features,
+   official vendor integration indexes, and credible maintained OSS before
+   new or materially expanded commodity work. Record exact versions,
+   authoritative sources, and checked date. Do not demand three candidates
+   when the current canonical implementation clearly suffices. Missing
+   network/package permissions route to research; they never prove no
+   library exists or justify a rewrite.
+3. Reuse an applicable current sourcing decision instead of repeating
+   research; renew it when requirements, versions, workload, security
+   posture, or cost materially change.
+4. Custom/fork decisions must identify a concrete unmet hard requirement or
+   demonstrated material net advantage over the best credible alternative —
+   including configuration, narrow adaptation, or an upstream contribution —
+   after lifetime integration, maintenance, security-update, review, and
+   migration costs. No safety/quality floor may regress.
+5. One authoritative implementation per capability and scope. Adapters
+   implement Jovie's actual contract only; no automatic universal SDK
+   replica. Small pure helpers need no package or full sourcing exercise.
+6. Record the decision as a sourcing receipt in
+   `canon/sourcing-receipts.jsonl` (outcome; capability and scope; canonical
+   owner; alternatives with authoritative evidence, versions, and checked
+   date; disposition reuse/configure/adopt/buy/extend/fork/build; binding
+   policy). The implementation author cannot self-approve an exception;
+   existing independent review owns it. Routine adoption within existing
+   authority is autonomous; paid commitments and new data disclosure still
+   require applicable authorization.
+7. Verify behavior and failure/security contracts, not dependency presence
+   or source strings — the same outcome suite tests incumbent and
+   candidate. A dependency does not remove integration accountability.
+
+The receipt gate (JOV-INV-035) runs nonblocking as a shadow
+qualification; blocking enforcement follows the promotion rules above with
+its own receipts. This extends the Prior-Art Gate in
+`.claude/rules/code-style.md` to capability level — one policy, projected
+into the scoped rules, not duplicated.
 
 ---
 

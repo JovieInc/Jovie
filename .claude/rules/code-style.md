@@ -19,7 +19,7 @@ TypeScript, React/Next.js, server/client boundaries, canonical imports, ESLint r
 | Linting | Biome |
 | Package Manager | pnpm 9.15.9 |
 | Monorepo | Turborepo |
-| Runtime | Node.js 24 LTS |
+| Runtime | Node.js 22 LTS |
 
 ## TypeScript
 
@@ -222,7 +222,7 @@ useQuery({
 
 ## Custom ESLint Rules
 
-20 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`; enforced in CI.
+19 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`; enforced in CI.
 
 | Rule | What It Blocks | Fix |
 |------|---------------|-----|
@@ -245,7 +245,6 @@ useQuery({
 | `chat-tool-schema-strict` | Bare `z.object()` chat tool input schemas | Wrap with `chatToolSchema()` |
 | `canonical-ui-label-casing` | Title Case / sentence-case violations on UI labels | Follow `DESIGN.md` casing; allowlist with `ui-casing-allow` |
 | `no-hardcoded-theme-colors` | Bare `text-black`/`bg-white` or `text-[#hex]` that bypass semantic tokens | Use token utilities (`text-primary-token`) or pair light/dark classes |
-| `no-direct-stripe-client` | Runtime `stripe` imports, `require('stripe')`, or `new Stripe(...)` outside `lib/stripe/` | Import the canonical client from `@/lib/stripe/client` (type-only imports are allowed) |
 
 **Run:** `pnpm --filter web lint:eslint` (all rules) or `pnpm --filter web lint:server-boundaries` (boundary rules only).
 
@@ -377,7 +376,7 @@ Hooks in `.claude/hooks/` run automatically on every tool use. You cannot bypass
 | Hook | Trigger | Purpose |
 |------|---------|---------|
 | `session-start.sh` | Session start | Verifies Node/pnpm versions, installs deps, builds gstack |
-| `post-task-validate.sh` | Task completion (Stop) | Blocks completion if Biome (changed files), web typecheck, server boundaries, or changed web test files fail; checks the session cwd |
+| `post-task-validate.sh` | Task completion (Stop) | Blocks completion if typecheck, Biome lint, server boundaries, or affected tests fail |
 
 ## Agent Autonomy: When to Ask vs. Just Do It
 
@@ -439,6 +438,8 @@ Before scoping infrastructure, tooling, or re-implementing a known software cate
 2. **Scan prior art (~5 min):** existing stack feature? standard OSS lib? SaaS/API? Note licenses.
 3. **Decide adopt > wrap > build.** Build only for core differentiation or when every candidate fails a stated hard requirement.
 4. **Record on the issue/plan:** category · candidates + links + license · adopt/wrap/build + why. Infra/tooling without this section is not ready.
+
+**Capability level (JOV-6212):** when the work implements or materially expands a *concrete capability* (an auth handoff, a PDF export, a browser-open flow — not just a "category"), apply the capability-level policy in [`canon/ENGINEERING.md`](../../canon/ENGINEERING.md): classify the capability, check official vendor integration indexes and existing decisions before bespoke work, record a sourcing receipt in `canon/sourcing-receipts.jsonl`, and verify behavior contracts, not dependency presence. A framework-level adoption decision (e.g. Better Auth) does not grandfather a bespoke sub-capability. Small pure helpers and bug fixes skip the receipt.
 
 **Precedence:** §2 (Search Before Building) runs before §1 (Boil the Lake). Completeness governs how thoroughly you finish what you've *decided* to build — never justifies rebuilding off-the-shelf solutions.
 
