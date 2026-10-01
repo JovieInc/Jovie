@@ -79,4 +79,38 @@ describe('ChatUiPlayground', () => {
     expect(preview).toHaveAttribute('data-scenario-id', 'shell-states');
     expect(preview.style.minHeight).toBe('42rem');
   });
+
+  it('renders alternate message and compact fixtures from the catalog', async () => {
+    const user = userEvent.setup();
+    render(<ChatUiPlayground />);
+
+    const preview = screen.getByTestId('chat-playground-preview');
+
+    await user.click(
+      screen.getByRole('button', { name: 'Thinking and streaming' })
+    );
+    expect(preview).toHaveAttribute('data-scenario-id', 'streaming');
+    expect(within(preview).getByLabelText('Pending Reply')).toBeInTheDocument();
+    expect(
+      within(preview).getByLabelText('Streaming Reply')
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Long content' }));
+    expect(preview).toHaveAttribute('data-scenario-id', 'long-content');
+    expect(
+      within(preview).getByTestId('fixture-message-playground-long-content')
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Compact and mobile' })
+    );
+    expect(preview).toHaveAttribute('data-scenario-id', 'compact-mobile');
+    const compactMessage = within(preview).getByTestId(
+      'fixture-message-playground-mobile-user'
+    );
+    expect(compactMessage.closest('[data-viewport]')).toHaveAttribute(
+      'data-viewport',
+      'compact'
+    );
+  });
 });
