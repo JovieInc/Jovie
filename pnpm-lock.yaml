@@ -410,6 +410,9 @@ importers:
       '@jovie/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@modelcontextprotocol/sdk':
+        specifier: '>=1.26.0'
+        version: 1.30.0(zod@4.6.5)
       '@neondatabase/serverless':
         specifier: ^1.1.0
         version: 1.1.0

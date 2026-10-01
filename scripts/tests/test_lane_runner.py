@@ -1129,8 +1129,84 @@ class DispatchTest(unittest.TestCase):
             fake = FakeShell([])
             with patch.object(lane, "sh", side_effect=fake):
                 lane.remove_worktree(lane.Host(state=Path(tmp), repo=Path(tmp)), Path(tmp))
-            self.assertEqual(fake.calls, [["git", "status", "--porcelain"],
+            self.assertEqual(fake.calls, [["lsof", "-nP", "-a", "-d", "cwd", "-F", "pn"],
+                                          ["git", "status", "--porcelain"],
+                                          ["git", "rev-list", "--count", "HEAD", "--not", "--all"],
                                           ["git", "worktree", "remove", "--force", tmp]])
+
+    def test_removal_is_journaled_before_the_remove_runs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            path = Path(tmp) / "worktrees/done"
+            path.mkdir(parents=True)
+            os.utime(path, (0, 0))
+            journal = host.state / "runs/worktree-removals.jsonl"
+
+            def shell(args, **kwargs):
+                if args[:3] == ["git", "worktree", "remove"]:
+                    self.assertTrue(journal.exists(), "the receipt precedes the destructive call")
+                if args[:2] == ["git", "rev-list"]:
+                    return SimpleNamespace(returncode=0, stdout="0", stderr="")
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            with patch.object(lane, "sh", side_effect=shell):
+                lane.prune_worktrees(host)
+            rows = [json.loads(line) for line in journal.read_text().splitlines()]
+            self.assertEqual(rows[-1]["verdict"], "removed")
+            self.assertEqual(rows[-1]["worktree"], str(path))
+
+    def test_prune_keeps_a_worktree_while_a_process_runs_inside(self):
+        """PID reuse cannot fake this: liveness is a live cwd, not a remembered PID."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "worktrees/live"
+            path.mkdir(parents=True)
+            (path / "wip.py").write_text("unfinished")
+            os.utime(path, (0, 0))
+
+            def shell(args, **kwargs):
+                if args[0] == "lsof":
+                    return SimpleNamespace(returncode=0, stdout=f"p4242\nn{path}\n", stderr="")
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            with patch.object(lane, "sh", side_effect=shell) as mocked:
+                lane.prune_worktrees(host)
+            self.assertEqual((path / "wip.py").read_text(), "unfinished")
+            self.assertTrue((path / lane.disk_guard.PRESERVED_REPAIR).exists())
+            self.assertFalse(any("remove" in call.args[0] for call in mocked.call_args_list))
+            journal = (host.state / "runs/worktree-removals.jsonl").read_text()
+            self.assertIn("process-still-running", journal)
+
+    def test_prune_keeps_a_worktree_while_its_index_is_locked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            gitdir = Path(tmp) / "repo/.git/worktrees/locked"
+            gitdir.mkdir(parents=True)
+            path = Path(tmp) / "worktrees/locked"
+            path.mkdir(parents=True)
+            (path / ".git").write_text(f"gitdir: {gitdir}\n")
+            (gitdir / "index.lock").write_text("")
+            os.utime(path, (0, 0))
+            host = lane.Host(state=Path(tmp), repo=Path(tmp) / "repo")
+            with patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stdout="", stderr="")) as mocked:
+                lane.prune_worktrees(host)
+            self.assertTrue(path.exists())
+            self.assertTrue((path / lane.disk_guard.PRESERVED_REPAIR).exists())
+            self.assertFalse(any("remove" in call.args[0] for call in mocked.call_args_list))
+
+    def test_remove_preserves_unpublished_commits(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            path = Path(tmp) / "worktrees/wip"
+            path.mkdir(parents=True)
+
+            def shell(args, **kwargs):
+                if args[:2] == ["git", "rev-list"]:
+                    return SimpleNamespace(returncode=0, stdout="2", stderr="")
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            with patch.object(lane, "sh", side_effect=shell) as mocked:
+                lane.remove_worktree(host, path)
+            self.assertTrue((path / lane.disk_guard.PRESERVED_REPAIR).exists())
+            self.assertFalse(any("remove" in call.args[0] for call in mocked.call_args_list))
+            self.assertIn("unpublished-work",
+                          (host.state / "runs/worktree-removals.jsonl").read_text())
 
     def test_pruning_dirty_or_unreadable_source_retains_it(self):
         for code, output in ((0, "?? dirty.py"), (1, "")):
