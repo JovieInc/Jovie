@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { GET as getLlmsTxt } from '@/app/llms.txt/route';
 import { GET as getLlmsFull } from '@/app/llms-full.txt/route';
 import { LEGAL_ENTITY_NAME } from '@/constants/app';
+import { buildHomepageMarkdown } from '@/lib/agent/homepage-markdown';
+import { isArtistOnlyCompanyDefinition } from '@/lib/marketing/company-identity-policy';
 
 describe('public discovery privacy and resource links', () => {
   it.each([
@@ -84,5 +86,52 @@ describe('GET /llms-full.txt', () => {
     expect(body).not.toContain('**Authentication**: Clerk');
     expect(body).not.toContain('Max tier');
     expect(body).not.toContain('14-day Pro trial');
+  });
+});
+
+describe('agent discovery scope agreement (JOV-6265)', () => {
+  it('describes general profile jobs while the artist-scoped API keeps exact semantics', async () => {
+    const body = await getLlmsTxt().text();
+
+    expect(body).toContain(
+      'Look up a public Jovie profile (name, bio, DSP and social links) at https://jov.ie/{username} — profiles serve artists, founders, authors, creators, and independent experts'
+    );
+    expect(body).toContain('the public API is artist-scoped');
+    expect(body).not.toContain('public independent-artist profile');
+    expect(isArtistOnlyCompanyDefinition(body)).toBe(false);
+  });
+
+  it('keeps the guidance copy identical across llms.txt, llms-full.txt, and homepage markdown', async () => {
+    const llms = await getLlmsTxt().text();
+    const llmsFull = await getLlmsFull().text();
+    const homepageMarkdown = buildHomepageMarkdown();
+
+    for (const projection of [llms, llmsFull, homepageMarkdown]) {
+      expect(projection).toContain(
+        'Look up a public Jovie profile (name, bio, DSP and social links)'
+      );
+      expect(projection).toContain('the public API is artist-scoped');
+      expect(projection).not.toContain('public independent-artist profile');
+      expect(isArtistOnlyCompanyDefinition(projection)).toBe(false);
+    }
+  });
+
+  it('rejects an artist-only machine identity and a false write-API claim as guidance', async () => {
+    expect(
+      isArtistOnlyCompanyDefinition(
+        'Jovie is a release platform for independent musicians.'
+      )
+    ).toBe(true);
+    expect(
+      isArtistOnlyCompanyDefinition(
+        'Use Jovie when you need to look up a public independent-artist profile.'
+      )
+    ).toBe(false);
+
+    const body = await getLlmsTxt().text();
+    expect(body).not.toMatch(/write-only|POST .*api\/v1|public write API/i);
+    expect(body).toContain(
+      'the public artist API and anonymous MCP tools are read-only'
+    );
   });
 });

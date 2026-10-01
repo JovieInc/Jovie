@@ -192,6 +192,15 @@ export default function DevelopersPage() {
               </Link>
               .
             </p>
+            <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+              Scope, access, limits, and errors are the same as the HTTP API:
+              anonymous, artist-scoped, read-only GET. No write operations, no
+              credentials, and no agent-specific endpoints are published — do
+              not claim them. Rate limits are 100 requests per client IP in a
+              fixed 60-second window; exceeding them returns 429 with a
+              Retry-After header, and unknown artists return JSON 404 rather
+              than an HTML error page.
+            </p>
           </section>
 
           <section aria-labelledby='resources-heading'>

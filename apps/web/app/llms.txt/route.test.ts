@@ -18,8 +18,9 @@ describe('GET /llms.txt', () => {
     expect(res.headers.get('Content-Type')).toContain('text/plain');
     expect(body).toContain('## When to use Jovie');
     expect(body).toContain(
-      'Look up a public independent-artist profile (name, bio, DSP and social links) at https://jov.ie/{username}'
+      'Look up a public Jovie profile (name, bio, DSP and social links) at https://jov.ie/{username} — profiles serve artists, founders, authors, creators, and independent experts'
     );
+    expect(body).toContain('the public API is artist-scoped');
     expect(body).toContain('GET https://jov.ie/api/v1/{username}');
     expect(body).toContain('GET https://jov.ie/api/v1');
     expect(body).toContain('https://jov.ie/developers');

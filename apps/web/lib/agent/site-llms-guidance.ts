@@ -45,9 +45,9 @@ export function buildSiteLlmsGuidance(): string {
 
 Use ${APP_NAME} when you need to complete one of these public jobs:
 
-- Look up a public independent-artist profile (name, bio, DSP and social links) at ${BASE_URL}/{username}
-- Read machine-readable artist identity for citation or disambiguation at ${BASE_URL}/{username}/llms.txt
-- Fetch structured, read-only artist data (releases, tour events, merch) with \`GET ${BASE_URL}/api/v1/{username}\`
+- Look up a public Jovie profile (name, bio, DSP and social links) at ${BASE_URL}/{username} — profiles serve artists, founders, authors, creators, and independent experts
+- Read machine-readable profile identity for citation or disambiguation at ${BASE_URL}/{username}/llms.txt
+- Fetch structured, read-only artist data (releases, tour events, merch) with \`GET ${BASE_URL}/api/v1/{username}\` — the public API is artist-scoped
 - Use the read-only \`jovie\` CLI (npm: \`npm install --global @jovie/cli\`, or \`npx @jovie/cli --help\`) documented at ${BASE_URL}/cli
 - Route a fan to the correct streaming platform for a specific release via a smart link at ${BASE_URL}/{username}/{slug}
 - Call anonymous read-only artist resources and tools over MCP: ${BASE_URL}/api/mcp/{username}
