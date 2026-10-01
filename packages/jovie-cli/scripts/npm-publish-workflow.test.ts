@@ -51,7 +51,18 @@ function assertPublishWorkflowContract(source: string): void {
   expect(source).toContain(
     'Checkout drifted from current origin/main immediately before publication.'
   );
-  expect(source).toContain("tr -d '[:space:]' < VERSION");
+  expect(source).toContain(
+    "readFileSync('VERSION', 'utf8'), process.env.CLI_RELEASE_VERSION"
+  );
+  expect(source).toContain(
+    'CLI_RELEASE_VERSION: ${{ inputs.release_version }}'
+  );
+  expect(source).toContain(
+    "import { resolveReleaseVersion } from './packages/jovie-cli/scripts/pack-manifest.ts'"
+  );
+  expect(source).toContain(
+    '- name: Run @jovie/cli package smoke\n        env:\n          RELEASE_VERSION: ${{ steps.release.outputs.version }}'
+  );
   expect(source).toContain(
     "manifest.repository?.url === 'git+https://github.com/JovieInc/Jovie.git'"
   );
@@ -319,6 +330,138 @@ describe('canonical source validation discovers CLI publication changes', () => 
       const result = runSourceGate('packages/jovie-cli/src/mcp.ts', failure);
       expect(result.status).toBe(19);
       expect(result.calls.at(-1)).toBe(`--filter @jovie/cli run ${failure}`);
+    }
+  );
+});
+
+// Execute the actual pre-registry release step with inert Git/registry peers.
+// The real Node version selector and package guards are not stubbed.
+describe('independent manual CLI release cadence', () => {
+  function runReleaseSelection(
+    version: string | undefined,
+    manifestVersion?: unknown
+  ) {
+    const step = workflow.match(
+      /- name: Verify exact main and unpublished release[\s\S]*?        run: \|\n([\s\S]*?)(?=      - name: Install dependencies)/
+    );
+    expect(step).not.toBeNull();
+    const dir = mkdtempSync(resolve(tmpdir(), 'jovie-cli-release-selection-'));
+    try {
+      const packageRoot = resolve(dir, 'packages/jovie-cli');
+      mkdirSync(resolve(packageRoot, 'scripts'), { recursive: true });
+      writeFileSync(resolve(dir, 'VERSION'), '26.9.16\n');
+      const manifest = JSON.parse(
+        readFileSync(resolve(import.meta.dirname, '../package.json'), 'utf8')
+      );
+      if (manifestVersion !== undefined) manifest.version = manifestVersion;
+      writeFileSync(
+        resolve(packageRoot, 'package.json'),
+        JSON.stringify(manifest)
+      );
+      writeFileSync(
+        resolve(packageRoot, 'scripts/pack-manifest.ts'),
+        readFileSync(resolve(import.meta.dirname, 'pack-manifest.ts'))
+      );
+      writeFileSync(
+        resolve(dir, 'git'),
+        '#!/bin/sh\nif [ "$1" = rev-parse ]; then printf "%040d\n" 1; fi\n'
+      );
+      writeFileSync(
+        resolve(dir, 'curl'),
+        '#!/bin/sh\nprintf invoked >> "$TEST_REGISTRY_CALLS"\nprintf 404\n'
+      );
+      chmodSync(resolve(dir, 'git'), 0o755);
+      chmodSync(resolve(dir, 'curl'), 0o755);
+      const output = resolve(dir, 'output');
+      const calls = resolve(dir, 'registry-calls');
+      const result = spawnSync(
+        'bash',
+        ['-c', step![1].replace(/^          /gm, '')],
+        {
+          cwd: dir,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${dir}:${process.env.PATH}`,
+            GITHUB_REF: 'refs/heads/main',
+            GITHUB_OUTPUT: output,
+            RUNNER_TEMP: dir,
+            PACKAGE_NAME: '@jovie/cli',
+            REGISTRY_URL: 'https://registry.invalid',
+            PUBLISH_MCP_ONLY: 'false',
+            CLI_RELEASE_VERSION: version ?? '',
+            TEST_REGISTRY_CALLS: calls,
+          },
+        }
+      );
+      return {
+        status: result.status,
+        diagnostics: result.stdout + result.stderr,
+        versionOutput: (() => {
+          try {
+            return readFileSync(output, 'utf8');
+          } catch {
+            return '';
+          }
+        })(),
+        registryCalls: (() => {
+          try {
+            return readFileSync(calls, 'utf8');
+          } catch {
+            return '';
+          }
+        })(),
+      };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it('selects a CLI release without changing the desktop VERSION', () => {
+    const result = runReleaseSelection('26.10.0');
+    expect(result.status, result.diagnostics).toBe(0);
+    expect(result.versionOutput).toBe('version=26.10.0\n');
+    expect(result.registryCalls).toBe('invoked');
+  });
+
+  it('uses the canonical VERSION when the optional selection is absent', () => {
+    const result = runReleaseSelection(undefined);
+    expect(result.status, result.diagnostics).toBe(0);
+    expect(result.versionOutput).toBe('version=26.9.16\n');
+  });
+
+  it.each(['26.9.16', '', null])(
+    'rejects conflicting source pin %j before registry access',
+    pin => {
+      const result = runReleaseSelection('26.10.0', pin);
+      expect(result.status, result.diagnostics).not.toBe(0);
+      expect(result.registryCalls).toBe('');
+      expect(result.versionOutput).toBe('');
+    }
+  );
+
+  it('accepts a source manifest already pinned to the selected release', () => {
+    const result = runReleaseSelection('26.10.0', '26.10.0');
+    expect(result.status, result.diagnostics).toBe(0);
+    expect(result.versionOutput).toBe('version=26.10.0\n');
+  });
+
+  it.each([
+    ' ',
+    ' 26.10.0',
+    '26.10.0\n',
+    '26.10.00',
+    '26.13.0',
+    '26.10.0-rc.1',
+    '$(touch forbidden)',
+    '26.10.9007199254740992',
+  ])(
+    'rejects explicit malformed input %j before touching the registry',
+    version => {
+      const result = runReleaseSelection(version);
+      expect(result.status, result.diagnostics).not.toBe(0);
+      expect(result.registryCalls).toBe('');
+      expect(result.versionOutput).toBe('');
     }
   );
 });
