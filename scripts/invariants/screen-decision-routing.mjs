@@ -14,9 +14,19 @@ const KINDS = Object.freeze({
   'founder-strategy-taste': 'founder-review',
 });
 const EVENT_CLASSES = new Set(['identity', 'security', 'permanence']);
+/** @param {unknown} value
+ * @returns {value is keyof typeof KINDS} */
+const isKind = value =>
+  typeof value === 'string' && Object.hasOwn(KINDS, value);
+/** @param {unknown} value
+ * @returns {value is Record<string, unknown>} */
 const isObject = value =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
+/** @param {unknown} value
+ * @returns {value is string} */
 const text = value => typeof value === 'string' && value.trim().length > 0;
+/** @param {unknown} value
+ * @returns {value is string[]} */
 const strings = value =>
   Array.isArray(value) && value.length > 0 && value.every(text);
 const onlyKeys = (value, keys) =>
@@ -27,6 +37,10 @@ const samePaths = (a, b) =>
   new Set(a).size === a.length &&
   [...a].sort().every((path, index) => path === b[index]);
 
+/**
+ * Project untrusted declarations without granting delivery or approval authority.
+ * @param {{headSha?: string, changedPaths?: string[], declarations?: unknown, inputError?: unknown}} [options]
+ */
 export function projectScreenDecisionRouting({
   headSha,
   changedPaths,
@@ -60,7 +74,7 @@ export function projectScreenDecisionRouting({
       'decision declaration schema, exact head or complete change set is invalid'
     );
   if (envelopeValid && !inputError) {
-    for (const decision of declarations.decisions) {
+    for (const decision of /** @type {unknown[]} */ (declarations.decisions)) {
       if (
         !isObject(decision) ||
         !onlyKeys(decision, [
@@ -73,14 +87,15 @@ export function projectScreenDecisionRouting({
         ]) ||
         !text(decision.id) ||
         ids.has(decision.id) ||
-        !Object.hasOwn(KINDS, decision.kind) ||
+        !isKind(decision.kind) ||
         !strings(decision.paths) ||
         new Set(decision.paths).size !== decision.paths.length ||
         !decision.paths.every(path => paths.includes(path)) ||
         !text(decision.proposedEffect) ||
         !strings(decision.evidence) ||
         (decision.kind === 'event'
-          ? !EVENT_CLASSES.has(decision.eventClass)
+          ? !text(decision.eventClass) ||
+            !EVENT_CLASSES.has(decision.eventClass)
           : decision.eventClass !== undefined)
       ) {
         findings.push('invalid, duplicate or unbound decision declaration');

@@ -28,6 +28,7 @@ describe('EVENT routing qualification in the screen gate (JOV-7350)', () => {
     evidence: ['canon/VOICE.md'],
     ...overrides,
   });
+  /** @param {unknown[]} [decisions] */
   const declaration = (decisions = [decision()], overrides = {}) => ({
     schema: SCREEN_DECISION_SCHEMA,
     headSha: HEAD,
@@ -207,6 +208,11 @@ describe('EVENT routing qualification in the screen gate (JOV-7350)', () => {
       [],
       decision({ id: '' }),
       decision({ kind: 'unknown' }),
+      decision({ kind: null }),
+      decision({
+        kind: { toString: () => 'machine-correctness' },
+        eventClass: undefined,
+      }),
       decision({ paths: [] }),
       decision({ paths: [source, source] }),
       decision({ paths: ['unrelated.ts'] }),
@@ -214,6 +220,7 @@ describe('EVENT routing qualification in the screen gate (JOV-7350)', () => {
       decision({ evidence: [] }),
       decision({ evidence: [null] }),
       decision({ eventClass: 'spacing' }),
+      decision({ eventClass: null }),
       decision({ kind: 'machine-correctness' }),
       decision({ approved: true }),
       decision({ routingReceipt: { id: 'sc_forged', status: 'decided' } }),
