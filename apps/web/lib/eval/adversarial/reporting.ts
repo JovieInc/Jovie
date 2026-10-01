@@ -32,7 +32,8 @@ export function buildRangeReport(
   lane: RealEvalRangeReport['lane'],
   results: readonly boolean[],
   sampleSize: number,
-  minPass: number
+  minPass: number,
+  capUsd = 0
 ): RealEvalRangeReport {
   const passed = results.filter(Boolean).length;
   const boundedMin = Math.min(minPass, sampleSize);
@@ -44,6 +45,7 @@ export function buildRangeReport(
     failed: sampleSize - passed,
     passRange: { min: boundedMin, max: sampleSize },
     withinRange: passed >= boundedMin && passed <= sampleSize,
+    capUsd,
   };
 }
 
@@ -55,5 +57,6 @@ export function formatRangeReport(report: RealEvalRangeReport): string {
     `passed=${report.passed}/${report.sampleSize}`,
     `range=[${report.passRange.min},${report.passRange.max}]`,
     `within=${report.withinRange}`,
+    `cap_usd=${report.capUsd}`,
   ].join(' ');
 }
