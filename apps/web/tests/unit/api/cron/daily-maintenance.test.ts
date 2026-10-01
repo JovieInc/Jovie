@@ -171,7 +171,7 @@ describe('GET /api/cron/daily-maintenance', () => {
       byModel: [],
       alerts: [],
     });
-    mockRunMusicResolverParityCorpus.mockResolvedValue([{ version: 1 }]);
+    mockRunMusicResolverParityCorpus.mockResolvedValue([{ version: 2 }]);
   });
 
   afterEach(() => {
@@ -262,11 +262,10 @@ describe('GET /api/cron/daily-maintenance', () => {
         alerts: [],
       },
     });
-    expect(mockRunMusicResolverParityCorpus).not.toHaveBeenCalled();
+    expect(mockRunMusicResolverParityCorpus).toHaveBeenCalledTimes(1);
     expect(data.results.musicResolverParity).toEqual({
       success: true,
-      skipped: true,
-      data: { reason: 'independent-benchmark-source-required' },
+      data: [{ version: 2 }],
     });
     expect(data.results.dataRetention.success).toBe(true);
   });
