@@ -6,8 +6,16 @@ import { createGateway } from '@ai-sdk/gateway';
 
 const HELICONE_VERCEL_GATEWAY_BASE_URL = 'https://vercel.helicone.ai/v1/ai';
 
-export function isRealModelEvalEnabled(): boolean {
+export function isRealModelEvalEnabled(
+  /**
+   * JOV-6234 explicit cost eligibility precondition. Paid live-model calls
+   * require the operator-set REAL_EVAL_COST_ELIGIBILITY authorization plus
+   * an explicit positive budget cap; automatic runs never set either.
+   */
+  costEligible = true
+): boolean {
   return (
+    costEligible &&
     process.env.JOVIE_RUN_REAL_MODEL_EVALS === '1' &&
     Boolean(process.env.AI_GATEWAY_API_KEY) &&
     Boolean(process.env.HELICONE_API_KEY)
