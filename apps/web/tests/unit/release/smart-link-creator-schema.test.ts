@@ -109,4 +109,43 @@ describe('smart-link creator schema compatibility', () => {
     const selection = selectMock.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(Object.keys(selection)).toContain('isClaimed');
   });
+
+  it('omits each missing optional column instead of failing the query', async () => {
+    doesColumnExistMock.mockImplementation(
+      async (_table: string, column: string) =>
+        !['musicbrainz_id', 'youtube_url'].includes(column)
+    );
+    limitMock.mockResolvedValue([
+      {
+        id: 'creator-1',
+        userId: 'user-1',
+        displayName: 'Dua Lipa',
+        username: 'dualipa',
+        usernameNormalized: 'dualipa',
+        avatarUrl: null,
+        settings: {},
+        isClaimed: true,
+      },
+    ]);
+
+    const { getCreatorByUsername } = await import(
+      '@/app/[username]/[slug]/_lib/data'
+    );
+
+    await expect(getCreatorByUsername('dualipa')).resolves.toMatchObject({
+      usernameNormalized: 'dualipa',
+      isClaimed: true,
+      youtubeUrl: null,
+      musicbrainzId: null,
+    });
+
+    const selection = selectMock.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(Object.keys(selection)).not.toContain('musicbrainzId');
+    expect(Object.keys(selection)).not.toContain('youtubeUrl');
+    expect(Object.keys(selection)).toContain('spotifyUrl');
+    expect(doesColumnExistMock).toHaveBeenCalledWith(
+      'creator_profiles',
+      'musicbrainz_id'
+    );
+  });
 });
