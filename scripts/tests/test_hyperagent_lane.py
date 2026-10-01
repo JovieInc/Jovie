@@ -352,6 +352,8 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(result["reasons"], reasons)
         self.assertEqual(review.call_count, int(review_expected))
         self.assertFalse(any(args[:3] in (["gh", "pr", "ready"], ["gh", "pr", "merge"]) for args in commands))
+        boundaries = [r for r in map(json.loads, (self.host.state / "runs/execution-attempts.jsonl").read_text().splitlines()) if r["event"] == "boundary_admitted"]
+        self.assertEqual([(r["reservation"], r["fencingToken"]) for r in boundaries], [({"spend": 1, "mutations": 1}, result["execution"]["fencingToken"])] * 2)
 
     def test_sensitive_issue_remote_entry_enforces_existing_500_line_cap(self):
         self.issue.labels = ["Area:Auth"]

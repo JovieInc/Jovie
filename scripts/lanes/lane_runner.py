@@ -1321,10 +1321,10 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear=None) -> d
                         raise RuntimeError("PR read unavailable")
                     return json.loads(result.stdout)
                 def gate(pr):
-                    boundary(0, 1)
+                    sensitive = issue_is_sensitive(issue) or SENSITIVE_PR_LABEL in {l["name"].lower() for l in pr.get("labels", [])}
+                    boundary(int(sensitive), 1)
                     # Existing adoption owns its isolated checkout, diff policy,
                     # canonical checks and native queue; no second PR is created.
-                    sensitive = issue_is_sensitive(issue) or SENSITIVE_PR_LABEL in {l["name"].lower() for l in pr.get("labels", [])}
                     return {**adopt_pr(host, "hyperagent", pr, sensitive=sensitive), "gateSensitive": sensitive}
                 def unreserved(fence, retry=False):
                     def inspect(rows):
