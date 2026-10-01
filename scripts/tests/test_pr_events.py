@@ -59,7 +59,8 @@ def fake_lane(shell, claimed=False):
         sh=shell, REPO_SLUG=runner.REPO_SLUG, PR_FIELDS=runner.PR_FIELDS, RED=runner.RED,
         MAX_FIX_ATTEMPTS=runner.MAX_FIX_ATTEMPTS, held_path=runner.held_path, update_json=runner.update_json,
         now_iso=runner.now_iso, best_per_issue=runner.best_per_issue, load_providers=lambda: PROVIDERS,
-        claimed_elsewhere=lambda number, sha, kind: claimed, post_claim=lambda number, sha, kind: posted.append(number))
+        claimed_elsewhere=lambda number, sha, kind: claimed, post_claim=lambda number, sha, kind: posted.append(number),
+        publication_revocation=runner.publication_revocation)
     module.posted = posted
     return module
 
@@ -367,6 +368,15 @@ class TickTest(unittest.TestCase):
         self.assertEqual([call[:3] for call in shell.calls], [["gh", "pr", "ready"], ["gh", "pr", "merge"]])
         ledger = [json.loads(line) for line in (self.host.state / "runs/ledger.jsonl").read_text().splitlines()]
         self.assertEqual((ledger[0]["kind"], ledger[0]["verdict"]), ("ready-green", "landing"))
+
+    def test_a_revoked_branch_is_never_readied_enrolled_or_resynced(self):
+        runner.revoke_publication(self.host, branch="devin/jov-1-20260926t0900", reason="run-stopped")
+        shell = Shell()
+        self.assertEqual(events.ready_green(self.host, fake_lane(shell), pr(draft=True, merge="CLEAN"),
+                                            {}, NOW), "revoked:run-stopped")
+        self.assertEqual(events.sync_main(self.host, fake_lane(shell), pr(merge="CLEAN"), NOW),
+                         "revoked:run-stopped")
+        self.assertFalse(shell.calls, "a revoked branch takes no publication mutation")
 
     def test_a_failed_enqueue_is_handed_to_the_requeue_retry(self):
         shell = Shell({("gh", "pr", "merge"): (1, "")})
