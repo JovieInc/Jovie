@@ -70,7 +70,10 @@ describe('DevelopersPage', () => {
       screen.getByText(/Start from the same profile endpoint/i)
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/anonymous and read-only; owner-only tools/i)
+      screen.getByText(/anonymous; the API and per-artist MCP resources/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/create an unclaimed profile from a Spotify/i)
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '/cli' })).toHaveAttribute(
       'href',
@@ -88,7 +91,7 @@ describe('developer guide contract vs llms guidance (JOV-6265)', () => {
     const guidance = await getLlmsTxt().text();
 
     expect(guidance).toContain(
-      'the public artist API and anonymous MCP tools are read-only'
+      'the public artist API and anonymous per-artist MCP resources are read-only'
     );
     // The HTML guide must agree with the machine guidance: neither surface
     // may claim a capability the other denies.
@@ -153,6 +156,31 @@ describe('developer guide contract vs llms guidance (JOV-6265)', () => {
 
     expect(cliSource).not.toMatch(
       /path: \['\w+', '(update|delete|patch|put|write)'\]/i
+    );
+  });
+
+  it('keeps llms.txt CLI capability claims aligned with the actual CLI surface', async () => {
+    // JOV-6265: llms.txt guidance must never describe the CLI as read-only
+    // while the CLI command table exposes writes (readOnly: false). The
+    // executable truth is packages/jovie-cli/src/commands.ts.
+    const cliSource = readWebSource('../../packages/jovie-cli/src/commands.ts');
+    const hasWriteCommands = /readOnly: false/.test(cliSource);
+    const guidance = await getLlmsTxt().text();
+
+    if (hasWriteCommands) {
+      // The CLI exposes writes, so the guidance must say so and must not
+      // blanket-describe the CLI as read-only.
+      expect(guidance).toContain('profile create');
+      expect(guidance).toContain('/api/agents/profiles');
+      expect(guidance).not.toMatch(/read-only `jovie` CLI/i);
+      expect(guidance).not.toMatch(/CLI[^.\n]*read-only commands/i);
+    } else {
+      expect(guidance).toContain('read-only');
+    }
+
+    // The public artist API itself stays read-only in guidance regardless.
+    expect(guidance).toContain(
+      'the public artist API and anonymous per-artist MCP resources are read-only'
     );
   });
 });
