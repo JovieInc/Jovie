@@ -28,8 +28,17 @@ export { MarketingContainer } from './MarketingContainer';
 export type { MarketingContentShellProps } from './MarketingContentShell';
 export { MarketingContentShell } from './MarketingContentShell';
 export { MarketingCtaPendingLabel } from './MarketingCtaPendingLabel';
-export type { MarketingEditorialBackgroundProps } from './MarketingEditorialBackground';
-export { MarketingEditorialBackground } from './MarketingEditorialBackground';
+export type {
+  MarketingEditorialBackgroundProps,
+  MarketingEditorialBackgroundVariant,
+} from './MarketingEditorialBackground';
+export {
+  MARKETING_EDITORIAL_BACKGROUND_ACCENT_TOKEN,
+  MARKETING_EDITORIAL_BACKGROUND_SCHEMA,
+  MARKETING_EDITORIAL_BACKGROUND_VARIANTS,
+  MARKETING_EDITORIAL_BACKGROUND_VERSION,
+  MarketingEditorialBackground,
+} from './MarketingEditorialBackground';
 export type { MarketingEditorialHeroPhotoProps } from './MarketingEditorialHeroPhoto';
 export { MarketingEditorialHeroPhoto } from './MarketingEditorialHeroPhoto';
 export type { MarketingElectricSeamProps } from './MarketingElectricSeam';
@@ -51,6 +60,7 @@ export type { MarketingMetricCardProps } from './MarketingMetricCard';
 export { MarketingMetricCard } from './MarketingMetricCard';
 export type { MarketingPageShellProps } from './MarketingPageShell';
 export { MarketingPageShell } from './MarketingPageShell';
+export type { MarketingPlatformSpecBentoProps } from './MarketingPlatformSpecBento';
 export { MarketingPlatformSpecBento } from './MarketingPlatformSpecBento';
 export type {
   MarketingPosterHeroCta,
