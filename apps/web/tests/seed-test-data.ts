@@ -11,7 +11,7 @@
 /* eslint-disable no-restricted-imports */
 import { neon } from '@neondatabase/serverless';
 import { Redis } from '@upstash/redis';
-import { and, eq, not } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, not } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
 import { deriveConfirmationStatus } from '@/lib/events/confirmation-status';
@@ -61,6 +61,31 @@ export function buildPublicReleaseApprovalSeedRow(
     assetId: releaseId,
     itemKind: 'release',
     approvalStatus: 'approved',
+  };
+}
+
+export function buildPromoDownloadRightsAttestationSeed(
+  ownerUserId: string | null | undefined,
+  attestedAt: Date
+) {
+  if (!ownerUserId) {
+    return null;
+  }
+
+  return {
+    values: {
+      isActive: true,
+      rightsControlAttested: true,
+      rightsControlAttestedBy: ownerUserId,
+      rightsControlAttestedAt: attestedAt,
+    },
+    conflictUpdate: {
+      isActive: true,
+      rightsControlAttested: true,
+      rightsControlAttestedBy: drizzleSql<string>`CASE WHEN ${promoDownloads.rightsControlAttested} THEN ${promoDownloads.rightsControlAttestedBy} ELSE ${ownerUserId} END`,
+      rightsControlAttestedAt: drizzleSql<Date>`CASE WHEN ${promoDownloads.rightsControlAttested} THEN ${promoDownloads.rightsControlAttestedAt} ELSE ${attestedAt} END`,
+      updatedAt: attestedAt,
+    },
   };
 }
 
@@ -1743,47 +1768,49 @@ async function seedReleasesForProfile(
       .select({ userId: creatorProfiles.userId })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, profileId));
-    try {
-      await db
-        .insert(promoDownloads)
-        .values({
-          creatorProfileId: profileId,
-          releaseId: promoReleaseId,
-          title: 'Neon Skyline Radio Edit',
-          slug: 'neon-skyline-radio-edit',
-          description: 'Deterministic promo download fixture for public QA.',
-          fileUrl: 'fixtures/promo-downloads/neon-skyline-radio-edit.mp3',
-          fileName: 'neon-skyline-radio-edit.mp3',
-          fileMimeType: 'audio/mpeg',
-          fileSizeBytes: 4_600_000,
-          artworkUrl: DEFAULT_TEST_RELEASE_ARTWORK_URL,
-          isActive: true,
-          rightsControlAttested: true,
-          rightsControlAttestedBy: profileOwner?.userId ?? null,
-          rightsControlAttestedAt: new Date(),
-          position: 0,
-          metadata: { fixture: true },
-        })
-        .onConflictDoUpdate({
-          target: [promoDownloads.releaseId, promoDownloads.slug],
-          set: {
-            isActive: true,
-            rightsControlAttested: true,
-            rightsControlAttestedBy: profileOwner?.userId ?? null,
-            rightsControlAttestedAt: new Date(),
-            updatedAt: new Date(),
-          },
-        });
-      console.log('    ✓ Ensured promo download fixture for Neon Skyline');
-    } catch (error) {
-      if (isMissingPromoDownloadsRelationError(error)) {
-        console.warn(
-          `    ⚠ promo_downloads is missing; skipping promo download fixture: ${
-            error instanceof Error ? error.message : String(error)
-          }`
-        );
-      } else {
-        throw error;
+    const rightsAttestationSeed = buildPromoDownloadRightsAttestationSeed(
+      profileOwner?.userId,
+      new Date()
+    );
+
+    if (!rightsAttestationSeed) {
+      console.warn(
+        '    ⚠ profile has no owner user; skipping attested promo download fixture'
+      );
+    } else {
+      try {
+        await db
+          .insert(promoDownloads)
+          .values({
+            creatorProfileId: profileId,
+            releaseId: promoReleaseId,
+            title: 'Neon Skyline Radio Edit',
+            slug: 'neon-skyline-radio-edit',
+            description: 'Deterministic promo download fixture for public QA.',
+            fileUrl: 'fixtures/promo-downloads/neon-skyline-radio-edit.mp3',
+            fileName: 'neon-skyline-radio-edit.mp3',
+            fileMimeType: 'audio/mpeg',
+            fileSizeBytes: 4_600_000,
+            artworkUrl: DEFAULT_TEST_RELEASE_ARTWORK_URL,
+            ...rightsAttestationSeed.values,
+            position: 0,
+            metadata: { fixture: true },
+          })
+          .onConflictDoUpdate({
+            target: [promoDownloads.releaseId, promoDownloads.slug],
+            set: rightsAttestationSeed.conflictUpdate,
+          });
+        console.log('    ✓ Ensured promo download fixture for Neon Skyline');
+      } catch (error) {
+        if (isMissingPromoDownloadsRelationError(error)) {
+          console.warn(
+            `    ⚠ promo_downloads is missing; skipping promo download fixture: ${
+              error instanceof Error ? error.message : String(error)
+            }`
+          );
+        } else {
+          throw error;
+        }
       }
     }
   }
