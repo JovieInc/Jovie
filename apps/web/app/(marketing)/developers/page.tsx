@@ -171,8 +171,11 @@ export default function DevelopersPage() {
             <p className='mt-4 text-base leading-relaxed text-secondary-token'>
               Start from the same profile endpoint as the quickstart above, then
               follow the resource links in the response. Every surface below is
-              anonymous and read-only; owner-only tools require authenticated
-              profile ownership and are never part of this quickstart.
+              anonymous; the API and per-artist MCP resources are read-only. The
+              CLI can also create an unclaimed profile from a Spotify artist URL
+              — the artist verifies on Spotify to claim it — and file bug or
+              feedback reports. Owner-only tools require authenticated profile
+              ownership and are never part of this quickstart.
             </p>
             <p className='mt-4 text-base leading-relaxed text-secondary-token'>
               For agent context, read{' '}
