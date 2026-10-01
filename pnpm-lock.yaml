@@ -810,6 +810,9 @@ importers:
       postcss:
         specifier: 8.5.28
         version: 8.5.28
+      postgres:
+        specifier: 3.4.8
+        version: 3.4.8
       promptfoo:
         specifier: 0.121.20
         version: 0.121.20(@aws-sdk/credential-provider-node@3.972.83)(@cloudflare/workers-types@5.20260928.1)(@neondatabase/serverless@1.1.0)(@smithy/signature-v4@5.7.3)(@swc/helpers@0.5.23)(@types/json-schema@7.0.15)(@types/node@26.6.3)(@types/pg@8.20.0)(@upstash/redis@1.39.0)(babel-plugin-macros@3.1.0)(better-sqlite3@12.10.0)(bufferutil@4.1.0)(kysely@0.28.17)(pg@8.23.0)(playwright-core@1.60.0)(postgres@3.4.8)(socks@2.8.10)(utf-8-validate@6.0.6)
@@ -31867,8 +31870,7 @@ snapshots:
       xtend: 4.0.2
     optional: true
 
-  postgres@3.4.8:
-    optional: true
+  postgres@3.4.8: {}
 
   posthog-node@5.24.17:
     dependencies:
