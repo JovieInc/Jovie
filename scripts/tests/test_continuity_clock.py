@@ -62,6 +62,11 @@ class ClockTest(unittest.TestCase):
         self.assertEqual(self.tick()["status"], "cooldown")
         self.assertEqual(len(self.calls), 3)
 
+    def test_historical_workflow_run_trigger_does_not_block_current_clock_recovery(self):
+        # PR19436 removed workflow_run, but GitHub still returns those old runs.
+        self.rows = [run_row(), run_row(172800, event="workflow_run")]
+        self.assertEqual(self.tick()["status"], "dispatch-requested")
+
     def test_recent_completed_run_needs_no_recovery_including_dispatch_event(self):
         for event in ("schedule", "workflow_dispatch"):
             with self.subTest(event=event):

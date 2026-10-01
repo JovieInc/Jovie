@@ -38,7 +38,7 @@ def observe(run, now: float) -> dict:
     for row in rows:
         if (not isinstance(row, dict) or not isinstance(row.get("id"), int)
                 or row.get("head_branch") != "main"
-                or row.get("event") not in {"schedule", "workflow_dispatch"}
+                or row.get("event") not in {"schedule", "workflow_dispatch", "workflow_run"}
                 or row.get("status") not in ACTIVE | {"completed"}):
             raise ValueError("workflow-run-invalid")
         created = datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
