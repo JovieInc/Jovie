@@ -47,6 +47,7 @@ const OBJECT_FIELDS = [
   'issues',
 ];
 
+/** @returns {never} */
 function fail(message) {
   throw new Error(`certification-inventory: ${message}`);
 }
@@ -61,6 +62,11 @@ function requireString(value, label) {
   return value;
 }
 
+/**
+ * @param {unknown} value
+ * @param {string} label
+ * @param {{ pattern?: RegExp, allowEmpty?: boolean }} [options]
+ */
 function requireStringArray(value, label, { pattern, allowEmpty = true } = {}) {
   if (!Array.isArray(value)) fail(`${label}: expected array`);
   if (!allowEmpty && value.length === 0) fail(`${label}: expected non-empty`);
