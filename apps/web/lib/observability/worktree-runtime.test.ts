@@ -97,7 +97,7 @@ describe('local app and telemetry correlation', () => {
     const { logger } = await import('../utils/logger');
     logger.info('ready', { value: 1 }, 'app');
     expect(info).toHaveBeenCalledWith(
-      `[worktree:${identity.id}:${identity.boot}] [app] ready`,
+      `[worktree ${identity.id} boot=${identity.boot}] [app] ready`,
       { value: 1 }
     );
   });
