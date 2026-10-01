@@ -10,6 +10,7 @@ import {
   fetchSiteLlms,
   JovieInputError,
   normalizeBaseUrl,
+  readResponseBody,
   reportIssue,
   validateUsername,
 } from './client.js';
@@ -334,5 +335,140 @@ describe('Jovie public resource client', () => {
       )
     ).toThrow(JovieInputError);
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe('mutation and stable error contract', () => {
+  it('never retries an ambiguously committed POST', async () => {
+    let calls = 0;
+    const fetchImpl: FetchImplementation = async () => {
+      calls++;
+      throw new Error('connection lost after commit');
+    };
+    await expect(
+      reportIssue(
+        { kind: 'bug', title: 'issue', details: 'details' },
+        {},
+        { fetchImpl }
+      )
+    ).rejects.toMatchObject({ code: 'REQUEST_FAILED' });
+    expect(calls).toBe(1);
+  });
+  it.each([
+    [429, 'RATE_LIMITED'],
+    [503, 'RATE_LIMIT_UNAVAILABLE'],
+  ])('preserves top-level API code on %s', async (status, code) => {
+    const { fetchImpl } = createFetch(
+      JSON.stringify({ code, error: 'unavailable' }),
+      status
+    );
+    await expect(fetchArtist('demo', { fetchImpl })).rejects.toMatchObject({
+      status,
+      apiCode: code,
+    });
+  });
+});
+
+describe('bounded body consumption', () => {
+  it('cancels an oversized body', async () => {
+    let canceled = false;
+    const fetchImpl: FetchImplementation = async () =>
+      new Response(
+        new ReadableStream({
+          start(c) {
+            c.enqueue(new Uint8Array(1_048_577));
+          },
+          cancel() {
+            canceled = true;
+          },
+        })
+      );
+    await expect(fetchSiteLlms(false, { fetchImpl })).rejects.toMatchObject({
+      code: 'REQUEST_FAILED',
+      message: 'Response body exceeds 1 MiB.',
+    });
+    expect(canceled).toBe(true);
+  });
+  it('retains deadline after headers and cancels a hanging body', async () => {
+    let canceled = false;
+    const fetchImpl: FetchImplementation = async () =>
+      new Response(
+        new ReadableStream({
+          cancel() {
+            canceled = true;
+          },
+        })
+      );
+    await expect(
+      fetchSiteLlms(false, { fetchImpl, timeoutMs: 10 })
+    ).rejects.toMatchObject({ code: 'REQUEST_FAILED' });
+    expect(canceled).toBe(true);
+  });
+  it('cancels body consumption when the caller aborts', async () => {
+    const controller = new AbortController();
+    let canceled = false;
+    const fetchImpl: FetchImplementation = async () => {
+      setTimeout(() => controller.abort(), 5);
+      return new Response(
+        new ReadableStream({
+          cancel() {
+            canceled = true;
+          },
+        })
+      );
+    };
+    await expect(
+      fetchSiteLlms(false, { fetchImpl, signal: controller.signal })
+    ).rejects.toMatchObject({ code: 'REQUEST_FAILED' });
+    expect(canceled).toBe(true);
+  });
+});
+
+describe('response decoding and preexisting cancellation', () => {
+  it('rejects an already-aborted response instead of returning an empty success', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      readResponseBody(new Response('abc'), controller.signal)
+    ).rejects.toThrow('canceled');
+    await expect(
+      readResponseBody(new Response(null, { status: 204 }), controller.signal)
+    ).rejects.toThrow('canceled');
+    await expect(
+      fetchSiteLlms(false, {
+        fetchImpl: async (_url, init) => {
+          init?.signal?.dispatchEvent(new Event('abort'));
+          controller.abort();
+          return new Response('abc');
+        },
+        signal: controller.signal,
+      })
+    ).rejects.toMatchObject({ code: 'REQUEST_FAILED' });
+  });
+  it('rejects cancellation after headers before reading the body', async () => {
+    const controller = new AbortController();
+    await expect(
+      fetchSiteLlms(false, {
+        signal: controller.signal,
+        fetchImpl: async () => {
+          controller.abort();
+          return new Response('abc');
+        },
+      })
+    ).rejects.toMatchObject({ code: 'REQUEST_FAILED' });
+  });
+  it('decodes UTF8 JSON with a leading BOM like Response.text', async () => {
+    const fetchImpl: FetchImplementation = async () =>
+      new Response(
+        new Uint8Array([
+          239,
+          187,
+          191,
+          ...new TextEncoder().encode('{"artist":{"username":"demo"}}'),
+        ])
+      );
+    await expect(fetchArtist('demo', { fetchImpl })).resolves.toEqual({
+      artist: { username: 'demo' },
+    });
   });
 });

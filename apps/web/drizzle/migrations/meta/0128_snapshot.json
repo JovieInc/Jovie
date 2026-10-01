@@ -1,5 +1,5 @@
 {
-  "id": "e1514dec-5f8d-4397-8eef-6b038d8020b4",
+  "id": "9a017da9-e329-4199-832b-8cb7360818b1",
   "prevId": "94a8d275-1e15-4508-88cf-54ec88b6d7b9",
   "version": "7",
   "dialect": "postgresql",
@@ -15944,6 +15944,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "default_lens": {
+          "name": "default_lens",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -16011,255 +16017,6 @@
           "tableTo": "finance_institutions",
           "columnsFrom": [
             "institution_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.finance_anomalies": {
-      "name": "finance_anomalies",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "owner_user_id": {
-          "name": "owner_user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "account_id": {
-          "name": "account_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'open'"
-        },
-        "detail": {
-          "name": "detail",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "resolved_at": {
-          "name": "resolved_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "finance_anomalies_owner_idx": {
-          "name": "finance_anomalies_owner_idx",
-          "columns": [
-            {
-              "expression": "owner_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "finance_anomalies_account_idx": {
-          "name": "finance_anomalies_account_idx",
-          "columns": [
-            {
-              "expression": "account_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "finance_anomalies_owner_user_id_users_id_fk": {
-          "name": "finance_anomalies_owner_user_id_users_id_fk",
-          "tableFrom": "finance_anomalies",
-          "tableTo": "users",
-          "columnsFrom": [
-            "owner_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "finance_anomalies_account_id_finance_accounts_id_fk": {
-          "name": "finance_anomalies_account_id_finance_accounts_id_fk",
-          "tableFrom": "finance_anomalies",
-          "tableTo": "finance_accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.finance_balance_snapshots": {
-      "name": "finance_balance_snapshots",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "owner_user_id": {
-          "name": "owner_user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "account_id": {
-          "name": "account_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "snapshot_date": {
-          "name": "snapshot_date",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source": {
-          "name": "source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "balance": {
-          "name": "balance",
-          "type": "numeric(19, 4)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "finance_balance_snapshots_owner_idx": {
-          "name": "finance_balance_snapshots_owner_idx",
-          "columns": [
-            {
-              "expression": "owner_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "finance_balance_snapshots_account_date_unique": {
-          "name": "finance_balance_snapshots_account_date_unique",
-          "columns": [
-            {
-              "expression": "account_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "snapshot_date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "source",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "finance_balance_snapshots_owner_user_id_users_id_fk": {
-          "name": "finance_balance_snapshots_owner_user_id_users_id_fk",
-          "tableFrom": "finance_balance_snapshots",
-          "tableTo": "users",
-          "columnsFrom": [
-            "owner_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "finance_balance_snapshots_account_id_finance_accounts_id_fk": {
-          "name": "finance_balance_snapshots_account_id_finance_accounts_id_fk",
-          "tableFrom": "finance_balance_snapshots",
-          "tableTo": "finance_accounts",
-          "columnsFrom": [
-            "account_id"
           ],
           "columnsTo": [
             "id"
@@ -16441,6 +16198,189 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.finance_classification_rules": {
+      "name": "finance_classification_rules",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "owner_user_id": {
+          "name": "owner_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "priority": {
+          "name": "priority",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 100
+        },
+        "match_account_id": {
+          "name": "match_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "match_merchant_pattern": {
+          "name": "match_merchant_pattern",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "match_direction": {
+          "name": "match_direction",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "match_amount_min": {
+          "name": "match_amount_min",
+          "type": "numeric(19, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "match_amount_max": {
+          "name": "match_amount_max",
+          "type": "numeric(19, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "match_description_tokens": {
+          "name": "match_description_tokens",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "match_recurrence": {
+          "name": "match_recurrence",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "set_lens": {
+          "name": "set_lens",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "set_category": {
+          "name": "set_category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provenance": {
+          "name": "provenance",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'manual'"
+        },
+        "source_transaction_id": {
+          "name": "source_transaction_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "finance_classification_rules_owner_idx": {
+          "name": "finance_classification_rules_owner_idx",
+          "columns": [
+            {
+              "expression": "owner_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "finance_classification_rules_owner_user_id_users_id_fk": {
+          "name": "finance_classification_rules_owner_user_id_users_id_fk",
+          "tableFrom": "finance_classification_rules",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "finance_classification_rules_match_account_id_finance_accounts_id_fk": {
+          "name": "finance_classification_rules_match_account_id_finance_accounts_id_fk",
+          "tableFrom": "finance_classification_rules",
+          "tableTo": "finance_accounts",
+          "columnsFrom": [
+            "match_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "finance_classification_rules_source_transaction_id_finance_transactions_id_fk": {
+          "name": "finance_classification_rules_source_transaction_id_finance_transactions_id_fk",
+          "tableFrom": "finance_classification_rules",
+          "tableTo": "finance_transactions",
+          "columnsFrom": [
+            "source_transaction_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -16660,8 +16600,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.finance_ledger_events": {
-      "name": "finance_ledger_events",
+    "public.finance_transaction_classifications": {
+      "name": "finance_transaction_classifications",
       "schema": "",
       "columns": {
         "id": {
@@ -16677,163 +16617,54 @@
           "primaryKey": false,
           "notNull": true
         },
-        "entity_kind": {
-          "name": "entity_kind",
+        "transaction_id": {
+          "name": "transaction_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lens": {
+          "name": "lens",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "entity_id": {
-          "name": "entity_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "event_kind": {
-          "name": "event_kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "payload": {
-          "name": "payload",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sync_request_id": {
-          "name": "sync_request_id",
+        "category": {
+          "name": "category",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "occurred_at": {
-          "name": "occurred_at",
+        "confidence": {
+          "name": "confidence",
+          "type": "numeric(5, 4)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "explanation": {
+          "name": "explanation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rule_id": {
+          "name": "rule_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        }
-      },
-      "indexes": {
-        "finance_ledger_events_owner_idx": {
-          "name": "finance_ledger_events_owner_idx",
-          "columns": [
-            {
-              "expression": "owner_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "finance_ledger_events_entity_idx": {
-          "name": "finance_ledger_events_entity_idx",
-          "columns": [
-            {
-              "expression": "entity_kind",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "entity_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "finance_ledger_events_owner_user_id_users_id_fk": {
-          "name": "finance_ledger_events_owner_user_id_users_id_fk",
-          "tableFrom": "finance_ledger_events",
-          "tableTo": "users",
-          "columnsFrom": [
-            "owner_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.finance_sync_states": {
-      "name": "finance_sync_states",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "owner_user_id": {
-          "name": "owner_user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "institution_id": {
-          "name": "institution_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "cursor": {
-          "name": "cursor",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'idle'"
-        },
-        "failure_count": {
-          "name": "failure_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "last_error_code": {
-          "name": "last_error_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_request_id": {
-          "name": "last_request_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_synced_at": {
-          "name": "last_synced_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         },
         "updated_at": {
           "name": "updated_at",
@@ -16844,8 +16675,23 @@
         }
       },
       "indexes": {
-        "finance_sync_states_owner_idx": {
-          "name": "finance_sync_states_owner_idx",
+        "finance_transaction_classifications_tx_idx": {
+          "name": "finance_transaction_classifications_tx_idx",
+          "columns": [
+            {
+              "expression": "transaction_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "finance_transaction_classifications_owner_idx": {
+          "name": "finance_transaction_classifications_owner_idx",
           "columns": [
             {
               "expression": "owner_user_id",
@@ -16858,33 +16704,12 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "finance_sync_states_institution_unique": {
-          "name": "finance_sync_states_institution_unique",
-          "columns": [
-            {
-              "expression": "owner_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "institution_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
-        "finance_sync_states_owner_user_id_users_id_fk": {
-          "name": "finance_sync_states_owner_user_id_users_id_fk",
-          "tableFrom": "finance_sync_states",
+        "finance_transaction_classifications_owner_user_id_users_id_fk": {
+          "name": "finance_transaction_classifications_owner_user_id_users_id_fk",
+          "tableFrom": "finance_transaction_classifications",
           "tableTo": "users",
           "columnsFrom": [
             "owner_user_id"
@@ -16895,12 +16720,152 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "finance_sync_states_institution_id_finance_institutions_id_fk": {
-          "name": "finance_sync_states_institution_id_finance_institutions_id_fk",
-          "tableFrom": "finance_sync_states",
-          "tableTo": "finance_institutions",
+        "finance_transaction_classifications_transaction_id_finance_transactions_id_fk": {
+          "name": "finance_transaction_classifications_transaction_id_finance_transactions_id_fk",
+          "tableFrom": "finance_transaction_classifications",
+          "tableTo": "finance_transactions",
           "columnsFrom": [
-            "institution_id"
+            "transaction_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "finance_transaction_classifications_rule_id_finance_classification_rules_id_fk": {
+          "name": "finance_transaction_classifications_rule_id_finance_classification_rules_id_fk",
+          "tableFrom": "finance_transaction_classifications",
+          "tableTo": "finance_classification_rules",
+          "columnsFrom": [
+            "rule_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.finance_transaction_splits": {
+      "name": "finance_transaction_splits",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "owner_user_id": {
+          "name": "owner_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "transaction_id": {
+          "name": "transaction_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "seq": {
+          "name": "seq",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(19, 4)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lens": {
+          "name": "lens",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "finance_transaction_splits_tx_idx": {
+          "name": "finance_transaction_splits_tx_idx",
+          "columns": [
+            {
+              "expression": "transaction_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "finance_transaction_splits_owner_idx": {
+          "name": "finance_transaction_splits_owner_idx",
+          "columns": [
+            {
+              "expression": "owner_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "finance_transaction_splits_owner_user_id_users_id_fk": {
+          "name": "finance_transaction_splits_owner_user_id_users_id_fk",
+          "tableFrom": "finance_transaction_splits",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "finance_transaction_splits_transaction_id_finance_transactions_id_fk": {
+          "name": "finance_transaction_splits_transaction_id_finance_transactions_id_fk",
+          "tableFrom": "finance_transaction_splits",
+          "tableTo": "finance_transactions",
+          "columnsFrom": [
+            "transaction_id"
           ],
           "columnsTo": [
             "id"

@@ -171,7 +171,7 @@ describe('GET /api/cron/daily-maintenance', () => {
       byModel: [],
       alerts: [],
     });
-    mockRunMusicResolverParityCorpus.mockResolvedValue([{ version: 1 }]);
+    mockRunMusicResolverParityCorpus.mockResolvedValue([{ version: 2 }]);
   });
 
   afterEach(() => {
@@ -262,7 +262,11 @@ describe('GET /api/cron/daily-maintenance', () => {
         alerts: [],
       },
     });
-    expect(data.results.musicResolverParity.success).toBe(true);
+    expect(mockRunMusicResolverParityCorpus).toHaveBeenCalledTimes(1);
+    expect(data.results.musicResolverParity).toEqual({
+      success: true,
+      data: [{ version: 2 }],
+    });
     expect(data.results.dataRetention.success).toBe(true);
   });
 

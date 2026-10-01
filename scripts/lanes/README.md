@@ -40,6 +40,7 @@ The harness, not the model, owns:
 | Provider throughput: matched-work offers, accepts, starts, productive/PR/first-pass rates, remediation, issue→PR→merge time, landed output, idle qualified capacity and failure reasons; landed attribution comes from receipts, never a branch prefix | `provider_throughput()`, `doctor.status_feed()`, `hud.py` |
 | Provider failover: a lane that exits non-zero mid-issue (every account spent, auth, crash) hands the same worktree to the next enabled, healthy, uncooled lane, up to 2 handoffs; the receipt records `handoffs` and `finishedBy` | `run_issue()`, `next_provider()` |
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
+| Stop revokes publication: a kill writes `runs/publication-revocations.jsonl` before the kill is acked, and every irreversible boundary (push, PR open, label, enqueue) revalidates it — revoked branches never ship (JOV-5060) | `run_agent(on_kill=)`, `revoke_publication()`, `require_publishable()` |
 
 Event-driven: a worker that finishes re-execs the current release and pulls the next
 issue. The minute timer only restarts idle lanes and applies updates; it never signals a
@@ -184,6 +185,28 @@ State and receipts live under `~/.local/state/jovie-lanes`. Every gated run reco
 `gateWaitS` (seconds queued for a gate seat) on its receipt; the doctor aggregates
 `gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
 second host is decided on measured queue time, not on timeouts alone.
+
+## Preserved repairs (JOV-7347)
+
+Repair retries reuse a registered preserved checkout only after its ended run,
+execution identity, current target head, ancestry and idle process state agree.
+The existing coordinator still enforces the live lease and original retry budget;
+changing check failures does not grant a fresh budget. A host-local PR lock spans
+failure identities. Unverifiable or superseded work emits a recovery handoff.
+Damaged markers matched to the requested target still require a handoff;
+unidentified markers are logged for host reconciliation without blocking unrelated
+targets. Completed recovery clears its marker and checkout only when the source
+is clean, matches the verified remote head, and has no live working directory.
+Unpublished edits, unreadable evidence, and failed cleanup retain protection.
+Preserved issue implementations require execution reconciliation and remain on
+Backlog with their source and accountable issue reference intact.
+
+The runner tracks observed descendants by PID and start time across detached
+sessions, cleans them up on completion/cancellation, and never kills by pathname.
+A child that fully daemonizes before its first snapshot cannot be attributed this
+way; preserved-work admission therefore also checks live working directories.
+Cleanup retains protected, dirty or unreadable source. Installed-runtime evidence
+is required before calling this commissioned.
 
 ## Tests
 

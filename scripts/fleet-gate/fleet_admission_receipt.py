@@ -151,6 +151,45 @@ def _project_signals(value: object) -> dict[str, Any]:
         "status": main_status,
         "sha": _hex_sha(main.get("sha"), "signals.main.sha"),
     }
+    # JOV-4970: carry the exact main-health reason and required/optional check
+    # classification through the bounded projection so an owner can tell a real
+    # red main from an optional pending workflow.
+    for key in ("reason", "combinedStatus"):
+        value = main.get(key)
+        if isinstance(value, str) and value:
+            projected_main[key] = value
+    if main.get("generationVerified") is True or main.get("generationVerified") is False:
+        projected_main["generationVerified"] = main["generationVerified"]
+    contract = main.get("contract")
+    if isinstance(contract, dict) and isinstance(contract.get("version"), str):
+        projected_main["contractVersion"] = contract["version"]
+    marker = main.get("marker")
+    if isinstance(marker, dict) and isinstance(marker.get("verified"), bool):
+        projected_main["marker"] = {
+            "name": marker.get("name"),
+            "verified": marker["verified"],
+            "stale": marker.get("stale") is True,
+        }
+    for key in ("pendingChecks", "failedChecks"):
+        names = main.get(key)
+        if isinstance(names, list) and all(isinstance(name, str) for name in names):
+            projected_main[key] = names[:64]
+    checks = main.get("checks")
+    if isinstance(checks, list):
+        degraded = [
+            {
+                "name": entry["name"],
+                "classification": entry["classification"],
+                "verdict": entry["verdict"],
+            }
+            for entry in checks
+            if isinstance(entry, dict)
+            and isinstance(entry.get("name"), str)
+            and entry.get("classification") in {"required", "optional"}
+            and entry.get("verdict") != "success"
+        ]
+        if degraded:
+            projected_main["checks"] = degraded[:64]
     projected_production: dict[str, Any] = {"status": production_status}
     deployed = production.get("deployedSha")
     if isinstance(deployed, str) and deployed:

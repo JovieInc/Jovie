@@ -143,6 +143,8 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
                 }
             if endpoint.startswith("actions/runs?"):
                 return {"workflow_runs": []}
+            if endpoint.startswith("actions/artifacts?"):
+                return {"artifacts": []}
             raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
 
         with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
@@ -171,12 +173,16 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
                         }
                     ]
                 }
+            if endpoint.startswith("actions/artifacts?"):
+                return {"artifacts": []}
             raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
 
         with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
             observed = MODULE.observe_main("JovieInc/Jovie")
 
         self.assertEqual(observed["status"], "red")
+        self.assertEqual(observed["reason"], "required-check-failed")
+        self.assertEqual(observed["failedChecks"], ["Main Release Ready"])
         self.assertNotIn("error", observed)
 
     def test_observe_main_preserves_exact_sha_when_release_gate_is_missing(self):
@@ -231,6 +237,11 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
                         }
                     ]
                 }
+            if endpoint.startswith("actions/artifacts?"):
+                self.assertIn(
+                    f"name=production-generation-verified-{MAIN_SHA}", endpoint
+                )
+                return {"artifacts": []}
             raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
 
         with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
@@ -240,6 +251,8 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         self.assertEqual(observed["sha"], MAIN_SHA)
         self.assertEqual(observed["sourceGate"]["conclusion"], "success")
         self.assertEqual(observed["sourceGate"]["status"], "completed")
+        self.assertEqual(observed["reason"], "required-checks-green-generation-unverified")
+        self.assertFalse(observed["generationVerified"])
 
     def test_observe_main_uses_sentinel_when_branch_lookup_fails(self):
         with mock.patch.object(MODULE, "gh_json", side_effect=OSError("offline")):
@@ -289,6 +302,193 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
             red = MODULE.observe_main("JovieInc/gbrain")
 
         self.assertEqual(red["status"], "red")
+
+
+def _main_fixture(
+    check_runs: list[dict[str, object]],
+    artifacts: list[dict[str, object]] | None = None,
+    combined_state: str = "pending",
+    sha: str | None = None,
+):
+    """Deterministic observe_main fixture: one exact main head, its check runs,
+    and the production-generation-verified-<sha> artifact listing."""
+    sha = sha or MAIN_SHA
+
+    def github_response(_repo: str, endpoint: str):
+        if endpoint == "branches/main":
+            return {"commit": {"sha": sha}}
+        if endpoint == f"commits/{sha}/status":
+            return {"state": combined_state}
+        if endpoint.startswith(f"commits/{sha}/check-runs?"):
+            return {"check_runs": check_runs}
+        if endpoint.startswith("actions/runs?"):
+            return {"workflow_runs": []}
+        if endpoint.startswith("actions/artifacts?"):
+            return {"artifacts": artifacts or []}
+        raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+    return github_response
+
+
+def _check_run(
+    name: str,
+    status: str = "completed",
+    conclusion: str | None = "success",
+    started_at: str = "2026-10-01T00:00:00Z",
+) -> dict[str, object]:
+    return {
+        "name": name,
+        "status": status,
+        "conclusion": conclusion,
+        "started_at": started_at,
+        "completed_at": started_at if status == "completed" else None,
+    }
+
+
+def _marker(sha: str | None = None, expired: bool = False, artifact_id: int = 1):
+    return {
+        "id": artifact_id,
+        "name": f"production-generation-verified-{sha or MAIN_SHA}",
+        "expired": expired,
+    }
+
+
+class MainHealthContractTests(unittest.TestCase):
+    """JOV-4970 fixtures: promotion binds to the versioned required-check set
+    plus exact generation evidence, never to every check run on the SHA."""
+
+    def test_required_pending_is_unknown(self):
+        with mock.patch.object(
+            MODULE,
+            "gh_json",
+            side_effect=_main_fixture(
+                [
+                    _check_run(
+                        "Main Release Ready", status="in_progress", conclusion=None
+                    ),
+                ],
+                artifacts=[_marker()],
+            ),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "unknown")
+        self.assertEqual(observed["reason"], "required-check-pending")
+        self.assertEqual(observed["pendingChecks"], ["Main Release Ready"])
+
+    def test_optional_pending_stays_green_with_exact_marker(self):
+        """The JOV-4970 incident shape: verified generation, required checks
+        green, Generate Screenshots still running. Promotable."""
+        with mock.patch.object(
+            MODULE,
+            "gh_json",
+            side_effect=_main_fixture(
+                [
+                    _check_run("Main Release Ready"),
+                    _check_run(
+                        "Generate Screenshots",
+                        status="in_progress",
+                        conclusion=None,
+                        started_at="2026-10-01T00:30:00Z",
+                    ),
+                ],
+                artifacts=[_marker()],
+            ),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(
+            observed["reason"], "required-checks-green-generation-verified"
+        )
+        self.assertTrue(observed["generationVerified"])
+        self.assertEqual(observed["pendingChecks"], ["Generate Screenshots"])
+        checks = {entry["name"]: entry for entry in observed["checks"]}
+        self.assertEqual(checks["Generate Screenshots"]["classification"], "optional")
+        self.assertEqual(checks["Main Release Ready"]["classification"], "required")
+
+    def test_required_failed_is_red(self):
+        with mock.patch.object(
+            MODULE,
+            "gh_json",
+            side_effect=_main_fixture(
+                [_check_run("Main Release Ready", conclusion="failure")],
+                artifacts=[_marker()],
+            ),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "red")
+        self.assertEqual(observed["reason"], "required-check-failed")
+
+    def test_optional_failed_does_not_flip_global_main_red(self):
+        with mock.patch.object(
+            MODULE,
+            "gh_json",
+            side_effect=_main_fixture(
+                [
+                    _check_run("Main Release Ready"),
+                    _check_run("Generate Screenshots", conclusion="failure"),
+                ],
+                artifacts=[_marker()],
+            ),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["failedChecks"], ["Generate Screenshots"])
+        checks = {entry["name"]: entry for entry in observed["checks"]}
+        self.assertEqual(checks["Generate Screenshots"]["verdict"], "failed")
+
+    def test_stale_marker_is_not_verified(self):
+        with mock.patch.object(
+            MODULE,
+            "gh_json",
+            side_effect=_main_fixture(
+                [_check_run("Main Release Ready")],
+                artifacts=[_marker(expired=True)],
+            ),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertFalse(observed["generationVerified"])
+        self.assertTrue(observed["marker"]["stale"])
+
+    def test_exact_marker_binds_generation(self):
+        with mock.patch.object(
+            MODULE,
+            "gh_json",
+            side_effect=_main_fixture(
+                [_check_run("Main Release Ready")],
+                artifacts=[_marker(artifact_id=42)],
+            ),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertTrue(observed["generationVerified"])
+        self.assertEqual(observed["marker"]["artifactId"], 42)
+
+    def test_main_advancement_unbinds_prior_generation_marker(self):
+        """A marker preserved for the previous main head never verifies the
+        advanced SHA; its name is sha-bound."""
+        prior_sha = "b" * 40
+        with mock.patch.object(
+            MODULE,
+            "gh_json",
+            side_effect=_main_fixture(
+                [_check_run("Main Release Ready")],
+                artifacts=[_marker(sha=prior_sha)],
+            ),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertFalse(observed["generationVerified"])
+        self.assertEqual(
+            observed["marker"]["name"],
+            f"production-generation-verified-{MAIN_SHA}",
+        )
 
 
 class ProductionHealthTests(unittest.TestCase):

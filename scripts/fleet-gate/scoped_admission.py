@@ -3,10 +3,18 @@
 
 from __future__ import annotations
 
+import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
-POLICY_VERSION = "jovie.fleet-admission/2026-09-29.1"
+_FLEET_GATE_DIR = Path(__file__).resolve().parent
+if str(_FLEET_GATE_DIR) not in sys.path:
+    sys.path.insert(0, str(_FLEET_GATE_DIR))
+
+from gem_gate_contract import SURFACE_SCOPED_OPTIONAL_CHECKS  # noqa: E402
+
+POLICY_VERSION = "jovie.fleet-admission/2026-10-01.1"
 SCHEMA = "jovie-fleet-admission/v2"
 MAX_AGE = timedelta(minutes=10)
 RISK_LANES = frozenset({"not_applicable", "low", "medium", "high", "unknown"})
@@ -65,6 +73,29 @@ def _health_signals(receipt: dict[str, Any], request: dict[str, Any]) -> dict[st
             rows[name] = row
     main = signals.get("main") if isinstance(signals.get("main"), dict) else {}
     record("main", main.get("status"), main.get("error"), "signals.main")
+    # JOV-4970: optional main checks stay individually observable. A terminal
+    # failure surfaces as `check:<name>` and binds only the surfaces that name
+    # it; pending optional lanes degrade nothing globally.
+    checks = main.get("checks")
+    if isinstance(checks, list):
+        for entry in checks:
+            if (
+                not isinstance(entry, dict)
+                or entry.get("classification") != "optional"
+                or not isinstance(entry.get("name"), str)
+            ):
+                continue
+            verdict = entry.get("verdict")
+            record(
+                f"check:{entry['name']}",
+                "unhealthy"
+                if verdict == "failed"
+                else "unknown"
+                if verdict == "pending"
+                else "healthy",
+                entry.get("conclusion") or entry.get("status") or verdict,
+                "signals.main.checks",
+            )
     production = signals.get("production") if isinstance(signals.get("production"), dict) else {}
     components = production.get("dependencies")
     if isinstance(components, dict) and components:
@@ -123,6 +154,13 @@ def build_scoped_admission(
     fresh = timedelta(0) <= age <= MAX_AGE
     health = _health_signals(receipt, request)
     required = _required_dependencies(surface, risk_lane, repository)
+    # Surface-scoped optional checks (JOV-4970): a failed auxiliary lane gates
+    # only the surfaces that name it. Pending or absent optional evidence never
+    # becomes a required dependency.
+    for check_name in sorted(SURFACE_SCOPED_OPTIONAL_CHECKS.get(surface, ())):
+        signal = f"check:{check_name}"
+        if health.get(signal, {}).get("status") == "unhealthy":
+            required.append(signal)
     blockers = [
         health.get(name, {"signal": name, "status": "unknown", "detail": "required dependency health is missing", "proof": "missing"})
         for name in required

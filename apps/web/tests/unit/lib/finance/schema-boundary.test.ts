@@ -38,7 +38,7 @@ const MIGRATION_PATHS = [
 
 const LEDGER_MIGRATION_PATH = path.join(
   process.cwd(),
-  'drizzle/migrations/0128_plain_the_leader.sql'
+  'drizzle/migrations/0130_tearful_korath.sql'
 );
 
 describe('finance schema owner boundary (JOV-4609)', () => {

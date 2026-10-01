@@ -15,8 +15,8 @@ type Story = StoryObj<typeof ConnectorCard>;
 
 const STATES = [
   { status: 'not_connected' },
-  { status: 'connected', email: 'artist@example.com' },
-  { status: 'syncing', email: 'artist@example.com' },
+  { status: 'connected', accountLabel: 'artist@example.com' },
+  { status: 'syncing', accountLabel: 'artist@example.com' },
   { status: 'error', errorMessage: 'Google rejected the connection.' },
   {
     status: 'needs_reauth',
