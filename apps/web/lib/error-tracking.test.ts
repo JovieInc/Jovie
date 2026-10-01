@@ -220,6 +220,28 @@ describe('captureError Sentry fingerprint', () => {
     getClient.mockReturnValue({});
   });
 
+  it('captures the nested driver error for Drizzle failed-query wrappers', async () => {
+    const pgError = Object.assign(
+      new Error('relation "creator_profiles" does not exist'),
+      { code: '42P01' }
+    );
+    const drizzleError = new Error(
+      'Failed query: select "id" from "creator_profiles"',
+      { cause: pgError }
+    );
+
+    await captureError('Dashboard route error', drizzleError);
+
+    expect(captureException).toHaveBeenCalledWith(
+      pgError,
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          query_wrapper: 'Failed query: select "id" from "creator_profiles"',
+        }),
+      })
+    );
+  });
+
   it('uses a caller fingerprint when one is provided', async () => {
     await captureError('RLS set_config failed', new Error('Failed query'), {
       fingerprint: 'auth_rls_set_config_failed',
