@@ -1159,6 +1159,7 @@ describe('performance budgets guard', () => {
     const route = {
       id: 'warm-navigation-fixture',
       path: '/app/library',
+      navigationItemId: 'library',
       warmNavigationStartPath: '/app',
       measureMode: 'warm-navigation',
       readySelectors: {
@@ -1185,10 +1186,8 @@ describe('performance budgets guard', () => {
     expect(fixture.events.indexOf('goto')).toBeLessThan(
       fixture.events.indexOf('click')
     );
-    const acknowledgmentSelector = '[data-navigation-pending="true"]';
-    expect(
-      fixture.events.indexOf(`visible:${acknowledgmentSelector}`)
-    ).toBeGreaterThan(fixture.events.indexOf('click'));
+    const acknowledgmentSelector =
+      '[data-navigation-item-id="library"][data-navigation-pending="true"]';
     expect(
       fixture.events.indexOf(`visible:${acknowledgmentSelector}`)
     ).toBeLessThan(fixture.events.indexOf('elapsed:12'));

@@ -1106,6 +1106,19 @@ async function readWarmNavigationElapsed(page: Page) {
   });
 }
 
+function getWarmNavigationAcknowledgmentSelector(
+  route: PerfRouteDefinition
+): string {
+  const navigationItemId = route.navigationItemId?.trim();
+  if (!navigationItemId) {
+    throw new TypeError(
+      `Warm-navigation route "${route.id}" is missing navigationItemId for shell acknowledgment measurement.`
+    );
+  }
+
+  return `[data-navigation-item-id="${navigationItemId}"][data-navigation-pending="true"]`;
+}
+
 export async function measureWarmNavigationRoute(
   page: Page,
   route: PerfRouteDefinition,
@@ -1152,14 +1165,12 @@ export async function measureWarmNavigationRoute(
 
   let warmShellResponse: number;
   if (route.measureMode === 'warm-navigation') {
-    // The authenticated shell keeps the source route mounted until the
-    // destination commits, so the perceived response is the nav control's
-    // paint-only pending acknowledgment — not the URL commit, which also
-    // waits on the destination payload. The nav holds
-    // data-navigation-pending for a minimum visible window so this probe
-    // observes the acknowledgment even when a prefetched transition commits
-    // almost immediately.
-    await waitForAnyVisible(page, ['[data-navigation-pending="true"]']);
+    // The authenticated shell retains the source route until the destination
+    // is ready. Measure its immediate, geometry-stable acknowledgment rather
+    // than conflating shell response with the later URL commit.
+    await waitForAnyVisible(page, [
+      getWarmNavigationAcknowledgmentSelector(route),
+    ]);
     warmShellResponse = await readWarmNavigationElapsed(page);
   } else {
     await routeReadyPromise;
