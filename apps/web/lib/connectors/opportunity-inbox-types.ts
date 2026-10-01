@@ -8,7 +8,28 @@ export type OpportunityInboxCardCategory =
   | 'report'
   | 'brand_deal'
   | 'workflow_capture'
-  | 'youtube_thumbnail';
+  | 'youtube_thumbnail'
+  | 'social_reply';
+
+export type OpportunityInboxSocialReplyExecutionState =
+  | 'pending'
+  | 'checking'
+  | 'sending'
+  | 'verified'
+  | 'blocked'
+  | 'ambiguous';
+
+/** Inbound social item + draft copy awaiting the creator's call (JOV-5128). */
+export interface OpportunityInboxSocialReplyData {
+  readonly platform: string;
+  readonly authorLabel: string;
+  readonly typeLabel: string;
+  readonly inboundText: string;
+  readonly draftedText: string;
+  readonly sourceUrl: string | null;
+  readonly executionState: OpportunityInboxSocialReplyExecutionState;
+  readonly revisionCount: number;
+}
 
 export interface OpportunityInboxYoutubeThumbnailData {
   readonly channelId: string;
@@ -83,6 +104,8 @@ export interface OpportunityInboxCardViewModel {
   readonly workflowCapture?: OpportunityInboxWorkflowCaptureData;
   /** Present only when category === 'youtube_thumbnail'. */
   readonly youtubeThumbnail?: OpportunityInboxYoutubeThumbnailData;
+  /** Present only when category === 'social_reply'. */
+  readonly socialReply?: OpportunityInboxSocialReplyData;
 }
 
 export interface OpportunityInboxTourDateItem {
