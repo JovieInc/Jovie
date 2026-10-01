@@ -2,11 +2,73 @@
 
 Status: Canon
 Inherits: [`OPERATING_SYSTEM.md`](./OPERATING_SYSTEM.md)
-Last updated: 2026-07-17
+Last updated: 2026-09-26
 
 Engineering exists to increase company throughput by making the product correct, shippable, reliable, and easy to change.
 
 ---
+
+## Capability Sourcing (JOV-6212)
+
+EVENT: Founder direction, 2026-09-12 (tracked as Linear JOV-6212, implemented
+2026-09-26). Minimize lifetime ownership of undifferentiated mechanisms,
+subject to required correctness, security, reliability, privacy, performance
+and user experience. Custom product behavior is expected; custom commodity
+mechanisms are an evidence-earned exception. More dependencies or fewer lines
+are not goals.
+
+1. State the user outcome and classify each consequential capability as
+   differentiating product logic, necessary integration, or commodity
+   mechanism. Identify its canonical implementation/owner. Renaming auth as
+   proprietary does not change its classification.
+2. Before new or materially expanded commodity work, inspect existing
+   code/dependencies, platform/standard-library features, official vendor
+   integration/plugin indexes, and credible maintained OSS/services. Record
+   exact versions, authoritative sources and checked date. Do not require
+   three candidates when the current canonical implementation clearly
+   suffices.
+3. Reuse an applicable current sourcing decision without repeating research;
+   renew it when requirements, versions, workload, security posture, operating
+   cost or material regressions change.
+4. Custom/fork decisions must identify a concrete unmet hard requirement or
+   demonstrated material net advantage over the best credible alternative,
+   after considering configuration, narrow adaptation or an upstream
+   contribution. Include lifetime integration, maintenance, security updates,
+   infrastructure, review/incident, migration and opportunity costs. Forks
+   identify upstream/license, patch scope, update owner and exit trigger.
+5. One authoritative implementation per capability and scope. Adapters
+   implement Jovie's actual contract only. Temporary compatibility for
+   installed clients requires version scope and retirement criteria. Small
+   pure helpers do not need a package or a full sourcing exercise.
+6. Routine adoption within existing authority is autonomous. Missing
+   network/package permissions route to the existing research path; they
+   never establish that no library exists or justify a rewrite.
+7. Verify behavior and failure/security contracts, not merely dependency
+   presence or implementation strings.
+8. The implementation author cannot approve their own exception, weaken a
+   guard, or enlarge an allowlist to authorize the same change. Exceptions
+   and custom/fork decisions get independent review through the existing
+   review/governance owner. No blanket founder merge gate.
+9. Apply proportionately; do not halt unrelated delivery or mandate a rewrite
+   of legacy infrastructure. Incident fixes remain possible under existing
+   emergency authority.
+
+The minimal sourcing receipt (extend an existing receipt, not a parallel
+ledger) records: outcome; capability and scope; canonical owner/runtime; hard
+requirements; existing implementation/decision reference; alternatives with
+authoritative evidence, version and checked date; selected disposition;
+bounded custom delta and rejected alternatives; lifetime-cost/risk assessment;
+tests; rollback/retirement/re-evaluation triggers; independent review for
+exceptions. Unverified facts remain unverified.
+
+**Enforcement (JOV-INV-035):** a minimal deterministic validator
+(`scripts/invariants/capability-sourcing.mjs`, composed into the existing
+`pnpm invariants:check` entrypoint) binds this policy to its router and
+skill surfaces. Per the 2026-09-09 founder rule above, this gate runs
+**nonblocking/advisory in shadow** until qualified on multiple representative
+actual ships; promotion to blocking enforcement happens through the existing
+authority with tested rollback. LLM/source classification remains advisory
+until specifically qualified.
 
 ## Engineering Optimization Order
 

@@ -19,7 +19,7 @@ TypeScript, React/Next.js, server/client boundaries, canonical imports, ESLint r
 | Linting | Biome |
 | Package Manager | pnpm 9.15.9 |
 | Monorepo | Turborepo |
-| Runtime | Node.js 24 LTS |
+| Runtime | Node.js 22 LTS |
 
 ## TypeScript
 
@@ -222,7 +222,7 @@ useQuery({
 
 ## Custom ESLint Rules
 
-20 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`; enforced in CI.
+19 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`; enforced in CI.
 
 | Rule | What It Blocks | Fix |
 |------|---------------|-----|
@@ -245,7 +245,6 @@ useQuery({
 | `chat-tool-schema-strict` | Bare `z.object()` chat tool input schemas | Wrap with `chatToolSchema()` |
 | `canonical-ui-label-casing` | Title Case / sentence-case violations on UI labels | Follow `DESIGN.md` casing; allowlist with `ui-casing-allow` |
 | `no-hardcoded-theme-colors` | Bare `text-black`/`bg-white` or `text-[#hex]` that bypass semantic tokens | Use token utilities (`text-primary-token`) or pair light/dark classes |
-| `no-direct-stripe-client` | Runtime `stripe` imports, `require('stripe')`, or `new Stripe(...)` outside `lib/stripe/` | Import the canonical client from `@/lib/stripe/client` (type-only imports are allowed) |
 
 **Run:** `pnpm --filter web lint:eslint` (all rules) or `pnpm --filter web lint:server-boundaries` (boundary rules only).
 
@@ -430,6 +429,22 @@ Before merging any PR that introduces background/scheduled work, verify:
 - [ ] What happens if this job fails? Is there retry logic? Dead letter handling?
 - [ ] Is the frequency justified? What breaks if we run it less often?
 - [ ] Have I included a Cost Impact section in the PR description?
+
+## Capability Sourcing (JOV-6212)
+
+Before implementing or materially expanding a commodity capability (auth, PDF,
+parsing, queues, scheduling, charts, dates, state management, …), record a
+capability-level sourcing decision: classify the capability, name its canonical
+implementation/owner, inspect existing code, platform features, official vendor
+integrations and credible OSS (with versions and checked dates), then decide
+reuse / configure / adopt / buy / extend / fork / build with bounded reasons and
+lifetime cost. The implementation author cannot self-approve an exception —
+exceptions and custom/fork decisions get independent review. Small pure helpers
+and bug fixes skip the exercise. Canonical policy, receipt fields, and the
+shadow-qualification enforcement rule live once in
+[canon/ENGINEERING.md](../../canon/ENGINEERING.md) → "Capability Sourcing
+(JOV-6212)"; this section routes there and does not duplicate it. Runs at
+capability level, before and narrower than the Prior-Art Gate below.
 
 ## Build Before You Build (Prior-Art Gate)
 

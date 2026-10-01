@@ -99,6 +99,38 @@ preflight in `AGENTS.md`).
   its own prior-art gate (`.claude/rules/code-style.md` → "Build Before You
   Build").
 
+## Capability-first mode (JOV-6212)
+
+When the question is not "evaluate this named tool" but "should we build this
+capability" (auth handoff, PDF export, visual diffing, scheduling, queues,
+charts, dates, state management — any known software category), this skill
+runs capability-first instead of link-first:
+
+1. **Classify the capability** — differentiating product logic, necessary
+   integration, or commodity mechanism — and name its canonical
+   implementation/owner in this repo.
+2. **Search the same sources as Steps 2–3** (existing stack features and
+   dependencies, platform/standard-library features, official vendor
+   integration/plugin indexes, credible maintained OSS), recording exact
+   versions, authoritative sources and checked dates. Do not require three
+   candidates when the current canonical implementation clearly suffices.
+3. **Return the sourcing decision** — reuse / configure / adopt / buy /
+   extend / fork / build, with bounded reasons and lifetime cost
+   (integration, maintenance, security updates, migration, opportunity) —
+   as the same structured evaluation from Step 4. Mark anything unverified
+   as "not found"; never conclude "no library exists" from a blocked search —
+   route to the bounded research path instead.
+4. **Feed the decision through existing paths only**: save it to gbrain
+   (Step 5) and reference it from the issue/plan. This mode does not create a
+   second skill tree, research database, or receipt ledger — the canonical
+   policy and receipt fields live in
+   [canon/ENGINEERING.md](../../../canon/ENGINEERING.md) → "Capability
+   Sourcing (JOV-6212)".
+
+This is still a research/evaluation pass. Implementation of the chosen
+disposition is separate work; the implementation author cannot self-approve
+an exception to this policy.
+
 ## Common failures
 
 | Symptom | Fix |
