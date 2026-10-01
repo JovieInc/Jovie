@@ -185,7 +185,6 @@
   "lib/notifications/",
   "lib/onboarding/",
   "lib/ovie/acceptance.test.ts",
-  "lib/ovie/approvals.test.ts",
   "lib/ovie/certifications/",
   "lib/ovie/lyb-mrr.server.test.ts",
   "lib/ovie/lyb-mrr.test.ts",
