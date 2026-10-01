@@ -441,6 +441,30 @@ describe('performance route manifest', () => {
     ).toThrow('duplicate warm-navigation item "library"');
   });
 
+  it('requires warm-navigation routes to identify their shell control', () => {
+    const warmRoute = {
+      id: 'fixture-warm-route',
+      group: 'creator-shell',
+      surface: 'creator-app',
+      path: '/app/library',
+      warmNavigationStartPath: '/app',
+      requiresAuth: true,
+      warmupStrategy: 'authenticated-shell',
+      measureMode: 'warm-navigation',
+      readySelectors: {
+        content: ['main'],
+        navTrigger: ['a[href="/app/library"]'],
+      },
+      timings: [{ metric: 'warm-shell-response', budget: 100 }],
+      resourceSizes: [{ resourceType: 'total', budget: 100 }],
+      priority: 1,
+    } as const satisfies PerfRouteDefinition;
+
+    expect(() => assertValidPerfRouteDefinition(warmRoute)).toThrow(
+      'must define navigationItemId for shell acknowledgment measurement'
+    );
+  });
+
   it('requires dynamic fixtures to resolve every route token', () => {
     const dynamicRoute = {
       id: 'dynamic-fixture',

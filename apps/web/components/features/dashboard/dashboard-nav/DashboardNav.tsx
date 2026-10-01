@@ -65,6 +65,9 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     const query = searchParams.toString();
     return query ? `${pathname}?${query}` : pathname;
   }, [pathname, searchParams]);
+  const [pendingNavigationItemId, setPendingNavigationItemId] = useState<
+    string | null
+  >(null);
   const queryClient = useQueryClient();
   const isElectron = useIsElectronRuntime();
   // Persisted navigation state is a client-only enhancement. Reading it during
@@ -104,6 +107,13 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     setThreadReadAtById(readThreadReadState());
     setHasHydratedPersistedState(true);
   }, []);
+
+  // Route segments deliberately keep authenticated content mounted during a
+  // warm transition. Clear only the paint-only nav acknowledgment once the
+  // committed URL changes; no loading surface replaces the current content.
+  useEffect(() => {
+    setPendingNavigationItemId(null);
+  }, [currentNavigationHref]);
 
   useEffect(() => {
     if (
@@ -232,6 +242,9 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     }
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
       return;
+    setPendingNavigationItemId(
+      currentNavigationHref === item.href ? null : item.id
+    );
     startNavigationTelemetry({
       itemId: item.id,
       sourcePathname: currentNavigationHref,
@@ -261,6 +274,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
           calm={!isInSettings}
           item={item}
           isActive={isActive}
+          pending={pendingNavigationItemId === item.id}
           shortcut={shortcut}
           // Warm the approved customer destinations without a route flash.
           // Next's automatic mode skips full payloads for dynamic routes;
@@ -280,6 +294,19 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                     context: telemetryContext,
                   })
           }
+          onNavigate={
+            demoUnavailable || isActive
+              ? undefined
+              : () => setPendingNavigationItemId(item.id)
+          }
+          onCancelNavigate={
+            demoUnavailable || isActive
+              ? undefined
+              : () =>
+                  setPendingNavigationItemId(current =>
+                    current === item.id ? null : current
+                  )
+          }
           preventNavigation={demoUnavailable}
           renderAsButton={false}
           onPrefetch={() => handlePrefetch(item.id)}
@@ -289,6 +316,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     [
       currentNavigationHref,
       pathname,
+      pendingNavigationItemId,
       handleDemoNavClick,
       handlePrefetch,
       isDemo,
@@ -340,6 +368,9 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                 href={APP_ROUTES.DASHBOARD}
                 onClick={event => handleCommandClick(event, inboxNavItem)}
                 prefetch={!isDemo}
+                aria-busy={
+                  pendingNavigationItemId === inboxNavItem.id || undefined
+                }
                 aria-label={
                   hasRuntimeUpdate ? 'Inbox — App Update Available' : 'Inbox'
                 }
@@ -348,7 +379,11 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                     ? 'available'
                     : (inboxNavigation?.state ?? 'unknown')
                 }
-                className='relative flex size-7 shrink-0 items-center justify-center rounded-full text-secondary-token hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2 after:lg:hidden'
+                data-navigation-item-id={inboxNavItem.id}
+                data-navigation-pending={
+                  pendingNavigationItemId === inboxNavItem.id || undefined
+                }
+                className='relative flex size-7 shrink-0 items-center justify-center rounded-full text-secondary-token transition-colors duration-subtle ease-subtle hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[navigation-pending=true]:bg-sidebar-accent-active data-[navigation-pending=true]:text-primary-token after:absolute after:-inset-2 after:lg:hidden'
               >
                 <Bell
                   className='size-(--app-shell-sidebar-icon-size)'
@@ -374,6 +409,9 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
               <Link
                 href={APP_ROUTES.CHAT}
                 onClick={event => handleCommandClick(event, chatNavItem)}
+                aria-busy={
+                  pendingNavigationItemId === chatNavItem.id || undefined
+                }
                 aria-current={
                   normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT &&
                   searchParams.get('panel') !== 'profile'
@@ -382,7 +420,11 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                 }
                 prefetch={!isDemo}
                 aria-label='New Chat'
-                className='relative flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-(--color-bg-base) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2.5 after:lg:hidden'
+                data-navigation-item-id={chatNavItem.id}
+                data-navigation-pending={
+                  pendingNavigationItemId === chatNavItem.id || undefined
+                }
+                className='relative flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-(--color-bg-base) transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[navigation-pending=true]:opacity-70 after:absolute after:-inset-2.5 after:lg:hidden'
               >
                 <Plus className='size-3.5' aria-hidden='true' />
               </Link>
