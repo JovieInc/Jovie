@@ -23,7 +23,7 @@ enum AppShellTab: Equatable, Hashable, CaseIterable {
   var title: String {
     switch self {
     case .chat: return "Chat"
-    case .library: return "Library"
+    case .library: return "Work"
     case .calendar: return "Calendar"
     case .inbox: return "Inbox"
     case .profile: return "My Jovie Card"

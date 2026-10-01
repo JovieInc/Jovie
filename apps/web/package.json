@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.9.16",
+  "version": "26.10.0",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -45,7 +45,7 @@
     "lint:seo:live": "tsx scripts/seo-ratchet-live.ts",
     "playbooks:validate": "tsx scripts/validate-playbooks.ts",
     "playbooks:compile": "tsx scripts/compile-playbooks.ts",
-    "typecheck": "node ../../scripts/typecheck-singleflight.mjs -- tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo",
+    "typecheck": "NODE_OPTIONS=--max-old-space-size=8192 node ../../scripts/typecheck-singleflight.mjs -- tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo",
     "typecheck:tests": "NODE_OPTIONS=--max-old-space-size=8192 node ../../scripts/typecheck-singleflight.mjs -- node ../../scripts/typecheck-web-tests.mjs",
     "typecheck:tests:update": "NODE_OPTIONS=--max-old-space-size=8192 node ../../scripts/typecheck-web-tests.mjs --update-baseline",
     "typecheck:stories": "NODE_OPTIONS=--max-old-space-size=8192 node ../../scripts/typecheck-singleflight.mjs -- node ../../scripts/typecheck-web-stories.mjs",
@@ -259,7 +259,7 @@
     "@radix-ui/react-toggle": "^1.1.18",
     "@radix-ui/react-toggle-group": "^1.1.19",
     "@radix-ui/react-tooltip": "^1.2.16",
-    "@sentry/nextjs": "^10.75.3",
+    "@sentry/nextjs": "^11.0.0",
     "@statsig/statsig-node-core": "^0.23.1",
     "@tanstack/react-pacer": "^0.23.0",
     "@tanstack/react-query": "^5.104.0",
@@ -341,6 +341,7 @@
     "@storybook/addon-docs": "10.5.10",
     "@storybook/addon-vitest": "10.6.1",
     "@storybook/nextjs-vite": "10.6.1",
+    "@storybook/react-vite": "10.6.1",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
     "@tailwindcss/postcss": "^4.3.3",

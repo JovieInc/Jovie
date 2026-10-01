@@ -8,7 +8,7 @@ import {
 const generationResult: ChatMerchGenerationResult = {
   success: true,
   generationId: '00000000-0000-4000-8000-000000000100',
-  nextStep: 'Pick one to save it to Library.',
+  nextStep: 'Pick one to save it to Work.',
   options: [
     {
       id: '00000000-0000-4000-8000-000000000101',

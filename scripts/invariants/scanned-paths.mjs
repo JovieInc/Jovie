@@ -45,12 +45,31 @@ function latencyAllowlistEntries() {
   return Object.keys(pack.entries ?? {});
 }
 
+// H-06 audits the companion inventory plus the named test/rule anchors.
+// Compose its inputs here so a guard-only edit cannot skip the existing audit.
+/** @param {(path: string, encoding: 'utf8') => string} [read] */
+export function readFeedbackGuardPaths(read = readFileSync) {
+  try {
+    return JSON.parse(read(`${REPO_ROOT}LESSONS.guards.json`, 'utf8'))
+      .lessons.flatMap(lesson => lesson.guards.map(guard => guard.path))
+      .filter(path => typeof path === 'string' && path.length > 0);
+  } catch {
+    // Missing/malformed shadow input must not prevent CI lane selection.
+    // validate.mjs reports the failed qualification; existing scopes remain.
+    return [];
+  }
+}
+const feedbackGuardPaths = readFeedbackGuardPaths();
+
 export const INVARIANT_SCANNED_PATHS = Object.freeze(
   [
     ...new Set([
       // The invariants, their registry, and their ratchet/allowlist data.
       'scripts/invariants',
       'canon/invariants.jsonl',
+      'LESSONS.md',
+      'LESSONS.guards.json',
+      ...feedbackGuardPaths,
       // JOV-INV-031 latency-sensitive-execution (thread-blocking).
       ...RUNTIME_ROOTS,
       ...DESKTOP_ENTRY_POINTS,

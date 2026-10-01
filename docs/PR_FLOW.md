@@ -413,6 +413,17 @@ Use `JOVIE_PUSH_PHASE=qualification git push` before ready/landing.
 
 Before you open a PR:
 
+Use an explicit non-closing Linear reference from creation: `Refs JOV-1234.`
+on a separate line for each linked issue, with the existing
+`linear-issue-id` / `linear-issue-identifier` markers retained. Avoid closing
+keywords even for normal implementation work: native Linear automation cannot
+inspect commissioning labels or runtime acceptance. The existing repository
+merge sync still closes normal completed implementation issues and leaves
+commissioning/parent issues open. A commissioning note alone does not change
+native linking semantics. For an already-linked issue, inspect its other PR
+relationships before editing; an older merged closing link can still affect
+status. Do not add a reconciliation loop or disable team-wide automation.
+
 1. **Small + focused**, targeting `main`. Dependent? Use the native GitHub
    retarget/rebase sequence in [`pr-stacking.md`](../.claude/rules/pr-stacking.md).
    Mechanical sweep? one `big-pr` PR. Never create an uncontrolled stack.

@@ -1,6 +1,7 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { VideoRecordingProposalPayload } from '@/lib/teleprompter/types';
+import { uploadRecordableVideo } from '@/lib/teleprompter/upload-video';
 import { fastRender } from '@/tests/utils/fast-render';
 import { ChatVideoRecordingProposalCard } from './ChatVideoRecordingProposalCard';
 
@@ -62,5 +63,28 @@ describe('ChatVideoRecordingProposalCard', () => {
     expect(uploadButton).not.toBeDisabled();
     fireEvent.click(uploadButton);
     expect(uploadButton).not.toBeDisabled();
+  });
+
+  it('confirms a finished upload lands in Work', async () => {
+    vi.mocked(uploadRecordableVideo).mockResolvedValue({
+      blobUrl: 'blob:video',
+    });
+    const { container } = renderCard();
+
+    const fileInput = container.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement;
+    fireEvent.change(fileInput, {
+      target: {
+        files: [new File(['video'], 'promo.mp4', { type: 'video/mp4' })],
+      },
+    });
+
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('chat-video-recording-upload-success')
+      ).toBeInTheDocument()
+    );
+    expect(screen.getByText('Video uploaded to Work')).toBeInTheDocument();
   });
 });

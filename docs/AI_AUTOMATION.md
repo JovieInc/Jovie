@@ -105,6 +105,24 @@ Durable hardening policy:
 - Create a Linear follow-up issue when the right fix requires product work, broad refactors, or human **taste** prioritization — not when CI can gate auth/billing/migration.
 - Never auto-merge taste-labelled PRs; never create app/Vercel cron routes without CI review. High-risk paths ship via **stricter CI**, not mandatory human code review.
 
+## Weekly agent-readiness loop
+
+`Weekly Paxel + Is Agentic` is a Tuesday Codex workspace automation on the
+coding workstation. It is deliberately local because Paxel reads local coding
+sessions in Docker and requires YC SSO. It is not a GitHub Actions schedule,
+Vercel cron, or frequent LLM task.
+
+The automation uses `scripts/weekly-agent-readiness.mjs` to:
+
+- run only the reviewed, SHA-256-pinned Paxel uploader;
+- compare the five current Paxel axes with the previous private profile;
+- require fresh 100/100 Is Agentic reports for Jovie and LYB, with no Essential failures;
+- require one concrete shipped change from each evidence source; and
+- retain the bounded receipt outside the repository.
+
+Setup, privacy boundary, command examples, current baseline, and failure
+handling are in `docs/operations/weekly-agent-readiness.md`.
+
 ## CodeRabbit CLI (local)
 
 If you use CodeRabbit locally, keep it lightweight:

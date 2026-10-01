@@ -221,7 +221,8 @@ const preview: Preview = {
   },
   tags: ['autodocs'],
   decorators: [
-    Story => {
+    (Story, context) => {
+      const themeOverride = context.parameters?.themes?.themeOverride;
       const [queryClient] = React.useState(
         () =>
           new QueryClient({
@@ -245,6 +246,11 @@ const preview: Preview = {
             <ThemeProvider
               attribute='class'
               defaultTheme='dark'
+              forcedTheme={
+                themeOverride === 'light' || themeOverride === 'dark'
+                  ? themeOverride
+                  : undefined
+              }
               enableSystem={false}
               storageKey='jovie-theme-storybook'
             >

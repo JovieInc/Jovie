@@ -15,6 +15,7 @@ import {
 } from '@/features/dashboard/organisms/shopify/ShopifyStoreCard';
 import { useSettingsContext } from '@/features/dashboard/organisms/useSettingsContext';
 import type { ArtistRuleView } from '@/lib/artist-rules/types';
+import { SettingsRiderSection } from './SettingsRiderSection';
 
 function MobileProfilePanelTrigger() {
   const { open } = usePreviewPanelState();
@@ -129,6 +130,10 @@ export function ArtistProfileContent({
           />
           <SettingsPaySection />
           <ShopifyStoreCard />
+          <SettingsRiderSection
+            profileId={artist.id}
+            username={artist.handle}
+          />
           <SettingsPanel
             title='Artist Rules'
             description='Confirmed rules guide every draft. Memory can suggest a rule, but it cannot activate one.'

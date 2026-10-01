@@ -181,7 +181,7 @@ describe('/solutions/[audience] family renderer (JOV-7275)', () => {
     );
     const schema = JSON.parse(script?.textContent ?? '{}');
     expect(schema['@type']).toBe('SoftwareApplication');
-    expect(schema.description).toBe(ARTIST_PROFILE_COPY.seo.description);
+    expect(schema.description).toBe(solutionsArtistsPage.seo.description);
   });
 
   it('renders the record contract markers once, in music scope', async () => {
@@ -225,8 +225,8 @@ describe('/solutions/[audience] family renderer (JOV-7275)', () => {
     const canonicalUrl = `${BASE_URL}${APP_ROUTES.SOLUTIONS_ARTISTS}`;
     const ogImage = `${BASE_URL}/og/default.png`;
 
-    expect(metadata.title).toBe(ARTIST_PROFILE_COPY.seo.title);
-    expect(metadata.description).toBe(ARTIST_PROFILE_COPY.seo.description);
+    expect(metadata.title).toBe(solutionsArtistsPage.seo.title);
+    expect(metadata.description).toBe(solutionsArtistsPage.seo.description);
     expect(metadata.keywords).toEqual(ARTIST_PROFILE_COPY.seo.keywords);
     expect(metadata.alternates?.canonical).toBe(canonicalUrl);
     expect(metadata.robots).toBeUndefined();
@@ -241,7 +241,7 @@ describe('/solutions/[audience] family renderer (JOV-7275)', () => {
           secureUrl: ogImage,
           width: 1200,
           height: 630,
-          alt: ARTIST_PROFILE_COPY.seo.title,
+          alt: solutionsArtistsPage.seo.title,
           type: 'image/png',
         },
       ],

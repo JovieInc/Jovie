@@ -886,6 +886,14 @@ export function JovieChat({
                           className='mx-auto flex min-h-full w-full flex-col items-center justify-start gap-5 py-2 sm:py-3'
                           data-testid='chat-empty-state-action-card-slot'
                         >
+                          {!composerHasIntent ? (
+                            <FeatureIntroHost
+                              catalog={featureIntroCatalog}
+                              onHighlightCTA={() => {
+                                inputRef.current?.focus();
+                              }}
+                            />
+                          ) : null}
                           {showEmptyWelcome ? (
                             <ChatEmptyStateWelcome
                               onSelectSample={handleSuggestedPrompt}

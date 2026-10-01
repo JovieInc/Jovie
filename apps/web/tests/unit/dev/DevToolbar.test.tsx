@@ -915,22 +915,26 @@ describe('DevToolbar', () => {
     });
 
     it('loads and displays the active persona when opened', async () => {
-      fetchSpy.mockResolvedValueOnce(
-        mockSessionResponse({
-          active: true,
-          persona: 'creator-ready',
-          userId: 'user_ready',
-          email: 'browse-ready+clerk_test@jov.ie',
-          profilePath: '/browse-ready-user',
-        })
-      );
+      const session =
+        Promise.withResolvers<ReturnType<typeof mockSessionResponse>>();
+      fetchSpy.mockReturnValueOnce(session.promise);
+      const response = mockSessionResponse({
+        active: true,
+        persona: 'creator-ready',
+        userId: 'user_ready',
+        email: 'browse-ready+clerk_test@jov.ie',
+        profilePath: '/browse-ready-user',
+      });
 
       renderToolbar();
       fireEvent.click(screen.getByRole('button', { name: 'Test Persona' }));
 
       expect(await screen.findByText('Pro Creator')).toBeInTheDocument();
+      expect(screen.getByText('No test persona active')).toBeInTheDocument();
+      // The menu exists before the session response; its label is not a ready signal.
+      session.resolve(response);
       expect(
-        screen.getByText('Active: browse-ready+clerk_test@jov.ie')
+        await screen.findByText('Active: browse-ready+clerk_test@jov.ie')
       ).toBeInTheDocument();
       expect(screen.getByText('/browse-ready-user')).toBeInTheDocument();
       expect(

@@ -68,10 +68,13 @@ export const DETERMINISTIC_TEST_OTP = '424242';
 /**
  * Trusted origins: production + staging + local dev + native deep-link
  * schemes. Exact Vercel deployment hosts (preview and production) are
- * added from VERCEL_URL / VERCEL_BRANCH_URL — never a bare *.vercel.app
- * wildcard (plan eng row 36). Production Controller smokes the staged
- * `*.vercel.app` URL before the jov.ie alias binds; that host must be
- * trusted for cookie-bearing POSTs or Better Auth CSRF rejects them.
+ * added from VERCEL_URL / VERCEL_BRANCH_URL / VERCEL_PROJECT_PRODUCTION_URL —
+ * never a bare *.vercel.app wildcard (plan eng row 36). Production
+ * Controller smokes the staged `*.vercel.app` URL before the jov.ie alias
+ * binds; that host must be trusted for cookie-bearing POSTs or Better Auth
+ * CSRF rejects them. VERCEL_PROJECT_PRODUCTION_URL covers the project's
+ * default `*-*.vercel.app` production domain, which Vercel keeps routable
+ * beside the jov.ie alias (JOV-4344).
  */
 export const STATIC_TRUSTED_ORIGINS = [
   'https://jov.ie',
@@ -93,7 +96,11 @@ function originFromVercelHost(host: string | undefined): string | undefined {
 }
 
 export function resolveTrustedOrigins(): string[] {
-  const vercelOrigins = [env.VERCEL_URL, env.VERCEL_BRANCH_URL]
+  const vercelOrigins = [
+    env.VERCEL_URL,
+    env.VERCEL_BRANCH_URL,
+    env.VERCEL_PROJECT_PRODUCTION_URL,
+  ]
     .map(originFromVercelHost)
     .filter((origin): origin is string => Boolean(origin));
   const ovieOrigin = resolveOvieWebOrigin(env.OVIE_WEB_ORIGIN, env);
@@ -147,7 +154,15 @@ function resolveLocalBetterAuthUrl(): URL | undefined {
 }
 
 function isNonVercelRuntime(): boolean {
-  return env.VERCEL_ENV !== 'preview' && env.VERCEL_ENV !== 'production';
+  if (env.VERCEL_ENV !== 'preview' && env.VERCEL_ENV !== 'production') {
+    return true;
+  }
+  // VERCEL_ENV alone is not proof of a Vercel runtime: Doppler env pulls and
+  // local dogfood/QA runners can carry a leaked VERCEL_ENV while the process
+  // still serves loopback ports (JOV-4382: Host "127.0.0.1:32117" rejected
+  // with only the static allowed hosts). Real Vercel deployments always set
+  // VERCEL=1, so only trust VERCEL_ENV when it is present.
+  return process.env.VERCEL !== '1';
 }
 
 /**
@@ -205,6 +220,7 @@ function resolveBaseUrl(): NonNullable<BetterAuthOptions['baseURL']> {
           ...resolveLoopbackHostPatterns(),
           env.VERCEL_URL,
           env.VERCEL_BRANCH_URL,
+          env.VERCEL_PROJECT_PRODUCTION_URL,
           ovieOrigin?.host,
         ].filter((host): host is string => Boolean(host))
       ),
