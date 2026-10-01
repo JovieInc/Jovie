@@ -23,6 +23,7 @@ import {
   createHeliconeGateway,
   EvalBudgetTracker,
   formatRangeReport,
+  isRealModelEvalCostEligible,
   isRealModelEvalEnabled,
   parseBudgetCapUsd,
   parseMinPassCount,
@@ -36,7 +37,9 @@ import {
 import { assertGoldenCaseQuality } from './assertions';
 import { GOLDEN_CASES } from './cases';
 
-const REAL_EVAL_ENABLED = isRealModelEvalEnabled();
+// JOV-6234: live-model calls require explicit cost eligibility — the
+// opt-in flag plus gateway keys alone no longer authorize paid calls.
+const REAL_EVAL_ENABLED = isRealModelEvalEnabled(isRealModelEvalCostEligible());
 const SAMPLE_SIZE = parseSampleSize(process.env.REAL_EVAL_SAMPLE_SIZE, 5);
 const MIN_PASS = parseMinPassCount(SAMPLE_SIZE, process.env.REAL_EVAL_MIN_PASS);
 const CASE_TIMEOUT_MS = 45_000;
@@ -126,7 +129,8 @@ describe.skipIf(!REAL_EVAL_ENABLED)(
         'golden',
         goldenResults,
         SAMPLE_SIZE,
-        MIN_PASS
+        MIN_PASS,
+        budgetTracker ? budgetTracker.cap : 0
       );
       console.log(formatRangeReport(report));
       expect(report.withinRange).toBe(true);
@@ -192,7 +196,8 @@ describe.skipIf(!REAL_EVAL_ENABLED)(
         'adversarial',
         adversarialResults,
         ADVERSARIAL_CASES.length,
-        minPass
+        minPass,
+        budgetTracker ? budgetTracker.cap : 0
       );
       console.log(formatRangeReport(report));
       expect(report.withinRange).toBe(true);
@@ -201,12 +206,15 @@ describe.skipIf(!REAL_EVAL_ENABLED)(
 );
 
 describe('Golden eval-set real-model lane (disabled guard)', () => {
-  it('skips live provider calls unless JOVIE_RUN_REAL_MODEL_EVALS is enabled', () => {
+  it('skips live provider calls unless explicit cost eligibility is authorized (JOV-6234)', () => {
     if (REAL_EVAL_ENABLED) {
       expect(process.env.JOVIE_RUN_REAL_MODEL_EVALS).toBe('1');
       return;
     }
 
-    expect(process.env.JOVIE_RUN_REAL_MODEL_EVALS).not.toBe('1');
+    // The suites also skip when the flag is set but explicit cost
+    // eligibility is absent — exactly the automatic-run case, which
+    // must never authorize a paid call.
+    expect(isRealModelEvalCostEligible()).toBe(false);
   });
 });
