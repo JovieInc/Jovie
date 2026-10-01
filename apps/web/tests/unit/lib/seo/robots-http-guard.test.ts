@@ -5,6 +5,31 @@ import {
 } from '@/lib/seo/robots-http-guard';
 
 describe('robots-http-guard (#11043 regression)', () => {
+  it('accepts grouped case-insensitive rules and merges repeated groups', () => {
+    const agents = [
+      'OAI-SearchBot',
+      'ChatGPT-User',
+      'GPTBot',
+      'Claude-SearchBot',
+      'Claude-Web',
+      'ClaudeBot',
+      'Anthropic-AI',
+      'Applebot-Extended',
+      'PerplexityBot',
+      'Google-Extended',
+    ];
+    const body = [
+      'User-agent: *',
+      'Allow: /',
+      ...agents.map(agent => `User-agent: ${agent.toLowerCase()}`),
+      'Disallow: /',
+      ...agents.map(agent => `User-agent: ${agent}`),
+      'Allow: / # declared policy',
+      'Sitemap: https://jov.ie/sitemap.xml',
+    ].join('\n');
+    expect(validateRobotsTxtBody(body)).toEqual({ ok: true, violations: [] });
+  });
+
   it('catches the incident pattern: User-agent * + Disallow / with no Allow /', () => {
     const incidentBody = ['User-agent: *', 'Disallow: /', ''].join('\n');
     const result = validateRobotsTxtBody(incidentBody);

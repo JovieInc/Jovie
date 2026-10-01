@@ -1,6 +1,7 @@
 import { MetadataRoute } from 'next';
 import { BASE_URL } from '@/constants/app';
 import { env } from '@/lib/env-server';
+import { REQUIRED_AI_CRAWLERS } from '@/lib/seo/guardrail-check';
 
 // Single domain robots.txt configuration
 // Everything is served from jov.ie:
@@ -52,20 +53,8 @@ const DISALLOW_PATHS = [
   '/*&gclid=*',
 ];
 
-/**
- * AI crawlers to explicitly allow.
- * Listing them signals that Jovie welcomes AI search indexing.
- */
-const AI_CRAWLERS = [
-  'GPTBot',
-  'ChatGPT-User',
-  'Claude-Web',
-  'ClaudeBot',
-  'Anthropic-AI',
-  'Applebot-Extended',
-  'PerplexityBot',
-  'Google-Extended',
-];
+// Preserve explicit search, user-fetch, training/control, and legacy grants.
+// Their distinct purposes are recorded by the certification/guardrail owner.
 
 export default function robots(): MetadataRoute.Robots {
   // jov.ie - allow marketing + profiles, block app/api routes
@@ -77,9 +66,9 @@ export default function robots(): MetadataRoute.Robots {
           allow: '/',
           disallow: DISALLOW_PATHS,
         },
-        // Explicitly welcome AI crawlers for better AI search visibility
+        // Apply the declared AI crawler policy by purpose
         // But block investor and internal utility routes from ALL crawlers
-        ...AI_CRAWLERS.map(crawler => ({
+        ...REQUIRED_AI_CRAWLERS.map(crawler => ({
           userAgent: crawler,
           allow: ['/', '/llms.txt'],
           disallow: DISALLOW_PATHS,

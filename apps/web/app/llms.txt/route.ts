@@ -84,23 +84,23 @@ Music-native tools stay scoped to artist jobs. They do not define the company:
 
 ## Key Page Types
 
-- **Public profiles**: ${BASE_URL}/{username} — Public profile with work, links, and bio
-- **Artist release smart links**: ${BASE_URL}/{username}/{slug} — Directs fans to the right streaming platform for a specific release or track
-- **Homepage**: ${BASE_URL} — Marketing page explaining ${APP_NAME}
-- **About**: ${BASE_URL}/about — Company story, founder, and brand information
-- **Pricing**: ${BASE_URL}/pricing — Plans and features
-- **Blog**: ${BASE_URL}/blog — Insights and product updates
-- **Help Center**: ${DOCS_URL}/docs — Guides and troubleshooting
-- **Support**: ${BASE_URL}/support — Help and contact
-- **OpenAPI**: ${BASE_URL}/openapi.json — Public read-only artist API contract (canonical: ${BASE_URL}/api/v1/openapi.json)
+- [Public profiles](${BASE_URL}/{username}) — Public profile with work, links, and bio
+- [Artist release smart links](${BASE_URL}/{username}/{slug}) — Directs fans to the right streaming platform for a specific release or track
+- [Homepage](${BASE_URL}) — Marketing page explaining ${APP_NAME}
+- [About](${BASE_URL}/about) — Company story, founder, and brand information
+- [Pricing](${BASE_URL}/pricing) — Plans and features
+- [Blog](${BASE_URL}/blog) — Insights and product updates
+- [Help Center](${DOCS_URL}/docs) — Guides and troubleshooting
+- [Support](${BASE_URL}/support) — Help and contact
+- [OpenAPI](${BASE_URL}/openapi.json) — Public read-only artist API contract (canonical: ${BASE_URL}/api/v1/openapi.json)
 
 ${buildSiteLlmsGuidance()}
 
 ## Contact
 
-- Website: ${BASE_URL}
-- Help Center: ${DOCS_URL}/docs
-- Support: ${BASE_URL}/support
+- [Website](${BASE_URL})
+- [Help Center](${DOCS_URL}/docs)
+- [Support](${BASE_URL}/support)
 `;
 
   return new Response(content, {
