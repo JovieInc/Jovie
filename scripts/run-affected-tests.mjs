@@ -1061,13 +1061,14 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set(
 );
 
 export function buildAffectedTestPlan(changedFiles, options) {
-  const plan = planAffectedTests(changedFiles, options);
-  const lanePythonCoverage = changedFiles.some(file =>
+  const files = unique(changedFiles.filter(Boolean));
+  const plan = planAffectedTests(files, options);
+  const lanePythonCoverage = files.some(file =>
     LANE_PYTHON_COVERAGE_INPUTS.has(file)
   );
   const unknownPythonPeer =
     lanePythonCoverage &&
-    changedFiles.some(
+    files.some(
       file => file.endsWith('.py') && !LANE_PYTHON_COVERAGE_INPUTS.has(file)
     );
   // Global/full early returns need the same command fields as focused plans.
