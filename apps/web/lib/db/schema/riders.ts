@@ -1,4 +1,3 @@
-import { sql as drizzleSql } from 'drizzle-orm';
 import {
   integer,
   jsonb,
@@ -25,14 +24,11 @@ export const creatorProfileRiders = pgTable(
     creatorProfileId: uuid('creator_profile_id')
       .notNull()
       .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
-    technical: jsonb('technical')
-      .$type<RiderSection[]>()
-      .notNull()
-      .default(drizzleSql`'[]'::jsonb`),
+    technical: jsonb('technical').$type<RiderSection[]>().notNull().default([]),
     hospitality: jsonb('hospitality')
       .$type<RiderSection[]>()
       .notNull()
-      .default(drizzleSql`'[]'::jsonb`),
+      .default([]),
     visibility: text('visibility')
       .$type<RiderVisibility>()
       .notNull()
