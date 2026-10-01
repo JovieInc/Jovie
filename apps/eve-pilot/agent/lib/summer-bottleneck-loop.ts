@@ -165,6 +165,8 @@ export const summerBottleneckSnapshotSchema = z
             workSource: runnerAuthority,
             capacityAvailable: z.number().int().nonnegative().nullable(),
             queuedWork: z.number().int().nonnegative().nullable(),
+            running: z.number().int().nonnegative().nullable(),
+            blocked: z.number().int().nonnegative().nullable(),
           })
           .strict(),
         ciAudit: ciAuditSchema.nullable(),
