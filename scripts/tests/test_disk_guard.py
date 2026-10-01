@@ -131,6 +131,8 @@ class WorktreeTest(unittest.TestCase):
             def run(args, **kw):
                 if args[:3] == ["git", "worktree", "list"]:
                     return self.porcelain(str(repo), str(stale))
+                if args[0] == "lsof":
+                    return SimpleNamespace(returncode=0, stdout="", stderr="")
                 if args[3:4] == ["status"]:
                     return SimpleNamespace(returncode=0, stdout="", stderr="")
                 return SimpleNamespace(returncode=1, stdout="", stderr="locked")
@@ -139,6 +141,34 @@ class WorktreeTest(unittest.TestCase):
             guard.sweep_worktrees(SimpleNamespace(repo=repo, state=Path(tmp)), run, NOW, report)
             self.assertTrue(stale.exists())
             self.assertTrue(report["errors"])
+
+    def test_busy_or_locked_worktrees_are_never_swept(self):
+        for busy in ("process", "index-lock", "lsof-down"):
+            with self.subTest(busy=busy), tempfile.TemporaryDirectory() as tmp:
+                repo = Path(tmp) / "repo"
+                repo.mkdir()
+                stale = make_tree(repo.parent / "worktrees/wt", ["f.ts"], age_s=20 * 3600)
+                if busy == "index-lock":
+                    gitdir = repo / ".git/worktrees/wt"
+                    gitdir.mkdir(parents=True)
+                    (stale / ".git").write_text(f"gitdir: {gitdir}\n")
+                    (gitdir / "index.lock").write_text("")
+                    os.utime(stale / ".git", (0, 0))
+
+                def run(args, **kw):
+                    if args[:3] == ["git", "worktree", "list"]:
+                        return self.porcelain(str(repo), str(stale))
+                    if args[0] == "lsof":
+                        if busy == "lsof-down":
+                            return SimpleNamespace(returncode=2, stdout="", stderr="lsof failed")
+                        out = f"p9\nn{stale}\n" if busy == "process" else ""
+                        return SimpleNamespace(returncode=0, stdout=out, stderr="")
+                    return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+                report = {"actions": [], "errors": []}
+                guard.sweep_worktrees(SimpleNamespace(repo=repo, state=Path(tmp)), run, NOW, report)
+                self.assertTrue(stale.exists())
+                self.assertTrue(any("preserved busy" in a for a in report["actions"]))
 
 
 class CheckTest(unittest.TestCase):
