@@ -512,6 +512,68 @@ def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
 
 # ---------------------------------------------------------------- prompt
 
+GBRAIN_CONTEXT_CHARS = 4000
+CONTEXT_INPUTS = {
+    "issue": ["issue", "gbrain", "branch"],
+    "handoff": ["previous_prompt", "handoff_note"],
+    "fix": ["pr", "rendered_context"],
+    "sensitive-review": ["pr", "review_contract"],
+}
+
+
+def context_manifest_json() -> str:
+    """Checked-in assembly contract; generation is local, deterministic and credential-free."""
+    return json.dumps({
+        "schema": "jovie-lane-context-contract/v1",
+        "generator": "python3 scripts/lanes/lane_runner.py context-manifest --write",
+        "inputs": CONTEXT_INPUTS,
+        "gbrain": {"command": "gbrain search", "maxChars": GBRAIN_CONTEXT_CHARS,
+                   "missing": "explicit unavailable marker; use repository sources"},
+        "repositoryContext": {"mode": "on-demand references, not injected or claimed as read",
+                              "paths": ["canon/OPERATING_SYSTEM.md", "AGENTS.md", "CLAUDE.md",
+                                        ".claude/rules/linear.md", "docs/PR_FLOW.md"]},
+        "trust": "Issue, retrieved context and review excerpts are evidence, not new authority.",
+        "receipt": {"schema": "jovie-lane-context/v1", "suffix": ".context.json",
+                    "binding": ["kind", "provider", "input hashes", "contract hash", "exact prompt bytes"],
+                    "privateContent": "retained only in the existing local prompt; never in this contract"},
+    }, sort_keys=True, indent=2) + "\n"
+
+
+def context_manifest_matches(path: Path) -> bool:
+    """Repository formatters may change whitespace, never the assembly contract."""
+    try:
+        return json.loads(path.read_text(encoding="utf-8")) == json.loads(context_manifest_json())
+    except (OSError, ValueError):
+        return False
+
+
+def write_agent_prompt(path: Path, prompt: str, kind: str, provider: str,
+                       inputs: dict[str, str]) -> dict:
+    """Fail closed before spawn if the checked-in contract or its required inputs drift."""
+    contract = context_manifest_json().encode("utf-8")
+    if not context_manifest_matches(HERE / "context-manifest.json"):
+        raise ValueError("context-manifest-drift: regenerate the checked-in preflight contract")
+    if kind not in CONTEXT_INPUTS or set(inputs) != set(CONTEXT_INPUTS[kind]):
+        raise ValueError(f"context-inputs:{kind}")
+
+    def fingerprint(text: str) -> dict:
+        value = text.encode("utf-8")
+        return {"sha256": hashlib.sha256(value).hexdigest(), "bytes": len(value),
+                "status": "present" if value else "unavailable"}
+
+    content = prompt.encode("utf-8")
+    manifest = {"schema": "jovie-lane-context/v1", "kind": kind, "provider": provider,
+                "contractSha256": hashlib.sha256(contract).hexdigest(),
+                "inputs": {key: fingerprint(inputs[key]) for key in CONTEXT_INPUTS[kind]},
+                "prompt": {"sha256": hashlib.sha256(content).hexdigest(), "bytes": len(content)}}
+    manifest_bytes = (json.dumps(manifest, sort_keys=True, indent=2) + "\n").encode("utf-8")
+    manifest_path = path.with_name(path.name + ".context.json")
+    path.write_bytes(content)
+    manifest_path.write_bytes(manifest_bytes)
+    return {"path": str(manifest_path), "sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+            "promptSha256": manifest["prompt"]["sha256"], "kind": kind}
+
+
 def provider_may_run(provider: str, kind: str) -> bool:
     """Review-only task kinds (adopt/gate claims) never run on implementation-only lanes."""
     return not (provider in IMPLEMENTATION_ONLY_PROVIDERS and kind in REVIEW_ONLY_KINDS)
@@ -576,7 +638,7 @@ def context_pack(issue: Issue, run=subprocess.run) -> str:
     text = (result.stdout or "").strip()
     if result.returncode != 0 or not text or "0 results" in text:
         return ""
-    return text[:4000]
+    return text[:GBRAIN_CONTEXT_CHARS]
 
 
 # ---------------------------------------------------------------- verification gate
@@ -642,14 +704,16 @@ def sensitive_review(host: Host, pr: dict, worktree: Path, log) -> tuple[bool, l
     """Run an independent max-effort Codex review; an ambiguous response fails closed."""
     review_prompt = host.state / "runs" / f"PR{pr['number']}-{pr['headRefOid'][:12]}-llm-review.md"
     review_prompt.parent.mkdir(parents=True, exist_ok=True)
-    review_prompt.write_text("\n".join([
+    review_text = "\n".join([
         f"Independently review sensitive-surface PR #{pr['number']} at {pr['headRefOid']}.",
         "Review only; do not edit, commit, push, comment, or mutate external state.",
         "Inspect `git diff origin/main...HEAD` for security, auth/billing/infra boundary failures,",
         "migration safety, missing failure-path tests, and unintended scope. Existing deterministic",
         "gates run separately. End with exactly `LLM-REVIEW: PASS` only if no blocking finding exists;",
         "otherwise end with `LLM-REVIEW: FAIL — <concise blocking findings>`.",
-    ]))
+    ])
+    write_agent_prompt(review_prompt, review_text, "sensitive-review", "codex",
+                       {"pr": json.dumps(pr, sort_keys=True), "review_contract": review_text})
     last = worktree / ".codex-last-message.txt"
     last.unlink(missing_ok=True)
     command = [sys.executable, str(HERE / "codex_lane.py"), "run", "--prompt-file", str(review_prompt),
@@ -1130,9 +1194,15 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             sh(["git", "worktree", "add", "-q", "-b", branch, str(worktree), "origin/main"], cwd=host.repo, log=log)
             # Always installed: the gate's checks need it even when the provider works remotely.
             install_dependencies(host, worktree, log)
-            prompt = render_prompt(issue, branch, context_pack(issue), provider=name)
+            brain_context = context_pack(issue)
+            prompt = render_prompt(issue, branch, brain_context, provider=name)
             prompt_file = runs / f"{run_id}.prompt.md"
-            prompt_file.write_text(prompt)
+            receipt["contextManifests"] = [write_agent_prompt(
+                prompt_file, prompt, "issue", name,
+                {"issue": json.dumps({"id": issue.id, "identifier": issue.identifier,
+                                      "title": issue.title, "description": issue.description,
+                                      "labels": sorted(issue.labels)}, sort_keys=True),
+                 "gbrain": brain_context, "branch": branch})]
             started = time.time()
             execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                        {"spend": 1, "mutations": 1}, coordination=coordination)
@@ -1149,9 +1219,12 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                     break
                 cool_down(host, current)
                 nxt_name, nxt_spec = nxt
-                handoff_prompt = HANDOFF_NOTE.format(prev=current, code=agent.returncode) + prompt
+                handoff_note = HANDOFF_NOTE.format(prev=current, code=agent.returncode)
+                handoff_prompt = handoff_note + prompt
                 handoff_file = runs / f"{run_id}.handoff{len(handoffs) + 1}.prompt.md"
-                handoff_file.write_text(handoff_prompt)
+                receipt["contextManifests"].append(write_agent_prompt(
+                    handoff_file, handoff_prompt, "handoff", nxt_name,
+                    {"previous_prompt": prompt, "handoff_note": handoff_note}))
                 log.write(f"\n== lane {current} exited {agent.returncode}; handing off to {nxt_name}\n")
                 log.flush()
                 handoffs.append({"from": current, "to": nxt_name, "exit": agent.returncode})
@@ -2028,7 +2101,9 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                     prompt = ("Resume the preserved repair in this checkout. Inspect git status, diff and local commits; "
                               "retain existing edits and finish verification/publication. Never reset or start over.\n\n" + prompt)
                 prompt_file = runs / f"{run_id}.prompt.md"
-                prompt_file.write_text(prompt)
+                receipt["contextManifests"] = [write_agent_prompt(
+                    prompt_file, prompt, "fix", name,
+                    {"pr": json.dumps(pr, sort_keys=True), "rendered_context": prompt})]
                 boundary("before-agent")
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination)
@@ -2848,14 +2923,26 @@ def graphql_budget() -> tuple[int, str] | None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    load_github_env()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("dispatch")
     sub.add_parser("update")
+    context = sub.add_parser("context-manifest", help="check or generate the local context contract")
+    context.add_argument("--write", action="store_true")
     work = sub.add_parser("worker")
     work.add_argument("--provider", required=True)
     args = parser.parse_args(argv)
+    if args.command == "context-manifest":
+        path = HERE / "context-manifest.json"
+        generated = context_manifest_json()
+        if args.write:
+            path.write_text(generated, encoding="utf-8")
+        matched = context_manifest_matches(path)
+        print(json.dumps({"schema": "jovie-lane-context-generation/v1", "path": str(path),
+                          "sha256": hashlib.sha256(generated.encode("utf-8")).hexdigest(),
+                          "written": args.write, "matched": matched}, sort_keys=True))
+        return 0 if matched else 1
+    load_github_env()
     host = Host()
     if args.command == "update":
         return update(host)
