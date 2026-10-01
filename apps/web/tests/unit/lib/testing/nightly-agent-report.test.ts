@@ -157,6 +157,31 @@ describe('nightly-agent-report', () => {
     expect(status.mutation?.total).toBe(4);
   });
 
+  it('rejects mutation evidence made entirely of uncovered mutants', () => {
+    const status = buildNightlyAgentStatusFromSkillDelta(
+      {
+        generatedAt: '2026-10-01T16:31:02Z',
+        repo: 'jovie',
+        failures: [],
+        mutation: { score: 0, killed: 0, survived: 0, total: 4 },
+      },
+      {
+        workflowConclusion: 'success',
+        suites: [
+          {
+            lane: 'mutation',
+            total: 4,
+            passed: 0,
+            failed: 0,
+            flaky: 0,
+            skipped: 4,
+          },
+        ],
+      }
+    );
+    expect(status.pass).toBe(false);
+  });
+
   it('rejects malformed redis payloads', () => {
     expect(parseNightlyAgentStatus({ pass: true })).toBeNull();
     expect(isNightlyAgentStatus(null)).toBe(false);

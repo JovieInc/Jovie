@@ -166,7 +166,10 @@ export function buildNightlyAgentStatusFromSkillDelta(
     options.workflowConclusion === 'success';
   const hasExecutedEvidence =
     options.suites.some(suite => suite.passed > 0 || suite.failed > 0) ||
-    (mutation?.total ?? 0) > 0;
+    (mutation?.killed ?? 0) +
+      (mutation?.survived ?? 0) +
+      (mutation?.timedOut ?? 0) >
+      0;
   const pass =
     workflowPassed &&
     hasExecutedEvidence &&
