@@ -221,6 +221,15 @@ test('JOV-7341 fails closed on contradictory candidate status and counts', () =>
     /executedComparisons: 0/
   );
 
+  const baselineRan = structuredClone(report);
+  baselineRan.workloads[0].candidates.find(
+    candidate => candidate.id === 'deterministic-baseline'
+  ).executedComparisons = 1;
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(baselineRan),
+    /must not execute supplier comparisons/
+  );
+
   const duplicated = structuredClone(report);
   duplicated.workloads[0].candidates.push(
     structuredClone(duplicated.workloads[0].candidates[1])

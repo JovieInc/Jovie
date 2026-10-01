@@ -466,21 +466,21 @@ export function validateDecisionRoutingBenchmark(report) {
             `${field}.candidate.${id} with status ${candidate.status} must record executedComparisons: 0`
           );
         }
+      } else if (id === 'deterministic-baseline') {
+        if (
+          candidate.executedComparisons !== undefined &&
+          candidate.executedComparisons !== 0
+        ) {
+          throw new Error(
+            `${field}.candidate.${id} must not execute supplier comparisons`
+          );
+        }
       } else if (
-        id !== 'deterministic-baseline' &&
-        (!Number.isInteger(candidate.executedComparisons) ||
-          candidate.executedComparisons <= 0)
+        !Number.isInteger(candidate.executedComparisons) ||
+        candidate.executedComparisons <= 0
       ) {
         throw new Error(
           `${field}.candidate.${id}.executedComparisons must be a positive integer when status is complete`
-        );
-      } else if (
-        candidate.executedComparisons !== undefined &&
-        (!Number.isInteger(candidate.executedComparisons) ||
-          candidate.executedComparisons < 0)
-      ) {
-        throw new Error(
-          `${field}.candidate.${id}.executedComparisons must be a non-negative integer`
         );
       }
     }
