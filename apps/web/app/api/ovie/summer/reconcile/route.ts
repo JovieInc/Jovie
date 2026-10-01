@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionContext } from '@/lib/auth/session';
 import { getOvieOperatingStore } from '@/lib/ovie/mcp/runtime-store';
+import { requireOvieApiAccess } from '@/lib/ovie/privacy-lock/access';
 import {
   authorizeFounderSummerUser,
   founderPrincipalHash,
@@ -104,6 +105,8 @@ export async function GET(): Promise<NextResponse> {
       authorization === 'unconfigured' ? 503 : 403
     );
   }
+  const denied = await requireOvieApiAccess({ privileged: true });
+  if (denied) return denied;
   if (process.env.VERCEL_ENV !== 'production') {
     return json({ ok: false, code: 'production_origin_required' }, 503);
   }

@@ -365,12 +365,12 @@ export const TOOL_UI_REGISTRY = {
     errorTitle: "Couldn't research this artist",
   },
   surfaceLibraryOpportunities: {
-    label: 'Library opportunities',
+    label: 'Work opportunities',
     uiHint: 'artifact',
     renderer: 'artifact',
-    loadingTitle: 'Checking your Library presence…',
-    successTitle: 'Library opportunities ready',
-    errorTitle: "Couldn't load Library opportunities",
+    loadingTitle: 'Checking your work…',
+    successTitle: 'Work opportunities ready',
+    errorTitle: "Couldn't load Work opportunities",
   },
   assembleArtistProfile: {
     label: 'Profile assembly',

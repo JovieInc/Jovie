@@ -10,10 +10,19 @@ import { SettingsSection } from '@/components/features/dashboard/organisms/Setti
 import { toast } from '@/components/feedback';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  CONNECTOR_PROVIDERS,
+  type ConnectorProviderId,
+  getConnectorDefinition,
+  getConnectorDefinitions,
+} from '@/lib/connectors/registry';
+
+const CONNECTOR_DEFINITIONS = getConnectorDefinitions();
 
 interface ConnectorState {
   readonly status: ConnectorStatus;
-  readonly email?: string;
+  readonly accountLabel?: string;
+  readonly scopes?: readonly string[];
   readonly errorMessage?: string;
 }
 
@@ -39,36 +48,61 @@ interface SuggestedActionPreview {
 }
 
 interface ConnectorsClientProps {
-  readonly gmail: ConnectorState;
-  readonly calendar: ConnectorState;
+  readonly connectors: Readonly<Record<ConnectorProviderId, ConnectorState>>;
+  readonly creatorProfileId: string | null;
   readonly suggestedActions: SuggestedActionPreview[];
   readonly isDev: boolean;
 }
 
 export function ConnectorsClient({
-  gmail,
-  calendar,
+  connectors,
+  creatorProfileId,
   suggestedActions,
   isDev,
 }: ConnectorsClientProps) {
   const router = useRouter();
   const [isPendingExtract, startExtract] = useTransition();
 
-  const handleConnect = () => {
+  const handleConnect = (provider: ConnectorProviderId) => {
+    const definition = getConnectorDefinition(provider);
+    const params = new URLSearchParams({
+      returnTo: APP_ROUTES.SETTINGS_CONNECTORS,
+    });
+    if (provider === CONNECTOR_PROVIDERS.youtube) {
+      if (!creatorProfileId) {
+        toast.error('Select an artist profile before connecting YouTube.');
+        return;
+      }
+      params.set('creatorProfileId', creatorProfileId);
+    }
     router.push(
-      `/api/connectors/google/authorize?returnTo=${encodeURIComponent(APP_ROUTES.SETTINGS_CONNECTORS)}`
+      `/api/connectors/${definition.oauthBundle}/authorize?${params.toString()}`
     );
   };
 
-  const handleDisconnect = async () => {
+  const handleDisconnect = async (provider: ConnectorProviderId) => {
+    const definition = getConnectorDefinition(provider);
     try {
-      const res = await fetch('/api/connectors/google/disconnect', {
+      const requestInit: RequestInit = {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
+      };
+      if (provider === CONNECTOR_PROVIDERS.youtube) {
+        if (!creatorProfileId) {
+          toast.error('Select an artist profile before disconnecting YouTube.');
+          return;
+        }
+        requestInit.headers = { 'Content-Type': 'application/json' };
+        requestInit.body = JSON.stringify({ creatorProfileId });
+      } else if (definition.oauthBundle === 'google') {
+        requestInit.headers = { 'Content-Type': 'application/json' };
+        requestInit.body = JSON.stringify({});
+      }
+      const res = await fetch(
+        `/api/connectors/${definition.oauthBundle}/disconnect`,
+        requestInit
+      );
       if (!res.ok) throw new Error('Disconnect failed');
-      toast.success('Google connectors disconnected');
+      toast.success(`${definition.label} disconnected`);
       router.refresh();
     } catch {
       toast.error('Failed to disconnect. Please try again.');
@@ -96,54 +130,62 @@ export function ConnectorsClient({
     });
   };
 
-  const isGoogleConnected =
-    gmail.status === 'connected' || gmail.status === 'syncing';
+  const isGoogleConnected = [
+    connectors[CONNECTOR_PROVIDERS.gmail],
+    connectors[CONNECTOR_PROVIDERS.google_calendar],
+  ].some(
+    connector =>
+      connector.status === 'connected' || connector.status === 'syncing'
+  );
 
   return (
     <SettingsSection
       id='connectors'
       title='Connections'
       // ui-casing-allow: sentence-case description (Found === Expected)
-      description='Connect Gmail and Google Calendar to automatically detect booking confirmations.'
+      description='Connect the services Jovie uses to understand and manage your work.'
     >
-      <SettingsPanel title='Google Account'>
+      <SettingsPanel title='Connected Apps' bodyClassName='px-4 sm:px-5'>
         <div className='divide-y divide-subtle'>
-          <ConnectorCard
-            provider='gmail'
-            status={gmail.status}
-            email={gmail.email}
-            errorMessage={gmail.errorMessage}
-            onConnect={handleConnect}
-            onDisconnect={handleDisconnect}
-          />
-          <ConnectorCard
-            provider='google_calendar'
-            status={calendar.status}
-            email={calendar.email}
-            errorMessage={calendar.errorMessage}
-            onConnect={handleConnect}
-            onDisconnect={handleDisconnect}
-          />
+          {CONNECTOR_DEFINITIONS.map(definition => {
+            const connector = connectors[definition.id];
+            return (
+              <ConnectorCard
+                key={definition.id}
+                provider={definition.id}
+                status={connector.status}
+                accountLabel={connector.accountLabel}
+                scopes={connector.scopes}
+                errorMessage={connector.errorMessage}
+                onConnect={() => handleConnect(definition.id)}
+                onDisconnect={() => handleDisconnect(definition.id)}
+              />
+            );
+          })}
         </div>
       </SettingsPanel>
 
       {suggestedActions.length > 0 && (
-        <SettingsPanel title='Suggested Actions'>
-          <div className='space-y-3 pt-2'>
-            {suggestedActions.map(action => (
-              <SuggestedActionCard
-                key={action.id}
-                {...action}
-                // Approve/Reject handlers are wired in C-PR-3.
-              />
-            ))}
-          </div>
+        <SettingsPanel
+          title='Suggested Actions'
+          bodyClassName='space-y-3 px-4 py-3 sm:px-5'
+        >
+          {suggestedActions.map(action => (
+            <SuggestedActionCard
+              key={action.id}
+              {...action}
+              // Approve/Reject handlers are wired in C-PR-3.
+            />
+          ))}
         </SettingsPanel>
       )}
 
       {isDev && isGoogleConnected && (
-        <SettingsPanel title='Developer Tools'>
-          <div className='py-2'>
+        <SettingsPanel
+          title='Developer Tools'
+          bodyClassName='px-4 py-3 sm:px-5'
+        >
+          <div>
             <Button
               variant='outline'
               size='sm'

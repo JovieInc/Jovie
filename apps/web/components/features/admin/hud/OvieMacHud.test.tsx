@@ -4,7 +4,7 @@ import type { DecisionHudView } from '@/lib/hud/decision-signals';
 import type { OvieMacHudSnapshot } from '@/lib/hud/ovie-mac-hud';
 import { OvieMacHud } from './OvieMacHud';
 
-vi.mock('@/components/atoms/DesktopTitlebar', () => ({
+vi.mock('@/components/organisms/DesktopTitlebar', () => ({
   DesktopTitlebar: () => <div data-testid='desktop-titlebar' />,
 }));
 
@@ -18,6 +18,10 @@ vi.mock('./OperationalTasksPanel', () => ({
 
 vi.mock('./OvieLauncherRail', () => ({
   OvieLauncherRail: () => null,
+}));
+
+vi.mock('@/components/features/admin/summer-cards', () => ({
+  SummerCardReviewPanel: () => <div data-testid='summer-card-review-panel' />,
 }));
 
 const snapshot: OvieMacHudSnapshot = {
@@ -126,5 +130,10 @@ describe('OvieMacHud', () => {
     expect(
       screen.queryByTestId('ovie-mac-hud-decision-queue')
     ).not.toBeInTheDocument();
+  });
+
+  it('renders the Summer card review panel', () => {
+    render(<OvieMacHud snapshot={snapshot} />);
+    expect(screen.getByTestId('summer-card-review-panel')).toBeInTheDocument();
   });
 });

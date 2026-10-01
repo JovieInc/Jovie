@@ -1,4 +1,13 @@
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -28,7 +37,7 @@ function assertPublishWorkflowContract(source: string): void {
   );
   expect(source).toMatch(/node-version-file: .nvmrc/);
   expect(source).toContain('registry-url: https://registry.npmjs.org');
-  expect(source).toMatch(/node --version.*v22\.23\.2/s);
+  expect(source).toMatch(/node --version.*v24\.21\.0/s);
   expect(source).toContain('pnpm install --frozen-lockfile');
   expect(source).toContain('pnpm --filter @jovie/cli run test:coverage');
   expect(source).toContain('pnpm --filter @jovie/cli run typecheck');
@@ -42,7 +51,18 @@ function assertPublishWorkflowContract(source: string): void {
   expect(source).toContain(
     'Checkout drifted from current origin/main immediately before publication.'
   );
-  expect(source).toContain("tr -d '[:space:]' < VERSION");
+  expect(source).toContain(
+    "readFileSync('VERSION', 'utf8'), process.env.CLI_RELEASE_VERSION"
+  );
+  expect(source).toContain(
+    'CLI_RELEASE_VERSION: ${{ inputs.release_version }}'
+  );
+  expect(source).toContain(
+    "import { resolveReleaseVersion } from './packages/jovie-cli/scripts/pack-manifest.ts'"
+  );
+  expect(source).toContain(
+    '- name: Run @jovie/cli package smoke\n        env:\n          RELEASE_VERSION: ${{ steps.release.outputs.version }}'
+  );
   expect(source).toContain(
     "manifest.repository?.url === 'git+https://github.com/JovieInc/Jovie.git'"
   );
@@ -138,4 +158,310 @@ describe('manual npm provenance workflow', () => {
   ])('fails closed when the %s is weakened', (_, unsafeWorkflow) => {
     expect(() => assertPublishWorkflowContract(unsafeWorkflow)).toThrow();
   });
+});
+
+// Execute the real registry-state shell rather than accepting a marker string.
+describe('MCP-only publication resumes an already published artifact', () => {
+  it.each([
+    ['false', '404', 0],
+    ['false', '200', 1],
+    ['true', '200', 0],
+    ['true', '404', 1],
+    ['true', '503', 1],
+  ])('mode=%s HTTP=%s fails closed or continues', (mode, status, expected) => {
+    const guard = workflow.match(/case "\$registry_status" in[\s\S]*?esac/);
+    expect(guard).not.toBeNull();
+    const result = spawnSync(
+      'bash',
+      ['-c', `set -euo pipefail\n${guard?.[0]}`],
+      {
+        env: {
+          ...process.env,
+          PACKAGE_NAME: '@jovie/cli',
+          release_version: '26.9.16',
+          registry_status: status,
+          PUBLISH_MCP_ONLY: mode,
+        },
+        encoding: 'utf8',
+      }
+    );
+    expect(result.status, result.stdout + result.stderr).toBe(expected);
+  });
+});
+
+describe('bounded MCP publication authority', () => {
+  it('keeps both npm and registry side effects behind explicit manual mode', () => {
+    expect(workflow).toContain('publish_mcp_only:');
+    expect(workflow).toContain('default: false');
+    for (const name of [
+      'Use npm with trusted publishing support',
+      'Publish with npm provenance',
+    ]) {
+      expect(workflow).toContain(
+        `- name: ${name}` + '\n        if: ${{ !inputs.publish_mcp_only }}'
+      );
+    }
+    for (const name of [
+      'Verify exact staged bytes and prepare MCP manifest',
+      'Publish exact MCP listing using GitHub OIDC',
+    ]) {
+      expect(workflow).toContain(
+        `- name: ${name}` + '\n        if: ${{ inputs.publish_mcp_only }}'
+      );
+    }
+    expect(workflow).toContain(
+      'node packages/jovie-cli/scripts/verify-published-package.mjs'
+    );
+    expect(workflow).toContain('npm audit signatures --prefix');
+    expect(workflow).toContain('login github-oidc');
+    expect(workflow).toContain(
+      'a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc'
+    );
+    expect(workflow).toContain('Main advanced before MCP publication.');
+    expect(workflow).toContain('verifyRegistryReadback(actual, expected)');
+  });
+});
+
+describe('canonical source validation discovers CLI publication changes', () => {
+  const source = readFileSync(
+    resolve(
+      import.meta.dirname,
+      '../../../.github/workflows/source-validation.yml'
+    ),
+    'utf8'
+  );
+  function runSourceGate(changed: string, failure: string = '') {
+    const step = source.match(
+      /- name: Verify changed CLI publication behavior\n        shell: bash\n        run: \|\n([\s\S]*?)(?=^  security:)/m
+    );
+    expect(
+      step,
+      'real Source Validation step must discover and enforce CLI coverage'
+    ).not.toBeNull();
+    const dir = mkdtempSync(resolve(tmpdir(), 'jovie-cli-source-gate-'));
+    const calls = resolve(dir, 'calls');
+    try {
+      const git = (...args: string[]) => {
+        const result = spawnSync('git', args, {
+          cwd: dir,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            GIT_CONFIG_COUNT: '2',
+            GIT_CONFIG_KEY_0: 'user.name',
+            GIT_CONFIG_VALUE_0: 'CI fixture',
+            GIT_CONFIG_KEY_1: 'user.email',
+            GIT_CONFIG_VALUE_1: 'fixture@example.invalid',
+          },
+        });
+        expect(result.status, result.stderr).toBe(0);
+      };
+      git('init', '-q');
+      writeFileSync(resolve(dir, 'README.md'), 'base');
+      git('add', '.');
+      git('commit', '-qm', 'base');
+      git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+      const changedPath = changed || 'README.md';
+      mkdirSync(resolve(dir, changedPath, '..'), { recursive: true });
+      writeFileSync(resolve(dir, changedPath), 'changed');
+      git('add', '.');
+      git('commit', '-qm', 'changed');
+      writeFileSync(
+        resolve(dir, 'pnpm'),
+        '#!/bin/bash\nprintf "%s\\n" "$*" >> "$TEST_CALLS"\nif [ "$*" = "--filter @jovie/cli run $TEST_FAILURE" ]; then exit 19; fi\n'
+      );
+      chmodSync(resolve(dir, 'pnpm'), 0o755);
+      const result = spawnSync(
+        'bash',
+        [
+          '-c',
+          step![1]
+            .replace(/^          /gm, '')
+            .replaceAll('${{ github.base_ref }}', 'main'),
+        ],
+        {
+          cwd: dir,
+          env: {
+            ...process.env,
+            PATH: `${dir}:${process.env.PATH}`,
+            TEST_CHANGED: changed,
+            TEST_CALLS: calls,
+            TEST_FAILURE: failure,
+          },
+          encoding: 'utf8',
+        }
+      );
+      return {
+        status: result.status,
+        calls:
+          result.status === 0 && !changed
+            ? []
+            : readFileSync(calls, 'utf8').trim().split('\n'),
+      };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+  it.each([
+    'packages/jovie-cli/src/mcp.ts',
+    '.github/workflows/npm-publish.yml',
+    '.github/workflows/source-validation.yml',
+  ])('runs real enforced coverage and package checks for %s', changed => {
+    const result = runSourceGate(changed);
+    expect(result.status).toBe(0);
+    expect(result.calls).toEqual(
+      ['test:coverage', 'typecheck', 'build', 'pack:dry'].map(
+        command => `--filter @jovie/cli run ${command}`
+      )
+    );
+    for (const path of [
+      'packages/jovie-cli',
+      '.github/workflows/npm-publish.yml',
+      '.github/workflows/source-validation.yml',
+    ])
+      expect(source).toContain(path);
+  });
+  it('does not add unrelated package work when no publication surface changed', () => {
+    expect(runSourceGate('')).toEqual({ status: 0, calls: [] });
+  });
+  it.each(['test:coverage', 'typecheck', 'build', 'pack:dry'])(
+    'fails closed immediately when %s fails',
+    failure => {
+      const result = runSourceGate('packages/jovie-cli/src/mcp.ts', failure);
+      expect(result.status).toBe(19);
+      expect(result.calls.at(-1)).toBe(`--filter @jovie/cli run ${failure}`);
+    }
+  );
+});
+
+// Execute the actual pre-registry release step with inert Git/registry peers.
+// The real Node version selector and package guards are not stubbed.
+describe('independent manual CLI release cadence', () => {
+  function runReleaseSelection(
+    version: string | undefined,
+    manifestVersion?: unknown
+  ) {
+    const step = workflow.match(
+      /- name: Verify exact main and unpublished release[\s\S]*?        run: \|\n([\s\S]*?)(?=      - name: Install dependencies)/
+    );
+    expect(step).not.toBeNull();
+    const dir = mkdtempSync(resolve(tmpdir(), 'jovie-cli-release-selection-'));
+    try {
+      const packageRoot = resolve(dir, 'packages/jovie-cli');
+      mkdirSync(resolve(packageRoot, 'scripts'), { recursive: true });
+      writeFileSync(resolve(dir, 'VERSION'), '26.9.16\n');
+      const manifest = JSON.parse(
+        readFileSync(resolve(import.meta.dirname, '../package.json'), 'utf8')
+      );
+      if (manifestVersion !== undefined) manifest.version = manifestVersion;
+      writeFileSync(
+        resolve(packageRoot, 'package.json'),
+        JSON.stringify(manifest)
+      );
+      writeFileSync(
+        resolve(packageRoot, 'scripts/pack-manifest.ts'),
+        readFileSync(resolve(import.meta.dirname, 'pack-manifest.ts'))
+      );
+      writeFileSync(
+        resolve(dir, 'git'),
+        '#!/bin/sh\nif [ "$1" = rev-parse ]; then printf "%040d\n" 1; fi\n'
+      );
+      writeFileSync(
+        resolve(dir, 'curl'),
+        '#!/bin/sh\nprintf invoked >> "$TEST_REGISTRY_CALLS"\nprintf 404\n'
+      );
+      chmodSync(resolve(dir, 'git'), 0o755);
+      chmodSync(resolve(dir, 'curl'), 0o755);
+      const output = resolve(dir, 'output');
+      const calls = resolve(dir, 'registry-calls');
+      const result = spawnSync(
+        'bash',
+        ['-c', step![1].replace(/^          /gm, '')],
+        {
+          cwd: dir,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${dir}:${process.env.PATH}`,
+            GITHUB_REF: 'refs/heads/main',
+            GITHUB_OUTPUT: output,
+            RUNNER_TEMP: dir,
+            PACKAGE_NAME: '@jovie/cli',
+            REGISTRY_URL: 'https://registry.invalid',
+            PUBLISH_MCP_ONLY: 'false',
+            CLI_RELEASE_VERSION: version ?? '',
+            TEST_REGISTRY_CALLS: calls,
+          },
+        }
+      );
+      return {
+        status: result.status,
+        diagnostics: result.stdout + result.stderr,
+        versionOutput: (() => {
+          try {
+            return readFileSync(output, 'utf8');
+          } catch {
+            return '';
+          }
+        })(),
+        registryCalls: (() => {
+          try {
+            return readFileSync(calls, 'utf8');
+          } catch {
+            return '';
+          }
+        })(),
+      };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it('selects a CLI release without changing the desktop VERSION', () => {
+    const result = runReleaseSelection('26.10.0');
+    expect(result.status, result.diagnostics).toBe(0);
+    expect(result.versionOutput).toBe('version=26.10.0\n');
+    expect(result.registryCalls).toBe('invoked');
+  });
+
+  it('uses the canonical VERSION when the optional selection is absent', () => {
+    const result = runReleaseSelection(undefined);
+    expect(result.status, result.diagnostics).toBe(0);
+    expect(result.versionOutput).toBe('version=26.9.16\n');
+  });
+
+  it.each(['26.9.16', '', null])(
+    'rejects conflicting source pin %j before registry access',
+    pin => {
+      const result = runReleaseSelection('26.10.0', pin);
+      expect(result.status, result.diagnostics).not.toBe(0);
+      expect(result.registryCalls).toBe('');
+      expect(result.versionOutput).toBe('');
+    }
+  );
+
+  it('accepts a source manifest already pinned to the selected release', () => {
+    const result = runReleaseSelection('26.10.0', '26.10.0');
+    expect(result.status, result.diagnostics).toBe(0);
+    expect(result.versionOutput).toBe('version=26.10.0\n');
+  });
+
+  it.each([
+    ' ',
+    ' 26.10.0',
+    '26.10.0\n',
+    '26.10.00',
+    '26.13.0',
+    '26.10.0-rc.1',
+    '$(touch forbidden)',
+    '26.10.9007199254740992',
+  ])(
+    'rejects explicit malformed input %j before touching the registry',
+    version => {
+      const result = runReleaseSelection(version);
+      expect(result.status, result.diagnostics).not.toBe(0);
+      expect(result.registryCalls).toBe('');
+      expect(result.versionOutput).toBe('');
+    }
+  );
 });

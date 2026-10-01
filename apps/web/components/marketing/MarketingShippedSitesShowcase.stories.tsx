@@ -3,7 +3,7 @@ import { MarketingPageShell } from './MarketingPageShell';
 import { MarketingShippedSitesShowcase } from './MarketingShippedSitesShowcase';
 
 const meta: Meta<typeof MarketingShippedSitesShowcase> = {
-  title: 'Marketing/Primitives/MarketingShippedSitesShowcase',
+  title: 'Marketing/Sections/product-gallery',
   component: MarketingShippedSitesShowcase,
   parameters: { layout: 'fullscreen' },
   decorators: [

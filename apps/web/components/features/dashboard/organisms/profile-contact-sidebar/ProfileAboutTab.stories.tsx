@@ -24,4 +24,14 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  args: {
+    bio: 'Independent artist writing pop songs about growing up.',
+    genres: ['pop', 'indie'],
+    location: 'Los Angeles, CA',
+    hometown: 'Austin, TX',
+    activeSinceYear: 2019,
+    allowPhotoDownloads: true,
+    showOldReleases: true,
+  },
+};

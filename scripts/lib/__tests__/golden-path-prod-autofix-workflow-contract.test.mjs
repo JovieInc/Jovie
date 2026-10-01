@@ -24,9 +24,9 @@ const CI_WORKFLOW = readFileSync(
 );
 
 describe('Golden Path prod autofix workflow contract', () => {
-  it('is event-driven off Production Controller, not a cron', () => {
-    expect(WORKFLOW).toContain('workflows: [Production Controller]');
-    expect(WORKFLOW).toContain('types: [completed]');
+  it('is a bounded manual fallback, not a recursive observer', () => {
+    expect(WORKFLOW).toContain('workflow_dispatch:');
+    expect(WORKFLOW).not.toContain('workflow_run:');
     expect(WORKFLOW).not.toMatch(/^\s*schedule:/m);
     expect(WORKFLOW).not.toContain('cron:');
   });

@@ -1,7 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Virtualizer } from '@tanstack/react-virtual';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatInput } from '@/components/jovie/components/ChatInput';
@@ -11,6 +11,7 @@ import {
   CHAT_EMPTY_VIEWPORT_CLASSNAME,
   ChatComposerSurface,
   ChatEmptyStateComposerRegion,
+  ChatInlineError,
   ChatLoadingConversationSkeleton,
   ChatThreadMessages,
 } from './JovieChatSections';
@@ -121,6 +122,111 @@ describe('JovieChatSections', () => {
     expect(
       screen.getByRole('button', { name: 'Composer' })
     ).toBeInTheDocument();
+  });
+});
+
+describe('ChatInlineError', () => {
+  const chatError = {
+    type: 'server' as const,
+    message: 'We encountered a temporary issue. Please try again.',
+    failedMessage: 'What matters now?',
+  };
+
+  function renderInlineError(chatMode?: 'ov') {
+    return render(
+      <ChatInlineError
+        chatError={chatError}
+        onRetry={vi.fn()}
+        isLoading={false}
+        isSubmitting={false}
+        chatMode={chatMode}
+      />
+    );
+  }
+
+  it('uses the default paused-message presentation outside ov mode', () => {
+    renderInlineError();
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Message paused');
+    expect(alert).not.toHaveTextContent('Summer Didn’t Finish That Reply');
+  });
+
+  it('uses the operator presentation in ov chat mode', () => {
+    renderInlineError('ov');
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Summer Didn’t Finish That Reply');
+    expect(alert).toHaveTextContent(
+      'Your briefing is still current. Retry this message or ask something else.'
+    );
+    expect(alert).not.toHaveTextContent('Message paused');
+  });
+});
+
+function renderThreadMessages({
+  collapsedFailureCount = 0,
+  onShowCollapsedFailures,
+}: {
+  readonly collapsedFailureCount?: number;
+  readonly onShowCollapsedFailures?: () => void;
+} = {}) {
+  return render(
+    <ChatThreadMessages
+      messages={[]}
+      shouldVirtualizeMessages={false}
+      virtualizer={{} as Virtualizer<HTMLDivElement, Element>}
+      virtualizedMessageViewportHeight={0}
+      virtualizedMinHeight={0}
+      messageViewportPaddingBottom={undefined}
+      totalSizeRef={() => undefined}
+      bottomSentinelRef={() => undefined}
+      isStreaming={false}
+      lastAssistantIndex={-1}
+      knownMessageIds={new Set()}
+      inlineChatError={null}
+      isStuckToBottom
+      onScrollToBottom={() => undefined}
+      collapsedFailureCount={collapsedFailureCount}
+      onShowCollapsedFailures={onShowCollapsedFailures}
+    />
+  );
+}
+
+describe('ChatThreadMessages collapsed summer failures', () => {
+  it('hides the control when there are no collapsed failures', () => {
+    renderThreadMessages({
+      collapsedFailureCount: 0,
+      onShowCollapsedFailures: vi.fn(),
+    });
+
+    expect(
+      screen.queryByTestId('chat-collapsed-failures')
+    ).not.toBeInTheDocument();
+  });
+
+  it('uses singular copy for one earlier unanswered message and reveals it on click', () => {
+    const onShowCollapsedFailures = vi.fn();
+    renderThreadMessages({ collapsedFailureCount: 1, onShowCollapsedFailures });
+
+    const control = screen.getByTestId('chat-collapsed-failures');
+    expect(control).toHaveTextContent(
+      '1 earlier message went unanswered. Show it'
+    );
+
+    fireEvent.click(control);
+    expect(onShowCollapsedFailures).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses plural copy for multiple earlier unanswered messages', () => {
+    renderThreadMessages({
+      collapsedFailureCount: 3,
+      onShowCollapsedFailures: vi.fn(),
+    });
+
+    expect(screen.getByTestId('chat-collapsed-failures')).toHaveTextContent(
+      '3 earlier messages went unanswered. Show them'
+    );
   });
 });
 

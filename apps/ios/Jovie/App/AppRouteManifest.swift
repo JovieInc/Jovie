@@ -207,11 +207,11 @@ enum AppRouteManifest {
     ),
     AppRouteEntry(
       id: "surface.library",
-      title: "Library",
+      title: "Work",
       classification: .shipped,
       presentation: .surfacePane,
       source: "Jovie/Features/Library/LibrarySurfaceView.swift",
-      userTask: "Browse saved assets and vlogs",
+      userTask: "Browse releases, products, videos, writing, and campaigns",
       stateOwner: "AppShellView.selectedTab + libraryHome",
       entry: "Drawer surface row; vlog save lands here",
       exit: "Drawer surface switch",
@@ -243,7 +243,7 @@ enum AppRouteManifest {
     ),
     AppRouteEntry(
       id: "surface.profile",
-      title: "Profile",
+      title: "My Jovie Card",
       classification: .shipped,
       presentation: .surfacePane,
       source: "Jovie/Features/Dashboard/DashboardView.swift",

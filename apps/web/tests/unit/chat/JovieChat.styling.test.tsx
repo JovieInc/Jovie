@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { act } from '@testing-library/react';
+import { act, fireEvent } from '@testing-library/react';
 import {
   afterAll,
   afterEach,
@@ -28,6 +28,21 @@ const resizeObserverCallbacks = vi.hoisted(
   () => [] as ResizeObserverCallback[]
 );
 
+const mockInsightsSummary = vi.hoisted(() => ({
+  data: undefined as
+    | { insights: { status: string; title: string }[] }
+    | undefined,
+}));
+
+vi.mock('@/lib/queries', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/queries')>()),
+  useInsightsSummaryQuery: () => ({
+    data: mockInsightsSummary.data,
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
 vi.mock('@tanstack/react-virtual', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@tanstack/react-virtual')>();
@@ -54,6 +69,8 @@ const mockChatState = vi.hoisted(() => ({
   isLoading: true,
   isSubmitting: false,
   status: 'streaming' as 'ready' | 'streaming',
+  collapsedSummerFailureCount: 0,
+  showCollapsedSummerFailures: vi.fn(),
   messages: [{ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Hi' }] }],
 }));
 
@@ -98,6 +115,8 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
       isLoading: mockChatState.isLoading,
       isSubmitting: mockChatState.isSubmitting,
       hasMessages: mockChatState.hasMessages,
+      collapsedSummerFailureCount: mockChatState.collapsedSummerFailureCount,
+      showCollapsedSummerFailures: mockChatState.showCollapsedSummerFailures,
       isLoadingConversation: mockChatState.isLoadingConversation,
       conversationTitle: null,
       status: mockChatState.status,
@@ -147,7 +166,8 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
   };
 });
 
-vi.mock('@/components/jovie/components', () => ({
+vi.mock('@/components/jovie/components', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/components/jovie/components')>()),
   ChatInput: () => <div data-testid='chat-input' />,
   ChatMessage: (props: { isThinking?: boolean }) =>
     props.isThinking ? (
@@ -210,9 +230,12 @@ afterEach(() => {
   mockChatState.isLoading = true;
   mockChatState.isSubmitting = false;
   mockChatState.status = 'streaming';
+  mockChatState.collapsedSummerFailureCount = 0;
+  mockChatState.showCollapsedSummerFailures = vi.fn();
   mockChatState.messages = [
     { id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Hi' }] },
   ];
+  mockInsightsSummary.data = undefined;
 });
 
 afterAll(() => {
@@ -324,6 +347,42 @@ describe('JovieChat styling regressions', () => {
     );
   });
 
+  it("keeps What's New above starter actions and out of the composer dock (JOV-5350)", () => {
+    // Asserted node:fs read of the exact component source — the
+    // FeatureIntroHost must join the scrollable starter-action slot rather
+    // than crowding the fixed composer dock and covering the card CTA.
+    const jovieChatSource = readFileSync(
+      resolve(process.cwd(), 'components/jovie/JovieChat.tsx'),
+      'utf8'
+    );
+
+    expect(jovieChatSource).toMatch(
+      /data-testid='chat-empty-state-action-card-slot'[\s\S]{0,300}<FeatureIntroHost/
+    );
+    expect(jovieChatSource).toMatch(
+      /!composerHasIntent && emptyStateAffordance === 'none'[\s\S]{0,200}<FeatureIntroHost/
+    );
+  });
+
+  it('renders the greeting (not chips) for the bare and suggestion-pill empty states (JOV-7150)', () => {
+    // The chip/suggestion rail is retired for the bare and chip-only
+    // affordances — ChatEmptyStateGreeting owns that slot instead. Real
+    // render coverage lives in JovieChat.empty-state.test.tsx; this locks
+    // the source contract so SuggestedPrompts cannot come back for those
+    // two states without touching this test.
+    const jovieChatSource = readFileSync(
+      resolve(process.cwd(), 'components/jovie/JovieChat.tsx'),
+      'utf8'
+    );
+
+    expect(jovieChatSource).toMatch(
+      /showEmptyGreeting \? \([\s\S]{0,80}<ChatEmptyStateGreeting/
+    );
+    // FEATURED_SKILL_SUGGESTIONS (an affordance-priority count) is still
+    // imported from that module; the JSX component itself is retired.
+    expect(jovieChatSource).not.toContain('<SuggestedPrompts');
+  });
+
   it('marks an empty conversation-load shell as busy for assistive technology', () => {
     mockChatState.isLoadingConversation = true;
     mockChatState.hasMessages = false;
@@ -393,5 +452,156 @@ describe('JovieChat styling regressions', () => {
       8,
       expect.objectContaining({ align: 'end', behavior: 'auto' })
     );
+  });
+
+  it('surfaces the collapsed unanswered-turns control when the hook reports them', () => {
+    mockChatState.collapsedSummerFailureCount = 2;
+    mockChatState.isLoading = false;
+    mockChatState.status = 'ready';
+
+    const { container } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    const control = container.querySelector(
+      '[data-testid="chat-collapsed-failures"]'
+    );
+    expect(control).toBeTruthy();
+    expect(control?.textContent).toContain(
+      '2 earlier messages went unanswered'
+    );
+
+    fireEvent.click(control as HTMLElement);
+    expect(mockChatState.showCollapsedSummerFailures).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the collapsed unanswered-turns control hidden when there are none', () => {
+    const { container } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    expect(
+      container.querySelector('[data-testid="chat-collapsed-failures"]')
+    ).toBeNull();
+  });
+
+  it('renders the greeting-only empty state left-aligned above the composer (JOV-7150)', () => {
+    mockChatState.hasMessages = false;
+    mockChatState.isLoading = false;
+    mockChatState.isSubmitting = false;
+    mockChatState.status = 'ready';
+    mockChatState.messages = [];
+
+    const { container } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' displayName='Tim White' />
+    );
+
+    const region = container.querySelector(
+      '[data-testid="chat-empty-state-greeting-region"]'
+    );
+    expect(region).toBeTruthy();
+
+    const greeting = container.querySelector(
+      '[data-testid="chat-empty-state-greeting-text"]'
+    );
+    expect(greeting?.textContent).toMatch(
+      /^Good (morning|afternoon|evening), Tim\.$/
+    );
+    // Display line + left-aligned column, not a centered welcome block.
+    expect(greeting?.className).toContain('text-4xl');
+    expect(greeting?.parentElement?.className).toContain('items-start');
+    expect(greeting?.parentElement?.className).toContain('text-left');
+
+    // The "Just ask" heading and suggestion chips are gone for this state.
+    expect(container.textContent).not.toContain('Just ask');
+    expect(
+      container.querySelector('[data-testid="chat-empty-state-insight"]')
+    ).toBeNull();
+  });
+
+  it('renders the one real insight under the greeting when an active insight exists (JOV-7150)', () => {
+    mockChatState.hasMessages = false;
+    mockChatState.isLoading = false;
+    mockChatState.isSubmitting = false;
+    mockChatState.status = 'ready';
+    mockChatState.messages = [];
+    mockInsightsSummary.data = {
+      insights: [{ status: 'active', title: 'Streams are up 12% this week' }],
+    };
+
+    const { container } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' displayName='Tim White' />
+    );
+
+    const insight = container.querySelector(
+      '[data-testid="chat-empty-state-insight"]'
+    );
+    expect(insight?.textContent).toBe('Streams are up 12% this week');
+    expect(insight?.className).toContain('text-secondary-token');
+  });
+
+  it('renders the Ovie editorial briefing as the empty-state affordance in ov mode', () => {
+    mockChatState.hasMessages = false;
+    mockChatState.isLoading = false;
+    mockChatState.isSubmitting = false;
+    mockChatState.status = 'ready';
+    mockChatState.messages = [];
+
+    const { container } = renderWithQueryClient(
+      <JovieChat
+        profileId='profile-1'
+        chatMode='ov'
+        ovieHomeBriefing={{
+          greeting: 'Good morning, Tim.',
+          updatedLabel: 'Updated Sep 28, 8:00 AM PDT',
+          signal: {
+            id: 'activation.first-user',
+            title: 'The first real user completed onboarding',
+            summary: 'Activation has moved from theory to observed behavior.',
+            currentValue: '1 activated user',
+            delta: '+1 today',
+            target: 'Learn what made the path work',
+            sourceLabel: 'Founder Funnel',
+            nextAction: 'Review the session.',
+            removalEvent: 'The activation lesson is applied.',
+            summerCanAct: true,
+          },
+          actions: [
+            {
+              id: 'activation.first-user:next',
+              label: 'Start The Next Step',
+              prompt: 'Review the first activation with me.',
+            },
+          ],
+        }}
+      />
+    );
+
+    expect(
+      container.querySelector('[data-testid="ovie-editorial-briefing"]')
+    ).toBeTruthy();
+    expect(
+      container
+        .querySelector('[data-testid="chat-empty-state-viewport"]')
+        ?.getAttribute('data-empty-affordance')
+    ).toBe('ovie-briefing');
+    // The briefing owns the empty-state chrome layer — no usage banner stack.
+    expect(container.querySelector('[data-testid="chat-usage"]')).toBeNull();
+  });
+
+  it('never renders the Ovie briefing outside ov mode', () => {
+    mockChatState.hasMessages = false;
+    mockChatState.isLoading = false;
+    mockChatState.isSubmitting = false;
+    mockChatState.status = 'ready';
+    mockChatState.messages = [];
+
+    const { container } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    expect(
+      container.querySelector('[data-testid="ovie-editorial-briefing"]')
+    ).toBeNull();
   });
 });

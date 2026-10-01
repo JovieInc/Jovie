@@ -5,6 +5,7 @@ import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { assertOviePrivacyUnlocked } from '@/lib/ovie/privacy-lock/server';
 
 export interface AdminPageAccess {
   readonly userId: string | null;
@@ -48,5 +49,6 @@ export async function requireCurrentAdminPageAccess(): Promise<string> {
     redirect(APP_ROUTES.DASHBOARD);
   }
 
+  await assertOviePrivacyUnlocked();
   return access.userId;
 }

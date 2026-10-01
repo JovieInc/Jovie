@@ -28,6 +28,14 @@ def profile(root: Path, name: str, kind: str = "chatgpt") -> None:
     (home / "auth.json").write_text(json.dumps(auth))
 
 
+def rate_snapshot(now=1_000_000, credits=None, secondary=True) -> dict:
+    limits = {"planType": "pro", "primary": {"usedPercent": 50, "resetsAt": now + 7200, "windowDurationMins": 10080}}
+    if secondary: limits["secondary"] = {"usedPercent": 80, "resetsAt": now + 3600, "windowDurationMins": 300}
+    return {"account": {"account": {"type": "chatgpt", "planType": "pro"}},
+            "rateLimits": {"rateLimits": limits, "rateLimitResetCredits": credits},
+            "messages": {"messages": []}}
+
+
 class Isolated(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -111,6 +119,136 @@ class ClassifyTest(unittest.TestCase):
         self.assertLess(soon - now, 86400)
 
 
+class LedgerTest(Isolated):
+    def test_announcements_keep_immediate_and_banked_promises_independent(self):
+        cases = [("We reset your rate limits now.", (True, False)),
+            ("You receive one banked reset credit per day.", (False, True)),
+            ("We reset rate limits now and granted a reset credit.", (True, True)),
+            ("We did not reset rate limits and no reset credit was granted.", (False, False)),
+            ("If needed, we may reset rate limits and could grant a reset credit.", (False, False)),
+            ("Last month we reset rate limits and granted a reset credit.", (False, False)),
+        ]
+        for index, (body, expected) in enumerate(cases):
+            with self.subTest(body=body):
+                parsed = codex.parse_announcement({"messageId": str(index), "messageBody": body})
+                self.assertEqual((parsed["immediateReset"], parsed["bankedCreditGrant"]), expected)
+        self.assertIsNone(codex.parse_announcement({"messageBody": "reset"}))
+        message = {"messageId": "same", "messageBody": "A banked reset credit was granted."}
+        fresh, seen = codex.announcement_evidence([message, message])
+        self.assertEqual((len(fresh), codex.announcement_evidence([message], seen)[0]), (1, []))
+    def test_capacity_lease_models_lifecycle_expiry_and_unknowns_without_assumptions(self):
+        now = 1_000_000
+        evidence = {"observedSustainableThroughputPerHour": 25, "observedConcurrency": 2,
+                    "throughputObservedAt": now, "throughputConfidence": "observed"}
+        expected = [({}, 3600), ({"canceledAtPeriodEnd": True, "subscriptionEndAt": now + 1200}, 1200),
+                    ({"paymentFailure": True, "graceEndsAt": now + 900}, 900),
+                    ({"accessLossAt": now + 60}, 60)]
+        for lifecycle, unavailable in expected:
+            lease = codex.build_capacity_lease("alpha", rate_snapshot(now), {**evidence, **lifecycle}, now)
+            self.assertEqual((lease["timeToUnavailabilityS"], lease["throughput"]["estimatedDrainTimeS"]), (unavailable, 1440))
+        summary = {"availableCount": 2, "credits": [
+            {"id": "never", "status": "available", "resetType": "codexRateLimits", "grantedAt": now, "expiresAt": None},
+            {"id": "soon", "status": "available", "resetType": "codexRateLimits", "grantedAt": now, "expiresAt": now + 500}]}
+        lease = codex.build_capacity_lease("alpha", rate_snapshot(now, summary),
+                                           {**evidence, "promotionalCredits": [{"id": "promo", "hardCap": 5, "expiresAt": now + 300}]}, now)
+        deadlines = {row["id"]: row["redemptionDeadline"] for row in lease["credits"]["details"]}
+        self.assertEqual(deadlines, {"never": None, "soon": now + 500, "promo": now + 300})
+        unknown = codex.build_capacity_lease("alpha", {"rateLimits": {"rateLimits": {}}, "messages": {}}, {}, now)
+        self.assertIsNone(unknown["timeToUnavailabilityS"])
+        self.assertEqual(unknown["sources"]["lifecycle"]["reconciliation"], "unknown")
+    def test_redemption_requires_terminal_lock_fresh_drain_and_usable_runway(self):
+        now = 1_000_000
+        credits = {"availableCount": 3, "credits": [
+            {"id": "late", "status": "available", "resetType": "codexRateLimits", "grantedAt": 1, "expiresAt": now + 900},
+            {"id": "early", "status": "available", "resetType": "codexRateLimits", "grantedAt": 2, "expiresAt": now + 300},
+            {"id": "wrong", "status": "available", "resetType": "other", "grantedAt": 0, "expiresAt": now + 1}]}
+        rates = rate_snapshot(now, credits)["rateLimits"]
+        lifecycle = {"observedSustainableThroughputPerHour": 200, "observedConcurrency": 1,
+                     "throughputObservedAt": now}
+        decision = codex.redemption_decision("alpha", {"type": "terminal_limit"}, rates, lifecycle, True, True, now)
+        self.assertEqual(decision["credit"]["id"], "early")
+        self.assertIsNone(codex.select_reset_credit({"rateLimitResetCredits": {**credits, "availableCount": 4}}, now))
+        self.assertEqual(decision["idempotencyKey"], codex.redemption_decision(
+            "alpha", {"type": "terminal_limit"}, rates, lifecycle, True, True, now)["idempotencyKey"])
+        variants = [({"type": "other"}, lifecycle, True, True, "not-terminal-limit"),
+                    ({"type": "terminal_limit"}, lifecycle, True, False, "lock-lost"),
+                    ({"type": "terminal_limit"}, lifecycle, False, True, "other-seat-available"),
+                    ({"type": "terminal_limit"}, {}, True, True, "missing-or-stale-drain-evidence"),
+                    ({"type": "terminal_limit"}, {**lifecycle, "accessLossAt": now + 100}, True, True, "access-loss-before-drain")]
+        for event, life, others, lock, reason in variants:
+            self.assertEqual(codex.redemption_decision("alpha", event, rates, life, others, lock, now)["reason"], reason)
+        near = rate_snapshot(now, credits)["rateLimits"]
+        near["rateLimits"]["secondary"]["resetsAt"] = now + 100
+        self.assertEqual(codex.redemption_decision("alpha", {"type": "terminal_limit"}, near, lifecycle, True, True, now)["reason"],
+                         "natural-reset-before-drain")
+    def test_readback_reconciles_both_windows_and_rejects_ambiguous_effects(self):
+        before = rate_snapshot()["rateLimits"]
+        after = rate_snapshot()["rateLimits"]
+        for key in ("primary", "secondary"): after["rateLimits"][key]["usedPercent"] = 0
+        self.assertTrue(codex.reset_readback_verified(before, after))
+        after["rateLimits"].pop("secondary")
+        self.assertFalse(codex.reset_readback_verified(before, after))
+    def test_heartbeat_emits_changes_once_and_respects_hourly_cadence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            saved = codex.STATE
+            codex.STATE = Path(tmp) / "state.json"
+            try:
+                codex.reconcile(1_000_000, 0, lambda _: rate_snapshot())
+                self.assertFalse(codex.reconcile(1_000_001, 3600, lambda _: rate_snapshot())["reconciled"])
+                codex.reconcile(1_003_601, 3600, lambda _: rate_snapshot())
+                self.assertEqual(len((Path(tmp) / "capacity-events.jsonl").read_text().splitlines()), len(codex.accounts()))
+            finally:
+                codex.STATE = saved
+    def test_installer_pins_the_hourly_monitor_and_revision_receipt(self):
+        self.assertTrue(all(value in (ROOT / "scripts/lanes/install.sh").read_text() for value in ("ledger_cadence=3600", "install-receipt")))
+
+    def test_exhaustion_waits_for_the_latest_depleted_window(self):
+        now = 1_000_000
+        snapshot = rate_snapshot(now)
+        for key in ("primary", "secondary"):
+            snapshot["rateLimits"]["rateLimits"][key]["usedPercent"] = 100
+        codex.reconcile(now, 0, lambda _: snapshot)
+        self.assertEqual(codex.read_state()["alpha"]["exhaustedUntil"], now + 7200)
+
+    def test_reconcile_stamps_the_cadence_when_a_snapshot_is_malformed(self):
+        codex.reconcile(1_000_000, 0, lambda _: "not-a-dict")
+        result = codex.reconcile(1_000_001, 3600, lambda _: rate_snapshot())
+        self.assertFalse(result["reconciled"])
+        self.assertIn("alpha", codex.read_state()["_ledger"]["errors"])
+
+    def test_redemption_deadline_uses_every_access_loss_field(self):
+        now = 1_000_000
+        credits = {"availableCount": 1, "credits": [
+            {"id": "c", "status": "available", "resetType": "codexRateLimits", "grantedAt": 1, "expiresAt": None}]}
+        rates = rate_snapshot(now, credits)["rateLimits"]
+        lifecycle = {"observedSustainableThroughputPerHour": 200, "observedConcurrency": 1, "throughputObservedAt": now}
+        event = {"type": "terminal_limit"}
+        for field in ({"paymentFailure": True, "graceEndsAt": now + 100},
+                      {"canceledAtPeriodEnd": True, "subscriptionEndAt": now + 100}):
+            decision = codex.redemption_decision("alpha", event, rates, {**lifecycle, **field}, True, True, now)
+            self.assertEqual(decision["reason"], "access-loss-before-drain")
+
+    def test_a_pending_reset_retries_the_same_credit_and_key(self):
+        now = time.time()
+        before = rate_snapshot()["rateLimits"]
+        after = rate_snapshot()["rateLimits"]
+        for key in ("primary", "secondary"):
+            after["rateLimits"][key]["usedPercent"] = 0
+        codex.write_state({"alpha": {"pendingReset": {"creditId": "c1", "idempotencyKey": "k1", "before": before},
+                                     "exhaustedUntil": now + 3600}})
+        calls = []
+        saved = codex.app_server_calls
+        codex.app_server_calls = lambda name, requested, **kw: calls.append(requested) or [{"outcome": "alreadyRedeemed"}, after]
+        try:
+            self.assertTrue(codex.maybe_redeem("alpha", handle=type("H", (), {"closed": False})(), now=now))
+        finally:
+            codex.app_server_calls = saved
+        self.assertEqual(calls[0][0][1], {"creditId": "c1", "idempotencyKey": "k1"})
+        entry = codex.read_state()["alpha"]
+        self.assertNotIn("pendingReset", entry)
+        self.assertNotIn("exhaustedUntil", entry)
+
+
 class StatusTest(Isolated):
     def test_status_reports_availability_resets_and_health_exit(self):
         now = 1_000_000.0
@@ -147,7 +285,11 @@ class RunTest(Isolated):
             with tempfile.NamedTemporaryFile("w", suffix=".md") as prompt, tempfile.TemporaryDirectory() as cwd:
                 prompt.write("ship it")
                 prompt.flush()
-                return codex.main(["run", "--prompt-file", prompt.name, "--cwd", cwd])
+                receipt = Path(cwd) / "provider.jsonl"
+                code = codex.main(["run", "--prompt-file", prompt.name, "--receipt-file", str(receipt),
+                                   "--cwd", cwd])
+                self.lease_events = [json.loads(line) for line in receipt.read_text().splitlines()]
+                return code
         finally:
             os.environ["PATH"] = saved
 
@@ -168,6 +310,10 @@ class RunTest(Isolated):
         self.assertLess(state["alpha"]["exhaustedUntil"] - time.time(), codex.DEFAULT_COOLDOWN_S)
         self.assertEqual(state["beta"]["lastKind"], "ok")
         self.assertNotIn("exhaustedUntil", state["beta"])
+        self.assertEqual([row["account"] for row in self.lease_events], ["alpha", "beta"])
+        self.assertTrue(all(row["schema"] == "jovie-provider-lease/v1" and
+                            row["accountClass"] == "chatgpt-oauth" and
+                            row["event"] == "account-leased" for row in self.lease_events))
 
 
 if __name__ == "__main__":

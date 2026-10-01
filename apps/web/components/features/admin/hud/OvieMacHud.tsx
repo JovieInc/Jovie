@@ -3,13 +3,14 @@ import { Button } from '@jovie/ui';
 import { MessageCircle } from 'lucide-react';
 import Link from 'next/link';
 import { HudStatusPill } from '@/app/app/(shell)/admin/ops/HudStatusPill';
-import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
 import { DesignProposalReviewPanel } from '@/components/features/admin/design-lab';
 import { OperationalTasksPanel } from '@/components/features/admin/hud/OperationalTasksPanel';
 import { OvieLauncherRail } from '@/components/features/admin/hud/OvieLauncherRail';
+import { SummerCardReviewPanel } from '@/components/features/admin/summer-cards';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { DesktopTitlebar } from '@/components/organisms/DesktopTitlebar';
 import { APP_ROUTES } from '@/constants/routes';
 import type { DecisionHudView } from '@/lib/hud/decision-signals';
 import {
@@ -324,6 +325,7 @@ export function OvieMacHud({
           <InFlightPullRequestsPanel pullRequests={inFlightPullRequests} />
         </section>
         <DesignProposalReviewPanel />
+        <SummerCardReviewPanel />
       </main>
     </div>
   );

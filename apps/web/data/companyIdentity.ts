@@ -10,15 +10,15 @@
  */
 export const COMPANY_IDENTITY = {
   productName: 'Jovie',
-  headline: 'Presence, Relationships, And Growth.',
+  headline: 'Presence, relationships, and growth.',
   support:
     'One product for artists, founders, authors, creators, and independent experts.',
   definition:
     'Jovie is one product for presence, relationships, and growth. It helps artists, founders, authors, creators, and independent experts control how they are found and turn attention into relationships.',
-  seoTitle: 'Jovie | Your living identity on the internet',
+  seoTitle: 'Jovie | Be found. Be understood.',
   seoDescription:
-    'Your work, your links, your next chapter. Together in your Jovie profile.',
-  homepageHeadline: 'Your living identity on the internet.',
+    'Claim your name. Jovie finds what the web says about you and makes you easy to reach, for people and for agents.',
+  homepageHeadline: 'Be found. Be understood.',
   audiences: [
     'artists',
     'founders',

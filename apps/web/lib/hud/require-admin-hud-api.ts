@@ -1,25 +1,11 @@
 import 'server-only';
-
-import { NextResponse } from 'next/server';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
+import { requireOvieApiAccess } from '@/lib/ovie/privacy-lock/access';
+/** Read-only Ovie observation uses baseline role + optional privacy, not a mandatory MFA curtain. */
 export async function requireAdminHudApiAccess(options?: {
   session?: 'cookie' | 'fresh';
-}): Promise<NextResponse | null> {
-  const entitlements = await getCurrentUserEntitlements(options);
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
-  return null;
+  privileged?: boolean;
+}) {
+  return requireOvieApiAccess({
+    privileged: options?.privileged ?? false,
+  });
 }

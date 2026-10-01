@@ -68,7 +68,7 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
     ).toBe(false);
     expect(
       isArtistOnlyCompanyDefinition(
-        'Jovie was founded by Tim White, a music marketing veteran who ran campaigns for artists like Tory Lanez.'
+        'Jovie was founded by Tim White, a music marketing veteran who ran campaigns for artists like some named artist.'
       )
     ).toBe(false);
   });
@@ -116,7 +116,7 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
 
   it('uses general metadata, Open Graph, and Organization schema on /about', async () => {
     const { metadata } = await import('../../../app/(marketing)/about/page');
-    const expectedTitle = `About — ${COMPANY_IDENTITY.headline.replace(/\.$/, '')}`;
+    const expectedTitle = `About Jovie: ${COMPANY_IDENTITY.headline.replace(/\.$/, '')}`;
 
     expect(metadata.title).toBe(expectedTitle);
     expect(String(metadata.description)).toContain(COMPANY_IDENTITY.definition);

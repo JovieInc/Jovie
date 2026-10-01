@@ -198,8 +198,16 @@ selecting both iOS and Mac needs two macOS jobs, leaving one reserve at two
 groups. The five self-hosted Linux runners do not provide capacity for these
 hosted product lanes.
 
+On 2026-09-25 a ruleset admin raised live `max_entries_to_build` to GitHub's
+10-group ceiling (`updated_at` 2026-09-25T22:20Z, during the production-freeze
+incident window). Source-of-record synced to the applied live value under
+JOV-6815; the live-parity check keeps accepting any lower build count so a
+rollback to the JOV-6107 bound stays green. Re-evaluate against measured
+runner saturation — ten full groups (~190 hosted jobs) exceeds both capacity
+figures above — and return live to `2` if deep queues starve required CI.
+
 Source preflight accepts integer build counts from one through the reviewed
-ceiling of two and records the actual count and any difference from the target.
+ceiling of ten and records the actual count and any difference from the target.
 This permits source-first rollout and a one-field rollback without blocking
 normal admission.
 
@@ -404,6 +412,17 @@ Use `JOVIE_PUSH_PHASE=qualification git push` before ready/landing.
 ## Agent checklist
 
 Before you open a PR:
+
+Use an explicit non-closing Linear reference from creation: `Refs JOV-1234.`
+on a separate line for each linked issue, with the existing
+`linear-issue-id` / `linear-issue-identifier` markers retained. Avoid closing
+keywords even for normal implementation work: native Linear automation cannot
+inspect commissioning labels or runtime acceptance. The existing repository
+merge sync still closes normal completed implementation issues and leaves
+commissioning/parent issues open. A commissioning note alone does not change
+native linking semantics. For an already-linked issue, inspect its other PR
+relationships before editing; an older merged closing link can still affect
+status. Do not add a reconciliation loop or disable team-wide automation.
 
 1. **Small + focused**, targeting `main`. Dependent? Use the native GitHub
    retarget/rebase sequence in [`pr-stacking.md`](../.claude/rules/pr-stacking.md).

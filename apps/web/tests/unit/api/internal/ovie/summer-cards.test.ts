@@ -105,6 +105,14 @@ describe('POST /api/internal/ovie/summer-cards', () => {
       { ...input, evidence: Array(17).fill('https://jov.ie') },
     ],
     ['negative spend', { ...input, amountUsd: -1 }],
+    [
+      'spend without intent preflight',
+      {
+        ...input,
+        kind: 'spend',
+        preflightReceiptId: 'spf_0123456789abcdef0123456789abcdef',
+      },
+    ],
     ['unknown field', { ...input, send: true }],
   ])('rejects %s with 422', async (_label, body) => {
     const response = await POST(post(body));

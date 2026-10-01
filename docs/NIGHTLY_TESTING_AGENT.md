@@ -6,20 +6,19 @@
 
 ## Purpose
 
-The nightly testing agent ranks high-risk surfaces, runs deterministic test lanes,
-optionally exercises Stryker mutation hotspots, and emits a compact daily report
+The testing agent ranks high-risk surfaces after relevant evidence changes, runs deterministic test lanes,
+optionally exercises Stryker mutation hotspots, and emits a compact report
 for the admin ops panel and `docs/NIGHTLY_TESTING_AGENT_REPORT.md`.
 
-## Schedule
+## Triggers
 
-| Workflow | Cron (PT) | Purpose |
-|----------|-----------|---------|
-| `Nightly Tests` | `30 23 * * *` | Full unit + E2E suite, Knip audit |
-| `Nightly Testing Agent` | `30 4 * * *` | Risk scoring, unit telemetry, mutation hotspots, daily report |
+| Workflow | Causal event | Purpose |
+|----------|--------------|---------|
+| `Changed-Evidence Test Suites` | Relevant web/shared/toolchain push to `main` | Full unit + E2E suite, Knip audit |
+| `Nightly Testing Agent` | Test, mutation config, or harness push to `main` | Risk scoring, unit telemetry, mutation hotspots, report |
 
-The consolidated suite starts at 23:30, clear of the fixed 09:00 UTC screenshot and
-Tuesday harness lanes. The agent then starts at 04:30 after those runners have
-drained, so fresh failures from the main suite are reflected in its context.
+Manual dispatch remains available for a bounded diagnostic run. Twenty-four hours
+without a matching input change launches neither workflow.
 
 ## Cost path (economy / deterministic)
 
@@ -33,11 +32,11 @@ This automation is intentionally **LLM-free**:
 | Report generation | $0 | Markdown + JSON from normalized telemetry |
 | Redis publish | ~$0 | One `SET` per run via existing Upstash REST |
 
-**Do not** route nightly candidate generation through premium models on schedule.
+**Do not** route candidate generation through premium models from these events.
 Candidate validation is `workflow_dispatch` only and still executes focused Vitest
 commands — no model spend.
 
-GitHub Actions runner time is the only recurring cost (~45–70 minutes/night).
+GitHub Actions runner time is incurred only for changed evidence or manual diagnostics.
 
 ## Outputs
 

@@ -3,7 +3,15 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+const sourceValidationWorkflow = readFileSync(
+  '.github/workflows/source-validation.yml',
+  'utf8'
+);
 const triggerBlock = workflow.slice(0, workflow.indexOf('\npermissions:'));
+const sourceValidationTriggerBlock = sourceValidationWorkflow.slice(
+  0,
+  sourceValidationWorkflow.indexOf('\npermissions:')
+);
 
 function jobBlock(jobId) {
   const start = workflow.indexOf(`\n  ${jobId}:\n`);
@@ -18,12 +26,20 @@ const ciFastRemainingBlock = jobBlock('ci-fast-remaining');
 const ciFastAggregateBlock = jobBlock('ci-fast');
 
 test('CI prevention verifier runs for every source PR and exact merge-group head', () => {
-  assert.match(triggerBlock, /^on:\n  pull_request:\n/m);
+  // Bounded topology (JOV-5940): source-PR validation lives in
+  // source-validation.yml; ci.yml owns merge_group/push/dispatch heads.
+  assert.match(sourceValidationTriggerBlock, /^on:\n  pull_request:\n/m);
+  assert.doesNotMatch(triggerBlock, /^  pull_request:/m);
   assert.match(
     triggerBlock,
     /^  merge_group:\n    types: \[checks_requested\]$/m
   );
   assert.doesNotMatch(triggerBlock, /^    paths(?:-ignore)?:/m);
+  assert.doesNotMatch(sourceValidationTriggerBlock, /^    paths(?:-ignore)?:/m);
+  assert.match(
+    sourceValidationWorkflow,
+    /node scripts\/ci-release-incident-contract\.mjs/
+  );
   for (const ciFastChildBlock of [ciFastTypecheckBlock, ciFastRemainingBlock]) {
     assert.match(
       ciFastChildBlock,

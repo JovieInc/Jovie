@@ -4,22 +4,25 @@ import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import storyMeta, { Centered } from './ArtistProfileSectionHeader.stories';
 
 describe('ArtistProfileSectionHeader', () => {
-  it('renders the section headline with an explicit two-line bound', () => {
+  it('preserves the complete long section headline', () => {
     render(
       <ArtistProfileSectionHeader
         eyebrow='Artist Profile'
-        headline='Own the fan path from first tap.'
+        headline='Your music stays together. The right action leads.'
         body='Route every visitor to the next useful action.'
       />
     );
 
     expect(screen.getByText('Artist Profile')).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', {
-        level: 2,
-        name: 'Own the fan path from first tap.',
-      })
-    ).toHaveClass('line-clamp-2');
+    const heading = screen.getByRole('heading', {
+      level: 2,
+      name: 'Your music stays together. The right action leads.',
+    });
+    expect(heading).toHaveTextContent(
+      'Your music stays together. The right action leads.'
+    );
+    expect(heading).toHaveAttribute('data-wrap', 'editorial-title');
+    expect(heading.className).not.toMatch(/line-clamp|truncate/);
     expect(
       screen.getByText('Route every visitor to the next useful action.')
     ).toBeInTheDocument();

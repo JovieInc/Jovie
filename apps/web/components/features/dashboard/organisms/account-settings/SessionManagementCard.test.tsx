@@ -53,6 +53,14 @@ describe('SessionManagementCard', () => {
     expect(await screen.findByText('No active sessions.')).toBeVisible();
   });
 
+  it('shows an empty state when the session payload is not an array', async () => {
+    listSessions.mockResolvedValue({ data: {}, error: null });
+
+    render(<SessionManagementCard activeSessionId='session-current' />);
+
+    expect(await screen.findByText('No active sessions.')).toBeVisible();
+  });
+
   it('lists sessions, labels the current device, and hides the bulk action with one session', async () => {
     listSessions.mockResolvedValue({ data: [currentSession], error: null });
 

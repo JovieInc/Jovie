@@ -1,0 +1,126 @@
+{
+  "schema": "jovie.seo-certify-baseline/v1",
+  "failures": {
+    "/": ["geo:geo-sibling-links"],
+    "/about": ["geo:geo-sibling-links", "technical:open-graph"],
+    "/ai": ["agentic:structured-data"],
+    "/alternatives": [
+      "copy:copy-lint",
+      "geo:geo-jsonld-type",
+      "geo:geo-sibling-links",
+      "technical:open-graph"
+    ],
+    "/alternatives/linktree": [
+      "geo:geo-last-updated",
+      "geo:geo-sibling-links",
+      "technical:open-graph"
+    ],
+    "/api-versioning": [
+      "geo:geo-jsonld-type",
+      "geo:geo-sibling-links",
+      "technical:open-graph"
+    ],
+    "/artist-notifications": [
+      "agentic:structured-data",
+      "geo:geo-jsonld-type",
+      "geo:geo-sibling-links"
+    ],
+    "/artist-profile": ["agentic:structured-data"],
+    "/artist-profiles": ["geo:geo-jsonld-type", "geo:geo-sibling-links"],
+    "/blog": ["agentic:structured-data", "geo:geo-jsonld-type"],
+    "/blog/authors/tim": [
+      "copy:copy-lint",
+      "geo:geo-direct-answer",
+      "geo:geo-orphan",
+      "technical:open-graph"
+    ],
+    "/blog/category/artist-management": [
+      "geo:geo-jsonld-type",
+      "geo:geo-sibling-links",
+      "technical:open-graph"
+    ],
+    "/card": [
+      "agentic:structured-data",
+      "geo:geo-jsonld-type",
+      "geo:geo-sibling-links"
+    ],
+    "/changelog": [
+      "agentic:structured-data",
+      "copy:copy-lint",
+      "geo:geo-jsonld-type",
+      "geo:geo-last-updated"
+    ],
+    "/changelog/26.8.1": ["geo:geo-last-updated"],
+    "/cli": ["copy:copy-lint", "geo:geo-sibling-links", "technical:open-graph"],
+    "/compare": [
+      "copy:copy-lint",
+      "geo:geo-jsonld-type",
+      "geo:geo-sibling-links",
+      "technical:open-graph"
+    ],
+    "/compare/linktree": [
+      "geo:geo-last-updated",
+      "geo:geo-sibling-links",
+      "technical:open-graph"
+    ],
+    "/demo/video": [
+      "agentic:server-rendered-content",
+      "agentic:structured-data"
+    ],
+    "/demovideo": [
+      "agentic:server-rendered-content",
+      "agentic:structured-data"
+    ],
+    "/developers": ["geo:geo-jsonld-type", "technical:open-graph"],
+    "/download": [
+      "geo:geo-jsonld-type",
+      "geo:geo-orphan",
+      "geo:geo-sibling-links",
+      "technical:open-graph"
+    ],
+    "/engineering": [
+      "agentic:structured-data",
+      "geo:geo-jsonld-type",
+      "geo:geo-orphan",
+      "geo:geo-sibling-links"
+    ],
+    "/engineering/preview": ["agentic:structured-data"],
+    "/engineering/preview/verified-changelog": ["agentic:structured-data"],
+    "/instant-merch": [
+      "agentic:structured-data",
+      "copy:copy-lint",
+      "geo:geo-direct-answer",
+      "geo:geo-jsonld-type",
+      "geo:geo-sibling-links"
+    ],
+    "/launch": ["copy:copy-lint", "geo:geo-sibling-links"],
+    "/pay": [
+      "agentic:structured-data",
+      "geo:geo-jsonld-type",
+      "geo:geo-sibling-links"
+    ],
+    "/pricing": ["geo:geo-sibling-links"],
+    "/product": ["copy:copy-lint", "geo:geo-sibling-links"],
+    "/smart-links": [
+      "agentic:structured-data",
+      "copy:copy-lint",
+      "geo:geo-jsonld-type",
+      "geo:geo-sibling-links"
+    ],
+    "/solutions/artists": ["geo:geo-orphan", "geo:geo-sibling-links"],
+    "/support": [
+      "geo:geo-jsonld-type",
+      "geo:geo-sibling-links",
+      "technical:open-graph"
+    ],
+    "/voice": ["agentic:structured-data", "copy:copy-lint"],
+    "/waitlist": ["technical:html-source"],
+    "/waitlist/invite": ["technical:html-source"],
+    "/youtube-thumbnails": [
+      "agentic:structured-data",
+      "geo:geo-jsonld-type",
+      "geo:geo-orphan",
+      "geo:geo-sibling-links"
+    ]
+  }
+}

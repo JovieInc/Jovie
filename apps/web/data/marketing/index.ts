@@ -23,6 +23,27 @@
  */
 
 export type {
+  MarketingCharacterBoardDecision,
+  MarketingCharacterFinding,
+  MarketingCharacterGenerationBrief,
+  MarketingCharacterIndividualityAxis,
+  MarketingCharacterLightDirection,
+  MarketingCharacterPersona,
+  MarketingCharacterRecord,
+  MarketingCharacterShadowDirection,
+  MarketingCharacterSimilarityResult,
+  MarketingCharacterSystem,
+} from './characterSystem';
+export {
+  auditMarketingCharacterGenerationBrief,
+  findNearDuplicateMarketingCharacters,
+  formatMarketingCharacterSystemForPrompt,
+  JOVIE_MARKETING_CHARACTER_SYSTEM,
+  JOVIE_MARKETING_CHARACTER_SYSTEM_SCHEMA,
+  MARKETING_CHARACTER_INDIVIDUALITY_AXES,
+  scoreMarketingCharacterSimilarity,
+} from './characterSystem';
+export type {
   MarketingPenRegistryIssue,
   MarketingPenRegistryIssueCode,
   MarketingRecipeRegistryEntry,
@@ -85,15 +106,26 @@ export type {
   MarketingCopyTasteSignal,
   MarketingCopyTasteTag,
   MarketingCopyVisibleCopy,
+  RenderedCopyApprovedException,
+  RenderedCopyAuditOptions,
+  RenderedCopyCertification,
+  RenderedCopyCertificationInput,
+  RenderedCopyLine,
+  RenderedCopySection,
+  RenderedCopySurface,
 } from './copy';
 export {
   applyMarketingCopyTasteDecision,
   auditMarketingCopyPage,
   auditMarketingCopyPanel,
   auditMarketingCopySemantics,
+  auditRenderedCopyCertification,
+  auditRenderedMarketingCopy,
   createEmptyMarketingCopyTasteProfile,
   createMarketingCopyReviewDigest,
   createMarketingCopyTasteInboxItem,
+  createRenderedCopyCertification,
+  createRenderedCopyDigest,
   MARKETING_COPY_LINE_ROLES,
   MARKETING_COPY_REVIEW_ROLES,
   MARKETING_COPY_SEMANTIC_ENFORCEMENTS,
@@ -135,12 +167,37 @@ export {
   MARKETING_EDITORIAL_BACKGROUNDS,
 } from './editorialBackgrounds';
 export type {
+  FactoryStage,
+  FactoryStageArtifact,
+  StageReceipt,
+} from './factory/spine';
+export {
+  applyStagePassedBit,
+  COPY_LANDING_STAGE_TO_FACTORY,
+  FACTORY_CERTIFIER_HARNESS,
+  FACTORY_EVALUATOR_KINDS,
+  FACTORY_HERO_VARIANT_IDS,
+  FACTORY_MEDIA_KINDS,
+  FACTORY_RAMP_STATES,
+  FACTORY_RECEIPT_SCHEMA,
+  FACTORY_SPINE_VERSION,
+  FACTORY_STAGE_ARTIFACT_SCHEMAS,
+  FACTORY_STAGE_MAX_ATTEMPTS,
+  FACTORY_STAGES,
+  LANDING_PAGE_PIPELINE_STAGE_TO_FACTORY,
+  MARKETING_GENERATION_STAGE_TO_FACTORY,
+  StageReceiptSchema,
+  validateStageReceipt,
+} from './factory/spine';
+export type {
   MarketingCreativeRole,
   MarketingGateReceipt,
   MarketingGenerationFinding,
   MarketingGenerationStage,
   MarketingModelCandidate,
   MarketingModelCapability,
+  MarketingModelSelectionInput,
+  MarketingModelSelectionReceipt,
   MarketingNarrativePlan,
   MarketingNarrativeSectionPlan,
   MarketingTasteGateId,
@@ -148,8 +205,10 @@ export type {
 export {
   auditMarketingNarrativePlan,
   auditMarketingTasteAdmission,
+  MARKETING_ASSET_GENERATION_CHARACTER_CONTRACT,
   MARKETING_ASSET_GENERATION_COLOR_CONTRACT,
   MARKETING_ASSET_GENERATION_MEDIA_RECIPE_CONTRACT,
+  MARKETING_CREATIVE_ROLE_MODEL_ROLE,
   MARKETING_CREATIVE_ROLES,
   MARKETING_GENERATION_SPEC_VERSION,
   MARKETING_GENERATION_STAGES,
@@ -157,9 +216,12 @@ export {
   MARKETING_ROLE_REQUIREMENTS,
   MARKETING_STAGE_ATTEMPT_LIMITS,
   MARKETING_TASTE_GATE_IDS,
+  MARKETING_VISUAL_REVIEW_CHARACTER_CONTRACT,
   MARKETING_VISUAL_REVIEW_COLOR_CONTRACT,
   MARKETING_VISUAL_REVIEW_MEDIA_RECIPE_CONTRACT,
+  marketingModelCandidatesForRole,
   selectMarketingModelCandidate,
+  selectMarketingModelWithReceipt,
 } from './generation';
 export type {
   HomepageAssetShootout,
@@ -329,6 +391,17 @@ export {
   validateMarketingMediaRecipeInput,
 } from './mediaRecipes';
 export type {
+  MarketingModelChannel,
+  MarketingModelModality,
+  MarketingModelRole,
+  MarketingRoleModelCandidate,
+} from './modelRoles';
+export {
+  MARKETING_MODEL_CHANNEL_ORDER,
+  MARKETING_MODEL_ROLES,
+  MARKETING_ROLE_MODEL_CANDIDATES,
+} from './modelRoles';
+export type {
   MarketingPageContract,
   MarketingPageContractRouteGlob,
 } from './pageContracts';
@@ -367,6 +440,8 @@ export type {
   MarketingRouteDisposition,
   MarketingRouteDispositionLedgerEntry,
   MarketingRouteHealthTarget,
+  ProductEvidenceDeclaration,
+  ProductEvidenceKind,
   RouteManifestEntry,
   RouteRecipeParityReport,
 } from './routeManifest';
@@ -377,11 +452,14 @@ export {
   getRouteManifestEntry,
   getRouteRecipeParity,
   isExempt,
+  isProductRouteEntry,
   isRecipeRoute,
   MARKETING_EXACT_PUBLIC_ROUTE_TARGETS,
   MARKETING_ROUTE_DISPOSITION_LEDGER,
   MARKETING_ROUTE_HEALTH_TARGETS,
   MARKETING_ROUTE_MANIFEST,
+  PRODUCT_ROUTE_RECIPES,
+  productEvidenceDeclarationIssue,
 } from './routeManifest';
 export type {
   AudienceLegality,

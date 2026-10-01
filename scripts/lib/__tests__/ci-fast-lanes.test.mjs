@@ -23,10 +23,13 @@ import {
   MARKETING_CERTIFICATION_COMMAND,
   runCommandPool,
   runDesignConformance,
+  runMergeGroupGuards,
   runStructural,
+  SOURCE_GUARDS,
   STRUCTURAL_DEFAULT_CONCURRENCY,
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
   STRUCTURAL_WEB_JOB_PREFIXES,
+  selectSourceGuards,
   stripGitFetchNoise,
   structuralConcurrency,
   structuralLocks,
@@ -39,7 +42,9 @@ import {
 import {
   INVARIANT_SCANNED_PATHS,
   isInvariantScannedPath,
+  readFeedbackGuardPaths,
 } from '../../invariants/scanned-paths.mjs';
+import { classifyCiRepoLanes } from '../ci-repo-lanes.mjs';
 import { classifyProductLanes } from '../product-lane-classifier.mjs';
 
 const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
@@ -52,7 +57,7 @@ const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
   )
 );
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 const SUMMER_BRIDGE_COVERAGE_COMMAND =
   'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts';
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -88,6 +93,7 @@ describe('CI control selector', () => {
       expect(result.status, result.stderr).toBe(0);
       const scriptCommand = readFileSync(capture, 'utf8')
         .split('\n')
+        // The control pool runs commands concurrently, so match the suite, not the order.
         .find(
           command =>
             command.startsWith('exec vitest --root scripts ') &&
@@ -437,18 +443,14 @@ describe('runStructural screenshot contract discovery', () => {
     expect(web).toContain(
       'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs'
     );
-    // Merge-group-only guards also gate PRs so they cannot poison the queue.
-    expect(
-      web.some(
-        command =>
-          command.includes(
-            'tests/unit/analytics-metrics-layer-guard.test.ts'
-          ) &&
-          command.includes(
-            'tests/unit/design-system/component-family-ratchet.test.ts'
-          )
-      )
-    ).toBe(true);
+    // Merge-group-only guards gate PRs in their own web lane (component-family
+    // ratchet is inside tests/unit/design-system), not a structural command.
+    expect(LANE_COMMANDS['merge-group-guards']).toContain(
+      'tests/unit/analytics-metrics-layer-guard.test.ts'
+    );
+    expect(LANE_COMMANDS['merge-group-guards']).toContain(
+      'tests/unit/design-system'
+    );
     expect(web.every(command => !python.includes(command))).toBe(true);
     // Every @jovie/web Vitest run (shared apps/web coverage lock) is web's.
     for (const command of all) {
@@ -463,6 +465,27 @@ describe('runStructural screenshot contract discovery', () => {
     );
     // Consumed, so nested lane suites see the unsplit pool.
     expect(process.env.CI_FAST_STRUCTURAL_WEB).toBeUndefined();
+  });
+
+  it('shell-quotes merge-group guard tests under route groups', () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    const execute = vi.fn().mockReturnValue({ code: 0, output: '' });
+    runMergeGroupGuards({
+      execute,
+      changed: [
+        'apps/web/app/app/(shell)/library/page.test.tsx',
+        'apps/web/tests/e2e/skipped.test.ts',
+        'apps/web/gone.test.ts',
+      ],
+      exists: file => file !== 'apps/web/gone.test.ts',
+    });
+    const command = execute.mock.calls[0][0];
+    expect(command).toContain("'app/app/(shell)/library/page.test.tsx'");
+    expect(command).not.toContain('skipped.test.ts');
+    expect(command).not.toContain('gone.test.ts');
+    // The composed command must parse under /bin/sh; unquoted route-group
+    // parens used to break it with `Syntax error: "(" unexpected`.
+    expect(spawnSync('/bin/sh', ['-n'], { input: command }).status).toBe(0);
   });
 
   it('uses the default executor on the structural skip path', async () => {
@@ -630,6 +653,47 @@ describe('invariant-scanned structural selection', () => {
       LATENCY_ALLOWLIST_PATH,
     ]) {
       expect(isInvariantScannedPath(path), path).toBe(true);
+    }
+  });
+
+  it('isolates unavailable feedback qualification inputs from lane selection', () => {
+    const path = 'scripts/lib/__tests__/ci-fast-lanes.test.mjs';
+    const read = () =>
+      JSON.stringify({ lessons: [{ guards: [{ path }, { path: null }] }] });
+    expect(readFeedbackGuardPaths(read)).toEqual([path]);
+    for (const content of ['{', '{}', '{"lessons":[{}]}']) {
+      expect(readFeedbackGuardPaths(() => content)).toEqual([]);
+    }
+    expect(
+      readFeedbackGuardPaths(() => {
+        throw new Error('missing inventory');
+      })
+    ).toEqual([]);
+    expect(isInvariantScannedPath('scripts/invariants/validate.mjs')).toBe(
+      true
+    );
+  });
+
+  it('routes the feedback inventory to the control lane', () => {
+    const plan = classifyCiRepoLanes(['LESSONS.guards.json']);
+    expect(plan.runSymphonyControl).toBe(true);
+    expect(plan.runJovieProduct).toBe(false);
+  });
+
+  it('routes every feedback inventory and linked guard edit through invariants', async () => {
+    const paths = new Set([
+      'LESSONS.md',
+      'LESSONS.guards.json',
+      ...readFeedbackGuardPaths(),
+    ]);
+    for (const path of paths) {
+      expect(isInvariantScannedPath(path), path).toBe(true);
+      const { execute } = await runFor(
+        'pull_request',
+        [path],
+        classifyProductLanes([path]).selectedLanes
+      );
+      expect(invariantRuns(execute), path).toBe(1);
     }
   });
 
@@ -823,8 +887,8 @@ exit 0
         expect(result.status, result.stderr).toBe(1);
         const report = JSON.parse(readFileSync(output, 'utf8'));
         expect(report.setupError).toBeNull();
-        // The typecheck group also runs the web tests ratchet after typecheck.
-        expect(report.lanes).toHaveLength(scenario === 'other-lane' ? 2 : 1);
+        // The typecheck group also runs the web tests + stories ratchets.
+        expect(report.lanes).toHaveLength(scenario === 'other-lane' ? 3 : 1);
         expect(report.lanes[0].status).toBe('failure');
         const diagnostic = report.lanes[0].logExcerpt;
         expect(diagnostic.length).toBeLessThanOrEqual(1200);
@@ -1709,5 +1773,129 @@ describe('failing test identities in lane excerpts', () => {
     expect(lines.every(line => line.length <= 200)).toBe(true);
     expect(extractFailureIdentities('all good\n')).toEqual([]);
     expect(extractFailureIdentities(undefined)).toEqual([]);
+  });
+});
+
+// Guards that read their inputs from disk escape PR selection by import graph
+// and structural path patterns, so the merge queue met each one first:
+// #18703 landed a cron workflow without `# clock-class:` (ci-schedule-inventory
+// ran nowhere), and node-environment-files / static-revalidate-policy ejected
+// merge groups for inputs their source PRs never checked.
+describe('source-read guard selection', () => {
+  const selected = (event, files) =>
+    selectSourceGuards(event, files).map(guard => guard.id);
+
+  it.each([['pull_request'], ['merge_group'], ['push']])(
+    'runs ci-schedule-inventory on %s when a workflow changes',
+    event => {
+      expect(
+        selected(event, ['.github/workflows/upstash-quota-headroom.yml'])
+      ).toEqual(['ci-schedule-inventory']);
+    }
+  );
+
+  it.each([
+    ['scripts/lib/ci-schedule-inventory.mjs', ['ci-schedule-inventory']],
+    [
+      'scripts/lib/__tests__/ci-schedule-inventory.test.mjs',
+      ['ci-schedule-inventory'],
+    ],
+    ['.github/workflows/nested/not-loaded.yml', []],
+    ['.github/scripts/run-actionlint.sh', []],
+    [
+      'apps/web/tests/unit/lib/auth/redis-command-budget.test.ts',
+      ['node-environment-files'],
+    ],
+    ['apps/web/app/api/cron/example/route.test.ts', ['node-environment-files']],
+    ['apps/web/eslint-rules/rule.test.js', ['node-environment-files']],
+    ['apps/web/scripts/tool.test.mjs', ['node-environment-files']],
+    ['apps/web/tests/node-environment-files.json', ['node-environment-files']],
+    ['apps/web/tests/setup-optimized.ts', ['node-environment-files']],
+    [
+      'apps/web/vitest.config.fast.mts',
+      ['node-environment-files', 'static-revalidate-policy'],
+    ],
+    ['apps/web/lib/queries/fetch.ts', ['static-revalidate-policy']],
+    [
+      'apps/web/app/(marketing)/download/page.tsx',
+      ['static-revalidate-policy'],
+    ],
+    [
+      'apps/web/tests/unit/marketing/static-revalidate-policy.test.ts',
+      ['node-environment-files', 'static-revalidate-policy'],
+    ],
+    ['apps/web/tests/e2e/public-profile-smoke.spec.ts', []],
+    ['apps/ios/Jovie/App.swift', []],
+  ])('selects the guards that read %s on a PR', (path, guards) => {
+    expect(selected('pull_request', [path])).toEqual(guards);
+  });
+
+  it('keeps web-only guards to PRs; web merge groups already run them', () => {
+    for (const path of [
+      'apps/web/lib/queries/fetch.ts',
+      'apps/web/tests/node-environment-files.json',
+    ]) {
+      expect(classifyProductLanes([path]).selectedLanes).toContain('web');
+      expect(selected('merge_group', [path])).toEqual([]);
+      expect(selected('push', [path])).toEqual([]);
+    }
+  });
+
+  it('fails closed onto guards for manual, local, and unreadable diffs', () => {
+    const all = SOURCE_GUARDS.map(guard => guard.id);
+    // Manual dispatch runs web Unit Tests and structural, which carry the rest.
+    expect(selected('workflow_dispatch', ['README.md'])).toEqual([
+      'ci-schedule-inventory',
+    ]);
+    expect(selected('', ['README.md'])).toEqual(all);
+    expect(selected('pull_request', null)).toEqual(all);
+    expect(selected('pull_request', [])).toEqual(all);
+    expect(selected('merge_group', null)).toEqual(['ci-schedule-inventory']);
+  });
+
+  it('points every guard at a test file that exists', () => {
+    for (const guard of SOURCE_GUARDS) {
+      const dir = guard.command.includes('@jovie/web') ? 'apps/web' : 'scripts';
+      const file = guard.command.split(' ').at(-1);
+      expect(
+        readFileSync(join(REPO_ROOT, dir, file), 'utf8'),
+        guard.id
+      ).toContain('describe(');
+    }
+  });
+});
+
+describe('document review coverage contract', () => {
+  it('runs the same document behavior tests with enforced coverage in existing script contracts', async () => {
+    const { SCRIPT_CONTRACT_VITEST_COMMAND } = await import(
+      '../../ci-fast-lanes.mjs'
+    );
+    expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
+      'lib/__tests__/doc-freshness.test.mjs'
+    );
+    const [contracts, coverage] = SCRIPT_CONTRACT_VITEST_COMMAND.split(' && ');
+    expect(contracts).not.toContain('--coverage');
+    expect(contracts).toContain(
+      'lib/__tests__/component-rendered-certification.test.mjs'
+    );
+    expect(coverage).toMatch(
+      /run lib\/__tests__\/doc-freshness\.test\.mjs --coverage /u
+    );
+    expect(coverage).not.toContain('component-rendered-certification.test.mjs');
+    expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
+      '--coverage.include=lib/doc-review.mjs'
+    );
+    expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
+      '--coverage.include=lib/doc-freshness.mjs'
+    );
+    expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
+      '--coverage.thresholds.perFile=true'
+    );
+    expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
+      '--coverage.thresholds.lines=90'
+    );
+    expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
+      '--coverage.thresholds.branches=80'
+    );
   });
 });

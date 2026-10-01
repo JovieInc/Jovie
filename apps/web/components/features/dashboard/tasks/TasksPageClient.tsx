@@ -35,7 +35,10 @@ import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataConte
 import { providerConfig } from '@/app/app/(shell)/dashboard/releases/config';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { ReleaseTaskDueBadge } from '@/components/features/dashboard/release-tasks/ReleaseTaskDueBadge';
-import { TaskDataTable } from '@/components/features/dashboard/tasks/TaskDataTable';
+import {
+  TASK_DATA_TABLE_MULTILINE_CELL_CONTENT_CLASSNAME,
+  TaskDataTable,
+} from '@/components/features/dashboard/tasks/TaskDataTable';
 import { TaskDescriptionHelper } from '@/components/features/dashboard/tasks/TaskDescriptionHelper';
 import {
   PriorityBars,
@@ -1922,8 +1925,21 @@ export function TasksPageClient() {
       nextDescription !== currentDescription ||
       contentChanged;
 
+    if (!hasChanges) {
+      // Editor initialization and reverted drafts can emit updates without a
+      // change to the saved document. Never clear an in-flight or stale save.
+      if (
+        editorSaveStatus === 'dirty' &&
+        !editorSavingTaskIds.has(selectedTaskEditorId) &&
+        editorExpectedMutationVersionRef.current ===
+          (selectedTask?.mutationVersion ?? null)
+      ) {
+        setEditorSaveStatus('idle');
+      }
+      return;
+    }
+
     if (
-      !hasChanges ||
       !nextTitle ||
       editorSaveStatus !== 'dirty' ||
       editorSavingTaskIds.has(selectedTaskEditorId)
@@ -2010,6 +2026,7 @@ export function TasksPageClient() {
     selectedTaskEditorId,
     selectedTaskEditorContent,
     selectedTaskEditorTitle,
+    selectedTask?.mutationVersion,
     updateTaskAsync,
   ]);
 
@@ -2184,7 +2201,11 @@ export function TasksPageClient() {
           header: 'Tasks',
           size: 9999,
           cell: renderTaskCell,
-          meta: { className: 'px-0' },
+          meta: {
+            className: 'px-0',
+            cellContentClassName:
+              TASK_DATA_TABLE_MULTILINE_CELL_CONTENT_CLASSNAME,
+          },
         }),
       ] as ColumnDef<TaskView, unknown>[],
     [renderTaskCell]
@@ -2460,11 +2481,19 @@ export function TasksPageClient() {
                     }
                     saveStatus={editorSaveStatus}
                     onTitleChange={value => {
+                      if (value === editorTitle) return;
                       editorRevisionRef.current += 1;
                       setEditorTitle(value);
                       setEditorSaveStatus('dirty');
                     }}
                     onDescriptionChange={change => {
+                      if (
+                        change.plainText === editorDescription &&
+                        JSON.stringify(change.content) ===
+                          JSON.stringify(editorDescriptionContent)
+                      ) {
+                        return;
+                      }
                       editorRevisionRef.current += 1;
                       setEditorDescription(change.plainText);
                       setEditorDescriptionContent(change.content);

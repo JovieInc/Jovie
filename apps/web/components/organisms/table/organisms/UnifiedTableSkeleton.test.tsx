@@ -34,11 +34,11 @@ describe('UnifiedTableSkeleton', () => {
     // Skeleton rows have fixed height and live inside <tbody>.
     // UnifiedTable reserves max(skeletonRows, ceil(220px / rowHeight)) rows
     // so loading → empty → populated transitions do not shift layout
-    // (JOV-4869). Default rowHeight is 32px → ceil(220/32) = 7.
+    // (JOV-4869). Default rowHeight is 40px → ceil(220/40) = 6.
     const tbody = container.querySelector('tbody');
     expect(tbody).not.toBeNull();
     const rows = tbody?.querySelectorAll('tr') ?? [];
-    expect(rows.length).toBe(7);
+    expect(rows.length).toBe(6);
   });
 
   it('renders one <td> per column on every skeleton row', () => {

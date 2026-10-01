@@ -25,7 +25,7 @@ Per `.claude/rules/testing.md`, **every bug fix needs a regression test** at the
 
 Complete this section when the PR is a bug fix (`fix:` commits/title, `fix/` branch, or the Bug fix checkbox below):
 
-- [ ] Regression test added or updated (`*.test.*` / `*.spec.*`)
+- [ ] Regression test added or updated (`*.test.*` / `*.spec.*` / `test_*.py`)
 - [ ] `Regression test: <changed test path>` noted in this PR description
 - [ ] OR a bounded exception documents scope, rationale, independent approval,
       expiry, review trigger, and visible residual count

@@ -1,4 +1,27 @@
-import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
+import {
+  type CapabilityDefinition,
+  FEATURE_MATURITY_STATES,
+  type FeatureAccessState,
+  type FeatureAudienceScope,
+  type FeatureMaturity,
+  type MarketingCapabilityId,
+  PRODUCT_CAPABILITIES,
+  type PublicationPermission,
+  ROUTE_CAPABILITY_BINDINGS,
+} from '@/data/product-truth/registry';
+
+export {
+  FEATURE_ACCESS_STATES,
+  FEATURE_AUDIENCE_SCOPES,
+  FEATURE_MATURITY_STATES,
+  type FeatureAccessState,
+  type FeatureAudienceScope,
+  type FeatureMaturity,
+  type MarketingCapabilityId,
+  PUBLICATION_PERMISSIONS,
+  type PublicationPermission,
+  ROUTE_CAPABILITY_BINDINGS,
+} from '@/data/product-truth/registry';
 
 /**
  * Shared feature availability + publication contract (JOV-6216).
@@ -21,35 +44,6 @@ import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
  * interest instead of claiming immediate access. An acquisition experiment
  * succeeding can never promote a proposed feature to available.
  */
-
-export const FEATURE_MATURITY_STATES = [
-  'proposed',
-  'limited_testing',
-  'public_beta',
-  'general_availability',
-] as const;
-export type FeatureMaturity = (typeof FEATURE_MATURITY_STATES)[number];
-
-/** Explicit general-versus-ICP audience scope for a capability. */
-export const FEATURE_AUDIENCE_SCOPES = ['general', 'icp'] as const;
-export type FeatureAudienceScope = (typeof FEATURE_AUDIENCE_SCOPES)[number];
-
-/** Permission to announce a feature — separate from permission to use it. */
-export const PUBLICATION_PERMISSIONS = [
-  'internal_only',
-  'unlisted',
-  'public',
-] as const;
-export type PublicationPermission = (typeof PUBLICATION_PERMISSIONS)[number];
-
-/** Permission to use a feature — separate from permission to announce it. */
-export const FEATURE_ACCESS_STATES = [
-  'unavailable',
-  'interest_capture',
-  'enrolled',
-  'open',
-] as const;
-export type FeatureAccessState = (typeof FEATURE_ACCESS_STATES)[number];
 
 export interface FeatureCapabilityRecord {
   readonly capabilityId: string;
@@ -80,167 +74,33 @@ export interface FeatureCapabilityRecord {
   readonly accessLabel?: string;
 }
 
-export const MARKETING_FEATURE_CAPABILITIES = {
-  'jovie-card': {
-    capabilityId: 'jovie-card',
-    maturity: 'proposed',
-    publication: 'public',
-    access: 'interest_capture',
-    audience: 'general',
-    supportedJobs: ['in-person profile sharing', 'card interest capture'],
-    proofAuthorized: true,
-    contentRevision: '2026-09-19',
-    accessLabel:
-      'Jovie Card is planned, not available yet — join the list to register interest.',
-  },
-  voice: {
-    capabilityId: 'voice',
-    maturity: 'limited_testing',
-    publication: 'unlisted',
-    access: 'enrolled',
-    audience: 'general',
-    supportedJobs: ['voice-assisted profile actions'],
-    proofAuthorized: true,
-    contentRevision: '2026-07-11',
-    accessLabel: 'Voice is in limited testing and is not open to everyone.',
-  },
-  'smart-links': {
-    capabilityId: 'smart-links',
-    maturity: 'general_availability',
-    publication: 'public',
-    access: 'open',
-    audience: 'icp',
-    offerId: ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
-    supportedJobs: ['release smart links', 'remembered fan platform choice'],
-    proofAuthorized: true,
-    contentRevision: '2026-08-01',
-  },
-  'artist-profiles': {
-    capabilityId: 'artist-profiles',
-    maturity: 'general_availability',
-    publication: 'public',
-    access: 'open',
-    audience: 'icp',
-    offerId: ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
-    supportedJobs: [
-      'public artist profile',
-      'audience capture',
-      'fan reactivation',
-    ],
-    proofAuthorized: true,
-    contentRevision: '2026-08-01',
-  },
-  'artist-notifications': {
-    capabilityId: 'artist-notifications',
-    maturity: 'general_availability',
-    publication: 'public',
-    access: 'enrolled',
-    audience: 'icp',
-    offerId: ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
-    supportedJobs: ['opt-in fan notifications', 'audience reactivation'],
-    proofAuthorized: true,
-    contentRevision: '2026-08-01',
-  },
-  'instant-merch': {
-    capabilityId: 'instant-merch',
-    maturity: 'limited_testing',
-    publication: 'public',
-    access: 'enrolled',
-    audience: 'icp',
-    supportedJobs: ['merch concept generation'],
-    proofAuthorized: true,
-    contentRevision: '2026-08-01',
-    accessLabel:
-      'Instant Merch is in limited testing inside the authenticated workspace.',
-  },
-  'youtube-thumbnails': {
-    capabilityId: 'youtube-thumbnails',
-    maturity: 'public_beta',
-    publication: 'public',
-    access: 'open',
-    audience: 'icp',
-    supportedJobs: ['youtube thumbnail preview', 'channel packaging'],
-    proofAuthorized: true,
-    contentRevision: '2026-08-01',
-  },
-  pay: {
-    capabilityId: 'pay',
-    maturity: 'public_beta',
-    publication: 'public',
-    access: 'enrolled',
-    audience: 'icp',
-    supportedJobs: ['artist payment surface'],
-    proofAuthorized: true,
-    contentRevision: '2026-08-01',
-    accessLabel: 'Jovie Pay is in public beta for enrolled artists.',
-  },
-  'release-launch': {
-    capabilityId: 'release-launch',
-    maturity: 'general_availability',
-    publication: 'public',
-    access: 'enrolled',
-    audience: 'icp',
-    offerId: ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
-    supportedJobs: ['release launch planning'],
-    proofAuthorized: true,
-    contentRevision: '2026-08-01',
-  },
-  cli: {
-    capabilityId: 'cli',
-    maturity: 'general_availability',
-    publication: 'public',
-    access: 'open',
-    audience: 'icp',
-    supportedJobs: ['read-only public artist data from the command line'],
-    proofAuthorized: true,
-    contentRevision: '2026-08-01',
-  },
-  'public-profile': {
-    capabilityId: 'public-profile',
-    maturity: 'general_availability',
-    publication: 'public',
-    access: 'open',
-    audience: 'general',
-    offerId: ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
-    supportedJobs: ['claimable public profile page'],
-    proofAuthorized: true,
-    contentRevision: '2026-09-17',
-  },
-  'app-download': {
-    capabilityId: 'app-download',
-    maturity: 'general_availability',
-    publication: 'public',
-    access: 'open',
-    audience: 'general',
-    supportedJobs: ['install the Jovie app'],
-    proofAuthorized: true,
-    contentRevision: '2026-08-01',
-  },
-} as const satisfies Readonly<Record<string, FeatureCapabilityRecord>>;
-
-export type MarketingCapabilityId = keyof typeof MARKETING_FEATURE_CAPABILITIES;
+function projectCapability(
+  capabilityId: string,
+  definition: CapabilityDefinition
+): FeatureCapabilityRecord | null {
+  if (!definition.marketing) return null;
+  return {
+    capabilityId,
+    maturity: definition.maturity,
+    publication: definition.publication,
+    access: definition.access,
+    ...definition.marketing,
+  };
+}
 
 /**
- * Canonical route URL → capability binding. Routes without a binding carry
- * no capability claim (editorial, legal, company pages) and are governed by
- * the route manifest alone — a binding is required before a route may claim
- * availability for a feature.
+ * Public-route projection of the product-truth registry
+ * (`data/product-truth/registry.ts`). Only capabilities with a `marketing`
+ * block appear here; product-only capabilities never leak into public routes.
  */
-export const ROUTE_CAPABILITY_BINDINGS = {
-  '/card': 'jovie-card',
-  '/voice': 'voice',
-  '/smart-links': 'smart-links',
-  '/artist-profiles': 'artist-profiles',
-  '/artist-notifications': 'artist-notifications',
-  '/instant-merch': 'instant-merch',
-  '/youtube-thumbnails': 'youtube-thumbnails',
-  '/pay': 'pay',
-  '/launch': 'release-launch',
-  '/cli': 'cli',
-  '/product': 'public-profile',
-  '/new': 'release-launch',
-  '/download': 'app-download',
-} as const satisfies Readonly<Record<string, MarketingCapabilityId>>;
+export const MARKETING_FEATURE_CAPABILITIES = Object.fromEntries(
+  Object.entries(
+    PRODUCT_CAPABILITIES as Readonly<Record<string, CapabilityDefinition>>
+  ).flatMap(([capabilityId, definition]) => {
+    const record = projectCapability(capabilityId, definition);
+    return record ? [[capabilityId, record] as const] : [];
+  })
+) as Readonly<Record<MarketingCapabilityId, FeatureCapabilityRecord>>;
 
 const CAPABILITY_RECORDS: Readonly<Record<string, FeatureCapabilityRecord>> =
   MARKETING_FEATURE_CAPABILITIES;

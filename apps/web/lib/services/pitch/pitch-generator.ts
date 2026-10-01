@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { gateway, generateObject } from '@/lib/ai/sdk';
 import { type AiTelemetryIdentity, buildAiTelemetry } from '@/lib/ai/telemetry';
 import { PITCH_MODEL } from '@/lib/constants/ai-models';
+import { assertCustomerVoiceFloor } from '@/lib/copy/outbound-floor';
 import {
   buildPitchDraftSystemPrompt,
   buildPitchDraftUserPrompt,
@@ -85,7 +86,11 @@ export async function generatePitches(
     }),
   });
 
-  // Safety net: hard-cap each pitch to its platform limit
+  // Safety net: hard-cap each pitch to its platform limit, then gate the
+  // customer-voice copy floor before any pitch can ship (canon/VOICE.md).
+  for (const [platform, text] of Object.entries(object)) {
+    assertCustomerVoiceFloor(text, `pitch:${platform}`);
+  }
   const pitches = {
     spotify: truncateToLimit(object.spotify, PLATFORM_LIMITS.spotify),
     appleMusic: truncateToLimit(object.appleMusic, PLATFORM_LIMITS.appleMusic),
@@ -132,14 +137,26 @@ export async function generatePitchDraft(params: {
     }),
   });
 
+  const subjectLine = object.subjectLine?.trim() || null;
+  const body = truncateToLimit(object.body.trim(), destination.characterLimit);
+
+  // Copy floor (canon/VOICE.md): the draft persists on the release and ships
+  // in the customer's voice; refuse to produce floor-breaking copy.
+  if (subjectLine) {
+    assertCustomerVoiceFloor(subjectLine, 'pitch-draft:subject', {
+      headline: true,
+    });
+  }
+  assertCustomerVoiceFloor(body, 'pitch-draft:body');
+
   return {
     pitch: {
       target: destination.target,
       platform: destination.platform,
       destinationLabel: destination.label,
       audience: destination.audience,
-      subjectLine: object.subjectLine?.trim() || null,
-      body: truncateToLimit(object.body.trim(), destination.characterLimit),
+      subjectLine,
+      body,
       generatedAt: new Date().toISOString(),
       modelUsed: PITCH_MODEL,
     },

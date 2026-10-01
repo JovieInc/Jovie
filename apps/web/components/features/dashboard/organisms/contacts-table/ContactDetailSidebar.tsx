@@ -1,15 +1,15 @@
 'use client';
 
 import {
-  Badge,
+  badgeVariants,
   type CommonDropdownItem,
-  Label,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@jovie/ui';
+import { Check, Copy, Trash2 } from 'lucide-react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
@@ -17,10 +17,14 @@ import {
   DrawerEditableTextField,
   DrawerEntityAvatar,
   DrawerPropertyRow,
-  EntityHeaderCard,
+  EntityHeader,
   EntityTabbedRail,
 } from '@/components/molecules/drawer';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
+import {
+  type DrawerHeaderAction,
+  DrawerHeaderActions,
+} from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
 import {
   CONTACT_ROLE_OPTIONS,
@@ -28,9 +32,10 @@ import {
   getContactRoleLabel,
   summarizeTerritories,
 } from '@/lib/contacts/constants';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
+import { cn } from '@/lib/utils';
 import type { ContactChannel, ContactRole } from '@/types/contacts';
-import { useContactDetailHeaderParts } from './ContactDetailHeader';
 
 function getPreferredChannelLabel(
   channel: ContactChannel | null | undefined
@@ -49,6 +54,81 @@ const CONTACT_TERRITORY_OPTIONS = CONTACT_TERRITORY_PRESETS.map(territory => ({
   value: territory,
   label: territory,
 }));
+
+function useContactDetailHeaderParts({
+  role,
+  customLabel,
+  email,
+  onDelete,
+  onClose,
+  menuItems,
+}: Readonly<{
+  role: ContactRole;
+  customLabel?: string | null;
+  email?: string | null;
+  onDelete: () => void;
+  onClose?: () => void;
+  menuItems?: readonly CommonDropdownItem[];
+}>) {
+  const notifications = useNotifications();
+  const [isCopied, setIsCopied] = useState(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    },
+    []
+  );
+
+  const handleCopyEmail = useCallback(() => {
+    if (!email) return;
+    void navigator.clipboard.writeText(email);
+    notifications.success('Email copied');
+    setIsCopied(true);
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    copyTimeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
+  }, [email, notifications]);
+
+  const primaryActions: DrawerHeaderAction[] = [];
+  if (email) {
+    // eslint-disable-next-line react-hooks/refs -- ref value read is intentional for action state
+    primaryActions.push({
+      id: 'copy',
+      label: isCopied ? 'Copied!' : 'Copy email',
+      icon: Copy,
+      activeIcon: Check,
+      isActive: isCopied,
+      onClick: handleCopyEmail,
+    });
+  }
+  const overflowActions: DrawerHeaderAction[] = [
+    { id: 'delete', label: 'Delete Contact', icon: Trash2, onClick: onDelete },
+  ];
+
+  return {
+    title: getContactRoleLabel(role, customLabel),
+    actions:
+      primaryActions.length > 0 || overflowActions.length > 0 || onClose ? (
+        <DrawerHeaderActions
+          primaryActions={primaryActions}
+          overflowActions={overflowActions}
+          menuItems={menuItems}
+          onClose={onClose}
+        />
+      ) : undefined,
+    primaryActions,
+    overflowActions,
+  };
+}
+
+const CONTACT_SECTION_LABEL_CLASSNAME =
+  'inline-flex cursor-pointer items-center text-app font-medium tracking-normal leading-none text-secondary-token';
+
+const CONTACT_TERRITORY_CHIP_CLASSNAME = cn(
+  badgeVariants({ size: 'sm' }),
+  'rounded-md border border-subtle bg-surface-0 px-1.5 text-3xs text-secondary-token'
+);
 
 function contactFieldActions(field: string, value: string | null | undefined) {
   if (field === 'email' && value) {
@@ -261,7 +341,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       contentClassName='pt-2'
       entityHeader={
         contact ? (
-          <EntityHeaderCard
+          <EntityHeader
             layout='grid'
             title={contactDisplayName}
             subtitle={roleLabel}
@@ -271,7 +351,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             reserveSubtitleSlot
             reserveMetaSlot
             metaOverflow='scroll'
-            image={
+            thumbnail={
               <DrawerEntityAvatar
                 name={contactDisplayName}
                 testId='contact-entity-avatar-frame'
@@ -280,12 +360,9 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             meta={
               territorySummary ? (
                 <div className='flex items-center gap-1.5 text-2xs text-tertiary-token'>
-                  <Badge
-                    size='sm'
-                    className='rounded-md border border-subtle bg-surface-0 px-1.5 text-3xs text-secondary-token'
-                  >
+                  <span className={CONTACT_TERRITORY_CHIP_CLASSNAME}>
                     {territorySummary}
-                  </Badge>
+                  </span>
                 </div>
               ) : undefined
             }
@@ -305,9 +382,9 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                 title='Role'
                 className='space-y-2 border-b border-subtle pb-3'
               >
-                <Label className='text-app text-secondary-token'>
+                <span className={CONTACT_SECTION_LABEL_CLASSNAME}>
                   Contact Type
-                </Label>
+                </span>
                 <Select value={contact.role} onValueChange={handleRoleChange}>
                   <SelectTrigger aria-label='Contact Type'>
                     <SelectValue>{roleLabel}</SelectValue>
@@ -367,9 +444,9 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                   className='space-y-2 border-b border-subtle pb-3'
                 >
                   <div className='space-y-2'>
-                    <Label className='text-app text-secondary-token'>
+                    <span className={CONTACT_SECTION_LABEL_CLASSNAME}>
                       Default Action
-                    </Label>
+                    </span>
                     <Select
                       value={contact.preferredChannel || ''}
                       onValueChange={handlePreferredChannelChange}
@@ -396,12 +473,9 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                 <DrawerPropertyRow
                   label='Coverage'
                   value={
-                    <Badge
-                      size='sm'
-                      className='rounded-md border border-subtle bg-surface-0 px-1.5 text-3xs text-secondary-token'
-                    >
+                    <span className={CONTACT_TERRITORY_CHIP_CLASSNAME}>
                       {territorySummary}
-                    </Badge>
+                    </span>
                   }
                   labelWidth={96}
                   labelClassName='normal-case tracking-normal text-xs'

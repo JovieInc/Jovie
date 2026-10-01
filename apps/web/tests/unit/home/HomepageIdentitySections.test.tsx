@@ -1,5 +1,5 @@
-// Canonical Pen homepage v3 body and close (dark launch behind HOMEPAGE_V3_ENABLED).
-import { fireEvent, render, screen, within } from '@testing-library/react';
+// Homepage v3 body and the link-claim close (live since 2026-09-28).
+import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageIdentityClose } from '@/components/homepage/HomepageIdentityClose';
 import {
@@ -142,36 +142,25 @@ describe('HomepageIdentitySections', () => {
 });
 
 describe('HomepageIdentityClose', () => {
-  it('repeats the certified name search action when gated (JOV-5085)', () => {
-    render(<HomepageIdentityClose />);
+  it('repeats the hero jov.ie/you claim as the only close action', () => {
+    for (const waitlist of [true, false]) {
+      gate.WAITLIST_ENABLED = waitlist;
+      const { unmount } = render(<HomepageIdentityClose />);
 
-    const section = screen.getByRole('region', {
-      name: 'Make it your Jovie profile.',
-    });
-    expect(section).toBe(screen.getByTestId('marketing-section-cta'));
-    expect(section).toHaveAttribute('data-homepage-testid', 'homepage-close');
-    expect(within(section).getByRole('combobox')).toHaveAttribute(
-      'placeholder',
-      'Search your name'
-    );
-    expect(within(section).getByTestId('homepage-close-cta')).toHaveTextContent(
-      'Find me'
-    );
-    expect(within(section).queryAllByRole('link')).toHaveLength(0);
-    expect(
-      within(section).queryByText('Request access')
-    ).not.toBeInTheDocument();
-  });
-
-  it('returns focus to the hero name search while the waitlist is off', () => {
-    gate.WAITLIST_ENABLED = false;
-    render(
-      <>
-        <input id='homepage-name-search' aria-label='Name' />
-        <HomepageIdentityClose />
-      </>
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Find your profile' }));
-    expect(screen.getByLabelText('Name')).toHaveFocus();
+      const section = screen.getByRole('region', {
+        name: 'Make it your Jovie profile.',
+      });
+      expect(section).toBe(screen.getByTestId('marketing-section-cta'));
+      expect(section).toHaveAttribute('data-homepage-testid', 'homepage-close');
+      expect(
+        within(section).getByTestId('homepage-close-claim-form')
+      ).toHaveAttribute('action', '/start');
+      expect(
+        within(section).getByTestId('homepage-close-claim-cta')
+      ).toHaveTextContent('Claim');
+      expect(within(section).queryAllByRole('link')).toHaveLength(0);
+      expect(within(section).queryByText('Search your name')).toBeNull();
+      unmount();
+    }
   });
 });

@@ -22,13 +22,13 @@ export interface ProductUpdateTemplateData {
 export function getProductUpdateSubject(
   data: ProductUpdateTemplateData
 ): string {
-  return `What's new at ${APP_NAME} — v${data.version}`;
+  return `What's new at ${APP_NAME}: v${data.version}`;
 }
 
 export function getProductUpdateText(data: ProductUpdateTemplateData): string {
   const unsubscribeUrl = `${BASE_URL}/api/changelog/unsubscribe?token=${data.unsubscribeToken}`;
 
-  return `What's new at ${APP_NAME} — v${data.version} (${data.date})
+  return `What's new at ${APP_NAME}: v${data.version} (${data.date})
 
 ${data.entriesText}
 

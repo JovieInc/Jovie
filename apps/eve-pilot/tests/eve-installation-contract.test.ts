@@ -5,20 +5,25 @@ import { describe, expect, it } from 'vitest';
 const pilotRoot = process.cwd();
 
 describe('Eve installation contract', () => {
-  it('keeps the pinned Eve runtime and bundled docs discoverable', () => {
+  it('keeps runtime pins synchronized and bundled docs discoverable', () => {
     const packageJson = JSON.parse(
       readFileSync(resolve(pilotRoot, 'package.json'), 'utf8')
     ) as {
       packageManager?: string;
-      dependencies?: { eve?: string };
+      dependencies?: { ai?: string; eve?: string };
     };
+    const lockfile = readFileSync(resolve(pilotRoot, 'pnpm-lock.yaml'), 'utf8');
 
     // Keep this pin in lockstep with the package.json dependency; dependabot
     // bumps edit the manifest but not this test.
-    const EVE_PIN = '0.63.0';
+    const EVE_PIN = '0.67.2';
 
     expect(packageJson.packageManager).toBe('pnpm@9.15.9');
     expect(packageJson.dependencies?.eve).toBe(EVE_PIN);
+    expect(lockfile).toContain(
+      `      ai:\n        specifier: ${packageJson.dependencies?.ai}\n`
+    );
+    expect(lockfile).toContain(`  ai@${packageJson.dependencies?.ai}:`);
     expect(
       existsSync(resolve(pilotRoot, 'node_modules/eve/docs/README.md'))
     ).toBe(true);

@@ -6,12 +6,14 @@ import { APP_ROUTES } from '@/constants/routes';
 
 const {
   mockPathname,
+  mockSearchParams,
   mockSignOut,
   mockProfileHref,
   mockStartNavigationTelemetry,
   mockTrackNavigationImpressions,
 } = vi.hoisted(() => ({
-  mockPathname: vi.fn(() => APP_ROUTES.CHAT),
+  mockPathname: vi.fn<() => string>(() => APP_ROUTES.CHAT),
+  mockSearchParams: vi.fn(() => new URLSearchParams()),
   mockSignOut: vi.fn(),
   mockProfileHref: vi.fn(() => '/timwhite'),
   mockStartNavigationTelemetry: vi.fn(),
@@ -20,6 +22,7 @@ const {
 
 vi.mock('next/navigation', () => ({
   usePathname: () => mockPathname(),
+  useSearchParams: () => mockSearchParams(),
 }));
 
 vi.mock('@/hooks/useClerkSafe', () => ({
@@ -42,20 +45,14 @@ vi.mock('@/lib/tracking/navigation-telemetry', () => ({
     mockTrackNavigationImpressions(...args),
 }));
 
-const EXPANDED_LABELS = [
-  'Inbox',
-  'New Chat',
-  'Library',
-  'Contacts',
-  'Calendar',
-  'Tasks',
-  'Presence',
-] as const;
+const EXPANDED_LABELS = ['Home', 'Identity', 'Work', 'Audience'] as const;
 
 describe('DashboardMobileTabs', () => {
   beforeEach(() => {
     mockPathname.mockReset();
     mockPathname.mockReturnValue(APP_ROUTES.CHAT);
+    mockSearchParams.mockReset();
+    mockSearchParams.mockReturnValue(new URLSearchParams());
     mockSignOut.mockReset();
     mockProfileHref.mockReset();
     mockProfileHref.mockReturnValue('/timwhite');
@@ -63,7 +60,7 @@ describe('DashboardMobileTabs', () => {
     mockTrackNavigationImpressions.mockReset();
   });
 
-  it('keeps global destinations primary and artist destinations behind More', () => {
+  it('keeps the first three job destinations direct and Audience behind More', () => {
     render(<DashboardMobileTabs />);
 
     const tabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
@@ -72,9 +69,9 @@ describe('DashboardMobileTabs', () => {
     const directLinks = within(tabs).getAllByRole('link');
 
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([
-      'Inbox',
-      'New Chat',
-      'Library',
+      'Home',
+      'Identity',
+      'Work',
     ]);
     expect(
       within(tabs).getByRole('button', { name: 'More options' })
@@ -89,26 +86,26 @@ describe('DashboardMobileTabs', () => {
     render(<DashboardMobileTabs />);
 
     expect(mockTrackNavigationImpressions).toHaveBeenCalledWith(
-      ['inbox', 'chat', 'library'],
+      ['home', 'presence', 'library'],
       APP_ROUTES.CHAT,
       expect.objectContaining({
         isMobile: true,
-        navVariant: 'canonical_customer_ia_v1',
+        navVariant: 'canonical_identity_work_v1',
       })
     );
     await user.click(screen.getByRole('button', { name: 'More options' }));
-    const contactsLink = screen.getByRole('link', { name: 'Contacts' });
-    contactsLink.addEventListener('click', event => event.preventDefault());
-    await user.click(contactsLink);
+    const audienceLink = screen.getByRole('link', { name: 'Audience' });
+    audienceLink.addEventListener('click', event => event.preventDefault());
+    await user.click(audienceLink);
     expect(mockStartNavigationTelemetry).toHaveBeenCalledExactlyOnceWith({
-      itemId: 'contacts',
+      itemId: 'audience',
       sourcePathname: APP_ROUTES.CHAT,
-      destinationHref: APP_ROUTES.CONTACTS,
+      destinationHref: APP_ROUTES.CONTACTS_AUDIENCE,
       inputMethod: 'pointer',
       context: {
         isElectron: false,
         isMobile: true,
-        navVariant: 'canonical_customer_ia_v1',
+        navVariant: 'canonical_identity_work_v1',
       },
     });
   });
@@ -123,26 +120,54 @@ describe('DashboardMobileTabs', () => {
     });
     const links = within(menu).getAllByRole('link');
 
-    expect(links.slice(0, 7).map(link => link.textContent?.trim())).toEqual(
+    expect(links.slice(0, 4).map(link => link.textContent?.trim())).toEqual(
       EXPANDED_LABELS
     );
-    expect(links.slice(0, 7).map(link => link.getAttribute('href'))).toEqual([
+    expect(links.slice(0, 4).map(link => link.getAttribute('href'))).toEqual([
       APP_ROUTES.DASHBOARD,
-      APP_ROUTES.CHAT,
+      APP_ROUTES.PRESENCE,
       APP_ROUTES.LIBRARY,
-      APP_ROUTES.CONTACTS,
-      APP_ROUTES.CALENDAR,
-      APP_ROUTES.TASKS,
-      APP_ROUTES.PROFILES,
+      APP_ROUTES.CONTACTS_AUDIENCE,
     ]);
-    expect(links.at(7)).toHaveTextContent('Public Profile');
-    expect(links.at(7)).toHaveAttribute('href', '/timwhite');
-    expect(links.at(8)).toHaveTextContent('Settings');
-    expect(links.at(8)).toHaveAttribute('href', APP_ROUTES.SETTINGS);
+    expect(links.at(4)).toHaveTextContent('Public Profile');
+    expect(links.at(4)).toHaveAttribute('href', '/timwhite');
+    expect(links.at(5)).toHaveTextContent('Settings');
+    expect(links.at(5)).toHaveAttribute('href', APP_ROUTES.SETTINGS);
 
-    for (const label of ['Search', 'Touring', 'Audience', 'Releases']) {
+    for (const label of [
+      'Events',
+      'Library',
+      'Links',
+      'Products',
+      'Releases',
+      'Tasks',
+      'Videos',
+    ]) {
       expect(within(menu).queryByRole('link', { name: label })).toBeNull();
     }
+  });
+
+  it('closes More when a query-backed destination keeps the same pathname', async () => {
+    mockPathname.mockReturnValue(APP_ROUTES.CONTACTS);
+    mockSearchParams.mockReturnValue(new URLSearchParams());
+    const user = userEvent.setup();
+    render(<DashboardMobileTabs />);
+
+    await user.click(screen.getByRole('button', { name: 'More options' }));
+    const audienceLink = screen.getByRole('link', { name: 'Audience' });
+    audienceLink.addEventListener('click', event => event.preventDefault());
+    await user.click(audienceLink);
+
+    expect(
+      screen.queryByRole('dialog', { name: 'Expanded Navigation Menu' })
+    ).not.toBeInTheDocument();
+    expect(mockStartNavigationTelemetry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: 'audience',
+        sourcePathname: APP_ROUTES.CONTACTS,
+        destinationHref: APP_ROUTES.CONTACTS_AUDIENCE,
+      })
+    );
   });
 
   it('supports keyboard open and Escape close without moving the tab row', async () => {
@@ -185,7 +210,7 @@ describe('DashboardMobileTabs', () => {
     const menu = within(dialog).getByRole('navigation', {
       name: 'Expanded Navigation Menu',
     });
-    const first = within(menu).getByRole('link', { name: 'Inbox' });
+    const first = within(menu).getByRole('link', { name: 'Home' });
     const last = within(dialog).getByRole('button', { name: 'Sign out' });
     const background = screen.getByText('Background action');
 
@@ -210,52 +235,38 @@ describe('DashboardMobileTabs', () => {
     await waitFor(() => expect(more).toHaveFocus());
   });
 
-  it('marks Inbox active only at the shell root', () => {
+  it('marks Home active only at the shell root', () => {
     const chat = render(<DashboardMobileTabs />);
     const chatTabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
     expect(
-      within(chatTabs).getByRole('link', { name: 'Inbox' })
+      within(chatTabs).getByRole('link', { name: 'Home' })
     ).not.toHaveAttribute('aria-current');
-    expect(
-      within(chatTabs).getByRole('link', { name: 'New Chat' })
-    ).toHaveAttribute('aria-current', 'page');
     chat.unmount();
 
     mockPathname.mockReturnValue(APP_ROUTES.DASHBOARD);
     render(<DashboardMobileTabs />);
-    const inboxTabs = screen.getByRole('navigation', {
+    const homeTabs = screen.getByRole('navigation', {
       name: 'Dashboard Tabs',
     });
     expect(
-      within(inboxTabs).getByRole('link', { name: 'Inbox' })
+      within(homeTabs).getByRole('link', { name: 'Home' })
     ).toHaveAttribute('aria-current', 'page');
   });
 
-  it('keeps Library active in the tab row throughout a canonical release workspace', () => {
-    mockPathname.mockReturnValue('/app/releases/release-123/tasks');
-    render(<DashboardMobileTabs />);
-
-    const tabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
-    expect(within(tabs).getByRole('link', { name: 'Library' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    );
-  });
-
-  it('promotes Tasks into the tab row on its direct route', () => {
-    mockPathname.mockReturnValue(APP_ROUTES.TASKS);
+  it('promotes Audience into the tab row inside its Contacts context', () => {
+    mockPathname.mockReturnValue(APP_ROUTES.CONTACTS);
+    mockSearchParams.mockReturnValue(new URLSearchParams('tab=audience'));
     render(<DashboardMobileTabs />);
 
     const tabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
     const directLinks = within(tabs).getAllByRole('link');
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([
-      'Inbox',
-      'New Chat',
-      'Tasks',
+      'Home',
+      'Identity',
+      'Audience',
     ]);
-    expect(within(tabs).getByRole('link', { name: 'Tasks' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    );
+    expect(
+      within(tabs).getByRole('link', { name: 'Audience' })
+    ).toHaveAttribute('aria-current', 'page');
   });
 });

@@ -20,6 +20,8 @@ import {
   readShippingStateSource,
   resetShippingStateSource,
   SHIPPING_STATE_FRESHNESS_BUDGET_MS,
+  SHIPPING_STATE_POLL_INTERVAL_MS,
+  SHIPPING_STATE_REQUEST_TIMEOUT_MS,
   SHIPPING_STATE_SCHEMA,
   shippingStateReadFromHttp,
   summarizeFreshnessSamples,
@@ -181,6 +183,11 @@ describe('ovie.shipping-state.v1 client', () => {
     expect(disconnected.view.queued.value).toBe(2);
     expect(disconnected.view.inFlight.value).toBe(1);
     expect(healthy.view.productionVerified.value).toBe(true);
+    expect([
+      healthy.view.connection,
+      disconnected.view.connection,
+      apply({ kind: 'unauthorized' }, healthy).view.connection,
+    ]).toEqual(['connected', 'disconnected', 'unauthorized']);
     expect(
       apply(
         { kind: 'projection', payload: projection({ sequence: 3 }) },
@@ -210,6 +217,15 @@ describe('ovie.shipping-state.v1 client', () => {
     expect(expired.view.sourceTime).toBe('2026-08-22T12:00:00.000Z');
     expect(expired.view.truth).toBe('stale');
     expect(expired.view.queued.value).toBe(2);
+    expect(expired.view.flags.has('cacheExpired')).toBe(true);
+    const clockUncertain = apply({
+      kind: 'projection',
+      payload: projection({
+        observationTimestamp: '2026-08-22T12:00:02.001Z',
+      }),
+    });
+    expect(clockUncertain.view.truth).toBe('stale');
+    expect(clockUncertain.view.flags.has('clockUncertain')).toBe(true);
     expect(
       matchesShippingIdentity(healthy.view, {
         correlationId: 'corr-4',
@@ -217,9 +233,19 @@ describe('ovie.shipping-state.v1 client', () => {
         revision: 'rev-4',
       })
     ).toBe(true);
+    expect(summarizeFreshnessSamples([8800, 1200, 4000])).toEqual({
+      samples: [1200, 4000, 8800],
+      p50: 4000,
+      p95: 8800,
+      withinBudget: true,
+    });
     expect(
-      summarizeFreshnessSamples([1200, 4000, 8800]).p95
+      SHIPPING_STATE_POLL_INTERVAL_MS + SHIPPING_STATE_REQUEST_TIMEOUT_MS
     ).toBeLessThanOrEqual(SHIPPING_STATE_FRESHNESS_BUDGET_MS);
+    expect(
+      summarizeFreshnessSamples([SHIPPING_STATE_FRESHNESS_BUDGET_MS + 1])
+        .withinBudget
+    ).toBe(false);
     bindShippingStateSourceForTests({
       identity: 'test-ubuntu',
       read: async () => ({ kind: 'disconnected' }),
@@ -243,6 +269,111 @@ describe('ovie.shipping-state.v1 client', () => {
     expect(shippingStateReadFromHttp(200, projection()).kind).toBe(
       'projection'
     );
+    expect(
+      shippingStateReadFromHttp(200, { schema: 'ovie.shipping-state.v2' }).kind
+    ).toBe('projection');
+  });
+
+  it('keeps the prior identity when a sequence contradicts itself', () => {
+    const healthy = applyShippingStateRead(
+      createShippingMachine(),
+      { kind: 'projection', payload: projection() },
+      T0
+    );
+    const contradictory = applyShippingStateRead(
+      healthy,
+      {
+        kind: 'projection',
+        payload: projection({
+          projectionId: 'proj-conflict',
+          eventId: 'proj-conflict',
+          sourceRevision: 'rev-conflict',
+          correlation: { workId: 'corr-conflict' },
+        }),
+      },
+      T0 + 1000
+    );
+
+    expect(contradictory.view.truth).toBe('degraded');
+    expect(contradictory.view.flags.has('contradictory')).toBe(true);
+    expect(contradictory.view.lastError).toBe(
+      'Contradictory projection at sequence 4'
+    );
+    expect(contradictory.view.projectionId).toBe('proj-1');
+    expect(contradictory.view.revision).toBe('rev-4');
+    expect(contradictory.view.correlationEventId).toBe('corr-4');
+    expect(contradictory.lastAppliedProjectionId).toBe('proj-1');
+  });
+
+  it('makes unsupported and invalid projections explicit without new source metadata', () => {
+    const healthy = applyShippingStateRead(
+      createShippingMachine(),
+      { kind: 'projection', payload: projection() },
+      T0
+    );
+    const unsupported = applyShippingStateRead(
+      healthy,
+      {
+        kind: 'projection',
+        payload: { ...projection(), schema: 'ovie.shipping-state.v2' },
+      },
+      T0 + 1000
+    );
+    expect(unsupported.view.truth).toBe('unknown');
+    expect(unsupported.view.flags.has('unsupportedSchema')).toBe(true);
+    expect(unsupported.view.lastError).toBe(
+      'Unsupported shipping-state schema'
+    );
+    expect(unsupported.view.sourceTime).toBe(healthy.view.sourceTime);
+    expect(parseShippingStateProjection({})).toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
+
+    const invalid = applyShippingStateRead(
+      healthy,
+      { kind: 'projection', payload: { schema: SHIPPING_STATE_SCHEMA } },
+      T0 + 1000
+    );
+    expect(invalid.view.truth).toBe('unknown');
+    expect(invalid.view.flags.has('unsupportedSchema')).toBe(false);
+    expect(invalid.view.lastError).toBe('Invalid shipping-state projection');
+    expect(invalid.view.sourceTime).toBe(healthy.view.sourceTime);
+  });
+
+  it('retains one flat successful snapshot across refresh and timeout', () => {
+    const first = applyShippingStateRead(
+      createShippingMachine(),
+      { kind: 'projection', payload: projection() },
+      T0
+    );
+    const second = applyShippingStateRead(
+      first,
+      {
+        kind: 'projection',
+        payload: projection({
+          sequence: 5,
+          projectionId: 'proj-5',
+          eventId: 'proj-5',
+          sourceRevision: 'rev-5',
+        }),
+      },
+      T0 + 1000
+    );
+    expect(second.view.lastSuccess?.revision).toBe('rev-5');
+    expect(second.view.lastSuccess?.lastSuccess).toBeNull();
+
+    const timedOut = applyShippingStateRead(
+      second,
+      { kind: 'timeout' },
+      T0 + 4000
+    );
+    expect(timedOut.view.truth).toBe('unavailable');
+    expect(timedOut.view.connection).toBe('disconnected');
+    expect(timedOut.view.revision).toBe('rev-5');
+    expect(timedOut.view.sourceTime).toBe(second.view.sourceTime);
+    expect(timedOut.view.lastError).toBe('Shipping-state request timed out');
+    expect(timedOut.view.lastSuccess?.lastSuccess).toBeNull();
   });
 
   it('preserves the last fresh projection across degraded fallback states', () => {

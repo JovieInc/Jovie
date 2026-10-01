@@ -1,10 +1,10 @@
 /**
  * Warm-navigation is only valid when the destination is a desktop-visible
- * link. OqZTF locks the desktop rail to Library / Contacts / Presence; Inbox
- * and Chat stay as header command links. Destinations that live only in the
- * mobile More menu cannot be clicked from `/app` at desktop width, so the
- * performance guard must use a documented route-load contract instead of a
- * hidden `a[href]` selector.
+ * link. JOV-7159 locks the desktop root rail to Home / Presence / Links /
+ * Audience; Inbox and Chat stay as header command links. Destinations that
+ * live only in the mobile More menu cannot be clicked from `/app` at desktop
+ * width, so the performance guard must use a documented route-load contract
+ * instead of a hidden `a[href]` selector.
  */
 
 export type ResponsiveWarmNavReason =

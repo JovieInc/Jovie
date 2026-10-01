@@ -40,19 +40,49 @@ const {
 const CLAMP_BOUND = /(line-clamp-1|line-clamp-2|truncate|sr-only)/;
 const NON_PRODUCT = /\.(test|spec|stories)\.[jt]sx?$/;
 
-/** Full editorial titles are intentional; all other shell headings remain bounded. */
+/**
+ * Full editorial titles are intentional; all other shell headings remain
+ * bounded. Fail-closed: each exempt file is named here and must mark the
+ * heading with data-wrap='editorial-title' (JOV-6906: marketing h1/h2 must
+ * never truncate their value proposition).
+ */
+const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
+  'apps/web/components/marketing/FaqSection.tsx',
+  // Artist Profiles section value propositions stay complete at phone widths.
+  'apps/web/components/marketing/artist-profile/ArtistProfileSectionHeader.tsx',
+  'apps/web/components/marketing/artist-notifications/ArtistNotificationsHero.tsx',
+  // Terminal CTA headlines are the page's closing value proposition; a
+  // two-line clamp truncated /product's at 390px ("…people searc…").
+  'apps/web/components/site/MarketingTerminalCta.tsx',
+  // /product's closing CTA headline is the same terminal value proposition —
+  // the two-line clamp truncated it at 390px, so it renders editorial-title.
+  'apps/web/app/(marketing)/product/ProductLanding.tsx',
+  // /card section titles wrap to three lines at 390px; the clamp cut
+  // "An introduction. Not a list of usernames" mid-sentence.
+  'apps/web/app/(marketing)/card/JovieCardLanding.tsx',
+  // Factory-record solution section headlines are the record's value
+  // proposition; a clamp would truncate authored copy (JOV-7284).
+  'apps/web/app/(marketing)/solutions/[audience]/sections.tsx',
+]);
+
 function hasEditorialTitleContract(
   file: string,
   attrs: string,
   source: string
 ): boolean {
-  return (
-    file === 'apps/web/app/(marketing)/blog/components/BlogCard.tsx' &&
-    /data-wrap=['"]editorial-title['"]/.test(attrs) &&
-    !CLAMP_BOUND.test(attrs) &&
-    /row-span-3 grid[^'"\n]*grid-rows-subgrid/.test(source) &&
-    /row-span-2 grid[^'"\n]*grid-rows-subgrid/.test(source)
-  );
+  if (
+    !/data-wrap=['"]editorial-title['"]/.test(attrs) ||
+    CLAMP_BOUND.test(attrs)
+  ) {
+    return false;
+  }
+  if (file === 'apps/web/app/(marketing)/blog/components/BlogCard.tsx') {
+    return (
+      /row-span-3 grid[^'"\n]*grid-rows-subgrid/.test(source) &&
+      /row-span-2 grid[^'"\n]*grid-rows-subgrid/.test(source)
+    );
+  }
+  return FULL_TITLE_HEADING_FILES.has(file);
 }
 
 function shellSurfaceFiles(): string[] {
@@ -81,6 +111,24 @@ function shellSurfaceFiles(): string[] {
 }
 
 describe('mac-header-two-lines-v1', () => {
+  it('requires the complete-title contract on the Artist Profiles section heading', () => {
+    const file =
+      'apps/web/components/marketing/artist-profile/ArtistProfileSectionHeader.tsx';
+    const attrs = "data-wrap='editorial-title'";
+    expect(hasEditorialTitleContract(file, attrs, '')).toBe(true);
+    expect(hasEditorialTitleContract(file, '', '')).toBe(false);
+    expect(
+      hasEditorialTitleContract(file, `${attrs} className='line-clamp-2'`, '')
+    ).toBe(false);
+    expect(
+      hasEditorialTitleContract(
+        'apps/web/components/shell/Header.tsx',
+        attrs,
+        ''
+      )
+    ).toBe(false);
+  });
+
   it('requires the full-title marker and both shared grid tracks only on the editorial card', () => {
     const file = 'apps/web/app/(marketing)/blog/components/BlogCard.tsx';
     const attrs = "data-wrap='editorial-title'";

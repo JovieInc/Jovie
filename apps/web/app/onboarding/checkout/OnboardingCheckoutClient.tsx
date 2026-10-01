@@ -8,7 +8,7 @@ import { recordOnboardingUpgradeOfferDecision } from '@/app/onboarding/actions/u
 import { Avatar } from '@/components/molecules/Avatar/Avatar';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
-import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { SidebarProvider } from '@/components/organisms/sidebar';
 import {
   emitProofClaimEvent,
   hasStoredProofClaimAttribution,
@@ -366,7 +366,7 @@ export function OnboardingCheckoutClient({
         {/* Error message */}
         {error ? (
           <ContentSurfaceCard
-            className='mb-4 border-destructive/30 bg-destructive/5 px-4 py-3 text-app text-destructive'
+            className='mb-4 border-error/30 bg-error/5 px-4 py-3 text-app text-error'
             role='alert'
           >
             {error}

@@ -25,7 +25,11 @@ import {
 
 const NOW = new Date('2026-09-26T00:05:00.000Z');
 
-function reporter(daily: { cost: number; inputTokens: number }) {
+function reporter(daily: {
+  cost: number;
+  inputTokens: number;
+  model?: string;
+}) {
   return vi.fn(
     async (params: {
       groupBy?: string;
@@ -53,7 +57,7 @@ function reporter(daily: { cost: number; inputTokens: number }) {
       return {
         results: [
           {
-            model: 'anthropic/claude-sonnet-4-20250514',
+            model: daily.model ?? 'zai/glm-5.3',
             totalCost: monthly ? daily.cost * 30 : daily.cost,
             inputTokens: daily.inputTokens * 10,
             requestCount: 10,
@@ -102,7 +106,18 @@ describe('AI Gateway daily spend', () => {
 
     expect(spend.alerts).toEqual([
       'AI Gateway spend $6.00 on 2026-09-25 exceeds $5.00/day',
-      'anthropic/claude-sonnet-4-20250514 averaged 200000 input tokens/request on 2026-09-25',
+      'zai/glm-5.3 averaged 200000 input tokens/request on 2026-09-25',
+    ]);
+  });
+
+  it('alerts on any openai/* or anthropic/* spend line (JOV-7119)', async () => {
+    const spend = await getDailyGatewaySpend(
+      NOW,
+      reporter({ cost: 0.4, inputTokens: 1, model: 'openai/gpt-6-luna' })
+    );
+
+    expect(spend.alerts).toEqual([
+      'banned gateway model openai/gpt-6-luna billed $0.40 across 10 requests on 2026-09-25',
     ]);
   });
 

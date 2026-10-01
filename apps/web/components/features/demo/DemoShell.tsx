@@ -39,7 +39,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarProvider,
-} from '@/components/organisms/Sidebar';
+} from '@/components/organisms/sidebar';
 import {
   PageToolbar,
   PageToolbarActionButton,

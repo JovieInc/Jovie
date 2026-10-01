@@ -23,6 +23,12 @@ import { primeVercelBypassCookie } from './vercel-preview';
 
 const AUTH_READY_ROUTE = APP_ROUTES.DASHBOARD;
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 60_000;
+// The enter route 303s into /app, so page.goto also covers the redirect
+// target's DOMContentLoaded. The bypass-server warmup only pre-compiles the
+// server-side route (curl fetches no JS); the first real browser hit still
+// compiles /app's client modules, which exceeds the nightly suite's 45s
+// navigationTimeout (JOV-7206). Give this navigation its own budget.
+const AUTH_ENTER_NAVIGATION_TIMEOUT_MS = 120_000;
 
 export class TestAuthError extends Error {
   constructor(
@@ -146,6 +152,7 @@ async function enableTestAuthBypass(
   // same origin, so subsequent navigations are authenticated.
   const response = await page.goto(enterUrl, {
     waitUntil: 'domcontentloaded',
+    timeout: AUTH_ENTER_NAVIGATION_TIMEOUT_MS,
   });
 
   // Fail closed with a typed error when the proxy rewrites /api/dev/* to

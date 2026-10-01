@@ -163,7 +163,7 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /NAVIGATION_ABORTED_ERROR_CODE/);
   assert.match(
     mainSource,
-    /maybeShowDesktopAuthHandoff\(resolveNavigationUrl\(validatedURL\)\)/
+    /interceptMainWindowAuthNavigation\(win, resolveNavigationUrl\(validatedURL\)\)/
   );
   assert.match(mainSource, /showDesktopLoadFailure\(win\)/);
   // JOV-3595: blank/crashed-renderer recovery (beyond network did-fail-load).
@@ -505,6 +505,8 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
   for (const fileName of [
     'entitlements.mac.plist',
     'entitlements.mac.inherit.plist',
+    'entitlements.mac.production.plist',
+    'entitlements.mac.staging.plist',
   ]) {
     const entitlements = await readFile(
       join(desktopRoot, 'build', fileName),
@@ -520,6 +522,59 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
       assert.doesNotMatch(entitlements, new RegExp(`<key>${forbidden}</key>`));
     }
   }
+});
+
+// A keychain-access-groups entitlement the embedded profile does not
+// authorize stops the app from launching, so each channel pairs its own.
+test('signed channels pair Touch ID entitlements with a matching Developer ID profile (JOV-6727)', async () => {
+  for (const [config, bundleId] of [
+    ['electron-builder.yml', 'app.jov.ie'],
+    ['electron-builder.staging.yml', 'app.jov.ie.staging'],
+  ]) {
+    const builder = await readFile(join(desktopRoot, config), 'utf8');
+    assert.match(
+      builder,
+      new RegExp(`^appId: ${bundleId.replaceAll('.', '\\.')}$`, 'm')
+    );
+    const entitlementsPath = builder.match(/^ {2}entitlements: (\S+)$/m)?.[1];
+    const profilePath = builder.match(/^ {2}provisioningProfile: (\S+)$/m)?.[1];
+    assert.ok(entitlementsPath && profilePath, `${config} needs both`);
+
+    const appId = `G24T327LXT.${bundleId}`;
+    const entitlements = await readFile(
+      join(desktopRoot, entitlementsPath),
+      'utf8'
+    );
+    assert.match(entitlements, new RegExp(`<string>${appId}</string>`));
+    assert.match(
+      entitlements,
+      new RegExp(`<string>${appId}\\.webauthn</string>`)
+    );
+    const profile = (await readFile(join(desktopRoot, profilePath))).toString(
+      'latin1'
+    );
+    assert.ok(
+      profile.includes(`<string>${appId}</string>`),
+      `${profilePath} must be for ${bundleId}`
+    );
+    assert.ok(
+      profile.includes('<string>G24T327LXT.*</string>'),
+      `${profilePath} must allow the team keychain groups`
+    );
+  }
+
+  // Local builds have no profile, so they must not claim the entitlement.
+  const local = await readFile(
+    join(desktopRoot, 'electron-builder.local.yml'),
+    'utf8'
+  );
+  assert.doesNotMatch(local, /provisioningProfile/);
+  assert.match(local, /^ {2}entitlements: build\/entitlements\.mac\.plist$/m);
+  const base = await readFile(
+    join(desktopRoot, 'build/entitlements.mac.plist'),
+    'utf8'
+  );
+  assert.doesNotMatch(base, /keychain-access-groups/);
 });
 
 test('macOS disables Skia Graphite and only the main window opts out of throttling (JOV-5289)', async () => {
@@ -1229,11 +1284,37 @@ test('desktop main-window hub regression contracts (desktop QA)', async () => {
   );
   assert.match(
     mainSource,
-    /function handleAuthCompletion\([\s\S]{0,200}?if \(completion\.code === lastCompletedAuthCode\) return;/
+    /function handleAuthCompletion\([\s\S]{0,200}?if \(completion\.code === lastCompletedAuthCode\) return 'duplicate';/
   );
   assert.match(
     preloadSource,
     /redeemDesktopAuthReturnCode: \(returnCode: string\) =>[\s\S]{0,120}?REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL/
+  );
+
+  // Touch ID (JOV-6727): WebAuthn is configured only from the pure resolver
+  // (signed build + embedded provisioning profile), the account picker
+  // always answers, state writes are allowlisted, and in-app passkey
+  // completion is limited to the trusted auth surfaces.
+  assert.match(
+    mainSource,
+    /resolveDesktopWebAuthnConfig\(\{[\s\S]{0,300}?embedded\.provisionprofile[\s\S]{0,300}?app\.configureWebAuthn\(\{ touchID: config \}\)/
+  );
+  assert.match(
+    mainSource,
+    /'select-webauthn-account'[\s\S]{0,1200}?\.catch\(\(\) => callback\(\)\)/
+  );
+  assert.match(
+    mainSource,
+    /SET_DESKTOP_PASSKEY_STATE_CHANNEL,[\s\S]{0,300}?applyDesktopPasskeyStateUpdate\(update\)[\s\S]{0,120}?isTrustedIpcSender\(event\)/
+  );
+  assert.match(
+    mainSource,
+    /COMPLETE_DESKTOP_PASSKEY_SIGN_IN_CHANNEL,[\s\S]{0,200}?isTrustedDesktopAuthSender\(event\)[\s\S]{0,120}?!desktopPasskeyAvailable/
+  );
+  assert.match(mainSource, /mode: 0o600/);
+  assert.match(
+    preloadSource,
+    /completeDesktopPasskeySignIn: \(\) =>[\s\S]{0,120}?COMPLETE_DESKTOP_PASSKEY_SIGN_IN_CHANNEL/
   );
 
   // Fix: a no-pending-flow deep link surfaces a visible sign-in retry.
@@ -1269,7 +1350,7 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   const rootLayout = await readFile(join(webRoot, 'app/layout.tsx'), 'utf8');
   const globalsCss = await readFile(join(webRoot, 'app/globals.css'), 'utf8');
   const titlebarSource = await readFile(
-    join(webRoot, 'components/atoms/DesktopTitlebar.tsx'),
+    join(webRoot, 'components/organisms/DesktopTitlebar.tsx'),
     'utf8'
   );
   const runtimeInit = await readFile(
@@ -1358,4 +1439,305 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
   // native control reserve after resize.
   assert.match(globalsCss, /padding-left: var\(--electron-controls-width\);/);
   assert.match(mainSource, /minWidth: 800,/);
+});
+
+test('Ovie recovery main IPC binds the live main window and root frame without a renderer URL', async () => {
+  const source = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const ast = ts.createSourceFile(
+    'main.ts',
+    source,
+    ts.ScriptTarget.Latest,
+    true
+  );
+  const handler = ast.statements.find(statement =>
+    statement
+      .getText(ast)
+      .startsWith('ipcMain.handle(\n  OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL,')
+  );
+  assert.ok(handler, 'real main process must register the narrow handler');
+  const compiled = ts.transpileModule(handler.getText(ast), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  let registered;
+  let request;
+  const mainContents = {
+    getURL: () => 'https://jov.ie/app/ov?runtime=electron',
+  };
+  runInNewContext(compiled, {
+    OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL: 'open-current-ovie-in-browser',
+    ipcMain: {
+      handle(channel, callback) {
+        assert.equal(channel, 'open-current-ovie-in-browser');
+        registered = callback;
+      },
+    },
+    mainWindow: { webContents: mainContents },
+    getIpcSenderUrl: event => event.senderFrame?.url ?? '',
+    URL_DISPOSITION_OPTIONS: { appUrl: 'https://jov.ie', appEnv: 'production' },
+    openCurrentOvieInBrowser: async input => {
+      request = input;
+      return { ok: true };
+    },
+    shell: {
+      openExternal() {
+        throw Error('OS open must be owned by validated boundary');
+      },
+    },
+  });
+  const frame = { parent: null, detached: false, url: mainContents.getURL() };
+  await registered({ sender: mainContents, senderFrame: frame });
+  assert.equal(request.isMainWindow, true);
+  assert.equal(request.isMainFrame, true);
+  assert.equal(request.currentUrl, mainContents.getURL());
+  assert.equal(request.senderUrl, frame.url);
+  assert.equal(request.args.length, 0);
+  await registered(
+    { sender: {}, senderFrame: { ...frame, parent: {} } },
+    'https://evil.example'
+  );
+  assert.equal(request.isMainWindow, false);
+  assert.equal(request.isMainFrame, false);
+  assert.equal(request.args[0], 'https://evil.example');
+  await registered({ sender: mainContents, senderFrame: null });
+  assert.equal(request.isMainFrame, false);
+  await registered({
+    sender: mainContents,
+    senderFrame: { ...frame, detached: true },
+  });
+  assert.equal(request.isMainFrame, false);
+});
+
+test('Ovie recovery real preload sends zero arguments on its dedicated channel', async () => {
+  const source = await readFile(join(desktopRoot, 'src/preload.ts'), 'utf8');
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.CommonJS,
+    },
+  }).outputText;
+  let api;
+  const calls = [];
+  const response = { ok: false, reason: 'blocked-url' };
+  runInNewContext(compiled, {
+    exports: {},
+    process: { platform: 'darwin', versions: { electron: '44' } },
+    document: { documentElement: { dataset: {} } },
+    require(id) {
+      assert.equal(id, 'electron');
+      return {
+        contextBridge: {
+          exposeInMainWorld(name, value) {
+            if (name === 'electronAPI') api = value;
+          },
+        },
+        ipcRenderer: {
+          invoke(...args) {
+            calls.push(args);
+            return Promise.resolve(response);
+          },
+        },
+      };
+    },
+  });
+  assert.equal(await api.openCurrentOvieInBrowser(), response);
+  assert.deepEqual(calls, [['open-current-ovie-in-browser']]);
+});
+
+test('real native cancel wiring retries only an interrupted workspace document', async () => {
+  const source = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const recoverySource = await readFile(
+    join(desktopRoot, 'src/renderer-recovery.ts'),
+    'utf8'
+  );
+  const exports = {};
+  runInNewContext(
+    ts.transpileModule(recoverySource, {
+      compilerOptions: {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.CommonJS,
+      },
+    }).outputText,
+    { exports, URL, setTimeout, clearTimeout }
+  );
+  const ast = ts.createSourceFile(
+    'main.ts',
+    source,
+    ts.ScriptTarget.Latest,
+    true
+  );
+  const declarations = [
+    'restoreMainWindowAfterAuthHandoff',
+    'interceptMainWindowAuthNavigation',
+    'loadReturnedRoute',
+  ];
+  const declarationSource = declarations
+    .map(name => {
+      const declaration = ast.statements.find(
+        node => ts.isFunctionDeclaration(node) && node.name?.text === name
+      );
+      assert.ok(declaration, `real ${name} must exist`);
+      return declaration.getText(ast);
+    })
+    .join('\n');
+  const createWindow = ast.statements.find(
+    node => ts.isFunctionDeclaration(node) && node.name?.text === 'createWindow'
+  );
+  const registrations = [];
+  const visit = node => {
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.getText(ast) === 'win.webContents.on' &&
+      [
+        'did-start-navigation',
+        'did-finish-load',
+        'will-navigate',
+        'will-redirect',
+      ].includes(node.arguments[0]?.text)
+    ) {
+      registrations.push(node.getText(ast));
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(createWindow);
+  assert.equal(registrations.length, 4);
+  const cancelHandler = ast.statements.find(node =>
+    node
+      .getText(ast)
+      .startsWith('ipcMain.handle(\n  CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL,')
+  );
+  assert.ok(cancelHandler);
+  const events = new Map();
+  const loads = [];
+  const handoffs = [];
+  const completions = [];
+  let currentUrl = 'https://jov.ie/app/ov/chat';
+  let cancel;
+  const recovery =
+    exports.createAuthHandoffNavigationRecovery('https://jov.ie');
+  const win = {
+    isDestroyed: () => false,
+    webContents: {
+      id: 7,
+      getURL: () => currentUrl,
+      on: (event, callback) => events.set(event, callback),
+    },
+    loadURL: url => {
+      loads.push(url);
+      return new Promise(resolve => completions.push(resolve));
+    },
+  };
+  const context = {
+    URL,
+    APP_URL: 'https://jov.ie',
+    win,
+    mainWindow: win,
+    mainWindowHiddenForAuthHandoff: true,
+    authNavigationRecovery: recovery,
+    authNavigationRecoveries: new Map([[7, recovery]]),
+    parseDidStartNavigation: exports.parseDidStartNavigation,
+    isChromiumErrorDocument: exports.isChromiumErrorDocument,
+    shouldRecoverAuthHandoffToCanonicalShell:
+      exports.shouldRecoverAuthHandoffToCanonicalShell,
+    buildDesktopBrowserAuthUrl: url =>
+      url.endsWith('/signin') ? '/auth/native-start' : null,
+    buildDesktopAuthHandoffUrl: () => 'https://jov.ie/desktop-auth',
+    buildCentralDesktopAuthUrl: () => '/auth/native-start',
+    resolveNavigationUrl: value => value,
+    showDesktopAuthHandoff: url => handoffs.push(url),
+    showWindow: () => {},
+    getUrlDisposition: () => 'in-app',
+    shouldLoadDesktopAuthRouteInApp: () => false,
+    clearPendingDesktopAuthFlow: () => {},
+    isTrustedDesktopAuthSender: event => event.trusted,
+    CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL: 'close-desktop-auth-window',
+    ipcMain: {
+      handle: (_channel, handler) => {
+        cancel = handler;
+      },
+    },
+    BrowserWindow: {
+      fromWebContents: () => ({
+        isDestroyed: () => false,
+        close: () => context.restoreMainWindowAfterAuthHandoff(),
+      }),
+    },
+  };
+  context.authHandoffWindow = {
+    isDestroyed: () => false,
+    close: () => context.restoreMainWindowAfterAuthHandoff(),
+  };
+  const compiled = ts.transpileModule(
+    `${declarationSource}\n${registrations.join(';\n')};\n${cancelHandler.getText(ast)}`,
+    {
+      compilerOptions: { target: ts.ScriptTarget.ES2022 },
+    }
+  ).outputText;
+  runInNewContext(compiled, context);
+  const redirect = () => {
+    let prevented = false;
+    events.get('will-redirect')(
+      {
+        preventDefault: () => {
+          prevented = true;
+        },
+      },
+      'https://jov.ie/signin',
+      false,
+      true
+    );
+    assert.equal(prevented, true);
+  };
+  // The user left locked OV with an actual top-frame document navigation.
+  events.get('did-start-navigation')({}, 'https://jov.ie/app', false, true);
+  currentUrl = 'https://jov.ie/app'; // partially mounted shell before interception
+  redirect();
+  assert.equal(handoffs.length, 1);
+  assert.equal(cancel({ trusted: true }).ok, true);
+  assert.deepEqual(loads, ['https://jov.ie/app']); // no credentials/manual reload
+  // Successful server-authorized navigation finishes and clears the retry.
+  events.get('did-start-navigation')({}, 'https://jov.ie/app', false, true);
+  events.get('did-finish-load')();
+  completions[0]();
+  await Promise.resolve();
+  context.mainWindowHiddenForAuthHandoff = true;
+  redirect();
+  cancel({ trusted: true });
+  assert.equal(
+    loads.length,
+    1,
+    'an intact authenticated draft must not reload'
+  );
+  // A second interrupted navigation which still needs auth recovers inline.
+  context.mainWindowHiddenForAuthHandoff = true;
+  events.get('did-start-navigation')(
+    {},
+    'https://jov.ie/app/chat',
+    false,
+    true
+  );
+  redirect();
+  cancel({ trusted: true });
+  const previousHandoffs = handoffs.length;
+  events.get('did-start-navigation')(
+    {},
+    'https://jov.ie/app/chat',
+    false,
+    true
+  );
+  events.get('did-finish-load')(); // stale finish must not erase retry protection
+  redirect();
+  assert.equal(loads.at(-1), 'https://jov.ie/desktop-auth');
+  events.get('did-finish-load')();
+  redirect(); // duplicate abort/redirect cannot open another handoff
+  assert.equal(handoffs.length, previousHandoffs);
+  assert.equal(cancel({ trusted: false }).ok, false);
+  // A successful auth handback must never replay the interrupted old route.
+  events.get('did-start-navigation')({}, 'https://jov.ie/app/old', false, true);
+  redirect();
+  context.mainWindowHiddenForAuthHandoff = true;
+  const loadsBeforeHandback = loads.length;
+  context.loadReturnedRoute('/app/returned');
+  assert.deepEqual(loads.slice(loadsBeforeHandback), [
+    'https://jov.ie/app/returned',
+  ]);
 });

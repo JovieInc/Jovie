@@ -38,6 +38,7 @@ export {
   selectCampaignSettingsSchema,
 } from './admin';
 // Agent Registry (Skills Catalog, Tools Catalog, Retouch Jobs)
+export { agentVisibilityDrafts } from './agent-drafts';
 export {
   insertRetouchJobSchema,
   insertSkillsCatalogSchema,
@@ -247,6 +248,20 @@ export {
   workflowRunOutcomes,
   workflowRuns,
 } from './connectors';
+// Canonical Contacts (customer lifecycle)
+export {
+  type Contact,
+  type ContactStageTransition,
+  contactEvidenceReviews,
+  contactStageTransitions,
+  contacts,
+  insertContactSchema,
+  insertContactStageTransitionSchema,
+  type NewContact,
+  type NewContactStageTransition,
+  selectContactSchema,
+  selectContactStageTransitionSchema,
+} from './contacts';
 // Content (Providers, Releases, Recordings, Tracks)
 export {
   type Artist,
@@ -430,6 +445,7 @@ export {
   connectorProviderEnum,
   connectorStatusEnum,
   contactChannelEnum,
+  contactLifecycleStageEnum,
   contactRoleEnum,
   contentSlugTypeEnum,
   contextFactKindEnum,
@@ -487,8 +503,11 @@ export {
   pixelEventTypeEnum,
   pixelForwardStatusEnum,
   playlistStatusEnum,
+  profileApprovalEventEnum,
+  profileApprovalStatusEnum,
   profileClaimRoleEnum,
   profileOwnershipActionEnum,
+  profileRiskyActionEnum,
   providerKindEnum,
   providerLinkOwnerEnum,
   referralCommissionStatusEnum,
@@ -538,20 +557,47 @@ export {
   type NewFeedbackItem,
   selectFeedbackItemSchema,
 } from './feedback';
-// Finance (Owner-only personal financial data — JOV-4609)
+// Finance (Owner-only personal financial data — JOV-4609, JOV-4612)
 export {
   type FinanceAccount,
+  type FinanceAnomaly,
+  type FinanceBalanceSnapshot,
+  type FinanceBudgetSettings,
+  type FinanceBudgetTarget,
+  type FinanceClassificationRule,
   type FinanceExport,
   type FinanceInstitution,
+  type FinanceLedgerEvent,
+  type FinanceSyncState,
   type FinanceTransaction,
+  type FinanceTransactionClassification,
+  type FinanceTransactionSplit,
   financeAccounts,
+  financeAnomalies,
+  financeBalanceSnapshots,
+  financeBudgetSettings,
+  financeBudgetTargets,
+  financeClassificationRules,
   financeExports,
   financeInstitutions,
+  financeLedgerEvents,
+  financeSyncStates,
+  financeTransactionClassifications,
+  financeTransactionSplits,
   financeTransactions,
   type NewFinanceAccount,
+  type NewFinanceAnomaly,
+  type NewFinanceBalanceSnapshot,
+  type NewFinanceBudgetSettings,
+  type NewFinanceBudgetTarget,
+  type NewFinanceClassificationRule,
   type NewFinanceExport,
   type NewFinanceInstitution,
+  type NewFinanceLedgerEvent,
+  type NewFinanceSyncState,
   type NewFinanceTransaction,
+  type NewFinanceTransactionClassification,
+  type NewFinanceTransactionSplit,
 } from './finance';
 // Identity (Cross-platform artist identity links)
 export {
@@ -644,6 +690,14 @@ export {
   selectInvestorUpdateFinalApprovalSchema,
   selectInvestorViewSchema,
 } from './investors';
+// iOS APNs device registrations
+export {
+  IOS_PUSH_ENVIRONMENTS,
+  type IosPushDevice,
+  type IosPushEnvironment,
+  iosPushDevices,
+  type NewIosPushDevice,
+} from './ios-push-devices';
 // Leads (Discovery Pipeline)
 export {
   type DiscoveryKeyword,
@@ -971,6 +1025,7 @@ export {
   type NewModelUsageEvent,
   selectModelExperimentSchema,
 } from './model-experiments';
+export { musicResolverReceipts } from './music-resolver';
 // Notifications (SMS subscribe intents, cross-artist contact identity)
 export {
   insertNotificationContactSchema,
@@ -1040,6 +1095,26 @@ export {
   productUpdateSubscribers,
   selectProductUpdateSubscriberSchema,
 } from './product-update-subscribers';
+// Profile team approvals (JOV-6601 least-privilege owner approval)
+export {
+  insertProfileActionApprovalSchema,
+  insertProfileApprovalEventSchema,
+  type NewProfileActionApproval,
+  type NewProfileApprovalEvent,
+  type ProfileActionApproval,
+  type ProfileApprovalEvent,
+  profileActionApprovals,
+  profileApprovalEvents,
+  selectProfileActionApprovalSchema,
+  selectProfileApprovalEventSchema,
+} from './profile-approvals';
+export {
+  insertProfileInquirySchema,
+  type NewProfileInquiry,
+  type ProfileInquiry,
+  profileInquiries,
+  selectProfileInquirySchema,
+} from './profile-inquiries';
 // Provider-neutral artist search monitoring and issue evidence
 export {
   type ProfileSearchQuery,
@@ -1238,6 +1313,14 @@ export {
   type NewArtistRevenueCohortRow,
   selectArtistRevenueCohortSchema,
 } from './revenue-cohorts';
+export {
+  type CreatorProfileRider,
+  creatorProfileRiders,
+  type NewCreatorProfileRider,
+  RIDER_VISIBILITIES,
+  type RiderSection,
+  type RiderVisibility,
+} from './riders';
 // Sender (Email Quotas, Sending Reputation, Send Attribution)
 export {
   type CreatorEmailQuota,

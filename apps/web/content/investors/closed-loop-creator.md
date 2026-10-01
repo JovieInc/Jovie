@@ -6,8 +6,8 @@ bring attention in, turn attention into owned relationships, choose the next
 high-value action, get approval where judgment matters, execute, and learn from the
 outcome.
 
-This is a thesis and product direction—not a claim that every part of the loop is
-already shipped, automated, or proven at scale.
+This is a thesis and product direction. It does not claim that every part of the
+loop is already shipped, automated, or proven at scale.
 
 ## The owned-asset graph
 
@@ -72,8 +72,7 @@ may become automatic only after their boundaries and failure handling are explic
 
 ## Manual to automated maturity
 
-Automation is earned through repeated, observable success—not switched on because a
-model is available.
+Repeated, observable success earns automation. Model availability alone does not.
 
 1. **Observe:** collect the asset, event, and outcome facts with provenance.
 2. **Suggest:** produce a ranked task and show the evidence and uncertainty.
@@ -87,7 +86,7 @@ model is available.
 
 This progression keeps the product useful on day one. A creator does not need to
 hand over the business to get value; the first win can be better visibility and a
-shorter path from signal to approved action.
+shorter path between a signal and an approved action.
 
 ## Creator Deal Desk and rate-card floors
 
@@ -112,11 +111,11 @@ only the minimum approved payload needed for the task, with consent, purpose, an
 retention rules appropriate to the destination.
 
 Jovie should separate private operating context from sanitized, aggregate product
-learning. Cross-creator learning may use explicit, de-identified patterns—such as
-which task types are commonly useful—not a hidden exchange of one creator's
-contacts, rates, messages, or audience records with another. The product must expose
+learning. Cross-creator learning may use explicit, de-identified patterns, such as
+which task types are commonly useful. It must never exchange one creator's contacts,
+rates, messages, or audience records with another. The product must expose
 what will leave Jovie, where it will go, and what can be revoked. Privacy is a
-launch constraint, not a later compliance paragraph.
+launch constraint.
 
 ## Tim's dogfood loop and the PMF test
 
@@ -124,7 +123,7 @@ Founder dogfood is a fast way to find the sharp edges: Tim can use Jovie against
 real creator work, notice where context is missing, approve or reject suggested
 actions, and record whether the result saved time or created value. That loop is
 important because the product must survive real deadlines, messy contacts, changing
-assets, and judgment calls—not just a polished demo.
+assets, and judgment calls beyond a polished demo.
 
 Dogfood is evidence of usability and problem discovery, not proof of broad
 product-market fit. Each observation should become a testable hypothesis: a task
@@ -134,13 +133,12 @@ by independent creators, with permissioned data and attributable outcomes.
 
 ## What would make the thesis true
 
-The thesis earns credibility if creators repeatedly use Jovie to move from a real
-signal to a better approved action, return because the system remembers the work,
-and can see enough outcome evidence to decide what to do next. The key measures are
-therefore not just generated tasks. They include task acceptance and override
-rates, time from signal to approved execution, completion reliability, creator
-retention around meaningful work, and attributable lift where a defensible baseline
-exists.
+The thesis earns credibility if creators repeatedly use Jovie to turn a real signal
+into a better approved action, return because the system remembers the work, and can
+see enough outcome evidence to decide what to do next. The key measures include task
+acceptance and override rates, approval and execution time, completion reliability,
+creator retention around meaningful work, and attributable lift where a defensible
+baseline exists.
 
 Until those measurements exist, Jovie should describe the Closed-Loop Creator as a
 coherent direction with a staged implementation plan. The promise is ambitious:

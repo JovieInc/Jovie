@@ -32,7 +32,7 @@ export const Release: Story = {
       />
     ),
     title: 'Midnight Drive',
-    details: 'Tim White · Single',
+    subtitle: 'Tim White · Single',
     statusGlyph: (
       <EntityHeaderStatusGlyph
         icon={Radio}
@@ -47,7 +47,7 @@ export const Person: Story = {
   args: {
     thumbnail: <EntityHeaderThumbnail variant='person' name='Maya Vale' />,
     title: 'Maya Vale',
-    details: 'Brand partnerships · Worldwide',
+    subtitle: 'Brand partnerships · Worldwide',
   },
 };
 
@@ -60,6 +60,6 @@ export const Connection: Story = {
       />
     ),
     title: 'Spotify for Artists',
-    details: 'Maya Vale · DSP',
+    subtitle: 'Maya Vale · DSP',
   },
 };

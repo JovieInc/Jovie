@@ -20,7 +20,7 @@ On Windows PowerShell, use the wrapper so Git for Windows Bash is used (not the 
 .\scripts\setup.ps1
 ```
 
-`setup.sh` is idempotent. It checks Node.js (22.x), pnpm (9.15.9), `ripgrep`, Doppler CLI, and GitHub CLI auth, installs missing tools when supported, runs `pnpm install`, and verifies Doppler auth.
+`setup.sh` is idempotent. It checks Node.js (24.x), pnpm (9.15.9), `ripgrep`, Doppler CLI, and GitHub CLI auth, installs missing tools when supported, runs `pnpm install`, and verifies Doppler auth.
 
 Run `./scripts/setup.sh` again on every fresh Git worktree before doing anything else. Worktrees do not share `node_modules`, so dependency installation is per-worktree even when Turbo cache is shared.
 
@@ -28,20 +28,20 @@ Run `./scripts/setup.sh` again on every fresh Git worktree before doing anything
 
 | Tool | Required Version | Enforcement |
 |------|------------------|-------------|
-| **Node.js** | **22.x** (22.23.2+) | `.nvmrc`, `package.json` engines |
+| **Node.js** | **24.x** (24.21.0+) | `.nvmrc`, `package.json` engines |
 | **pnpm** | **9.15.9** (`packageManager`); engines `>=9.15.4 <10` | `package.json` |
 | **Turbo** | 2.8+ | Root devDependencies |
 
-AI agents frequently default to Node 18/20 which **will fail** or cause subtle issues. The entire CI/CD pipeline, build system, and runtime are configured for Node 22 LTS.
+AI agents frequently default to Node 18/20/22 which **will fail** or cause subtle issues. The entire CI/CD pipeline, build system, and runtime are configured for Node 24 LTS.
 
 ### Pre-Flight Checklist
 
 ```bash
-node --version  # Expected: v22.23.2 or higher
+node --version  # Expected: v24.21.0 or higher
 pnpm --version  # Expected: 9.15.9
 
 # If wrong:
-nvm use 22       # or: nvm install 22
+nvm use 24       # or: nvm install 24
 corepack enable && corepack prepare pnpm@9.15.9 --activate
 ```
 
@@ -54,7 +54,7 @@ corepack enable && corepack prepare pnpm@9.15.9 --activate
 | `npx turbo ...` | `pnpm turbo ...` |
 | Running turbo from wrong directory | Always run from repo root |
 | `cd apps/web && pnpm dev` | `pnpm run dev:web:fast` |
-| `node script.js` with Node < 22 | Verify `node --version` first |
+| `node script.js` with Node < 24 | Verify `node --version` first |
 
 ## Doppler (Secrets)
 
@@ -106,11 +106,11 @@ For headless/container environments (Codex, cloud sandboxes, CI runners). Requir
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 1. Node 22 LTS + pnpm
+# 1. Node 24 LTS + pnpm
 curl -fsSL https://fnm.vercel.app/install | bash
 export PATH="$HOME/.local/share/fnm:$PATH"
 eval "$(fnm env)"
-fnm install 22.23.2 && fnm use 22.23.2
+fnm install 24.21.0 && fnm use 24.21.0
 corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 # 2. Doppler CLI
@@ -262,27 +262,22 @@ git worktree remove ../Jovie-agent-1
 
 No configuration is needed — Turbo detects worktrees automatically. Combined with remote caching, agents in separate worktrees get near-instant cache hits.
 
-### Concurrent Commit Pitfall — `git stash` Races Across Worktrees
+### Concurrent Commits Across Worktrees
 
-`git stash` is **repo-global** — every worktree writes to the same `.git/refs/stash` stack. lint-staged backs up the working tree to a stash before running tasks and pops it on cleanup. When multiple worktrees invoke `git commit` concurrently, their lint-staged runs step on each other's backup stashes.
+`git stash` is **repo-global** — every worktree writes to the same
+`.git/refs/stash` stack. The pre-commit hook therefore runs
+`pnpm exec lint-staged --no-stash`: lint-staged still selects files from each
+worktree's staged diff, but it does not create a shared automatic-backup stash.
+Concurrent `git commit` processes in isolated worktrees are supported.
 
-Symptom (from a parallel swarm of worktree agents):
+Do not replace `--no-stash` with stash cleanup or commit serialization, and
+never use `--no-verify`. When changing the hook, run
+`pnpm gate-ladder:test`; its regression creates two linked worktrees, commits in
+both at the same time, and verifies staged-only task inputs with no stash race.
 
-```
-[STARTED] Cleaning up temporary files...
-[FAILED] lint-staged automatic backup is missing!
-husky - pre-commit script failed (code 1)
-```
-
-Important: the commit itself often **succeeds** before husky errors on cleanup. Check `git log --oneline origin/main..HEAD` before assuming the work was lost and retrying — a blind retry after "failure" is how duplicate commits get introduced.
-
-Mitigations (in priority order):
-
-1. **Serialize commits across worktrees** in the orchestrator. Don't fire `git commit` in 5 worktrees at once; queue them.
-2. Before commit, drop only the stale lint-staged backup stashes left by prior failed runs: `git stash list | grep "lint-staged automatic backup" | cut -d: -f1 | xargs -r -n1 git stash drop`. This targets the matching refs by name, so it won't clobber an unrelated stash you have on top. Run it right before the commit, not preemptively.
-3. If you're running long-lived parallel worktree agents (like `/swarm`), dispatch each agent in its own backgrounded turn so their commit windows rarely overlap.
-
-**Never** use `--no-verify` to route around this. The hook failure message is cosmetic, but the fix is coordination, not skipping validation.
+Without the automatic backup, lint-staged leaves task modifications in the
+index when a task fails. Inspect and fix that worktree before retrying the
+commit; do not assume a failed hook restored the index.
 
 ## Quick Troubleshooting
 
@@ -293,7 +288,7 @@ corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 ### "Node version mismatch"
 ```bash
-nvm install 22 && nvm use 22
+nvm install 24 && nvm use 24
 # Or check .nvmrc: cat .nvmrc
 ```
 
@@ -324,6 +319,16 @@ Three workspaces, each on a different machine, with a clear separation of concer
 
 - **Houston** (this repo, MacBook Pro 32 GB) — the **code** workspace. Default profile: `coder`. Claude Code, Codex CLI, Conductor worktrees, and Hermes issue runners all live here. PRs originate here.
 - **Raleigh** (`/Users/timwhite/conductor/workspaces/ops/raleigh`) — the **ops / FounderOS** workspace. Source of truth for `company_state.md`, daily briefings, and task routing.
-- **Hermes-Air** (MacBook Air 16 GB, dedicated) — the **always-on orchestration** node. Runs the Hermes gateway service, gbrain (as server, exposed over Tailscale), and ops crons. Ingests brain dumps (Telegram + Voice Memos) and files Linear issues consumed by Houston's runner. **Does no coding.** See [`.claude/rules/hermes-air.md`](hermes-air.md) and [`docs/HERMES_AIR.md`](../../docs/HERMES_AIR.md).
+- **Hermes-Air** (MacBook Air 16 GB, dedicated): since 2026-09-29 the fleet's always-on **Mac lane**. It hosts the heartbeat-gated self-hosted macOS Actions runner (`jovie-mac`) and a nightly Mac dogfood verifier that files `mac-dogfood` Linear issues. It is a gbrain client of the ops Mac, and the Hermes gateway is retired. **Does not author code unattended.** See [`.claude/rules/hermes-air.md`](hermes-air.md) and [`docs/HERMES_AIR.md`](../../docs/HERMES_AIR.md).
 
 The contract between Hermes-Air and Houston is Linear issues. The contract between Hermes-Air and Raleigh is gbrain over Tailscale. Keep code changes in Houston; keep orchestration on the Air; keep company-state in Raleigh.
+
+## Branch Switches And External Editors
+
+- Stop the worktree's dev server before checkout, stash or stash-pop operations.
+  If Turbopack output is stale afterwards, remove only that worktree's generated
+  `apps/web/.next` cache and restart; preserve source and other active worktrees.
+- Coordinate with another editor before editing a file it has open: close that
+  file there or disable its autosave for the edit. Verify `git diff` and reread
+  the saved file after the edit and before committing. An editor overwrite is a
+  persistence failure; resolve the competing writer before retrying.

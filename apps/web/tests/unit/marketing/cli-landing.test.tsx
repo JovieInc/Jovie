@@ -68,6 +68,11 @@ describe('CLI landing page', () => {
       expect(screen.getByText(item.request)).toBeVisible();
     }
 
+    expect(
+      CLI_DOCUMENTED_COMMANDS.find(item => item.command === 'jovie skill')
+        ?.request
+    ).toBe('Prints the Jovie SKILL.md for agents');
+
     expect(screen.queryByText(/login/i, { selector: 'h2' })).toBeNull();
     expect(screen.queryByText(/oauth/i, { selector: 'h2' })).toBeNull();
     expect(screen.queryByText('npm publish')).toBeNull();
@@ -163,6 +168,23 @@ describe('CLI landing page', () => {
     expect(cliSource).toContain('-v, --version');
     expect(cliSource).toContain('No login or API key');
     expect(isReservedUsername('cli')).toBe(true);
+  });
+
+  it('documents the published CLI Node engines range', () => {
+    const packageJson = JSON.parse(
+      readFileSync(
+        resolve(process.cwd(), '../../packages/jovie-cli/package.json'),
+        'utf8'
+      )
+    ) as { engines?: { node?: string } };
+    const nodeFaq = CLI_FAQ_ITEMS.find(
+      item => item.question === 'Which Node.js version does it need?'
+    );
+
+    expect(packageJson.engines?.node).toBe('>=24.21.0 <25');
+    expect(nodeFaq?.answer).toContain('Node.js 24.21.0');
+    expect(nodeFaq?.answer).toContain('below Node 25');
+    expect(nodeFaq?.answer).toContain('published package engines field');
   });
 
   it('keeps every scrollable command block reachable by keyboard', () => {

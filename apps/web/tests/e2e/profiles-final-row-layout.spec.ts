@@ -107,7 +107,7 @@ async function readFinalRowMetrics(table: Locator): Promise<FinalRowMetrics> {
  * Captures the first real `/api/suggestions` response body in the test
  * process. Reading it later through `Response.json()` asks Chromium for the
  * body, which it evicts once the page navigates or reloads (the auth redirect
- * chain lands on /app/profiles), failing with `Network.getResponseBody: No data
+ * chain lands on /app/presence), failing with `Network.getResponseBody: No data
  * found`. The request still reaches the real server; the response is passed
  * through unchanged.
  */
@@ -170,7 +170,7 @@ test('keeps the final profile row and destination line visible in a constrained 
 
   await setTestAuthBypassSession(page, 'creator-ready');
   await page.goto(
-    `/api/dev/test-auth/enter?persona=creator-ready&redirect=${encodeURIComponent(APP_ROUTES.PROFILES)}`,
+    `/api/dev/test-auth/enter?persona=creator-ready&redirect=${encodeURIComponent(APP_ROUTES.PRESENCE)}`,
     { waitUntil: 'domcontentloaded', timeout: 120_000 }
   );
   await page.waitForURL(/\/app\/profiles(?:$|\?)/, { timeout: 60_000 });
@@ -189,7 +189,7 @@ test('keeps the final profile row and destination line visible in a constrained 
   logMetrics('baseline', baselineMetrics);
 
   await page.goto(
-    `/api/dev/test-auth/enter?persona=creator-ready&fixture=profiles-final-row&redirect=${encodeURIComponent(APP_ROUTES.PROFILES)}`,
+    `/api/dev/test-auth/enter?persona=creator-ready&fixture=profiles-final-row&redirect=${encodeURIComponent(APP_ROUTES.PRESENCE)}`,
     { waitUntil: 'domcontentloaded', timeout: 120_000 }
   );
   await page.waitForURL(/\/app\/profiles(?:$|\?)/, { timeout: 60_000 });
@@ -233,7 +233,7 @@ test('keeps page identity and review status readable at narrow widths', async ({
   const { captured: suggestionsResponse } =
     await captureFirstSuggestionsResponse(page);
   await page.goto(
-    `/api/dev/test-auth/enter?persona=creator-ready&fixture=profiles-final-row&redirect=${encodeURIComponent(APP_ROUTES.PROFILES)}`
+    `/api/dev/test-auth/enter?persona=creator-ready&fixture=profiles-final-row&redirect=${encodeURIComponent(APP_ROUTES.PRESENCE)}`
   );
   await page.waitForURL(/\/app\/profiles(?:$|\?)/);
   const response = await suggestionsResponse;

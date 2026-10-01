@@ -70,7 +70,7 @@ function loadNextConfigForTracingTest(vercelEnv = ''): NextConfigForTest {
         return { withWorkflow: identityConfig };
       case '@vercel/toolbar/plugins/next':
         return () => identityConfig;
-      case '@sentry/nextjs':
+      case '@sentry/nextjs/config':
         return { withSentryConfig: identityConfig };
       default:
         throw new Error(`Unexpected next.config.js dependency: ${specifier}`);
@@ -146,6 +146,26 @@ function turbopackGlobSource(exclude: string): string {
 }
 
 describe('Vercel function config', () => {
+  it('loads the real production config with Sentry source maps enabled', () => {
+    const result = spawnSync(
+      process.execPath,
+      ['-e', "require('./next.config.js')"],
+      {
+        cwd: appWebRoot,
+        env: {
+          ...process.env,
+          NODE_ENV: 'production',
+          NEXT_ENABLE_TOOLBAR: '0',
+          SENTRY_AUTH_TOKEN: 'test-token',
+          VERCEL_ENV: 'production',
+        },
+        encoding: 'utf8',
+      }
+    );
+
+    expect(result.status, result.stderr).toBe(0);
+  });
+
   it.each(['', 'preview', 'production'])(
     'never traces files outside apps/web (VERCEL_ENV=%s)',
     vercelEnv => {
@@ -331,6 +351,17 @@ describe('Vercel function config', () => {
       expect.arrayContaining(screenshotIncludes)
     );
     expect(includes).not.toEqual(expect.arrayContaining(screenshotIncludes));
+
+    // Certification packet files are staged into runtime-data and traced only
+    // into the certification API routes that read them.
+    const certificationIncludes = ['runtime-data/docs/certification/**/*'];
+    expect(includesByRoute['/api/ovie/certifications']).toEqual(
+      certificationIncludes
+    );
+    expect(includesByRoute['/api/ovie/certifications/**']).toEqual(
+      certificationIncludes
+    );
+    expect(includes).not.toEqual(expect.arrayContaining(certificationIncludes));
   });
 
   it('excludes non-runtime repo files from traces without dropping runtime reads', async () => {

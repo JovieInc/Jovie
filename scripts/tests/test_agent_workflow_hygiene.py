@@ -449,8 +449,8 @@ def test_repair_controllers_use_causal_events_instead_of_polling() -> None:
     assert "workflows: ['CI']" in conflicts
 
 
-def test_sha_bound_nightlies_skip_only_repeated_scheduled_heads() -> None:
-    """Expensive clocks fail closed and manual dispatches always execute."""
+def test_changed_evidence_workflows_do_not_use_schedule_dedupe() -> None:
+    """Event-driven evidence lanes execute directly from their changed inputs."""
     action = (
         REPO_ROOT / ".github" / "actions" / "skip-if-unchanged" / "action.yml"
     ).read_text(encoding="utf-8")
@@ -468,9 +468,11 @@ def test_sha_bound_nightlies_skip_only_repeated_scheduled_heads() -> None:
     ):
         workflow = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
         assert "actions: read" in workflow, workflow_name
-        assert "uses: ./.github/actions/skip-if-unchanged" in workflow, workflow_name
-        assert "needs: unchanged" in workflow, workflow_name
-        assert "needs.unchanged.outputs.skip != 'true'" in workflow, workflow_name
+        assert (
+            "uses: ./.github/actions/skip-if-unchanged" not in workflow
+        ), workflow_name
+        assert "needs: unchanged" not in workflow, workflow_name
+        assert "needs.unchanged.outputs.skip" not in workflow, workflow_name
 
     live_model = (WORKFLOWS / "eval-real-model.yml").read_text(encoding="utf-8")
     nightly = (WORKFLOWS / "nightly-tests.yml").read_text(encoding="utf-8")
@@ -1237,8 +1239,8 @@ def test_live_model_work_never_fans_out_from_pull_requests() -> None:
     assert "github.event_name == 'pull_request' && '0'" in deterministic
 
 
-def test_deep_lanes_are_staggered_and_bounded() -> None:
-    """Scheduled exhaustive coverage should not fan out across the runner pool."""
+def test_deep_lanes_are_event_driven_and_bounded() -> None:
+    """Changed-evidence coverage should not fan out across the runner pool."""
     full_matrix = (WORKFLOWS / "e2e-full-matrix.yml").read_text(encoding="utf-8")
     nightly_agent = (WORKFLOWS / "nightly-testing-agent.yml").read_text(
         encoding="utf-8"
@@ -1246,20 +1248,36 @@ def test_deep_lanes_are_staggered_and_bounded() -> None:
 
     assert "max-parallel: 1" in full_matrix
     assert "needs: [context, deterministic]" in nightly_agent
-    assert "'30 4 * * *'" in nightly_agent
+    assert "schedule:" not in nightly_agent
+    assert "push:" in nightly_agent
 
     nightly = (WORKFLOWS / "nightly-tests.yml").read_text(encoding="utf-8")
     screenshots = (WORKFLOWS / "screenshots.yml").read_text(encoding="utf-8")
     harness = (WORKFLOWS / "agent-harness-health-report.yml").read_text(
         encoding="utf-8"
     )
-    assert "'30 23 * * *'" in nightly
+    assert "schedule:" not in nightly
+    assert "push:" in nightly
     screenshot_triggers = screenshots.split("\non:\n", 1)[1].split(
         "\npermissions:", 1
     )[0]
     assert "push:" in screenshot_triggers
     assert "schedule:" not in screenshot_triggers
     assert "'0 9 * * 2'" in harness
+
+
+def test_full_matrix_supersedes_stale_runs_cleanly() -> None:
+    """Main pushes outpace the serial matrix; only the freshest run should
+    survive, and supersession must be a workflow-level cancellation rather
+    than an external mid-test runner kill (JOV-7167)."""
+    workflow = (WORKFLOWS / "e2e-full-matrix.yml").read_text(encoding="utf-8")
+
+    concurrency = workflow.split("\nconcurrency:\n", 1)[1].split(
+        "\njobs:\n", 1
+    )[0]
+    assert "group: e2e-full-matrix-" in concurrency
+    assert "github.event_name" in concurrency
+    assert "cancel-in-progress: true" in concurrency
 
 
 def test_nightly_unit_suite_fetches_storybook_provenance_history() -> None:
@@ -1525,7 +1543,6 @@ def test_api_only_pr_controllers_never_consume_fixed_ci_capacity() -> None:
     assert "Graphite" not in dependabot
     assert "scripts/native-merge-intent.mjs" in dependabot
     assert "--match-head-commit" in (REPO_ROOT / "scripts" / "native-merge-intent.mjs").read_text(encoding="utf-8")
-    assert "workflow_run.workflow_id == 178737329" in dependabot
     adapter = (REPO_ROOT / "scripts" / "dependabot-workflow-run-adapter.mjs").read_text(
         encoding="utf-8"
     )
@@ -1543,9 +1560,7 @@ def test_dependabot_workflow_materializes_trusted_policy_runtime() -> None:
 
     assert "ref: ${{ github.sha }}" in step
     assert "persist-credentials: false" in step
-    assert "github.event.workflow_run.workflow_id == 178737329" in workflow
-    assert "github.event.workflow_run.event == 'pull_request'" in workflow
-    assert "github.event.workflow_run.conclusion == 'success'" in workflow
+    assert "\n  workflow_run:" not in workflow
     assert "actions/download-artifact" not in workflow
     assert "      actions: read" in workflow
     for entrypoint in (
@@ -1563,6 +1578,7 @@ def test_retired_merge_queue_label_has_no_active_producers() -> None:
         REPO_ROOT / ".claude/rules/swarm.md",
         REPO_ROOT / ".github/rulesets/branch-protection.yml",
         WORKFLOWS / "agent-pipeline.yml",
+        # codex-issue-shipper moved to JovieInc/symphony-control and is checked there.
     ]
     forbidden = re.compile(
         r"--(?:add|remove)-label\s+[\"']?merge-queue|"
@@ -1589,14 +1605,13 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     block = _job_block("fleet-gate-refresh.yml", "refresh")
 
     assert "schedule:" not in trigger
-    assert "workflows: [CI, Production Controller]" in trigger
+    assert "workflow_run:" not in trigger
     assert "opened" in trigger
     assert "edited" in trigger
     assert "synchronize" in trigger
     assert "Production Marker Recovery]" not in trigger
     assert "group: fleet-gate-event-refresh" in workflow
     assert "cancel-in-progress: false" in workflow
-    assert "github.event.workflow_run.conclusion != 'cancelled'" in block
     assert "github.event.pull_request.merged != true" in block
     assert "github.event.label.name == 'hold'" in block
     assert "github.event.label.name == 'gated'" in block

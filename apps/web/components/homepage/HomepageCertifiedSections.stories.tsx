@@ -4,8 +4,8 @@ import { HomepageCertifiedSections } from './HomepageCertifiedSections';
 
 // Same real public-profile exports the live homepage mounts (jov.ie/timwhite).
 const previews = {
-  connected: HOMEPAGE_MEDIA_MAP.connected.asset,
-  relationships: HOMEPAGE_MEDIA_MAP.relationships.asset,
+  subscribe: HOMEPAGE_MEDIA_MAP.relationships.asset,
+  pay: HOMEPAGE_MEDIA_MAP.pay.asset,
 } as const;
 
 const meta = {

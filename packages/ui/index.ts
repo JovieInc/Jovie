@@ -205,7 +205,10 @@ export {
   FOUNDER_PEN_ATOM_CONSUMERS,
   FOUNDER_PEN_ATOM_FAMILIES,
   FOUNDER_PEN_ATOM_IDS,
+  FOUNDER_PEN_VIDEO_ATOM_IDS,
+  FOUNDER_PEN_VIDEO_SURFACE_CONSUMERS,
   type FounderPenAtomFamily,
+  type FounderPenVideoAtomId,
 } from './atoms/founder-pen-atoms';
 // IconButton
 export type { IconButtonProps } from './atoms/icon-button';
@@ -319,6 +322,14 @@ export type {
   StackableBadgeTone,
 } from './atoms/stackable-badge-group';
 export { StackableBadgeGroup } from './atoms/stackable-badge-group';
+// Status Glyph
+export type {
+  StatusGlyphFill,
+  StatusGlyphProps,
+  StatusGlyphSize,
+  StatusGlyphState,
+} from './atoms/status-glyph';
+export { STATUS_GLYPH_STATES, StatusGlyph } from './atoms/status-glyph';
 // Switch
 export { Switch } from './atoms/switch';
 // Textarea

@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
@@ -18,7 +18,7 @@ describe('AboutPageContent', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'Presence, Relationships, And Growth.',
+        name: 'Presence, relationships, and growth.',
       })
     ).toBeVisible();
     const sectionHeadings = Array.from(container.querySelectorAll('section'))
@@ -31,7 +31,15 @@ describe('AboutPageContent', () => {
       'Frequently Asked Questions',
       'Ready to build your Jovie profile?',
     ]);
-    expect(screen.getByText('— Tim White, Founder')).toBeVisible();
+    expect(screen.getByText('Tim White, Founder')).toBeVisible();
+    expect(
+      screen.getByRole('img', { name: 'Tim White, founder of Jovie' })
+    ).toBeVisible();
+    const originSection = screen
+      .getByRole('heading', { level: 2, name: 'Why Jovie Exists' })
+      .closest('section');
+    expect(originSection?.className).toContain('lg:flex-row');
+    expect(originSection?.className).not.toContain('grid-cols-[');
     for (const feature of [
       'Living Profile',
       'Relationships',
@@ -61,7 +69,7 @@ describe('AboutPageContent', () => {
       {
         question: 'Who founded Jovie?',
         answer:
-          'Jovie was founded by Tim White, a music marketing veteran with 15+ years of experience working with labels like Armada Music and Universal Music, and running digital campaigns for artists like Tory Lanez and Megan Thee Stallion, and brands like Google and the NFL.',
+          'Jovie was founded by Tim White, an artist, producer, and engineer with 15+ years in music: 500+ live shows, five singles signed to Armada Music, songwriting and production for We Are Loud, Justin Prime, and Orjan Nilsen, engineering for Lauryn Hill, and a Clio Award for Hulu Pride Fest 2020.',
       },
       {
         question: 'What does Jovie do?',
@@ -71,12 +79,12 @@ describe('AboutPageContent', () => {
       {
         question: 'Is Jovie free?',
         answer:
-          'Yes, Jovie offers a free tier that lets you create a profile and start from your name. Paid plans unlock advanced analytics, notifications, contact export, and more.',
+          'Yes, Jovie offers a free tier that lets you create a profile and start with your name. Paid plans add advanced analytics, notifications, and contact export.',
       },
       {
         question: 'How is Jovie different from Linktree?',
         answer:
-          'Linktree is a general-purpose link list. Jovie is a living profile for presence and relationships — work, links, and a next step in one place. For artists, that includes smart links for releases, fan capture, and notifications when new music drops.',
+          'Linktree is a general-purpose link list. Jovie keeps your work, links, and a clear next step in one living profile. For artists, that includes smart links for releases, fan capture, and notifications when new music drops.',
       },
     ]);
 
@@ -84,6 +92,14 @@ describe('AboutPageContent', () => {
     for (const { question } of ABOUT_FAQ_ITEMS) {
       expect(screen.getByRole('button', { name: question })).toBeVisible();
     }
+  });
+
+  it('does not name unverified artists in founder copy', () => {
+    const founderAnswer = ABOUT_FAQ_ITEMS.find(
+      item => item.question === 'Who founded Jovie?'
+    )?.answer;
+    expect(founderAnswer).toBeDefined();
+    expect(founderAnswer).not.toMatch(/artists like /);
   });
 
   it('keeps metadata and schema ownership in the route and binds the exact story', () => {
@@ -164,14 +180,32 @@ describe('AboutPageContent', () => {
       return;
     }
 
-    expect(() =>
-      execFileSync('git', [
+    // Exit 0 and 1 are git's ancestry verdicts; any other exit is an execution
+    // error, not a verdict — retry it. A shallow boundary severs ancestry for
+    // an explicitly fetched commit, so a non-ancestor verdict in a shallow
+    // checkout proves nothing (same contract as component-ship-gate's
+    // storybook-story-quality-guard).
+    let ancestorStatus: number | null = null;
+    for (
+      let attempt = 0;
+      attempt < 3 && ancestorStatus !== 0 && ancestorStatus !== 1;
+      attempt += 1
+    ) {
+      ancestorStatus = spawnSync('git', [
         'merge-base',
         '--is-ancestor',
         ABOUT_STORY_RECEIPT.containingMergeSha,
         'HEAD',
-      ])
-    ).not.toThrow();
+      ]).status;
+    }
+    if (ancestorStatus !== 0) {
+      expect(
+        execFileSync('git', ['rev-parse', '--is-shallow-repository'], {
+          encoding: 'utf8',
+        }).trim()
+      ).toBe('true');
+      return;
+    }
 
     const sourceAtReceipt = execFileSync(
       'git',

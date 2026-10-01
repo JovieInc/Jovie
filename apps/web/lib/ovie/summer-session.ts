@@ -66,6 +66,8 @@ export type SummerToolReceipt = {
   readonly ok: boolean;
   readonly receiptId: string;
   readonly summary: string;
+  /** Optional structured card payload carried to the chat renderer. */
+  readonly data?: unknown;
 };
 
 export type SummerSession = {

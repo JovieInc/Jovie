@@ -20,11 +20,6 @@ on:
     # Signed JOV Triage events bridged by /api/webhooks/linear. Serialized with
     # every other event under the single fleet-gate-event-refresh group below.
     types: [linear_triage_assess]
-  workflow_run:
-    # Marker Recovery dispatches after durable bytes to stay within GitHub's
-    # three-level workflow_run chain ceiling.
-    workflows: [CI, Production Controller]
-    types: [completed]
   push:
     branches: [main]
   workflow_dispatch:
@@ -39,13 +34,11 @@ concurrency:
 jobs:
   refresh:
     name: Refresh persisted fleet gate receipt
-    # Skip cancelled runs and merged-close duplicates. Label events matter only
-    # when they change green-ready depth or a queue/area hold. Linear dispatch
+    # Skip merged-close duplicates. Label events matter only when they change
+    # green-ready depth or a queue/area hold. Linear dispatch
     # events are owned by the assess job below.
     if: >-
       github.event_name != 'repository_dispatch' &&
-      (github.event_name != 'workflow_run' ||
-      github.event.workflow_run.conclusion != 'cancelled') &&
       (github.event_name != 'pull_request_target' ||
       github.event.action != 'closed' ||
       github.event.pull_request.merged != true) &&
@@ -77,14 +70,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '22'
+          node-version: '24'
       - name: Refresh canonical receipt
         id: refresh
         uses: ./.github/actions/evaluate-fleet-gate
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           # pull_request_target must not write live latest.json (clobbers Gem capacity
-          # when main gate is unfenced). Persist only on main push / workflow_run / dispatch.
+          # when main gate is unfenced). Persist only on main push or dispatch.
           dry-run: ${{ github.event_name == 'pull_request_target' && 'true' || 'false' }}
 
       # Source PR/fork workflow definitions never execute their code here.
@@ -145,7 +138,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '22'
+          node-version: '24'
       - name: Assess latest Linear Triage issue
         shell: bash
         env:

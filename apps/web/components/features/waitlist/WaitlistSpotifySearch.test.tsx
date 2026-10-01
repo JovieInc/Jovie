@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SpotifyArtistResult } from '@/lib/queries';
@@ -91,4 +93,17 @@ describe('WaitlistSpotifySearch', () => {
       expect(onArtistNameChange).toHaveBeenLastCalledWith(null);
     }
   );
+
+  it('renders search-failure text with the error token, not raw red-* (JOV-6773)', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/waitlist/WaitlistSpotifySearch.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/\bred-\d/);
+    expect(source).toContain('text-error');
+  });
 });

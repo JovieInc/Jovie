@@ -8,7 +8,7 @@ import {
   TableRoot,
   TableRow,
 } from '@/components/organisms/table';
-import { rowState } from '@/components/organisms/table/table.styles';
+import { presets, rowState } from '@/components/organisms/table/table.styles';
 import { cn } from '@/lib/utils';
 
 export function InvestorTable({
@@ -19,7 +19,7 @@ export function InvestorTable({
   minWidth?: string;
 }>) {
   return (
-    <div className='overflow-x-auto'>
+    <div className='w-full min-w-0 overflow-x-auto'>
       <TableRoot className={cn('w-full border-collapse text-app', minWidth)}>
         {children}
       </TableRoot>
@@ -75,8 +75,8 @@ export function InvestorTableRow({
   return (
     <TableRow
       className={cn(
+        presets.tableRow,
         'border-b border-subtle bg-transparent',
-        rowState.base,
         rowState.hover
       )}
     >

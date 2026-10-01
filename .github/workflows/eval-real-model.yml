@@ -1,21 +1,31 @@
 # Real-Model Eval Lane (JOV-3659)
 #
-# PURPOSE: Scheduled + manual regression checks against the live chat model via
+# PURPOSE: Changed-input + manual regression checks against the live chat model via
 # Helicone observability. Runs golden-case sampling (N=5) and the adversarial
 # input battery sequentially (batch size 1) with a hard BUDGET_CAP_USD.
 #
 # TRIGGER:
-# - Nightly schedule
+# - Relevant model, prompt, tool, dataset, evaluator, or policy changes on main
 # - Manual workflow_dispatch
 
 name: Real-Model Eval Lane
-# clock-class: upstream-advisory
 
 on:
-  schedule:
-    # Runs after the deterministic nightly lanes; never fans out from PRs.
-    - cron: '30 6 * * *'
-      timezone: 'America/Los_Angeles'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/lib/ai/**'
+      - 'apps/web/lib/chat/**'
+      - 'apps/web/lib/constants/ai-models.ts'
+      - 'apps/web/lib/eval/**'
+      - 'apps/web/prompts/**'
+      - 'apps/web/promptfooconfig*.yaml'
+      - 'apps/web/tests/eval/**'
+      - 'apps/web/tests/unit/chat/**'
+      - 'apps/web/tests/unit/lib/ai/**'
+      - '.github/workflows/eval-real-model.yml'
+      - 'apps/web/package.json'
+      - 'pnpm-lock.yaml'
   workflow_dispatch:
     inputs:
       budget_cap_usd:
@@ -46,7 +56,7 @@ env:
 jobs:
   real-model-eval:
     name: Golden + Adversarial (Helicone)
-    # Live-model work is scheduled/manual and never consumes fixed CI slots.
+    # Live-model work stays outside source-PR and merge-queue fixed CI slots.
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

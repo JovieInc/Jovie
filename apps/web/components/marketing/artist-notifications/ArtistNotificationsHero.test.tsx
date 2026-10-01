@@ -14,15 +14,16 @@ describe('ArtistNotificationsHero', () => {
         level: 1,
         name: segmentedAccessibleName('Reach Every Fan.', 'Automatically.'),
       })
-    ).toHaveClass('line-clamp-2');
+    ).not.toHaveClass('line-clamp-2');
     expect(
       screen.getByRole('link', {
         name: ARTIST_NOTIFICATIONS_COPY.hero.primaryCtaLabel,
       })
     ).toHaveAttribute('href', ARTIST_NOTIFICATIONS_COPY.hero.primaryCtaHref);
 
+    const cardStage = screen.getByTestId('artist-notifications-card-stage');
     for (const card of ARTIST_NOTIFICATIONS_COPY.hero.floatingCards) {
-      expect(screen.getByText(card.title)).toBeInTheDocument();
+      expect(cardStage).toHaveTextContent(card.title);
     }
   });
 

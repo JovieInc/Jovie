@@ -1,7 +1,7 @@
 'use client';
 
 // @coverage-via apps/web/tests/components/organisms/PersistentAudioBar.test.tsx
-import { ChevronDown, ChevronUp, Play } from 'lucide-react';
+import { ChevronDown, ChevronUp, Play, X } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -15,25 +15,21 @@ import { toast } from '@/components/feedback';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { AudioBar, type AudioBarTrack } from '@/components/shell/AudioBar';
 import { AudioPlayButton } from '@/components/shell/AudioPlayControl';
+import { IconBtn } from '@/components/shell/IconBtn';
+import { ShellAudioDock } from '@/components/shell/ShellAudioDock';
 import {
   APP_ROUTES,
   buildLyricsRoute,
   resolveLyricsReturnRoute,
 } from '@/constants/routes';
-import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { isFormElement } from '@/lib/utils/keyboard';
 import {
   resetAudioChromeSnapshot,
   setAudioChromeSnapshot,
+  useFullAudioPlayerExpandRequests,
 } from './audio-chrome-state';
-
-const SHELL_AUDIO_BAR_TRANSITION =
-  'max-height var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)';
-// Flat player (founder spec 2026-09-25 #1): no border to transition anymore.
-const SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME =
-  'transition-[max-height,opacity,transform,background-color] duration-cinematic ease-cinematic';
 
 function isLyricsRoutePath(pathname: string | null): boolean {
   return (
@@ -84,21 +80,25 @@ export function PersistentAudioBar() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { playbackState, toggleTrack, playNext, playPrevious, seek, onError } =
-    useTrackAudioPlayer();
-  const prefersReducedMotion = useReducedMotion();
+  const {
+    playbackState,
+    toggleTrack,
+    playNext,
+    playPrevious,
+    seek,
+    stop,
+    onError,
+  } = useTrackAudioPlayer();
   const [imgError, setImgError] = useState(false);
   // Compact is the default surface for an active track (founder spec
-  // 2026-09-25). The bottom-right PlayerVisibilityToggle opens/closes it;
-  // there is no idle tray — the player is simply absent until a track loads.
+  // 2026-09-25). The dock's PlayerVisibilityToggle closes it to the sidebar
+  // mini (JOV-3511); idle/dismissed playback leaves no dock at all (JOV-6680).
   const [playerOpen, setPlayerOpen] = useState(true);
   const [waveformOn, setWaveformOn] = useState(false);
-  // Cinematic reveal (JOV-3487): the shell bar lands into place from the
-  // bottom on first play. Starts un-revealed so the CSS transition has an
-  // off-screen "from" frame to interpolate from; flips to revealed on the
-  // next frame after a track becomes active. Resets per track so a fresh
-  // track replays the reveal even without an unmount.
-  const [revealed, setRevealed] = useState(false);
+  // Reopen requests from compact chrome (e.g. the sidebar mini card) land on
+  // this counter; the player owns `playerOpen` so the published snapshot
+  // always matches the rendered dock.
+  const fullPlayerExpandRequests = useFullAudioPlayerExpandRequests();
   const lastNonLyricsPathRef = useRef<string>(APP_ROUTES.LIBRARY);
   const currentPathWithSearch = useMemo(() => {
     if (!pathname) return APP_ROUTES.LIBRARY;
@@ -121,30 +121,17 @@ export function PersistentAudioBar() {
     setPlayerOpen(true);
   }, [playbackState.activeTrackId]);
 
-  // Drive the cinematic reveal. No active track → no reveal (un-revealed so
-  // the next first-play animates in). Reduced motion → snap revealed (no
-  // translate frame ever paints). Otherwise paint one un-revealed frame, then
-  // flip to revealed on the next animation frame so the bar decelerates into
-  // place from below.
+  // The shell dock (ShellAudioDock) owns the cinematic reveal/hide motion —
+  // it transitions height/opacity/transform off the published
+  // `fullPlayerVisible` snapshot, so no per-track reveal bookkeeping lives
+  // here. Compact chrome (sidebar mini) asks to reopen the full player via
+  // the expand-request counter.
+  const lastExpandRequestRef = useRef(fullPlayerExpandRequests);
   useEffect(() => {
-    if (!playbackState.activeTrackId) {
-      setRevealed(false);
-      return;
-    }
-    if (prefersReducedMotion) {
-      setRevealed(true);
-      return;
-    }
-    setRevealed(false);
-    let secondFrame = 0;
-    const firstFrame = requestAnimationFrame(() => {
-      secondFrame = requestAnimationFrame(() => setRevealed(true));
-    });
-    return () => {
-      cancelAnimationFrame(firstFrame);
-      if (secondFrame) cancelAnimationFrame(secondFrame);
-    };
-  }, [playbackState.activeTrackId, prefersReducedMotion]);
+    if (fullPlayerExpandRequests === lastExpandRequestRef.current) return;
+    lastExpandRequestRef.current = fullPlayerExpandRequests;
+    setPlayerOpen(true);
+  }, [fullPlayerExpandRequests]);
 
   useEffect(() => {
     if (!isLyricsRoutePath(pathname) && pathname) {
@@ -165,6 +152,12 @@ export function PersistentAudioBar() {
     playbackState.trackTitle,
     toggleTrack,
   ]);
+
+  // Dismiss (X): hides the dock AND stops playback (JOV-6680) — pause keeps
+  // the dock visible, so the only way to remove chrome is stopping the track.
+  const handleDismiss = useCallback(() => {
+    stop();
+  }, [stop]);
 
   const handleCloseLyrics = useCallback(() => {
     router.push(
@@ -304,9 +297,15 @@ export function PersistentAudioBar() {
   }, []);
 
   if (!hasActiveTrack || !activeTrackId) {
-    // Idle: player absent, zero reserved space, no layout shift of main
-    // content (founder spec 2026-09-25 #5). There is nothing to toggle open.
-    return null;
+    // Idle/stopped: keep the dock mounted but empty so ShellAudioDock can
+    // animate 0-height after the snapshot clears (the panel slides back down
+    // instead of the player vanishing). Zero reserved space — the closed
+    // dock's max-height is 0.
+    return (
+      <div className='hidden shrink-0 lg:block'>
+        <ShellAudioDock>{null}</ShellAudioDock>
+      </div>
+    );
   }
 
   const isLoading = playbackState.playbackStatus === 'loading';
@@ -422,48 +421,23 @@ export function PersistentAudioBar() {
     musicalKey: playbackState.musicalKey,
   };
   const lyricsPath = buildLyricsRoute(activeTrackId);
+
   return (
     <>
-      {/* Desktop player host — sits below main content, sharing its surface
-          tone (flat: no separate card border/radius/shadow). The visibility
-          toggle is always present here so a closed player can be reopened;
-          the bar itself collapses to 0 height when closed and the sidebar
-          mini takes over (JOV-3511: never full + mini at once). */}
-      <div className='hidden shrink-0 bg-(--app-shell-content-surface) lg:block'>
-        <div className='flex items-center justify-end px-4 py-1 lg:px-6'>
-          <PlayerVisibilityToggle
-            open={playerOpen}
-            onClick={() => setPlayerOpen(value => !value)}
-          />
-        </div>
-        <div
-          data-testid='audio-surface-expanded-shell'
-          data-shell-audio-surface='persistent-expanded'
-          aria-hidden={!playerOpen}
-          className={cn(
-            'overflow-hidden',
-            SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME
-          )}
-          style={{
-            maxHeight: playerOpen ? 'var(--app-shell-audio-bar-max-height)' : 0,
-            opacity: revealed && playerOpen ? 1 : 0,
-            transform: prefersReducedMotion
-              ? 'translateY(0)'
-              : !revealed
-                ? 'translateY(100%)'
-                : playerOpen
-                  ? 'translateY(0)'
-                  : 'translateY(10px)',
-            // Keyed on open state only — the reveal is purely visual
-            // (transform + opacity), so the bar stays interactive the
-            // instant it mounts rather than waiting out the slide-in.
-            pointerEvents: playerOpen ? 'auto' : 'none',
-            transition: prefersReducedMotion
-              ? 'none'
-              : SHELL_AUDIO_BAR_TRANSITION,
-          }}
-        >
-          <div className='px-4 py-1.5 lg:px-6'>
+      {/* Desktop player host — the shell dock below the rounded main panel
+          (JOV-6680). The dock itself owns visibility: it reads
+          `fullPlayerVisible` from audio-chrome-state and animates height so
+          the panel's bottom edge slides in lockstep. Closing to the sidebar
+          mini (chevron) or dismissing (X → stop) collapses the dock to 0;
+          JOV-3511 keeps full + mini exclusive. */}
+      <div className='hidden shrink-0 lg:block'>
+        <ShellAudioDock>
+          <div
+            data-testid='audio-surface-expanded-shell'
+            data-shell-audio-surface='persistent-expanded'
+            aria-hidden={!playerOpen}
+            className='flex items-center gap-3 px-4 py-1.5 lg:px-6'
+          >
             <AudioBar
               isPlaying={playbackState.isPlaying}
               onPlay={handleToggle}
@@ -488,29 +462,29 @@ export function PersistentAudioBar() {
               }
               onLyricsIntent={prefetchLyricsRoute}
               track={shellTrack}
-              className='min-w-0 px-0 py-0'
+              className='min-w-0 flex-1 px-0 py-0'
             />
+            <div className='flex shrink-0 items-center gap-1'>
+              <PlayerVisibilityToggle
+                open={playerOpen}
+                onClick={() => setPlayerOpen(value => !value)}
+              />
+              <IconBtn
+                label='Dismiss Player'
+                onClick={handleDismiss}
+                tooltipSide='top'
+                tone='ghost'
+                testId='audio-player-dismiss'
+              >
+                <X
+                  aria-hidden='true'
+                  className='h-3.5 w-3.5'
+                  strokeWidth={2.25}
+                />
+              </IconBtn>
+            </div>
           </div>
-        </div>
-        {/* Compact surface is intentionally empty: mini chrome lives in the
-            sidebar bridge when the player is closed (JOV-3511). Kept as a
-            zero-height slot so tests and chrome-state consumers still see
-            the transition without a second visible player. */}
-        <div
-          data-testid='audio-surface-compact-shell'
-          data-shell-audio-surface='persistent-compact'
-          aria-hidden={playerOpen}
-          className={cn(
-            'overflow-hidden',
-            SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME
-          )}
-          style={{
-            maxHeight: 0,
-            opacity: 0,
-            pointerEvents: 'none',
-            transition: SHELL_AUDIO_BAR_TRANSITION,
-          }}
-        />
+        </ShellAudioDock>
       </div>
       {mobileBar('lg:hidden')}
     </>

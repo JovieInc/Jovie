@@ -43,7 +43,7 @@ function writeExecutable(filePath, contents) {
 }
 
 function makeToolStubs({
-  nodeVersion = 'v22.23.2',
+  nodeVersion = 'v24.21.0',
   pnpmVersion = '9.15.9',
 } = {}) {
   const bin = makeTempDir('jovie-setup-health-bin-');
@@ -55,7 +55,7 @@ function makeToolStubs({
 function makeWorktree() {
   const root = makeTempDir('jovie-setup-health-repo-');
   writeFileSync(join(root, 'package.json'), '{"name":"fixture"}\n');
-  writeFileSync(join(root, '.nvmrc'), '22.23.2\n');
+  writeFileSync(join(root, '.nvmrc'), '24.21.0\n');
   writeFileSync(join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9.0\n');
   writeFileSync(join(root, 'pnpm-workspace.yaml'), 'packages: []\n');
   const git = spawnSync('git', ['-c', 'init.defaultBranch=main', 'init'], {
@@ -295,9 +295,10 @@ describe('SessionStart still uses setup.sh for the skip', () => {
 });
 
 describe('package prepare hook lifecycle', () => {
-  const prepare = JSON.parse(
+  const rootPackage = JSON.parse(
     readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
-  ).scripts.prepare;
+  );
+  const prepare = rootPackage.scripts.prepare;
   const configurator = readFileSync(
     resolve(repoRoot, 'scripts/hooks/configure-git-hooks.sh'),
     'utf8'
@@ -345,6 +346,13 @@ describe('package prepare hook lifecycle', () => {
       spawnSync(command, args, { cwd, env, encoding: 'utf8', timeout: 10000 });
     return { root, env, run };
   }
+
+  it('keeps tracked hook setup independent of Husky wrappers', () => {
+    expect(rootPackage.devDependencies).not.toHaveProperty('husky');
+    expect(rootPackage.devDependencies).toHaveProperty('@commitlint/cli');
+    expect(rootPackage.devDependencies).toHaveProperty('lint-staged');
+    expect(prepare).toContain('scripts/hooks/configure-git-hooks.sh');
+  });
 
   it('keeps tracked push gates active in another linked worktree after package prepare', () => {
     const { root, env, run } = fixture();

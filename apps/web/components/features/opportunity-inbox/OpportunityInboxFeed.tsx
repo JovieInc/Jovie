@@ -7,6 +7,7 @@ import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity
 import { cn } from '@/lib/utils';
 import { FounderReviewStack } from './FounderReviewStack';
 import { OpportunityInboxReportCard } from './OpportunityInboxReportCard';
+import { OpportunityInboxSocialReplyCard } from './OpportunityInboxSocialReplyCard';
 import { OpportunityInboxYoutubeThumbnailCard } from './OpportunityInboxYoutubeThumbnailCard';
 import { WorkflowCaptureInboxCard } from './WorkflowCaptureInboxCard';
 
@@ -24,8 +25,10 @@ export interface OpportunityInboxFeedProps {
     comment?: string
   ) => void;
   readonly onNextStep?: (id: string) => void;
+  readonly onRevise?: (id: string, comment: string) => void;
   readonly pendingActionId?: string | null;
   readonly pendingFeedbackId?: string | null;
+  readonly pendingReviseId?: string | null;
   readonly pendingNextStepId?: string | null;
   /** When true, render the swipe/keyboard card stack (JOV-3932). */
   readonly enableStackInteractions?: boolean;
@@ -59,8 +62,10 @@ export function OpportunityInboxFeed({
   onOpen,
   onFeedback: _onFeedback,
   onNextStep,
+  onRevise,
   pendingActionId = null,
   pendingFeedbackId: _pendingFeedbackId = null,
+  pendingReviseId = null,
   pendingNextStepId = null,
   enableStackInteractions = false,
   stackKeyboardControlRef,
@@ -142,6 +147,17 @@ export function OpportunityInboxFeed({
               onDismiss={onDismiss}
               isSubmittingNextStep={pendingNextStepId === card.id}
               isDismissing={pendingActionId === card.id}
+            />
+          ) : card.category === 'social_reply' && card.socialReply ? (
+            <OpportunityInboxSocialReplyCard
+              key={card.id}
+              card={card}
+              onApprove={id => void onApprove(id)}
+              onDismiss={id => void onDismiss(id)}
+              onRevise={onRevise ?? (() => undefined)}
+              isApproving={pendingActionId === card.id}
+              isDismissing={pendingActionId === card.id}
+              isRevising={pendingReviseId === card.id}
             />
           ) : card.category === 'youtube_thumbnail' && card.youtubeThumbnail ? (
             <OpportunityInboxYoutubeThumbnailCard

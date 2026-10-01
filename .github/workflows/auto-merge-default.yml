@@ -1,0 +1,281 @@
+# Auto-Merge Default
+#
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Ovie
+# necessary-trust-boundary: This controller is the single writer that enables GitHub native auto-merge on every PR and the only scheduled triage that comments on stuck PRs; Jovie Bot app-token mutations stay inside this workflow so per-PR events and the hourly sweep never race a second writer.
+# revisit-trigger: Remove this workflow if GitHub exposes a repo-level "auto-merge on by default" setting or a first-party stuck auto-merge triage surface.
+#
+# PURPOSE: Auto-merge (squash) is ON for every PR by default, forever, with no
+# human action and no manual batch jobs. Policy (2026-09-22): "everything should
+# have automerge on by default"; non-green PRs wait in GitHub's native auto-merge
+# queue and merge the moment required checks pass; PRs are never auto-closed —
+# stuck ones get a single diagnostic comment plus one aggregate tracking issue.
+#
+# MECHANISM:
+# 1. `enable` job — fires on opened/reopened and runs
+#    `gh pr merge --auto --squash` with GITHUB_TOKEN (GraphQL
+#    enablePullRequestAutoMerge; GITHUB_TOKEN is sufficient — the PAT workflow-
+#    scope gap that blocks pushing workflow-file changes does NOT apply to
+#    enabling auto-merge). Drafts are skipped here; `ready_for_review` is
+#    contractually reserved for merge-queue-autoenroll.yml (trigger-hygiene
+#    rule 3 / JOV-INV-029), so undrafted PRs are caught by the triage sweep.
+# 2. `triage` job — hourly sweep + manual dispatch. First enables auto-merge
+#    on any open, non-draft, same-repo PR that lacks it (covers drafts that
+#    went ready and any missed enable events). Then PRs with auto-merge
+#    enabled but unmerged after STUCK_THRESHOLD_HOURS get ONE upserted
+#    diagnostic comment naming the blocker (failing checks w/ links, pending
+#    checks, conflicts, behind-base) and are aggregated into ONE tracking
+#    issue. Never closes PRs.
+# 3. `self-test` job — workflow_dispatch only. Creates a throwaway draft PR,
+#    marks it ready, exercises the same enable path, asserts autoMergeRequest
+#    via GraphQL, then runs triage with threshold 0 and asserts exactly one
+#    marker comment exists. Cleans up (closes PR, deletes branch) always.
+#
+# FAILURE MODES:
+# - Enable step fails loudly (failing check on the offending PR).
+# - Triage does not depend on the enable job; it is a separate scheduled run.
+# - Fork PRs: `pull_request` grants a read-only GITHUB_TOKEN, so enable is
+#   skipped with a notice rather than a guaranteed red check.
+# - Dependabot PRs: `pull_request` runs in the Dependabot secret store so the
+#   Jovie Bot key is empty (JOV-4782); enable is skipped with a notice and
+#   dependabot-auto-merge.yml / the triage sweep own the lane.
+
+name: Auto-Merge Default
+# clock-class: temporal-resource
+
+on:
+  pull_request:
+    types: [opened, reopened]
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Log stuck PRs without commenting or editing the tracking issue'
+        required: false
+        default: 'false'
+      threshold_hours:
+        description: 'Hours after auto-merge enable before a PR counts as stuck'
+        required: false
+        default: '6'
+      self_test:
+        description: 'Run end-to-end self-test against a throwaway PR'
+        required: false
+        default: 'false'
+
+permissions: {}
+
+concurrency:
+  group: auto-merge-default-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  enable:
+    name: Enable auto-merge (squash)
+    # Same-repo + non-Dependabot only: GitHub runs pull_request workflows for
+    # fork heads and dependabot[bot] actors with no secrets access, so the
+    # Jovie Bot private key is empty and token generation fails before the
+    # in-job fork notice could run. Dependabot PRs get native merge intent
+    # from dependabot-auto-merge.yml (pull_request_target); forks and missed
+    # events are covered by the hourly triage sweep's --enable-missing.
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      JOVIE_BOT_PRIVATE_KEY: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+    steps:
+      - name: Generate Jovie Bot token
+        # GitHub starts no workflows for events GITHUB_TOKEN creates, and auto-merge enqueues
+        # as the actor that enabled it, so GITHUB_TOKEN-enabled PRs built merge groups with no
+        # CI that sat at the queue head (#18873, #18960, #19048 on 2026-09-28).
+        # Dependabot pull_request runs only see the Dependabot secret store, so the
+        # Jovie Bot private key is empty and this mint fails hard (JOV-4782). The
+        # dependabot lane is owned by dependabot-auto-merge.yml plus the hourly
+        # triage --enable-missing sweep, which run with full secrets.
+        if: >-
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          env.JOVIE_BOT_PRIVATE_KEY != ''
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::notice::No token available (fork or Dependabot PR) — dependabot-auto-merge.yml and the hourly triage sweep enable auto-merge; skipping."
+            exit 0
+          fi
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "::notice::No Jovie Bot token available in this event context (empty secrets context); the hourly triage sweep will enable auto-merge."
+            exit 0
+          fi
+          if [[ "$HEAD_REPO" != "$BASE_REPO" ]]; then
+            echo "::notice::Fork PR — GITHUB_TOKEN is read-only on pull_request events from forks; skipping auto-merge enable."
+            exit 0
+          fi
+          if gh pr view "$PR_NUMBER" --repo "$BASE_REPO" --json autoMergeRequest --jq '.autoMergeRequest.enabledAt // empty' | grep -q .; then
+            echo "Auto-merge already enabled on PR #$PR_NUMBER."
+            exit 0
+          fi
+          gh pr merge "$PR_NUMBER" --repo "$BASE_REPO" --auto --squash
+          echo "Auto-merge (squash) enabled on PR #$PR_NUMBER."
+
+  triage:
+    name: Triage stuck auto-merge PRs
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.self_test != 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Run unit tests for triage script
+        run: node --test .github/scripts/auto-merge-stuck-triage.test.js
+
+      - name: Generate Jovie Bot token
+        # See the enable job: GitHub starts no workflows for events GITHUB_TOKEN creates, and auto-merge enqueues
+        # as the actor that enabled it, so GITHUB_TOKEN-enabled PRs built merge groups with no
+        # CI that sat at the queue head (#18873, #18960, #19048 on 2026-09-28).
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+      - name: Triage stuck PRs
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+          THRESHOLD_HOURS: ${{ inputs.threshold_hours || '6' }}
+        run: |
+          set -euo pipefail
+          ARGS=(--repo "$GH_REPO" --threshold-hours "$THRESHOLD_HOURS" --enable-missing)
+          if [[ "${DRY_RUN,,}" == "true" ]]; then
+            ARGS+=(--dry-run)
+          fi
+          node .github/scripts/auto-merge-stuck-triage.js "${ARGS[@]}"
+
+  self-test:
+    name: Self-test (throwaway PR)
+    if: github.event_name == 'workflow_dispatch' && inputs.self_test == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Run unit tests for triage script
+        run: node --test .github/scripts/auto-merge-stuck-triage.test.js
+
+      - name: Create throwaway draft PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          BRANCH="automerge-self-test/run-${RUN_ID}"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          echo "Self-test for auto-merge-default run ${RUN_ID} ($(date -u +%FT%TZ))" > ".github/auto-merge-self-test-${RUN_ID}.md"
+          git add ".github/auto-merge-self-test-${RUN_ID}.md"
+          git commit -m "test: auto-merge-default self-test run ${RUN_ID}"
+          git push -u origin "$BRANCH"
+          PR_URL=$(gh pr create --repo "$REPO" --base main --head "$BRANCH" --draft \
+            --title "test: auto-merge-default self-test ${RUN_ID}" \
+            --body "Throwaway PR created by the auto-merge-default self-test. Will be closed automatically.")
+          echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+          echo "Created draft PR: $PR_URL"
+          gh pr view "$PR_URL" --json isDraft --jq '.isDraft' | grep -qx true
+
+      - name: Verify drafts do not get auto-merge, then mark ready and enable
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_URL: ${{ steps.pr.outputs.pr_url }}
+        run: |
+          set -euo pipefail
+          # Drafts must not have auto-merge (GitHub forbids it).
+          AM=$(gh pr view "$PR_URL" --json autoMergeRequest --jq '.autoMergeRequest // empty')
+          if [[ -n "$AM" ]]; then
+            echo "::error::Draft PR unexpectedly has autoMergeRequest."
+            exit 1
+          fi
+          gh pr ready "$PR_URL"
+          # The pull_request 'ready_for_review' event does not fire new workflow
+          # runs for GITHUB_TOKEN actors, so the self-test invokes the identical
+          # enable command the `enable` job runs on real events.
+          gh pr merge "$PR_URL" --auto --squash
+          for i in $(seq 1 12); do
+            AM=$(gh pr view "$PR_URL" --json autoMergeRequest --jq '.autoMergeRequest.enabledAt // empty')
+            if [[ -n "$AM" ]]; then
+              echo "Auto-merge enabled at $AM (attempt $i)."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::autoMergeRequest not set after enabling auto-merge."
+          exit 1
+
+      - name: Verify triage posts exactly one diagnostic comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_URL: ${{ steps.pr.outputs.pr_url }}
+        run: |
+          set -euo pipefail
+          PR_NUMBER=$(gh pr view "$PR_URL" --json number --jq '.number')
+          # Threshold 0 forces the PR to count as stuck; --pr scopes the sweep.
+          node .github/scripts/auto-merge-stuck-triage.js --repo "$REPO" --threshold-hours 0 --pr "$PR_NUMBER"
+          node .github/scripts/auto-merge-stuck-triage.js --repo "$REPO" --threshold-hours 0 --pr "$PR_NUMBER"
+          COUNT=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments?per_page=100" \
+            --jq '[.[] | select(.body | contains("auto-merge-stuck-triage"))] | length')
+          echo "Marker comments on PR #$PR_NUMBER: $COUNT"
+          if [[ "$COUNT" -ne 1 ]]; then
+            echo "::error::Expected exactly 1 diagnostic comment, found $COUNT."
+            exit 1
+          fi
+
+      - name: Cleanup throwaway PR and branch
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_URL: ${{ steps.pr.outputs.pr_url }}
+          BRANCH: ${{ steps.pr.outputs.branch }}
+        run: |
+          set -uo pipefail
+          if [[ -n "$PR_URL" ]]; then
+            gh pr close "$PR_URL" --comment "Self-test complete — closing." || true
+          fi
+          if [[ -n "$BRANCH" ]]; then
+            git push origin --delete "$BRANCH" || true
+          fi

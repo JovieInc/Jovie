@@ -22,6 +22,8 @@ import {
   type NightlyAgentStatus,
 } from '@/lib/testing/nightly-agent-report';
 
+import { findRepoRoot } from './nightly-test-agent-root';
+
 type RepoKey = 'jovie' | 'ops';
 type TestLane =
   | 'e2e'
@@ -220,23 +222,6 @@ interface PlaywrightResult {
 
 const currentFile = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFile);
-
-function findRepoRoot(startDir = currentDir): string {
-  let dir = startDir;
-  for (;;) {
-    if (
-      existsSync(path.join(dir, 'package.json')) &&
-      existsSync(path.join(dir, 'AGENTS.md'))
-    ) {
-      return dir;
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) {
-      throw new Error(`Unable to locate repo root from ${startDir}`);
-    }
-    dir = parent;
-  }
-}
 
 function parseArgs(argv: string[]): Record<string, string> {
   const args: Record<string, string> = {};
@@ -1178,7 +1163,7 @@ async function commandPublishStatus(
 }
 
 async function main(): Promise<void> {
-  const repoRoot = findRepoRoot();
+  const repoRoot = findRepoRoot(currentDir);
   const argv = process.argv.slice(2).filter(arg => arg !== '--');
   const command = argv[0]?.startsWith('--')
     ? 'context'

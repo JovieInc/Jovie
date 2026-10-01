@@ -31,7 +31,7 @@ large task-specific gstack playbooks remain and should be evaluated before split
   checker, decision grader and prompt renderer. CI calls the same package scripts
   in its existing dependency-free risk-classifier job.
 - 31 existing Node regressions pass: design-manifest generation, skill catalog,
-  skill governance and OKLCH guard. Run with repo-pinned Node 22.23.2.
+  skill governance and OKLCH guard. Run with repo-pinned Node 24.21.0.
 - 5 existing Vitest design-policy tests pass: icon alignment and layout stability.
 - Manifest freshness, document freshness, skill governance, palette guard,
   gstack generation dry-run, skill-size check, Biome and whitespace checks pass.

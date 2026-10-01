@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   identity: vi.fn(),
   resolve: vi.fn(),
   access: vi.fn(),
+  reservedHandle: vi.fn(),
   gateEnabled: vi.fn(),
 }));
 
@@ -17,6 +18,7 @@ vi.mock('@/lib/auth/gate', async () => ({
   resolveRequestAuthIdentity: mocks.identity,
   resolveUserState: mocks.resolve,
   getWaitlistAccess: mocks.access,
+  getWaitlistReservedHandle: mocks.reservedHandle,
 }));
 vi.mock('@/lib/waitlist/settings', () => ({
   isWaitlistGateEnabled: mocks.gateEnabled,
@@ -45,6 +47,7 @@ describe('waitlist receipt reload', () => {
     });
     mocks.gateEnabled.mockResolvedValue(true);
     mocks.access.mockResolvedValue({ entryId: null, status: null });
+    mocks.reservedHandle.mockResolvedValue(null);
   });
 
   it('renders an honest error when a pending account has no saved receipt', async () => {
@@ -52,6 +55,21 @@ describe('waitlist receipt reload', () => {
     const receipt = result.props.children;
 
     expect(receipt.props.outcome).toBe('receipt_unavailable');
+    expect(receipt.props.email).toBe('test@example.com');
+  });
+
+  it('passes the held handle to the pending receipt so copy can claim it', async () => {
+    mocks.access.mockResolvedValue({
+      entryId: 'entry_1',
+      status: 'waitlisted',
+    });
+    mocks.reservedHandle.mockResolvedValue('coolartist');
+
+    const result = await WaitlistPage();
+    const receipt = result.props.children;
+
+    expect(mocks.reservedHandle).toHaveBeenCalledWith('entry_1');
+    expect(receipt.props.reservedHandle).toBe('coolartist');
     expect(receipt.props.email).toBe('test@example.com');
   });
 });

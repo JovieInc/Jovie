@@ -14,6 +14,15 @@
  * at enrollment without expanding that gate. merge_group allows the shrink;
  * local / pull_request still fail closed so the PR that changed the count
  * updates the floor when the unit test actually runs.
+ *
+ * Provenance: that same merge_group leniency can land a shrink with the floor
+ * left stale on main. Without attribution every later branch off that base
+ * fails its own local / pull_request run for debt it did not author
+ * (JOV-5326). When the caller supplies `baseCount` — the count measured at the
+ * merge-base — a below-baseline count only fails when this tree actually
+ * removed occurrences (`count < baseCount`). If the base was already under the
+ * floor the verdict is `inherited_shrink`: it passes, because the stale floor
+ * belongs to the removal owner's lane, not to unrelated diffs.
  */
 
 export const SHRINK_ONLY_COUNT_EVENTS = Object.freeze({
@@ -30,6 +39,7 @@ export const SHRINK_ONLY_COUNT_STATUSES = Object.freeze({
   REGRESSION: 'regression',
   UNBASELINED_SHRINK: 'unbaselined_shrink',
   SIBLING_SHRINK: 'sibling_shrink',
+  INHERITED_SHRINK: 'inherited_shrink',
 } as const);
 
 export type ShrinkOnlyCountStatus =
@@ -38,6 +48,11 @@ export type ShrinkOnlyCountStatus =
 export interface ShrinkOnlyCountInput {
   readonly count: number;
   readonly baseline: number;
+  /**
+   * Count measured at the tree's merge-base, when the caller can resolve one.
+   * Below-baseline counts fail closed while this is unknown (JOV-5326).
+   */
+  readonly baseCount?: number;
   readonly event?: ShrinkOnlyCountEvent;
   readonly metric?: string;
 }
@@ -79,9 +94,13 @@ export function resolveShrinkOnlyCountEvent(
 export function evaluateShrinkOnlyCount(
   input: ShrinkOnlyCountInput
 ): ShrinkOnlyCountVerdict {
-  if (!isFiniteCount(input.count) || !isFiniteCount(input.baseline)) {
+  if (
+    !isFiniteCount(input.count) ||
+    !isFiniteCount(input.baseline) ||
+    (input.baseCount !== undefined && !isFiniteCount(input.baseCount))
+  ) {
     throw new Error(
-      `shrink-only count and baseline must be finite numbers; got count=${input.count} baseline=${input.baseline}`
+      `shrink-only count and baseline must be finite numbers; got count=${input.count} baseline=${input.baseline} baseCount=${input.baseCount}`
     );
   }
 
@@ -115,6 +134,21 @@ export function evaluateShrinkOnlyCount(
           `${metric} dropped to ${count} (baseline ${baseline}). ` +
           'merge_group allows this unbaselined shrink so a sibling cannot UNMERGEABLE the ALLGREEN group. ' +
           `The PR that changed the count must still lower the baseline to ${count}.`,
+      };
+    }
+
+    if (input.baseCount !== undefined && count >= input.baseCount) {
+      return {
+        ok: true,
+        status: SHRINK_ONLY_COUNT_STATUSES.INHERITED_SHRINK,
+        event,
+        count,
+        baseline,
+        message:
+          `${metric} is ${count}, below baseline ${baseline}, but the ` +
+          `merge-base already measures ${input.baseCount} — this tree did not ` +
+          'author the shrink, so the stale floor is inherited (JOV-5326). ' +
+          `The removal owner's lane should still lower the baseline to ${input.baseCount}.`,
       };
     }
 

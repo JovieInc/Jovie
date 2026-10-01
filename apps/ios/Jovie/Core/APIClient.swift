@@ -26,6 +26,11 @@ enum APIClientError: Error, Equatable, LocalizedError {
   }
 }
 
+enum IOSPushEnvironment: String, Encodable, Sendable {
+  case sandbox
+  case production
+}
+
 protocol TokenProviding: Sendable {
   func bearerToken(forceRefresh: Bool) async throws -> String
 }
@@ -47,6 +52,27 @@ protocol APIClientProtocol: Sendable {
   func fetchAudienceHighlights() async throws -> MobileAudienceHighlightsResponse
   func fetchActionLoopInbox() async throws -> MobileActionLoopInboxResponse
   func fetchActionLoopCalendar() async throws -> MobileActionLoopCalendarResponse
+  func decideSummerCard(
+    cardID: String,
+    decision: SummerCardDecision,
+    comment: String?
+  ) async throws -> SummerCardDecisionResult
+}
+
+/// Result of POSTing a Summer card decision; `alreadyDecided` maps the server's 409.
+enum SummerCardDecisionResult: Equatable, Sendable {
+  case decided
+  case alreadyDecided
+}
+
+extension APIClientProtocol {
+  func decideSummerCard(
+    cardID _: String,
+    decision _: SummerCardDecision,
+    comment _: String?
+  ) async throws -> SummerCardDecisionResult {
+    throw APIClientError.invalidResponse
+  }
 }
 
 struct APIClient: APIClientProtocol, Sendable {
@@ -61,6 +87,16 @@ struct APIClient: APIClientProtocol, Sendable {
 
   private struct ProfileCompletionErrorResponse: Decodable {
     let error: String
+  }
+
+  private struct RegisterPushDeviceRequest: Encodable {
+    let token: String
+    let environment: IOSPushEnvironment
+    let timezone: String
+  }
+
+  private struct UnregisterPushDeviceRequest: Encodable {
+    let token: String
   }
 
   private let baseURL: URL
@@ -142,6 +178,30 @@ struct APIClient: APIClientProtocol, Sendable {
     try await sendMeRequest(forceRefresh: false)
   }
 
+  func registerPushDevice(
+    token: String,
+    environment: IOSPushEnvironment,
+    timezone: String
+  ) async throws {
+    try await sendPushDeviceRequest(
+      method: "PUT",
+      body: RegisterPushDeviceRequest(
+        token: token,
+        environment: environment,
+        timezone: timezone
+      ),
+      forceRefresh: false
+    )
+  }
+
+  func unregisterPushDevice(token: String) async throws {
+    try await sendPushDeviceRequest(
+      method: "DELETE",
+      body: UnregisterPushDeviceRequest(token: token),
+      forceRefresh: false
+    )
+  }
+
   func fetchAppleWalletProfilePass() async throws -> Data {
     try await sendAppleWalletProfilePassRequest(forceRefresh: false)
   }
@@ -160,6 +220,131 @@ struct APIClient: APIClientProtocol, Sendable {
 
   func fetchActionLoopCalendar() async throws -> MobileActionLoopCalendarResponse {
     try await sendActionLoopCalendarRequest(forceRefresh: false)
+  }
+
+  func decideSummerCard(
+    cardID: String,
+    decision: SummerCardDecision,
+    comment: String?
+  ) async throws -> SummerCardDecisionResult {
+    try await sendSummerCardDecisionRequest(
+      cardID: cardID,
+      decision: decision,
+      comment: comment,
+      forceRefresh: false
+    )
+  }
+
+  private func sendPushDeviceRequest<Body: Encodable>(
+    method: String,
+    body: Body,
+    forceRefresh: Bool,
+    tokenOverride: String? = nil
+  ) async throws {
+    let token = try await resolveToken(forceRefresh: forceRefresh, tokenOverride: tokenOverride)
+    var request = URLRequest(url: baseURL.appending(path: "/api/mobile/v1/push-devices"))
+    request.httpMethod = method
+    request.timeoutInterval = requestTimeout
+    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    request.setValue("application/json", forHTTPHeaderField: "Accept")
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.httpBody = try JSONEncoder().encode(body)
+
+    let response: URLResponse
+    do {
+      (_, response) = try await session.data(for: request)
+    } catch let error as URLError {
+      throw APIClientError.transportFailed(code: error.code.rawValue)
+    } catch {
+      throw APIClientError.invalidResponse
+    }
+
+    guard let httpResponse = response as? HTTPURLResponse else {
+      throw APIClientError.invalidResponse
+    }
+    if httpResponse.statusCode == 401, !forceRefresh {
+      let refreshed = try await retryTokenOrTerminal(after: token)
+      return try await sendPushDeviceRequest(
+        method: method,
+        body: body,
+        forceRefresh: true,
+        tokenOverride: refreshed
+      )
+    }
+    if httpResponse.statusCode == 401, forceRefresh {
+      handleTerminalUnauthorized()
+    }
+    guard (200 ... 299).contains(httpResponse.statusCode) else {
+      throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
+    }
+
+    refreshStoredSessionFromResponse(response)
+  }
+
+  private struct SummerCardDecisionRequest: Encodable {
+    let decision: String
+    let comment: String?
+  }
+
+  private func sendSummerCardDecisionRequest(
+    cardID: String,
+    decision: SummerCardDecision,
+    comment: String?,
+    forceRefresh: Bool,
+    tokenOverride: String? = nil
+  ) async throws -> SummerCardDecisionResult {
+    let token = try await resolveToken(forceRefresh: forceRefresh, tokenOverride: tokenOverride)
+    var request = URLRequest(
+      url: baseURL.appending(path: "/api/ovie/summer-cards/\(cardID)/decision")
+    )
+    request.httpMethod = "POST"
+    request.timeoutInterval = requestTimeout
+    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    request.setValue("application/json", forHTTPHeaderField: "Accept")
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.httpBody = try JSONEncoder().encode(
+      SummerCardDecisionRequest(decision: decision.rawValue, comment: comment)
+    )
+
+    let response: URLResponse
+    do {
+      (_, response) = try await session.data(for: request)
+    } catch let error as URLError {
+      throw APIClientError.transportFailed(code: error.code.rawValue)
+    } catch {
+      throw APIClientError.invalidResponse
+    }
+
+    guard let httpResponse = response as? HTTPURLResponse else {
+      throw APIClientError.invalidResponse
+    }
+
+    if httpResponse.statusCode == 401 {
+      if forceRefresh {
+        handleTerminalUnauthorized()
+        throw APIClientError.requestFailed(statusCode: 401)
+      }
+      let refreshed = try await retryTokenOrTerminal(after: token)
+      return try await sendSummerCardDecisionRequest(
+        cardID: cardID,
+        decision: decision,
+        comment: comment,
+        forceRefresh: true,
+        tokenOverride: refreshed
+      )
+    }
+
+    if httpResponse.statusCode == 409 {
+      refreshStoredSessionFromResponse(response)
+      return .alreadyDecided
+    }
+
+    guard (200 ... 299).contains(httpResponse.statusCode) else {
+      throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
+    }
+
+    refreshStoredSessionFromResponse(response)
+    return .decided
   }
 
   func completeProfile(displayName: String, username: String) async throws {

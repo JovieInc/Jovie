@@ -87,20 +87,25 @@ final class JovieUITests: XCTestCase {
       $0.buttons["Copy URL"]
     }
 
-    XCTAssertTrue(app.staticTexts["Profile"].exists)
+    XCTAssertTrue(app.staticTexts["My Jovie Card"].exists)
     XCTAssertTrue(app.buttons["Open navigation drawer"].exists)
-    XCTAssertTrue(app.buttons["shell-actions-menu"].exists)
-    app.buttons["shell-actions-menu"].tap()
-    XCTAssertTrue(
-      app.buttons["Open Settings"].waitForExistence(timeout: 3),
-      "Settings must stay reachable from the shell Actions menu.\n\(app.debugDescription)"
-    )
-    app.buttons["shell-actions-menu"].tap()
     XCTAssertTrue(app.buttons["dashboard-copy-url-button"].isEnabled)
     XCTAssertTrue(app.buttons["dashboard-share-profile-button"].isEnabled)
     XCTAssertTrue(app.buttons["Open Public Profile"].exists)
     XCTAssertTrue(app.buttons["Open Public Profile"].isEnabled)
+    XCTAssertEqual(
+      app.staticTexts["apple-wallet-profile-pass-status"].label,
+      "Apple Wallet isn't available for this profile yet."
+    )
     attachScreenshot(named: "profile", app: app)
+
+    let actionsMenu = app.buttons["shell-actions-menu"]
+    XCTAssertTrue(actionsMenu.exists)
+    actionsMenu.tap()
+    XCTAssertTrue(
+      app.buttons["Open Settings"].waitForExistence(timeout: 3),
+      "Settings must stay reachable from the shell Actions menu.\n\(app.debugDescription)"
+    )
   }
 
   func testPublicProfileOpensInFullScreenEmbeddedBrowser() {
@@ -157,7 +162,7 @@ final class JovieUITests: XCTestCase {
       $0.buttons["QR unavailable"]
     }
 
-    XCTAssertTrue(app.staticTexts["Profile"].exists)
+    XCTAssertTrue(app.staticTexts["My Jovie Card"].exists)
     let copyButton = app.buttons["dashboard-copy-url-button"]
     let shareButton = app.buttons["dashboard-share-profile-button"]
     XCTAssertTrue(copyButton.exists)
@@ -352,6 +357,7 @@ final class JovieUITests: XCTestCase {
         "Settings row \(linkTitle) did not appear in the accessibility tree.\n\(app.debugDescription)"
       )
     }
+    app.swipeUp()
     for valueTitle in ["Version", "Build"] {
       XCTAssertTrue(
         app.staticTexts[valueTitle].waitForExistence(timeout: 2),
@@ -501,18 +507,12 @@ final class JovieUITests: XCTestCase {
     )
     XCTAssertFalse(
       shellControlExists(app, identifier: "shell-tab-library"),
-      "Library must not be a bottom tab.\n\(app.debugDescription)"
+      "Work must not be a bottom tab.\n\(app.debugDescription)"
     )
     XCTAssertTrue(
       app.buttons["shell-actions-menu"].exists,
       "The Actions overflow must be the shell's single trailing control.\n\(app.debugDescription)"
     )
-    app.buttons["shell-actions-menu"].tap()
-    XCTAssertTrue(
-      app.descendants(matching: .any)["shell-talk-fab"].waitForExistence(timeout: 3),
-      "Talk must stay reachable from the Actions menu.\n\(app.debugDescription)"
-    )
-    app.buttons["shell-actions-menu"].tap()
     XCTAssertFalse(
       app.buttons["chat-voice-button"].exists,
       "Composer mic should stay removed.\n\(app.debugDescription)"
@@ -521,7 +521,7 @@ final class JovieUITests: XCTestCase {
     app.buttons["Open navigation drawer"].tap()
     XCTAssertTrue(
       app.buttons["shell-drawer-surface-shell-tab-library"].waitForExistence(timeout: 3),
-      "Sidebar must expose Library.\n\(app.debugDescription)"
+      "Sidebar must expose Work.\n\(app.debugDescription)"
     )
     XCTAssertTrue(app.buttons["shell-drawer-surface-shell-tab-calendar"].exists)
     XCTAssertTrue(app.buttons["shell-drawer-surface-shell-tab-inbox"].exists)
@@ -668,6 +668,11 @@ final class JovieUITests: XCTestCase {
       $0.textFields["chat-composer-input"]
     }
 
+    XCTAssertFalse(
+      shellControlExists(app, identifier: "shell-tab-bar"),
+      "Talk must not require a bottom tab bar.\n\(app.debugDescription)"
+    )
+
     let actionsMenu = app.buttons["shell-actions-menu"]
     XCTAssertTrue(
       actionsMenu.waitForExistence(timeout: 3),
@@ -677,11 +682,6 @@ final class JovieUITests: XCTestCase {
     XCTAssertTrue(
       app.descendants(matching: .any)["shell-talk-fab"].waitForExistence(timeout: 3),
       "Talk did not appear in the shell Actions menu.\n\(app.debugDescription)"
-    )
-    actionsMenu.tap()
-    XCTAssertFalse(
-      shellControlExists(app, identifier: "shell-tab-bar"),
-      "Talk must not require a bottom tab bar.\n\(app.debugDescription)"
     )
     XCTAssertFalse(
       app.buttons["chat-voice-button"].exists,
@@ -994,7 +994,7 @@ final class JovieUITests: XCTestCase {
     )
     XCTAssertTrue(
       app.buttons["shell-drawer-surface-shell-tab-library"].isHittable,
-      "Sidebar Library must be reachable after a leading swipe.\n\(app.debugDescription)"
+      "Sidebar Work must be reachable after a leading swipe.\n\(app.debugDescription)"
     )
     XCTAssertFalse(
       app.buttons["Copy URL"].exists,
@@ -2197,7 +2197,7 @@ final class JovieUITests: XCTestCase {
         "Chat message",
         "Send",
         "Chat",
-        "Library",
+        "Work",
         "Inbox",
         "Calendar",
         "Done",
