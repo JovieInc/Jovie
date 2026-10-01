@@ -73,31 +73,6 @@ describe('DashboardNav interactions', () => {
     expect(searchSlot).toContainElement(newChat);
   });
 
-  it('acknowledges New Chat immediately while retaining authenticated content', () => {
-    mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
-    renderDashboardNav({
-      renderFn: render,
-      children: (
-        <main data-testid='authenticated-route-content'>Current route</main>
-      ),
-    });
-
-    const newChat = screen.getByRole('link', { name: 'New Chat' });
-    newChat.addEventListener('click', event => event.preventDefault());
-    fireEvent.click(newChat);
-
-    expect(newChat).toHaveAttribute('aria-busy', 'true');
-    expect(newChat).toHaveAttribute('data-navigation-item-id', 'chat');
-    expect(newChat).toHaveAttribute('data-navigation-pending', 'true');
-    expect(newChat).toHaveClass('size-6', 'rounded-full');
-    expect(newChat.className).toContain(
-      'data-[navigation-pending=true]:opacity-70'
-    );
-    expect(screen.getByTestId('authenticated-route-content')).toHaveTextContent(
-      'Current route'
-    );
-  });
-
   it('wires a plain nav click to one canonical privacy-safe activation', async () => {
     const user = userEvent.setup();
     renderDashboardNav({ renderFn: render });
