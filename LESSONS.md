@@ -7,11 +7,14 @@ See [the self-improvement loop](.claude/rules/code-style.md#self-improvement-loo
 level-three heading) to a named regression test or scoped rule, with a reason and
 a SHA-256 of the reviewed lesson. When adding or changing a lesson, review its
 prevention and update that entry together. Do not refresh hashes without review.
-The existing `scripts/invariants/harness-contract.test.mjs` audit checks exhaustive
-coverage, reviewed text, local paths and exact guard anchors. Its linkage receipt
-proves those references exist; it does not prove all linked tests ran or certify
+The existing `scripts/invariants/validate.mjs` process emits a nonblocking
+qualification audit of exhaustive coverage, reviewed text, local paths and exact
+guard anchors. Fixed fixtures in `harness-contract.test.mjs` test the verifier.
+A passing linkage receipt proves those references exist; it does not prove all linked tests ran or certify
 runtime behavior. Scoped rules are policy guards, not automated regression tests.
-No lesson is declared unable to recur in this inventory.
+No lesson is declared unable to recur in this inventory. H-EX-06 stays partial
+until shadow-qualification and promotion receipts meet `canon/ENGINEERING.md`;
+policy-only fingerprints are listed explicitly and do not prove executable prevention.
 
 ---
 

@@ -346,10 +346,21 @@ export function runDocFreshnessLint(registry, options = {}) {
     });
   }
 
+  // New H-03 requirements qualify alongside existing checks before promotion.
+  const reviewStarted = performance.now();
   const documents = topMapDocuments(registry, repoRoot);
-  violations.push(
-    ...findDocumentReviewViolations(registry, documents, repoRoot)
+  const reviewViolations = findDocumentReviewViolations(
+    registry,
+    documents,
+    repoRoot
   );
+  const qualification = {
+    schema: 'jovie-document-review-qualification/v1',
+    mode: 'qualification-only',
+    ok: reviewViolations.length === 0,
+    violations: reviewViolations,
+    durationMs: performance.now() - reviewStarted,
+  };
 
   const crossLinkFiles = expandDocScopes(registry.crossLinkScopes, repoRoot);
   violations.push(...findBrokenCrossLinks(crossLinkFiles, repoRoot));
@@ -361,6 +372,7 @@ export function runDocFreshnessLint(registry, options = {}) {
   return {
     ok: violations.length === 0,
     violations,
+    qualification,
     scanned: {
       crossLinkFiles: crossLinkFiles.length,
       agentsMapLines: lineCount,

@@ -404,8 +404,8 @@
     },
     "docs/DOCUMENTATION.md": {
       "owner": "@itstimwhite",
-      "claim": "Local source parity and per-document source review remain distinct from runtime proof.",
-      "documentSha256": "2d966b21dc37d26b19e7af26ce8990b13462842ddc1189883e6ea8fec47daaf2",
+      "claim": "Local source parity and per-document reviews are not runtime proof. New review findings qualify nonblocking before promotion; existing freshness gates remain enforced.",
+      "documentSha256": "86d4ea8093eb834c379629c495b82e0883ca3f050be5aed1e43e13ec024ef938",
       "sources": [
         {
           "path": "scripts/repository_docs.py",
@@ -414,6 +414,15 @@
         {
           "path": "scripts/lib/doc-review.mjs",
           "sha256": "584ad2a3423c982601dc9af203a39a991be276af5ffa8bb3e4c2603c7b0fe42c"
+        },
+        {
+          "path": "scripts/lib/doc-freshness.mjs",
+          "sha256": "e4c869b8577d579f6934b11f17f0405e8c7bfc0f3851b672791080cd5bf00349"
+        },
+        {
+          "path": "canon/ENGINEERING.md",
+          "section": "### Qualify delivery gates in shadow before enforcement",
+          "sha256": "44292842cd76459716aed9f37fd0112b8ae4905ff4969da4e91bdd38619ae70b"
         }
       ]
     },
