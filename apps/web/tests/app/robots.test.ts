@@ -337,6 +337,23 @@ describe('robots.ts — production behavior', () => {
     }
   });
 
+  it('emits exactly the independently declared crawler policy', async () => {
+    const { REQUIRED_AI_CRAWLERS: declaredPolicy } = await import(
+      '@/lib/seo/guardrail-check'
+    );
+    const robots = await importRobots(undefined);
+    const result = robots();
+    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+    const agents = rules
+      .flatMap(rule =>
+        Array.isArray(rule.userAgent) ? rule.userAgent : [rule.userAgent]
+      )
+      .filter(agent => agent !== '*')
+      .sort();
+    expect(agents).toEqual([...REQUIRED_AI_CRAWLERS].sort());
+    expect(agents).toEqual([...declaredPolicy].sort());
+  });
+
   it.each(REQUIRED_AI_CRAWLERS)(
     'explicitly allows AI crawler "%s" in production',
     async crawler => {
