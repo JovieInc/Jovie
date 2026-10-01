@@ -1,5 +1,6 @@
 import {
   index,
+  integer,
   jsonb,
   numeric,
   pgTable,
@@ -74,6 +75,12 @@ export const financeAccounts = pgTable(
       scale: 4,
     }),
     balanceUpdatedAt: timestamp('balance_updated_at', { withTimezone: true }),
+    /**
+     * Account-level default lens applied when no rule or deterministic
+     * pattern matches. One of FINANCE_LENSES or null (no default).
+     * Classification only — never a sharing signal (JOV-4615).
+     */
+    defaultLens: text('default_lens'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -143,7 +150,6 @@ export const financeExports = pgTable(
     ownerIdx: index('finance_exports_owner_idx').on(table.ownerUserId),
   })
 );
-
 /**
  * Budget targets (JOV-4620).
  *
@@ -203,6 +209,138 @@ export const financeBudgetSettings = pgTable('finance_budget_settings', {
     .notNull(),
 });
 
+/**
+ * Owner-authored classification rules (JOV-4615).
+ *
+ * Rules are derived from owner corrections (or created manually) and match on
+ * safe fields only: account, normalized merchant pattern, direction, amount
+ * range, recurrence, and description tokens. `provenance` records where the
+ * rule came from so every classification can show which rule produced it.
+ */
+export const financeClassificationRules = pgTable(
+  'finance_classification_rules',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    status: text('status').notNull().default('active'),
+    priority: integer('priority').notNull().default(100),
+    matchAccountId: uuid('match_account_id').references(
+      () => financeAccounts.id,
+      { onDelete: 'cascade' }
+    ),
+    matchMerchantPattern: text('match_merchant_pattern'),
+    matchDirection: text('match_direction'),
+    matchAmountMin: numeric('match_amount_min', {
+      precision: 19,
+      scale: 4,
+    }),
+    matchAmountMax: numeric('match_amount_max', {
+      precision: 19,
+      scale: 4,
+    }),
+    matchDescriptionTokens: jsonb('match_description_tokens').$type<string[]>(),
+    matchRecurrence: text('match_recurrence'),
+    setLens: text('set_lens').notNull(),
+    setCategory: text('set_category'),
+    provenance: text('provenance').notNull().default('manual'),
+    sourceTransactionId: uuid('source_transaction_id').references(
+      () => financeTransactions.id,
+      { onDelete: 'set null' }
+    ),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    ownerIdx: index('finance_classification_rules_owner_idx').on(
+      table.ownerUserId
+    ),
+  })
+);
+
+/**
+ * The stored classification for one transaction (JOV-4615).
+ *
+ * One row per transaction; reprocessing upserts by `transaction_id` so
+ * re-runs are idempotent. `source`/`ruleId`/`explanation` give the owner
+ * provenance: which rule, deterministic pattern, or (audited) model decision
+ * produced the result.
+ */
+export const financeTransactionClassifications = pgTable(
+  'finance_transaction_classifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    transactionId: uuid('transaction_id')
+      .notNull()
+      .references(() => financeTransactions.id, { onDelete: 'cascade' }),
+    lens: text('lens').notNull(),
+    category: text('category'),
+    confidence: numeric('confidence', { precision: 5, scale: 4 }).notNull(),
+    explanation: text('explanation').notNull(),
+    source: text('source').notNull(),
+    ruleId: uuid('rule_id').references(() => financeClassificationRules.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    transactionIdx: uniqueIndex(
+      'finance_transaction_classifications_tx_idx'
+    ).on(table.transactionId),
+    ownerIdx: index('finance_transaction_classifications_owner_idx').on(
+      table.ownerUserId
+    ),
+  })
+);
+
+/**
+ * Split lines for transactions spanning personal and creator purposes
+ * (JOV-4615). Split amounts must sum exactly to the parent transaction's
+ * amount; enforced in the repository layer.
+ */
+export const financeTransactionSplits = pgTable(
+  'finance_transaction_splits',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    transactionId: uuid('transaction_id')
+      .notNull()
+      .references(() => financeTransactions.id, { onDelete: 'cascade' }),
+    seq: integer('seq').notNull(),
+    amount: numeric('amount', { precision: 19, scale: 4 }).notNull(),
+    lens: text('lens').notNull(),
+    category: text('category'),
+    note: text('note'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    transactionIdx: index('finance_transaction_splits_tx_idx').on(
+      table.transactionId
+    ),
+    ownerIdx: index('finance_transaction_splits_owner_idx').on(
+      table.ownerUserId
+    ),
+  })
+);
+
 export type FinanceInstitution = typeof financeInstitutions.$inferSelect;
 export type NewFinanceInstitution = typeof financeInstitutions.$inferInsert;
 export type FinanceAccount = typeof financeAccounts.$inferSelect;
@@ -216,3 +354,15 @@ export type NewFinanceBudgetTarget = typeof financeBudgetTargets.$inferInsert;
 export type FinanceBudgetSettings = typeof financeBudgetSettings.$inferSelect;
 export type NewFinanceBudgetSettings =
   typeof financeBudgetSettings.$inferInsert;
+export type FinanceClassificationRule =
+  typeof financeClassificationRules.$inferSelect;
+export type NewFinanceClassificationRule =
+  typeof financeClassificationRules.$inferInsert;
+export type FinanceTransactionClassification =
+  typeof financeTransactionClassifications.$inferSelect;
+export type NewFinanceTransactionClassification =
+  typeof financeTransactionClassifications.$inferInsert;
+export type FinanceTransactionSplit =
+  typeof financeTransactionSplits.$inferSelect;
+export type NewFinanceTransactionSplit =
+  typeof financeTransactionSplits.$inferInsert;
