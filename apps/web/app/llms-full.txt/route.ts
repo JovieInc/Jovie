@@ -110,6 +110,7 @@ Tim White is the founder of ${APP_NAME}. Current founder biography is published 
 - [Canonical contract](${BASE_URL}/api/v1/openapi.json)
 - [Public artist profile](${BASE_URL}/api/v1/{username})
 - Public artist API and anonymous per-artist MCP access are read-only
+- [Jovie CLI](${BASE_URL}/cli) can also create an unclaimed profile (POST ${BASE_URL}/api/agents/profiles) that the artist claims by verifying on Spotify, and file bug or feedback reports
 
 ## Contact
 
