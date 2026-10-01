@@ -16,6 +16,7 @@ import {
   COVERAGE_PACKAGES,
   normalizeCoverageReports,
   normalizeLcov,
+  prepareSonarSources,
 } from './normalize-sonar-lcov.mjs';
 
 function fixture(t) {
@@ -26,6 +27,12 @@ function fixture(t) {
     writeFileSync(join(root, path), text);
   };
   for (const pkg of COVERAGE_PACKAGES) write(`${pkg}/lib/utils.ts`);
+  write('apps/web/app/.well-known/oauth/route.ts');
+  write('apps/web/app/page.tsx');
+  write(
+    'sonar-project.properties',
+    'sonar.sources=apps/web,packages/ui\nsonar.tests=apps/web,packages/ui\nsonar.exclusions=**/.storybook/**\n'
+  );
   return { root, write };
 }
 const record = source =>
@@ -149,4 +156,78 @@ test('the production CLI exits nonzero on absent evidence and rewrites valid rep
   });
   assert.equal(success.status, 0, success.stderr);
   assert.match(success.stdout, /web=1, ui=1/);
+  assert.match(
+    readFileSync(join(root, 'sonar-project.properties'), 'utf8'),
+    /^sonar.sources=.*apps\/web\/app\/\.well-known\/oauth/m
+  );
+});
+
+test('hidden discovery routes receive disjoint visible roots without dropping other scope', t => {
+  const { root, write } = fixture(t);
+  write('apps/web/app/.well-known/metadata.test.ts');
+  write('apps/web/.claude/quality.json');
+  write('apps/web/.storybook/preview.ts');
+  write('apps/web/reports/generated.json');
+  const prepared = prepareSonarSources(root);
+  const roots = prepared.text.match(/^sonar.sources=(.+)$/m)[1].split(',');
+  assert.ok(roots.includes('apps/web/app/.well-known/oauth'));
+  assert.ok(roots.includes('apps/web/app/.well-known/metadata.test.ts'));
+  for (const path of [
+    'apps/web/app/page.tsx',
+    'apps/web/lib',
+    'apps/web/.claude',
+    'apps/web/.storybook',
+    'apps/web/reports',
+    'packages/ui',
+  ]) {
+    assert.ok(roots.includes(path), path);
+  }
+  for (const path of roots) {
+    assert.ok(
+      !roots.some(other => other !== path && path.startsWith(`${other}/`)),
+      path
+    );
+  }
+  assert.equal(prepared.text.match(/^sonar.tests=(.+)$/m)[1], roots.join(','));
+  assert.match(prepared.text, /^sonar.exclusions=\*\*\/\.storybook\/\*\*$/m);
+  assert.ok(!prepared.text.includes('excludeHiddenFiles'));
+  write('sonar-project.properties', prepared.text);
+  assert.deepEqual(prepareSonarSources(root), prepared);
+});
+
+test('source preparation rejects missing discovery roots, unsafe paths, and changed canonical scope', t => {
+  const { root, write } = fixture(t);
+  rmSync(join(root, 'apps/web/app/.well-known'), { recursive: true });
+  assert.throws(() => prepareSonarSources(root), /ENOENT/);
+  mkdirSync(join(root, 'apps/web/app/.well-known'));
+  assert.throws(() => prepareSonarSources(root), /Missing discovery sources/);
+  write('apps/web/app/.well-known/oauth/route.ts');
+  write('apps/web/bad,name/file.ts');
+  assert.throws(
+    () => prepareSonarSources(root),
+    /Unsupported Sonar source root/
+  );
+  rmSync(join(root, 'apps/web/bad,name'), { recursive: true });
+  write(
+    'sonar-project.properties',
+    'sonar.sources=apps/web/lib\nsonar.tests=apps/web,packages/ui\n'
+  );
+  assert.throws(() => prepareSonarSources(root), /Unexpected sonar.sources/);
+});
+
+test('ambiguous Java property overrides cannot survive source preparation', t => {
+  const { root, write } = fixture(t);
+  for (const override of [
+    'sonar.sources: apps/web/lib',
+    '  sonar.sources=apps/web/lib',
+    'sonar.tests apps/web/lib',
+    'sonar.sources',
+    'sonar.tests',
+  ]) {
+    write(
+      'sonar-project.properties',
+      `sonar.sources=apps/web,packages/ui\nsonar.tests=apps/web,packages/ui\n${override}\n`
+    );
+    assert.throws(() => prepareSonarSources(root), /Unexpected sonar/);
+  }
 });
