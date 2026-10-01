@@ -2590,14 +2590,69 @@ def failures_path(host: Host) -> Path:
     return host.state / "failures.json"
 
 
-def record_idle_exit(host: Host, name: str, reason: str) -> None:
+def deferred_requeue_blocks(host: Host, name: str, current_context=None) -> dict:
+    """Exact retry dispositions since the last ordinary work scan, in the existing idle ledger."""
+    try:
+        idle = json.loads((host.state / "worker-idle.json").read_text()).get(name, {})
+        queued = json.loads((host.state / "requeue.json").read_text())
+        blocks = {number: row for number, row in idle.get("deferredRequeue", {}).items()
+                  if queued.get(number) == row["pr"]["headRefOid"]}
+        if current_context:
+            blocks = {number: row for number, row in blocks.items()
+                      if (not current_context(row["pr"]).get("active") if row["terminal"]
+                          else current_context(row["pr"]) == row["context"])}
+        return blocks
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return {}
+
+
+def yield_deferred_requeues(host: Host, name: str) -> None:
+    """Under claim.lock: one ordinary unit/scan yields before reconsidering transient holds."""
+    path = host.state / "worker-idle.json"
+    if not path.exists(): return
+    def clear(data):
+        row = data.get(name, {})
+        row["deferredRequeue"] = {number: item for number, item in row.get("deferredRequeue", {}).items()
+                                  if item["terminal"]}
+    update_json(path, clear)
+
+
+def finish_deferred_retry(host: Host, name: str, pr: dict, retry, context, *, slot):
+    """One deferred unit owns its receipt and exit; no second work starts on a held result."""
+    try:
+        def invoke(live):
+            issue, outcome = retry(live)
+            if outcome and outcome.get("verdict") in ("landing", "verified-not-queued", "gate-timeout", "remote-repair-required"):
+                receipt = qualification_receipt(name, issue, outcome)
+                with (host.state / "runs/ledger.jsonl").open("a") as ledger: ledger.write(json.dumps(receipt) + "\n")
+                return receipt
+        try:
+            receipt = run_deferred_requeue(host, pr, invoke, slot=slot)
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError):
+            receipt = None  # run_deferred_requeue already released its slot on an error
+        if receipt is None or receipt.get("verdict") == "remote-repair-required":
+            marker = {"pr": {key: pr[key] for key in ("number", "headRefOid", "headRefName")},
+                      "issue": LANE_BRANCH.match(pr["headRefName"]).group("issue").upper(),
+                      "context": context(pr), "terminal": bool(receipt)}
+            record_idle_exit(host, name, "deferred-repair-required" if receipt else "deferred-held", deferred=marker)
+        if receipt is None and not slot.handle.closed: slot.release()
+        return receipt
+    except BaseException:
+        if not slot.handle.closed: slot.release()
+        raise
+
+
+def record_idle_exit(host: Host, name: str, reason: str, *, deferred=None) -> None:
     """A durable marker that a spawned worker reached the claim scan and exited cleanly, so the
     doctor's spawn-exit rule can tell 'pool had nothing claimable' from workers dying on claim."""
     lock = Locked(host.state / "claim.lock", blocking=True)
     try:
         path = host.state / "worker-idle.json"
         data = json.loads(path.read_text()) if path.exists() else {}
-        data[name] = {"at": now_iso(), "reason": reason}
+        blocks = data.get(name, {}).get("deferredRequeue", {})
+        if deferred: blocks[str(deferred["pr"]["number"])] = deferred
+        else: blocks = {number: row for number, row in blocks.items() if row["terminal"]}
+        data[name] = {"at": now_iso(), "reason": reason, **({"deferredRequeue": blocks} if blocks else {})}
         path.write_text(json.dumps(data))
     except (OSError, ValueError):
         pass
@@ -2655,6 +2710,10 @@ def worker(host: Host, name: str) -> int:
                 linear.move(issue.id, "In Progress")
     finally:
         claim.release()
+    if red is not None or adopt is not None or issue is not None:
+        claim = Locked(host.state / "claim.lock", blocking=True)
+        try: yield_deferred_requeues(host, name)
+        finally: claim.release()
     if red is not None or adopt is not None:
         if red is not None:
             fix_red_pr(host, name, spec, red)
