@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  mockUsePathname,
   renderDashboardNav,
   resetDashboardNavTestMocks,
 } from '@/tests/utils/dashboard-nav-test-support';
@@ -71,6 +72,31 @@ describe('DashboardNav route warming', () => {
         screen.queryByRole('link', { name: label })
       ).not.toBeInTheDocument();
     }
+  });
+
+  it('acknowledges New Chat immediately while retaining authenticated content', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
+    renderDashboardNav({
+      renderFn: render,
+      children: (
+        <main data-testid='authenticated-route-content'>Current route</main>
+      ),
+    });
+
+    const newChat = screen.getByRole('link', { name: 'New Chat' });
+    newChat.addEventListener('click', event => event.preventDefault());
+    fireEvent.click(newChat);
+
+    expect(newChat).toHaveAttribute('aria-busy', 'true');
+    expect(newChat).toHaveAttribute('data-navigation-item-id', 'chat');
+    expect(newChat).toHaveAttribute('data-navigation-pending', 'true');
+    expect(newChat).toHaveClass('size-6', 'rounded-full');
+    expect(newChat.className).toContain(
+      'data-[navigation-pending=true]:opacity-70'
+    );
+    expect(screen.getByTestId('authenticated-route-content')).toHaveTextContent(
+      'Current route'
+    );
   });
 
   it('shows runtime update attention on the existing Inbox bell while preserving opportunity counts', () => {
