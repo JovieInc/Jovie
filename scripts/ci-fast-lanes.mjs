@@ -284,7 +284,7 @@ export function webCiContractTestsCommand(
   return `pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci${excludes}`;
 }
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 
 /**
  * Script contracts that no other CI command ran (orphan sweep). The
@@ -498,9 +498,13 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/web-test-selectors.test.mjs',
   'scripts/lib/__tests__/web-vitest-fast-runner.test.mjs',
 ]);
+// Keep scanner-heavy script contracts outside V8 instrumentation; cover the
+// document helpers with the same behavior test in a small separate process.
 export const SCRIPT_CONTRACT_VITEST_COMMAND = `pnpm exec vitest --root scripts --config vitest.config.mts run ${SCRIPT_CONTRACT_VITEST_TESTS.map(
   test => test.replace(/^scripts\//u, '')
-).join(' ')}`;
+).join(
+  ' '
+)} && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/doc-freshness.test.mjs --coverage --coverage.include=lib/doc-review.mjs --coverage.include=lib/doc-freshness.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="\${RUNNER_TEMP:-/tmp}/jovie-document-review-coverage" --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.branches=80 --coverage.thresholds.functions=90`;
 
 const REPO_ROOT = process.cwd();
 const selectedProductLanes = () =>

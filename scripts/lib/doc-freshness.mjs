@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { findDocumentReviewViolations } from './doc-review.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = resolve(__dirname, '..', '..');
@@ -105,6 +106,29 @@ export function countAgentsMapLines(registry, repoRoot = REPO_ROOT) {
 }
 
 export function extractMarkdownLinks(content, sourceFile) {
+  let fence = null;
+  content = content
+    .split('\n')
+    .map(line => {
+      const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+      if (fence) {
+        if (
+          marker &&
+          marker[1][0] === fence[0] &&
+          marker[1].length >= fence.length &&
+          !marker[2].trim()
+        )
+          fence = null;
+        return '';
+      }
+      if (marker) {
+        fence = marker[1];
+        return '';
+      }
+      return line;
+    })
+    .join('\n');
+  const referenceKey = label => label.trim().replace(/\s+/g, ' ').toLowerCase();
   const links = [];
   let match;
   MARKDOWN_LINK_RE.lastIndex = 0;
@@ -113,6 +137,24 @@ export function extractMarkdownLinks(content, sourceFile) {
     const target = normalizeLinkTarget(rawTarget);
     if (shouldSkipLink(target)) continue;
     links.push({ sourceFile, rawTarget, target });
+  }
+  const definitions = new Map();
+  for (const definition of content.matchAll(
+    /^\s{0,3}\[([^\]]+)\]:\s*(\S+)/gm
+  )) {
+    definitions.set(referenceKey(definition[1]), definition[2]);
+  }
+  for (const reference of content.matchAll(
+    /\[([^\]\n]+)\](?:\[([^\]\n]*)\])?/g
+  )) {
+    const next = content[reference.index + reference[0].length];
+    // Definitions are not uses; inline links already have their own target.
+    if (next === ':' || next === '(') continue;
+    const key = referenceKey(reference[2] || reference[1]);
+    const rawTarget = definitions.get(key);
+    if (!rawTarget) continue;
+    const target = normalizeLinkTarget(rawTarget);
+    if (!shouldSkipLink(target)) links.push({ sourceFile, rawTarget, target });
   }
   return links;
 }
@@ -269,6 +311,24 @@ export function findStaleFreshnessMarkers(registry, options = {}) {
   return violations;
 }
 
+export function topMapDocuments(registry, repoRoot = REPO_ROOT) {
+  const map = registry.agentsMap.path;
+  const links = extractMarkdownLinks(
+    readFileSync(resolve(repoRoot, map), 'utf8'),
+    map
+  )
+    .map(link => resolveMarkdownLink(map, link.target, repoRoot).relativeTarget)
+    .filter(file => file.endsWith('.md'));
+  // Scoped rules named by the map include both linked and compactly listed rules.
+  return [
+    ...new Set([
+      map,
+      ...links,
+      ...expandDocScopes(['.claude/rules/*.md'], repoRoot),
+    ]),
+  ].sort();
+}
+
 export function runDocFreshnessLint(registry, options = {}) {
   const { includeGardeningOnly = false, repoRoot = REPO_ROOT } = options;
   const violations = [];
@@ -286,6 +346,22 @@ export function runDocFreshnessLint(registry, options = {}) {
     });
   }
 
+  // New H-03 requirements qualify alongside existing checks before promotion.
+  const reviewStarted = performance.now();
+  const documents = topMapDocuments(registry, repoRoot);
+  const reviewViolations = findDocumentReviewViolations(
+    registry,
+    documents,
+    repoRoot
+  );
+  const qualification = {
+    schema: 'jovie-document-review-qualification/v1',
+    mode: 'qualification-only',
+    ok: reviewViolations.length === 0,
+    violations: reviewViolations,
+    durationMs: performance.now() - reviewStarted,
+  };
+
   const crossLinkFiles = expandDocScopes(registry.crossLinkScopes, repoRoot);
   violations.push(...findBrokenCrossLinks(crossLinkFiles, repoRoot));
 
@@ -296,9 +372,11 @@ export function runDocFreshnessLint(registry, options = {}) {
   return {
     ok: violations.length === 0,
     violations,
+    qualification,
     scanned: {
       crossLinkFiles: crossLinkFiles.length,
       agentsMapLines: lineCount,
+      reviewedDocuments: documents.length,
     },
   };
 }

@@ -9,6 +9,7 @@ import {
   validateDesignSurfaces,
 } from './design-surfaces.mjs';
 import { validateDoneSprintInvariants } from './done-sprint-invariants.mjs';
+import { auditFeedbackLinkage } from './feedback-linkage.mjs';
 import { validateGateIntegrityPolicy } from './gate-integrity.mjs';
 import {
   buildHarnessReceipt,
@@ -108,6 +109,11 @@ const errors = [
   ...designCiJudgeRouterErrors.map(error => `design-ci-judge-router: ${error}`),
   ...writingErrors.map(error => `writing-surfaces: ${error}`),
 ];
+
+// H-06 ships in shadow under ENGINEERING.md; findings never join gate errors.
+process.stdout.write(
+  `feedback-linkage-qualification: ${JSON.stringify(auditFeedbackLinkage())}\n`
+);
 
 const ok = errors.length === 0 && result.blockers.length === 0;
 
