@@ -1297,7 +1297,7 @@ class PreservedRecoveryTest(unittest.TestCase):
         self.path = self.path.parent / "renamed-preserved-work"
         self.git(self.host.repo, "worktree", "move", str(canonical), str(self.path))
         prior["preservedWorktree"] = str(self.path)
-        (self.host.state / "runs/ledger.jsonl").write_text(json.dumps(prior) + "\n")
+        (self.host.state / "runs/ledger.jsonl").write_text(json.dumps(prior) + "\n{truncated unrelated row\n")
         (self.path / lane.disk_guard.PRESERVED_REPAIR).write_text("{")
         for ledger_available in (True, False):
             if not ledger_available:

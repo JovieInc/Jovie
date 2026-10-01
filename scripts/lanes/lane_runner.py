@@ -1637,9 +1637,15 @@ def preserved_run(host: Host, *, pr=None, issue=None):
             # The ended ledger or canonical run name can identify the target for
             # a refusal, but neither substitutes for a valid recovery marker.
             try:
-                rows = [json.loads(line) for line in (host.state / "runs/ledger.jsonl").read_text().splitlines()]
-            except (OSError, ValueError):
-                rows = []
+                lines = (host.state / "runs/ledger.jsonl").read_text().splitlines()
+            except OSError:
+                lines = []
+            rows = []
+            for line in lines:
+                try:
+                    rows.append(json.loads(line))
+                except ValueError:
+                    continue  # Keep readable bindings for refusal, never for admission.
             bound = any(isinstance(row, dict) and row.get("preservedWorktree") == str(marker_path.parent)
                         and ((pr is not None and row.get("pr") == pr) or (issue and row.get("issue") == issue))
                         for row in rows)
