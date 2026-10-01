@@ -10,6 +10,12 @@ export const ACTION_IDS = [
   'contact.create',
   'release.create',
   'task.create',
+  'fleet.register',
+  'fleet.status',
+  'work.next',
+  'work.claim',
+  'work.report',
+  'defect.report',
 ] as const;
 
 export type ActionId = (typeof ACTION_IDS)[number];
