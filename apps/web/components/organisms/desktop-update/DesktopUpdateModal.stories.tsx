@@ -53,6 +53,19 @@ export const Downloading: Story = {
   },
 };
 
+export const DownloadingSlow: Story = {
+  args: {
+    state: {
+      state: 'downloading',
+      percent: 25,
+      transferredBytes: 128 * 1024,
+      totalBytes: 512 * 1024,
+      bytesPerSecond: 32 * 1024,
+    },
+    version: '26.9.16',
+  },
+};
+
 export const Ready: Story = {
   args: { state: { state: 'ready', version: '26.9.16' } },
 };
