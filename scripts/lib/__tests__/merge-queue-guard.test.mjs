@@ -2686,7 +2686,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     }
   });
 
-  // Execute production shell inventory/collision functions and both real CLIs.
+  // Execute production shell and real admission/collision CLIs as needed.
   // Only the gh transport is a fixture. SNAP is deliberately target-only.
   function runDrainChangelogDecision({
     branch = stampBranch,
@@ -2694,12 +2694,14 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     candidateFiles = ['CHANGELOG.md'],
     inventoryFailure = false,
     malformedInventory = false,
+    expectedFinalCliCalls = 1,
+    admissionReceipt,
   } = {}) {
     const drain = readFileSync(
       resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
       'utf8'
     );
-    const functions =
+    let functions =
       drain.slice(
         drain.indexOf('native_state_to_snap() {'),
         drain.indexOf('REPO="${REPO:-JovieInc/Jovie}"')
@@ -2708,6 +2710,13 @@ describe('native merge-queue cohort (JOV-5047)', () => {
         drain.indexOf('pr_changed_paths_json() {'),
         drain.indexOf('reconcile_deferred_auto_merge_after_main_push() {')
       );
+    if (admissionReceipt !== undefined) {
+      // Corrupt only the returned receipt after the real admission CLI ran.
+      functions = functions.replace(
+        'node scripts/lib/pre-land-changelog.mjs admission)"',
+        'node scripts/lib/pre-land-changelog.mjs admission)"\n  admission="$STAMP_ADMISSION_RECEIPT"'
+      );
+    }
     const snapshot = [{ n: 17463, head: branch, q: false }];
     const files = Object.fromEntries([
       ['17463', candidateFiles],
@@ -2754,23 +2763,17 @@ describe('native merge-queue cohort (JOV-5047)', () => {
         ];
     const dir = mkdtempSync(resolve(tmpdir(), 'stamp-drain-'));
     const callsPath = resolve(dir, 'calls.jsonl');
+    const nodeCallsPath = resolve(dir, 'node-calls.tsv');
     writeFileSync(callsPath, '');
+    writeFileSync(nodeCallsPath, '');
+    writeFileSync(
+      resolve(dir, 'node'),
+      "#!/bin/sh\nprintf '%s\\t%s\\n' \"${1##*/}\" \"${2:-}\" >> \"$STAMP_NODE_CALLS\"\nexec \"$STAMP_REAL_NODE\" \"$@\"\n",
+      { mode: 0o755 }
+    );
     writeFileSync(
       resolve(dir, 'gh'),
-      `#!/usr/bin/env node
-      const fs = require('node:fs');
-      const args = process.argv.slice(2);
-      fs.appendFileSync(process.env.STAMP_CALLS, JSON.stringify(args) + String.fromCharCode(10));
-      if (args[0] === 'api' && args[1] === 'graphql' && args.some(arg => arg.includes('MergeQueueOpenPullRequestStates'))) {
-        if (!args.includes('--paginate') || !args.includes('--slurp')) process.exit(9);
-        console.log(process.env.STAMP_PAGES);
-        if (process.env.STAMP_INVENTORY_FAILURE === '1') process.exit(1);
-      } else if (args[0] === 'pr' && args[1] === 'view' && args.includes('files')) {
-        const files = JSON.parse(process.env.STAMP_FILES)[args[2]];
-        if (files == null) process.exit(1);
-        console.log(JSON.stringify(files));
-      } else { console.error('Unexpected gh invocation'); process.exit(9); }
-    `,
+      "#!/bin/sh\nset -eu\njq -cn --args '$ARGS.positional' -- \"$@\" >> \"$STAMP_CALLS\"\nquery=0\npaginate=0\nslurp=0\nfiles_arg=0\nfor arg do\n  case \"$arg\" in *MergeQueueOpenPullRequestStates*) query=1;; esac\n  case \"$arg\" in\n    --paginate) paginate=1;;\n    --slurp) slurp=1;;\n    files) files_arg=1;;\n  esac\ndone\nif [ \"${1:-}\" = api ] && [ \"${2:-}\" = graphql ] && [ \"$query\" = 1 ]; then\n  [ \"$paginate\" = 1 ] && [ \"$slurp\" = 1 ] || exit 9\n  printf '%s\\n' \"$STAMP_PAGES\"\n  [ \"$STAMP_INVENTORY_FAILURE\" != 1 ] || exit 1\nelif [ \"${1:-}\" = pr ] && [ \"${2:-}\" = view ] && [ \"$files_arg\" = 1 ]; then\n  files=$(printf '%s' \"$STAMP_FILES\" | jq -c --arg number \"${3:-}\" '.[$number]')\n  [ \"$files\" != null ] || exit 1\n  printf '%s\\n' \"$files\"\nelse\n  printf '%s\\n' 'Unexpected gh invocation' >&2\n  exit 9\nfi\n",
       { mode: 0o755 }
     );
     try {
@@ -2798,6 +2801,9 @@ describe('native merge-queue cohort (JOV-5047)', () => {
               PATH: `${dir}:${dirname(process.execPath)}:${process.env.PATH}`,
               GH_INVENTORY_RETRY_ATTEMPTS: '1',
               STAMP_CALLS: callsPath,
+              STAMP_NODE_CALLS: nodeCallsPath,
+              STAMP_REAL_NODE: process.execPath,
+              STAMP_ADMISSION_RECEIPT: admissionReceipt ?? '',
               STAMP_SNAPSHOT: JSON.stringify(snapshot),
               STAMP_FILES: JSON.stringify(files),
               STAMP_PAGES: JSON.stringify(pages),
@@ -2810,6 +2816,20 @@ describe('native merge-queue cohort (JOV-5047)', () => {
         .trim()
         .split('\n')
         .map(line => JSON.parse(line));
+      const nodeCalls = readFileSync(nodeCallsPath, 'utf8')
+        .trim()
+        .split('\n')
+        .map(line => line.split('\t'));
+      expect(
+        nodeCalls.filter(([script, command]) =>
+          script === 'pre-land-changelog.mjs' && command === 'admission'
+        )
+      ).toHaveLength(1);
+      expect(
+        nodeCalls.filter(([script, command]) =>
+          script === 'ci-merge-queue-check.mjs' && command === 'changelog-collision'
+        )
+      ).toHaveLength(expectedFinalCliCalls);
       const inventoryCalls = calls.filter(args => args[0] === 'api');
       const needsInventory =
         branch === stampBranch && candidateFiles?.includes('CHANGELOG.md');
@@ -2835,19 +2855,31 @@ describe('native merge-queue cohort (JOV-5047)', () => {
 
   it('keeps implementation rejection and unavailable candidate evidence through the real drain caller', () => {
     expect(
-      runDrainChangelogDecision({ branch: 'codex/implementation' })
+      runDrainChangelogDecision({ branch: 'codex/implementation', expectedFinalCliCalls: 0 })
     ).toEqual({
       action: 'skip',
       reason: 'pre-land-changelog',
     });
-    expect(runDrainChangelogDecision({ branch: '' })).toEqual({
+    expect(runDrainChangelogDecision({ branch: '', expectedFinalCliCalls: 0 })).toEqual({
       action: 'skip',
       reason: 'pre-land-changelog',
     });
-    expect(runDrainChangelogDecision({ candidateFiles: null })).toEqual({
+    expect(runDrainChangelogDecision({ candidateFiles: null, expectedFinalCliCalls: 0 })).toEqual({
       action: 'unknown',
       reason: 'changelog-evidence-unavailable',
     });
+  });
+
+  it.each([
+    'not-json',
+    '{}',
+    '{"schema":"wrong","action":"reject","reason":"pre-land-changelog","path":"CHANGELOG.md"}',
+    '{"schema":"jovie-pre-land-changelog/v1","action":"reject","reason":"pre-land-changelog","path":"other.md"}',
+    '{"schema":"jovie-pre-land-changelog/v1","action":"allow","reason":"unknown"}',
+  ])('rechecks malformed or unrecognized admission receipt %s with the real CLI', admissionReceipt => {
+    expect(runDrainChangelogDecision({
+      branch: 'codex/implementation', admissionReceipt,
+    })).toEqual({ action: 'skip', reason: 'pre-land-changelog' });
   });
 
   it('ignores self and nonqueued changelogs in the separate complete inventory', () => {
