@@ -54,8 +54,6 @@ function richFixture(t) {
   f.put('.vercel/output/config.json', '{"version":3}');
   f.put('.vercel/output/static/big.bin', Buffer.alloc(4096));
   f.put('.vercel/output/static/café.txt', 'accent');
-  f.put('.vercel/output/static/Readme.md', 'a');
-  f.put('.vercel/output/static/readme.md', 'b');
   f.put('.vercel/output/static/what?.txt', 'q');
   f.put(`${LONG_DIR}/${'n'.repeat(140)}.js`, 'long');
   mkdirSync(resolve(f.root, '.vercel/output/static/empty'), {
@@ -68,7 +66,11 @@ function richFixture(t) {
     '.vercel/output/static/escape.js',
     '../../../apps/web/public/escape.js'
   );
-  f.link('.vercel/output/static/absolute.js', '/etc/hostname');
+  const outsideRoot = mkdtempSync(resolve(tmpdir(), 'jovie-manifest-outside-'));
+  t.after(() => rmSync(outsideRoot, { recursive: true, force: true }));
+  const absoluteTarget = resolve(outsideRoot, 'absolute-target.txt');
+  writeFileSync(absoluteTarget, 'outside repository');
+  f.link('.vercel/output/static/absolute.js', absoluteTarget);
   f.link('.vercel/output/static/dangling.js', 'nope.js');
   f.link('.vercel/output/static/dirlink', 'empty');
   f.put('apps/web/public/escape.js', 'outside output');
@@ -156,9 +158,7 @@ test('manifest records the upload shape without following symlinks', t => {
   );
   assert.deepEqual(names['café.txt'], ['non-ascii']);
   assert.deepEqual(names['what?.txt'], ['reserved']);
-  assert.deepEqual(out.caseCollisions.entries, [
-    ['.vercel/output/static/Readme.md', '.vercel/output/static/readme.md'],
-  ]);
+  assert.deepEqual(out.caseCollisions.entries, []);
   assert.deepEqual(out.hardlinks.entries, [
     {
       nlink: 2,
@@ -186,6 +186,30 @@ test('manifest records the upload shape without following symlinks', t => {
   assert.equal(fpm.symlinks.toFiles, 1);
   assert.deepEqual(fpm.errors, [
     { path: 'node_modules/pkg/missing.js', code: 'ENOENT' },
+  ]);
+});
+
+test('case-distinct traced paths are reported on every filesystem', t => {
+  const f = fixture(t);
+  // filePathMap retains both named references even when the host filesystem
+  // stores these two spellings as a single directory entry.
+  f.put('node_modules/pkg/Readme.md', 'a');
+  f.put('node_modules/pkg/readme.md', 'b');
+  f.put(
+    '.vercel/output/functions/index.func/.vc-config.json',
+    JSON.stringify({
+      filePathMap: {
+        'Readme.md': 'node_modules/pkg/Readme.md',
+        'readme.md': 'node_modules/pkg/readme.md',
+      },
+    })
+  );
+  const traced = buildManifest({ root: f.root }).filePathMap;
+  assert.equal(traced.references, 2);
+  assert.equal(traced.totals.files, 2);
+  assert.deepEqual(traced.errors, []);
+  assert.deepEqual(traced.caseCollisions.entries, [
+    ['node_modules/pkg/Readme.md', 'node_modules/pkg/readme.md'],
   ]);
 });
 
