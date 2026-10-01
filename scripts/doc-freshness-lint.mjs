@@ -35,5 +35,6 @@ if (result.violations.length > 0) {
 
 console.log(
   `doc-freshness: ok (${result.scanned.crossLinkFiles} cross-link files, ` +
-    `${result.scanned.agentsMapLines} AGENTS map lines)`
+    `${result.scanned.agentsMapLines} AGENTS map lines, ` +
+    `${result.scanned.reviewedDocuments} source-bound document reviews)`
 );
