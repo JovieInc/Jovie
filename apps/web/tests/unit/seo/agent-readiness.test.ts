@@ -260,7 +260,7 @@ describe('auditJsonLdSemantics', () => {
     expect(check?.summary).toContain('offers.url');
   });
 
-  it('fails on a JSON-LD document with no @type', () => {
+  it('fails on a JSON-LD node with no @type', () => {
     const check = byId(
       auditJsonLdSemantics(
         headWithLd([{ '@context': 'https://schema.org', name: 'Untyped' }])
