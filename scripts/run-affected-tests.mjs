@@ -4,7 +4,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DELIVERY_CONTROLLER_COVERAGE_ARGS } from './ci-fast-lanes.mjs';
+import {
+  DELIVERY_CONTROLLER_COVERAGE_ARGS,
+  STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
+} from './ci-fast-lanes.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -1008,7 +1011,59 @@ const LINEAR_SYNC_ON_MERGE_LANE = new Set([
   'scripts/run-affected-tests.mjs',
 ]);
 
-export function buildAffectedTestPlan(
+const LANE_PYTHON_COVERAGE_INPUTS = new Set(
+  [
+    'lane_runner',
+    'pr_events',
+    'reason_lane',
+    'doctor',
+    'disk_guard',
+    'hyperagent_lane',
+    'execution_attempt',
+  ].flatMap(name => [
+    `scripts/lanes/${name}.py`,
+    `scripts/tests/test_${name}.py`,
+  ])
+);
+
+export function buildAffectedTestPlan(changedFiles, options) {
+  const plan = planAffectedTests(changedFiles, options);
+  const lanePythonCoverage = changedFiles.some(file =>
+    LANE_PYTHON_COVERAGE_INPUTS.has(file)
+  );
+  const unknownPythonPeer =
+    lanePythonCoverage &&
+    changedFiles.some(
+      file => file.endsWith('.py') && !LANE_PYTHON_COVERAGE_INPUTS.has(file)
+    );
+  // Global/full early returns need the same command fields as focused plans.
+  // Retain lane coverage even when an unrelated input requires the full suite.
+  return {
+    selectedTests: [],
+    rootVitestTests: [],
+    pythonTests: [],
+    pythonUnittestTests: [],
+    scriptVitestTests: [],
+    ...plan,
+    ...(lanePythonCoverage
+      ? {
+          lanePythonCoverage: true,
+          mode: unknownPythonPeer
+            ? 'full'
+            : plan.mode === 'none'
+              ? 'selected'
+              : plan.mode,
+          ...(unknownPythonPeer
+            ? {
+                fallbackReason: 'unmapped Python peer mixed with lane coverage',
+              }
+            : {}),
+        }
+      : {}),
+  };
+}
+
+function planAffectedTests(
   changedFiles,
   {
     isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)),
@@ -2225,7 +2280,7 @@ async function runCommands(commands, concurrency = 1, options = {}) {
   }
 
   await Promise.all(Array.from({ length: workerCount }, () => worker()));
-  process.exit(failureStatus);
+  return failureStatus;
 }
 
 export function buildCompanyRegistryTestCommand() {
@@ -2329,6 +2384,14 @@ export function buildSelectedTestCommands(
   head
 ) {
   const commands = [];
+  if (plan.lanePythonCoverage) {
+    // Qualification must fail when the CI-pinned Python dependencies are absent,
+    // even on a local host; the structural wrapper's local skip is not proof.
+    commands.push([
+      'env',
+      ['CI=true', 'bash', '-c', STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0]],
+    ]);
+  }
   if (plan.selectedTests.includes(SUMMER_PIN_GUARD_WEB_TEST)) {
     commands.push(SUMMER_PIN_GUARD_NODE_COMMAND);
   }
@@ -2633,11 +2696,16 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     // 2k-file web suite to trigger host memory pressure near teardown. Keep
     // deterministic, bounded-memory shards, but schedule a small bounded set
     // concurrently so a complete fail-closed suite does not serialize all 8.
-    await runCommands(buildFullSuiteCommands(maxWorkers), shardConcurrency, {
-      timeoutMs: shardTimeoutMs,
-      progressIntervalMs,
-      labelPrefix: 'shard',
-    });
+    const fullStatus = await runCommands(
+      buildFullSuiteCommands(maxWorkers),
+      shardConcurrency,
+      {
+        timeoutMs: shardTimeoutMs,
+        progressIntervalMs,
+        labelPrefix: 'shard',
+      }
+    );
+    if (fullStatus !== 0) process.exit(fullStatus);
   }
 
   const coverageBase = plan.retouchPromptCoverage
@@ -2652,13 +2720,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         encoding: 'utf8',
       }).trim()
     : undefined;
-  await runCommands(
-    buildSelectedTestCommands(plan, maxWorkers, coverageBase, coverageHead),
-    1,
-    {
-      timeoutMs: shardTimeoutMs,
-      progressIntervalMs,
-      labelPrefix: 'selected',
-    }
+  process.exit(
+    await runCommands(
+      buildSelectedTestCommands(plan, maxWorkers, coverageBase, coverageHead),
+      1,
+      {
+        timeoutMs: shardTimeoutMs,
+        progressIntervalMs,
+        labelPrefix: 'selected',
+      }
+    )
   );
 }
