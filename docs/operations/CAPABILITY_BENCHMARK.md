@@ -66,6 +66,12 @@ compared.
 The lane is preemptible. `validateCapacityReceipt` requires a receipt proving
 no eligible JOV-5911/JOV-5912 blocker was displaced.
 
+## Commissioning receipts
+
+- [Meta Muse SMB connector reconciliation](META_MUSE_RECONCILIATION.md) —
+  JOV-7342 consume/distribute decision, affected backlog inventory, verified
+  JOV-2923 retirement, and event-driven re-evaluation triggers.
+
 ## Run
 
 ```
