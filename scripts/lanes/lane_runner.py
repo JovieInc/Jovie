@@ -853,11 +853,20 @@ class AgentProcesses:
         raise RuntimeError("owned-processes-still-running")
 
 
+class RunStopped(BaseException):
+    """SIGTERM/SIGINT while a provider runs: the caller's `on_kill` revokes publication
+    before the owned process tree is killed."""
+
+
 def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
-              guard_interval: float = 30) -> subprocess.CompletedProcess:
+              guard_interval: float = 30, on_kill=None) -> subprocess.CompletedProcess:
     """Track descendants while the provider runs, including detached test sessions.
     Observation cannot recover a child that daemonizes before its first snapshot;
     preserved checkout admission therefore also refuses live working directories.
+
+    `on_kill(error)` runs before the kill of the owned tree is acknowledged: a stop
+    (timeout, guard hold, SIGTERM/SIGINT) writes its revocation receipt first, so a
+    stopped run can never be published later (JOV-5060).
     """
     import signal
     if guard:
@@ -866,6 +875,16 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
     proc = subprocess.Popen(cmd, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True,
                             start_new_session=True, env=env)
     owned = AgentProcesses(proc.pid)
+    restored = {}
+
+    def _stopped(sig, _frame):
+        raise RunStopped(f"signal:{sig}")
+
+    for signo in (signal.SIGTERM, signal.SIGINT):
+        try:
+            restored[signo] = signal.signal(signo, _stopped)
+        except (ValueError, OSError):
+            pass  # handlers only install on the main thread
     try:
         owned.observe()
         deadline = time.monotonic() + timeout
@@ -887,7 +906,18 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
                     raise
         owned.stop(proc)
         return subprocess.CompletedProcess(cmd, code)
-    except BaseException:
+    except BaseException as error:
+        # The revocation receipt lands before the kill is acknowledged, so a stopped
+        # run's branch can never reach push/PR/enqueue afterwards.
+        if on_kill is not None:
+            try:
+                on_kill(error)
+            except Exception as failure:
+                try:
+                    log.write(f"publication revocation receipt failed: "
+                              f"{type(failure).__name__}: {failure}\n")
+                except (AttributeError, OSError):
+                    pass
         try:
             owned.stop(proc)
         finally:
@@ -914,6 +944,12 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
                     continue
                 break
         raise
+    finally:
+        for signo, previous in restored.items():
+            try:
+                signal.signal(signo, previous)
+            except (ValueError, OSError):
+                pass
 
 
 PROVIDER_HANDOFFS = 2
@@ -954,6 +990,69 @@ def next_provider(host: Host, exclude: set[str], providers: dict | None = None):
         if provider_healthy(spec):
             return name, spec
     return None
+
+
+# ------------------------------------------------- publication revocation (JOV-5060)
+# Process kill is not publication revocation: a stopped run's branch must never later
+# push, open a PR, take a label, enroll, or merge. `run_agent` writes the immutable
+# receipt before the kill is acknowledged; every irreversible boundary revalidates it.
+
+PUBLICATION_REVOCATION_SCHEMA = "jovie-publication-revocation/v1"
+
+
+def revocations_path(host: Host) -> Path:
+    return host.state / "runs" / "publication-revocations.jsonl"
+
+
+def revoke_publication(host: Host, *, branch: str, run_id=None, issue=None, pr=None,
+                       reason: str) -> dict:
+    """Append the immutable revocation receipt. Callers write it before they ack a kill."""
+    receipt = {"schema": PUBLICATION_REVOCATION_SCHEMA, "branch": branch, "reason": reason,
+               "owner": HOST, "at": now_iso()}
+    receipt.update({key: value for key, value in
+                    {"runId": run_id, "issue": issue, "pr": pr}.items() if value is not None})
+    path = revocations_path(host)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a") as out:
+        out.write(json.dumps(receipt) + "\n")
+    return receipt
+
+
+class PublicationRevoked(RuntimeError):
+    def __init__(self, branch: str, stage: str, receipt: dict):
+        super().__init__(f"publication-revoked:{stage}:{receipt.get('reason', '?')}")
+        self.branch, self.stage, self.receipt = branch, stage, receipt
+
+
+def publication_revocation(host: Host, branch: str | None) -> dict | None:
+    """The newest revocation receipt for `branch`; None only when the ledger is absent or
+    holds none. An unreadable or corrupt ledger fails closed as revoked: an authorization
+    that cannot be verified is not a publication permit."""
+    if not branch:
+        return None
+    try:
+        lines = revocations_path(host).read_text().splitlines()
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        return {"schema": PUBLICATION_REVOCATION_SCHEMA, "branch": branch, "unreadable": True,
+                "reason": f"revocation-ledger-unreadable:{type(error).__name__}"}
+    rows = []
+    for line in lines:
+        try:
+            rows.append(json.loads(line))
+        except ValueError:
+            return {"schema": PUBLICATION_REVOCATION_SCHEMA, "branch": branch, "unreadable": True,
+                    "reason": "revocation-ledger-corrupt"}
+    return next((row for row in reversed(rows)
+                 if isinstance(row, dict) and row.get("schema") == PUBLICATION_REVOCATION_SCHEMA
+                 and row.get("branch") == branch), None)
+
+
+def require_publishable(host: Host, branch: str | None, stage: str) -> None:
+    revoked = publication_revocation(host, branch)
+    if revoked:
+        raise PublicationRevoked(branch or "", stage, revoked)
 
 
 # ---------------------------------------------------------------- one run
@@ -1014,6 +1113,17 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     receipt["offer"]["accepted"] = True
     with open(runs / f"{run_id}.log", "w") as log:
         try:
+            def revoke_run(error) -> None:
+                """Any kill of this run — timeout, guard hold, operator signal — permanently
+                revokes the branch's publication authority before the kill is acked."""
+                revoke_publication(host, branch=branch, run_id=run_id, issue=issue.identifier,
+                                   reason=("run-stopped" if isinstance(error, RunStopped)
+                                           else f"run-killed:{type(error).__name__}"[:200]))
+
+            def run_guard(stage):
+                require_disk(host, stage)
+                require_publishable(host, branch, stage)
+
             require_disk(host, "issue-checkout")
             sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
             sh(["git", "worktree", "add", "-q", "-b", branch, str(worktree), "origin/main"], cwd=host.repo, log=log)
@@ -1028,7 +1138,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree),
                                                        "provider_receipt": str(provider_evidence)}),
                               worktree, log, host.agent_timeout,
-                              guard=lambda: require_disk(host, "agent-running"))
+                              guard=lambda: run_guard("agent-running"), on_kill=revoke_run)
             # Tim 2026-09-27: an exhausted provider never leaves the issue half-done; another
             # lane finishes it on the same worktree.
             handoffs, current = [], name
@@ -1050,7 +1160,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                                                              "cwd": str(worktree),
                                                              "provider_receipt": str(provider_evidence)}),
                                   worktree, log, host.agent_timeout,
-                                  guard=lambda: require_disk(host, "handoff-agent-running"))
+                                  guard=lambda: run_guard("handoff-agent-running"), on_kill=revoke_run)
                 current = nxt_name
             if handoffs:
                 receipt.update(handoffs=handoffs, finishedBy=current)
@@ -1067,6 +1177,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                 receipt.update(verdict="provider-error", reasons=[f"agent-exit:{agent.returncode}"])
         except DiskAdmissionError as error:
             receipt.update(verdict="disk-held", reasons=[str(error)])
+        except PublicationRevoked as error:
+            receipt.update(verdict="revoked", reasons=[str(error)], revocation=error.receipt)
         except subprocess.TimeoutExpired as error:
             receipt.update(verdict="failed", reasons=[f"timeout:{error.cmd[0] if error.cmd else '?'}"])
         except Exception as error:  # a broken run must still leave a receipt and free its issue
@@ -1124,13 +1236,17 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
         ahead = sh(["git", "rev-list", "--count", "origin/main..HEAD"], cwd=worktree).stdout.strip()
         if ahead in ("", "0"):
             return {"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}
+        require_publishable(host, branch, "before-push")
         sh(["git", "push", "-q", "-u", "origin", branch], cwd=worktree, log=log)
+        # The push's own hooks can take minutes; a stop during them still bars the PR open.
+        require_publishable(host, branch, "before-pr-create")
         sh(["gh", "pr", "create", "--repo", REPO_SLUG, "--draft", "--head", branch,
             "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
             "--body", f"Lane run for {issue.identifier}. Verification by the lane gate."], cwd=worktree, log=log)
         return verify_and_land(host, issue, branch, worktree, log, started, opened=True, sensitive=sensitive)
     pr = max(prs, key=lambda item: item["createdAt"])
     if sensitive:
+        require_publishable(host, pr.get("headRefName") or branch, "before-label")
         sh(["gh", "label", "create", SENSITIVE_PR_LABEL, "--repo", REPO_SLUG, "--force",
             "--color", "B60205", "--description", "Guarded auth/billing/infra lane policy"], log=log)
         sh(["gh", "pr", "edit", str(pr["number"]), "--repo", REPO_SLUG,
@@ -1168,6 +1284,12 @@ def gate_timeouts(host: Host, pr: dict, change: int = 0) -> int:
 
 def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False) -> dict:
     """The independent gate for one PR head: diff rules, the canonical repo gate, then land."""
+    revoked = publication_revocation(host, pr.get("headRefName"))
+    if revoked:
+        return {"pr": pr["number"], "prUrl": pr.get("url"), "headSha": pr["headRefOid"],
+                "verdict": "revoked",
+                "reasons": [f"publication-revoked:{revoked.get('reason', '?')}"],
+                "revocation": revoked}
     sh(["git", "fetch", "-q", "origin", f"pull/{pr['number']}/head"], cwd=worktree, log=log)
     sh(["git", "checkout", "-q", "--detach", pr["headRefOid"]], cwd=worktree, log=log)
     numstat = sh(["git", "diff", "--numstat", "origin/main...HEAD"], cwd=worktree).stdout
@@ -1213,6 +1335,11 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False) 
             "Lane gate held this PR (it stays draft):\n" + "\n".join(f"- `{r}`" for r in reasons)], log=log)
         record_held(host, pr["number"], pr["headRefOid"], reasons + evidence)
         return {**result, "verdict": "held"}
+    revoked = publication_revocation(host, pr.get("headRefName"))
+    if revoked:
+        return {**result, "verdict": "revoked",
+                "reasons": [f"publication-revoked:{revoked.get('reason', '?')}"],
+                "revocation": revoked}
     sh(["gh", "pr", "ready", str(pr["number"]), "--repo", REPO_SLUG], log=log)
     queued = sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto"], log=log)
     if queued.returncode != 0:
@@ -1241,10 +1368,14 @@ def requeue_verified(host: Host, prs: list[dict]) -> None:
     if not path.exists():
         return
     heads = {str(pr["number"]): pr["headRefOid"] for pr in prs}
+    branches = {str(pr["number"]): pr.get("headRefName") for pr in prs}
     def retry(requeue: dict) -> None:
         for number, head in list(requeue.items()):
             if heads.get(number) != head:
                 del requeue[number]  # merged, closed, or a new head that the gate owns again
+                continue
+            if publication_revocation(host, branches.get(number)):
+                del requeue[number]  # revoked branches never re-enroll
                 continue
             sh(["gh", "pr", "ready", number, "--repo", REPO_SLUG])
             if sh(["gh", "pr", "merge", number, "--repo", REPO_SLUG, "--auto"]).returncode == 0:
@@ -1858,7 +1989,9 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
         try:
             def verify_target(target, stage, *, worktree=None):
                 receipt["targetStateReads"] += 1
-                return require_fix_target(target, stage, worktree=worktree)
+                live = require_fix_target(target, stage, worktree=worktree)
+                require_publishable(host, live.get("headRefName") or pr["headRefName"], stage)
+                return live
             require_disk(host, "repair-checkout")
             verify_target(pr, "before-checkout")
             sh(["git", "fetch", "-q", "origin", "main", pr["headRefName"]], cwd=host.repo, log=log)
@@ -1867,6 +2000,14 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 qualify_preserved_pr(host, pr, preserved)
             else:
                 add_worktree(host, ["-B", pr["headRefName"], str(worktree), f"origin/{pr['headRefName']}"], log)
+            def revoke_fix(error) -> None:
+                """An operator stop revokes this PR branch's publication authority before the
+                kill lands. Ordinary kills (timeout, disk, supersede) do not: the branch is the
+                PR's shared head, and the next fix attempt must still be able to land it."""
+                if isinstance(error, RunStopped):
+                    revoke_publication(host, branch=pr["headRefName"], run_id=run_id,
+                                       pr=pr["number"], reason="run-stopped")
+
             def boundary(stage="repair-command", allow_local_push=False):
                 require_disk(host, stage)
                 verify_target(pr, stage, worktree=worktree if allow_local_push else None)
@@ -1894,7 +2035,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                                          "cwd": str(worktree),
                                                          "provider_receipt": str(provider_evidence)}),
                                   worktree, log, host.agent_timeout,
-                                  guard=lambda: boundary("agent-running", allow_local_push=True))
+                                  guard=lambda: boundary("agent-running", allow_local_push=True),
+                                  on_kill=revoke_fix)
             verify_target(pr, "after-agent", worktree=worktree)
             head = sh(["git", "ls-remote", "origin", f"refs/heads/{pr['headRefName']}"], cwd=host.repo).stdout.split()
             after = head[0] if head else ""
@@ -1922,6 +2064,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                "stage": error.stage, "observedState": live.get("state", "UNKNOWN"),
                                "mergedAt": live.get("mergedAt"), "observedHead": live.get("headRefOid"),
                                "requestSource": receipt["requestSource"]})
+        except PublicationRevoked as error:
+            receipt.update(verdict="revoked", reasons=[str(error)], revocation=error.receipt)
         except DiskAdmissionError as error:
             receipt.update(verdict="disk-held", reasons=[str(error)])
         except RecoveryHandoff as error:
@@ -1937,7 +2081,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             if preserved:
                 if not retire_completed_repair(host, worktree, receipt):
                     preserve_repair(worktree, receipt)
-            elif receipt.get("verdict") in {"cancelled", "reconcile-unavailable", "disk-held", "recovery-handoff"}:
+            elif receipt.get("verdict") in {"cancelled", "revoked", "reconcile-unavailable", "disk-held", "recovery-handoff"}:
                 preserve_repair(worktree, receipt)
             else:
                 remove_worktree(host, worktree)
