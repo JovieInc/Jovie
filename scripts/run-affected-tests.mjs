@@ -528,6 +528,15 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
       '--test-coverage-functions=100',
     ],
   ],
+  [
+    '.github/scripts/internal-pr-review.test.mjs',
+    '.github/scripts/internal-pr-review.mjs',
+    [
+      '--test-coverage-lines=85',
+      '--test-coverage-branches=80',
+      '--test-coverage-functions=85',
+    ],
+  ],
 ];
 const CI_CONTROL_WEB_TESTS = [
   'apps/web/tests/unit/ci/test-coverage-audit-workflow.test.ts',
