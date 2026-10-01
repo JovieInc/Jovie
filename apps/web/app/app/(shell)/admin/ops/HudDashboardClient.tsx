@@ -25,7 +25,9 @@ import { DesignProposalReviewPanel } from '@/components/features/admin/design-la
 import { FounderFunnelBand } from '@/components/features/admin/hud/FounderFunnelBand';
 import { FounderMorningWalkCard } from '@/components/features/admin/hud/FounderMorningWalkCard';
 import { HudCashMrrBand } from '@/components/features/admin/hud/HudCashMrrBand';
+import { HudDrilldownSearch } from '@/components/features/admin/hud/HudDrilldownSearch';
 import { HudEnvExceptionsPanel } from '@/components/features/admin/hud/HudEnvExceptionsPanel';
+import { HudExceptionsStrip } from '@/components/features/admin/hud/HudExceptionsStrip';
 import { HudKpiSubgrid } from '@/components/features/admin/hud/HudKpiSubgrid';
 import { HudNoiseDisclosure } from '@/components/features/admin/hud/HudNoiseDisclosure';
 import { HudGithubBudgetPanel } from '@/components/features/admin/hud/HudShipperPanels';
@@ -817,6 +819,12 @@ export function HudDashboardClient({
         );
       case 'factory-health':
         return <HudSystemHealthStrip metrics={metrics} />;
+      case 'exceptions':
+        return (
+          <div data-testid={section.testId}>
+            <HudExceptionsStrip metrics={metrics} />
+          </div>
+        );
       case 'shipper':
         return <OvieShippingStateCard kioskToken={kioskToken} />;
       case 'morning-walk':
@@ -1012,6 +1020,24 @@ export function HudDashboardClient({
             data-testid={section.testId}
           >
             <HudEnvExceptionsPanel />
+          </div>
+        );
+      case 'drilldowns':
+        return presentation === 'token' ? (
+          <ContentSurfaceCard
+            surface='details'
+            className='space-y-3 p-3'
+            data-testid={section.testId}
+          >
+            <SectionLabel>Search records</SectionLabel>
+            <p className='text-app text-secondary-token'>
+              Customer, release, event, and exception drill-downs stay on the
+              signed-in operator path.
+            </p>
+          </ContentSurfaceCard>
+        ) : (
+          <div data-testid={section.testId}>
+            <HudDrilldownSearch metrics={metrics} />
           </div>
         );
       default: {

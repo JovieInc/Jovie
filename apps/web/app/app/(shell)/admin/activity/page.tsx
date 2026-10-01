@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ActivityTableUnified } from '@/features/admin/ActivityTableUnified';
+import { filterAdminActivityItems } from '@/lib/admin/activity-search';
 import { getAdminActivityFeed } from '@/lib/admin/overview';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { AdminActivitySkeleton } from './loading';
@@ -12,15 +13,25 @@ export const metadata: Metadata = {
 
 export const runtime = 'nodejs';
 
-async function ActivityContent() {
-  const items = await getAdminActivityFeed(50);
-  return <ActivityTableUnified items={items} />;
+interface AdminActivityPageProps {
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+async function ActivityContent({ query }: { readonly query: string }) {
+  const items = await getAdminActivityFeed(query ? 200 : 50);
+  return (
+    <ActivityTableUnified items={filterAdminActivityItems(items, query)} />
+  );
 }
 
 const activityTabs = [{ value: 'activity', label: 'Activity' }] as const;
 
-export default async function AdminActivityPage() {
+export default async function AdminActivityPage({
+  searchParams,
+}: Readonly<AdminActivityPageProps>) {
   await requireCurrentAdminPageAccess();
+  const params = await searchParams;
+  const query = typeof params.q === 'string' ? params.q : '';
 
   return (
     <AdminPage
@@ -35,7 +46,7 @@ export default async function AdminActivityPage() {
       viewTestId='admin-activity-view'
     >
       <Suspense fallback={<AdminActivitySkeleton />}>
-        <ActivityContent />
+        <ActivityContent query={query} />
       </Suspense>
     </AdminPage>
   );
