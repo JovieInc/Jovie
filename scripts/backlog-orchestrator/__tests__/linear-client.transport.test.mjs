@@ -243,6 +243,11 @@ describe('Gem Linear transport', () => {
       };
       const issue = await linear.fetchIssue('JOV-123', { fetchImpl });
       await linear.transitionIssue('issue-1', 'state-1', { fetchImpl });
+      await linear.updateIssue(
+        'issue-1',
+        { description: 'rewritten' },
+        { fetchImpl }
+      );
       assert.deepEqual(issue, { id: 'issue-1' });
       assert.match(requests[0].query, /issues\s*\(/);
       assert.doesNotMatch(requests[0].query, /issueSearch/);
@@ -250,6 +255,10 @@ describe('Gem Linear transport', () => {
       assert.deepEqual(requests[1].variables, {
         id: 'issue-1',
         stateId: 'state-1',
+      });
+      assert.deepEqual(requests[2].variables, {
+        id: 'issue-1',
+        input: { description: 'rewritten' },
       });
     });
   });
