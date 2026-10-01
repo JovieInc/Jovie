@@ -166,10 +166,10 @@ describe('blog metadata contract', () => {
   });
 
   it('preserves the shared unsafe-Markdown sanitization boundary', async () => {
-    const document = await createMarkdownDocument(
+    const rendered = await createMarkdownDocument(
       '[unsafe](javascript:alert(1)) <script>alert(2)</script>'
     );
-    expect(document.html).not.toMatch(/javascript:|<script/i);
+    expect(rendered.html).not.toMatch(/javascript:|<script/i);
   });
 });
 
