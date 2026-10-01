@@ -22,8 +22,10 @@ def verified(spec, now):
     if not isinstance(proof, dict):
         return False
     number = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+    model = spec.get("model")
     return (isinstance(proof.get("agentId"), str) and bool(proof["agentId"])
-            and proof.get("model") == spec.get("model") and proof.get("model") not in (None, "auto")
+            and isinstance(model, str) and bool(model.strip()) and model.strip().lower() != "auto"
+            and proof.get("model") == model
             and proof.get("repository") == REPO and proof.get("currentInstructions") is True
             and proof.get("source") == "hyperagent-settings-readback"
             and isinstance(proof.get("evidenceSha256"), str) and re.fullmatch(r"[a-f0-9]{64}", proof["evidenceSha256"]) is not None

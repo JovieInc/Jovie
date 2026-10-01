@@ -157,6 +157,23 @@ class HyperagentLaneTest(unittest.TestCase):
                 self.meta[field] = old
         self.assertFalse(self.calls)
 
+    def test_matching_unknown_model_values_hold_before_any_transport(self):
+        values = [None, True, False, 123, 1.5, "", " ", "\t\n", [], {}, ["z-ai/glm-5.3"], "auto", " auto ", "AUTO"]
+        for index, value in enumerate(values):
+            with self.subTest(model=value):
+                self.calls.clear()
+                self.gates.clear()
+                self.spec["model"] = value
+                self.meta["model"] = value
+                path = Path(self.tmp.name) / f"unknown-model-{index}.jsonl"
+                result = remote.run(self.spec, "JOV-6871", "attempt-1", "hyperagent/jov-6871-attempt", "prompt",
+                                    path, self.call, lambda number: self.pr, self.gate,
+                                    timeout=3, clock=lambda: self.now, pause=self.tick)
+                self.assertEqual(result.get("reasons"), ["remote-preflight-unverified"])
+                self.assertFalse(self.calls)
+                self.assertFalse(self.gates)
+                self.assertFalse(path.exists())
+
     def test_missing_lifecycle_status_never_counts_as_completion(self):
         del self.payload["isRunning"]
         self.assertEqual(self.run_remote()["reasons"], ["remote-status-unverified"])
