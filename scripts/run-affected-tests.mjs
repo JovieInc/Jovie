@@ -210,6 +210,7 @@ const SUMMER_COMMISSIONING_LANE = new Set([
 ]);
 const CAPABILITY_BENCHMARK_PRIMARY_INPUTS = new Set([
   'scripts/capability-benchmark/capability-benchmark-registry.json',
+  'scripts/capability-benchmark/decision-routing-benchmark.json',
   'scripts/capability-benchmark/capability-reconciliation.mjs',
   'scripts/capability-benchmark/capability-reconciliation.test.mjs',
   'scripts/capability-benchmark/capability-benchmark.mjs',

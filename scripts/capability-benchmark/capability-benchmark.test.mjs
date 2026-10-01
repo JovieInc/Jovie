@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-
+import { buildCorpus as buildInboxCorpus } from '../invariants/fixtures/inbox-triage-corpus.gen.mjs';
+import { buildCorpus as buildReleaseCorpus } from '../invariants/fixtures/release-task-corpus.gen.mjs';
+import { summarizeOutcomes as summarizeInbox } from '../invariants/jev-inbox-pilot.mjs';
+import { summarizeOutcomes as summarizeRelease } from '../invariants/jev-task-pilot.mjs';
 import {
   BENCHMARK_REGISTRY_SCHEMA,
   CAPACITY_RECEIPT_SCHEMA,
   classifyTriggerEvent,
+  DECISION_BENCHMARK_DIMENSIONS,
   isDecisionStale,
+  loadDecisionRoutingBenchmark,
   loadRegistry,
   MATERIAL_TRIGGER_CLASSES,
   REQUIRED_CODE_REVIEW_METRICS,
@@ -14,6 +19,7 @@ import {
   SOURCING_STATES,
   validateBenchmarkRegistry,
   validateCapacityReceipt,
+  validateDecisionRoutingBenchmark,
   validateShadowReplayReceipt,
 } from './capability-benchmark.mjs';
 
@@ -83,6 +89,80 @@ test('shipped registry validates', () => {
   assert.equal(registry.issue, 'JOV-2966');
   assert.equal(registry.evidenceLifecycleIssue, 'JOV-5916');
   assert.match(registryDigest(registry), /^[a-f0-9]{64}$/u);
+});
+
+test('JOV-7341 records workload-scoped dispositions on the pinned cohorts', () => {
+  const report = loadDecisionRoutingBenchmark();
+  assert.equal(validateDecisionRoutingBenchmark(report), true);
+  assert.equal(Object.hasOwn(report, 'aggregateScore'), false);
+  const generated = new Map(
+    [buildReleaseCorpus(), buildInboxCorpus()].map(corpus => [
+      corpus.version,
+      registryDigest(corpus),
+    ])
+  );
+  for (const workload of report.workloads) {
+    assert.equal(
+      generated.get(workload.cohort.version),
+      workload.cohort.sha256
+    );
+    assert.deepEqual(
+      Object.keys(workload.evidenceByDimension).sort(),
+      [...DECISION_BENCHMARK_DIMENSIONS].sort()
+    );
+    assert.equal(workload.sourcingDecision.state, 'retain-internal-only');
+    const baseline = workload.candidates.find(
+      candidate => candidate.id === 'deterministic-baseline'
+    );
+    const corpus =
+      workload.id === 'release-task-clustering'
+        ? buildReleaseCorpus()
+        : buildInboxCorpus();
+    const outcomes = corpus.examples.map(example => ({
+      id: example.id,
+      decision:
+        workload.id === 'release-task-clustering'
+          ? { action: 'abstain', clusterSlug: null }
+          : { action: 'abstain', category: null, priority: null },
+      latencyMs: 0,
+      executed: false,
+    }));
+    const metrics =
+      workload.id === 'release-task-clustering'
+        ? summarizeRelease(corpus, outcomes, {}, {})
+        : summarizeInbox(corpus, outcomes, {}, {});
+    assert.equal(baseline.evaluated, metrics.evaluated);
+    assert.equal(baseline.macroF1, metrics.macroF1);
+    assert.equal(baseline.abstentionRate, metrics.abstentionRate);
+  }
+});
+
+test('JOV-7341 fails closed on cohort drift, hidden calls, or missing resume event', () => {
+  const report = loadDecisionRoutingBenchmark();
+  const drifted = structuredClone(report);
+  drifted.workloads[0].candidates[1].cohortSha256 = '0'.repeat(64);
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(drifted),
+    /different cohort/
+  );
+
+  const hiddenCall = structuredClone(report);
+  hiddenCall.workloads[0].bypass.oneOption.probabilisticCalls = 1;
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(hiddenCall),
+    /zero calls/
+  );
+
+  const noResume = structuredClone(report);
+  delete noResume.access.resumeEvent;
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(noResume),
+    /resumeEvent/
+  );
+
+  const rolledUp = structuredClone(report);
+  rolledUp.aggregateScore = 0.99;
+  assert.throws(() => validateDecisionRoutingBenchmark(rolledUp), /aggregate/);
 });
 
 test('rejects wrong schema and second ledger', () => {
