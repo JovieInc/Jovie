@@ -149,8 +149,9 @@ export async function grantOvieApproval(
           expiresAt: existing.expiresAt,
         };
       }
-      // Concurrent re-grant won: return the record bound to this caller's
-      // fresh token; its digest lost the race, so re-read to stay honest.
+      // Concurrent re-grant won the rotation race. This caller's fresh token
+      // is not the stored digest, so its later assert fails closed; return
+      // the record bound to this caller's own token with the stored expiry.
       return { ...record, expiresAt: existing.expiresAt };
     }
     // Expired/absent record for the same id: replace with a fresh grant.
