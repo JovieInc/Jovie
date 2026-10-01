@@ -208,6 +208,22 @@ way; preserved-work admission therefore also checks live working directories.
 Cleanup retains protected, dirty or unreadable source. Installed-runtime evidence
 is required before calling this commissioned.
 
+## Context receipts
+
+The existing spawn preflight checks `context-manifest.json` before issue,
+handoff, repair, and sensitive-review agent execution. Regenerate the checked-in
+contract with `python3 scripts/lanes/lane_runner.py context-manifest --write`;
+omit `--write` to check it without credentials or network calls.
+
+Each local prompt has a `.context.json` sidecar binding its exact UTF-8 bytes,
+provider, contract, and source inputs by SHA-256. Missing GBrain context is
+explicitly marked unavailable. The contract hash uses canonical JSON; repository
+formatting changes do not count as drift. Contract drift or a receipt-write failure stops
+execution before the agent runs. Repository documents remain on-demand
+references; the receipt does not claim they were injected or read. Private issue
+and retrieved text remain in the existing local prompt, not the checked-in
+contract or hash-only sidecar.
+
 ## Tests
 
 ```sh
