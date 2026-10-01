@@ -1,17 +1,25 @@
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 """Remote Hyperagent lifecycle regressions; all external calls are deterministic."""
-import importlib.util
 import json
 import hashlib
 import re
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/lanes"))
 import hyperagent_lane as remote
+
+
+def verified_remote_fixture(model, verified_at, expires_at):
+    return {"agentId": "agent-1", "model": model, "repository": "JovieInc/Jovie",
+            "verifiedAt": verified_at, "expiresAt": expires_at, "balanceUsd": 5, "maxCostUsd": 1,
+            "allInCap": True, "currentInstructions": True, "executionMode": "auto",
+            "source": "hyperagent-settings-readback", "evidenceSha256": "c" * 64}
 
 
 class HyperagentLaneTest(unittest.TestCase):
@@ -20,9 +28,7 @@ class HyperagentLaneTest(unittest.TestCase):
         self.path = Path(self.tmp.name) / "attempt.provider.jsonl"
         self.calls, self.gates = [], []
         self.now = 1000
-        self.meta = {"agentId": "agent-1", "model": "z-ai/glm-5.3", "repository": "JovieInc/Jovie",
-                     "verifiedAt": 1000, "expiresAt": 1100, "balanceUsd": 5, "maxCostUsd": 1,
-                     "allInCap": True, "currentInstructions": True, "executionMode": "auto", "source": "hyperagent-settings-readback", "evidenceSha256": "c" * 64}
+        self.meta = verified_remote_fixture("z-ai/glm-5.3", 1000, 1100)
         self.spec = {"model": "z-ai/glm-5.3", "verifiedRemote": self.meta}
         self.payload = {"thread": {"id": "thread-1", "namedAgentId": "agent-1"},
                         "isRunning": False, "awaitingApproval": False,
@@ -259,6 +265,7 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         from scripts.tests.test_lane_runner import lane, issue, GateOutcomeTest
         import time
         self.lane, self.issue = lane, issue("JOV-6871")
+        self.issue_fixture = issue
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name))
@@ -266,18 +273,14 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.real_adopt = GateOutcomeTest.real_adopt
         self.approval = False
         self.model = "z-ai/glm-5.3"
-        self.spec = {"model": self.model, "verifiedRemote": {
-            "agentId": "agent-1", "model": self.model, "repository": "JovieInc/Jovie",
-            "verifiedAt": time.time(), "expiresAt": time.time() + 120,
-            "balanceUsd": 5, "maxCostUsd": 1, "allInCap": True,
-            "currentInstructions": True, "executionMode": "auto", "source": "hyperagent-settings-readback", "evidenceSha256": "c" * 64}}
+        self.spec = {"model": self.model, "verifiedRemote":
+                     verified_remote_fixture(self.model, time.time(), time.time() + 120)}
         identity = lane.execution_attempt.identity("linear-work", {"issue": "JOV-6871", "outcome": "draft-pr"},
                      {"title": self.issue.title, "description": self.issue.description})
         self.branch = f"hyperagent/jov-6871-{identity['identityDigest'][:15]}"
         self.pr = {"number": 7, "url": "https://github.com/JovieInc/Jovie/pull/7", "state": "OPEN",
                    "title": "fix: JOV-6871", "headRefName": self.branch, "headRefOid": "a" * 40,
                    "body": "<!-- linear-issue-id:JOV-6871 -->"}
-        from unittest.mock import patch
         def read(args, **kwargs):
             self.assertEqual(args[:3], ["gh", "pr", "view"])
             fields = args[args.index("--json") + 1].split(",")
@@ -331,9 +334,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
 
     def assert_sensitive_gate(self, lines, reasons, review_expected):
-        from unittest.mock import patch
-        from contextlib import ExitStack
-        from types import SimpleNamespace
         lane = self.lane
         commands = []
         def command(args, **kwargs):
@@ -371,7 +371,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assert_sensitive_gate(2, ["sensitive-review-fixture"], True)
 
     def test_expired_remote_attempt_is_reconciled_without_another_dispatch(self):
-        from unittest.mock import patch
         self.approval = True
         held = self.run_entry()
         self.assertEqual(held["reasons"], ["remote-approval-required"])
@@ -396,7 +395,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertFalse(self.gates)
 
     def test_live_remote_attempt_keeps_foreign_owner_out_without_renewal(self):
-        from unittest.mock import patch
         self.approval = True
         held = self.run_entry()
         path = self.host.state / "runs/execution-attempts.jsonl"
@@ -421,7 +419,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
 
     def test_generated_remote_draft_is_discovered_adopted_and_counts_toward_wip(self):
-        from unittest.mock import patch
         self.run_entry()
         draft = {**self.pr, "isDraft": True, "mergeStateStatus": "CLEAN"}
         dated = {**draft, "number": 9, "headRefName": "hyperagent/jov-9-20260930t123000"}
@@ -447,7 +444,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(lane.sweep_plan([older, draft], now=100, pushes={7: 100}), ([(older, 7)], []))
 
     def test_generated_digest_ownership_is_exact_and_only_extends_hyperagent(self):
-        from unittest.mock import patch
         lane = self.lane
         branches = [self.branch, "hyperagent/jov-6871-20260930t123000", self.branch + "0",
                     self.branch[:-1], self.branch + "-extra", self.branch.replace("hyperagent/", "devin/"),
@@ -479,7 +475,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
 
     def test_actual_entry_expired_lease_cannot_be_renewed_or_redispatched(self):
-        from unittest.mock import patch
         self.approval = True
         first = self.run_entry()
         expired = first["execution"]["leaseExpiresAt"] + 1
@@ -491,9 +486,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
 
     @contextmanager
     def worker_fixture(self):
-        from unittest.mock import patch
-        from contextlib import ExitStack
-        from types import SimpleNamespace
         lane = self.lane
         state = {"name": "Todo", "comments": []}
         moves = []
@@ -543,7 +535,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
                 self.test_worker_resumes_only_its_receipt_owned_current_in_progress_issue()
 
     def test_failed_hold_delivery_releases_slot_and_retries_before_suppressing(self):
-        from unittest.mock import patch
         with self.worker_fixture() as (lane, state, moves):
             self.spec.pop("verifiedRemote"); linear = lane.Linear(None); comment = linear.comment
             with patch.object(linear, "comment", side_effect=lambda ident, body: (_ for _ in ()).throw(OSError("delivery failed")) if "remote hold" in body else comment(ident, body)):
@@ -557,7 +548,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
             with patch.object(lane, "run_issue", side_effect=lambda *args: {**run(*args), "headSha": "head-B", "remoteThreadId": "thread-B"}): lane.worker(self.host, "hyperagent"); lane.worker(self.host, "hyperagent"); self.assertEqual(len(state["comments"]), 3)
 
     def test_known_predispatch_failure_retries_without_unknown_creation_or_renewal(self):
-        from unittest.mock import patch
         original = self.call
         def failing(name, args):
             if name == "list_agents": raise OSError("read unavailable")
@@ -572,7 +562,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertNotEqual(completed["execution"]["fencingToken"], held["execution"]["fencingToken"])
 
     def test_repeated_known_mode_mismatch_quarantines_without_paid_dispatch(self):
-        from unittest.mock import patch
         with patch("runpy.run_path", return_value={"mcp_call": lambda *args: {"agents": []}}):
             results = [self.run_entry() for _ in range(self.lane.MAX_FAILURES)]
             last = self.run_entry()
@@ -582,8 +571,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertFalse(self.gates)
 
     def test_pending_selection_preserves_foreign_revision_and_terminal_ownership(self):
-        from unittest.mock import patch
-        from types import SimpleNamespace
         self.approval = True
         self.run_entry()
         proof = self.spec.pop("verifiedRemote")
@@ -607,7 +594,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(lane.pending_hyperagent_issue(self.host, self.spec, linear), self.issue)
 
     def test_existing_thread_read_failure_cannot_become_retryable_no_dispatch(self):
-        from unittest.mock import patch
         self.approval = True
         held = self.run_entry()
         ledger = self.host.state / "runs/execution-attempts.jsonl"
@@ -620,7 +606,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
 
     def test_distinct_known_read_failures_exhaust_existing_attempt_budget(self):
-        from unittest.mock import patch
         reasons = iter(("401", "402", "read unavailable"))
         def failed_read(*args): raise OSError(next(reasons))
         with patch("runpy.run_path", return_value={"mcp_call": failed_read}):
@@ -630,7 +615,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertFalse(self.calls)
 
     def test_reserved_boundary_without_create_intent_cannot_be_retired_or_rebound(self):
-        from unittest.mock import patch
         self.approval = True
         first = self.run_entry()
         journal = next((self.host.state / "runs").glob("*.provider.jsonl"))
@@ -646,7 +630,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertNotIn("knownPreDispatchFailure", journal.read_text())
 
     def test_retry_journal_cannot_rebind_without_matching_known_finished_disposition(self):
-        from unittest.mock import patch
         with patch("runpy.run_path", return_value={"mcp_call": lambda *args: {"agents": []}}):
             self.run_entry()
         ledger = self.host.state / "runs/execution-attempts.jsonl"
@@ -658,8 +641,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertFalse(self.calls)
 
     def test_transport_setup_failure_keeps_local_pending_ownership_without_claim(self):
-        from unittest.mock import patch
-        from types import SimpleNamespace
         with patch.object(self.lane.shutil, "which", return_value=None):
             held = self.run_entry()
         self.assertEqual(held["verdict"], "remote-held")
@@ -675,7 +656,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
 
     def test_digest_remote_prs_never_enter_generic_adoption_or_red_repair(self):
-        from unittest.mock import patch
         draft = {**self.pr, "isDraft": True, "mergeStateStatus": "DIRTY"}
         dated = {**draft, "number": 9, "headRefName": "hyperagent/jov-9-20260930t123000"}
         lane = self.lane
@@ -687,7 +667,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
             self.assertEqual(lane.claim_adoptable_pr(self.host, "devin", [draft, dated]), dated)
 
     def test_worker_terminal_known_mode_failure_moves_backlog_without_paid_dispatch(self):
-        from unittest.mock import patch
         with self.worker_fixture() as (lane, state, moves), patch("runpy.run_path", return_value={"mcp_call": lambda *args: {"agents": []}}):
             lane.worker(self.host, "hyperagent"); lane.worker(self.host, "hyperagent")
             self.assertEqual(state["name"], "Backlog")
@@ -695,10 +674,8 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertFalse(self.calls)
 
     def test_corrupt_candidate_and_empty_journal_do_not_block_owned_pending_issue(self):
-        from types import SimpleNamespace
-        from scripts.tests.test_lane_runner import issue
         self.approval = True; self.run_entry()
-        ledger = self.host.state / "runs/ledger.jsonl"; good = json.loads(ledger.read_text().splitlines()[-1]); bad = issue("JOV-99")
+        ledger = self.host.state / "runs/ledger.jsonl"; good = json.loads(ledger.read_text().splitlines()[-1]); bad = self.issue_fixture("JOV-99")
         ident = self.lane.execution_attempt.identity("linear-work", {"issue": bad.identifier, "outcome": "draft-pr"}, {"title": bad.title, "description": bad.description})
         row = {**good, "issue": bad.identifier, "linearIssueId": bad.id, "execution": {**good["execution"], **ident}}
         (self.host.state / "runs" / (ident["identityDigest"] + ".provider.jsonl")).write_text("")
@@ -710,13 +687,11 @@ class ProductionRemoteEntryTest(unittest.TestCase):
                 self.assertEqual(self.lane.pending_hyperagent_issue(self.host, self.spec, linear), self.issue)
 
     def test_worker_filters_digest_github_events_before_generic_claim(self):
-        from unittest.mock import patch
         with self.worker_fixture() as (lane, state, moves), patch.object(lane.pr_events, "queued_prs", return_value=[self.pr]), patch.object(lane.pr_events, "claim_event_pr", side_effect=lambda host, module, name, events: self.assertEqual(events, [])):
             self.spec.pop("verifiedRemote"); lane.worker(self.host, "hyperagent")
         self.assertFalse(self.calls)
 
     def test_completed_held_remote_worker_records_repair_dependency_in_backlog(self):
-        from unittest.mock import patch
         with self.worker_fixture() as (lane, state, moves), patch.object(lane, "adopt_pr", return_value={"verdict": "held", "pr": 7, "prUrl": self.pr["url"], "headSha": self.pr["headRefOid"], "reasons": ["diff-too-large:600"]}):
             lane.worker(self.host, "hyperagent")
             self.assertEqual(state["name"], "Backlog")
@@ -727,7 +702,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
 
     def test_completed_gate_timeout_retries_same_head_with_fresh_issue_sensitivity(self):
-        from unittest.mock import patch
         gates = []
         def gate(host, name, pr, *, sensitive=False):
             gates.append(sensitive)
@@ -742,7 +716,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
 
     def test_unauthenticated_digest_requeue_retains_entry_and_never_enqueues(self):
-        from unittest.mock import patch
         path = self.host.state / "requeue.json"; path.write_text(json.dumps({"7": self.pr["headRefOid"]}))
         with patch.object(self.lane, "sh") as command:
             self.lane.requeue_verified(self.host, [self.pr])
@@ -755,8 +728,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
             self.assertEqual(json.loads(path.read_text()), {}); self.assertFalse(self.calls)
 
     def test_completed_verified_not_queued_retries_exact_enqueue_with_local_zero_spend_fence(self):
-        from unittest.mock import patch
-        from types import SimpleNamespace
         self.run_entry(); path = self.host.state / "requeue.json"; path.write_text(json.dumps({"7": self.pr["headRefOid"]})); commands = []
         def command(args, **kw):
             commands.append(args)
@@ -779,8 +750,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
 
     def test_completed_context_rejects_foreign_changed_and_unfinished_provenance(self):
-        from unittest.mock import patch
-        from types import SimpleNamespace
         self.run_entry(); lane = self.lane; linear = SimpleNamespace(get_issue=lambda ident: (self.issue, "In Progress"))
         before = list(self.gates); original = self.pr.copy()
         for field, value in (("headRefOid", "b" * 40), ("headRefName", "other"), ("body", ""), ("title", "other")):
@@ -801,7 +770,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(self.gates, before)
 
     def test_completed_gate_continuation_is_bounded_and_preserves_original_journal(self):
-        from unittest.mock import patch
         gate = {"verdict": "gate-timeout", "pr": 7, "prUrl": self.pr["url"], "headSha": self.pr["headRefOid"], "reasons": ["gate-timeout:900s:x1"]}
         with self.worker_fixture() as (lane, state, moves), patch.object(lane, "adopt_pr", return_value=gate) as adoption:
             lane.worker(self.host, "hyperagent")
@@ -815,8 +783,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
 
     def test_unknown_qualification_outcome_never_regates_or_enqueues(self):
-        from unittest.mock import patch
-        from types import SimpleNamespace
         self.run_entry(); lane = self.lane; linear = SimpleNamespace(get_issue=lambda ident: (self.issue, "In Progress"))
         journal = next((self.host.state / "runs").glob("*.provider.jsonl")); state = json.loads(journal.read_text().splitlines()[-1])
         state["completionIntent"] = {"operation": "enqueue", "head": self.pr["headRefOid"], "sensitive": False}; journal.write_text(json.dumps(state) + "\n")
@@ -826,7 +792,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
 
     def test_shared_requeue_missing_lane_inventory_preserves_unknown_and_exact_digest(self):
-        from unittest.mock import patch
         path = self.host.state / "requeue.json"
         for live in (None, self.pr, {**self.pr, "state": "CLOSED"}, {**self.pr, "headRefOid": "b" * 40}):
             with self.subTest(live=live):
@@ -837,7 +802,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
                 self.assertEqual(json.loads(path.read_text()), {"7": self.pr["headRefOid"]} if live is None or live == self.pr else {})
 
     def test_legacy_completed_held_worker_handoff_and_known_gate_failure(self):
-        from unittest.mock import patch
         for verdict in ("held", "failed", "skipped"):
             with self.subTest(verdict=verdict):
                 self.setUp(); base = {"pr": 7, "prUrl": self.pr["url"], "headSha": self.pr["headRefOid"], "reasons": ["preserved-reason"]}
@@ -858,8 +822,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
                 self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
 
     def test_actual_gate_rejects_changed_head_before_enqueue(self):
-        from unittest.mock import patch
-        from types import SimpleNamespace
         merges = []
         def command(args, **kw):
             if args[:3] == ["gh", "pr", "merge"]:
@@ -871,8 +833,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(merges[0][merges[0].index("--match-head-commit") + 1], self.pr["headRefOid"])
 
     def test_queue_retry_requires_authenticated_current_gate_sensitivity(self):
-        from unittest.mock import patch
-        from types import SimpleNamespace
         for escalation in ("Billing", "pr-label", "missing", "tampered", "pre-sensitive"):
             with self.subTest(escalation=escalation):
                 self.setUp()
@@ -903,8 +863,6 @@ class ProductionRemoteEntryTest(unittest.TestCase):
                 self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
 
     def test_actual_worker_preserves_retry_repair_disposition_without_second_run(self):
-        from unittest.mock import patch
-        from types import SimpleNamespace
         for condition in ("Billing", "pr-label", "exhausted", "legacy-missing"):
             with self.subTest(condition=condition):
                 self.setUp(); self.run_entry(); lane = self.lane; retry = lane.requeue_verified; comments = []; commands = []
@@ -943,6 +901,38 @@ class ProductionRemoteEntryTest(unittest.TestCase):
                 if condition != "exhausted": self.assertFalse(any(args[:3] in (["gh", "pr", "ready"], ["gh", "pr", "merge"]) for args in commands))
 
 
+
+    def test_successive_workers_yield_blocked_retry_to_exact_retry_or_ordinary_work(self):
+        for held in (None, "remote-held", "remote-repair-required"):
+            for next_unit in ("retry", "ordinary"):
+                with self.subTest(held=held, next_unit=next_unit):
+                    self.setUp(); original = self.run_entry(); lane = self.lane; retry = lane.requeue_verified
+                    second = self.issue_fixture("JOV-8"); statuses = {self.issue.identifier: "In Progress", second.identifier: "Todo" if next_unit == "ordinary" else "In Progress"}
+                    pr8 = {**self.pr, "number": 8, "headRefName": "hyperagent/jov-8-" + "c" * 15, "url": "https://github.com/JovieInc/Jovie/pull/8"}
+                    path = self.host.state / "requeue.json"; queued = {"7": self.pr["headRefOid"], **({"8": pr8["headRefOid"]} if next_unit == "retry" else {})}; path.write_text(json.dumps(queued)); seen = []; restored = False
+                    def completion(host, spec, linear, selected, *, expected_pr, enqueue):
+                        from scripts.tests.test_lane_runner import DeferredRequeueTest
+                        DeferredRequeueTest.concurrent_update(self, host, {})
+                        self.assertTrue(enqueue); self.assertEqual(expected_pr["headRefOid"], self.pr["headRefOid"]); seen.append(expected_pr["number"])
+                        verdict = "landing" if expected_pr["number"] == 8 or restored else held
+                        return {**original, "verdict": verdict, "pr": expected_pr["number"], "prUrl": expected_pr["url"], "headSha": expected_pr["headRefOid"]} if verdict else None
+                    with self.worker_fixture() as (_, state, moves), patch.object(lane, "requeue_verified", retry), patch.object(lane, "lane_prs", return_value=[self.pr, pr8] if next_unit == "retry" else [self.pr]), patch.object(lane, "reconcile_fix_target", side_effect=lambda pr: dict(pr)), patch.object(lane, "reconcile_hyperagent_completion", side_effect=completion), patch.object(lane, "run_issue", return_value={"verdict": "landing", "prUrl": pr8["url"]}) as dispatch, patch.object(lane, "adopt_pr") as adopt:
+                        linear = lane.Linear(None)
+                        linear.get_issue = lambda key: ((second if key in (second.identifier, second.id) else self.issue), statuses[second.identifier if key in (second.identifier, second.id) else self.issue.identifier])
+                        linear.lane_issues = lambda label: [second] if next_unit == "ordinary" and statuses[second.identifier] == "Todo" else []
+                        linear.state_of = lambda key: statuses[second.identifier if key in (second.identifier, second.id) else self.issue.identifier]
+                        linear.move = lambda key, status: statuses.update({second.identifier if key in (second.identifier, second.id) else self.issue.identifier: status})
+                        lane.worker(self.host, "hyperagent"); dispatch.assert_not_called(); adopt.assert_not_called()
+                        lane.worker(self.host, "hyperagent")
+                        self.assertEqual(seen, [7, 8] if next_unit == "retry" else [7]); self.assertEqual(dispatch.call_count, int(next_unit == "ordinary")); adopt.assert_not_called()
+                        self.assertEqual(json.loads(path.read_text()), {"7": self.pr["headRefOid"]})
+                        self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
+                        self.assertTrue((self.host.state / "worker-idle.json").exists())
+                        statuses[self.issue.identifier] = "In Progress"; restored = True; self.spec["verifiedRemote"]["evidenceSha256"] = "d" * 64
+                        lane.worker(self.host, "hyperagent"); self.assertEqual(seen[-1], 7); self.assertEqual(json.loads(path.read_text()), {})
+                    slot = lane.Locked(self.host.state / "slots/hyperagent.0.lock", blocking=False)
+                    try: self.assertTrue(slot.held)
+                    finally: slot.release()
 
 
 if __name__ == "__main__":
