@@ -10,7 +10,7 @@ import {
   AboutPageContent,
 } from '@/components/organisms/AboutPageContent';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
-import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
+import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { buildOrganizationSchema } from '@/lib/constants/schemas';
 import {
   ARTIST_LABELED_IDENTITY_SURFACES,
@@ -68,7 +68,7 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
     ).toBe(false);
     expect(
       isArtistOnlyCompanyDefinition(
-        'Jovie was founded by Tim White, a music marketing veteran who ran campaigns for artists like some named artist.'
+        'Jovie was founded by Tim White, a music marketing veteran who ran campaigns for artists like Tory Lanez.'
       )
     ).toBe(false);
   });
@@ -83,12 +83,12 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
   });
 
   it('keeps canonical identity aligned with the approved homepage SEO copy', () => {
-    expect(COMPANY_IDENTITY.seoTitle).toBe(HOMEPAGE_IDENTITY_COPY.seo.title);
+    expect(COMPANY_IDENTITY.seoTitle).toBe(HOMEPAGE_LAUNCH_COPY.seo.title);
     expect(COMPANY_IDENTITY.seoDescription).toBe(
-      HOMEPAGE_IDENTITY_COPY.seo.description
+      HOMEPAGE_LAUNCH_COPY.seo.description
     );
     expect(COMPANY_IDENTITY.homepageHeadline).toBe(
-      HOMEPAGE_IDENTITY_COPY.hero.headline
+      HOMEPAGE_LAUNCH_COPY.hero.headline
     );
   });
 
@@ -116,7 +116,7 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
 
   it('uses general metadata, Open Graph, and Organization schema on /about', async () => {
     const { metadata } = await import('../../../app/(marketing)/about/page');
-    const expectedTitle = `About Jovie: ${COMPANY_IDENTITY.headline.replace(/\.$/, '')}`;
+    const expectedTitle = `About — ${COMPANY_IDENTITY.headline.replace(/\.$/, '')}`;
 
     expect(metadata.title).toBe(expectedTitle);
     expect(String(metadata.description)).toContain(COMPANY_IDENTITY.definition);
@@ -214,5 +214,105 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
       })
     ).toBeVisible();
     expect(screen.getByText(COMPANY_IDENTITY.seoDescription)).toBeVisible();
+  });
+});
+
+describe('public machine guidance product truth (JOV-6216 / JOV-6223)', () => {
+  /**
+   * Deliberate-red fixtures: each body is crafted to be the kind of content
+   * the guards must reject. A guard returning a pass on its own fixture is a
+   * bug in the guard. Live surfaces must pass the same guards.
+   */
+
+  it('rejects a generic artist-only company definition in machine guidance', async () => {
+    const redFixture =
+      'Jovie is a release platform for independent musicians. Look up artist data at /api/v1/{username}.';
+    expect(isArtistOnlyCompanyDefinition(redFixture)).toBe(true);
+
+    const liveLlms = extractCompanyIdentityBlock(await getLlmsTxt().text());
+    const liveLlmsFull = extractCompanyIdentityBlock(
+      await getLlmsFull().text()
+    );
+    expect(isArtistOnlyCompanyDefinition(liveLlms)).toBe(false);
+    expect(isArtistOnlyCompanyDefinition(liveLlmsFull)).toBe(false);
+  });
+
+  it('rejects machine guidance whose developer resources disagree with the HTML guide', async () => {
+    const llmsBody = await getLlmsTxt().text();
+
+    // Both representations must link the same verified public surfaces:
+    // OpenAPI, the API capability index, and the CLI.
+    for (const surface of ['/openapi.json', '/api/v1', '/cli']) {
+      expect(llmsBody).toContain(surface);
+    }
+    const { DevelopersPage } = await import(
+      '@/app/(marketing)/developers/page'
+    );
+    render(<DevelopersPage />);
+    expect(
+      screen.getByRole('link', { name: 'Read the OpenAPI contract' })
+    ).toHaveAttribute('href', '/openapi.json');
+    expect(
+      screen.getByRole('link', { name: 'Public API capability index' })
+    ).toHaveAttribute('href', '/api/v1');
+    expect(screen.getByRole('link', { name: 'Jovie CLI' })).toHaveAttribute(
+      'href',
+      '/cli'
+    );
+
+    // Red fixture: a guidance body that omits the CLI the HTML guide links,
+    // or links a developer account surface that does not exist.
+    const redFixture = `## Jovie developer resources
+
+- **OpenAPI 3.1**: https://jov.ie/openapi.json
+- **Developer console**: https://jov.ie/dev/console`;
+    expect(redFixture).not.toContain('/cli');
+    expect(redFixture).toContain('/dev/console');
+    expect(llmsBody).toContain('/cli');
+    expect(llmsBody).not.toContain('/dev/console');
+  });
+
+  it('rejects a false write-API claim in machine guidance', async () => {
+    const redFixture =
+      'Use POST https://jov.ie/api/v1/{username} to update the public artist profile. The public artist API supports writes.';
+    expect(redFixture).toMatch(/supports writes/i);
+    expect(redFixture).toMatch(/POST https:\/\/jov\.ie\/api\/v1/);
+
+    for (const body of [
+      await getLlmsTxt().text(),
+      await getLlmsFull().text(),
+    ]) {
+      expect(body).toContain('read-only');
+      expect(body).not.toMatch(/public artist API[^.]*supports writes/i);
+      expect(body).not.toMatch(
+        /(?:POST|PUT|PATCH|DELETE) https:\/\/jov\.ie\/api\/v1/i
+      );
+    }
+
+    const developersSource = readWebSource(
+      'app/(marketing)/developers/page.tsx'
+    );
+    expect(developersSource).not.toMatch(/(?:POST|PUT|PATCH|DELETE)\s+['"`]/i);
+  });
+
+  it('rejects private features leaking through llms guidance', async () => {
+    const redFixture =
+      '## Internal tools\n\n- **Summer**: the internal QA agent at jov.ie/app/summer\n- **Eve**: the internal PM agent\n- **gbrain**: the company brain at jov.ie/app/gbrain';
+    for (const leaked of ['Summer', 'Eve', 'gbrain']) {
+      expect(redFixture).toContain(leaked);
+    }
+
+    for (const body of [
+      await getLlmsTxt().text(),
+      await getLlmsFull().text(),
+    ]) {
+      expect(body).not.toMatch(/\bSummer\b/);
+      expect(body).not.toMatch(/\bEve\b/);
+      expect(body).not.toMatch(/\bgbrain\b/);
+      expect(body).not.toMatch(/\bsymphony\b/i);
+      expect(body).not.toMatch(/\bhermes\b/i);
+      expect(body).not.toMatch(/internal (?:QA|PM) agent/i);
+      expect(body).not.toMatch(/app\/(?:summer|gbrain)/i);
+    }
   });
 });

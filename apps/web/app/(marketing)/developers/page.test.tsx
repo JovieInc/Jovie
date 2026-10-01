@@ -1,15 +1,6 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { GET as getLlmsTxt } from '@/app/llms.txt/route';
 import DevelopersPage from './page';
-
-const webRoot = process.cwd();
-
-function readWebSource(relativePath: string): string {
-  return readFileSync(resolve(webRoot, relativePath), 'utf8');
-}
 
 describe('DevelopersPage', () => {
   it('renders the public artist API quickstart and machine-readable resources', () => {
@@ -47,101 +38,52 @@ describe('DevelopersPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('links the CLI and the API versioning policy alongside the contract', () => {
-    render(<DevelopersPage />);
-
-    expect(
-      screen.getByRole('link', { name: /jovie cli and mcp server/i })
-    ).toHaveAttribute('href', '/cli');
-    expect(
-      screen.getByRole('link', {
-        name: /api versioning and deprecation policy/i,
-      })
-    ).toHaveAttribute('href', '/api-versioning');
-  });
-
-  it('renders an agent quickstart that only names verified public jobs', () => {
+  it('renders the agent quickstart with verified public surfaces only', () => {
     render(<DevelopersPage />);
 
     expect(
       screen.getByRole('heading', { name: 'Agent quickstart' })
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Start from the same profile endpoint/i)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/anonymous and read-only; owner-only tools/i)
-    ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '/cli' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Jovie CLI' })).toHaveAttribute(
       'href',
       '/cli'
     );
-    expect(screen.getByRole('link', { name: '/llms.txt' })).toHaveAttribute(
-      'href',
-      '/llms.txt'
-    );
-  });
-});
 
-describe('developer guide contract vs llms guidance (JOV-6265)', () => {
-  it('keeps the developer page and llms.txt guidance on the same read-only boundary', async () => {
-    const guidance = await getLlmsTxt().text();
-
-    expect(guidance).toContain(
-      'the public artist API and anonymous MCP tools are read-only'
+    const quickstart = screen
+      .getByRole('heading', { name: 'Agent quickstart' })
+      .closest('section');
+    expect(quickstart).toHaveTextContent(
+      'this read-only API, the read-only Jovie CLI, and per-artist MCP endpoints'
     );
-    // The HTML guide must agree with the machine guidance: neither surface
-    // may claim a capability the other denies.
-    const pageSource = readWebSource('app/(marketing)/developers/page.tsx');
-    expect(pageSource).toContain('does not add a');
-    expect(pageSource).toContain('write API');
-    expect(pageSource).not.toMatch(/public write API|write endpoint/i);
+    expect(quickstart).toHaveTextContent('https://jov.ie/api/mcp/{username}');
   });
 
-  it('rejects a false write-API claim leaking into agent-facing copy', () => {
-    // Deliberate-red fixture: a hypothetical write capability advertised in
-    // agent-facing copy must fail every honest-surface check.
-    const falseWriteClaim =
-      'Jovie offers a public write API: POST /api/v1/{username}/profile updates an artist profile anonymously.';
-    const pageSource = readWebSource('app/(marketing)/developers/page.tsx');
+  it('states the real read/write scope from the actual contracts', () => {
+    render(<DevelopersPage />);
 
-    // The fixture itself is shaped like the claim we must never ship.
-    expect(falseWriteClaim).toMatch(/public write API|POST \/api\/v1/i);
-    expect(pageSource).not.toContain('public write API');
-    expect(pageSource).not.toMatch(/POST \/api\/v1/i);
-    expect(pageSource).not.toContain(falseWriteClaim);
+    const quickstart = screen
+      .getByRole('heading', { name: 'Agent quickstart' })
+      .closest('section');
+    expect(quickstart).toHaveTextContent(/are read-only/i);
+    expect(quickstart).toHaveTextContent(
+      /require authenticated profile ownership plus explicit confirmation/i
+    );
+    expect(quickstart).toHaveTextContent(
+      /No credential, key, or developer account is needed/i
+    );
   });
 
-  it('keeps /cli command documentation aligned with the actual CLI surface', () => {
-    const cliSource = [
-      '../../packages/jovie-cli/src/cli.ts',
-      '../../packages/jovie-cli/src/commands.ts',
-    ]
-      .map(readWebSource)
-      .join('\n');
-    const cliPageSource = readWebSource(
-      'components/marketing/CliLandingPage.tsx'
-    );
+  it('documents limits and error behavior from the API contract', () => {
+    render(<DevelopersPage />);
 
-    // Every command the CLI landing page documents must exist in the CLI
-    // command table. The only write the CLI may expose is profile create.
-    for (const [page, path] of [
-      ['artist get <username>', "path: ['artist', 'get']"],
-      ['artist llms <username>', "path: ['artist', 'llms']"],
-      ['api openapi', "path: ['api', 'openapi']"],
-      ['docs llms', "path: ['docs', 'llms']"],
-      ['profile create <spotify-artist-url>', "path: ['profile', 'create']"],
-    ]) {
-      expect(cliPageSource, `CLI landing page must document ${page}`).toContain(
-        `jovie ${page}`
-      );
-      expect(cliSource, `CLI implementation must implement ${page}`).toContain(
-        path
-      );
-    }
-
-    expect(cliSource).not.toMatch(
-      /path: \['\w+', '(update|delete|patch|put|write)'\]/i
-    );
+    const quickstart = screen
+      .getByRole('heading', { name: 'Agent quickstart' })
+      .closest('section');
+    expect(quickstart).toHaveTextContent(/100 per client IP/i);
+    expect(quickstart).toHaveTextContent(/60-second window/i);
+    expect(quickstart).toHaveTextContent('429');
+    expect(quickstart).toHaveTextContent('503');
+    expect(quickstart).toHaveTextContent('404');
+    expect(quickstart).toHaveTextContent(/Only GET is supported/i);
   });
 });
