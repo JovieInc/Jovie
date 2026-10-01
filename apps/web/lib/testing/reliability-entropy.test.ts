@@ -68,6 +68,10 @@ describe('reliability entropy projection', () => {
     writeFileSync(join(tmp, 'package.json'), '{"type":"module"}');
     writeFileSync(join(tmp, 'pnpm-workspace.yaml'), 'packages: []\n');
     copyFileSync(resolve('scripts/nightly-test-agent.ts'), script);
+    copyFileSync(
+      resolve('scripts/nightly-test-agent-root.ts'),
+      join(web, 'scripts/nightly-test-agent-root.ts')
+    );
     symlinkSync(resolve('node_modules'), join(web, 'node_modules'), 'dir');
     const quarantine = join(web, 'tests/quarantine.json');
     writeFileSync(quarantine, JSON.stringify(ledger().ledger));
