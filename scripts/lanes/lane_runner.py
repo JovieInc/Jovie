@@ -2536,7 +2536,7 @@ def finish_deferred_retry(host: Host, name: str, pr: dict, retry, context, *, sl
                 return receipt
         try:
             receipt = run_deferred_requeue(host, pr, invoke, slot=slot)
-        except (OSError, ValueError, KeyError, TypeError, RuntimeError):
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.SubprocessError):
             receipt = None  # run_deferred_requeue already released its slot on an error
         if receipt is None or receipt.get("verdict") == "remote-repair-required":
             marker = {"pr": {key: pr[key] for key in ("number", "headRefOid", "headRefName")},
