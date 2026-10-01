@@ -335,7 +335,7 @@
     "@lhci/cli": "^0.15.1",
     "@next/bundle-analyzer": "^16.3.7",
     "@playwright/test": "1.63.0",
-    "@sentry/node": "^10.75.3",
+    "@sentry/node": "^11.0.0",
     "@shadcn/lint": "0.2.0",
     "@storybook/addon-a11y": "10.6.0",
     "@storybook/addon-docs": "10.5.10",
