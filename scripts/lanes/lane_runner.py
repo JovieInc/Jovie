@@ -841,8 +841,17 @@ class Linear:
                      {"id": issue_id, "s": target})
 
     def comment(self, issue_id: str, body: str) -> None:
-        self.gql('mutation($id:String!,$b:String!){commentCreate(input:{issueId:$id,body:$b}){success}}',
-                 {"id": issue_id, "b": body})
+        result = self.gql('mutation($id:String!,$b:String!){commentCreate(input:{issueId:$id,body:$b}){success}}',
+                          {"id": issue_id, "b": body})
+        if result.get("commentCreate", {}).get("success") is not True: raise RuntimeError("linear: comment not delivered")
+
+
+def notify_issue_claim(linear: Linear, issue: Issue, name: str, spec: dict) -> None:
+    """An informational comment cannot prevent durable ownership from being recorded."""
+    try:
+        linear.comment(issue.id, f"🤖 lane `{name}` claimed this issue (model `{spec.get('model')}`).")
+    except (OSError, RuntimeError, ValueError) as error:
+        print(f"lane claim comment unavailable: {type(error).__name__}", file=sys.stderr)
 
 
 class Locked:
@@ -2595,7 +2604,7 @@ def worker(host: Host, name: str) -> int:
                          "in-flight-unknown" if in_flight is None else "none-eligible")
         slot.release()
         return 0
-    linear.comment(issue.id, f"🤖 lane `{name}` claimed this issue (model `{spec.get('model')}`).")
+    notify_issue_claim(linear, issue, name, spec)
     receipt = run_issue(host, name, spec, linear, issue)
     verdict = receipt.get("verdict")
     if verdict == "disk-held":
