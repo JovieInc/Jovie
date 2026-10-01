@@ -74,18 +74,25 @@ import type { PressPhoto } from '@/types/press-photos';
 import type { NotificationSourceContext } from '../artist-notifications-cta/types';
 import { useProfileMobileOverflow } from './useProfileMobileOverflow';
 
-const ProfileUnifiedDrawer = dynamic(() =>
-  import('@/features/profile/ProfileUnifiedDrawer').then(mod => ({
-    default: mod.ProfileUnifiedDrawer,
-  }))
+// Optional overlays must suspend locally. A late visitor assignment can mount
+// their lazy modules after the profile is visible; without a local fallback,
+// the page-level loading boundary hides the artist and navigation together.
+const ProfileUnifiedDrawer = dynamic(
+  () =>
+    import('@/features/profile/ProfileUnifiedDrawer').then(mod => ({
+      default: mod.ProfileUnifiedDrawer,
+    })),
+  { loading: () => null }
 );
 
-const ProfileInlineNotificationsCTA = dynamic(() =>
-  import(
-    '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
-  ).then(mod => ({
-    default: mod.ProfileInlineNotificationsCTA,
-  }))
+const ProfileInlineNotificationsCTA = dynamic(
+  () =>
+    import(
+      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
+    ).then(mod => ({
+      default: mod.ProfileInlineNotificationsCTA,
+    })),
+  { loading: () => null }
 );
 
 const DEFAULT_CONTENT_PREFS: Record<NotificationContentType, boolean> = {

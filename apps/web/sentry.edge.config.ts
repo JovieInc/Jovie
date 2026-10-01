@@ -72,13 +72,6 @@ Sentry.init({
     /toHaveURL/,
   ],
 
-  // AI Agent Monitoring: Explicit for edge runtime (not auto-enabled like Node).
-  // recordInputs/recordOutputs disabled to avoid capturing PII from user
-  // prompts or model replies. See sentry.server.config.ts for rationale.
-  integrations: [
-    Sentry.vercelAIIntegration({
-      recordInputs: false,
-      recordOutputs: false,
-    }),
-  ],
+  // Sentry 11 does not support vercelAIIntegration on Vercel Edge.
+  // The shared collection policy still disables model inputs and outputs.
 });

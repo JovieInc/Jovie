@@ -35,6 +35,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import continuity_clock  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
@@ -80,7 +81,7 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py",
-              "scripts/tests/test_disk_guard.py"]
+              "scripts/tests/test_disk_guard.py", "scripts/tests/test_continuity_clock.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
@@ -2626,7 +2627,11 @@ def dispatch(host: Host) -> int:
 
 
 def finish_dispatch(host: Host, tick: dict) -> int:
-    """Retain the existing doctor's alert path even when admission denied all work."""
+    """Retain production observation and doctor alerts even when worker admission fails."""
+    try:
+        tick["continuity"] = continuity_clock.tick(host.state, HOST)
+    except Exception as error:  # liveness must not suppress the existing doctor
+        tick["continuity"] = {"status": "failed", "error": type(error).__name__}
     update_json(host.state / "tick.json", lambda data: (data.clear(), data.update(tick)))
     try:
         doctor.run(host, sys.modules[__name__], codex_lane_module())

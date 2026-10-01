@@ -30,7 +30,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "1a774604c907fa87740624ea5e9d0af3d6d65029437de56dd9df70b899c9a836"
+    "bodySha256": "b9a483feb9c99fd3ba8345136569e1c0635fc92bb764de76d3add42a8337b256"
   },
   {
     "file": ".claude/rules/gstack.md",
@@ -125,7 +125,7 @@
       "scripts/backlog-orchestrator/**",
       ".claude/commands/qa-swarm*"
     ],
-    "bodySha256": "3b601f1f02ff5afc2c65eca5d22f43dc1b93dea2da784ee488018b17e4208c2c"
+    "bodySha256": "ebcfed0ae2958f670dbebe13e10f59def055a75f5523510b06895b8eeac1a400"
   },
   {
     "file": ".claude/rules/testing.md",

@@ -52,19 +52,20 @@ const DISALLOW_PATHS = [
   '/*&gclid=*',
 ];
 
-/**
- * AI crawlers to explicitly allow.
- * Listing them signals that Jovie welcomes AI search indexing.
- */
+// Preserve explicit search, user-fetch, training/control, and legacy grants.
+// Their distinct purposes are recorded by the certification/guardrail owner.
+// Keep this route's literal grants visible to the static SEO ratchet.
 const AI_CRAWLERS = [
+  'OAI-SearchBot',
+  'Claude-SearchBot',
+  'PerplexityBot',
   'GPTBot',
+  'ClaudeBot',
+  'Google-Extended',
+  'Applebot-Extended',
   'ChatGPT-User',
   'Claude-Web',
-  'ClaudeBot',
   'Anthropic-AI',
-  'Applebot-Extended',
-  'PerplexityBot',
-  'Google-Extended',
 ];
 
 export default function robots(): MetadataRoute.Robots {
@@ -77,7 +78,7 @@ export default function robots(): MetadataRoute.Robots {
           allow: '/',
           disallow: DISALLOW_PATHS,
         },
-        // Explicitly welcome AI crawlers for better AI search visibility
+        // Apply the declared AI crawler policy by purpose
         // But block investor and internal utility routes from ALL crawlers
         ...AI_CRAWLERS.map(crawler => ({
           userAgent: crawler,
