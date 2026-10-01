@@ -39,7 +39,7 @@ export function getWorktreeSentryOptions(): WorktreeSentryOptions {
     }),
     beforeSendSpan: span => ({
       ...span,
-      data: { ...span.data, ...attributes },
+      attributes: { ...span.attributes, ...attributes },
     }),
   };
 }

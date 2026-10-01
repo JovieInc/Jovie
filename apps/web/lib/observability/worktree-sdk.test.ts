@@ -30,7 +30,6 @@ it('carries one boot identity through actual error, metric and trace envelopes',
     dsn: 'https://public@example.invalid/1',
     defaultIntegrations: false,
     tracesSampleRate: 1,
-    enableMetrics: true,
     transport: () => ({
       send: async (envelope: Envelope) => {
         envelopes.push(envelope);
@@ -53,26 +52,28 @@ it('carries one boot identity through actual error, metric and trace envelopes',
       envelope => envelope[1]
     );
     const error = items.find(([header]) => header.type === 'event');
-    const transaction = items.find(([header]) => header.type === 'transaction');
+    const spans = items.filter(([header]) => header.type === 'span');
     const metrics = items.filter(([header]) =>
       String(header.type).includes('metric')
     );
     expect(error).toBeDefined();
-    expect(transaction).toBeDefined();
-    expect(transaction?.[1]).toEqual(
-      expect.objectContaining({
-        spans: expect.arrayContaining([
-          expect.objectContaining({
-            data: expect.objectContaining({
-              'jovie.worktree.id': identity.id,
-              'jovie.worktree.boot': identity.boot,
+    expect(spans.length).toBeGreaterThan(0);
+    for (const [, payload] of spans) {
+      expect(payload).toEqual(
+        expect.objectContaining({
+          items: expect.arrayContaining([
+            expect.objectContaining({
+              attributes: expect.objectContaining({
+                'jovie.worktree.id': { type: 'string', value: identity.id },
+                'jovie.worktree.boot': { type: 'string', value: identity.boot },
+              }),
             }),
-          }),
-        ]),
-      })
-    );
+          ]),
+        })
+      );
+    }
     expect(metrics.length).toBeGreaterThan(0);
-    for (const receipt of [error, transaction, metrics]) {
+    for (const receipt of [error, spans, metrics]) {
       const encoded = JSON.stringify(receipt);
       expect(encoded).toContain(identity.id);
       expect(encoded).toContain(identity.head);

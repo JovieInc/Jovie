@@ -76,9 +76,12 @@ describe('local app and telemetry correlation', () => {
         span_id: '1234567890123456',
         trace_id: 'a'.repeat(32),
         start_timestamp: 1,
-        data: { other: 'keep', 'jovie.worktree.id': 'spoof' },
+        name: 'worktree proof',
+        status: 'ok' as const,
+        is_segment: true,
+        attributes: { other: 'keep', 'jovie.worktree.id': 'spoof' },
       };
-      expect(config.beforeSendSpan?.(span).data).toEqual({
+      expect(config.beforeSendSpan?.(span)?.attributes).toEqual({
         ...attributes,
         other: 'keep',
       });
