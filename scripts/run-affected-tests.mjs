@@ -210,6 +210,8 @@ const SUMMER_COMMISSIONING_LANE = new Set([
 ]);
 const CAPABILITY_BENCHMARK_PRIMARY_INPUTS = new Set([
   'scripts/capability-benchmark/capability-benchmark-registry.json',
+  'scripts/capability-benchmark/capability-reconciliation.mjs',
+  'scripts/capability-benchmark/capability-reconciliation.test.mjs',
   'scripts/capability-benchmark/capability-benchmark.mjs',
   'scripts/capability-benchmark/capability-benchmark.test.mjs',
   'docs/operations/CAPABILITY_BENCHMARK.md',
@@ -221,6 +223,7 @@ const CAPABILITY_BENCHMARK_LANE = new Set([
 ]);
 const CAPABILITY_BENCHMARK_NODE_TESTS = [
   'scripts/capability-benchmark/capability-benchmark.test.mjs',
+  'scripts/capability-benchmark/capability-reconciliation.test.mjs',
 ];
 const SUMMER_COMMISSIONING_NODE_TESTS = [
   'scripts/summer-commissioning/company-registry.test.mjs',
@@ -510,6 +513,15 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
       '--test-coverage-lines=95',
       '--test-coverage-branches=80',
       '--test-coverage-functions=95',
+    ],
+  ],
+  [
+    'scripts/normalize-sonar-lcov.test.mjs',
+    'scripts/normalize-sonar-lcov.mjs',
+    [
+      '--test-coverage-lines=100',
+      '--test-coverage-branches=100',
+      '--test-coverage-functions=100',
     ],
   ],
 ];

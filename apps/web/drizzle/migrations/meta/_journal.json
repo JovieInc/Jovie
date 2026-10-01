@@ -897,6 +897,13 @@
       "when": 1790824898838,
       "tag": "0127_finance_budgets",
       "breakpoints": true
+    },
+    {
+      "idx": 128,
+      "version": "7",
+      "when": 1790834323639,
+      "tag": "0128_finance_classification",
+      "breakpoints": true
     }
   ]
 }
