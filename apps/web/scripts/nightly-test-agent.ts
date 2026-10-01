@@ -21,6 +21,14 @@ import {
   type NightlyAgentSkillDelta,
   type NightlyAgentStatus,
 } from '@/lib/testing/nightly-agent-report';
+import {
+  type ParsedQuarantineLedger,
+  parseQuarantineLedger,
+} from '@/lib/testing/quarantine-ledger';
+import {
+  nightlyReliabilityEvents,
+  projectReliabilityEntropy,
+} from '@/lib/testing/reliability-entropy';
 
 import { findRepoRoot } from './nightly-test-agent-root';
 
@@ -964,6 +972,47 @@ function loadSelectedTargets(inputDir: string): SelectedTarget[] {
   );
 }
 
+function projectReportEntropy(
+  repoRoot: string,
+  status: NightlyAgentStatus,
+  observedTimes: readonly string[],
+  sourceRef: string,
+  asOf: string
+) {
+  if (status.repo !== 'jovie') return undefined;
+  const quarantinePath = path.join(repoRoot, 'apps/web/tests/quarantine.json');
+  let quarantine: ParsedQuarantineLedger | null = null;
+  if (existsSync(quarantinePath)) {
+    try {
+      quarantine = parseQuarantineLedger(readJson<unknown>(quarantinePath));
+    } catch {
+      console.warn(
+        'Quarantine input unavailable — entropy projection retains unknown.'
+      );
+    }
+  }
+  // Replaying an artifact must retain the age of every contributing result.
+  const inputTimes = observedTimes.map(value => Date.parse(value));
+  const observedAt =
+    inputTimes.length === 0
+      ? status.generatedAt
+      : inputTimes.every(Number.isFinite)
+        ? new Date(Math.min(...inputTimes)).toISOString()
+        : 'invalid';
+  return projectReliabilityEntropy(
+    nightlyReliabilityEvents(
+      {
+        ...status,
+        generatedAt: observedAt,
+        reportDocPath: sourceRef,
+      },
+      quarantine,
+      asOf
+    ),
+    asOf
+  );
+}
+
 function commandEmitDelta(
   repoRoot: string,
   args: Record<string, string>
@@ -991,8 +1040,9 @@ function commandEmitDelta(
   ];
   const failures = reports.flatMap(report => report.failures);
   const mutation = reports.find(report => report.mutation)?.mutation;
-  writeJson(path.join(dir, 'skill-delta.json'), {
-    generatedAt: new Date().toISOString(),
+  const generatedAt = new Date().toISOString();
+  const delta = {
+    generatedAt,
     repo,
     selectedTargets: selectedTargets.map(target => ({
       id: target.id,
@@ -1013,6 +1063,19 @@ function commandEmitDelta(
       failed: report.total - report.kept,
       executed: report.results.filter(result => result.executed).length,
     })),
+  };
+  const entropyProjection = projectReportEntropy(
+    repoRoot,
+    buildNightlyAgentStatusFromSkillDelta(delta, { suites }),
+    [...reports, ...candidateReports].map(report => report.generatedAt),
+    path.relative(repoRoot, path.join(dir, 'skill-delta.json')),
+    generatedAt
+  );
+  // This existing completion event and uploaded artifact own the projection.
+  // Missing detectors remain unknown; artifact presence is never a passing run.
+  writeJson(path.join(dir, 'skill-delta.json'), {
+    ...delta,
+    entropyProjection,
   });
   const suiteRows = suites.map(
     suite =>
@@ -1124,6 +1187,20 @@ async function commandPublishStatus(
     suites,
     workflowRunUrl: args['workflow-run-url'],
     workflowConclusion,
+  });
+
+  // Refresh the same uploaded receipt once the existing job knows its conclusion.
+  writeJson(skillDeltaPath, {
+    ...skillDelta,
+    entropyProjection: projectReportEntropy(
+      repoRoot,
+      status,
+      [...reports, ...loadCandidateValidationReports(inputDir)].map(
+        report => report.generatedAt
+      ),
+      path.relative(repoRoot, skillDeltaPath),
+      new Date().toISOString()
+    ),
   });
 
   const reportDocPath = resolveFromRoot(
