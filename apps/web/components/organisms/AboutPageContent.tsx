@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import Link from 'next/link';
 import {
   FaqSection,
   MarketingContainer,
@@ -66,7 +67,13 @@ export function AboutPageContent() {
               width={640}
             />
             <figcaption className='px-5 py-4 text-sm text-secondary-token'>
-              {ABOUT_COPY.origin.signoff}
+              <Link
+                href={ABOUT_COPY.origin.href}
+                prefetch={false}
+                className='underline underline-offset-4'
+              >
+                {ABOUT_COPY.origin.signoff}
+              </Link>
             </figcaption>
           </figure>
         </section>
@@ -81,7 +88,13 @@ export function AboutPageContent() {
             {ABOUT_COPY.features.map(feature => (
               <div key={feature.title}>
                 <h3 className='font-medium text-primary-token'>
-                  {feature.title}
+                  <Link
+                    href={feature.href}
+                    prefetch={false}
+                    className='underline underline-offset-4'
+                  >
+                    {feature.title}
+                  </Link>
                 </h3>
                 <p className='mt-2 text-sm leading-relaxed text-secondary-token'>
                   {feature.description}

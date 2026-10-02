@@ -451,7 +451,7 @@
     "docs/marketing/AGENT_GUIDE.md": {
       "owner": "@itstimwhite",
       "claim": "Marketing briefs and composition use the typed source registry.",
-      "documentSha256": "c9bdfb3fdd03a01e666072c57f009568134507d24b2e0ad7b25aaf8fb8349ff9",
+      "documentSha256": "3d55318b5a7ade0cf7326f72d7245f211e19ce6463ac57745078a10672fd1ba5",
       "sources": [
         {
           "path": "apps/web/data/marketing/spec.ts",
