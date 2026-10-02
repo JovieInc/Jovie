@@ -291,6 +291,18 @@ export async function fileRemediationPlans(plans, { dryRun, upsert, apiKey }) {
   return filed;
 }
 
+/**
+ * @param {object} options
+ * @param {string} [options.mode]
+ * @param {boolean} [options.dryRun]
+ * @param {number} [options.nowMs]
+ * @param {() => Promise<any[]>} [options.loadPulls]
+ * @param {() => Promise<any>} [options.loadHealth]
+ * @param {() => Promise<any>} [options.loadDeployments]
+ * @param {boolean} [options.vercelTokenPresent]
+ * @param {(args: any) => Promise<any>} [options.upsert]
+ * @param {string} [options.apiKey]
+ */
 export async function runRemediationSweep({
   mode = 'all',
   dryRun = false,
