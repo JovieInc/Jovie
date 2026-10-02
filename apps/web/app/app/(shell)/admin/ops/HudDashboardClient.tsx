@@ -21,7 +21,6 @@ import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { AgentOsRunsPanel } from '@/components/features/admin/agent-os';
-import { DesignProposalReviewPanel } from '@/components/features/admin/design-lab';
 import { FounderFunnelBand } from '@/components/features/admin/hud/FounderFunnelBand';
 import { FounderMorningWalkCard } from '@/components/features/admin/hud/FounderMorningWalkCard';
 import { HudCashMrrBand } from '@/components/features/admin/hud/HudCashMrrBand';
@@ -33,14 +32,11 @@ import { HudNoiseDisclosure } from '@/components/features/admin/hud/HudNoiseDisc
 import { HudGithubBudgetPanel } from '@/components/features/admin/hud/HudShipperPanels';
 import { HudSystemHealthStrip } from '@/components/features/admin/hud/HudSystemHealthStrip';
 import { OperationalTasksPanel } from '@/components/features/admin/hud/OperationalTasksPanel';
+import { OvieInbox } from '@/components/features/admin/hud/OvieInbox';
 import { OvieLauncherRail } from '@/components/features/admin/hud/OvieLauncherRail';
 import { OvieShippingStateCard } from '@/components/features/admin/hud/OvieShippingStateCard';
-import { VisualQaReviewPanel } from '@/components/features/admin/hud/VisualQaReviewPanel';
 import type { DailyBucket } from '@/components/features/admin/ShippingVelocityChart';
 import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
-import { SummerCardReviewPanel } from '@/components/features/admin/summer-cards';
-import { TimActionRequiredSection } from '@/components/features/admin/TimActionRequiredSection';
-import { WhatShipped } from '@/components/features/admin/WhatShipped';
 import { toast } from '@/components/feedback';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -784,7 +780,11 @@ export function HudDashboardClient({
       case 'action-required':
         return (
           <div data-testid={section.testId}>
-            <TimActionRequiredSection />
+            {presentation === 'token' ? (
+              <p>Open the signed-in Inbox to review decisions.</p>
+            ) : (
+              <OvieInbox />
+            )}
           </div>
         );
       case 'cash-mrr':
@@ -828,18 +828,6 @@ export function HudDashboardClient({
           <FounderMorningWalkCard
             defaultStatus={metrics.overview.defaultStatusDetail}
           />
-        );
-      case 'design-jury':
-        return (
-          <div
-            key={section.id}
-            className='flex flex-col gap-3'
-            data-testid={section.testId}
-          >
-            <DesignProposalReviewPanel />
-            <SummerCardReviewPanel />
-            <VisualQaReviewPanel />
-          </div>
         );
       case 'velocity':
         return (
@@ -945,8 +933,6 @@ export function HudDashboardClient({
             )}
           </div>
         );
-      case 'what-shipped':
-        return <WhatShipped kioskToken={kioskToken} />;
       case 'dispatch-details':
         return (
           <div

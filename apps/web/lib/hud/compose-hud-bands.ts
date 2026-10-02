@@ -7,8 +7,8 @@
  */
 
 export const HUD_NEED_SECTION_IDS = [
-  'cash-mrr',
   'action-required',
+  'cash-mrr',
   'shipper',
   'factory-health',
   'exceptions',
@@ -17,10 +17,8 @@ export const HUD_NEED_SECTION_IDS = [
 export const HUD_NOISE_SECTION_IDS = [
   'bottleneck',
   'morning-walk',
-  'design-jury',
   'velocity',
   'agent-runs',
-  'what-shipped',
   'dispatch-details',
   'drilldowns',
   'env-exceptions',
@@ -40,10 +38,8 @@ export const HUD_SECTION_TEST_IDS = {
   shipper: 'hud-shipper-status-panel',
   'factory-health': 'hud-system-health-strip',
   'morning-walk': 'founder-morning-walk',
-  'design-jury': 'hud-design-jury',
   velocity: 'hud-shipping-velocity',
   'agent-runs': 'hud-agent-runs',
-  'what-shipped': 'what-shipped-card',
   'dispatch-details': 'hud-dispatch-details',
   'env-exceptions': 'hud-section-env-exceptions',
   exceptions: 'hud-exceptions-section',
@@ -51,16 +47,14 @@ export const HUD_SECTION_TEST_IDS = {
 } as const satisfies Record<HudSectionId, string>;
 
 export const HUD_SECTION_LABELS = {
-  'action-required': 'Needs You',
+  'action-required': 'Inbox',
   'cash-mrr': 'Company Now',
   bottleneck: 'Bottleneck',
   shipper: 'Delivery',
   'factory-health': 'Operating chain',
   'morning-walk': 'Morning walk',
-  'design-jury': 'Design jury',
   velocity: 'Velocity',
   'agent-runs': 'Agent runs',
-  'what-shipped': 'What shipped',
   'dispatch-details': 'Dispatch and diagnostics',
   'env-exceptions': 'Env exceptions',
   exceptions: 'Needs attention',

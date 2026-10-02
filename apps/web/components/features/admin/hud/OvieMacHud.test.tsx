@@ -8,8 +8,8 @@ vi.mock('@/components/organisms/DesktopTitlebar', () => ({
   DesktopTitlebar: () => <div data-testid='desktop-titlebar' />,
 }));
 
-vi.mock('@/components/features/admin/design-lab', () => ({
-  DesignProposalReviewPanel: () => null,
+vi.mock('@/components/features/admin/hud/OvieInbox', () => ({
+  OvieInbox: () => <div data-testid='ovie-inbox' />,
 }));
 
 vi.mock('./OperationalTasksPanel', () => ({
@@ -117,7 +117,7 @@ describe('OvieMacHud', () => {
     expect(
       screen.getByTestId('ovie-mac-hud-decision-queue')
     ).toBeInTheDocument();
-    expect(screen.getByText('Decision queue')).toBeInTheDocument();
+    expect(screen.getByText('Operational signals')).toBeInTheDocument();
     expect(screen.getByText(/Weekly revenue flat/)).toBeInTheDocument();
   });
 
@@ -132,8 +132,8 @@ describe('OvieMacHud', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('renders the Summer card review panel', () => {
+  it('renders one canonical Inbox before secondary diagnostics', () => {
     render(<OvieMacHud snapshot={snapshot} />);
-    expect(screen.getByTestId('summer-card-review-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('ovie-inbox')).toBeInTheDocument();
   });
 });

@@ -15,10 +15,8 @@ vi.mock('@/components/features/admin/hud/OperationalTasksPanel', () => ({
   OperationalTasksPanel: () => <div data-testid='operational-tasks-panel' />,
 }));
 
-vi.mock('@/components/features/admin/design-lab', () => ({
-  DesignProposalReviewPanel: () => (
-    <div data-testid='ovie-taste-inbox'>Taste Inbox</div>
-  ),
+vi.mock('@/components/features/admin/hud/OvieInbox', () => ({
+  OvieInbox: () => <div data-testid='ovie-taste-inbox'>Taste Inbox</div>,
 }));
 
 const BASE: OvieMacHudSnapshot = {
