@@ -22,12 +22,14 @@ export function parseBudgetCapUsd(
   raw: string | undefined,
   fallback: number = DEFAULT_BUDGET_CAP_USD
 ): number {
-  const parsed = Number.parseFloat(raw ?? String(fallback));
+  const safeFallback =
+    Number.isFinite(fallback) && fallback > 0 && fallback <= MAX_BUDGET_CAP_USD
+      ? fallback
+      : DEFAULT_BUDGET_CAP_USD;
+  const parsed = Number(raw ?? safeFallback);
   const bounded =
-    Number.isFinite(parsed) &&
-    parsed > 0 &&
-    parsed <= Math.max(MAX_BUDGET_CAP_USD, fallback);
-  return bounded ? parsed : fallback;
+    Number.isFinite(parsed) && parsed > 0 && parsed <= MAX_BUDGET_CAP_USD;
+  return bounded ? parsed : safeFallback;
 }
 
 export class EvalBudgetTracker {

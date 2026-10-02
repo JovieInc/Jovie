@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  createRealEvalBudgetTracker,
   formatRealEvalProvenance,
   isRealModelEvalEnabled,
   parseRealEvalEligibility,
@@ -119,6 +120,40 @@ describe('real-model eval cost eligibility', () => {
 });
 
 describe('parseBudgetCapUsd bounds (JOV-6234)', () => {
+  it('never lets a custom fallback raise or invalidate the absolute ceiling', () => {
+    for (const fallback of [30, 0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(parseBudgetCapUsd('27', fallback)).toBe(DEFAULT_BUDGET_CAP_USD);
+      expect(parseBudgetCapUsd(undefined, fallback)).toBe(
+        DEFAULT_BUDGET_CAP_USD
+      );
+    }
+    expect(parseBudgetCapUsd('invalid', 1)).toBe(1);
+  });
+
+  it('enforces the authorized cap even when the legacy override requests more', () => {
+    const tracker = createRealEvalBudgetTracker({
+      ...BASE_ENV,
+      REAL_EVAL_ELIGIBILITY: ELIGIBILITY,
+      BUDGET_CAP_USD: '25',
+    });
+    expect(tracker.remaining).toBe(2);
+    tracker.recordUsage(0, 200_000);
+    expect(() => tracker.assertWithinBudget('authorization')).toThrow(
+      'exceeded'
+    );
+  });
+
+  it('preserves a stricter legacy cap and refuses unauthorized initialization', () => {
+    expect(
+      createRealEvalBudgetTracker({
+        ...BASE_ENV,
+        REAL_EVAL_ELIGIBILITY: ELIGIBILITY,
+        BUDGET_CAP_USD: '0.5',
+      }).remaining
+    ).toBe(0.5);
+    expect(() => createRealEvalBudgetTracker(BASE_ENV)).toThrow('eligibility');
+  });
+
   it('keeps a valid in-range cap', () => {
     expect(parseBudgetCapUsd('0.50')).toBe(0.5);
     expect(parseBudgetCapUsd('1.50')).toBe(1.5);

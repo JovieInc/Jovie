@@ -9,7 +9,7 @@
 
 import { createGateway } from '@ai-sdk/gateway';
 
-import { parseBudgetCapUsd } from './budget';
+import { EvalBudgetTracker, parseBudgetCapUsd } from './budget';
 
 const HELICONE_VERCEL_GATEWAY_BASE_URL = 'https://vercel.helicone.ai/v1/ai';
 
@@ -78,6 +78,20 @@ export function isRealModelEvalEnabled(
   env: Readonly<Record<string, string | undefined>> = process.env
 ): boolean {
   return resolveRealEvalEligibility(env) !== null;
+}
+
+/** The enforced budget cannot exceed the authorization or a stricter override. */
+export function createRealEvalBudgetTracker(
+  env: Readonly<Record<string, string | undefined>> = process.env
+): EvalBudgetTracker {
+  const eligibility = resolveRealEvalEligibility(env);
+  if (!eligibility) throw new Error('Real eval cost eligibility is required');
+  return new EvalBudgetTracker(
+    Math.min(
+      eligibility.capUsd,
+      parseBudgetCapUsd(env.BUDGET_CAP_USD, eligibility.capUsd)
+    )
+  );
 }
 
 /** Machine-readable provenance line for run logs (account/provider/cap). */

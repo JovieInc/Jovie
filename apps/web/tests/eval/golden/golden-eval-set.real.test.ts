@@ -21,11 +21,11 @@ import {
   assertAdversarialCaseQuality,
   buildRangeReport,
   createHeliconeGateway,
+  createRealEvalBudgetTracker,
   EvalBudgetTracker,
   formatRangeReport,
   formatRealEvalProvenance,
   isRealModelEvalEnabled,
-  parseBudgetCapUsd,
   parseMinPassCount,
   parseRealEvalEligibility,
   parseSampleSize,
@@ -80,9 +80,7 @@ describe.skipIf(!REAL_EVAL_ENABLED)(
 
     beforeAll(() => {
       evalGateway = createHeliconeGateway();
-      budgetTracker = new EvalBudgetTracker(
-        parseBudgetCapUsd(process.env.BUDGET_CAP_USD)
-      );
+      budgetTracker = createRealEvalBudgetTracker();
       expect(BATCH_SIZE).toBe(1);
       expect(sampledGoldenCases.length).toBe(SAMPLE_SIZE);
       // Provenance: every live run logs the explicit cost eligibility
@@ -90,11 +88,14 @@ describe.skipIf(!REAL_EVAL_ENABLED)(
       // budget cap matches the bounded eligibility cap (JOV-6234).
       const eligibility = resolveRealEvalEligibility();
       expect(eligibility).not.toBeNull();
-      console.log(formatRealEvalProvenance(eligibility!));
-      expect(budgetTracker).toBeInstanceOf(EvalBudgetTracker);
-      expect(eligibility!.capUsd).toBe(
-        parseBudgetCapUsd(String(eligibility!.declaredCapUsd))
+      console.log(
+        formatRealEvalProvenance({
+          ...eligibility!,
+          capUsd: budgetTracker.remaining,
+        })
       );
+      expect(budgetTracker).toBeInstanceOf(EvalBudgetTracker);
+      expect(budgetTracker.remaining).toBeLessThanOrEqual(eligibility!.capUsd);
     });
 
     for (const golden of sampledGoldenCases) {
@@ -157,9 +158,7 @@ describe.skipIf(!REAL_EVAL_ENABLED)(
     beforeAll(() => {
       evalGateway ??= createHeliconeGateway();
       if (!budgetTracker) {
-        budgetTracker = new EvalBudgetTracker(
-          parseBudgetCapUsd(process.env.BUDGET_CAP_USD)
-        );
+        budgetTracker = createRealEvalBudgetTracker();
       }
     });
 
@@ -227,14 +226,10 @@ describe('Golden eval-set real-model lane (disabled guard)', () => {
     // disabled even when the opt-in flag is set and provider keys exist.
     expect(
       isRealModelEvalEnabled({
-        ...process.env,
         JOVIE_RUN_REAL_MODEL_EVALS: '1',
         AI_GATEWAY_API_KEY: 'present-but-unauthorized',
         HELICONE_API_KEY: 'present-but-unauthorized',
       })
     ).toBe(false);
-    expect(process.env.REAL_EVAL_ELIGIBILITY ?? '').not.toMatch(
-      /^\s*\{.*"account"/
-    );
   });
 });

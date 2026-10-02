@@ -7,6 +7,7 @@ export type {
 } from './helicone-gateway';
 export {
   createHeliconeGateway,
+  createRealEvalBudgetTracker,
   formatRealEvalProvenance,
   isRealModelEvalEnabled,
   parseRealEvalEligibility,
