@@ -301,10 +301,11 @@
     "copy:check": "tsx packages/copy/cli.ts check",
     "copy:landing": "tsx apps/web/scripts/copy-landing.ts",
     "copy:judge": "doppler run --project jovie-web --config dev -- tsx packages/copy/cli.ts judge",
-    "test:certification-inventory": "node --test scripts/certification-inventory/inventory.test.mjs"
+    "test:certification-inventory": "node --test scripts/certification-inventory/inventory.test.mjs",
+    "desktop:performance": "pnpm --filter @jovie/desktop run performance"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.128.0",
+    "@anthropic-ai/sdk": "^0.129.0",
     "@biomejs/biome": "^2.5.14",
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",

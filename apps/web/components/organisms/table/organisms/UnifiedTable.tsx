@@ -540,6 +540,7 @@ export function UnifiedTable<TData extends RowData>({
   });
 
   const { rows } = table.getRowModel();
+  const resolvedColumnVisibility = table.getState().columnVisibility;
 
   const focusedIndex = Math.max(
     0,
@@ -614,6 +615,7 @@ export function UnifiedTable<TData extends RowData>({
         <VirtualizedTableRow
           key={row.id}
           row={row}
+          visibleCells={row.getVisibleCells()}
           rowIndex={index}
           rowRefsMap={rowRefs}
           shouldEnableKeyboardNav={shouldEnableKeyboardNav}
@@ -667,8 +669,12 @@ export function UnifiedTable<TData extends RowData>({
 
       return wrappedRowElement;
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- visibility invalidates stable TanStack rows so compiled grouped bodies recompute cells
     [
       groupedRowMap,
+      // TanStack keeps row identity stable when visibility changes. Invalidate
+      // the callback so compiled GroupedTableBody renders fresh visible cells.
+      resolvedColumnVisibility,
       getRowId,
       shouldEnableKeyboardNav,
       focusedIndex,
@@ -850,6 +856,7 @@ export function UnifiedTable<TData extends RowData>({
         )}
         <VirtualizedTableBody
           rows={rows}
+          columnVisibility={resolvedColumnVisibility}
           shouldVirtualize={shouldVirtualize}
           virtualRows={virtualRows}
           paddingTop={paddingTop}

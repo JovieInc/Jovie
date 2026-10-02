@@ -57,6 +57,27 @@ export const Loading: Story = {
   },
 };
 
+function ResponsiveColumnsExample() {
+  const [showArtist, setShowArtist] = useState(true);
+  return (
+    <div className='space-y-3'>
+      <Button onClick={() => setShowArtist(value => !value)}>
+        {showArtist ? 'Hide artist column' : 'Show artist column'}
+      </Button>
+      <UnifiedTable
+        data={data}
+        columns={columns}
+        columnVisibility={{ artist: showArtist }}
+        enableVirtualization={false}
+      />
+    </div>
+  );
+}
+
+export const ResponsiveColumns: Story = {
+  render: () => <ResponsiveColumnsExample />,
+};
+
 function RowModeScrollFixture() {
   const [loading, setLoading] = useState(true);
   return (

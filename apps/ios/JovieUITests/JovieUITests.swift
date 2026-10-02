@@ -530,6 +530,61 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "chat-first-sidebar", app: app)
   }
 
+  func testDrawerUsesCanonicalRootsAndWorkChildren() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "chat composer") {
+      $0.textFields["chat-composer-input"]
+    }
+    app.buttons["Open navigation drawer"].tap()
+    let home = app.buttons["shell-drawer-surface-shell-tab-chat"]
+    XCTAssertTrue(waitForHittable(home, timeout: 3))
+    let identity = app.buttons["shell-drawer-surface-shell-tab-profile"]
+    let work = app.buttons["shell-drawer-surface-shell-tab-library"]
+    let inbox = app.buttons["shell-drawer-surface-shell-tab-inbox"]
+    let calendar = app.buttons["shell-drawer-surface-shell-tab-calendar"]
+    let audience = app.buttons["shell-drawer-surface-shell-tab-audience"]
+    XCTAssertEqual(home.label, "Home")
+    XCTAssertEqual(identity.label, "Identity")
+    let rows = [home, identity, work, inbox, calendar, audience]
+    for (above, below) in zip(rows, rows.dropFirst()) {
+      XCTAssertLessThan(above.frame.maxY, below.frame.maxY)
+      XCTAssertGreaterThanOrEqual(below.frame.height, 44)
+    }
+    XCTAssertGreaterThan(inbox.frame.minX, work.frame.minX)
+    XCTAssertEqual(inbox.frame.minX, calendar.frame.minX, accuracy: 1)
+    attachScreenshot(named: "ios-canonical-information-architecture", app: app)
+
+    inbox.tap()
+    XCTAssertTrue(app.descendants(matching: .any)["inbox-surface"].waitForExistence(timeout: 3))
+    app.buttons["Open navigation drawer"].tap()
+    XCTAssertTrue(waitForHittable(calendar, timeout: 3))
+    calendar.tap()
+    XCTAssertTrue(app.descendants(matching: .any)["calendar-surface"].waitForExistence(timeout: 3))
+    app.buttons["Open navigation drawer"].tap()
+    XCTAssertTrue(waitForHittable(identity, timeout: 3))
+    identity.tap()
+    XCTAssertTrue(app.buttons["Copy URL"].waitForExistence(timeout: 3))
+  }
+
+  func testOfflineStatusReservesToolbarGeometry() {
+    let onlineApp = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "chat composer") {
+      $0.textFields["chat-composer-input"]
+    }
+    let onlineTitle = onlineApp.staticTexts["Home"].firstMatch.frame
+    let onlineActions = onlineApp.buttons["shell-actions-menu"].frame
+    XCTAssertFalse(onlineApp.staticTexts["Offline"].exists)
+    onlineApp.terminate()
+
+    let offlineApp = launchMockApp(launchArgument: "-ui-testing-chat-offline", expectedElementDescription: "chat composer") {
+      $0.textFields["chat-composer-input"]
+    }
+    XCTAssertTrue(offlineApp.staticTexts["Offline"].exists)
+    let offlineTitle = offlineApp.staticTexts["Home"].firstMatch.frame
+    let offlineActions = offlineApp.buttons["shell-actions-menu"].frame
+    XCTAssertEqual(onlineTitle.minY, offlineTitle.minY, accuracy: 1)
+    XCTAssertEqual(onlineActions.minY, offlineActions.minY, accuracy: 1)
+    attachScreenshot(named: "ios-offline-stable-toolbar", app: offlineApp)
+  }
+
   func testShellVlogControlOpensPromptCaptureDirectly() {
     let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
       $0.textFields["chat-composer-input"]
