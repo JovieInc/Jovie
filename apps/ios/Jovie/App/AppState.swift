@@ -57,7 +57,7 @@ final class AppState {
   private struct ProfileLoadAttempt {
     let id = UUID()
     let userID: String
-    let isSessionCurrent: () -> Bool
+    let canContinue: () -> Bool
   }
 
   private let captureProfileLoadCurrentness: () -> (() -> Bool)
@@ -78,7 +78,7 @@ final class AppState {
     actionLoopCache: ActionLoopCache? = nil,
     captureProfileLoadCurrentness: @escaping () -> (() -> Bool) = {
       let ownership = NativeSessionTokenStore.captureSessionContext().ownership
-      return { NativeSessionTokenStore.isCurrent(ownership) }
+      return { NativeSessionTokenStore.canContinueProfileLoad(ownedBy: ownership) }
     }
   ) {
     self.configuration = configuration
@@ -175,7 +175,7 @@ final class AppState {
     guard launchMode.usesLiveAuth, didInitializeAuth else { return }
 
     if let userID, let attempt = profileLoadAttempt,
-       attempt.userID == userID, attempt.isSessionCurrent() {
+       attempt.userID == userID, attempt.canContinue() {
       return
     }
 
@@ -202,7 +202,7 @@ final class AppState {
     }
     let attempt = ProfileLoadAttempt(
       userID: userID,
-      isSessionCurrent: captureProfileLoadCurrentness()
+      canContinue: captureProfileLoadCurrentness()
     )
     profileLoadAttempt = attempt
     defer {
@@ -215,7 +215,7 @@ final class AppState {
     // users never wait on the network to see their dashboard. The network
     // revalidation below silently swaps in fresh data when it lands.
     let cachedSnapshot = await repository.cachedSnapshot(for: userID)
-    guard isActive(attempt), attempt.isSessionCurrent() else { return }
+    guard isActive(attempt), attempt.canContinue() else { return }
 
     if let cachedSnapshot {
       apply(response: cachedSnapshot)
@@ -235,7 +235,7 @@ final class AppState {
 
     do {
       let result = try await repository.loadMe(for: userID)
-      guard isActive(attempt), attempt.isSessionCurrent() else { return }
+      guard isActive(attempt), attempt.canContinue() else { return }
       isOffline = result.isStale
 
       switch result.response.state {
@@ -286,7 +286,7 @@ final class AppState {
         }
       }
 
-      guard attempt.isSessionCurrent() else { return }
+      guard attempt.canContinue() else { return }
       route = .ready
       dashboardState = .error("Couldn't load your profile.")
       isOffline = didTransportFail

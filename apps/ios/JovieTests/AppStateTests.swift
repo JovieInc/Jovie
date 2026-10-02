@@ -2226,6 +2226,7 @@ private actor ControlledProfileRepository: AppStateRepository {
   private let firstCacheGate: ProfileLoadGate?
   private let loadGates: [ProfileLoadGate]
   private let firstResult: Result<MeRepositoryResult, APIClientError>
+  private let requiresAuthorization: Bool
   private var cacheCalls = 0
   private var loadCalls = 0
   private var cleared: [String] = []
@@ -2235,8 +2236,10 @@ private actor ControlledProfileRepository: AppStateRepository {
     loadGates: [ProfileLoadGate],
     firstResult: Result<MeRepositoryResult, APIClientError> = .success(
       MeRepositoryResult(response: .previewReady, isStale: false)
-    )
+    ),
+    requiresAuthorization: Bool = false
   ) {
+    self.requiresAuthorization = requiresAuthorization
     self.firstCacheGate = firstCacheGate
     self.loadGates = loadGates
     self.firstResult = firstResult
@@ -2255,6 +2258,9 @@ private actor ControlledProfileRepository: AppStateRepository {
     // Unexpected duplicate loads fail promptly instead of leaving a test suspended.
     guard index < loadGates.count else { throw APIClientError.invalidResponse }
     _ = await loadGates[index].wait()
+    if requiresAuthorization, NativeSessionTokenStore.requestAuthorization() == nil {
+      throw APIClientError.missingToken
+    }
     if index == 0 { return try firstResult.get() }
     return MeRepositoryResult(response: .previewReady, isStale: false)
   }
@@ -2439,6 +2445,81 @@ extension AppStateTests {
       #expect(await repository.clearedUsers() == ["same-user"])
       #expect(await revoker.calls() == 0)
       #expect(NativeSessionTokenStore.load() == nil)
+    }
+  }
+}
+
+extension AppStateTests {
+  private func expirePersistedSession() {
+    // Advance only expiry metadata: saving an expired token would create a new login.
+    UserDefaults.standard.set(1, forKey: "ie.jov.Jovie.nativeSession.expiresAt")
+  }
+
+  @Test(arguments: [false, true], [false, true])
+  func passiveExpiryKeepsProfileLoadingOnItsExistingResultPath(externalExpiryReader: Bool, succeeds: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      _ = try saveSession()
+      let owner = NativeSessionTokenStore.captureSessionContext().ownership
+      let cacheGate = ProfileLoadGate()
+      let loadGate = ProfileLoadGate()
+      let repository = ControlledProfileRepository(
+        firstCacheGate: cacheGate, loadGates: [loadGate], requiresAuthorization: !succeeds
+      )
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = makeState(repository, sessionRevoker: revoker)
+      let task = Task {
+        await state.handleSignedInUserChange("same-user")
+        await loadGate.ownerFinished()
+      }
+      await cacheGate.waitUntilEntered()
+      expirePersistedSession()
+      if externalExpiryReader { #expect(NativeSessionTokenStore.load() == nil) }
+      await cacheGate.complete(true)
+      let entered = await loadGate.waitUntilEntered()
+      #expect(entered, "Passive expiry must still reach the existing profile result/terminal path")
+      if entered, !externalExpiryReader {
+        #expect(UserDefaults.standard.double(forKey: "ie.jov.Jovie.nativeSession.expiresAt") == 1)
+      }
+      // Buffered release also drains the task when a regressed owner check skips loadMe.
+      await loadGate.complete(true)
+      await task.value
+      #expect(state.route == (succeeds ? .ready : .signedOut))
+      #expect(state.dashboardState == (succeeds ? .loaded(.previewReady) : .idle))
+      #expect(state.activeUserID == (succeeds ? "same-user" : nil))
+      #expect(!state.isOffline)
+      #expect(await repository.clearedUsers() == (succeeds ? [] : ["same-user"]))
+      #expect(await revoker.calls() == 0)
+      #expect(NativeSessionTokenStore.requestAuthorization() == nil)
+      #expect(NativeSessionTokenStore.canContinueProfileLoad(ownedBy: owner) == succeeds)
+    }
+  }
+
+  enum AfterPassiveExpiry: CaseIterable, Sendable { case explicitClear, sameUserLogin, replacementExpires }
+
+  @Test(arguments: AfterPassiveExpiry.allCases)
+  func passiveExpiryContinuationCannotSurviveAnExplicitOwnershipChange(change: AfterPassiveExpiry) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      _ = try saveSession()
+      let original = NativeSessionTokenStore.captureSessionContext().ownership
+      expirePersistedSession()
+      #expect(NativeSessionTokenStore.load() == nil)
+      #expect(NativeSessionTokenStore.canContinueProfileLoad(ownedBy: original))
+      #expect(!NativeSessionTokenStore.isCurrent(original))
+      #expect(NativeSessionTokenStore.requestAuthorization(ifOwnedBy: original) == nil)
+      if change == .explicitClear {
+        NativeSessionTokenStore.clear()
+      } else {
+        _ = try saveSession() // Identical user and bearer still replace login ownership.
+        let replacement = NativeSessionTokenStore.captureSessionContext().ownership
+        if change == .replacementExpires {
+          expirePersistedSession()
+          #expect(NativeSessionTokenStore.load() == nil)
+        }
+        #expect(NativeSessionTokenStore.canContinueProfileLoad(ownedBy: replacement))
+      }
+      let context = NativeSessionTokenStore.captureSessionContext()
+      #expect(!NativeSessionTokenStore.canContinueProfileLoad(ownedBy: original))
+      #expect(NativeSessionTokenStore.captureSessionContext() == context)
     }
   }
 }
