@@ -652,50 +652,32 @@ jobs:
             fi
 
             if [ "$run_web" = true ]; then
-              staging_receipt_sha="$web_evidence_sha"
-              staging_deployment_id=""
-              if [[ ! "$staging_receipt_sha" =~ ^[0-9a-f]{40}$ ]]; then
-                staging_identity="$(curl --fail --silent --show-error --max-time 20 https://staging.jov.ie/api/health/build-info)" || { echo "::error::Canonical staging identity is unavailable. Next: inspect staging.jov.ie build-info."; exit 1; }
-                staging_receipt_sha="$(jq -er '.commitSha | select(type == "string" and test("^[0-9a-f]{40}$"))' <<<"$staging_identity")"
-                staging_deployment_id="$(jq -er '.deploymentId | select(type == "string" and test("^dpl_[A-Za-z0-9]+$"))' <<<"$staging_identity")"
-              fi
-              staging_compare="$(gh api "repos/$REPOSITORY/compare/${staging_receipt_sha}...${EXPECTED_SHA}" --jq '.status // empty')"
-              [[ "$staging_compare" =~ ^(ahead|identical)$ ]] || { echo "::error::Canonical staging SHA $staging_receipt_sha is not on the production lineage to $EXPECTED_SHA."; exit 1; }
-              staging_artifact_name="staging-deployment-${staging_receipt_sha}"
-              staging_artifact_id=""
-              # 25 min bound: staging queue + deploy took ~20 min on 2026-09-29; a 10 min wait
-              # failed valid releases with "receipt missing" (JOV-19527).
+              # Historical Web CI evidence and an actual staging deployment are
+              # different proofs: coalescing may stage a descendant only.
+              staging_lower_bound_sha="$web_evidence_sha"
+              [[ "$staging_lower_bound_sha" =~ ^[0-9a-f]{40}$ ]] || staging_lower_bound_sha=""
+              staging_verified=false
+              # 25 min bound for a still-eligible generation. Before every poll,
+              # let an obsolete queued generation yield before waiting on proof.
               for attempt in $(seq 1 150); do
-                staging_artifact_id="$(gh api \
-                  "repos/$REPOSITORY/actions/artifacts?name=$staging_artifact_name&per_page=100" \
-                  --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at, .id) | last | .id // empty')"
-                [ -n "$staging_artifact_id" ] && break
+                receipt_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+                receipt_decision="$(CURRENT_MAIN_SHA="$receipt_main_sha" BOUNDARY="before staging proof wait" IN_FLIGHT=false \
+                  bash .github/scripts/release-lineage-gate.sh)" || exit 1
+                if [ "$receipt_decision" != "decision=proceed" ]; then
+                  echo "::notice::Controller generation $EXPECTED_SHA yielded before staging proof wait."
+                  echo "is_current=false" >> "$GITHUB_OUTPUT"
+                  exit 0
+                fi
+                staging_proof="$(STAGING_LOWER_BOUND_SHA="$staging_lower_bound_sha" node scripts/lib/production-staging-evidence.mjs)"
+                staging_verified="$(jq -r '.state == "verified"' <<<"$staging_proof")"
+                [ "$staging_verified" = true ] && break
                 [ "$attempt" -lt 150 ] && sleep 10
               done
-              [[ "$staging_artifact_id" =~ ^[1-9][0-9]*$ ]] || {
-                echo "::error::Exact staging receipt is missing. Next: inspect Staging Controller for $staging_receipt_sha. Proof: $staging_artifact_name."
+              if [ "$staging_verified" != true ]; then
+                echo "::error::Exact staging receipt is missing for eligible lineage $staging_lower_bound_sha..$EXPECTED_SHA. Next: inspect Staging Controller proof."
                 exit 1
-              }
-              staging_receipt_dir="$RUNNER_TEMP/staging-deployment"
-              mkdir -p "$staging_receipt_dir"
-              gh api "repos/$REPOSITORY/actions/artifacts/$staging_artifact_id/zip" > "$staging_receipt_dir/receipt.zip"
-              unzip -q "$staging_receipt_dir/receipt.zip" -d "$staging_receipt_dir"
-              jq -e --arg sha "$staging_receipt_sha" --arg deployment "$staging_deployment_id" '
-                .schema == "jovie-staging-deployment/v1" and
-                .terminal == true and
-                (.state == "current" or .state == "superseded_after_mutation") and
-                .sha == $sha and
-                (.sourceCiRunId | type == "string" and test("^[1-9][0-9]*$")) and
-                (.deploymentId | type == "string" and test("^dpl_[A-Za-z0-9]+$")) and
-                ($deployment == "" or .deploymentId == $deployment) and
-                .alias == "staging.jov.ie" and
-                .environment == "preview" and
-                .exactIdentity == "passed" and
-                .routeSmoke == "passed"
-              ' "$staging_receipt_dir/staging-deployment-receipt.json" >/dev/null || {
-                echo "::error::Exact staging receipt is missing or ambiguous. Next: rerun Staging Controller for $staging_receipt_sha. Proof: artifact $staging_artifact_id."
-                exit 1
-              }
+              fi
+              printf '%s\n' "$staging_proof" > "$RUNNER_TEMP/production-staging-proof.json"
               echo "staging_verified=true" >> "$GITHUB_OUTPUT"
             fi
 

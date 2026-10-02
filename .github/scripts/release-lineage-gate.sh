@@ -83,11 +83,27 @@ if [ "$lineage" = diverged ]; then
 elif [ "$lineage" = ancestor ]; then
   # A newer generation already waiting on the production-mutation lease will
   # ship a SHA closer to main; yield to it rather than build a stale one.
-  runs_json="$("$gh_cli" api "repos/$repository/actions/workflows/production-controller.yml/runs?branch=main&event=workflow_run&per_page=30" 2>/dev/null || true)"
-  pending="$(jq -r --argjson run "$run_id" \
-    '[(.workflow_runs // [])[] | select(.status != "completed" and .id > $run)] | length' \
-    <<<"${runs_json:-{\}}" 2>/dev/null || echo 0)"
-  [[ "$pending" =~ ^[0-9]+$ ]] || pending=0
+  # Unknown visibility must not become an empty-queue decision, including
+  # under starvation. Emit bounded diagnostics without raw API response text.
+  lookup_status=0
+  runs_json="$("$gh_cli" api "repos/$repository/actions/workflows/production-controller.yml/runs?branch=main&event=workflow_run&per_page=30" 2>/dev/null)" || lookup_status=$?
+  if [ "$lookup_status" -ne 0 ] || ! pending="$(jq -er --argjson run "$run_id" '
+    if (.workflow_runs | type) != "array" or
+      any(.workflow_runs[]; (.id | type) != "number" or .id <= 0 or
+        (.status | type) != "string" or (.status | length) == 0)
+    then error("invalid workflow run listing")
+    else [.workflow_runs[] | select(.status != "completed" and .id > $run)] | length end
+  ' <<<"$runs_json" 2>/dev/null)"; then
+    emit lineage "$lineage"
+    emit successor_pending unknown
+    emit successor_lookup_exit "$lookup_status"
+    emit starving unknown
+    emit gate_decision error
+    emit gate_reason successor_lookup_unavailable
+    echo "::error::Release successor lookup is unknown (exit=$lookup_status); inspect Actions run-list access/response before admission." >&2
+    printf 'decision=error\n'
+    exit 1
+  fi
   if [ "$pending" -gt 0 ]; then
     successor_pending=true
   fi

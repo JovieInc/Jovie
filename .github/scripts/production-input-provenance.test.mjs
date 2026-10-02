@@ -612,7 +612,7 @@ test('production controller waits longer for the staging receipt than staging ta
   );
   const attempts = Number(
     workflow.match(
-      /for attempt in \$\(seq 1 (\d+)\); do\n\s+staging_artifact_id/
+      /for attempt in \$\(seq 1 (\d+)\); do\n\s+receipt_main_sha/
     )?.[1]
   );
   const job = workflow.slice(workflow.indexOf('  authorize-production:'));

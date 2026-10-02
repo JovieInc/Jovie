@@ -852,7 +852,7 @@ describe('controller starvation bound', () => {
     expect(
       coalesce.match(/release-lineage-gate\.sh/g)?.length ?? 0
     ).toBeGreaterThanOrEqual(3);
-    expect(authorize.match(/release-lineage-gate\.sh/g)?.length ?? 0).toBe(2);
+    expect(authorize.match(/release-lineage-gate\.sh/g)?.length ?? 0).toBe(3);
     expect(coalesce).not.toContain(
       'if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then\n            record_receipt "superseded"'
     );
