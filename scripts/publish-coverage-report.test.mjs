@@ -163,15 +163,20 @@ test('the actual nightly publication step succeeds with main protected', t => {
     'Nightly failed; evidence retained\n'
   );
   mkdirSync(join(f.cwd, 'scripts/lib'), { recursive: true });
-  writeFileSync(
-    join(f.cwd, 'scripts/lib/publish-coverage-report.mjs'),
-    readFileSync(new URL('./lib/publish-coverage-report.mjs', import.meta.url))
-  );
+  for (const lib of [
+    'publish-coverage-report.mjs',
+    'retire-coverage-reports.mjs',
+  ]) {
+    writeFileSync(
+      join(f.cwd, `scripts/lib/${lib}`),
+      readFileSync(new URL(`./lib/${lib}`, import.meta.url))
+    );
+  }
   const bin = join(f.root, 'bin');
   mkdirSync(bin);
   writeFileSync(
     join(bin, 'gh'),
-    `#!/bin/sh\nif [ "$1" = pr ]; then echo '${url}'; fi\n`,
+    `#!/bin/sh\nif [ "$2" = create ]; then echo '${url}'; elif [ "$2" = list ]; then echo '[]'; fi\n`,
     { mode: 0o755 }
   );
   const workflow =
