@@ -97,7 +97,6 @@ function EntryMedia({
         // Unoptimized: media srcs come from the receipt-backed contract and
         // are not limited to the optimizer's allowlisted hosts. The 16:9
         // frame reserves the box so fill+lazy loading never shifts layout.
-        // biome-ignore lint/a11y/noNoninteractiveElementInteractions: load failure collapses the media region to the text-first entry, it is not a user interaction.
         <Image
           className='changelog-entry-media__asset'
           src={media.src}
