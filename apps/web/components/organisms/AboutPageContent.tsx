@@ -5,8 +5,10 @@ import {
   MarketingHero,
   MarketingHeroPhoto,
 } from '@/components/marketing';
+import { AboutPageRefresh } from '@/components/organisms/AboutPageRefresh';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { ABOUT_COPY, ABOUT_FAQ_ITEMS } from '@/data/aboutCopy';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 export { ABOUT_FAQ_ITEMS };
 
@@ -17,6 +19,10 @@ const ABOUT_HERO_PHOTO = {
 } as const;
 
 export function AboutPageContent() {
+  if (FEATURE_FLAGS.SHOW_PUBLIC_ABOUT_FOOTER_REFRESH) {
+    return <AboutPageRefresh />;
+  }
+
   return (
     <>
       <div className='marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'>

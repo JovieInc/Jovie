@@ -21,6 +21,7 @@ describe('AboutPageContent', () => {
         name: 'Presence, relationships, and growth.',
       })
     ).toBeVisible();
+    expect(screen.queryByTestId('about-page-refresh')).toBeNull();
     const sectionHeadings = Array.from(container.querySelectorAll('section'))
       .map(section => section.querySelector('h2')?.textContent?.trim())
       .filter((heading): heading is string => heading !== undefined);
