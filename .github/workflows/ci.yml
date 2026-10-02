@@ -720,6 +720,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
+            printf '### Qualification classification\n\nManual dispatch requires full qualification across all product lanes.\n' >> "$GITHUB_STEP_SUMMARY"
             PRODUCT_LANE_DIR="$RUNNER_TEMP/product-lane-classification"
             mkdir -p "$PRODUCT_LANE_DIR"
             git ls-files > "$PRODUCT_LANE_DIR/changed-paths.txt"

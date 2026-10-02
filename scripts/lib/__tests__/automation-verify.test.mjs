@@ -19,6 +19,7 @@ import {
   buildSelectedTestCommands,
   buildVerificationEnv,
   CONTROL_TEST_CONCURRENCY,
+  classifyBlogContentForAffectedTests,
   controlCoverageReportsDirectory,
   formatAffectedTestPlanDiagnostic,
   runCommandStatus,
@@ -27,6 +28,18 @@ import {
 import { classifyBlogContentChanges } from '../blog-content-ci.mjs';
 
 describe('affected-test selector inventory', () => {
+  it('fails closed to the full suite when the real blog Git diff cannot be classified', () => {
+    const receipt = classifyBlogContentForAffectedTests(
+      '0'.repeat(40),
+      'HEAD',
+      { prerequisitesAvailable: true }
+    );
+    expect(
+      buildAffectedTestPlan(['apps/web/content/blog/article.md'], {
+        blogContentReceipt: receipt,
+      }).mode
+    ).toBe('full');
+  });
   it('selects publication, certification, and candidate-build proof for a status-qualified post', () => {
     const path = 'apps/web/content/blog/a-safe-article.md';
     const plan = buildAffectedTestPlan([path], {
@@ -60,6 +73,34 @@ describe('affected-test selector inventory', () => {
         isFileAvailable: () => true,
       }).mode
     ).toBe('full');
+  });
+
+  it('maps the Decisions benchmark fixture to the complete capability lane', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/capability-benchmark/decision-routing-benchmark.json',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+    expect(plan.nodeTests).toEqual([
+      'scripts/capability-benchmark/capability-benchmark.test.mjs',
+      'scripts/capability-benchmark/computer-use-decision.test.mjs',
+      'scripts/capability-benchmark/capability-reconciliation.test.mjs',
+    ]);
+  });
+
+  it('fails closed when a capability benchmark change has an unknown peer', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/capability-benchmark/decision-routing-benchmark.json',
+      'scripts/lib/unknown-capability-peer.mjs',
+    ]);
+
+    expect(plan.mode).toBe('full');
+    expect(plan.fallbackReason).toBe(
+      'Capability benchmark change exceeds its focused lane'
+    );
   });
 
   it('enforces real merge-sync writer coverage in its existing focused CI selector', () => {

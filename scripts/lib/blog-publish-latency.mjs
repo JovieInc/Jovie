@@ -56,8 +56,25 @@ export function isStrictBlogContentPr(pr) {
   return classifyBlogContentChanges(blogChangesForPr(pr)).contentOnly;
 }
 
+export function findBlogQualificationRun(runs, pr) {
+  return runs
+    .filter(
+      run =>
+        run.head_sha === pr.headRefOid &&
+        (run.prNumbers?.includes(pr.number) ||
+          run.head_branch === pr.headRefName)
+    )
+    .toSorted((a, b) => b.id - a.id)[0];
+}
+
 export function buildBlogPublishLatency(raw) {
   const deployments = raw.deployments ?? [];
+  const mergedPrs = (raw.mergedPrs ?? []).filter(
+    pr => pr.mergedAt && pr.mergeCommitSha
+  );
+  const classifiedPrCount = mergedPrs.filter(pr =>
+    Array.isArray(pr.files)
+  ).length;
   const samples = (raw.mergedPrs ?? [])
     .filter(pr => pr.mergedAt && pr.mergeCommitSha && isStrictBlogContentPr(pr))
     .map(pr => {
@@ -123,6 +140,12 @@ export function buildBlogPublishLatency(raw) {
     schema: 'jovie-blog-publish-latency/v1',
     generatedAt: raw.collectedAt ?? new Date().toISOString(),
     sampleCount: samples.length,
+    classification: {
+      mergedPrCount: mergedPrs.length,
+      classifiedPrCount,
+      unclassifiedPrCount: mergedPrs.length - classifiedPrCount,
+      complete: classifiedPrCount === mergedPrs.length,
+    },
     cohorts: {
       legacy: summary(legacy),
       contentOnly: summary(contentOnly),

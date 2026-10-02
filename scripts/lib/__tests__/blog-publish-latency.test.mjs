@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildBlogPublishLatency,
+  findBlogQualificationRun,
   isStrictBlogContentPr,
 } from '../blog-publish-latency.mjs';
 
@@ -10,6 +11,52 @@ const post = {
 };
 
 describe('blog publish latency', () => {
+  it('matches an unlinked Actions run only to the exact candidate branch and head', () => {
+    const pr = {
+      number: 42,
+      headRefName: 'candidate',
+      headRefOid: 'a'.repeat(40),
+    };
+    const exact = {
+      id: 1,
+      head_sha: pr.headRefOid,
+      head_branch: pr.headRefName,
+      prNumbers: [],
+    };
+    expect(
+      findBlogQualificationRun(
+        [
+          exact,
+          { ...exact, id: 2, head_sha: 'b'.repeat(40), prNumbers: [42] },
+          { ...exact, id: 3, head_branch: 'other' },
+        ],
+        pr
+      )
+    ).toEqual(exact);
+    expect(
+      findBlogQualificationRun([{ ...exact, head_branch: 'other' }], pr)
+    ).toBeUndefined();
+  });
+
+  it('discloses unclassified PRs instead of silently reporting a complete cohort', () => {
+    const report = buildBlogPublishLatency({
+      mergedPrs: [
+        {
+          number: 1,
+          mergedAt: '2026-10-01T01:00:00Z',
+          mergeCommitSha: 'a',
+          files: [post],
+        },
+        { number: 2, mergedAt: '2026-10-01T01:00:00Z', mergeCommitSha: 'b' },
+      ],
+    });
+    expect(report.classification).toEqual({
+      mergedPrCount: 2,
+      classifiedPrCount: 1,
+      unclassifiedPrCount: 1,
+      complete: false,
+    });
+  });
   it('rejects mixed, renamed, executable, and unsafe samples', () => {
     expect(isStrictBlogContentPr({ files: [post] })).toBe(true);
     for (const files of [

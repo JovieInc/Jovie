@@ -215,6 +215,7 @@ const SUMMER_COMMISSIONING_LANE = new Set([
 ]);
 const CAPABILITY_BENCHMARK_PRIMARY_INPUTS = new Set([
   'scripts/capability-benchmark/capability-benchmark-registry.json',
+  'scripts/capability-benchmark/decision-routing-benchmark.json',
   'scripts/capability-benchmark/computer-use-decision.jsonl',
   'scripts/capability-benchmark/computer-use-decision.mjs',
   'scripts/capability-benchmark/computer-use-decision.test.mjs',
@@ -1047,6 +1048,17 @@ const LINEAR_SYNC_ON_MERGE_LANE = new Set([
   'scripts/run-affected-tests.mjs',
 ]);
 
+export function classifyBlogContentForAffectedTests(base, head, options) {
+  try {
+    return classifyBlogContentDiff(base, head, options);
+  } catch {
+    console.warn(
+      '[affected-tests] Blog diff classification failed; requiring the full suite.'
+    );
+    return undefined;
+  }
+}
+
 export function buildAffectedTestPlan(
   changedFiles,
   {
@@ -1202,6 +1214,11 @@ export function buildAffectedTestPlan(
       scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
       nodeTests: CAPABILITY_BENCHMARK_NODE_TESTS,
     };
+  }
+  if (files.some(file => CAPABILITY_BENCHMARK_PRIMARY_INPUTS.has(file))) {
+    return fullSuitePlan(
+      'Capability benchmark change exceeds its focused lane'
+    );
   }
   const isBoundedSummerCommissioningChange =
     files.some(file => SUMMER_COMMISSIONING_PRIMARY_INPUTS.has(file)) &&
@@ -2720,7 +2737,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   );
   const blogContentReceipt =
     !explicitFiles && files.some(isBlogContentCandidatePath)
-      ? classifyBlogContentDiff(base, 'HEAD', { prerequisitesAvailable })
+      ? classifyBlogContentForAffectedTests(base, 'HEAD', {
+          prerequisitesAvailable,
+        })
       : undefined;
   const plan = buildAffectedTestPlan(files, { blogContentReceipt });
   if (args.includes('--dry-run')) {

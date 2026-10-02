@@ -31,6 +31,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   buildBlogPublishLatency,
+  findBlogQualificationRun,
   isStrictBlogContentPr,
 } from './lib/blog-publish-latency.mjs';
 import {
@@ -175,7 +176,7 @@ export function collectRaw({ workflows, days }) {
         '[.[][] | {filename, status, previousFilename: .previous_filename}]',
       ]);
     } catch {
-      pr.files = [];
+      pr.files = null;
     }
     if (!isStrictBlogContentPr(pr)) continue;
 
@@ -191,9 +192,7 @@ export function collectRaw({ workflows, days }) {
       pr.candidateCreatedAt = null;
     }
 
-    const run = runs.pull_request
-      .filter(candidate => candidate.prNumbers?.includes(pr.number))
-      .sort((a, b) => b.id - a.id)[0];
+    const run = findBlogQualificationRun(runs.pull_request, pr);
     if (run) {
       try {
         const jobs = gh([
