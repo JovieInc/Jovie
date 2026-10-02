@@ -91,17 +91,34 @@ export interface CopyGateResult {
   readonly critique: readonly string[];
 }
 
-const family = (model: string) => model.split('/')[0] ?? model;
+/** `anthropic/claude-opus-5.5` -> `anthropic`. The unit of judge independence. */
+export const modelFamily = (model: string) => model.split('/')[0] ?? model;
+const family = modelFamily;
+
+/**
+ * Keeps preference order, drops the generator's own family (a family never
+ * judges its own output) and anything the transport cannot reach right now.
+ * Shared by the copy panel and the design CI judge dispatcher.
+ */
+export function excludeGeneratorFamily(
+  models: readonly string[],
+  generatorModel?: string,
+  available: (model: string) => boolean = () => true
+): string[] {
+  const excluded = generatorModel ? family(generatorModel) : undefined;
+  return models.filter(model => family(model) !== excluded && available(model));
+}
 
 export function selectJudges(
   tier: CopyTier,
   generatorModel?: string,
   available: (model: string) => boolean = () => true
 ): string[] {
-  const excluded = generatorModel ? family(generatorModel) : undefined;
-  return JUDGE_ROSTER[tier]
-    .filter(model => family(model) !== excluded && available(model))
-    .slice(0, TIER_POLICY[tier].judges);
+  return excludeGeneratorFamily(
+    JUDGE_ROSTER[tier],
+    generatorModel,
+    available
+  ).slice(0, TIER_POLICY[tier].judges);
 }
 
 const REGISTER_GUIDE: Readonly<Record<CopyRegister, string>> = {

@@ -22,6 +22,7 @@ interface ActionDialProps {
   readonly onActivate?: (id: string) => void;
   readonly hint?: string;
   readonly className?: string;
+  readonly disabled?: boolean;
 }
 
 const SNAP_MS = 150;
@@ -47,6 +48,7 @@ export function ActionDial({
   onActivate,
   hint = 'Swipe to switch. Your choice is remembered.',
   className,
+  disabled = false,
 }: Readonly<ActionDialProps>) {
   const selectedIndex = Math.max(
     0,
@@ -218,7 +220,12 @@ export function ActionDial({
       data-testid='action-dial'
     >
       <legend className='sr-only'>{groupLabel}</legend>
-      <div className='relative h-53 overflow-hidden'>
+      <div
+        className={cn(
+          'relative overflow-hidden',
+          options.length === 1 ? 'h-19' : 'h-53'
+        )}
+      >
         <div
           className={cn(
             'absolute inset-0 transition-transform duration-subtle ease-out motion-reduce:transition-none',
@@ -281,8 +288,12 @@ export function ActionDial({
           href={active.href}
           providerKey={active.id}
           primary
+          disabled={disabled}
           ariaLabel={`${actionLabel} with ${active.label}`}
-          className='absolute inset-x-3 top-20 z-10 w-auto'
+          className={cn(
+            'absolute inset-x-3 z-10 w-auto',
+            options.length === 1 ? 'top-3' : 'top-20'
+          )}
           onClick={event => {
             if (suppressClickRef.current) {
               event.preventDefault();
@@ -292,7 +303,12 @@ export function ActionDial({
           }}
         />
       </div>
-      <p className='text-muted-foreground mt-1 text-center text-xs'>{hint}</p>
+      {/* JOV-INV-019 image-contrast: text-muted-foreground resolves to
+          text-secondary-token, which measures 4.48:1 against a real photo
+          background on the pay hint (just under the 4.5:1 floor); bump one
+          rung to text-primary-token for margin, same fix as the tab-bar
+          scrim label. */}
+      <p className='mt-1 text-center text-xs text-primary-token'>{hint}</p>
       <p className='sr-only' role='status' aria-live='polite'>
         {active.label} selected
       </p>

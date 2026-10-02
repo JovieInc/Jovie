@@ -1,16 +1,16 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# capability-gap: Production Controller completion has no native downstream autofix hop; this workflow runs the read-only jov.ie probe and launches a fingerprint-deduped Cursor agent with no Vercel mutation credentials.
+# removal-trigger: Remove when production remediation is owned natively by the canonical controller loop, or when the golden-path probe proves 30 consecutive days without an actionable failure.
 name: Golden Path Prod Autofix
 
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# necessary-trust-boundary: Trusted-main workflow_run observes deployed runtime; only this bounded job receives Linear/Cursor mutation credentials and it never deploys or merges.
-# removal-trigger: Remove when Production Controller emits the same durable attempt receipt and dispatches this bounded autofix without a downstream workflow hop.
+# necessary-trust-boundary: Manual trusted-main dispatch observes deployed runtime; only this bounded job receives Linear/Cursor mutation credentials and it never deploys or merges.
+# compatibility-expiry: 2026-10-31; delete after the probe is owned in-band by Production Controller.
 # Does not read signup-account secrets. Missing CURSOR_API_KEY fails closed.
 
 on:
-  workflow_run:
-    workflows: [Production Controller]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
 
 permissions: {}
@@ -22,25 +22,22 @@ concurrency:
 jobs:
   probe-and-autofix:
     name: Probe live golden path
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (
-        github.event_name == 'workflow_run' &&
-        github.event.workflow_run.head_branch == 'main' &&
-        github.event.workflow_run.path == '.github/workflows/production-controller.yml'
-      )
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write
+      # JOV-6827: fingerprint dedupe searches open PRs and comments on the
+      # existing PR instead of launching a duplicate Cursor agent.
       # JOV-6832: read open fix PRs so a failing probe never launches a duplicate.
       pull-requests: read
+      issues: write
       statuses: write
     env:
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       EXECUTION_GENERATION: ${{ github.event.workflow_run.head_sha || github.sha }}
       EXECUTION_ATTEMPT_LEDGER: /tmp/golden-path-lock/execution-attempts.jsonl
     steps:
@@ -52,7 +49,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '22'
+          node-version: '24'
 
       - name: Probe https://jov.ie without signup secrets
         id: probe

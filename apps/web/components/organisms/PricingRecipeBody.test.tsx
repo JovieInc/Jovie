@@ -88,12 +88,16 @@ describe('PricingRecipeBody', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: 'Pricing' })
     ).toBeVisible();
+    expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
+      'data-marketing-variant',
+      'centered-none'
+    );
+    expect(screen.queryByTestId('homepage-trust')).toBeNull();
     expect(
-      screen.getByRole('heading', {
-        level: 2,
+      screen.queryByRole('heading', {
         name: 'Public Jovie profile and audience capture',
       })
-    ).toBeVisible();
+    ).toBeNull();
     expect(screen.getByTestId('plans-slot')).toBeVisible();
     expect(screen.getByTestId('comparison-slot')).toBeVisible();
     expect(screen.getByText(expectedRequestAccessCopy)).toBeVisible();
@@ -112,14 +116,14 @@ describe('PricingRecipeBody', () => {
     );
   });
 
-  it('docks the hero over its unique abstract photo with Jovie profile naming', () => {
+  it('keeps pricing and actions focal without the rejected particle or shader asset', () => {
     const { container } = render(<PricingPage />);
 
-    const photo = container.querySelector('.marketing-hero-photo img');
-    expect(photo?.getAttribute('src')).toContain(
-      'marketing-hero%2Fpricing.webp'
-    );
-    expect(photo).toHaveAttribute('alt', '');
+    expect(
+      screen.getByTestId('marketing-section-hero').querySelector('img')
+    ).toBeNull();
+    expect(container.innerHTML).not.toContain('marketing-hero%2Fpricing.webp');
+    expect(container.innerHTML).not.toContain('marketing-hero%2FnOcpy.webp');
     expect(
       screen.getAllByRole('link', { name: 'Explore Jovie Profiles' }).length
     ).toBeGreaterThan(0);

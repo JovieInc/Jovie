@@ -11,6 +11,7 @@ vi.mock('@/lib/changelog-source', () => ({ getChangelogSnapshot }));
 
 const RELEASE_FIXTURE = {
   version: '26.9.0',
+  kind: 'release',
   date: '2026-09-26',
   summary: '',
   sections: {
@@ -22,6 +23,14 @@ const RELEASE_FIXTURE = {
   },
   dogfood: ['Relaunch the Mac app and open the banner link'],
 };
+
+Object.assign(RELEASE_FIXTURE, {
+  customerOutcomes: Object.fromEntries(
+    Object.values(RELEASE_FIXTURE.sections)
+      .flat()
+      .map(text => [text, { availability: 'unverified', prerequisites: [] }])
+  ),
+});
 
 describe('GET /changelog/whats-new.json', () => {
   beforeEach(() => {

@@ -1,5 +1,6 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { PRODUCT_CLAIM_HREF, PRODUCT_COPY } from '@/data/productCopy';
+import type { PageCopyScope, PageRecordFamily } from './factory/pageRecord';
 
 /**
  * Language scope describes the page's subject, never the visitor's
@@ -10,7 +11,7 @@ import { PRODUCT_CLAIM_HREF, PRODUCT_COPY } from '@/data/productCopy';
  * See docs/marketing/LANGUAGE.md before adding or changing
  * customer-facing copy.
  */
-export type MarketingCopyScope = 'shared' | 'music' | 'video' | 'editorial';
+export type MarketingCopyScope = PageCopyScope;
 
 export interface MarketingPageContract {
   readonly routeGlob: string;
@@ -23,6 +24,13 @@ export interface MarketingPageContract {
     readonly href: string;
     readonly label: string;
   };
+  /**
+   * Family routes whose pages are factory records. The glob contract is only
+   * the family fallback: each routed record carries its own contract derived
+   * from `record.brief` (factory/pageRecordContract.ts), and consumers
+   * resolve `/<family>/<slug>` through it.
+   */
+  readonly recordFamily?: PageRecordFamily;
 }
 
 const START_CTA = {
@@ -94,14 +102,17 @@ export const MARKETING_PAGE_CONTRACTS = {
     successEvent: 'artist claims a profile from the alias',
     primaryCta: CLAIM_PROFILE_CTA,
   },
-  '(marketing)/solutions/artists/page.tsx': {
-    routeGlob: '(marketing)/solutions/artists/page.tsx',
-    copyScope: 'music',
-    url: APP_ROUTES.SOLUTIONS_ARTISTS,
-    job: 'show artists how profiles connect music, links, and permissioned fan updates',
+  '(marketing)/solutions/[audience]/page.tsx': {
+    routeGlob: '(marketing)/solutions/[audience]/page.tsx',
+    // Family fallback only. Each record's brief sets its own scope, audience,
+    // and terms (JOV-7283); unknown context stays shared.
+    copyScope: 'shared',
+    url: '/solutions/*',
+    job: 'show each audience the supported workflow for its goal',
     proof: 'profile gallery, capture flow, and conversion sections',
-    successEvent: 'artist claims a profile',
+    successEvent: 'visitor claims a profile',
     primaryCta: CLAIM_PROFILE_CTA,
+    recordFamily: 'solutions',
   },
   '(marketing)/artist-notifications/page.tsx': {
     routeGlob: '(marketing)/artist-notifications/page.tsx',
@@ -206,7 +217,7 @@ export const MARKETING_PAGE_CONTRACTS = {
     copyScope: 'shared',
     url: APP_ROUTES.SUPPORT,
     job: 'help visitors find support and answers',
-    proof: 'support channels and FAQ content',
+    proof: 'Help Center entry and contact support fallback',
     successEvent: 'visitor resolves a support path',
     primaryCta: START_CTA,
   },

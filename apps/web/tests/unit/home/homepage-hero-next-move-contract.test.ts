@@ -25,61 +25,41 @@ describe('homepage hero contract (JOV-5864)', () => {
       path.join(webRoot, 'app/(home)/page.tsx'),
       'utf8'
     );
-    const componentSource = [
-      'components/homepage/HomepageIdentityHero.tsx',
-      'components/homepage/HomepageProfileSpecimen.tsx',
-    ]
-      .map(file => readFileSync(path.join(webRoot, file), 'utf8'))
-      .join('\n');
+    const componentSource = readFileSync(
+      path.join(webRoot, 'components/homepage/HomepageIdentityHero.tsx'),
+      'utf8'
+    );
     const heroSource = pageSource.slice(
       pageSource.indexOf('function HomepageHero()'),
       pageSource.indexOf('function HomepageUnlockedSections()')
     );
-    const heroCss = readHeroCss();
-    const rejectedPhotoFixture = `
-      <picture><img src='/stock-nightlife.webp' /></picture>
-      .homepage-identity-hero { background: image-set(url('/stock.jpg') 1x); }
-    `;
-    const rasterSourcePattern =
-      /<(?:picture|img|video|canvas)\b|\.(?:avif|gif|jpe?g|png|webp)\b/i;
-    const cssImagePattern = /\b(?:url|image-set)\s*\(/i;
-
-    expect(rejectedPhotoFixture).toMatch(rasterSourcePattern);
-    expect(rejectedPhotoFixture).toMatch(cssImagePattern);
-    // The page itself mounts no media; the hero owns exactly two rasters.
-    expect(heroSource).not.toMatch(rasterSourcePattern);
-    expect(heroCss).not.toMatch(cssImagePattern);
+    // The page mounts no media; the hero owns exactly the Pen texture photo
+    // plus Tim White's real avatar as proof (JOV-6946).
+    expect(heroSource).not.toMatch(/<(?:picture|img|video|canvas)\b/i);
+    expect(readHeroCss()).not.toMatch(/\b(?:url|image-set)\s*\(/i);
     expect(componentSource).not.toMatch(/<(?:picture|img|video|canvas)\b/);
     expect(
       [...componentSource.matchAll(/'\/assets\/generated\/[^']+'/g)].map(
         match => match[0]
       )
-    ).toEqual([
-      "'/assets/generated/homepage-hero-technical-texture-v1.webp'",
-      "'/assets/generated/homepage-avery-chen-portrait-v1.webp'",
-    ]);
-    // The hero texture is the LCP layer: priority, full-bleed, sized by fill.
-    expect(componentSource).toMatch(
-      /<Image\s+alt=''\s+className='homepage-identity-hero__texture-image'\s+fill\s+priority\s+sizes='100vw'/
-    );
+    ).toEqual(["'/assets/generated/homepage-hero-technical-texture-v1.webp'"]);
+    expect(componentSource).not.toContain('HOMEPAGE_MEDIA_MAP');
   });
 
-  it('uses the exact canonical headline and one support line', () => {
-    expect(HOMEPAGE_IDENTITY_COPY.hero.eyebrow).toBe(
-      'Jovie / Identity, connected'
-    );
+  it('uses the exact identity headline and one support line (Tim 2026-09-28)', () => {
     expect(HOMEPAGE_IDENTITY_COPY.hero.headline).toBe(
-      'A living identity for the internet.'
+      'Be found. Be understood.'
     );
     expect(HOMEPAGE_IDENTITY_COPY.hero.subhead).toBe(
-      'Your work, your links, your next chapter. Together in your Jovie profile.'
+      'Claim your name. Jovie finds what the web says about you and makes you easy to reach, for people and for agents.'
     );
   });
 
-  it('keeps one primary action with the name search as the waitlist-off fallback', () => {
-    expect(HOMEPAGE_IDENTITY_COPY.hero.search).toEqual({
-      placeholder: 'Search your name',
-      action: 'Find me',
+  it('keeps one primary action: the jov.ie/you claim', () => {
+    expect(HOMEPAGE_IDENTITY_COPY.hero.claim).toEqual({
+      domain: 'jov.ie/',
+      placeholder: 'you',
+      action: 'Claim',
     });
 
     const pageSource = readFileSync(
@@ -98,18 +78,6 @@ describe('homepage hero contract (JOV-5864)', () => {
     expect(heroSource).not.toContain('secondaryCta');
     expect(heroSource).not.toMatch(/Get started|Drop more music|waitlist/i);
     expect(pageSource).not.toContain('/images/hero/');
-  });
-
-  it('keeps the two-line H1 measure balanced at every width', () => {
-    const css = readHeroCss();
-
-    expect(css).toMatch(
-      /\.homepage-identity-hero__headline\s*\{[\s\S]*?max-width: 11ch;[\s\S]*?text-wrap: balance;[\s\S]*?\}/
-    );
-    expect(css).toMatch(
-      /\.homepage-identity-hero__support\s*\{[\s\S]*?text-wrap: balance;[\s\S]*?\}/
-    );
-    expect(css).not.toMatch(/white-space: nowrap/);
   });
 
   it('clips the name-search aura to the pill', () => {
@@ -132,14 +100,10 @@ describe('homepage hero contract (JOV-5864)', () => {
     );
   });
 
-  it('drifts only the texture for 20s with reduced-motion parity', () => {
+  it('keeps the hero still: a static CSS light, no drift or reveal', () => {
     const css = readHeroCss();
 
-    expect(css).toContain(
-      'animation: homepage-identity-texture-drift 20s ease-in-out infinite'
-    );
-    expect(css).toContain('@media (prefers-reduced-motion: reduce)');
-    expect(css).toContain('animation: none;');
+    expect(css).not.toContain('homepage-identity-texture-drift');
     expect(css).not.toContain('homepage-hero-content-reveal');
   });
 

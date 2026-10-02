@@ -1,7 +1,8 @@
 /**
- * Alpha-knockout spike (throwaway). Proves gpt-image transparent output drops
+ * Alpha-knockout spike (throwaway). Proves recraft-v3 transparent output drops
  * cleanly onto a garment color (Tim: "alpha'd clean so it can be dropped onto
- * objects for the comp and product printing").
+ * objects for the comp and product printing"). gpt-image was the original
+ * subject; openai/* is banned on the gateway (JOV-7119).
  *
  *   doppler run --project jovie-web --config dev -- \
  *     pnpm --filter @jovie/web exec tsx scripts/merch-alpha-spike.ts
@@ -26,10 +27,10 @@ const PROMPT = [
 async function main() {
   mkdirSync(OUT_DIR, { recursive: true });
   const result = await generateImage({
-    model: gateway.image('openai/gpt-image-1.5'),
+    model: gateway.image('recraft/recraft-v3'),
     prompt: PROMPT,
     size: '1024x1024',
-    providerOptions: { openai: { background: 'transparent' } },
+    providerOptions: { recraft: { response_format: 'png' } },
   });
   const img = result.images[0] as { uint8Array?: Uint8Array; base64?: string };
   const raw = img.uint8Array

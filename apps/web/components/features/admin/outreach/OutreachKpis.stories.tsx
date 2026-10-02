@@ -15,4 +15,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  args: {
+    counts: { email: 24, dm: 9, manualReview: 3, total: 36 },
+  },
+};

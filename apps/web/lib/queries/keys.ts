@@ -100,6 +100,17 @@ export const queryKeys = {
       ] as const,
   },
 
+  // Admin asset library
+  adminAssets: {
+    all: ['admin-assets'] as const,
+    list: (filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.adminAssets.all,
+        'list',
+        ...(filters === undefined ? [] : [filters]),
+      ] as const,
+  },
+
   // Admin users
   adminUsers: {
     all: ['admin-users'] as const,
@@ -286,6 +297,7 @@ export const queryKeys = {
   admin: {
     all: ['admin'] as const,
     impersonation: () => [...queryKeys.admin.all, 'impersonation'] as const,
+    certifications: () => [...queryKeys.admin.all, 'certifications'] as const,
     waitlistSettings: () =>
       [...queryKeys.admin.all, 'waitlist-settings'] as const,
     leads: {

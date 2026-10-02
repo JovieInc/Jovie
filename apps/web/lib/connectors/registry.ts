@@ -12,6 +12,7 @@
  */
 
 import { z } from 'zod';
+import { SPOTIFY_OAUTH_SCOPES } from './spotify/scopes';
 import {
   CONNECTOR_PROVIDER_IDS,
   type ConnectorDefinition,
@@ -35,6 +36,7 @@ export {
 export const CONNECTOR_PROVIDERS = {
   gmail: 'gmail',
   google_calendar: 'google_calendar',
+  spotify: 'spotify',
   youtube: 'youtube',
 } as const satisfies Record<string, ConnectorProviderId>;
 
@@ -58,6 +60,7 @@ export const CONNECTOR_REGISTRY = {
       GOOGLE_OAUTH_SCOPE.gmailReadonly,
       GOOGLE_OAUTH_SCOPE.userinfoEmail,
     ],
+    oauthScopeLabels: ['Read Booking Emails', 'View Account Email'],
     tokenHandler: 'shared_token_vault',
     syncRunner: CONNECTOR_PROVIDERS.gmail,
     webhookHandler: null,
@@ -74,23 +77,55 @@ export const CONNECTOR_REGISTRY = {
       GOOGLE_OAUTH_SCOPE.calendarEvents,
       GOOGLE_OAUTH_SCOPE.userinfoEmail,
     ],
+    oauthScopeLabels: [
+      'Read Calendar Events',
+      'Manage Approved Events',
+      'View Account Email',
+    ],
     tokenHandler: 'shared_token_vault',
     syncRunner: CONNECTOR_PROVIDERS.google_calendar,
     webhookHandler: null,
     displayOrder: 2,
   },
+  [CONNECTOR_PROVIDERS.spotify]: {
+    id: CONNECTOR_PROVIDERS.spotify,
+    label: 'Spotify',
+    description:
+      'Connect Spotify so agent workflows can publish playlists and read catalog data.',
+    iconKey: 'spotify',
+    oauthBundle: 'spotify',
+    oauthScopes: [...SPOTIFY_OAUTH_SCOPES],
+    oauthScopeLabels: [
+      'View Account Email',
+      'View Account Details',
+      'Manage Public Playlists',
+      'Read Private Playlists',
+      'Upload Playlist Covers',
+      'Manage Private Playlists',
+    ],
+    tokenHandler: 'shared_token_vault',
+    syncRunner: null,
+    webhookHandler: null,
+    displayOrder: 3,
+  },
   [CONNECTOR_PROVIDERS.youtube]: {
     id: CONNECTOR_PROVIDERS.youtube,
     label: 'YouTube',
     description:
-      'Import channel videos into Library and verify approved thumbnail changes.',
+      'Import channel videos into Work, verify approved thumbnail changes, and post approved comment replies.',
     iconKey: 'youtube',
     oauthBundle: 'youtube',
     oauthScopes: YOUTUBE_OAUTH_SCOPES,
+    oauthScopeLabels: [
+      'Read Channel Data',
+      'Manage Videos',
+      'View Channel Analytics',
+      'Post Approved Replies',
+    ],
     tokenHandler: 'shared_token_vault',
     syncRunner: CONNECTOR_PROVIDERS.youtube,
     webhookHandler: null,
-    displayOrder: 3,
+    displayOrder: 4,
   },
 } as const satisfies Record<ConnectorProviderId, ConnectorDefinition>;
 

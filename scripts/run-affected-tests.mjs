@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DELIVERY_CONTROLLER_COVERAGE_ARGS } from './ci-fast-lanes.mjs';
+import {
+  BLOG_CERTIFICATION_PROOFS,
+  classifyBlogContentDiff,
+  isBlogContentCandidatePath,
+} from './lib/blog-content-ci.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -29,7 +34,30 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
     'apps/web/tests/unit/design-system/arbitrary-values.baseline.json',
     ['apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'],
   ],
+  [
+    'apps/web/data/marketing/penContracts.ts',
+    [
+      'apps/web/tests/unit/marketing/component-registry.test.ts',
+      'apps/web/tests/unit/marketing/locked-pen-chrome-contract.test.ts',
+      'apps/web/tests/unit/marketing/artist-profile/ArtistProfileAdaptiveSection.test.tsx',
+      'apps/web/tests/unit/marketing/artist-profile/ArtistProfileOutcomesLedger.test.tsx',
+      'apps/web/tests/unit/marketing/MarketingTerminalCta.test.tsx',
+    ],
+  ],
 ]);
+// Any web source that uses TanStack Virtual must stay out of React Compiler
+// memoization (JOV-6702); the invariant has no import edge to such files.
+const VIRTUALIZER_COMPILER_INVARIANT_TEST =
+  'apps/web/tests/unit/virtualization/virtualizer-compiler-optout.test.ts';
+const USES_TANSTACK_VIRTUAL =
+  /useVirtualizer\(|\.getVirtualItems\(|\.getTotalSize\(/;
+function readRepoFile(file) {
+  try {
+    return readFileSync(resolve(REPO_ROOT, file), 'utf8');
+  } catch {
+    return '';
+  }
+}
 const INVESTOR_NOTE_INGESTION_TESTS = [
   'apps/web/tests/unit/investors/note-ingestion.test.ts',
   'apps/web/tests/unit/investors/note-ingestion-cli.test.ts',
@@ -131,8 +159,6 @@ const HOMEPAGE_SYSTEM_B_STYLE_GUARD_TESTS = [
   'apps/web/tests/unit/home/mounted-home-product-statement-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-trust-strip-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-workspace-system-b-style-guard.test.ts',
-  'apps/web/tests/unit/home/release-mode-mock-card-system-b-style-guard.test.tsx',
-  'apps/web/tests/unit/home/release-operating-system-showcase-system-b-style-guard.test.tsx',
 ];
 const HOMEPAGE_SYSTEM_B_GUARD_EXACT_INPUTS = new Set([
   'apps/web/components/marketing/ClientFaqAccordion.tsx',
@@ -189,6 +215,12 @@ const SUMMER_COMMISSIONING_LANE = new Set([
 ]);
 const CAPABILITY_BENCHMARK_PRIMARY_INPUTS = new Set([
   'scripts/capability-benchmark/capability-benchmark-registry.json',
+  'scripts/capability-benchmark/decision-routing-benchmark.json',
+  'scripts/capability-benchmark/computer-use-decision.jsonl',
+  'scripts/capability-benchmark/computer-use-decision.mjs',
+  'scripts/capability-benchmark/computer-use-decision.test.mjs',
+  'scripts/capability-benchmark/capability-reconciliation.mjs',
+  'scripts/capability-benchmark/capability-reconciliation.test.mjs',
   'scripts/capability-benchmark/capability-benchmark.mjs',
   'scripts/capability-benchmark/capability-benchmark.test.mjs',
   'docs/operations/CAPABILITY_BENCHMARK.md',
@@ -200,6 +232,8 @@ const CAPABILITY_BENCHMARK_LANE = new Set([
 ]);
 const CAPABILITY_BENCHMARK_NODE_TESTS = [
   'scripts/capability-benchmark/capability-benchmark.test.mjs',
+  'scripts/capability-benchmark/computer-use-decision.test.mjs',
+  'scripts/capability-benchmark/capability-reconciliation.test.mjs',
 ];
 const SUMMER_COMMISSIONING_NODE_TESTS = [
   'scripts/summer-commissioning/company-registry.test.mjs',
@@ -303,6 +337,7 @@ const CI_UI_DRIFT_GUARDRAIL_NODE_TESTS = [
 const OWNERLESS_RECOVERY_POLICY_TEST =
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs';
 const CI_CONTROL_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
   'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
   'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
   'scripts/lib/__tests__/native-queue-eval.test.mjs',
@@ -462,6 +497,60 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
       '--test-coverage-lines=85',
       '--test-coverage-branches=75',
       '--test-coverage-functions=90',
+    ],
+  ],
+  [
+    'scripts/publish-coverage-report.test.mjs',
+    'scripts/lib/publish-coverage-report.mjs',
+    [
+      '--test-coverage-lines=95',
+      '--test-coverage-branches=90',
+      '--test-coverage-functions=90',
+    ],
+  ],
+  [
+    'scripts/coverage-surface-files.test.mjs',
+    'scripts/lib/coverage-surface-files.mjs',
+    [
+      '--test-coverage-lines=100',
+      '--test-coverage-branches=100',
+      '--test-coverage-functions=100',
+    ],
+  ],
+  [
+    'scripts/invariants/sonar-repair-contract.test.mjs',
+    'scripts/invariants/sonar-repair-contract.mjs',
+    [
+      '--test-coverage-lines=95',
+      '--test-coverage-branches=80',
+      '--test-coverage-functions=95',
+    ],
+  ],
+  [
+    'scripts/normalize-sonar-lcov.test.mjs',
+    'scripts/normalize-sonar-lcov.mjs',
+    [
+      '--test-coverage-lines=100',
+      '--test-coverage-branches=100',
+      '--test-coverage-functions=100',
+    ],
+  ],
+  [
+    '.github/scripts/internal-pr-review.test.mjs',
+    '.github/scripts/internal-pr-review.mjs',
+    [
+      '--test-coverage-lines=85',
+      '--test-coverage-branches=80',
+      '--test-coverage-functions=85',
+    ],
+  ],
+  [
+    'scripts/lib/__tests__/source-admission-policy.test.mjs',
+    'scripts/lib/source-admission-policy.mjs',
+    [
+      '--test-coverage-lines=95',
+      '--test-coverage-branches=90',
+      '--test-coverage-functions=100',
     ],
   ],
 ];
@@ -824,6 +913,17 @@ const VISUAL_QA_DIFF_ARTIFACTS_MANIFEST = new Set([
   VISUAL_QA_DIFF_ARTIFACTS_SOURCE,
   VISUAL_QA_DIFF_ARTIFACTS_TEST,
 ]);
+const CERTIFICATION_NORMALIZATION_SOURCE =
+  'apps/web/lib/ovie/certifications/normalize.ts';
+const CERTIFICATION_NORMALIZATION_TESTS = [
+  'apps/web/lib/ovie/certifications/normalize.test.ts',
+  'apps/web/lib/ovie/certifications/inventory.server.test.ts',
+  'apps/web/components/features/admin/certifications/CertificationDetailRail.test.tsx',
+];
+const CERTIFICATION_NORMALIZATION_MANIFEST = new Set([
+  CERTIFICATION_NORMALIZATION_SOURCE,
+  ...CERTIFICATION_NORMALIZATION_TESTS,
+]);
 const MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST = new Set([
   'apps/web/tests/e2e/mobile-overflow.spec.ts',
   'apps/web/tests/e2e/utils/mobile-overflow.ts',
@@ -960,14 +1060,66 @@ const LINEAR_SYNC_ON_MERGE_LANE = new Set([
   'scripts/run-affected-tests.mjs',
 ]);
 
+export function classifyBlogContentForAffectedTests(base, head, options) {
+  try {
+    return classifyBlogContentDiff(base, head, options);
+  } catch {
+    console.warn(
+      '[affected-tests] Blog diff classification failed; requiring the full suite.'
+    );
+    return undefined;
+  }
+}
+
 export function buildAffectedTestPlan(
   changedFiles,
-  { isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)) } = {}
+  {
+    isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)),
+    readFile = readRepoFile,
+    blogContentReceipt = undefined,
+  } = {}
 ) {
   const files = unique(changedFiles.filter(Boolean)).sort();
   const globalTestInput = files.find(file => GLOBAL_TEST_INPUTS.has(file));
   if (globalTestInput) {
     return fullSuitePlan(`global test input changed: ${globalTestInput}`);
+  }
+  if (files.some(isBlogContentCandidatePath)) {
+    if (
+      !blogContentReceipt?.contentOnly ||
+      files.length !== blogContentReceipt.changedPaths?.length ||
+      files.some(file => !blogContentReceipt.changedPaths.includes(file))
+    ) {
+      return fullSuitePlan(
+        'blog content diff was mixed, unsafe, or lacked status-aware qualification'
+      );
+    }
+    if (!BLOG_CERTIFICATION_PROOFS.every(isFileAvailable)) {
+      return fullSuitePlan('blog certification proof is unavailable');
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [...BLOG_CERTIFICATION_PROOFS],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: [],
+      nodeTests: [],
+      blogCandidateBuild: true,
+    };
+  }
+  const isBoundedCertificationNormalizationChange = files.includes(
+    CERTIFICATION_NORMALIZATION_SOURCE
+  );
+  if (isBoundedCertificationNormalizationChange) {
+    if (!files.every(file => CERTIFICATION_NORMALIZATION_MANIFEST.has(file))) {
+      return fullSuitePlan('mixed certification normalization source changes');
+    }
+    if (![...CERTIFICATION_NORMALIZATION_MANIFEST].every(isFileAvailable)) {
+      return fullSuitePlan('certification normalization proof is unavailable');
+    }
   }
   const isLinearSyncOnMerge =
     files.some(file => LINEAR_SYNC_ON_MERGE_PRIMARY.has(file)) &&
@@ -989,6 +1141,17 @@ export function buildAffectedTestPlan(
       scriptVitestTests: [
         'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
         'scripts/lib/__tests__/automation-verify.test.mjs',
+      ],
+      scriptVitestCoverageArgs: [
+        '--coverage',
+        '--coverage.include=lib/linear-sync-on-merge.mjs',
+        '--coverage.reporter=text',
+        '--coverage.reporter=json-summary',
+        '--coverage.thresholds.perFile=true',
+        '--coverage.thresholds.lines=85',
+        '--coverage.thresholds.statements=85',
+        '--coverage.thresholds.functions=80',
+        '--coverage.thresholds.branches=70',
       ],
       nodeTests: [],
     };
@@ -1074,6 +1237,11 @@ export function buildAffectedTestPlan(
       scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
       nodeTests: CAPABILITY_BENCHMARK_NODE_TESTS,
     };
+  }
+  if (files.some(file => CAPABILITY_BENCHMARK_PRIMARY_INPUTS.has(file))) {
+    return fullSuitePlan(
+      'Capability benchmark change exceeds its focused lane'
+    );
   }
   const isBoundedSummerCommissioningChange =
     files.some(file => SUMMER_COMMISSIONING_PRIMARY_INPUTS.has(file)) &&
@@ -1525,7 +1693,9 @@ export function buildAffectedTestPlan(
         manifest.has(file) &&
         (hasUnsupportedAutomationPeer || !directlyRunnableTestFiles.has(file))
     );
-  const mandatoryTests = [];
+  const mandatoryTests = isBoundedCertificationNormalizationChange
+    ? [...CERTIFICATION_NORMALIZATION_TESTS]
+    : [];
   const hasSeedConfirmationChange = files.some(
     file =>
       file === 'apps/web/tests/seed-test-data.ts' ||
@@ -1592,6 +1762,16 @@ export function buildAffectedTestPlan(
   if (files.some(isInvestorNoteIngestionInput)) {
     mandatoryTests.push(...INVESTOR_NOTE_INGESTION_TESTS);
   }
+  if (
+    files.some(
+      file =>
+        file.startsWith('apps/web/') &&
+        /\.[jt]sx?$/.test(file) &&
+        USES_TANSTACK_VIRTUAL.test(readFile(file))
+    )
+  ) {
+    mandatoryTests.push(VIRTUALIZER_COMPILER_INVARIANT_TEST);
+  }
   const hasCiCancellationHealerChange = files.some(file =>
     CI_CANCELLATION_HEALER_PRIMARY_INPUTS.has(file)
   );
@@ -1623,7 +1803,19 @@ export function buildAffectedTestPlan(
     mandatoryTests.push(...RUNNER_PREREQUISITE_CONTRACT_TESTS);
   }
 
-  const selectedTests = unique([...directTests, ...mandatoryTests]);
+  if (
+    isBoundedCertificationNormalizationChange &&
+    !mandatoryTests.every(isFileAvailable)
+  ) {
+    return fullSuitePlan('certification normalization proof is unavailable');
+  }
+  const selectedTests = unique([
+    ...(isBoundedCertificationNormalizationChange
+      ? CERTIFICATION_NORMALIZATION_TESTS
+      : []),
+    ...directTests,
+    ...mandatoryTests,
+  ]);
   const rootVitestTests = unique([
     ...(isExactVercelCongestionControl
       ? VERCEL_CONGESTION_CONTROL_ROOT_VITEST_TESTS
@@ -1678,6 +1870,11 @@ export function buildAffectedTestPlan(
   ]);
   const isCoveredSource = file => {
     if (VITEST_TEST_FILE.test(file)) return true;
+    if (
+      isBoundedCertificationNormalizationChange &&
+      CERTIFICATION_NORMALIZATION_MANIFEST.has(file)
+    )
+      return true;
     const fixtureTests = KNOWN_VITEST_FIXTURE_TESTS.get(file);
     if (fixtureTests) return fixtureTests.every(isFileAvailable);
     if (file.startsWith('apps/web/components/features/profile/')) return true;
@@ -2110,6 +2307,16 @@ export async function runCommandStatus(
   logger(
     `[affected-tests] complete ${label} status=${status} elapsedMs=${Date.now() - startedAt} pid=${child.pid ?? 'unknown'} command=${commandText}`
   );
+  if (bufferOutput) {
+    // Queue a barrier after both the stage output and completion log. The CLI
+    // can exit immediately, so its parent pipe must finish writing first.
+    await new Promise((resolveWrite, rejectWrite) => {
+      process.stdout.write('', error => {
+        if (error) rejectWrite(error);
+        else resolveWrite();
+      });
+    });
+  }
   return status;
 }
 
@@ -2254,6 +2461,13 @@ export function buildControlCoverageCommands() {
   ];
 }
 
+const SUMMER_PIN_GUARD_WEB_TEST =
+  'apps/web/lib/ovie/summer-deployment-pin-guard.test.ts';
+const SUMMER_PIN_GUARD_NODE_COMMAND = [
+  'node',
+  ['--test', 'scripts/summer-deployment-pin-guard.test.mjs'],
+];
+
 export function buildSelectedTestCommands(
   plan,
   maxWorkers,
@@ -2261,6 +2475,9 @@ export function buildSelectedTestCommands(
   head
 ) {
   const commands = [];
+  if (plan.selectedTests.includes(SUMMER_PIN_GUARD_WEB_TEST)) {
+    commands.push(SUMMER_PIN_GUARD_NODE_COMMAND);
+  }
   if (plan.deliveryControllerCoverage) {
     commands.push(['node', [...DELIVERY_CONTROLLER_COVERAGE_ARGS]]);
   }
@@ -2385,6 +2602,25 @@ export function buildSelectedTestCommands(
       ],
     ]);
   }
+  if (plan.blogCandidateBuild) {
+    commands.push([
+      'env',
+      [
+        'NEXT_PUBLIC_APP_URL=http://localhost:3100',
+        'NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3100',
+        'NEXT_PUBLIC_CLERK_MOCK=1',
+        'NEXT_PUBLIC_CLERK_PROXY_DISABLED=1',
+        'NEXT_PUBLIC_E2E_MODE=1',
+        'NEXT_IGNORE_ESLINT=1',
+        'NEXT_IGNORE_TYPECHECK=1',
+        'NEXT_PRIVATE_SKIP_SIZE_CHECK=true',
+        'pnpm',
+        'turbo',
+        'build',
+        '--filter=@jovie/web',
+      ],
+    ]);
+  }
   return commands;
 }
 
@@ -2417,6 +2653,8 @@ export function buildFullSuiteCommands(maxWorkers, shardCount = 8) {
   return [
     buildCompanyRegistryTestCommand(),
     buildProjectCreationTestCommand(),
+    // Keep the full repository pin scan outside Vitest's 12-second test budget.
+    SUMMER_PIN_GUARD_NODE_COMMAND,
     ...commands,
   ];
 }
@@ -2545,9 +2783,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     DEFAULT_PROGRESS_INTERVAL_MS
   );
   const explicitFiles = argValue(args, '--changed-files-json', '');
-  const plan = buildAffectedTestPlan(
-    explicitFiles ? JSON.parse(explicitFiles) : changedFiles(base)
+  const files = explicitFiles ? JSON.parse(explicitFiles) : changedFiles(base);
+  const prerequisitesAvailable = BLOG_CERTIFICATION_PROOFS.every(file =>
+    existsSync(resolve(REPO_ROOT, file))
   );
+  const blogContentReceipt =
+    !explicitFiles && files.some(isBlogContentCandidatePath)
+      ? classifyBlogContentForAffectedTests(base, 'HEAD', {
+          prerequisitesAvailable,
+        })
+      : undefined;
+  const plan = buildAffectedTestPlan(files, { blogContentReceipt });
   if (args.includes('--dry-run')) {
     console.log(JSON.stringify(plan, null, 2));
     process.exit(0);

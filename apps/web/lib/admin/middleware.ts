@@ -4,6 +4,8 @@ import { NextResponse } from 'next/server';
 import { getCachedAuth, getFreshAuth } from '@/lib/auth/cached';
 import { maskUserIdForLog } from '@/lib/auth/mask-user-id';
 import { captureWarning } from '@/lib/error-tracking';
+import { privacyErrorResponse } from '@/lib/ovie/privacy-lock/access';
+import { assertOviePrivacyUnlocked } from '@/lib/ovie/privacy-lock/server';
 import { isAdmin } from './roles';
 
 /**
@@ -30,7 +32,8 @@ export async function requireAdmin(options?: {
   session?: 'cookie' | 'fresh';
 }): Promise<NextResponse | null> {
   const readAuth = options?.session === 'fresh' ? getFreshAuth : getCachedAuth;
-  const { userId } = await readAuth();
+  const auth = await readAuth();
+  const { userId } = auth;
 
   // User not authenticated. This is routine traffic (unauth hits to admin
   // routes) — not an actionable signal, so we record a breadcrumb for
@@ -65,6 +68,16 @@ export async function requireAdmin(options?: {
       { error: 'Forbidden. Admin privileges required.' },
       { status: 403 }
     );
+  }
+
+  try {
+    await assertOviePrivacyUnlocked(
+      auth.userId && auth.sessionId
+        ? { userId: auth.userId, sessionId: auth.sessionId }
+        : undefined
+    );
+  } catch (error) {
+    return privacyErrorResponse(error);
   }
 
   // Log successful admin access with masked ID (for audit trail)

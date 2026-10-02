@@ -18,13 +18,18 @@
 import { usePathname } from 'next/navigation';
 import { useContext, useEffect } from 'react';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { getFeedbackErrorMessage, toast } from '@/components/feedback';
 import { useThemeToggle } from '@/components/site/theme-toggle/useThemeToggle';
 import { useFounderDoor } from '@/contexts/FounderDoorContext';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
-import { getNextPermittedAppShellWorkspace } from '@/lib/app-shell/workspaces';
+import {
+  getCurrentAppShellWorkspace,
+  getNextPermittedAppShellWorkspace,
+} from '@/lib/app-shell/workspaces';
 import { WORKSPACE_SWITCH_KEY } from '@/lib/keyboard-shortcuts';
 import { isFounderDoorToggleEvent } from '@/lib/ovie/founder-door';
 import { isFormElement } from '@/lib/utils/keyboard';
+import { lockWorkspace } from '@/lib/workspace-lock/workspace-lock';
 
 export function useGlobalShortcutActions() {
   const { cycleTheme } = useThemeToggle();
@@ -34,6 +39,7 @@ export function useGlobalShortcutActions() {
   const { canUse: canUseFounderDoor, toggle: toggleFounderDoor } =
     useFounderDoor();
   const pathname = usePathname();
+  const isOvieWorkspace = getCurrentAppShellWorkspace(pathname).id === 'ov';
 
   // Alt+T → cycle theme (skip when typing in inputs).
   useEffect(() => {
@@ -62,6 +68,26 @@ export function useGlobalShortcutActions() {
     globalThis.addEventListener('keydown', onKey);
     return () => globalThis.removeEventListener('keydown', onKey);
   }, [signOut]);
+
+  // Alt+Shift+L → lock the workspace (JOV-6829). Physical key code so the
+  // binding survives Option-modified keys on macOS, matching the W binding.
+  useEffect(() => {
+    if (!isOvieWorkspace) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.isComposing) return;
+      if (!e.altKey || !e.shiftKey || e.metaKey || e.ctrlKey) return;
+      if (e.code !== 'KeyL' && e.key.toLowerCase() !== 'l') return;
+      if (isFormElement(e.target)) return;
+      e.preventDefault();
+      void lockWorkspace().catch(error =>
+        toast.error(
+          getFeedbackErrorMessage(error, 'Could not lock Ovie. Try again.')
+        )
+      );
+    }
+    globalThis.addEventListener('keydown', onKey);
+    return () => globalThis.removeEventListener('keydown', onKey);
+  }, [isOvieWorkspace]);
 
   // Alt+Shift+W → cycle to the next authorized workspace.
   useEffect(() => {

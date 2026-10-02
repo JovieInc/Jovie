@@ -12,32 +12,6 @@ import {
   type PublicPriceClaim,
 } from '@/lib/billing/offer-truth';
 
-const STORY_CARDS = [
-  {
-    label: 'Profile',
-    headline: 'Public Jovie profile and audience capture',
-    body: 'Claim profile same day.',
-  },
-] as const;
-
-function PricingStoryCard({
-  label,
-  headline,
-  body,
-}: Readonly<{
-  label: string;
-  headline: string;
-  body: string;
-}>) {
-  return (
-    <article className='system-b-pricing-story-card'>
-      <p className='system-b-pricing-story-label'>{label}</p>
-      <h2 className='system-b-pricing-story-title'>{headline}</h2>
-      <p className='system-b-pricing-story-body'>{body}</p>
-    </article>
-  );
-}
-
 function formatMonthlyPrice(claim: PublicPriceClaim): string {
   return `${claim.priceLabel}/month`;
 }
@@ -68,7 +42,11 @@ export function PricingRecipeBody({
         <MarketingHero
           className='system-b-pricing-hero'
           headingId='pricing-hero-heading'
+          testId='marketing-section-hero'
+          sectionVariant='centered-none'
+          sectionOwner='apps/web/components/organisms/PricingRecipeBody.tsx'
           headline='Pricing'
+          logos={false}
           subtitle={`Jovie profiles are free forever. Artist Visibility Pro is ${proMonthlyPrice} with limited access.`}
           primaryCta={{
             label: freeClaim.ctaLabel,
@@ -78,26 +56,15 @@ export function PricingRecipeBody({
             label: 'Explore Jovie Profiles',
             href: APP_ROUTES.ARTIST_PROFILES,
           }}
-          photo={{
-            src: '/images/marketing-hero/pricing.webp',
-            width: 1600,
-            height: 901,
-          }}
-          media={
-            <div className='system-b-pricing-story-grid'>
-              {STORY_CARDS.map(card => (
-                <PricingStoryCard
-                  key={card.label}
-                  label={card.label}
-                  headline={card.headline}
-                  body={card.body}
-                />
-              ))}
-            </div>
-          }
         />
 
-        <section aria-label='Plans' className='system-b-pricing-section'>
+        <section
+          aria-label='Plans'
+          className='system-b-pricing-section'
+          data-testid='marketing-section-pricing'
+          data-marketing-owner='apps/web/components/organisms/PricingRecipeBody.tsx'
+          data-marketing-variant='tier-cards-neutral'
+        >
           <MarketingContainer width='page'>
             <div className='system-b-pricing-plans'>{plans}</div>
           </MarketingContainer>
@@ -105,6 +72,9 @@ export function PricingRecipeBody({
 
         <section
           aria-labelledby='pricing-compare-heading'
+          data-testid='marketing-section-comparison'
+          data-marketing-owner='apps/web/components/organisms/PricingRecipeBody.tsx'
+          data-marketing-variant='feature-matrix'
           className='system-b-pricing-section'
         >
           <MarketingContainer width='page'>
@@ -129,6 +99,9 @@ export function PricingRecipeBody({
 
         <section
           aria-labelledby='pricing-get-started-heading'
+          data-testid='marketing-section-cta'
+          data-marketing-owner='apps/web/components/organisms/PricingRecipeBody.tsx'
+          data-marketing-variant='plan-actions'
           className='system-b-pricing-final'
         >
           <MarketingContainer width='page'>

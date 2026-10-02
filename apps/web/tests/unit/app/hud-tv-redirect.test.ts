@@ -17,10 +17,10 @@ describe('/hud-tv compatibility alias', () => {
     redirectMock.mockClear();
   });
 
-  it('redirects the TV URL to fullscreen Ops', async () => {
+  it('redirects the TV URL to shell-owned Ops', async () => {
     await expect(
       HudTvRedirectPage({ searchParams: Promise.resolve({}) })
-    ).rejects.toThrow(`NEXT_REDIRECT:${APP_ROUTES.HUD}?fs=1`);
+    ).rejects.toThrow(`NEXT_REDIRECT:${APP_ROUTES.HUD}`);
   });
 
   it('preserves the kiosk token on the canonical Ops route', async () => {

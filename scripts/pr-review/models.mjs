@@ -84,7 +84,13 @@ export function loadModelPrices(registry = null) {
 /** Validate that both routes are priced and come from different families. */
 export function assertRoutes(prices, routes = REVIEW_ROUTES) {
   for (const model of Object.values(routes)) {
-    if (!prices[model]) throw new Error(`model not in registry: ${model}`);
+    if (
+      !prices[model] ||
+      ![prices[model].inPerMillion, prices[model].outPerMillion].every(
+        value => Number.isFinite(value) && value >= 0
+      )
+    )
+      throw new Error(`model not in registry: ${model}`);
   }
   if (prices[routes.discovery].family === prices[routes.verification].family) {
     throw new Error('discovery and verification must use different families');
@@ -105,6 +111,7 @@ export function costUsd(prices, model, usage) {
  * Default transport: one explicit Gateway instance, no retries, no global
  * provider. Raw provider errors are not persisted by callers.
  */
+/** @param {{apiKey?: string, fetch?: typeof globalThis.fetch}} [options] */
 export function createGatewayTransport({ apiKey, fetch } = {}) {
   if (!apiKey?.trim()) throw new Error('Gateway credential unavailable');
   const gateway = createGateway({ apiKey, fetch });

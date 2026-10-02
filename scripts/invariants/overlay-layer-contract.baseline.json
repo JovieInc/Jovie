@@ -1,0 +1,197 @@
+{
+  "schema": "jovie.overlay-raw-z-index/v1",
+  "invariant": "JOV-INV-039",
+  "scope": [
+    "apps/web/app",
+    "apps/web/components",
+    "apps/web/hooks",
+    "apps/web/lib",
+    "apps/web/styles",
+    "packages/ui"
+  ],
+  "localStackingMax": 30,
+  "totalFindings": 81,
+  "files": {
+    "apps/web/app/exp/component-checker/ComponentCheckerClient.tsx": {
+      "z-50": 1
+    },
+    "apps/web/app/exp/page-builder/page-builder.css": {
+      "z-index:120": 1
+    },
+    "apps/web/app/exp/page-builder/PageBuilderClient.tsx": {
+      "z-50": 1
+    },
+    "apps/web/app/exp/shell-v1/ShellV1ExperimentClient.tsx": {
+      "z-40": 1,
+      "z-50": 1
+    },
+    "apps/web/app/globals.css": {
+      "z-index:60": 1
+    },
+    "apps/web/app/investor-portal/_components/InvestorNav.tsx": {
+      "z-40": 1,
+      "z-50": 1
+    },
+    "apps/web/app/investor-portal/_components/InvestorStickyBar.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/atoms/InvisibleTurnstile.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/atoms/SkipToContent.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/features/admin/design-lab/DesignProposalReviewPanel.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/features/admin/ImpersonationBanner.tsx": {
+      "z-9999": 2
+    },
+    "apps/web/components/features/admin/OperatorBanner.tsx": {
+      "z-9999": 1
+    },
+    "apps/web/components/features/auth/atoms/AuthBackButton.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/features/auth/AuthLayout.tsx": {
+      "z-50": 3
+    },
+    "apps/web/components/features/dashboard/atoms/link-actions/LinkActions.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/features/dashboard/atoms/LinkPill.tsx": {
+      "z-100": 1
+    },
+    "apps/web/components/features/dashboard/molecules/artist-search-mode/UniversalLinkInputArtistSearchMode.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/features/dashboard/molecules/FirstFanCelebration.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/features/dashboard/molecules/ProfileLiveCelebration.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/features/dashboard/molecules/universal-link-input/UniversalLinkInput.tsx": {
+      "z-100": 1
+    },
+    "apps/web/components/features/dashboard/organisms/links/ChatStyleLinkItem.tsx": {
+      "z-100": 1
+    },
+    "apps/web/components/features/dashboard/organisms/LiquidGlassMenu.tsx": {
+      "z-40": 1,
+      "z-50": 3
+    },
+    "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/SidebarLinkInput.tsx": {
+      "z-100": 1
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/features/demo/FounderDemoRecordingSurface.tsx": {
+      "z-40": 1,
+      "z-50": 1
+    },
+    "apps/web/components/features/dev/DevToolbar.tsx": {
+      "z-[9999]": 2
+    },
+    "apps/web/components/features/home/AuthRedirectHandler.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/features/home/AutomaticReleaseSmartlinksSection.tsx": {
+      "z-[2]": 1
+    },
+    "apps/web/components/features/home/FloatingClaimBar.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/features/home/HeroSpotifySearch.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/features/home/HomePhoneFrame.tsx": {
+      "z-[18]": 1
+    },
+    "apps/web/components/features/home/HomeTrustSection.tsx": {
+      "z-[1]": 1
+    },
+    "apps/web/components/features/onboarding/OnboardingShell.tsx": {
+      "z-40": 2
+    },
+    "apps/web/components/features/pitch/InvestorBrief.tsx": {
+      "z-40": 1
+    },
+    "apps/web/components/features/tracking/ConsentBanner.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/features/waitlist/WaitlistSpotifySearch.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/feedback/BannerViewport.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/homepage/HomepageIntent.tsx": {
+      "z-[1]": 2
+    },
+    "apps/web/components/jovie/components/ChatInput.tsx": {
+      "z-[80]": 2
+    },
+    "apps/web/components/jovie/components/TeleprompterShowcaseInterstitial.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/marketing/HomeComposerHero.tsx": {
+      "z-[1]": 1,
+      "z-[2]": 1
+    },
+    "apps/web/components/molecules/drawer/RightDrawer.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/molecules/MobileNav.tsx": {
+      "z-[100]": 1,
+      "z-[101]": 1,
+      "z-[99]": 1
+    },
+    "apps/web/components/organisms/combobox/ComboboxDropdown.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/organisms/CookieBannerSection.tsx": {
+      "z-[60]": 1
+    },
+    "apps/web/components/organisms/HeaderNav.tsx": {
+      "zIndex:100": 1
+    },
+    "apps/web/components/shell/ContextMenuOverlay.tsx": {
+      "z-[110]": 1
+    },
+    "apps/web/components/shell/HeaderSearchSurface.tsx": {
+      "z-50": 1
+    },
+    "apps/web/components/shell/JovieOverlay.tsx": {
+      "z-40": 1,
+      "z-50": 1
+    },
+    "apps/web/components/shell/MobilePlayerCard.tsx": {
+      "z-40": 1
+    },
+    "apps/web/components/shell/ShellLoader.tsx": {
+      "z-[60]": 1
+    },
+    "apps/web/components/shell/TabletPlayerCard.tsx": {
+      "z-40": 1
+    },
+    "apps/web/components/site/MarketingFooterCta.tsx": {
+      "z-[1]": 1,
+      "z-[2]": 1
+    },
+    "apps/web/components/site/MarketingTerminalCta.tsx": {
+      "z-[2]": 1
+    },
+    "apps/web/lib/profile/z-index-constants.ts": {
+      "z-[140]": 1,
+      "z-40": 1,
+      "z-50": 1
+    },
+    "apps/web/styles/system-b-app.css": {
+      "z-index:150": 3,
+      "z-index:40": 1,
+      "z-index:90": 2
+    }
+  }
+}

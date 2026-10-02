@@ -1,17 +1,23 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render as renderUI, screen } from '@testing-library/react';
+import { act, render as renderUI, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { hydrateRoot } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AuthShell,
   isWhatsNewBannerEnabled,
 } from '@/components/organisms/AuthShell';
-import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { SidebarProvider } from '@/components/organisms/sidebar';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 
-const { unifiedSidebarMock } = vi.hoisted(() => ({
+const { unifiedSidebarMock, sidebarMock } = vi.hoisted(() => ({
   unifiedSidebarMock: vi.fn(),
+  sidebarMock: {
+    isMobile: false,
+    state: 'open' as 'open' | 'closed',
+  },
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
@@ -45,13 +51,24 @@ vi.mock('@/components/organisms/PersistentAudioBar', () => ({
   PersistentAudioBar: () => null,
 }));
 
-vi.mock('@/components/organisms/Sidebar', () => ({
+vi.mock('@/components/organisms/sidebar', () => ({
   SidebarProvider: ({ children }: { children: ReactNode }) => (
     <div>{children}</div>
   ),
   SidebarTrigger: () => <button type='button'>Toggle Sidebar</button>,
-  useSidebar: () => ({ isMobile: false, state: 'open' }),
+  useSidebar: () => sidebarMock,
 }));
+
+vi.mock(
+  '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton',
+  () => ({
+    SidebarCollapseButton: () => (
+      <button type='button' data-testid='sidebar-rail-toggle'>
+        Expand sidebar
+      </button>
+    ),
+  })
+);
 
 vi.mock('@/components/organisms/UnifiedSidebar', () => ({
   UnifiedSidebar: ({
@@ -159,6 +176,68 @@ describe('AuthShell runtime update wiring', () => {
 });
 
 describe('AuthShell canonical wiring', () => {
+  beforeEach(() => {
+    sidebarMock.isMobile = false;
+    sidebarMock.state = 'open';
+    delete document.documentElement.dataset.desktopRuntime;
+  });
+
+  it('mounts the header collapse control in the browser when the rail is closed', () => {
+    sidebarMock.state = 'closed';
+    renderAuthShell();
+
+    expect(screen.getByTestId('sidebar-rail-toggle')).toBeInTheDocument();
+  });
+
+  it('does not mount a second left-sidebar control in Electron (JOV-7207)', () => {
+    // The desktop window-control row owns the single canonical toggle.
+    document.documentElement.dataset.desktopRuntime = 'electron';
+    sidebarMock.state = 'closed';
+    renderAuthShell();
+
+    expect(screen.queryByTestId('sidebar-rail-toggle')).not.toBeInTheDocument();
+  });
+
+  it('hydrates the collapsed Electron shell without replacing server content (JOV-7207)', async () => {
+    sidebarMock.state = 'closed';
+    const tree = (
+      <QueryClientProvider client={new QueryClient()}>
+        <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+          <AuthShell section='dashboard' breadcrumbs={[]}>
+            <input aria-label='Retained draft' defaultValue='Server draft' />
+          </AuthShell>
+        </AppFlagProvider>
+      </QueryClientProvider>
+    );
+    const container = document.createElement('div');
+    container.innerHTML = renderToString(tree);
+    document.body.append(container);
+    const serverInput = container.querySelector('input');
+    expect(serverInput).not.toBeNull();
+    if (!serverInput) throw new Error('Missing server-rendered draft');
+    serverInput.value = 'Draft typed before hydration';
+    // Electron's preload identifies the runtime before React hydrates. The
+    // server cannot see this marker; the first client tree must still match.
+    document.documentElement.dataset.desktopRuntime = 'electron';
+    const onRecoverableError = vi.fn();
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    try {
+      await act(async () => {
+        root = hydrateRoot(container, tree, { onRecoverableError });
+      });
+      expect(onRecoverableError).not.toHaveBeenCalled();
+      expect(container.querySelector('input')).toBe(serverInput);
+      expect(serverInput.value).toBe('Draft typed before hydration');
+      expect(
+        container.querySelector('[data-testid="sidebar-rail-toggle"]')
+      ).toBeNull();
+    } finally {
+      await act(async () => root?.unmount());
+      container.remove();
+      delete document.documentElement.dataset.desktopRuntime;
+    }
+  });
+
   it('uses the single shell frame and in-sidebar collapse control', () => {
     renderAuthShell();
 

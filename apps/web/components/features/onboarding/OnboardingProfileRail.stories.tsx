@@ -1,5 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { OnboardingProfileRail } from './OnboardingProfileRail';
+import {
+  EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
+  OnboardingProfileRail,
+} from './OnboardingProfileRail';
 
 const meta = {
   title: 'Features/Onboarding/OnboardingProfileRail',
@@ -12,4 +15,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  args: {
+    state: EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
+  },
+};

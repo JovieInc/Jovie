@@ -6,6 +6,10 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 import { z } from 'zod';
+import {
+  DecisionPredictionReceiptSchema,
+  PREDICTION_RECEIPT_SCHEMA,
+} from '../../../../packages/agent-transport-contracts/prediction-receipt';
 
 const SHA = /^[0-9a-f]{40}$/u;
 const DIGEST = /^[0-9a-f]{64}$/u;
@@ -571,6 +575,7 @@ function paths(snapshot: SummerBottleneckSnapshot, fingerprint?: string) {
     ...(fingerprint
       ? {
           claim: `${PREFIX}/claims/${fingerprint}.json`,
+          prediction: `${PREFIX}/predictions/${fingerprint}.json`,
           dispatch: `${PREFIX}/dispatch/${fingerprint}.json`,
           outcome: `${PREFIX}/outcomes/${fingerprint}.json`,
         }
@@ -1300,8 +1305,100 @@ async function processStoredSnapshot(
       snapshotDigest: digest(snapshot),
     },
   };
-
+  const predictionPath = recordPaths.prediction!;
   let dispatchReceipt = await dependencies.store.read(recordPaths.dispatch!);
+  const existingPrediction = await dependencies.store.read(predictionPath);
+  const retrospective = Boolean(dispatchReceipt && !existingPrediction);
+  const predictedAt =
+    typeof existingPrediction?.predictedAt === 'string'
+      ? existingPrediction.predictedAt
+      : retrospective
+        ? dependencies.now().toISOString()
+        : task.createdAt;
+
+  const prediction = DecisionPredictionReceiptSchema.parse({
+    schema: PREDICTION_RECEIPT_SCHEMA,
+    predictionId: `summer-repair:${fingerprint}`,
+    identity: {
+      decisionId: fingerprint,
+      taskRunId: fingerprint,
+      experimentId: null,
+      variantId: selected.id,
+      tenantId: 'jovie-internal',
+      scopeId: 'summer-bottleneck',
+      entityId: selected.handle,
+    },
+    links: {
+      issueRef: `linear:${task.existingRepair.identifier}`,
+      commitRef: task.source.sourceVersion,
+      deploymentRef: null,
+      certificationRef: null,
+    },
+    decisionAt: task.createdAt,
+    predictedAt,
+    temporalClass:
+      existingPrediction?.temporalClass === 'retrospective' || retrospective
+        ? 'retrospective'
+        : 'prospective',
+    input: {
+      snapshotRef: recordPaths.event,
+      snapshotDigest: task.source.snapshotDigest,
+      capturedAt: snapshot.observedAt,
+      freshness: 'fresh',
+      provenanceRefs: [recordPaths.event, task.selected.handle],
+    },
+    target: {
+      stage: 'engineering',
+      name: 'exact-head-repair-completed',
+      units: 'terminal-repair',
+      horizonEndsAt: task.existingRepair.expiresAt,
+      baseline: null,
+    },
+    action: {
+      eligibleActionsRef: recordPaths.claim,
+      selectedAction: task.action,
+      selectionMethod: 'deterministic',
+      selectionProbability: null,
+    },
+    prediction: {
+      expected: 'succeeded',
+      lower: null,
+      upper: null,
+      confidence: 'unknown',
+    },
+    versions: {
+      model: null,
+      provider: null,
+      prompt: null,
+      policy: task.schema,
+      codeRevision: task.source.sourceVersion,
+      executionTupleRef: `record:${task.existingRepair.assignmentDigest}`,
+    },
+    disclosure: {
+      providerData: 'withheld',
+      consent: 'not-required',
+      consentRef: null,
+      consentValidUntil: null,
+    },
+    management: {
+      productBetContractRef: null,
+    },
+  });
+  const predictionWrite = await dependencies.store.create(
+    predictionPath,
+    prediction
+  );
+  const persistedPrediction =
+    predictionWrite === 'created'
+      ? prediction
+      : await dependencies.store.read(predictionPath);
+  if (
+    !persistedPrediction ||
+    digest(persistedPrediction) !== digest(prediction)
+  ) {
+    throw new Error('prediction receipt conflict');
+  }
+
   if (!dispatchReceipt) {
     const dispatched = await dependencies.dispatchToSymphony(task, {
       idempotencyKey: fingerprint,
@@ -1315,6 +1412,7 @@ async function processStoredSnapshot(
         ...baseReceipt(snapshot, dependencies, selected, fingerprint, ranking),
         schema: 'jovie.eve.summer-bottleneck-dispatch/v1',
         decision: 'dispatched',
+        predictionRef: predictionPath,
         task,
         symphony: { handle: dispatched.handle },
         terminal: false,
@@ -1403,6 +1501,7 @@ async function processStoredSnapshot(
         observed.status === 'succeeded'
           ? 'symphony-succeeded'
           : 'symphony-failed',
+      predictionRef: predictionPath,
       symphony: {
         handle,
         detail: observed.detail,

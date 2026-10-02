@@ -35,7 +35,19 @@ const sourceSetSha256 = sources =>
     .update([...sources].sort().join('\n'))
     .digest('hex');
 
+const discoveredInventoryCache = new Map();
+
 export function discoverAtomMoleculeInventory(repoRoot = REPO_ROOT) {
+  if (!discoveredInventoryCache.has(repoRoot)) {
+    discoveredInventoryCache.set(
+      repoRoot,
+      computeAtomMoleculeInventory(repoRoot)
+    );
+  }
+  return structuredClone(discoveredInventoryCache.get(repoRoot));
+}
+
+function computeAtomMoleculeInventory(repoRoot) {
   const enrolledSources = new Map();
   for (const baseline of COMPARATIVE_QUALITY_BAR) {
     enrolledSources.set(baseline.owner.sourcePath, baseline.id);

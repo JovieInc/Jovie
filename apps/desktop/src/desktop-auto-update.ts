@@ -69,8 +69,9 @@ export function nightlyUpdateMinute(appEnv: DesktopAppEnv): number | null {
 export function shouldInstallDownloadedUpdateNow(input: {
   readonly nightlyLaunch: boolean;
   readonly hasVisibleWindow: boolean;
+  readonly workStateSafe: boolean;
 }): boolean {
-  return input.nightlyLaunch && !input.hasVisibleWindow;
+  return input.nightlyLaunch && !input.hasVisibleWindow && input.workStateSafe;
 }
 
 export type DesktopUpdateCheckOutcome = 'not-available' | 'error';
@@ -188,15 +189,107 @@ export function shouldInstallDownloadedUpdateWhileRunning(input: {
   readonly systemIdleSeconds: number;
   readonly audible: boolean;
   readonly hasUnsentInput: boolean;
+  readonly workStateSafe: boolean;
 }): boolean {
   return (
     input.updateReadyToInstall &&
     input.localHour >= IDLE_UPDATE_INSTALL_WINDOW.startHour &&
     input.localHour < IDLE_UPDATE_INSTALL_WINDOW.endHour &&
     !input.audible &&
+    input.workStateSafe &&
     !input.hasUnsentInput &&
     input.systemIdleSeconds >= IDLE_UPDATE_INSTALL_SECONDS
   );
+}
+
+// ---------------------------------------------------------------------------
+// Renderer-facing update state machine (JOV-6683)
+//
+// autoUpdater's events are flattened into one typed state the renderer can
+// subscribe to over IPC. Every event fully determines the next phase, so the
+// mapper is a pure function and unit-testable without Electron.
+// ---------------------------------------------------------------------------
+
+export type DesktopUpdatePhase =
+  | { readonly state: 'idle' }
+  | { readonly state: 'checking' }
+  | { readonly state: 'not-available' }
+  | {
+      readonly state: 'available';
+      readonly version: string;
+      readonly releaseDate: string | null;
+      readonly notesUrl: string;
+    }
+  | {
+      readonly state: 'downloading';
+      readonly percent: number;
+      readonly transferredBytes: number;
+      readonly totalBytes: number;
+      readonly bytesPerSecond: number;
+    }
+  | { readonly state: 'ready'; readonly version: string }
+  | {
+      readonly state: 'error';
+      readonly message: string;
+      readonly retryable: boolean;
+    };
+
+/** Minimal shapes of the electron-updater events main.ts forwards here. */
+export type DesktopUpdateEvent =
+  | { readonly type: 'checking-for-update' }
+  | {
+      readonly type: 'update-available';
+      readonly version: string;
+      readonly releaseDate?: string | null;
+    }
+  | { readonly type: 'update-not-available' }
+  | {
+      readonly type: 'download-progress';
+      readonly percent: number;
+      readonly transferredBytes: number;
+      readonly totalBytes: number;
+      readonly bytesPerSecond: number;
+    }
+  | { readonly type: 'update-downloaded'; readonly version: string }
+  | { readonly type: 'error'; readonly message: string };
+
+export const DESKTOP_UPDATE_INITIAL_STATE: DesktopUpdatePhase = {
+  state: 'idle',
+};
+
+/**
+ * Map one autoUpdater event to the renderer-facing phase. `notesUrl` is the
+ * release-notes page the renderer links to when it cannot render notes inline.
+ */
+export function reduceDesktopUpdateState(
+  event: DesktopUpdateEvent,
+  notesUrl: string
+): DesktopUpdatePhase {
+  switch (event.type) {
+    case 'checking-for-update':
+      return { state: 'checking' };
+    case 'update-not-available':
+      return { state: 'not-available' };
+    case 'update-available':
+      return {
+        state: 'available',
+        version: event.version,
+        releaseDate: event.releaseDate ?? null,
+        notesUrl,
+      };
+    case 'download-progress':
+      return {
+        state: 'downloading',
+        percent: event.percent,
+        transferredBytes: event.transferredBytes,
+        totalBytes: event.totalBytes,
+        bytesPerSecond: event.bytesPerSecond,
+      };
+    case 'update-downloaded':
+      return { state: 'ready', version: event.version };
+    case 'error':
+      return { state: 'error', message: event.message, retryable: true };
+  }
 }
 
 /** Minimum gap between wake/unlock-triggered update checks. */

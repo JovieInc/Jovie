@@ -58,7 +58,13 @@ walk capture, dispatch, and developer controls stay in disclosure.
 Read-only projection `ovie.shipping-state.v1` at `GET /api/hud/shipping-state`.
 It composes Symphony runtime/task state, lease-guard capacity, native
 `mergeQueueEntry`, exact-SHA CI, Production Controller, live build-info, and
-the typed fleet receipt. JOV-5249 consumes freshness UX. Shutdown retains the
+the lanes feed, lane pull requests, and Summer runtime health. When
+`HUD_GEM_BRIDGE_URL`/`HUD_GEM_BRIDGE_TOKEN` are set, the Gem-authored
+`lanes-status` receipt is read over the authenticated bridge at its fixed
+`/receipts/<source>` key; otherwise the publisher keeps its honest public
+feed reads or explicit `unavailable`. The terminal-failure count never
+aliases blocked work, and ship time is measured only between observations
+with matched work/build identity. JOV-5249 consumes freshness UX. Shutdown retains the
 expired last-known marker. No Mac-journal fallback, merged-PR-as-shipped, or
 dispatch/retry/cancel/restart surface.
 
@@ -78,8 +84,13 @@ If you are already signed in as admin, Fullscreen fetches `/api/hud/kiosk-sessio
 The original Ovie plan was a standalone Swift menu-bar app at
 [`JovieInc/ovie`](https://github.com/JovieInc/ovie). After founder direction
 (2026-07), that plan was deprecated: the Swift codebase is a **launcher
-only**, and the repo is **archived (read-only)** on GitHub. There is no Swift
-Mac product transition in this checkout. Current stack and proposed
+only** and read-only by policy. The GitHub repository is not currently
+archived (API checked 2026-10-02); that does not revive its deprecated Swift
+implementation. The accepted
+[native Mac direction](macos/ADR-swift-native-mac.md) reuses iOS client
+foundations and plans Ovie as a surface of one native Mac product; it does not
+revive that deprecated Swift implementation. Electron remains shipped until
+qualified cutover. Current stack and proposed
 Swift-control slugs: [`docs/macos/swift-control-invariants.md`](macos/swift-control-invariants.md).
 
 - Deprecation issue: [#12894](https://github.com/JovieInc/Jovie/issues/12894)

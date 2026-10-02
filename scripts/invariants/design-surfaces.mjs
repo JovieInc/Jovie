@@ -486,7 +486,6 @@ export const NAV_LABEL_DESTINATIONS = Object.freeze({
   Contact: ['SUPPORT'],
   Compare: ['COMPARE'],
   Alternatives: ['ALTERNATIVES'],
-  Status: ['https://status.jov.ie'],
   Instagram: ['https://instagram.com/meetjovie'],
   X: ['https://x.com/meetjovie'],
   Privacy: ['LEGAL_PRIVACY'],

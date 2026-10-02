@@ -4,6 +4,7 @@ import { Button, Skeleton } from '@jovie/ui';
 import { ExternalLink, PanelRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { ArtistRulesSheet } from '@/app/app/(shell)/library/ArtistRulesSheet';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { SettingsPaySection } from '@/features/dashboard/organisms/SettingsPaySection';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
@@ -13,6 +14,8 @@ import {
   ShopifyStoreCardSkeleton,
 } from '@/features/dashboard/organisms/shopify/ShopifyStoreCard';
 import { useSettingsContext } from '@/features/dashboard/organisms/useSettingsContext';
+import type { ArtistRuleView } from '@/lib/artist-rules/types';
+import { SettingsRiderSection } from './SettingsRiderSection';
 
 function MobileProfilePanelTrigger() {
   const { open } = usePreviewPanelState();
@@ -40,7 +43,15 @@ function MobileProfilePanelTrigger() {
   );
 }
 
-export function ArtistProfileContent() {
+export function ArtistProfileContent({
+  creatorProfileId = 'unavailable',
+  initialArtistRules = [],
+  defaultRulesOpen = false,
+}: {
+  readonly creatorProfileId?: string;
+  readonly initialArtistRules?: readonly ArtistRuleView[];
+  readonly defaultRulesOpen?: boolean;
+} = {}) {
   const router = useRouter();
   const { artist, setArtist, avatarQuality } = useSettingsContext();
 
@@ -119,6 +130,23 @@ export function ArtistProfileContent() {
           />
           <SettingsPaySection />
           <ShopifyStoreCard />
+          <SettingsRiderSection
+            profileId={artist.id}
+            username={artist.handle}
+          />
+          <SettingsPanel
+            title='Artist Rules'
+            description='Confirmed rules guide every draft. Memory can suggest a rule, but it cannot activate one.'
+            bodyClassName='px-4 py-4 sm:px-5'
+          >
+            <div id='artist-rules'>
+              <ArtistRulesSheet
+                creatorProfileId={creatorProfileId}
+                initialRules={initialArtistRules}
+                defaultOpen={defaultRulesOpen}
+              />
+            </div>
+          </SettingsPanel>
         </div>
       </SettingsSection>
       <MobileProfilePanelTrigger />

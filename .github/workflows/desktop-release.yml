@@ -616,11 +616,14 @@ jobs:
               .path == ".github/workflows/desktop-release.yml" and
               (.event == "workflow_run" or .event == "workflow_dispatch") and
               (.head_sha | test("^[0-9a-f]{40}$")) and
-              (. as $run | $run.display_title == ("Desktop release " + $run.head_sha))
+              (.display_title | test("^Desktop release [0-9a-f]{40}$"))
             ' >/dev/null <<<"$run_json"; then
               continue
             fi
-            run_sha="$(jq -r '.head_sha' <<<"$run_json")"
+            # workflow_run events stamp the run with main's tip at trigger
+            # time; the published generation is the one in the run name.
+            run_sha="$(jq -r '.display_title | ltrimstr("Desktop release ")' <<<"$run_json")"
+            run_head_sha="$(jq -r '.head_sha' <<<"$run_json")"
             workflow_id="$(jq -r '.workflow_id' <<<"$run_json")"
             if ! workflow_json="$(gh api \
               "repos/$REPOSITORY/actions/workflows/$workflow_id")"; then
@@ -673,7 +676,7 @@ jobs:
               exit 1
             fi
             publisher_count="$(jq \
-              --arg sha "$run_sha" \
+              --arg sha "$run_head_sha" \
               --arg job "$publisher_job_id" '
               [
                 .[].jobs[]?
@@ -717,7 +720,7 @@ jobs:
             }
             desktop_workflow_id="$(jq -r '.id' <<<"$desktop_workflow")"
             recovery_runs="$(gh api \
-              "repos/$REPOSITORY/actions/workflows/$desktop_workflow_id/runs?branch=main&status=completed&per_page=25")"
+              "repos/$REPOSITORY/actions/workflows/$desktop_workflow_id/runs?branch=main&status=completed&per_page=100")"
             jq -e \
               --arg repo "$REPOSITORY" \
               --arg workflow_id "$desktop_workflow_id" '
@@ -742,21 +745,21 @@ jobs:
             recovery_candidates="$(
               if [ "$DESKTOP_RUN_ATTEMPT" -gt 1 ]; then
                 for ((attempt = DESKTOP_RUN_ATTEMPT - 1; attempt >= 1; attempt--)); do
-                  printf '%s\t%s\t%s\n' "$DESKTOP_RUN_ID" "$attempt" "$release_sha"
+                  printf '%s\t%s\t%s\t%s\n' "$DESKTOP_RUN_ID" "$attempt" "$release_sha" "$GITHUB_SHA"
                 done
               fi
               jq -r '
                 map(. as $run | select(
                   ($run.event == "workflow_run" or $run.event == "workflow_dispatch") and
-                  $run.display_title == ("Desktop release " + $run.head_sha)
+                  ($run.display_title | test("^Desktop release [0-9a-f]{40}$"))
                 )) |
                 sort_by(.created_at, .id) | reverse | .[] |
                 . as $run |
                 range(.run_attempt; 0; -1) |
-                [$run.id, ., $run.head_sha] | @tsv
+                [$run.id, ., ($run.display_title | ltrimstr("Desktop release ")), $run.head_sha] | @tsv
               ' <<<"$(jq -c '.workflow_runs' <<<"$recovery_runs")"
             )"
-            while IFS=$'\t' read -r recovery_run_id recovery_attempt recovery_sha; do
+            while IFS=$'\t' read -r recovery_run_id recovery_attempt recovery_sha recovery_head_sha; do
               [ -n "$recovery_run_id" ] || continue
               if ! recovery_jobs="$(gh api --paginate --slurp \
                 "repos/$REPOSITORY/actions/runs/$recovery_run_id/attempts/$recovery_attempt/jobs?per_page=100")"; then
@@ -770,7 +773,7 @@ jobs:
                 echo "::error::GitHub returned malformed desktop recovery jobs."
                 exit 1
               }
-              recovery_publisher_count="$(jq --arg sha "$recovery_sha" '[
+              recovery_publisher_count="$(jq --arg sha "$recovery_head_sha" '[
                 .[].jobs[]?
                 | select(
                     .name == "Publish production desktop release" and
@@ -784,20 +787,17 @@ jobs:
                     )] | length) == 1
                   )
               ] | length' <<<"$recovery_jobs")"
-              recovery_asset_proof_count="$(jq --arg sha "$recovery_sha" '[
+              # Asset proof is the verify step. The publisher cross-prove is
+              # already established above from this attempt's own jobs, and a
+              # cross-prove failure after verified assets must stay recoverable.
+              recovery_asset_proof_count="$(jq --arg sha "$recovery_head_sha" '[
                 .[].jobs[]?
                 | select(
                     .name == "Record production desktop publish" and
                     .head_sha == $sha and
                     .status == "completed" and
-                    .conclusion == "success" and
                     ([.steps[]? | select(
                       .name == "Verify exact published release assets" and
-                      .status == "completed" and
-                      .conclusion == "success"
-                    )] | length) == 1 and
-                    ([.steps[]? | select(
-                      .name == "Cross-prove exact production publisher" and
                       .status == "completed" and
                       .conclusion == "success"
                     )] | length) == 1
@@ -1245,7 +1245,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "22"
+          node-version: "24"
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
@@ -1530,7 +1530,7 @@ jobs:
           node scripts/desktop-release-assets.mjs upload-and-publish \
             --environment staging \
             --sha "$RELEASE_SHA" \
-            --version "${{ steps.staging-version.outputs.version }}" \
+            --version="${{ steps.staging-version.outputs.version }}" \
             --dist "apps/desktop/dist"
 
       - name: Package production desktop app
@@ -1668,7 +1668,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "22"
+          node-version: "24"
 
       - name: Verify exact published release assets
         id: release-proof
@@ -1688,12 +1688,14 @@ jobs:
           PUBLISHER_ATTEMPT: ${{ needs.build.outputs.publisher_attempt }}
           REPOSITORY: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
+          WORKFLOW_SHA: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
           [[ "$PUBLISHED_SHA" =~ ^[0-9a-f]{40}$ ]] &&
             [[ "$PUBLISHER_ATTEMPT" =~ ^[1-9][0-9]*$ ]] &&
-            [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]] || {
+            [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
+            [[ "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Desktop publisher identity is malformed."
             exit 1
           }
@@ -1703,21 +1705,25 @@ jobs:
             --arg repo "$REPOSITORY" \
             --arg run "$RUN_ID" \
             --arg attempt "$PUBLISHER_ATTEMPT" \
-            --arg sha "$PUBLISHED_SHA" '
+            --arg published_sha "$PUBLISHED_SHA" \
+            --arg workflow_sha "$WORKFLOW_SHA" '
               type == "object" and
               (.id | tostring) == $run and
               (.run_attempt | tostring) == $attempt and
               (.workflow_id | type == "number") and
-              .head_sha == $sha and
+              .head_sha == $workflow_sha and
               .head_branch == "main" and
               .head_repository.full_name == $repo and
               .path == ".github/workflows/desktop-release.yml" and
               (.event == "workflow_run" or .event == "workflow_dispatch") and
-              .display_title == ("Desktop release " + $sha)
+              .display_title == ("Desktop release " + $published_sha)
             ' >/dev/null <<<"$run_record" || {
             echo "::error::Exact desktop publisher run was not proven."
             exit 1
           }
+          # The run name carries the published generation; the run and its
+          # jobs carry main's tip at trigger time, which is often newer.
+          run_head_sha="$(jq -r '.head_sha' <<<"$run_record")"
           workflow_id="$(jq -r '.workflow_id' <<<"$run_record")"
           workflow_record="$(gh api \
             "repos/$REPOSITORY/actions/workflows/$workflow_id")"
@@ -1739,11 +1745,14 @@ jobs:
             echo "::error::GitHub returned malformed desktop publisher jobs."
             exit 1
           }
-          publisher="$(jq -c --arg sha "$PUBLISHED_SHA" '[
+          publisher="$(jq -c \
+            --arg sha "$run_head_sha" \
+            --arg workflow_sha "$WORKFLOW_SHA" '[
             .[].jobs[]?
             | select(
                 .name == "Publish production desktop release" and
                 .head_sha == $sha and
+                .head_sha == $workflow_sha and
                 .status == "completed" and
                 .conclusion == "success" and
                 ([.steps[]? | select(

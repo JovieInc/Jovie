@@ -187,3 +187,13 @@ export function isInternalEntry(entry) {
   if (hasDependencyVersionBump(entry)) return true;
   return false;
 }
+
+/** A customer outcome must not publish test, agent, or source-maintenance copy. */
+export function isCustomerCopy(entry) {
+  return (
+    !isInternalEntry(entry) &&
+    !/\b(?:Codex|GBrain|PersistentAudioBar|test-only|unit tests?|runner|worktree|refactor|source guard|migration journal|JOV-\d+)\b|\bP[0-3]\b|\b(?:apps|tests|scripts|packages)\/[\w/-]+/i.test(
+      entry
+    )
+  );
+}

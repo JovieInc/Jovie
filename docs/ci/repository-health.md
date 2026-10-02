@@ -140,6 +140,8 @@ All must hold: exact-main is at least 90% of an absolute byte budget or two ordi
 
 Delete only after an owner, consumer/import search, replacement proof, history, and focused tests show obsolescence. Knip is evidence, not sole authorization. Remove generated output only when regeneration/retrieval and retention are tested. Never delete user work for a budget. History rewriting or LFS migration requires explicit approval, coordinated clone/worktree migration, and at least 25% measured reachable-history savings.
 
+Pruned under this rule (JOV-6671): historical `apps/web/drizzle/migrations/meta/*_snapshot.json` files. Each snapshot is a ~1 MiB full-schema copy; the directory grew to 83 files / ~54 MiB, the single largest tracked cost class, and pushed main to ~99% of the tracked-bytes budget. `drizzle-kit generate` reads only the newest snapshot as its diff base and `drizzle-kit check`/`up` only validate the snapshots that remain; the runtime migrator reads `_journal.json` + `*.sql` and never touches snapshots. Ship now: retain only the newest snapshot (deleted 0000–0116, kept `0117_snapshot.json`), recover ~52.7 MiB, and cap retention at 8 snapshots — enforced by `scripts/repo-hygiene-guard.test.mjs`, which tells the crossing PR to `git rm` the oldest snapshots. Re-evaluate when: a `drizzle-kit` upgrade consumes older snapshots (`up`/`generate` fails citing a missing `*_snapshot.json`) or the diff history is needed for a schema audit. Then: restore from git history (`git checkout <sha> -- <path>`) or regenerate via `drizzle-kit` from the live database.
+
 ### Split a package or repository
 
 All must hold for two consecutive 30-day windows:

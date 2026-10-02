@@ -129,7 +129,9 @@ function ChangelogFreshnessNotice({
       Release notes are being prepared for newer release slots.{' '}
       {latestDate
         ? `The latest published update is ${latestDate}.`
-        : 'The latest published update is listed below.'}
+        : latestPublished.length
+          ? 'The latest published update is listed below.'
+          : 'No customer updates have been published yet.'}
     </p>
   );
 }
@@ -155,7 +157,9 @@ export default async function ChangelogPage() {
             </p>
             <ChangelogFreshnessNotice
               latestPublished={latest}
-              hasUnpublishedReleases={snapshot.unpublishedReleases.length > 0}
+              hasUnpublishedReleases={snapshot.unpublishedReleases.some(
+                release => release.date > (latest[0]?.date ?? '')
+              )}
             />
           </div>
 
@@ -167,7 +171,13 @@ export default async function ChangelogPage() {
           </aside>
 
           <div className='changelog-entries'>
-            <CustomerChangelogArchive months={months} />
+            <CustomerChangelogArchive
+              months={months}
+              technicalReleases={snapshot.releases.map(({ version, date }) => ({
+                version,
+                date,
+              }))}
+            />
           </div>
         </div>
       </MarketingContainer>

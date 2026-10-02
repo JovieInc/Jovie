@@ -1,7 +1,7 @@
 /**
  * Playlist Concept Generation
  *
- * Uses Claude Haiku to generate hyper-niche playlist concepts.
+ * Uses the lightweight gateway model to generate hyper-niche playlist concepts.
  * Each concept includes: title, description, track suggestions,
  * genre/mood tags, and cover art direction.
  */
@@ -9,7 +9,8 @@
 import 'server-only';
 import { count, desc } from 'drizzle-orm';
 import { z } from 'zod';
-import { getAnthropicClient } from '@/lib/ai/anthropic';
+import { gateway, generateText } from '@/lib/ai/sdk';
+import { CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
 import { db } from '@/lib/db';
 import { joviePlaylists } from '@/lib/db/schema/playlists';
 import { captureError } from '@/lib/error-tracking';
@@ -65,14 +66,14 @@ const CATEGORY_ROTATION: Array<'general' | 'soundtrack' | 'cultural'> = [
   'general',
 ];
 
-const ANTHROPIC_REQUEST_TIMEOUT_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 30_000;
 
 // ============================================================================
 // Main Function
 // ============================================================================
 
 /**
- * Generate a new playlist concept using Claude Haiku.
+ * Generate a new playlist concept using the lightweight gateway model.
  * Deduplicates against existing playlist titles in the database.
  */
 export async function generatePlaylistConcept(options?: {
@@ -108,32 +109,26 @@ export async function generatePlaylistConcept(options?: {
     seed: Date.now() % 10000,
   });
 
-  const anthropic = getAnthropicClient();
-
   // Try up to 3 times to get a valid concept
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const message = await withTimeout(
-        anthropic.messages.create(
-          {
-            model: 'claude-haiku-4-5-20251001',
-            max_tokens: 2000,
-            messages: [{ role: 'user', content: prompt }],
-          },
-          { timeout: ANTHROPIC_REQUEST_TIMEOUT_MS }
-        ),
+      const result = await withTimeout(
+        generateText({
+          model: gateway(CHAT_MODEL_LIGHT),
+          maxOutputTokens: 2000,
+          prompt,
+        }),
         {
-          timeoutMs: ANTHROPIC_REQUEST_TIMEOUT_MS + 1_000,
-          context: 'Anthropic generatePlaylistConcept',
+          timeoutMs: REQUEST_TIMEOUT_MS + 1_000,
+          context: 'generatePlaylistConcept',
         }
       );
 
-      const textBlock = message.content.find(b => b.type === 'text');
-      if (textBlock?.type !== 'text') {
-        throw new Error('No text response from Claude');
+      if (!result.text) {
+        throw new Error('No text response from model');
       }
 
-      const jsonStr = extractJsonPayload(textBlock.text);
+      const jsonStr = extractJsonPayload(result.text);
       const parsed = JSON.parse(jsonStr);
       const concept = PlaylistConceptSchema.parse(parsed);
 

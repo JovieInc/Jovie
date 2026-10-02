@@ -2021,6 +2021,163 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(result.admit[0].type, 'issue');
   });
 
+  it('records the displaced candidate and opportunity cost when economics change queue order', async () => {
+    const highLeverage = admissionIssue({
+      identifier: 'JOV-4513',
+      title: 'Prevent broad downstream rework',
+    });
+    const lowerValue = admissionIssue({
+      identifier: 'JOV-4396',
+      title: 'Polish one isolated path',
+    });
+    const economic = (issue, expectedValue, cost, preventionLeverage = 0) => ({
+      ...classification(issue),
+      economic: {
+        expectedValue: {
+          amount: expectedValue,
+          unit: 'normalized-value',
+          confidence: 0.9,
+          sourceRef: `forecast://${issue.identifier}/value`,
+        },
+        preventionLeverage: {
+          amount: preventionLeverage,
+          unit: 'normalized-value',
+          confidence: 0.85,
+          sourceRef: `JOV-7091://${issue.identifier}`,
+        },
+        fullyLoadedCost: {
+          valuationUnit: 'normalized-value',
+          knownLowerBound: cost,
+          expectedTotal: {
+            amount: cost,
+            unit: 'normalized-value',
+          },
+          uncertainty: {
+            confidence: 0.8,
+            missingSourceContracts: [],
+          },
+          sourceContracts: [`cost-receipt://${issue.identifier}`],
+        },
+      },
+    });
+    const result = await admitter.selectNextToAdmit(
+      [economic(highLeverage, 70, 20, 40), economic(lowerValue, 80, 5)],
+      [],
+      {
+        currentlyShipping: 0,
+        fleetGate: greenFleetGate(),
+        now: '2026-09-28T12:00:00.000Z',
+      }
+    );
+
+    assert.equal(result.admit[0].identifier, 'JOV-4513');
+    assert.equal(result.queueRankingReceipt.mode, 'fully-loaded-economic');
+    assert.equal(result.queueRankingReceipt.orderingChanged, true);
+    assert.equal(result.queueRankingReceipt.displacedCandidate, 'JOV-4396');
+    assert.deepEqual(result.queueRankingReceipt.estimatedOpportunityCost, {
+      amount: 75,
+      unit: 'normalized-value',
+      sourceRefs: [
+        'JOV-7091://JOV-4396',
+        'cost-receipt://JOV-4396',
+        'forecast://JOV-4396/value',
+      ],
+      confidence: 0.8,
+    });
+    const receipt = admitter.buildAdmissionReceipt(highLeverage, {
+      now: '2026-09-28T12:00:00.000Z',
+      queueRankingReceipt: result.queueRankingReceipt,
+    });
+    assert.match(receipt, /"displacedCandidate":"JOV-4396"/);
+    assert.match(receipt, /"amount":75/);
+  });
+
+  it('admits an evidence-backed cross-cutting guardrail ahead of lower-leverage work', async () => {
+    const guardrail = admissionIssue({
+      identifier: 'JOV-3541',
+      title: 'Guardrail ratchet: block new ci violations',
+      labels: ['invariant'],
+    });
+    const downstreamIds = ['JOV-4601', 'JOV-4602', 'JOV-4603', 'JOV-4604'];
+    const downstream = downstreamIds.map(identifier =>
+      admissionIssue({ identifier, title: 'Fix ci pipeline regression' })
+    );
+    const cls = (issue, overrides = {}) => ({
+      ...classification(issue),
+      mrrCategory: 'reliability',
+      effort: 'small',
+      ...overrides,
+    });
+    const result = await admitter.selectNextToAdmit(
+      [
+        cls(guardrail, {
+          area: 'ci',
+          mrrConfidence: 'medium',
+          effort: 'medium',
+        }),
+        ...downstream.map(issue =>
+          cls(issue, { area: 'ci', mrrConfidence: 'high' })
+        ),
+      ],
+      [],
+      {
+        currentlyShipping: 0,
+        fleetGate: greenFleetGate(),
+        now: '2026-09-28T12:00:00.000Z',
+      }
+    );
+
+    assert.equal(result.admit[0].identifier, 'JOV-3541');
+    const receipt = result.queueRankingReceipt;
+    assert.ok(receipt.orderingReasons.includes('prevention-leverage'));
+    const top = receipt.rankings[0];
+    assert.equal(top.candidate, 'JOV-3541');
+    assert.equal(top.preventionLeverage.unit, 'normalized-value');
+    assert.ok(top.preventionLeverage.amount > 0);
+    assert.deepEqual(top.preventionLeverage.affectedIssues, downstreamIds);
+    assert.match(top.preventionLeverage.reason, /defect class/);
+  });
+
+  it('does not prioritize a mislabeled invariant without evidence', async () => {
+    const noisy = admissionIssue({
+      identifier: 'JOV-4999',
+      title: 'Invariant hardening',
+      labels: ['invariant'],
+    });
+    const work = admissionIssue({
+      identifier: 'JOV-4601',
+      title: 'Fix billing crash',
+    });
+    const cls = (issue, area) => ({
+      ...classification(issue),
+      mrrCategory: 'reliability',
+      mrrConfidence: 'high',
+      effort: 'small',
+      area,
+    });
+    const result = await admitter.selectNextToAdmit(
+      [cls(noisy, 'ops'), cls(work, 'ui')],
+      [],
+      {
+        currentlyShipping: 0,
+        fleetGate: greenFleetGate(),
+        now: '2026-09-28T12:00:00.000Z',
+      }
+    );
+
+    assert.equal(result.admit[0].identifier, 'JOV-4601');
+    const entry = result.queueRankingReceipt.rankings.find(
+      ranking => ranking.candidate === 'JOV-4999'
+    );
+    assert.equal(entry.preventionLeverage.amount, null);
+    assert.deepEqual(entry.preventionLeverage.affectedIssues, []);
+    assert.ok(
+      !result.queueRankingReceipt.orderingReasons.includes(
+        'prevention-leverage'
+      )
+    );
+  });
+
   it('admits founder-assigned work without a human ownership hold', async () => {
     const protectedIssue = admissionIssue({
       identifier: 'JOV-4513',

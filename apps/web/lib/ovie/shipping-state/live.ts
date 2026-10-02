@@ -1,3 +1,4 @@
+import { parseCapacityHorizon } from './client';
 import {
   DELIVERY_MERGE_REPOS,
   type DeliveryLane,
@@ -31,6 +32,7 @@ export const NAMED_AUTHORITY_URLS = {
   'lanes-status':
     'https://gist.githubusercontent.com/itstimwhite/07ec460956451da7632fe852934f21c5/raw/lanes-status.json',
   'live-build-info': 'https://jov.ie/api/health/build-info',
+  'staging-build-info': 'https://staging.jov.ie/api/health/build-info',
   'summer-runtime': 'https://summer.jov.ie/runtime/v1/health',
 } as const;
 
@@ -44,6 +46,7 @@ export const SOURCE_CACHE_TTL_MS = {
   'lane-pull-requests': 15_000,
   'github-merges': 60_000,
   'live-build-info': 30_000,
+  'staging-build-info': 30_000,
   'summer-runtime': 30_000,
 } as const satisfies Partial<Record<ShippingSourceId, number>>;
 const FAILED_READ_CACHE_TTL_MS = 5_000;
@@ -59,7 +62,7 @@ const DAY_MS = 24 * 60 * 60_000;
 const MERGE_QUEUE_QUERY =
   'query ShippingStateMergeQueue($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:1){totalCount}mergeQueue(branch:"main"){entries(first:20){totalCount pageInfo{hasNextPage}nodes{id position state pullRequest{number headRefOid}}}}}}';
 const LANE_PR_FIELDS =
-  'issueCount nodes{... on PullRequest{number title headRefName headRefOid isDraft mergeable reviewDecision updatedAt mergeQueueEntry{position}}}';
+  'issueCount nodes{... on PullRequest{number title url createdAt headRefName headRefOid isDraft mergeable reviewDecision updatedAt mergeQueueEntry{position state} author{login} commits(last:1){nodes{commit{statusCheckRollup{state contexts(first:50){nodes{__typename ... on CheckRun{name status conclusion} ... on StatusContext{context state}}}}}}}}}';
 const LANE_PULL_REQUESTS_QUERY = `query ShippingStateLanePullRequests($query:String!){search(type:ISSUE,first:100,query:$query){${LANE_PR_FIELDS}}}`;
 const MERGES_QUERY =
   'query ShippingStateMerges($org:String!,$jovie:String!,$lyb:String!,$summer:String!,$last7:String!,$prior7:String!){org:search(type:ISSUE,query:$org,first:1){issueCount}jovie:search(type:ISSUE,query:$jovie,first:1){issueCount}lyb:search(type:ISSUE,query:$lyb,first:1){issueCount}summer:search(type:ISSUE,query:$summer,first:1){issueCount}last7:search(type:ISSUE,query:$last7,first:1){issueCount}prior7:search(type:ISSUE,query:$prior7,first:1){issueCount}}';
@@ -72,10 +75,134 @@ const GITHUB_RATE_LIMIT_MAX_BACKOFF_MS = 60 * 60_000;
 export type LiveIo = {
   readonly fetch: (url: string, init?: RequestInit) => Promise<Response>;
   readonly githubToken?: string;
+  /** Preferred over githubToken: resolves a fresh (bot) token per call. */
+  readonly getGithubToken?: () => Promise<string | undefined>;
   readonly githubOwner?: string;
   readonly githubRepo?: string;
   readonly nowMs?: () => number;
+  /**
+   * Optional authenticated bridge to the Gem execution host. When present,
+   * Gem-resident authorities are read over this transport instead of the
+   * public feed that only exists once Gem publishes it.
+   */
+  readonly gemBridge?: GemBridge;
 };
+
+export type GemBridge = {
+  readonly url: string;
+  readonly token: string;
+};
+
+/**
+ * Fixed receipt keys the Gem bridge may serve. Each maps to exactly one
+ * `GET {bridge}/receipts/{key}` — the transport can never address an
+ * arbitrary path, log, or command surface.
+ */
+export const GEM_BRIDGE_RECEIPT_KEYS = {
+  'lanes-status': 'lanes-status',
+} as const satisfies Partial<Record<ShippingSourceId, string>>;
+
+const GEM_BRIDGE_TIMEOUT_MS = 2_500;
+
+export function gemBridgeReceiptUrl(
+  bridge: GemBridge,
+  sourceId: ShippingSourceId
+): string | null {
+  const key = (
+    GEM_BRIDGE_RECEIPT_KEYS as Partial<Record<ShippingSourceId, string>>
+  )[sourceId];
+  if (key == null || bridge.token.length === 0) return null;
+  let base: URL;
+  try {
+    base = new URL(bridge.url);
+  } catch {
+    return null;
+  }
+  if (
+    (base.protocol !== 'https:' && base.protocol !== 'http:') ||
+    base.username !== '' ||
+    base.password !== '' ||
+    base.search !== '' ||
+    base.hash !== ''
+  ) {
+    return null;
+  }
+  let prefix = base.pathname;
+  while (prefix.length > 1 && prefix.endsWith('/')) {
+    prefix = prefix.slice(0, -1);
+  }
+  if (prefix === '/') prefix = '';
+  return `${base.origin}${prefix}/receipts/${key}`;
+}
+
+async function readJsonAuthority(
+  io: LiveIo,
+  sourceId: ShippingSourceId,
+  url: string,
+  timeoutMs: number,
+  authority: string,
+  malformedMessage: string,
+  headers: Record<string, string> = {}
+): Promise<AuthorityRead> {
+  try {
+    const response = await io.fetch(url, {
+      method: 'GET',
+      headers: { accept: 'application/json', ...headers },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (response.status === 401 || response.status === 403) {
+      return failedRead(
+        sourceId,
+        'unauthorized',
+        `${authority} returned ${response.status}`
+      );
+    }
+    if (!response.ok) {
+      return failedRead(
+        sourceId,
+        'unavailable',
+        `${authority} returned ${response.status}`,
+        { errorCode: `http-${response.status}` }
+      );
+    }
+    const payload: unknown = await response.json();
+    if (!isRecord(payload)) {
+      return failedRead(sourceId, 'error', malformedMessage, {
+        errorCode: 'malformed',
+      });
+    }
+    return okJsonRead(sourceId, payload);
+  } catch (error) {
+    return disconnectedRead(
+      sourceId,
+      error instanceof Error ? error.message : `${authority} unreachable`
+    );
+  }
+}
+
+async function readBridgeReceipt(
+  io: LiveIo,
+  sourceId: ShippingSourceId
+): Promise<AuthorityRead> {
+  const url = io.gemBridge ? gemBridgeReceiptUrl(io.gemBridge, sourceId) : null;
+  if (url == null) {
+    return failedRead(
+      sourceId,
+      'unavailable',
+      'Gem bridge receipt is not configured',
+      { errorCode: 'not-configured' }
+    );
+  }
+  return readJsonAuthority(
+    io,
+    sourceId,
+    url,
+    GEM_BRIDGE_TIMEOUT_MS,
+    'Gem bridge',
+    'Gem bridge receipt was not an object',
+    { authorization: `Bearer ${io.gemBridge?.token ?? ''}` }
+  );
+}
 
 const githubBackoffUntilByIo = new WeakMap<LiveIo, number>();
 
@@ -161,7 +288,7 @@ function cachedReader(
             ...entry,
             expiresAt: Math.min(
               entry.expiresAt,
-              now + FAILED_READ_CACHE_TTL_MS
+              nowOf(io) + FAILED_READ_CACHE_TTL_MS
             ),
           };
         }
@@ -208,43 +335,14 @@ async function readNamedUrl(
   url: string,
   timeoutMs: number
 ): Promise<AuthorityRead> {
-  try {
-    const response = await io.fetch(url, {
-      method: 'GET',
-      headers: { accept: 'application/json' },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (response.status === 401 || response.status === 403) {
-      return failedRead(
-        sourceId,
-        'unauthorized',
-        `named authority returned ${response.status}`
-      );
-    }
-    if (!response.ok) {
-      return failedRead(
-        sourceId,
-        'unavailable',
-        `named authority returned ${response.status}`,
-        { errorCode: `http-${response.status}` }
-      );
-    }
-    const payload: unknown = await response.json();
-    if (!isRecord(payload)) {
-      return failedRead(
-        sourceId,
-        'error',
-        'named authority payload was not an object',
-        { errorCode: 'malformed' }
-      );
-    }
-    return okJsonRead(sourceId, payload);
-  } catch (error) {
-    return disconnectedRead(
-      sourceId,
-      error instanceof Error ? error.message : 'named authority unreachable'
-    );
-  }
+  return readJsonAuthority(
+    io,
+    sourceId,
+    url,
+    timeoutMs,
+    'named authority',
+    'named authority payload was not an object'
+  );
 }
 
 async function githubFetch(
@@ -254,7 +352,10 @@ async function githubFetch(
   init: RequestInit,
   timeoutMs = GITHUB_TIMEOUT_MS
 ): Promise<Response | AuthorityRead> {
-  if (!io.githubToken || !io.githubOwner || !io.githubRepo) {
+  const githubToken = io.getGithubToken
+    ? await io.getGithubToken()
+    : io.githubToken;
+  if (!githubToken || !io.githubOwner || !io.githubRepo) {
     return failedRead(
       sourceId,
       'unavailable',
@@ -272,7 +373,7 @@ async function githubFetch(
     signal: AbortSignal.timeout(timeoutMs),
     headers: {
       accept: 'application/vnd.github+json',
-      authorization: `Bearer ${io.githubToken}`,
+      authorization: `Bearer ${githubToken}`,
       ...init.headers,
     },
   });
@@ -424,7 +525,7 @@ export async function readMergeQueue(io: LiveIo): Promise<AuthorityRead> {
 
 export async function readWorkflow(
   io: LiveIo,
-  sourceId: 'exact-sha-ci' | 'production-controller',
+  sourceId: 'exact-sha-ci' | 'production-controller' | 'staging-controller',
   workflow: string
 ): Promise<AuthorityRead> {
   const repositoryUrl = `${GITHUB_API_URL}/repos/${encodeURIComponent(io.githubOwner ?? '')}/${encodeURIComponent(io.githubRepo ?? '')}`;
@@ -655,6 +756,10 @@ export async function readWorkflow(
       errorMessage: green ? undefined : (conclusion ?? 'ci-not-green'),
       measuredMeanings:
         sourceId === 'exact-sha-ci' ? { ciGreen: green } : undefined,
+      delivery:
+        sourceId === 'staging-controller'
+          ? { certifiedHead: certifiedHeadFromRuns(runs) }
+          : undefined,
     };
   } catch (error) {
     if (sourceId === 'production-controller') {
@@ -672,6 +777,25 @@ export async function readWorkflow(
       error instanceof Error ? error.message : 'workflow unreachable'
     );
   }
+}
+
+/**
+ * The exact main HEAD the staging controller generation certified: the
+ * newest fetched run whose own conclusion was success. Absent runs report
+ * nothing rather than zero.
+ */
+function certifiedHeadFromRuns(runs: readonly Record<string, unknown>[]): {
+  readonly sha: string | null;
+  readonly certifiedAt: string | null;
+} {
+  const certified = runs.find(
+    run => run.conclusion === 'success' && isExactSha(run.head_sha)
+  );
+  return {
+    sha:
+      certified && isExactSha(certified.head_sha) ? certified.head_sha : null,
+    certifiedAt: certified ? parseTimestamp(certified.updated_at) : null,
+  };
 }
 
 function countRecord(value: unknown): Record<string, number> {
@@ -743,18 +867,21 @@ export function parseLanesStatus(
     alerts,
     heldByReason: countRecord(payload.held_by_reason),
     failedByReason: countRecord(payload.failed_by_reason),
+    capacity: parseCapacityHorizon(payload.capacity),
     publishedAt,
     stale: false,
   };
 }
 
 export async function readLanesStatus(io: LiveIo): Promise<AuthorityRead> {
-  const read = await readNamedUrl(
-    io,
-    'lanes-status',
-    NAMED_AUTHORITY_URLS['lanes-status'],
-    PUBLIC_SOURCE_TIMEOUT_MS
-  );
+  const read = io.gemBridge
+    ? await readBridgeReceipt(io, 'lanes-status')
+    : await readNamedUrl(
+        io,
+        'lanes-status',
+        NAMED_AUTHORITY_URLS['lanes-status'],
+        PUBLIC_SOURCE_TIMEOUT_MS
+      );
   if (read.status !== 'ok' || !read.payload) return read;
   const lanes = parseLanesStatus(read.payload);
   if (!lanes) {
@@ -836,6 +963,91 @@ function unreachable(sourceId: ShippingSourceId, error: unknown) {
   );
 }
 
+const CHECK_RUN_FAILURE_CONCLUSIONS = new Set([
+  'FAILURE',
+  'TIMED_OUT',
+  'CANCELLED',
+  'ACTION_REQUIRED',
+  'STARTUP_FAILURE',
+  'STALE',
+]);
+const STATUS_CONTEXT_FAILURE_STATES = new Set(['FAILURE', 'ERROR']);
+const MAX_FAILING_CHECK_NAMES = 20;
+
+function boundedCheckName(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.replace(/\s+/g, ' ').trim().slice(0, 120);
+  return normalized.length > 0 ? normalized : null;
+}
+
+function checkRollupState(
+  value: unknown
+): 'success' | 'failure' | 'pending' | 'unknown' {
+  if (typeof value !== 'string') return 'unknown';
+  switch (value.toUpperCase()) {
+    case 'SUCCESS':
+      return 'success';
+    case 'FAILURE':
+    case 'ERROR':
+      return 'failure';
+    case 'PENDING':
+    case 'EXPECTED':
+      return 'pending';
+    default:
+      return 'unknown';
+  }
+}
+
+function failingContextName(context: unknown): string | null {
+  if (!isRecord(context)) return null;
+  if (context.__typename === 'CheckRun') {
+    if (
+      typeof context.conclusion !== 'string' ||
+      !CHECK_RUN_FAILURE_CONCLUSIONS.has(context.conclusion)
+    ) {
+      return null;
+    }
+    return boundedCheckName(context.name);
+  }
+  if (context.__typename === 'StatusContext') {
+    if (
+      typeof context.state !== 'string' ||
+      !STATUS_CONTEXT_FAILURE_STATES.has(context.state)
+    ) {
+      return null;
+    }
+    return boundedCheckName(context.context);
+  }
+  return null;
+}
+
+/**
+ * Per-PR check rollup: GitHub's `StatusCheckRollup.state` plus the names of
+ * the failing runs so the shipping matrix can say *what* is red without a
+ * second fetch. Missing or partial data reads as `unknown`, never success.
+ */
+function laneChecksSummary(node: Record<string, unknown>): {
+  rollup: 'success' | 'failure' | 'pending' | 'unknown';
+  failing: string[];
+} {
+  const commits = isRecord(node.commits) ? node.commits.nodes : null;
+  const first = Array.isArray(commits) ? commits.find(isRecord) : null;
+  const commit = first && isRecord(first.commit) ? first.commit : null;
+  const rollup =
+    commit && isRecord(commit.statusCheckRollup)
+      ? commit.statusCheckRollup
+      : null;
+  const summary = checkRollupState(rollup?.state);
+  const failing: string[] = [];
+  const contexts =
+    rollup && isRecord(rollup.contexts) ? rollup.contexts.nodes : null;
+  for (const ctx of Array.isArray(contexts) ? contexts : []) {
+    const name = failingContextName(ctx);
+    if (name && failing.length < MAX_FAILING_CHECK_NAMES) failing.push(name);
+  }
+  return { rollup: summary, failing };
+}
+
 /**
  * Open lane PRs (`devin/`, `codex/` heads) via one search request per poll.
  * Dependabot and human branches are excluded by construction.
@@ -897,6 +1109,8 @@ export async function readLanePullRequests(io: LiveIo): Promise<AuthorityRead> {
         pullRequests.push({
           number: node.number,
           title: node.title,
+          url: typeof node.url === 'string' ? node.url : null,
+          createdAt: node.createdAt,
           headRefName: node.headRefName,
           headRefOid: node.headRefOid,
           isDraft: node.isDraft === true,
@@ -906,6 +1120,13 @@ export async function readLanePullRequests(io: LiveIo): Promise<AuthorityRead> {
           mergeQueuePosition: Number.isInteger(queueEntry?.position)
             ? queueEntry?.position
             : null,
+          mergeQueueState:
+            typeof queueEntry?.state === 'string' ? queueEntry.state : null,
+          authorLogin:
+            isRecord(node.author) && typeof node.author.login === 'string'
+              ? node.author.login
+              : null,
+          checks: laneChecksSummary(node),
         });
       }
     }
@@ -1031,12 +1252,15 @@ async function readBehindMain(io: LiveIo, sha: string) {
   }
 }
 
-/** jov.ie build-info plus how many main commits production is missing. */
-export async function readLiveBuild(io: LiveIo): Promise<AuthorityRead> {
+/** A `jovie-build-info/v1` host receipt plus its distance behind main. */
+async function readBuildInfo(
+  io: LiveIo,
+  sourceId: 'live-build-info' | 'staging-build-info'
+): Promise<AuthorityRead> {
   const read = await readNamedUrl(
     io,
-    'live-build-info',
-    NAMED_AUTHORITY_URLS['live-build-info'],
+    sourceId,
+    NAMED_AUTHORITY_URLS[sourceId],
     PUBLIC_SOURCE_TIMEOUT_MS
   );
   if (read.status !== 'ok' || !read.payload) return read;
@@ -1047,17 +1271,29 @@ export async function readLiveBuild(io: LiveIo): Promise<AuthorityRead> {
     Number.isFinite(payload.deployedAt)
       ? new Date(payload.deployedAt).toISOString()
       : parseTimestamp(payload.deployedAt);
+  const block = {
+    sha,
+    version: sanitizeOpaqueIdentifier(payload.version, 32),
+    deployedAt,
+    behindMain: sha ? await readBehindMain(io, sha) : NOT_MEASURED_COUNT,
+  };
   return {
     ...read,
-    delivery: {
-      production: {
-        sha,
-        version: sanitizeOpaqueIdentifier(payload.version, 32),
-        deployedAt,
-        behindMain: sha ? await readBehindMain(io, sha) : NOT_MEASURED_COUNT,
-      },
-    },
+    delivery:
+      sourceId === 'live-build-info'
+        ? { production: block }
+        : { staging: block },
   };
+}
+
+/** jov.ie build-info plus how many main commits production is missing. */
+export async function readLiveBuild(io: LiveIo): Promise<AuthorityRead> {
+  return readBuildInfo(io, 'live-build-info');
+}
+
+/** staging.jov.ie build-info — the standing staging revision. */
+export async function readStagingBuild(io: LiveIo): Promise<AuthorityRead> {
+  return readBuildInfo(io, 'staging-build-info');
 }
 
 /** Summer's public runtime health channel (`/runtime/v1/health`). */
@@ -1111,10 +1347,17 @@ export function createLiveShippingStateReaders(
     'exact-sha-ci': () => readWorkflow(io, 'exact-sha-ci', 'ci.yml'),
     'production-controller': () =>
       readWorkflow(io, 'production-controller', 'production-controller.yml'),
+    'staging-controller': () =>
+      readWorkflow(io, 'staging-controller', 'staging-controller.yml'),
     'live-build-info': cachedReader(
       io,
       () => readLiveBuild(io),
       SOURCE_CACHE_TTL_MS['live-build-info']
+    ),
+    'staging-build-info': cachedReader(
+      io,
+      () => readStagingBuild(io),
+      SOURCE_CACHE_TTL_MS['staging-build-info']
     ),
     'summer-runtime': cachedReader(
       io,
@@ -1128,8 +1371,12 @@ export function defaultLiveIo(overrides: Partial<LiveIo> = {}): LiveIo {
   return {
     fetch: overrides.fetch ?? fetch,
     githubToken: overrides.githubToken,
+    ...(overrides.getGithubToken
+      ? { getGithubToken: overrides.getGithubToken }
+      : {}),
     githubOwner: overrides.githubOwner,
     githubRepo: overrides.githubRepo,
     ...(overrides.nowMs ? { nowMs: overrides.nowMs } : {}),
+    gemBridge: overrides.gemBridge,
   };
 }

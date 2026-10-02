@@ -18,6 +18,31 @@ import {
 import { runReview } from './run.mjs';
 
 const SHA_RE = /^[0-9a-f]{40}$/;
+/** @param {unknown} value @returns {value is Record<string, unknown>} */
+const isRecord = value =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+function gitRef(value) {
+  if (
+    !isRecord(value) ||
+    typeof value.sha !== 'string' ||
+    !SHA_RE.test(value.sha)
+  )
+    throw new Error('GitHub commit identity is malformed');
+  return { sha: value.sha };
+}
+export function parsePull(value) {
+  if (!isRecord(value) || (value.state !== 'open' && value.state !== 'closed'))
+    throw new Error('GitHub pull request is malformed');
+  return {
+    state: value.state,
+    base: gitRef(value.base),
+    head: gitRef(value.head),
+  };
+}
+export function parseCompare(value) {
+  if (!isRecord(value)) throw new Error('GitHub comparison is malformed');
+  return { merge_base_commit: gitRef(value.merge_base_commit) };
+}
 
 export function readRiskRuleIds(path) {
   if (!path || !existsSync(path)) return null;
@@ -55,14 +80,16 @@ async function main() {
     throw new Error('PR_NUMBER, HEAD_SHA and GITHUB_REPOSITORY are required');
   }
 
-  const pull = await github(`/repos/${repo}/pulls/${pr}`, token);
-  const compare = await github(
-    `/repos/${repo}/compare/${pull.base.sha}...${expectedHead}`,
-    token
+  const pull = parsePull(await github(`/repos/${repo}/pulls/${pr}`, token));
+  const compare = parseCompare(
+    await github(
+      `/repos/${repo}/compare/${pull.base.sha}...${expectedHead}`,
+      token
+    )
   );
   const baseSha = compare.merge_base_commit?.sha ?? '';
   const readLiveHead = async () =>
-    (await github(`/repos/${repo}/pulls/${pr}`, token)).head.sha;
+    parsePull(await github(`/repos/${repo}/pulls/${pr}`, token)).head.sha;
 
   const write = receipt => {
     writeFileSync(out, `${JSON.stringify(receipt, null, 2)}\n`);

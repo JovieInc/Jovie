@@ -38,8 +38,6 @@ const SERIES_COLORS = {
   closed: 'var(--color-accent-gray)',
 } as const;
 
-const CHART_DOT_STROKE = 'var(--color-bg-surface-1)';
-const CHART_CURSOR_STROKE = 'var(--color-border-subtle)';
 const REFRESH_INTERVAL_MS = 2 * 60 * 1000;
 const AGE_TICK_INTERVAL_MS = 30 * 1000;
 
@@ -60,16 +58,6 @@ function formatCachedAgo(cachedTimestamp: number, nowMs: number): string {
   return `${hours} hrs ago`;
 }
 
-function formatTooltipDate(dateStr: string): string {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  const date = new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1));
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  });
-}
-
 function ShippingVelocityChartSkeleton() {
   return (
     <ContentChartSkeleton
@@ -80,196 +68,12 @@ function ShippingVelocityChartSkeleton() {
   );
 }
 
-interface CustomTooltipProps {
-  readonly active?: boolean;
-  readonly payload?: Array<{
-    name: string;
-    value: number;
-    color: string;
-  }>;
-  readonly label?: string;
-}
-
-function CustomTooltip({
-  active,
-  payload,
-  label,
-}: Readonly<CustomTooltipProps>) {
-  if (!active || !payload || payload.length === 0 || !label) return null;
-
-  const dateLabel = formatTooltipDate(label);
-  const merged = payload.find(p => p.name === 'merged');
-  const opened = payload.find(p => p.name === 'opened');
-  const closed = payload.find(p => p.name === 'closed');
-
-  const parts: string[] = [];
-  if (merged && merged.value > 0) parts.push(`${merged.value} merged`);
-  if (opened && opened.value > 0) parts.push(`${opened.value} opened`);
-  if (closed && closed.value > 0) parts.push(`${closed.value} closed`);
-
-  if (parts.length === 0) return null;
-
-  return (
-    <div className='rounded-lg border border-subtle bg-surface-1 px-3 py-2 shadow-card'>
-      <p className='mb-1 text-2xs font-semibold text-secondary-token'>
-        {dateLabel}
-      </p>
-      <p className='text-xs text-primary-token'>{parts.join(', ')}</p>
-    </div>
-  );
-}
-
-// The actual Recharts chart — lazy-loaded to keep bundle size down
 const LazyVelocityChart = dynamic(
   () =>
-    import('recharts').then(mod => {
-      const { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } = mod;
-
-      interface ChartDataPoint extends DailyBucket {
-        label: string;
-      }
-
-      interface InnerChartProps {
-        readonly data: DailyBucket[];
-        readonly spotlight: string | null;
-        readonly onLineClick: (series: string) => void;
-        readonly onChartClick: () => void;
-        readonly showClosed: boolean;
-      }
-
-      function getSeriesOpacity(
-        seriesName: string,
-        spotlight: string | null
-      ): number {
-        if (!spotlight) return 1;
-        return spotlight === seriesName ? 1 : 0.15;
-      }
-
-      function RechartVelocityChart({
-        data,
-        spotlight,
-        onLineClick,
-        onChartClick,
-        showClosed,
-      }: Readonly<InnerChartProps>) {
-        const formatted: ChartDataPoint[] = data.map(d => ({
-          ...d,
-          label: d.date,
-        }));
-
-        const mergedOpacity = getSeriesOpacity('merged', spotlight);
-        const openedOpacity = getSeriesOpacity('opened', spotlight);
-        const closedOpacity = getSeriesOpacity('closed', spotlight);
-
-        return (
-          <ResponsiveContainer width='100%' height={200}>
-            <AreaChart
-              data={formatted}
-              margin={{ top: 8, right: 8, left: 8, bottom: 0 }}
-              onClick={onChartClick}
-              accessibilityLayer={false}
-            >
-              <defs>
-                <linearGradient id='mergedGradient' x1='0' y1='0' x2='0' y2='1'>
-                  <stop
-                    offset='5%'
-                    stopColor={SERIES_COLORS.merged}
-                    stopOpacity={0.08}
-                  />
-                  <stop
-                    offset='95%'
-                    stopColor={SERIES_COLORS.merged}
-                    stopOpacity={0}
-                  />
-                </linearGradient>
-              </defs>
-
-              <XAxis
-                dataKey='label'
-                tick={false}
-                axisLine={false}
-                tickLine={false}
-              />
-
-              <Tooltip
-                content={<CustomTooltip />}
-                cursor={{ stroke: CHART_CURSOR_STROKE, strokeWidth: 1 }}
-              />
-
-              {/* Merged PRs — hero series */}
-              <Area
-                type='monotone'
-                dataKey='merged'
-                stroke={SERIES_COLORS.merged}
-                strokeWidth={2.5}
-                fill='url(#mergedGradient)'
-                dot={false}
-                activeDot={{
-                  r: 4,
-                  fill: SERIES_COLORS.merged,
-                  stroke: CHART_DOT_STROKE,
-                  strokeWidth: 2,
-                  onClick: () => onLineClick('merged'),
-                }}
-                opacity={mergedOpacity}
-                onClick={() => onLineClick('merged')}
-                style={{ cursor: 'pointer' }}
-              />
-
-              {/* Opened PRs — dashed comparison series */}
-              <Area
-                type='monotone'
-                dataKey='opened'
-                stroke={SERIES_COLORS.opened}
-                strokeWidth={1.5}
-                strokeDasharray='5 3'
-                fill='none'
-                dot={false}
-                activeDot={{
-                  r: 3,
-                  fill: SERIES_COLORS.opened,
-                  stroke: CHART_DOT_STROKE,
-                  strokeWidth: 2,
-                  onClick: () => onLineClick('opened'),
-                }}
-                opacity={openedOpacity * 0.55}
-                onClick={() => onLineClick('opened')}
-                style={{ cursor: 'pointer' }}
-              />
-
-              {/* Closed without merge — hidden by default */}
-              {showClosed ? (
-                <Area
-                  type='monotone'
-                  dataKey='closed'
-                  stroke={SERIES_COLORS.closed}
-                  strokeWidth={1.5}
-                  strokeDasharray='2 3'
-                  fill='none'
-                  dot={false}
-                  activeDot={{
-                    r: 3,
-                    fill: SERIES_COLORS.closed,
-                    stroke: CHART_DOT_STROKE,
-                    strokeWidth: 2,
-                    onClick: () => onLineClick('closed'),
-                  }}
-                  opacity={closedOpacity}
-                  onClick={() => onLineClick('closed')}
-                  style={{ cursor: 'pointer' }}
-                />
-              ) : null}
-            </AreaChart>
-          </ResponsiveContainer>
-        );
-      }
-
-      return RechartVelocityChart;
-    }),
-  {
-    ssr: false,
-    loading: () => <ShippingVelocityChartSkeleton />,
-  }
+    import('./ShippingVelocityCanvas').then(
+      module => module.ShippingVelocityCanvas
+    ),
+  { ssr: false, loading: () => <ShippingVelocityChartSkeleton /> }
 );
 
 export function ShippingVelocityChart({
@@ -454,13 +258,13 @@ export function ShippingVelocityChart({
     setSpotlight(null);
   }
 
-  function handleLineClick(series: string) {
+  const handleLineClick = useCallback((series: string) => {
     setSpotlight(prev => (prev === series ? null : series));
-  }
+  }, []);
 
-  function handleChartClick() {
+  const handleChartClick = useCallback(() => {
     setSpotlight(null);
-  }
+  }, []);
 
   const handleRetry = () => {
     fetchData(requestedRange).catch(() => {});
@@ -493,8 +297,8 @@ export function ShippingVelocityChart({
   return (
     <div className='p-4'>
       {/* Header row */}
-      <div className='mb-3 flex items-center justify-between gap-3'>
-        <div className='flex items-center gap-3'>
+      <div className='mb-3 flex flex-wrap items-center justify-between gap-3'>
+        <div className='flex flex-wrap items-center gap-3'>
           <h3
             id={titleId}
             className='text-2xs font-semibold tracking-normal text-secondary-token'
@@ -571,76 +375,86 @@ export function ShippingVelocityChart({
         </div>
       </div>
 
-      {/* Chart area */}
-      {isLoading && data.length === 0 ? (
-        <ShippingVelocityChartSkeleton />
-      ) : observation === 'not_configured' ? (
-        <ContentChartFrame heightClassName='h-50'>
-          <HudObservationStatus
-            state='not_configured'
-            message={error ?? 'GitHub is not configured for shipping velocity.'}
-            testId='hud-shipping-velocity-observation'
-          />
-        </ContentChartFrame>
-      ) : observation === 'empty' ? (
-        <ContentChartFrame heightClassName='h-50'>
-          <HudObservationStatus
-            state='empty'
-            message='No PRs in this period. Zero is shown only after a successful observation.'
-            freshnessLabel={freshnessLabel}
-            testId='hud-shipping-velocity-observation'
-          />
-        </ContentChartFrame>
-      ) : observation === 'unavailable' && data.length === 0 ? (
-        <ContentChartFrame heightClassName='h-50'>
-          <HudObservationStatus
-            state='unavailable'
-            message={error ?? 'Shipping velocity is unavailable.'}
-            freshnessLabel={freshnessLabel}
-            onRetry={handleRetry}
-            testId='hud-shipping-velocity-observation'
-          />
-        </ContentChartFrame>
-      ) : showChart ? (
-        <>
-          <div className='min-h-14' data-testid='shipping-velocity-status-slot'>
-            {observation === 'unavailable' || observation === 'stale' ? (
-              <HudObservationStatus
-                state={observation}
-                message={
-                  observation === 'stale'
-                    ? (error ??
-                      'Refresh unavailable; showing last verified shipping velocity.')
-                    : retainedRangeMessage
-                }
-                freshnessLabel={freshnessLabel}
-                onRetry={handleRetry}
-                testId='hud-shipping-velocity-observation'
-              />
-            ) : null}
-          </div>
-          <figure
-            role='img'
-            aria-labelledby={titleId}
-            aria-describedby={summaryId}
-            data-testid='shipping-velocity-figure'
-          >
-            <LazyVelocityChart
-              data={data}
-              spotlight={spotlight}
-              onLineClick={handleLineClick}
-              onChartClick={handleChartClick}
-              showClosed={showClosed}
+      {/* Stable observation viewport across asynchronous states. */}
+      <div className='min-h-72'>
+        {isLoading && data.length === 0 ? (
+          <ShippingVelocityChartSkeleton />
+        ) : observation === 'not_configured' ? (
+          <ContentChartFrame heightClassName='h-50'>
+            <HudObservationStatus
+              state='not_configured'
+              message={
+                error ?? 'GitHub is not configured for shipping velocity.'
+              }
+              testId='hud-shipping-velocity-observation'
             />
-            <figcaption id={summaryId} className='sr-only'>
-              {accessibleSummary}
-            </figcaption>
-          </figure>
-        </>
-      ) : (
-        <ShippingVelocityChartSkeleton />
-      )}
-
+          </ContentChartFrame>
+        ) : observation === 'empty' ? (
+          <ContentChartFrame heightClassName='h-50'>
+            <HudObservationStatus
+              state='empty'
+              message='No Pull Requests in this period. Zero is shown only after a successful observation.'
+              freshnessLabel={freshnessLabel}
+              testId='hud-shipping-velocity-observation'
+            />
+          </ContentChartFrame>
+        ) : observation === 'unavailable' && data.length === 0 ? (
+          <ContentChartFrame heightClassName='h-50'>
+            <HudObservationStatus
+              state='unavailable'
+              message={error ?? 'Shipping velocity is unavailable.'}
+              freshnessLabel={freshnessLabel}
+              onRetry={handleRetry}
+              testId='hud-shipping-velocity-observation'
+            />
+          </ContentChartFrame>
+        ) : showChart ? (
+          <>
+            <div
+              className='min-h-14'
+              data-testid='shipping-velocity-status-slot'
+            >
+              {observation === 'unavailable' || observation === 'stale' ? (
+                <HudObservationStatus
+                  state={observation}
+                  message={
+                    observation === 'stale'
+                      ? (error ??
+                        'Refresh unavailable; showing last verified shipping velocity.')
+                      : retainedRangeMessage
+                  }
+                  freshnessLabel={freshnessLabel}
+                  onRetry={handleRetry}
+                  testId='hud-shipping-velocity-observation'
+                />
+              ) : null}
+            </div>
+            <figure
+              role='img'
+              aria-labelledby={titleId}
+              aria-describedby={summaryId}
+              data-testid='shipping-velocity-figure'
+            >
+              <LazyVelocityChart
+                data={data}
+                spotlight={spotlight}
+                onLineClick={handleLineClick}
+                onChartClick={handleChartClick}
+                showClosed={showClosed}
+              />
+              <figcaption id={summaryId} className='sr-only'>
+                {accessibleSummary}
+              </figcaption>
+            </figure>
+          </>
+        ) : (
+          <ShippingVelocityChartSkeleton />
+        )}
+      </div>
+      <p className='mt-2 text-xs text-secondary-token'>
+        GitHub pull requests · UTC days · Counts per day. Merges are source
+        changes; deployment and verified runtime require separate receipts.
+      </p>
       {/* Footer */}
       <div
         className='mt-2 min-h-4 truncate text-right text-3xs text-tertiary-token'

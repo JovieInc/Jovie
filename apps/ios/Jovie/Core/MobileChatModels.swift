@@ -1,41 +1,5 @@
 import Foundation
-
-struct MobileConversationSummary: Codable, Equatable, Identifiable, Sendable {
-  let id: String
-  let title: String?
-  let createdAt: String
-  let updatedAt: String
-  let latestMessageRole: String?
-  let latestTurnStatus: String?
-}
-
-struct MobileConversationListResponse: Codable, Equatable, Sendable {
-  let conversations: [MobileConversationSummary]
-}
-
-struct MobileConversationDetailResponse: Codable, Equatable, Sendable {
-  let conversation: MobileConversationRecord
-  let messages: [MobileConversationMessage]
-  let hasMore: Bool
-}
-
-struct MobileConversationRecord: Codable, Equatable, Sendable {
-  let id: String
-  let title: String?
-  let createdAt: String
-  let updatedAt: String
-}
-
-struct MobileConversationMessage: Codable, Equatable, Identifiable, Sendable {
-  let id: String
-  let role: String
-  let content: String
-  let clientMessageId: String?
-  let turnId: String?
-  let turnStatus: String?
-  let createdAt: String
-  let requiresWebHandoff: Bool
-}
+import JovieKit
 
 enum MobileChatTimelineRole: String, Equatable, Sendable {
   case user
@@ -315,50 +279,6 @@ enum MobileChatAllComponentsFixture {
   ]
 }
 
-struct MobileChatTurnRequest: Encodable, Sendable {
-  let conversationId: String?
-  let clientTurnId: String
-  let clientMessageId: String
-  let text: String
-  let source: String
-  let chatMode: String?
-
-  init(
-    conversationId: String?,
-    clientTurnId: String,
-    clientMessageId: String,
-    text: String,
-    source: String,
-    chatMode: String? = nil
-  ) {
-    self.conversationId = conversationId
-    self.clientTurnId = clientTurnId
-    self.clientMessageId = clientMessageId
-    self.text = text
-    self.source = source
-    self.chatMode = chatMode
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case conversationId
-    case clientTurnId
-    case clientMessageId
-    case text
-    case source
-    case chatMode
-  }
-
-  func encode(to encoder: Encoder) throws {
-    var container = encoder.container(keyedBy: CodingKeys.self)
-    try container.encodeIfPresent(conversationId, forKey: .conversationId)
-    try container.encode(clientTurnId, forKey: .clientTurnId)
-    try container.encode(clientMessageId, forKey: .clientMessageId)
-    try container.encode(text, forKey: .text)
-    try container.encode(source, forKey: .source)
-    try container.encodeIfPresent(chatMode, forKey: .chatMode)
-  }
-}
-
 struct EyesFreeCaptureAPIRequest: Encodable, Sendable {
   let destination: String
   let transcript: String
@@ -373,41 +293,4 @@ struct EyesFreeCaptureAPIResponse: Decodable, Equatable, Sendable {
   let turnId: String?
   let readback: String
   let errorCode: String?
-}
-
-enum MobileChatStreamEvent: Equatable, Sendable {
-  case turnReserved(conversationId: String, turnId: String, clientTurnId: String)
-  case turnState(clientTurnId: String, state: String, eveWorkId: String?)
-  case assistantDelta(clientTurnId: String, text: String)
-  case assistantCompleted(
-    clientTurnId: String,
-    conversationId: String,
-    turnId: String,
-    text: String
-  )
-  case webHandoff(clientTurnId: String, conversationId: String, url: URL, summary: String)
-  case error(code: String, message: String)
-}
-
-enum MobileChatClientError: Error, Equatable, LocalizedError {
-  case decodingFailed
-  case invalidResponse
-  case requestFailed(statusCode: Int)
-  case transportFailed(code: Int)
-  case streamFailed(message: String)
-
-  var errorDescription: String? {
-    switch self {
-    case .decodingFailed:
-      return "The chat response could not be decoded."
-    case .invalidResponse:
-      return "The chat server returned an invalid response."
-    case let .requestFailed(statusCode):
-      return "The chat request failed with status code \(statusCode)."
-    case let .transportFailed(code):
-      return "The chat network request failed with code \(code)."
-    case let .streamFailed(message):
-      return message
-    }
-  }
 }

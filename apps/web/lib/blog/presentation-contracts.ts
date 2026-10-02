@@ -8,6 +8,8 @@ export interface BlogPostMetadata {
   authorProfile?: string;
   category?: string;
   tags: string[];
+  image?: string;
+  imageAlt?: string;
   excerpt: string;
   readingTime: number;
   wordCount: number;

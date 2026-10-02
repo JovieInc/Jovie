@@ -29,6 +29,8 @@ import {
 } from '@/lib/ovie/shipping-state';
 import {
   createLiveShippingStateReaders,
+  GEM_BRIDGE_RECEIPT_KEYS,
+  gemBridgeReceiptUrl,
   NAMED_AUTHORITY_URLS,
   readMergeQueue,
   readWorkflow,
@@ -133,6 +135,8 @@ function baseline(
         measuredMeanings: { exactLiveBuild: true },
       }
     ),
+    'staging-controller': ok('staging-controller', { conclusion: 'success' }),
+    'staging-build-info': ok('staging-build-info', { commitSha: SHA }),
     ...overrides,
   };
 }
@@ -162,7 +166,9 @@ describe('ovie.shipping-state.v1 contract', () => {
       'github-merges',
       'exact-sha-ci',
       'production-controller',
+      'staging-controller',
       'live-build-info',
+      'staging-build-info',
       'summer-runtime',
     ]);
     expect(BUDGET).toBe(10_000);
@@ -1715,6 +1721,174 @@ describe('truthful blocked-work and ship-time semantics', () => {
     expect(unmatched.timeToShipSeconds).toEqual({
       state: 'not-measured',
       value: null,
+    });
+  });
+});
+
+describe('bounded authenticated Gem transport', () => {
+  const bridge = { url: 'https://gem.example.internal/hud', token: 'tok' };
+  const lanesReceipt = {
+    schema: 'symphony-lanes-status/v1',
+    at: T0,
+    running: 1,
+    idle: 1,
+    lanes: { main: { running: 1, slots: 2 } },
+  };
+
+  it('addresses only fixed receipt keys on the configured bridge', () => {
+    for (const sourceId of SHIPPING_SOURCE_IDS) {
+      const url = gemBridgeReceiptUrl(bridge, sourceId);
+      if (sourceId in GEM_BRIDGE_RECEIPT_KEYS) {
+        expect(url).toBe(
+          `https://gem.example.internal/hud/receipts/${sourceId}`
+        );
+      } else {
+        expect(url).toBeNull();
+      }
+    }
+    expect(gemBridgeReceiptUrl(bridge, 'lanes-status')).toBe(
+      'https://gem.example.internal/hud/receipts/lanes-status'
+    );
+    expect(
+      gemBridgeReceiptUrl(
+        { ...bridge, url: 'https://gem.example.internal/hud///' },
+        'lanes-status'
+      )
+    ).toBe('https://gem.example.internal/hud/receipts/lanes-status');
+    for (const bad of [
+      { url: 'ftp://gem.example.internal', token: 'tok' },
+      { url: 'https://user:pw@gem.example.internal', token: 'tok' },
+      { url: 'https://gem.example.internal/?cmd=retry', token: 'tok' },
+      { url: 'https://gem.example.internal/#frag', token: 'tok' },
+      { url: 'not-a-url', token: 'tok' },
+      { url: 'https://gem.example.internal', token: '' },
+    ]) {
+      expect(gemBridgeReceiptUrl(bad, 'lanes-status')).toBeNull();
+    }
+  });
+
+  it('reads the lanes status receipt over the bridge with bearer auth', async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(JSON.stringify(lanesReceipt), { status: 200 })
+    );
+    const readers = createLiveShippingStateReaders({
+      fetch: fetchMock,
+      gemBridge: bridge,
+    });
+
+    const read = await readers['lanes-status']();
+
+    expect(read).toMatchObject({
+      status: 'ok',
+      sourceTimestamp: T0,
+      delivery: {
+        lanes: expect.objectContaining({ running: expect.anything() }),
+      },
+    });
+    const call = fetchMock.mock.calls[0];
+    expect(String(call?.[0])).toBe(
+      'https://gem.example.internal/hud/receipts/lanes-status'
+    );
+    expect((call?.[1]?.headers as Record<string, string>).authorization).toBe(
+      'Bearer tok'
+    );
+  });
+
+  it.each([
+    ['unauthorized', 401, 'unauthorized'],
+    ['forbidden', 403, 'unauthorized'],
+    ['http failure', 502, 'unavailable'],
+  ])(
+    'maps bridge %s to an explicit observation state',
+    async (_label, status, expected) => {
+      const readers = createLiveShippingStateReaders({
+        fetch: vi.fn(async () => new Response('{}', { status })),
+        gemBridge: bridge,
+        nowMs: () => Date.parse(T0),
+      });
+
+      expect(await readers['lanes-status']()).toMatchObject({
+        status: expected,
+      });
+    }
+  );
+
+  it('reports disconnect and malformed bridge receipts without fabricating', async () => {
+    const offline = createLiveShippingStateReaders({
+      fetch: vi.fn(async () => {
+        throw new Error('connection refused');
+      }),
+      gemBridge: bridge,
+      nowMs: () => Date.parse(T0),
+    });
+    expect(await offline['lanes-status']()).toMatchObject({
+      status: 'disconnected',
+    });
+
+    const malformed = createLiveShippingStateReaders({
+      fetch: vi.fn(async () => new Response('[]', { status: 200 })),
+      gemBridge: bridge,
+      nowMs: () => Date.parse(T0),
+    });
+    expect(await malformed['lanes-status']()).toMatchObject({
+      status: 'error',
+      errorCode: 'malformed',
+    });
+  });
+});
+
+describe('terminal failures are not aliased to blocked', () => {
+  it('measures terminal lane failures separately from blocked work', async () => {
+    const projection = await publish(
+      baseline({
+        'lanes-status': ok('lanes-status', {
+          schema: 'symphony-lanes-status/v1',
+          running: 1,
+          idle: 1,
+          failed_by_reason: { watchdog: 2, checkout: 1 },
+        }),
+      })
+    );
+
+    expect(projection.sources['lanes-status'].counts.terminalFailures).toEqual({
+      state: 'measured-nonzero',
+      value: 3,
+    });
+    expect(projection.terminalFailures).toEqual({
+      state: 'measured-nonzero',
+      value: 3,
+    });
+  });
+
+  it('stays not-measured when the feed reports no failure evidence', async () => {
+    const projection = await publish(
+      baseline({
+        'lanes-status': ok('lanes-status', lanes(1)),
+      })
+    );
+
+    expect(projection.terminalFailures).toEqual({
+      state: 'not-measured',
+      value: null,
+    });
+  });
+
+  it('measures zero only when the failure record is actually empty', async () => {
+    const projection = await publish(
+      baseline({
+        'lanes-status': ok('lanes-status', {
+          schema: 'symphony-lanes-status/v1',
+          running: 0,
+          idle: 0,
+          failed_by_reason: {},
+        }),
+      })
+    );
+
+    expect(projection.terminalFailures).toEqual({
+      state: 'measured-zero',
+      value: 0,
     });
   });
 });

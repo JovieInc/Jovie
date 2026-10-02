@@ -87,7 +87,7 @@ const merchModel: EntityCardModel = {
   meta: 'Premium tee',
   status: { label: 'Live', tone: 'live' },
   price: { display: '$45.00', profit: '$11.87' },
-  cta: { label: 'Buy', href: '/tim/merch/m1' },
+  cta: { label: 'Shop', href: '/tim/merch/m1' },
 };
 
 const pacArtist = {
@@ -108,7 +108,7 @@ describe('EntityCard', () => {
       screen.getByRole('heading', { name: 'Tour Tee 2026' })
     ).toBeInTheDocument();
     expect(screen.getByText('$45.00')).toBeInTheDocument();
-    expect(screen.getByText('Buy')).toBeInTheDocument();
+    expect(screen.getByText('Shop')).toBeInTheDocument();
   });
 
   it('keeps editorial helper lines outside paragraph anatomy', () => {
@@ -136,6 +136,11 @@ describe('EntityCard', () => {
     expect(screen.getByText('Jul')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    // JOV-INV-019 image-contrast: the pill sits on the card's own gradient
+    // artStyle background, so the date text needs a guaranteed-opaque well
+    // (bg-surface-0) underneath it, not a translucent one.
+    const dayPill = screen.getByText('4').closest('div');
+    expect(dayPill).toHaveClass('bg-surface-0');
   });
 
   it('renders a plain container when there is no href or cta target', () => {
@@ -192,7 +197,7 @@ describe('EntityCard', () => {
 
   it('keeps the CTA footer anchored outside the clipped text zone when shaped', () => {
     render(<EntityCard model={merchModel} treatment='big' shape='standard' />);
-    const cta = screen.getByText('Buy');
+    const cta = screen.getByText('Shop');
     // The footer row (CTA's parent) carries the bottom anchor and never sits
     // inside the overflow-hidden text block, so the button cannot shift or
     // clip regardless of title/metadata length.
@@ -318,7 +323,7 @@ describe('EntityCard', () => {
       render(
         <EntityCard model={merchModel} treatment='detailed' anatomy='unified' />
       );
-      const cta = screen.getByText('Buy');
+      const cta = screen.getByText('Shop');
       expect(cta.className).toContain('h-9');
       expect(cta.className).toContain('w-full');
       // Price joins the single meta line; there is no separate price block.
@@ -341,7 +346,7 @@ describe('EntityCard', () => {
         />
       );
 
-      const cta = screen.getByText('Buy');
+      const cta = screen.getByText('Shop');
       expect(cta).toHaveAttribute('href', '/tim/merch/m1');
       expect(cta.className).toContain('h-11');
       expect(cta.className).toContain('flex-none');
@@ -374,7 +379,7 @@ describe('EntityCard source contract', () => {
     const source = readFileSync(resolve(__dirname, './EntityCard.tsx'), 'utf8');
 
     expect(source).toContain(
-      "'block min-w-0 truncate text-[11.5px] text-tertiary-token'"
+      "'block min-w-0 truncate text-xs text-tertiary-token'"
     );
     expect(source).toContain(
       "<span className='block text-2xs text-tertiary-token'>"
@@ -784,6 +789,7 @@ describe('ProfilePacCard landscape states', () => {
     const card = screen.getByTestId('profile-pac');
     await waitFor(() => expect(card).toHaveAttribute('data-state', 'prompt'));
     expect(screen.queryByTestId('profile-pac-featured-art')).toBeNull();
+    expect(screen.getByText('New music, shows, and merch.')).toBeVisible();
     const email = screen.getByRole('textbox', { name: /email address/i });
     expect(email.closest('form')).toHaveClass('flex-col');
     expect(screen.getByRole('button', { name: 'Get Updates' })).toHaveClass(

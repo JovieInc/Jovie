@@ -31,6 +31,14 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 | `/api/account/email` | POST | Better Auth | Update account email |
 | `/api/account/export` | GET | Better Auth | Export user data (GDPR) |
 
+### Ovie privacy
+
+| Endpoint | Method | Auth | Purpose |
+|----------|--------|------|---------|
+| `/api/ovie/privacy-lock` | GET/POST | Fresh Better Auth + admin role; same-origin POST | Read `{enabled,locked,unlockedUntil}` or `enable`, `disable`, `lock`, `unlock`. Default off. Unlock requires a recent verified admin-capable passkey on the current session and lasts 24 hours from verification. Explicit relock invalidates receipts; disabling requires an active privacy unlock. |
+
+The optional per-user Ovie privacy gate protects operator data and actions server-side. It is independent of ordinary Jovie access and existing privileged-action/passkey-management authorization. A client cookie never grants operator access. Independent signed machine/service tokens and anonymous kiosk signage retain their existing authority; a valid kiosk token used in an authenticated browser still obeys that user's privacy policy. Credential-bearing claim-token exports and kiosk-secret retrieval retain privileged MFA even when privacy is unlocked.
+
 ### Admin (requires admin role)
 
 | Endpoint | Method | Auth | Purpose |
@@ -39,6 +47,7 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 | `/api/admin/campaigns/invites` | GET | Admin | List campaign invites |
 | `/api/admin/campaigns/settings` | GET | Admin | Campaign settings |
 | `/api/admin/campaigns/stats` | GET | Admin | Campaign statistics |
+| `/api/admin/contacts` | GET/POST | Admin | Read canonical customer lifecycle data and update stages |
 | `/api/admin/creator-avatar` | POST | Admin | Upload creator avatar |
 | `/api/admin/creator-ingest` | POST | Admin | Ingest single creator |
 | `/api/admin/creator-ingest/rerun` | POST | Admin | Re-run creator ingestion |
@@ -126,6 +135,7 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 | `/api/cron/process-pre-saves` | GET | CRON_SECRET | Process pre-save queue |
 | `/api/cron/schedule-release-notifications` | GET | CRON_SECRET | Schedule release alerts |
 | `/api/cron/send-release-notifications` | GET | CRON_SECRET | Send release alerts |
+| `/api/cron/web-ai-health` | GET | CRON_SECRET | Probe five production AI surfaces and return a redacted health receipt |
 
 ### Inbox Founder Reviews (authenticated founder surface)
 
@@ -460,6 +470,7 @@ All Drizzle schema files: `apps/web/lib/db/schema/`
 | `auth.ts` | Users, roles, sessions |
 | `analytics.ts` | Page views, click events |
 | `chat.ts` | Chat conversations, messages |
+| `contacts.ts` | Canonical contacts and lifecycle stage history |
 | `insights.ts` | AI-generated insights |
 | `dsp-enrichment.ts` | DSP match candidates |
 | `dsp-bio-sync.ts` | Bio sync jobs |
@@ -589,7 +600,7 @@ Zod-validated environment variables. Never use `process.env` directly.
 
 For the full set of enforced rules, see [`AGENTS.md`](../AGENTS.md). Key points:
 
-- **Node 22 + pnpm 9.15.4** -- verify before any command
+- **Node 24 + pnpm 9.15.9** -- verify before any command
 - **Monorepo commands from root** -- `pnpm --filter web ...`, never `cd apps/web`
 - **Server/client boundaries** -- no DB imports in `'use client'` files
 - **No `db.transaction()`** -- requires explicit approval; use approved RLS wrappers

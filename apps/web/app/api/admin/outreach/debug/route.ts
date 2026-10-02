@@ -2,10 +2,10 @@ import { count, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { env } from '@/lib/env';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import {
   developmentOnlyForbiddenJson,
   isExplicitDevelopmentEnvironment,
@@ -284,7 +284,7 @@ export async function GET() {
     });
   }
 
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },

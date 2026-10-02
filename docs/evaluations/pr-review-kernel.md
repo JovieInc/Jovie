@@ -91,7 +91,7 @@ of the relevant subscription cost.
   automatically. The Gateway model id is unverified until the first live run.
 - Replays switch models with `PR_REVIEW_DISCOVERY_MODEL` and
   `PR_REVIEW_VERIFICATION_MODEL`, limited to the allowlist above.
-- Per-PR budget: $0.50 (`DEFAULT_RUN_LIMITS.budgetUsd`).
+- Per-PR budget: $0.50 (`DEFAULT_RUN_LIMITS.budgetUsd`). Calls reserve a conservative input-byte/output-token ceiling before dispatch, including concurrent calls. Receipts distinguish observed spend from reserved budget; missing usage makes the receipt incomplete. The Gateway key must retain its own spend cap.
 
 ## Enabling the shadow run
 
@@ -106,8 +106,8 @@ Score replays with `node scripts/pr-review/replay.mjs <seed.json>`.
 
 1. **Contracts (done):** the receipt and finding contracts, the risk floors,
    and the release.md finding states.
-2. **Shadow run (this change):** the kernel in `scripts/pr-review/` and a
-   `pr-review.yml` workflow triggered by `workflow_run` of CI. Importers are found
+2. **Shadow run (this change):** the kernel in `scripts/pr-review/`; the disabled
+   `pr-review.yml` workflow ships separately. Importers are found
    with `git grep` for now; the TypeScript compiler API walk is deferred. Receipts are stored as artifacts only.
    Replay a seed set of 40–60 historical regressions plus about 20 clean PRs.
 3. **Publish:** the summary comment and inline findings. `/ship` reads the receipt.

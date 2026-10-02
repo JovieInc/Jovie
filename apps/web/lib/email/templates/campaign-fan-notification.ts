@@ -44,7 +44,7 @@ function buildCtaUrl(data: CampaignFanNotificationData): string {
 export function getCampaignFanNotificationSubject(
   data: CampaignFanNotificationData
 ): string {
-  return `${data.artistName} — ${data.campaignTitle}`;
+  return `${data.artistName}: ${data.campaignTitle}`;
 }
 
 /**

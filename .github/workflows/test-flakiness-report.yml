@@ -1,10 +1,14 @@
 name: Test Flakiness Report
-# clock-class: skip-if-unchanged
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# capability-gap: Retry and quarantine artifacts exist only after each test workflow terminates; this read-only hop aggregates them without rerunning a suite.
+# removal-trigger: Collapse this hop when each test producer emits the shared flakiness report and ratchet result in-band from the same exact artifacts.
 
 on:
-  schedule:
-    # Daily flakiness snapshot at 08:00 UTC; weekly deep report on Mondays.
-    - cron: '0 8 * * *'
+  workflow_run:
+    workflows: [CI, Changed-Evidence Test Suites, E2E Full Browser Matrix]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:

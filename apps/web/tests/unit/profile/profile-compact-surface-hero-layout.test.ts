@@ -192,6 +192,25 @@ describe('ProfileCompactSurface identity header layout', () => {
     );
   });
 
+  it('reserves the floating dock outside the scroll box at every viewport (JOV-7192)', () => {
+    const contents = readFileSync(DESIGN_SYSTEM, 'utf8');
+
+    // The reservation must live at top level, not inside the max-width media
+    // block: on the fixed-height desktop shell the dock otherwise covers the
+    // last card at rest even though it can technically scroll into view.
+    const declaration = 'margin-bottom: var(--profile-bottom-nav-height);';
+    const declarationIndex = contents.indexOf(declaration);
+    expect(declarationIndex).toBeGreaterThan(-1);
+    const lastMedia = contents.lastIndexOf('@media', declarationIndex);
+    const lastTopLevelClose = contents.lastIndexOf('\n}', declarationIndex);
+    expect(lastMedia).toBeLessThan(lastTopLevelClose);
+    // Embedded previews render no dock, so they keep the in-box padding.
+    const ruleStart = contents.lastIndexOf(':where(', declarationIndex);
+    expect(contents.slice(ruleStart, declarationIndex)).toContain(
+      'data-presentation="embedded"'
+    );
+  });
+
   it('preserves the landscape track minimum when identity text consumes the viewport', () => {
     const contents = readFileSync(DESIGN_SYSTEM, 'utf8');
 

@@ -73,7 +73,7 @@ export function SettingsSmsAccessSection({
                 </button>
               )}
               {isError && (
-                <p className='mt-1.5 text-xs text-red-500'>
+                <p className='mt-1.5 text-xs text-error'>
                   {error?.message ?? 'Failed to submit request'}
                 </p>
               )}

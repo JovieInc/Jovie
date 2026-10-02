@@ -1,14 +1,15 @@
 import 'server-only';
 import { z } from 'zod';
-import { getAnthropicClient } from '@/lib/ai/anthropic';
+import { gateway, generateText } from '@/lib/ai/sdk';
+import { CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
 import type {
   InterviewSummaryStructured,
   InterviewTranscriptEntry,
 } from '@/lib/db/schema/user-interviews';
 import { withTimeout } from '@/lib/resilience/primitives';
 
-const ANTHROPIC_REQUEST_TIMEOUT_MS = 30_000;
-const MODEL_ID = 'claude-haiku-4-5-20251001';
+const REQUEST_TIMEOUT_MS = 30_000;
+const MODEL_ID = CHAT_MODEL_LIGHT;
 
 const SUMMARY_SCHEMA = z.object({
   one_line_summary: z.string().min(1).max(400),
@@ -77,28 +78,23 @@ export interface SummarizeResult {
 export async function summarizeInterview(
   transcript: InterviewTranscriptEntry[]
 ): Promise<SummarizeResult> {
-  const anthropic = getAnthropicClient();
   const prompt = buildPrompt(transcript);
 
-  const message = await withTimeout(
-    anthropic.messages.create(
-      {
-        model: MODEL_ID,
-        max_tokens: 800,
-        messages: [{ role: 'user', content: prompt }],
-      },
-      { timeout: ANTHROPIC_REQUEST_TIMEOUT_MS }
-    ),
+  const result = await withTimeout(
+    generateText({
+      model: gateway(MODEL_ID),
+      maxOutputTokens: 800,
+      prompt,
+    }),
     {
-      timeoutMs: ANTHROPIC_REQUEST_TIMEOUT_MS + 1_000,
-      context: 'Anthropic summarizeInterview',
+      timeoutMs: REQUEST_TIMEOUT_MS + 1_000,
+      context: 'summarizeInterview',
     }
   );
 
-  const textBlock = message.content.find(block => block.type === 'text');
-  const responseText = textBlock?.type === 'text' ? textBlock.text : null;
+  const responseText = result.text;
   if (!responseText) {
-    throw new Error('No text response from Claude');
+    throw new Error('No text response from model');
   }
 
   const parsed = JSON.parse(extractJson(responseText));

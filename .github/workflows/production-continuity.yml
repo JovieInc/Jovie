@@ -11,14 +11,6 @@ on:
   # that remained individually paused after another project was resumed.
   schedule:
     - cron: '*/5 * * * *'
-  # Production Controller completion is the event-driven freshness signal.
-  # GitHub throttles this repository's five-minute schedule to hours
-  # (2026-09-26: six scheduled runs in 18 h), so the production-stale alarm
-  # also rides every controller generation, including failed ones.
-  workflow_run:
-    workflows: [Production Controller]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
 
 permissions:

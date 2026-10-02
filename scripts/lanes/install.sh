@@ -6,11 +6,18 @@
 set -euo pipefail
 state="${LANES_STATE:-$HOME/.local/state/jovie-lanes}"
 repo="${LANES_REPO:-$HOME/devin-sweep/Jovie}"
+ledger_cadence=3600
 here="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$state"
 LANES_STATE="$state" LANES_REPO="$repo" python3 "$here/lane_runner.py" update
-tick="python3 $state/current/lane_runner.py update; exec python3 $state/current/lane_runner.py dispatch"
-path="$HOME/.local/bin:$HOME/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+tick="python3 $state/current/lane_runner.py update; python3 $state/current/codex_lane.py reconcile --if-due $ledger_cadence; exec python3 $state/current/lane_runner.py dispatch"
+# Pin timers to the Node selected by the installing shell.
+node_dir="$(dirname "$(command -v node)")"
+path="$node_dir:$HOME/.local/bin:$HOME/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+source_tree="$(cat "$state/current/.tree")"
+source_commit="$(git -C "$repo" rev-parse origin/main)"
+LANES_STATE="$state" python3 "$state/current/codex_lane.py" install-receipt \
+  --source-commit "$source_commit" --source-tree "$source_tree" --platform "$(uname)" --cadence "$ledger_cadence" >/dev/null
 
 if [ "$(uname)" = "Darwin" ]; then
   plist="$HOME/Library/LaunchAgents/com.jovie.lanes.plist"
@@ -24,6 +31,7 @@ if [ "$(uname)" = "Darwin" ]; then
     <key>PATH</key><string>$path</string>
     <key>LANES_STATE</key><string>$state</string>
     <key>LANES_REPO</key><string>$repo</string>
+    <key>CODEX_LEDGER_CADENCE_S</key><string>$ledger_cadence</string>
     <key>LANES_LINEAR_ENV</key><string>${LANES_LINEAR_ENV:-$HOME/.config/symphony/linear.env}</string>
   </dict>
   <key>StartInterval</key><integer>60</integer>
@@ -47,6 +55,7 @@ KillMode=process
 Environment=PATH=$path
 Environment=LANES_STATE=$state
 Environment=LANES_REPO=$repo
+Environment=CODEX_LEDGER_CADENCE_S=$ledger_cadence
 Environment=LANES_LINEAR_ENV=${LANES_LINEAR_ENV:-$HOME/.config/symphony/linear.env}
 ExecStart=/bin/bash -c '$tick'
 UNIT

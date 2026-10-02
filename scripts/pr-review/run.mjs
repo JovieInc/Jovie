@@ -8,7 +8,7 @@ import {
   validateFinding,
 } from '../lib/pr-review-contracts.mjs';
 import { excerptForFinding, renderContext } from './context.mjs';
-import { costUsd, REVIEW_ROUTES } from './models.mjs';
+import { assertRoutes, costUsd, REVIEW_ROUTES } from './models.mjs';
 import { SPECIALISTS, VERIFIER } from './specialists.mjs';
 
 export const DEFAULT_RUN_LIMITS = Object.freeze({
@@ -84,7 +84,7 @@ async function mapLimit(items, limit, worker) {
  *   pr: number, baseSha: string, headSha: string,
  *   riskRuleIds?: string[], advisedTier?: string,
  *   context: {files: {path: string, patch: string}[], importers: object[], truncated: string[], skipped?: string[]},
- *   transport: (call: {model: string, system: string, prompt: string, maxOutputTokens: number, signal?: AbortSignal}) => Promise<{text: string, usage?: object}>,
+ *   transport: (call: {model: string, system: string, prompt: string, maxOutputTokens: number, signal?: AbortSignal}) => Promise<{text: string, usage?: {inputTokens?: number, outputTokens?: number}}>,
  *   prices: Record<string, {family: string, inPerMillion: number, outPerMillion: number}>,
  *   readLiveHead: () => Promise<string>,
  *   limits?: typeof DEFAULT_RUN_LIMITS,
@@ -115,7 +115,9 @@ export async function runReview({
   const plan = planReview({ riskRuleIds, advisedTier, testsChanged });
   const stats = { invalidCandidates: 0, droppedOverCap: 0, callErrors: 0 };
   let spent = 0;
+  let reserved = 0;
   let failure = null;
+  assertRoutes(prices, routes);
 
   const finish = (liveHeadSha, findings, assessed, notAssessed) => ({
     ...assembleReceipt({
@@ -126,12 +128,15 @@ export async function runReview({
       findings,
       coverage: { assessed, notAssessed },
       failure,
-      spend: { usd: Number(spent.toFixed(6)), capUsd: limits.budgetUsd },
+      spend: {
+        usd: Number(spent.toFixed(6)),
+        capUsd: limits.budgetUsd,
+      },
       generatedAt: now(),
     }),
     plan,
     routes,
-    stats,
+    stats: { ...stats, reservedUsd: reserved },
   });
 
   const contextGaps = [
@@ -151,10 +156,21 @@ export async function runReview({
   }
 
   const call = async (model, system, prompt, maxOutputTokens) => {
-    if (spent >= limits.budgetUsd) {
+    const ceiling = costUsd(prices, model, {
+      inputTokens: Buffer.byteLength(system + prompt, 'utf8') + 512,
+      outputTokens: maxOutputTokens,
+    });
+    if (
+      !Number.isFinite(limits.budgetUsd) ||
+      !Number.isSafeInteger(maxOutputTokens) ||
+      maxOutputTokens < 1 ||
+      ceiling + reserved > limits.budgetUsd
+    ) {
       failure = 'budget-exhausted';
       return null;
     }
+    // Reserve synchronously before await so parallel calls cannot spend the same budget.
+    reserved += ceiling;
     try {
       const result = await transport({
         model,
@@ -164,6 +180,12 @@ export async function runReview({
         signal,
       });
       spent += costUsd(prices, model, result.usage);
+      if (
+        ![result.usage?.inputTokens, result.usage?.outputTokens].every(
+          value => Number.isSafeInteger(value) && value >= 0
+        )
+      )
+        failure ??= 'usage-unverifiable';
       return result.text;
     } catch {
       stats.callErrors += 1;

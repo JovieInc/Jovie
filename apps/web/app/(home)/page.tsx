@@ -6,8 +6,9 @@ import {
 } from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
 import { HomepageEditorialChangelog } from '@/components/homepage/HomepageEditorialChangelog';
+import { HomepageIdentityClose } from '@/components/homepage/HomepageIdentityClose';
 import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
-import { HomepageNoScriptContent } from '@/components/homepage/HomepageNoScriptContent';
+import { HomepageIdentitySections } from '@/components/homepage/HomepageIdentitySections';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
@@ -17,12 +18,13 @@ import {
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
+import { HOMEPAGE_V3_ENABLED } from '@/lib/flags/homepage-v3';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { HomepageQueryProvider } from './homepage-query-provider';
 
 const CERTIFIED_PREVIEWS = {
-  connected: HOMEPAGE_MEDIA_MAP.connected.asset,
-  relationships: HOMEPAGE_MEDIA_MAP.relationships.asset,
+  subscribe: HOMEPAGE_MEDIA_MAP.relationships.asset,
+  pay: HOMEPAGE_MEDIA_MAP.pay.asset,
 } as const satisfies HomepageCertifiedPreviews;
 
 export const revalidate = false;
@@ -162,6 +164,20 @@ function HomepageStoryStack() {
   );
 }
 
+// Canonical Pen v3 body (dark launch): presence, structure, and the close,
+// on the shared page background. The live story stack is unchanged while off.
+function HomepageIdentityStoryStack() {
+  return (
+    <div
+      className='homepage-identity-stack'
+      data-testid='homepage-identity-story-stack'
+    >
+      <HomepageIdentitySections />
+      <HomepageIdentityClose />
+    </div>
+  );
+}
+
 function HomePageShell({ children }: { readonly children: React.ReactNode }) {
   return (
     <>
@@ -170,7 +186,6 @@ function HomePageShell({ children }: { readonly children: React.ReactNode }) {
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
       <SignupFunnelBeacon surface='homepage' />
       {children}
-      <HomepageNoScriptContent />
     </>
   );
 }
@@ -192,7 +207,11 @@ export default async function HomePage() {
     <HomePageShell>
       <HomepageQueryProvider>
         <HomepageHero />
-        <HomepageStoryStack />
+        {HOMEPAGE_V3_ENABLED ? (
+          <HomepageIdentityStoryStack />
+        ) : (
+          <HomepageStoryStack />
+        )}
       </HomepageQueryProvider>
     </HomePageShell>
   );

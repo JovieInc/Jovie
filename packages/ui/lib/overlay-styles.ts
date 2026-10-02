@@ -8,7 +8,7 @@
  * Provides consistent backdrop styling across all overlay components.
  */
 export const overlayStyles = {
-  base: 'fixed inset-0 z-50 bg-black/52',
+  base: 'fixed inset-0 z-modal bg-black/52',
   animation:
     'data-[state=open]:animate-in data-[state=closed]:animate-out ' +
     'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ' +
@@ -21,6 +21,15 @@ export const overlayStyles = {
 export const overlayClassName = `${overlayStyles.base} ${overlayStyles.animation}`;
 
 /**
+ * Sheet backdrop. Shares the modal scrim but sits on the sheet layer so a
+ * dialog opened from a sheet paints its own scrim over the sheet.
+ */
+export const sheetOverlayClassName = overlayClassName.replace(
+  'z-modal',
+  'z-sheet'
+);
+
+/**
  * Base content positioning and animation styles.
  * Used for centered modal dialogs.
  */
@@ -28,7 +37,7 @@ export const centeredContentStyles = {
   // Use CSS translate property directly (not Tailwind's CSS-variable-based
   // translate utilities) to avoid a Chrome bug where translate with CSS vars
   // fails to composite: https://github.com/shadcn-ui/ui/issues/7507
-  position: 'fixed left-1/2 top-1/2 z-50 [translate:-50%_-50%]',
+  position: 'fixed left-1/2 top-1/2 z-modal [translate:-50%_-50%]',
   layout:
     'grid max-h-overlay-viewport w-overlay-viewport max-w-lg gap-5 overflow-y-auto overscroll-contain',
   surface:
@@ -75,7 +84,7 @@ export const footerStyles = {
  * Title styles for modal components.
  */
 export const titleStyles = {
-  base: 'text-base font-medium leading-snug tracking-tight text-primary-token',
+  base: 'text-(length:--text-base) font-medium leading-snug tracking-tight text-primary-token',
 } as const;
 
 /**

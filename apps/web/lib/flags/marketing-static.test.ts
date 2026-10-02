@@ -20,4 +20,8 @@ describe('marketing-static homepage design flags', () => {
   it('renders the V2 public profile (SHOW_PUBLIC_PROFILE_V1_DESIGN must stay false)', () => {
     expect(FEATURE_FLAGS.SHOW_PUBLIC_PROFILE_V1_DESIGN).toBe(false);
   });
+
+  it('keeps the public about and footer refresh off by default', () => {
+    expect(FEATURE_FLAGS.SHOW_PUBLIC_ABOUT_FOOTER_REFRESH).toBe(false);
+  });
 });

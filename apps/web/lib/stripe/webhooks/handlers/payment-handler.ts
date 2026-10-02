@@ -28,6 +28,7 @@ import {
   logFallback,
 } from '@/lib/error-tracking';
 import { recordCommission } from '@/lib/referrals/service';
+import { trackServerEvent } from '@/lib/server-analytics';
 import { stripe } from '@/lib/stripe/client';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import {
@@ -248,6 +249,31 @@ export class PaymentHandler extends BaseSubscriptionHandler {
       if (!result.appUserId) {
         throw new Error('Billing update omitted canonical app user ID');
       }
+
+      // Durable revenue event emitted from the verified webhook, not the
+      // buyer's return page. `stripe:${stripeEventId}` deduplicates Stripe
+      // retries; a failed write throws so the webhook stays unprocessed and
+      // Stripe redelivers instead of leaving a paid transition unmeasured.
+      const paymentDelivery = await trackServerEvent(
+        invoice.billing_reason === 'subscription_cycle'
+          ? 'subscription_renewed'
+          : 'payment_succeeded',
+        {
+          stripeEventId,
+          billingReason: invoice.billing_reason ?? undefined,
+        },
+        undefined,
+        {
+          eventIdentity: `stripe:${stripeEventId}`,
+          occurredAt: stripeEventTimestamp,
+        }
+      );
+      if (!paymentDelivery.ok) {
+        throw new Error(
+          `Payment analytics delivery failed: ${paymentDelivery.error}`
+        );
+      }
+
       await invalidateBillingCache(result.appUserId);
       await this.tryRecordReferralCommission(result.appUserId, invoice);
       this.sendRecoveryEmailIfNeeded(invoice, subscription, result.appUserId);

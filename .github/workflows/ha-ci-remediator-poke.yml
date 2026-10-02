@@ -1,13 +1,12 @@
 name: HA CI remediator poke
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Hyperagent
-# necessary-trust-boundary: GitHub-hosted CI failure events on pull_request/merge_group
-#   wake the Hyperagent remediator via X-Hyperagent-Webhook-Secret (HA docs;
+# necessary-trust-boundary: Manual exact-PR dispatch wakes the Hyperagent remediator via X-Hyperagent-Webhook-Secret (HA docs;
 #   ha-webhook-auth-only-v1). Timestamp/Signature HMAC headers are also sent;
 #   HA ignores them and 401s only when the secret header is missing. Do not
 #   send Authorization Bearer as a substitute. No self-hosted
 #   runner access, no local systemd, no Symphony port pokes.
-# removal-trigger: Delete when Hyperagent ingests GitHub CI workflow_run failures natively.
+# compatibility-expiry: 2026-10-31; delete after remediation dispatch moves into Lane Fix Relay.
 # idempotency-contract (JOV-5921): at most one delivered poke per PR + head SHA,
 #   and at most one new remediator thread per open PR inside a 45-minute window.
 #   - Workflow-level concurrency is per-PR (not PR+sha), FIFO, no cancel. Same-PR
@@ -27,14 +26,15 @@ name: HA CI remediator poke
 # FX canary overlap guard: while the existing hosted-FX single-PR canary is
 # enabled, suppress HA for that PR (including forced dispatches). Keep
 # merge_group deliveries on the existing HA lane: FX only accepts source-PR CI.
-run-name: ha-remediate/PR${{ github.event.workflow_run.pull_requests[0].number || inputs.pr_number || 'na' }}/${{ github.event.workflow_run.head_sha || github.sha }}
+run-name: ha-remediate/PR${{ inputs.pr_number || 'na' }}/${{ inputs.head_sha || 'invalid-head' }}
 on:
-  workflow_run:
-    workflows: ['CI']
-    types: [completed]
   workflow_dispatch:
     inputs:
       pr_number:
+        type: string
+      head_sha:
+        description: 'Exact current 40-hex PR head SHA'
+        required: true
         type: string
       run_url:
         type: string
@@ -51,13 +51,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   poke:
-    if: >-
-      (github.event_name == 'workflow_dispatch' && inputs.pr_number != '16419') ||
-      (
-        github.event.workflow_run.conclusion == 'failure' &&
-        contains(fromJSON('["pull_request","merge_group"]'), github.event.workflow_run.event) &&
-        github.event.workflow_run.pull_requests[0].number != 16419
-      )
+    if: inputs.pr_number != '16419'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions:
@@ -70,7 +64,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number || inputs.pr_number || '' }}
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          HEAD_SHA: ${{ inputs.head_sha }}
           FORCE: ${{ inputs.force || false }}
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
@@ -152,6 +146,11 @@ jobs:
               echo "::notice::PR #$PR_NUMBER is $state (merged=$merged); remediation key is terminal. Skipping poke."
               exit 0
             fi
+            current_head=$(jq -r '.head.sha' <<<"$pr_json")
+            if [ "$HEAD_SHA" != "$current_head" ]; then
+              echo "::error::Requested head is not the current exact PR head."
+              exit 1
+            fi
           fi
 
           if [ "${FORCE:-false}" != "true" ]; then
@@ -197,7 +196,7 @@ jobs:
           WEBHOOK_SECRET: ${{ secrets.HYPERAGENT_CI_WEBHOOK_SECRET }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number || inputs.pr_number || '' }}
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          HEAD_SHA: ${{ inputs.head_sha }}
           RUN_URL: ${{ github.event.workflow_run.html_url || inputs.run_url || format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}
           REPO: ${{ github.repository }}
           EVENT: ${{ github.event.workflow_run.event || 'workflow_dispatch' }}

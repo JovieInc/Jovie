@@ -96,6 +96,23 @@ describe('WhatsNewBannerView', () => {
     ).toHaveAttribute('href', 'https://jov.ie/changelog/26.9.2');
   });
 
+  it('sits on the banner overlay layer, below sheets and dialogs', () => {
+    render(
+      <WhatsNewBannerView
+        unseen={{
+          entry: FEED.entries[0],
+          unseenCount: 1,
+          href: FEED.entries[0].url,
+        }}
+        onOpen={vi.fn()}
+        onDismiss={vi.fn()}
+      />
+    );
+    const banner = screen.getByTestId('whats-new-banner');
+    expect(banner.className).toContain('z-banner');
+    expect(banner.className).not.toMatch(/(?:^|\s)z-\d/);
+  });
+
   it('counts multiple unseen updates and links the changelog index', () => {
     render(
       <WhatsNewBannerView
@@ -192,5 +209,42 @@ describe('WhatsNewBanner', () => {
     render(<WhatsNewBanner enabled />);
     await settle();
     expect(screen.queryByTestId('whats-new-banner')).toBeNull();
+  });
+
+  it('prefers the daily post and dismisses it server-side', async () => {
+    const prompt = {
+      contractVersion: 'release-communications/v1',
+      postId: 'post-9',
+      localDate: '2026-10-02',
+      title: 'Daily shipped outcome',
+      summary: 'New today',
+      materialCount: 1,
+      changelogUrl: 'https://jov.ie/changelog',
+    };
+    const fetchMock = vi
+      .fn()
+      .mockImplementation((url: string) =>
+        Promise.resolve(
+          jsonResponse(url === '/api/whats-new' ? { prompt } : FEED)
+        )
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<WhatsNewBanner enabled />);
+    await settle();
+    expect(screen.getByText('Daily shipped outcome')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('whats-new-banner-dismiss'));
+    expect(screen.queryByTestId('whats-new-banner')).toBeNull();
+    expect(
+      fetchMock.mock.calls.some(
+        ([url, init]) =>
+          url === '/api/whats-new/dismiss' &&
+          (init as RequestInit).method === 'POST' &&
+          String((init as RequestInit).body).includes('post-9')
+      )
+    ).toBe(true);
+    // Daily dismissal is server-side; the feed last-seen key stays empty.
+    expect(localStorage.getItem(WHATS_NEW_LAST_SEEN_KEY)).toBeNull();
   });
 });

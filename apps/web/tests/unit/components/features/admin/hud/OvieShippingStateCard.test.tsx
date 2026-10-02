@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OperationalTasksPanel } from '@/components/features/admin/hud/OperationalTasksPanel';
 import { OvieShippingStateCard } from '@/components/features/admin/hud/OvieShippingStateCard';
@@ -8,7 +8,10 @@ import {
   resetHudShippingStateForTests,
 } from '@/components/features/admin/hud/useHudShippingStateQuery';
 import { unknownProjection } from '@/lib/ovie/shipping-state';
-import { SHIPPING_STATE_SCHEMA } from '@/lib/ovie/shipping-state-client';
+import {
+  SHIPPING_STATE_REQUEST_TIMEOUT_MS,
+  SHIPPING_STATE_SCHEMA,
+} from '@/lib/ovie/shipping-state-client';
 
 const fetchMock = vi.fn();
 vi.stubGlobal('fetch', fetchMock);
@@ -53,6 +56,8 @@ function deferredResponse() {
 
 const NOW = Date.now();
 const LIVE_SHA = 'ee7401f37e0b324e225751f0d97ce229838ac8b4';
+const CERT_SHA = 'c3e74e00a9d234b8f6a1b2c3d4e5f60718293a4b';
+const STAGE_SHA = 'a1b2c3d4e5f60718293a4bc3e74e00a9d234b8f6';
 const count = (value: number) =>
   value === 0
     ? { state: 'measured-zero', value: 0 }
@@ -90,13 +95,93 @@ const delivery = {
   },
   mergeQueueDepth: count(2),
   inFlight: count(0),
+  certifiedHead: {
+    sha: CERT_SHA,
+    certifiedAt: new Date(NOW - 1_800_000).toISOString(),
+  },
   production: {
     sha: LIVE_SHA,
     version: '26.9.15',
     deployedAt: new Date(NOW - 3_600_000).toISOString(),
     behindMain: count(54),
   },
+  staging: {
+    sha: STAGE_SHA,
+    version: '26.9.16',
+    deployedAt: new Date(NOW - 1_200_000).toISOString(),
+    behindMain: count(2),
+  },
   summer: { availability: 'up' },
+};
+/** One capacity-horizon lease row, shaped per lib/ovie/shipping-state/capacity.ts. */
+const capacityLease = {
+  leaseId: 'codex:lane-a',
+  alias: 'lane-a',
+  provider: 'codex',
+  sourcePresent: true,
+  available: true,
+  subscriptionStatus: 'active' as const,
+  compatibility: { cli: '2.1', harness: '1.0', models: [], restrictions: [] },
+  concurrency: 2,
+  usableRemaining: 40,
+  bankedCount: 0,
+  event: {
+    kind: 'natural-reset' as const,
+    label: 'reset',
+    at: null,
+    countdownSeconds: 3_600,
+  },
+  forecast: {
+    schema: 'jovie.drain-forecast/v1' as const,
+    completionP50At: null,
+    completionP90At: null,
+    sustainablePercentPerHour: 5,
+    burstPercentPerHour: 8,
+    usableBeforeUnavailability: 10,
+    projectedUnused: 2,
+    qualifiedWork: [],
+    bottleneck: null,
+  },
+  route: {
+    schema: 'jovie.capacity-route-receipt/v1' as const,
+    selectedJob: 'JOV-1234',
+    selectedRoute: 'lane-a',
+    selectedLeaseId: 'codex:lane-a',
+    alternativesConsidered: ['lane-b'],
+    marginalValue: 1,
+    expectedCertifiedOutcome: 'ship',
+    drainMode: 'normal' as const,
+    modeTrigger: 'least-recently-used',
+    reason: 'least-recently-used available compatible lease',
+    replanConditions: ['lane-a exhausted'],
+    sourceGaps: [],
+  },
+  mode: 'normal' as const,
+  outcomes: {
+    useful: 1,
+    certified: 1,
+    duplicate: 0,
+    retry: 0,
+    failed: 0,
+    unknown: 0,
+  },
+  freshness: { observedAt: null, status: 'fresh' as const, confidence: 'high' },
+};
+const deliveryWithCapacityLease = {
+  ...delivery,
+  lanes: {
+    ...delivery.lanes,
+    capacity: {
+      schema: 'jovie.capacity-horizon/v1' as const,
+      generatedAt: new Date(NOW).toISOString(),
+      leases: [capacityLease],
+      outcomes: capacityLease.outcomes,
+      incidents: [],
+      topBlocker: null,
+      founderJudgmentRequired: false,
+      controls: 'show-only' as const,
+    },
+  },
 };
 const projection = {
   schema: SHIPPING_STATE_SCHEMA,
@@ -132,6 +217,10 @@ const projection = {
     productionVerified: { state: 'measured', value: true },
     exactLiveBuild: { state: 'measured', value: true },
   },
+};
+const projectionWithCapacityLease = {
+  ...projection,
+  delivery: deliveryWithCapacityLease,
 };
 
 function cockpitWithTask(title: string) {
@@ -174,6 +263,8 @@ const LABELS = [
   'In Flight',
   'Jovie / LYB / Summer',
   'Merged 7d',
+  'Certified HEAD',
+  'Staging',
   'Production',
   'Behind Main',
   'CI Green',
@@ -187,6 +278,7 @@ function metricValue(label: string): string | null {
 
 describe('OvieShippingStateCard', () => {
   afterEach(() => {
+    vi.useRealTimers();
     resetHudShippingStateForTests();
     fetchMock.mockReset();
   });
@@ -221,6 +313,8 @@ describe('OvieShippingStateCard', () => {
     expect(metricValue('In Flight')).toBe('0');
     expect(metricValue('Jovie / LYB / Summer')).toBe('189 / 17 / 26');
     expect(metricValue('Merged 7d')).toBe('862 (+283% WoW)');
+    expect(metricValue('Certified HEAD')).toBe('c3e74e0');
+    expect(metricValue('Staging')).toBe('26.9.16 a1b2c3d');
     expect(metricValue('Production')).toBe('26.9.15 ee7401f');
     expect(metricValue('Behind Main')).toBe('54');
     expect(metricValue('CI Green')).toBe('Yes');
@@ -231,6 +325,7 @@ describe('OvieShippingStateCard', () => {
       )
     ).toBeTruthy();
     expect(screen.getByText('61 harness-failed runs in 24h')).toBeTruthy();
+    expect(screen.getByText('Capacity source gap')).toBeTruthy();
     for (const label of LABELS) {
       expect(screen.getByText(label)).toBeTruthy();
     }
@@ -304,6 +399,165 @@ describe('OvieShippingStateCard', () => {
     expect(metricValue('Lanes Running')).toBe('n/a');
   });
 
+  it('ages a connected projection to stale at its deadline without another read', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    fetchMock.mockResolvedValue(
+      jsonResponse(200, {
+        ...projection,
+        freshnessDeadline: new Date(NOW + 100).toISOString(),
+      })
+    );
+    const client = createQueryClient();
+    render(
+      <QueryClientProvider client={client}>
+        <OvieShippingStateCard />
+      </QueryClientProvider>
+    );
+    const panel = () => screen.getByTestId('hud-shipper-status-panel');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(panel()).toHaveAttribute('data-truth', 'fresh');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_101);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await vi.waitFor(() =>
+      expect(panel()).toHaveAttribute('data-truth', 'stale')
+    );
+    expect(panel()).toHaveAttribute('data-connection', 'connected');
+    expect(panel()).toHaveAttribute('data-flags', 'cacheExpired');
+    expect(screen.getByText('Cache expired')).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('times out a hung read without inventing a measurement', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    fetchMock.mockImplementation(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'));
+          });
+        })
+    );
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <OvieShippingStateCard />
+      </QueryClientProvider>
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SHIPPING_STATE_REQUEST_TIMEOUT_MS);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    const panel = screen.getByTestId('hud-shipper-status-panel');
+    await vi.waitFor(() =>
+      expect(panel).toHaveAttribute('data-truth', 'unavailable')
+    );
+    expect(panel).toHaveAttribute('data-connection', 'disconnected');
+    expect(screen.getByText('Shipping-state request timed out')).toBeTruthy();
+    expect(metricValue('Merged Today')).toBe('n/a');
+    expect(screen.queryByText('0')).toBeNull();
+  });
+
+  it('shows unsupported schema and sequence anomalies while retaining identity', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(200, projection))
+      .mockResolvedValueOnce(jsonResponse(200, projection))
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          ...projection,
+          projectionId: 'proj-replay',
+          eventId: 'proj-replay',
+          sequence: 3,
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          ...projection,
+          projectionId: 'proj-6',
+          eventId: 'proj-6',
+          sequence: 6,
+          sourceRevision: 'rev-6',
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          ...projection,
+          projectionId: 'proj-6-conflict',
+          eventId: 'proj-6-conflict',
+          sequence: 6,
+          sourceRevision: 'rev-conflict',
+        })
+      );
+    const client = createQueryClient();
+    render(
+      <QueryClientProvider client={client}>
+        <OvieShippingStateCard />
+      </QueryClientProvider>
+    );
+    const panel = () => screen.getByTestId('hud-shipper-status-panel');
+    await waitFor(() => expect(panel()).toHaveAttribute('data-truth', 'fresh'));
+
+    await client.refetchQueries({ queryKey: ['hud', 'shipping-state', null] });
+    await waitFor(() =>
+      expect(panel()).toHaveAttribute('data-flags', 'duplicate')
+    );
+    expect(screen.getByText('Duplicate ignored')).toBeTruthy();
+
+    await client.refetchQueries({ queryKey: ['hud', 'shipping-state', null] });
+    await waitFor(() =>
+      expect(panel()).toHaveAttribute('data-flags', 'replay')
+    );
+    expect(screen.getByText('Replay ignored')).toBeTruthy();
+    expect(panel()).toHaveAttribute('data-revision', 'rev-4');
+
+    await client.refetchQueries({ queryKey: ['hud', 'shipping-state', null] });
+    await waitFor(() =>
+      expect(panel()).toHaveAttribute('data-flags', 'sequenceGap')
+    );
+    expect(screen.getByText('Sequence gap')).toBeTruthy();
+    expect(panel()).toHaveAttribute('data-revision', 'rev-6');
+
+    await client.refetchQueries({ queryKey: ['hud', 'shipping-state', null] });
+    await waitFor(() => {
+      expect(panel()).toHaveAttribute('data-truth', 'degraded');
+      expect(panel()).toHaveAttribute('data-flags', 'contradictory');
+    });
+    expect(screen.getByText('Contradictory sequence ignored')).toBeTruthy();
+    expect(panel()).toHaveAttribute('data-revision', 'rev-6');
+  });
+
+  it('renders an unsupported successful response as unknown, not unavailable', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(200, { ...projection, schema: 'ovie.shipping-state.v2' })
+    );
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <OvieShippingStateCard />
+      </QueryClientProvider>
+    );
+
+    expect(
+      await screen.findByText('Unsupported shipping-state schema')
+    ).toBeTruthy();
+    const panel = screen.getByTestId('hud-shipper-status-panel');
+    expect(panel).toHaveAttribute('data-truth', 'unknown');
+    expect(panel).toHaveAttribute('data-flags', 'unsupportedSchema');
+    expect(screen.getByText('Unsupported schema')).toBeTruthy();
+  });
+
   it('does not refetch for the initial pageshow event', async () => {
     fetchMock.mockResolvedValue(jsonResponse(200, projection));
     render(
@@ -326,6 +580,79 @@ describe('OvieShippingStateCard', () => {
     await new Promise(resolve => setTimeout(resolve, 25));
 
     expect(fetchMock).toHaveBeenCalledTimes(callsAfterMount);
+  });
+
+  it('refetches on a persisted pageshow and recovers from unavailability', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(200, projection))
+      .mockResolvedValueOnce(jsonResponse(503, { error: 'Source offline' }))
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          ...projection,
+          projectionId: 'proj-5',
+          eventId: 'proj-5',
+          sequence: 5,
+          sourceRevision: 'rev-5',
+        })
+      );
+    const client = createQueryClient();
+    render(
+      <QueryClientProvider client={client}>
+        <OvieShippingStateCard />
+      </QueryClientProvider>
+    );
+    const panel = () => screen.getByTestId('hud-shipper-status-panel');
+    await waitFor(() => expect(panel()).toHaveAttribute('data-truth', 'fresh'));
+    await client.refetchQueries({ queryKey: ['hud', 'shipping-state', null] });
+    await waitFor(() =>
+      expect(panel()).toHaveAttribute('data-truth', 'unavailable')
+    );
+
+    const resumedPage = new Event('pageshow') as PageTransitionEvent;
+    Object.defineProperty(resumedPage, 'persisted', { value: true });
+    window.dispatchEvent(resumedPage);
+
+    await waitFor(() =>
+      expect(panel()).toHaveAttribute('data-truth', 'recovery')
+    );
+    expect(panel()).toHaveAttribute('data-revision', 'rev-5');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('accepts a restarted producer sequence after a cold relaunch', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(200, projection))
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          ...projection,
+          projectionId: 'proj-cold-1',
+          eventId: 'proj-cold-1',
+          sequence: 1,
+          sourceRevision: 'rev-cold-1',
+          correlation: { workId: 'corr-cold-1' },
+        })
+      );
+    const firstSession = render(
+      <QueryClientProvider client={createQueryClient()}>
+        <OvieShippingStateCard kioskToken='packaged-session' />
+      </QueryClientProvider>
+    );
+    const panel = () => screen.getByTestId('hud-shipper-status-panel');
+    await waitFor(() =>
+      expect(panel()).toHaveAttribute('data-revision', 'rev-4')
+    );
+    firstSession.unmount();
+
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <OvieShippingStateCard kioskToken='packaged-session' />
+      </QueryClientProvider>
+    );
+    await waitFor(() =>
+      expect(panel()).toHaveAttribute('data-revision', 'rev-cold-1')
+    );
+    expect(panel()).toHaveAttribute('data-sequence', '1');
+    expect(panel()).toHaveAttribute('data-flags', '');
   });
 
   it('resets the shipping state machine when the kiosk token changes', async () => {
@@ -531,5 +858,40 @@ describe('OvieShippingStateCard', () => {
       machines: 0,
       operationalFeeds: 0,
     });
+  });
+
+  it('keeps the capacity-lease Linear link out of the reason disclosure toggle', async () => {
+    // Regression for a WCAG 4.1.2 "nested-interactive" axe violation: an <a>
+    // rendered inside a <summary> (itself a native toggle). The Linear link
+    // and the reason disclosure must be siblings, not nested.
+    fetchMock.mockResolvedValue(jsonResponse(200, projectionWithCapacityLease));
+    const { container } = render(
+      <QueryClientProvider client={createQueryClient()}>
+        <OvieShippingStateCard />
+      </QueryClientProvider>
+    );
+
+    const link = await screen.findByRole('link', { name: 'JOV-1234' });
+    expect(link).toHaveAttribute(
+      'href',
+      'https://linear.app/jovie/issue/JOV-1234'
+    );
+
+    const summary = container.querySelector('summary');
+    expect(summary).not.toBeNull();
+    expect(summary?.querySelector('a')).toBeNull();
+    expect(link.closest('summary')).toBeNull();
+
+    // <details> is flow/block content a <p> cannot validly contain.
+    expect(summary?.closest('details')?.closest('p')).toBeNull();
+
+    // The decorative marker replacing the list-none disclosure triangle
+    // stays out of the accessible name.
+    const marker = summary?.querySelector('[aria-hidden="true"]');
+    expect(marker).not.toBeNull();
+    expect(marker?.getAttribute('aria-hidden')).toBe('true');
+    expect(summary?.textContent).toContain(
+      'least-recently-used available compatible lease'
+    );
   });
 });

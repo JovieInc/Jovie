@@ -3,10 +3,10 @@
  *
  * Single entry point that coordinates the full playlist generation flow:
  *   1. Check compliance (should we generate today?)
- *   2. Generate concept (Claude Haiku)
+ *   2. Generate concept (gateway glm-5.3-flash)
  *   3. Discover tracks (Spotify Search)
  *   4. Find matching Jovie artists
- *   5. Curate tracklist (Claude Sonnet)
+ *   5. Curate tracklist (gateway glm-5.3)
  *   6. Generate cover art (Sharp + Unsplash)
  *   7. Save to database as "pending" (for admin approval)
  *

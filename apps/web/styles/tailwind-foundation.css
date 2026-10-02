@@ -13,12 +13,23 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  /* Custom font sizes — Linear's type scale registered as Tailwind utilities
-     text-3xs = 10px, text-2xs = 11px, text-app = 13px (Linear's default UI size), text-mid = 15px */
+  /* Consolidated type scale (Tim 2026-09-27, Pen text-* steps): UI text sits
+     on 10 / 12 / 14 / 16 / 20 / 24. The legacy names stay as aliases of their
+     step: text-3xs = 10 (micro), text-2xs and text-app = 12 (small, the app
+     default), text-mid = 14 (body). */
   --text-3xs: 0.625rem;
-  --text-2xs: 0.6875rem;
-  --text-app: 0.8125rem;
-  --text-mid: 0.9375rem;
+  --text-2xs: 0.75rem;
+  --text-app: 0.75rem;
+  --text-mid: 0.875rem;
+  /* Display ladder (same decision): Tailwind's off-scale defaults snap to
+     the nearest step. text-lg 18 -> 16 (large), text-3xl 30 -> 32,
+     text-4xl 36 -> 40. Line heights keep Tailwind's ratios. */
+  --text-lg: 1rem;
+  --text-lg--line-height: 1.5;
+  --text-3xl: 2rem;
+  --text-3xl--line-height: 1.2;
+  --text-4xl: 2.5rem;
+  --text-4xl--line-height: 1.1;
   /* Profile composition shapes (#11899, lib/profile/composition.ts):
      aspect-hero = fixed hero banner crop; aspect-card-standard = the default
      4:5 portrait card. 1:1 / 16:9 use built-in aspect-square / aspect-video. */
@@ -73,8 +84,9 @@
   --color-brand-youtube-subtle: var(--color-brand-youtube-subtle);
   /* Error token — generates text-error, bg-error, border-error */
   --color-error: var(--color-error);
-  /* Surface backgrounds — generates bg-base, bg-surface-0, bg-surface-1, etc. */
-  --color-base: var(--color-bg-base);
+  /* Surface backgrounds. `base` is bridged below because registering
+     --color-base makes Tailwind resolve text-base as a color instead of the
+     16px type token. */
   --color-surface-0: var(--color-bg-surface-0);
   --color-surface-1: var(--color-bg-surface-1);
   --color-surface-2: var(--color-bg-surface-2);
@@ -104,9 +116,19 @@
   --ease-cinematic: cubic-bezier(0.32, 0.72, 0, 1);
   --animate-progress-indeterminate: progress-indeterminate 1.5s ease-in-out
     infinite;
-  /* Shared overlay layers — semantic names preserve the stacking contract
-     without encoding numeric z-index values at component call sites. */
+  /* Overlay layer contract. Semantic names preserve the
+     stacking order without encoding numeric z-index values at call sites.
+     Order, low to high: persistent banners < sheets/drawers < modal dialogs
+     < anchored popovers (menus, selects, popovers, submenus) < tooltips.
+     Anchored popovers sit above modals and sheets so a menu or
+     select opened inside a dialog or sheet is never painted behind it, and a
+     dialog opened from a sheet always covers the sheet.
+     This contract keeps the order explicit and ratchets raw z-index values
+     out of component source. */
+  --z-index-banner: 60;
   --z-index-sheet: 65;
+  --z-index-modal: 70;
+  --z-index-popover: 80;
   --z-index-tooltip: 150;
   /* Shadow tokens — register design-system.css shadows as Tailwind utilities */
   --shadow-sm: var(--shadow-sm);
@@ -128,6 +150,33 @@
   --shadow-ring-surface-1: 0 0 0 3px var(--linear-bg-surface-1);
   --shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.22);
   --shadow-panel-ring: inset 0 0 0 1px var(--linear-panel-ring);
+}
+
+/* Preserve the established page-surface utilities without registering the
+   colliding --color-base Tailwind token. These declarations intentionally
+   mirror Tailwind's color utilities while reading the canonical DS token. */
+@utility bg-base {
+  background-color: var(--color-bg-base);
+}
+
+@utility from-base {
+  --tw-gradient-from: var(--color-bg-base);
+  --tw-gradient-stops: var(
+    --tw-gradient-via-stops,
+    var(--tw-gradient-position),
+    var(--tw-gradient-from) var(--tw-gradient-from-position),
+    var(--tw-gradient-to) var(--tw-gradient-to-position)
+  );
+}
+
+@utility to-base {
+  --tw-gradient-to: var(--color-bg-base);
+  --tw-gradient-stops: var(
+    --tw-gradient-via-stops,
+    var(--tw-gradient-position),
+    var(--tw-gradient-from) var(--tw-gradient-from-position),
+    var(--tw-gradient-to) var(--tw-gradient-to-position)
+  );
 }
 
 @utility w-overlay-viewport {

@@ -12,11 +12,7 @@ private struct AppContentView: View {
   let onAuthError: @MainActor (String?) -> Void
   @State private var chatRepository: ChatRepository?
   @State private var chatDraft = ""
-  @State private var audienceHighlightsState: AudienceHighlightsLoadState
-  @State private var calendarResponse: MobileActionLoopCalendarResponse?
-  @State private var inboxResponse: MobileActionLoopInboxResponse?
-  @State private var isLoadingCalendar = false
-  @State private var isLoadingInbox = false
+  @State private var homeData: MobileHomeDataStore
   @State private var workspaceMode: MobileWorkspaceMode = .jovie
   @State private var showWhatsNew = false
   @State private var changelogWhatsNew: WhatsNewUnseen?
@@ -43,9 +39,13 @@ private struct AppContentView: View {
     self.onLogout = onLogout
     self.onAuthReturn = onAuthReturn
     self.onAuthError = onAuthError
-    _audienceHighlightsState = State(
-      initialValue: Self.previewAudienceHighlightsState(for: appState.launchMode)
+    let homeData = MobileHomeDataStore()
+    homeData.showFixture(
+      audience: Self.previewAudienceHighlightsState(for: appState.launchMode),
+      calendar: nil,
+      inbox: nil
     )
+    _homeData = State(initialValue: homeData)
   }
 
 #if DEBUG
@@ -230,9 +230,9 @@ private struct AppContentView: View {
           )
         } audienceContent: { askJovie in
           AudienceHighlightsView(
-            state: audienceHighlightsState,
+            state: homeData.audienceState,
             isOffline: appState.isOffline,
-            onRetry: { await reloadAudienceHighlights(for: appState.activeUserID) },
+            onRetry: { await reloadHomeData(for: appState.activeUserID) },
             onAskJovie: askJovie
           )
         } libraryContent: { onSelectAsset, home in
@@ -243,20 +243,21 @@ private struct AppContentView: View {
           )
         } calendarContent: { askJovie in
           CalendarSurfaceView(
-            response: calendarResponse ?? (usesPreviewActionLoops ? .preview : nil),
-            isLoading: isLoadingCalendar && calendarResponse == nil,
+            response: homeData.calendar ?? (usesPreviewActionLoops ? .preview : nil),
+            isLoading: homeData.isLoadingCalendar && homeData.calendar == nil,
             isOffline: appState.isOffline,
-            onRetry: { await reloadActionLoops(for: appState.activeUserID) },
+            onRetry: { await reloadHomeData(for: appState.activeUserID) },
             onAskJovie: askJovie
           )
         } inboxContent: { askJovie in
           InboxSurfaceView(
-            response: inboxResponse ?? (usesPreviewActionLoops && workspaceMode == .jovie ? .preview : nil),
-            isLoading: isLoadingInbox && inboxResponse == nil,
+            response: homeData.inbox ?? (usesPreviewActionLoops && workspaceMode == .jovie ? .preview : nil),
+            isLoading: homeData.isLoadingInbox && homeData.inbox == nil,
             isOffline: appState.isOffline,
             workspaceMode: workspaceMode,
-            onRetry: { await reloadActionLoops(for: appState.activeUserID) },
-            onAskJovie: askJovie
+            onRetry: { await reloadHomeData(for: appState.activeUserID) },
+            onAskJovie: askJovie,
+            onDecideSummerCard: decideSummerCard
           )
         } chatContent: { draft, voiceCaptureTrigger, onEntityTap, onRecordVideo in
           if let chatRepository {
@@ -292,6 +293,14 @@ private struct AppContentView: View {
     .task(id: "\(appState.route)-\(scenePhase)") {
       await checkChangelogWhatsNew()
     }
+    .onChange(of: appState.activeUserID) {
+      homeData.setContext(userID: appState.activeUserID, workspace: workspaceMode)
+    }
+    .onChange(of: appState.route) {
+      if appState.route != .ready {
+        homeData.setContext(userID: nil, workspace: workspaceMode)
+      }
+    }
     .task(id: "\(appState.route)-\(appState.launchMode)-\(appState.activeUserID ?? "")-\(workspaceMode.rawValue)") {
       guard appState.route == .ready else { return }
       // Live What’s New is the changelog sheet above. The versioned sheet is
@@ -299,8 +308,7 @@ private struct AppContentView: View {
       if appState.launchMode == .uiTestingWhatsNew {
         showWhatsNew = true
       }
-      await reloadAudienceHighlights(for: appState.activeUserID)
-      await reloadActionLoops(for: appState.activeUserID)
+      await reloadHomeData(for: appState.activeUserID)
     }
     .task(id: "\(appState.activeUserID ?? "")-\(workspaceMode.rawValue)-\(showsWorkspaceSwitch)") {
       // Ovie never persists across launches: the artist app cold-starts in
@@ -308,22 +316,18 @@ private struct AppContentView: View {
       let resolved = MobileWorkspaceStore.load(isAdmin: showsWorkspaceSwitch)
       if workspaceMode != resolved {
         workspaceMode = resolved
-        inboxResponse = nil
+        homeData.setContext(userID: appState.activeUserID, workspace: resolved)
       }
 
       guard let activeUserID = appState.activeUserID else {
         chatRepository = nil
-        if Self.previewAudienceHighlightsState(for: appState.launchMode) == .idle {
-          audienceHighlightsState = .idle
-        }
-        calendarResponse = nil
-        inboxResponse = nil
+        homeData.setContext(userID: nil, workspace: workspaceMode)
         return
       }
 
       if appState.launchMode == .uiTestingAuthCallback {
         chatRepository = nil
-        audienceHighlightsState = .loaded(.preview)
+        homeData.showFixture(audience: .loaded(.preview), calendar: .preview, inbox: .preview)
         return
       }
 
@@ -424,7 +428,7 @@ private struct AppContentView: View {
     guard showsWorkspaceSwitch else { return }
     MobileWorkspaceStore.save(mode, isAdmin: true)
     workspaceMode = mode
-    inboxResponse = nil
+    homeData.setContext(userID: appState.activeUserID, workspace: mode)
   }
 
   private func makeChatRepository(userID: String) -> ChatRepository {
@@ -469,110 +473,60 @@ private struct AppContentView: View {
   }
 
   @MainActor
-  private func reloadActionLoops(for userID: String?) async {
+  private func reloadHomeData(for userID: String?) async {
     if appState.launchMode.holdsActionLoopLoading {
-      calendarResponse = nil
-      inboxResponse = nil
-      isLoadingCalendar = appState.launchMode == .uiTestingCalendarLoading
-      isLoadingInbox = appState.launchMode == .uiTestingInboxLoading
+      homeData.showFixture(
+        audience: Self.previewAudienceHighlightsState(for: appState.launchMode),
+        calendar: nil,
+        inbox: nil,
+        isLoadingCalendar: appState.launchMode == .uiTestingCalendarLoading,
+        isLoadingInbox: appState.launchMode == .uiTestingInboxLoading
+      )
       return
     }
-
     if usesPreviewActionLoops {
-      calendarResponse = .preview
-      inboxResponse = .preview
-      isLoadingCalendar = false
-      isLoadingInbox = false
+      homeData.showFixture(
+        audience: Self.previewAudienceHighlightsState(for: appState.launchMode),
+        calendar: .preview,
+        inbox: .preview
+      )
       return
     }
-
     guard let userID, appState.route == .ready else {
-      calendarResponse = nil
-      inboxResponse = nil
+      homeData.setContext(userID: nil, workspace: workspaceMode)
       return
     }
+    await homeData.reload(
+      userID: userID,
+      workspace: workspaceMode,
+      client: APIClient(
+        baseURL: appState.configuration.apiBaseURL,
+        tokenProvider: NativeSessionTokenProvider()
+      )
+    )
+  }
 
-    let cache = ActionLoopCache()
-    if calendarResponse == nil {
-      calendarResponse = await cache.loadCalendar(for: userID)
-    }
-    if inboxResponse == nil {
-      inboxResponse = await cache.loadInbox(for: userID, workspace: workspaceMode)
-    }
-
+  /// Posts a Summer card decision (final on the server; 409 counts as decided)
+  /// and drops the item from the local inbox snapshot.
+  @MainActor
+  private func decideSummerCard(
+    card: MobileSummerCard,
+    decision: SummerCardDecision,
+    comment: String?
+  ) async -> Bool {
+    guard let userID = appState.activeUserID else { return false }
+    let workspace = workspaceMode
+    let cardID = card.id
     let client = APIClient(
       baseURL: appState.configuration.apiBaseURL,
       tokenProvider: NativeSessionTokenProvider()
     )
-
-    isLoadingCalendar = calendarResponse == nil
-    isLoadingInbox = inboxResponse == nil
-
-    async let fetchedCalendar = client.fetchActionLoopCalendar()
-    async let fetchedInbox = client.fetchActionLoopInbox(workspace: workspaceMode)
-
-    if let calendar = try? await fetchedCalendar {
-      calendarResponse = calendar
-      await cache.storeCalendar(calendar, for: userID)
-    }
-    isLoadingCalendar = false
-
-    if let inbox = try? await fetchedInbox {
-      inboxResponse = inbox
-      await cache.storeInbox(inbox, for: userID, workspace: workspaceMode)
-    }
-    isLoadingInbox = false
-  }
-
-  @MainActor
-  private func reloadAudienceHighlights(for userID: String?) async {
-    guard appState.launchMode.usesLiveAuth else {
-      audienceHighlightsState = Self.previewAudienceHighlightsState(for: appState.launchMode)
-      return
-    }
-
-    if appState.launchMode == .uiTestingAudience
-      || appState.launchMode == .uiTestingReady
-      || appState.launchMode == .uiTestingChat
-      || appState.launchMode == .uiTestingAuthCallback
-      || appState.launchMode == .uiTestingChatEntityFixture
-      || appState.launchMode == .uiTestingChatAllComponents
-      || appState.launchMode == .uiTestingSettings
-      || appState.launchMode == .uiTestingVenueMode
-    {
-      audienceHighlightsState = .loaded(.preview)
-      return
-    }
-
-    guard let userID else {
-      audienceHighlightsState = .idle
-      return
-    }
-
-    let repository = AudienceHighlightsRepository(
-      apiClient: APIClient(
-        baseURL: appState.configuration.apiBaseURL,
-        tokenProvider: NativeSessionTokenProvider()
-      ),
-      cache: AudienceHighlightsCache()
-    )
-
-    if let cached = await repository.cachedSnapshot(for: userID) {
-      audienceHighlightsState = .loaded(cached)
-    } else if audienceHighlightsShouldShowLoading(current: audienceHighlightsState) {
-      audienceHighlightsState = .loading
-    }
-
-    do {
-      let result = try await repository.load(for: userID)
-      audienceHighlightsState = .loaded(result.response)
-    } catch {
-      if case .loaded = audienceHighlightsState {
-        return
-      }
-      audienceHighlightsState = .error("Couldn't load audience highlights.")
+    return await homeData.decideSummerCard(cardID, userID: userID, workspace: workspace) {
+      _ = try await client.decideSummerCard(cardID: cardID, decision: decision, comment: comment)
     }
   }
+
+
 }
 
 private struct WaitlistPendingView: View {
@@ -648,107 +602,8 @@ func shouldApplyAuthenticatedUserIDChange(
   authenticatedUserID != nil || liveHydrateOwnsSession == false
 }
 
-func audienceHighlightsShouldShowLoading(current: AudienceHighlightsLoadState) -> Bool {
-  if case .loaded = current {
-    return false
-  }
-  return true
-}
 
-struct CachedActionLoopInboxSnapshot: Codable, Equatable, Sendable {
-  let response: MobileActionLoopInboxResponse
-  let cachedAt: Date
-}
 
-struct CachedActionLoopCalendarSnapshot: Codable, Equatable, Sendable {
-  let response: MobileActionLoopCalendarResponse
-  let cachedAt: Date
-}
-
-actor ActionLoopCache {
-  private var inboxMemory: [String: CachedActionLoopInboxSnapshot] = [:]
-  private var calendarMemory: [String: CachedActionLoopCalendarSnapshot] = [:]
-  private let defaults: UserDefaults
-  private let encoder = JSONEncoder()
-  private let decoder = JSONDecoder()
-
-  init(defaults: UserDefaults = .standard) {
-    self.defaults = defaults
-  }
-
-  func loadInbox(for userID: String, workspace: MobileWorkspaceMode = .jovie) -> MobileActionLoopInboxResponse? {
-    let key = inboxCacheKey(for: userID, workspace: workspace)
-    if let snapshot = inboxMemory[key] {
-      return snapshot.response
-    }
-
-    guard
-      let data = defaults.data(forKey: key),
-      let snapshot = try? decoder.decode(CachedActionLoopInboxSnapshot.self, from: data)
-    else {
-      return nil
-    }
-
-    inboxMemory[key] = snapshot
-    return snapshot.response
-  }
-
-  func storeInbox(_ response: MobileActionLoopInboxResponse, for userID: String, workspace: MobileWorkspaceMode = .jovie) {
-    let key = inboxCacheKey(for: userID, workspace: workspace)
-    let snapshot = CachedActionLoopInboxSnapshot(response: response, cachedAt: Date())
-    inboxMemory[key] = snapshot
-    if let data = try? encoder.encode(snapshot) {
-      defaults.set(data, forKey: key)
-    }
-  }
-
-  func loadCalendar(for userID: String) -> MobileActionLoopCalendarResponse? {
-    if let snapshot = calendarMemory[userID] {
-      return snapshot.response
-    }
-
-    guard
-      let data = defaults.data(forKey: calendarCacheKey(for: userID)),
-      let snapshot = try? decoder.decode(CachedActionLoopCalendarSnapshot.self, from: data)
-    else {
-      return nil
-    }
-
-    calendarMemory[userID] = snapshot
-    return snapshot.response
-  }
-
-  func storeCalendar(_ response: MobileActionLoopCalendarResponse, for userID: String) {
-    let snapshot = CachedActionLoopCalendarSnapshot(response: response, cachedAt: Date())
-    calendarMemory[userID] = snapshot
-    if let data = try? encoder.encode(snapshot) {
-      defaults.set(data, forKey: calendarCacheKey(for: userID))
-    }
-  }
-
-  func remove(for userID: String) {
-    calendarMemory[userID] = nil
-    defaults.removeObject(forKey: calendarCacheKey(for: userID))
-    removeInbox(for: userID, workspace: .jovie)
-    removeInbox(for: userID, workspace: .ovie)
-  }
-
-  private func removeInbox(for userID: String, workspace: MobileWorkspaceMode) {
-    let key = inboxCacheKey(for: userID, workspace: workspace)
-    inboxMemory[key] = nil
-    defaults.removeObject(forKey: key)
-  }
-
-  private func inboxCacheKey(for userID: String, workspace: MobileWorkspaceMode) -> String {
-    workspace == .ovie
-      ? "ie.jov.Jovie.actionLoopInbox.\(userID).ov"
-      : "ie.jov.Jovie.actionLoopInbox.\(userID)"
-  }
-
-  private func calendarCacheKey(for userID: String) -> String {
-    "ie.jov.Jovie.actionLoopCalendar.\(userID)"
-  }
-}
 
 struct RootView: View {
   @Bindable var appState: AppState
@@ -833,8 +688,8 @@ enum WhatsNewCatalog {
         ),
         WhatsNewItem(
           id: "sidebar-destinations",
-          title: "Library, Calendar, and Inbox live in the sidebar",
-          testHint: "Open the sidebar and tap Library, Calendar, Inbox, Profile, Audience, and Talk. None of these should be bottom tabs."
+          title: "Work, Calendar, and Inbox live in the sidebar",
+          testHint: "Open the sidebar and tap Work, Calendar, Inbox, Profile, Audience, and Talk. None of these should be bottom tabs."
         ),
         WhatsNewItem(
           id: "chat-quality",

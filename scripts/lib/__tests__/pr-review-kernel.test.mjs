@@ -1,8 +1,12 @@
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { readRiskRuleIds } from '../../pr-review/cli.mjs';
+import {
+  parseCompare,
+  parsePull,
+  readRiskRuleIds,
+} from '../../pr-review/cli.mjs';
 import {
   collectContext,
   excerptForFinding,
@@ -24,7 +28,6 @@ import {
   runReview,
 } from '../../pr-review/run.mjs';
 
-const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const BASE = 'a'.repeat(40);
 const HEAD = 'b'.repeat(40);
 const PATH = 'apps/web/app/api/stripe/webhook/route.ts';
@@ -100,6 +103,24 @@ const baseRun = extra => ({
   readLiveHead: async () => HEAD,
   now: () => '2026-09-25T00:00:00.000Z',
   ...extra,
+});
+
+it('rejects malformed GitHub identities before git or model dispatch', () => {
+  for (const input of [
+    null,
+    {},
+    { state: 'open', base: { sha: BASE }, head: { sha: 'bad' } },
+  ])
+    expect(() => parsePull(input)).toThrow();
+  expect(
+    parsePull({ state: 'open', base: { sha: BASE }, head: { sha: HEAD } }).head
+      .sha
+  ).toBe(HEAD);
+  for (const input of [null, {}, { merge_base_commit: { sha: 'bad' } }])
+    expect(() => parseCompare(input)).toThrow();
+  expect(
+    parseCompare({ merge_base_commit: { sha: BASE } }).merge_base_commit.sha
+  ).toBe(BASE);
 });
 
 describe('parseJsonObject', () => {
@@ -195,6 +216,7 @@ describe('runReview', () => {
       'specialist:behavior-contracts'
     );
     expect(receipt.findings).toEqual([]);
+    expect(receipt.failure).toBe('usage-unverifiable');
   });
 
   it('drops malformed findings inside valid JSON', async () => {
@@ -215,7 +237,9 @@ describe('runReview', () => {
   });
 
   it('stops at the budget and marks the receipt incomplete', async () => {
-    const { transport } = transportReturning({ discovery: [rawFinding] });
+    const { transport, calls } = transportReturning({
+      discovery: [rawFinding],
+    });
     const receipt = await runReview(
       baseRun({
         riskRuleIds: ['billing-money'],
@@ -224,7 +248,7 @@ describe('runReview', () => {
         limits: {
           budgetUsd: 0.0000001,
           maxCandidates: 12,
-          concurrency: 1,
+          concurrency: 4,
           discoveryMaxOutputTokens: 10,
           verificationMaxOutputTokens: 10,
         },
@@ -233,6 +257,36 @@ describe('runReview', () => {
     expect(receipt.status).toBe('incomplete');
     expect(receipt.failure).toBe('budget-exhausted');
     expect(receipt.coverage.notAssessed).toContain('specialist:billing-money');
+    expect(calls).toHaveLength(0);
+  });
+
+  it('reserves parallel request ceilings before any transport settles', async () => {
+    const calls = [];
+    const receipt = await runReview(
+      baseRun({
+        riskRuleIds: ['billing-money'],
+        context: context(),
+        limits: {
+          budgetUsd: 0.002,
+          maxCandidates: 12,
+          concurrency: 4,
+          discoveryMaxOutputTokens: 2000,
+          verificationMaxOutputTokens: 300,
+        },
+        transport: async call => {
+          calls.push(call);
+          await Promise.resolve();
+          return {
+            text: '{"findings":[]}',
+            usage: { inputTokens: 1000, outputTokens: 2000 },
+          };
+        },
+      })
+    );
+    expect(calls).toHaveLength(1);
+    expect(receipt.spend.usd).toBeLessThanOrEqual(0.002);
+    expect(receipt.stats.reservedUsd).toBeLessThanOrEqual(0.002);
+    expect(receipt.failure).toBe('budget-exhausted');
   });
 
   it('caps candidates and keeps the most severe', async () => {
@@ -384,8 +438,14 @@ describe('models', () => {
     expect(() => assertRoutes({})).toThrow(/not in registry/);
     expect(() =>
       assertRoutes({
-        [REVIEW_ROUTES.discovery]: { family: 'x' },
-        [REVIEW_ROUTES.verification]: { family: 'x' },
+        [REVIEW_ROUTES.discovery]: {
+          ...PRICES[REVIEW_ROUTES.discovery],
+          family: 'x',
+        },
+        [REVIEW_ROUTES.verification]: {
+          ...PRICES[REVIEW_ROUTES.verification],
+          family: 'x',
+        },
       })
     ).toThrow(/different families/);
   });
@@ -503,43 +563,5 @@ describe('scoreReplay', () => {
 
   it('returns null ratios for empty denominators', () => {
     expect(scoreReplay([])).toMatchObject({ precision: null, recall: null });
-  });
-});
-
-describe('pr-review workflow contract', () => {
-  const workflow = readFileSync(
-    resolve(REPO_ROOT, '.github/workflows/pr-review.yml'),
-    'utf8'
-  );
-
-  it('runs trusted main code after PR CI, same-repo only, and ships disabled', () => {
-    expect(workflow).toContain(
-      'controller-hop-exception: jovie-controller-hop/v1'
-    );
-    expect(workflow).toContain("vars.PR_REVIEW_ENABLED == 'true'");
-    expect(workflow).toContain(
-      "github.event.workflow_run.event == 'pull_request'"
-    );
-    expect(workflow).toContain(
-      "github.event.workflow_run.conclusion != 'cancelled'"
-    );
-    expect(workflow).toContain(
-      'github.event.workflow_run.head_repository.full_name == github.repository'
-    );
-    expect(workflow).toContain('ref: main');
-    expect(workflow).toContain('persist-credentials: false');
-    expect(workflow).toContain('runs-on: ubuntu-latest');
-  });
-
-  it('never gets write access, never posts, never executes PR code', () => {
-    expect(workflow).not.toMatch(/:\s*write\b/);
-    expect(workflow).toContain('permissions: {}');
-    expect(workflow).not.toMatch(
-      /pull_request_target|createComment|createReview|gh pr/
-    );
-    expect(workflow).not.toMatch(
-      /ref:\s*\$\{\{\s*github\.event\.workflow_run\.head/
-    );
-    expect(workflow).not.toContain('pull_requests[0].head');
   });
 });

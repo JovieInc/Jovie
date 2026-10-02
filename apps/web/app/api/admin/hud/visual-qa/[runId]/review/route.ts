@@ -11,12 +11,12 @@ import {
   type VisualQaFollowUpAction,
   VisualQaReviewError,
 } from '@/lib/agent-os/visual-qa/review';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import {
   dispatchHermesWorker,
   getHermesDispatchAvailability,
 } from '@/lib/hermes/dispatch';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -130,7 +130,9 @@ export async function POST(
   context: { params: Promise<{ runId: string }> }
 ): Promise<Response> {
   try {
-    const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
+    const entitlements = await getOvieOperatorEntitlements({
+      session: 'fresh',
+    });
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { error: 'Unauthorized' },

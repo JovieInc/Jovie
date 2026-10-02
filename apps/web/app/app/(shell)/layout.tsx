@@ -22,7 +22,7 @@ import { resolveUserState } from '@/lib/auth/gate';
 import ChatLoading from './chat/ChatLoadingState';
 import { DashboardShellContent } from './DashboardShellContent';
 import { ReleaseTableSkeleton } from './dashboard/releases/loading';
-import { LibraryLoadingState } from './library/LibrarySurface';
+import { LibraryLoadingState } from './library/LibraryLoadingState';
 import { requireAppShellModeAccess } from './shell-mode';
 import {
   isChatShellRoute,
@@ -184,7 +184,12 @@ export default async function AppShellLayout({
                 href: APP_ROUTES.DASHBOARD,
                 variant: 'primary',
               },
-              { label: 'Return To Jovie', href: '/', variant: 'secondary' },
+              {
+                // ui-casing-allow: recovery action sentence case (Tim, 2026-09-28)
+                label: 'Return to Jovie',
+                href: '/',
+                variant: 'secondary',
+              },
             ]}
             testId='dashboard-error'
           />

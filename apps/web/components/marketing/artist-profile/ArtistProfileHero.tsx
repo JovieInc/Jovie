@@ -16,16 +16,19 @@ const HERO_PROFILE = getMarketingExportImage('tim-white-profile-live-mobile');
 
 function ArtistProfileHeroMedia() {
   return (
-    <div className='ap-hero__product-stage'>
+    <div
+      className='ap-hero__product-stage'
+      data-testid='artist-profile-hero-product'
+    >
       <div className='ap-hero__stage-grid' aria-hidden='true' />
       <ArtistProfilePhoneFrame className='ap-hero__phone'>
         <Image
           fill
           priority
           src={HERO_PROFILE.publicUrl}
-          alt="Tim White's Jovie artist profile leading with his latest release and a Listen action."
+          alt="Demonstration of Tim White's Jovie artist profile with a release and a Listen action."
           className='object-cover object-top'
-          sizes='(min-width: 768px) 19rem, 15rem'
+          sizes='(min-width: 768px) 19rem, (min-width: 440px) 17.5rem, 74vw'
         />
       </ArtistProfilePhoneFrame>
     </div>
@@ -39,6 +42,8 @@ export function ArtistProfileHero({ hero }: Readonly<ArtistProfileHeroProps>) {
     <div className='ap-hero'>
       <HomepagePosterHero
         headingId='artist-profile-hero-heading'
+        sectionVariant='centered-phone'
+        sectionOwner='apps/web/components/marketing/MarketingPosterHero.tsx'
         headline={hero.headline}
         subtitle={hero.subhead}
         primaryCta={{

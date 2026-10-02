@@ -225,7 +225,7 @@ const mockArtist: Artist = {
 const mockContacts = [
   {
     id: 'contact-1',
-    role: 'booking',
+    role: 'bookings',
     roleLabel: 'Booking',
     territorySummary: 'Worldwide',
     territoryCount: 1,
@@ -368,11 +368,23 @@ describe('ProfileCompactTemplate', () => {
       },
     }));
     window.history.replaceState(null, '', '/test-artist');
+    // AnonCookieBootstrap fetches the per-user variant on mount; resolve it
+    // deterministically so tests exercise the post-resolution state.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ alertOptInVariant: 'button' }),
+      })
+    );
   });
 
   afterEach(() => {
     window.matchMedia = originalMatchMedia;
+    vi.unstubAllGlobals();
     vi.useRealTimers();
+    document.cookie =
+      'jv_country=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
   });
 
   it('keeps the signed-in escape hatch on a live tablet profile that uses embedded presentation', async () => {
@@ -443,6 +455,25 @@ describe('ProfileCompactTemplate', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+  });
+
+  it('passes the proof claim to the phone claim bar (JOV-7114)', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        proofClaim
+        showClaimFooter
+        claimFooterHref='/start?campaign=proof-to-claim'
+        claimFooterLabel='Claim yours'
+      />
+    );
+
+    expect(
+      await screen.findByTestId('profile-proof-claim-bar-cta')
+    ).toHaveAttribute('href', '/start?campaign=proof-to-claim');
   });
 
   it('hides the floating back control on the public profile root first landing', async () => {
@@ -592,14 +623,17 @@ describe('ProfileCompactTemplate', () => {
     ).toHaveTextContent(`jov.ie/${mockArtist.handle}`);
     // Location lives in About, not in the identity header.
     expect(within(identity).queryByText('Los Angeles')).toBeNull();
-    const listen = within(identity).getByTestId('profile-identity-listen');
-    expect(listen).toHaveClass('h-11');
-    expect(listen).toHaveAttribute('href', `/${mockArtist.handle}/listen`);
-    expect(listen.firstElementChild).toHaveClass(
-      'profile-glass-pill',
-      'profile-glass-pill--flat',
-      'h-7'
-    );
+    // Get Updates is the only identity action; songs carry their own Listen.
+    expect(
+      within(identity).queryByTestId('profile-identity-listen')
+    ).toBeNull();
+    const getUpdates = within(identity).getByRole('button', {
+      name: 'Get Updates',
+    });
+    expect(getUpdates.parentElement).toHaveClass('h-11');
+    expect(
+      getUpdates.parentElement?.querySelector('.profile-glass-pill')
+    ).toHaveClass('profile-glass-pill', 'profile-glass-pill--flat', 'h-7');
     expect(
       within(screen.getByTestId('profile-identity-social-row')).getByRole(
         'link'
@@ -607,7 +641,14 @@ describe('ProfileCompactTemplate', () => {
     ).toHaveClass('h-11', 'w-11');
   });
 
-  it('opens Music from the identity Listen action without a page load', async () => {
+  it('opens the existing subscribe flow from the identity Get Updates action', async () => {
+    const revealNotifications = vi.fn();
+    mockProfileInlineNotificationsCTA.mockImplementation(
+      (props: { readonly onRegisterReveal?: (reveal: () => void) => void }) => {
+        props.onRegisterReveal?.(revealNotifications);
+        return null;
+      }
+    );
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -617,18 +658,33 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId('profile-identity-listen'));
+    // The hero CTA mounts once the visitor assignment resolves; the reveal is
+    // registered at mount, so clicks afterwards hit the reveal path.
+    await waitFor(() => {
+      expect(mockProfileInlineNotificationsCTA).toHaveBeenCalled();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Get Updates' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
-        'data-mode',
-        'listen'
-      );
+      expect(revealNotifications).toHaveBeenCalledTimes(1);
     });
-    expect(screen.getByTestId('profile-identity-listen')).toHaveAttribute(
-      'aria-current',
-      'page'
+  });
+
+  it('shows no Get Updates action when the profile cannot take fans', () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        allowFanCapture={false}
+      />
     );
+
+    expect(
+      screen.queryByRole('button', { name: 'Get Updates' })
+    ).not.toBeInTheDocument();
   });
 
   it('scopes the mobile overflow contract to the active home surface slot', () => {
@@ -726,14 +782,32 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Release credits' }));
+    // No raw credits control in the shell; the entry lives in the menu.
+    expect(
+      screen.queryByRole('button', { name: 'Release credits' })
+    ).toBeNull();
+    const drawerProps = mockProfileUnifiedDrawer.mock.calls.at(-1)?.[0] as {
+      onOpenReleaseCredits?: () => void;
+    };
+    expect(drawerProps.onOpenReleaseCredits).toBeTypeOf('function');
+    act(() => drawerProps.onOpenReleaseCredits?.());
 
     const drawer = await screen.findByRole('dialog', { name: 'Credits' });
     expect(within(drawer).getByText('Main artist')).toBeInTheDocument();
     expect(within(drawer).queryByText('Producer')).toBeNull();
+
+    // The desktop surface slot owns a sheet container that anchors modal
+    // drawers to the desktop shell (route DOM certification, JOV-6915).
+    const sheetContainer = document.querySelector('[data-sheet-container]');
+    expect(sheetContainer).not.toBeNull();
+    expect(
+      sheetContainer?.querySelector(
+        '[data-testid="mock-profile-desktop-surface"]'
+      )
+    ).not.toBeNull();
   });
 
-  it('hides the release credits trigger when every credit group is empty', () => {
+  it('hides the release credits menu entry when every credit group is empty', () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -744,9 +818,10 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(
-      screen.queryByRole('button', { name: 'Release credits' })
-    ).toBeNull();
+    const drawerProps = mockProfileUnifiedDrawer.mock.calls.at(-1)?.[0] as {
+      onOpenReleaseCredits?: () => void;
+    };
+    expect(drawerProps.onOpenReleaseCredits).toBeUndefined();
   });
 
   it('keeps the identity header without a portrait image when a profile has no real photo', () => {
@@ -801,9 +876,9 @@ describe('ProfileCompactTemplate', () => {
   // Regression: JOV-3377 — with overflow-y-auto, overflow-x computes to auto
   // (CSS Overflow 3), so the home scroll region clips at its own padding box.
   // Without the --page-pad bleed, that clip lands --page-pad inside the shell
-  // and hard-clips the catalog carousel's trailing card instead of letting it
-  // peek to the surface edge.
-  it('bleeds the home content scroll region to the shell edge so the catalog carousel is not clipped', async () => {
+  // and hard-clips the featured editorial card instead of letting it reach
+  // the surface edge (JOV-7123: the card replaces the old catalog carousel).
+  it('bleeds the home content scroll region to the shell edge so the editorial card is not clipped', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -1274,6 +1349,36 @@ describe('ProfileCompactTemplate', () => {
     pushStateSpy.mockRestore();
   });
 
+  it('does not push a source-less URL before the source param hydrates', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+    window.history.replaceState(null, '', '/test-artist?source=qr');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sourceOverride: 'qr',
+        })
+      );
+    });
+
+    expect(window.location.search).toBe('?source=qr');
+    for (const call of pushStateSpy.mock.calls) {
+      expect(String(call[2])).toContain('source=qr');
+    }
+
+    pushStateSpy.mockRestore();
+  });
+
   it('renders the alerts tab when ?mode=subscribe is in the URL', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
     window.history.replaceState(null, '', '/test-artist?mode=subscribe');
@@ -1367,12 +1472,12 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(
-      screen.getByTestId('profile-home-alerts-fallback-card')
-    ).toHaveTextContent('Alerts');
-    expect(screen.getByTestId('profile-home-carousel')).toHaveTextContent(
-      'Tickets'
-    );
+    // JOV-7123: the featured editorial card carries the show — there is no
+    // carousel or separate alerts card on the home surface.
+    const pacCard = screen.getByTestId('profile-pac');
+    expect(pacCard).toHaveAttribute('data-state', 'tickets');
+    expect(pacCard).toHaveTextContent('Tickets');
+    expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
     expect(
       screen.queryByTestId('profile-hero-status-pill')
     ).not.toBeInTheDocument();
@@ -1395,25 +1500,19 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
-    const carousel = screen.getByTestId('profile-home-carousel');
     const pacCard = screen.getByTestId('profile-pac');
 
-    expect(alertsCard).toHaveTextContent('Alerts');
-    // The featured mode card carries the release and its Listen CTA; the
-    // alerts card stays last, inside the carousel below it.
+    // The featured editorial card carries the release and its Listen CTA as
+    // the single card surface on the home rail.
     expect(pacCard).toHaveTextContent("Don't Look Down");
     expect(pacCard).toHaveTextContent('Listen now');
-    expect(carousel.contains(alertsCard)).toBe(true);
-    expect(
-      screen.getByTestId('profile-pac').compareDocumentPosition(alertsCard)
-    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
     expect(
       screen.queryByTestId('profile-hero-status-pill')
     ).not.toBeInTheDocument();
   });
 
-  it('shows catalog releases in the home carousel when latestRelease is not provided', async () => {
+  it('leads the featured editorial card with the newest catalog release when latestRelease is not provided', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -1424,12 +1523,15 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
+    // JOV-7123: the editorial card resolves the newest catalog release as its
+    // subject; the rest of the catalog stays on the Music destination.
     const homeRail = screen.getByTestId('profile-home-rail');
     expect(homeRail).toHaveTextContent("Don't Look Down");
-    expect(homeRail).toHaveTextContent('Holding On');
+    expect(homeRail).not.toHaveTextContent('Holding On');
+    expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
   });
 
-  it('opens the alerts tab from the compact hero alerts row', async () => {
+  it('opens the alerts tab from the identity header Get Updates action', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -1439,11 +1541,9 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const alertsRow = screen.getByTestId('profile-home-alerts-fallback-card');
-    expect(alertsRow).toHaveTextContent('Alerts');
-    expect(alertsRow).not.toHaveTextContent('New music and shows');
-
-    fireEvent.click(alertsRow);
+    // JOV-7123: the alerts carousel card is gone; Get Updates on the
+    // identity header is the home capture entry point.
+    fireEvent.click(screen.getByTestId('profile-identity-get-updates'));
 
     await waitFor(() => {
       expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
@@ -1482,7 +1582,11 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId('profile-home-alerts-fallback-card'));
+    // The hero CTA mounts once the visitor assignment resolves; the reveal is
+    // registered at mount, so clicks afterwards hit the reveal path.
+    await screen.findByTestId('mock-inline-notifications-cta');
+
+    fireEvent.click(screen.getByTestId('profile-identity-get-updates'));
 
     await waitFor(() => {
       expect(revealNotifications).toHaveBeenCalledTimes(1);
@@ -1492,7 +1596,191 @@ describe('ProfileCompactTemplate', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('hides the compact hero alerts card for returning subscribers', async () => {
+  it('keeps the fan-capture CTA unmounted until the visitor assignment resolves', async () => {
+    let resolveAssignment:
+      | ((value: { ok: boolean; json: () => Promise<unknown> }) => void)
+      | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise(resolve => {
+            resolveAssignment = resolve;
+          })
+      )
+    );
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    // While the assignment fetch is in flight the interactive capture CTA
+    // must not exist — a control that would morph post-paint stays absent.
+    expect(
+      screen.queryByTestId('mock-inline-notifications-cta')
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('profile-compact-shell')).not.toHaveAttribute(
+      'data-visitor-assignment-resolved'
+    );
+    expect(mockProfileInlineNotificationsCTA).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveAssignment?.({
+        ok: true,
+        json: async () => ({ alertOptInVariant: 'toggle' }),
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('profile-compact-shell')).toHaveAttribute(
+        'data-visitor-assignment-resolved',
+        'true'
+      );
+    });
+    // The CTA mounts exactly once, with the assigned variant — never the
+    // ISR default that would later morph.
+    expect(screen.getByTestId('profile-compact-shell')).toHaveAttribute(
+      'data-alert-opt-in-variant',
+      'toggle'
+    );
+    expect(mockProfileInlineNotificationsCTA).toHaveBeenCalledWith(
+      expect.objectContaining({ experimentVariant: 'toggle' })
+    );
+    expect(
+      mockProfileInlineNotificationsCTA.mock.calls.filter(
+        ([props]) =>
+          (props as { experimentVariant?: string }).experimentVariant ===
+          'button'
+      )
+    ).toHaveLength(0);
+  });
+
+  it('keeps the ISR default variant when assignment resolution fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(new Error('network down'))
+    );
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('profile-compact-shell')).toHaveAttribute(
+        'data-visitor-assignment-resolved',
+        'true'
+      );
+    });
+    expect(mockProfileInlineNotificationsCTA).toHaveBeenCalledWith(
+      expect.objectContaining({ experimentVariant: 'button' })
+    );
+  });
+
+  it('routes a cold-load alerts click to the capture flow under the assigned variant', async () => {
+    let resolveAssignment:
+      | ((value: { ok: boolean; json: () => Promise<unknown> }) => void)
+      | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise(resolve => {
+            resolveAssignment = resolve;
+          })
+      )
+    );
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    // Early click: the visitor lands on the subscribe tab before the
+    // assignment resolves; the panel receives the unresolved flag so its
+    // capture control stays inert.
+    fireEvent.click(screen.getByTestId('profile-identity-get-updates'));
+
+    await waitFor(() => {
+      expect(mockProfilePrimaryTabPanel).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          mode: 'subscribe',
+          visitorAssignmentResolved: false,
+        })
+      );
+    });
+
+    await act(async () => {
+      resolveAssignment?.({
+        ok: true,
+        json: async () => ({ alertOptInVariant: 'toggle' }),
+      });
+    });
+
+    await waitFor(() => {
+      expect(mockProfilePrimaryTabPanel).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          mode: 'subscribe',
+          visitorAssignmentResolved: true,
+          alertOptInVariant: 'toggle',
+        })
+      );
+    });
+  });
+
+  it('geo-sorts DSPs from the readable jv_country cookie after mount', async () => {
+    document.cookie = 'jv_country=DE; path=/';
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({ viewerCountryCode: 'DE' })
+      );
+    });
+  });
+
+  it('prefers an explicit viewerCountryCode prop over the jv_country cookie', async () => {
+    document.cookie = 'jv_country=DE; path=/';
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        viewerCountryCode='US'
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({ viewerCountryCode: 'US' })
+      );
+    });
+  });
+
+  it('marks the Get Updates action subscribed for returning subscribers', async () => {
     mockUseProfileShell.mockImplementation(() => ({
       notificationsContextValue: {
         subscribedChannels: { email: true },
@@ -1515,15 +1803,15 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(
-      screen.queryByTestId('profile-home-alerts-fallback-card')
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('profile-home-alerts-row')
-    ).not.toBeInTheDocument();
+    // JOV-7123: no separate alerts card exists; subscribed visitors see the
+    // identity header's Updates On state instead of a capture CTA.
+    expect(screen.getByTestId('profile-identity-get-updates')).toHaveAttribute(
+      'data-subscribed',
+      'true'
+    );
   });
 
-  it('hides the compact hero alerts card after activation in the current session', async () => {
+  it('marks the Get Updates action subscribed after activation in the current session', async () => {
     mockProfileInlineNotificationsCTA.mockImplementation(
       (props: { readonly onSubscriptionActivated?: () => void }) => (
         <button
@@ -1547,7 +1835,7 @@ describe('ProfileCompactTemplate', () => {
 
     const view = render(renderProfile());
 
-    fireEvent.click(screen.getByTestId('mock-inline-notifications-cta'));
+    fireEvent.click(await screen.findByTestId('mock-inline-notifications-cta'));
 
     mockUseProfileShell.mockImplementation(() => ({
       notificationsContextValue: {
@@ -1564,12 +1852,10 @@ describe('ProfileCompactTemplate', () => {
 
     view.rerender(renderProfile());
 
-    expect(
-      screen.queryByTestId('profile-home-alerts-fallback-card')
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('profile-home-alerts-row')
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('profile-identity-get-updates')).toHaveAttribute(
+      'data-subscribed',
+      'true'
+    );
   });
 
   it('falls back to the mode prop when the URL has no mode param', async () => {
@@ -1691,7 +1977,7 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId('mock-inline-notifications-cta'));
+    fireEvent.click(await screen.findByTestId('mock-inline-notifications-cta'));
 
     await waitFor(() => {
       expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
@@ -1729,7 +2015,7 @@ describe('ProfileCompactTemplate', () => {
     pushStateSpy.mockRestore();
   });
 
-  it('renders the confirmed playlist fallback when no release is available', async () => {
+  it('does not stack a playlist card under the featured editorial card', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -1750,15 +2036,14 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
+    // JOV-7123: one card surface on home — the playlist fallback no longer
+    // renders a second card under the editorial card.
+    expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
     expect(
-      screen.getByRole('link', {
+      screen.queryByRole('link', {
         name: /This Is Tim White/,
       })
-    ).toHaveAttribute(
-      'href',
-      'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu'
-    );
-    expect(screen.getByText('Open Playlist')).toBeInTheDocument();
+    ).not.toBeInTheDocument();
   });
 
   it('keeps optional hero role metadata out of the mobile hero chrome', async () => {
@@ -1822,9 +2107,10 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-home-carousel')).toHaveTextContent(
-      'The Ballroom'
-    );
+    // The featured editorial card resolves the upcoming show as its subject;
+    // nothing else stacks under it.
+    expect(screen.getByTestId('profile-pac')).toHaveTextContent('The Ballroom');
+    expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
     expect(
       screen.queryByRole('link', {
         name: `Open This Is playlist for ${mockArtist.name}`,

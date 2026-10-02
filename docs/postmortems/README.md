@@ -10,6 +10,8 @@ Tim is never required.
 
 | Date | Incident | Failure classes | Status |
 | --- | --- | --- | --- |
+| 2026-10-02 | [PR recovery stopped converging](2026-10-02-pr-recovery-stall.md) | `non-convergent-control-loop`, `pre-merge-parity-gap` | draft |
+| 2026-09-28 | [Codex lane dispatch and attribution gap](2026-09-28-codex-lane-attribution-gap.md) | `green-by-implication`, `evidence-forgery-or-staleness` | draft |
 | 2026-09-27 | [Production freeze: SBOM step failed every promotion after #18879](2026-09-27-sbom-provenance-freeze.md) | `pre-merge-parity-gap`, `silent-production-staleness`, `green-by-implication` | draft |
 | 2026-09-26 | [Production freeze: jov.ie stuck on `eb15ae0` for five days](2026-09-26-production-freeze.md) | `silent-production-staleness`, `pre-merge-parity-gap`, `serial-layer-discovery`, `non-convergent-control-loop`, `green-by-implication`, `privileged-recovery-only`, `unowned-incident` | reviewed |
 | 2026-07 | [CI/release drain: incident prevention and inheritance](2026-07-ci-release-drain.md) | see the [39-incident CI/release index](../ci/CI_RELEASE_INCIDENTS.md) and [machine ledger](../../.github/ci-harness/ci-release-incidents.json) | contract |
@@ -126,6 +128,9 @@ improvement loop and bottleneck ranking (JOV-5817).
    class seen twice or more gets one class-level hardening issue, linked from
    each post-mortem. Report counts and time-to-detect trends in the
    improvement loop.
+   The [quality gap finder](../quality/QUALITY_GAP_FINDER.md) re-checks every
+   class on each post-mortem merge. It proposes a guardrail when no invariant,
+   ledger entry, or script names the class and its actions have closed.
 4. **Closure needs live proof.** An action closes only when its control is
    **verified live**, meaning the alert fired, the gate rejected a deliberate
    red fixture, or the invariant test failed on the old code. Merging the

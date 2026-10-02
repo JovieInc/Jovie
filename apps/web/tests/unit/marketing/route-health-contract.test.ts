@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   getMarketingRouteHealthTarget,
+  getRouteManifestEntry,
+  getRouteRecipeParity,
+  isExempt,
+  isRecipeRoute,
   MARKETING_EXACT_PUBLIC_ROUTE_TARGETS,
   MARKETING_ROUTE_DISPOSITION_LEDGER,
   MARKETING_ROUTE_HEALTH_TARGETS,
@@ -49,6 +53,72 @@ describe('marketing route health contract', () => {
         healthCheck: undefined,
       })
     ).toThrow(/concrete absolute path/);
+  });
+
+  it('rejects relative and wildcard redirect destinations before browser admission', () => {
+    for (const finalPath of ['login', '/future/*']) {
+      expect(() =>
+        getMarketingRouteHealthTarget({
+          ...MARKETING_ROUTE_MANIFEST[0],
+          healthCheck: {
+            path: '/legacy',
+            expected: 'redirect',
+            allowedFinalPaths: [finalPath],
+          },
+        })
+      ).toThrow(/invalid redirect target/);
+    }
+    expect(
+      getMarketingRouteHealthTarget({
+        ...MARKETING_ROUTE_MANIFEST[0],
+        healthCheck: {
+          path: '/legacy',
+          expected: 'redirect',
+          allowedFinalPaths: ['/pricing'],
+        },
+      })
+    ).toMatchObject({ expected: 'redirect', allowedFinalPaths: ['/pricing'] });
+  });
+
+  it('returns real route ownership and fails closed for unknown source paths', () => {
+    const pricing = MARKETING_ROUTE_MANIFEST.find(
+      entry => entry.url === '/pricing'
+    );
+    const developers = MARKETING_ROUTE_MANIFEST.find(
+      entry => entry.url === '/developers'
+    );
+    expect(pricing).toBeDefined();
+    expect(developers).toBeDefined();
+    expect(getRouteManifestEntry(pricing!.glob)).toBe(pricing);
+    expect(isRecipeRoute(pricing!.glob)).toBe(true);
+    expect(isExempt(pricing!.glob)).toBe(false);
+    expect(isExempt(developers!.glob)).toBe(true);
+    expect(isRecipeRoute(developers!.glob)).toBe(false);
+    expect(
+      getRouteManifestEntry('(marketing)/unregistered/page.tsx')
+    ).toBeNull();
+    expect(isExempt('(marketing)/unregistered/page.tsx')).toBe(false);
+    expect(isRecipeRoute('(marketing)/unregistered/page.tsx')).toBe(false);
+  });
+
+  it('never projects an unverified or non-recipe binding as matching recipe proof', () => {
+    const pricing = MARKETING_ROUTE_MANIFEST.find(
+      entry => entry.url === '/pricing'
+    )!;
+    expect(
+      getRouteRecipeParity({
+        ...pricing,
+        bindingEvidence: { ...pricing.bindingEvidence, status: 'unverified' },
+      })
+    ).toMatchObject({ evidenceStatus: 'unverified', matches: null });
+    const developers = MARKETING_ROUTE_MANIFEST.find(
+      entry => entry.url === '/developers'
+    )!;
+    expect(getRouteRecipeParity(developers)).toMatchObject({
+      expectedSectionIds: [],
+      matches: null,
+    });
+    expect(getRouteRecipeParity(pricing).matches).toBe(false);
   });
 
   it('keeps pay, support, and the public waitlist source-bound and renderable', () => {
@@ -124,6 +194,27 @@ describe('marketing route health contract', () => {
         entry => entry.disposition === 'unknown'
       )
     ).toEqual([]);
+  });
+
+  it('serves a page for every active manifest route with a concrete URL', () => {
+    // JOV-6859: an active route must never silently 404 — its resolved health
+    // target cannot be declared not-found. Wildcard routes keep their explicit
+    // fixture probes (e.g. the unpublished engineering article check).
+    for (const entry of MARKETING_ROUTE_MANIFEST) {
+      const target = getMarketingRouteHealthTarget(entry);
+      if (entry.status === 'active' && !entry.url.includes('*')) {
+        expect(
+          target.expected,
+          `${entry.glob} is active but declares ${target.expected}`
+        ).toBe('page');
+      }
+      if (target.expected === 'not-found') {
+        expect(
+          entry.url,
+          `${entry.glob} declares a not-found probe on a concrete route`
+        ).toContain('*');
+      }
+    }
   });
 
   it('generates exact capture targets only for active public pages', () => {

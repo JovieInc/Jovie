@@ -29,6 +29,70 @@ ACTION_CACHE_RESTORE_V6_1_0_SHA = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
 ACTION_CACHE_SAVE_V6_1_0_SHA = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
 
 
+def test_staging_controller_is_independent_and_exact_sha() -> None:
+    staging = (REPO_ROOT / ".github/workflows/staging-controller.yml").read_text()
+    production = (REPO_ROOT / ".github/workflows/production-controller.yml").read_text()
+    assert "workflows: [CI]" in staging
+    assert "group: staging-mutation" in staging
+    assert "outcome=not_applicable" in staging
+    assert "product-lane-release-${candidate_sha}-${candidate_attempt}" in staging
+    assert "release_mode: staging" in staging
+    assert "fleet-promotion" not in staging
+    assert "release_mode: production" in production
+    assert 'staging_receipt_sha="$web_evidence_sha"' in production
+    assert "https://staging.jov.ie/api/health/build-info" in production
+
+
+def test_staging_lineage_receipt_accepts_merge_group_provenance(tmp_path: Path) -> None:
+    """JOV-7182: release.json provenance is the merge-queue proof run, not the
+    main push run. When CI is re-run or evidence came from merge_group, the
+    receipt's provenance.runAttempt differs from the source main run attempt.
+    The artifact name (product-lane-release-{sha}-{attempt}) fetched from the
+    exact run-id already binds sha + run + attempt, and
+    releaseRouting.sourceMainRunId pins the run -- so the lineage filter must
+    not equate provenance.runAttempt with the main run attempt.
+    """
+    staging = (REPO_ROOT / ".github/workflows/staging-controller.yml").read_text()
+    match = re.search(
+        r"jq -e (?P<args>(?:--arg \w+ \"[^\"]+\" )+)'(?P<filter>[^']+)' \"\$receipt\"",
+        staging,
+    )
+    assert match, "canonical lineage jq filter missing from staging controller"
+
+    env = {
+        "EXPECTED_SHA": "3485a84eda8ff824dec61475ea247ba73f025214",
+        "SOURCE_CI_RUN_ID": "36564906495",
+        "SOURCE_CI_RUN_ATTEMPT": "2",
+    }
+    jq_argv = ["jq", "-e"]
+    for name, raw in re.findall(r"--arg (\w+) \"([^\"]+)\"", match.group("args")):
+        value = raw
+        for key, resolved in env.items():
+            value = value.replace(f"${key}", resolved)
+        jq_argv += ["--arg", name, value]
+    jq_argv += [match.group("filter"), "receipt.json"]
+
+    receipt = {
+        "provenance": {
+            "sha": env["EXPECTED_SHA"],
+            "runId": "36564346980",
+            "runAttempt": "1",
+        },
+        "releaseRouting": {
+            "admissionRunId": "36564346980",
+            "sourceMainRunId": env["SOURCE_CI_RUN_ID"],
+            "sourceArtifactId": "11031612048",
+        },
+        "aggregatePassed": True,
+        "selectedLanes": ["web"],
+    }
+    (tmp_path / "receipt.json").write_text(json.dumps(receipt))
+    result = subprocess.run(jq_argv, cwd=tmp_path, capture_output=True, text=True)
+    assert result.returncode == 0, (
+        "lineage filter must accept merge-group provenance: " + result.stderr
+    )
+
+
 def test_production_next_cache_experiment_is_bounded_and_restore_only_by_default() -> None:
     """Keep the production cache experiment narrow enough to be reversible.
 
@@ -412,11 +476,7 @@ def test_workflow_waits_for_readiness_and_aliases_only_after_canary() -> None:
     )
     assert "vercel inspect" in workflow[wait_index:canary_index]
     assert "--wait" in workflow[wait_index:canary_index]
-    assert (
-        "needs: [deploy-staging, attest-staging-build, canary-health-gate, "
-        "alias-staging, production-head, migrate-production]"
-        in workflow[promote_index:]
-    )
+    assert "needs: [production-head, migrate-production]" in workflow[promote_index:]
 
     source_workflow = CI_WORKFLOW.read_text()
     preview_deploy_index = source_workflow.index(

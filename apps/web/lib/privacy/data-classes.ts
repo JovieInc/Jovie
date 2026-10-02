@@ -234,7 +234,7 @@ export const DATA_CLASSES: DataClass[] = [
     title: 'Notification subscriptions and consent',
     purpose:
       'Fan opt-ins for releases/notifications (email, phone, OTP state) and ' +
-      'recipient channel preferences.',
+      'recipient channel preferences, including encrypted iOS push registrations.',
     owner: 'app/notifications',
     classification: 'personal-data',
     tables: [
@@ -242,13 +242,24 @@ export const DATA_CLASSES: DataClass[] = [
       'notification_contacts',
       'sms_subscribe_intents',
       'recipient_preferences',
+      'ios_push_devices',
     ],
     retention:
       'notification_subscriptions rows are deleted after the analytics ' +
-      'retention window; SMS intents are cleaned by the sms-intents cron.',
-    deletion: ['retention-cron'],
+      'retention window; SMS intents are cleaned by the sms-intents cron; ' +
+      'iOS registrations are removed on sign-out, account deletion, or invalid-token response.',
+    deletion: [
+      'account-delete-route',
+      'fk-cascade',
+      'retention-cron',
+      'vendor',
+    ],
     export: ['none'],
-    vendors: ['Twilio (sms delivery)', 'Resend (email delivery)'],
+    vendors: [
+      'Apple Push Notification service',
+      'Twilio (sms delivery)',
+      'Resend (email delivery)',
+    ],
   },
   {
     id: 'tips',
@@ -283,6 +294,21 @@ export const DATA_CLASSES: DataClass[] = [
     deletion: ['fk-cascade', 'vendor'],
     export: ['none'],
     vendors: ['Printful (fulfillment)', 'Stripe (payment)'],
+  },
+  {
+    id: 'profile-inquiries',
+    title: 'Profile inquiries and visitor intents',
+    purpose:
+      'Visitor messages, unanswered questions, and follow intents (with ' +
+      'optional name/email/city) captured by the public Ask Jovie surface.',
+    owner: 'app/profiles',
+    classification: 'communications',
+    tables: ['profile_inquiries'],
+    retention: 'For the life of the parent profile; no automated retention.',
+    deletion: ['fk-cascade', 'unmanaged'],
+    export: ['none'],
+    notes:
+      'Visitor rows are not covered by account-export — documented gap, same class as audience members.',
   },
   {
     id: 'chat',
@@ -416,6 +442,26 @@ export const DATA_CLASSES: DataClass[] = [
     export: ['admin-export'],
     vendors: ['Resend'],
     notes: 'Lead/waitlist row retention is a documented gap — see audit doc.',
+  },
+  {
+    id: 'canonical-contacts',
+    title: 'Canonical customer contacts',
+    purpose:
+      'Canonical prospect/customer identity for the admin lifecycle surface: ' +
+      'one deduped row per person across waitlist, lead, creator-profile, and ' +
+      'user sources, plus its stage-transition history.',
+    owner: 'ops/growth',
+    classification: 'personal-data',
+    tables: ['contacts', 'contact_stage_transitions'],
+    retention:
+      'For the life of the underlying source record; no dedicated retention ' +
+      'job today.',
+    deletion: ['fk-cascade', 'unmanaged'],
+    export: ['admin-export'],
+    notes:
+      'contact_stage_transitions cascades on contact delete; source links use ' +
+      'set-null so deleting a user/lead/profile severs the link but keeps the ' +
+      'contact row. Erasure propagation into contacts is a documented gap.',
   },
   {
     id: 'finance',

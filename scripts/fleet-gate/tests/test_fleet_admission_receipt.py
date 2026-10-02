@@ -135,6 +135,29 @@ def evaluate_receipt(**overrides):
     return GATE_MODULE.evaluate(signals(**overrides), now_iso())
 
 
+def scoped_request(surface="production-web", risk_lane="low", **overrides):
+    request = {
+        "consumer": "deployment",
+        "surface": surface,
+        "repository": "JovieInc/Jovie",
+        "revision": SHA,
+        "mutation": "promote-staged-web-release",
+        "riskLane": risk_lane,
+        "healthSignals": [],
+    }
+    request.update(overrides)
+    return request
+
+
+def production_health(alias, database="green"):
+    dependencies = {
+        "vercel-alias": {"status": alias, "detail": "alias health"},
+    }
+    if database is not None:
+        dependencies["database"] = {"status": database, "detail": "database health"}
+    return {"status": "green" if alias == database == "green" else "red", "deployedSha": SHA, "dependencies": dependencies}
+
+
 def legacy_controller_repair_receipt():
     """Preserve validation of receipts emitted before runtime/source decoupling."""
     receipt = evaluate_receipt(controller={"status": "failed"})
@@ -568,15 +591,19 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
 
     def test_cli_projects_stdin_and_fails_closed(self):
         receipt = inject_inventories(evaluate_receipt())
-        ok = subprocess.run(
-            ["python3", str(PROJECTOR)],
-            input=json.dumps(receipt),
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            request = pathlib.Path(tmp) / "request.json"
+            request.write_text(json.dumps(scoped_request()))
+            ok = subprocess.run(
+                ["python3", str(PROJECTOR), "--request", str(request)],
+                input=json.dumps(receipt),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
         self.assertEqual(ok.returncode, 0, ok.stderr)
         projection = json.loads(ok.stdout)
+        self.assertEqual(projection["scopedAdmission"]["surface"], "production-web")
         self.assertNotIn(
             "classifications", projection["signals"]["closureHealth"]
         )
@@ -590,6 +617,171 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         self.assertEqual(refused.returncode, 2)
         self.assertIn("Fleet admission projection failed", refused.stderr)
 
+    def test_scopes_unhealthy_signals_to_the_exact_mutation(self):
+        receipt = evaluate_receipt(
+            controller={"status": "failed"},
+            production=production_health("green", "red"),
+            closureHealth={**signals()["closureHealth"], "repository": "JovieInc/Sibling",
+                "status": "red", "newIssueIntakeAllowed": False,
+                "reasons": ["sibling repository unhealthy"]},
+        )
+        low = PROJECT.project_fleet_admission_receipt(receipt, scoped_request())[
+            "scopedAdmission"
+        ]
+        self.assertTrue(low["allowed"])
+        self.assertEqual((low["schema"], low["allowedMode"], low["freshness"]["fresh"], len(low["hardInvariants"])), ("jovie-fleet-admission/v2", "normal", True, 5))
+        self.assertEqual(
+            {row["signal"] for row in low["unrelatedDegradations"]},
+            {"database", "symphony-capacity", "repository:JovieInc/Sibling"},
+        )
+
+        migration = PROJECT.project_fleet_admission_receipt(
+            receipt, scoped_request("migration", "high", mutation="apply-migration")
+        )["scopedAdmission"]
+        self.assertFalse(migration["allowed"])
+        self.assertEqual(
+            {row["signal"] for row in migration["relevantBlockers"]},
+            {"database"},
+        )
+        self.assertIn("database", migration["nextProof"])
+        unknown = PROJECT.project_fleet_admission_receipt(
+            evaluate_receipt(production=production_health("green", None)),
+            scoped_request(risk_lane="high"),
+        )["scopedAdmission"]
+        self.assertEqual(unknown["relevantBlockers"][0]["status"], "unknown")
+
+    def test_production_alias_failure_does_not_block_independent_staging(self):
+        receipt = evaluate_receipt(production=production_health("red", "green"))
+        production = PROJECT.project_fleet_admission_receipt(
+            receipt, scoped_request()
+        )["scopedAdmission"]
+        self.assertFalse(production["allowed"])
+        self.assertIn("vercel-alias", production["nextProof"])
+
+        staging_signal = {"signal": "staging-alias", "status": "green", "detail": "staging exact", "proof": "staging-controller"}
+        staging = PROJECT.project_fleet_admission_receipt(receipt, scoped_request(
+            "staging-web", "low", mutation="deploy-staging-web",
+            healthSignals=[staging_signal],
+        ))["scopedAdmission"]
+        self.assertTrue(staging["allowed"])
+        self.assertIn(
+            "vercel-alias",
+            {row["signal"] for row in staging["unrelatedDegradations"]},
+        )
+
+    def test_failed_screenshot_check_blocks_only_production_web(self):
+        """JOV-4970: a terminal Generate Screenshots failure gates the UI
+        surface that names it, never global fleet promotion."""
+        main = {
+            "status": "green",
+            "sha": SHA,
+            "checks": [
+                {
+                    "name": "Main Release Ready",
+                    "classification": "required",
+                    "verdict": "success",
+                },
+                {
+                    "name": "Generate Screenshots",
+                    "classification": "optional",
+                    "verdict": "failed",
+                    "conclusion": "failure",
+                },
+            ],
+        }
+        receipt = evaluate_receipt(main=main)
+        self.assertEqual(receipt["signals"]["main"]["status"], "green")
+        production = PROJECT.project_fleet_admission_receipt(
+            receipt, scoped_request("production-web")
+        )["scopedAdmission"]
+        self.assertFalse(production["allowed"])
+        self.assertEqual(
+            {row["signal"] for row in production["relevantBlockers"]},
+            {"check:Generate Screenshots"},
+        )
+        fleet = PROJECT.project_fleet_admission_receipt(
+            receipt,
+            scoped_request("fleet-control", mutation="refresh-fleet-admission"),
+        )["scopedAdmission"]
+        self.assertTrue(fleet["allowed"])
+        self.assertEqual(
+            {row["signal"] for row in fleet["unrelatedDegradations"]},
+            {"check:Generate Screenshots"},
+        )
+
+    def test_pending_screenshot_check_never_blocks_promotion(self):
+        """The incident shape: optional pending lane stays observable only."""
+        main = {
+            "status": "green",
+            "sha": SHA,
+            "checks": [
+                {
+                    "name": "Generate Screenshots",
+                    "classification": "optional",
+                    "verdict": "pending",
+                    "status": "in_progress",
+                },
+            ],
+        }
+        receipt = evaluate_receipt(main=main)
+        for surface, mutation in (
+            ("production-web", "promote-staged-web-release"),
+            ("fleet-control", "refresh-fleet-admission"),
+        ):
+            admission = PROJECT.project_fleet_admission_receipt(
+                receipt, scoped_request(surface, mutation=mutation)
+            )["scopedAdmission"]
+            self.assertTrue(admission["allowed"], surface)
+            self.assertEqual(
+                {row["signal"] for row in admission["unrelatedDegradations"]},
+                {"check:Generate Screenshots"},
+            )
+
+    def test_main_health_classification_survives_bounded_projection(self):
+        main = {
+            "status": "green",
+            "sha": SHA,
+            "reason": "required-checks-green-generation-verified",
+            "generationVerified": True,
+            "contract": {"version": "2026-10-01.1"},
+            "marker": {
+                "name": f"production-generation-verified-{SHA}",
+                "verified": True,
+                "stale": False,
+            },
+            "pendingChecks": ["Generate Screenshots"],
+            "checks": [
+                {
+                    "name": "Generate Screenshots",
+                    "classification": "optional",
+                    "verdict": "pending",
+                },
+            ],
+        }
+        projection = PROJECT.project_fleet_admission_receipt(
+            evaluate_receipt(main=main)
+        )
+        projected_main = projection["signals"]["main"]
+        self.assertEqual(
+            projected_main["reason"],
+            "required-checks-green-generation-verified",
+        )
+        self.assertTrue(projected_main["generationVerified"])
+        self.assertEqual(projected_main["contractVersion"], "2026-10-01.1")
+        self.assertTrue(projected_main["marker"]["verified"])
+        self.assertEqual(
+            projected_main["pendingChecks"], ["Generate Screenshots"]
+        )
+        self.assertEqual(
+            projected_main["checks"],
+            [
+                {
+                    "name": "Generate Screenshots",
+                    "classification": "optional",
+                    "verdict": "pending",
+                }
+            ],
+        )
 
 class LargeAdmissionDrainLaunchTests(unittest.TestCase):
     def test_projected_large_receipt_launches_the_drain_path(self):

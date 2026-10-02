@@ -13,7 +13,6 @@ WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 HOT_PATH_WORKFLOWS = (
     "auto-ready-agent-drafts.yml",
     "agent-tick.yml",
-    "auto-fix-lint-agent-drafts.yml",
     "stuck-draft-autoclose.yml",
 )
 
@@ -34,7 +33,6 @@ MODEL_OR_ADVISORY_JOBS = (
     ("eval.yml", "eval"),
     ("eval-real-model.yml", "real-model-eval"),
     ("github-ai-orchestrator.yml", "implement_and_open_pr"),
-    ("main-autofix.yml", "autofix"),
     ("sentry-autofix.yml", "autofix"),
     ("taste-classifier.yml", "classify"),
     ("taste-label-guard.yml", "guard"),
@@ -132,7 +130,6 @@ HOSTED_BACKGROUND_CONTROLLER_JOBS = (
     ("agent-tick.yml", "dispatch"),
     ("agent-tick.yml", "neon-cleanup"),
     ("agent-tick.yml", "synthetic-monitoring"),
-    ("auto-fix-lint-agent-drafts.yml", "auto-fix-lint"),
     ("doc-gardening-agent.yml", "garden"),
     ("github-ai-dispatcher.yml", "dispatch"),
     ("github-ai-orchestrator.yml", "guard"),
@@ -433,33 +430,10 @@ def test_workflow_test_tooling_is_hash_pinned() -> None:
         assert "pip install pytest" not in workflow, workflow_name
 
 
-def test_autofix_uses_corepack_for_pnpm_distribution() -> None:
-    """Avoid an unhashed npm global install on the automated repair path."""
-    script = (REPO_ROOT / "scripts" / "auto-fix-lint-agent-drafts.sh").read_text(
-        encoding="utf-8"
-    )
-    workflow = (WORKFLOWS / "auto-fix-lint-agent-drafts.yml").read_text(
-        encoding="utf-8"
-    )
-
-    assert "npm install -g pnpm@" not in script
-    assert "corepack prepare pnpm@9.15.9 --activate" in script
-    assert "pnpm install --frozen-lockfile --ignore-scripts" in script
-    assert "env -u GH_TOKEN -u GITHUB_TOKEN -u NODE_AUTH_TOKEN" in script
-    assert ".headOwner == $repo_owner" in script
-    assert "headOwner/$headRepo.git" not in script
-    assert "persist-credentials: false" in workflow
-    assert "TARGET_PR_NUMBER" in script
-    assert 'gh_retry pr view "$TARGET_PR_NUMBER"' in script
-    assert "github.event.workflow_run.conclusion == 'failure'" in workflow
-    assert "github.event.workflow_run.pull_requests[0].number != null" in workflow
 
 
 def test_repair_controllers_use_causal_events_instead_of_polling() -> None:
     """Repairs run from the state change they reconcile, without duplicate clocks."""
-    autofix = (WORKFLOWS / "auto-fix-lint-agent-drafts.yml").read_text(
-        encoding="utf-8"
-    )
     receipts = (WORKFLOWS / "delivery-control-receipts.yml").read_text(
         encoding="utf-8"
     )
@@ -467,8 +441,6 @@ def test_repair_controllers_use_causal_events_instead_of_polling() -> None:
         encoding="utf-8"
     )
 
-    assert "schedule:" not in autofix
-    assert "workflows: ['CI']" in autofix
     assert "schedule:" not in receipts
     assert "workflow_run:" in receipts
     assert "--reconcile" not in receipts
@@ -477,8 +449,8 @@ def test_repair_controllers_use_causal_events_instead_of_polling() -> None:
     assert "workflows: ['CI']" in conflicts
 
 
-def test_sha_bound_nightlies_skip_only_repeated_scheduled_heads() -> None:
-    """Expensive clocks fail closed and manual dispatches always execute."""
+def test_changed_evidence_workflows_do_not_use_schedule_dedupe() -> None:
+    """Event-driven evidence lanes execute directly from their changed inputs."""
     action = (
         REPO_ROOT / ".github" / "actions" / "skip-if-unchanged" / "action.yml"
     ).read_text(encoding="utf-8")
@@ -496,9 +468,11 @@ def test_sha_bound_nightlies_skip_only_repeated_scheduled_heads() -> None:
     ):
         workflow = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
         assert "actions: read" in workflow, workflow_name
-        assert "uses: ./.github/actions/skip-if-unchanged" in workflow, workflow_name
-        assert "needs: unchanged" in workflow, workflow_name
-        assert "needs.unchanged.outputs.skip != 'true'" in workflow, workflow_name
+        assert (
+            "uses: ./.github/actions/skip-if-unchanged" not in workflow
+        ), workflow_name
+        assert "needs: unchanged" not in workflow, workflow_name
+        assert "needs.unchanged.outputs.skip" not in workflow, workflow_name
 
     live_model = (WORKFLOWS / "eval-real-model.yml").read_text(encoding="utf-8")
     nightly = (WORKFLOWS / "nightly-tests.yml").read_text(encoding="utf-8")
@@ -534,7 +508,6 @@ def test_agent_landing_does_not_treat_risk_classifier_as_human_merge_gate() -> N
         "agent-pipeline.yml",
         "agent-landing-sweep.yml",
         "agent-tick.yml",
-        "main-autofix.yml",
         "sentry-autofix.yml",
         "github-ai-orchestrator.yml",
     ):
@@ -927,51 +900,30 @@ def test_standalone_health_monitors_have_independent_bounded_schedules() -> None
         assert "runs-on: ubuntu-latest" in _job_block(workflow, job_name)
 
 
-def test_main_autofix_waits_for_rerun_and_exact_sha_repair_ownership() -> None:
-    """Schedule ticks must not dispatch or alert repeatedly for owned failures."""
+def test_main_health_monitor_alerts_once_and_reruns_once() -> None:
+    """Schedule ticks fail closed on evidence gaps and self-heal with one rerun."""
     evaluator = (
         REPO_ROOT / ".github/actions/eval-main-health/action.yml"
     ).read_text(encoding="utf-8")
-    autofix = (WORKFLOWS / "main-autofix.yml").read_text(encoding="utf-8")
+    monitor = (WORKFLOWS / "main-ci-health-monitor.yml").read_text(
+        encoding="utf-8"
+    )
 
     assert "const failingRunAttempt = Number(latestFailure?.run_attempt ?? 0)" in evaluator
-    assert "failingRunAttempt < 2" in evaluator
-    assert "autofixSkipReason = 'awaiting_one_shot_rerun'" in evaluator
-    assert "repairInFlight = openPulls.some" in evaluator
-    assert "run.head_sha === failingSha" in evaluator
-    assert "github.rest.repos.listCommitStatusesForRef" in evaluator
     assert "github.rest.repos.getCommit" in evaluator
     assert "latestFailure.head_sha !== currentMainSha" in evaluator
-    assert "ownedAttempts >= autofixAttemptLimit" in evaluator
-    assert "withinLease(latestOwnershipStatus.created_at)" in evaluator
-    assert "uncertain:repair_state_unavailable" in evaluator
-    assert "status.context === 'main-autofix/ownership'" in evaluator
-    assert "description.match(/^owned:run-" in evaluator
-    assert "description.startsWith('terminal:')" in evaluator
-    assert "const recentAttemptShas = new Set([currentFailingSha])" in evaluator
-    assert "(status.description ?? '').startsWith('owned:')" in evaluator
-    assert "candidateStatuses = await github.paginate" in evaluator
-    assert "if (r.head_sha) recentShas.add(r.head_sha)" not in evaluator
-    assert "autofixSkipReason = 'repair_in_flight'" in evaluator
-    assert "autofixSkipReason = 'repair_marker_owned'" in evaluator
-    assert "autofixSkipReason = 'terminal_repair_recorded'" in evaluator
-    assert "autofixSkipReason = 'repair_state_unavailable'" in evaluator
     assert "const shouldAlert =" in evaluator
-    assert "(repairStateKnown || firstUncertaintyAlert)" in evaluator
+    assert "detectedIssue && evidenceKnown" in evaluator
     assert "failingRunAttempt === 1" in evaluator
-    assert autofix.count("context: 'main-autofix/ownership'") == 2
-    assert "Record exact-SHA repair ownership" in autofix
-    assert "Finalize exact-SHA repair ownership" in autofix
-    assert "terminal:no_changes" in autofix
-    assert "released:pr-${prNumber}" in autofix
-    assert "forcing autofix" not in autofix
-    assert "dispatch_target_not_current_failure" in autofix
+    assert "canaryOrSentryFailed" in evaluator
+    # The retired main-autofix workflow must not be dispatched or inspected.
+    assert "main-autofix" not in evaluator
+    assert "needs_autofix" not in evaluator
+    assert "main-autofix" not in monitor
+    assert "needs_autofix" not in monitor
 
-    for workflow, job_name in (
-        ("main-ci-health-monitor.yml", "monitor"),
-        ("main-autofix.yml", "evaluate"),
-    ):
-        assert "statuses: write" in _job_block(workflow, job_name)
+    monitor_job = _job_block("main-ci-health-monitor.yml", "monitor")
+    assert "statuses: write" not in monitor_job
 
     agent_tick = (WORKFLOWS / "agent-tick.yml").read_text(encoding="utf-8")
     assert "\n  main-ci-health:\n" not in agent_tick
@@ -1287,8 +1239,8 @@ def test_live_model_work_never_fans_out_from_pull_requests() -> None:
     assert "github.event_name == 'pull_request' && '0'" in deterministic
 
 
-def test_deep_lanes_are_staggered_and_bounded() -> None:
-    """Scheduled exhaustive coverage should not fan out across the runner pool."""
+def test_deep_lanes_are_event_driven_and_bounded() -> None:
+    """Changed-evidence coverage should not fan out across the runner pool."""
     full_matrix = (WORKFLOWS / "e2e-full-matrix.yml").read_text(encoding="utf-8")
     nightly_agent = (WORKFLOWS / "nightly-testing-agent.yml").read_text(
         encoding="utf-8"
@@ -1296,20 +1248,36 @@ def test_deep_lanes_are_staggered_and_bounded() -> None:
 
     assert "max-parallel: 1" in full_matrix
     assert "needs: [context, deterministic]" in nightly_agent
-    assert "'30 4 * * *'" in nightly_agent
+    assert "schedule:" not in nightly_agent
+    assert "push:" in nightly_agent
 
     nightly = (WORKFLOWS / "nightly-tests.yml").read_text(encoding="utf-8")
     screenshots = (WORKFLOWS / "screenshots.yml").read_text(encoding="utf-8")
     harness = (WORKFLOWS / "agent-harness-health-report.yml").read_text(
         encoding="utf-8"
     )
-    assert "'30 23 * * *'" in nightly
+    assert "schedule:" not in nightly
+    assert "push:" in nightly
     screenshot_triggers = screenshots.split("\non:\n", 1)[1].split(
         "\npermissions:", 1
     )[0]
     assert "push:" in screenshot_triggers
     assert "schedule:" not in screenshot_triggers
     assert "'0 9 * * 2'" in harness
+
+
+def test_full_matrix_supersedes_stale_runs_cleanly() -> None:
+    """Main pushes outpace the serial matrix; only the freshest run should
+    survive, and supersession must be a workflow-level cancellation rather
+    than an external mid-test runner kill (JOV-7167)."""
+    workflow = (WORKFLOWS / "e2e-full-matrix.yml").read_text(encoding="utf-8")
+
+    concurrency = workflow.split("\nconcurrency:\n", 1)[1].split(
+        "\njobs:\n", 1
+    )[0]
+    assert "group: e2e-full-matrix-" in concurrency
+    assert "github.event_name" in concurrency
+    assert "cancel-in-progress: true" in concurrency
 
 
 def test_nightly_unit_suite_fetches_storybook_provenance_history() -> None:
@@ -1575,7 +1543,6 @@ def test_api_only_pr_controllers_never_consume_fixed_ci_capacity() -> None:
     assert "Graphite" not in dependabot
     assert "scripts/native-merge-intent.mjs" in dependabot
     assert "--match-head-commit" in (REPO_ROOT / "scripts" / "native-merge-intent.mjs").read_text(encoding="utf-8")
-    assert "workflow_run.workflow_id == 178737329" in dependabot
     adapter = (REPO_ROOT / "scripts" / "dependabot-workflow-run-adapter.mjs").read_text(
         encoding="utf-8"
     )
@@ -1593,9 +1560,7 @@ def test_dependabot_workflow_materializes_trusted_policy_runtime() -> None:
 
     assert "ref: ${{ github.sha }}" in step
     assert "persist-credentials: false" in step
-    assert "github.event.workflow_run.workflow_id == 178737329" in workflow
-    assert "github.event.workflow_run.event == 'pull_request'" in workflow
-    assert "github.event.workflow_run.conclusion == 'success'" in workflow
+    assert "\n  workflow_run:" not in workflow
     assert "actions/download-artifact" not in workflow
     assert "      actions: read" in workflow
     for entrypoint in (
@@ -1613,6 +1578,7 @@ def test_retired_merge_queue_label_has_no_active_producers() -> None:
         REPO_ROOT / ".claude/rules/swarm.md",
         REPO_ROOT / ".github/rulesets/branch-protection.yml",
         WORKFLOWS / "agent-pipeline.yml",
+        # codex-issue-shipper moved to JovieInc/symphony-control and is checked there.
     ]
     forbidden = re.compile(
         r"--(?:add|remove)-label\s+[\"']?merge-queue|"
@@ -1639,14 +1605,13 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     block = _job_block("fleet-gate-refresh.yml", "refresh")
 
     assert "schedule:" not in trigger
-    assert "workflows: [CI, Production Controller]" in trigger
+    assert "workflow_run:" not in trigger
     assert "opened" in trigger
     assert "edited" in trigger
     assert "synchronize" in trigger
     assert "Production Marker Recovery]" not in trigger
     assert "group: fleet-gate-event-refresh" in workflow
     assert "cancel-in-progress: false" in workflow
-    assert "github.event.workflow_run.conclusion != 'cancelled'" in block
     assert "github.event.pull_request.merged != true" in block
     assert "github.event.label.name == 'hold'" in block
     assert "github.event.label.name == 'gated'" in block

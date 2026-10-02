@@ -3,17 +3,17 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Bell, Plus } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { toast } from '@/components/feedback';
+import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
   useSidebar,
-} from '@/components/organisms/Sidebar';
-import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
+} from '@/components/organisms/sidebar';
 import { useRuntimeUpdate } from '@/components/shell/RuntimeUpdateProvider';
 import {
   readThreadReadState,
@@ -28,11 +28,13 @@ import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import {
+  NAVIGATION_DROP_OFF_MS,
   type NavigationTelemetryContext,
   navigationInputMethodFromClick,
   startNavigationTelemetry,
   trackNavigationImpressions,
 } from '@/lib/tracking/navigation-telemetry';
+import { cn } from '@/lib/utils';
 import {
   artistSettingsNavigation,
   canonicalSidebarNavigation,
@@ -41,7 +43,7 @@ import {
   userSettingsNavigation,
 } from './config';
 import { NavMenuItem } from './NavMenuItem';
-import { isLibraryNavigationRoute } from './navigation-state';
+import { isNavigationItemActive } from './navigation-state';
 import type { DashboardNavProps, NavItem } from './types';
 
 type DashboardNavSection = {
@@ -50,51 +52,21 @@ type DashboardNavSection = {
   readonly items: NavItem[];
 };
 
-function navItemPathname(href: string): string {
-  return new URL(href, 'https://jovie.local').pathname;
-}
-
-function isItemActive(pathname: string, item: NavItem): boolean {
-  // Inbox owns only the shell root. Prefix matching `/app` would otherwise
-  // mark it active on every customer route.
-  if (item.id === 'inbox') {
-    return normalizeTrailingSlash(pathname) === APP_ROUTES.DASHBOARD;
-  }
-
-  if (item.id === 'library') {
-    return isLibraryNavigationRoute(pathname);
-  }
-
-  const normalizedPathname = (() => {
-    if (isLibraryNavigationRoute(pathname)) {
-      return APP_ROUTES.LIBRARY;
-    }
-    if (
-      pathname === APP_ROUTES.DASHBOARD_AUDIENCE ||
-      pathname === APP_ROUTES.AUDIENCE
-    ) {
-      return APP_ROUTES.CONTACTS;
-    }
-    return pathname;
-  })();
-
-  const itemPathname = navItemPathname(item.href);
-
-  if (normalizedPathname === itemPathname || normalizedPathname === item.href) {
-    return true;
-  }
-
-  // Admin routes need exact match to avoid false positives
-  if (item.href === APP_ROUTES.ADMIN) {
-    return false;
-  }
-
-  return normalizedPathname.startsWith(`${itemPathname}/`);
-}
-
 function normalizeTrailingSlash(pathname: string): string {
   return pathname === '/' ? pathname : pathname.replace(/\/$/, '');
 }
+
+interface PendingNavigationRecord {
+  readonly itemId: string;
+  readonly startedAt: number;
+}
+
+// The paint-only nav acknowledgment stays visible for a minimum window so it
+// is observable even when a prefetched route commits the URL almost
+// immediately. A transition that fails without committing a URL recovers on
+// the same drop-off window navigation telemetry uses instead of sticking.
+const PENDING_NAVIGATION_MIN_VISIBLE_MS = 400;
+const PENDING_NAVIGATION_RECOVERY_MS = NAVIGATION_DROP_OFF_MS;
 
 export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   const { selectedProfile, inboxNavigation } = useDashboardData();
@@ -102,7 +74,17 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   const hasRuntimeUpdate = Boolean(runtimeUpdate?.available);
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
-  const router = useRouter();
+  const searchParams = useSearchParams();
+  const currentNavigationHref = useMemo(() => {
+    const query = searchParams.toString();
+    return query ? `${pathname}?${query}` : pathname;
+  }, [pathname, searchParams]);
+  const [pendingNavigation, setPendingNavigation] =
+    useState<PendingNavigationRecord | null>(null);
+  const pendingNavigationTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(
+    new Set()
+  );
+  const previousNavigationHrefRef = useRef(currentNavigationHref);
   const queryClient = useQueryClient();
   const isElectron = useIsElectronRuntime();
   // Persisted navigation state is a client-only enhancement. Reading it during
@@ -119,7 +101,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     () => ({
       isElectron,
       isMobile,
-      navVariant: 'canonical_customer_ia_v1',
+      navVariant: 'canonical_identity_work_v1',
     }),
     [isElectron, isMobile]
   );
@@ -142,6 +124,78 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     setThreadReadAtById(readThreadReadState());
     setHasHydratedPersistedState(true);
   }, []);
+
+  const schedulePendingNavigationClear = useCallback(
+    (record: PendingNavigationRecord, delayMs: number) => {
+      const timer = setTimeout(() => {
+        pendingNavigationTimersRef.current.delete(timer);
+        setPendingNavigation(current => (current === record ? null : current));
+      }, delayMs);
+      pendingNavigationTimersRef.current.add(timer);
+    },
+    []
+  );
+
+  const beginPendingNavigation = useCallback(
+    (itemId: string) => {
+      const record: PendingNavigationRecord = {
+        itemId,
+        startedAt: Date.now(),
+      };
+      setPendingNavigation(record);
+      schedulePendingNavigationClear(record, PENDING_NAVIGATION_RECOVERY_MS);
+    },
+    [schedulePendingNavigationClear]
+  );
+
+  const cancelPendingNavigation = useCallback((itemId: string) => {
+    setPendingNavigation(current =>
+      current?.itemId === itemId ? null : current
+    );
+  }, []);
+
+  // Route segments keep authenticated content mounted during a warm
+  // transition, so the committed URL — not a loading surface — is what ends
+  // the acknowledgment. Hold the pending state for a minimum visible window
+  // once the URL commits so fast prefetched transitions still expose it.
+  useEffect(() => {
+    const hrefChanged =
+      previousNavigationHrefRef.current !== currentNavigationHref;
+    previousNavigationHrefRef.current = currentNavigationHref;
+    if (!hrefChanged || !pendingNavigation) return;
+
+    const remainingMs =
+      PENDING_NAVIGATION_MIN_VISIBLE_MS -
+      (Date.now() - pendingNavigation.startedAt);
+    if (remainingMs <= 0) {
+      setPendingNavigation(null);
+    } else {
+      schedulePendingNavigationClear(pendingNavigation, remainingMs);
+    }
+  }, [
+    currentNavigationHref,
+    pendingNavigation,
+    schedulePendingNavigationClear,
+  ]);
+
+  useEffect(
+    () => () => {
+      for (const timer of pendingNavigationTimersRef.current) {
+        clearTimeout(timer);
+      }
+      pendingNavigationTimersRef.current.clear();
+    },
+    []
+  );
+
+  // Connectivity loss can retain the source URL. Clear its acknowledgment
+  // immediately; the existing per-navigation recovery timer remains bounded.
+  useEffect(() => {
+    if (!pendingNavigation) return;
+    const clearAcknowledgment = () => setPendingNavigation(null);
+    globalThis.addEventListener('offline', clearAcknowledgment);
+    return () => globalThis.removeEventListener('offline', clearAcknowledgment);
+  }, [pendingNavigation]);
 
   useEffect(() => {
     if (
@@ -185,8 +239,6 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
 
   // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const libraryPrefetchedProfileIdRef = useRef<string | null>(null);
-  const libraryWarmReadyProfileIdRef = useRef<string | null>(null);
   useEffect(
     () => () => {
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
@@ -194,67 +246,18 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     []
   );
 
-  useEffect(() => {
-    libraryPrefetchedProfileIdRef.current = null;
-    libraryWarmReadyProfileIdRef.current = null;
-  }, [profileId]);
-
-  const warmLibraryRoute = useCallback(async () => {
-    if (isDemo || !profileId) return;
-
-    router.prefetch(APP_ROUTES.LIBRARY);
-    if (libraryPrefetchedProfileIdRef.current === profileId) return;
-
-    libraryPrefetchedProfileIdRef.current = profileId;
-    try {
-      await Promise.all([
-        import('@/features/dashboard/organisms/release-provider-matrix'),
-        import('@/lib/queries/prefetch-dashboard').then(
-          ({ prefetchForRoute }) =>
-            prefetchForRoute('library', queryClient, profileId)
-        ),
-      ]);
-      libraryWarmReadyProfileIdRef.current = profileId;
-    } catch {
-      libraryPrefetchedProfileIdRef.current = null;
-      libraryWarmReadyProfileIdRef.current = null;
-    }
-  }, [isDemo, profileId, queryClient, router]);
-
-  useEffect(() => {
-    if (
-      isDemo ||
-      !profileId ||
-      libraryWarmReadyProfileIdRef.current === profileId ||
-      isLibraryNavigationRoute(pathname)
-    ) {
-      return;
-    }
-
-    const handle = setTimeout(() => {
-      warmLibraryRoute().catch(() => {});
-    }, 300);
-
-    return () => clearTimeout(handle);
-  }, [isDemo, pathname, profileId, warmLibraryRoute]);
-
   const handlePrefetch = useCallback(
     (itemId: string) => {
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
-      const prefetchDelayMs = itemId === 'library' ? 0 : 150;
       prefetchTimerRef.current = setTimeout(() => {
-        if (itemId === 'library') {
-          warmLibraryRoute().catch(() => {});
-          return;
-        }
         import('@/lib/queries/prefetch-dashboard')
           .then(({ prefetchForRoute }) =>
             prefetchForRoute(itemId, queryClient, profileId || undefined)
           )
           .catch(() => {});
-      }, prefetchDelayMs);
+      }, 150);
     },
-    [profileId, queryClient, warmLibraryRoute]
+    [profileId, queryClient]
   );
 
   // In demo mode, intercept nav clicks for tabs without demo data
@@ -321,9 +324,12 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     }
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
       return;
+    if (event.button === 0 && currentNavigationHref !== item.href) {
+      beginPendingNavigation(item.id);
+    }
     startNavigationTelemetry({
       itemId: item.id,
-      sourcePathname: pathname,
+      sourcePathname: currentNavigationHref,
       destinationHref: item.href,
       inputMethod: navigationInputMethodFromClick(event.detail),
       context: telemetryContext,
@@ -336,11 +342,12 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
       const isNewThreadItem =
         item.id === 'chat' && item.href === APP_ROUTES.CHAT;
       const isActive = isNewThreadItem
-        ? normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT
-        : isItemActive(pathname, item);
+        ? normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT &&
+          searchParams.get('panel') !== 'profile'
+        : isNavigationItemActive(item, pathname, searchParams);
       const shortcut = NAV_SHORTCUTS[item.id];
 
-      // In demo mode, only Library has real content — intercept all other nav clicks.
+      // The demo fixture only implements Work content; other roots stay disabled.
       const demoUnavailable = isDemo && item.id !== 'library';
 
       return (
@@ -349,6 +356,17 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
           calm={!isInSettings}
           item={item}
           isActive={isActive}
+          pending={pendingNavigation?.itemId === item.id}
+          onNavigate={
+            demoUnavailable || isActive
+              ? undefined
+              : () => beginPendingNavigation(item.id)
+          }
+          onCancelNavigate={
+            demoUnavailable || isActive
+              ? undefined
+              : () => cancelPendingNavigation(item.id)
+          }
           shortcut={shortcut}
           // Warm the approved customer destinations without a route flash.
           // Next's automatic mode skips full payloads for dynamic routes;
@@ -362,7 +380,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
               : inputMethod =>
                   startNavigationTelemetry({
                     itemId: isInSettings ? 'settings' : item.id,
-                    sourcePathname: pathname,
+                    sourcePathname: currentNavigationHref,
                     destinationHref: item.href,
                     inputMethod,
                     context: telemetryContext,
@@ -375,11 +393,16 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
       );
     },
     [
+      beginPendingNavigation,
+      cancelPendingNavigation,
+      currentNavigationHref,
       pathname,
+      pendingNavigation,
       handleDemoNavClick,
       handlePrefetch,
       isDemo,
       isInSettings,
+      searchParams,
       telemetryContext,
     ]
   );
@@ -426,6 +449,9 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                 href={APP_ROUTES.DASHBOARD}
                 onClick={event => handleCommandClick(event, inboxNavItem)}
                 prefetch={!isDemo}
+                aria-busy={
+                  pendingNavigation?.itemId === inboxNavItem.id || undefined
+                }
                 aria-label={
                   hasRuntimeUpdate ? 'Inbox — App Update Available' : 'Inbox'
                 }
@@ -434,12 +460,15 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                     ? 'available'
                     : (inboxNavigation?.state ?? 'unknown')
                 }
-                aria-current={
-                  normalizeTrailingSlash(pathname) === APP_ROUTES.DASHBOARD
-                    ? 'page'
-                    : undefined
+                data-navigation-item-id={inboxNavItem.id}
+                data-navigation-pending={
+                  pendingNavigation?.itemId === inboxNavItem.id || undefined
                 }
-                className='relative flex size-7 shrink-0 items-center justify-center rounded-full text-secondary-token hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2 after:lg:hidden'
+                className={cn(
+                  'relative flex size-7 shrink-0 items-center justify-center rounded-full text-secondary-token transition-colors duration-subtle ease-subtle hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2 after:lg:hidden',
+                  pendingNavigation?.itemId === inboxNavItem.id &&
+                    'bg-sidebar-accent-active text-primary-token'
+                )}
               >
                 <Bell
                   className='size-(--app-shell-sidebar-icon-size)'
@@ -465,14 +494,25 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
               <Link
                 href={APP_ROUTES.CHAT}
                 onClick={event => handleCommandClick(event, chatNavItem)}
+                aria-busy={
+                  pendingNavigation?.itemId === chatNavItem.id || undefined
+                }
                 aria-current={
-                  normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT
+                  normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT &&
+                  searchParams.get('panel') !== 'profile'
                     ? 'page'
                     : undefined
                 }
                 prefetch={!isDemo}
                 aria-label='New Chat'
-                className='relative flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-(--color-bg-base) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2.5 after:lg:hidden'
+                data-navigation-item-id={chatNavItem.id}
+                data-navigation-pending={
+                  pendingNavigation?.itemId === chatNavItem.id || undefined
+                }
+                className={cn(
+                  'relative flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-(--color-bg-base) transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2.5 after:lg:hidden',
+                  pendingNavigation?.itemId === chatNavItem.id && 'opacity-70'
+                )}
               >
                 <Plus className='size-3.5' aria-hidden='true' />
               </Link>

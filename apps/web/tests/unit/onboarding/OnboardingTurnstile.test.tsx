@@ -297,7 +297,7 @@ describe('OnboardingTurnstile (minimal presentation)', () => {
 
     render(
       <OnboardingTurnstile
-        instruction='Verify you are human to send'
+        instruction='One quick check before we send'
         onToken={vi.fn()}
         onStateChange={vi.fn()}
       />
@@ -310,7 +310,7 @@ describe('OnboardingTurnstile (minimal presentation)', () => {
     expect(
       isOnboardingTurnstilePanelVisible(
         { status: 'loading' },
-        'Verify you are human to send'
+        'One quick check before we send'
       )
     ).toBe(true);
   });

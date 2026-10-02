@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
+/** @type {{maxBytes: number, maxFiles: number, maxImportersPerFile: number, diffContextLines: number}} */
 export const DEFAULT_CONTEXT_LIMITS = Object.freeze({
   maxBytes: 120_000,
   maxFiles: 40,

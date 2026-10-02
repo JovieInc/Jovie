@@ -7,15 +7,12 @@
 # - OSSF Scorecard: Supply chain security scoring (added in subtask-1-5)
 #
 name: Security Scanning
-# clock-class: upstream-advisory
 
 on:
   # PR and merge-group diff scans are required through ci.yml / PR Ready.
-  # This workflow owns post-merge and nightly security scans only.
+  # This workflow owns changed post-merge and explicit diagnostic scans only.
   push:
     branches: ['main']
-  schedule:
-    - cron: '5 6 * * *' # Offset from other deep scheduled lanes
   workflow_dispatch:
 
 # Default permissions - each job specifies its own required permissions
@@ -195,7 +192,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4.38.1
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           sarif_file: 'trivy-results.sarif'
           category: 'trivy-filesystem'
@@ -224,7 +221,7 @@ jobs:
           publish_results: false
 
       - name: Upload Scorecard results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4.38.1
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           sarif_file: 'scorecard-results.sarif'
           category: 'ossf-scorecard'

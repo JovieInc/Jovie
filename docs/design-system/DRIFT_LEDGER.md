@@ -35,90 +35,93 @@ route's graph. Imports from `packages/*` are out of scope.
 <!-- drift-ledger:start -->
 | Aggregate | Count |
 |---|---:|
-| Routes scanned | 96 |
-| Files counted (route-owned or shared layer) | 639 |
-| Raw Tailwind palette utilities and hex colors | 262 |
-| Arbitrary values | 263 |
-| Raw `<button>` tags | 111 |
-| Legacy `--linear-*` tokens | 93 |
-| Visible 44/48px controls (`h-11`, `h-12`, `size-*`) | 23 |
-| Danger alias utilities (`error`, `destructive`, `red`) | 165 |
-| Registry entries with `penRootId: null` | 17 |
+| Routes scanned | 105 |
+| Files counted (route-owned or shared layer) | 676 |
+| Raw Tailwind palette utilities and hex colors | 255 |
+| Arbitrary values | 250 |
+| Raw `<button>` tags | 101 |
+| Legacy `--linear-*` tokens | 86 |
+| Visible 44/48px controls (`h-11`, `h-12`, `size-*`) | 19 |
+| Danger alias utilities (`error`, `destructive`, `red`) | 171 |
+| Registry entries with `penRootId: null` | 14 |
 | Status pill, badge, dot, and glyph components | 9 |
-| Entity header components | 5 |
-| Rail components | 10 |
+| Entity header components | 1 |
+| Rail components | 11 |
 
 | Shared design-system layers reached by routes | Count |
 |---|---:|
-| Files counted (route-owned or shared layer) | 278 |
-| Raw Tailwind palette utilities and hex colors | 146 |
-| Arbitrary values | 197 |
-| Raw `<button>` tags | 62 |
+| Files counted (route-owned or shared layer) | 281 |
+| Raw Tailwind palette utilities and hex colors | 191 |
+| Arbitrary values | 210 |
+| Raw `<button>` tags | 60 |
 | Legacy `--linear-*` tokens | 42 |
-| Visible 44/48px controls (`h-11`, `h-12`, `size-*`) | 22 |
+| Visible 44/48px controls (`h-11`, `h-12`, `size-*`) | 21 |
 | Danger alias utilities (`error`, `destructive`, `red`) | 38 |
 
 | Registry | Entries | `penRootId: null` |
 |---|---:|---:|
-| appScreens | 7 | 7 |
+| appScreens | 7 | 4 |
 | componentRegistry | 11 | 10 |
 
-Routes with at least one signal: 54 of 96.
+Routes with at least one signal: 57 of 105.
 
 | Route | Files | Raw palette | Arbitrary | Raw button | --linear-* | 44/48px | Danger alias |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| `/app` | 81 | 70 | 42 | 17 | 10 | 1 | 9 |
-| `/app/admin/activity` | 19 | 27 | 22 | 1 | 10 | 0 | 4 |
-| `/app/admin/agent-runs/[id]` | 6 | 2 | 17 | 0 | 10 | 0 | 2 |
-| `/app/admin/chat` | 133 | 77 | 51 | 35 | 17 | 7 | 26 |
-| `/app/admin/costs` | 18 | 27 | 24 | 1 | 10 | 0 | 4 |
-| `/app/admin/features` | 20 | 27 | 22 | 1 | 10 | 0 | 4 |
-| `/app/admin/growth` | 55 | 27 | 25 | 2 | 12 | 0 | 25 |
-| `/app/admin/hud` | 51 | 46 | 91 | 2 | 14 | 1 | 26 |
-| `/app/admin/interviews` | 6 | 2 | 16 | 0 | 10 | 0 | 1 |
-| `/app/admin/investors` | 18 | 27 | 25 | 1 | 12 | 0 | 4 |
-| `/app/admin/investors/links` | 17 | 27 | 22 | 1 | 10 | 1 | 9 |
-| `/app/admin/investors/settings` | 6 | 2 | 18 | 0 | 10 | 0 | 5 |
-| `/app/admin/investors/updates` | 6 | 2 | 16 | 0 | 10 | 0 | 2 |
-| `/app/admin/people` | 101 | 86 | 34 | 3 | 17 | 2 | 34 |
-| `/app/admin/platform-connections` | 8 | 4 | 17 | 0 | 10 | 0 | 2 |
-| `/app/admin/playlists` | 8 | 2 | 16 | 0 | 10 | 0 | 1 |
-| `/app/admin/revenue-lift` | 6 | 2 | 19 | 0 | 10 | 0 | 1 |
-| `/app/admin/screenshots` | 6 | 2 | 17 | 0 | 16 | 0 | 1 |
-| `/app/admin/share-studio` | 16 | 27 | 25 | 1 | 10 | 0 | 4 |
-| `/app/admin/system` | 9 | 2 | 16 | 0 | 10 | 0 | 1 |
-| `/app/calendar` | 37 | 27 | 22 | 3 | 10 | 0 | 4 |
-| `/app/chat` | 190 | 127 | 73 | 52 | 17 | 9 | 32 |
-| `/app/chat/[id]` | 189 | 127 | 73 | 52 | 17 | 9 | 32 |
-| `/app/chats` | 32 | 27 | 21 | 2 | 10 | 0 | 4 |
-| `/app/contacts` | 87 | 43 | 28 | 9 | 12 | 1 | 5 |
+| `/app` | 81 | 67 | 42 | 17 | 10 | 1 | 8 |
+| `/app/admin/activity` | 16 | 25 | 6 | 1 | 0 | 0 | 3 |
+| `/app/admin/agent-runs/[id]` | 3 | 0 | 1 | 0 | 0 | 0 | 1 |
+| `/app/admin/certifications` | 19 | 28 | 6 | 1 | 0 | 0 | 6 |
+| `/app/admin/chat` | 132 | 54 | 25 | 25 | 1 | 3 | 25 |
+| `/app/admin/costs` | 15 | 25 | 8 | 1 | 0 | 0 | 3 |
+| `/app/admin/feature-registry` | 15 | 25 | 6 | 1 | 0 | 0 | 3 |
+| `/app/admin/features` | 17 | 25 | 6 | 1 | 0 | 0 | 3 |
+| `/app/admin/growth` | 58 | 25 | 9 | 2 | 2 | 0 | 32 |
+| `/app/admin/hud` | 50 | 41 | 75 | 2 | 4 | 1 | 25 |
+| `/app/admin/investors` | 15 | 25 | 9 | 1 | 2 | 0 | 3 |
+| `/app/admin/investors/links` | 14 | 25 | 6 | 1 | 0 | 1 | 8 |
+| `/app/admin/investors/settings` | 3 | 0 | 2 | 0 | 0 | 0 | 4 |
+| `/app/admin/investors/updates` | 3 | 0 | 0 | 0 | 0 | 0 | 1 |
+| `/app/admin/needs-you` | 14 | 37 | 6 | 1 | 0 | 0 | 8 |
+| `/app/admin/operations` | 16 | 25 | 6 | 1 | 0 | 0 | 3 |
+| `/app/admin/people` | 105 | 91 | 17 | 3 | 6 | 2 | 34 |
+| `/app/admin/platform-connections` | 10 | 9 | 7 | 1 | 0 | 0 | 1 |
+| `/app/admin/presence` | 17 | 25 | 6 | 1 | 0 | 0 | 7 |
+| `/app/admin/revenue-lift` | 3 | 0 | 3 | 0 | 0 | 0 | 0 |
+| `/app/admin/screenshots` | 3 | 0 | 1 | 0 | 6 | 0 | 0 |
+| `/app/admin/share-studio` | 13 | 25 | 9 | 1 | 0 | 0 | 3 |
+| `/app/admin/shipping` | 8 | 0 | 0 | 0 | 0 | 0 | 3 |
+| `/app/admin/wiki` | 7 | 26 | 0 | 0 | 0 | 0 | 0 |
+| `/app/calendar` | 34 | 25 | 7 | 3 | 0 | 0 | 3 |
+| `/app/chat` | 192 | 102 | 62 | 42 | 11 | 5 | 31 |
+| `/app/chat/[id]` | 191 | 102 | 62 | 42 | 11 | 5 | 31 |
+| `/app/chats` | 29 | 25 | 6 | 2 | 0 | 0 | 3 |
+| `/app/contacts` | 82 | 41 | 13 | 9 | 2 | 1 | 4 |
 | `/app/dashboard/earnings` | 24 | 25 | 6 | 2 | 0 | 0 | 3 |
-| `/app/dashboard/release-plan` | 6 | 11 | 15 | 0 | 33 | 0 | 1 |
-| `/app/dashboard/releases` | 114 | 71 | 41 | 33 | 25 | 2 | 15 |
-| `/app/dashboard/releases/[releaseId]/downloads` | 15 | 28 | 22 | 2 | 10 | 0 | 7 |
-| `/app/dashboard/releases/[releaseId]/tasks` | 55 | 46 | 23 | 11 | 12 | 1 | 9 |
+| `/app/dashboard/release-plan` | 3 | 9 | 0 | 0 | 23 | 0 | 0 |
+| `/app/dashboard/releases` | 115 | 58 | 41 | 33 | 25 | 2 | 14 |
+| `/app/dashboard/releases/[releaseId]/downloads` | 12 | 26 | 7 | 2 | 0 | 0 | 6 |
+| `/app/dashboard/releases/[releaseId]/tasks` | 52 | 31 | 8 | 11 | 2 | 1 | 7 |
 | `/app/earnings` | 24 | 25 | 6 | 2 | 0 | 0 | 3 |
-| `/app/insights` | 35 | 27 | 23 | 2 | 12 | 0 | 4 |
-| `/app/jovie-work` | 30 | 27 | 21 | 2 | 10 | 0 | 6 |
-| `/app/library` | 114 | 71 | 41 | 33 | 25 | 2 | 15 |
-| `/app/lyrics/[trackId]` | 29 | 27 | 21 | 2 | 10 | 0 | 4 |
-| `/app/profiles` | 51 | 27 | 22 | 7 | 10 | 1 | 10 |
-| `/app/releases/[releaseId]/tasks` | 55 | 46 | 23 | 11 | 12 | 1 | 9 |
-| `/app/settings/account` | 47 | 27 | 21 | 2 | 10 | 0 | 12 |
+| `/app/insights` | 32 | 25 | 8 | 2 | 2 | 0 | 3 |
+| `/app/jovie-work` | 27 | 25 | 6 | 2 | 0 | 0 | 5 |
+| `/app/library` | 114 | 58 | 41 | 33 | 25 | 2 | 14 |
+| `/app/lyrics/[trackId]` | 26 | 25 | 6 | 2 | 0 | 0 | 3 |
+| `/app/presence` | 49 | 25 | 7 | 7 | 0 | 1 | 9 |
+| `/app/releases/[releaseId]/tasks` | 52 | 31 | 8 | 11 | 2 | 1 | 7 |
+| `/app/settings/account` | 45 | 25 | 15 | 2 | 0 | 0 | 12 |
 | `/app/settings/admin` | 23 | 25 | 6 | 2 | 0 | 0 | 3 |
-| `/app/settings/analytics` | 38 | 27 | 21 | 2 | 10 | 0 | 5 |
-| `/app/settings/artist-profile` | 80 | 77 | 46 | 10 | 10 | 2 | 13 |
-| `/app/settings/audience` | 42 | 32 | 25 | 3 | 10 | 0 | 8 |
-| `/app/settings/billing` | 33 | 27 | 23 | 2 | 10 | 0 | 5 |
-| `/app/settings/connectors` | 32 | 27 | 21 | 2 | 10 | 0 | 5 |
-| `/app/settings/contacts` | 43 | 27 | 22 | 2 | 10 | 0 | 5 |
-| `/app/settings/data-privacy` | 33 | 27 | 21 | 2 | 10 | 0 | 4 |
-| `/app/settings/payments` | 29 | 27 | 23 | 2 | 10 | 0 | 5 |
-| `/app/settings/referral` | 7 | 2 | 15 | 0 | 10 | 0 | 1 |
-| `/app/settings/retargeting-ads` | 6 | 2 | 16 | 0 | 10 | 2 | 1 |
-| `/app/settings/touring` | 37 | 28 | 21 | 4 | 10 | 0 | 4 |
-| `/app/settings/usage` | 33 | 27 | 24 | 2 | 10 | 0 | 7 |
-| `/app/tasks` | 75 | 52 | 73 | 28 | 30 | 4 | 14 |
-| `/app/tour-dates` | 39 | 38 | 22 | 3 | 10 | 1 | 8 |
-| `/app/youtube` | 27 | 27 | 21 | 2 | 10 | 0 | 4 |
+| `/app/settings/analytics` | 35 | 25 | 6 | 2 | 0 | 0 | 4 |
+| `/app/settings/artist-profile` | 81 | 74 | 46 | 10 | 10 | 2 | 12 |
+| `/app/settings/audience` | 39 | 28 | 10 | 3 | 0 | 0 | 7 |
+| `/app/settings/billing` | 30 | 25 | 8 | 2 | 0 | 0 | 4 |
+| `/app/settings/connectors` | 29 | 25 | 6 | 2 | 0 | 0 | 4 |
+| `/app/settings/contacts` | 39 | 25 | 7 | 2 | 0 | 0 | 4 |
+| `/app/settings/data-privacy` | 30 | 25 | 6 | 2 | 0 | 0 | 3 |
+| `/app/settings/payments` | 26 | 25 | 8 | 2 | 0 | 0 | 4 |
+| `/app/settings/retargeting-ads` | 3 | 0 | 1 | 0 | 0 | 2 | 0 |
+| `/app/settings/touring` | 34 | 26 | 6 | 4 | 0 | 0 | 3 |
+| `/app/settings/usage` | 30 | 25 | 9 | 2 | 0 | 0 | 6 |
+| `/app/tasks` | 73 | 39 | 73 | 28 | 30 | 4 | 13 |
+| `/app/tour-dates` | 36 | 36 | 7 | 3 | 0 | 1 | 7 |
+| `/app/youtube` | 24 | 25 | 6 | 2 | 0 | 0 | 3 |
 <!-- drift-ledger:end -->

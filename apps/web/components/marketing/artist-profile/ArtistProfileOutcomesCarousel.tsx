@@ -24,6 +24,9 @@ export function ArtistProfileOutcomesCarousel({
 
   return (
     <ArtistProfileSectionShell
+      sectionId='feature-grid'
+      sectionVariant='4-ledger'
+      sectionOwner='apps/web/components/marketing/artist-profile/ArtistProfileOutcomesCarousel.tsx'
       className='ap-outcomes'
       penContractId={MARKETING_PEN_CONTRACT_IDS.section.featureGrid}
     >

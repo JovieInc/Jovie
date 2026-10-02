@@ -15,7 +15,7 @@ export const INSTANT_MERCH_COPY = {
   },
   flow: {
     eyebrow: 'The creation flow',
-    title: 'From rough idea to ready-to-review.',
+    title: 'Make a rough idea ready for review.',
     body: 'The same conversation-led merch flow already inside Jovie, introduced with a clearer starting point.',
     steps: [
       {
@@ -57,7 +57,7 @@ export const INSTANT_MERCH_COPY = {
       {
         title: 'See the honest state',
         description:
-          'Concepts and product mockups are distinct steps. The flow does not call an unfinished asset live.',
+          'Each product stays clearly labeled as a concept until you approve it for the next step.',
       },
     ],
   },

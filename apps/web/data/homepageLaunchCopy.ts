@@ -51,78 +51,23 @@ export const HOMEPAGE_LAUNCH_COPY = {
   },
   // Certified nine-section homepage: sections 2-9. Section 1 is `hero`.
   certified: {
+    // Pen My0zu (JOV-6946): one relationships section. The hero shows the
+    // profile; this section proves the next steps, with real jov.ie/tim
+    // captures in visual accent order (pay: blue, updates: purple).
     sections: [
-      {
-        id: 'connected',
-        eyebrow: 'IDENTITY, ACROSS THE INTERNET',
-        headline: 'Everything about you, connected.',
-        body: 'Your work and story are scattered across the internet. Your identity should be easier to see.',
-      },
       {
         id: 'relationships',
         headline: 'Turn attention into relationships.',
-        body: 'Give every person a tailored next step—follow, subscribe, listen, buy, book, or reach out—without forcing everyone through the same funnel.',
-        outcomes: [
+        body: 'Give every person a tailored next step, without forcing everyone through the same funnel.',
+        steps: [
+          { id: 'pay', caption: 'A direct way to pay Tim, in one tap.' },
           {
-            id: 'found',
-            headline: 'Be found. Be understood.',
-            body: 'Share the right version of you, legible wherever people want to know how you can help.',
-          },
-          {
-            id: 'know',
-            headline: 'Know who cares.',
-            body: 'See who is paying attention, what brought them to you, and what they may want next.',
-          },
-          {
-            id: 'built',
-            headline: 'Built around who you are.',
-            body: 'Jovie adapts to your work without reducing you to a category.',
+            id: 'subscribe',
+            caption: 'Tim’s updates, sent only to people who asked for them.',
           },
         ],
       },
     ],
-    // JOV-6300 locked multi-hyphenate treatment. One approved subject
-    // (customer-zero Tim White) stays constant while emphasis shifts across
-    // three contextual lenses. Renders inside the relationships chapter as a
-    // bounded refinement of the "Built around who you are." outcome.
-    identity: {
-      opening: 'You are not one thing.',
-      payoff: 'One identity. Every side of you.',
-      subject: {
-        name: TIM_WHITE_PROFILE.name,
-        profileDisplay: TIM_WHITE_PROFILE.publicProfileDisplay,
-        portrait: {
-          src: TIM_WHITE_PROFILE.avatarSrc,
-          alt: 'Portrait of Tim White',
-          width: 640,
-          height: 640,
-          // Asset record: source public/images/avatars/tim-white.jpg;
-          // customer-zero founder consent and image rights on file;
-          // approved square crop 1:1; privacy-approved for homepage use;
-          // mobile fallback is the same asset at a smaller rendered size.
-          rights: 'customer-zero-founder-approved',
-          crop: 'square-1x1',
-          mobileFallback: 'same-asset-scaled',
-        },
-      },
-      lenses: [
-        {
-          id: 'listener',
-          label: 'Listener',
-          emphasis: 'Artist. Releases. Shows.',
-        },
-        {
-          id: 'collaborator',
-          label: 'Collaborator',
-          emphasis: 'Producer. Credits. Contact.',
-        },
-        {
-          id: 'investor',
-          label: 'Investor',
-          emphasis: 'Founder. Company. Work.',
-        },
-      ],
-    },
     close: {
       headline: 'Take control of your presence.',
       action: 'Find your profile',
@@ -310,7 +255,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
     {
       question: 'Who is Jovie for?',
       answer:
-        'Artists with a catalog already out and the team around them. Built for the work between drops, not just launch week.',
+        'Artists with a catalog already out and the team around them. Built for the work between drops and during launch week.',
     },
   ],
 } as const;

@@ -204,7 +204,6 @@ export const artistProfileAssembly: Story = {
     <SectionFrame sectionId='feature-split'>
       <ArtistProfileLandingPage
         copy={ARTIST_PROFILE_COPY}
-        socialProof={ARTIST_PROFILE_SOCIAL_PROOF}
         flags={{ FULL_PAGE: false, SOCIAL_PROOF: false, FAQ: false }}
       />
     </SectionFrame>
@@ -321,7 +320,12 @@ export const comparison: Story = {
             WIP: registry points at ComparisonData; matrix is page-local. Story
             composes verified competitor rows from content/comparisons.
           </p>
-          <div className='mt-8 overflow-x-auto'>
+          <section
+            className='mt-8 overflow-x-auto'
+            aria-label={`Jovie vs ${data.competitor} feature matrix`}
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region needs a keyboard entry point for native scrolling (axe scrollable-region-focusable)
+            tabIndex={0}
+          >
             <table className='w-full min-w-160 border-collapse text-left text-sm'>
               <thead>
                 <tr className='border-b border-subtle'>
@@ -363,7 +367,7 @@ export const comparison: Story = {
                 ))}
               </tbody>
             </table>
-          </div>
+          </section>
         </MarketingContainer>
       </SectionFrame>
     );
@@ -466,6 +470,18 @@ export const artistProfileCalloutSystem: Story = {
           </MarketingSurfaceCard>
         </div>
       </MarketingSnapRail>
+    </SectionFrame>
+  ),
+};
+
+export const productGallery: Story = {
+  name: 'product-gallery',
+  render: () => (
+    <SectionFrame sectionId='product-gallery'>
+      <MarketingShippedSitesShowcase />
+      <ArtistProfileReleaseCycleGallery
+        releaseCycle={ARTIST_PROFILE_COPY.releaseCycle}
+      />
     </SectionFrame>
   ),
 };
