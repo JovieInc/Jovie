@@ -717,7 +717,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:enroll
-    jobCount: 1
+    jobCount: 2
   - name: Merge Queue Ruleset Verify
     path: .github/workflows/merge-queue-ruleset-verify.yml
     active: true
