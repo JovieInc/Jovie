@@ -130,7 +130,7 @@ describe('getFounderFunnelData', () => {
     expect(chats.drillDownHref).toBeNull();
   });
 
-  it('encodes cohort stage and window in identifiable drill-down hrefs', async () => {
+  it('encodes cohort stage and range in identifiable drill-down hrefs', async () => {
     mockExecute.mockResolvedValue({ rows: [makeFunnelRow()] });
 
     const { getFounderFunnelData } = await import('@/lib/admin/founder-funnel');
