@@ -174,6 +174,7 @@ export type {
   PublicEndpointType,
   RateLimitConfig,
   RateLimitKeyType,
+  RateLimitReadResult,
   RateLimitResult,
   RateLimitStatus,
   TrackingEndpointType,

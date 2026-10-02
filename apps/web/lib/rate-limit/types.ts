@@ -85,6 +85,22 @@ export interface RateLimitStatus {
   retryAfterSeconds: number;
 }
 
+/** A read-only observation of the same configured bucket used by enforcement. */
+export type RateLimitReadResult =
+  | {
+      readonly available: true;
+      readonly backend: 'redis' | 'memory';
+      readonly limit: number;
+      readonly remaining: number;
+      /** Null when the selected memory bucket has no active window. */
+      readonly resetTime: number | null;
+      readonly observedAt: number;
+    }
+  | {
+      readonly available: false;
+      readonly backend: 'unavailable';
+    };
+
 /**
  * Types of public endpoints for rate limiting
  */
@@ -154,6 +170,9 @@ export interface PlanAwareRateLimiter {
    * @param plan - The user's plan tier (null/undefined defaults to 'free')
    */
   getStatus(identifier: string, plan: PlanInput): RateLimitStatus;
+
+  /** Read authoritative quota without consuming it; unavailable never becomes a local balance. */
+  readStatus(identifier: string, plan: PlanInput): Promise<RateLimitReadResult>;
 
   /**
    * Check if the request would be rate limited (without incrementing).

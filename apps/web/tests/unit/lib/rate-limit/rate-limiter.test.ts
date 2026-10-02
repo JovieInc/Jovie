@@ -27,6 +27,7 @@ const {
   return {
     mockRedisLimiter: {
       limit: vi.fn(),
+      getRemaining: vi.fn(),
     },
     mockMemoryInstance,
     mockIsRedisAvailable: vi.fn(),
@@ -631,6 +632,147 @@ describe('rate-limiter.ts', () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  describe('readStatus()', () => {
+    it('reads the enforcement bucket without incrementing quota or using memory', async () => {
+      const reset = Date.now() + 60_000;
+      mockRedisLimiter.getRemaining.mockResolvedValue({
+        limit: 10,
+        remaining: 3,
+        reset,
+      });
+      const limiter = new RateLimiter(baseConfig, { requireRedis: true });
+      expect(await limiter.readStatus('user-1')).toEqual({
+        available: true,
+        backend: 'redis',
+        limit: 10,
+        remaining: 3,
+        resetTime: reset,
+        observedAt: expect.any(Number),
+      });
+      expect(mockRedisLimiter.getRemaining).toHaveBeenCalledWith('user-1');
+      expect(mockRedisLimiter.limit).not.toHaveBeenCalled();
+      expect(mockMemoryInstance.getStatus).not.toHaveBeenCalled();
+      expect(mockMemoryInstance.limit).not.toHaveBeenCalled();
+    });
+
+    it('returns unavailable when Redis is missing instead of the empty local counter', async () => {
+      mockCreateRedisRateLimiter.mockReturnValue(null);
+      const limiter = new RateLimiter(baseConfig, { requireRedis: true });
+      expect(await limiter.readStatus('user-1')).toEqual({
+        available: false,
+        backend: 'unavailable',
+      });
+      expect(mockMemoryInstance.getStatus).not.toHaveBeenCalled();
+    });
+
+    it('keeps failed Redis reads unavailable while the shared circuit is open', async () => {
+      mockRedisLimiter.getRemaining.mockRejectedValue(new Error('offline'));
+      const limiter = new RateLimiter(baseConfig, { requireRedis: true });
+      expect(await limiter.readStatus('user-1')).toEqual({
+        available: false,
+        backend: 'unavailable',
+      });
+      expect(await limiter.readStatus('user-2')).toEqual({
+        available: false,
+        backend: 'unavailable',
+      });
+      expect(mockRedisLimiter.getRemaining).toHaveBeenCalledTimes(1);
+      expect(mockMemoryInstance.getStatus).not.toHaveBeenCalled();
+    });
+
+    it('bounds a hanging quota read without consuming or falling back', async () => {
+      vi.useFakeTimers();
+      try {
+        mockRedisLimiter.getRemaining.mockImplementationOnce(
+          () => new Promise(() => {})
+        );
+        const read = new RateLimiter(baseConfig).readStatus('user-1');
+        await vi.advanceTimersByTimeAsync(751);
+        expect(await read).toEqual({
+          available: false,
+          backend: 'unavailable',
+        });
+        expect(mockRedisLimiter.limit).not.toHaveBeenCalled();
+        expect(mockMemoryInstance.getStatus).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it.each([
+      { limit: Number.NaN, remaining: 1 },
+      { limit: 10, remaining: Number.NaN },
+      { limit: -1, remaining: 0 },
+      { limit: 10, remaining: 11 },
+      { limit: 10, remaining: -1 },
+      { limit: Number.POSITIVE_INFINITY, remaining: 1 },
+    ])('rejects invalid finite quota observations: %j', async fields => {
+      mockRedisLimiter.getRemaining.mockResolvedValue({
+        ...fields,
+        reset: Date.now() + 60_000,
+      });
+      expect(await new RateLimiter(baseConfig).readStatus('user-1')).toEqual({
+        available: false,
+        backend: 'unavailable',
+      });
+    });
+
+    it.each([Number.NaN, 0, Date.now() - 1, 9e15])(
+      'does not invent a reset for invalid timestamps: %s',
+      async reset => {
+        mockRedisLimiter.getRemaining.mockResolvedValue({
+          limit: 10,
+          remaining: 3,
+          reset,
+        });
+        expect(await new RateLimiter(baseConfig).readStatus('user-1')).toEqual({
+          available: false,
+          backend: 'unavailable',
+        });
+      }
+    );
+
+    it('preserves a real zero allowance as available and exhausted', async () => {
+      mockRedisLimiter.getRemaining.mockResolvedValue({
+        limit: 0,
+        remaining: 0,
+        reset: Date.now() + 60_000,
+      });
+      expect(
+        await new RateLimiter(baseConfig).readStatus('user-1')
+      ).toMatchObject({ available: true, limit: 0, remaining: 0 });
+    });
+
+    it('reads intentional development memory without creating a reset window', async () => {
+      mockEnv.NODE_ENV = 'development';
+      mockEnv.VERCEL_ENV = undefined;
+      mockMemoryInstance.getStatus.mockReturnValue({
+        limit: 10,
+        remaining: 10,
+        resetTime: Date.now() + 60_000,
+      });
+      const limiter = new RateLimiter(baseConfig, { requireRedis: true });
+      expect(await limiter.readStatus('new-user')).toMatchObject({
+        available: true,
+        backend: 'memory',
+        remaining: 10,
+        resetTime: null,
+      });
+      mockMemoryInstance.getStatus.mockReturnValue({
+        limit: 10,
+        remaining: 9,
+        resetTime: 12345,
+      });
+      expect(await limiter.readStatus('active-user')).toMatchObject({
+        available: true,
+        remaining: 9,
+        resetTime: 12345,
+      });
+      expect(mockRedisLimiter.getRemaining).not.toHaveBeenCalled();
+      expect(mockMemoryInstance.limit).not.toHaveBeenCalled();
     });
   });
 
