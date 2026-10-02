@@ -61,7 +61,7 @@
     "package:local": "pnpm run compile && electron-builder --config electron-builder.local.yml --publish never",
     "pretypecheck": "node scripts/write-env.mjs",
     "typecheck": "tsc --noEmit",
-    "test:desktop-main-liveness": "vitest run --config vitest.config.mts scripts/main-liveness.test.ts",
+    "test:desktop-main-liveness": "vitest run --config vitest.config.mts scripts/main-liveness.test.ts scripts/desktop-launch-readiness.test.ts",
     "performance": "node scripts/capture-production-baseline.mjs",
     "test:performance": "node --test scripts/capture-production-baseline.test.mjs"
   },

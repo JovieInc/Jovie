@@ -30,6 +30,11 @@ extension MobileChatClientProtocol {
 }
 
 struct MobileChatClient: MobileChatClientProtocol, Sendable {
+  private struct AuthorizedRequest {
+    var request: URLRequest
+    let authorization: NativeRequestAuthorization
+  }
+
   private let baseURL: URL
   private let session: URLSession
   private let tokenProvider: TokenProviding
@@ -100,12 +105,13 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?,
     tokenOverride: String? = nil
   ) async throws -> [MobileChatStreamEvent] {
-    var urlRequest = try await authorizedRequest(
+    let authorized = try await authorizedRequest(
       url: baseURL.appending(path: "/api/mobile/v1/chat/turns"),
       method: "POST",
       forceRefresh: forceRefresh,
       tokenOverride: tokenOverride
     )
+    var urlRequest = authorized.request
     urlRequest.setValue("application/x-ndjson", forHTTPHeaderField: "Accept")
     urlRequest.httpBody = try encoder.encode(request)
 
@@ -116,7 +122,7 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     }
 
     if httpResponse.statusCode == 401, !forceRefresh {
-      let token = try await retryTokenOrTerminal(after: failedBearerToken(from: urlRequest))
+      let token = try await retryTokenOrTerminal(after: authorized.authorization.bearerToken)
       return try await sendTurn(
         request,
         forceRefresh: true,
@@ -132,7 +138,7 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
       throw MobileChatClientError.requestFailed(statusCode: httpResponse.statusCode)
     }
 
-    NativeSessionTokenStore.refresh(from: response)
+    NativeSessionTokenStore.refresh(from: response, authorizedBy: authorized.authorization)
     return try await readStreamEvents(from: bytes, onEvent: onEvent)
   }
 
@@ -147,12 +153,13 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     forceRefresh: Bool,
     tokenOverride: String? = nil
   ) async throws -> EyesFreeCaptureAPIResponse {
-    var urlRequest = try await authorizedRequest(
+    let authorized = try await authorizedRequest(
       url: baseURL.appending(path: "/api/mobile/v1/eyes-free-capture"),
       method: "POST",
       forceRefresh: forceRefresh,
       tokenOverride: tokenOverride
     )
+    var urlRequest = authorized.request
     urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
     urlRequest.httpBody = try encoder.encode(request)
 
@@ -163,7 +170,7 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     }
 
     if httpResponse.statusCode == 401, !forceRefresh {
-      let token = try await retryTokenOrTerminal(after: failedBearerToken(from: urlRequest))
+      let token = try await retryTokenOrTerminal(after: authorized.authorization.bearerToken)
       return try await submitEyesFreeCapture(
         request,
         forceRefresh: true,
@@ -178,7 +185,7 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     if (200 ... 409).contains(httpResponse.statusCode),
        let decoded = try? decoder.decode(EyesFreeCaptureAPIResponse.self, from: data)
     {
-      NativeSessionTokenStore.refresh(from: response)
+      NativeSessionTokenStore.refresh(from: response, authorizedBy: authorized.authorization)
       return decoded
     }
     guard (200 ... 299).contains(httpResponse.statusCode) else {
@@ -211,29 +218,19 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     method: String,
     forceRefresh: Bool = false,
     tokenOverride: String? = nil
-  ) async throws -> URLRequest {
-    let token: String
+  ) async throws -> AuthorizedRequest {
+    let authorization: NativeRequestAuthorization
     if let tokenOverride {
-      token = tokenOverride
+      authorization = NativeRequestAuthorization(unmanagedBearerToken: tokenOverride)
     } else {
-      token = try await tokenProvider.bearerToken(forceRefresh: forceRefresh)
+      authorization = try await tokenProvider.requestAuthorization(forceRefresh: forceRefresh)
     }
     var request = URLRequest(url: url)
     request.httpMethod = method
     request.timeoutInterval = requestTimeout
-    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    request.setValue("Bearer \(authorization.bearerToken)", forHTTPHeaderField: "Authorization")
     request.setValue("application/json", forHTTPHeaderField: "Accept")
-    return request
-  }
-
-  private func failedBearerToken(from request: URLRequest) -> String {
-    guard
-      let value = request.value(forHTTPHeaderField: "Authorization"),
-      value.hasPrefix("Bearer ")
-    else {
-      return ""
-    }
-    return String(value.dropFirst("Bearer ".count))
+    return AuthorizedRequest(request: request, authorization: authorization)
   }
 
   private func retryTokenOrTerminal(after failedToken: String) async throws -> String {
@@ -246,20 +243,26 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
   }
 
   private func sendJSON<Response: Decodable>(
-    request: URLRequest,
+    request: AuthorizedRequest,
     forceRefresh: Bool
   ) async throws -> Response {
-    let (data, response) = try await performData(for: request)
+    let (data, response) = try await performData(for: request.request)
 
     guard let httpResponse = response as? HTTPURLResponse else {
       throw MobileChatClientError.invalidResponse
     }
 
     if httpResponse.statusCode == 401, !forceRefresh {
-      let token = try await retryTokenOrTerminal(after: failedBearerToken(from: request))
-      var refreshed = request
+      let token = try await retryTokenOrTerminal(after: request.authorization.bearerToken)
+      var refreshed = request.request
       refreshed.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-      return try await sendJSON(request: refreshed, forceRefresh: true)
+      return try await sendJSON(
+        request: AuthorizedRequest(
+          request: refreshed,
+          authorization: NativeRequestAuthorization(unmanagedBearerToken: token)
+        ),
+        forceRefresh: true
+      )
     }
 
     if httpResponse.statusCode == 401 {
@@ -270,7 +273,7 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
       throw MobileChatClientError.requestFailed(statusCode: httpResponse.statusCode)
     }
 
-    NativeSessionTokenStore.refresh(from: response)
+    NativeSessionTokenStore.refresh(from: response, authorizedBy: request.authorization)
 
     do {
       return try decoder.decode(Response.self, from: data)

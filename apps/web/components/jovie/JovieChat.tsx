@@ -650,6 +650,7 @@ export function JovieChat({
   }
 
   const chatInputProps = {
+    desktopConversationReady: !isLoadingConversation,
     ref: inputRef,
     value: input,
     onChange: setInput,
