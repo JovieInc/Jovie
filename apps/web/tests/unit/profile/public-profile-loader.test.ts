@@ -129,7 +129,7 @@ beforeEach(() => {
   getProfileWithLinksMock.mockReset();
   // The loader's unstable_cache path is skipped under NODE_ENV=test; the
   // cache-configuration assertions below run under a production-like env.
-  process.env.NODE_ENV = 'test';
+  vi.stubEnv('NODE_ENV', 'test');
 });
 
 describe('public profile loader behavior (JOV-5778)', () => {
@@ -403,7 +403,7 @@ describe('public profile loader behavior (JOV-5778)', () => {
 
   describe('cache layer', () => {
     it('bypasses unstable_cache under NODE_ENV=test', async () => {
-      process.env.NODE_ENV = 'test';
+      vi.stubEnv('NODE_ENV', 'test');
       getProfileWithLinksMock.mockResolvedValue(buildProfileWithLinks());
       const { getProfileAndLinks } = await importLoader();
 
@@ -414,7 +414,7 @@ describe('public profile loader behavior (JOV-5778)', () => {
     });
 
     it('bypasses unstable_cache under PUBLIC_NOAUTH_SMOKE', async () => {
-      process.env.NODE_ENV = 'production';
+      vi.stubEnv('NODE_ENV', 'production');
       process.env.PUBLIC_NOAUTH_SMOKE = '1';
       getProfileWithLinksMock.mockResolvedValue(buildProfileWithLinks());
       const { getProfileAndLinks } = await importLoader();
@@ -426,7 +426,7 @@ describe('public profile loader behavior (JOV-5778)', () => {
     });
 
     it('registers a per-username cache key with profile tags and a 1h revalidate', async () => {
-      process.env.NODE_ENV = 'production';
+      vi.stubEnv('NODE_ENV', 'production');
       delete process.env.PUBLIC_NOAUTH_SMOKE;
       getProfileWithLinksMock.mockResolvedValue(buildProfileWithLinks());
       const { getProfileAndLinks } = await importLoader();
@@ -443,7 +443,7 @@ describe('public profile loader behavior (JOV-5778)', () => {
     });
 
     it('does not cache non-ok results: the fetcher throws inside unstable_cache', async () => {
-      process.env.NODE_ENV = 'production';
+      vi.stubEnv('NODE_ENV', 'production');
       delete process.env.PUBLIC_NOAUTH_SMOKE;
       getProfileWithLinksMock.mockResolvedValue(
         buildProfileWithLinks({ isPublic: false })
@@ -462,7 +462,7 @@ describe('public profile loader behavior (JOV-5778)', () => {
 
 describe('non-ok payload unwrapping through the cache throw path', () => {
   it('carries the original result object through NonCacheableProfileResultError', async () => {
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
     delete process.env.PUBLIC_NOAUTH_SMOKE;
     getProfileWithLinksMock.mockResolvedValue(
       buildProfileWithLinks({ isPublic: false })
@@ -476,7 +476,7 @@ describe('non-ok payload unwrapping through the cache throw path', () => {
   });
 
   it('falls back to a fresh fetch when the cache layer itself throws', async () => {
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
     delete process.env.PUBLIC_NOAUTH_SMOKE;
     getProfileWithLinksMock.mockResolvedValueOnce(buildProfileWithLinks());
     // Simulate an unstable_cache infrastructure failure: this invocation of
@@ -500,6 +500,6 @@ describe('non-ok payload unwrapping through the cache throw path', () => {
 });
 
 afterEach(() => {
-  process.env.NODE_ENV = 'test';
+  vi.unstubAllEnvs();
   delete process.env.PUBLIC_NOAUTH_SMOKE;
 });

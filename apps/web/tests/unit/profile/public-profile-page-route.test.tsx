@@ -406,9 +406,7 @@ describe('public profile page route behavior (JOV-5778)', () => {
   });
 
   it('renders the dedicated client surface for the unfazed handle', async () => {
-    const pageTree = (await executeArtistPage('unfazed')) as {
-      props: { children: unknown };
-    };
+    const pageTree = await executeArtistPage('unfazed');
     // The Unfazed branch returns its client element before the Suspense
     // boundary, so the tree is the Unfazed element itself.
     const html = renderToStaticMarkup(pageTree);
