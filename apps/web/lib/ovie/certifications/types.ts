@@ -51,6 +51,7 @@ export const OVIE_CERTIFICATION_DOMAINS = [
   'marketing',
   'lyb',
   'acquisition',
+  'feature_registry',
 ] as const;
 
 export type OvieCertificationDomainId =
@@ -105,6 +106,16 @@ export interface OvieCertificationDecisionAvailability {
   readonly reason: string | null;
   /** Kernel evidence digest the decision must bind to. */
   readonly evidenceDigest: string | null;
+  /**
+   * The founder decision bound to the current evidence digest, if one exists.
+   * Stale decisions recorded against older evidence never appear here.
+   */
+  readonly currentDecision: {
+    readonly kind: OvieCertificationDecisionKind;
+    readonly decidedAt: string;
+    readonly reviewer: string;
+    readonly notes: string | null;
+  } | null;
 }
 
 export interface OvieCertificationRow {
@@ -200,6 +211,7 @@ export const OVIE_CERTIFICATION_DOMAIN_LABELS: Readonly<
   marketing: 'Marketing',
   lyb: 'LYB',
   acquisition: 'Acquisition',
+  feature_registry: 'Feature Registry',
 };
 
 export const OVIE_CERTIFICATION_STATE_LABELS: Readonly<

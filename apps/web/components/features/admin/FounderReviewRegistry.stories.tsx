@@ -1,9 +1,16 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import {
   RightPanelProvider,
   useRightPanel,
 } from '@/contexts/RightPanelContext';
 import type { FounderReviewItem, FounderReviewMedia } from '@/lib/admin/types';
+import type {
+  OvieCertificationInventory,
+  OvieCertificationRow,
+} from '@/lib/ovie/certifications/types';
+import { queryKeys } from '@/lib/queries/keys';
 import { FounderReviewRegistry } from './FounderReviewRegistry';
 
 // Built inline: the shared fixture hashes with node:crypto, which cannot load
@@ -119,6 +126,47 @@ function RightPanelSlot() {
   );
 }
 
+/** Minimal server projection so the ready story item is decidable. */
+function storyRow(item: FounderReviewItem): OvieCertificationRow {
+  const reviewReady = item.readiness === 'ready';
+  return {
+    id: `feature_registry:${item.id}`,
+    domain: 'feature_registry',
+    surface: 'Feature Capability',
+    subject: { id: item.id, kind: 'feature', title: item.title },
+    state: reviewReady ? 'review_ready' : 'working',
+    tiers: {},
+    evidence: [],
+    blockers: [],
+    staleFounderLock: false,
+    updatedAt: '2026-10-02T00:00:00.000Z',
+    links: [],
+    history: [],
+    decision: {
+      available: reviewReady,
+      reason: reviewReady ? null : 'Evidence is incomplete: 1 blocker.',
+      evidenceDigest: item.decisionEvidenceDigest,
+      currentDecision: null,
+    },
+    source: null,
+  } as unknown as OvieCertificationRow;
+}
+
+function RegistryStory({ children }: { readonly children: React.ReactNode }) {
+  const client = useMemo(() => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const key = queryKeys.admin.certifications();
+    queryClient.setQueryDefaults(key, { enabled: false, staleTime: Infinity });
+    queryClient.setQueryData(key, {
+      rows: items.map(storyRow),
+    } as unknown as OvieCertificationInventory);
+    return queryClient;
+  }, []);
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+}
+
 const meta = {
   title: 'Features/Admin/FounderReviewRegistry',
   component: FounderReviewRegistry,
@@ -128,14 +176,16 @@ const meta = {
   },
   decorators: [
     Story => (
-      <RightPanelProvider>
-        <div className='flex h-screen bg-(--app-shell-content-surface)'>
-          <main className='min-w-0 flex-1 overflow-auto p-4'>
-            <Story />
-          </main>
-          <RightPanelSlot />
-        </div>
-      </RightPanelProvider>
+      <RegistryStory>
+        <RightPanelProvider>
+          <div className='flex h-screen bg-(--app-shell-content-surface)'>
+            <main className='min-w-0 flex-1 overflow-auto p-4'>
+              <Story />
+            </main>
+            <RightPanelSlot />
+          </div>
+        </RightPanelProvider>
+      </RegistryStory>
     ),
   ],
   args: {

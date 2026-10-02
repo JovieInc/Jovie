@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   store: vi.fn(),
   backend: vi.fn(),
   packetFiles: vi.fn(),
+  featureRegistry: vi.fn(),
 }));
 
 vi.mock('@/lib/ovie/mcp/principal', () => ({
@@ -36,6 +37,9 @@ vi.mock(
     readCertificationPacketFiles: mocks.packetFiles,
   })
 );
+vi.mock('@/lib/admin/feature-registry.server', () => ({
+  readFeatureRegistrySource: mocks.featureRegistry,
+}));
 
 const request = () => new Request('https://jov.ie/api/ovie/certifications');
 
@@ -78,6 +82,10 @@ describe('GET /api/ovie/certifications', () => {
     );
     mocks.backend.mockReturnValue(readOnlyBackend);
     mocks.packetFiles.mockResolvedValue(packetRead);
+    mocks.featureRegistry.mockResolvedValue({
+      items: [],
+      sourceUpdatedAt: '2026-09-27T07:00:00.000Z',
+    });
   });
 
   it('rejects unauthenticated and non-admin callers before reading any inventory', async () => {
