@@ -912,6 +912,17 @@ const VISUAL_QA_DIFF_ARTIFACTS_MANIFEST = new Set([
   VISUAL_QA_DIFF_ARTIFACTS_SOURCE,
   VISUAL_QA_DIFF_ARTIFACTS_TEST,
 ]);
+const CERTIFICATION_NORMALIZATION_SOURCE =
+  'apps/web/lib/ovie/certifications/normalize.ts';
+const CERTIFICATION_NORMALIZATION_TESTS = [
+  'apps/web/lib/ovie/certifications/normalize.test.ts',
+  'apps/web/lib/ovie/certifications/inventory.server.test.ts',
+  'apps/web/components/features/admin/certifications/CertificationDetailRail.test.tsx',
+];
+const CERTIFICATION_NORMALIZATION_MANIFEST = new Set([
+  CERTIFICATION_NORMALIZATION_SOURCE,
+  ...CERTIFICATION_NORMALIZATION_TESTS,
+]);
 const MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST = new Set([
   'apps/web/tests/e2e/mobile-overflow.spec.ts',
   'apps/web/tests/e2e/utils/mobile-overflow.ts',
@@ -1097,6 +1108,17 @@ export function buildAffectedTestPlan(
       nodeTests: [],
       blogCandidateBuild: true,
     };
+  }
+  const isBoundedCertificationNormalizationChange = files.includes(
+    CERTIFICATION_NORMALIZATION_SOURCE
+  );
+  if (isBoundedCertificationNormalizationChange) {
+    if (!files.every(file => CERTIFICATION_NORMALIZATION_MANIFEST.has(file))) {
+      return fullSuitePlan('mixed certification normalization source changes');
+    }
+    if (![...CERTIFICATION_NORMALIZATION_MANIFEST].every(isFileAvailable)) {
+      return fullSuitePlan('certification normalization proof is unavailable');
+    }
   }
   const isLinearSyncOnMerge =
     files.some(file => LINEAR_SYNC_ON_MERGE_PRIMARY.has(file)) &&
@@ -1670,7 +1692,9 @@ export function buildAffectedTestPlan(
         manifest.has(file) &&
         (hasUnsupportedAutomationPeer || !directlyRunnableTestFiles.has(file))
     );
-  const mandatoryTests = [];
+  const mandatoryTests = isBoundedCertificationNormalizationChange
+    ? [...CERTIFICATION_NORMALIZATION_TESTS]
+    : [];
   const hasSeedConfirmationChange = files.some(
     file =>
       file === 'apps/web/tests/seed-test-data.ts' ||
@@ -1778,7 +1802,19 @@ export function buildAffectedTestPlan(
     mandatoryTests.push(...RUNNER_PREREQUISITE_CONTRACT_TESTS);
   }
 
-  const selectedTests = unique([...directTests, ...mandatoryTests]);
+  if (
+    isBoundedCertificationNormalizationChange &&
+    !mandatoryTests.every(isFileAvailable)
+  ) {
+    return fullSuitePlan('certification normalization proof is unavailable');
+  }
+  const selectedTests = unique([
+    ...(isBoundedCertificationNormalizationChange
+      ? CERTIFICATION_NORMALIZATION_TESTS
+      : []),
+    ...directTests,
+    ...mandatoryTests,
+  ]);
   const rootVitestTests = unique([
     ...(isExactVercelCongestionControl
       ? VERCEL_CONGESTION_CONTROL_ROOT_VITEST_TESTS
@@ -1833,6 +1869,11 @@ export function buildAffectedTestPlan(
   ]);
   const isCoveredSource = file => {
     if (VITEST_TEST_FILE.test(file)) return true;
+    if (
+      isBoundedCertificationNormalizationChange &&
+      CERTIFICATION_NORMALIZATION_MANIFEST.has(file)
+    )
+      return true;
     const fixtureTests = KNOWN_VITEST_FIXTURE_TESTS.get(file);
     if (fixtureTests) return fixtureTests.every(isFileAvailable);
     if (file.startsWith('apps/web/components/features/profile/')) return true;
@@ -2265,6 +2306,16 @@ export async function runCommandStatus(
   logger(
     `[affected-tests] complete ${label} status=${status} elapsedMs=${Date.now() - startedAt} pid=${child.pid ?? 'unknown'} command=${commandText}`
   );
+  if (bufferOutput) {
+    // Queue a barrier after both the stage output and completion log. The CLI
+    // can exit immediately, so its parent pipe must finish writing first.
+    await new Promise((resolveWrite, rejectWrite) => {
+      process.stdout.write('', error => {
+        if (error) rejectWrite(error);
+        else resolveWrite();
+      });
+    });
+  }
   return status;
 }
 

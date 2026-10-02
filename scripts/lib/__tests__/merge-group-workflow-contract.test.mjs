@@ -224,6 +224,42 @@ const BLOBLESS_BASE_FETCH_JOBS = new Set([
 const BACKGROUND_BASE_FETCH_JOBS = new Set(['ci-fast-remaining']);
 
 describe('merge_group workflow contract', () => {
+  it('runs the web build for changelog-only releases without turning ordinary docs into builds', () => {
+    const script = CI_WORKFLOW.slice(
+      CI_WORKFLOW.indexOf('# CHANGELOG.md is customer-facing web content'),
+      CI_WORKFLOW.indexOf('# Test paths')
+    );
+    const directory = mkdtempSync(join(tmpdir(), 'changelog-ci-routing-'));
+    try {
+      for (const { files, builds } of [
+        { files: 'CHANGELOG.md', builds: true },
+        { files: 'docs/changelog.md', builds: false },
+        { files: 'README.md', builds: false },
+      ]) {
+        const output = join(directory, 'outputs');
+        writeFileSync(output, '');
+        const result = spawnSync(
+          'bash',
+          ['-c', 'emit_ci_lanes() { :; };\n' + script],
+          {
+            env: {
+              ...process.env,
+              CHANGED_FILES: files,
+              GITHUB_OUTPUT: output,
+            },
+            encoding: 'utf8',
+          }
+        );
+        expect(result.status, result.stderr).toBe(0);
+        expect(readFileSync(output, 'utf8')).toContain('run_build=' + builds);
+        expect(readFileSync(output, 'utf8')).toContain(
+          'has_code_changes=' + builds
+        );
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
   it('accepts reordered exact ci-fast failure operands', () => {
     expect(
       parseExactCiFastFailureOperands(
@@ -3805,9 +3841,10 @@ describe('merge-queue green enroll scan window (JOV-6831)', () => {
   );
 
   it('pages through every open PR instead of one oldest-first window', () => {
-    expect(ENROLL).toContain('after: $cursor');
-    expect(ENROLL).toContain('pageInfo { hasNextPage endCursor }');
-    expect(ENROLL).toContain('} while (cursor);');
+    expect(ENROLL).toContain('github.paginate(github.rest.pulls.list');
+    expect(ENROLL).toContain("state: 'open', base: 'main', per_page: 100");
+    expect(ENROLL).toContain('pullRequest(number: $number)');
+    expect(ENROLL).not.toContain('pullRequests(');
     expect(ENROLL).not.toMatch(/direction:\s*ASC/);
   });
 

@@ -71,6 +71,8 @@ const nextConfig = {
       'runtime-data/apps/eve-pilot/identities/summer/instructions.md',
       'tests/quarantine.json',
       'content/**/*',
+      // Blog catalog validation checks these assets with fs.access at request time.
+      'public/images/blog/**/*',
       'lib/chat/knowledge/topics/**/*',
       'public/fonts/Satoshi-Bold.ttf',
       'public/fonts/DMSans-Regular.ttf',

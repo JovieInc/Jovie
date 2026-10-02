@@ -26,7 +26,7 @@ name: Auto-Ready Agent Drafts
 
 on:
   workflow_run:
-    workflows: ['CI', 'Fork PR Gate', 'PR Size Guard']
+    workflows: ['Source Validation', 'CI', 'Fork PR Gate', 'PR Size Guard']
     types: [completed]
   check_suite:
     types: [completed]
@@ -105,6 +105,7 @@ jobs:
           github.event.workflow_run.event == 'pull_request_target'
         ) &&
         (
+          startsWith(github.event.workflow_run.path, '.github/workflows/source-validation.yml') ||
           startsWith(github.event.workflow_run.path, '.github/workflows/ci.yml') ||
           startsWith(github.event.workflow_run.path, '.github/workflows/fork-pr-gate.yml') ||
           startsWith(github.event.workflow_run.path, '.github/workflows/pr-size-guard.yml')

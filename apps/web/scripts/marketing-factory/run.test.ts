@@ -76,6 +76,7 @@ describe('factory:run content stages', () => {
     });
     expect(manifest.chain.map(link => link.stage)).toEqual([
       'truth',
+      'persuasion',
       'outcomes',
       'narrative',
       'copy',
@@ -86,20 +87,40 @@ describe('factory:run content stages', () => {
     ]);
     expect(verifyFactoryRun(runDir())).toEqual([]);
 
-    const copy = record('04-copy.attempt-1.json').receipt;
+    const copy = record('05-copy.attempt-1.json').receipt;
     expect(copy.producer).toMatchObject({
       modelId: 'fixture:anthropic/claude-opus-5.5',
       family: 'anthropic',
     });
     expect(copy.evaluators.map(e => e.family)).toEqual(['openai', 'zai']);
-    expect(record('06-hero-variant.attempt-1.json').artifact).toMatchObject({
+    expect(record('07-hero-variant.attempt-1.json').artifact).toMatchObject({
       variantId: 'xm2iz',
       headerId: 'eoUUU',
     });
-    expect(record('07-proof.attempt-1.json').artifact).toMatchObject({
+    expect(record('08-proof.attempt-1.json').artifact).toMatchObject({
       items: [{ registryId: 'product-profile-subscribe-capture' }],
       requests: [],
     });
+  });
+
+  it('fails persuasion and stops before composition on stale research', async () => {
+    const manifest = await run({
+      brief: {
+        ...brief,
+        persuasion: { ...brief.persuasion, researchedAt: '2026-01-01' },
+      },
+    });
+
+    expect(manifest).toMatchObject({
+      status: 'failed',
+      stoppedAt: 'persuasion',
+    });
+    expect(
+      record('02-persuasion.attempt-3.json').receipt.invariantsFailed
+    ).toContain('research-fresh');
+    expect(existsSync(join(runDir(), '03-outcomes.attempt-1.json'))).toBe(
+      false
+    );
   });
 
   it('fails truth when the brief names a claim product truth does not hold', async () => {
@@ -121,8 +142,8 @@ describe('stage retries', () => {
     });
 
     expect(manifest.chain.find(link => link.stage === 'copy')?.attempt).toBe(2);
-    expect(record('04-copy.attempt-1.json').receipt.passed).toBe(false);
-    expect(record('04-copy.attempt-2.json').feedbackIn).toContain(
+    expect(record('05-copy.attempt-1.json').receipt.passed).toBe(false);
+    expect(record('05-copy.attempt-2.json').feedbackIn).toContain(
       'copy-no-em-dash'
     );
     expect(verifyFactoryRun(runDir())).toEqual([]);
@@ -135,13 +156,14 @@ describe('stage retries', () => {
 
     expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'copy' });
     expect(manifest.attempts.filter(file => file.includes('-copy.'))).toEqual([
-      '04-copy.attempt-1.json',
-      '04-copy.attempt-2.json',
-      '04-copy.attempt-3.json',
+      '05-copy.attempt-1.json',
+      '05-copy.attempt-2.json',
+      '05-copy.attempt-3.json',
     ]);
-    expect(existsSync(join(runDir(), '05-layout.attempt-1.json'))).toBe(false);
+    expect(existsSync(join(runDir(), '06-layout.attempt-1.json'))).toBe(false);
     expect(manifest.chain.map(link => link.stage)).toEqual([
       'truth',
+      'persuasion',
       'outcomes',
       'narrative',
     ]);
@@ -158,7 +180,7 @@ describe('stage retries', () => {
     });
 
     expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'layout' });
-    expect(record('05-layout.attempt-3.json').feedbackIn).toContain(
+    expect(record('06-layout.attempt-3.json').feedbackIn).toContain(
       'stage-error: resolver exploded'
     );
   });
@@ -173,7 +195,7 @@ describe('harness rules', () => {
     });
 
     expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'outcomes' });
-    const outcomes = record('02-outcomes.attempt-3.json').receipt;
+    const outcomes = record('03-outcomes.attempt-3.json').receipt;
     expect(outcomes.passed).toBe(false);
     expect(outcomes.invariantsFailed).toContain('cross-family-evaluator');
   });
@@ -192,7 +214,7 @@ describe('harness rules', () => {
     });
 
     expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'outcomes' });
-    expect(record('02-outcomes.attempt-2.json').feedbackIn).toContain(
+    expect(record('03-outcomes.attempt-2.json').feedbackIn).toContain(
       'name the outcome'
     );
   });
@@ -207,7 +229,7 @@ describe('harness rules', () => {
     });
 
     expect(manifest.chain.map(link => link.stage)).toContain('copy');
-    const copy = record('04-copy.attempt-1.json').receipt;
+    const copy = record('05-copy.attempt-1.json').receipt;
     expect(copy.evaluators.every(e => e.score <= 1)).toBe(true);
   });
 
@@ -219,7 +241,7 @@ describe('harness rules', () => {
       stoppedAt: 'outcomes',
       mode: 'live',
     });
-    const receipt = record('02-outcomes.attempt-1.json').receipt;
+    const receipt = record('03-outcomes.attempt-1.json').receipt;
     expect(receipt.passed).toBe(false);
     expect(receipt.invariantsFailed).toContain('credentials-unavailable');
   });

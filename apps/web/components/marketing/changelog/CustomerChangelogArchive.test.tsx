@@ -60,6 +60,43 @@ const MONTHS: readonly CustomerChangelogMonthGroup[] = [
 ];
 
 describe('CustomerChangelogArchive', () => {
+  it('shows source-declared limited rollout prerequisites without a GA badge', () => {
+    render(
+      <CustomerChangelogArchive
+        months={[
+          {
+            ...MONTHS[0],
+            entries: [
+              {
+                ...MONTHS[0].entries[0],
+                availability: 'limited',
+                prerequisites: ['Eligible profiles with updates enabled'],
+              },
+            ],
+          },
+        ]}
+      />
+    );
+    expect(screen.getByText('Limited availability')).toBeVisible();
+    expect(
+      screen.getByText('Eligible profiles with updates enabled')
+    ).toBeVisible();
+    expect(screen.queryByText('Generally available')).not.toBeInTheDocument();
+  });
+
+  it('retains permanent engineering links when there are no approved customer outcomes', () => {
+    render(
+      <CustomerChangelogArchive
+        months={[]}
+        technicalReleases={[{ version: '26.6.50', date: '2026-06-15' }]}
+      />
+    );
+    expect(screen.getByRole('link', { name: /26.6.50/ })).toHaveAttribute(
+      'href',
+      '/changelog/26.6.50'
+    );
+    expect(screen.getByText('Engineering history')).not.toBeVisible();
+  });
   it('leads with outcome titles and keeps version tertiary', () => {
     render(<CustomerChangelogArchive months={MONTHS.slice(0, 1)} />);
 
@@ -110,6 +147,7 @@ describe('CustomerChangelogArchive', () => {
 
   it('links unloaded months to version pages and mounted months to existing anchors', () => {
     const { container } = render(<CustomerChangelogArchive months={MONTHS} />);
+    fireEvent.click(screen.getByText('Browse all updates'));
     const archive = within(
       screen.getByRole('navigation', { name: 'Changelog Archive' })
     );
@@ -154,20 +192,17 @@ describe('CustomerChangelogArchive', () => {
 
   it('keeps published older releases crawlable in initial server-rendered HTML', () => {
     const markdown = readFileSync(resolveMonorepoPath('CHANGELOG.md'), 'utf8');
+    const releases = parseChangelog(markdown);
     const months = groupCustomerChangelogByMonth(
-      projectCustomerChangelog(parseChangelog(markdown))
+      projectCustomerChangelog(releases)
     );
-    expect(months.length).toBeGreaterThan(1);
-    const olderVersions = [
-      ...new Set(
-        months
-          .slice(1)
-          .flatMap(group => group.entries.map(entry => entry.technicalVersion))
-      ),
-    ];
+    expect(months).toHaveLength(1); // Historical engineering records stay in the technical log.
+    const olderVersions = releases
+      .filter(release => release.version !== '2026-10-02')
+      .map(release => release.version);
     expect(olderVersions).toContain('26.8.1');
     const html = renderToStaticMarkup(
-      <CustomerChangelogArchive months={months} />
+      <CustomerChangelogArchive months={months} technicalReleases={releases} />
     );
     const checks = auditOrphans(
       [
@@ -184,7 +219,27 @@ describe('CustomerChangelogArchive', () => {
     for (const version of olderVersions) {
       expect(checks.get(`/changelog/${version}`)?.status).toBe('passed');
     }
-    expect(html).not.toContain(`id="${months[1].entries[0].slug}"`);
+    expect(html).not.toContain('PersistentAudioBar tests');
+    expect(html).toContain('Engineering history');
+  });
+
+  it('keeps current outcomes visible while the full crawlable archive stays in a native disclosure', () => {
+    render(<CustomerChangelogArchive months={MONTHS} />);
+    const disclosure = screen
+      .getByText('Browse all updates')
+      .closest('details');
+    expect(disclosure).not.toHaveAttribute('open');
+    expect(
+      screen.getByRole('heading', { name: MONTHS[0].entries[0].title })
+    ).toBeVisible();
+    expect(
+      screen.getByRole('navigation', { name: 'Changelog Archive' })
+    ).not.toBeVisible();
+    fireEvent.click(screen.getByText('Browse all updates'));
+    expect(disclosure).toHaveAttribute('open');
+    expect(
+      screen.getByRole('navigation', { name: 'Changelog Archive' })
+    ).toBeVisible();
   });
 
   it('keeps JOV-IDs, Redis, and admission on Level 3', () => {

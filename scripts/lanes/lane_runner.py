@@ -1652,11 +1652,9 @@ def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
         prefix = ["fix-exhausted"] if record.get("count", 0) else []
         update_json(held_path(host), lambda held: held.update({str(pr["number"]): pr_events.held_record(
             pr["headRefOid"], [*prefix, *held.get(str(pr["number"]), {}).get("evidence", [])])}))
-        found = LANE_BRANCH.match(pr.get("headRefName") or "")
-        if found and found.group("lane") in pr_events.disabled_lanes(load_providers()):
-            pr_events.return_to_pool(THIS, linear, pr, "orphaned lane PR after its fix attempts ran out")
+        # A disabled implementation lane does not make its preserved work redundant.
+        # Exhaustion holds this source generation; semantic retirement is a separate disposition.
         try:
-            # After the pool return so the terminal disposition wins over a Todo re-admission.
             apply_terminal_disposition(linear, pr, record, reason)
         except Exception:
             pass  # Linear down: the PR label and held record still tombstone the head

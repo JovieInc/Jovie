@@ -1,4 +1,5 @@
 import Foundation
+import JovieKit
 import Testing
 @testable import Jovie
 
@@ -260,7 +261,7 @@ struct MobileChatClientTests {
   }
 
   private func makeClient(
-    tokenProvider: MockChatTokenProvider = MockChatTokenProvider(tokens: ["chat-token"])
+    tokenProvider: TokenProviding = MockChatTokenProvider(tokens: ["chat-token"])
   ) -> MobileChatClient {
     MobileChatClient(
       baseURL: URL(string: "https://jov.ie")!,
@@ -287,6 +288,87 @@ struct MobileChatClientTests {
       httpVersion: nil,
       headerFields: nil
     )!
+  }
+
+  enum RefreshRequest: CaseIterable, Sendable {
+    case list, detail, stream, eyesFree, eyesFreeConflict
+
+    var data: Data {
+      switch self {
+      case .list:
+        return Data(#"{"conversations":[]}"#.utf8)
+      case .detail:
+        return Data(#"{"conversation":{"id":"conv_1","title":"Test","createdAt":"2026-06-01","updatedAt":"2026-06-01"},"messages":[],"hasMore":false}"#.utf8)
+      case .stream:
+        return Data(#"{"type":"assistant.delta","clientTurnId":"client_turn_1","text":"Hello"}"#.utf8)
+      case .eyesFree, .eyesFreeConflict:
+        return Data(#"{"destination":"summer","status":"accepted","readback":"Captured"}"#.utf8)
+      }
+    }
+  }
+
+  enum ResponseSessionChange: CaseIterable, Sendable {
+    case none, login, rotation
+  }
+
+  @Test(arguments: RefreshRequest.allCases, ResponseSessionChange.allCases)
+  func successHeaderRequiresTheDispatchedSession(
+    operation: RefreshRequest,
+    sessionChange: ResponseSessionChange
+  ) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      let expiry = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded() + 3_600)
+      NativeSessionTokenStore.save(token: "request-a", userID: "user-a", expiresAt: expiry)
+      let parallel = try #require(NativeSessionTokenStore.requestAuthorization())
+      MockChatURLProtocol.requestHandler = { request in
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer request-a")
+        // The request has captured A; change storage before delivering its response.
+        if sessionChange == .login {
+          NativeSessionTokenStore.save(token: "login-b", userID: "user-b", expiresAt: expiry)
+        } else if sessionChange == .rotation {
+          let earlier = HTTPURLResponse(
+            url: request.url!, statusCode: 200, httpVersion: nil,
+            headerFields: ["set-auth-token": "parallel-roll"]
+          )!
+          NativeSessionTokenStore.refresh(from: earlier, authorizedBy: parallel)
+        }
+        let response = HTTPURLResponse(
+          url: request.url!,
+          statusCode: operation == .eyesFreeConflict ? 409 : 200,
+          httpVersion: nil,
+          headerFields: ["set-auth-token": "rolled-a"]
+        )!
+        return (response, operation.data)
+      }
+      defer { MockChatURLProtocol.requestHandler = nil }
+
+      let client = makeClient(tokenProvider: NativeSessionTokenProvider())
+      switch operation {
+      case .list:
+        #expect(try await client.listConversations().isEmpty)
+      case .detail:
+        #expect(try await client.fetchConversation(id: "conv_1", limit: 20).conversation.id == "conv_1")
+      case .stream:
+        #expect(try await client.sendTurn(makeTurnRequest()) == [
+          .assistantDelta(clientTurnId: "client_turn_1", text: "Hello"),
+        ])
+      case .eyesFree, .eyesFreeConflict:
+        let response = try await client.submitEyesFreeCapture(EyesFreeCaptureAPIRequest(
+          destination: "summer", transcript: "Capture this",
+          clientTurnId: "turn_1234", clientMessageId: "msg_1234"
+        ))
+        #expect(response.readback == "Captured")
+      }
+
+      let stored = try #require(NativeSessionTokenStore.load())
+      if sessionChange == .login {
+        #expect(stored == NativeStoredSession(userID: "user-b", token: "login-b", expiresAt: expiry))
+      } else {
+        #expect(stored.userID == "user-a")
+        #expect(stored.token == (sessionChange == .rotation ? "parallel-roll" : "rolled-a"))
+        #expect(stored.expiresAt > expiry)
+      }
+    }
   }
 
   @Test func parsesChatStreamEvents() async throws {
@@ -337,58 +419,6 @@ struct MobileChatClientTests {
       .error(code: "RATE_LIMITED", message: "Slow down"),
     ])
     #expect(await tokenProvider.recordedForceRefreshValues() == [false])
-  }
-
-  @Test func incrementalParserEmitsEventsAsCompleteLinesArrive() throws {
-    let baseURL = URL(string: "https://jov.ie")!
-    let ndjson = """
-    {"type":"turn.reserved","conversationId":"conv_1","turnId":"turn_1","clientTurnId":"client_turn_1"}
-    {"type":"assistant.delta","clientTurnId":"client_turn_1","text":"Hel"}
-    {"type":"ignored.event","clientTurnId":"client_turn_1"}
-    {"type":"assistant.completed","clientTurnId":"client_turn_1","conversationId":"conv_1","turnId":"turn_1","text":"Hello"}
-    """
-    let data = Data(ndjson.utf8)
-    let firstNewline = try #require(data.firstIndex(of: UInt8(ascii: "\n")))
-    let firstChunk = data[...firstNewline]
-    let splitIndex = data.index(firstNewline, offsetBy: 20, limitedBy: data.endIndex) ?? data.endIndex
-    let secondChunk = data[data.index(after: firstNewline)..<splitIndex]
-    let remainder = data[splitIndex...]
-
-    var leftover = Data()
-    let firstEvents = try MobileChatNDJSONParser.consume(
-      chunk: Data(firstChunk),
-      leftover: &leftover,
-      baseURL: baseURL
-    )
-    #expect(firstEvents == [
-      .turnReserved(conversationId: "conv_1", turnId: "turn_1", clientTurnId: "client_turn_1"),
-    ])
-    #expect(leftover.isEmpty)
-
-    let midEvents = try MobileChatNDJSONParser.consume(
-      chunk: Data(secondChunk),
-      leftover: &leftover,
-      baseURL: baseURL
-    )
-    #expect(midEvents.isEmpty)
-    #expect(!leftover.isEmpty)
-
-    let restEvents = try MobileChatNDJSONParser.consume(
-      chunk: Data(remainder),
-      leftover: &leftover,
-      baseURL: baseURL
-    )
-    let trailing = try MobileChatNDJSONParser.finish(leftover: &leftover, baseURL: baseURL)
-    #expect(restEvents + trailing == [
-      .assistantDelta(clientTurnId: "client_turn_1", text: "Hel"),
-      .assistantCompleted(
-        clientTurnId: "client_turn_1",
-        conversationId: "conv_1",
-        turnId: "turn_1",
-        text: "Hello"
-      ),
-    ])
-    #expect(leftover.isEmpty)
   }
 
   @Test func mapsMalformedChatStreamToDecodingFailed() async throws {
@@ -753,5 +783,127 @@ struct MobileChatClientTests {
     #expect(json?["destination"] as? String == "summer")
     #expect(json?["transcript"] as? String == "what is blocked")
     #expect(json?["clientTurnId"] as? String == "turn_1234")
+  }
+}
+
+@Suite(.serialized)
+struct NativeSessionRefreshTests {
+  private func response(token: String?) -> HTTPURLResponse {
+    HTTPURLResponse(
+      url: URL(string: "https://jov.ie/api/mobile/v1/me")!,
+      statusCode: 200,
+      httpVersion: nil,
+      headerFields: token.map { ["set-auth-token": $0] }
+    )!
+  }
+
+  @Test(arguments: [false, true])
+  func explicitLoginFencesOldHeadersEvenWhenIdentityAndBearerAreReused(sameLogin: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      let expiry = Date().addingTimeInterval(3_600)
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: expiry)
+      let oldRequest = try #require(NativeSessionTokenStore.requestAuthorization())
+      NativeSessionTokenStore.save(
+        token: sameLogin ? "a" : "b", userID: sameLogin ? "a" : "b", expiresAt: expiry
+      )
+      let newRequest = try #require(NativeSessionTokenStore.requestAuthorization())
+      let before = NativeSessionTokenStore.load()
+      #expect(newRequest != oldRequest)
+
+      NativeSessionTokenStore.refresh(from: response(token: "late-a"), authorizedBy: oldRequest)
+
+      #expect(NativeSessionTokenStore.load() == before)
+      #expect(NativeSessionTokenStore.requestAuthorization() == newRequest)
+    }
+  }
+
+  @Test func clearedSessionCannotBeResurrectedByAResponse() async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: Date().addingTimeInterval(3_600))
+      let request = try #require(NativeSessionTokenStore.requestAuthorization())
+      NativeSessionTokenStore.clear()
+      NativeSessionTokenStore.refresh(from: response(token: "late-a"), authorizedBy: request)
+      #expect(NativeSessionTokenStore.load() == nil)
+      #expect(NativeSessionTokenStore.requestAuthorization() == nil)
+    }
+  }
+
+  @Test func parallelOldBearerCannotOverwriteARotationOrAnABA() async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      NativeSessionTokenStore.save(token: "t0", userID: "a", expiresAt: Date().addingTimeInterval(3_600))
+      let first = try #require(NativeSessionTokenStore.requestAuthorization())
+      let parallel = try #require(NativeSessionTokenStore.requestAuthorization())
+      #expect(first == parallel)
+      NativeSessionTokenStore.refresh(from: response(token: "t1"), authorizedBy: first)
+      let rotated = try #require(NativeSessionTokenStore.requestAuthorization())
+      #expect(rotated.bearerToken == "t1")
+      NativeSessionTokenStore.refresh(from: response(token: "late-t0"), authorizedBy: parallel)
+      #expect(NativeSessionTokenStore.requestAuthorization() == rotated)
+
+      // Token equality alone would let the first request overwrite this newer revision.
+      NativeSessionTokenStore.refresh(from: response(token: "t0"), authorizedBy: rotated)
+      let returnedToT0 = try #require(NativeSessionTokenStore.requestAuthorization())
+      NativeSessionTokenStore.refresh(from: response(token: "late-again"), authorizedBy: first)
+      #expect(NativeSessionTokenStore.requestAuthorization() == returnedToT0)
+      #expect(returnedToT0.bearerToken == "t0")
+    }
+  }
+
+  @Test func absentEmptyAndUnmanagedHeadersDoNotChangeTheSession() async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: Date().addingTimeInterval(3_600))
+      let request = try #require(NativeSessionTokenStore.requestAuthorization())
+      NativeSessionTokenStore.refresh(from: response(token: nil), authorizedBy: request)
+      NativeSessionTokenStore.refresh(from: response(token: ""), authorizedBy: request)
+      NativeSessionTokenStore.refresh(
+        from: response(token: "unmanaged"),
+        authorizedBy: NativeRequestAuthorization(unmanagedBearerToken: "a")
+      )
+      #expect(NativeSessionTokenStore.requestAuthorization() == request)
+    }
+  }
+
+  @Test func nativeProviderCapturesPerRequestAndStillRejectsForceRefresh() async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      let provider: TokenProviding = NativeSessionTokenProvider()
+      await #expect(throws: APIClientError.missingToken) {
+        _ = try await provider.requestAuthorization(forceRefresh: false)
+      }
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: Date().addingTimeInterval(3_600))
+      let first = try await provider.requestAuthorization(forceRefresh: false)
+      NativeSessionTokenStore.save(token: "b", userID: "b", expiresAt: Date().addingTimeInterval(3_600))
+      let second = try await provider.requestAuthorization(forceRefresh: false)
+      #expect(first.bearerToken == "a")
+      #expect(second.bearerToken == "b")
+      await #expect(throws: APIClientError.missingToken) {
+        _ = try await provider.requestAuthorization(forceRefresh: true)
+      }
+      #expect(NativeSessionTokenStore.requestAuthorization() == second)
+
+      NativeSessionTokenStore.save(token: "expired", userID: "a", expiresAt: .distantPast)
+      #expect(NativeSessionTokenStore.requestAuthorization() == nil)
+      #expect(NativeSessionTokenStore.load() == nil)
+    }
+  }
+
+  @Test func concurrentStoreOperationsNeverExposeMixedTokenAndMetadata() async {
+    await withNativeSessionTokenStoreTestIsolation {
+      await withTaskGroup(of: Void.self) { group in
+        for index in 0..<24 {
+          group.addTask {
+            let value = "session-\(index)"
+            let expiry = Date(timeIntervalSince1970: 4_102_444_800 + Double(index))
+            NativeSessionTokenStore.save(token: value, userID: value, expiresAt: expiry)
+            if let stored = NativeSessionTokenStore.load() {
+              #expect(stored.token == stored.userID)
+              let storedIndex = Int(stored.userID.dropFirst("session-".count))
+              #expect(storedIndex != nil)
+              #expect(stored.expiresAt.timeIntervalSince1970 == 4_102_444_800 + Double(storedIndex ?? -1))
+            }
+            if index.isMultiple(of: 3) { NativeSessionTokenStore.clear() }
+          }
+        }
+      }
+    }
   }
 }

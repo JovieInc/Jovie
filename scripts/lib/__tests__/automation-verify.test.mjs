@@ -74,6 +74,124 @@ describe('affected-test selector inventory', () => {
       }).mode
     ).toBe('full');
   });
+  const certificationSource = 'apps/web/lib/ovie/certifications/normalize.ts';
+  const certificationTests = [
+    'apps/web/lib/ovie/certifications/normalize.test.ts',
+    'apps/web/lib/ovie/certifications/inventory.server.test.ts',
+    'apps/web/components/features/admin/certifications/CertificationDetailRail.test.tsx',
+  ];
+  const certificationComponentGuards = [
+    'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+    'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
+  ];
+  const certificationVirtualizerGuard =
+    'apps/web/tests/unit/virtualization/virtualizer-compiler-optout.test.ts';
+
+  it.each([
+    [certificationSource],
+    [certificationSource, certificationTests[0]],
+  ])(
+    'selects normalization and its inventory/rail consumers for %j',
+    (...files) => {
+      const plan = buildAffectedTestPlan(files);
+      expect(plan.mode).toBe('selected');
+      expect(plan.selectedTests).toEqual(certificationTests);
+      expect(buildSelectedTestCommands(plan, '2')).toEqual([
+        [
+          'pnpm',
+          [
+            '--filter',
+            '@jovie/web',
+            'exec',
+            'vitest',
+            'run',
+            ...certificationTests.map(file => file.replace(/^apps\/web\//, '')),
+            '--passWithNoTests',
+            '--maxWorkers',
+            '2',
+          ],
+        ],
+      ]);
+    }
+  );
+
+  it.each([
+    [certificationSource, certificationTests[2]],
+    [certificationSource, ...certificationTests],
+  ])('retains common component guards for %j', (...files) => {
+    const plan = buildAffectedTestPlan(files);
+    const expected = [...certificationTests, ...certificationComponentGuards];
+    expect(plan.mode).toBe('selected');
+    expect(plan.mandatoryTests).toEqual(expected);
+    expect(plan.selectedTests).toEqual(expected);
+    expect(buildSelectedTestCommands(plan, '2')[0][1]).toEqual([
+      '--filter',
+      '@jovie/web',
+      'exec',
+      'vitest',
+      'run',
+      ...expected.map(file => file.replace(/^apps\/web\//, '')),
+      '--passWithNoTests',
+      '--maxWorkers',
+      '2',
+    ]);
+  });
+
+  it.each([certificationSource, ...certificationTests])(
+    'retains the content-based virtualizer guard for %s',
+    virtualizedFile => {
+      const plan = buildAffectedTestPlan(
+        [certificationSource, virtualizedFile],
+        {
+          isFileAvailable: () => true,
+          readFile: file =>
+            file === virtualizedFile
+              ? 'const v = useVirtualizer({ count });'
+              : '',
+        }
+      );
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toContain(certificationVirtualizerGuard);
+      expect(plan.selectedTests).toContain(certificationVirtualizerGuard);
+    }
+  );
+
+  it.each([...certificationComponentGuards, certificationVirtualizerGuard])(
+    'fails closed when a triggered certification guard is missing: %s',
+    missing => {
+      const plan = buildAffectedTestPlan(
+        [certificationSource, certificationTests[2]],
+        {
+          isFileAvailable: file => file !== missing,
+          readFile: () => 'const v = useVirtualizer({ count });',
+        }
+      );
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toMatch(/proof.*unavailable/);
+    }
+  );
+
+  it.each([certificationSource, ...certificationTests])(
+    'keeps full verification when normalization proof is missing: %s',
+    missing => {
+      expect(
+        buildAffectedTestPlan([certificationSource], {
+          isFileAvailable: file => file !== missing,
+        }).mode
+      ).toBe('full');
+    }
+  );
+
+  it.each([
+    'apps/web/lib/unknown.ts',
+    'apps/web/components/atoms/Button.tsx',
+    'scripts/run-affected-tests.mjs',
+  ])('keeps mixed normalization changes fail-closed: %s', peer => {
+    expect(
+      buildAffectedTestPlan([certificationSource, certificationTests[0], peer])
+        .mode
+    ).toBe('full');
+  });
 
   it('maps the Decisions benchmark fixture to the complete capability lane', () => {
     const plan = buildAffectedTestPlan([
@@ -402,9 +520,10 @@ describe('structural control stage execution', () => {
     const diagnostics = [];
     const writes = [];
     const originalWrite = process.stdout.write;
-    process.stdout.write = chunk => {
-      writes.push(String(chunk));
-      return true;
+    process.stdout.write = (chunk, callback) => {
+      if (chunk.length > 0) writes.push(String(chunk));
+      if (callback) queueMicrotask(callback);
+      return false;
     };
     let status;
     try {
@@ -427,6 +546,71 @@ describe('structural control stage execution', () => {
     expect(writes[0]).toContain('first');
     expect(writes[0]).toContain('second');
     expect(diagnostics.at(-1)).toContain('status=3');
+  });
+
+  it('preserves a failing stage diagnostic tail when the CLI exits immediately', async () => {
+    const payloadBytes = 1024 * 1024;
+    const sentinel = '\nFAILURE_DIAGNOSTIC_END\n';
+    const completion = 'PARENT_DIAGNOSTIC_END\n';
+    const childCode = `
+      process.stdout.write('x'.repeat(${payloadBytes}) + ${JSON.stringify(sentinel)});
+      process.exitCode = 3;
+    `;
+    const wrapperCode = `
+      import { runCommandStatus } from ${JSON.stringify(
+        new URL('../../run-affected-tests.mjs', import.meta.url).href
+      )};
+      const status = await runCommandStatus(process.execPath, ['-e', ${JSON.stringify(childCode)}], {
+        bufferOutput: true,
+        logger: message => {
+          if (message.includes('complete')) process.stdout.write(${JSON.stringify(completion)});
+        },
+      });
+      process.exit(status);
+    `;
+    const wrapper = spawn(
+      process.execPath,
+      ['--input-type=module', '-e', wrapperCode],
+      { stdio: ['ignore', 'pipe', 'pipe'], timeout: 5000 }
+    );
+    const output = [];
+    const errors = [];
+    wrapper.stdout.on('data', chunk => output.push(chunk));
+    wrapper.stderr.on('data', chunk => errors.push(chunk));
+    const status = await new Promise((resolveExit, rejectExit) => {
+      wrapper.once('error', rejectExit);
+      wrapper.once('close', resolveExit);
+    });
+    const stdout = Buffer.concat(output);
+    expect(Buffer.concat(errors).toString()).toBe('');
+    expect(status).toBe(3);
+    expect(stdout.byteLength).toBe(
+      payloadBytes + Buffer.byteLength(sentinel + completion)
+    );
+    expect(stdout.toString().endsWith(sentinel + completion)).toBe(true);
+  });
+
+  it('cleans up signal handlers before a buffered output write rejects', async () => {
+    const interruptListeners = process.listenerCount('SIGINT');
+    const terminateListeners = process.listenerCount('SIGTERM');
+    const error = new Error('parent output unavailable');
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (_chunk, callback) => {
+      queueMicrotask(() => callback(error));
+      return false;
+    };
+    try {
+      await expect(
+        runCommandStatus(process.execPath, ['-e', 'process.exit(3)'], {
+          bufferOutput: true,
+          logger: () => {},
+        })
+      ).rejects.toBe(error);
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+    expect(process.listenerCount('SIGINT')).toBe(interruptListeners);
+    expect(process.listenerCount('SIGTERM')).toBe(terminateListeners);
   });
 });
 
