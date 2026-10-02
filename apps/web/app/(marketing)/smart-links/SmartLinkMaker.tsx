@@ -2,6 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { type FormEvent, useState } from 'react';
+import { linkFailureMessage } from '@/lib/smart-link-mvp/messages';
 
 interface MakerResult {
   readonly status?: string;
@@ -106,14 +107,14 @@ export function SmartLinkMaker() {
           ))}
         </ul>
       ) : null}
-      {result?.code === 'LIMIT_REACHED' && result.plansUrl ? (
+      {linkFailureMessage(result?.code) ? (
         <p className='mt-6 text-sm text-secondary-token'>
-          <a href={result.plansUrl}>See Jovie plans</a>
+          {linkFailureMessage(result?.code)}
         </p>
       ) : null}
-      {result?.status === 'not_found' ? (
-        <p className='mt-6 text-sm text-secondary-token'>
-          Jovie could not find that recording.
+      {result?.code === 'LIMIT_REACHED' && result.plansUrl ? (
+        <p className='mt-2 text-sm text-secondary-token'>
+          <a href={result.plansUrl}>See Jovie plans</a>
         </p>
       ) : null}
     </div>

@@ -17,6 +17,7 @@ import {
   publicClickLimiter,
 } from '@/lib/rate-limit';
 import { trackServerEvent } from '@/lib/server-analytics';
+import { jovieLinkMetadata } from '@/lib/smart-link-mvp/page-metadata';
 import {
   findSmartLinkByCode,
   recordSmartLinkClick,
@@ -40,11 +41,13 @@ export async function generateMetadata({
   if (!CODE_PATTERN.test(code)) return {};
   const link = await findSmartLinkByCode(code);
   if (!link) return {};
-  const title = [link.title, link.artistName].filter(Boolean).join(' — ');
-  return {
-    title: title || 'Jovie',
-    robots: { index: false, follow: false },
-  };
+  const pageUrl = new URL(`/l/${code}`, BASE_URL).toString();
+  return jovieLinkMetadata({
+    title: link.title,
+    artistName: link.artistName,
+    artworkUrl: link.artworkUrl,
+    pageUrl,
+  });
 }
 
 function orderedProviders(

@@ -42,6 +42,32 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+vi.mock('@/lib/smart-link-mvp/in-house', () => ({
+  resolveInHouseTrackUrl: vi.fn(async (url: string) => ({
+    title: 'Creep',
+    artist: 'Radiohead',
+    artworkUrl: null,
+    isrc: 'GBAYE9200070',
+    upc: null,
+    providerKey: 'spotify:70LcF31zb1H0PyJoS1Sx1r',
+    providers: [
+      { key: 'spotify', label: 'Spotify', url },
+      {
+        key: 'apple_music',
+        label: 'Apple Music',
+        url: 'https://music.apple.com/us/song/creep/1679849823',
+      },
+    ],
+  })),
+  resolveInHouseIsrc: vi.fn(async () => null),
+  searchInHouseTracks: vi.fn(async () => ({ status: 'ok', candidates: [] })),
+  searchInHouseArtists: vi.fn(async () => []),
+}));
+
+vi.mock('@/lib/discography/musicfetch', () => ({
+  isMusicfetchAvailable: () => false,
+}));
+
 vi.mock('@/lib/musicfetch/resilient-client', () => {
   class MusicfetchBudgetExceededError extends Error {
     override readonly name = 'MusicfetchBudgetExceededError';
@@ -129,7 +155,7 @@ describe('POST /api/links', () => {
     expect(state.musicfetchCalls).toBe(0);
   });
 
-  it('creates one link and returns the same link without a second MusicFetch call', async () => {
+  it('creates one link from the in-house resolver and does not call MusicFetch', async () => {
     const created = await post({ query: TRACK });
     expect(created.status).toBe(200);
     const first = (await created.json()) as {
@@ -142,13 +168,18 @@ describe('POST /api/links', () => {
     expect(first.shortUrl).toMatch(/^https?:\/\/.+\/l\/[a-z2-9]{8}$/);
     expect(first.claimed).toBe(false);
     expect(first.claimUrl).toBe(`${first.shortUrl}/claim`);
-    expect(state.musicfetchCalls).toBe(1);
+    expect(state.musicfetchCalls).toBe(0);
+    const body = first as { providers?: Array<{ key: string }> };
+    expect(body.providers?.map(provider => provider.key)).toEqual([
+      'spotify',
+      'apple_music',
+    ]);
 
     const again = await post({ query: TRACK });
     const second = (await again.json()) as { status: string; shortUrl: string };
     expect(second.status).toBe('existing');
     expect(second.shortUrl).toBe(first.shortUrl);
-    expect(state.musicfetchCalls).toBe(1);
+    expect(state.musicfetchCalls).toBe(0);
     expect((await GET()).status).toBe(405);
   });
 });

@@ -10,7 +10,7 @@ import {
 import { makeLinkInputSchema } from '@/lib/smart-link-mvp/contract';
 import { createSmartLink } from '@/lib/smart-link-mvp/create-link';
 import { resolveLinkActor } from '@/lib/smart-link-mvp/principal';
-import { createMusicfetchResolver } from '@/lib/smart-link-mvp/resolve';
+import { createSmartLinkResolver } from '@/lib/smart-link-mvp/resolve';
 import { createSmartLinkStore } from '@/lib/smart-link-mvp/store';
 
 export const runtime = 'nodejs';
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
     origin: new URL(BASE_URL).origin,
     actor: await resolveLinkActor(request),
     store: createSmartLinkStore(),
-    resolver: createMusicfetchResolver(),
+    resolver: createSmartLinkResolver(),
   });
   return json(result, statusFor(result.code, result.status));
 }

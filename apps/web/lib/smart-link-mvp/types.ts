@@ -73,9 +73,7 @@ export interface SmartLinkResolver {
   resolveTrackUrl(url: string): Promise<ResolveResult<ResolvedRelease>>;
   resolveIsrc(isrc: string): Promise<ResolveResult<ResolvedRelease>>;
   searchTracks(query: string): Promise<ResolveResult<readonly LinkCandidate[]>>;
-  resolveArtist(
-    query: string
-  ): Promise<
+  resolveArtist(query: string): Promise<
     ResolveResult<
       | { readonly status: 'resolved'; readonly release: ResolvedRelease }
       | {

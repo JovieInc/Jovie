@@ -10,7 +10,7 @@ import {
 } from './contract';
 import { createSmartLink } from './create-link';
 import { resolveLinkActor } from './principal';
-import { createMusicfetchResolver } from './resolve';
+import { createSmartLinkResolver } from './resolve';
 import { createSmartLinkStore } from './store';
 
 function toolResult(result: LinkResult): CallToolResult {
@@ -38,7 +38,7 @@ export async function callMakeLink(
     origin: new URL(BASE_URL).origin,
     actor,
     store: createSmartLinkStore(),
-    resolver: createMusicfetchResolver(),
+    resolver: createSmartLinkResolver(),
   });
   return toolResult(linkResultSchema.parse(result));
 }

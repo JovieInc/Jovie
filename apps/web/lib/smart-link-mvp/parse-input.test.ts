@@ -30,6 +30,14 @@ describe('parseLinkQuery', () => {
     expect(providerKeyForUrl(SPOTIFY_ARTIST)).toBe(
       'artist:spotify:4Z8W4fKeB5YxbusRsdQVPb'
     );
+    expect(
+      providerKeyForUrl(
+        'https://music.apple.com/us/album/motion-sickness/1256607808?i=1256607810&uo=4'
+      )
+    ).toBe('apple_music:1256607810');
+    expect(providerKeyForUrl('https://www.deezer.com/track/384037361')).toBe(
+      'deezer:384037361'
+    );
   });
 
   it('treats a bare name as an artist and rejects a mismatched kind', () => {

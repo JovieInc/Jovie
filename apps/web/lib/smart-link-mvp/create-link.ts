@@ -5,6 +5,7 @@ import {
   type LinkCandidate,
   type LinkResult,
 } from './contract';
+import { sameRecording, splitArtistTitle } from './match';
 import { parseLinkQuery, providerKeyForUrl } from './parse-input';
 import type {
   CanonicalRelease,
@@ -256,10 +257,19 @@ export async function createSmartLink(
   const found = await input.resolver.searchTracks(parsed.query);
   if (!found.ok) return failure(found.code, input.origin);
   if (found.value.length === 0) return failure('NOT_FOUND', input.origin);
-  if (found.value.length > 1 || !found.value[0]?.url) {
+  const only = found.value[0];
+  const split = splitArtistTitle(parsed.query);
+  const exactMatch =
+    found.value.length === 1 &&
+    Boolean(only?.url) &&
+    split !== null &&
+    sameRecording(split, {
+      artist: only?.artist ?? '',
+      title: only?.name ?? '',
+    });
+  if (!exactMatch || !only?.url) {
     return choices(found.value);
   }
-  const only = found.value[0];
   const resolved = await input.resolver.resolveTrackUrl(only.url!);
   if (!resolved.ok) return failure(resolved.code, input.origin);
   return persist(
