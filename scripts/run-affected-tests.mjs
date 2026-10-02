@@ -2263,6 +2263,16 @@ export async function runCommandStatus(
   logger(
     `[affected-tests] complete ${label} status=${status} elapsedMs=${Date.now() - startedAt} pid=${child.pid ?? 'unknown'} command=${commandText}`
   );
+  if (bufferOutput) {
+    // Queue a barrier after both the stage output and completion log. The CLI
+    // can exit immediately, so its parent pipe must finish writing first.
+    await new Promise((resolveWrite, rejectWrite) => {
+      process.stdout.write('', error => {
+        if (error) rejectWrite(error);
+        else resolveWrite();
+      });
+    });
+  }
   return status;
 }
 
