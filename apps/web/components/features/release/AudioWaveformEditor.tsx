@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, Pause, Play } from 'lucide-react';
+import { Loader2, Pause, Play, RotateCcw } from 'lucide-react';
 import {
   type PointerEvent as ReactPointerEvent,
   useCallback,
@@ -15,7 +15,11 @@ import {
   resumePlaybackAfterInterruption,
   useTrackAudioPlayer,
 } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
-import { decodeWaveformPeaks } from '@/lib/audio/decode-waveform-peaks';
+import {
+  type AudioPreviewFailureReason,
+  decodeWaveformPeaks,
+  isAudioPreviewError,
+} from '@/lib/audio/decode-waveform-peaks';
 import {
   type AudioSnippet,
   createDefaultSnippet,
@@ -24,8 +28,40 @@ import {
 } from '@/lib/audio/snippet';
 import { formatTime } from '@/lib/format-time';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/utils/logger';
 
 type TrimHandle = 'start' | 'end';
+
+const PREVIEW_FAILURE_COPY: Record<
+  AudioPreviewFailureReason,
+  { readonly title: string; readonly hint: string; readonly retryable: boolean }
+> = {
+  network: {
+    title: 'Audio preview unavailable',
+    hint: 'The file is still attached — the preview could not be loaded. Check your connection and try again.',
+    retryable: true,
+  },
+  unavailable: {
+    title: 'Audio preview unavailable',
+    hint: 'The file is still attached — the preview could not be loaded.',
+    retryable: true,
+  },
+  permission: {
+    title: 'Preview not permitted',
+    hint: 'Your session does not have access to this file.',
+    retryable: true,
+  },
+  removed: {
+    title: 'File no longer available',
+    hint: 'The source file was removed. Upload a new file to restore the preview.',
+    retryable: false,
+  },
+  unsupported: {
+    title: 'Preview not supported',
+    hint: 'This file cannot be previewed here.',
+    retryable: false,
+  },
+};
 
 const WAVEFORM_WIDTH = 1000;
 const WAVEFORM_HEIGHT = 56;
@@ -88,7 +124,9 @@ export function AudioWaveformEditor({
   const [peaks, setPeaks] = useState<readonly number[]>([]);
   const [resolvedDurationMs, setResolvedDurationMs] = useState(durationMs ?? 0);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [previewError, setPreviewError] =
+    useState<AudioPreviewFailureReason | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [currentTimeMs, setCurrentTimeMs] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [snippet, setSnippet] = useState<AudioSnippet | null>(
@@ -113,7 +151,7 @@ export function AudioWaveformEditor({
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
-    setLoadError(null);
+    setPreviewError(null);
 
     decodeWaveformPeaks(audioUrl)
       .then(result => {
@@ -127,11 +165,12 @@ export function AudioWaveformEditor({
       })
       .catch(error => {
         if (cancelled) return;
-        setLoadError(
-          error instanceof Error
-            ? error.message
-            : 'Unable to render waveform preview'
-        );
+        const reason = isAudioPreviewError(error)
+          ? error.reason
+          : 'unavailable';
+        const status = isAudioPreviewError(error) ? error.status : undefined;
+        logger.warn('audio preview failed', { reason, status });
+        setPreviewError(reason);
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
@@ -140,7 +179,7 @@ export function AudioWaveformEditor({
     return () => {
       cancelled = true;
     };
-  }, [audioUrl, durationMs]);
+  }, [audioUrl, durationMs, reloadKey]);
 
   useEffect(() => {
     const audio = new Audio(audioUrl);
@@ -189,7 +228,7 @@ export function AudioWaveformEditor({
       audioRef.current = null;
       releaseGlobalFocus();
     };
-  }, [audioUrl, snippet]);
+  }, [audioUrl, snippet, reloadKey]);
 
   useEffect(() => {
     if (!globalPlayback.isPlaying) return;
@@ -319,11 +358,37 @@ export function AudioWaveformEditor({
     }
   }, [activeDurationMs, onSaveSnippet, snippet]);
 
-  if (loadError) {
+  const handleRetryPreview = useCallback(() => {
+    setPreviewError(null);
+    setIsLoading(true);
+    setReloadKey(key => key + 1);
+  }, []);
+
+  if (previewError) {
+    const copy = PREVIEW_FAILURE_COPY[previewError];
     return (
-      <p className='text-xs text-error' data-testid='audio-waveform-error'>
-        {loadError}
-      </p>
+      <div
+        className='rounded-lg border border-subtle bg-surface-0 px-3 py-3'
+        data-testid='audio-preview-unavailable'
+        data-failure-reason={previewError}
+      >
+        <p className='text-xs font-medium text-primary-token'>{copy.title}</p>
+        <p className='mt-0.5 text-2xs leading-4 text-tertiary-token'>
+          {copy.hint}
+        </p>
+        {copy.retryable ? (
+          <button
+            type='button'
+            onClick={handleRetryPreview}
+            disabled={disabled}
+            className='focus-ring-themed mt-2 inline-flex h-7 items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-2.5 text-2xs font-medium text-primary-token transition-colors duration-subtle hover:bg-surface-2 disabled:opacity-60'
+            data-testid='audio-preview-retry'
+          >
+            <RotateCcw className='h-3 w-3' aria-hidden='true' />
+            Retry preview
+          </button>
+        ) : null}
+      </div>
     );
   }
 
