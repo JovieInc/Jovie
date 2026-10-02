@@ -984,7 +984,10 @@ jobs:
           test "$(git rev-parse "$BASE_HEAD^{commit}")" = "$BASE_HEAD"
           git show "$BASE_HEAD:scripts/run-affected-tests.mjs" \
             > "$RUNNER_TEMP/trusted-run-affected-tests.mjs"
+          git show "$BASE_HEAD:scripts/lib/blog-content-ci.mjs" \
+            > "$RUNNER_TEMP/trusted-blog-content-ci.mjs"
           chmod 0444 "$RUNNER_TEMP/trusted-run-affected-tests.mjs"
+          chmod 0444 "$RUNNER_TEMP/trusted-blog-content-ci.mjs"
           {
             echo 'candidate=true'
             echo "candidate_receipt_sha=$receipt_sha"
@@ -1017,6 +1020,7 @@ jobs:
             --env HOME=/tmp/jovie-container-home \
             --volume "$GITHUB_WORKSPACE:/workspace:rw" \
             --volume "$RUNNER_TEMP/trusted-run-affected-tests.mjs:/workspace/scripts/run-affected-tests.mjs:ro" \
+            --volume "$RUNNER_TEMP/trusted-blog-content-ci.mjs:/workspace/scripts/lib/blog-content-ci.mjs:ro" \
             --workdir /workspace \
             'node:24.21.0-bookworm@sha256:6dac556d980b7f0e5498d08f08cee0ca67798b4ad6c23964a9214920e67758d0' \
             bash -lc 'corepack enable && corepack prepare pnpm@9.15.9 --activate && pnpm install --frozen-lockfile && node scripts/run-affected-tests.mjs --base "$SOURCE_HEAD" --max-workers 2'

@@ -27,7 +27,8 @@ nothing. Add `--file` with `LINEAR_API_KEY` to file issues.
 | --- | --- | --- |
 | `invariant-evidence-unwired` | A canon invariant has no enforcing test, or cites a test that no workflow, package script, ci-fast lane, or Vitest include glob runs | 0.85 |
 | `postmortem-class-unguarded` | A post-mortem failure class that no invariant, CI incident ledger entry, or script names. Classes with open `postmortem-action` issues are skipped while those issues are open | 0.8 when recurring or when every action closed; otherwise 0.55 |
-| `escaped-defect-untested` | A `bug`, `dogfood`, `sentry`, `intake`, or `escaped-defect` issue from the last 30 days names a source file that has no test | 0.8 (0.85 if the fix already shipped) |
+| `escaped-defect-untested` | A `bug`, `dogfood`, `sentry`, `intake`, or `escaped-defect` issue updated in the last 30 days names a source file that has no test | 0.8 (0.85 if the fix already shipped) |
+| `escaped-defect-closure-unverified` | A completed `escaped-defect` issue lacks a valid product-repair + detector-repair [closure receipt](ESCAPED_DEFECT_CLOSURE.md) | 1.0 |
 | `component-state-untested` | A UI component changed in the window with neither a story nor a test | 0.78 for shared or 3+ commits; 0.6 for 2 commits; 1 commit is below the floor |
 | `changed-code-untested` | An API route or `lib` module changed in the window with no test | 0.8 for routes or 2+ commits; 1 commit is below the floor |
 | `coverage-evidence-stale` | `docs/TEST_COVERAGE_HEATMAP.md` is older than 30 days, or a module lost 3 or more points of line coverage (`--coverage-summary` plus `--coverage-baseline`) | 0.85 / 0.8 |
@@ -41,6 +42,10 @@ nothing. Add `--file` with `LINEAR_API_KEY` to file issues.
 - a test on a file that imports the module (one hop)
 
 Proposals below 0.5 confidence are dropped as noise.
+
+An escaped-defect closure proposal names and links the originating defect. Its
+suggested action is to reopen and complete that issue, never to use the quality
+gap proposal as a parallel product-repair record.
 
 ## Routing
 

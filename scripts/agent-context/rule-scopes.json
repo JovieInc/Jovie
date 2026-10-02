@@ -68,7 +68,7 @@
       "scripts/lanes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "61546096d949fab333264a7dc4a34a40edfe5d61502f01e85f6910398b1ba9d9"
+    "bodySha256": "c095a5c80b805429d92dfb98fa96e3b66bce96d552b5d4fa980d61d6b3067aea"
   },
   {
     "file": ".claude/rules/macos.md",
@@ -112,7 +112,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "5419d37583492f3865eba90376ce096fd22d4d9ff2b81374e7143dc157b6f373"
+    "bodySha256": "34343c6f2353f4e812b4f65ef23c68bdd1bb93ef40ec6d3f1c08d9c76efac937"
   },
   {
     "file": ".claude/rules/security.md",

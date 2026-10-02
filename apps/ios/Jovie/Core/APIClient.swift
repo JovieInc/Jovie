@@ -176,11 +176,43 @@ struct APIClient: APIClientProtocol, Sendable {
     )
   }
 
+  /// Push lifecycle work keeps the authorization captured by its owner and
+  /// never retries with credentials from a later login.
+  func registerPushDevice(
+    token: String,
+    environment: IOSPushEnvironment,
+    timezone: String,
+    authorization: NativeRequestAuthorization
+  ) async throws {
+    try await sendPushDeviceRequest(
+      method: "PUT",
+      body: RegisterPushDeviceRequest(
+        token: token,
+        environment: environment,
+        timezone: timezone
+      ),
+      forceRefresh: false,
+      pinnedAuthorization: authorization
+    )
+  }
+
   func unregisterPushDevice(token: String) async throws {
     try await sendPushDeviceRequest(
       method: "DELETE",
       body: UnregisterPushDeviceRequest(token: token),
       forceRefresh: false
+    )
+  }
+
+  func unregisterPushDevice(
+    token: String,
+    authorization: NativeRequestAuthorization
+  ) async throws {
+    try await sendPushDeviceRequest(
+      method: "DELETE",
+      body: UnregisterPushDeviceRequest(token: token),
+      forceRefresh: false,
+      pinnedAuthorization: authorization
     )
   }
 
@@ -221,11 +253,17 @@ struct APIClient: APIClientProtocol, Sendable {
     method: String,
     body: Body,
     forceRefresh: Bool,
-    tokenOverride: String? = nil
+    tokenOverride: String? = nil,
+    pinnedAuthorization: NativeRequestAuthorization? = nil
   ) async throws {
-    let authorization = try await resolveAuthorization(
-      forceRefresh: forceRefresh, tokenOverride: tokenOverride
-    )
+    let authorization: NativeRequestAuthorization
+    if let pinnedAuthorization {
+      authorization = pinnedAuthorization
+    } else {
+      authorization = try await resolveAuthorization(
+        forceRefresh: forceRefresh, tokenOverride: tokenOverride
+      )
+    }
     let token = authorization.bearerToken
     var request = URLRequest(url: baseURL.appending(path: "/api/mobile/v1/push-devices"))
     request.httpMethod = method
@@ -246,6 +284,10 @@ struct APIClient: APIClientProtocol, Sendable {
 
     guard let httpResponse = response as? HTTPURLResponse else {
       throw APIClientError.invalidResponse
+    }
+    if httpResponse.statusCode == 401, pinnedAuthorization != nil {
+      // Best-effort push cleanup cannot invalidate the current app session.
+      throw APIClientError.requestFailed(statusCode: 401)
     }
     if httpResponse.statusCode == 401, !forceRefresh {
       let refreshed = try await retryTokenOrTerminal(after: token)
