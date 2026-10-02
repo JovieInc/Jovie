@@ -364,6 +364,70 @@ describe('ChatPageClient', () => {
     );
   });
 
+  it('preserves the existing title when header actions rerender', () => {
+    const { rerender } = fastRender(
+      <DashboardDataProvider value={baseDashboardData}>
+        <ChatPageClient
+          conversationId='conv-123'
+          initialConversationTitle='Release Planning Conversation'
+        />
+      </DashboardDataProvider>
+    );
+
+    rerender(
+      <DashboardDataProvider value={baseDashboardData}>
+        <ChatPageClient
+          conversationId='conv-123'
+          initialConversationTitle='Release Planning Conversation'
+        />
+      </DashboardDataProvider>
+    );
+
+    expect(mockSetHeaderBadge).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        props: expect.objectContaining({
+          title: 'Release Planning Conversation',
+        }),
+      })
+    );
+    expect(mockSetHeaderActions.mock.calls.at(-1)?.[0]).not.toBeNull();
+  });
+
+  it('updates the title for another conversation and clears it for a new chat', () => {
+    const { rerender } = fastRender(
+      <DashboardDataProvider value={baseDashboardData}>
+        <ChatPageClient
+          conversationId='conv-123'
+          initialConversationTitle='Release Planning Conversation'
+        />
+      </DashboardDataProvider>
+    );
+
+    rerender(
+      <DashboardDataProvider value={baseDashboardData}>
+        <ChatPageClient
+          conversationId='conv-456'
+          initialConversationTitle='Artwork Conversation'
+        />
+      </DashboardDataProvider>
+    );
+
+    expect(mockSetHeaderBadge).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        props: expect.objectContaining({ title: 'Artwork Conversation' }),
+      })
+    );
+
+    rerender(
+      <DashboardDataProvider value={baseDashboardData}>
+        <ChatPageClient />
+      </DashboardDataProvider>
+    );
+
+    expect(mockSetHeaderBadge).toHaveBeenLastCalledWith(null);
+    expect(mockSetHeaderActions).toHaveBeenLastCalledWith(null);
+  });
+
   it('sets header badge when title changes to non-null', async () => {
     renderChatPage('conv-123');
     expect(capturedOnTitleChange).toBeDefined();
