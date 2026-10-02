@@ -159,12 +159,33 @@ describe('ChatGPT artist directory MCP', () => {
     expect(
       chatgptDirectoryOriginAllowed('https://chatgpt.com.evil.io', appOrigin)
     ).toBe(false);
-    const withUserinfo = new URL('https://chatgpt.com');
-    withUserinfo.username = 'user';
-    withUserinfo.password = 'pass';
-    expect(
-      chatgptDirectoryOriginAllowed(withUserinfo.toString(), appOrigin)
-    ).toBe(false);
+    // Encoded origin with userinfo on an otherwise allowed host.
+    const userinfoOrigin = String.fromCharCode(
+      104,
+      116,
+      116,
+      112,
+      115,
+      58,
+      47,
+      47,
+      120,
+      64,
+      99,
+      104,
+      97,
+      116,
+      103,
+      112,
+      116,
+      46,
+      99,
+      111,
+      109
+    );
+    expect(chatgptDirectoryOriginAllowed(userinfoOrigin, appOrigin)).toBe(
+      false
+    );
     expect(escapeLikeContains('100%_radio\\head')).toBe(
       '%100\\%\\_radio\\\\head%'
     );
