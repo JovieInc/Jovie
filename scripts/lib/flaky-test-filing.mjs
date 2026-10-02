@@ -8,22 +8,21 @@ export function githubIssueFilingRetired(workflowSource) {
 }
 
 export function planFlakyTestFiling({
-  workflowSource,
   ratchetFailed,
   flakyCount = '0',
   runUrl = '',
 }) {
-  if (ratchetFailed !== true || !githubIssueFilingRetired(workflowSource))
-    return null;
+  if (ratchetFailed !== true) return null;
   const fingerprint = FLAKY_FILING_FINGERPRINT;
   return {
     fingerprint,
-    title: `Flaky-test ratchet is red while GitHub issue filing is retired (${fingerprint})`,
+    title: `Flaky-test ratchet is red (${fingerprint})`,
     description: [
       'Workflow test-flakiness-report.yml. Current issue JOV-6507.',
       runUrl ? `Run: ${runUrl}` : null,
-      `Ratchet failed with ${flakyCount} flaky test(s). GitHub issue filing stays retired.`,
-      'Reopens while the ratchet is red and GitHub filing stays off.',
+      `Ratchet failed with ${flakyCount} flaky test(s).`,
+      'Filed through the remediation label. GitHub issue steps stay retired.',
+      'Reopens while the ratchet is red.',
       `Fingerprint: \`${fingerprint}\``,
     ]
       .filter(Boolean)

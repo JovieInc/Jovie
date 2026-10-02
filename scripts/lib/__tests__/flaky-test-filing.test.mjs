@@ -17,9 +17,9 @@ describe('flaky-test filing remediation', () => {
     expect(retired).not.toContain('issues: write');
   });
 
-  it('files when the ratchet fails and GitHub filing is still off', () => {
+  it('files a red ratchet through the remediation label', () => {
+    expect(planFlakyTestFiling({ ratchetFailed: false })).toBeNull();
     const plan = planFlakyTestFiling({
-      workflowSource: retired,
       ratchetFailed: true,
       flakyCount: '4',
       runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
@@ -29,23 +29,5 @@ describe('flaky-test filing remediation', () => {
     expect(plan.reopenTerminal).toBe(true);
     expect(plan.createStateName).toBe('Todo');
     expect(plan.description).toContain('JOV-6507');
-  });
-
-  it('does nothing when the ratchet passes or GitHub filing is re-enabled', () => {
-    expect(
-      planFlakyTestFiling({
-        workflowSource: retired,
-        ratchetFailed: false,
-      })
-    ).toBeNull();
-    expect(
-      planFlakyTestFiling({
-        workflowSource: retired.replaceAll(
-          '__retired_linear_only__',
-          'workflow_run'
-        ),
-        ratchetFailed: true,
-      })
-    ).toBeNull();
   });
 });
