@@ -1,9 +1,9 @@
 import type { VirtualItem } from '@tanstack/react-virtual';
-import { render, screen } from '@testing-library/react';
+import { render, renderHook, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { VirtualizedTableBody } from '@/components/organisms/table/organisms/VirtualizedTableBody';
-import type { Row } from '@/lib/tanstack-table';
+import { getCoreRowModel, type Row, useReactTable } from '@/lib/tanstack-table';
 
 const tableContextMenuSpy = vi.fn();
 
@@ -29,12 +29,17 @@ vi.mock('@/components/organisms/table/molecules/TableContextMenu', () => ({
 
 type TestRow = { id: string; name: string };
 
-const createRow = (id: string, name: string): Row<TestRow> =>
-  ({
-    id,
-    original: { id, name },
-    getVisibleCells: () => [],
-  }) as Row<TestRow>;
+const createRow = (id: string, name: string): Row<TestRow> => {
+  const { result } = renderHook(() =>
+    useReactTable<TestRow>({
+      data: [{ id, name }],
+      columns: [],
+      getRowId: row => row.id,
+      getCoreRowModel: getCoreRowModel(),
+    })
+  );
+  return result.current.getRowModel().rows[0]!;
+};
 
 const baseProps = {
   shouldEnableKeyboardNav: false,
