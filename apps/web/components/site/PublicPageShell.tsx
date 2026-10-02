@@ -2,6 +2,7 @@ import type { LogoVariant } from '@/components/atoms/Logo';
 import { SkipToContent } from '@/components/atoms/SkipToContent';
 import type { MarketingHeaderBrand } from '@/data/marketing/headerBrand';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { cn } from '@/lib/utils';
 import { MarketingFooter } from './MarketingFooter';
 import {
@@ -85,7 +86,11 @@ export function PublicPageShell({
         <MarketingPageContractMarkers />
         {children}
       </main>
-      <MarketingFooter className={footerClassName} variant={footerVariant} />
+      <MarketingFooter
+        className={footerClassName}
+        genericCreatorNav={isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')}
+        variant={footerVariant}
+      />
     </div>
   );
 }

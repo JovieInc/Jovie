@@ -21,6 +21,13 @@ export const CODE_FLAGS = {
   // flag flips on only when Tim certifies the redo output. Env override:
   // FEATURE_YOUTUBE_THUMBNAILS_PASTE_GENERATE=true
   YOUTUBE_THUMBNAILS_PASTE_GENERATE: false,
+  // JOV-7580 / JOV-7579: generic creator marketing labels and the
+  // /smart-links hero. Default off, so the Music footer and the current
+  // smart-link headline stay. FEATURE_MARKETING_GENERIC_CREATOR_NAV=true
+  // uses audience wording and frames a release as the worked example.
+  // Does not certify smart links beyond music. Static pages pick this up
+  // at build time.
+  MARKETING_GENERIC_CREATOR_NAV: false,
   // Better Auth dynamic client registration. Default off: Better Auth
   // discovery omits registration_endpoint and /oauth2/register stays closed.
   // FEATURE_OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION=true opens unauthenticated
