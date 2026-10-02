@@ -186,7 +186,7 @@ async function InvestorPipelineTable() {
         <InvestorTableBody>
           {links.map(link => (
             <InvestorTableRow key={link.id}>
-              <InvestorTableCell className='w-investor-label'>
+              <InvestorTableCell className='w-investor-label' multiline>
                 <div className='flex min-w-0 flex-col gap-0.5'>
                   <span className='truncate font-semibold text-primary-token'>
                     {link.label}

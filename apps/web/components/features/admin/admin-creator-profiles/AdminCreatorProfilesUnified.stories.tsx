@@ -1,5 +1,7 @@
 import '@/styles/system-b-app.css';
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 import { AdminCreatorProfilesUnified } from './AdminCreatorProfilesUnified';
@@ -181,6 +183,31 @@ const meta: Meta<typeof AdminCreatorProfilesUnified> = {
 export default meta;
 
 type Story = StoryObj<typeof meta>;
+
+function SearchNavigationFixture() {
+  const [searched, setSearched] = useState(true);
+  const rows = searched ? mockProfiles.slice(0, 1) : mockProfiles;
+  return (
+    <>
+      <Button onClick={() => setSearched(value => !value)}>
+        {searched ? 'Clear Search' : 'Search First Creator'}
+      </Button>
+      <AdminCreatorProfilesUnified
+        profiles={rows}
+        page={1}
+        pageSize={20}
+        total={rows.length}
+        search={searched ? mockProfiles[0].username : ''}
+        sort='created_desc'
+      />
+    </>
+  );
+}
+
+/** Clearing and restoring a server search must preserve separate cached rows. */
+export const SearchNavigation: Story = {
+  render: () => <SearchNavigationFixture />,
+};
 
 /**
  * Default light mode with 15 creator profiles.

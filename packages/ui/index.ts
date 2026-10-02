@@ -250,6 +250,7 @@ export { NativeSelect } from './atoms/native-select';
 export {
   Popover,
   PopoverAnchor,
+  PopoverClose,
   PopoverContent,
   PopoverTrigger,
 } from './atoms/popover';

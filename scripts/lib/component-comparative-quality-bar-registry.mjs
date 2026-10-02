@@ -82,9 +82,9 @@ export const ATOM_MOLECULE_INVENTORY_RATCHET = deepFreeze([
   },
   {
     root: 'apps/web/components/**/molecules',
-    total: 167,
+    total: 169,
     sourceSetSha256:
-      '2cbf789f33bf282b941ee831cdd51e4979966865c980483fca46deaaf25f946b',
+      'b180442ef279dab3ecbfe9d39d2f7d1d6139dcd8c3122040354dab61ec407dda',
   },
   {
     root: 'registered-out-of-taxonomy/atoms',
