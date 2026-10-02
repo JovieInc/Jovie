@@ -266,7 +266,7 @@
     "@tanstack/react-table": "^9.2.4",
     "@tanstack/react-virtual": "^3.14.13",
     "@tiptap/core": "3.31.3",
-    "@tiptap/extension-placeholder": "3.31.3",
+    "@tiptap/extension-placeholder": "3.31.4",
     "@tiptap/pm": "3.31.3",
     "@tiptap/react": "3.31.3",
     "@tiptap/starter-kit": "3.31.3",
