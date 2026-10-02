@@ -1,10 +1,13 @@
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  copyFileSync,
   existsSync,
   globSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -314,6 +317,30 @@ describe('Vercel function config', () => {
     }
     for (const excludedPath of excludedPaths) {
       expect(isIgnored(excludedPath), excludedPath).toBe(true);
+    }
+  });
+
+  it('packages public blog assets needed by request-time catalog validation', async () => {
+    const { loadBlogCatalog } = await import('@/lib/blog/getBlogPosts');
+    const runtimeRoot = mkdtempSync(resolve(tmpdir(), 'jovie-blog-trace-'));
+    try {
+      const includes =
+        loadNextConfigForTracingTest().outputFileTracingIncludes?.['/*'] ?? [];
+      const tracedPublicFiles = includes
+        .flatMap(pattern => globSync(pattern, { cwd: appWebRoot }))
+        .filter(file => file.startsWith('public/') && !file.endsWith('/'));
+      for (const file of tracedPublicFiles) {
+        const destination = resolve(runtimeRoot, file);
+        mkdirSync(dirname(destination), { recursive: true });
+        copyFileSync(resolve(appWebRoot, file), destination);
+      }
+      const catalog = await loadBlogCatalog({
+        directory: resolve(appWebRoot, 'content/blog'),
+        publicDirectory: resolve(runtimeRoot, 'public'),
+      });
+      expect(catalog.publicPosts.length).toBeGreaterThan(0);
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
     }
   });
 

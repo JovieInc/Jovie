@@ -35,7 +35,7 @@
     "test:desktop-permissions": "vitest run --config vitest.config.mts scripts/desktop-permissions.test.ts",
     "test:desktop-tray-png": "vitest run --config vitest.config.mts scripts/desktop-tray-png.test.ts",
     "test:desktop-tray-menu": "vitest run --config vitest.config.mts scripts/desktop-tray-menu.test.ts",
-    "test:navigation": "vitest run --config vitest.config.mts scripts/navigation.test.ts",
+    "test:navigation": "vitest run --config vitest.config.mts scripts/navigation.test.ts scripts/navigation-coordinator.test.ts scripts/client-navigation-bridge.test.ts",
     "test:system-b-tokens": "vitest run --config vitest.config.mts scripts/system-b-tokens.test.ts",
     "test:summer-runtime-bridge": "vitest run --config vitest.config.mts scripts/summer-runtime-bridge.test.ts",
     "test:voice-session": "vitest run --config vitest.config.mts scripts/voice-session.test.ts",

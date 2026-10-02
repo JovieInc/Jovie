@@ -52,6 +52,37 @@ const ENTRY_MEDIA_ICONS: Record<
 
 export interface CustomerChangelogArchiveProps {
   readonly months: readonly CustomerChangelogMonthGroup[];
+  readonly technicalReleases?: readonly { version: string; date: string }[];
+}
+
+function TechnicalReleaseNav({
+  releases,
+}: {
+  readonly releases: readonly { version: string; date: string }[];
+}) {
+  if (!releases.length) return null;
+  return (
+    <nav aria-label='Technical Release Log' className='changelog-archive-nav'>
+      <p className='text-sm text-secondary-token'>Engineering history</p>
+      <ul className='changelog-archive-nav__links'>
+        {releases.map(release => (
+          <li key={release.version}>
+            <Link
+              href={versionHref(release.version)}
+              className='changelog-archive-nav__link'
+            >
+              <span className='changelog-archive-nav__link-date'>
+                {formatCustomerChangelogDate(release.date)}
+              </span>
+              <span className='changelog-archive-nav__link-title'>
+                {release.version}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
 }
 
 function versionHref(version: string): string {
@@ -95,7 +126,10 @@ function EntryRow({
     entry.date,
     entry.technicalVersion
   );
-  const hasLevel2 = Boolean(entry.explanation) || entry.supporting.length > 0;
+  const hasLevel2 =
+    Boolean(entry.explanation) ||
+    entry.supporting.length > 0 ||
+    Boolean(entry.prerequisites?.length);
   const hasLevel3 = entry.technical.length > 0;
 
   return (
@@ -113,12 +147,25 @@ function EntryRow({
             {/* ui-casing-allow: tiny taxonomy caption, not IA heading */}
             {CUSTOMER_CHANGELOG_CATEGORY_LABELS[entry.category]}
           </p>
+          {entry.availability === 'preview' ||
+          entry.availability === 'limited' ? (
+            <p className='text-sm text-secondary-token'>
+              {entry.availability === 'preview'
+                ? 'Preview'
+                : 'Limited availability'}
+            </p>
+          ) : null}
           <h3 className='changelog-entry__title'>{entry.title}</h3>
           <EntryMedia entry={entry} tone={tone} variant='feature' />
           {hasLevel2 ? (
             <div className='space-y-2'>
               {entry.explanation ? (
                 <p className='changelog-entry__excerpt'>{entry.explanation}</p>
+              ) : null}
+              {entry.prerequisites?.length ? (
+                <p className='changelog-entry__excerpt'>
+                  {entry.prerequisites.join(' · ')}
+                </p>
               ) : null}
               {entry.supporting.length > 0 ? (
                 <ul className='space-y-1'>
@@ -293,6 +340,7 @@ function ArchiveJumpNav({
  */
 export function CustomerChangelogArchive({
   months,
+  technicalReleases = [],
 }: CustomerChangelogArchiveProps) {
   const [visibleMonthCount, setVisibleMonthCount] =
     useState(INITIAL_MONTH_COUNT);
@@ -322,6 +370,12 @@ export function CustomerChangelogArchive({
     return (
       <div data-reduced-motion='static'>
         <p className='text-secondary-token'>No updates yet. Check back soon!</p>
+        <details className='mb-6'>
+          <summary className='min-h-11 cursor-pointer text-sm text-secondary-token'>
+            Browse engineering history
+          </summary>
+          <TechnicalReleaseNav releases={technicalReleases} />
+        </details>
       </div>
     );
   }
@@ -357,6 +411,7 @@ export function CustomerChangelogArchive({
               months={filteredMonths}
               visibleMonthCount={visibleCount}
             />
+            <TechnicalReleaseNav releases={technicalReleases} />
           </details>
           <div id='changelog-outcome-list'>
             {visibleMonths.map((group, index) => (
