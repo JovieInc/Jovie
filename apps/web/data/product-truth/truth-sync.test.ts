@@ -117,6 +117,39 @@ describe('truth-sync digest', () => {
     expect(isDigestInSync(diff)).toBe(false);
   });
 
+  it('diffs changed and removed claims from a legacy digest without route metadata', () => {
+    const current = buildTruthDigest(claims);
+    const legacy = {
+      version: 1,
+      claims: current.claims,
+      capabilities: current.capabilities,
+    } as TruthDigest;
+
+    const changed = diffTruthDigest(
+      legacy,
+      buildTruthDigest(
+        claims.map(claim =>
+          claim.id === 'offer.pro.price'
+            ? { ...claim, statement: '$1/mo' }
+            : claim
+        )
+      )
+    );
+    expect(changed.schemaChanged).toBe(true);
+    expect(changed.changed).toEqual(['offer.pro.price']);
+    expect(changed.affectedRoutes).toEqual(['/pricing', '/product']);
+
+    const removed = diffTruthDigest(
+      legacy,
+      buildTruthDigest(
+        claims.filter(claim => claim.id !== 'capability.pay.access-label')
+      )
+    );
+    expect(removed.schemaChanged).toBe(true);
+    expect(removed.removed).toEqual(['capability.pay.access-label']);
+    expect(removed.affectedRoutes).toEqual(['/pay']);
+  });
+
   it('hashClaim is stable and sensitive to evidence fields', () => {
     const claim = { ...baseClaim };
     expect(hashClaim(claim)).toBe(hashClaim({ ...claim }));

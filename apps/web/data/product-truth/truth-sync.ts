@@ -192,7 +192,7 @@ export function diffTruthDigest(
     digest: TruthDigest | null
   ) => {
     const routesFor =
-      digest?.capabilityRoutes[capabilityId] ??
+      digest?.capabilityRoutes?.[capabilityId] ??
       getCapabilityRoutes(capabilityId);
     for (const route of routesFor) routes.add(route);
   };
