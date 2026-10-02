@@ -5,6 +5,13 @@ const REQUIRED = [
   'Fork PR Gate',
   'PR Size Guard',
 ];
+const BLOCKING_LABELS = new Set([
+  'hold',
+  'gated',
+  'incident',
+  'do-not-merge',
+  'queue-poison',
+]);
 function finishCustomerNotes(repo, prs, dryRun, command) {
   for (const pr of prs) {
     if (
@@ -17,9 +24,7 @@ function finishCustomerNotes(repo, prs, dryRun, command) {
       pr.files?.totalCount !== 1 ||
       pr.files.nodes[0]?.path !== 'CHANGELOG.md' ||
       (pr.labels?.nodes ?? []).some(label =>
-        ['hold', 'gated', 'incident', 'do-not-merge', 'queue-poison'].includes(
-          label.name.toLowerCase()
-        )
+        BLOCKING_LABELS.has(label.name.toLowerCase())
       )
     )
       continue;
@@ -48,22 +53,29 @@ function finishCustomerNotes(repo, prs, dryRun, command) {
       checks.some(check => check.bucket !== 'pass')
     )
       continue;
-    const fresh = JSON.parse(
-      command([
-        'pr',
-        'view',
-        String(pr.number),
-        '--repo',
-        repo,
-        '--json',
-        'headRefOid',
-      ])
-    );
-    if (fresh.headRefOid !== pr.headRefOid || dryRun) continue;
-    command(['pr', 'ready', String(pr.number), '--repo', repo]);
+    try {
+      const fresh = JSON.parse(
+        command([
+          'pr',
+          'view',
+          String(pr.number),
+          '--repo',
+          repo,
+          '--json',
+          'headRefOid',
+        ])
+      );
+      if (fresh.headRefOid !== pr.headRefOid || dryRun) continue;
+      command(['pr', 'ready', String(pr.number), '--repo', repo]);
+    } catch {
+      console.warn(
+        `PR #${pr.number}: customer-note handoff deferred; the existing owner will retry.`
+      );
+      continue;
+    }
     // The normal enable pass owns auto-merge; its ready event also provides a retry.
     pr.isDraft = false;
     pr.customerNotesReadyHead = pr.headRefOid;
   }
 }
-module.exports = { finishCustomerNotes };
+module.exports = { finishCustomerNotes, BLOCKING_LABELS };

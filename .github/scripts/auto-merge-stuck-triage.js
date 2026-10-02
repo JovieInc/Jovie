@@ -20,7 +20,10 @@
 // ready_for_review subscriber (trigger-hygiene rule 3 / JOV-INV-029).
 
 const { execFileSync } = require('node:child_process');
-const { finishCustomerNotes } = require('./customer-notes-ready');
+const {
+  finishCustomerNotes,
+  BLOCKING_LABELS,
+} = require('./customer-notes-ready');
 
 const COMMENT_MARKER = '<!-- auto-merge-stuck-triage -->';
 const ISSUE_MARKER = '<!-- auto-merge-stuck-tracker -->';
@@ -293,14 +296,6 @@ function upsertTrackingIssue(repo, stuck, dryRun) {
 
 // Same set merge-queue-green-enroll.yml refuses. On a merge-queue repo,
 // enabling auto-merge on a CLEAN PR enqueues it at once, so a held PR must be skipped.
-const BLOCKING_LABELS = new Set([
-  'hold',
-  'gated',
-  'incident',
-  'do-not-merge',
-  'queue-poison',
-]);
-
 // Pure: a PR needs the enable pass when it is open, not a draft, lives in
 // this repo (fork tokens are read-only), carries no blocking label, and has no
 // autoMergeRequest yet.

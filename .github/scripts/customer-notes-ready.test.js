@@ -69,3 +69,23 @@ test('missing, failing and pending checks, advanced heads and dry runs retain th
     assert.equal(pr.isDraft, true);
   }
 });
+
+test('one failed view or ready action leaves the next note and normal triage available', () => {
+  for (const operation of ['view', 'ready']) {
+    const first = source(),
+      second = { ...source(), number: 43 };
+    const calls = [];
+    finishCustomerNotes('o/r', [first, second], false, args => {
+      calls.push(args);
+      if (args[1] === operation && args[2] === '42')
+        throw new Error('head changed');
+      return JSON.stringify(
+        args[1] === 'checks' ? checks : { headRefOid: 'abc' }
+      );
+    });
+    assert.equal(first.isDraft, true);
+    assert.equal(second.isDraft, false);
+    assert.equal(second.customerNotesReadyHead, 'abc');
+    assert.ok(calls.some(args => args[1] === 'ready' && args[2] === '43'));
+  }
+});
