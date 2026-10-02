@@ -128,7 +128,7 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: libraryMutationMocks.captureError,
 }));
 
-vi.mock('@/lib/queries', () => ({
+vi.mock('@/lib/queries/useReleaseMutations', () => ({
   useSyncReleasesFromSpotifyMutation: () => ({
     isPending: false,
     mutate: libraryMutationMocks.syncSpotify,

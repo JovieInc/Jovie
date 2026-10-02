@@ -57,6 +57,14 @@ import {
   useMemo,
   useState,
 } from 'react';
+import {
+  archiveLibraryRelease,
+  restoreRelease,
+} from '@/app/app/(shell)/dashboard/releases/actions';
+import {
+  archiveLibraryMerchCard,
+  restoreLibraryMerchCard,
+} from '@/app/app/(shell)/library/actions';
 import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
@@ -153,7 +161,7 @@ import {
   deriveWorkInspectorPresentation,
   scopeWorkInspectorBundle,
 } from '@/lib/library/work-inspector-read-model';
-import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries';
+import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries/useReleaseMutations';
 import {
   type ColumnDef,
   createColumnHelper,
@@ -161,11 +169,6 @@ import {
 } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
-import {
-  archiveLibraryRelease,
-  restoreRelease,
-} from '../dashboard/releases/actions';
-import { archiveLibraryMerchCard, restoreLibraryMerchCard } from './actions';
 import {
   LIBRARY_TABLE_MIN_WIDTH,
   LIBRARY_TABLE_ROW_HEIGHT,
