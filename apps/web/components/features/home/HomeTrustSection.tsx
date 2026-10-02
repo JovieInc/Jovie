@@ -8,6 +8,7 @@ import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 
 interface HomeTrustSectionProps {
+  readonly sectionVariant?: string;
   readonly variant?: 'default' | 'compact';
   readonly className?: string;
   readonly presentation?: 'card' | 'inline-strip' | 'artist-profile';
@@ -41,6 +42,7 @@ function getLabelMarginClass(
 function getSlotClass(isInlineStrip: boolean, slotName: string): string {
   return cn(
     'flex min-w-0 items-center justify-center',
+    !isInlineStrip && 'w-full sm:w-auto',
     isInlineStrip &&
       `homepage-trust-logo-slot homepage-trust-logo-slot--${slotName} system-b-mounted-home-trust-strip-logo-slot system-b-mounted-home-trust-strip-logo-slot--${slotName}`
   );
@@ -53,6 +55,7 @@ export function HomeTrustSection({
   label,
   ariaLabel,
   logoIds,
+  sectionVariant,
 }: Readonly<HomeTrustSectionProps>) {
   const isInlineStrip = presentation === 'inline-strip';
   const accessibleLabel =
@@ -68,7 +71,17 @@ export function HomeTrustSection({
     return (
       <section
         data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.logoCloud}
-        data-testid='artist-profile-logo-bar'
+        data-testid={
+          sectionVariant
+            ? 'marketing-section-logo-cloud'
+            : 'artist-profile-logo-bar'
+        }
+        data-marketing-owner={
+          sectionVariant
+            ? 'apps/web/components/features/home/HomeTrustSection.tsx'
+            : undefined
+        }
+        data-marketing-variant={sectionVariant}
         data-presentation={presentation}
         className={cn(
           'flex w-full flex-wrap items-center justify-center gap-x-11 gap-y-6 text-primary-token/72',
@@ -90,7 +103,15 @@ export function HomeTrustSection({
   return (
     <section
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.logoCloud}
-      data-testid='homepage-trust'
+      data-testid={
+        sectionVariant ? 'marketing-section-logo-cloud' : 'homepage-trust'
+      }
+      data-marketing-owner={
+        sectionVariant
+          ? 'apps/web/components/features/home/HomeTrustSection.tsx'
+          : undefined
+      }
+      data-marketing-variant={sectionVariant}
       data-presentation={presentation}
       className={cn(
         isInlineStrip

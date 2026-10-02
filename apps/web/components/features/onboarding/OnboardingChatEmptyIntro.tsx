@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/onboarding/OnboardingShell.sign-in-placement.test.tsx
+
 import { LoaderCircle } from 'lucide-react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
@@ -26,12 +28,12 @@ function getEntryCopy(mode: OnboardingEntryMode): {
     case 'spotify_handoff':
       return {
         title: 'Getting Your Artist Ready',
-        support: 'Your message will send after a quick browser verification.',
+        support: 'Your message is on its way.',
       };
     case 'prompt_handoff':
       return {
         title: 'Getting This Ready',
-        support: 'Your message will send after a quick browser verification.',
+        support: 'Your message is on its way.',
       };
     case 'restoring_intent':
       return {

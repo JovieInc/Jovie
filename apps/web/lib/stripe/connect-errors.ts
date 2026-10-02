@@ -1,7 +1,10 @@
 import 'server-only';
 
-export const STRIPE_CONNECT_PLATFORM_PROFILE_INCOMPLETE_PATTERN =
-  /complete your platform profile to use Connect/i;
+export const STRIPE_CONNECT_PLATFORM_PROFILE_INCOMPLETE_PATTERNS = [
+  /complete your platform profile to use Connect/i,
+  /managing losses for connected accounts/i,
+  /settings\/connect\/platform-profile/i,
+] as const;
 
 /** Retry-After value (seconds) for platform-profile-incomplete 503 responses. */
 export const STRIPE_CONNECT_PLATFORM_GUARD_TTL_SECONDS = 30 * 60;
@@ -49,7 +52,10 @@ export function isStripeConnectPlatformProfileIncompleteError(
 ): boolean {
   const message = extractStripeErrorMessage(error);
   return Boolean(
-    message && STRIPE_CONNECT_PLATFORM_PROFILE_INCOMPLETE_PATTERN.test(message)
+    message &&
+      STRIPE_CONNECT_PLATFORM_PROFILE_INCOMPLETE_PATTERNS.some(pattern =>
+        pattern.test(message)
+      )
   );
 }
 

@@ -997,13 +997,7 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(controllerHeader).toContain('group: production-mutation');
     expect(controllerHeader).toContain('queue: max');
     expect(controllerHeader).toContain('cancel-in-progress: false');
-    for (const prerequisite of [
-      'deploy-staging',
-      'attest-staging-build',
-      'canary-health-gate',
-      'alias-staging',
-      'production-head',
-    ]) {
+    for (const prerequisite of ['production-head']) {
       expect(migrationJob).toContain(prerequisite);
       expect(migrationJob).toContain(
         `needs.${prerequisite}.result == 'success'`
@@ -1012,6 +1006,7 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(migrationJob).toContain(
       "needs.production-head.outputs.is_current == 'true'"
     );
+    expect(migrationJob).toContain('inputs.staging_verified');
     expect(migrationJob).toContain('ref: ${{ inputs.expected_sha }}');
     expect(migrationJob).not.toContain('/commits/main');
     expect(migrationJob).not.toContain('migration-head');
@@ -1203,9 +1198,7 @@ describe('deploy workflow Vercel env resolution', () => {
     );
     const productionOauthJob = getJobBlock(workflow, 'production-oauth-gate');
 
-    expect(oauthStep).toContain(
-      'if PLAYWRIGHT_WORKERS=1 CI=true SMOKE_ONLY=1 \\\n'
-    );
+    expect(oauthStep).toContain('PLAYWRIGHT_WORKERS=1 CI=true SMOKE_ONLY=1');
     expect(oauthStep).toContain(
       'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run --'
     );
@@ -2324,12 +2317,22 @@ describe('iOS stage contract', () => {
     );
     expect(iosWorkflow).not.toMatch(/^  pull_request:/m);
     expect(iosWorkflow).not.toMatch(/^  push:/m);
-    expect(iosWorkflow).toContain('runs-on: macos-26');
+    // Hosted macOS stays the fallback; the self-hosted Mac is heartbeat-gated
+    // and never probed for release regressions.
+    expect(iosWorkflow).toContain(
+      `runs-on: \${{ needs.mac-runner-route.outputs.runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-26' }}`
+    );
+    expect(iosWorkflow).toContain(
+      'HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml'
+    );
+    expect(iosWorkflow).toContain(
+      "if: ${{ !inputs.full-regression && vars.JOVIE_MAC_RUNNER != 'off' }}"
+    );
     expect(pathChanges).toContain(
       "run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}"
     );
     expect(pathChanges).toContain(
-      'git show "${CLASSIFICATION_BASE_REF}:scripts/lib/product-lane-classifier.mjs"'
+      'git show "${CLASSIFICATION_POLICY_REF}:scripts/lib/product-lane-classifier.mjs"'
     );
     expect(pathChanges).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
     expect(pathChanges).not.toContain(
@@ -2551,6 +2554,12 @@ describe('canary health gate workflow', () => {
       'EXPECTED_VERCEL_ALIAS_ORIGIN: https://staging.jov.ie'
     );
     expect(oauthStep).toContain('PLAYWRIGHT_VERCEL_BYPASS_SECRET:');
+    expect(oauthStep).toContain(
+      'DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}'
+    );
+    expect(oauthStep).toContain(
+      '"$GITHUB_WORKSPACE/node_modules/.bin/vercel" alias set'
+    );
     expect(oauthStep).toContain('oauth-providers.spec.ts');
     expect(oauthStep).toContain(
       'oauth_retry_root="$RUNNER_TEMP/aliased-staging-oauth-retries"'
@@ -2595,7 +2604,7 @@ describe('canary health gate workflow', () => {
     const receiptJob = getJobBlock(release, 'staging-deployment-receipt');
     const reassert = getStepBlock(
       receiptJob,
-      'Reassert the exact preview after production settles'
+      'Classify staging generation after mutation'
     );
     const prove = getStepBlock(
       receiptJob,
@@ -2607,23 +2616,19 @@ describe('canary health gate workflow', () => {
     );
     const releaseResult = getJobBlock(release, 'release-result');
 
-    expect(receiptJob).toContain(
-      'needs: [deploy-staging, alias-staging, promote-production, rollback-production]'
-    );
+    expect(receiptJob).toContain('needs: [deploy-staging, alias-staging]');
     expect(receiptJob).toContain("needs.alias-staging.result == 'success'");
     expect(receiptJob).toContain(
       "needs.alias-staging.outputs.is_current == 'true'"
     );
-    expect(reassert).toContain(
-      'vercel alias set "$deployment_url" staging.jov.ie'
-    );
+    expect(reassert).toContain('staging_refresh_outcome=current');
     expect(reassert).toContain(
       'gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq \'.sha\''
     );
+    expect(reassert).toContain('[ "$current_main" = "$EXPECTED_COMMIT_SHA" ]');
     expect(reassert).toContain(
-      '[[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]'
+      'staging_refresh_outcome=superseded_after_mutation'
     );
-    expect(reassert).toContain('needs.deploy-staging.outputs.deploy_url_b64');
     expect(prove).toContain('EXPECTED_DEPLOYMENT_ID:');
     expect(prove).toContain('EXPECTED_COMMIT_SHA:');
     expect(prove).toContain('--arg url "$deployment_url"');
@@ -2633,12 +2638,17 @@ describe('canary health gate workflow', () => {
     expect(prove).toContain('for attempt in $(seq 1 15)');
     expect(prove).toContain('(.id | type == "string")');
     expect(prove).toContain('(.readyState | type == "string")');
-    expect(prove).toContain('(.target | type == "string")');
     expect(prove).toContain('[ "$alias_id" = "$EXPECTED_DEPLOYMENT_ID" ]');
     expect(prove).toContain('[ "$alias_state" = "READY" ]');
-    expect(prove).toContain('[ "$alias_target" = "preview" ]');
+    expect(prove).not.toContain('alias_target');
+    expect(prove).not.toContain('.target');
     expect(prove).toContain('[ "$attempt" -eq 15 ]');
     expect(prove).toContain('sleep 4');
+    expect(
+      prove.match(
+        /\.\/node_modules\/\.bin\/vercel alias set "\$deployment_url" staging\.jov\.ie/g
+      )
+    ).toHaveLength(2);
     expect(prove).toContain('https://staging.jov.ie/api/health/build-info');
     expect(prove).toContain('[ "$observed_sha" = "$EXPECTED_COMMIT_SHA" ]');
     expect(prove).toContain('[ "$observed_environment" = "preview" ]');
@@ -2653,15 +2663,13 @@ describe('canary health gate workflow', () => {
     expect(writeReceipt).toContain(
       'gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq \'.sha\''
     );
-    expect(writeReceipt).toContain(
-      '[[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]'
-    );
+    expect(writeReceipt).toContain('[[ "$current_main" =~ ^[0-9a-f]{40}$ ]]');
     expect(writeReceipt).toContain('currentMainSha: $currentMainSha');
     expect(writeReceipt).toContain(
-      'ROLLBACK_RESULT: ${{ needs.rollback-production.result }}'
+      'STAGING_REFRESH_OUTCOME: ${{ steps.reassert.outputs.staging_refresh_outcome }}'
     );
-    expect(writeReceipt).toContain('rollbackResult: $rollbackResult');
-    expect(writeReceipt).toContain('state: "deployed"');
+    expect(writeReceipt).toContain('sloState: $sloState');
+    expect(writeReceipt).toContain('state: $state');
     expect(writeReceipt).toContain('terminal: true');
     expect(writeReceipt).toContain(
       'privacy: "robots-block-all-and-http-noindex"'
@@ -2673,19 +2681,19 @@ describe('canary health gate workflow', () => {
     expect(receiptJob).not.toContain('vercel rollback');
     expect(releaseResult).toContain('staging-deployment-receipt,');
     expect(releaseResult).toContain(
-      'staging_refresh_outcome="${{ needs.staging-deployment-receipt.outputs.staging_refresh_outcome }}"'
+      "if: ${{ always() && inputs.release_mode == 'production' }}"
     );
     expect(releaseResult).toContain(
-      '[ "${{ needs.staging-deployment-receipt.result }}" != "success" ]'
+      'if [ "${{ inputs.staging_verified }}" != "true" ]; then'
     );
     expect(releaseResult).toContain(
-      '[ "${{ needs.staging-deployment-receipt.outputs.deployed }}" = "true" ]'
+      'Production release lacks the exact staging controller receipt.'
     );
     expect(releaseResult).toContain(
-      'Superseded staging refresh lacked exact pre-promotion staging gates or exact production promotion evidence.'
+      'Pre-production supersession lacks an exact staging receipt.'
     );
     expect(releaseResult).toContain(
-      'Current staging refresh lacked an exact deployed receipt.'
+      'production-head:${{ needs.production-head.result }}'
     );
     expect(release.indexOf('  promote-production:')).toBeLessThan(
       release.indexOf('  staging-deployment-receipt:')
@@ -2782,6 +2790,7 @@ jq -n \
           resolve(vercelBin, 'vercel'),
           `#!/usr/bin/env bash
 set -euo pipefail
+if [ "$1" = "alias" ]; then exit 0; fi
 attempt=0
 if [ -f "$RECEIPT_ALIAS_COUNTER" ]; then
   attempt="$(cat "$RECEIPT_ALIAS_COUNTER")"
@@ -2792,7 +2801,7 @@ if [ "$attempt" -eq 1 ]; then
   printf '%s\\n' '{"id":42,"readyState":null,"target":{"unexpected":true}}'
 else
   jq -n --arg id "$EXPECTED_DEPLOYMENT_ID" \
-    '{id: $id, readyState: "READY", target: "preview"}'
+    '{id: $id, readyState: "READY"}'
 fi
 `,
           { mode: 0o700 }
@@ -2857,7 +2866,7 @@ case "$url" in
       printf 'SECRET_SENTINEL' > "$output_path"
     else
       jq -n --arg sha "$sha" --arg environment "$environment" \
-        '{commitSha: $sha, environment: $environment, privateField: "SECRET_SENTINEL"}' > "$output_path"
+        '{commitSha: $sha, deploymentId: $ENV.EXPECTED_DEPLOYMENT_ID, environment: $environment, privateField: "SECRET_SENTINEL"}' > "$output_path"
     fi
     if "$write_meta"; then printf '%s\\n%s' "$status" "$content_type"; fi
     exit "$curl_status"
@@ -2888,7 +2897,7 @@ esac
         );
 
         const expectedSha = '0123456789abcdef0123456789abcdef01234567';
-        const expectedDeploymentId = 'dpl_exact_receipt';
+        const expectedDeploymentId = 'dpl_exactreceipt';
         const result = spawnSync(
           'bash',
           [
@@ -2952,7 +2961,7 @@ esac
             )
           );
           expect(output).toContain(
-            `commitSha=${expectedSha} environment=preview`
+            `commitSha=${expectedSha} deploymentId=${expectedDeploymentId} environment=preview`
           );
         } else if (
           scenario === 'missing-noindex' ||
@@ -2983,7 +2992,7 @@ esac
         ).toThrow();
         expect(readFileSync(counter, 'utf8')).toBe('2');
         expect(result.stdout).toContain(
-          `staging.jov.ie owns exact READY preview ${expectedDeploymentId}.`
+          `staging.jov.ie owns exact READY deployment ${expectedDeploymentId}.`
         );
       } finally {
         rmSync(root, { force: true, recursive: true });
@@ -3005,9 +3014,16 @@ esac
       const fakeBin = resolve(root, 'bin');
       const runnerTemp = resolve(root, 'runner-temp');
       const counter = resolve(root, 'attempt-count');
+      const vercelBin = resolve(workspace, 'node_modules/.bin');
       mkdirSync(web, { recursive: true });
       mkdirSync(fakeBin);
       mkdirSync(runnerTemp);
+      mkdirSync(vercelBin, { recursive: true });
+      writeFileSync(
+        resolve(vercelBin, 'vercel'),
+        '#!/usr/bin/env bash\nexit 0\n',
+        { mode: 0o700 }
+      );
       writeFileSync(
         resolve(fakeBin, 'node'),
         `#!/usr/bin/env bash
@@ -3045,11 +3061,15 @@ fi
           cwd: workspace,
           env: {
             ...process.env,
+            DEPLOYMENT_URL_B64: Buffer.from(
+              'https://jovie-exact-jovie.vercel.app'
+            ).toString('base64'),
             GITHUB_WORKSPACE: workspace,
             OAUTH_TEST_COUNTER: counter,
             PATH: `${fakeBin}:${process.env.PATH}`,
             PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
             RUNNER_TEMP: runnerTemp,
+            VERCEL_ORG_ID: 'team_test',
           },
           encoding: 'utf8',
         }
@@ -3087,9 +3107,16 @@ fi
       const runnerTemp = resolve(root, 'runner-temp');
       const counter = resolve(root, 'attempt-count');
       const sleepMarker = resolve(root, 'sleep-called');
+      const vercelBin = resolve(workspace, 'node_modules/.bin');
       mkdirSync(web, { recursive: true });
       mkdirSync(fakeBin);
       mkdirSync(runnerTemp);
+      mkdirSync(vercelBin, { recursive: true });
+      writeFileSync(
+        resolve(vercelBin, 'vercel'),
+        '#!/usr/bin/env bash\nexit 0\n',
+        { mode: 0o700 }
+      );
       writeFileSync(
         resolve(fakeBin, 'node'),
         `#!/usr/bin/env bash
@@ -3123,11 +3150,15 @@ exit 23
           cwd: workspace,
           env: {
             ...process.env,
+            DEPLOYMENT_URL_B64: Buffer.from(
+              'https://jovie-exact-jovie.vercel.app'
+            ).toString('base64'),
             GITHUB_WORKSPACE: workspace,
             OAUTH_SLEEP_MARKER: sleepMarker,
             OAUTH_TEST_COUNTER: counter,
             PATH: `${fakeBin}:${process.env.PATH}`,
             RUNNER_TEMP: runnerTemp,
+            VERCEL_ORG_ID: 'team_test',
           },
           encoding: 'utf8',
         }
@@ -5236,8 +5267,6 @@ describe('production promotion exact-artifact contract', () => {
       readFileSync(productionControllerRunLiveFixturePath, 'utf8')
     );
 
-    expect(health).toContain('workflow_run:');
-    expect(health).toContain('workflows: [Production Controller]');
     expect(health).not.toContain(
       'workflows: [Production Controller, Production Marker Recovery]'
     );
@@ -5583,10 +5612,7 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     const workflow = readFileSync(productionMarkerRecoveryWorkflowPath, 'utf8');
 
     expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).toContain('workflow_run:');
-    expect(workflow).toContain('workflows: [Production Controller]');
-    expect(workflow).toContain('types: [completed]');
-    expect(workflow).toContain('branches: [main]');
+    expect(workflow).not.toContain('workflow_run:');
     expect(workflow).not.toContain('push:');
     expect(workflow).not.toContain('schedule:');
     expect(workflow).toContain('group: production-mutation');
@@ -5623,7 +5649,7 @@ describe('production marker recovery workflow (JOV-4965)', () => {
       'name: production-generation-verified-${{ env.EXPECTED_SHA }}'
     );
     const fleetRefresh = readFileSync(fleetGateRefreshWorkflowPath, 'utf8');
-    expect(fleetRefresh).toContain('workflows: [CI, Production Controller]');
+    expect(fleetRefresh).not.toContain('workflow_run:');
     expect(fleetRefresh).not.toContain('Production Marker Recovery]');
   });
 

@@ -34,6 +34,24 @@ describe('Ovie deployment configuration', () => {
         permanent: false,
       });
     }
+    expect(await config.redirects()).toContainEqual({
+      source: '/hud-tv',
+      destination: '/hud',
+      permanent: false,
+    });
+    expect(await config.rewrites()).toMatchObject({
+      beforeFiles: expect.arrayContaining([
+        { source: '/hud/wiki', destination: '/app/admin/wiki' },
+        {
+          source: '/hud',
+          missing: [
+            { type: 'query', key: 'kiosk' },
+            { type: 'query', key: 'mode', value: 'kiosk' },
+          ],
+          destination: '/app/admin/hud',
+        },
+      ]),
+    });
   });
 
   it('keeps the build-time typecheck unless CI already ran it separately', async () => {

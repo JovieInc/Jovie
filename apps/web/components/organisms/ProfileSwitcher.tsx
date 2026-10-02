@@ -14,47 +14,47 @@ import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataConte
 import { toast } from '@/components/feedback';
 import { Avatar } from '@/components/molecules/Avatar';
 import { cn } from '@/lib/utils';
-import { CreateProfileDialog } from './CreateProfileDialog';
+import { CreateIdentityDialog } from './CreateProfileDialog';
 
-interface SwitchProfileResult {
+interface SwitchIdentityResult {
   success: boolean;
   error?: string;
 }
 
-export function ProfileSwitcher() {
-  const { creatorProfiles, selectedProfile } = useDashboardData();
+export function IdentitySwitcher() {
+  const { identities, activeIdentity } = useDashboardData();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [switchingProfileId, setSwitchingProfileId] = useState<string | null>(
+  const [switchingIdentityId, setSwitchingIdentityId] = useState<string | null>(
     null
   );
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  if (creatorProfiles.length < 2 && !showCreateDialog) {
+  if (identities.length < 2 && !showCreateDialog) {
     return null;
   }
 
-  function handleSwitch(profileId: string) {
-    if (profileId === selectedProfile?.id) return;
-    setSwitchingProfileId(profileId);
+  function handleSwitch(identityId: string) {
+    if (identityId === activeIdentity?.id) return;
+    setSwitchingIdentityId(identityId);
     startTransition(async () => {
-      let result: SwitchProfileResult;
+      let result: SwitchIdentityResult;
       try {
         const response = await fetch('/api/dashboard/profile/switch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ profileId }),
+          body: JSON.stringify({ profileId: identityId }),
         });
-        result = (await response.json()) as SwitchProfileResult;
+        result = (await response.json()) as SwitchIdentityResult;
       } catch {
-        setSwitchingProfileId(null);
-        toast.error("Couldn't switch profile. Try again.");
+        setSwitchingIdentityId(null);
+        toast.error("Couldn't switch identity. Try again.");
         return;
       }
 
-      setSwitchingProfileId(null);
+      setSwitchingIdentityId(null);
       if (!result.success) {
-        toast.error(result.error ?? "Couldn't switch profile. Try again.");
+        toast.error(result.error ?? "Couldn't switch identity. Try again.");
         return;
       }
       router.refresh();
@@ -67,25 +67,25 @@ export function ProfileSwitcher() {
         <DropdownMenuTrigger asChild>
           <button
             type='button'
-            aria-label='Switch Artist Profile'
+            aria-label='Switch Identity'
             className={cn(
               'flex h-7 w-full items-center gap-1.5 rounded-full px-2 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:bg-sidebar-accent/60',
               'group-data-[collapsible=icon]:justify-center'
             )}
           >
             <Avatar
-              src={selectedProfile?.avatarUrl}
-              alt={selectedProfile?.displayName ?? ''}
+              src={activeIdentity?.avatarUrl}
+              alt={activeIdentity?.displayName ?? ''}
               size='xs'
               name={
-                selectedProfile?.displayName ||
-                selectedProfile?.username ||
-                'Select profile'
+                activeIdentity?.displayName ||
+                activeIdentity?.username ||
+                'Select identity'
               }
               className='shrink-0'
             />
             <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
-              {selectedProfile?.displayName || 'Select profile'}
+              {activeIdentity?.displayName || 'Select identity'}
             </span>
             <ChevronDown
               className='size-2.5 shrink-0 text-sidebar-item-icon group-data-[collapsible=icon]:hidden'
@@ -94,30 +94,29 @@ export function ProfileSwitcher() {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align='start' sideOffset={4} className='w-55'>
-          {creatorProfiles.map(profile => {
-            const isActive = profile.id === selectedProfile?.id;
-            const isSwitching = switchingProfileId === profile.id;
+          {identities.map(identity => {
+            const isActive = identity.id === activeIdentity?.id;
+            const isSwitching = switchingIdentityId === identity.id;
             return (
               <DropdownMenuItem
-                key={profile.id}
-                onSelect={() => handleSwitch(profile.id)}
+                key={identity.id}
+                onSelect={() => handleSwitch(identity.id)}
                 disabled={isPending}
-                className='flex items-center gap-2'
               >
                 <Avatar
-                  src={profile.avatarUrl}
-                  alt={profile.displayName ?? ''}
-                  name={profile.displayName || profile.username}
+                  src={identity.avatarUrl}
+                  alt={identity.displayName ?? ''}
+                  name={identity.displayName || identity.username}
                   size='sm'
                   className='shrink-0'
                 />
                 <div className='min-w-0 flex-1'>
                   <p className='truncate text-sm font-medium'>
-                    {profile.displayName || profile.username}
+                    {identity.displayName || identity.username}
                   </p>
-                  {profile.username && profile.displayName && (
+                  {identity.username && identity.displayName && (
                     <p className='truncate text-xs text-muted-foreground'>
-                      @{profile.username}
+                      @{identity.username}
                     </p>
                   )}
                 </div>
@@ -136,12 +135,12 @@ export function ProfileSwitcher() {
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => setShowCreateDialog(true)}>
             <Plus className='mr-2 size-3.5' />
-            Add artist profile
+            Add Artist Identity
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <CreateProfileDialog
+      <CreateIdentityDialog
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
       />

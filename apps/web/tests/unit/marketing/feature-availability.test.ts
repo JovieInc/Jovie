@@ -20,6 +20,7 @@ import {
 import {
   MARKETING_FOOTER_COLUMNS,
   MARKETING_NAV_LINKS,
+  PUBLIC_COMMERCIAL_FOOTER_LINKS,
 } from '@/data/marketingNavigation';
 import {
   isNavigableRoute,
@@ -213,6 +214,28 @@ describe('route publication policy — real registry', () => {
     expect(isCapabilityIndexable(r)).toBe(false);
   });
 
+  it('selective-reach stays gated: registered but never public (JOV-6299)', () => {
+    const selectiveReach = getCapabilityRecord('selective-reach');
+    expect(selectiveReach).toBeDefined();
+    expect(selectiveReach?.maturity).toBe('proposed');
+    expect(selectiveReach?.proofAuthorized).toBe(false);
+    expect(isPublicationPermitted(selectiveReach)).toBe(false);
+    expect(isCapabilityIndexable(selectiveReach)).toBe(false);
+    expect(isCapabilityNavigable(selectiveReach)).toBe(false);
+    expect(isFeatureUsable(selectiveReach)).toBe(false);
+    expect(isInterestCaptureOnly(selectiveReach)).toBe(false);
+    expect(isCapabilityPurchasable(selectiveReach)).toBe(false);
+    expect(describeFeatureAccess(selectiveReach)).toBe('Not available.');
+    // No route may claim the capability while it is gated.
+    expect(Object.values(ROUTE_CAPABILITY_BINDINGS)).not.toContain(
+      'selective-reach'
+    );
+    // An acquisition experiment cannot promote it to a usable state.
+    expect(resolvePostExperimentAccess(selectiveReach!, true)).toBe(
+      'unavailable'
+    );
+  });
+
   it('capability index gate composes with sitemap rules', () => {
     expect(
       isSitemapIndexableMarketingRoute({ url: '/card', status: 'active' })
@@ -234,6 +257,9 @@ describe('navigation consumes the shared policy', () => {
       for (const link of column.links) {
         expect(link.external || isNavigationEligiblePath(link.href)).toBe(true);
       }
+    }
+    for (const link of PUBLIC_COMMERCIAL_FOOTER_LINKS) {
+      expect(isNavigationEligiblePath(link.href)).toBe(true);
     }
   });
 

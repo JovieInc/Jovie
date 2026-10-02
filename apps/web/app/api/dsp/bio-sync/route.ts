@@ -17,6 +17,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { CopyFloorViolationError } from '@/lib/copy/outbound-floor';
 import { getOwnedProfile } from '@/lib/dsp-bio-sync/ownership';
 import {
   DSP_BIO_PROVIDERS,
@@ -129,6 +130,17 @@ export async function POST(request: Request) {
       })),
     });
   } catch (error) {
+    if (error instanceof CopyFloorViolationError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: error.message,
+          rules: error.rules,
+        },
+        { status: 400 }
+      );
+    }
+
     await captureError('DSP Bio Sync failed', error, {
       route: '/api/dsp/bio-sync',
     });

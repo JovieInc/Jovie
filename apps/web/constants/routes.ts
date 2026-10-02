@@ -39,6 +39,8 @@ export const APP_ROUTES = {
   /** @deprecated Profile is now a drawer on the chat route. Use CHAT instead. */
   PROFILE: '/app/chat',
   CONTACTS: '/app/contacts',
+  /** Audience context inside the Contacts workspace. */
+  CONTACTS_AUDIENCE: '/app/contacts?tab=audience',
   RELEASES: '/app/releases',
   TOUR_DATES: '/app/tour-dates',
   CALENDAR: '/app/calendar',
@@ -55,8 +57,9 @@ export const APP_ROUTES = {
   YOUTUBE_REVIVAL: '/app/youtube',
   JOVIE_WORK: '/app/jovie-work',
   LYRICS: '/app/lyrics',
+  /** Legacy Presence workspace path. Keep for old bookmarks; use PRESENCE for navigation. */
   PROFILES: '/app/profiles',
-  /** Legacy profile-presence route. Use PROFILES for navigation. */
+  /** Public-facing output generated for the active identity. */
   PRESENCE: '/app/presence',
 
   // Settings
@@ -85,7 +88,12 @@ export const APP_ROUTES = {
   LEGACY_ADMIN: '/app/admin',
   ADMIN: '/app/ov',
   ADMIN_CHAT: '/app/ov/chat',
+  /** Founder home: business and production reality in one scan. */
+  ADMIN_NOW: '/hud',
   ADMIN_OPS: '/hud',
+  ADMIN_PRODUCT: '/app/ov/product',
+  ADMIN_OPERATIONS: '/app/ov/operations',
+  ADMIN_NEEDS_YOU: '/app/ov/needs-you',
   ADMIN_SHIPPING: '/app/ov/shipping',
   ADMIN_PEOPLE: '/app/ov/people',
   ADMIN_GROWTH: '/app/ov/growth',
@@ -114,6 +122,7 @@ export const APP_ROUTES = {
   ADMIN_OUTREACH_REVIEW: '/app/ov/outreach/review',
   ADMIN_INGEST: '/app/ov/ingest',
   ADMIN_SCREENSHOTS: '/app/ov/screenshots',
+  ADMIN_FEATURE_REGISTRY: '/app/ov/feature-registry',
   ADMIN_SHARE_STUDIO: '/app/ov/share-studio',
   ADMIN_RELEASES: '/app/ov/releases',
   ADMIN_USERS_BAN: '/app/ov/users/ban',
@@ -128,6 +137,8 @@ export const APP_ROUTES = {
   ADMIN_REVENUE_LIFT: '/app/ov/revenue-lift',
   ADMIN_SYSTEM: '/app/ov/system',
   ADMIN_FEATURES: '/app/ov/features',
+  /** Jovie's own pages: index, SEO/agentic cert, copy gate, Lighthouse (JOV-6770). */
+  ADMIN_PRESENCE: '/app/ov/presence',
   ADMIN_CERTIFICATIONS: '/app/ov/certifications',
   /** Legacy feature-flags route. Redirect-only; use ADMIN_FEATURES. */
   LEGACY_FEATURE_FLAGS: '/app/feature-flags',

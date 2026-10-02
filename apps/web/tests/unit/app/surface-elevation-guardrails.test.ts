@@ -364,7 +364,7 @@ describe('surface elevation guardrails', () => {
 
     expect(librarySurface).toContain('useRegisterHeaderSearch');
     expect(librarySurface).toContain("key: 'library'");
-    expect(librarySurface).toContain('Filter Library');
+    expect(librarySurface).toContain('Filter Work');
     expect(librarySurface).not.toContain('OPEN_COMMAND_PALETTE_EVENT');
     expect(appShellLayout).toContain('isLibraryShellRoute');
     expect(appShellLayout).toContain('LibraryLoadingState');
@@ -393,8 +393,6 @@ describe('surface elevation guardrails', () => {
   it('keeps task and preview cards off the shell canvas token', () => {
     const files = [
       'components/features/dashboard/layout/PreviewPanel.tsx',
-      'components/features/dashboard/molecules/phone-mockup-preview/PhoneMockupPreview.tsx',
-      'components/features/dashboard/organisms/DashboardPreview.tsx',
       'components/features/dashboard/organisms/ProfileEditPreviewCard.tsx',
       'components/features/dashboard/release-tasks/ReleaseTaskEmptyState.tsx',
       'components/features/dashboard/release-tasks/ReleaseTaskExplainerPopover.tsx',
@@ -556,6 +554,15 @@ describe('surface elevation guardrails', () => {
       'components/features/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx'
     );
     expect(creatorProfiles).not.toContain("'@tanstack/react-table'");
+  });
+
+  it('renders the admin feedback detail header through the canonical EntityHeader', () => {
+    const adminFeedbackTable = readComponent(
+      'components/features/admin/feedback-table/AdminFeedbackTable.tsx'
+    );
+
+    expect(adminFeedbackTable).toContain('EntityHeader');
+    expect(adminFeedbackTable).not.toContain('EntityHeaderCard');
   });
 
   it('names the hidden-header release table for screen readers', () => {

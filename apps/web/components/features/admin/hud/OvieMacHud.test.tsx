@@ -4,7 +4,7 @@ import type { DecisionHudView } from '@/lib/hud/decision-signals';
 import type { OvieMacHudSnapshot } from '@/lib/hud/ovie-mac-hud';
 import { OvieMacHud } from './OvieMacHud';
 
-vi.mock('@/components/atoms/DesktopTitlebar', () => ({
+vi.mock('@/components/organisms/DesktopTitlebar', () => ({
   DesktopTitlebar: () => <div data-testid='desktop-titlebar' />,
 }));
 

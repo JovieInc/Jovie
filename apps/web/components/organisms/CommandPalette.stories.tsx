@@ -2,7 +2,10 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
-import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import {
+  DashboardDataContext,
+  type DashboardDataContextValue,
+} from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   HeaderActionsProvider,
   useHeaderActions,
@@ -41,10 +44,12 @@ storyQueryClient.setQueryData(queryKeys.chat.capabilities(STORY_PROFILE_ID), {
   },
 });
 
-const storyDashboardData = {
+const storyDashboardData: DashboardData = {
   user: { id: 'story-user' },
   creatorProfiles: [],
-  selectedProfile: { id: STORY_PROFILE_ID },
+  selectedProfile: {
+    id: STORY_PROFILE_ID,
+  } as DashboardData['selectedProfile'],
   needsOnboarding: false,
   sidebarCollapsed: false,
   hasSocialLinks: true,
@@ -52,6 +57,8 @@ const storyDashboardData = {
   isAdmin: false,
   tippingStats: {
     tipClicks: 0,
+    qrTipClicks: 0,
+    linkTipClicks: 0,
     tipsSubmitted: 0,
     totalReceivedCents: 0,
     monthReceivedCents: 0,
@@ -63,7 +70,13 @@ const storyDashboardData = {
     steps: [],
     profileIsLive: true,
   },
-} as DashboardData;
+};
+
+const storyDashboardDataContext: DashboardDataContextValue = {
+  ...storyDashboardData,
+  identities: storyDashboardData.creatorProfiles,
+  activeIdentity: storyDashboardData.selectedProfile,
+};
 
 function OpenPaletteOnMount() {
   const { openCommandPalette } = useHeaderActions();
@@ -85,7 +98,7 @@ function PaletteHeaderSlot() {
 function CommandPaletteStorySurface() {
   return (
     <QueryClientProvider client={storyQueryClient}>
-      <DashboardDataContext.Provider value={storyDashboardData}>
+      <DashboardDataContext.Provider value={storyDashboardDataContext}>
         <HeaderActionsProvider>
           <div className='flex h-[44rem] w-[min(64rem,100vw)] flex-col overflow-hidden bg-(--app-shell-content-surface)'>
             <PaletteHeaderSlot />

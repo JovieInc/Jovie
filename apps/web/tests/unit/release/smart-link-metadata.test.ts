@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { generateMetadata } from '@/app/[username]/[slug]/page';
 
 const {
   getContentBySlugMock,
@@ -125,7 +126,6 @@ describe('smart-link metadata', () => {
       previewUrl: 'https://example.com/preview.mp3',
     });
 
-    const { generateMetadata } = await import('@/app/[username]/[slug]/page');
     const metadata = await generateMetadata({
       params: Promise.resolve({ username: 'dualipa', slug: 'neon-skyline' }),
     });
@@ -159,7 +159,6 @@ describe('smart-link metadata', () => {
       trackNumber: null,
     });
 
-    const { generateMetadata } = await import('@/app/[username]/[slug]/page');
     const metadata = await generateMetadata({
       params: Promise.resolve({
         username: 'dualipa',
@@ -239,7 +238,6 @@ describe('smart-link metadata', () => {
       trackNumber: null,
     });
 
-    const { generateMetadata } = await import('@/app/[username]/[slug]/page');
     const metadata = await generateMetadata({
       params: Promise.resolve({
         username: 'timwhite',

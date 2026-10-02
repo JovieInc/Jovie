@@ -1,5 +1,9 @@
 name: Production Synthetic Monitoring
 # clock-class: production-liveness
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: The deployed app keeps production Gateway OIDC while the GitHub-hosted observer receives only cron, Slack, and Linear credentials needed to trigger the redacted probe and route a failure signal.
+# removal-trigger: Remove this hosted signal hop when a first-party production monitor schedules the same five-surface Gateway receipt and proves Slack plus Linear delivery for 30 consecutive days.
 
 permissions:
   contents: read
@@ -9,6 +13,8 @@ on:
     # Deep production coverage runs independently of the disabled Agent Tick
     # monolith and is intentionally outside the deploy-blocking path.
     - cron: '17 */6 * * *'
+    # JOV-6938: exactly five tiny production Gateway turns once per day.
+    - cron: '47 7 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -18,6 +24,7 @@ concurrency:
 jobs:
   synthetic-test:
     name: Production Synthetic Tests
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '17 */6 * * *' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true', PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true' }
@@ -294,3 +301,164 @@ jobs:
         run: |
           echo "Marking job as failed because synthetic status is '${{ steps.test-results.outputs.test_status }}'"
           exit 1
+
+  web-ai-health:
+    name: Web AI Health (Daily)
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '47 7 * * *' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Doppler CLI
+        uses: ./.github/actions/setup-doppler
+
+      - name: Run production Web AI health probe
+        id: health
+        continue-on-error: true
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+        run: |
+          set +e
+          doppler run --project jovie-web --config prd --only-secrets=CRON_SECRET --no-fallback -- \
+            env -u DOPPLER_TOKEN node .github/scripts/run-web-ai-health.mjs \
+              --url https://jov.ie/api/cron/web-ai-health \
+              --receipt "$RUNNER_TEMP/web-ai-health/receipt.json"
+          probe_exit=$?
+          set -e
+          if [ ! -f "$RUNNER_TEMP/web-ai-health/receipt.json" ]; then
+            env -u CRON_SECRET node .github/scripts/run-web-ai-health.mjs \
+              --url https://jov.ie/api/cron/web-ai-health \
+              --receipt "$RUNNER_TEMP/web-ai-health/receipt.json" || true
+          fi
+          exit "$probe_exit"
+
+      - name: Upload Web AI health receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: web-ai-health-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/web-ai-health/receipt.json
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Send Slack alert on Web AI failure
+        if: ${{ always() && (steps.health.outcome != 'success' || steps.health.outputs.health_status != 'passed') }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#alerts-production'
+          author_name: 'Web AI Health'
+          custom_payload: |
+            {
+              "text": "High: production Web AI health failed",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    {
+                      "title": "Route",
+                      "value": "bug",
+                      "short": true
+                    },
+                    {
+                      "title": "Gateway allowlist",
+                      "value": ${{ toJSON(steps.health.outputs.allowlist_name) }},
+                      "short": true
+                    },
+                    {
+                      "title": "Failures",
+                      "value": ${{ toJSON(format('```{0}```', steps.health.outputs.failure_summary)) }},
+                      "short": false
+                    },
+                    {
+                      "title": "Action",
+                      "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View receipt>",
+                      "short": false
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: File high-priority Linear bug signal
+        if: ${{ always() && (steps.health.outcome != 'success' || steps.health.outputs.health_status != 'passed') }}
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          WEB_AI_HEALTH_RECEIPT_PATH: ${{ runner.temp }}/web-ai-health/receipt.json
+        run: node scripts/web-ai-health-intake.mjs
+
+      - name: Record green Web AI health summary
+        if: ${{ steps.health.outcome == 'success' && steps.health.outputs.health_status == 'passed' }}
+        env:
+          ALLOWLIST_NAME: ${{ steps.health.outputs.allowlist_name }}
+        run: |
+          {
+            echo '## Web AI health'
+            echo
+            echo "All five production AI surfaces passed under \`${ALLOWLIST_NAME}\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail job if Web AI health is red
+        if: ${{ always() && (steps.health.outcome != 'success' || steps.health.outputs.health_status != 'passed') }}
+        run: |
+          echo "Web AI health status is '${{ steps.health.outputs.health_status }}'."
+          exit 1
+
+  # JOV-6870: /api/health stays 200 while every requireRedis limiter fails
+  # closed (hid the 09-24 quota outage for 3 days). Probe the limiter store.
+  limiter-store-health:
+    name: Limiter Store Health
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '17 */6 * * *' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Doppler CLI
+        uses: ./.github/actions/setup-doppler
+
+      - name: Probe production limiter store
+        id: probe
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2016 # expanded by the inner sh, after doppler injects CRON_SECRET
+          doppler run --project jovie-web --config prd --only-secrets=CRON_SECRET --no-fallback -- \
+            env -u DOPPLER_TOKEN sh -c 'curl --silent --show-error --connect-timeout 10 --max-time 20 \
+              -o "$RUNNER_TEMP/redis-health.json" -w "%{http_code}" \
+              -H "Authorization: Bearer $CRON_SECRET" https://jov.ie/api/health/redis' > "$RUNNER_TEMP/redis-code"
+          code=$(cat "$RUNNER_TEMP/redis-code")
+          body=$(jq -c '{status, failureKind}' "$RUNNER_TEMP/redis-health.json" 2>/dev/null || echo '{}')
+          echo "Limiter store: HTTP $code $body" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "summary=HTTP $code $body" >> "$GITHUB_OUTPUT"
+          test "$code" = 200
+
+      - name: Send Slack alert on limiter store failure
+        if: ${{ failure() }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SUMMARY: ${{ steps.probe.outputs.summary }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          test -n "$SLACK_WEBHOOK_URL" || exit 0
+          curl --fail --silent --show-error --max-time 20 -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg s "$SUMMARY" --arg r "$RUN_URL" \
+              '{text: ("High: production rate-limit store unhealthy; requireRedis limiters fail closed (onboarding chat, /api/v1). " + $s + " <" + $r + "|run>")}')"

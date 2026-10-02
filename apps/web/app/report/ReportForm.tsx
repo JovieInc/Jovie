@@ -165,7 +165,7 @@ export function ReportForm({
       </Field>
 
       {error ? (
-        <p className='text-xs text-destructive' role='alert'>
+        <p className='text-xs text-error' role='alert'>
           {error}
         </p>
       ) : null}

@@ -14,7 +14,11 @@ if (!data) {
 
 describe('ComparisonPageContent', () => {
   it('renders the complete checked-in comparison body', () => {
-    render(<ComparisonPageContent data={data} />);
+    const { container } = render(<ComparisonPageContent data={data} />);
+
+    expect(
+      container.querySelector('[class~="via-(--color-bg-base)/70"]')
+    ).toBeInTheDocument();
 
     expect(
       screen.getByRole('heading', { level: 1, name: data.heroHeadline })
@@ -38,8 +42,8 @@ describe('ComparisonPageContent', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(data.bottomLine)).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: 'Try Jovie Free' })
-    ).toHaveAttribute('href', '/signup');
+      screen.getByRole('link', { name: 'Claim my free profile' })
+    ).toHaveAttribute('href', '/signup?plan=free');
     expect(screen.getAllByRole('button')).toHaveLength(data.faq.length);
   });
 

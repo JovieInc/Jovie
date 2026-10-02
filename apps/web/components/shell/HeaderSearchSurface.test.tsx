@@ -214,16 +214,16 @@ describe('HeaderSearchSurface', () => {
 
     expect(screen.getByText('Threads')).toBeVisible();
     expect(screen.getByText('Entities')).toBeVisible();
-    expect(screen.getByText('Library Assets')).toBeVisible();
+    expect(screen.getByText('Work')).toBeVisible();
     expect(screen.getByText('Current view')).toBeVisible();
     expect(screen.getByRole('group', { name: 'Threads' })).toBeVisible();
     expect(screen.getByRole('group', { name: 'Entities' })).toBeVisible();
-    expect(screen.getByRole('group', { name: 'Library Assets' })).toBeVisible();
+    expect(screen.getByRole('group', { name: 'Work' })).toBeVisible();
     expect(screen.getByRole('group', { name: 'Current View' })).toBeVisible();
     for (const heading of [
       screen.getByText('Threads'),
       screen.getByText('Entities'),
-      screen.getByText('Library Assets'),
+      screen.getByText('Work'),
       screen.getByText('Current view'),
     ]) {
       expect(heading.className).not.toContain('uppercase');

@@ -31,12 +31,12 @@ struct MobileActionLoopCalendarResponse: Codable, Equatable, Sendable {
     pendingReviewCount: 1,
     upcomingEvents: [
       MobileActionLoopCalendarEventItem(
-        id: "event-1",
-        title: "Brooklyn show",
-        subtitle: "Brooklyn, NY · Bandsintown",
-        eventDate: "2026-07-10T20:00:00.000Z",
-        eventType: "tour",
-        confirmationStatus: "pending",
+        id: "event-2",
+        title: "Listening party",
+        subtitle: "New York, NY · Manual",
+        eventDate: "2026-07-15T20:00:00.000Z",
+        eventType: "livestream",
+        confirmationStatus: "confirmed",
         statusBadge: nil
       ),
     ],

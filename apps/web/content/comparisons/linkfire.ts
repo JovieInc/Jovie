@@ -5,10 +5,10 @@ export const linkfireComparison: ComparisonData = {
   competitor: 'Linkfire',
   title: 'Jovie vs Linkfire',
   metaDescription:
-    'Compare Jovie and Linkfire for independent musicians. See why artists choose Jovie for smart links, fan notifications, and AI tools without enterprise pricing.',
+    'Compare Jovie and Linkfire for artist profiles, release smart links, pre-saves, audience capture, notifications, and analytics.',
   heroHeadline: 'Jovie vs Linkfire',
   heroSubheadline:
-    'Linkfire is built for labels. Jovie is built for independent artists. Here\u2019s how they compare.',
+    'Both products support artists with music links, bio pages, audience capture, and analytics. Their access models and surrounding workflows differ.',
   heroImage: {
     src: '/images/hero/compare-linkfire.webp',
     alt: 'An abstract arc of glowing cyan light against black.',
@@ -18,87 +18,92 @@ export const linkfireComparison: ComparisonData = {
       name: 'Smart links for releases',
       jovie: true,
       competitor: true,
-    },
-    {
-      name: 'Streaming platform routing',
-      jovie: true,
-      competitor: true,
+      claimIds: ['jovie.smart-links', 'linkfire.smart-links'],
     },
     {
       name: 'Pre-save links',
       jovie: true,
       competitor: true,
+      claimIds: ['jovie.pre-save', 'linkfire.pre-save'],
     },
     {
-      name: 'Artist profile / link-in-bio',
+      name: 'Artist profile or bio link',
       jovie: true,
-      competitor: false,
-      note: 'Linkfire focuses on individual links, not full artist profiles',
-    },
-    {
-      name: 'Fan CRM & contact collection',
-      jovie: true,
-      competitor: false,
-      note: 'Jovie collects and manages fan emails directly',
-    },
-    {
-      name: 'Automatic fan notifications',
-      jovie: true,
-      competitor: false,
-      note: 'Jovie notifies fans when you release new music',
-    },
-    {
-      name: 'AI tools (press releases, strategy)',
-      jovie: true,
-      competitor: false,
-    },
-    {
-      name: 'Release task management',
-      jovie: true,
-      competitor: false,
-    },
-    {
-      name: 'Free tier',
-      jovie: true,
-      competitor: false,
-      note: 'Linkfire requires a paid subscription; Jovie has a free tier',
-    },
-    {
-      name: 'Built for independent artists',
-      jovie: true,
-      competitor: false,
-      note: 'Linkfire is designed for labels and distributors',
-    },
-    {
-      name: 'Enterprise label features',
-      jovie: false,
       competitor: true,
-      note: 'Linkfire has team management, label dashboards, and distributor integrations',
+      note: 'Jovie publishes an artist profile; Linkfire documents customizable Bio Links',
+      claimIds: ['jovie.public-profile', 'linkfire.bio-links'],
+    },
+    {
+      name: 'Email collection',
+      jovie: true,
+      competitor: true,
+      note: 'Jovie includes audience capture; Linkfire lists email collection in its plans and Bio Link guidance',
+      claimIds: ['jovie.contact-collection', 'linkfire.email-collection'],
+    },
+    {
+      name: 'Fan notifications',
+      jovie: true,
+      competitor: true,
+      note: 'Jovie notifications require enrollment; Linkfire documents automated pre-save subscription emails for supported services',
+      claimIds: ['jovie.fan-notifications', 'linkfire.notifications'],
     },
     {
       name: 'Analytics',
       jovie: true,
       competitor: true,
-      note: 'Both offer analytics; Jovie adds audience intelligence and fan CRM',
+      note: 'Jovie advanced analytics require enrollment; Linkfire documents link, streaming, channel, and location analytics',
+      claimIds: ['jovie.analytics', 'linkfire.analytics'],
+    },
+    {
+      name: 'Free access option',
+      jovie: true,
+      competitor: true,
+      note: 'Jovie offers a free public profile; Linkfire says trial accounts revert to a limited free account',
+      claimIds: ['jovie.free-profile', 'linkfire.plans'],
     },
   ],
   faq: [
     {
       question: 'Is Jovie a good alternative to Linkfire?',
       answer:
-        'If you\u2019re an independent artist, yes. Linkfire is built for labels and distributors with enterprise pricing. Jovie is built for independent musicians with a free tier, fan CRM, automatic notifications, and AI tools. You get smart links plus everything else you need to run your release.',
+        'It can be, depending on your workflow. Both support release links, pre-saves, an artist-facing profile or bio link, audience capture, and analytics. Jovie also provides an enrolled release-planning workspace; compare current access and plan details before switching.',
+      claimIds: [
+        'jovie.smart-links',
+        'jovie.pre-save',
+        'jovie.public-profile',
+        'jovie.contact-collection',
+        'jovie.analytics',
+        'jovie.release-workspace',
+        'linkfire.smart-links',
+        'linkfire.pre-save',
+        'linkfire.bio-links',
+        'linkfire.email-collection',
+        'linkfire.analytics',
+      ],
     },
     {
       question: 'How much does Linkfire cost vs Jovie?',
       answer:
-        'Linkfire requires a paid subscription with no free tier. Jovie has a free tier that includes smart links, artist profiles, and fan collection. Paid plans add advanced features.',
+        'Jovie offers a free public profile, while paid Jovie capabilities have separate access terms. Linkfire publishes paid Pro, Teams, Premium, and Enterprise options, a free trial, and a limited free account after the trial. Check both pricing pages for current terms.',
+      claimIds: ['jovie.free-profile', 'jovie.pricing', 'linkfire.plans'],
     },
     {
-      question: 'Can I use Jovie if I\u2019m on a label?',
+      question: 'Can I use Jovie if I’m on a label?',
       answer:
-        'Yes. Jovie works for any musician, independent or signed. But if your label already uses Linkfire for campaign-level analytics, Jovie is ideal as your personal artist platform for fan relationships and direct engagement.',
+        'Jovie’s public artist profile is available to claim, while some workspace capabilities require enrollment. Linkfire publishes plans for solo artists, teams, labels, and enterprise organizations.',
+      claimIds: [
+        'jovie.public-profile',
+        'jovie.capability-access',
+        'linkfire.plans',
+      ],
     },
   ],
   bottomLine:
-    'Linkfire is powerful for labels managing hundreds of releases. But if you\u2019re an independent artist who needs smart links, a profile, fan data, and release automation without enterprise pricing, Jovie is the better fit.',
+    'Jovie and Linkfire overlap on core artist-link workflows. Jovie centers a public artist profile and enrolled release workspace; Linkfire publishes a broader plan ladder for solo artists, teams, and enterprise organizations. The better fit depends on the exact access and team workflow you need.',
+  claimIds: [
+    'jovie.public-profile',
+    'jovie.release-workspace',
+    'jovie.capability-access',
+    'linkfire.plans',
+  ],
 };

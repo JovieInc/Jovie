@@ -214,6 +214,33 @@ describe('jovie CLI', () => {
     expect(invalid.read()).toContain('--full is only supported by docs llms');
   });
 
+  it('reports a missing command argument instead of an unknown command', async () => {
+    const stdout = createOutput();
+    const stderr = createOutput();
+
+    await expect(
+      runCli(['artist', 'get', '--json'], {
+        stdout: stdout.output,
+        stderr: stderr.output,
+      })
+    ).resolves.toBe(2);
+    expect(JSON.parse(stdout.read())).toEqual({
+      error: {
+        code: 'USAGE_ERROR',
+        message: 'Missing required argument <username> for artist get',
+      },
+    });
+
+    const text = createOutput();
+    await expect(
+      runCli(['profile', 'create'], { stderr: text.output })
+    ).resolves.toBe(2);
+    expect(text.read()).toContain(
+      'Missing required argument <url> for profile create'
+    );
+    expect(text.read()).not.toContain('Unknown command');
+  });
+
   it('rejects malformed parser options and unsafe base URLs', async () => {
     const parserError = createOutput();
     await expect(
@@ -268,15 +295,16 @@ describe('jovie CLI', () => {
     expect(stderr.read()).toContain('--full is only supported by docs llms');
   });
 
-  it('keeps an unexpected response-body failure distinct from request failures', async () => {
+  it('reports response stream failure with a stable request code', async () => {
     const stdout = createOutput();
     const fetchImpl: FetchImplementation = async () =>
-      ({
-        ok: true,
-        text: async () => {
-          throw new Error('body stream unavailable');
-        },
-      }) as unknown as Response;
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.error(new Error('body stream unavailable'));
+          },
+        })
+      );
 
     await expect(
       runCli(['docs', 'llms', '--json'], {
@@ -286,8 +314,9 @@ describe('jovie CLI', () => {
     ).resolves.toBe(1);
     expect(JSON.parse(stdout.read())).toEqual({
       error: {
-        code: 'CLI_ERROR',
+        code: 'REQUEST_FAILED',
         message: 'body stream unavailable',
+        status: 200,
       },
     });
   });
@@ -408,5 +437,27 @@ describe('jovie CLI', () => {
     const help = createOutput();
     await runCli(['--help'], { stdout: help.output });
     expect(help.read()).toContain('report bug --title <text> --details <text>');
+  });
+});
+
+describe('machine-readable special commands', () => {
+  it('prints JSON help and version', async () => {
+    for (const flag of ['--help', '--version']) {
+      const stdout = createOutput();
+      expect(await runCli([flag, '--json'], { stdout: stdout.output })).toBe(0);
+      expect(JSON.parse(stdout.read())).toHaveProperty(
+        flag === '--help' ? 'content' : 'version'
+      );
+    }
+  });
+  it('rejects unsupported special command flags', async () => {
+    for (const args of [
+      ['skill', '--full', '--json'],
+      ['skill', '--title', 'bad', '--json'],
+    ]) {
+      const stdout = createOutput();
+      expect(await runCli(args, { stdout: stdout.output })).toBe(2);
+      expect(JSON.parse(stdout.read()).error.code).toBe('USAGE_ERROR');
+    }
   });
 });

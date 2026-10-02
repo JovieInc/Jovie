@@ -21,7 +21,7 @@ function installProcessPolyfill(): void {
   // Chromatic story extraction runs in a browser. Vite `define` rewrites most
   // process.env.* references, but a global fallback prevents hard crashes if
   // any residual bare `process` access remains in the story graph.
-  const g = globalThis as typeof globalThis & {
+  const g = globalThis as unknown as {
     process?: { env?: Record<string, string | undefined> };
   };
   if (!g.process) {
@@ -143,7 +143,10 @@ if (typeof window !== 'undefined') {
       // pin `fetch` at module init, so swapping `globalThis.fetch` inside a
       // story decorator can never reach them. Registering a handler on
       // `window.__jovieApiMock` works because this pinned wrapper consults
-      // the live global on every request.
+      // the live global on every request. The shared `withSignedInSession`
+      // decorator (.storybook/signed-in-session.tsx) registers through this
+      // hook; a `?id=` query check cannot work under the vitest browser
+      // runner, which owns the page URL.
       const storyApiMock = (
         window as Window & {
           __jovieApiMock?: (request: {
@@ -156,27 +159,9 @@ if (typeof window !== 'undefined') {
         const mocked = await storyApiMock({ url: urlObj, init });
         if (mocked) return mocked;
       }
-      // Auth-backed account stories need a signed-in fixture after the
-      // Better Auth migration; the old Clerk mock no longer supplies it.
-      if (
-        urlObj.pathname === '/api/auth/get-session' &&
-        new URLSearchParams(window.location.search)
-          .get('id')
-          ?.match(/^organisms-(sidebaridentitygroup|unifiedsidebar)--/)
-      ) {
-        return Response.json({
-          user: {
-            id: 'story-user',
-            name: 'Tim White',
-            email: 'tim@example.com',
-            image: null,
-          },
-          session: {
-            id: 'story-session',
-            userId: 'story-user',
-            expiresAt: '2099-01-01T00:00:00Z',
-          },
-        });
+      // Better Auth's get-session returns null when signed out.
+      if (urlObj.pathname === '/api/auth/get-session') {
+        return Response.json(null);
       }
       return new Response(JSON.stringify({}), {
         status: 200,
@@ -236,7 +221,8 @@ const preview: Preview = {
   },
   tags: ['autodocs'],
   decorators: [
-    Story => {
+    (Story, context) => {
+      const themeOverride = context.parameters?.themes?.themeOverride;
       const [queryClient] = React.useState(
         () =>
           new QueryClient({
@@ -260,8 +246,12 @@ const preview: Preview = {
             <ThemeProvider
               attribute='class'
               defaultTheme='dark'
+              forcedTheme={
+                themeOverride === 'light' || themeOverride === 'dark'
+                  ? themeOverride
+                  : undefined
+              }
               enableSystem={false}
-              disableTransitionOnChange
               storageKey='jovie-theme-storybook'
             >
               <TooltipProvider delayDuration={0} skipDelayDuration={0}>

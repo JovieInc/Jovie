@@ -3,6 +3,7 @@
  * (email-newsletter-agent + klaviyo-agent-audit). No Klaviyo MCP, no MJML.
  */
 
+import { customerVoiceFloorViolations } from '@/lib/copy/outbound-floor';
 import type {
   FanEmailClaimKey,
   FanEmailDisposition,
@@ -20,6 +21,9 @@ export const FAN_EMAIL_SEND_RULES = `FAN-EMAIL — email-newsletter-agent + klav
 export const UNKNOWN_LIST_SKIP_REASON =
   'Fan list size is unknown. Skip send. No queue.';
 export const EMPTY_LIST_SKIP_REASON = 'No fan emails yet. Skip send. No queue.';
+
+/** Safe subject used when drafted subject copy fails the copy floor. */
+export const FAN_EMAIL_FALLBACK_SUBJECT = 'New music is out.';
 
 const URL_PATTERN = /https?:\/\/[^\s)>\]]+/gi;
 const TESTIMONIAL_PATTERN =
@@ -196,12 +200,28 @@ export function sanitizeFanEmailCopy(input: {
   const extras = (body.match(URL_PATTERN) ?? []).filter(url => url !== ctaUrl);
   if (extras.length > 0) body = collapse(stripUrlsExcept(body, ctaUrl));
   const hasCta = Boolean(ctaUrl && body.includes(ctaUrl));
+
+  // Copy floor (canon/VOICE.md, JOV-6616): fan email goes out in the
+  // customer's voice. A blocking violation swaps in a safe line and the
+  // fired rules are reported so the send path never ships floor-breaking
+  // copy.
+  const copyFloorViolations = new Set(
+    customerVoiceFloorViolations(subject, { headline: true })
+  );
+  const gatedSubject =
+    copyFloorViolations.size > 0 ? FAN_EMAIL_FALLBACK_SUBJECT : subject;
+  const bodyViolations = customerVoiceFloorViolations(body);
+  if (bodyViolations.length > 0) {
+    for (const rule of bodyViolations) copyFloorViolations.add(rule);
+    body = ctaUrl ? `The release is live. ${ctaUrl}` : 'The release is live.';
+  }
   return {
-    subject,
+    subject: gatedSubject,
     body,
     ctaUrl: hasCta ? ctaUrl : null,
     ctaCount: hasCta ? 1 : 0,
     omittedClaims: omitted,
+    copyFloorViolations: [...copyFloorViolations],
   };
 }
 

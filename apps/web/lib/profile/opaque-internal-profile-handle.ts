@@ -8,9 +8,12 @@
  * redirect to the canonical handle or 404.
  *
  * Shape matches JOV-6126 QA machine handles. Unclaimed collaborator
- * `a_{uuid36}` profiles are a separate, intentional public identity and are
- * not treated as junk destinations here — except when that encoded handle is
- * attached to the page owner, in which case the owner's claimed handle wins.
+ * `a_{uuid36}` profiles are a separate, intentional public identity — the
+ * `/artists/:id` route still resolves them — but the encoded handle is a raw
+ * registry ID, not a readable slug, so public credit/mention surfaces never
+ * link to it (JOV-6612): the name renders as plain text instead. When that
+ * encoded handle is attached to the page owner, the owner's claimed handle
+ * wins.
  */
 
 export const QA_MACHINE_HANDLE_PATTERN = /^tmoc[0-9a-z]{10,}$/;
@@ -70,8 +73,10 @@ function namesMatch(left: string, right: string): boolean {
  * Public href handle for a release-page artist name.
  *
  * Opaque internal IDs never become `/${handle}` destinations. When the credit
- * is the page owner, use the owner's canonical handle. Other opaque credits
- * stay unlinked so we do not mint junk profile traffic.
+ * is the page owner, use the owner's canonical handle. Other opaque credits —
+ * including encoded `a_*` unclaimed handles, which are raw registry IDs, not
+ * readable slugs (JOV-6612) — stay unlinked so we do not mint junk profile
+ * traffic.
  */
 export function canonicalizeReleaseArtistHandle(input: {
   readonly handle: string | null;
@@ -88,9 +93,8 @@ export function canonicalizeReleaseArtistHandle(input: {
     return ownerHandle;
   }
 
-  if (!handle) return null;
-  if (isOpaqueInternalProfileHandle(handle)) return null;
-  return handle;
+  if (!isCanonicalPublicProfileHandle(handle)) return null;
+  return normalizePublicProfileHandle(handle);
 }
 
 export function canonicalizeReleaseArtistCredits<
@@ -147,6 +151,19 @@ export function decideOpaqueInternalProfileUsername(input: {
   }
 
   return { action: 'not_found' };
+}
+
+/**
+ * True only for a single-segment `/{handle}` public profile path whose handle
+ * is canonical — never `/artists/<id>` or an encoded `a_*` raw-ID destination
+ * (JOV-6612). Credit/mention link builders use this to decide between a
+ * readable link and a non-link treatment.
+ */
+export function isPublicArtistMentionHref(
+  href: string | null | undefined
+): boolean {
+  const segment = /^\/([^/?#]+)$/.exec(href?.trim() ?? '')?.[1];
+  return segment != null && isCanonicalPublicProfileHandle(segment);
 }
 
 export function publicProfilePathForHandle(handle: string): string {

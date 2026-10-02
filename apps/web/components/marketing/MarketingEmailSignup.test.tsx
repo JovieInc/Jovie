@@ -6,8 +6,16 @@ import { MarketingEmailSignup } from './MarketingEmailSignup';
 const route = vi.hoisted(() => ({ pathname: '/blog' as string | null }));
 vi.mock('next/navigation', () => ({ usePathname: () => route.pathname }));
 vi.mock('@/app/(marketing)/changelog/ChangelogEmailSignup', () => ({
-  ChangelogEmailSignup: ({ source }: { source: string }) => (
-    <div data-testid='signup'>{source}</div>
+  ChangelogEmailSignup: ({
+    source,
+    marketingSection,
+  }: {
+    source: string;
+    marketingSection?: boolean;
+  }) => (
+    <div data-testid='signup' data-marketing-section={marketingSection}>
+      {source}
+    </div>
   ),
 }));
 
@@ -31,6 +39,10 @@ describe('MarketingEmailSignup placement', () => {
     render(<MarketingEmailSignup />);
     expect(screen.getByTestId('signup')).toHaveTextContent(
       `marketing:${pathname}`
+    );
+    expect(screen.getByTestId('signup')).toHaveAttribute(
+      'data-marketing-section',
+      'true'
     );
   });
   it.each([

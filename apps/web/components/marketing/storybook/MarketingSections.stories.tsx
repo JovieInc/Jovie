@@ -204,7 +204,6 @@ export const artistProfileAssembly: Story = {
     <SectionFrame sectionId='feature-split'>
       <ArtistProfileLandingPage
         copy={ARTIST_PROFILE_COPY}
-        socialProof={ARTIST_PROFILE_SOCIAL_PROOF}
         flags={{ FULL_PAGE: false, SOCIAL_PROOF: false, FAQ: false }}
       />
     </SectionFrame>
@@ -466,6 +465,18 @@ export const artistProfileCalloutSystem: Story = {
           </MarketingSurfaceCard>
         </div>
       </MarketingSnapRail>
+    </SectionFrame>
+  ),
+};
+
+export const productGallery: Story = {
+  name: 'product-gallery',
+  render: () => (
+    <SectionFrame sectionId='product-gallery'>
+      <MarketingShippedSitesShowcase />
+      <ArtistProfileReleaseCycleGallery
+        releaseCycle={ARTIST_PROFILE_COPY.releaseCycle}
+      />
     </SectionFrame>
   ),
 };

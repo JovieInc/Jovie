@@ -29,6 +29,16 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
     'apps/web/tests/unit/design-system/arbitrary-values.baseline.json',
     ['apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'],
   ],
+  [
+    'apps/web/data/marketing/penContracts.ts',
+    [
+      'apps/web/tests/unit/marketing/component-registry.test.ts',
+      'apps/web/tests/unit/marketing/locked-pen-chrome-contract.test.ts',
+      'apps/web/tests/unit/marketing/artist-profile/ArtistProfileAdaptiveSection.test.tsx',
+      'apps/web/tests/unit/marketing/artist-profile/ArtistProfileOutcomesLedger.test.tsx',
+      'apps/web/tests/unit/marketing/MarketingTerminalCta.test.tsx',
+    ],
+  ],
 ]);
 // Any web source that uses TanStack Virtual must stay out of React Compiler
 // memoization (JOV-6702); the invariant has no import edge to such files.
@@ -144,8 +154,6 @@ const HOMEPAGE_SYSTEM_B_STYLE_GUARD_TESTS = [
   'apps/web/tests/unit/home/mounted-home-product-statement-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-trust-strip-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-workspace-system-b-style-guard.test.ts',
-  'apps/web/tests/unit/home/release-mode-mock-card-system-b-style-guard.test.tsx',
-  'apps/web/tests/unit/home/release-operating-system-showcase-system-b-style-guard.test.tsx',
 ];
 const HOMEPAGE_SYSTEM_B_GUARD_EXACT_INPUTS = new Set([
   'apps/web/components/marketing/ClientFaqAccordion.tsx',
@@ -202,6 +210,11 @@ const SUMMER_COMMISSIONING_LANE = new Set([
 ]);
 const CAPABILITY_BENCHMARK_PRIMARY_INPUTS = new Set([
   'scripts/capability-benchmark/capability-benchmark-registry.json',
+  'scripts/capability-benchmark/computer-use-decision.jsonl',
+  'scripts/capability-benchmark/computer-use-decision.mjs',
+  'scripts/capability-benchmark/computer-use-decision.test.mjs',
+  'scripts/capability-benchmark/capability-reconciliation.mjs',
+  'scripts/capability-benchmark/capability-reconciliation.test.mjs',
   'scripts/capability-benchmark/capability-benchmark.mjs',
   'scripts/capability-benchmark/capability-benchmark.test.mjs',
   'docs/operations/CAPABILITY_BENCHMARK.md',
@@ -213,6 +226,8 @@ const CAPABILITY_BENCHMARK_LANE = new Set([
 ]);
 const CAPABILITY_BENCHMARK_NODE_TESTS = [
   'scripts/capability-benchmark/capability-benchmark.test.mjs',
+  'scripts/capability-benchmark/computer-use-decision.test.mjs',
+  'scripts/capability-benchmark/capability-reconciliation.test.mjs',
 ];
 const SUMMER_COMMISSIONING_NODE_TESTS = [
   'scripts/summer-commissioning/company-registry.test.mjs',
@@ -475,6 +490,60 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
       '--test-coverage-lines=85',
       '--test-coverage-branches=75',
       '--test-coverage-functions=90',
+    ],
+  ],
+  [
+    'scripts/publish-coverage-report.test.mjs',
+    'scripts/lib/publish-coverage-report.mjs',
+    [
+      '--test-coverage-lines=95',
+      '--test-coverage-branches=90',
+      '--test-coverage-functions=90',
+    ],
+  ],
+  [
+    'scripts/coverage-surface-files.test.mjs',
+    'scripts/lib/coverage-surface-files.mjs',
+    [
+      '--test-coverage-lines=100',
+      '--test-coverage-branches=100',
+      '--test-coverage-functions=100',
+    ],
+  ],
+  [
+    'scripts/invariants/sonar-repair-contract.test.mjs',
+    'scripts/invariants/sonar-repair-contract.mjs',
+    [
+      '--test-coverage-lines=95',
+      '--test-coverage-branches=80',
+      '--test-coverage-functions=95',
+    ],
+  ],
+  [
+    'scripts/normalize-sonar-lcov.test.mjs',
+    'scripts/normalize-sonar-lcov.mjs',
+    [
+      '--test-coverage-lines=100',
+      '--test-coverage-branches=100',
+      '--test-coverage-functions=100',
+    ],
+  ],
+  [
+    '.github/scripts/internal-pr-review.test.mjs',
+    '.github/scripts/internal-pr-review.mjs',
+    [
+      '--test-coverage-lines=85',
+      '--test-coverage-branches=80',
+      '--test-coverage-functions=85',
+    ],
+  ],
+  [
+    'scripts/lib/__tests__/source-admission-policy.test.mjs',
+    'scripts/lib/source-admission-policy.mjs',
+    [
+      '--test-coverage-lines=95',
+      '--test-coverage-branches=90',
+      '--test-coverage-functions=100',
     ],
   ],
 ];
@@ -1005,6 +1074,17 @@ export function buildAffectedTestPlan(
       scriptVitestTests: [
         'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
         'scripts/lib/__tests__/automation-verify.test.mjs',
+      ],
+      scriptVitestCoverageArgs: [
+        '--coverage',
+        '--coverage.include=lib/linear-sync-on-merge.mjs',
+        '--coverage.reporter=text',
+        '--coverage.reporter=json-summary',
+        '--coverage.thresholds.perFile=true',
+        '--coverage.thresholds.lines=85',
+        '--coverage.thresholds.statements=85',
+        '--coverage.thresholds.functions=80',
+        '--coverage.thresholds.branches=70',
       ],
       nodeTests: [],
     };
@@ -2280,6 +2360,13 @@ export function buildControlCoverageCommands() {
   ];
 }
 
+const SUMMER_PIN_GUARD_WEB_TEST =
+  'apps/web/lib/ovie/summer-deployment-pin-guard.test.ts';
+const SUMMER_PIN_GUARD_NODE_COMMAND = [
+  'node',
+  ['--test', 'scripts/summer-deployment-pin-guard.test.mjs'],
+];
+
 export function buildSelectedTestCommands(
   plan,
   maxWorkers,
@@ -2287,6 +2374,9 @@ export function buildSelectedTestCommands(
   head
 ) {
   const commands = [];
+  if (plan.selectedTests.includes(SUMMER_PIN_GUARD_WEB_TEST)) {
+    commands.push(SUMMER_PIN_GUARD_NODE_COMMAND);
+  }
   if (plan.deliveryControllerCoverage) {
     commands.push(['node', [...DELIVERY_CONTROLLER_COVERAGE_ARGS]]);
   }
@@ -2443,6 +2533,8 @@ export function buildFullSuiteCommands(maxWorkers, shardCount = 8) {
   return [
     buildCompanyRegistryTestCommand(),
     buildProjectCreationTestCommand(),
+    // Keep the full repository pin scan outside Vitest's 12-second test budget.
+    SUMMER_PIN_GUARD_NODE_COMMAND,
     ...commands,
   ];
 }

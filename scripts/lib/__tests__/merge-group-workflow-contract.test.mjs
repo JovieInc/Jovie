@@ -18,6 +18,7 @@ import {
   runMergeGroupStorybookCertification,
   SHALLOW_DEEPEN_DEPTHS,
 } from '../../component-merge-group-storybook-cert.mjs';
+import { workflowDeclaresReadyForReviewType } from '../../invariants/pr-lifecycle-contract.mjs';
 import {
   EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES,
   EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
@@ -80,6 +81,10 @@ const FORK_GATE_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/fork-pr-gate.yml'),
   'utf8'
 );
+const AUTO_MERGE_DEFAULT_WORKFLOW = readFileSync(
+  resolve(REPO_ROOT, '.github/workflows/auto-merge-default.yml'),
+  'utf8'
+);
 const SIZE_GUARD_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/pr-size-guard.yml'),
   'utf8'
@@ -129,7 +134,7 @@ function getJobBlock(workflow, jobKey) {
   return block.join('\n');
 }
 
-function getStepRunScript(jobBlock, stepName) {
+function getStepBlock(jobBlock, stepName) {
   const lines = jobBlock.split('\n');
   const stepStart = lines.findIndex(
     line => line === `      - name: ${stepName}`
@@ -141,10 +146,13 @@ function getStepRunScript(jobBlock, stepName) {
   const stepEnd = lines.findIndex(
     (line, index) => index > stepStart && /^      - /.test(line)
   );
-  const stepLines = lines.slice(
-    stepStart,
-    stepEnd === -1 ? lines.length : stepEnd
-  );
+  return lines
+    .slice(stepStart, stepEnd === -1 ? lines.length : stepEnd)
+    .join('\n');
+}
+
+function getStepRunScript(jobBlock, stepName) {
+  const stepLines = getStepBlock(jobBlock, stepName).split('\n');
   // `run: &anchor |` shares the script with ci-fast (structural python).
   const runStart = stepLines.findIndex(line =>
     /^ {8}run: (?:&[\w-]+ )?\|$/.test(line)
@@ -203,27 +211,6 @@ function parseExactCiFastFailureOperands(script) {
   )
     throw new Error('Invalid ci-fast fail-closed result set');
   return operands;
-}
-
-function workflowDeclaresReadyForReviewType(source) {
-  const lines = source.split('\n');
-  for (let index = 0; index < lines.length; index += 1) {
-    const match = lines[index].match(/^(\s*)types:\s*(.*?)\s*$/);
-    if (!match) continue;
-
-    const indentation = match[1].length;
-    const declaration = [match[2].replace(/\s+#.*$/, '')];
-    for (let next = index + 1; next < lines.length; next += 1) {
-      const line = lines[next];
-      if (line.trim() === '' || /^\s*#/.test(line)) continue;
-      const nextIndentation = line.match(/^\s*/)?.[0].length ?? 0;
-      if (nextIndentation <= indentation) break;
-      declaration.push(line.replace(/\s+#.*$/, '').trim());
-    }
-
-    if (/\bready_for_review\b/.test(declaration.join(' '))) return true;
-  }
-  return false;
 }
 
 const BLOBLESS_BASE_FETCH_JOBS = new Set([
@@ -323,7 +310,6 @@ describe('merge_group workflow contract', () => {
 
     // Draft state does not change the source SHA. The original source checks
     // remain authoritative when the owner pairs ready with native auto-merge.
-    expect(CI_WORKFLOW).toContain(sourceRevisionTrigger);
     expect(SIZE_GUARD_WORKFLOW).toContain(sourceRevisionTrigger);
     expect(FORK_GATE_WORKFLOW).toContain(
       `pull_request:\n    ${sourceRevisionTrigger}`
@@ -343,18 +329,29 @@ describe('merge_group workflow contract', () => {
     );
   });
 
-  it('ignores the ready transition in every workflow', () => {
+  it('reserves ready_for_review for auto-merge enable only', () => {
     const workflowDir = resolve(REPO_ROOT, '.github/workflows');
     const offenders = readdirSync(workflowDir)
       .filter(file => file.endsWith('.yml') || file.endsWith('.yaml'))
+      .filter(file => file !== 'auto-merge-default.yml')
       .filter(file => {
         const source = readFileSync(resolve(workflowDir, file), 'utf8');
         return workflowDeclaresReadyForReviewType(source);
       });
 
     // A ready transition must never earn an unchanged head a second CI
-    // flight. GitHub native merge queue owns admission without a subscriber.
+    // flight. auto-merge-default.yml is the sole subscriber: it enables
+    // native auto-merge and still skips drafts.
     expect(offenders).toEqual([]);
+    expect(
+      workflowDeclaresReadyForReviewType(AUTO_MERGE_DEFAULT_WORKFLOW)
+    ).toBe(true);
+    expect(AUTO_MERGE_DEFAULT_WORKFLOW).toContain(
+      'types: [opened, reopened, ready_for_review]'
+    );
+    expect(getJobBlock(AUTO_MERGE_DEFAULT_WORKFLOW, 'enable')).toContain(
+      'github.event.pull_request.draft == false'
+    );
   });
 
   it('rejects every valid YAML spelling of a ready_for_review type', () => {
@@ -849,8 +846,23 @@ describe('merge_group workflow contract', () => {
     );
     expect(aggregate).not.toContain('ci-pr-vercel-preview');
     expect(aggregate).not.toContain('ci-a11y');
-    expect(aggregate).not.toContain('neon-db');
+    expect(aggregate).toContain('neon-db');
+    expect(aggregate).toContain(
+      '"$RUN_NEON" == "true" && "$DATABASE_CERTIFICATION_RESULT" != "success"'
+    );
     expect(aggregate).not.toContain('deploy-staging');
+
+    const databaseCertification = getJobBlock(CI_WORKFLOW, 'neon-db');
+    expect(databaseCertification).toContain(
+      "github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true')"
+    );
+    expect(databaseCertification).toMatch(
+      /continue-on-error: true[\s\S]*run test:integration[\s\S]*steps\.integration-tests\.outcome[\s\S]*steps\.migration-upgrade\.outcome/
+    );
+    expect(databaseCertification).toContain("DB_CERTIFICATION: 'true'");
+    expect(databaseCertification).toContain(
+      'Reject inert database test evidence'
+    );
 
     for (const job of [
       'ci-risk-classifier',
@@ -973,7 +985,7 @@ describe('merge_group workflow contract', () => {
       "github.event_name == 'merge_group'"
     );
     expect(aggregate).toContain(
-      'Preview/A11y evidence is explicit opt-in or post-merge; merge groups do not provision Neon.'
+      'Only risk-selected database changes provision expiring Neon; preview/A11y evidence remains explicit opt-in or post-merge.'
     );
 
     for (const jobId of ['ci-promptfoo-evals', 'ci-golden-eval-set']) {
@@ -1357,6 +1369,68 @@ describe('merge_group workflow contract', () => {
     );
   });
 
+  it('classifies the pull_request head diff when the merge result is tree-identical to base (JOV-6820)', () => {
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    const detectStep = pathChanges.slice(
+      pathChanges.indexOf('Detect path changes for all job types')
+    );
+    const pullRequestBranch = detectStep.slice(
+      detectStep.indexOf(
+        'elif [[ "${{ github.event_name }}" == "pull_request" ]]; then'
+      )
+    );
+    const emptyCheckIdx = pullRequestBranch.indexOf(
+      'if [[ -z "${CHANGED_FILES//[$\'\\t\\r\\n\' ]/}" ]]; then'
+    );
+    // The fallback diffs merge-base(origin/<base>, PR head)..PR head.
+    const headFallbackIdx = pullRequestBranch.indexOf(
+      '"origin/${{ github.base_ref }}" "$PULL_REQUEST_HEAD_SHA")'
+    );
+    expect(pullRequestBranch).toContain(
+      'CLASSIFICATION_HEAD_REF="$PULL_REQUEST_HEAD_SHA"'
+    );
+    const hardFailIdx = pullRequestBranch.indexOf(
+      'refusing a false docs-only classification'
+    );
+    expect(headFallbackIdx).toBeGreaterThan(emptyCheckIdx);
+    expect(hardFailIdx).toBeGreaterThan(headFallbackIdx);
+    expect(pullRequestBranch).toContain(
+      'git fetch --no-tags origin "$PULL_REQUEST_HEAD_SHA"'
+    );
+  });
+
+  it('keeps every run block under GitHub max expression length', () => {
+    // GitHub refuses to load a workflow when a single run: block exceeds 21000
+    // chars ("Exceeded max expression length"), which silently drops every
+    // pull_request lane for the branch.
+    const lines = CI_WORKFLOW.split('\n');
+    for (let i = 0; i < lines.length; i += 1) {
+      const start = /^(\s*)run: \|/.exec(lines[i]);
+      if (!start) continue;
+      const indent = start[1].length;
+      const block = [];
+      let j = i + 1;
+      while (
+        j < lines.length &&
+        (/^\s*$/.test(lines[j]) || /^(\s*)/.exec(lines[j])[1].length > indent)
+      ) {
+        block.push(lines[j]);
+        j += 1;
+      }
+      const base = Math.min(
+        ...block.filter(l => l.trim()).map(l => /^(\s*)/.exec(l)[1].length)
+      );
+      const length = block.reduce(
+        (n, l) => n + Math.max(l.length - base, 0) + 1,
+        0
+      );
+      expect(
+        length,
+        `run block starting at ci.yml:${i + 1} exceeds GitHub limit`
+      ).toBeLessThanOrEqual(21000);
+    }
+  });
+
   it('materializes an empty path artifact for typed no-op merge groups', () => {
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
     const detectStep = pathChanges.slice(
@@ -1477,7 +1551,7 @@ describe('merge_group workflow contract', () => {
     expect(pathChanges).toContain('python3 "$TRUSTED_BRAND_SCRUBBER"');
     expect(pathChanges).not.toContain('python3 scripts/brand-scrub.py');
     expect(pathChanges).toContain(
-      'git show "${CLASSIFICATION_BASE_REF}:scripts/lib/product-lane-classifier.mjs"'
+      'git show "${CLASSIFICATION_POLICY_REF}:scripts/lib/product-lane-classifier.mjs"'
     );
     expect(pathChanges).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
     expect(pathChanges).not.toContain(
@@ -1854,6 +1928,20 @@ ${selectedGateScript}`,
     expect(envLines(build).length).toBeGreaterThan(0);
     expect(envLines(build)).toEqual(envLines(ciBuild));
 
+    // The homepage visual compare restores the same entry, so it builds with
+    // the same NEXT_* env and task hash. NEXT_DISABLE_TOOLBAR is the one extra:
+    // turbo does not hash it and the homepage baselines render without the
+    // cookie banner it disables. No DATABASE_URL/VERCEL_ENV pass-through.
+    const visualBuild = stepIn(
+      getJobBlock(CI_WORKFLOW, 'ci-visual-snapshot-compare'),
+      'Build homepage for rendered snapshot compare'
+    );
+    expect(envLines(visualBuild)).toEqual([
+      ...envLines(build),
+      "          NEXT_DISABLE_TOOLBAR: '1'",
+    ]);
+    expect(visualBuild).not.toMatch(/^ {10}(DATABASE_URL|VERCEL_ENV):/m);
+
     // Size/symlink guard and a single trusted-main save of the primary key.
     const measure = stepIn(
       warm,
@@ -1901,6 +1989,39 @@ ${selectedGateScript}`,
     );
     expect(iosCaller).toContain(
       "concurrency-key: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || '' }}"
+    );
+  });
+
+  it('avoids redundant SwiftPM uploads on persistent Mac runners (JOV-7346)', () => {
+    const iosGate = getJobBlock(IOS_CI_WORKFLOW, 'test');
+    const cache = getStepBlock(iosGate, 'Restore Swift package cache');
+    const resolvePackages = getStepBlock(
+      iosGate,
+      'Resolve Swift package dependencies'
+    );
+    const fastGate = getStepBlock(iosGate, 'Run fast unit and coverage gate');
+    const fullGate = getStepBlock(iosGate, 'Run full simulator regression');
+
+    // actions/cache saves in its post step too. Gating the action itself keeps
+    // both remote restore and upload off persistent runners, while hosted VMs
+    // still receive the lockfile- and toolchain-scoped package cache.
+    expect(cache).toContain("if: ${{ runner.environment == 'github-hosted' }}");
+    expect(cache).toContain('uses: actions/cache@');
+    expect(cache).toContain('.build/ios-ci/SourcePackages');
+    expect(cache).toContain('~/Library/Caches/org.swift.swiftpm');
+    expect(cache).toContain('steps.xcode-version.outputs.cache_key');
+    expect(cache).toContain('Package.resolved');
+    expect(cache).toContain('restore-keys:');
+
+    // Only remote caching is conditional on runner ownership. Both runner
+    // classes must resolve dependencies and execute their selected test gate.
+    expect(resolvePackages).not.toMatch(/^\s+if:/m);
+    expect(fastGate).toContain('if: ${{ !inputs.full-regression }}');
+    expect(fastGate).toContain('bash apps/ios/scripts/run-unit-tests.sh');
+    expect(fastGate).toContain('bash apps/ios/scripts/check_coverage.sh');
+    expect(fullGate).toContain('if: ${{ inputs.full-regression }}');
+    expect(iosGate).toContain(
+      'timeout-minutes: ${{ inputs.full-regression && 55 || 18 }}'
     );
   });
 
@@ -2187,7 +2308,7 @@ ${selectedGateScript}`,
     expect(coalesce).not.toContain('secrets: inherit');
   });
 
-  it('keeps merge groups out of manual evidence and deployment jobs', () => {
+  it('keeps merge groups out of non-database manual evidence and deployment jobs', () => {
     expect(getJobBlock(CI_WORKFLOW, 'neon-db')).not.toContain(
       "github.event_name == 'push'"
     );
@@ -2296,9 +2417,7 @@ ${selectedGateScript}`,
       0,
       POSTDEPLOY_PROBES_WORKFLOW.indexOf('\njobs:')
     );
-    expect(header).toContain('workflows: [Production Controller]');
-    expect(header).toContain('types: [completed]');
-    expect(header).toContain('branches: [main]');
+    expect(header).not.toContain('workflow_run:');
     expect(header).toMatch(/^  workflow_dispatch:\s*$/m);
     expect(header).not.toMatch(/^  (pull_request|push|merge_group|schedule):/m);
 
@@ -2440,6 +2559,33 @@ ${selectedGateScript}`,
     );
     expect(dependabotGate).toContain('actions/create-github-app-token');
     expect(dependabotGate).toContain('-f context="Fork PR Gate"');
+  });
+
+  it('skips the auto-merge app token for Dependabot-authored PRs and forks', () => {
+    const enable = getJobBlock(AUTO_MERGE_DEFAULT_WORKFLOW, 'enable');
+    const tokenStep = getStepBlock(enable, 'Generate Jovie Bot token');
+    const enableStep = getStepBlock(enable, 'Enable auto-merge');
+    const enableScript = getStepRunScript(enable, 'Enable auto-merge');
+
+    // Dependabot pull_request runs receive an empty secrets context, so the
+    // step also bails when JOVIE_BOT_PRIVATE_KEY is unavailable; the hourly
+    // triage sweep enables auto-merge with full secrets.
+    expect(tokenStep).toContain(`        if: >-
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          env.JOVIE_BOT_PRIVATE_KEY != ''
+        id: app-token`);
+    expect(enable).toContain(
+      '      JOVIE_BOT_PRIVATE_KEY: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}'
+    );
+    expect(tokenStep).not.toContain("github.actor != 'dependabot[bot]'");
+    expect(enableStep).toContain(
+      'GH_TOKEN: ${{ steps.app-token.outputs.token }}'
+    );
+    expect(enableScript).toMatch(
+      /^set -euo pipefail\nif \[\[ -z "\$GH_TOKEN" \]\]; then\n/
+    );
+    expect(enableScript).toContain('exit 0');
   });
 
   it.each([

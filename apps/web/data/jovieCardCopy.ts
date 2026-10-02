@@ -10,13 +10,18 @@ export const JOVIE_CARD_COPY = {
     canIssuePasses: false,
   },
   seo: {
-    title: 'Jovie Card — Your profile in Apple Wallet',
+    title: 'Jovie Card: Your profile in Apple Wallet',
     description:
       'Jovie Card is coming to Apple Wallet. Join the list for access updates about sharing your Jovie profile in person.',
   },
   hero: {
     headline: 'Your Jovie profile. Ready for the real world.',
-    body: 'We’re bringing your Jovie profile to Apple Wallet—a personal card designed for the people you meet in person. Join the list for access updates.',
+    body: 'We’re bringing your Jovie profile to Apple Wallet as a personal card for the people you meet in person. Join the list for access updates.',
+  },
+  sections: {
+    howItWorks: 'Show your card. They open your profile',
+    introduction: 'An introduction. Not a list of usernames',
+    closing: 'Bring your profile into the room',
   },
   steps: [
     {
@@ -65,7 +70,7 @@ export const JOVIE_CARD_COPY = {
     {
       question: 'Who is eligible?',
       answer:
-        'Eligibility has not been announced. Joining the list only signs you up for access updates and does not unlock or issue a Wallet pass.',
+        'Eligibility has not been announced. Joining the list signs you up for access updates. It does not issue a Wallet pass.',
     },
     {
       question: 'How much will Jovie Card cost?',

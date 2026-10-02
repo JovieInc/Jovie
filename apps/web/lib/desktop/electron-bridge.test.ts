@@ -306,6 +306,53 @@ describe('electron-bridge — defensive guards', () => {
     ).resolves.toEqual({ ok: true });
   });
 
+  it('reads Touch ID state through the bridge and fails closed without it', async () => {
+    const getDesktopPasskeyState = vi.fn(async () => ({
+      available: true,
+      enrolled: 'yes',
+      dismissed: false,
+    }));
+    const setDesktopPasskeyState = vi.fn(
+      async (): Promise<{ ok: boolean; reason?: string }> => ({ ok: true })
+    );
+    const completeDesktopPasskeySignIn = vi.fn(
+      async (): Promise<{ ok: boolean; reason?: string }> => ({
+        ok: false,
+        reason: 'invalid-request',
+      })
+    );
+    setElectronAPI({
+      getDesktopPasskeyState,
+      setDesktopPasskeyState,
+      completeDesktopPasskeySignIn,
+    });
+
+    await expect(__testing.getDesktopPasskeyState()).resolves.toEqual({
+      available: true,
+      enrolled: false,
+      dismissed: false,
+    });
+    await expect(__testing.setDesktopPasskeyState('enrolled')).resolves.toEqual(
+      { ok: true }
+    );
+    expect(setDesktopPasskeyState).toHaveBeenCalledWith('enrolled');
+    await expect(__testing.completeDesktopPasskeySignIn()).resolves.toEqual({
+      ok: false,
+      reason: 'invalid-request',
+    });
+
+    setElectronAPI({ versions: { app: '0.1.0' } });
+    await expect(__testing.getDesktopPasskeyState()).resolves.toEqual({
+      available: false,
+      enrolled: false,
+      dismissed: false,
+    });
+    await expect(__testing.completeDesktopPasskeySignIn()).resolves.toEqual({
+      ok: false,
+      reason: 'desktop-passkey-bridge-unavailable',
+    });
+  });
+
   it('reports return codes unsupported on a stale bridge', async () => {
     setElectronAPI({ versions: { app: '0.1.0' } });
 
@@ -579,6 +626,36 @@ describe('electron-bridge — defensive guards', () => {
       expect(() => unsub()).not.toThrow();
     });
   });
+
+  describe('showDesktopNotification — native notification bridge', () => {
+    it('silently no-ops when electronAPI is absent (browser)', async () => {
+      await expect(
+        __testing.showDesktopNotification({ title: 'New message' })
+      ).resolves.toBeUndefined();
+      expect(captureWarningMock).not.toHaveBeenCalled();
+    });
+
+    it('silently no-ops when showNotification is missing (stale binary)', async () => {
+      setElectronAPI({ versions: { app: '0.1.0' } });
+      await expect(
+        __testing.showDesktopNotification({ title: 'New message' })
+      ).resolves.toBeUndefined();
+      expect(captureWarningMock).not.toHaveBeenCalled();
+    });
+
+    it('passes the payload through to the bridge', async () => {
+      const showNotification = vi.fn().mockResolvedValue({ ok: true });
+      setElectronAPI({ showNotification });
+
+      const payload = {
+        title: 'New fan DM',
+        body: 'Alex sent you a message',
+        url: '/inbox?thread=123',
+      };
+      await __testing.showDesktopNotification(payload);
+      expect(showNotification).toHaveBeenCalledWith(payload);
+    });
+  });
 });
 
 /**
@@ -655,5 +732,42 @@ describe('useDesktopBuildIdentity — build-identity handoff', () => {
       await Promise.resolve();
     });
     expect(result.current).toBeUndefined();
+  });
+});
+
+describe('narrow current Ovie browser bridge', () => {
+  it('passes no destination to native and never uses window.open', async () => {
+    const open = vi.fn(async () => ({ ok: true }));
+    setElectronAPI({ openCurrentOvieInBrowser: open });
+    expect(await __testing.openCurrentOvieInBrowser()).toEqual({ ok: true });
+    expect(open).toHaveBeenCalledExactlyOnceWith();
+    expect(windowOpenSpy).not.toHaveBeenCalled();
+  });
+  it('fails closed for stale binary or ordinary browser', async () => {
+    expect((await __testing.openCurrentOvieInBrowser()).ok).toBe(false);
+    setElectronAPI({});
+    expect(await __testing.openCurrentOvieInBrowser()).toEqual({
+      ok: false,
+      reason: 'ovie-browser-bridge-unavailable',
+    });
+    expect(windowOpenSpy).not.toHaveBeenCalled();
+  });
+  it.each([null, { ok: false }, { ok: false, reason: 'blocked-url' }])(
+    'preserves explicit native failure %j',
+    async result => {
+      setElectronAPI({ openCurrentOvieInBrowser: vi.fn(async () => result) });
+      expect((await __testing.openCurrentOvieInBrowser()).ok).toBe(false);
+      expect(windowOpenSpy).not.toHaveBeenCalled();
+    }
+  );
+  it('converts rejected IPC into actionable failure', async () => {
+    setElectronAPI({
+      openCurrentOvieInBrowser: vi.fn().mockRejectedValue(Error('IPC lost')),
+    });
+    expect(await __testing.openCurrentOvieInBrowser()).toEqual({
+      ok: false,
+      reason: 'ovie-browser-open-failed',
+    });
+    expect(windowOpenSpy).not.toHaveBeenCalled();
   });
 });

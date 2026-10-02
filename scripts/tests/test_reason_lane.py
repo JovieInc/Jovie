@@ -24,6 +24,8 @@ SPEC.loader.exec_module(reason)
 CONFIG = reason.load_config()
 PROPOSAL = {"summary": "Ship the $199 upsell first", "confidence": 0.8, "assumptions": ["artists convert"],
             "risks": ["no traffic"],
+            "precedentDisposition": "adapt", "materialDifference": "Jovie serves independent artists",
+            "newLearningNeeded": ["measure paid conversion"],
             "ranking": [{"id": f"A{i}", "option": f"option {i}", "rationale": "because", "evidence": ["JOV-1"]}
                         for i in range(1, 6)]}
 AGREE = {"verdict": "revise", "counterRanking": ["A1", "A3", "A2", "NEW: cold email"], "missingOptions": ["cold email"],
@@ -147,6 +149,64 @@ class ContextTest(unittest.TestCase):
         self.assertIn("unavailable: RuntimeError", text)
         self.assertIn("gbrain get failed: down", text)
         self.assertTrue(reason.gather_context(job, broken, run=run, limit=20).endswith("cap)"))
+
+
+class BusinessPriorArtTest(unittest.TestCase):
+    def test_representative_founder_questions_are_classified(self):
+        questions = {
+            "How do we know if we have product-market fit and retention?": "product-market-fit-retention",
+            "How should we talk to users and get first customers?": "users-first-customers",
+            "When should we launch the MVP?": "launch-mvp",
+            "How should we set pricing and unit economics?": "pricing-unit-economics",
+            "Should we pursue growth or avoid premature scaling?": "growth-scaling",
+            "Where should founder time and focus go?": "founder-focus",
+            "Should we hire our first engineer?": "hiring-team",
+            "Should we fundraise given our runway?": "fundraising-runway",
+            "How should founder-led B2B sales work?": "b2b-sales",
+            "Which KPI should measure weekly growth?": "metrics-weekly-growth",
+            "Which founder failure modes waste the most time?": "failure-modes",
+        }
+        for question, topic in questions.items():
+            self.assertEqual(reason.business_topic(question), topic, question)
+
+    def test_keyword_first_results_bind_source_date_and_applicability(self):
+        internal = json.dumps({"results": [{"slug": "ops/summer/pricing-evidence"}]})
+        yc = "[0.91] knowledge/external/yc/playbook/pricing-unit-economics -- Pricing"
+        internal_page = "---\ntitle: Internal pricing evidence\nupdated_at: 2026-09-28\n---\n# Evidence"
+        yc_page = ("---\ntitle: Pricing and unit economics\npublished_at: 2017-09-25\n"
+                   "source_url: https://www.ycombinator.com/blog/ycs-essential-startup-advice\n---\n"
+                   "# Pricing\n## Applicability\nUse before buying growth.\n## Source evidence")
+        run = Runner(gbrain=[done(internal), done(yc), done(internal_page), done(yc_page)])
+        job = reason.parse_job("JOV-9", "Pricing", description({**JOB_BLOCK, "question": "How should we price Jovie?"}))
+        receipt = reason.retrieve_business_prior_art(job, run=run)
+        self.assertEqual(receipt["status"], "found")
+        self.assertEqual([p["sourceKind"] for p in receipt["precedents"]], ["internal", "yc-prior-art"])
+        self.assertEqual(receipt["precedents"][1]["publishedAt"], "2017-09-25")
+        self.assertEqual(receipt["precedents"][1]["applicability"], "Use before buying growth.")
+        self.assertEqual(run.made("gbrain")[0][1], "search", "keyword retrieval is always first")
+
+    def test_novel_problem_and_failure_are_distinct(self):
+        job = reason.parse_job("JOV-9", "Pricing", description({**JOB_BLOCK, "question": "Choose pricing for antimatter tours"}))
+        no_match = reason.retrieve_business_prior_art(job, run=Runner(gbrain=[done("0 results"), done("0 results"),
+                                                                             done("0 results"), done("0 results")]))
+        failed = reason.retrieve_business_prior_art(job, run=Runner(gbrain=done("", 1, "offline")))
+        self.assertEqual(no_match["status"], "no sufficiently applicable precedent")
+        self.assertEqual(failed["status"], "retrieval-failed")
+        self.assertIn("offline", failed["failure"])
+
+    def test_conflicting_jovie_evidence_is_explicit_in_the_receipt(self):
+        prior = {"schema": reason.PRIOR_ART_SCHEMA, "status": "found",
+                 "precedents": [{"slug": "knowledge/external/yc/playbook/hiring-team",
+                                  "sourceKind": "yc-prior-art", "sourceUrl": "https://yc/hiring"}]}
+        proposal = {**PROPOSAL, "precedentDisposition": "reject",
+                    "materialDifference": "Signed demand exceeds current capacity and JOV-7 proves the constraint.",
+                    "newLearningNeeded": []}
+        job = reason.parse_job("JOV-9", "Hire?", description({**JOB_BLOCK, "question": "Should we hire now?"}))
+        record = reason.result_record(job, reason.reconcile(proposal, AGREE), proposal, AGREE,
+                                      "opus", "grok", "slug", prior_art=prior)
+        self.assertEqual(record["decisionEvidence"]["inference"]["precedentDisposition"], "reject")
+        self.assertIn("JOV-7", record["decisionEvidence"]["inference"]["materialDifference"])
+        self.assertEqual(record["decisionEvidence"]["sourcedPrecedent"], ["https://yc/hiring"])
 
 
 class ParseOutputTest(unittest.TestCase):
@@ -338,6 +398,16 @@ class ExecuteTest(unittest.TestCase):
         self.assertTrue(out["retry"])
         self.assertEqual(out["record"]["confidence"], "failed")
 
+    def test_research_escalates_to_astra_only_when_glm_fails(self):
+        job = reason.parse_job("JOV-9", "t", description({**JOB_BLOCK, "decisionType": "research"}))
+        run = Runner(hyperagent=[done("", 2, "glm down"), done(json.dumps({"ok": True, "text": "Astra memo"}))])
+        with tempfile.TemporaryDirectory() as tmp:
+            out = reason.execute(job, CONFIG, "ctx", Path(tmp), run=run)
+        agents = [call[call.index("--agent-id") + 1] for call in run.made("hyperagent")]
+        self.assertEqual(agents, ["cmtj3n2q901i407adklzzq01t", "cmuc85zwf010j07adgiv0pvze"])
+        self.assertIn("Astra memo", out["comment"])
+        self.assertFalse(out["retry"])
+
     def test_research_goes_to_the_research_backend(self):
         job = reason.parse_job("JOV-9", "t", description({**JOB_BLOCK, "decisionType": "research"}))
         run = Runner(hyperagent=done(json.dumps({"ok": True, "text": "Answer: yes. Sources: ..."})))
@@ -348,7 +418,12 @@ class ExecuteTest(unittest.TestCase):
             gone = reason.execute(job, CONFIG, "ctx", Path(tmp), run=Runner(hyperagent=OSError("x")))
         self.assertEqual(out["record"]["confidence"], "research")
         self.assertIn("Answer: yes", out["comment"])
-        self.assertIn("fable-5.1", run.made("hyperagent")[0][3])
+        first = run.made("hyperagent")[0]
+        self.assertIn("z-ai/glm-5.3", first)
+        # The agent id picks the model; the --model string is only a label (Fable agent retired).
+        self.assertIn("cmtj3n2q901i407adklzzq01t", first)
+        self.assertNotIn("cmuk33ew70r2e06adfqx6gbpy", first)
+        self.assertEqual(len(run.made("hyperagent")), 1, "a GLM answer never escalates")
         self.assertTrue(failed["retry"])
         self.assertEqual(raw["record"]["confidence"], "research")
         self.assertTrue(gone["retry"])
@@ -384,6 +459,45 @@ class OneJobTest(unittest.TestCase):
         self.assertIsNone(record["gbrainSlug"])
         self.assertIsNone(result_block(linear.comments[-1][1])["gbrainSlug"])
         self.assertTrue(reason.write_gbrain("s", "t", "b", run=Runner(gbrain=OSError("x"))) is False)
+
+    def test_prior_art_failure_blocks_models_and_budget_spend(self):
+        linear = FakeLinear()
+        issue = {**self.issue, "description": description({**JOB_BLOCK, "question": "How should we price Jovie?",
+                                                            "contextRefs": []})}
+        run = Runner(gbrain=done("", 1, "gbrain offline"), claude=claude_ok())
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            record = reason.one_job(linear, issue, CONFIG, state, run=run)
+            self.assertFalse(reason.budget_path(state).exists())
+        self.assertEqual(record["priorArt"]["status"], "retrieval-failed")
+        self.assertEqual(run.made("claude"), [])
+        self.assertEqual(linear.moves[-1], ("i-9", "Todo"))
+
+    def test_known_yc_playbook_reaches_the_prompt_before_a_fresh_experiment(self):
+        linear = FakeLinear()
+        issue = {**self.issue, "description": description({**JOB_BLOCK, "question": "Should we hire our first engineer?",
+                                                            "contextRefs": ["JOV-12"]})}
+        linear.issues["JOV-12"] = {"identifier": "JOV-12", "title": "Capacity evidence", "priority": 2,
+                                   "state": {"name": "Todo"}, "labels": {"nodes": []},
+                                   "description": "Current customer demand does not exceed capacity."}
+        hit = "[0.9] knowledge/external/yc/playbook/hiring-team -- Hiring and team growth"
+        page = ("---\ntitle: Hiring and team growth\npublished_at: 2026-09-28\n"
+                "source_url: https://www.ycombinator.com/library/4H-how-to-hire-your-first-engineer\n---\n"
+                "# Hiring\n## Applicability\nUse before adding early headcount.\n## Source evidence")
+        proposal = {**PROPOSAL, "precedentDisposition": "adopt",
+                    "materialDifference": "No material difference; Jovie is pre-PMF with spare capacity.",
+                    "newLearningNeeded": [],
+                    "ranking": [{**item, "evidence": ["knowledge/external/yc/playbook/hiring-team", "JOV-12"]}
+                                for item in PROPOSAL["ranking"]]}
+        run = Runner(gbrain=[done("0 results"), done(hit), done(hit), done(page), done("ok")],
+                     claude=claude_ok(proposal), grok=[done("logged in"), done(json.dumps(AGREE))])
+        with tempfile.TemporaryDirectory() as tmp:
+            record = reason.one_job(linear, issue, CONFIG, Path(tmp), run=run)
+        prompt = run.calls[next(i for i, (args, _) in enumerate(run.calls) if args[0] == "claude")][1]["input"]
+        self.assertIn("knowledge/external/yc/playbook/hiring-team", prompt)
+        self.assertIn("what is materially different about Jovie's case?", prompt)
+        self.assertEqual(record["decisionEvidence"]["inference"]["precedentDisposition"], "adopt")
+        self.assertEqual(record["decisionEvidence"]["newLearning"], [])
 
     def test_failure_retries_once_then_cancels(self):
         linear = FakeLinear()

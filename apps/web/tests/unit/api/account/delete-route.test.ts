@@ -109,6 +109,10 @@ vi.mock('@/lib/db/schema/profiles', () => ({
   },
 }));
 
+vi.mock('@/lib/db/schema/ios-push-devices', () => ({
+  iosPushDevices: { userId: 'iosPushDevices.userId' },
+}));
+
 vi.mock('@/lib/db/schema/pre-save', () => ({
   preSaveTokens: { userId: 'preSaveTokens.userId' },
 }));
@@ -235,7 +239,7 @@ describe('POST /api/account/delete', () => {
     expect(response.status).toBe(200);
     const json = await response.json();
     expect(json.success).toBe(true);
-    expect(mockDbDelete).toHaveBeenCalledTimes(4);
+    expect(mockDbDelete).toHaveBeenCalledTimes(5);
     expect(mockDbUpdate).not.toHaveBeenCalled();
   });
 
@@ -255,7 +259,7 @@ describe('POST /api/account/delete', () => {
     expect(json.success).toBe(true);
 
     // Verify the erasure fence is committed before dependent-row cleanup.
-    expect(mockDbDelete).toHaveBeenCalledTimes(4);
+    expect(mockDbDelete).toHaveBeenCalledTimes(5);
     expect(mockDbUpdate).toHaveBeenCalled();
     expect(mockDbUpdate.mock.invocationCallOrder[0]).toBeLessThan(
       mockDbDelete.mock.invocationCallOrder[0]

@@ -1,5 +1,4 @@
 import { Button } from '@jovie/ui';
-import { Check } from 'lucide-react';
 import Link from 'next/link';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import {
@@ -83,7 +82,6 @@ function MarketingPricingPlanCard({
         <ul className='marketing-pricing-plan-card__features'>
           {plan.features.map(feature => (
             <li key={feature}>
-              <Check aria-hidden='true' size={15} strokeWidth={1.8} />
               <span>{feature}</span>
             </li>
           ))}

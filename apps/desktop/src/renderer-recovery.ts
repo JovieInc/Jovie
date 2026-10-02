@@ -565,6 +565,89 @@ export function shouldRecoverAuthHandoffToCanonicalShell(url: string): boolean {
   return url === '' || url === 'about:blank';
 }
 
+/** Recover only a document navigation actually interrupted by auth. */
+export function createAuthHandoffNavigationRecovery(appOrigin: string) {
+  let pending: string | null = null;
+  let interrupted: string | null = null;
+  let retry: string | null = null;
+  let canonicalRecoveryPending = false;
+  let generation = 0;
+  const isWorkspace = (value: string) => {
+    try {
+      const url = new URL(value);
+      return (
+        url.origin === appOrigin &&
+        !url.username &&
+        !url.password &&
+        (url.pathname === '/app' || url.pathname.startsWith('/app/'))
+      );
+    } catch {
+      return false;
+    }
+  };
+  const clear = () => {
+    generation += 1;
+    pending = null;
+    interrupted = null;
+    retry = null;
+    canonicalRecoveryPending = false;
+  };
+  return {
+    navigationStarted(input: {
+      url: string;
+      currentUrl: string;
+      isMainFrame: boolean;
+      isInPlace: boolean;
+    }) {
+      if (!input.isMainFrame || input.isInPlace) return;
+      // loadURL's retry start must retain its one-shot auth-loop protection.
+      if (retry === input.url) return;
+      if (canonicalRecoveryPending) {
+        try {
+          const url = new URL(input.url);
+          if (url.origin === appOrigin && url.pathname === '/desktop-auth') {
+            return;
+          }
+        } catch {
+          // An unrelated/invalid navigation discards stale recovery state.
+        }
+      }
+      clear();
+      if (isWorkspace(input.currentUrl) && isWorkspace(input.url)) {
+        pending = input.url;
+      }
+    },
+    authIntercepted(): 'handoff' | 'canonical-auth-shell' | 'ignore' {
+      if (canonicalRecoveryPending) return 'ignore';
+      if (retry) {
+        clear();
+        canonicalRecoveryPending = true;
+        return 'canonical-auth-shell';
+      }
+      interrupted = pending;
+      return 'handoff';
+    },
+    documentFinished() {
+      // This event has no navigation identity. It cannot complete an owned retry.
+      if (!interrupted && !retry && !canonicalRecoveryPending) clear();
+    },
+    navigationCompletion() {
+      const startedGeneration = generation;
+      return () => {
+        if (generation === startedGeneration) clear();
+      };
+    },
+    cancel(): string | null {
+      const target = interrupted;
+      if (!target) return null;
+      clear();
+      retry = target;
+      return target;
+    },
+    clear,
+  };
+}
+
 /**
  * The main window may sit idle while the dedicated auth handoff is the
  * interactive surface. Only skip its watchdog when that handoff is actually

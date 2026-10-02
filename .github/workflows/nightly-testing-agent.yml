@@ -1,11 +1,17 @@
 name: Nightly Testing Agent
-# clock-class: skip-if-unchanged
 
 on:
-  schedule:
-    # Starts well after the consolidated 23:30 deep suite has released its runner.
-    - cron: '30 4 * * *'
-      timezone: 'America/Los_Angeles'
+  push:
+    branches: [main]
+    paths:
+      - '.agents/skills/nightly-test-agent/**'
+      - '.github/workflows/nightly-testing-agent.yml'
+      - 'apps/web/**/*.test.*'
+      - 'apps/web/**/*.spec.*'
+      - 'apps/web/scripts/nightly-test-agent.ts'
+      - 'apps/web/stryker.config.mjs'
+      - 'apps/web/package.json'
+      - 'pnpm-lock.yaml'
   workflow_dispatch:
     inputs:
       run_unit:
@@ -30,26 +36,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  unchanged:
-    name: Skip if no new SHA
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    outputs:
-      skip: ${{ steps.gate.outputs.skip }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          sparse-checkout: .github/actions/skip-if-unchanged
-      - id: gate
-        uses: ./.github/actions/skip-if-unchanged
-        with:
-          workflow: nightly-testing-agent.yml
-
   context:
     name: Build Agent Context
-    needs: unchanged
-    if: needs.unchanged.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -81,11 +69,15 @@ jobs:
           retention-days: 30
 
   deterministic:
-    name: Deterministic Unit Telemetry
+    name: Deterministic Unit Telemetry (${{ matrix.shard }}/4)
     needs: [context]
-    if: ${{ github.event_name == 'schedule' || inputs.run_unit }}
+    if: ${{ github.event_name == 'push' || inputs.run_unit }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -97,24 +89,26 @@ jobs:
       - name: Run unit suite
         id: unit
         continue-on-error: true
-        run: pnpm --filter=@jovie/web run test
+        run: pnpm --filter=@jovie/web run test --shard ${{ matrix.shard }}/4
         env:
           CI: 'true'
+          VITEST_JUNIT_OUTPUT_FILE: test-results/nightly-agent/unit-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}.junit.xml
 
       - name: Normalize unit telemetry
         if: always()
-        run: >-
-          node .github/scripts/guard-playwright-artifacts.mjs --run --
-          pnpm --filter=@jovie/web run test:nightly-agent:normalize --
-          --junit apps/web/test-report.junit.xml
-          --out apps/web/test-results/nightly-agent/deterministic
+        run: |
+          test -s apps/web/test-results/nightly-agent/unit-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}.junit.xml
+          node .github/scripts/guard-playwright-artifacts.mjs --run -- \
+          pnpm --filter=@jovie/web run test:nightly-agent:normalize -- \
+          --junit apps/web/test-results/nightly-agent/unit-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}.junit.xml \
+          --out apps/web/test-results/nightly-agent/deterministic \
           --name normalized-results.json
 
       - name: Upload deterministic telemetry
         if: ${{ always() && hashFiles('apps/web/test-results/nightly-agent/deterministic/normalized-results.json') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
-          name: nightly-agent-deterministic-${{ github.run_id }}
+          name: nightly-agent-deterministic-${{ matrix.shard }}-${{ github.run_id }}
           path: apps/web/test-results/nightly-agent/deterministic/
           retention-days: 30
 
@@ -128,7 +122,7 @@ jobs:
     if: >-
       always() &&
       needs.context.result == 'success' &&
-      (github.event_name == 'schedule' || inputs.run_mutation)
+      (github.event_name == 'push' || inputs.run_mutation)
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
@@ -195,8 +189,8 @@ jobs:
 
   report:
     name: Emit Agent Report
-    needs: [unchanged, context, deterministic, mutation-hotspots, candidate-validation]
-    if: ${{ always() && needs.unchanged.outputs.skip != 'true' }}
+    needs: [context, deterministic, mutation-hotspots, candidate-validation]
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -217,27 +211,39 @@ jobs:
         with:
           pattern: nightly-agent-*-${{ github.run_id }}
           path: apps/web/test-results/nightly-agent/incoming
-          merge-multiple: true
-
-      - name: Emit compact report and skill delta
-        run: >-
-          pnpm --filter=@jovie/web run test:nightly-agent:emit-delta --
-          --input-dir apps/web/test-results/nightly-agent/incoming
+          merge-multiple: false
 
       - name: Resolve workflow conclusion
         id: conclusion
         run: |
-          if [ "${{ needs.deterministic.result }}" = "failure" ]; then
-            echo "value=failure" >> "$GITHUB_OUTPUT"
-          elif [ "${{ needs.mutation-hotspots.result }}" = "cancelled" ]; then
-            echo "value=cancelled" >> "$GITHUB_OUTPUT"
-          elif [ "${{ needs.mutation-hotspots.result }}" = "failure" ]; then
+          results=("${{ needs.context.result }}" "${{ needs.deterministic.result }}" "${{ needs.mutation-hotspots.result }}" "${{ needs.candidate-validation.result }}")
+          for result in "${results[@]}"; do
+            if [ "$result" = "failure" ]; then
+              echo "value=failure" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          for result in "${results[@]}"; do
+            if [ "$result" = "cancelled" ]; then
+              echo "value=cancelled" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          if [ "${{ needs.context.result }}" != "success" ]; then
             echo "value=failure" >> "$GITHUB_OUTPUT"
           else
             echo "value=success" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Publish daily report and ops status
+      - name: Emit compact report and skill delta
+        env:
+          WORKFLOW_CONCLUSION: ${{ steps.conclusion.outputs.value }}
+        run: >-
+          pnpm --filter=@jovie/web run test:nightly-agent:emit-delta --
+          --input-dir apps/web/test-results/nightly-agent/incoming
+          --workflow-conclusion "$WORKFLOW_CONCLUSION"
+
+      - name: Publish evidence report and ops status
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
@@ -258,8 +264,8 @@ jobs:
       - name: Add report to job summary
         run: cat apps/web/test-results/nightly-agent/nightly-report.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Commit daily report when changed
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+      - name: Commit evidence report when changed
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -279,7 +285,7 @@ jobs:
             echo "Nothing staged after rebase."
             exit 0
           fi
-          git commit -m "chore(testing): nightly testing agent daily report" \
+          git commit -m "chore(testing): refresh testing agent evidence report" \
             -m "Auto-generated by .github/workflows/nightly-testing-agent.yml." \
             -m "Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
           git -c "http.https://github.com/.extraheader=$AUTH_HEADER" push

@@ -48,6 +48,7 @@ import {
   CertificationStateGlyph,
   CertificationTierGlyph,
 } from './CertificationGlyphs';
+import { CertificationWalkthrough } from './CertificationWalkthrough';
 import {
   CERTIFICATION_STATE_FILTERS,
   CERTIFICATION_STATE_RANK,
@@ -331,6 +332,7 @@ export function OvieCertificationsWorkspace() {
   const [pendingDecision, setPendingDecision] =
     useState<OvieCertificationDecisionKind | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [walkthroughOpen, setWalkthroughOpen] = useState(false);
 
   const inventory = query.data;
   const allRows = useMemo(() => inventory?.rows ?? [], [inventory]);
@@ -359,7 +361,7 @@ export function OvieCertificationsWorkspace() {
 
   const handleDecide = useCallback(
     async (kind: OvieCertificationDecisionKind, notes: string | null) => {
-      if (!selected?.decision.evidenceDigest) return;
+      if (!selected?.decision.evidenceDigest) return false;
       setPendingDecision(kind);
       setDecisionError(null);
       try {
@@ -371,8 +373,10 @@ export function OvieCertificationsWorkspace() {
           actionId: crypto.randomUUID(),
         });
         toast.success(DECISION_TOASTS[kind]);
+        return true;
       } catch (error) {
         setDecisionError(getCertificationDecisionErrorMessage(error));
+        return false;
       } finally {
         setPendingDecision(null);
       }
@@ -408,6 +412,7 @@ export function OvieCertificationsWorkspace() {
         row={selected}
         onClose={() => setSelectedId(null)}
         onDecide={handleDecide}
+        onWalkthrough={() => setWalkthroughOpen(true)}
         pendingDecision={pendingDecision}
         decisionError={decisionError}
       />
@@ -464,7 +469,6 @@ export function OvieCertificationsWorkspace() {
       data-testid='ovie-certifications-page'
       contentClassName='min-h-0'
     >
-      <h1 className='sr-only'>Certifications</h1>
       <div className='flex h-full min-h-0 flex-col'>
         <AdminTableSubheader
           className='border-b border-(--app-shell-frame-seam)'
@@ -555,6 +559,13 @@ export function OvieCertificationsWorkspace() {
             />
           )}
         </AdminTableShell>
+        <CertificationWalkthrough
+          row={selected}
+          open={walkthroughOpen}
+          onOpenChange={setWalkthroughOpen}
+          onDecide={handleDecide}
+          pendingDecision={pendingDecision}
+        />
       </div>
     </PageShell>
   );

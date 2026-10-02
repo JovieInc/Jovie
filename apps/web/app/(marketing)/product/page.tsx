@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { PRODUCT_COPY } from '@/data/productCopy';
+import { buildSoftwareSchema } from '@/lib/constants/schemas';
 import { ProductLanding } from './ProductLanding';
 
 export const revalidate = false;
@@ -30,6 +31,13 @@ export const metadata: Metadata = {
   },
 };
 
+const PRODUCT_SCHEMA = buildSoftwareSchema(PRODUCT_COPY.seo.description);
+
 export default function ProductPage() {
-  return <ProductLanding />;
+  return (
+    <>
+      <script type='application/ld+json'>{PRODUCT_SCHEMA}</script>
+      <ProductLanding />
+    </>
+  );
 }

@@ -28,15 +28,13 @@ const productCanon = readFileSync(
 const assetsIa = readFileSync(locateRepoFile(ASSETS_IA_RELATIVE_PATH), 'utf8');
 
 describe('Library product-first invariants', () => {
-  it('locks Library as the visible post-release surface, not a license desk', () => {
+  it('locks Work as the visible post-release surface, not a license desk', () => {
+    expect(productCanon).toContain('The visible product name is **Work**.');
     expect(productCanon).toContain(
-      'The visible product name remains **Library**.'
+      'Work is the track-first post-release presence surface'
     );
     expect(productCanon).toContain(
-      'Library is the track-first post-release presence surface'
-    );
-    expect(productCanon).toContain(
-      'Library never presents or promotes license sales.'
+      'Work never presents or promotes license sales.'
     );
     expect(productCanon).toContain(
       'Songview/MLC can observe composition claims only'
@@ -85,7 +83,7 @@ describe('Library product-first invariants', () => {
 
   it('marks the Assets IA as historical and does not reintroduce docs/plans', () => {
     expect(assetsIa).toContain('Status: superseded historical recommendation');
-    expect(assetsIa).toContain('the visible product remains **Library**');
+    expect(assetsIa).toContain('the visible product is **Work**');
     expect(assetsIa).toContain(
       '../product/library-content-graph-and-artist-rules.md'
     );

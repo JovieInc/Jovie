@@ -145,20 +145,20 @@ vi.mock('@/components/molecules/drawer', () => ({
   EntityHeader: ({
     thumbnail,
     title,
-    details,
+    subtitle,
     statusGlyph,
     actions,
   }: {
     thumbnail?: React.ReactNode;
     title?: React.ReactNode;
-    details?: React.ReactNode;
+    subtitle?: React.ReactNode;
     statusGlyph?: React.ReactNode;
     actions?: React.ReactNode;
   }) => (
     <div>
       {thumbnail}
       {title}
-      {details}
+      {subtitle}
       {statusGlyph}
       {actions}
     </div>
@@ -341,13 +341,6 @@ vi.mock('@/features/dashboard/atoms/DspProviderIcon', () => ({
   DspProviderIcon: () => <span data-testid='provider-icon' />,
 }));
 
-vi.mock('@/components/organisms/release-sidebar/ReleaseSidebarHeader', () => ({
-  useReleaseHeaderParts: () => ({
-    headerLabel: '',
-    primaryActions: [],
-    overflowActions: [],
-  }),
-}));
 vi.mock('next/image', () => ({
   default: (props: { alt: string }) => <img alt={props.alt} />,
 }));
@@ -392,12 +385,6 @@ vi.mock(
   () => ({
     fetchReleaseCreditsAction: (...args: unknown[]) =>
       mockFetchReleaseCreditsAction(...args),
-  })
-);
-vi.mock(
-  '@/components/organisms/release-sidebar/ReleaseSmartLinkSection',
-  () => ({
-    ReleaseSmartLinkSection: () => <div>Smart link</div>,
   })
 );
 vi.mock(

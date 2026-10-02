@@ -4,6 +4,21 @@ Issue: JOV-2966
 Registry: `scripts/capability-benchmark/capability-benchmark-registry.json`
 Harness: `scripts/capability-benchmark/capability-benchmark.mjs`
 
+## Computer-use canary
+
+JOV-7340's source-bound decision is
+`scripts/capability-benchmark/computer-use-decision.jsonl`, validated by
+`computer-use-decision.mjs`. It inventories the affected Linear work, maps the
+managed substrate and Jovie-owned control layers, records the executed backlog
+rewrites, and replays the public read-only session lifecycle against an
+independent-oracle requirement. The contract replay proves adapter
+compatibility only; it explicitly cannot promote an OpenAI-hosted browser.
+
+Promotion requires a live same-cohort shadow with exact outcome, cost,
+recovery, privacy/terms and rollback evidence. Deterministic Playwright,
+identity/tenant controls, consequential-action approval, provenance and
+certification remain Jovie-owned.
+
 This loop keeps consequential internal capabilities at or above external
 state of the art without a calendar sweep and without letting discoveries
 steal first-revenue capacity. It owns the **benchmark-and-decision
@@ -65,6 +80,12 @@ compared.
 
 The lane is preemptible. `validateCapacityReceipt` requires a receipt proving
 no eligible JOV-5911/JOV-5912 blocker was displaced.
+
+## Commissioning receipts
+
+- [Meta Muse SMB connector reconciliation](META_MUSE_RECONCILIATION.md) —
+  JOV-7342 consume/distribute decision, affected backlog inventory, verified
+  JOV-2923 retirement, and event-driven re-evaluation triggers.
 
 ## Run
 

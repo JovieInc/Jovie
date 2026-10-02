@@ -67,25 +67,25 @@ describe('useAuthRouteConfig', () => {
     ]);
   });
 
-  it('keeps the default library view labeled Library', () => {
+  it('labels the default library route as Work', () => {
     mockUsePathname.mockReturnValue('/app/library');
 
     const { result } = renderHook(() => useAuthRouteConfig());
 
     expect(result.current.breadcrumbs).toEqual([
-      { label: 'Library', href: '/app/library' },
+      { label: 'Work', href: '/app/library' },
     ]);
     expect(result.current.isTableRoute).toBe(true);
   });
 
-  it('keeps other library views labeled Library', () => {
+  it('keeps other library views labeled Work', () => {
     mockUsePathname.mockReturnValue('/app/library');
     mockUseSearchParams.mockReturnValue(new URLSearchParams('view=audio'));
 
     const { result } = renderHook(() => useAuthRouteConfig());
 
     expect(result.current.breadcrumbs).toEqual([
-      { label: 'Library', href: '/app/library' },
+      { label: 'Work', href: '/app/library' },
     ]);
   });
 

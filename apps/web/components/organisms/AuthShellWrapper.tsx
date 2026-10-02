@@ -1,10 +1,11 @@
 'use client';
 
-// @coverage-via apps/web/tests/unit/components/organisms/AuthShellWrapper.test.tsx
+// @coverage-via apps/web/components/organisms/AuthShellWrapper.search-state.test.tsx
 import { TooltipProvider } from '@jovie/ui';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import {
+  Activity,
   useCallback,
   useEffect,
   useMemo,
@@ -52,6 +53,7 @@ export { TableMetaProvider, usePendingShell, useTableMeta };
 
 export interface AuthShellWrapperProps {
   readonly mode?: AppShellMode;
+  readonly isWorkspaceLocked?: boolean;
   readonly persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;
   readonly sidebarDefaultOpen?: boolean;
   readonly previewPanelDefaultOpen?: boolean;
@@ -73,12 +75,14 @@ function KeyboardShortcutsHandler() {
  */
 function AuthShellWrapperInner({
   mode,
+  isWorkspaceLocked = false,
   persistSidebarCollapsed,
   sidebarDefaultOpen,
   previewPanelDefaultOpen,
   children,
 }: Readonly<{
   mode: AppShellMode;
+  isWorkspaceLocked?: boolean;
   persistSidebarCollapsed?: AuthShellWrapperProps['persistSidebarCollapsed'];
   sidebarDefaultOpen?: boolean;
   previewPanelDefaultOpen?: boolean;
@@ -199,10 +203,21 @@ function AuthShellWrapperInner({
   );
   const shellChildren = (
     <div className='relative flex h-full min-h-0 flex-col'>
-      {headerActions.isCommandPaletteOpen ? (
-        <CommandPaletteMainSurface />
-      ) : (
+      {isWorkspaceLocked ? (
         children
+      ) : (
+        <>
+          {/* Search hides the route and suspends its effects without losing
+              selection/drafts. Locking removes this entire retained boundary. */}
+          <Activity
+            mode={headerActions.isCommandPaletteOpen ? 'hidden' : 'visible'}
+          >
+            {children}
+          </Activity>
+          {headerActions.isCommandPaletteOpen ? (
+            <CommandPaletteMainSurface />
+          ) : null}
+        </>
       )}
       {pendingShellRoute === 'releases' ? (
         <div
@@ -289,6 +304,7 @@ function AuthShellWrapperInner({
  */
 export function AuthShellWrapper({
   mode = 'customer',
+  isWorkspaceLocked = false,
   persistSidebarCollapsed,
   sidebarDefaultOpen,
   previewPanelDefaultOpen,
@@ -302,6 +318,7 @@ export function AuthShellWrapper({
             <ShellSidebarOverrideProvider>
               <AuthShellWrapperInner
                 mode={mode}
+                isWorkspaceLocked={isWorkspaceLocked}
                 persistSidebarCollapsed={persistSidebarCollapsed}
                 sidebarDefaultOpen={sidebarDefaultOpen}
                 previewPanelDefaultOpen={previewPanelDefaultOpen}
@@ -309,7 +326,7 @@ export function AuthShellWrapper({
                 {children}
               </AuthShellWrapperInner>
               <KeyboardShortcutsHandler />
-              <CommandPalette />
+              {!isWorkspaceLocked ? <CommandPalette /> : null}
             </ShellSidebarOverrideProvider>
           </HeaderActionsProvider>
         </FounderDoorProvider>

@@ -15,10 +15,16 @@ describe('AppShellFrame', () => {
     );
 
     const mainContent = screen.getByRole('main');
+    const appShellFrame = mainContent.closest('[data-app-shell-frame]');
+    const desktopTitlebar = screen.getByTestId('electron-titlebar-row');
 
     expect(mainContent).toHaveAttribute('id', 'main-content');
     expect(mainContent).not.toHaveAttribute('tabindex');
-    expect(mainContent.closest('[data-app-shell-frame]')).toBeInTheDocument();
+    expect(appShellFrame).toBeInTheDocument();
+    expect(appShellFrame).toContainElement(desktopTitlebar);
+    expect(
+      appShellFrame?.querySelectorAll('[data-testid="electron-titlebar-row"]')
+    ).toHaveLength(1);
     const shellBody = mainContent.closest('[data-app-shell-body]');
     expect(shellBody).toHaveAttribute('data-shell-rail-motion', 'coordinated');
     expect(shellBody).toHaveAttribute(
@@ -43,7 +49,13 @@ describe('AppShellFrame', () => {
     const routeContent = mainContent.querySelector(
       '[data-app-shell-main-content]'
     );
-    expect(routeContent).toHaveClass('p-(--app-shell-content-inset)');
+    // The content inset belongs to the scroll wrapper, not the shared
+    // header+route column: the header spans the panel edge-to-edge so the
+    // top row reads as one clipped plane (JOV-7207).
+    expect(routeContent).not.toHaveClass('p-(--app-shell-content-inset)');
+    expect(
+      mainContent.querySelector('[data-app-shell-content-inset]')
+    ).toHaveClass('p-(--app-shell-content-inset)');
     expect(mainContent.closest('[data-app-shell-main-plane]')).not.toHaveClass(
       'lg:gap-(--app-shell-gap)'
     );

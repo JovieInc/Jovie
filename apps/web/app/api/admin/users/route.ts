@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 
 import { type AdminUsersSort, getAdminUsers } from '@/lib/admin/users';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function GET(request: Request) {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
 
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(

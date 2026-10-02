@@ -1,15 +1,16 @@
 name: SonarCloud
-# clock-class: skip-if-unchanged
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: The coverage producer stays Sonar-token-free; this downstream consumer receives SONAR_TOKEN only after an exact successful run artifact exists.
+# removal-trigger: Collapse this hop when Test Coverage Audit can pass the exact lcov artifact to a same-run Sonar job without expanding the producer's credential scope.
 
-# Native analysis runs nightly against main, not as a per-PR gate. Deterministic
-# local detectors block known failure classes in ci-fast; this fresh analysis
-# confirms merged repairs and catches dataflow/security rules not faithfully
-# expressible locally. Missing scan credentials fail visibly.
-# Hygiene (#10463): no pull_request trigger (path-filter would still burn runners
-# on large source diffs); nightly + manual only.
+# Native analysis consumes exact successful Test Coverage Audit evidence instead
+# of regenerating web coverage. Deterministic local detectors remain the PR gate.
 on:
-  schedule:
-    - cron: '0 7 * * *' # 07:00 UTC nightly (~midnight PT)
+  workflow_run:
+    workflows: [Test Coverage Audit]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -21,26 +22,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  unchanged:
-    name: Skip if no new SHA
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    outputs:
-      skip: ${{ steps.gate.outputs.skip }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          sparse-checkout: .github/actions/skip-if-unchanged
-      - id: gate
-        uses: ./.github/actions/skip-if-unchanged
-        with:
-          workflow: sonarcloud.yml
-
   sonarcloud:
     name: SonarCloud
-    needs: unchanged
-    if: needs.unchanged.outputs.skip != 'true'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -57,13 +43,23 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
         with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
 
       - uses: ./.github/actions/setup-node-pnpm
         if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
 
-      - name: Run apps/web coverage
-        if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
+      - name: Download exact changed-evidence web coverage
+        if: ${{ env.SONAR_SCAN_ENABLED == 'true' && github.event_name == 'workflow_run' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v6.0.0
+        with:
+          name: coverage-audit-${{ github.event.workflow_run.id }}
+          path: .
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Run apps/web coverage for manual diagnostics
+        if: ${{ env.SONAR_SCAN_ENABLED == 'true' && github.event_name == 'workflow_dispatch' }}
         run: pnpm --filter=@jovie/web run test:ci -- --config=vitest.config.ci.mts --coverage
 
       - name: Verify apps/web coverage artifact
@@ -78,6 +74,10 @@ jobs:
         if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
         run: test -f packages/ui/coverage/lcov.info
 
+      - name: Bind LCOV sources to their producing packages
+        if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
+        run: node scripts/normalize-sonar-lcov.mjs
+
       - name: Cache SonarQube packages
         if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -86,8 +86,27 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
+      - name: Disable SonarCloud automatic analysis
+        if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
+        run: |
+          # CI analysis is authoritative. SonarQube Cloud refuses a scanner run
+          # while project-level Automatic Analysis is toggled on, which someone
+          # can flip back on in the UI. Disable it the same way the UI does so a
+          # stale toggle cannot fail main again. The endpoint is undocumented,
+          # so warn-and-continue if the request itself fails — the scan below
+          # remains the real signal.
+          if ! curl -sS -f -X POST \
+            -H "Authorization: Bearer ${SONAR_TOKEN}" \
+            "https://sonarcloud.io/api/autoscan/activation" \
+            -d "enable=false&projectKey=JovieInc_Jovie"; then
+            echo "::warning::Could not disable SonarCloud automatic analysis; the scan will fail if it is still enabled."
+          fi
+
       - name: SonarQube Scan
         if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
         uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4 # v8.2.1 trufflehog:ignore (pinned action SHA is a git commit, not a credential)
+        with:
+          # workflow_run's GITHUB_SHA belongs to this wrapper, not the analyzed checkout.
+          args: -Dsonar.scm.revision=${{ github.event.workflow_run.head_sha || github.sha }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

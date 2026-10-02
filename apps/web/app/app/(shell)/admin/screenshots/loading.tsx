@@ -1,9 +1,5 @@
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import {
-  PageContent,
-  PageHeader,
-  PageShell,
-} from '@/components/organisms/PageShell';
 
 const SKELETON_KEYS = Array.from({ length: 8 }, (_, i) => `ss-loading-${i}`);
 
@@ -12,22 +8,18 @@ const SKELETON_KEYS = Array.from({ length: 8 }, (_, i) => `ss-loading-${i}`);
  */
 export default function ScreenshotsLoading() {
   return (
-    <PageShell frame='none' contentPadding='none'>
-      <PageHeader title='Screenshots' description='Loading screenshots...' />
-      <PageContent>
-        <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
-          {SKELETON_KEYS.map(key => (
-            <ContentSurfaceCard
-              key={key}
-              className='space-y-3 rounded-xl bg-surface-0 p-3.5'
-            >
+    <AdminPage title='Screenshots' testId='admin-screenshots-loading'>
+      <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
+        {SKELETON_KEYS.map(key => (
+          <ContentSurfaceCard key={key} surface='nested'>
+            <div className='space-y-3 p-3.5'>
               <div className='aspect-video w-full rounded-lg skeleton' />
               <div className='h-4 w-3/4 skeleton' />
               <div className='h-8 w-24 rounded-md skeleton' />
-            </ContentSurfaceCard>
-          ))}
-        </div>
-      </PageContent>
-    </PageShell>
+            </div>
+          </ContentSurfaceCard>
+        ))}
+      </div>
+    </AdminPage>
   );
 }

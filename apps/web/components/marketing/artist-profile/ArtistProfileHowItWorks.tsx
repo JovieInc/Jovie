@@ -44,6 +44,9 @@ export function ArtistProfileHowItWorks({
 }: Readonly<ArtistProfileHowItWorksProps>) {
   return (
     <ArtistProfileSectionShell
+      sectionId='how-it-works'
+      sectionVariant='split-setup'
+      sectionOwner='apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.tsx'
       penContractId={MARKETING_PEN_CONTRACT_IDS.section.howItWorks}
     >
       <div className='mx-auto grid max-w-public-content items-start gap-12 lg:grid-cols-[minmax(18rem,0.72fr)_minmax(36rem,1.28fr)] lg:gap-16'>

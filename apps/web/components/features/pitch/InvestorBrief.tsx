@@ -28,7 +28,7 @@ export function InvestorBrief({ investorName = null }: InvestorBriefProps) {
     <div className='min-h-svh bg-base text-primary-token'>
       <PitchEngagement />
 
-      <nav className='sticky top-0 z-40 border-b border-subtle bg-base/90 backdrop-blur-md'>
+      <nav className='sticky top-0 z-40 border-b border-subtle bg-(--color-bg-base)/90 backdrop-blur-md'>
         <div className='mx-auto flex h-14 max-w-6xl items-center justify-between px-5 sm:px-8'>
           <Link
             aria-label='Jovie Home'

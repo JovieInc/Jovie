@@ -8,16 +8,22 @@ const GO_FORWARD_CHANNEL = 'go-forward';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
 const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
 const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
+const OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL = 'open-current-ovie-in-browser';
 const COPY_DESKTOP_AUTH_URL_CHANNEL = 'copy-desktop-auth-url';
 const OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL = 'open-public-profile-in-browser';
 const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
 const REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL =
   'redeem-desktop-auth-return-code';
+const GET_DESKTOP_PASSKEY_STATE_CHANNEL = 'get-desktop-passkey-state';
+const SET_DESKTOP_PASSKEY_STATE_CHANNEL = 'set-desktop-passkey-state';
+const COMPLETE_DESKTOP_PASSKEY_SIGN_IN_CHANNEL =
+  'complete-desktop-passkey-sign-in';
 const CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL =
   'consume-desktop-auth-completion';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
 const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
 const TRAY_ACTION_CHANNEL = 'tray-action';
+const DESKTOP_NOTIFICATION_CHANNEL = 'desktop-notification-show';
 const APP_BOOTED_CHANNEL = 'app-booted';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
 const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity';
@@ -146,6 +152,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }>;
   },
 
+  /** Continue the current Ovie route in an independent browser session. */
+  openCurrentOvieInBrowser: () =>
+    ipcRenderer.invoke(OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL) as Promise<{
+      ok: boolean;
+      reason?: string;
+    }>,
+
   /** Open this isolated public profile in the system browser. */
   openPublicProfileInBrowser: () => {
     return ipcRenderer.invoke(
@@ -158,6 +171,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return ipcRenderer.invoke(
       REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL,
       returnCode
+    ) as Promise<{
+      ok: boolean;
+      reason?: string;
+    }>;
+  },
+  getDesktopPasskeyState: () => {
+    return ipcRenderer.invoke(GET_DESKTOP_PASSKEY_STATE_CHANNEL) as Promise<{
+      available: boolean;
+      enrolled: boolean;
+      dismissed: boolean;
+    }>;
+  },
+  setDesktopPasskeyState: (update: 'enrolled' | 'dismissed' | 'reset') => {
+    return ipcRenderer.invoke(SET_DESKTOP_PASSKEY_STATE_CHANNEL, update) as Promise<{
+      ok: boolean;
+      reason?: string;
+    }>;
+  },
+  completeDesktopPasskeySignIn: () => {
+    return ipcRenderer.invoke(
+      COMPLETE_DESKTOP_PASSKEY_SIGN_IN_CHANNEL
     ) as Promise<{
       ok: boolean;
       reason?: string;
@@ -211,6 +245,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on(TRAY_ACTION_CHANNEL, listener);
     return () => ipcRenderer.removeListener(TRAY_ACTION_CHANNEL, listener);
   },
+
+  /**
+   * Post a native OS notification (JOV-6716). The main process validates the
+   * payload and, on click, routes `url` through the same URL disposition rules
+   * as in-app navigation — deep links land on the right screen, unsafe URLs
+   * just focus the window.
+   */
+  showNotification: (payload: {
+    title: string;
+    body?: string;
+    url?: string;
+  }) =>
+    ipcRenderer.invoke(DESKTOP_NOTIFICATION_CHANNEL, payload) as Promise<{
+      ok: boolean;
+      reason?: string;
+    }>,
 
   /**
    * First successful hosted-app paint (JOV-3595). Cancels the main-process

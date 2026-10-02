@@ -2,6 +2,10 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HomepageHeroMockupCarousel } from '@/components/homepage/HomepageHeroCarousel';
 
+vi.mock('@/components/homepage/homepage-analytics', () => ({
+  trackHomepageEvent: vi.fn(),
+}));
+
 const originalMatchMedia = window.matchMedia;
 
 function expectActiveShot(testId: string) {

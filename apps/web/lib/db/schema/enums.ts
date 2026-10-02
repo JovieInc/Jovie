@@ -292,6 +292,21 @@ export const waitlistInviteStatusEnum = pgEnum('waitlist_invite_status', [
   'failed',
 ]);
 
+// Canonical customer lifecycle stages (JOV-6888). One ordered funnel shared by
+// leads, waitlist entries, creator profiles, and users.
+export const contactLifecycleStageEnum = pgEnum('contact_lifecycle_stage', [
+  'suggested',
+  'approved',
+  'outreach',
+  'profile_created',
+  'certified',
+  'signed_up',
+  'claimed',
+  'activated',
+  'paying',
+  'churned',
+]);
+
 // User status lifecycle enum - single source of truth for user state
 export const userStatusLifecycleEnum = pgEnum('user_status_lifecycle', [
   'waitlist_pending',
@@ -658,6 +673,7 @@ export const tipStatusEnum = pgEnum('tip_status', [
 export const profileClaimRoleEnum = pgEnum('profile_claim_role', [
   'owner',
   'manager',
+  'assistant',
   'viewer',
 ]);
 
@@ -667,6 +683,32 @@ export const profileOwnershipActionEnum = pgEnum('profile_ownership_action', [
   'unlinked',
   'transferred',
   'role_changed',
+]);
+
+// Profile Team Approval Enums (JOV-6601 least-privilege team roles)
+export const profileRiskyActionEnum = pgEnum('profile_risky_action', [
+  'links.mutate',
+  'handle.change',
+  'auth.change',
+  'membership.manage',
+  'broadcast.send',
+]);
+
+export const profileApprovalStatusEnum = pgEnum('profile_approval_status', [
+  'pending',
+  'approved',
+  'rejected',
+  'expired',
+  'revoked',
+]);
+
+export const profileApprovalEventEnum = pgEnum('profile_approval_event', [
+  'requested',
+  'approved',
+  'rejected',
+  'expired',
+  'revoked',
+  'consumed',
 ]);
 
 // Release Task Enums
@@ -758,6 +800,7 @@ export const referralCommissionStatusEnum = pgEnum(
 export const connectorProviderEnum = pgEnum('connector_provider', [
   'google_calendar',
   'gmail',
+  'spotify',
   'youtube',
 ]);
 

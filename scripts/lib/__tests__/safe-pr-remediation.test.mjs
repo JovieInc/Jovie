@@ -730,7 +730,7 @@ describe('GitHub Actions remediation separation', () => {
   );
 
   it('dispatches only after the isolated Eve workflow or root CI fails', () => {
-    expect(workflow).toContain("workflows: ['Eve Pilot', 'CI']");
+    expect(workflow).toContain("workflows: ['Eve Pilot']");
     expect(workflow).toContain('types: [completed]');
     expect(workflow).toContain(
       "github.event.workflow_run.conclusion == 'failure'"

@@ -14,7 +14,7 @@ import {
   ShellListRowDisclosureIcon,
 } from '@/components/organisms/table';
 import { TypeBadge } from '@/components/shell/TypeBadge';
-import { mobileReleaseTokens } from '@/features/dashboard/tokens';
+import { mobileReleaseTokens } from '@/features/dashboard/tokens/mobile-tokens';
 import { formatCompactReleaseArtistLine } from '@/lib/discography/formatting';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';

@@ -51,7 +51,7 @@ describe('CertificationDetailRail', () => {
     expect(screen.getByTestId('entity-header-title')).toHaveTextContent(
       'Flow signup'
     );
-    expect(screen.getByTestId('entity-header-details')).toHaveTextContent(
+    expect(screen.getByTestId('entity-header-details-row')).toHaveTextContent(
       'Flows · Golden Path'
     );
     const evidence = screen.getByTestId('certification-evidence');
@@ -111,6 +111,25 @@ describe('CertificationDetailRail', () => {
     expect(screen.getByRole('status')).toHaveTextContent(
       'The evidence changed since this page loaded.'
     );
+  });
+
+  it('launches the walkthrough only when a decision can land', () => {
+    const onWalkthrough = vi.fn();
+    renderRail({ onWalkthrough });
+    fireEvent.click(screen.getByTestId('certification-walkthrough-action'));
+    expect(onWalkthrough).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the walkthrough action for items that cannot be decided', () => {
+    renderRail({
+      onWalkthrough: vi.fn(),
+      row: fixtureRow('claim', {
+        packet: fixturePacket('claim', {
+          visualProof: [fixtureReceipt('visual_proof', 'v', 'failed')],
+        }),
+      }),
+    });
+    expect(screen.queryByTestId('certification-walkthrough-action')).toBeNull();
   });
 
   it('locks actions while a decision is pending', () => {

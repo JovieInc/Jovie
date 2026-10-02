@@ -169,7 +169,7 @@ export function MerchCheckoutForm({
 
       <div className='min-h-9 pt-3'>
         {error ? (
-          <p className='text-xs leading-5 text-red-200'>{error}</p>
+          <p className='text-xs leading-5 text-error'>{error}</p>
         ) : (
           <p className='text-xs leading-5 text-white/48'>
             Produced after payment clears.

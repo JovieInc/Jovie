@@ -16,7 +16,13 @@ export function ArtistProfileOpinionatedSection({
   opinionated,
 }: Readonly<ArtistProfileOpinionatedSectionProps>) {
   return (
-    <ArtistProfileSectionShell className='ap-opinionated bg-surface-0'>
+    <ArtistProfileSectionShell
+      sectionId='feature-split'
+      sectionVariant='phone-right'
+      sectionOwner='apps/web/components/marketing/artist-profile/ArtistProfileOpinionatedSection.tsx'
+      sectionOccurrence='opinionated'
+      className='ap-opinionated bg-surface-0'
+    >
       <div className='mx-auto max-w-public-content'>
         <div className='grid items-center gap-10 lg:grid-cols-[minmax(0,0.78fr)_minmax(26rem,1fr)] lg:gap-20'>
           <div className='max-w-2xl'>

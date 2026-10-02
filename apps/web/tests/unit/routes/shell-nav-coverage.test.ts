@@ -26,9 +26,13 @@ const CONTACTS_CLIENT_PATH = path.join(
 const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app': 'Shell root entry page',
   '/app/chats': 'Canonical chat index reached from the sidebar link',
+  '/app/chat': 'New Chat utility and contextual Identity link editor',
   '/app/chat/[id]': 'Thread detail is reached from chat history',
-  '/app/library':
-    'Canonical library page for releases, merch, images, videos, and audio',
+  '/app/library': 'Canonical Work surface with stable library route ownership',
+  '/app/calendar':
+    'Contextual moments workspace reached from event and release links',
+  '/app/tasks':
+    'Contextual workflow reached from Home, chat, and entity actions',
   '/app/audience':
     'Retained customer workspace reachable by direct links and shortcuts after primary navigation consolidation',
   '/app/tour-dates':
@@ -42,7 +46,12 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/ov/hud':
     'Operator HUD workspace reached from the default /hud rewrite into the OV app shell',
   '/app/ov/interviews': 'Internal admin review workspace (manual entry)',
+  '/app/ov/wiki':
+    'Internal admin wiki index reached from the /hud/wiki rewrite into the OV app shell',
+  '/app/ov/wiki/[...slug]':
+    'Internal admin wiki article reached from the /hud/wiki/:path* rewrite into the OV app shell',
   '/app/ov/playlists': 'Internal admin workflow (manual entry)',
+  '/app/ov/presence': 'Internal admin workspace pending Ovie IA placement',
   '/app/ov/agent-runs/[id]':
     'Dynamic operator debug route reached from an agent run action',
   '/app/dashboard/releases/[releaseId]/tasks':

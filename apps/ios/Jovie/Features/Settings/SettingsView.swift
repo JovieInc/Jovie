@@ -39,10 +39,13 @@ struct SettingsView: View {
 
   @State private var isLoggingOut = false
   @State private var isShowingLogoutConfirmation = false
+  @AppStorage(BiometricLockSettings.enabledStorageKey)
+  private var isBiometricLockEnabled = BiometricLockSettings.isEnabledByDefault
 
   var body: some View {
     List {
       accountSection
+      securitySection
       linksSection
       buildSection
       logoutSection
@@ -72,6 +75,23 @@ struct SettingsView: View {
       Button("Cancel", role: .cancel) {}
     } message: {
       Text("You'll need to sign in again to use your creator account on this device.")
+    }
+  }
+
+  private var securitySection: some View {
+    Section("Security") {
+      Toggle(isOn: $isBiometricLockEnabled) {
+        VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
+          Text("App Lock")
+
+          Text("Require Face ID, Touch ID, or your device passcode to open Jovie.")
+            .font(JovieFont.body(size: 13))
+            .foregroundStyle(JovieColor.textTertiary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+      .accessibilityIdentifier("settings-biometric-lock-toggle")
+      .accessibilityHint("Locks Jovie on launch and after one minute in the background")
     }
   }
 

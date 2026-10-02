@@ -37,10 +37,13 @@ jobs:
   # queue, and waits only a bounded queue-derived window when a newer
   # generation is already approaching, so no staging deploy, migration,
   # canary, promotion, or rollback mutation can start for a stale SHA.
-  # A stale-but-ancestor SHA yields only to a generation already queued behind
-  # it, and never once main has carried unshipped commits past the starvation
-  # bound (release-lineage-gate.sh), so a continuous merge stream cannot starve
-  # production the way exact-SHA yields did on 2026-09-26.
+  # A stale-but-ancestor SHA yields to a generation already queued behind it,
+  # even past the starvation bound, so a stale backlog drains to the newest
+  # queued generation instead of every generation running the full pipeline
+  # (JOV-7149). The starvation bound (release-lineage-gate.sh) applies only to
+  # generations already in flight past coalescing, so a continuous merge
+  # stream cannot starve production the way exact-SHA yields did on
+  # 2026-09-26.
   coalesce-production:
     name: Coalesce release wave
     if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' }}
@@ -64,8 +67,10 @@ jobs:
           EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
           REPOSITORY: ${{ github.repository }}
           # Starvation bound for the forward-only lineage gate: once main has
-          # carried unshipped commits this long, an ancestor generation keeps
-          # the lease even though a newer generation is queued behind it.
+          # carried unshipped commits this long, an in-flight ancestor
+          # generation keeps the lease even though a newer generation is
+          # queued behind it. Still-queued ancestors yield regardless, so a
+          # stale backlog drains to the newest queued generation.
           PRODUCTION_STARVATION_SECONDS: '5400'
           # The bounded window derives from queue state, never a universal
           # constant: one increment per newer generation already validating in
@@ -147,9 +152,10 @@ jobs:
             exit 1
           }
           if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
-            # Forward-only starvation bound: yield only to a generation that is
-            # already queued behind this one, and never once main has carried
-            # unshipped commits past PRODUCTION_STARVATION_SECONDS.
+            # Forward-only lineage: yield to a generation already queued
+            # behind this one, even past PRODUCTION_STARVATION_SECONDS —
+            # a still-queued generation costs seconds to yield, so a stale
+            # backlog drains to the newest queued generation (JOV-7149).
             gate_decision="$(CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="before evaluation" \
               bash .github/scripts/release-lineage-gate.sh | tail -n 1)"
             if [ "$gate_decision" != "decision=proceed" ]; then
@@ -157,7 +163,7 @@ jobs:
               exit 0
             fi
             echo "is_current=true" >> "$GITHUB_OUTPUT"
-            record_receipt "proceed" "main advanced to $current_main_sha but this ancestor generation keeps the lease (forward-only starvation bound)" "$EXPECTED_SHA" 0 "authorize exact CI evidence"
+            record_receipt "proceed" "main advanced to $current_main_sha but no newer generation is queued; this ancestor generation keeps the lease" "$EXPECTED_SHA" 0 "authorize exact CI evidence"
             exit 0
           fi
 
@@ -212,7 +218,7 @@ jobs:
               exit 0
             fi
             echo "is_current=true" >> "$GITHUB_OUTPUT"
-            record_receipt "proceed" "main advanced to $current_main_sha during the window but this ancestor generation keeps the lease (forward-only starvation bound)" "$EXPECTED_SHA" "$wait_seconds" "authorize exact CI evidence"
+            record_receipt "proceed" "main advanced to $current_main_sha during the window but no newer generation is queued; this ancestor generation keeps the lease" "$EXPECTED_SHA" "$wait_seconds" "authorize exact CI evidence"
             exit 0
           fi
 
@@ -228,6 +234,7 @@ jobs:
     outputs:
       deployment_allowed: ${{ steps.policy.outputs.deployment_allowed }}
       mode: ${{ steps.policy.outputs.mode }}
+      admission_receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}
     steps:
       - name: Generate read-only Jovie Bot token
         id: app-token
@@ -235,6 +242,7 @@ jobs:
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
           permission-contents: read
           permission-pull-requests: read
       - name: Checkout exact main policy
@@ -242,6 +250,38 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
+      - name: Resolve exact CI risk lane
+        id: risk
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+          SOURCE_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact="ci-risk-classification-${SOURCE_RUN_ID}-${SOURCE_RUN_ATTEMPT}"
+          root="$RUNNER_TEMP/ci-risk"
+          risk_lane=unknown
+          if gh run download "$SOURCE_RUN_ID" --name "$artifact" --dir "$root"; then
+            risk_lane="$(jq -r '.riskLevel // "unknown"' "$root/ci-risk-classification.json")"
+          else
+            # Queue-proven main pushes skip the classifier by design; the exact SHA
+            # was classified in its successful merge-group CI run (same head SHA).
+            proof_run="$(gh api "repos/$REPO/actions/runs?head_sha=$SOURCE_SHA&event=merge_group&status=success&per_page=20" \
+              --jq '[.workflow_runs[] | select(.path == ".github/workflows/ci.yml")] | max_by(.run_attempt) | .id // empty')"
+            if [[ "$proof_run" =~ ^[0-9]+$ ]]; then
+              proof_artifact="$(gh api "repos/$REPO/actions/runs/$proof_run/artifacts" \
+                --jq '[.artifacts[] | select(.name | startswith("ci-risk-classification-'"$proof_run"'-")) | select(.expired == false)] | max_by(.name) | .name // empty')"
+              if [[ -n "$proof_artifact" ]] && gh run download "$proof_run" --name "$proof_artifact" --dir "$root"; then
+                risk_lane="$(jq -r '.riskLevel // "unknown"' "$root/ci-risk-classification.json")"
+                echo "::notice::Risk lane $risk_lane from merge-group CI run $proof_run for $SOURCE_SHA."
+              fi
+            fi
+          fi
+          [[ "$risk_lane" =~ ^(low|medium|high)$ ]] || risk_lane=unknown
+          echo "risk_lane=$risk_lane" >> "$GITHUB_OUTPUT"
       - name: Require fresh exact-main deployment authority
         id: policy
         uses: ./.github/actions/evaluate-fleet-gate
@@ -250,13 +290,16 @@ jobs:
           dry-run: 'false'
           consumer: deployment
           expected-sha: ${{ github.event.workflow_run.head_sha }}
+          surface: production-web
+          mutation: promote-staged-web-release
+          risk-lane: ${{ steps.risk.outputs.risk_lane }}
 
   authorize-production:
     name: Authorize exact main CI evidence
     needs: [coalesce-production, fleet-promotion]
     if: ${{ needs.coalesce-production.result == 'success' && needs.coalesce-production.outputs.is_current == 'true' && needs.fleet-promotion.result == 'success' && needs.fleet-promotion.outputs.deployment_allowed == 'true' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 35
     permissions:
       contents: read
       actions: read
@@ -273,12 +316,27 @@ jobs:
       deployed_sha: ${{ steps.authorize.outputs.deployed_sha }}
       web_evidence_sha: ${{ steps.authorize.outputs.web_evidence_sha }}
       lane_receipt_artifact_id: ${{ steps.authorize.outputs.lane_receipt_artifact_id }}
+      staging_verified: ${{ steps.authorize.outputs.staging_verified }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Bind scoped fleet admission to the release lineage
+        env:
+          ADMISSION_RECEIPT_B64: ${{ needs.fleet-promotion.outputs.admission_receipt_b64 }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$ADMISSION_RECEIPT_B64" | base64 --decode > "$RUNNER_TEMP/fleet-admission.json"
+          jq -e --arg sha "$EXPECTED_SHA" '
+            .scopedAdmission.schema == "jovie-fleet-admission/v2" and
+            .scopedAdmission.revision == $sha and
+            .scopedAdmission.surface == "production-web" and
+            .scopedAdmission.allowed == true
+          ' "$RUNNER_TEMP/fleet-admission.json" >/dev/null
       - name: Cross-prove exact successful push CI
         id: authorize
         env:
@@ -307,6 +365,7 @@ jobs:
             echo "selected_lanes=none"
             echo "deployed_sha="
             echo "web_evidence_sha=none"
+            echo "staging_verified=false"
           } >> "$GITHUB_OUTPUT"
           marker_recovery=false
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
@@ -350,7 +409,7 @@ jobs:
             exit 1
           }
           if [ "$current_main_sha" != "$EXPECTED_SHA" ] &&
-            [ "$(CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="before production authorization" \
+            [ "$(CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="before production authorization" IN_FLIGHT=true \
               bash .github/scripts/release-lineage-gate.sh | tail -n 1)" != "decision=proceed" ]; then
             echo "::notice::Controller generation $EXPECTED_SHA yielded to $current_main_sha before production authorization."
             exit 0
@@ -592,13 +651,61 @@ jobs:
               echo "::notice::Live production $deployed_sha is unbound from current main $EXPECTED_SHA with sealed lanes $selected_lanes; forcing Web/Promote so skip-promote cannot occupy the bind."
             fi
 
+            if [ "$run_web" = true ]; then
+              staging_receipt_sha="$web_evidence_sha"
+              staging_deployment_id=""
+              if [[ ! "$staging_receipt_sha" =~ ^[0-9a-f]{40}$ ]]; then
+                staging_identity="$(curl --fail --silent --show-error --max-time 20 https://staging.jov.ie/api/health/build-info)" || { echo "::error::Canonical staging identity is unavailable. Next: inspect staging.jov.ie build-info."; exit 1; }
+                staging_receipt_sha="$(jq -er '.commitSha | select(type == "string" and test("^[0-9a-f]{40}$"))' <<<"$staging_identity")"
+                staging_deployment_id="$(jq -er '.deploymentId | select(type == "string" and test("^dpl_[A-Za-z0-9]+$"))' <<<"$staging_identity")"
+              fi
+              staging_compare="$(gh api "repos/$REPOSITORY/compare/${staging_receipt_sha}...${EXPECTED_SHA}" --jq '.status // empty')"
+              [[ "$staging_compare" =~ ^(ahead|identical)$ ]] || { echo "::error::Canonical staging SHA $staging_receipt_sha is not on the production lineage to $EXPECTED_SHA."; exit 1; }
+              staging_artifact_name="staging-deployment-${staging_receipt_sha}"
+              staging_artifact_id=""
+              # 25 min bound: staging queue + deploy took ~20 min on 2026-09-29; a 10 min wait
+              # failed valid releases with "receipt missing" (JOV-19527).
+              for attempt in $(seq 1 150); do
+                staging_artifact_id="$(gh api \
+                  "repos/$REPOSITORY/actions/artifacts?name=$staging_artifact_name&per_page=100" \
+                  --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at, .id) | last | .id // empty')"
+                [ -n "$staging_artifact_id" ] && break
+                [ "$attempt" -lt 150 ] && sleep 10
+              done
+              [[ "$staging_artifact_id" =~ ^[1-9][0-9]*$ ]] || {
+                echo "::error::Exact staging receipt is missing. Next: inspect Staging Controller for $staging_receipt_sha. Proof: $staging_artifact_name."
+                exit 1
+              }
+              staging_receipt_dir="$RUNNER_TEMP/staging-deployment"
+              mkdir -p "$staging_receipt_dir"
+              gh api "repos/$REPOSITORY/actions/artifacts/$staging_artifact_id/zip" > "$staging_receipt_dir/receipt.zip"
+              unzip -q "$staging_receipt_dir/receipt.zip" -d "$staging_receipt_dir"
+              jq -e --arg sha "$staging_receipt_sha" --arg deployment "$staging_deployment_id" '
+                .schema == "jovie-staging-deployment/v1" and
+                .terminal == true and
+                (.state == "current" or .state == "superseded_after_mutation") and
+                .sha == $sha and
+                (.sourceCiRunId | type == "string" and test("^[1-9][0-9]*$")) and
+                (.deploymentId | type == "string" and test("^dpl_[A-Za-z0-9]+$")) and
+                ($deployment == "" or .deploymentId == $deployment) and
+                .alias == "staging.jov.ie" and
+                .environment == "preview" and
+                .exactIdentity == "passed" and
+                .routeSmoke == "passed"
+              ' "$staging_receipt_dir/staging-deployment-receipt.json" >/dev/null || {
+                echo "::error::Exact staging receipt is missing or ambiguous. Next: rerun Staging Controller for $staging_receipt_sha. Proof: artifact $staging_artifact_id."
+                exit 1
+              }
+              echo "staging_verified=true" >> "$GITHUB_OUTPUT"
+            fi
+
             final_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
             [[ "$final_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
               echo "::error::Could not resolve exact main at the production authorization boundary."
               exit 1
             }
             if [ "$final_main_sha" != "$EXPECTED_SHA" ] &&
-              [ "$(CURRENT_MAIN_SHA="$final_main_sha" BOUNDARY="at authorization" \
+              [ "$(CURRENT_MAIN_SHA="$final_main_sha" BOUNDARY="at authorization" IN_FLIGHT=true \
                 bash .github/scripts/release-lineage-gate.sh | tail -n 1)" != "decision=proceed" ]; then
               echo "::notice::Controller generation $EXPECTED_SHA yielded to $final_main_sha at authorization."
               echo "is_current=false" >> "$GITHUB_OUTPUT"
@@ -623,7 +730,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: production-lane-range-${{ steps.authorize.outputs.expected_sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/production-lane-range.json
+          path: |
+            ${{ runner.temp }}/production-lane-range.json
+            ${{ runner.temp }}/fleet-admission.json
           if-no-files-found: error
           retention-days: 30
 
@@ -660,6 +769,8 @@ jobs:
       id-token: write
     with:
       expected_sha: ${{ needs.authorize-production.outputs.expected_sha }}
+      release_mode: production
+      staging_verified: ${{ needs.authorize-production.outputs.staging_verified == 'true' }}
     secrets: inherit
   ci-public-profile-smoke:
     name: Post-Deploy Smoke (Production)
@@ -935,6 +1046,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      actions: read
     outputs:
       verified: ${{ steps.finalize.outputs.verified || 'false' }}
     steps:
@@ -942,6 +1054,11 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: ${{ needs.authorize-production.outputs.authorized == 'true' }}
+        with:
+          name: production-lane-range-${{ needs.authorize-production.outputs.expected_sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-lineage
       - name: Resolve current main before final verification
         id: current
         env:
@@ -962,7 +1079,7 @@ jobs:
           if [ "$current_sha" != "$EXPECTED_SHA" ]; then
             echo "::warning::Post-deploy verification for $EXPECTED_SHA was superseded by $current_sha; exact production bind will be proven before marker preservation."
             if [ "$RUN_WEB" != true ]; then
-              node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha"
+              node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha" --allow-in-flight-supersede
             fi
             echo "is_current=false" >> "$GITHUB_OUTPUT"
             echo "superseded_before_marker=true" >> "$GITHUB_OUTPUT"
@@ -1147,7 +1264,8 @@ jobs:
               --arg controller_run "${{ github.run_id }}" \
               --arg controller_attempt "${{ github.run_attempt }}" \
               --arg terminal_reason "skipped_no_web" \
-              '{sha: $sha, deploymentId: "not-applicable", deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: "not-applicable", terminalReason: $terminal_reason}' \
+              --slurpfile fleet "$RUNNER_TEMP/release-lineage/fleet-admission.json" \
+              '{sha: $sha, deploymentId: "not-applicable", deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: "not-applicable", terminalReason: $terminal_reason, fleetAdmission: $fleet[0].scopedAdmission}' \
               > "$RUNNER_TEMP/production-generation-verified.json"
             echo "verified=true" >> "$GITHUB_OUTPUT"
             echo "Web release skipped by the sealed product-lane receipt."
@@ -1180,7 +1298,8 @@ jobs:
               --arg web_evidence_sha "$WEB_EVIDENCE_SHA" \
               --arg lanes "$SELECTED_LANES" \
               --arg terminal_reason "$terminal_reason" \
-              '{sha: $sha, deploymentId: $deployment_id, deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke, terminalReason: $terminal_reason}' \
+              --slurpfile fleet "$RUNNER_TEMP/release-lineage/fleet-admission.json" \
+              '{sha: $sha, deploymentId: $deployment_id, deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke, terminalReason: $terminal_reason, fleetAdmission: $fleet[0].scopedAdmission}' \
               > "$RUNNER_TEMP/production-generation-verified.json"
             test -s "$RUNNER_TEMP/production-generation-verified.json" || {
               echo "::error::Verified marker write-through produced an empty file."

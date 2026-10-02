@@ -127,7 +127,7 @@ extension IntentNavigationRequest {
 /// Versioned, executable census of the iOS route graph (JOV-6095). Bump
 /// `version` whenever a route is added, reclassified, or removed.
 enum AppRouteManifest {
-  static let version = 1
+  static let version = 2
 
   static let entries: [AppRouteEntry] = [
     // MARK: Root routes (AppState.route → RootView)
@@ -193,7 +193,7 @@ enum AppRouteManifest {
 
     AppRouteEntry(
       id: "surface.chat",
-      title: "Chat",
+      title: "Home",
       classification: .gated,
       presentation: .surfacePane,
       source: "Jovie/Features/Chat/MobileChatView.swift",
@@ -207,11 +207,11 @@ enum AppRouteManifest {
     ),
     AppRouteEntry(
       id: "surface.library",
-      title: "Library",
+      title: "Work",
       classification: .shipped,
       presentation: .surfacePane,
       source: "Jovie/Features/Library/LibrarySurfaceView.swift",
-      userTask: "Browse saved assets and vlogs",
+      userTask: "Browse releases, products, videos, writing, and campaigns",
       stateOwner: "AppShellView.selectedTab + libraryHome",
       entry: "Drawer surface row; vlog save lands here",
       exit: "Drawer surface switch",
@@ -243,7 +243,7 @@ enum AppRouteManifest {
     ),
     AppRouteEntry(
       id: "surface.profile",
-      title: "Profile",
+      title: "Identity",
       classification: .shipped,
       presentation: .surfacePane,
       source: "Jovie/Features/Dashboard/DashboardView.swift",

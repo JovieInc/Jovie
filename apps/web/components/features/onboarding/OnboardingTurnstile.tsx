@@ -195,12 +195,14 @@ export function OnboardingTurnstile({
           setInteractiveChallengeVisible(false);
           commitState({ status: 'verified' });
         },
-        'error-callback': code => {
+        // The Cloudflare error code is diagnostic, not user copy (JOV-3379 plan b).
+        'error-callback': () => {
           setInteractiveChallengeRequested(false);
           setInteractiveChallengeVisible(false);
           commitState({
             status: 'error',
-            message: `Verification failed (${code}). Refresh the page to try again.`,
+            message:
+              "We couldn't start your chat. Refresh the page to try again.",
           });
         },
         'expired-callback': () => {

@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/features/onboarding/ChatProposeNextStepCard.test.tsx
 import { useEffect, useRef } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthShell } from '@/features/auth';
@@ -91,8 +92,8 @@ export function ChatProposeNextStepCard({
       return (
         <div className='min-h-72 px-1 py-1'>
           <p className='text-mid leading-7 text-primary-token'>
-            Saving your request to the waitlist now. Keep this page open until
-            the receipt appears.
+            Saving your request and reserving your name and profile now. Keep
+            this page open until the receipt appears.
           </p>
         </div>
       );
@@ -102,8 +103,9 @@ export function ChatProposeNextStepCard({
       return (
         <div className='min-h-72 px-1 py-1'>
           <p className='text-mid leading-7 text-primary-token'>
-            Add a verified email to save this request. You are not on the list
-            until the confirmation appears.
+            Save your spot. Add a verified email to save this request and
+            reserve your name and profile. You are not on the list until the
+            confirmation appears.
           </p>
         </div>
       );
@@ -112,8 +114,9 @@ export function ChatProposeNextStepCard({
     return (
       <div className='min-h-72 space-y-3 px-1 py-1'>
         <p className='mb-3 text-mid leading-7 text-primary-token'>
-          Add a verified email to save this request. You are not on the list
-          until the confirmation appears.
+          Save your spot. Add a verified email to save this request and reserve
+          your name and profile. You are not on the list until the confirmation
+          appears.
         </p>
         <AuthShell
           mode='sign-up'
@@ -151,7 +154,7 @@ export function ChatProposeNextStepCard({
   return (
     <div className='space-y-3 px-1 py-1'>
       <p className='mb-3 text-mid leading-7 text-primary-token'>
-        {`You're in. Add an email to keep going. I'll save this conversation to your account so we don't lose it.`}
+        {`You're in. Add an email to save your profile and this conversation.`}
       </p>
       <AuthShell
         mode='sign-up'

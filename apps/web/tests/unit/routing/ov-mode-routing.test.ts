@@ -75,7 +75,7 @@ describe('OV mode routing', () => {
     });
   });
 
-  it('rewrites default /hud into the OV app shell and keeps isolated query modes on /hud', async () => {
+  it('rewrites /hud and wiki into the OV app shell except token kiosk mode', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const grouped = (await nextConfig.rewrites()) as {
@@ -84,6 +84,10 @@ describe('OV mode routing', () => {
     };
     const hudInShell = {
       source: APP_ROUTES.HUD,
+      // fs=1 (JOV-7126): the hud-isolated screen-cert producer's own path to
+      // the isolated apps/web/app/hud/page.tsx source. See
+      // tests/unit/routing/hud-rewrite-exemptions.test.ts for the dedicated
+      // contract test on this rewrite's exemption set.
       missing: [
         { type: 'query', key: 'fs', value: '1' },
         { type: 'query', key: 'kiosk' },
@@ -96,5 +100,9 @@ describe('OV mode routing', () => {
     // keeps the chrome-less isolated screen.
     expect(grouped.beforeFiles).toContainEqual(hudInShell);
     expect(grouped.afterFiles ?? []).not.toContainEqual(hudInShell);
+    expect(grouped.beforeFiles).toContainEqual({
+      source: '/hud/wiki/:path*',
+      destination: '/app/ov/wiki/:path*',
+    });
   });
 });

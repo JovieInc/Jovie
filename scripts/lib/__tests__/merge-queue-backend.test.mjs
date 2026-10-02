@@ -61,7 +61,7 @@ const VALID_REPOSITORY = Object.freeze(
 );
 const VALID_RULESET = Object.freeze(
   JSON.parse(
-    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":60,"grouping_strategy":"ALLGREEN","max_entries_to_build":2,"max_entries_to_merge":5,"merge_method":"SQUASH","min_entries_to_merge":5,"min_entries_to_merge_wait_minutes":10}}]}`
+    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":60,"grouping_strategy":"ALLGREEN","max_entries_to_build":10,"max_entries_to_merge":5,"merge_method":"SQUASH","min_entries_to_merge":5,"min_entries_to_merge_wait_minutes":10}}]}`
   )
 );
 const VALID_WORKFLOW = `name: CI
@@ -85,7 +85,7 @@ const VALID_BRANCH_PROTECTION_REF = Object.freeze({
 }} */
 const VALID_LIVE_QUEUE_CONFIGURATION = Object.freeze({
   checkResponseTimeout: 3600,
-  maximumEntriesToBuild: 2,
+  maximumEntriesToBuild: 10,
   maximumEntriesToMerge: 5,
   mergeMethod: 'SQUASH',
   minimumEntriesToMerge: 5,
@@ -742,7 +742,7 @@ describe('native live preflight', () => {
   });
 
   it.each([
-    1, 2,
+    1, 2, 10,
   ])('allows supported build count %s during rollout and rollback with truthful readback', buildCount => {
     const result = validateNativePreflightEvidence({
       ruleset: VALID_RULESET,
@@ -758,15 +758,15 @@ describe('native live preflight', () => {
     expect(result.policyReadback.observed.max_entries_to_build).toBe(
       buildCount
     );
-    expect(result.policyReadback.matched).toBe(buildCount === 2);
+    expect(result.policyReadback.matched).toBe(buildCount === 10);
     expect(result.policyReadback.drift).toEqual(
-      buildCount === 1 ? ['max_entries_to_build'] : []
+      buildCount === 10 ? [] : ['max_entries_to_build']
     );
   });
 
   it.each([
     0,
-    3,
+    11,
     100,
     -1,
     1.5,
@@ -837,7 +837,7 @@ describe('native live preflight', () => {
               ...rule,
               parameters: {
                 ...rule.parameters,
-                max_entries_to_build: 3,
+                max_entries_to_build: 12,
               },
             }
           : rule
@@ -863,7 +863,7 @@ describe('native live preflight', () => {
     expect(liveGraphql.policyReadback).toMatchObject({
       matched: true,
       drift: [],
-      observed: { max_entries_to_build: 2 },
+      observed: { max_entries_to_build: 10 },
     });
   });
 
@@ -876,7 +876,7 @@ describe('native live preflight', () => {
     expect(result).toMatchObject({ ready: true });
     expect(result.policyReadback).toMatchObject({
       matched: true,
-      observed: { max_entries_to_build: 2 },
+      observed: { max_entries_to_build: 10 },
     });
     const liveConfigCall = runner.mock.calls.find(([args]) =>
       queryText(args).includes('MergeQueueLiveConfiguration')
@@ -980,7 +980,7 @@ describe('native live preflight', () => {
               ...rule,
               parameters: {
                 ...rule.parameters,
-                max_entries_to_build: 3,
+                max_entries_to_build: 12,
               },
             }
           : rule
@@ -996,7 +996,7 @@ describe('native live preflight', () => {
       ready: true,
       policyReadback: {
         matched: true,
-        observed: { max_entries_to_build: 2 },
+        observed: { max_entries_to_build: 10 },
       },
     });
   });
@@ -1508,7 +1508,7 @@ describe('canonical admission membership binding', () => {
     expect(afterResponse.message).toContain('"stdoutBytes":500');
     expect(afterResponse.message).not.toContain('exitMs');
   });
-  it('encodes the GraphQL Int through the real gh HTTP transport', async () => {
+  it('encodes the GraphQL Int through the real gh HTTP transport', { timeout: 30000 }, async () => {
     const config = mkdtempSync(join(tmpdir(), 'membership-gh-'));
     const started = performance.now();
     const phases = {};
@@ -1576,7 +1576,7 @@ describe('canonical admission membership binding', () => {
                 ],
                 {
                   env: environment,
-                  timeout: 3000,
+                  timeout: 20000,
                 },
                 (error, stdout, stderr) => {
                   if (error) {

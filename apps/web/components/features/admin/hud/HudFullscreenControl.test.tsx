@@ -3,55 +3,92 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HudFullscreenControl } from '@/components/features/admin/hud/HudFullscreenControl';
 import { APP_ROUTES } from '@/constants/routes';
 
+const { replace } = vi.hoisted(() => ({ replace: vi.fn() }));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace }),
+}));
+
 describe('HudFullscreenControl', () => {
-  const assign = vi.fn();
+  let fullscreenElement: Element | null;
+  const requestFullscreen = vi.fn(async function (this: HTMLElement) {
+    fullscreenElement = this;
+    document.dispatchEvent(new Event('fullscreenchange'));
+  });
+  const exitFullscreen = vi.fn(async () => {
+    fullscreenElement = null;
+    document.dispatchEvent(new Event('fullscreenchange'));
+  });
 
   beforeEach(() => {
-    assign.mockReset();
-    vi.stubGlobal('location', {
-      origin: 'https://jov.ie',
-      assign,
-    } satisfies Pick<Location, 'origin' | 'assign'>);
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('enters isolated fullscreen with fs=1 when no kiosk token is issued', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-      })
-    );
-
-    render(<HudFullscreenControl />);
-    fireEvent.click(screen.getByRole('button', { name: 'Fullscreen' }));
-
-    await vi.waitFor(() => {
-      expect(assign).toHaveBeenCalledWith('https://jov.ie/hud?fs=1');
+    fullscreenElement = null;
+    replace.mockReset();
+    requestFullscreen.mockClear();
+    exitFullscreen.mockClear();
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => fullscreenElement,
+    });
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: requestFullscreen,
+    });
+    Object.defineProperty(document, 'exitFullscreen', {
+      configurable: true,
+      value: exitFullscreen,
     });
   });
 
-  it('exits fullscreen back to the canonical /hud shell URL', () => {
-    render(<HudFullscreenControl action='exit' />);
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('expands the current main-content plane without navigating', async () => {
+    render(
+      <main data-app-shell-main-plane='true'>
+        <HudFullscreenControl />
+      </main>
+    );
+    const mainPlane = screen.getByRole('main');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fullscreen' }));
+
+    await vi.waitFor(() => expect(requestFullscreen).toHaveBeenCalledOnce());
+    expect(requestFullscreen.mock.instances[0]).toBe(mainPlane);
+    expect(replace).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('button', { name: 'Exit fullscreen' })
+    ).toBeVisible();
+    expect(screen.getByRole('main')).toBe(mainPlane);
+  });
+
+  it('exits the browser fullscreen surface in place', async () => {
+    render(
+      <main data-app-shell-main-plane='true'>
+        <HudFullscreenControl />
+      </main>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Fullscreen' }));
+    await screen.findByRole('button', { name: 'Exit fullscreen' });
+
     fireEvent.click(screen.getByRole('button', { name: 'Exit fullscreen' }));
 
-    expect(assign).toHaveBeenCalledWith(APP_ROUTES.HUD);
+    await vi.waitFor(() => expect(exitFullscreen).toHaveBeenCalledOnce());
+    expect(screen.getByRole('button', { name: 'Fullscreen' })).toBeVisible();
   });
 
-  it('returns from isolated fullscreen on Escape', () => {
-    render(<HudFullscreenControl action='exit' />);
-    fireEvent.keyDown(window, { key: 'Escape' });
-
-    expect(assign).toHaveBeenCalledWith(APP_ROUTES.HUD);
-  });
-
-  it('closes packaged Mac HUD back to canonical /hud', () => {
+  it('keeps the legacy packaged close control on canonical /hud', () => {
     render(<HudFullscreenControl action='close' />);
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 
-    expect(assign).toHaveBeenCalledWith(APP_ROUTES.HUD);
+    expect(replace).toHaveBeenCalledWith(APP_ROUTES.HUD);
+  });
+
+  it('renders the enter control as an icon-only button', () => {
+    render(<HudFullscreenControl />);
+
+    const button = screen.getByRole('button', { name: 'Fullscreen' });
+    expect(button).toHaveAttribute('title', 'Fullscreen');
+    expect(button).toHaveTextContent('');
   });
 });

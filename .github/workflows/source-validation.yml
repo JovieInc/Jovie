@@ -1,0 +1,131 @@
+name: Source Validation
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main, 'integration/**']
+permissions:
+  contents: read
+concurrency:
+  group: source-validation-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  deterministic:
+    name: Source Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - &source-checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - &source-setup
+        uses: ./.github/actions/setup-node-pnpm
+      # component-ship-gate's live-storybook-cert launches Chromium when the
+      # diff touches in-scope UI components; without browsers the gate fails
+      # closed before any story is measured.
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
+      - name: Run deterministic source contract
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          TURBO_SCM_BASE: origin/${{ github.base_ref }}
+          TURBO_SCM_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          node scripts/verify-workflow-references.mjs
+          node scripts/lockfile-specifier-preflight.mjs
+          node scripts/ci-release-incident-contract.mjs
+          pnpm ci:harness:check
+          pnpm typecheck
+          pnpm biome:check
+          ESLINT_CHANGED_BASE="origin/${{ github.base_ref }}" pnpm --filter @jovie/web run lint:eslint:changed
+          pnpm component-ship-gate
+          pnpm ci:control:test
+      - name: Verify changed CLI publication behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_sha="$(git merge-base 'origin/${{ github.base_ref }}' HEAD)"
+          changed_cli="$(git diff --name-only "$base_sha" HEAD -- packages/jovie-cli .github/workflows/npm-publish.yml .github/workflows/source-validation.yml)"
+          if [ -n "$changed_cli" ]; then
+            pnpm --filter @jovie/cli run test:coverage
+            pnpm --filter @jovie/cli run typecheck
+            pnpm --filter @jovie/cli run build
+            pnpm --filter @jovie/cli run pack:dry
+          fi
+  security:
+    name: Security Evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - *source-checkout
+      - *source-setup
+      - name: Scan the exact source diff
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          ./scripts/security/scan-secrets.sh ci-pr "$base_sha"
+          ./scripts/security/verify-gitleaks-coverage.sh
+          node scripts/golden-path-lock.mjs merge-gate
+  migration:
+    name: Migration Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - *source-checkout
+      - *source-setup
+      - name: Validate changed migration surfaces
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          if git diff --quiet "$base_sha"...HEAD -- apps/web/drizzle apps/web/scripts/check-migrations.sh apps/web/scripts/validate-migrations.sh apps/web/scripts/online-index-migrate.ts; then
+            echo 'No migration surface changed; non-applicable receipt recorded.'
+            exit 0
+          fi
+          cd apps/web
+          ./scripts/check-migrations.sh
+          ./scripts/validate-migrations.sh
+          pnpm exec tsx scripts/online-index-migrate.ts --validate-only
+  coverage:
+    name: Exact-head Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - *source-checkout
+      - *source-setup
+      - name: Run changed-behavior coverage ratchet
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          plan="$(node scripts/check-changed-test-coverage.mjs --base "$base_sha" --head "$EXPECTED_HEAD" --plan)"
+          if [ "$(jq -r '.applicable' <<<"$plan")" != true ]; then
+            echo 'No coverable web product source; non-applicable receipt recorded.'
+            exit 0
+          fi
+          JOVIE_COVERAGE_INCLUDE="$(jq -r '.coverageInclude // [] | .[]' <<<"$plan")"
+          JOVIE_COVERAGE_RELATED_TESTS="$(jq -r '.relatedTests[]?' <<<"$plan")"
+          export JOVIE_COVERAGE_INCLUDE JOVIE_COVERAGE_RELATED_TESTS
+          pnpm --filter @jovie/web test:coverage --changed "$base_sha" --bail 1
+          node scripts/check-changed-test-coverage.mjs --base "$base_sha" --head "$EXPECTED_HEAD" --coverage apps/web/coverage/coverage-final.json
+  ready:
+    name: PR Ready
+    if: ${{ always() }}
+    needs: [deterministic, security, migration, coverage]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every source proof
+        env:
+          RESULTS: ${{ join(needs.*.result, ',') }}
+        run: test "$RESULTS" = 'success,success,success,success'

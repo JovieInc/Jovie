@@ -17,7 +17,7 @@ describe('LibrarySurface shared right rail contract', () => {
     );
     expect(source).toContain('useRegisterRightPanel(assetDrawerPanel);');
     expect(source).toContain('<InspectorShell');
-    expect(source).toContain("ariaLabel='Library asset details'");
+    expect(source).toContain("ariaLabel='Work details'");
     expect(source).toContain('LIBRARY_INSPECTOR_TABS');
     expect(source).toContain("data-testid='library-asset-entity-header'");
     expect(source).not.toContain('DrawerSectionGroup');

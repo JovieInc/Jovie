@@ -1,0 +1,246 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  applyStagePassedBit,
+  FACTORY_CERTIFIER_HARNESS,
+  FACTORY_RECEIPT_SCHEMA,
+} from '../../data/marketing/factory/spine';
+import { loadFactoryBrief } from './brief';
+import {
+  attemptFileName,
+  digestOf,
+  FACTORY_RUN_SCHEMA,
+  type FactoryRunManifest,
+  readJson,
+  type StageAttemptRecord,
+  stageInputDigest,
+  verifyFactoryRun,
+  writeJson,
+} from './receipts';
+
+const brief = loadFactoryBrief('solutions', 'founders');
+const PAGE_ID = 'solutions-founders';
+
+let runDir: string;
+
+const truthArtifact = {
+  pageId: PAGE_ID,
+  claims: [
+    {
+      id: 'offer.free.price',
+      statement: '$0',
+      maturity: 'shipped',
+      evidenceRefs: ['offer-free'],
+    },
+  ],
+};
+
+const outcomesArtifact = {
+  pageId: PAGE_ID,
+  brief: brief.brief,
+  icp: brief.icp,
+  jobsToBeDone: brief.jobsToBeDone,
+  ...(brief.dry?.outcomes as object),
+};
+
+/** Writes a two-link chain (truth, outcomes) the way run.ts does. */
+function writeChain(): FactoryRunManifest {
+  const briefDigest = digestOf(brief);
+  const chain: FactoryRunManifest['chain'] = [];
+  const links = [
+    { stage: 'truth' as const, artifact: truthArtifact, producer: null },
+    {
+      stage: 'outcomes' as const,
+      artifact: outcomesArtifact,
+      producer: {
+        modelId: 'anthropic/claude-opus-5.5',
+        family: 'anthropic',
+        channel: 'subscription-cli' as const,
+      },
+    },
+  ];
+  for (const link of links) {
+    const receipt = applyStagePassedBit(
+      {
+        schema: FACTORY_RECEIPT_SCHEMA,
+        pageId: PAGE_ID,
+        stage: link.stage,
+        attempt: 1,
+        inputDigest: stageInputDigest(
+          briefDigest,
+          chain.map(item => item.outputDigest)
+        ),
+        outputDigest: digestOf(link.artifact),
+        producer: link.producer,
+        evaluators: link.producer
+          ? [
+              {
+                id: 'openai/gpt-5.5',
+                family: 'openai',
+                kind: 'llm',
+                verdict: 'pass',
+                score: 0.9,
+                rubricVersion: 'factory-outcomes/1',
+              },
+            ]
+          : [],
+        invariantsPassed: ['fixture'],
+        invariantsFailed: [],
+        at: '2026-09-30T00:00:00.000Z',
+      },
+      { certifier: FACTORY_CERTIFIER_HARNESS }
+    );
+    const file = attemptFileName(link.stage, 1);
+    const record: StageAttemptRecord = {
+      receipt,
+      artifact: link.artifact,
+      feedbackIn: [],
+      notes: {},
+      unavailable: null,
+    };
+    writeJson(join(runDir, file), record);
+    chain.push({
+      stage: link.stage,
+      attempt: 1,
+      file,
+      outputDigest: receipt.outputDigest,
+    });
+  }
+  const manifest: FactoryRunManifest = {
+    schema: FACTORY_RUN_SCHEMA,
+    pageId: PAGE_ID,
+    family: brief.family,
+    slug: brief.slug,
+    mode: 'dry',
+    briefDigest,
+    status: 'failed',
+    stoppedAt: 'narrative',
+    reason: 'fixture',
+    chain,
+    attempts: chain.map(link => link.file),
+  };
+  writeJson(join(runDir, 'brief.json'), brief);
+  writeJson(join(runDir, 'run.json'), manifest);
+  return manifest;
+}
+
+function editRecord(
+  file: string,
+  edit: (record: StageAttemptRecord) => StageAttemptRecord
+) {
+  const path = join(runDir, file);
+  writeJson(path, edit(readJson<StageAttemptRecord>(path)));
+}
+
+beforeEach(() => {
+  runDir = mkdtempSync(join(tmpdir(), 'factory-receipts-'));
+});
+
+afterEach(() => {
+  rmSync(runDir, { recursive: true, force: true });
+});
+
+describe('digestOf', () => {
+  it('is stable across key order and binds prior digests in order', () => {
+    expect(digestOf({ a: 1, b: [2, { d: 4, c: 3 }] })).toBe(
+      digestOf({ b: [2, { c: 3, d: 4 }], a: 1 })
+    );
+    expect(digestOf({ a: 1 })).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(stageInputDigest('sha256:x', ['a', 'b'])).not.toBe(
+      stageInputDigest('sha256:x', ['b', 'a'])
+    );
+  });
+
+  it('names attempt files in spine order', () => {
+    expect(attemptFileName('truth', 1)).toBe('01-truth.attempt-1.json');
+    expect(attemptFileName('publish', 3)).toBe('15-publish.attempt-3.json');
+  });
+});
+
+describe('verifyFactoryRun', () => {
+  it('accepts an untouched chain', () => {
+    writeChain();
+    expect(verifyFactoryRun(runDir)).toEqual([]);
+  });
+
+  it('catches a tampered artifact and every later link', () => {
+    writeChain();
+    editRecord('01-truth.attempt-1.json', record => ({
+      ...record,
+      artifact: {
+        ...truthArtifact,
+        claims: [{ ...truthArtifact.claims[0], statement: '$1' }],
+      },
+    }));
+
+    expect(verifyFactoryRun(runDir)).toContain(
+      'truth#1: artifact digest does not match the receipt'
+    );
+  });
+
+  it('catches a receipt edited into a self-review', () => {
+    writeChain();
+    editRecord('02-outcomes.attempt-1.json', record => ({
+      ...record,
+      receipt: {
+        ...record.receipt,
+        evaluators: record.receipt.evaluators.map(evaluator => ({
+          ...evaluator,
+          family: 'anthropic',
+        })),
+      },
+    }));
+
+    expect(verifyFactoryRun(runDir)).toContain(
+      'outcomes#1: evaluator openai/gpt-5.5 shares family anthropic with the producer'
+    );
+  });
+
+  it('catches a passed bit set by a model', () => {
+    writeChain();
+    editRecord('02-outcomes.attempt-1.json', record => ({
+      ...record,
+      receipt: { ...record.receipt, certifier: 'anthropic/claude-opus-5.5' },
+    }));
+
+    expect(verifyFactoryRun(runDir)).toContain(
+      'outcomes#1: only the harness may set passed, got anthropic/claude-opus-5.5'
+    );
+  });
+
+  it('catches a broken chain link, an edited brief and a short complete run', () => {
+    const manifest = writeChain();
+    writeJson(join(runDir, 'run.json'), {
+      ...manifest,
+      status: 'complete',
+      chain: [
+        { ...manifest.chain[0], outputDigest: digestOf('other') },
+        manifest.chain[1],
+      ],
+    });
+    writeJson(join(runDir, 'brief.json'), { ...brief, icp: 'Someone else' });
+    const issues = verifyFactoryRun(runDir);
+
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        'brief.json digest does not match run.json',
+        'complete run has 2/15 stages',
+        'truth#1: run.json digest does not match the receipt',
+        'outcomes#1: input digest does not bind the prior chain',
+      ])
+    );
+  });
+
+  it('reports missing files and malformed manifests', () => {
+    expect(verifyFactoryRun(runDir)).toEqual([`no run.json in ${runDir}`]);
+    const manifest = writeChain();
+    rmSync(join(runDir, '02-outcomes.attempt-1.json'));
+    expect(verifyFactoryRun(runDir)).toContain(
+      'outcomes#1: missing 02-outcomes.attempt-1.json'
+    );
+    writeJson(join(runDir, 'run.json'), { ...manifest, status: 'shipped' });
+    expect(verifyFactoryRun(runDir)[0]).toMatch(/^run.json status:/);
+  });
+});

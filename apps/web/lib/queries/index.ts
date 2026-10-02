@@ -41,6 +41,11 @@
 
 // Admin infinite queries
 export {
+  type AdminAssetIssuesFilter,
+  type AdminAssetRow,
+  type AdminAssetSort,
+  type AdminAssetType,
+  type AdminAssetVerifiedFilter,
   type AdminCreatorProfileRow,
   type AdminCreatorProfilesSort,
   type AdminLeadsSortBy,
@@ -49,6 +54,7 @@ export {
   type AdminUserRow,
   type AdminUserStatus,
   type AdminUsersSort,
+  useAdminAssetsInfiniteQuery,
   useAdminCreatorsInfiniteQuery,
   useAdminReleasesInfiniteQuery,
   useAdminUsersInfiniteQuery,
@@ -69,7 +75,6 @@ export {
   getCacheGeneration,
   getCacheScope,
   isShareableAcrossProfileSwitch,
-  registerIsolatedCacheSurface,
   resetCacheIsolationForTests,
   subscribeCacheFence,
   withCacheScope,

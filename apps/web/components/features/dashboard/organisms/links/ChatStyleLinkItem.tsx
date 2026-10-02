@@ -46,7 +46,7 @@ const SWIPE_ACTION_CLASS =
   'flex h-full flex-col items-center justify-center gap-1 px-4 text-xs font-caption transition-colors active:opacity-80';
 const NEUTRAL_SWIPE_ACTION_CLASS =
   'bg-surface-2 text-primary-token hover:bg-surface-3';
-const DESTRUCTIVE_SWIPE_ACTION_CLASS = 'bg-red-500 text-white dark:text-white';
+const DESTRUCTIVE_SWIPE_ACTION_CLASS = 'bg-error text-white dark:text-white';
 
 export interface ChatStyleLinkItemProps<T extends DetectedLink = DetectedLink> {
   readonly id: string;
@@ -259,7 +259,6 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
                 modal
                 initialFocus={firstItemRef}
               >
-                {/* eslint-disable react-hooks/refs -- floating-ui ref callback is intentional */}
                 <div
                   ref={floatingRefs.setFloating}
                   tabIndex={-1}
@@ -295,7 +294,6 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
                     </button>
                   ))}
                 </div>
-                {/* eslint-enable react-hooks/refs */}
               </FloatingFocusManager>
             </FloatingPortal>
           )}

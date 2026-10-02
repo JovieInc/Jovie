@@ -23,8 +23,8 @@ for (const theme of ['dark', 'light']) {
       page.viewportSize()!.height,
       0
     );
-    const library = nav.getByRole('link', { name: 'Library' });
-    const row = await library.boundingBox();
+    const home = nav.getByRole('link', { name: 'Home' });
+    const row = await home.boundingBox();
     expect(row!.height).toBe(36);
     const create = nav.getByRole('link', { name: 'New Chat' });
     const colors = await create.evaluate(element => ({

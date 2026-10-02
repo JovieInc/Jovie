@@ -108,6 +108,83 @@ struct APIClientTests {
     #expect(await tokenProvider.recordedForceRefreshValues() == [false])
   }
 
+  @Test func registersPushDeviceWithAuthenticatedJSON() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["token-1"])
+    MockURLProtocol.requestHandler = { request in
+      #expect(request.url?.path == "/api/mobile/v1/push-devices")
+      #expect(request.httpMethod == "PUT")
+      #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token-1")
+      let body = try requestBodyData(request)
+      let payload = try #require(
+        JSONSerialization.jsonObject(with: body) as? [String: String]
+      )
+      #expect(payload == [
+        "environment": "sandbox",
+        "timezone": "America/Los_Angeles",
+        "token": "0123456789abcdef",
+      ])
+      return (
+        HTTPURLResponse(
+          url: request.url!,
+          statusCode: 204,
+          httpVersion: nil,
+          headerFields: nil
+        )!,
+        Data()
+      )
+    }
+
+    let client = APIClient(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
+      tokenProvider: tokenProvider
+    )
+
+    try await client.registerPushDevice(
+      token: "0123456789abcdef",
+      environment: .sandbox,
+      timezone: "America/Los_Angeles"
+    )
+    #expect(await tokenProvider.recordedForceRefreshValues() == [false])
+  }
+
+  @Test func unregistersPushDeviceWithAuthenticatedJSON() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["token-1"])
+    MockURLProtocol.requestHandler = { request in
+      #expect(request.url?.path == "/api/mobile/v1/push-devices")
+      #expect(request.httpMethod == "DELETE")
+      let body = try requestBodyData(request)
+      let payload = try #require(
+        JSONSerialization.jsonObject(with: body) as? [String: String]
+      )
+      #expect(payload == ["token": "0123456789abcdef"])
+      return (
+        HTTPURLResponse(
+          url: request.url!,
+          statusCode: 204,
+          httpVersion: nil,
+          headerFields: nil
+        )!,
+        Data()
+      )
+    }
+
+    let client = APIClient(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
+      tokenProvider: tokenProvider
+    )
+
+    try await client.unregisterPushDevice(token: "0123456789abcdef")
+  }
+
+  @Test func rendersAPNsDeviceTokenAsLowercaseHex() {
+    #expect(
+      PushNotificationManager.tokenString(from: Data([0x00, 0x0A, 0xFE, 0xFF]))
+        == "000afeff"
+    )
+  }
+
   @Test func retriesWithFreshTokenAfterUnauthorized() async throws {
     let tokenProvider = MockTokenProvider(tokens: ["stale-token", "fresh-token"])
     var requestCount = 0

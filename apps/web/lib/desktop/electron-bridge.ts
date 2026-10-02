@@ -70,6 +70,19 @@ export interface ElectronAPI {
     readonly ok: boolean;
     readonly reason?: string;
   }>;
+  /** Touch ID sign-in capability and this Mac's enrollment choice. */
+  readonly getDesktopPasskeyState?: () => Promise<DesktopPasskeyState>;
+  /** Record that this Mac enrolled or declined Touch ID sign-in. */
+  readonly setDesktopPasskeyState?: (
+    update: DesktopPasskeyStateUpdate
+  ) => Promise<{ readonly ok: boolean; readonly reason?: string }>;
+  /** Finish an in-app Touch ID sign-in: close the handoff, open the app. */
+  readonly completeDesktopPasskeySignIn?: () => Promise<{
+    readonly ok: boolean;
+    readonly reason?: string;
+  }>;
+  /** Continue the main Ovie route in an independent browser session. */
+  readonly openCurrentOvieInBrowser?: () => Promise<DesktopAuthActionResult>;
   /** Open the current isolated public profile in the system browser. */
   readonly openPublicProfileInBrowser?: () => Promise<DesktopAuthActionResult>;
   /** Close the dedicated desktop auth handoff window. */
@@ -99,6 +112,16 @@ export interface ElectronAPI {
    */
   readonly onTrayAction?: (cb: (action: string) => void) => () => void;
   /**
+   * Post a native OS notification. On click the main process routes `url`
+   * through the desktop URL disposition rules, so only routes the shell
+   * already allows can be deep-linked. Optional on older binaries.
+   */
+  readonly showNotification?: (payload: {
+    title: string;
+    body?: string;
+    url?: string;
+  }) => Promise<{ readonly ok: boolean; readonly reason?: string }>;
+  /**
    * Signal first successful React paint so the desktop shell can cancel its
    * boot watchdog (JOV-3595). Optional — older binaries ignore the channel.
    */
@@ -124,6 +147,20 @@ export type DesktopAuthCompletionResult =
       readonly ok: false;
       readonly reason?: string;
     };
+
+export interface DesktopPasskeyState {
+  readonly available: boolean;
+  readonly enrolled: boolean;
+  readonly dismissed: boolean;
+}
+
+export type DesktopPasskeyStateUpdate = 'enrolled' | 'dismissed' | 'reset';
+
+const NO_DESKTOP_PASSKEY: DesktopPasskeyState = {
+  available: false,
+  enrolled: false,
+  dismissed: false,
+};
 
 export interface DesktopAuthActionResult {
   readonly ok: boolean;
@@ -561,6 +598,63 @@ export async function redeemDesktopAuthReturnCode(
   return { ok: false, reason: 'desktop-auth-return-code-bridge-unavailable' };
 }
 
+export async function getDesktopPasskeyState(): Promise<DesktopPasskeyState> {
+  const api = getRawElectronAPI();
+  if (typeof api?.getDesktopPasskeyState !== 'function') {
+    return NO_DESKTOP_PASSKEY;
+  }
+  try {
+    const state = await api.getDesktopPasskeyState();
+    return {
+      available: state?.available === true,
+      enrolled: state?.enrolled === true,
+      dismissed: state?.dismissed === true,
+    };
+  } catch {
+    return NO_DESKTOP_PASSKEY;
+  }
+}
+
+export async function setDesktopPasskeyState(
+  update: DesktopPasskeyStateUpdate
+): Promise<DesktopAuthActionResult> {
+  const api = getRawElectronAPI();
+  if (typeof api?.setDesktopPasskeyState !== 'function') {
+    return { ok: false, reason: 'desktop-passkey-bridge-unavailable' };
+  }
+  const result = await api.setDesktopPasskeyState(update);
+  return result.ok
+    ? { ok: true }
+    : { ok: false, reason: result.reason ?? 'desktop-passkey-state-failed' };
+}
+
+export async function completeDesktopPasskeySignIn(): Promise<DesktopAuthActionResult> {
+  const api = getRawElectronAPI();
+  if (typeof api?.completeDesktopPasskeySignIn !== 'function') {
+    return { ok: false, reason: 'desktop-passkey-bridge-unavailable' };
+  }
+  const result = await api.completeDesktopPasskeySignIn();
+  return result.ok
+    ? { ok: true }
+    : { ok: false, reason: result.reason ?? 'desktop-passkey-complete-failed' };
+}
+
+export async function openCurrentOvieInBrowser(): Promise<DesktopAuthActionResult> {
+  const api = getRawElectronAPI();
+  if (!api || typeof api.openCurrentOvieInBrowser !== 'function') {
+    if (api) reportMissingBridgeMethod('openCurrentOvieInBrowser');
+    return { ok: false, reason: 'ovie-browser-bridge-unavailable' };
+  }
+  try {
+    const result = await api.openCurrentOvieInBrowser();
+    return result?.ok === true
+      ? { ok: true }
+      : { ok: false, reason: result?.reason ?? 'ovie-browser-open-failed' };
+  } catch {
+    return { ok: false, reason: 'ovie-browser-open-failed' };
+  }
+}
+
 export async function openPublicProfileInBrowser(): Promise<DesktopAuthActionResult> {
   const api = getRawElectronAPI();
   if (api && typeof api.openPublicProfileInBrowser === 'function') {
@@ -788,6 +882,26 @@ export function onDesktopTrayAction(cb: (action: string) => void): () => void {
   return typeof unsubscribe === 'function' ? unsubscribe : noopUnsubscribe;
 }
 
+export interface DesktopNotificationPayload {
+  readonly title: string;
+  readonly body?: string;
+  readonly url?: string;
+}
+
+/**
+ * Post a native OS notification for an event the user already opted into by
+ * email (inbox, chat). Clicking it deep-links into the app via the desktop
+ * URL disposition rules. Silently no-ops in the browser and on stale binaries
+ * that predate the notification bridge.
+ */
+export async function showDesktopNotification(
+  payload: DesktopNotificationPayload
+): Promise<void> {
+  const api = getRawElectronAPI();
+  if (!api || typeof api.showNotification !== 'function') return;
+  await api.showNotification(payload);
+}
+
 export async function launchOperatorControl(
   request: OperatorLaunchRequest
 ): Promise<{ readonly ok: boolean; readonly reason?: string }> {
@@ -817,11 +931,16 @@ export const __testing = {
   copyDesktopAuthUrl,
   redeemDesktopAuthReturnCode,
   supportsDesktopAuthReturnCode,
+  getDesktopPasskeyState,
+  setDesktopPasskeyState,
+  completeDesktopPasskeySignIn,
   openPublicProfileInBrowser,
+  openCurrentOvieInBrowser,
   closeDesktopAuthWindow,
   consumeDesktopAuthCompletion,
   setDesktopTrayState,
   onDesktopTrayAction,
+  showDesktopNotification,
   launchOperatorControl,
   notifyDesktopAppBooted,
   RELEASE_DOWNLOAD_URL,

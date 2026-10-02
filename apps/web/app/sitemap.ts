@@ -6,7 +6,13 @@ import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getAlternativeSlugs } from '@/content/alternatives';
 import { getComparisonSlugs } from '@/content/comparisons';
-import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
+import { getIndexedSolutionsPages } from '@/content/pages/solutions';
+import { pageRecordPath } from '@/data/marketing/factory/pageRecord';
+import {
+  getBlogPosts,
+  isBlogPostIndexable,
+  slugifyCategory,
+} from '@/lib/blog/getBlogPosts';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { getChangelogReleases } from '@/lib/changelog-source';
 import { db } from '@/lib/db';
@@ -262,6 +268,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     marketingPages.push(sitemapEntry(`${APP_ROUTES.ALTERNATIVES}/${slug}`));
   }
 
+  // Factory page records: only `indexed` records publish (JOV-7275).
+  for (const record of getIndexedSolutionsPages()) {
+    marketingPages.push(sitemapEntry(pageRecordPath(record)));
+  }
+
   const editorialPages: MetadataRoute.Sitemap = [
     sitemapEntry('/blog', blogLastModified),
     sitemapEntry('/changelog', changelogLastModified),
@@ -269,12 +280,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   editorialPages.push(
-    ...blogPosts.map(post =>
-      sitemapEntry(
-        `/blog/${post.slug}`,
-        toContentRevisionDate(post.updatedDate ?? post.date)
+    ...blogPosts
+      .filter(post => isBlogPostIndexable(post.slug))
+      .map(post =>
+        sitemapEntry(
+          `/blog/${post.slug}`,
+          toContentRevisionDate(post.updatedDate ?? post.date)
+        )
       )
-    )
   );
 
   const blogAuthors = [

@@ -71,6 +71,38 @@ function emptyFirstArray(source, key) {
   return source.replace(pattern, `${key}: []`);
 }
 
+const SYNTHETIC_RECORDED_ON = '2026-09-27';
+const SYNTHETIC_EXPIRES_ON = '2026-10-27';
+
+function syntheticPendingRecord(ruleId) {
+  return {
+    ruleId,
+    status: VISUAL_EVALUATOR_MISSING,
+    owner: 'JOV-6040',
+    recordedOn: SYNTHETIC_RECORDED_ON,
+    expiresOn: SYNTHETIC_EXPIRES_ON,
+    reason: 'synthetic fixture for the fail-closed contract test',
+  };
+}
+
+/**
+ * Canonical now carries a real evaluator receipt for every visual-semantic
+ * rule (JOV-6040 resolved), so the fail-closed contract itself — what
+ * happens with no receipt and no/expired/malformed pending record — can no
+ * longer be exercised by reading canonical's live pendingEvaluators. These
+ * fixture-dependent tests synthesize an unresolved policy instead: no
+ * evaluatorReceipt on any visual rule, and one well-formed pending record
+ * per visual rule for callers to mutate further.
+ */
+function syntheticUnresolvedVisualState() {
+  return mutatedPolicy(value => {
+    for (const id of VISUAL_RULE_IDS) {
+      delete value.rules.find(rule => rule.id === id).evaluatorReceipt;
+    }
+    value.pendingEvaluators = VISUAL_RULE_IDS.map(syntheticPendingRecord);
+  });
+}
+
 describe('founder design invariants (JOV-INV-038)', () => {
   it('accepts the canonical design-invariants contract', () => {
     assert.deepEqual(validateDesignSurfacesContract(canonical), []);
@@ -407,30 +439,34 @@ describe('founder design invariants (JOV-INV-038)', () => {
     assert.deepEqual(scanTasteLocks(repoRoot), []);
   });
 
-  it('reports visual rules as not-certified while their dated record is valid', () => {
+  it('certifies all three visual-semantic rules through wired evaluator receipts (JOV-6040)', () => {
     const certification = designSurfacesCertification(canonical, {
       today: '2026-09-27',
     });
-    const notCertified = certification.filter(
-      item => item.status !== 'certified'
-    );
-    assert.deepEqual(
-      notCertified.map(item => item.id).sort(),
-      [...VISUAL_RULE_IDS].sort()
-    );
-    for (const item of notCertified) {
-      assert.equal(item.reason, VISUAL_EVALUATOR_MISSING);
+    for (const id of VISUAL_RULE_IDS) {
+      const item = certification.find(entry => entry.id === id);
+      assert.ok(item, `${id} present in certification report`);
+      assert.equal(item.status, 'certified');
+      assert.ok(
+        item.evaluator?.endsWith('-v1.test.tsx'),
+        `${id} is certified by an evaluator receipt path, got ${item.evaluator}`
+      );
     }
-    assert.match(
+    assert.equal(
       formatCertificationSummary(certification),
-      /5\/8 founder rules certified; NOT certified: .*visual-evaluator-missing/
+      'design-surfaces-v1: 8/8 founder rules certified'
+    );
+    // certifyVisualRules only reports 'certified' once existsSync resolves
+    // the receipt, so this also proves the three receipt files are real.
+    assert.deepEqual(
+      validateDesignSurfacesContract(canonical, { today: '2026-09-27' }),
+      []
     );
   });
 
-  it('deliberate red: visual rules block when the pending-evaluator record is absent', () => {
-    const { registry } = mutatedPolicy(policy => {
-      delete policy.pendingEvaluators;
-    });
+  it('deliberate red: visual rules block when neither a receipt nor a pending-evaluator record exists', () => {
+    const { registry, policy } = syntheticUnresolvedVisualState();
+    policy.pendingEvaluators = [];
     const errors = validateDesignSurfacesContract(registry, {
       today: '2026-09-27',
     });
@@ -441,24 +477,23 @@ describe('founder design invariants (JOV-INV-038)', () => {
             error.startsWith(`${VISUAL_EVALUATOR_MISSING}: ${id}`) &&
             error.includes('failing closed')
         ),
-        `${id} blocks without a record`
+        `${id} blocks without a receipt or a record`
       );
     }
   });
 
   it('deliberate red: one missing record blocks only that visual rule', () => {
-    const { policy } = mutatedPolicy(value => {
-      value.pendingEvaluators = value.pendingEvaluators.filter(
-        record => record.ruleId !== 'proximal-proof'
-      );
-    });
+    const { policy } = syntheticUnresolvedVisualState();
+    policy.pendingEvaluators = policy.pendingEvaluators.filter(
+      record => record.ruleId !== 'proximal-proof'
+    );
     const { errors } = certifyVisualRules(policy, { today: '2026-09-27' });
     assert.equal(errors.length, 1);
     assert.match(errors[0], /visual-evaluator-missing: proximal-proof/);
   });
 
   it('deliberate red: an expired pending-evaluator record blocks', () => {
-    const { policy } = mutatedPolicy(() => {});
+    const { policy } = syntheticUnresolvedVisualState();
     const expiry = policy.pendingEvaluators[0].expiresOn;
     assert.deepEqual(
       certifyVisualRules(policy, { today: expiry }).errors,
@@ -471,11 +506,10 @@ describe('founder design invariants (JOV-INV-038)', () => {
   });
 
   it('deliberate red: rejects malformed or misowned pending-evaluator records', () => {
-    const { policy } = mutatedPolicy(value => {
-      value.pendingEvaluators[0].owner = 'JOV-1';
-      value.pendingEvaluators[1].status = 'certified';
-      value.pendingEvaluators[2].expiresOn = 'soon';
-    });
+    const { policy } = syntheticUnresolvedVisualState();
+    policy.pendingEvaluators[0].owner = 'JOV-1';
+    policy.pendingEvaluators[1].status = 'certified';
+    policy.pendingEvaluators[2].expiresOn = 'soon';
     const { errors } = certifyVisualRules(policy, { today: '2026-09-27' });
     assert.ok(errors.some(error => error.includes('owned by JOV-6040')));
     assert.ok(errors.some(error => error.includes('status must be')));
@@ -484,10 +518,7 @@ describe('founder design invariants (JOV-INV-038)', () => {
 
   it('deliberate red: deterministic rules cannot be deferred with a pending record', () => {
     const { policy } = mutatedPolicy(value => {
-      value.pendingEvaluators.push({
-        ...value.pendingEvaluators[0],
-        ruleId: 'route-intent',
-      });
+      value.pendingEvaluators = [syntheticPendingRecord('route-intent')];
     });
     const { errors } = certifyVisualRules(policy, { today: '2026-09-27' });
     assert.ok(errors.some(error => error.includes('route-intent')));
@@ -495,9 +526,7 @@ describe('founder design invariants (JOV-INV-038)', () => {
 
   it('certifies a visual rule only through an existing evaluator receipt', () => {
     const missing = mutatedPolicy(value => {
-      value.pendingEvaluators = value.pendingEvaluators.filter(
-        record => record.ruleId !== 'progressive-depth'
-      );
+      value.pendingEvaluators = [];
       value.rules.find(
         rule => rule.id === 'progressive-depth'
       ).evaluatorReceipt = 'scripts/invariants/does-not-exist.mjs';
@@ -509,9 +538,10 @@ describe('founder design invariants (JOV-INV-038)', () => {
     );
 
     const wired = mutatedPolicy(value => {
-      value.rules.find(
-        rule => rule.id === 'progressive-depth'
-      ).evaluatorReceipt = 'scripts/invariants/design-surfaces.mjs';
+      // Canonical already wires a real progressive-depth receipt; simulate
+      // it still carrying a stale pending-evaluator record from before that
+      // receipt existed.
+      value.pendingEvaluators = [syntheticPendingRecord('progressive-depth')];
     }).policy;
     const stale = certifyVisualRules(wired, { today: '2026-09-27' });
     assert.ok(
@@ -563,7 +593,7 @@ describe('founder design invariants (JOV-INV-038)', () => {
     assert.deepEqual(
       scanNavSemantics(
         'apps/web/data/marketingNavigation.ts',
-        "const L = [{ href: APP_ROUTES.SOLUTIONS_FOUNDERS, label: 'Founders' }, { href: 'https://status.jov.ie', label: 'Status', external: true }];"
+        "const L = [{ href: APP_ROUTES.SOLUTIONS_FOUNDERS, label: 'Founders' }, { href: 'https://x.com/meetjovie', label: 'X', external: true }];"
       ),
       []
     );

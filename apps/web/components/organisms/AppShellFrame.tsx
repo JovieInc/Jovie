@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import { memo } from 'react';
 import { CanvasGrain } from '@/components/atoms/CanvasGrain';
-import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
+import { DesktopTitlebar } from '@/components/organisms/DesktopTitlebar';
 import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
 import { OverlayInteractionGuard } from '@/components/shell/OverlayInteractionGuard';
 import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
@@ -119,7 +119,10 @@ export const AppShellFrame = memo(function AppShellFrame({
               >
                 <div
                   data-app-shell-main-content='true'
-                  className='relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-(--app-shell-content-inset) transition-[flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none'
+                  // No inset here: the header spans the panel edge-to-edge so
+                  // the top row and route read as one clipped plane (JOV-7207).
+                  // The route inset lives on the scroll wrapper below.
+                  className='relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden transition-[flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none'
                 >
                   {/* The chat wash belongs to the route plane, not the contextual
                       inspector. Keeping the isolated paint layer in this column
@@ -135,7 +138,10 @@ export const AppShellFrame = memo(function AppShellFrame({
                   ) : null}
                   {isCodeFlagEnabled('CANVAS_GRAIN') && <CanvasGrain />}
                   {header}
-                  <div className='flex min-h-0 min-w-0 flex-1 overflow-hidden'>
+                  <div
+                    data-app-shell-content-inset='true'
+                    className='flex min-h-0 min-w-0 flex-1 overflow-hidden p-(--app-shell-content-inset)'
+                  >
                     <div
                       data-testid='app-shell-scroll'
                       className={cn(

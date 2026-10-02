@@ -49,10 +49,21 @@ function walkFiles(relDir, predicate) {
   return found.sort();
 }
 
-function macosTopLevelDirs() {
+function macosSwiftTargetDirs() {
   return readdirSync(join(ROOT, 'apps/macos'), { withFileTypes: true })
-    .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
+    .filter(
+      entry =>
+        entry.isDirectory() &&
+        !entry.name.startsWith('.') &&
+        entry.name !== 'node_modules' &&
+        existsSync(join(ROOT, 'apps/macos', entry.name, 'Package.swift'))
+    )
     .map(entry => entry.name)
+    .filter(
+      name =>
+        walkFiles(join('apps/macos', name), abs => abs.endsWith('.swift'))
+          .length > 0
+    )
     .sort();
 }
 
@@ -86,11 +97,20 @@ describe('Mac Swift-control invariants (JOV-5359)', () => {
   });
 
   it('keeps MenuMonitor as the only macOS Swift target and without a webview', () => {
-    assert.deepEqual(macosTopLevelDirs(), ['MenuMonitor']);
+    // The invariant is about Swift targets, not every top-level directory:
+    // apps/macos/media-ingest (JOV-5370) is a plain TypeScript CLI with no
+    // Package.swift, so it must not trip this check. Scoping to dirs with
+    // Package.swift means no hardcoded list needs editing when the next
+    // non-Swift tool is added here.
+    assert.deepEqual(macosSwiftTargetDirs(), ['MenuMonitor']);
     const macosSwift = walkFiles(
       'apps/macos',
       abs => abs.endsWith('.swift') && !abs.includes('/.build/')
     );
+    const swiftTopLevelDirs = new Set(
+      macosSwift.map(file => file.split('/')[2])
+    );
+    assert.deepEqual([...swiftTopLevelDirs].sort(), ['MenuMonitor']);
     assert.equal(
       macosSwift.every(file => file.startsWith('apps/macos/MenuMonitor/')),
       true

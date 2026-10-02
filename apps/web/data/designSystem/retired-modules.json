@@ -1,0 +1,45 @@
+{
+  "schema": "jovie.ds-retired-modules/v1",
+  "note": "Design-system modules and exports that were retired in favor of a canonical owner. A retired module must not be recreated or imported again; a retired export must not reappear. Consumed by apps/web/eslint.config.js (author-time no-restricted-imports) and tests/unit/design-system/retired-modules.test.ts (CI gate). To retire a fork: migrate its consumers, delete it, and add a row here in the same PR. See docs/design-system/drift-audit-2026-09-27.md.",
+  "modules": [
+    {
+      "specifiers": ["@/components/organisms/Sidebar"],
+      "source": "components/organisms/Sidebar.tsx",
+      "replacement": "@/components/organisms/sidebar",
+      "replacementSource": "components/organisms/sidebar/index.tsx",
+      "reason": "Backwards-compat barrel over the modular sidebar. On case-insensitive filesystems it also shadowed the sidebar/ directory.",
+      "retired": "2026-09-26"
+    },
+    {
+      "specifiers": [
+        "@/features/dashboard/organisms/DashboardWorkspacePanel",
+        "@/components/features/dashboard/organisms/DashboardWorkspacePanel"
+      ],
+      "source": "components/features/dashboard/organisms/DashboardWorkspacePanel.tsx",
+      "replacement": "@/components/organisms/PageShell",
+      "replacementSource": "components/organisms/PageShell.tsx",
+      "reason": "Alias re-export of PageShell under a second name.",
+      "retired": "2026-09-26"
+    },
+    {
+      "specifiers": [
+        "@/features/dashboard/molecules/FeedbackModal",
+        "@/components/features/dashboard/molecules/FeedbackModal"
+      ],
+      "source": "components/features/dashboard/molecules/FeedbackModal.tsx",
+      "replacement": "@/features/dashboard/organisms/DashboardFeedbackModal",
+      "replacementSource": "components/features/dashboard/organisms/DashboardFeedbackModal.tsx",
+      "reason": "Analytics wrapper around DashboardFeedbackModal with no consumers.",
+      "retired": "2026-09-26"
+    }
+  ],
+  "exports": [
+    {
+      "name": "CONTENT_SURFACE_CARD_CLASSNAME",
+      "source": "components/molecules/ContentSurfaceCard.tsx",
+      "replacement": "contentSurfaceCardVariants()",
+      "reason": "Precomputed default-variant class string; call the CVA recipe instead.",
+      "retired": "2026-09-26"
+    }
+  ]
+}

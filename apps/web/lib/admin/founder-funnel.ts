@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { sql as drizzleSql } from 'drizzle-orm';
-
+import { APP_ROUTES } from '@/constants/routes';
 import { db } from '@/lib/db';
 import { captureError } from '@/lib/error-tracking';
 
@@ -20,6 +20,8 @@ export interface FounderFunnelStage {
   conversionRate: number | null;
   /** Number lost between the previous stage and this one (null for first stage) */
   dropOff: number | null;
+  /** Entity view that supplies the aggregate. */
+  drillDownHref: string;
 }
 
 export interface FounderFunnelData {
@@ -38,26 +40,31 @@ const STAGE_DEFS = [
     key: 'onboarding_chats',
     label: 'Onboarding chats',
     description: 'Anonymous visitors who started the onboarding chat',
+    drillDownHref: APP_ROUTES.ADMIN_ACTIVITY,
   },
   {
     key: 'accounts_created',
     label: 'Accounts created',
     description: 'Signups (users created)',
+    drillDownHref: APP_ROUTES.ADMIN_USERS,
   },
   {
     key: 'profile_claimed',
     label: 'Profile claimed',
     description: 'Users with a claimed creator profile',
+    drillDownHref: APP_ROUTES.ADMIN_CREATORS,
   },
   {
     key: 'onboarding_complete',
     label: 'Onboarding complete',
     description: 'Users whose profile finished onboarding',
+    drillDownHref: APP_ROUTES.ADMIN_CREATORS,
   },
   {
     key: 'paid',
     label: 'Paid',
     description: 'Users with an active Stripe subscription',
+    drillDownHref: APP_ROUTES.ADMIN_USERS,
   },
 ] as const;
 

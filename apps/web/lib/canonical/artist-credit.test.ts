@@ -93,6 +93,46 @@ describe('ARTIST_CREDIT_CONTRACT (JOV-6543 deliberate-red fixtures)', () => {
     }
   });
 
+  it('admits the Take Me Over primary + featured + remixer graph without substitution', () => {
+    const observations = [
+      {
+        artistId: ARTIST_UUID,
+        role: 'main_artist',
+        isPrimary: true,
+        position: 0,
+      },
+      {
+        artistId: '223e4567-e89b-42d3-a456-426614174001',
+        role: 'featured_artist',
+        isPrimary: false,
+        position: 1,
+      },
+      {
+        artistId: '323e4567-e89b-42d3-a456-426614174002',
+        role: 'remixer',
+        isPrimary: false,
+        position: 2,
+      },
+    ] as const;
+
+    const decisions = observations.map(observation =>
+      admitArtistCredit(observation, {
+        producer: 'discography/provider-credit-reconciliation@1',
+        source: 'apple_music',
+        confidence: 'imported',
+      })
+    );
+
+    expect(decisions.every(decision => decision.status === 'accepted')).toBe(
+      true
+    );
+    expect(decisions.map(decision => decision.canonical?.role)).toEqual([
+      'main_artist',
+      'featured_artist',
+      'remixer',
+    ]);
+  });
+
   it('quarantines credits referencing a name or handle instead of a registry UUID', () => {
     for (const artistId of [
       'Fedde Le Grand',

@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { parseBrandDealOpportunity } from './brand-deal-opportunity';
 import { isReportKind } from './opportunity-inbox-report';
+import { parseSocialReplyDraft } from './social-reply-draft';
 import {
   BRAND_DEAL_OPPORTUNITY_KIND,
   CALENDAR_CREATE_EVENT_KIND,
+  SOCIAL_REPLY_DRAFT_KIND,
   WORKFLOW_CAPTURE_REQUEST_KIND,
   YOUTUBE_THUMBNAIL_CANDIDATE_KIND,
   YOUTUBE_THUMBNAIL_PLAYBOOK_KIND,
@@ -39,7 +41,7 @@ export type SuggestedActionDispatch =
     }
   | {
       readonly mode: 'decision-only';
-      readonly family: 'brand-deal' | 'youtube-thumbnail';
+      readonly family: 'brand-deal' | 'youtube-thumbnail' | 'social-reply';
     }
   | { readonly mode: 'workflow-capture' }
   | { readonly mode: 'next-step-only' }
@@ -108,6 +110,14 @@ export function resolveSuggestedActionDispatch(input: {
 
   if (input.kind === YOUTUBE_THUMBNAIL_PLAYBOOK_KIND) {
     return { mode: 'decision-only', family: 'youtube-thumbnail' };
+  }
+
+  if (input.kind === SOCIAL_REPLY_DRAFT_KIND) {
+    // Approve records the durable human decision; the reply executor binds to
+    // the approved row and drives checking → sending → verified itself.
+    return parseSocialReplyDraft(input.kind, input.payload)
+      ? { mode: 'decision-only', family: 'social-reply' }
+      : { mode: 'invalid', error: 'invalid-social-reply-draft' };
   }
 
   if (input.kind === WORKFLOW_CAPTURE_REQUEST_KIND) {

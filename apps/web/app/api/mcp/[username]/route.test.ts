@@ -6,6 +6,7 @@
  * other id or multiple concurrent requests.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ARTIST_MCP_OWNER_TOOLS } from '@/lib/mcp/artist-oauth-discovery';
 
 // ---------------------------------------------------------------------------
 // Hoist mocks
@@ -293,6 +294,10 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
       }),
       { params: Promise.resolve({ username: 'artist1' }) }
     );
+    expect(res.status).toBe(401);
+    expect(res.headers.get('www-authenticate')).toBe(
+      'Bearer resource_metadata="https://jov.ie/.well-known/oauth-protected-resource/api/mcp/artist1"'
+    );
     const body = await res.json();
     expect(body.error.message).toContain('Authentication required');
     expect(hoisted.createMerchGeneration).not.toHaveBeenCalled();
@@ -505,6 +510,10 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
       }),
       { params: Promise.resolve({ username: 'artist1' }) }
     );
+    expect(res.status).toBe(401);
+    expect(res.headers.get('www-authenticate')).toBe(
+      'Bearer resource_metadata="https://jov.ie/.well-known/oauth-protected-resource/api/mcp/artist1"'
+    );
     const body = await res.json();
     expect(body.error.message).toContain('Authentication required');
     expect(hoisted.getVideoMetricsForProfile).not.toHaveBeenCalled();
@@ -591,6 +600,10 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
       }),
       { params: Promise.resolve({ username: 'artist1' }) }
     );
+    expect(res.status).toBe(401);
+    expect(res.headers.get('www-authenticate')).toBe(
+      'Bearer resource_metadata="https://jov.ie/.well-known/oauth-protected-resource/api/mcp/artist1"'
+    );
     const body = await res.json();
     expect(body.error.message).toContain('Authentication required');
     expect(hoisted.registerThumbnailCandidateReview).not.toHaveBeenCalled();
@@ -667,5 +680,120 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
     expect(body.error.message).toBe(
       'Current YouTube API metrics required: yt-1'
     );
+  });
+
+  it.each(ARTIST_MCP_OWNER_TOOLS)(
+    '%s returns 401 and a per-resource Bearer challenge when unauthenticated',
+    async name => {
+      const { POST } = await import('./route');
+      const res = await POST(
+        makeRequest({
+          jsonrpc: '2.0',
+          id: name,
+          method: 'tools/call',
+          params: { name, arguments: {} },
+        }),
+        { params: Promise.resolve({ username: 'artist1' }) }
+      );
+
+      expect(res.status).toBe(401);
+      expect(res.headers.get('cache-control')).toBe('no-store');
+      expect(res.headers.get('www-authenticate')).toBe(
+        'Bearer resource_metadata="https://jov.ie/.well-known/oauth-protected-resource/api/mcp/artist1"'
+      );
+      const body = await res.json();
+      expect(body.id).toBe(name);
+      expect(body.error.code).toBe(-32602);
+      expect(body.error.message).toContain('Authentication required');
+      expect(hoisted.createMerchGeneration).not.toHaveBeenCalled();
+      expect(hoisted.selectMerchDesign).not.toHaveBeenCalled();
+      expect(hoisted.publishMerchCard).not.toHaveBeenCalled();
+      expect(hoisted.proposeMerchAction).not.toHaveBeenCalled();
+      expect(hoisted.getVideoMetricsForProfile).not.toHaveBeenCalled();
+      expect(hoisted.registerThumbnailCandidateReview).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps public profile resources and tools anonymous', async () => {
+    hoisted.getReleasesForProfileLite.mockResolvedValue([
+      {
+        id: 'rel-1',
+        title: 'Song',
+        releaseType: 'single',
+        releaseDate: null,
+        artworkUrl: null,
+      },
+    ]);
+    hoisted.getUpcomingTourDatesForProfile.mockResolvedValue([
+      {
+        id: 'evt-1',
+        title: 'Show',
+        startDate: '2026-10-01',
+        venueName: 'Hall',
+        city: 'Austin',
+        country: 'US',
+        ticketUrl: 'https://tickets.example/1',
+        ticketStatus: 'on_sale',
+      },
+    ]);
+    hoisted.getLiveMerchCardsForProfile.mockResolvedValue([
+      {
+        id: 'item-1',
+        title: 'Tee',
+        description: 'Cotton',
+        productType: 'shirt',
+        primaryImageUrl: null,
+        retailPriceCents: 2500,
+      },
+    ]);
+    hoisted.listVideosForProfile.mockResolvedValue([]);
+
+    const { POST } = await import('./route');
+    const resources = [
+      'artist://artist1/bio',
+      'artist://artist1/releases',
+      'artist://artist1/events',
+      'artist://artist1/merch',
+      'artist://artist1/videos',
+    ];
+    for (const uri of resources) {
+      const res = await POST(
+        makeRequest({
+          jsonrpc: '2.0',
+          id: uri,
+          method: 'resources/read',
+          params: { uri },
+        }),
+        { params: Promise.resolve({ username: 'artist1' }) }
+      );
+      expect(res.status, uri).toBe(200);
+      expect(res.headers.get('www-authenticate')).toBeNull();
+      const body = await res.json();
+      expect(body.result.contents[0].uri).toBe(uri);
+    }
+
+    const tools = [
+      { name: 'get_ticket_link', arguments: { eventId: 'evt-1' } },
+      { name: 'check_merch_availability', arguments: { itemId: 'item-1' } },
+      { name: 'add_to_cart', arguments: { itemId: 'item-1' } },
+      { name: 'list_videos', arguments: {} },
+    ];
+    for (const params of tools) {
+      const res = await POST(
+        makeRequest({
+          jsonrpc: '2.0',
+          id: params.name,
+          method: 'tools/call',
+          params,
+        }),
+        { params: Promise.resolve({ username: 'artist1' }) }
+      );
+      expect(res.status, params.name).toBe(200);
+      expect(res.headers.get('www-authenticate')).toBeNull();
+      const body = await res.json();
+      expect(body.error).toBeUndefined();
+      expect(body.result.content[0].text.length).toBeGreaterThan(0);
+    }
+    expect(hoisted.createMerchGeneration).not.toHaveBeenCalled();
   });
 });

@@ -46,6 +46,7 @@ export function PublicProfileFixture({
       artist={artist}
       socialLinks={[...HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS]}
       contacts={[...HOMEPAGE_PROFILE_PREVIEW_CONTACTS]}
+      showPayButton
       allowFanCapture={false}
       latestRelease={HOMEPAGE_PROFILE_PREVIEW_RELEASES.live}
       profileSettings={{ showOldReleases: true }}
@@ -55,6 +56,21 @@ export function PublicProfileFixture({
       allowPhotoDownloads={false}
       tourDates={[...tourDates]}
       releases={[...HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES]}
+      releaseCredits={[
+        {
+          role: 'producer',
+          label: 'Producer',
+          entries: [
+            {
+              artistId: '123e4567-e89b-12d3-a456-426614174001',
+              name: 'Tim White',
+              handle: 'tim',
+              role: 'producer',
+              position: 0,
+            },
+          ],
+        },
+      ]}
       profileBanner={
         <PublicClaimBanner
           profileHandle={artist.handle}
