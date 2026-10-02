@@ -3,18 +3,26 @@
   Do not edit manually — changes are overwritten on the next scheduled run.
 -->
 
-> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/27411234883)
+> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/37069882088)
 
 # Nightly Testing Agent — Daily Report
 
 Repo: jovie
-Generated: 2026-06-12T11:31:02.768Z
+Generated: 2026-10-02T22:20:07.143Z
+Workflow conclusion: failure
+
+## Evidence warnings
+
+- Missing mutation report at /home/runner/work/Jovie/Jovie/apps/web/reports/mutation/mutation.json
 
 ## Suites
 
 | Lane | Total | Passed | Failed | Flaky | Skipped |
 |---|---:|---:|---:|---:|---:|
-| unit | 13741 | 13717 | 0 | 0 | 24 |
+| unit | 7244 | 7227 | 2 | 0 | 15 |
+| unit | 7680 | 7638 | 0 | 0 | 42 |
+| unit | 7629 | 7589 | 0 | 0 | 40 |
+| unit | 7283 | 7276 | 2 | 0 | 5 |
 
 ## Selected Targets
 
@@ -38,4 +46,7 @@ Generated: 2026-06-12T11:31:02.768Z
 
 | Lane | Test | File | Message |
 |---|---|---|---|
-| none | none | none | none |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > inherits child env without JSON disclosure and rejects a real credential trace |  |  Running 1 test using 1 worker F    1) .artifact-json-hlbKO0/sentinel.spec.ts:1:47 › env ─────────────────────────────────────────────       |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > accepts only decoded metadata-free Playwright PNG bytes |  |  Running 1 test using 1 worker  [1A[2K[1/1] .artifact-comparison-LDV0cG/comparison.spec.ts:1:47 › comparison [1A[2K  1) .artifact-comparison |
+| unit | eslint-rules/__tests__/shadcn-lint-changed.test.ts shadcn-lint-changed probe > sees a changed production apps/web TS file from git root and misses it from apps/ |  | probe at git root saw no production files for 07ce5fefa51fd516a4c0d3d7ed28a627c3879281: expected null not to be null |
+| unit | tests/unit/design-system/story-source-sha-ancestry.test.ts story receipt SHA ancestry > keeps every literal receipt ancestral and able to replay its story path |  | expected 3 to be 5 // Object.is equality |
