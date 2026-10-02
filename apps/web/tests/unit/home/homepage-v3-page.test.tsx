@@ -14,6 +14,16 @@ vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
 vi.mock('@/components/homepage/homepage-analytics', () => ({
   trackHomepageEvent: vi.fn(),
 }));
+vi.mock('@/components/homepage/HomepageLatestNews', async importOriginal => {
+  const { HomepageLatestNews } =
+    await importOriginal<
+      typeof import('@/components/homepage/HomepageLatestNews')
+    >();
+  // Resolve the real server component before handing its markup to the DOM
+  // renderer, which cannot execute a nested async Server Component.
+  const news = await HomepageLatestNews();
+  return { HomepageLatestNews: () => news };
+});
 vi.mock('next/navigation', async importOriginal => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => ({ push: vi.fn() }),
@@ -48,17 +58,26 @@ describe('homepage v3 page composition', { timeout: 60_000 }, () => {
     vi.resetModules();
   });
 
-  it('mounts the v3 hero, presence, structure, and close with the flag on', async () => {
+  it('mounts the v3 hero, presence, structure, news, and close with the flag on', async () => {
     flags.HOMEPAGE_V3_ENABLED = true;
     const { container } = await renderHomePage();
 
-    const ids = [...container.querySelectorAll('[data-homepage-testid]')]
-      .map(section => section.getAttribute('data-homepage-testid'))
+    const ids = [
+      ...container.querySelectorAll(
+        '[data-homepage-testid], [data-testid="marketing-section-blog-feed"]'
+      ),
+    ]
+      .map(
+        section =>
+          section.getAttribute('data-homepage-testid') ??
+          section.getAttribute('data-testid')
+      )
       .filter(id => !id?.startsWith('homepage-possibility-'));
     expect(ids).toEqual([
       'homepage-hero-shell',
       'homepage-section-presence',
       'homepage-section-structure',
+      'marketing-section-blog-feed',
       'homepage-close',
     ]);
     expect(
@@ -91,6 +110,11 @@ describe('homepage v3 page composition', { timeout: 60_000 }, () => {
       '/assets/generated/homepage-presence-satin-v1.webp',
     ]);
     expect(screen.queryByText("What's new in Jovie")).toBeNull();
+    const news = screen.getByRole('region', { name: 'Latest News' });
+    expect(within(news).getAllByRole('article')).toHaveLength(4);
+    expect(
+      within(news).getByRole('link', { name: 'All posts' })
+    ).toHaveAttribute('href', '/blog');
   });
 
   it('keeps the live story stack with the flag off', async () => {
@@ -103,5 +127,6 @@ describe('homepage v3 page composition', { timeout: 60_000 }, () => {
     expect(screen.queryByTestId('homepage-identity-story-stack')).toBeNull();
     expect(screen.queryByTestId('homepage-presence-material')).toBeNull();
     expect(screen.queryByTestId('homepage-section-structure')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Latest News' })).toBeNull();
   });
 });
