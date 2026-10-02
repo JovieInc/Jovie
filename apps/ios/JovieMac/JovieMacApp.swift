@@ -26,6 +26,8 @@ struct MacDevelopmentView: View {
         Text("The native Mac app is not available yet.")
           .font(JovieFont.body(size: 16))
       #if DEBUG
+      case .localDraft:
+        MacLocalDraftExercise()
       case .fixture(let conversation, let messages):
         Text("Development fixture · Read only")
           .font(JovieFont.body(size: 14))
@@ -50,3 +52,22 @@ struct MacDevelopmentView: View {
     .background(JovieColor.backgroundBase)
   }
 }
+
+#if DEBUG
+private struct MacLocalDraftExercise: View {
+  @State private var draft = ""
+  @State private var focusRequest: UUID?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: JovieSpacing.medium) {
+      Text("Local draft · Not sent or saved")
+        .font(JovieFont.body(size: 14))
+        .foregroundStyle(JovieColor.textSecondary)
+      MacComposerTextView(text: $draft, focusRequest: focusRequest)
+        .frame(height: 180)
+        .clipShape(RoundedRectangle(cornerRadius: JovieRadius.medium))
+      Button("Focus draft") { focusRequest = UUID() }
+    }
+  }
+}
+#endif
