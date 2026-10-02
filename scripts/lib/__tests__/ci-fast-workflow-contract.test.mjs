@@ -416,6 +416,7 @@ describe('ci-fast bounded parallel workflow', () => {
         spotify: 'false',
         kbd: 'false',
         crawler: 'true',
+        desktop_update: 'false',
         overlay: 'false',
         privacy: 'false',
         tasks: 'false',
@@ -510,6 +511,45 @@ describe('ci-fast bounded parallel workflow', () => {
     ]);
   });
 
+  it('selects the desktop updater geometry proof for modal changes', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(
+      /DESKTOP_UPDATE_STORYBOOK_PATTERN='([^']+)'/
+    )?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'apps/web/components/organisms/desktop-update/DesktopUpdateModal.tsx',
+      'apps/web/components/organisms/desktop-update/DesktopUpdateModal.stories.tsx',
+      'apps/web/tests/e2e/storybook-desktop-update-modal.spec.ts',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern ?? 'a^'], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(
+      spawnSync('grep', ['-qE', pattern ?? 'a^'], {
+        input: 'apps/web/components/organisms/Other.tsx\n',
+        encoding: 'utf8',
+      }).status
+    ).not.toBe(0);
+    expect(remaining).toContain(
+      'RUN_DESKTOP_UPDATE: ${{ steps.storybook-browser.outputs.desktop_update }}'
+    );
+    expect(remaining).toContain(
+      'specs+=(tests/e2e/storybook-desktop-update-modal.spec.ts)'
+    );
+    expect(
+      jobBlock('ci-storybook-surfaces', 'ci-cross-product-integration')
+    ).toContain('tests/e2e/storybook-desktop-update-modal.spec.ts');
+  });
+
   it('selects the Tasks row geometry proof for its shared cell and feature surfaces', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
@@ -583,6 +623,7 @@ describe('ci-fast bounded parallel workflow', () => {
         crawler: 'false',
         overlay: 'false',
         tasks: 'true',
+        desktop_update: 'false',
         privacy: 'false',
       });
 
