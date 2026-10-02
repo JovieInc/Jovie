@@ -33,6 +33,7 @@ const createRow = (id: string, name: string): Row<TestRow> =>
   ({
     id,
     original: { id, name },
+    getVisibleCells: () => [],
   }) as Row<TestRow>;
 
 const baseProps = {
