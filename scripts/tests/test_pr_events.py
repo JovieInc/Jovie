@@ -107,6 +107,38 @@ class ReasonTest(unittest.TestCase):
 
 
 class RelayTest(unittest.TestCase):
+    def test_empty_ci_association_resolves_one_exact_same_repo_head_then_deduplicates(self):
+        sha = "a" * 40
+        workflow = {"event": "pull_request", "conclusion": "failure", "head_sha": sha,
+                    "head_branch": "codex/fix", "head_repository": {"full_name": events.REPO},
+                    "pull_requests": []}
+        candidate = {"number": 5, "state": "open",
+                     "head": {"sha": sha, "ref": "codex/fix", "repo": {"full_name": events.REPO}},
+                     "base": {"repo": {"full_name": events.REPO}}}
+        view = pr(branch="codex/fix", sha=sha)
+        shell = Shell({("gh", "api", f"repos/{events.REPO}/pulls"): [candidate],
+                       ("gh", "pr", "view"): lambda args: view})
+        payload = {"workflow_run": workflow}
+        self.assertEqual(events.relay("workflow_run", payload, shell, set()), [(5, "red")])
+        view["labels"] = [{"name": "lane-fix-red"}]
+        self.assertEqual(events.relay("workflow_run", payload, shell, set()), [])
+        self.assertEqual(len(shell.made("gh", "api", "-X", "POST")), 1)
+        for candidates in ([], [None], {}, [candidate, candidate], [{**candidate, "state": "closed"}],
+                           [{**candidate, "head": {**candidate["head"], "sha": "b" * 40}}],
+                           [{**candidate, "base": {"repo": {"full_name": "other/repo"}}}]):
+            rejected = Shell({("gh", "api", f"repos/{events.REPO}/pulls"): candidates})
+            self.assertEqual(events.relay("workflow_run", payload, rejected, set()), [])
+            self.assertEqual(rejected.made("gh", "pr", "view"), [])
+        for changed in ({"head_repository": {"full_name": "fork/repo"}}, {"head_sha": "bad"},
+                        {"head_branch": ""}, {"event": "push"}, {"conclusion": "cancelled"}):
+            rejected = Shell()
+            self.assertEqual(events.relay("workflow_run", {"workflow_run": {**workflow, **changed}},
+                                          rejected, set()), [])
+            self.assertEqual(rejected.calls, [])
+        failed = Shell({("gh", "api", f"repos/{events.REPO}/pulls"): (1, "")})
+        with self.assertRaisesRegex(RuntimeError, "cannot resolve"):
+            events.relay("workflow_run", payload, failed, set())
+
     def test_ci_failure_and_success_on_a_pr_become_red_and_green(self):
         run = {"event": "pull_request", "conclusion": "failure", "head_sha": "h1", "pull_requests": [{"number": 5}]}
         self.assertEqual(events.relay_targets("workflow_run", {"workflow_run": run}), [(5, "red", "h1")])
@@ -177,7 +209,11 @@ class RelayTest(unittest.TestCase):
 
         def relay_with(removals, labels=()):
             shell = Shell({("gh", "pr", "view"): {**view, "labels": [{"name": n} for n in labels]},
-                           ("gh", "api", "graphql"): removals})
+                           ("gh", "api", "graphql"): lambda args: removals if '--jq' in args else
+                           {"data": {"repository": {"pullRequest": {"headRefOid": "h7", "state": "OPEN", "timelineItems": {
+                               "nodes": [{"__typename": "PullRequestCommit", "commit": {"oid": "h7"}}] +
+                                        [{"__typename": "RemovedFromMergeQueueEvent", **item} for item in reversed(removals)],
+                               "pageInfo": {"hasPreviousPage": False, "startCursor": None}}}}}}})
             return events.relay("pull_request_target", payload, shell, set()), shell
 
         added, shell = relay_with([{"createdAt": stamp(60), "reason": "failed_checks"},
@@ -190,6 +226,63 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(len(shell.made("gh", "pr", "comment")), 1)
         added, shell = relay_with([{"createdAt": stamp(60), "reason": "failed_checks"}] * 3, labels=["queue-poison"])
         self.assertEqual(shell.made("gh", "pr", "comment"), [], "an already-poisoned PR is not re-announced")
+
+    def test_a_repaired_head_is_not_poisoned_by_old_revision_ejections(self):
+        removal = {"__typename": "RemovedFromMergeQueueEvent", "createdAt": "2033-05-18T03:32:20Z", "reason": "failed_checks"}
+        old = {"__typename": "PullRequestCommit", "commit": {"oid": "old"}}
+        new = {"__typename": "HeadRefForcePushedEvent", "afterCommit": {"oid": "h7"}}
+        view = pr(7, branch="tim/fix", sha="h7", state="OPEN")
+        nodes = [old, removal, removal, new, removal]
+        page = {"data": {"repository": {"pullRequest": {"headRefOid": "h7", "state": "OPEN", "timelineItems": {
+            "nodes": nodes, "pageInfo": {"hasPreviousPage": False, "startCursor": None}}}}}}
+        shell = Shell({("gh", "pr", "view"): view, ("gh", "api", "graphql"):
+                       lambda args: [removal] * 3 if '--jq' in args else page})
+        with patch.object(events.time, "time", return_value=NOW):
+            added = events.relay("pull_request_target", {"action": "dequeued", "pull_request": {"number": 7, "head": {"sha": "h7"}}}, shell, set())
+        self.assertEqual(added, [(7, "dequeued")])
+        self.assertEqual(shell.made("gh", "pr", "comment"), [])
+
+    def test_relay_never_poisons_explicitly_held_work(self):
+        view = pr(7, branch="tim/fix", sha="h7", state="OPEN", labels=["hold"])
+        removal = {"createdAt": "2033-05-18T03:32:20Z", "reason": "failed_checks"}
+        shell = Shell({("gh", "pr", "view"): view, ("gh", "api", "graphql"): [removal] * 2})
+        with patch.object(events.time, "time", return_value=NOW):
+            added = events.relay("pull_request_target", {"action": "dequeued", "pull_request": {"number": 7, "head": {"sha": "h7"}}}, shell, set())
+        self.assertEqual(added, [])
+        self.assertEqual(shell.made("gh", "api", "-X"), [])
+
+    def test_revision_ejections_paginate_back_to_the_actual_head_boundary(self):
+        removal = {"__typename": "RemovedFromMergeQueueEvent", "createdAt": "2033-05-18T03:32:20Z", "reason": "failed_checks"}
+        def page(nodes, previous=False, cursor=None, **extra):
+            return {"data": {"repository": {"pullRequest": {"headRefOid": "h7", "state": "OPEN", **extra,
+                "timelineItems": {"nodes": nodes, "pageInfo": {"hasPreviousPage": previous, "startCursor": cursor}}}}}}
+        replies = iter([page([removal], True, 'cursor"quoted'), page([
+            {"__typename": "PullRequestCommit", "commit": {"oid": "h7"}}, removal])])
+        def reply(args):
+            query = next(arg[6:] for arg in args if arg.startswith('query='))
+            self.assertEqual(query.count('{'), query.count('}'))
+            return next(replies)
+        shell = Shell({("gh", "api", "graphql"): reply})
+        self.assertEqual(events.queue_ejections(7, NOW, shell, head="h7"), 2)
+        self.assertIn('before:"cursor\\\"quoted"', shell.calls[1][-1])
+        for response in [page([removal]), page([removal], True), page([removal], headRefOid="changed"),
+                         {"errors": [{"message": "partial"}], **page([removal])}, 'malformed', (1, '')]:
+            self.assertIsNone(events.queue_ejections(7, NOW, Shell({("gh", "api", "graphql"): response}), head="h7"))
+        repeated = Shell({("gh", "api", "graphql"): page([removal], True, 'same')})
+        self.assertIsNone(events.queue_ejections(7, NOW, repeated, head="h7"))
+        self.assertEqual(len(repeated.calls), 2)
+
+    def test_poison_mutation_rechecks_live_head_and_hold_after_history_reads(self):
+        removal = {"__typename": "RemovedFromMergeQueueEvent", "createdAt": "2033-05-18T03:32:20Z", "reason": "failed_checks"}
+        page = {"data": {"repository": {"pullRequest": {"headRefOid": "h7", "state": "OPEN", "timelineItems": {
+            "nodes": [{"__typename": "PullRequestCommit", "commit": {"oid": "h7"}}, removal, removal],
+            "pageInfo": {"hasPreviousPage": False, "startCursor": None}}}}}}
+        initial = pr(7, branch="tim/fix", sha="h7", state="OPEN")
+        for live in [{**initial, "headRefOid": "changed"}, {**initial, "labels": [{"name": "hold"}]},
+                     {**initial, "state": "CLOSED"}, {**initial, "isCrossRepository": True}, (1, ''), 'malformed']:
+            shell = Shell({("gh", "api", "graphql"): page, ("gh", "pr", "view"): live})
+            self.assertFalse(events.mark_poison(7, initial, NOW, shell))
+            self.assertEqual(shell.made("gh", "api", "-X"), [])
 
     def test_a_push_to_main_labels_newly_conflicting_prs_after_mergeability_settles(self):
         reads = iter([
@@ -810,31 +903,35 @@ class RunnerHookTest(unittest.TestCase):
             record = json.loads((host.state / "held.json").read_text())["9"]
             self.assertEqual((record["reason"], record["next_action"]), ("diff-too-large", "bug-intake"))
 
-    def test_an_exhausted_orphan_is_escalated_then_returned_to_the_pool(self):
-        stuck = pr(number=7, branch="claude/jov-9-20260926t0100", merge="DIRTY", title="orphan")
-        calls = []
-        saved = (runner.sh, runner.load_providers, events.return_to_pool)
+    def test_exhausted_disabled_lane_preserves_pr_and_terminal_backlog_disposition(self):
+        stuck = pr(number=7, branch="claude/jov-9-20260926t0100", sha="h1", merge="DIRTY")
+        calls, moves, comments = [], [], []
+        saved = (runner.sh, runner.load_providers)
         runner.sh = lambda args, **k: calls.append(args) or SimpleNamespace(returncode=0, stderr="", stdout="")
         runner.load_providers = lambda: PROVIDERS
-        returned = []
-        events.return_to_pool = lambda lane, linear, pr, why: returned.append(pr["number"])
-        triaged = []
-        linear = SimpleNamespace(create_triage=lambda title, body, dedupe=None: triaged.append(body))
+        linear = SimpleNamespace(
+            gql=lambda *a: {"issues": {"nodes": [{"id": "iss", "state": {"type": "started"},
+                                                  "comments": {"nodes": []}}]}},
+            move=lambda issue, state: moves.append((issue, state)),
+            comment=lambda issue, body: comments.append(body))
         try:
             with tempfile.TemporaryDirectory() as tmp:
                 host = runner.Host(state=Path(tmp))
-                # `pushed` marks a head the fix loop may have produced itself: still terminal.
                 (host.state / "fix-attempts.json").write_text(json.dumps(
                     {"7": {"sha": "h0", "count": 2, "pushed": True}}))
                 runner.escalate_exhausted(host, [stuck], linear)
                 held = json.loads((host.state / "held.json").read_text())["7"]
+                runner.escalate_exhausted(host, [stuck], linear)
         finally:
-            runner.sh, runner.load_providers, events.return_to_pool = saved
-        self.assertEqual(returned, [7])
-        self.assertIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/issues/7/labels", "-f",
-                       "labels[]=lane-fix-exhausted"], calls, "held with a reason, visible on the PR")
-        self.assertEqual(triaged, [], "a terminal generation is a disposition, not queue inventory")
+            runner.sh, runner.load_providers = saved
+        self.assertFalse(any(call[:3] == ["gh", "pr", "close"] for call in calls),
+                         "retry exhaustion is evidence of a held generation, not redundant work")
+        self.assertEqual(moves, [("iss", "Backlog")])
+        self.assertEqual(len(comments), 1, "terminal disposition remains deduplicated")
+        self.assertIn("needs-human-decision", comments[0])
         self.assertEqual((held["reason"], held["sha"]), ("fix-exhausted", "h1"))
+        self.assertIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/issues/7/labels", "-f",
+                       "labels[]=lane-fix-exhausted"], calls)
 
     def test_an_unfixable_hold_escalates_once_without_burning_attempts(self):
         stuck = pr(number=7, title="big diff")

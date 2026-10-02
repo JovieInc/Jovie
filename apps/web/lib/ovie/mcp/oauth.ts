@@ -1,4 +1,8 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import {
+  acceptedMcpRedirectUris,
+  isAllowedMcpRedirectUri,
+} from '@/lib/oauth/mcp-redirect-allowlist';
 import { authorizeSummerControl } from '@/lib/ovie/control';
 import {
   OVIE_MCP_RESOURCE_PATH,
@@ -42,7 +46,7 @@ export type OvieAccessClaims = {
   readonly exp: number;
 };
 
-type ClientClaims = { readonly t: 'c'; readonly u: string[] };
+type ClientClaims = { readonly t: 'c'; readonly u: readonly string[] };
 type CodeClaims = {
   readonly t: 'a';
   readonly c: string;
@@ -64,6 +68,9 @@ export class OvieOAuthIssuer {
       issuer,
       authorization_endpoint: `${issuer}/authorize`,
       token_endpoint: `${issuer}/token`,
+      // /register is live and allowlist-gated. Advertise it so MCP clients
+      // that read this document can register. Better Auth discovery stays
+      // behind OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION.
       registration_endpoint: `${issuer}/register`,
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code'],
@@ -83,17 +90,7 @@ export class OvieOAuthIssuer {
   }
 
   registerClient(input: { redirect_uris?: unknown }): OvieOAuthClient {
-    const uris = Array.isArray(input.redirect_uris)
-      ? input.redirect_uris.filter(
-          (uri): uri is string =>
-            typeof uri === 'string' && isAllowedRedirect(uri)
-        )
-      : [];
-    if (!uris.length) {
-      throw new Error(
-        'redirect_uris must include a ChatGPT or localhost HTTPS/HTTP URI'
-      );
-    }
+    const uris = acceptedMcpRedirectUris(input.redirect_uris);
     return {
       client_id: signPayload(this.secret, {
         t: 'c',
@@ -191,18 +188,7 @@ export class OvieOAuthIssuer {
 }
 
 export function isAllowedRedirect(uri: string): boolean {
-  try {
-    const url = new URL(uri);
-    if (url.protocol === 'http:' && url.hostname === 'localhost') return true;
-    if (url.protocol !== 'https:') return false;
-    return (
-      url.hostname === 'chatgpt.com' ||
-      url.hostname === 'chat.openai.com' ||
-      url.hostname.endsWith('.chatgpt.com')
-    );
-  } catch {
-    return false;
-  }
+  return isAllowedMcpRedirectUri(uri);
 }
 
 export function pkceS256(verifier: string): string {

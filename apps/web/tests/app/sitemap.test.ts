@@ -24,8 +24,9 @@ vi.mock('@/lib/blog/getBlogPosts', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@/lib/blog/getBlogPosts')>();
   return {
+    ...actual,
     getBlogPosts,
-    slugifyCategory: actual.slugifyCategory,
+    isBlogPostIndexable: vi.fn().mockReturnValue(true),
   };
 });
 

@@ -37,6 +37,18 @@ const truthArtifact = {
   ],
 };
 
+const persuasionArtifact = {
+  pageId: PAGE_ID,
+  researchedAt: brief.persuasion.researchedAt,
+  classification: brief.persuasion.classification,
+  differentiator: brief.persuasion.differentiator,
+  requiredJobs: [
+    { primitive: 'pricing-risk-reduction', job: 'cta', routed: 'section' },
+  ],
+  sectionRequests: [],
+  proofGaps: [],
+};
+
 const outcomesArtifact = {
   pageId: PAGE_ID,
   brief: brief.brief,
@@ -45,12 +57,17 @@ const outcomesArtifact = {
   ...(brief.dry?.outcomes as object),
 };
 
-/** Writes a two-link chain (truth, outcomes) the way run.ts does. */
+/** Writes a three-link chain (truth, persuasion, outcomes) as run.ts does. */
 function writeChain(): FactoryRunManifest {
   const briefDigest = digestOf(brief);
   const chain: FactoryRunManifest['chain'] = [];
   const links = [
     { stage: 'truth' as const, artifact: truthArtifact, producer: null },
+    {
+      stage: 'persuasion' as const,
+      artifact: persuasionArtifact,
+      producer: null,
+    },
     {
       stage: 'outcomes' as const,
       artifact: outcomesArtifact,
@@ -116,7 +133,7 @@ function writeChain(): FactoryRunManifest {
     mode: 'dry',
     briefDigest,
     status: 'failed',
-    stoppedAt: 'narrative',
+    stoppedAt: 'copy',
     reason: 'fixture',
     chain,
     attempts: chain.map(link => link.file),
@@ -155,7 +172,7 @@ describe('digestOf', () => {
 
   it('names attempt files in spine order', () => {
     expect(attemptFileName('truth', 1)).toBe('01-truth.attempt-1.json');
-    expect(attemptFileName('publish', 3)).toBe('15-publish.attempt-3.json');
+    expect(attemptFileName('publish', 3)).toBe('16-publish.attempt-3.json');
   });
 });
 
@@ -182,7 +199,7 @@ describe('verifyFactoryRun', () => {
 
   it('catches a receipt edited into a self-review', () => {
     writeChain();
-    editRecord('02-outcomes.attempt-1.json', record => ({
+    editRecord('03-outcomes.attempt-1.json', record => ({
       ...record,
       receipt: {
         ...record.receipt,
@@ -200,7 +217,7 @@ describe('verifyFactoryRun', () => {
 
   it('catches a passed bit set by a model', () => {
     writeChain();
-    editRecord('02-outcomes.attempt-1.json', record => ({
+    editRecord('03-outcomes.attempt-1.json', record => ({
       ...record,
       receipt: { ...record.receipt, certifier: 'anthropic/claude-opus-5.5' },
     }));
@@ -226,9 +243,9 @@ describe('verifyFactoryRun', () => {
     expect(issues).toEqual(
       expect.arrayContaining([
         'brief.json digest does not match run.json',
-        'complete run has 2/15 stages',
+        'complete run has 2/16 stages',
         'truth#1: run.json digest does not match the receipt',
-        'outcomes#1: input digest does not bind the prior chain',
+        'persuasion#1: input digest does not bind the prior chain',
       ])
     );
   });
@@ -236,9 +253,9 @@ describe('verifyFactoryRun', () => {
   it('reports missing files and malformed manifests', () => {
     expect(verifyFactoryRun(runDir)).toEqual([`no run.json in ${runDir}`]);
     const manifest = writeChain();
-    rmSync(join(runDir, '02-outcomes.attempt-1.json'));
+    rmSync(join(runDir, '03-outcomes.attempt-1.json'));
     expect(verifyFactoryRun(runDir)).toContain(
-      'outcomes#1: missing 02-outcomes.attempt-1.json'
+      'outcomes#1: missing 03-outcomes.attempt-1.json'
     );
     writeJson(join(runDir, 'run.json'), { ...manifest, status: 'shipped' });
     expect(verifyFactoryRun(runDir)[0]).toMatch(/^run.json status:/);

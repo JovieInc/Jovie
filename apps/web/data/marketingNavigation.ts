@@ -168,6 +168,26 @@ export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] =
     links: eligibleLinks(column.links),
   }));
 
+/**
+ * Commercial pages for the flagged site-footer refresh.
+ * Every href is an existing public route. Count stays between 4 and 6.
+ */
+const RAW_PUBLIC_COMMERCIAL_FOOTER_LINKS = [
+  { href: APP_ROUTES.PRODUCT, label: 'Product' },
+  { href: APP_ROUTES.PRICING, label: 'Pricing' },
+  { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
+  { href: APP_ROUTES.SMART_LINKS, label: 'Music Smart Links' },
+  { href: APP_ROUTES.CARD, label: 'Jovie Card' },
+] as const satisfies readonly MarketingFooterLink[];
+
+export const PUBLIC_COMMERCIAL_FOOTER_LINKS: readonly MarketingFooterLink[] =
+  eligibleLinks(RAW_PUBLIC_COMMERCIAL_FOOTER_LINKS);
+
+export const PUBLIC_COMMERCIAL_FOOTER_COLUMN: MarketingFooterColumn = {
+  title: 'Product',
+  links: PUBLIC_COMMERCIAL_FOOTER_LINKS,
+};
+
 export const MARKETING_LEGAL_LINKS: readonly MarketingFooterLink[] = [
   { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy' },
   { href: APP_ROUTES.LEGAL_TERMS, label: 'Terms' },

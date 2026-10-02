@@ -35,7 +35,7 @@ export function ComparisonPageContent({
             alt={data.heroImage.alt}
             className='object-cover opacity-25'
           />
-          <div className='absolute inset-0 bg-gradient-to-b from-base via-base/70 to-base' />
+          <div className='absolute inset-0 bg-gradient-to-b from-base via-(--color-bg-base)/70 to-base' />
         </div>
         <p className='text-sm font-medium text-tertiary-token'>Compare</p>
         <h1 className='mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
@@ -51,7 +51,12 @@ export function ComparisonPageContent({
           <h2 className='text-2xl font-semibold text-primary-token'>
             Feature Comparison
           </h2>
-          <div className='mt-8 overflow-x-auto'>
+          <section
+            className='mt-8 overflow-x-auto'
+            aria-label={`${APP_NAME} vs ${data.competitor} feature comparison`}
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region needs a keyboard entry point for native scrolling (axe scrollable-region-focusable)
+            tabIndex={0}
+          >
             <table className='w-full text-sm'>
               <thead>
                 <tr className='border-b border-border-primary'>
@@ -119,7 +124,7 @@ export function ComparisonPageContent({
                 ))}
               </tbody>
             </table>
-          </div>
+          </section>
         </section>
       </MarketingContainer>
 

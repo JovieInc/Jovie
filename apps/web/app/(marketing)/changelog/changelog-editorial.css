@@ -185,12 +185,12 @@
 
 .changelog-subscribe-rail {
   grid-column: 2;
-  grid-row: 1 / span 2;
-  align-self: start;
+  grid-row: 1;
+  align-self: stretch;
 }
 
 @media (min-width: 1024px) {
-  .changelog-subscribe-rail {
+  .changelog-subscribe-rail > .changelog-subscribe {
     position: sticky;
     top: calc(var(--public-shell-header-offset) + var(--space-4));
   }
@@ -347,7 +347,7 @@
 /* ---------------------------------------------------------- */
 
 .changelog-entries {
-  grid-column: 1;
+  grid-column: 1 / -1;
   grid-row: 2;
   padding-bottom: calc(var(--space-16) + var(--space-2)); /* 72px */
 }
@@ -434,6 +434,26 @@
   font-size: var(--text-lg); /* 18px */
   line-height: var(--leading-normal);
   color: var(--color-text-primary-token);
+}
+
+.changelog-entry__action-row {
+  margin-top: var(--space-2);
+}
+
+.changelog-entry__action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.75rem;
+  font-size: var(--text-app);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary-token);
+  border-radius: var(--radius-xs);
+  transition: color var(--duration-subtle, 150ms) ease;
+}
+
+.changelog-entry__action:hover {
+  color: var(--color-text-secondary-token);
 }
 
 .changelog-entry__tertiary {

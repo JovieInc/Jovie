@@ -7,6 +7,8 @@ import {
 } from '../invariants/optimization-contract.mjs';
 import { admissionGateReceipt } from './admission-gate.mjs';
 import {
+  forbiddenActionRequest,
+  hasAggregateAdmissionLabel,
   hasProtectedAdmissionLabel,
   isFounderSteeringAssignee,
 } from './admission-policy.mjs';
@@ -25,8 +27,6 @@ export const TEAM_ROUTES = Object.freeze({
     repo: 'JovieInc/LogYourBody',
   }),
 });
-const PROHIBITED_TEXT =
-  /credential|secret|password|api[ -]?key|access token|private key|billing|payment|checkout|database migration|schema migration|production deploy|publish externally|delete (?:customer|production|user) data|destructive|synthetic|bundle|workstream|batch|epic-only/i;
 const MAX_CANDIDATE_AGE_DAYS = 60;
 export const ADMISSION_INTENT_STATES = Object.freeze([
   'Todo',
@@ -156,7 +156,7 @@ function valueQualification(description) {
 
 export function validateDeterministicPlanCandidate(
   issue,
-  { now = new Date().toISOString() } = {}
+  { now = new Date().toISOString(), reviewedPlan = false } = {}
 ) {
   if (!issue?.id || !teamRouteForIssue(issue))
     return 'not-concrete-routed-issue';
@@ -169,11 +169,12 @@ export function validateDeterministicPlanCandidate(
   // durable evidence written by the control plane, not a human prerequisite.
   // Explicit opt-out, ownership, and security labels remain fail-closed below.
   if (hasProtectedAdmissionLabel(issue)) return 'protected-policy';
+  if (hasAggregateAdmissionLabel(issue)) return 'parent-or-bundle';
   if (admissionGateReceipt(issue)) return 'already-admitted';
   if ((issue.children?.nodes || []).length > 0) return 'parent-or-bundle';
 
   const text = `${issue.title || ''}\n${issue.description || ''}`;
-  if (PROHIBITED_TEXT.test(text)) return 'sensitive-or-external-work';
+  if (forbiddenActionRequest(text)) return 'sensitive-or-external-work';
   const route = teamRouteForIssue(issue);
   if (
     commentsOf(issue).some(comment =>
@@ -192,6 +193,15 @@ export function validateDeterministicPlanCandidate(
   )
     return 'stale-or-invalid-created-at';
 
+  const targeting = resolveAdmissionTarget(issue);
+  if (targeting.decision !== 'admit')
+    return targeting.reason || 'no-jovie-artifact';
+  // A signed, independently accepted reviewed-plan task supplies the structured
+  // value/plan evidence without requiring a cosmetic issue rewrite. All common
+  // identity, ownership, hold, action-safety, PR, age, and target checks above
+  // still fail closed.
+  if (reviewedPlan) return null;
+
   if (
     !section(issue.description, [
       'Proposed fix',
@@ -204,9 +214,6 @@ export function validateDeterministicPlanCandidate(
     return 'acceptance-section-missing';
   if (!section(issue.description, ['Value', 'Value justification']))
     return 'value-justification-section-missing';
-  const targeting = resolveAdmissionTarget(issue);
-  if (targeting.decision !== 'admit')
-    return targeting.reason || 'no-jovie-artifact';
   return null;
 }
 

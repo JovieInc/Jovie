@@ -104,4 +104,37 @@ describe('SidebarNavItem active chrome', () => {
     expect(row).toContain('w-fit');
     expect(row).not.toContain('w-full');
   });
+
+  // JOV-5537 consolidation: this row is a button, so it exposes the active
+  // state as aria-pressed (matching NavMenuItem's renderAsButton path and
+  // the thread rows) and keeps the decorative icon out of the a11y tree.
+  it('exposes active state to assistive tech and hides the decorative icon', () => {
+    const TestIcon = (props: { className?: string }) => <svg {...props} />;
+
+    render(
+      <SidebarNavItem
+        item={{ icon: TestIcon, label: 'Releases', active: true }}
+        collapsed={false}
+      />
+    );
+
+    const row = screen.getByRole('button', { name: 'Releases' });
+    expect(row).toHaveAttribute('aria-pressed', 'true');
+    expect(row.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('does not mark an inactive row pressed', () => {
+    const TestIcon = (props: { className?: string }) => <svg {...props} />;
+
+    render(
+      <SidebarNavItem
+        item={{ icon: TestIcon, label: 'Releases' }}
+        collapsed={false}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Releases' })
+    ).not.toHaveAttribute('aria-pressed');
+  });
 });

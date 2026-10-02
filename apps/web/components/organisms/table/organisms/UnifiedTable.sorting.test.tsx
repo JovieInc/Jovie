@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -124,4 +124,96 @@ describe('UnifiedTable sorting ownership', () => {
       'none'
     );
   });
+});
+
+const data = [
+  { id: 'fan', name: 'Fan', engagement: 'High', lastSeen: 'Today' },
+];
+const responsiveColumns: ColumnDef<(typeof data)[number], unknown>[] = [
+  { accessorKey: 'name', header: 'Fan' },
+  { accessorKey: 'engagement', header: 'Engagement' },
+  { accessorKey: 'lastSeen', header: 'Last Seen' },
+];
+
+describe('UnifiedTable responsive columns', () => {
+  it.each([false, true])(
+    'keeps body cells aligned when columns change (grouped: %s)',
+    grouped => {
+      const props = {
+        data,
+        columns: responsiveColumns,
+        enableVirtualization: false,
+        groupingConfig: grouped
+          ? { getGroupKey: () => 'fans', getGroupLabel: () => 'Fans' }
+          : undefined,
+      };
+      const { rerender } = render(<UnifiedTable {...props} />);
+      const cells = () =>
+        within(screen.getByRole('cell', { name: /^Fan$/ }).closest('tr')!)
+          .getAllByRole('cell')
+          .map(cell => cell.textContent);
+
+      expect(cells()).toEqual(['Fan', 'High', 'Today']);
+      rerender(
+        <UnifiedTable {...props} columnVisibility={{ engagement: false }} />
+      );
+      expect(screen.getAllByRole('columnheader')).toHaveLength(2);
+      expect(cells()).toEqual(['Fan', 'Today']);
+
+      rerender(
+        <UnifiedTable {...props} columnVisibility={{ engagement: true }} />
+      );
+      expect(screen.getAllByRole('columnheader')).toHaveLength(3);
+      expect(cells()).toEqual(['Fan', 'High', 'Today']);
+    }
+  );
+});
+
+describe('UnifiedTable row mode geometry', () => {
+  it.each([
+    ['two-line', '56px', '48px'],
+    ['description', '72px', '64px'],
+    ['controls', '96px', '88px'],
+  ] as const)(
+    'shares the %s geometry between loading and data rows',
+    (rowMode, rowHeight, contentHeight) => {
+      const { rerender } = render(
+        <UnifiedTable
+          data={contacts}
+          columns={columns}
+          rowMode={rowMode}
+          isLoading
+          enableVirtualization={false}
+        />
+      );
+      const table = screen.getByRole('table');
+      expect(table.style.getPropertyValue('--table-row-height')).toBe(
+        rowHeight
+      );
+      expect(table.style.getPropertyValue('--table-cell-content-height')).toBe(
+        contentHeight
+      );
+      expect(table.querySelector('tbody tr')).toHaveStyle({
+        height: rowHeight,
+      });
+      rerender(
+        <UnifiedTable
+          data={contacts}
+          columns={columns}
+          rowMode={rowMode}
+          enableVirtualization={false}
+        />
+      );
+      expect(screen.getByRole('table')).toHaveAttribute(
+        'data-table-row-mode',
+        rowMode
+      );
+      expect(
+        screen
+          .getByRole('table')
+          .style.getPropertyValue('--table-cell-content-height')
+      ).toBe(contentHeight);
+      expect(roleOrder()).toEqual(['press', 'bookings', 'management']);
+    }
+  );
 });

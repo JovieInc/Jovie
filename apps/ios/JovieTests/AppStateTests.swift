@@ -1,27 +1,69 @@
 import AuthenticationServices
 import Foundation
+import JovieKit
 import Testing
+import UserNotifications
 @testable import Jovie
+
+private actor ProfileRevalidationGate {
+  private var completion: CheckedContinuation<Void, Never>?
+  private var startedObserver: CheckedContinuation<Bool, Never>?
+  private var started = false
+  private var finished = false
+  private var released = false
+
+  func wait() async {
+    started = true
+    startedObserver?.resume(returning: true)
+    startedObserver = nil
+    if released { return }
+    await withCheckedContinuation { continuation in
+      completion = continuation
+    }
+  }
+
+  func waitUntilStarted() async -> Bool {
+    if started { return true }
+    if finished { return false }
+    return await withCheckedContinuation { startedObserver = $0 }
+  }
+
+  func ownerFinished() {
+    finished = true
+    startedObserver?.resume(returning: started)
+    startedObserver = nil
+  }
+
+  func release() {
+    released = true
+    completion?.resume()
+    completion = nil
+  }
+}
 
 private actor MockRepository: AppStateRepository {
   var nextResult: Result<MeRepositoryResult, Error>
   private var clearedUserIDs: [String] = []
   private var loadCallCount = 0
   private let loadDelay: Duration?
+  private let revalidationGate: ProfileRevalidationGate?
   private let cached: MobileMeResponse?
 
   init(
     nextResult: Result<MeRepositoryResult, Error>,
     loadDelay: Duration? = nil,
+    revalidationGate: ProfileRevalidationGate? = nil,
     cached: MobileMeResponse? = nil
   ) {
     self.nextResult = nextResult
     self.loadDelay = loadDelay
+    self.revalidationGate = revalidationGate
     self.cached = cached
   }
 
   func loadMe(for userID: String) async throws -> MeRepositoryResult {
     loadCallCount += 1
+    await revalidationGate?.wait()
     if let loadDelay {
       try await Task.sleep(for: loadDelay)
     }
@@ -151,9 +193,10 @@ struct AppStateTests {
       chatEnabled: true,
       continueOnWebURL: "https://jov.ie/app"
     )
+    let revalidation = ProfileRevalidationGate()
     let repository = MockRepository(
       nextResult: .success(MeRepositoryResult(response: fresh, isStale: false)),
-      loadDelay: .milliseconds(300),
+      revalidationGate: revalidation,
       cached: .previewReady
     )
     let appState = AppState(
@@ -164,14 +207,20 @@ struct AppStateTests {
     )
     appState.didInitializeAuth = true
 
-    async let change: Void = appState.handleSignedInUserChange("user_123")
+    async let change: Void = {
+      await appState.handleSignedInUserChange("user_123")
+      await revalidation.ownerFinished()
+    }()
 
-    // Well before the 300ms network delay resolves, the cached profile must
-    // already be on screen — this is the "blazing fast" guarantee.
-    try await Task.sleep(for: .milliseconds(40))
+    // Observe the cache after revalidation starts but before it can complete.
+    // This proves cache-first paint without depending on executor scheduling.
+    let revalidationStarted = await revalidation.waitUntilStarted()
+    #expect(revalidationStarted)
     #expect(appState.route == .ready)
     #expect(appState.dashboardState == .loaded(.previewReady))
+    #expect(appState.isOffline == false)
 
+    await revalidation.release()
     await change
 
     // Once revalidation lands, the fresh profile silently replaces the cache.
@@ -1776,5 +1825,324 @@ struct WhatsNewFeedPolicyTests {
     let future = #"{"version":2,"changelogUrl":"https://jov.ie/changelog","entries":[]}"#
     #expect(WhatsNewFeedPolicy.decode(Data(future.utf8)) == nil)
     #expect(WhatsNewFeedPolicy.decode(Data("not json".utf8)) == nil)
+  }
+}
+
+private actor PushLifecycleGate {
+  private var completion: CheckedContinuation<Bool, Never>?
+  private var entered = false
+  private var observers: [CheckedContinuation<Void, Never>] = []
+
+  func wait() async -> Bool {
+    await withCheckedContinuation { continuation in
+      completion = continuation
+      entered = true
+      observers.forEach { $0.resume() }
+      observers.removeAll()
+    }
+  }
+
+  func waitUntilEntered() async {
+    if entered { return }
+    await withCheckedContinuation { observers.append($0) }
+  }
+
+  func complete(_ result: Bool) {
+    completion?.resume(returning: result)
+    completion = nil
+  }
+}
+
+private actor PushLifecycleService: PushDeviceServicing {
+  struct Request: Equatable, Sendable {
+    let token: String
+    let authorization: NativeRequestAuthorization
+  }
+  private var uploads: [Request] = []
+  private var deletions: [Request] = []
+  private var uploadGate: PushLifecycleGate?
+  private var deleteGate: PushLifecycleGate?
+
+  func holdUpload(_ gate: PushLifecycleGate) { uploadGate = gate }
+  func holdDelete(_ gate: PushLifecycleGate) { deleteGate = gate }
+  func requests() -> (uploads: [Request], deletions: [Request]) { (uploads, deletions) }
+
+  func registerPushDevice(
+    token: String, environment: IOSPushEnvironment, timezone: String,
+    authorization: NativeRequestAuthorization
+  ) async throws {
+    uploads.append(Request(token: token, authorization: authorization))
+    let gate = uploadGate
+    uploadGate = nil
+    if let gate, !(await gate.wait()) { throw APIClientError.requestFailed(statusCode: 401) }
+  }
+
+  func unregisterPushDevice(token: String, authorization: NativeRequestAuthorization) async throws {
+    deletions.append(Request(token: token, authorization: authorization))
+    let gate = deleteGate
+    deleteGate = nil
+    if let gate, !(await gate.wait()) { throw APIClientError.requestFailed(statusCode: 401) }
+  }
+}
+
+@MainActor
+private final class PushLifecycleHarness {
+  static let tokenKey = "jovie.apns.device-token"
+  let suiteName: String
+  let defaults: UserDefaults
+  let service = PushLifecycleService()
+  var registerCount = 0
+  var unregisterCount = 0
+  var status: @MainActor () async -> UNAuthorizationStatus = { .authorized }
+  var permission: @MainActor () async throws -> Bool = { true }
+  lazy var manager: PushNotificationManager = {
+    let manager = PushNotificationManager(
+      system: PushNotificationSystem(
+        authorizationStatus: { [unowned self] in await self.status() },
+        requestAuthorization: { [unowned self] in try await self.permission() },
+        register: { [unowned self] in self.registerCount += 1 },
+        unregister: { [unowned self] in self.unregisterCount += 1 }
+      ),
+      defaults: defaults
+    )
+    manager.configure(apiClient: service)
+    return manager
+  }()
+
+  init() {
+    let name = "PushLifecycleTests-\(UUID().uuidString)"
+    suiteName = name
+    defaults = UserDefaults(suiteName: name)!
+  }
+  func cleanup() { defaults.removePersistentDomain(forName: suiteName) }
+  var storedToken: String? { defaults.string(forKey: Self.tokenKey) }
+
+  func saveSession(sameUser: Bool = true) throws -> NativeRequestAuthorization {
+    NativeSessionTokenStore.save(
+      token: sameUser ? "session-a" : "session-b",
+      userID: sameUser ? "user-a" : "user-b",
+      expiresAt: Date().addingTimeInterval(3_600)
+    )
+    return try #require(NativeSessionTokenStore.requestAuthorization())
+  }
+}
+
+@Suite(.serialized)
+@MainActor
+struct PushNotificationManagerTests {
+  @Test(arguments: [false, true], [false, true])
+  func staleSettingsCannotAffectReplacementBeforeItsActivation(
+    sameUser: Bool, authorized: Bool
+  ) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let harness = PushLifecycleHarness()
+      defer { harness.cleanup() }
+      _ = try harness.saveSession()
+      harness.defaults.set("old-apns", forKey: PushLifecycleHarness.tokenKey)
+      let gate = PushLifecycleGate()
+      harness.status = { await gate.wait() ? .authorized : .denied }
+      let oldActivation = Task { await harness.manager.activate() }
+      await gate.waitUntilEntered()
+      let replacement = try harness.saveSession(sameUser: sameUser)
+      await gate.complete(authorized)
+      await oldActivation.value
+      #expect(harness.registerCount == 0)
+      #expect(harness.unregisterCount == 0)
+      #expect(harness.storedToken == "old-apns")
+      let oldRequests = await harness.service.requests()
+      #expect(oldRequests.uploads.isEmpty && oldRequests.deletions.isEmpty)
+
+      harness.status = { .authorized }
+      await harness.manager.activate()
+      let currentRequests = await harness.service.requests()
+      #expect(harness.registerCount == 1)
+      #expect(currentRequests.uploads == [.init(token: "old-apns", authorization: replacement)])
+      #expect(NativeSessionTokenStore.requestAuthorization() == replacement)
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func obsoleteOwnerCannotDeactivateReplacementBeforeItsActivation(sameUser: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let harness = PushLifecycleHarness()
+      defer { harness.cleanup() }
+      _ = try harness.saveSession()
+      await harness.manager.activate()
+      await harness.manager.didRegister(deviceToken: Data([0xAA]))
+      let before = await harness.service.requests()
+      let replacement = try harness.saveSession(sameUser: sameUser)
+      await harness.manager.deactivate()
+      let rejected = await harness.service.requests()
+      #expect(harness.registerCount == 1)
+      #expect(harness.unregisterCount == 0)
+      #expect(harness.storedToken == "aa")
+      #expect(rejected.uploads == before.uploads && rejected.deletions.isEmpty)
+      #expect(NativeSessionTokenStore.requestAuthorization() == replacement)
+
+      await harness.manager.activate()
+      let active = await harness.service.requests()
+      #expect(harness.registerCount == 2)
+      #expect(active.uploads.last == PushLifecycleService.Request(token: "aa", authorization: replacement))
+      #expect(active.deletions.isEmpty)
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func stalePermissionCannotReviveRegistrationAfterExpiryAndReplacement(approved: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let harness = PushLifecycleHarness()
+      defer { harness.cleanup() }
+      _ = try harness.saveSession()
+      harness.defaults.set("old-apns", forKey: PushLifecycleHarness.tokenKey)
+      let gate = PushLifecycleGate()
+      harness.status = { .notDetermined }
+      harness.permission = { await gate.wait() }
+      let oldActivation = Task { await harness.manager.activate() }
+      await gate.waitUntilEntered()
+      NativeSessionTokenStore.clear()
+      await harness.manager.deactivate()
+      #expect(harness.unregisterCount == 1)
+      #expect(harness.storedToken == nil)
+      #expect(await harness.service.requests().deletions.isEmpty)
+
+      let replacement = try harness.saveSession()
+      harness.status = { .authorized }
+      await harness.manager.activate()
+      await harness.manager.didRegister(deviceToken: Data([0xBB]))
+      await gate.complete(approved)
+      await oldActivation.value
+      let requests = await harness.service.requests()
+      #expect(harness.registerCount == 1)
+      #expect(harness.unregisterCount == 1)
+      #expect(harness.storedToken == "bb")
+      #expect(requests.uploads == [.init(token: "bb", authorization: replacement)])
+      #expect(requests.deletions.isEmpty)
+      #expect(NativeSessionTokenStore.requestAuthorization() == replacement)
+    }
+  }
+
+  @Test(arguments: [false, true], [false, true])
+  func lateDeleteCannotUnregisterOrRemoveReplacementToken(
+    sameUser: Bool, succeeds: Bool
+  ) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let harness = PushLifecycleHarness()
+      defer { harness.cleanup() }
+      let original = try harness.saveSession()
+      await harness.manager.activate()
+      await harness.manager.didRegister(deviceToken: Data([0xAA]))
+      let gate = PushLifecycleGate()
+      await harness.service.holdDelete(gate)
+      let oldCleanup = Task { await harness.manager.deactivate() }
+      await gate.waitUntilEntered()
+      let replacement = try harness.saveSession(sameUser: sameUser)
+      await harness.manager.activate()
+      await harness.manager.didRegister(deviceToken: Data([0xBB]))
+      let before = await harness.service.requests()
+      #expect(before.deletions == [.init(token: "aa", authorization: original)])
+      #expect(before.uploads.last == PushLifecycleService.Request(token: "bb", authorization: replacement))
+      await gate.complete(succeeds)
+      await oldCleanup.value
+      let after = await harness.service.requests()
+      #expect(harness.registerCount == 2)
+      #expect(harness.unregisterCount == 0)
+      #expect(harness.storedToken == "bb")
+      #expect(after.uploads == before.uploads && after.deletions == before.deletions)
+      #expect(NativeSessionTokenStore.requestAuthorization() == replacement)
+    }
+  }
+
+  @Test func bearerRotationKeepsPendingActivationOwnedAndUploadsTheCurrentBearer() async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let harness = PushLifecycleHarness()
+      defer { harness.cleanup() }
+      let original = try harness.saveSession()
+      let ownership = NativeSessionTokenStore.captureSessionContext().ownership
+      harness.defaults.set("old-apns", forKey: PushLifecycleHarness.tokenKey)
+      let gate = PushLifecycleGate()
+      harness.status = { await gate.wait() ? .authorized : .denied }
+      let activation = Task { await harness.manager.activate() }
+      await gate.waitUntilEntered()
+      let response = try #require(HTTPURLResponse(
+        url: URL(string: "https://jov.ie/api/mobile/v1/me")!, statusCode: 200,
+        httpVersion: nil, headerFields: ["set-auth-token": "rotated-a"]
+      ))
+      NativeSessionTokenStore.refresh(from: response, authorizedBy: original)
+      let current = try #require(NativeSessionTokenStore.requestAuthorization())
+      #expect(current.bearerToken == "rotated-a")
+      #expect(NativeSessionTokenStore.isCurrent(ownership))
+      await gate.complete(true)
+      await activation.value
+      let requests = await harness.service.requests()
+      #expect(harness.registerCount == 1)
+      #expect(harness.unregisterCount == 0)
+      #expect(requests.uploads == [.init(token: "old-apns", authorization: current)])
+      #expect(requests.deletions.isEmpty)
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func cleanupWorksForCurrentAndAlreadyExpiredOwnersWithoutDelegateResurrection(signedOut: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let harness = PushLifecycleHarness()
+      defer { harness.cleanup() }
+      let original = try harness.saveSession()
+      await harness.manager.activate()
+      await harness.manager.didRegister(deviceToken: Data([0xAA]))
+      if signedOut { NativeSessionTokenStore.clear() }
+      await harness.manager.deactivate()
+      let before = await harness.service.requests()
+      #expect(harness.registerCount == 1)
+      #expect(harness.unregisterCount == 1)
+      #expect(harness.storedToken == nil)
+      #expect(before.uploads == [.init(token: "aa", authorization: original)])
+      #expect(before.deletions == (signedOut ? [] : [.init(token: "aa", authorization: original)]))
+      await harness.manager.didRegister(deviceToken: Data([0xCC]))
+      let after = await harness.service.requests()
+      #expect(harness.storedToken == nil)
+      #expect(after.uploads == before.uploads && after.deletions == before.deletions)
+      #expect(NativeSessionTokenStore.requestAuthorization() == (signedOut ? nil : original))
+      if signedOut {
+        var settingsRequested = false
+        harness.status = {
+          settingsRequested = true
+          return .authorized
+        }
+        await harness.manager.activate()
+        #expect(!settingsRequested)
+        #expect(harness.registerCount == 1)
+        #expect(harness.storedToken == nil)
+        let emptyActivation = await harness.service.requests()
+        #expect(emptyActivation.uploads == before.uploads && emptyActivation.deletions.isEmpty)
+      }
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func lateUploadCompletionCannotChangeReplacementRegistration(succeeds: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let harness = PushLifecycleHarness()
+      defer { harness.cleanup() }
+      let original = try harness.saveSession()
+      await harness.manager.activate()
+      let gate = PushLifecycleGate()
+      await harness.service.holdUpload(gate)
+      let oldUpload = Task { await harness.manager.didRegister(deviceToken: Data([0xAA])) }
+      await gate.waitUntilEntered()
+      let replacement = try harness.saveSession()
+      await harness.manager.activate()
+      await harness.manager.didRegister(deviceToken: Data([0xBB]))
+      let before = await harness.service.requests()
+      #expect(before.uploads.first == PushLifecycleService.Request(token: "aa", authorization: original))
+      #expect(before.uploads.last == PushLifecycleService.Request(token: "bb", authorization: replacement))
+      await gate.complete(succeeds)
+      await oldUpload.value
+      let after = await harness.service.requests()
+      #expect(harness.registerCount == 2)
+      #expect(harness.unregisterCount == 0)
+      #expect(harness.storedToken == "bb")
+      #expect(after.uploads == before.uploads && after.deletions == before.deletions)
+      #expect(NativeSessionTokenStore.requestAuthorization() == replacement)
+    }
   }
 }

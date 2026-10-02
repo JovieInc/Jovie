@@ -8,6 +8,7 @@ import {
   JovieAuthValuesProvider,
 } from '@/hooks/useJovieAuth';
 import type { ClientAuthBootstrap } from '@/lib/auth/dev-test-auth-types';
+import { DesktopNavigationBridge } from '@/lib/desktop/desktop-navigation';
 import { useDesktopAppBootSignal } from '@/lib/desktop/electron-bridge';
 import type { ThemeMode } from '@/types';
 import { CoreProviders } from './CoreProviders';
@@ -77,6 +78,7 @@ export function ClientProviders({
     return (
       <JovieAuthDefaultsProvider>
         <DesktopAppBootSignal />
+        <DesktopNavigationBridge />
         {wrappedChildren}
       </JovieAuthDefaultsProvider>
     );
@@ -85,6 +87,7 @@ export function ClientProviders({
   return (
     <JovieAuthValuesProvider>
       <DesktopAppBootSignal />
+      <DesktopNavigationBridge />
       {wrappedChildren}
     </JovieAuthValuesProvider>
   );
