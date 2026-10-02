@@ -280,8 +280,11 @@ class LabeledEventTest(unittest.TestCase):
             "asc-agreements": "human-only",
             "billing-health-public": "fixable-by-agent",
             "stripe-reconcile": "fixable-by-agent",
-            "e2e-nightly": "fixable-by-agent",
-            "synthetic-monitor": "fixable-by-agent",
+            "e2e-login-timeout": "fixable-by-agent",
+            "synthetic-monitoring": "fixable-by-agent",
+            "golden-path-nightly": "fixable-by-agent",
+            "flaky-test-filing": "fixable-by-agent",
+            "codeowners-drift": "fixable-by-agent",
         }
         for fingerprint, cls in cases.items():
             classified = remediation.classify_labeled_event(fingerprint, fingerprint, "")
@@ -321,17 +324,17 @@ class LabeledEventTest(unittest.TestCase):
         self.assertEqual(again["comments"], [])
         self.assertEqual(again["events"]["stripe-reconcile"]["attempts"], plan["events"]["stripe-reconcile"]["attempts"])
 
-        closed = linear_issue("JOV-1", "e2e-nightly", state="completed", created="2026-09-01T00:00:00Z")
-        opened = linear_issue("JOV-8", "e2e-nightly", created="2026-10-02T00:00:00Z")
+        closed = linear_issue("JOV-1", "e2e-login-timeout", state="completed", created="2026-09-01T00:00:00Z")
+        opened = linear_issue("JOV-8", "e2e-login-timeout", created="2026-10-02T00:00:00Z")
         recur = remediation.plan_labeled_events(
-            [opened, closed], {"e2e-nightly": {"issueId": "id-JOV-1", "status": "done", "attempts": [
-                {"kind": "model", "lane": "codex", "head": "e2e-nightly", "at": NOW - 100},
+            [opened, closed], {"e2e-login-timeout": {"issueId": "id-JOV-1", "status": "done", "attempts": [
+                {"kind": "model", "lane": "codex", "head": "e2e-login-timeout", "at": NOW - 100},
             ]}},
             providers(), NOW, healthy=lambda *_: True)
-        self.assertEqual(recur["events"]["e2e-nightly"]["identifier"], "JOV-8")
-        self.assertEqual(recur["events"]["e2e-nightly"]["issueId"], "id-JOV-8")
-        self.assertEqual(recur["events"]["e2e-nightly"]["recurrence"], 1)
-        self.assertEqual(recur["events"]["e2e-nightly"]["attemptCount"], 1)
+        self.assertEqual(recur["events"]["e2e-login-timeout"]["identifier"], "JOV-8")
+        self.assertEqual(recur["events"]["e2e-login-timeout"]["issueId"], "id-JOV-8")
+        self.assertEqual(recur["events"]["e2e-login-timeout"]["recurrence"], 1)
+        self.assertEqual(recur["events"]["e2e-login-timeout"]["attemptCount"], 1)
         self.assertEqual(recur["reopens"], [])
         self.assertFalse(any(row.get("id") == "id-JOV-8" and "not a second event" in row["body"]
                              for row in recur["comments"]))
@@ -368,22 +371,22 @@ class LabeledEventTest(unittest.TestCase):
         self.assertTrue(exhausted["events"]["stripe-reconcile"]["ask"])
 
     def test_failover_picks_a_stronger_live_lane(self):
-        recorded = {"synthetic-monitor": {
+        recorded = {"synthetic-monitoring": {
             "issueId": "id-JOV-5", "status": "claimed", "release": True, "lane": None,
-            "attempts": [{"kind": "model", "lane": "codex", "head": "synthetic-monitor", "at": NOW - 10000}],
+            "attempts": [{"kind": "model", "lane": "codex", "head": "synthetic-monitoring", "at": NOW - 10000}],
         }}
         plan = remediation.plan_labeled_events(
-            [linear_issue("JOV-5", "synthetic-monitor")], recorded, providers(), NOW,
+            [linear_issue("JOV-5", "synthetic-monitoring")], recorded, providers(), NOW,
             healthy=lambda *_: True, cooled={"codex"})
-        self.assertEqual(plan["events"]["synthetic-monitor"]["status"], "claimed")
-        self.assertEqual(plan["events"]["synthetic-monitor"]["lane"], "host-local")
-        self.assertNotEqual(plan["events"]["synthetic-monitor"]["lane"], "hyperagent")
+        self.assertEqual(plan["events"]["synthetic-monitoring"]["status"], "claimed")
+        self.assertEqual(plan["events"]["synthetic-monitoring"]["lane"], "host-local")
+        self.assertNotEqual(plan["events"]["synthetic-monitoring"]["lane"], "hyperagent")
 
     def test_doctor_counts_by_fingerprint(self):
         snapshot = {"events": {
             "stripe-reconcile": {"status": "claimed", "identifier": "JOV-4", "cls": "fixable-by-agent", "lane": "codex"},
             "asc-agreements": {"status": "human", "identifier": "JOV-3", "cls": "human-only", "ask": "Tim"},
-            "e2e-nightly": {"status": "exhausted", "identifier": "JOV-8", "cls": "fixable-by-agent"},
+            "e2e-login-timeout": {"status": "exhausted", "identifier": "JOV-8", "cls": "fixable-by-agent"},
             "old": {"status": "done", "identifier": "JOV-1", "cls": "fixable-by-agent"},
         }}
         report = remediation.events_summary(snapshot)
@@ -406,7 +409,7 @@ class LabeledEventTest(unittest.TestCase):
         nodes = [
             linear_issue("JOV-1", "billing-health-public"),
             linear_issue("JOV-2", "billing-health-public", created="2026-10-03T00:00:00Z"),
-            linear_issue("LYB-9", "synthetic-monitor", team="LYB"),
+            linear_issue("LYB-9", "synthetic-monitoring", team="LYB"),
             linear_issue("JOV-7", "musicfetch-quota", title="Renew MusicFetch", description="renew MusicFetch"),
         ]
         calls = []
@@ -430,7 +433,7 @@ class LabeledEventTest(unittest.TestCase):
             runner.claim_remediation_events(host, Linear())
             stored = __import__("json").loads((Path(tmp) / "escalation.json").read_text())
             self.assertEqual(stored["events"]["billing-health-public"]["identifier"], "JOV-1")
-            self.assertEqual(stored["events"]["synthetic-monitor"]["team"], "LYB")
+            self.assertEqual(stored["events"]["synthetic-monitoring"]["team"], "LYB")
             self.assertEqual(stored["events"]["musicfetch-quota"]["route"], "JOV-7323")
             self.assertIn("Do not renew MusicFetch", stored["events"]["musicfetch-quota"]["dossier"])
             self.assertNotEqual(stored["events"]["billing-health-public"]["lane"], "devin")
@@ -486,14 +489,14 @@ class LabeledEventTest(unittest.TestCase):
     def test_router_flag_off_still_reopens_the_canonical_issue(self):
         os.environ["LANES_ESCALATION"] = "0"
         try:
-            closed = linear_issue("JOV-1", "e2e-nightly", state="completed", created="2026-09-01T00:00:00Z")
-            opened = linear_issue("JOV-8", "e2e-nightly", created="2026-10-02T00:00:00Z")
+            closed = linear_issue("JOV-1", "e2e-login-timeout", state="completed", created="2026-09-01T00:00:00Z")
+            opened = linear_issue("JOV-8", "e2e-login-timeout", created="2026-10-02T00:00:00Z")
             recur = remediation.plan_labeled_events(
-                [opened, closed], {"e2e-nightly": {"issueId": "id-JOV-1", "status": "done"}},
+                [opened, closed], {"e2e-login-timeout": {"issueId": "id-JOV-1", "status": "done"}},
                 providers(), NOW, healthy=lambda *_: True)
         finally:
             os.environ.pop("LANES_ESCALATION", None)
-        self.assertEqual(recur["events"]["e2e-nightly"]["identifier"], "JOV-1")
+        self.assertEqual(recur["events"]["e2e-login-timeout"]["identifier"], "JOV-1")
         self.assertEqual(recur["reopens"], [{"id": "id-JOV-1", "stateId": "todo-JOV"}])
 
     def test_stuck_pr_ladder_is_off_and_sweep_labels_are_ordinary_events(self):

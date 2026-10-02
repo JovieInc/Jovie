@@ -347,7 +347,9 @@ That label is the event. No new controller, workflow, or service is required, an
 has to file the event by hand beyond creating or reopening that issue.
 
 Examples: `remediation:asc-agreements`, `remediation:billing-health-public`,
-`remediation:stripe-reconcile`, `remediation:e2e-nightly`, `remediation:synthetic-monitor`.
+`remediation:stripe-reconcile`, `remediation:e2e-login-timeout`,
+`remediation:synthetic-monitoring`, `remediation:golden-path-nightly`,
+`remediation:flaky-test-filing`, `remediation:codeowners-drift`.
 
 The bare label `remediation` (no colon) is the relay intake label, not an event.
 
