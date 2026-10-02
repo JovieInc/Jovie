@@ -1,4 +1,12 @@
-import { and, sql as drizzleSql, eq, gte, lte } from 'drizzle-orm';
+import {
+  and,
+  sql as drizzleSql,
+  eq,
+  gte,
+  isNotNull,
+  isNull,
+  lte,
+} from 'drizzle-orm';
 import {
   buildEvidenceReceiptSet,
   buildMetricReceipt,
@@ -611,4 +619,32 @@ export async function getCanonicalProfileViews(input: {
     .where(and(...conditions));
 
   return Number(row?.views ?? 0);
+}
+
+/**
+ * Phone numbers with a confirmed, consented, non-unsubscribed subscription
+ * for the given creator profile. `smsConsentAt` is the TCPA consent ledger —
+ * without it the recipient is never sendable for a marketing blast.
+ */
+export async function listConsentedSmsRecipientPhones(
+  creatorProfileId: string,
+  limit: number
+): Promise<readonly string[]> {
+  const rows = await db
+    .select({ phone: notificationSubscriptions.phone })
+    .from(notificationSubscriptions)
+    .where(
+      and(
+        eq(notificationSubscriptions.creatorProfileId, creatorProfileId),
+        isNotNull(notificationSubscriptions.phone),
+        isNotNull(notificationSubscriptions.confirmedAt),
+        isNotNull(notificationSubscriptions.smsConsentAt),
+        isNull(notificationSubscriptions.unsubscribedAt)
+      )
+    )
+    .limit(limit);
+
+  return rows
+    .map(row => row.phone)
+    .filter((phone): phone is string => Boolean(phone));
 }
