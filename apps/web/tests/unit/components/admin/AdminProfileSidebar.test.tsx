@@ -114,16 +114,51 @@ describe('AdminProfileSidebar', () => {
       'data-layout',
       'inline'
     );
-    expect(screen.getByTestId('admin-creator-summary')).toBeInTheDocument();
+    expect(screen.getByText('2 linked destinations')).toBeVisible();
+    expect(screen.getByRole('img', { name: 'Claimed profile' })).toBeVisible();
+    expect(screen.queryByTestId('admin-creator-summary')).toBeNull();
+    expect(screen.getByTestId('admin-profile-tabbed-card')).toHaveAttribute(
+      'data-surface-variant',
+      'flat'
+    );
+    const header = screen.getByTestId('admin-creator-entity-header');
     expect(
-      screen.getByTestId('drawer-analytics-metric-value-linked-destinations')
-    ).toHaveTextContent('2');
-    expect(
-      screen.getByTestId('drawer-analytics-metric-value-profile-state')
-    ).toHaveTextContent('Claimed');
+      header.querySelector('[data-entity-header-thumbnail-variant="person"]')
+    ).toHaveClass('size-14');
     expect(screen.getByTestId('admin-creator-profile-link')).toHaveTextContent(
       'jov.ie/alice'
     );
+  });
+
+  it('describes a read-only empty category without an unavailable add action', async () => {
+    const user = userEvent.setup();
+    render(
+      <AdminProfileSidebar
+        profile={profile}
+        contact={contact}
+        isOpen
+        onClose={() => {}}
+      />
+    );
+    await user.click(screen.getByRole('tab', { name: 'Earn' }));
+    expect(screen.getByText('No earnings links yet.')).toBeVisible();
+    expect(screen.queryByText(/Click \+ to add/)).toBeNull();
+  });
+
+  it('labels missing enrichment evidence instead of exposing a storage enum', () => {
+    render(
+      <AdminProfileSidebar
+        profile={{ ...profile, isClaimed: false }}
+        contact={contact}
+        isOpen
+        onClose={() => {}}
+      />
+    );
+    expect(screen.getAllByText('Not checked')).toHaveLength(3);
+    expect(screen.queryByText('not_checked')).toBeNull();
+    expect(
+      screen.getByRole('img', { name: 'Unclaimed profile' })
+    ).toBeVisible();
   });
 
   it('shows about tab content', async () => {

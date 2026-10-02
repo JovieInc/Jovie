@@ -2,18 +2,19 @@
 'use client';
 
 import type { CommonDropdownItem } from '@jovie/ui';
+import { BadgeCheck, UserCheck, UserRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import {
-  DrawerAnalyticsSummaryCard,
   DrawerCardActionBar,
   DrawerTabbedCard,
   DrawerTabs,
   EntityHeader,
+  EntityHeaderStatusGlyph,
+  EntityHeaderThumbnail,
   EntitySidebarShell,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
-import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
 import { BASE_URL } from '@/constants/domains';
 import { ProfileAboutTab } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab';
@@ -32,6 +33,13 @@ const SOURCE_STATUS_LABELS = {
   not_found: 'Not found',
   not_checked: 'Not checked',
 };
+const ENRICHMENT_STATUS_LABELS = {
+  enriched: 'Enriched',
+  partial: 'Partially enriched',
+  conflicted: 'Conflicting evidence',
+  not_found: 'Not found',
+  skipped: 'Skipped',
+} satisfies Record<UnclaimedIdentityEnrichmentReceipt['status'], string>;
 
 function EnrichmentRow({
   label,
@@ -79,7 +87,9 @@ function IdentityEnrichmentPanel({
       </p>
       <EnrichmentRow
         label='Status'
-        value={receipt ? receipt.status : 'not_checked'}
+        value={
+          receipt ? ENRICHMENT_STATUS_LABELS[receipt.status] : 'Not checked'
+        }
       />
       <EnrichmentRow
         label='Share Readiness'
@@ -188,17 +198,41 @@ export function AdminProfileSidebar({
             titleLineClamp={1}
             subtitleLineClamp={1}
             reserveSubtitleSlot
-            reserveMetaSlot
             metaOverflow='scroll'
+            metaClassName='text-xs text-secondary-token'
             thumbnail={
-              <AvatarUploadable
+              <EntityHeaderThumbnail
+                variant='person'
                 src={profile.avatarUrl}
                 alt={`${profile.displayName ?? profile.username} avatar`}
                 name={profile.displayName ?? profile.username}
-                size='2xl'
               />
             }
-            meta={profile.location ? <span>{profile.location}</span> : null}
+            statusGlyph={
+              <EntityHeaderStatusGlyph
+                icon={
+                  profile.isVerified
+                    ? BadgeCheck
+                    : profile.isClaimed
+                      ? UserCheck
+                      : UserRound
+                }
+                label={
+                  profile.isVerified
+                    ? 'Verified creator'
+                    : profile.isClaimed
+                      ? 'Claimed profile'
+                      : 'Unclaimed profile'
+                }
+              />
+            }
+            meta={
+              <span>
+                {profile.location ? `${profile.location} · ` : ''}
+                {links.length} linked{' '}
+                {links.length === 1 ? 'destination' : 'destinations'}
+              </span>
+            }
             actions={
               <DrawerCardActionBar
                 primaryActions={primaryActions}
@@ -211,46 +245,25 @@ export function AdminProfileSidebar({
             bodyClassName='pr-9'
             data-testid='admin-creator-entity-header'
           />
-          <DrawerAnalyticsSummaryCard
-            testId='admin-creator-summary'
-            state='ready'
-            stableLayout
-            reserveFooterSlot
-            metricSlotCount={2}
-            metrics={[
-              {
-                id: 'linked-destinations',
-                label: 'Linked Destinations',
-                value: String(links.length),
-              },
-              {
-                id: 'profile-state',
-                label: 'Profile State',
-                value: profile.isVerified
-                  ? 'Verified'
-                  : profile.isClaimed
-                    ? 'Claimed'
-                    : 'Unclaimed',
-              },
-            ]}
-            footer={
-              <ShareableLinkRow
-                url={`${BASE_URL}/${profile.username}`}
-                density='rail'
-                surface='flat'
-                copyButtonTitle='Copy Profile Link'
-                openButtonTitle='Open Profile'
-                testId='admin-creator-profile-link'
-              />
-            }
-          />
+          <div className='px-3'>
+            <ShareableLinkRow
+              url={`${BASE_URL}/${profile.username}`}
+              density='rail'
+              surface='flat'
+              copyButtonTitle='Copy Profile Link'
+              openButtonTitle='Open Profile'
+              testId='admin-creator-profile-link'
+            />
+          </div>
         </>
       }
     >
       <DrawerTabbedCard
         testId='admin-profile-tabbed-card'
+        surfaceVariant='flat'
         tabs={
           <DrawerTabs
+            distribution='intrinsic'
             value={selectedCategory}
             onValueChange={value =>
               setSelectedCategory(
