@@ -13,6 +13,8 @@ import { HomepageLatestNews } from '@/components/homepage/HomepageLatestNews';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
+import { getBlogPosts } from '@/lib/blog/getBlogPosts';
+import type { BlogPostSummary } from '@/lib/blog/presentation-contracts';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
@@ -167,14 +169,18 @@ function HomepageStoryStack() {
 
 // Canonical Pen v3 body (dark launch): presence, structure, and the close,
 // on the shared page background. The live story stack is unchanged while off.
-function HomepageIdentityStoryStack() {
+function HomepageIdentityStoryStack({
+  posts,
+}: {
+  readonly posts: readonly BlogPostSummary[];
+}) {
   return (
     <div
       className='homepage-identity-stack'
       data-testid='homepage-identity-story-stack'
     >
       <HomepageIdentitySections />
-      <HomepageLatestNews />
+      <HomepageLatestNews posts={posts} />
       <HomepageIdentityClose />
     </div>
   );
@@ -205,12 +211,14 @@ export default async function HomePage() {
     );
   }
 
+  const posts = HOMEPAGE_V3_ENABLED ? await getBlogPosts() : [];
+
   return (
     <HomePageShell>
       <HomepageQueryProvider>
         <HomepageHero />
         {HOMEPAGE_V3_ENABLED ? (
-          <HomepageIdentityStoryStack />
+          <HomepageIdentityStoryStack posts={posts} />
         ) : (
           <HomepageStoryStack />
         )}

@@ -1,16 +1,8 @@
 import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getBlogPosts } from '@/lib/blog/getBlogPosts';
+import { describe, expect, it } from 'vitest';
 import type { BlogPostSummary } from '@/lib/blog/presentation-contracts';
 import { HomepageLatestNews } from './HomepageLatestNews';
-
-vi.mock('@/lib/blog/getBlogPosts', async () => {
-  const publication = await import('@/lib/blog/publication');
-  return {
-    getBlogPosts: vi.fn(),
-    isBlogPostIndexable: publication.isBlogPostIndexable,
-  };
-});
+import meta, { Empty, Partial } from './HomepageLatestNews.stories';
 
 function post(slug: string): BlogPostSummary {
   return {
@@ -26,17 +18,15 @@ function post(slug: string): BlogPostSummary {
 }
 
 describe('HomepageLatestNews', () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it('uses the four indexed articles and excludes unregistered content', async () => {
-    vi.mocked(getBlogPosts).mockResolvedValue([
+  it('uses the four indexed articles and excludes unregistered content', () => {
+    const posts = [
       post('private-draft'),
       post('the-suno-playbook-teardown'),
       post('the-contact-problem'),
       post('the-myspace-problem'),
       post('the-friday-problem'),
-    ]);
-    render(await HomepageLatestNews());
+    ];
+    render(<HomepageLatestNews posts={posts} />);
     expect(screen.getAllByRole('article')).toHaveLength(4);
     expect(
       screen.queryByRole('link', { name: 'private-draft' })
@@ -46,19 +36,18 @@ describe('HomepageLatestNews', () => {
     ).toHaveAttribute('href', '/blog/the-friday-problem');
   });
 
-  it('has no pending client state and renders nothing for an empty published catalog', async () => {
-    vi.mocked(getBlogPosts).mockResolvedValue([]);
-    render(await HomepageLatestNews());
+  it('has no pending client state and renders nothing for an empty published catalog', () => {
+    render(<HomepageLatestNews posts={[]} />);
     expect(screen.queryByRole('region')).not.toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('propagates invalid catalog errors rather than substituting fabricated cards', async () => {
-    vi.mocked(getBlogPosts).mockRejectedValue(
-      new Error('Invalid publication catalog')
-    );
-    await expect(HomepageLatestNews()).rejects.toThrow(
-      'Invalid publication catalog'
-    );
+  it('renders its real Storybook catalog states without a server loader', () => {
+    const { rerender } = render(<meta.component {...meta.args} />);
+    expect(screen.getAllByRole('article')).toHaveLength(4);
+    rerender(<meta.component {...meta.args} {...Partial.args} />);
+    expect(screen.getAllByRole('article')).toHaveLength(1);
+    rerender(<meta.component {...meta.args} {...Empty.args} />);
+    expect(screen.queryByRole('region')).not.toBeInTheDocument();
   });
 });

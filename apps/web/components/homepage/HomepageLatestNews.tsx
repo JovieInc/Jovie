@@ -1,16 +1,21 @@
 import { BlogEditorialRow } from '@/app/(marketing)/blog/components/BlogEditorialRow';
-import { getBlogPosts, isBlogPostIndexable } from '@/lib/blog/getBlogPosts';
+import type { BlogPostSummary } from '@/lib/blog/presentation-contracts';
+import { isBlogPostIndexable } from '@/lib/blog/publication';
 import { resolveAuthor } from '@/lib/blog/resolveAuthor';
 
-/** Build-time filesystem content; no request-time author or article fetch. */
-export async function HomepageLatestNews() {
-  const posts = (await getBlogPosts())
+export interface HomepageLatestNewsProps {
+  readonly posts: readonly BlogPostSummary[];
+}
+
+/** The route supplies build-time content; this presenter performs no fetch. */
+export function HomepageLatestNews({ posts }: HomepageLatestNewsProps) {
+  const latestPosts = posts
     .filter(post => isBlogPostIndexable(post.slug))
     .slice(0, 4);
 
   return (
     <BlogEditorialRow
-      entries={posts.map(post => ({ post, author: resolveAuthor(post) }))}
+      entries={latestPosts.map(post => ({ post, author: resolveAuthor(post) }))}
     />
   );
 }

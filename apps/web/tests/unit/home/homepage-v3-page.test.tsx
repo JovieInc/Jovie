@@ -2,6 +2,7 @@
 // since 2026-09-28), then off (rollback), so both compositions stay exact.
 import { render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getBlogPosts } from '@/lib/blog/getBlogPosts';
 
 const flags = vi.hoisted(() => ({ HOMEPAGE_V3_ENABLED: true }));
 vi.mock('@/lib/flags/homepage-v3', () => ({
@@ -14,16 +15,7 @@ vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
 vi.mock('@/components/homepage/homepage-analytics', () => ({
   trackHomepageEvent: vi.fn(),
 }));
-vi.mock('@/components/homepage/HomepageLatestNews', async importOriginal => {
-  const { HomepageLatestNews } =
-    await importOriginal<
-      typeof import('@/components/homepage/HomepageLatestNews')
-    >();
-  // Resolve the real server component before handing its markup to the DOM
-  // renderer, which cannot execute a nested async Server Component.
-  const news = await HomepageLatestNews();
-  return { HomepageLatestNews: () => news };
-});
+vi.mock('@/lib/blog/getBlogPosts', { spy: true });
 vi.mock('next/navigation', async importOriginal => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => ({ push: vi.fn() }),
@@ -55,6 +47,7 @@ async function renderHomePage() {
 
 describe('homepage v3 page composition', { timeout: 60_000 }, () => {
   afterEach(() => {
+    vi.clearAllMocks();
     vi.resetModules();
   });
 
@@ -120,6 +113,7 @@ describe('homepage v3 page composition', { timeout: 60_000 }, () => {
   it('keeps the live story stack with the flag off', async () => {
     flags.HOMEPAGE_V3_ENABLED = false;
     await renderHomePage();
+    expect(getBlogPosts).not.toHaveBeenCalled();
 
     // The identity hero stays live; only the v3 body is gated.
     expect(screen.getByTestId('homepage-claim-card')).not.toBeNull();
@@ -128,5 +122,15 @@ describe('homepage v3 page composition', { timeout: 60_000 }, () => {
     expect(screen.queryByTestId('homepage-presence-material')).toBeNull();
     expect(screen.queryByTestId('homepage-section-structure')).toBeNull();
     expect(screen.queryByRole('region', { name: 'Latest News' })).toBeNull();
+  });
+
+  it('propagates invalid catalog errors without fabricated cards', async () => {
+    flags.HOMEPAGE_V3_ENABLED = true;
+    vi.mocked(getBlogPosts).mockRejectedValueOnce(
+      new Error('Invalid publication catalog')
+    );
+    await expect(renderHomePage()).rejects.toThrow(
+      'Invalid publication catalog'
+    );
   });
 });
