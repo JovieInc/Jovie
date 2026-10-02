@@ -125,7 +125,7 @@ describe('overlay-styles', () => {
 
   describe('titleStyles', () => {
     it('base includes font sizing', () => {
-      expect(titleStyles.base).toContain('text-base');
+      expect(titleStyles.base).toContain('text-(length:--text-base)');
       expect(titleStyles.base).toContain('font-medium');
       expect(titleStyles.base).toContain('tracking-tight');
       expect(titleStyles.base).not.toContain('--ds-marketing');

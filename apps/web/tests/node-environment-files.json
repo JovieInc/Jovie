@@ -872,7 +872,7 @@
   "tests/unit/lib/featured-creators-avatar.test.ts",
   "tests/unit/lib/featured-creators-timeout.test.ts",
   "tests/unit/lib/feedback.test.ts",
-  "tests/unit/lib/fetch/deduped-fetch.test.ts",
+  "tests/unit/lib/fetch/retired-lifecycles.test.ts",
   "tests/unit/lib/finance/cache-keys.test.ts",
   "tests/unit/lib/finance/flags.test.ts",
   "tests/unit/lib/finance/ops-alerts.test.ts",

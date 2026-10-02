@@ -1,11 +1,17 @@
 ---
+id: the-myspace-problem
+slug: the-myspace-problem
 title: The MySpace Problem
+description: When I was a teenager, everyone had a MySpace.
 date: 2025-02-03
 author: Tim White
 authorUsername: tim
 authorTitle: Founder at Jovie
+authorProfile: /tim
 category: Inbound Marketing
 tags: MySpace, Facebook, platform design, simplicity, artist pages
+image: /images/blog/myspace-problem.svg
+imageAlt: Abstract artwork for The MySpace Problem.
 ---
 
 # The MySpace Problem

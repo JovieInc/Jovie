@@ -11,6 +11,9 @@ name: Lane Fix Relay
 # or adopting drafts left by disabled lanes.
 
 on:
+  workflow_run:
+    workflows: [Source Validation, Fork PR Gate, PR Size Guard]
+    types: [completed]
   pull_request_target:
     types: [dequeued]
   pull_request_review:
@@ -34,6 +37,10 @@ concurrency:
 jobs:
   relay:
     name: Queue lane repair
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.event == 'pull_request' &&
+       contains(fromJSON('["failure","timed_out","startup_failure","success"]'), github.event.workflow_run.conclusion))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
