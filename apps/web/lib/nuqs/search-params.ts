@@ -386,6 +386,12 @@ export const adminGrowthSearchParams = createSearchParamsCache({
   view: adminGrowthViewParser,
   queue: adminOutreachQueueParser,
   q: searchQueryParser,
+  /** Founder funnel drill-down: which stage's records to list (JOV-7484). */
+  funnelStage: searchQueryParser,
+  /** Founder funnel cohort window shared by aggregate and drill-down. */
+  funnelRange: parseAsStringLiteral(['7d', '30d', 'all'] as const).withDefault(
+    '30d'
+  ),
 });
 
 // ============================================================================

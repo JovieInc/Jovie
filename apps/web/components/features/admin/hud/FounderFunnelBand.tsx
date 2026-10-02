@@ -109,17 +109,8 @@ function FunnelStageTile({
   readonly stage: FounderFunnelStage;
   readonly isBiggestLeak: boolean;
 }>) {
-  return (
-    <Link
-      href={stage.drillDownHref}
-      className={cn(
-        'min-w-32 shrink-0 rounded-(--radius-md) border p-2.5',
-        isBiggestLeak ? 'border-error' : 'border-transparent'
-      )}
-      data-testid={`founder-funnel-stage-${stage.key}`}
-      title={stage.description}
-      aria-label={`${stage.count.toLocaleString('en-US')} ${stage.label}; inspect underlying entities`}
-    >
+  const content = (
+    <>
       <p className='text-2xs font-semibold text-tertiary-token'>
         {stage.label}
       </p>
@@ -138,6 +129,40 @@ function FunnelStageTile({
             ? 'Top of funnel'
             : `−${stage.dropOff.toLocaleString('en-US')} lost`}
       </p>
+      {!stage.identifiable ? (
+        <p className='mt-0.5 text-2xs text-tertiary-token'>
+          Anonymous · aggregate only
+        </p>
+      ) : null}
+    </>
+  );
+
+  const tileClass = cn(
+    'min-w-32 shrink-0 rounded-(--radius-md) border p-2.5',
+    isBiggestLeak ? 'border-error' : 'border-transparent'
+  );
+
+  if (stage.drillDownHref === null) {
+    return (
+      <div
+        className={tileClass}
+        data-testid={`founder-funnel-stage-${stage.key}`}
+        title={`${stage.description} — anonymous aggregate, no per-person records`}
+      >
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={stage.drillDownHref}
+      className={tileClass}
+      data-testid={`founder-funnel-stage-${stage.key}`}
+      title={stage.description}
+      aria-label={`${stage.count.toLocaleString('en-US')} ${stage.label}; inspect underlying entities`}
+    >
+      {content}
     </Link>
   );
 }

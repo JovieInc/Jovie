@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   getCanonicalContactMetrics: vi.fn(),
   getFounderFunnelData: vi.fn(),
+  getFounderFunnelStageRows: vi.fn(),
   getLeadFunnelCounts: vi.fn(),
   parseSearchParams: vi.fn(),
   requireAccess: vi.fn(),
@@ -16,6 +17,11 @@ vi.mock(
 );
 vi.mock('@/components/features/admin/hud/FounderFunnelBand', () => ({
   FounderFunnelBand: () => <div>Founder funnel</div>,
+}));
+vi.mock('@/components/features/admin/hud/FounderFunnelDrilldown', () => ({
+  FounderFunnelDrilldown: ({ result }: { result: { stageLabel: string } }) => (
+    <div>Funnel drill-down: {result.stageLabel}</div>
+  ),
 }));
 vi.mock('@/components/features/admin/layout/AdminPage', () => ({
   AdminPage: ({ children }: { readonly children: ReactNode }) => (
@@ -45,6 +51,14 @@ vi.mock('@/lib/admin/contacts', () => ({
 }));
 vi.mock('@/lib/admin/founder-funnel', () => ({
   getFounderFunnelData: mocks.getFounderFunnelData,
+  getFounderFunnelStageRows: mocks.getFounderFunnelStageRows,
+  isFounderFunnelDrilldownStage: (value: unknown) =>
+    [
+      'accounts_created',
+      'profile_claimed',
+      'onboarding_complete',
+      'paid',
+    ].includes(value as string),
 }));
 vi.mock('@/lib/admin/page-access', () => ({
   requireCurrentAdminPageAccess: mocks.requireAccess,
@@ -81,5 +95,35 @@ describe('AdminGrowthPage', () => {
         /Ovie leaves those stages unmeasured instead of inferring them/i
       )
     ).toBeInTheDocument();
+    expect(mocks.getFounderFunnelStageRows).not.toHaveBeenCalled();
+  });
+
+  it('renders a stage drill-down from URL cohort params', async () => {
+    mocks.parseSearchParams.mockResolvedValue({
+      funnelStage: 'paid',
+      funnelRange: '7d',
+    });
+    mocks.getFounderFunnelStageRows.mockResolvedValue({
+      stage: 'paid',
+      stageLabel: 'Paid',
+      stageDescription: 'Users with an active Stripe subscription',
+      timeRange: '7d',
+      total: 1,
+      rows: [],
+      limit: 100,
+      errors: [],
+      definitionVersion: 'founder-funnel.v2',
+    });
+
+    const { default: AdminGrowthPage } = await import('./page');
+
+    render(
+      await AdminGrowthPage({
+        searchParams: Promise.resolve({ funnelStage: 'paid' }),
+      })
+    );
+
+    expect(mocks.getFounderFunnelStageRows).toHaveBeenCalledWith('paid', '7d');
+    expect(screen.getByText('Funnel drill-down: Paid')).toBeInTheDocument();
   });
 });
