@@ -65,10 +65,15 @@ function parseArgs(argv) {
   return flags;
 }
 function normalizeImportPath(value) {
-  return String(value ?? '')
-    .replaceAll('\\', '/')
-    .replace(/^\/+/, '')
-    .replace(/^\.\//, '');
+  return (
+    String(value ?? '')
+      .replaceAll('\\', '/')
+      .replace(/^\/+/, '')
+      .replace(/^\.\//, '')
+      // Storybook 10 indexes web stories relative to apps/web; gate requests
+      // use repository paths. Normalize that exact root, never a suffix match.
+      .replace(/^(components|stories)\//, 'apps/web/$1/')
+  );
 }
 function parseStoryPathRequest(value) {
   const raw = String(value ?? '');
