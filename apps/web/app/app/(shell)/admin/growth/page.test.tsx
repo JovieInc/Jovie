@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   getFounderFunnelData: vi.fn(),
   getFounderFunnelStageRows: vi.fn(),
   getLeadFunnelCounts: vi.fn(),
-  parseSearchParams: vi.fn(),
   requireAccess: vi.fn(),
 }));
 
@@ -16,11 +15,14 @@ vi.mock(
   () => ({ CanonicalLifecycleFunnel: () => <div>Lifecycle funnel</div> })
 );
 vi.mock('@/components/features/admin/hud/FounderFunnelBand', () => ({
-  FounderFunnelBand: () => <div>Founder funnel</div>,
-}));
-vi.mock('@/components/features/admin/hud/FounderFunnelDrilldown', () => ({
-  FounderFunnelDrilldown: ({ result }: { result: { stageLabel: string } }) => (
-    <div>Funnel drill-down: {result.stageLabel}</div>
+  FounderFunnelBand: ({
+    initialFunnel,
+  }: {
+    initialFunnel: { timeRange: string; count: number };
+  }) => (
+    <div>
+      Founder funnel: {initialFunnel.timeRange} / {initialFunnel.count} people
+    </div>
   ),
 }));
 vi.mock('@/components/features/admin/layout/AdminPage', () => ({
@@ -63,17 +65,15 @@ vi.mock('@/lib/admin/founder-funnel', () => ({
 vi.mock('@/lib/admin/page-access', () => ({
   requireCurrentAdminPageAccess: mocks.requireAccess,
 }));
-vi.mock('@/lib/nuqs', () => ({
-  adminGrowthSearchParams: { parse: mocks.parseSearchParams },
-}));
-
 describe('AdminGrowthPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.requireAccess.mockResolvedValue('user_admin');
-    mocks.parseSearchParams.mockResolvedValue({});
     mocks.getLeadFunnelCounts.mockResolvedValue({});
-    mocks.getFounderFunnelData.mockResolvedValue({});
+    mocks.getFounderFunnelData.mockImplementation(async range => ({
+      timeRange: range,
+      count: range === '7d' ? 7 : 30,
+    }));
     mocks.getCanonicalContactMetrics.mockResolvedValue({});
   });
 
@@ -98,32 +98,70 @@ describe('AdminGrowthPage', () => {
     expect(mocks.getFounderFunnelStageRows).not.toHaveBeenCalled();
   });
 
-  it('renders a stage drill-down from URL cohort params', async () => {
-    mocks.parseSearchParams.mockResolvedValue({
-      funnelStage: 'paid',
-      funnelRange: '7d',
-    });
-    mocks.getFounderFunnelStageRows.mockResolvedValue({
-      stage: 'paid',
-      stageLabel: 'Paid',
-      stageDescription: 'Users with an active Stripe subscription',
-      timeRange: '7d',
-      total: 1,
-      rows: [],
-      limit: 100,
-      errors: [],
-      definitionVersion: 'founder-funnel.v2',
-    });
+  it.each([
+    ['7d', '7d'],
+    ['invalid', '30d'],
+    [undefined, '30d'],
+  ] as const)(
+    'reloads %s with a shared validated aggregate and row cohort',
+    async (rawRange, range) => {
+      const count = range === '7d' ? 7 : 30;
+      mocks.getFounderFunnelStageRows.mockImplementation(
+        async (_stage, cohort) => ({
+          stage: 'paid',
+          stageLabel: 'Paid',
+          stageDescription: 'Users with an active Stripe subscription',
+          timeRange: cohort,
+          total: cohort === '7d' ? 7 : 30,
+          rows: [
+            {
+              id: cohort,
+              displayName: `${cohort} customer`,
+              email: null,
+              enteredAt: null,
+            },
+          ],
+          limit: 100,
+          errors: [],
+          definitionVersion: 'founder-funnel.v2',
+        })
+      );
 
-    const { default: AdminGrowthPage } = await import('./page');
+      const { default: AdminGrowthPage } = await import('./page');
 
-    render(
-      await AdminGrowthPage({
-        searchParams: Promise.resolve({ funnelStage: 'paid' }),
-      })
-    );
+      render(
+        await AdminGrowthPage({
+          searchParams: Promise.resolve({
+            funnelStage: 'paid',
+            funnelRange: rawRange,
+            q: 'Ada',
+            tag: ['a', 'b'],
+          }),
+        })
+      );
 
-    expect(mocks.getFounderFunnelStageRows).toHaveBeenCalledWith('paid', '7d');
-    expect(screen.getByText('Funnel drill-down: Paid')).toBeInTheDocument();
-  });
+      expect(mocks.getFounderFunnelData).toHaveBeenCalledWith(range);
+      expect(mocks.getFounderFunnelStageRows).toHaveBeenCalledWith(
+        'paid',
+        range
+      );
+      expect(
+        screen.getByText(`Founder funnel: ${range} / ${count} people`)
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: `Paid · ${count} people` })
+      ).toBeInTheDocument();
+      expect(screen.getByText(`${range} customer`)).toBeInTheDocument();
+      const back = new URL(
+        screen
+          .getByRole('link', { name: 'Clear drill-down' })
+          .getAttribute('href')!,
+        'https://jov.ie'
+      ).searchParams;
+      expect(back.get('funnelRange')).toBe(range);
+      expect(back.has('funnelStage')).toBe(false);
+      expect(back.get('q')).toBe('Ada');
+      expect(back.getAll('tag')).toEqual(['a', 'b']);
+    }
+  );
 });

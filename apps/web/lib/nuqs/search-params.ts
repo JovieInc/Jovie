@@ -380,6 +380,12 @@ export const adminGrowthViewParser =
 export const adminOutreachQueueParser =
   parseAsStringLiteral(adminOutreachQueues).withDefault('all');
 
+export const founderFunnelRangeParser = parseAsStringLiteral([
+  '7d',
+  '30d',
+  'all',
+] as const).withDefault('30d');
+
 export const adminGrowthSearchParams = createSearchParamsCache({
   page: pageParser,
   pageSize: pageSizeParser,
@@ -389,9 +395,7 @@ export const adminGrowthSearchParams = createSearchParamsCache({
   /** Founder funnel drill-down: which stage's records to list (JOV-7484). */
   funnelStage: searchQueryParser,
   /** Founder funnel cohort window shared by aggregate and drill-down. */
-  funnelRange: parseAsStringLiteral(['7d', '30d', 'all'] as const).withDefault(
-    '30d'
-  ),
+  funnelRange: founderFunnelRangeParser,
 });
 
 // ============================================================================

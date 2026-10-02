@@ -39,13 +39,23 @@ export default async function AdminGrowthPage({
 }: Readonly<AdminGrowthPageProps>) {
   await requireCurrentAdminPageAccess();
 
-  const params = await adminGrowthSearchParams.parse(searchParams);
+  const rawParams = await searchParams;
+  const params = await adminGrowthSearchParams.parse(rawParams);
+  const urlParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(rawParams)) {
+    if (value === undefined) continue;
+    for (const item of Array.isArray(value) ? value : [value]) {
+      urlParams.append(key, item);
+    }
+  }
+  urlParams.set('funnelRange', params.funnelRange);
+  const urlSearchParams = urlParams.toString();
   const drilldownStage = isFounderFunnelDrilldownStage(params.funnelStage)
     ? params.funnelStage
     : null;
   const [counts, funnel, lifecycleMetrics, drilldown] = await Promise.all([
     getLeadFunnelCounts(),
-    getFounderFunnelData('30d'),
+    getFounderFunnelData(params.funnelRange),
     getCanonicalContactMetrics(),
     drilldownStage
       ? getFounderFunnelStageRows(drilldownStage, params.funnelRange)
@@ -59,8 +69,16 @@ export default async function AdminGrowthPage({
       testId='admin-growth-page'
       viewTestId='admin-growth-view-leads'
     >
-      <FounderFunnelBand initialFunnel={funnel} />
-      {drilldown ? <FounderFunnelDrilldown result={drilldown} /> : null}
+      <FounderFunnelBand
+        initialFunnel={funnel}
+        urlSearchParams={urlSearchParams}
+      />
+      {drilldown ? (
+        <FounderFunnelDrilldown
+          result={drilldown}
+          urlSearchParams={urlSearchParams}
+        />
+      ) : null}
       <CanonicalLifecycleFunnel metrics={lifecycleMetrics} />
       <ContentSurfaceCard surface='details'>
         <div className='p-3'>

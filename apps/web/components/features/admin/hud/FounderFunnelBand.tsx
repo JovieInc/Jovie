@@ -2,11 +2,14 @@
 
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useQueryState } from 'nuqs';
+import { useState, useTransition } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { HudObservationStatus } from '@/components/features/admin/hud/HudObservationStatus';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { APP_ROUTES } from '@/constants/routes';
 import type {
   FounderFunnelData,
   FounderFunnelStage,
@@ -16,6 +19,7 @@ import {
   type HudObservationState,
   isSuccessfulHudObservation,
 } from '@/lib/hud/observation';
+import { founderFunnelRangeParser } from '@/lib/nuqs';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
 import { cn } from '@/lib/utils';
 
@@ -169,17 +173,35 @@ function FunnelStageTile({
 
 function FunnelFlow({
   funnel,
-}: Readonly<{ readonly funnel: FounderFunnelData }>) {
+  urlSearchParams,
+}: Readonly<{
+  readonly funnel: FounderFunnelData;
+  readonly urlSearchParams?: string;
+}>) {
   return (
     <ul className='flex items-stretch gap-1 overflow-x-auto'>
       {funnel.stages.map((stage, i) => {
         const isBiggestLeak = stage.key === funnel.biggestDropOffKey;
+        const params = new URLSearchParams(urlSearchParams);
+        params.set('funnelStage', stage.key);
+        // A pending navigation still displays the previous server cohort.
+        params.set('funnelRange', funnel.timeRange);
+        const displayedStage =
+          urlSearchParams !== undefined && stage.drillDownHref
+            ? {
+                ...stage,
+                drillDownHref: `${APP_ROUTES.ADMIN_GROWTH}?${params.toString()}`,
+              }
+            : stage;
         return (
           <li key={stage.key} className='flex list-none items-center'>
             {i > 0 ? (
               <StageConnector stage={stage} isBiggestLeak={isBiggestLeak} />
             ) : null}
-            <FunnelStageTile stage={stage} isBiggestLeak={isBiggestLeak} />
+            <FunnelStageTile
+              stage={displayedStage}
+              isBiggestLeak={isBiggestLeak}
+            />
           </li>
         );
       })}
@@ -245,14 +267,74 @@ function observationMessage(
  */
 export function FounderFunnelBand({
   initialFunnel = null,
+  urlSearchParams,
 }: Readonly<{
   readonly initialFunnel?: FounderFunnelData | null;
+  readonly urlSearchParams?: string;
 }>) {
-  const [range, setRange] = useState<FounderFunnelTimeRange>(
+  return initialFunnel && urlSearchParams !== undefined ? (
+    <GrowthFounderFunnelBand
+      initialFunnel={initialFunnel}
+      urlSearchParams={urlSearchParams}
+    />
+  ) : (
+    <FounderFunnelBandContent initialFunnel={initialFunnel} />
+  );
+}
+
+function GrowthFounderFunnelBand({
+  initialFunnel,
+  urlSearchParams,
+}: {
+  readonly initialFunnel: FounderFunnelData;
+  readonly urlSearchParams: string;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [, setRange] = useQueryState(
+    'funnelRange',
+    founderFunnelRangeParser.withOptions({
+      shallow: false,
+      clearOnDefault: false,
+      history: 'push',
+      scroll: false,
+      startTransition,
+    })
+  );
+  return (
+    <FounderFunnelBandContent
+      initialFunnel={initialFunnel}
+      growth={{
+        pending,
+        urlSearchParams,
+        onChange: range => {
+          void setRange(range);
+        },
+        onRetry: () => startTransition(() => router.refresh()),
+      }}
+    />
+  );
+}
+
+function FounderFunnelBandContent({
+  initialFunnel = null,
+  growth,
+}: {
+  readonly initialFunnel?: FounderFunnelData | null;
+  readonly growth?: {
+    readonly pending: boolean;
+    readonly urlSearchParams: string;
+    readonly onChange: (range: FounderFunnelTimeRange) => void;
+    readonly onRetry: () => void;
+  };
+}) {
+  const [localRange, setLocalRange] = useState<FounderFunnelTimeRange>(
     initialFunnel?.timeRange ?? '30d'
   );
 
+  const range = growth && initialFunnel ? initialFunnel.timeRange : localRange;
   const funnelQuery = useQuery({
+    enabled: !growth,
     queryKey: ['hud', 'founder-funnel', range],
     queryFn: ({ signal }) => fetchFounderFunnel(range, signal),
     ...FREQUENT_CACHE,
@@ -262,24 +344,38 @@ export function FounderFunnelBand({
         : undefined,
   });
 
-  const funnel = funnelQuery.data;
-  const observation = resolveFunnelObservation(funnelQuery);
+  // Growth aggregate and rows arrive together; HUD stays locally queryable.
+  const funnel = growth ? (initialFunnel ?? undefined) : funnelQuery.data;
+  const observation = resolveFunnelObservation(
+    growth ? { data: funnel, isLoading: false, isError: false } : funnelQuery
+  );
   const showFunnel =
     Boolean(funnel) &&
     !isEmptyFunnel(funnel) &&
     (isSuccessfulHudObservation(observation) || observation === 'unavailable');
-  const handleRetry = () => {
-    funnelQuery.refetch().catch(() => {});
-  };
+  const handleRetry =
+    growth?.onRetry ??
+    (() => {
+      funnelQuery.refetch().catch(() => {});
+    });
 
   return (
-    <ContentSurfaceCard className='overflow-hidden'>
+    <ContentSurfaceCard className='overflow-hidden' aria-busy={growth?.pending}>
       <ContentSectionHeader
         title='Bottleneck'
-        subtitle='Death-step in onboarding chat to paid.'
+        subtitle={
+          growth?.pending
+            ? 'Updating funnel range…'
+            : 'Death-step in onboarding chat to paid.'
+        }
         density='compact'
         className='min-h-0 px-(--app-shell-header-padding-x) py-3'
-        actions={<RangeSelector value={range} onChange={setRange} />}
+        actions={
+          <RangeSelector
+            value={range}
+            onChange={growth?.onChange ?? setLocalRange}
+          />
+        }
       />
       <div
         className={cn(
@@ -294,7 +390,10 @@ export function FounderFunnelBand({
           <FunnelFlowSkeleton />
         ) : showFunnel && funnel ? (
           <>
-            <FunnelFlow funnel={funnel} />
+            <FunnelFlow
+              funnel={funnel}
+              urlSearchParams={growth?.urlSearchParams}
+            />
             {observation === 'unavailable' ? (
               <HudObservationStatus
                 state='unavailable'

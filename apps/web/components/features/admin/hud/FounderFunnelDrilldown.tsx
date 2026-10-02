@@ -1,9 +1,11 @@
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { buildAdminGrowthHref } from '@/constants/admin-navigation';
+import { APP_ROUTES } from '@/constants/routes';
 import type { FounderFunnelStageRows } from '@/lib/admin/types';
 
 interface FounderFunnelDrilldownProps {
   readonly result: FounderFunnelStageRows;
+  readonly urlSearchParams?: string;
 }
 
 const RANGE_LABELS = {
@@ -28,8 +30,14 @@ function formatDate(iso: string | null): string {
  */
 export function FounderFunnelDrilldown({
   result,
+  urlSearchParams,
 }: Readonly<FounderFunnelDrilldownProps>) {
-  const backHref = buildAdminGrowthHref('leads');
+  const params = new URLSearchParams(urlSearchParams);
+  params.delete('funnelStage');
+  const backHref =
+    urlSearchParams === undefined
+      ? buildAdminGrowthHref('leads')
+      : `${APP_ROUTES.ADMIN_GROWTH}?${params.toString()}`;
 
   return (
     <ContentSurfaceCard data-testid='founder-funnel-drilldown'>
