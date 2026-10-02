@@ -88,7 +88,8 @@
     },
     "patchedDependencies": {
       "eslint-plugin-react@7.37.5": "patches/eslint-plugin-react@7.37.5.patch",
-      "@parse/node-apn@8.1.0": "patches/@parse__node-apn@8.1.0.patch"
+      "@parse/node-apn@8.1.0": "patches/@parse__node-apn@8.1.0.patch",
+      "@better-auth/oauth-provider@1.7.6": "patches/@better-auth__oauth-provider@1.7.6.patch"
     }
   },
   "scripts": {
@@ -303,7 +304,7 @@
     "test:certification-inventory": "node --test scripts/certification-inventory/inventory.test.mjs"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.128.0",
+    "@anthropic-ai/sdk": "^0.129.0",
     "@biomejs/biome": "^2.5.14",
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
