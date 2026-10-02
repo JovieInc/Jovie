@@ -11,7 +11,7 @@
 /* eslint-disable no-restricted-imports */
 import { neon } from '@neondatabase/serverless';
 import { Redis } from '@upstash/redis';
-import { and, eq, not, sql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, not } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
 import { deriveConfirmationStatus } from '@/lib/events/confirmation-status';
@@ -80,7 +80,7 @@ export type PromoDownloadAttestationColumn =
 export function promoDownloadSeedAttestationAssignment(
   column: PromoDownloadAttestationColumn
 ) {
-  return sql.raw(
+  return drizzleSql.raw(
     `CASE WHEN promo_downloads.rights_control_attested THEN promo_downloads.${column} ELSE excluded.${column} END`
   );
 }
@@ -1983,8 +1983,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
 
   // Use Neon HTTP driver (same as the app) instead of WebSocket driver
   // This ensures we write to the same connection pool the app reads from
-  const sql = neon(databaseUrl);
-  const db = drizzle(sql, { schema });
+  const db = drizzle(neon(databaseUrl), { schema });
   const seedRetryOptions = {
     attempts: process.env.CI ? 6 : 2,
     initialDelayMs: process.env.CI ? 2_000 : 1_500,
