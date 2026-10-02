@@ -35,7 +35,7 @@ async function musicfetch<T>(
       endpoint,
       new URLSearchParams({
         ...params,
-        ...(endpoint === 'search'
+        ...(endpoint === '/search'
           ? {}
           : { services: SMART_LINK_MUSICFETCH_SERVICES }),
       }),
