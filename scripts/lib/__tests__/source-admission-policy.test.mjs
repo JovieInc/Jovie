@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -8,6 +9,53 @@ import {
   evaluateSourceAdmission,
   runSourceAdmission,
 } from '../source-admission-policy.mjs';
+
+const { load } = createRequire(import.meta.url)('js-yaml');
+
+test('source validation rejects script and web-test type errors before queue admission', () => {
+  const workflow = load(
+    readFileSync('.github/workflows/source-validation.yml', 'utf8')
+  );
+  const script = workflow.jobs.deterministic.steps
+    .find(step => step.name === 'Run deterministic source contract')
+    .run.replace(/\$\{\{[^}]+\}\}/g, 'main');
+  const bin = mkdtempSync(join(tmpdir(), 'source-typecheck-contract-'));
+  try {
+    writeFileSync(
+      join(bin, 'git'),
+      '#!/bin/sh\nif [ "$1" = rev-parse ]; then printf "%s" "$EXPECTED_HEAD"; fi\n',
+      { mode: 0o755 }
+    );
+    writeFileSync(join(bin, 'node'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    writeFileSync(
+      join(bin, 'pnpm'),
+      '#!/bin/sh\nif [ "$*" = "$FAIL_TYPECHECK" ]; then exit 17; fi\nexit 0\n',
+      { mode: 0o755 }
+    );
+    for (const command of [
+      'typecheck',
+      'run typecheck:scripts',
+      '--filter @jovie/web run typecheck:tests',
+    ]) {
+      const result = spawnSync('bash', ['-eo', 'pipefail', '-c', script], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          EXPECTED_HEAD: 'a'.repeat(40),
+          FAIL_TYPECHECK: command,
+        },
+      });
+      assert.equal(
+        result.status,
+        17,
+        `${command} must reject source admission: ${result.stderr}`
+      );
+    }
+  } finally {
+    rmSync(bin, { recursive: true, force: true });
+  }
+});
 
 const head = 'a'.repeat(40);
 const other = 'b'.repeat(40);

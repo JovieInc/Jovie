@@ -40,6 +40,8 @@ jobs:
           node scripts/ci-release-incident-contract.mjs
           pnpm ci:harness:check
           pnpm typecheck
+          pnpm run typecheck:scripts
+          pnpm --filter @jovie/web run typecheck:tests
           pnpm biome:check
           ESLINT_CHANGED_BASE="origin/${{ github.base_ref }}" pnpm --filter @jovie/web run lint:eslint:changed
           pnpm component-ship-gate
