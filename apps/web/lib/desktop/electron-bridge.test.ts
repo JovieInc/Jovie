@@ -19,8 +19,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __testing,
   isDesktopEnvironment,
-  reportDesktopWorkState,
   notifyDesktopComposerReadiness,
+  reportDesktopWorkState,
   useDesktopBuildIdentity,
 } from './electron-bridge';
 

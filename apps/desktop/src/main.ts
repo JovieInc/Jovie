@@ -3198,6 +3198,7 @@ ipcMain.on(CLIENT_NAVIGATION_READY_CHANNEL, (event, ready: unknown) => {
   }
   desktopNavigation.setReady(event.sender.id, ready);
 });
+
 // Optional composer evidence does not change the renderer recovery watchdog.
 ipcMain.handle(
   DESKTOP_COMPOSER_READINESS_CHANNEL,

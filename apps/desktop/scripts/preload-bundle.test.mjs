@@ -181,6 +181,7 @@ test('the production bundle command writes a sandbox-compatible preload', async 
   assert.equal(loadDocument().getWorkState(), null);
   currentDocument.setWorkState(null);
   assert.equal(currentDocument.getWorkState(), null);
+
   const invoked = [];
   let api;
   vm.runInNewContext(source, {
