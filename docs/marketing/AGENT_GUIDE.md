@@ -1,5 +1,5 @@
 <!--
-spec-version: 1.3.0
+spec-version: 1.4.0
 doc-freshness: docs/marketing/AGENT_GUIDE.md
 -->
 # Marketing Agent Guide
@@ -12,13 +12,19 @@ doc-freshness: docs/marketing/AGENT_GUIDE.md
 > `COMPOSITION_RULES.md`) are optional commentary. Copy generation follows the
 > typed contract below.
 
-spec-version: 1.3.0 · registry: `apps/web/data/marketing/index.ts`.
+spec-version: 1.4.0 · registry: `apps/web/data/marketing/index.ts`.
 
 ## Founder direction
 
 Before marketing design or copy work, read [Design invariants](./DESIGN_INVARIANTS.md).
 It owns the scoped 2026-09-13 founder decisions, approval distinctions, and
 review requirements; it does not create a second executable invariant registry.
+
+For company About, artist About and search-oriented content, apply
+[About pages and search evidence](./COMPOSITION_RULES.md#about-pages-and-search-evidence).
+It classifies verified requirements, editorial recipes and measurement hypotheses.
+Reuse the existing claim/copy/SEO contracts; practitioner advice is not a new
+ranking law or permission to fabricate proof.
 
 ## The 4-step procedure
 

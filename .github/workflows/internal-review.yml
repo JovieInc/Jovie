@@ -1,0 +1,59 @@
+name: Internal PR Review (advisory)
+
+# JOV-7400: internal, advisory-only AI reviewer — the CodeRabbit replacement.
+# Posts exactly one upserted comment per PR head covering correctness risks,
+# test gaps, and migration hazards on open/synchronize.
+#
+# Non-blocking by construction:
+#   - This workflow is never a required status check (see
+#     .github/BRANCH_PROTECTION.md) and is never an input to merge admission.
+#   - The script always exits 0: a missing gateway key, rate limit, oversized
+#     diff, or API failure degrades to a warning annotation, never a failure.
+#   - It runs on pull_request_target and checks out only the trusted base ref;
+#     the PR diff is read through the GitHub API as data, so no PR-controlled
+#     code executes and secrets stay scoped to the gateway call.
+#
+# Because the script is resolved from the base ref, changes to
+# .github/scripts/internal-pr-review.mjs take effect only after merge.
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Devin
+# capability-gap: pull_request_target is required so fork PRs receive the same advisory review and secrets stay available; the workflow checks out only the trusted base ref and reads the PR diff through the API as data — no PR-controlled code executes.
+# revisit-trigger: Re-evaluate if this reviewer ever gains write scope beyond issue comments, or if a required gate starts depending on its output.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+permissions: {}
+
+concurrency:
+  # One review per PR at a time; a newer push supersedes the stale head's run
+  # and the upserted comment always reflects the latest head SHA.
+  group: internal-pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Internal Review (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # Issues comments are the PR comment surface; pull-requests read covers
+      # the diff and metadata fetches.
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Checkout trusted base ref for the review script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run advisory internal review
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: node .github/scripts/internal-pr-review.mjs

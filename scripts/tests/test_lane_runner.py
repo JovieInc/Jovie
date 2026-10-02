@@ -6,6 +6,7 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import os
 import subprocess
@@ -30,7 +31,91 @@ def issue(identifier="JOV-1", priority=2, created="2026-09-01T00:00:00Z", labels
     return lane.Issue("id-" + identifier, identifier, "Tab indicator collapses", "body", priority, created, list(labels))
 
 
+class ContextManifestTest(unittest.TestCase):
+    def test_repository_formatting_is_accepted_but_malformed_or_missing_contract_is_not(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "context-manifest.json"
+            self.assertFalse(lane.context_manifest_matches(path))
+            path.write_text(json.dumps(json.loads(lane.context_manifest_json()), separators=(",", ":")))
+            self.assertTrue(lane.context_manifest_matches(path))
+            path.write_text("not JSON")
+            self.assertFalse(lane.context_manifest_matches(path))
+
+    def test_manifest_binds_exact_prompt_and_inputs_without_copying_private_content(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "issue.prompt.md"
+            inputs = {"issue": "private issue", "gbrain": "prior private decision", "branch": "devin/jov-1"}
+            first = lane.write_agent_prompt(path, "exact prompt\n", "issue", "devin", inputs)
+            body = Path(first["path"]).read_bytes()
+            receipt = json.loads(body)
+            self.assertEqual(path.read_text(), "exact prompt\n")
+            self.assertEqual(receipt["prompt"]["sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
+            self.assertNotIn(b"private", body)
+            self.assertEqual(receipt["inputs"]["gbrain"]["sha256"], hashlib.sha256(inputs["gbrain"].encode()).hexdigest())
+            self.assertEqual(receipt["inputs"]["gbrain"]["status"], "present")
+            repeated = lane.write_agent_prompt(path, "exact prompt\n", "issue", "devin", inputs)
+            self.assertEqual(first["sha256"], repeated["sha256"])
+            self.assertTrue(first["qualification"]["ok"])
+            self.assertEqual(first["qualification"]["mode"], "qualification-only")
+            self.assertGreaterEqual(first["qualification"]["durationMs"], 0)
+            self.assertEqual(body, Path(first["path"]).read_bytes())
+            changed = lane.write_agent_prompt(path, "different prompt", "issue", "devin", inputs)
+            self.assertNotEqual(first["sha256"], changed["sha256"])
+
+    def test_missing_context_and_drift_are_explicit_nonblocking_findings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "issue.prompt.md"
+            inputs = {"issue": "task", "gbrain": "", "branch": "codex/jov-1"}
+            receipt = lane.write_agent_prompt(path, "prompt", "issue", "codex", inputs)
+            self.assertEqual(json.loads(Path(receipt["path"]).read_text())["inputs"]["gbrain"]["status"], "unavailable")
+            with patch.object(lane, "HERE", Path(tmp)):
+                for contract in [None, '{}', 'malformed']:
+                    if contract is not None:
+                        (Path(tmp) / "context-manifest.json").write_text(contract)
+                    drift = lane.write_agent_prompt(path, "still runs", "issue", "codex", inputs)
+                    self.assertEqual(path.read_text(), "still runs")
+                    self.assertFalse(drift["qualification"]["ok"])
+                    self.assertIn("context-manifest-drift", drift["qualification"]["findings"][0])
+                    self.assertIsNone(drift["path"])
+                with patch.object(lane.sys.stderr, "write", side_effect=OSError("closed log")):
+                    self.assertFalse(lane.write_agent_prompt(path, "still runs", "issue", "codex", inputs)["qualification"]["ok"])
+            for kind, data in [("issue", {"gbrain": ""}), ("unknown", inputs),
+                               ("issue", {**inputs, "issue": None})]:
+                failed = lane.write_agent_prompt(path, "still runs", kind, "codex", data)
+                self.assertFalse(failed["qualification"]["ok"])
+                self.assertIsNone(failed["sha256"])
+
+    def test_generator_does_not_load_credentials_or_query_services(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(lane, "HERE", Path(tmp)), \
+                patch.object(lane, "load_github_env", side_effect=AssertionError("credential access")):
+            self.assertEqual(lane.main(["context-manifest", "--write"]), 0)
+            self.assertEqual(lane.main(["context-manifest"]), 0)
+            (Path(tmp) / "context-manifest.json").write_text('{}')
+            self.assertEqual(lane.main(["context-manifest"]), 1)
+
+
 class SelectionTest(unittest.TestCase):
+    def test_rejection_reasons_match_final_worker_admission(self):
+        red = issue("JOV-RED")
+        red.title = "Rotate production credentials"
+        failures = {"JOV-EXHAUSTED": 3, "JOV-BACKOFF": {"count": 1, "at": 9990}}
+        cases = [(issue(labels=["Type:Epic"]), "excluded-label:type:epic"),
+                 (red, "sensitive-text"), (issue(labels=["AUTH"]), "sensitive-provider"),
+                 (issue("JOV-EXHAUSTED"), "retry-exhausted"),
+                 (issue("JOV-BACKOFF"), "retry-backoff"),
+                 (issue("JOV-OWNED"), "in-flight-pr"), (issue("JOV-GOOD"), None)]
+        for task, expected in cases:
+            with self.subTest(expected=expected):
+                self.assertEqual(lane.admission_rejection(task, failures, 10000,
+                                 frozenset({"jov-owned"}), "devin"), expected)
+                self.assertEqual(lane.pick_issue([task], failures, now=10000,
+                                 in_flight=frozenset({"jov-owned"}), provider="devin"),
+                                 task if expected is None else None)
+        self.assertIsNone(lane.admission_rejection(issue(labels=["AUTH"]), {}, 10000, provider="codex"))
+        # Exactly one reason per candidate, preserving the existing gate precedence.
+        self.assertEqual(lane.admission_rejection(issue(labels=["Type:Epic", "auth"]), {}, 10000,
+                         provider="devin"), "excluded-label:type:epic")
+
     def test_orders_like_symphony_priority_then_age_with_none_last(self):
         now = datetime(2026, 9, 4, tzinfo=timezone.utc).timestamp()
         picked = lane.pick_issue([
@@ -139,6 +224,14 @@ class PromptTest(unittest.TestCase):
                        "Do not mark it ready or merge it", "NOT-SHIPPABLE"):
             self.assertIn(needle, prompt)
 
+    def test_native_issue_link_is_nonclosing_before_the_agent_opens_a_pr(self):
+        for labels in ([], ["commissioning"], ["parent"]):
+            with self.subTest(labels=labels):
+                prompt = lane.render_prompt(issue("JOV-42", labels=labels), "devin/jov-42-x", "")
+                self.assertIn("Refs JOV-42.", prompt)
+                self.assertIn("linear-issue-identifier:JOV-42", prompt)
+                self.assertIn("normal implementation", prompt)
+
     def test_contract_forbids_interactive_skill_workflows(self):
         prompt = lane.render_prompt(issue(), "codex/jov-1", "")
         self.assertIn("Never stop to ask", prompt)
@@ -230,6 +323,20 @@ class GateTest(unittest.TestCase):
                 lane.sh = original
         self.assertFalse(passed)
         self.assertTrue(reasons[0].startswith("llm-review-failed"))
+
+    def test_context_drift_does_not_replace_the_sensitive_review_verdict(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            host = lane.Host(state=root)
+            for verdict, expected in [("LLM-REVIEW: FAIL", False), ("LLM-REVIEW: PASS", True)]:
+                def review(*args, **kwargs):
+                    (root / ".codex-last-message.txt").write_text(verdict)
+                    return SimpleNamespace(returncode=0)
+                with patch.object(lane, "context_manifest_matches", return_value=False), \
+                        patch.object(lane, "sh", side_effect=review) as reviewer:
+                    passed, _ = lane.sensitive_review(host, {"number": 7, "headRefOid": "abc"}, root, None)
+                self.assertEqual(passed, expected)
+                reviewer.assert_called_once()
 
     def test_numstat_parsing_handles_binary(self):
         changes = lane.parse_numstat("3\t1\ta.ts\n-\t-\timg.png\nnoise\n")
@@ -342,6 +449,17 @@ class VerifyAndLandTest(unittest.TestCase):
     def test_older_prs_for_the_same_issue_are_ignored(self):
         stale = {**self.pr, "createdAt": "2026-09-20T00:00:00Z"}
         self.assertEqual(self.run_gate(FakeShell([stale]))["verdict"], "no-change")
+
+    def test_fallback_pr_is_nonclosing_from_creation_and_retains_merge_sync_identity(self):
+        fake = FakeShell([], ahead="2")
+        self.run_gate(fake)
+        creations = [call for call in fake.calls if call[:3] == ["gh", "pr", "create"]]
+        self.assertEqual(len(creations), 1)
+        body = creations[0][creations[0].index("--body") + 1]
+        self.assertTrue(body.startswith("Refs JOV-1.\n"))
+        self.assertIn("<!-- linear-issue-id:id-JOV-1 -->", body)
+        self.assertIn("<!-- linear-issue-identifier:JOV-1 -->", body)
+        self.assertNotIn("Closes", body)
 
     def test_pr_creation_failure_does_not_loop(self):
         result = self.run_gate(FakeShell([], ahead="2"))
@@ -470,6 +588,9 @@ class LinearClientTest(unittest.TestCase):
 
 class RunIssueTest(unittest.TestCase):
     def setUp(self):
+        disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+        disk.start()
+        self.addCleanup(disk.stop)
         self.real_sh, self.real_verify, self.real_pack = lane.sh, lane.verify_and_land, lane.context_pack
         self.real_next = lane.next_provider
         lane.next_provider = lambda *a, **k: None  # no live provider health checks in unit tests
@@ -506,6 +627,44 @@ class RunIssueTest(unittest.TestCase):
         self.assertTrue(receipt["branch"].startswith("devin/jov-8-"))
         self.assertIn(receipt["runId"], receipt["worktree"])
         self.assertEqual(receipt["result"], {"verdict": "landing", "commit": None, "pr": 9, "prUrl": None})
+        manifest = receipt["contextManifests"][0]
+        body = Path(manifest["path"]).read_bytes()
+        context = json.loads(body)
+        self.assertEqual(manifest["sha256"], hashlib.sha256(body).hexdigest())
+        self.assertEqual(context["provider"], "devin")
+        self.assertEqual(context["prompt"]["sha256"], hashlib.sha256(prompt.encode()).hexdigest())
+        self.assertEqual(self.ledger()[0]["contextManifests"], receipt["contextManifests"])
+
+    def test_context_contract_drift_does_not_prevent_agent_execution(self):
+        lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 9, "reasons": []}
+        with patch.object(lane, "context_manifest_json", return_value="drift"), \
+                patch.object(lane, "run_agent", wraps=lane.run_agent) as agent:
+            receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]), issue())
+        self.assertEqual(receipt["verdict"], "landing")
+        self.assertIn("context-manifest-drift", receipt["contextManifests"][0]["qualification"]["findings"][0])
+        agent.assert_called_once()
+        self.assertEqual(self.ledger()[0]["contextManifests"], receipt["contextManifests"])
+
+    def test_context_receipt_failure_is_isolated_but_prompt_write_failure_still_blocks(self):
+        original = Path.write_bytes
+        lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 9, "reasons": []}
+        for index, (suffix, verdict) in enumerate([(".context.json", "landing"), (".prompt.md", "failed")]):
+            def write(path, data):
+                if path.name.endswith(suffix):
+                    raise OSError("volume unavailable")
+                return original(path, data)
+            with patch.object(Path, "write_bytes", write), \
+                    patch.object(lane, "run_agent", wraps=lane.run_agent) as agent:
+                receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]), issue(f"JOV-{index + 1}"))
+            self.assertEqual(receipt["verdict"], verdict)
+            if suffix == ".context.json":
+                agent.assert_called_once()
+                context = receipt["contextManifests"][0]
+                self.assertIsNone(context["path"])
+                self.assertIn("volume unavailable", context["qualification"]["findings"][0])
+            else:
+                agent.assert_not_called()
+                self.assertIn("volume unavailable", receipt["reasons"][0])
 
     def test_agent_that_never_worked_is_a_provider_error(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}
@@ -532,6 +691,10 @@ class RunIssueTest(unittest.TestCase):
         handoff = next((self.host.state / "runs").glob("*.handoff1.prompt.md")).read_text()
         self.assertIn("Do not start over", handoff)
         self.assertIn("ctx", handoff)
+        self.assertEqual(len(receipt["contextManifests"]), 2)
+        context = json.loads(Path(receipt["contextManifests"][1]["path"]).read_text())
+        self.assertEqual((context["kind"], context["provider"]), ("handoff", "devin"))
+        self.assertEqual(context["prompt"]["sha256"], hashlib.sha256(handoff.encode()).hexdigest())
 
     def test_next_provider_takes_the_cheapest_enabled_healthy_uncooled_lane(self):
         providers = {
@@ -699,6 +862,9 @@ class AttributionAndThroughputTest(unittest.TestCase):
 
 class WorkerTest(unittest.TestCase):
     def setUp(self):
+        disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+        disk.start()
+        self.addCleanup(disk.stop)
         self.saved = (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
                       lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues,
                       lane.fix_candidates, lane.escalate_exhausted, lane.pr_events.queued_prs,
@@ -1086,22 +1252,30 @@ class PublicationRevocationTest(unittest.TestCase):
 
     def test_sigterm_is_a_stop_that_revokes_before_kill(self):
         import signal
-        import threading
         with tempfile.TemporaryDirectory() as tmp, open(os.devnull, "w") as log:
             root = Path(tmp)
             host = lane.Host(state=root)
             pidfile = root / "pid"
+            # Startup may exceed the old 0.5s timer on a loaded installer host.
             command = [sys.executable, "-c",
-                       "import os,time,pathlib; pathlib.Path('pid').write_text(str(os.getpid())); time.sleep(30)"]
-            timer = threading.Timer(0.5, lambda: os.kill(os.getpid(), signal.SIGTERM))
-            try:
-                timer.start()
-                with self.assertRaises(lane.RunStopped):
-                    lane.run_agent(command, root, log, timeout=30,
-                                   on_kill=lambda error: lane.revoke_publication(
-                                       host, branch="devin/jov-9-1", reason="run-stopped"))
-            finally:
-                timer.cancel()
+                       "import os,time,pathlib; time.sleep(0.75); pathlib.Path('pid').write_text(str(os.getpid())); time.sleep(30)"]
+
+            def signal_when_ready():
+                if pidfile.exists():
+                    os.kill(os.getpid(), signal.SIGTERM)
+
+            observed = []
+
+            def on_kill(error):
+                # Preserve receipt-before-kill proof for a real SIGTERM too.
+                os.kill(int(pidfile.read_text()), 0)
+                observed.append(type(error).__name__)
+                lane.revoke_publication(host, branch="devin/jov-9-1", reason="run-stopped")
+
+            with self.assertRaises(lane.RunStopped):
+                lane.run_agent(command, root, log, timeout=30,
+                               guard=signal_when_ready, guard_interval=0.05, on_kill=on_kill)
+            self.assertEqual(observed, ["RunStopped"])
             self.assertIsNotNone(lane.publication_revocation(host, "devin/jov-9-1"))
             with self.assertRaises(ProcessLookupError):
                 os.kill(int(pidfile.read_text()), 0)
@@ -1181,6 +1355,15 @@ class VerifyAndLandRevocationTest(unittest.TestCase):
 
 
 class DispatchTest(unittest.TestCase):
+    def setUp(self):
+        disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+        disk.start()
+        self.addCleanup(disk.stop)
+        # Host-independent tests must never contact production from Gem's test gate.
+        clock = patch.object(lane.continuity_clock, "tick", return_value={"status": "current"})
+        clock.start()
+        self.addCleanup(clock.stop)
+
     def test_critical_or_unknown_disk_blocks_all_dispatch_and_installs(self):
         for pct in (None, 4.0):
             with self.subTest(pct=pct), tempfile.TemporaryDirectory() as tmp, \
@@ -1706,6 +1889,9 @@ class PreservedRecoveryTest(unittest.TestCase):
 
 class FixRedTest(unittest.TestCase):
     def setUp(self):
+        disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+        disk.start()
+        self.addCleanup(disk.stop)
         self.real_reconcile_fix_target = lane.reconcile_fix_target
         lane.reconcile_fix_target = lambda pr: {**pr, "state": "OPEN", "mergedAt": None}
         self.addCleanup(setattr, lane, "reconcile_fix_target", self.real_reconcile_fix_target)

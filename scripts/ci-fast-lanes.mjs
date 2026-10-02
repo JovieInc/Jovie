@@ -365,14 +365,16 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   structuralPythonRegression(
     [
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py scripts/tests/test_pr_events.py scripts/tests/test_reason_lane.py scripts/tests/test_doctor.py scripts/tests/test_disk_guard.py -q',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py" --fail-under=85',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py scripts/tests/test_pr_events.py scripts/tests/test_reason_lane.py scripts/tests/test_doctor.py scripts/tests/test_disk_guard.py scripts/tests/test_continuity_clock.py -q',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85',
     ].join(' && ')
   ),
   ...STRUCTURAL_PYTEST_PARTS,
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  '.github/scripts/customer-notes-ready.test.js',
+  '.github/scripts/auto-merge-stuck-triage.test.js',
   '.claude/hooks/post-task-validate.test.mjs',
   '.claude/hooks/prod-db-session-guard.test.mjs',
   'scripts/agent-context/check.test.mjs',
@@ -438,9 +440,12 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/vision/art-evaluator.test.mjs',
   'scripts/visual-baseline-adopt.test.mjs',
   'scripts/web-ai-health-intake.test.mjs',
+  'scripts/weekly-agent-readiness.test.mjs',
 ]);
-export const SCRIPT_CONTRACT_NODE_COMMAND = `node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')}`;
+export const SCRIPT_CONTRACT_NODE_COMMAND = `node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')} && node --test --experimental-test-coverage --test-coverage-include=.github/scripts/customer-notes-ready.js --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 .github/scripts/customer-notes-ready.test.js`;
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
+  'scripts/lib/__tests__/nightly-agent-workflow.test.mjs',
+  'scripts/lib/__tests__/stryker-babel-compatibility.test.mjs',
   'scripts/lib/__tests__/actions-cache-supersede.test.mjs',
   'scripts/lib/__tests__/ci-dependency-workspace.test.mjs',
   'scripts/lib/__tests__/agent-branch-pattern.test.mjs',

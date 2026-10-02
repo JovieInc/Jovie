@@ -232,16 +232,22 @@ function CategoryFilterToolbar({
 
 function ArchiveJumpNav({
   months,
+  visibleMonthCount,
 }: {
   readonly months: readonly CustomerChangelogMonthGroup[];
+  readonly visibleMonthCount: number;
 }) {
   return (
     <nav aria-label='Changelog Archive' className='changelog-archive-nav'>
-      {months.map(group => (
+      {months.map((group, index) => (
         <div key={group.monthKey} className='changelog-archive-nav__row'>
           <div className='changelog-archive-nav__rail'>
             <Link
-              href={`#changelog-month-${group.monthKey}`}
+              href={
+                index < visibleMonthCount
+                  ? `#changelog-month-${group.monthKey}`
+                  : versionHref(group.entries[0].technicalVersion)
+              }
               className='changelog-archive-nav__month'
             >
               {group.label}
@@ -252,7 +258,11 @@ function ArchiveJumpNav({
             {group.entries.map(entry => (
               <li key={entry.slug}>
                 <Link
-                  href={`#${entry.slug}`}
+                  href={
+                    index < visibleMonthCount
+                      ? `#${entry.slug}`
+                      : versionHref(entry.technicalVersion)
+                  }
                   className='changelog-archive-nav__link'
                 >
                   <span className='changelog-archive-nav__link-date'>
@@ -339,7 +349,10 @@ export function CustomerChangelogArchive({
         </p>
       ) : (
         <>
-          <ArchiveJumpNav months={visibleMonths} />
+          <ArchiveJumpNav
+            months={filteredMonths}
+            visibleMonthCount={visibleCount}
+          />
           <div id='changelog-outcome-list'>
             {visibleMonths.map((group, index) => (
               <MonthSection

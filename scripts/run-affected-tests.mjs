@@ -210,6 +210,7 @@ const SUMMER_COMMISSIONING_LANE = new Set([
 ]);
 const CAPABILITY_BENCHMARK_PRIMARY_INPUTS = new Set([
   'scripts/capability-benchmark/capability-benchmark-registry.json',
+  'scripts/capability-benchmark/decision-routing-benchmark.json',
   'scripts/capability-benchmark/computer-use-decision.jsonl',
   'scripts/capability-benchmark/computer-use-decision.mjs',
   'scripts/capability-benchmark/computer-use-decision.test.mjs',
@@ -525,6 +526,24 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
     [
       '--test-coverage-lines=100',
       '--test-coverage-branches=100',
+      '--test-coverage-functions=100',
+    ],
+  ],
+  [
+    '.github/scripts/internal-pr-review.test.mjs',
+    '.github/scripts/internal-pr-review.mjs',
+    [
+      '--test-coverage-lines=85',
+      '--test-coverage-branches=80',
+      '--test-coverage-functions=85',
+    ],
+  ],
+  [
+    'scripts/lib/__tests__/source-admission-policy.test.mjs',
+    'scripts/lib/source-admission-policy.mjs',
+    [
+      '--test-coverage-lines=95',
+      '--test-coverage-branches=90',
       '--test-coverage-functions=100',
     ],
   ],
@@ -1152,6 +1171,11 @@ export function buildAffectedTestPlan(
       scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
       nodeTests: CAPABILITY_BENCHMARK_NODE_TESTS,
     };
+  }
+  if (files.some(file => CAPABILITY_BENCHMARK_PRIMARY_INPUTS.has(file))) {
+    return fullSuitePlan(
+      'Capability benchmark change exceeds its focused lane'
+    );
   }
   const isBoundedSummerCommissioningChange =
     files.some(file => SUMMER_COMMISSIONING_PRIMARY_INPUTS.has(file)) &&

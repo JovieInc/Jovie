@@ -6,6 +6,7 @@ import {
   MARKETING_NAV_LINKS,
   MARKETING_NAV_UTILITIES,
   MARKETING_TOOLS_FLYOUT_LINKS,
+  PUBLIC_COMMERCIAL_FOOTER_LINKS,
 } from './marketingNavigation';
 
 const PRIVATE_INVESTOR_HREF =
@@ -15,6 +16,7 @@ describe('public marketing navigation', () => {
   it('never links private investor surfaces', () => {
     const hrefs = [
       ...MARKETING_FOOTER_COLUMNS.flatMap(column => column.links),
+      ...PUBLIC_COMMERCIAL_FOOTER_LINKS,
       ...MARKETING_LEGAL_LINKS,
       ...MARKETING_NAV_LINKS,
       ...MARKETING_NAV_UTILITIES,

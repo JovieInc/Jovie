@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getCreatorByUsername } from '@/app/[username]/[slug]/_lib/data';
 
 const {
   doesColumnExistMock,
@@ -43,7 +44,6 @@ vi.mock('@/lib/db', () => ({
 
 describe('smart-link creator schema compatibility', () => {
   beforeEach(() => {
-    vi.resetModules();
     doesColumnExistMock.mockReset();
     selectMock.mockClear();
     fromMock.mockClear();
@@ -64,10 +64,6 @@ describe('smart-link creator schema compatibility', () => {
         settings: {},
       },
     ]);
-
-    const { getCreatorByUsername } = await import(
-      '@/app/[username]/[slug]/_lib/data'
-    );
 
     await expect(getCreatorByUsername('dualipa')).resolves.toMatchObject({
       usernameNormalized: 'dualipa',
@@ -97,10 +93,6 @@ describe('smart-link creator schema compatibility', () => {
       },
     ]);
 
-    const { getCreatorByUsername } = await import(
-      '@/app/[username]/[slug]/_lib/data'
-    );
-
     await expect(getCreatorByUsername('dualipa')).resolves.toMatchObject({
       usernameNormalized: 'dualipa',
       isClaimed: false,
@@ -127,10 +119,6 @@ describe('smart-link creator schema compatibility', () => {
         isClaimed: true,
       },
     ]);
-
-    const { getCreatorByUsername } = await import(
-      '@/app/[username]/[slug]/_lib/data'
-    );
 
     await expect(getCreatorByUsername('dualipa')).resolves.toMatchObject({
       usernameNormalized: 'dualipa',

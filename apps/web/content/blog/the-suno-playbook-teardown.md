@@ -1,11 +1,17 @@
 ---
+id: the-suno-playbook-teardown
+slug: the-suno-playbook-teardown
 title: "The $100K Suno Playbook Is Missing the Hard Part"
+description: "A viral post has been making the rounds. The pitch: a 7-step automated music business that earns $100K/year using Claude, Suno, and Spotify. It's been shared tens of thousands of times. People are exc"
 date: 2026-07-04
 author: Tim White
 authorUsername: tim
 authorTitle: Founder at Jovie
+authorProfile: /tim
 category: Music Business
 tags: suno, AI music, catalog spam, distribution, activation, release strategy, automation, revenue
+image: /images/blog/suno-playbook.svg
+imageAlt: Abstract artwork for The $100K Suno Playbook Is Missing the Hard Part.
 ---
 
 # The $100K Suno Playbook Is Missing the Hard Part
