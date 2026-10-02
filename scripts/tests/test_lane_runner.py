@@ -927,6 +927,18 @@ class AttributionAndThroughputTest(unittest.TestCase):
 
 
 class WorkerTest(unittest.TestCase):
+    def test_notification_error_releases_the_slot_even_while_traceback_is_retained(self):
+        lane.run_issue = lambda *args: {"verdict": "landing", "prUrl": "u"}
+        error = RuntimeError("notification unavailable")
+        with patch.object(self.linear, "comment", side_effect=error):
+            try: lane.worker(self.host, "devin")
+            except RuntimeError as caught: retained = caught
+            else: self.fail("notification failure must remain visible")
+        self.assertIs(retained, error)
+        contender = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
+        try: self.assertTrue(contender.held)
+        finally: contender.release()
+
     def setUp(self):
         disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
         disk.start()
@@ -3312,6 +3324,27 @@ class GateOutcomeTest(unittest.TestCase):
 
 
 class DeferredRequeueTest(unittest.TestCase):
+    def test_unrecognized_branch_retains_the_exact_retry_without_crashing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            pr = {"number": 5, "headRefOid": "head-A", "headRefName": "feature/manual"}
+            slot = lane.Locked(host.state / "slots/devin.0.lock", blocking=False)
+            with patch.object(lane, "run_deferred_requeue", return_value=None):
+                self.assertIsNone(lane.finish_deferred_retry(host, "devin", pr, Mock(), lambda pr: {"active": True}, slot=slot))
+            self.assertTrue(slot.handle.closed)
+            self.assertEqual(json.loads((host.state / "worker-idle.json").read_text())["devin"]["deferredRequeue"]["5"]["pr"], pr)
+
+    def test_legacy_deferred_markers_without_terminal_are_transient(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            path = host.state / "worker-idle.json"
+            path.write_text(json.dumps({"devin": {"deferredRequeue": {"5": {"pr": {"headRefOid": "a"}}}}}))
+            lane.record_idle_exit(host, "devin", "ordinary-scan")
+            self.assertNotIn("deferredRequeue", json.loads(path.read_text())["devin"])
+            path.write_text(json.dumps({"devin": {"deferredRequeue": {"5": {"pr": {"headRefOid": "a"}}}}}))
+            lane.yield_deferred_requeues(host, "devin")
+            self.assertEqual(json.loads(path.read_text())["devin"]["deferredRequeue"], {})
+
     @staticmethod
     def concurrent_update(test, host, values):
         claim = lane.Locked(host.state / "claim.lock", blocking=False)

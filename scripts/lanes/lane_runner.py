@@ -2826,7 +2826,7 @@ def deferred_requeue_blocks(host: Host, name: str, current_context=None) -> dict
                   if queued.get(number) == row["pr"]["headRefOid"]}
         if current_context:
             blocks = {number: row for number, row in blocks.items()
-                      if (not current_context(row["pr"]).get("active") if row["terminal"]
+                      if (not current_context(row["pr"]).get("active") if row.get("terminal", False)
                           else current_context(row["pr"]) == row["context"])}
         return blocks
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
@@ -2840,7 +2840,7 @@ def yield_deferred_requeues(host: Host, name: str) -> None:
     def clear(data):
         row = data.get(name, {})
         row["deferredRequeue"] = {number: item for number, item in row.get("deferredRequeue", {}).items()
-                                  if item["terminal"]}
+                                  if item.get("terminal", False)}
     update_json(path, clear)
 
 
@@ -2858,8 +2858,9 @@ def finish_deferred_retry(host: Host, name: str, pr: dict, retry, context, *, sl
         except (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.SubprocessError):
             receipt = None  # run_deferred_requeue already released its slot on an error
         if receipt is None or receipt.get("verdict") == "remote-repair-required":
+            branch = LANE_BRANCH.match(pr.get("headRefName") or "")
             marker = {"pr": {key: pr[key] for key in ("number", "headRefOid", "headRefName")},
-                      "issue": LANE_BRANCH.match(pr["headRefName"]).group("issue").upper(),
+                      **({"issue": branch.group("issue").upper()} if branch else {}),
                       "context": context(pr), "terminal": bool(receipt)}
             record_idle_exit(host, name, "deferred-repair-required" if receipt else "deferred-held", deferred=marker)
         if receipt is None and not slot.handle.closed: slot.release()
@@ -2878,7 +2879,7 @@ def record_idle_exit(host: Host, name: str, reason: str, *, deferred=None) -> No
         data = json.loads(path.read_text()) if path.exists() else {}
         blocks = data.get(name, {}).get("deferredRequeue", {})
         if deferred: blocks[str(deferred["pr"]["number"])] = deferred
-        else: blocks = {number: row for number, row in blocks.items() if row["terminal"]}
+        else: blocks = {number: row for number, row in blocks.items() if row.get("terminal", False)}
         data[name] = {"at": now_iso(), "reason": reason, **({"deferredRequeue": blocks} if blocks else {})}
         path.write_text(json.dumps(data))
     except (OSError, ValueError):
@@ -2900,6 +2901,14 @@ def worker(host: Host, name: str) -> int:
         lock.release()
     if slot is None:
         return 0
+    try:
+        return worker_with_slot(host, name, spec, slot)
+    finally:
+        if not slot.handle.closed: slot.release()
+
+
+def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
+    """Release ownership on every exceptional exit, including notification failures."""
     try:
         report = disk_guard.check(host, sweep=True)
         if not report.get("admitted"):
