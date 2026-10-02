@@ -1056,6 +1056,26 @@ function assertLedgerMatchesRegistry(
   }
 }
 
+/** Grow the denominator without certifying new identities or discarding history. */
+function extendLedgerRegistry(
+  ledger: MarketingCertificationLedger,
+  entries: readonly MarketingRegistryEntry[],
+  initializedAt: string
+): MarketingCertificationLedger {
+  const storedIds = new Set(ledger.registryIds);
+  const existingEntries = entries.filter(entry => storedIds.has(entry.id));
+  // Reject removals, duplicate ids, orphan records, and invalid existing packets.
+  assertLedgerMatchesRegistry(ledger, existingEntries, initializedAt);
+  const addedEntries = entries.filter(entry => !storedIds.has(entry.id));
+  if (addedEntries.length === 0) return ledger;
+  const additions = initialLedger(addedEntries, initializedAt);
+  return {
+    ...ledger,
+    registryIds: registryIds(entries),
+    records: { ...ledger.records, ...additions.records },
+  };
+}
+
 export class MarketingCertificationStore {
   private readonly entries: readonly MarketingRegistryEntry[];
   private readonly entryById: ReadonlyMap<string, MarketingRegistryEntry>;
@@ -1267,7 +1287,7 @@ export class MarketingCertificationStore {
     const ledger =
       raw === null || raw === undefined
         ? initialLedger(this.entries, evaluatedAt)
-        : parseLedger(raw);
+        : extendLedgerRegistry(parseLedger(raw), this.entries, evaluatedAt);
     assertLedgerMatchesRegistry(ledger, this.entries, evaluatedAt);
     return {
       contract: JOVIE_CERTIFICATION_CONTRACT,
@@ -1357,7 +1377,24 @@ export class MarketingCertificationStore {
       attempt += 1
     ) {
       const raw = await this.backend.get(MARKETING_CERTIFICATION_STORE_KEY);
-      if (raw !== null && raw !== undefined) return parseLedger(raw);
+      if (raw !== null && raw !== undefined) {
+        const current = parseLedger(raw);
+        const extended = extendLedgerRegistry(
+          current,
+          this.entries,
+          initializedAt
+        );
+        if (extended === current) return current;
+        assertLedgerMatchesRegistry(extended, this.entries, initializedAt);
+        const updated = await this.backend.compareAndSet(
+          MARKETING_CERTIFICATION_STORE_KEY,
+          certificationRecordJson(raw) as string,
+          serializeLedger(extended),
+          PERSISTENCE_TTL_SECONDS
+        );
+        if (updated) return extended;
+        continue;
+      }
 
       const ledger = initialLedger(this.entries, initializedAt);
       const serialized = serializeLedger(ledger);
@@ -1382,6 +1419,7 @@ export class MarketingCertificationStore {
       readonly result: Result;
     }
   ): Promise<Result> {
+    await this.ensureLedger(initializedAt);
     return mutateCertificationRecord({
       backend: this.backend,
       key: MARKETING_CERTIFICATION_STORE_KEY,

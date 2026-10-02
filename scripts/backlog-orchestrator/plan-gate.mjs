@@ -12,6 +12,8 @@
 import { createHash } from 'node:crypto';
 import { validateOptimizationContract } from '../invariants/optimization-contract.mjs';
 import {
+  forbiddenActionRequest,
+  hasAggregateAdmissionLabel,
   hasProtectedAdmissionLabel,
   isFounderSteeringAssignee,
 } from './admission-policy.mjs';
@@ -29,9 +31,6 @@ export const PLAN_GATE_SUFFIX = '<!--/plan-gate-->';
 export const PLAN_APPROVED_LABEL = 'plan-approved';
 
 const ALLOWED_STATES = new Set(['Triage', 'Backlog', 'Todo']);
-const CREDENTIAL_PATTERN =
-  /credential|secret|password|api[ -]?key|access token|private key/i;
-const SYNTHETIC_PATTERN = /synthetic|bundle|workstream|batch|epic-only/i;
 const REPO_BY_TEAM = Object.freeze({
   JOV: 'JovieInc/Jovie',
   LYB: 'JovieInc/LogYourBody',
@@ -210,14 +209,11 @@ export function validatePlanCandidate(issue, evidence) {
     return 'already-assigned';
   if (
     hasProtectedAdmissionLabel(issue) ||
-    labelsOf(issue).includes('synthetic')
+    hasAggregateAdmissionLabel(issue)
   )
     return 'protected-policy';
-  if (
-    SYNTHETIC_PATTERN.test(`${labelsOf(issue).join(' ')} ${issueText(issue)}`)
-  )
-    return 'synthetic-or-ambiguous-work';
-  if (CREDENTIAL_PATTERN.test(issueText(issue))) return 'credential-work';
+  const forbiddenAction = forbiddenActionRequest(issueText(issue));
+  if (forbiddenAction) return forbiddenAction;
   if (hasActivePullRequest(issue)) return 'active-pull-request';
   if (evidence.synthetic === true || evidence.ambiguous === true)
     return 'synthetic-or-ambiguous-evidence';
