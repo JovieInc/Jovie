@@ -290,67 +290,6 @@ afterAll(() => {
 });
 
 describe('JovieChat styling regressions', () => {
-  it('publishes rail context only when its meaning changes during streaming', () => {
-    mockRailPanel.enabled = true;
-    mockChatState.messages = [
-      {
-        id: 'm1',
-        role: 'assistant',
-        parts: [{ type: 'text', text: '@release:one[One]' }],
-      },
-    ];
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    const { rerender } = render(
-      <QueryClientProvider client={queryClient}>
-        <JovieChat profileId='profile-1' conversationId='one' />
-      </QueryClientProvider>
-    );
-    const rerenderChat = (conversationId: string) =>
-      rerender(
-        <QueryClientProvider client={queryClient}>
-          <JovieChat profileId='profile-1' conversationId={conversationId} />
-        </QueryClientProvider>
-      );
-    expect(mockRailPanel.value.upsertContexts).toHaveBeenCalledTimes(1);
-
-    // Opening another panel changes the context value, but the publisher and
-    // derived candidates still mean the same thing.
-    mockRailPanel.value = { ...mockRailPanel.value };
-    rerenderChat('one');
-    expect(mockRailPanel.value.upsertContexts).toHaveBeenCalledTimes(1);
-
-    mockChatState.messages = [
-      {
-        id: 'm1',
-        role: 'assistant',
-        parts: [
-          { type: 'text', text: '@release:one[One] Streaming more text' },
-        ],
-      },
-    ];
-    rerenderChat('one');
-    expect(mockRailPanel.value.upsertContexts).toHaveBeenCalledTimes(1);
-
-    mockChatState.messages = [
-      {
-        id: 'm1',
-        role: 'assistant',
-        parts: [{ type: 'text', text: '@release:one[Renamed]' }],
-      },
-    ];
-    rerenderChat('one');
-    expect(mockRailPanel.value.upsertContexts).toHaveBeenCalledTimes(2);
-    expect(mockRailPanel.value.upsertContexts).toHaveBeenLastCalledWith([
-      expect.objectContaining({ id: 'one', label: 'Renamed' }),
-    ]);
-
-    mockChatState.messages = [];
-    rerenderChat('two');
-    expect(mockRailPanel.value.clearContexts).toHaveBeenCalledTimes(1);
-  });
-
   it('renders thinking placeholder as a ChatMessage with isThinking when loading', () => {
     const { container } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />
@@ -699,5 +638,66 @@ describe('JovieChat styling regressions', () => {
     expect(
       container.querySelector('[data-testid="ovie-editorial-briefing"]')
     ).toBeNull();
+  });
+
+  it('publishes rail context only when its meaning changes during streaming', () => {
+    mockRailPanel.enabled = true;
+    mockChatState.messages = [
+      {
+        id: 'm1',
+        role: 'assistant',
+        parts: [{ type: 'text', text: '@release:one[One]' }],
+      },
+    ];
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <JovieChat profileId='profile-1' conversationId='one' />
+      </QueryClientProvider>
+    );
+    const rerenderChat = (conversationId: string) =>
+      rerender(
+        <QueryClientProvider client={queryClient}>
+          <JovieChat profileId='profile-1' conversationId={conversationId} />
+        </QueryClientProvider>
+      );
+    expect(mockRailPanel.value.upsertContexts).toHaveBeenCalledTimes(1);
+
+    // Opening another panel changes the context value, but the publisher and
+    // derived candidates still mean the same thing.
+    mockRailPanel.value = { ...mockRailPanel.value };
+    rerenderChat('one');
+    expect(mockRailPanel.value.upsertContexts).toHaveBeenCalledTimes(1);
+
+    mockChatState.messages = [
+      {
+        id: 'm1',
+        role: 'assistant',
+        parts: [
+          { type: 'text', text: '@release:one[One] Streaming more text' },
+        ],
+      },
+    ];
+    rerenderChat('one');
+    expect(mockRailPanel.value.upsertContexts).toHaveBeenCalledTimes(1);
+
+    mockChatState.messages = [
+      {
+        id: 'm1',
+        role: 'assistant',
+        parts: [{ type: 'text', text: '@release:one[Renamed]' }],
+      },
+    ];
+    rerenderChat('one');
+    expect(mockRailPanel.value.upsertContexts).toHaveBeenCalledTimes(2);
+    expect(mockRailPanel.value.upsertContexts).toHaveBeenLastCalledWith([
+      expect.objectContaining({ id: 'one', label: 'Renamed' }),
+    ]);
+
+    mockChatState.messages = [];
+    rerenderChat('two');
+    expect(mockRailPanel.value.clearContexts).toHaveBeenCalledTimes(1);
   });
 });
