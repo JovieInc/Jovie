@@ -101,6 +101,22 @@ describe('public changelog page', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'October 2026' })).toBeVisible();
   });
+  it.each(['empty', 'undated'] as const)(
+    'reports %s publication without inventing a date or update',
+    async kind => {
+      currentSnapshot = {
+        ...SNAPSHOT,
+        releases:
+          kind === 'empty' ? [] : [{ ...SNAPSHOT.releases[0], date: '' }],
+      };
+      render(await ChangelogPage());
+      expect(screen.getByRole('status')).toHaveTextContent(
+        kind === 'empty'
+          ? 'No customer updates have been published yet.'
+          : 'The latest published update is listed below.'
+      );
+    }
+  );
   it('keeps one customer-facing heading and discloses unpublished source slots', async () => {
     render(await ChangelogPage());
 

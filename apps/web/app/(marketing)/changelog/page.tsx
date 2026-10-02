@@ -129,7 +129,9 @@ function ChangelogFreshnessNotice({
       Release notes are being prepared for newer release slots.{' '}
       {latestDate
         ? `The latest published update is ${latestDate}.`
-        : 'The latest published update is listed below.'}
+        : latestPublished.length
+          ? 'The latest published update is listed below.'
+          : 'No customer updates have been published yet.'}
     </p>
   );
 }

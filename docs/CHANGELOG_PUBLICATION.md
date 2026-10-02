@@ -1,69 +1,52 @@
 # Customer changelog publication
 
-Owner: Production Controller (transport), source PR writer (approved customer
-copy and customer-path evidence). CHANGELOG.md is the public authority. Public
-page, permanent date pages, JSON/Atom feeds and What's New consume its parser.
+Owner: Production Controller (transport), source PR writer (approved customer copy and path evidence).
+CHANGELOG.md is the authority for the public page, date permalinks, JSON/Atom feeds and What's New.
 Subscriptions are unchanged; publishing a digest does not send email.
 
 ## Source metadata
 
-Put this hidden block in the source PR body. Copy is a customer outcome, not a
-PR title or implementation description. Related PRs share an outcome key and
-identical approved copy; conflicting copy fails closed. Internal changes use
-`<!-- customer-changelog/v1 {"releaseWorthy":false} -->`.
-Source Validation requires an explicit decision for customer-code PRs created
-from 2026-10-03 UTC; older PRs retain their existing admission contract.
+Put this hidden block in the source PR body. Use a customer outcome, not a PR title or implementation description.
+Related PRs share an outcome key and identical copy; conflicting copy fails closed.
+Internal work uses `<!-- customer-changelog/v1 {"releaseWorthy":false} -->`.
+Source Validation requires an explicit decision for customer-code PRs created from 2026-10-03 UTC;
+older PRs retain their admission contract. Metadata-only repairs require rerunning Source Validation.
 
 ```html
 <!-- customer-changelog/v1 {"issueId":"JOV-7447","outcomeKey":"profile-link-claim","audience":"public","visibility":"public","releaseWorthy":true,"section":"Added","text":"Choose your profile link: Start with a name on the homepage.","evidence":[{"url":"https://jov.ie/","contains":"Claim"}]} -->
 ```
 
-Sections are Added, Changed, Fixed or Removed. Public copy is at most 400
-characters and excludes internal tooling and issue IDs. Evidence is a bounded
-read-only check on jov.ie or docs.jov.ie. A page substring is suitable only for
-a claim that the page proves; authenticated actions, payments and entitled
-features need their actual customer-path receipt before public copy is approved.
-Do not use a marketing headline as proof that an action works.
+Sections: Added, Changed, Fixed, Removed. Public copy is at most 400 characters, without internal tooling or issue IDs.
+Evidence uses bounded read-only checks on jov.ie or docs.jov.ie. Approve only claims the path actually proves;
+authenticated actions, payments and entitlements need their actual customer-path receipt, not marketing headlines.
 
 ## Release path
 
-`node scripts/publish-daily-changelog.mjs --marker <verified-marker.json>
---output <temporary-directory>` produces a reviewable plan and changelog. The
-marker must belong to a successful Production Verified job on main and match
-the fresh public build SHA and deployment ID. Every source merge must be an
-ancestor of that deployment. Superseded-before-availability generations,
-missing metadata, failed paths and conflicting claims cannot publish.
+`node scripts/publish-daily-changelog.mjs --marker <verified-marker.json> --output <temporary-directory>`
+produces a reviewable plan and changelog. The successful main Production Verified job, controller run/attempt,
+fresh public build SHA and deployment ID must match. Every source merge must be an ancestor of that deployment.
+The publisher checks public identity again after collection. Superseded generations defer; missing copy,
+failed paths and conflicting claims cannot publish.
 
-`--write` requires a clean `release/daily-changelog-YYYY-MM-DD-<run>-<attempt>` checkout. The
-release PR changes only CHANGELOG.md, follows exact-head source CI and the
-native merge queue, and deploys through the ordinary Production Controller.
-No CalVer, package version, tag, desktop release or alias is mutated by the
-publisher. Implementation branch restrictions stay in force. The existing
-hourly Auto-Merge Default owner promotes only changelog-only release drafts
-with every required check passing at the observed head, then requests native
-auto-merge. Production Controller never becomes a second merge owner.
+`--write` requires a clean `release/daily-changelog-YYYY-MM-DD-<run>-<attempt>` checkout.
+The release PR changes only CHANGELOG.md and follows exact-head source CI, the native queue and Production Controller.
+No CalVer, package version, tag, desktop release or alias is mutated. Implementation-branch restrictions remain.
+The existing hourly Auto-Merge Default owner finishes only changelog-only drafts with every required check passing
+at the observed head, then requests native auto-merge. The production publisher is not a second merge owner.
 
-At most three grouped customer outcomes are published per UTC date. Later
-verified changes append to the same daily post identity, preserving published
-copy and whole-post dismissal. Overflow remains pending for the next date.
-Source IDs are persisted in hidden receipts, overflow is carried forward, and
-no-change/deferral/failure plans are retained as workflow artifacts. Older
-recovered work is dated when its customer path is verified, never its merge
-date. `--seed <file>` accepts a reviewed array of `{number, note}` records for
-recovery without modifying historical PR bodies.
+At most three grouped outcomes per UTC date. Later changes append to that post, preserving copy, source/runtime
+provenance and whole-post dismissal. Overflow remains pending for the next date. Source IDs are persisted in receipts.
+No-change/deferral plans are retained as workflow artifacts; validation failures fail the job.
+Recovered work is dated when its path is verified, never its merge date. `--seed <file>` accepts reviewed
+`{number, note}` records for recovery without modifying historical PR bodies.
 
 ## Verification and cost
 
-The scripts CI lane executes the evaluator and publication tests with per-file
-coverage floors of 85% lines, 75% branches and 82% functions. Recovery scans at
-most 5,000 first-parent commits, reads PRs in batches of 50 and performs at most
-three public checks per explicitly public source. Normal runs begin at the last
-published deployment head. There is no model invocation, new service, database,
-cron, subscriber iteration or automatic email.
+Scripts CI runs evaluator/publication tests with per-file floors: 85% lines, 75% branches, 82% functions.
+Recovery scans at most 5,000 first-parent commits; PR reads batch 50/request; public sources have at most three checks.
+Normal collection starts at the last published deployment head. No model, service, database, cron or automatic email.
 
-Adopt-first decision, 2026-10-02: extend the existing daily evaluator, parsers,
-Production Verified artifact and release branch transport. A separate release
-service or store adds an authority without fixing the missing publisher. Ship
-now: exact approved copy and verified customer outcomes. Re-evaluate when
-approved source metadata cannot be maintained by PR writers; then assess the
-existing governed factual-writing model route using measured evaluation proof.
+Adopt-first decision, 2026-10-02: extend the existing evaluator, parsers, verified artifact and release transport.
+A separate service/store adds an authority without fixing the missing publisher. Ship now: approved copy and
+verified outcomes. Re-evaluate when PR writers cannot maintain metadata; then assess the existing governed
+factual-writing model route with measured evaluation proof.
