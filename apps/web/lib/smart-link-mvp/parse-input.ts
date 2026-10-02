@@ -47,13 +47,25 @@ export function providerKeyForUrl(value: string): string | null {
     );
     if (artist) return `artist:spotify:${artist[1]}`;
   }
-  if (host === 'music.apple.com') {
+  if (host === 'music.apple.com' || host === 'itunes.apple.com') {
     const song = /^\/[a-z]{2}\/song\/(?:[^/]+\/)?(\d+)\/?$/.exec(url.pathname);
     if (song) return `apple_music:${song[1]}`;
+    const trackId = url.searchParams.get('i');
+    if (
+      trackId &&
+      /^\d+$/.test(trackId) &&
+      /^\/[a-z]{2}\/album\//.test(url.pathname)
+    ) {
+      return `apple_music:${trackId}`;
+    }
     const artist = /^\/[a-z]{2}\/artist\/(?:[^/]+\/)?(\d+)\/?$/.exec(
       url.pathname
     );
     if (artist) return `artist:apple_music:${artist[1]}`;
+  }
+  if (host === 'deezer.com' || host === 'www.deezer.com') {
+    const track = /^\/(?:[a-z]{2}\/)?track\/(\d+)\/?$/.exec(url.pathname);
+    if (track) return `deezer:${track[1]}`;
   }
   if (
     host === 'music.youtube.com' ||

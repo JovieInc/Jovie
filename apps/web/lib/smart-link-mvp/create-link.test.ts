@@ -172,7 +172,7 @@ describe('createSmartLink', () => {
     let n = 0;
     for (let i = 0; i < FREE_LINKS_PER_MONTH; i++) {
       const created = await createSmartLink({
-        query: `Artist ${i} - Track`,
+        query: `Artist ${i} - Track ${i}`,
         origin: ORIGIN,
         actor: anonymous,
         store: db.store,
@@ -249,6 +249,35 @@ describe('createSmartLink', () => {
     expect(() => assertNeutralToolResult(limited)).not.toThrow();
     expect(JSON.stringify(limited)).not.toMatch(/\$|upgrade|checkout/i);
     expect(n).toBe(FREE_LINKS_PER_MONTH);
+  });
+
+  it('asks before saving a different version of the song', async () => {
+    const db = memory();
+    const result = await createSmartLink({
+      query: 'Radiohead - Creep',
+      origin: ORIGIN,
+      actor: anonymous,
+      store: db.store,
+      resolver: {
+        ...resolver({ n: 0 }),
+        async searchTracks() {
+          return {
+            ok: true,
+            value: [
+              {
+                id: 'acoustic',
+                name: 'Creep (Acoustic)',
+                artist: 'Radiohead',
+                url: TRACK,
+                artworkUrl: null,
+              },
+            ],
+          };
+        },
+      },
+    });
+    expect(result.status).toBe('needs_choice');
+    expect(db.rows).toHaveLength(0);
   });
 
   it('asks for a choice on an artist name and does not insert', async () => {
