@@ -7,7 +7,11 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { gatewayTransport, type JudgeTransport } from './judge';
+import {
+  type GatewayRequestPolicy,
+  gatewayTransport,
+  type JudgeTransport,
+} from './judge';
 
 // Subscription CLIs carry frontier judges; the gateway carries allowlisted ones.
 // Codex now ships inside ChatGPT.app; env overrides win, then the bundled CLI, then PATH.
@@ -51,8 +55,13 @@ function runCli(
 }
 
 /** anthropic/* -> Claude Code CLI, openai/* -> Codex CLI, zai/* -> AI Gateway. */
-export function routedTransport(apiKey?: string): JudgeTransport {
-  const gateway = apiKey ? gatewayTransport(apiKey) : undefined;
+export function routedTransport(
+  apiKey?: string,
+  policy?: GatewayRequestPolicy
+): JudgeTransport {
+  const gateway = apiKey
+    ? gatewayTransport(apiKey, undefined, policy)
+    : undefined;
   const send: JudgeTransport = async request => {
     const [family, name = ''] = request.model.split('/');
     const input = `${request.system}\n\n${request.prompt}`;
