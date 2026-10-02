@@ -132,6 +132,22 @@ function factoryRecord(copyOverrides: PageRecord['copy'] = {}) {
   });
 }
 
+function leftNoneFactoryRecord(withHeroMedia = false) {
+  const base = factoryRecord();
+  const sections = base.composition.sections.map((section, index) =>
+    index === 0 ? { ...section, variantId: 'left-none' } : section
+  );
+  const media = { ...base.media };
+  if (!withHeroMedia) delete media['hero-1'];
+
+  return definePage({
+    ...base,
+    heroVariant: 'left-content',
+    composition: { ...base.composition, sections },
+    media,
+  });
+}
+
 describe('/solutions/[audience] family renderer (JOV-7275)', () => {
   it('is fully static over the routed records', () => {
     expect(revalidate).toBe(false);
@@ -187,6 +203,31 @@ describe('/solutions/[audience] family renderer (JOV-7275)', () => {
       expectedCapture.alt
     );
     expect(featureSplit?.querySelector('figcaption')).toBeNull();
+  });
+
+  it('renders left-none as a left-aligned hero with no media column', () => {
+    const record = leftNoneFactoryRecord();
+
+    expect(() => assertRenderableSolutionsRecord(record)).not.toThrow();
+    const { container } = render(<SolutionsRecordBody record={record} />);
+    const hero = container.querySelector(
+      '[data-testid="marketing-section-hero"]'
+    );
+
+    expect(hero).toHaveAttribute('data-marketing-variant', 'left-none');
+    expect(hero).toHaveClass('marketing-hero--left');
+    expect(hero?.querySelector('.marketing-hero-media')).toBeNull();
+  });
+
+  it('rejects media for left-none before it can render as a split hero', () => {
+    const record = leftNoneFactoryRecord(true);
+
+    expect(() => assertRenderableSolutionsRecord(record)).toThrowError(
+      /variant left-none cannot render media; choose a split hero variant/u
+    );
+    expect(() => render(<SolutionsRecordBody record={record} />)).toThrowError(
+      /variant left-none cannot render media; choose a split hero variant/u
+    );
   });
 
   it('fails the build gate when a factory section is missing a required copy slot', () => {

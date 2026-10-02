@@ -248,6 +248,11 @@ function FactoryHero({
       `Page record ${context.record.id} hero section variant ${variantId} does not match ${context.record.heroVariant} binding ${binding.sectionVariantId}`
     );
   }
+  if (variantId === 'left-none' && context.media) {
+    throw new Error(
+      `Page record ${context.record.id} hero ${context.section.instanceId} variant left-none cannot render media; choose a split hero variant`
+    );
+  }
   const contract = derivePageRecordContract(context.record);
 
   return (
@@ -261,7 +266,7 @@ function FactoryHero({
         href: contract.primaryCta.href,
       }}
       media={
-        context.media ? (
+        variantId === 'split-screenshot-right' && context.media ? (
           <FactorySectionMedia media={context.media} />
         ) : undefined
       }
@@ -403,6 +408,11 @@ function validateFactorySection(context: SolutionsSectionRenderContext) {
     if (!expectedVariant || expectedVariant !== section.variantId) {
       throw new Error(
         `Page record ${record.id} hero section variant ${section.variantId} does not match ${record.heroVariant} code binding ${expectedVariant ?? '(unbound)'}`
+      );
+    }
+    if (section.variantId === 'left-none' && context.media) {
+      throw new Error(
+        `Page record ${record.id} hero ${section.instanceId} variant left-none cannot render media; choose a split hero variant`
       );
     }
     if (section.variantId === 'split-screenshot-right') {
