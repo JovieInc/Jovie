@@ -1,5 +1,7 @@
 'use client';
 
+import { TableIssueSummary } from '@/components/organisms/table/molecules/TableIssueSummary';
+
 // @coverage-via apps/web/tests/unit/app/admin-releases-table-normalization.test.ts
 
 import { Avatar, AvatarFallback, AvatarImage } from '@jovie/ui';
@@ -19,6 +21,7 @@ import {
   PAGE_TOOLBAR_META_TEXT_CLASS,
   TableEmptyState,
 } from '@/components/organisms/table';
+import { TABLE_CELL_MULTILINE_CONTENT_CLASSNAME } from '@/components/organisms/table/atoms/TableCell';
 import { APP_ROUTES } from '@/constants/routes';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
@@ -111,24 +114,7 @@ function IssuesPills({ row }: { readonly row: AdminReleaseRow }) {
     });
   }
 
-  if (issues.length === 0) {
-    return <span className='text-2xs text-tertiary-token'>—</span>;
-  }
-
-  return (
-    <div className='flex flex-wrap gap-1'>
-      {issues.map(issue => (
-        <span
-          key={issue.label}
-          className='inline-flex items-center gap-0.5 rounded-full bg-error/10 px-1.5 py-0.5 text-3xs font-medium text-error'
-          title={issue.label}
-        >
-          {issue.icon}
-          {issue.label}
-        </span>
-      ))}
-    </div>
-  );
+  return <TableIssueSummary issues={issues} />;
 }
 
 function formatDate(date: Date | string | null): string {
@@ -146,6 +132,7 @@ function createColumns(): ColumnDef<AdminReleaseRow, unknown>[] {
   return [
     columnHelper.display({
       id: 'release',
+      meta: { cellContentClassName: TABLE_CELL_MULTILINE_CONTENT_CLASSNAME },
       header: 'Release',
       size: 280,
       cell: ({ row }) => {
@@ -179,12 +166,14 @@ function createColumns(): ColumnDef<AdminReleaseRow, unknown>[] {
     }),
     columnHelper.display({
       id: 'issues',
+      meta: { cellContentClassName: TABLE_CELL_MULTILINE_CONTENT_CLASSNAME },
       header: 'Issues',
       size: 160,
       cell: ({ row }) => <IssuesPills row={row.original} />,
     }),
     columnHelper.display({
       id: 'artist',
+      meta: { cellContentClassName: TABLE_CELL_MULTILINE_CONTENT_CLASSNAME },
       header: 'Artist',
       size: 200,
       cell: ({ row }) => {
@@ -352,6 +341,7 @@ export function AdminReleasesTableUnified({
     >
       {() => (
         <AdminDataTable
+          rowMode='two-line'
           data={allReleases}
           columns={columns}
           getRowId={(row: AdminReleaseRow) => row.id}
@@ -362,8 +352,6 @@ export function AdminReleasesTableUnified({
           getContextMenuItems={(row: AdminReleaseRow) =>
             getContextMenuItems(row)
           }
-          rowHeight={52}
-          getRowClassName={() => 'h-13'}
           hasNextPage={hasNextPage ?? false}
           isFetchingNextPage={isFetchingNextPage}
           onLoadMore={fetchNextPage}

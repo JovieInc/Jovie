@@ -370,6 +370,14 @@ on a feature branch.
 
 **Shared parser:** `apps/web/lib/changelog-parser.ts` is the single source of truth for changelog parsing in the Next.js app (page + RSS feed). `scripts/lib/changelog-parser.mjs` is the Node ESM version used by the email send script.
 
+**Customer outcome metadata:** New customer-code PRs created from 2026-10-03
+UTC must include the explicit public/internal decision in
+[the customer publication contract](../../docs/CHANGELOG_PUBLICATION.md).
+Approved public copy groups by outcome, carries customer-path evidence, and
+publishes only after exact production verification. Internal changes explicitly
+set `releaseWorthy: false`. The source gate enforces this decision without
+requiring release artifacts on implementation branches.
+
 **Post-merge emails:** After a PR merges to main, run `pnpm changelog:send` to email all verified changelog subscribers (requires `RESEND_API_KEY`, `DATABASE_URL`).
 
 **Spam protection:** `changelog:send` enforces a 24-hour cooldown between product update emails. If subscribers were emailed within the last 24h, the send is skipped automatically. Use `--force` to override for critical announcements.

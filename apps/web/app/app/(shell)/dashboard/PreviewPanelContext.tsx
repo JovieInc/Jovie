@@ -8,6 +8,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -80,12 +81,20 @@ interface PreviewPanelProviderProps {
   readonly children: React.ReactNode;
   readonly defaultOpen?: boolean;
   readonly enabled?: boolean;
+  /**
+   * Identity of the rail surface (e.g. 'app-shell' vs 'chat'). When it
+   * changes, the rail returns to its closed default so an open rail never
+   * carries over into a surface where it wasn't explicitly requested
+   * (JOV-7150: empty chat must not open the profile rail unsolicited).
+   */
+  readonly scope?: string;
 }
 
 export function PreviewPanelProvider({
   children,
   defaultOpen = false,
   enabled = true,
+  scope,
 }: Readonly<PreviewPanelProviderProps>) {
   // Check if screen is large (md breakpoint: 768px).
   // Default to false during SSR to avoid hydration mismatch on mobile devices
@@ -113,6 +122,16 @@ export function PreviewPanelProvider({
   const [isOpen, setIsOpen] = useState(false);
   const [previewData, setPreviewData] = useState<PreviewPanelData | null>(null);
 
+  // Surface change (dashboard ↔ chat ↔ artist-profile settings) resets the
+  // rail to closed — it only opens from an explicit user action afterward.
+  const previousScopeRef = useRef(scope);
+  useEffect(() => {
+    if (previousScopeRef.current === scope) return;
+    previousScopeRef.current = scope;
+    setIsOpen(false);
+    setPreviewData(null);
+  }, [scope]);
+
   // Open panel after mount on large screens when defaultOpen is requested.
   // Also close when switching to a small screen.
   useEffect(() => {
@@ -121,9 +140,11 @@ export function PreviewPanelProvider({
     } else if (!isLargeScreen && isOpen) {
       setIsOpen(false);
     }
-    // Intentionally omit isOpen to avoid re-triggering when user manually closes
+    // Intentionally omit isOpen to avoid re-triggering when user manually closes.
+    // `scope` is included so returning to a default-open surface (dashboard)
+    // reopens the rail after the scope reset closes it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLargeScreen, defaultOpen]);
+  }, [isLargeScreen, defaultOpen, scope]);
 
   const open = useCallback(() => {
     if (!enabled) return;
