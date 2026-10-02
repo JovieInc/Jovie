@@ -80,6 +80,11 @@ describe('blog content CI classifier', () => {
       'executable-markdown',
     ],
     [
+      'uppercase executable MDX',
+      [change('apps/web/content/blog/post.MDX')],
+      'executable-markdown',
+    ],
+    [
       'unsafe SVG asset',
       [change('apps/web/public/images/blog/post.svg')],
       'unsafe-blog-asset',

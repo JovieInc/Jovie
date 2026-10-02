@@ -66,7 +66,7 @@ function rejectionFor(change) {
   if (!PLAIN_CHANGE_STATUSES.has(change.status)) return 'unsupported-status';
   if (!change.path) return 'malformed-change';
   if (/\.mdx?$/i.test(change.path) && !BLOG_POST_PATTERN.test(change.path)) {
-    return change.path.endsWith('.mdx')
+    return change.path.toLowerCase().endsWith('.mdx')
       ? 'executable-markdown'
       : 'unapproved-markdown';
   }
