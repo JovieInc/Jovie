@@ -9,7 +9,7 @@ const LIBRARY_ROUTE_ROOTS = [
 ] as const;
 
 /**
- * Library owns both the canonical asset surface and release workspaces,
+ * Work owns both the canonical asset surface and release workspaces,
  * including their legacy aliases and nested release-task routes.
  */
 export function isLibraryNavigationRoute(pathname: string): boolean {
@@ -33,7 +33,7 @@ function normalizePathname(pathname: string): string {
 /**
  * Match a root navigation item without treating query-backed contextual views
  * as their entire parent workspace. Extra query params are allowed so filters
- * inside Links or Audience do not clear the active root destination.
+ * inside contextual links or Audience do not clear the active destination.
  */
 export function isNavigationItemActive(
   item: Pick<NavItem, 'href' | 'id'>,

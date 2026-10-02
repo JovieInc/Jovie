@@ -1248,6 +1248,19 @@ export async function transitionIssue(issueId, stateId, options = {}) {
   );
 }
 
+/** Update a source-fenced issue after its owning policy has produced a receipt. */
+export async function updateIssue(issueId, input, options = {}) {
+  return graphql(
+    `
+    mutation($id: String!, $input: IssueUpdateInput!) {
+      issueUpdate(id: $id, input: $input) { success }
+    }
+  `,
+    { id: issueId, input },
+    options
+  );
+}
+
 /** Attach a follow-up to its canonical parent issue. */
 export async function setIssueParent(issueId, parentId, options = {}) {
   return graphql(

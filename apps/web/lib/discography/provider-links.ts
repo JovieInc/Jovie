@@ -81,6 +81,8 @@ export interface AppleMusicLookupResult {
   url: string;
   trackId: string | null;
   previewUrl: string | null;
+  trackName: string | null;
+  artistName: string | null;
 }
 
 export interface SpotifyLookupResult {
@@ -206,6 +208,9 @@ export async function lookupAppleMusicByIsrc(
       url: canonicalUrl,
       trackId,
       previewUrl,
+      trackName: typeof match.trackName === 'string' ? match.trackName : null,
+      artistName:
+        typeof match.artistName === 'string' ? match.artistName : null,
     };
   } catch (error) {
     Sentry.addBreadcrumb({

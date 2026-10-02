@@ -61,7 +61,6 @@ struct AppShellLeftDrawer: View {
   let isLoadingConversations: Bool
   let activeConversationID: String?
   let drawerWidth: CGFloat
-  let reduceMotion: Bool
   let onSelectTab: (AppShellTab) -> Void
   let onStartNewChat: () -> Void
   let onSelectConversation: (String) -> Void
@@ -71,9 +70,6 @@ struct AppShellLeftDrawer: View {
   var onOpenProfileQR: () -> Void = {}
 
   @State private var threadSearch = ""
-  // Decorative open-stagger only; the drawer is fully interactive regardless
-  // of this flag (rows never block on it — see DrawerRowRevealModifier).
-  @State private var contentRevealed = false
   private var filteredConversations: [MobileConversationSummary] {
     AppShellDrawerThreadsFilter.filtered(
       conversations: recentConversations,
@@ -92,9 +88,8 @@ struct AppShellLeftDrawer: View {
 
       ScrollView {
         VStack(alignment: .leading, spacing: JovieSpacing.xLarge) {
-          // Surface switcher leads the drawer (approved IA 3A): it is the
-          // primary reason to open the drawer, so it sits above the account
-          // header rather than being buried mid-list.
+          // Job-level roots lead; Work owns its review and planning workflows.
+          // Account controls and conversation history follow navigation.
           DrawerSurfaceSwitcher(
             chatEnabled: chatEnabled,
             audienceEnabled: audienceEnabled,
@@ -103,7 +98,6 @@ struct AppShellLeftDrawer: View {
             onSelectTab: onSelectTab,
             onOpenProfileQR: onOpenProfileQR
           )
-          .drawerRowReveal(isRevealed: contentRevealed, delay: 0, reduceMotion: reduceMotion)
 
           DrawerAccountHeader(
             profile: profile,
@@ -117,14 +111,11 @@ struct AppShellLeftDrawer: View {
               }
             }
           )
-            .drawerRowReveal(isRevealed: contentRevealed, delay: 0.04, reduceMotion: reduceMotion)
 
           if chatEnabled {
             DrawerTalkRow(action: onTalk)
-              .drawerRowReveal(isRevealed: contentRevealed, delay: 0.06, reduceMotion: reduceMotion)
 
             DrawerNewChatButton(action: onStartNewChat)
-              .drawerRowReveal(isRevealed: contentRevealed, delay: 0.08, reduceMotion: reduceMotion)
 
             DrawerThreadsSection(
               searchText: $threadSearch,
@@ -134,11 +125,9 @@ struct AppShellLeftDrawer: View {
               activeConversationID: activeConversationID,
               onSelectConversation: onSelectConversation
             )
-            .drawerRowReveal(isRevealed: contentRevealed, delay: 0.08, reduceMotion: reduceMotion)
           }
 
           DrawerSettingsRow(action: onOpenSettings)
-            .drawerRowReveal(isRevealed: contentRevealed, delay: 0.12, reduceMotion: reduceMotion)
         }
         .padding(.horizontal, JovieSpacing.large)
         .padding(.bottom, JovieSpacing.xxLarge)
@@ -154,50 +143,6 @@ struct AppShellLeftDrawer: View {
       guard !isPresented else { return }
       threadSearch = ""
     }
-    // Reveal is purely decorative (opacity/offset only, see the modifier
-    // below) — it never gates hit-testing or accessibility, both of which
-    // stay driven by `isPresented` above.
-    .task(id: isPresented) {
-      guard isPresented else {
-        contentRevealed = false
-        return
-      }
-
-      guard !reduceMotion else {
-        contentRevealed = true
-        return
-      }
-
-      contentRevealed = false
-      try? await Task.sleep(nanoseconds: 20_000_000)
-      contentRevealed = true
-    }
-  }
-}
-
-// Decorative stagger for the drawer's open animation: rows fade + slide in a
-// short distance, `delay` apart. Opacity-only (no offset) and undelayed under
-// Reduce Motion per motion.md §6. Never affects interactivity — hit-testing
-// is controlled solely by `isPresented` on the drawer root.
-private struct DrawerRowRevealModifier: ViewModifier {
-  let isRevealed: Bool
-  let delay: Double
-  let reduceMotion: Bool
-
-  func body(content: Content) -> some View {
-    content
-      .opacity((reduceMotion || isRevealed) ? 1 : 0)
-      .offset(x: (reduceMotion || isRevealed) ? 0 : -8)
-      .animation(
-        reduceMotion ? nil : JovieMotion.easeOut().delay(delay),
-        value: isRevealed
-      )
-  }
-}
-
-private extension View {
-  func drawerRowReveal(isRevealed: Bool, delay: Double, reduceMotion: Bool) -> some View {
-    modifier(DrawerRowRevealModifier(isRevealed: isRevealed, delay: delay, reduceMotion: reduceMotion))
   }
 }
 
@@ -244,8 +189,8 @@ private struct DrawerSurfaceSwitcher: View {
   let onSelectTab: (AppShellTab) -> Void
   let onOpenProfileQR: () -> Void
 
-  private var surfaces: [AppShellTab] {
-    AppShellPanePolicy.sidebarDestinations(
+  private var roots: [AppShellTab] {
+    AppShellPanePolicy.rootDestinations(
       chatEnabled: chatEnabled,
       audienceEnabled: audienceEnabled
     )
@@ -253,33 +198,44 @@ private struct DrawerSurfaceSwitcher: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: JovieSpacing.small) {
-      Text("Surfaces")
+      Text("Your workspace")
         .font(JovieFont.body(size: 13, weight: .semibold))
         .foregroundStyle(JovieColor.textTertiary)
 
       VStack(spacing: JovieSpacing.small) {
-        ForEach(surfaces, id: \.self) { tab in
-          HStack(spacing: JovieSpacing.small) {
-            DrawerSurfaceButton(
-              tab: tab,
-              isSelected: selectedTab == tab,
-              action: { onSelectTab(tab) }
-            )
+        ForEach(roots, id: \.self) { tab in
+          VStack(spacing: 0) {
+            HStack(spacing: JovieSpacing.small) {
+              DrawerSurfaceButton(
+                tab: tab,
+                isSelected: selectedTab == tab,
+                action: { onSelectTab(tab) }
+              )
 
-            if tab == .profile, hasProfileQR {
-              Button(action: onOpenProfileQR) {
-                Image(systemName: "qrcode")
-                  .font(.system(size: 16, weight: .semibold))
-                  .foregroundStyle(JovieColor.textPrimary)
-                  .frame(width: 48, height: 48)
-                  .background(
-                    JovieColor.surface1,
-                    in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous)
-                  )
+              if tab == .profile, hasProfileQR {
+                Button(action: onOpenProfileQR) {
+                  Image(systemName: "qrcode")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(JovieColor.textPrimary)
+                    .frame(width: 48, height: 48)
+                    .background(
+                      JovieColor.surface1,
+                      in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous)
+                    )
+                }
+                .buttonStyle(JoviePressFeedbackButtonStyle())
+                .accessibilityLabel("Profile QR code")
+                .accessibilityIdentifier("shell-drawer-profile-qr")
               }
-              .buttonStyle(JoviePressFeedbackButtonStyle())
-              .accessibilityLabel("Profile QR code")
-              .accessibilityIdentifier("shell-drawer-profile-qr")
+            }
+            ForEach(AppShellPanePolicy.childDestinations(of: tab), id: \.self) { child in
+              DrawerSurfaceButton(
+                tab: child,
+                isSelected: selectedTab == child,
+                isChild: true,
+                action: { onSelectTab(child) }
+              )
+              .padding(.leading, JovieSpacing.large)
             }
           }
         }
@@ -291,6 +247,7 @@ private struct DrawerSurfaceSwitcher: View {
 private struct DrawerSurfaceButton: View {
   let tab: AppShellTab
   let isSelected: Bool
+  var isChild: Bool = false
   let action: () -> Void
 
   var body: some View {
@@ -301,7 +258,7 @@ private struct DrawerSurfaceButton: View {
           .frame(width: 22)
 
         Text(tab.title)
-          .font(JovieFont.body(size: 16, weight: .semibold))
+          .font(JovieFont.body(size: 16, weight: isChild ? .regular : .semibold))
           .lineLimit(1)
           .minimumScaleFactor(AppShellDrawerSurfaceLayout.labelMinimumScaleFactor)
 
@@ -392,7 +349,7 @@ private struct DrawerThreadsSection: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: JovieSpacing.medium) {
-      Text("Threads")
+      Text("Conversations")
         .font(JovieFont.body(size: 13, weight: .semibold))
         .foregroundStyle(JovieColor.textTertiary)
 
@@ -401,7 +358,7 @@ private struct DrawerThreadsSection: View {
           .font(.system(size: 14, weight: .medium))
           .foregroundStyle(JovieColor.textTertiary)
 
-        TextField("Search threads", text: $searchText)
+        TextField("Search conversations", text: $searchText)
           .textInputAutocapitalization(.never)
           .disableAutocorrection(true)
           .font(JovieFont.body(size: 15))
@@ -430,12 +387,12 @@ private struct DrawerThreadsSection: View {
           .foregroundStyle(JovieColor.textTertiary)
           .fixedSize(horizontal: false, vertical: true)
       } else if conversations.isEmpty {
-        Text("No threads match your search.")
+        Text("No conversations match your search.")
           .font(JovieFont.body(size: 15))
           .foregroundStyle(JovieColor.textTertiary)
           .fixedSize(horizontal: false, vertical: true)
       } else {
-        VStack(spacing: JovieSpacing.xSmall) {
+        LazyVStack(spacing: JovieSpacing.xSmall) {
           ForEach(conversations) { conversation in
             DrawerThreadRow(
               conversation: conversation,

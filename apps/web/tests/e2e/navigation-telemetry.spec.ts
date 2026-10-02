@@ -116,9 +116,9 @@ test('desktop navigation emits exactly one redacted activation-to-ready pair', a
   });
   await page
     .getByRole('navigation', { name: 'Dashboard Navigation' })
-    .getByRole('link', { name: 'Presence' })
+    .getByRole('link', { name: 'Identity' })
     .click();
-  await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.PROFILES}$`));
+  await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.PRESENCE}$`));
   await expect(page.getByTestId('profiles-workspace')).toBeVisible({
     timeout: 30_000,
   });
@@ -158,7 +158,7 @@ test('desktop navigation emits exactly one redacted activation-to-ready pair', a
     destination_route: 'other_app',
     input_method: 'pointer',
     platform: 'web_desktop',
-    nav_variant: 'canonical_customer_ia_v1',
+    nav_variant: 'canonical_identity_work_v1',
     consent_mode: 'explicit',
   });
   expect(clickToReady[0]?.presenceSurfaceVisible).toBe(false);

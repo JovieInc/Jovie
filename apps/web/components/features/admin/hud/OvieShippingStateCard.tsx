@@ -11,6 +11,7 @@ import type {
   CountMeasurement,
 } from '@/lib/ovie/shipping-state';
 import type {
+  ShippingFlag,
   ShippingMeaningView,
   ShippingStateView,
 } from '@/lib/ovie/shipping-state-client';
@@ -29,6 +30,17 @@ const TRUTH_LABEL: Record<ShippingStateView['truth'], string> = {
 };
 
 const NOT_MEASURED = 'n/a';
+
+const FLAG_LABEL: Record<ShippingFlag, string> = {
+  replay: 'Replay ignored',
+  duplicate: 'Duplicate ignored',
+  contradictory: 'Contradictory sequence ignored',
+  sequenceGap: 'Sequence gap',
+  partial: 'Partial source',
+  unsupportedSchema: 'Unsupported schema',
+  cacheExpired: 'Cache expired',
+  clockUncertain: 'Clock uncertain',
+};
 
 type Delivery = ShippingStateView['delivery'];
 
@@ -216,6 +228,8 @@ function ShippingStateBody({
   ]
     .filter(Boolean)
     .join(' / ');
+  const flagLine = [...view.flags].map(flag => FLAG_LABEL[flag]).join(' · ');
+  const stateDetail = [view.lastError, flagLine].filter(Boolean).join(' · ');
   const { delivery } = view;
   const byRepo = delivery.merges.byRepo;
   const rows = [
@@ -300,8 +314,14 @@ function ShippingStateBody({
       >
         {sourceLine || 'No successful source yet'}
       </p>
-      <p className='min-h-5 text-app leading-5 text-secondary-token'>
-        {view.lastError ?? ''}
+      <p
+        className='min-h-5 truncate text-app leading-5 text-secondary-token'
+        data-testid='hud-shipping-state-detail'
+        title={stateDetail || undefined}
+      >
+        {view.lastError ? <span>{view.lastError}</span> : null}
+        {view.lastError && flagLine ? ' · ' : null}
+        {flagLine ? <span>{flagLine}</span> : null}
       </p>
     </>
   );
@@ -326,6 +346,7 @@ export function OvieShippingStateCard({
       data-correlation={view.correlationEventId ?? view.projectionId ?? ''}
       data-source-time={view.sourceTime ?? ''}
       data-sequence={view.sequence ?? ''}
+      data-flags={[...view.flags].join(',')}
       role='status'
       aria-live='polite'
       aria-label='Ubuntu Shipping State'

@@ -1530,7 +1530,7 @@ jobs:
           node scripts/desktop-release-assets.mjs upload-and-publish \
             --environment staging \
             --sha "$RELEASE_SHA" \
-            --version "${{ steps.staging-version.outputs.version }}" \
+            --version="${{ steps.staging-version.outputs.version }}" \
             --dist "apps/desktop/dist"
 
       - name: Package production desktop app

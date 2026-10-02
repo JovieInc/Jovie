@@ -19,8 +19,8 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
 
 const CANONICAL_NAV = [
   ['Home', APP_ROUTES.DASHBOARD],
-  ['Presence', APP_ROUTES.PRESENCE],
-  ['Links', APP_ROUTES.CHAT_PROFILE_PANEL],
+  ['Identity', APP_ROUTES.PRESENCE],
+  ['Work', APP_ROUTES.LIBRARY],
   ['Audience', APP_ROUTES.CONTACTS_AUDIENCE],
 ] as const;
 
@@ -29,6 +29,7 @@ const FORBIDDEN_PRIMARY_LABELS = [
   'Contacts',
   'Events',
   'Library',
+  'Links',
   'Products',
   'Releases',
   'Tasks',
@@ -86,7 +87,7 @@ describe('DashboardNav', () => {
       expect(queryByRole('button', { name: label })).toBeNull();
     }
 
-    expect(getByRole('link', { name: 'Presence' })).toHaveAttribute(
+    expect(getByRole('link', { name: 'Identity' })).toHaveAttribute(
       'href',
       APP_ROUTES.PRESENCE
     );
@@ -237,7 +238,7 @@ describe('DashboardNav', () => {
     });
 
     expect(container.querySelector('[aria-expanded]')).toBeNull();
-    expect(getByRole('link', { name: 'Presence' })).toHaveAttribute(
+    expect(getByRole('link', { name: 'Identity' })).toHaveAttribute(
       'href',
       APP_ROUTES.PRESENCE
     );
@@ -251,18 +252,17 @@ describe('DashboardNav', () => {
     );
   });
 
-  it('applies active state only inside query-backed job contexts', () => {
-    mockUsePathname.mockReturnValue(APP_ROUTES.CHAT);
-    mockUseSearchParams.mockReturnValue(new URLSearchParams('panel=profile'));
-    const links = renderDashboardNav({ renderFn: fastRender });
-    expect(links.getByRole('link', { name: 'Links' })).toHaveAttribute(
+  it('applies active state inside canonical top-level contexts', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.LIBRARY);
+    const work = renderDashboardNav({ renderFn: fastRender });
+    expect(work.getByRole('link', { name: 'Work' })).toHaveAttribute(
       'aria-current',
       'page'
     );
-    expect(links.getByRole('link', { name: 'New Chat' })).not.toHaveAttribute(
+    expect(work.getByRole('link', { name: 'New Chat' })).not.toHaveAttribute(
       'aria-current'
     );
-    links.unmount();
+    work.unmount();
 
     mockUsePathname.mockReturnValue(APP_ROUTES.CONTACTS);
     mockUseSearchParams.mockReturnValue(new URLSearchParams('tab=audience'));

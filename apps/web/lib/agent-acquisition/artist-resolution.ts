@@ -135,20 +135,25 @@ function errorResult(
  * Existing provider clients own bounded HTTP, retries, credentials and circuits.
  */
 export async function resolveAgentArtist(
-  input: unknown
+  input: unknown,
+  signal?: AbortSignal
 ): Promise<ArtistResolution> {
   const parsed = parseAgentArtistInput(input);
   if (parsed.kind === 'invalid') return errorResult(parsed.code);
   try {
+    signal?.throwIfAborted();
     if (parsed.kind === 'exact') {
       if (parsed.provider === 'spotify' && isBlacklistedSpotifyId(parsed.id)) {
         return errorResult('ARTIST_NOT_FOUND');
       }
       const raw =
         parsed.provider === 'spotify'
-          ? await spotifyClient.getArtist(parsed.id)
+          ? signal
+            ? await spotifyClient.getArtist(parsed.id, { signal })
+            : await spotifyClient.getArtist(parsed.id)
           : await getAppleArtist(parsed.id, {
               storefront: parsed.storefront ?? 'us',
+              ...(signal ? { signal } : {}),
             });
       if (!raw) return errorResult('ARTIST_NOT_FOUND');
       const artist =
@@ -168,12 +173,13 @@ export async function resolveAgentArtist(
 
     const found =
       parsed.provider === 'spotify'
-        ? (await spotifyClient.searchArtists(parsed.query, 5)).map(
-            spotifySnapshot
-          )
-        : (await searchAppleArtists(parsed.query, {}, 5)).map(artist =>
-            appleSnapshot(artist)
-          );
+        ? (signal
+            ? await spotifyClient.searchArtists(parsed.query, 5, 0, { signal })
+            : await spotifyClient.searchArtists(parsed.query, 5)
+          ).map(spotifySnapshot)
+        : (
+            await searchAppleArtists(parsed.query, signal ? { signal } : {}, 5)
+          ).map(artist => appleSnapshot(artist));
     const seen = new Set<string>();
     // Preserve provider relevance order; duplicate results never become two artists.
     const candidates = found

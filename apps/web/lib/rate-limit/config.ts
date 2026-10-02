@@ -512,6 +512,30 @@ export const RATE_LIMITERS = {
     requireRedis: true,
   } satisfies RateLimitConfig,
 
+  /** Public rider reads/exports: 30/min per IP. */
+  riderPublicAccess: {
+    name: 'Rider Public Access',
+    limit: 30,
+    window: '1 m',
+    prefix: 'public:rider-access',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
+  /** Rider password unlocks: 10/10min per IP+profile; fail-closed. */
+  riderUnlock: {
+    name: 'Rider Unlock',
+    limit: 10,
+    window: '10 m',
+    prefix: 'public:rider-unlock',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
   /**
    * Public profile capture dismissal reads/writes: 20 requests per minute per
    * IP. Keep this isolated from the general API bucket so unrelated same-origin

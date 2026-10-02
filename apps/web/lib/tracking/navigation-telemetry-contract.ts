@@ -76,8 +76,11 @@ export const NAVIGATION_PLATFORMS = [
 ] as const;
 export type NavigationPlatform = (typeof NAVIGATION_PLATFORMS)[number];
 
-/** Canonical customer IA only. Retired shell experiments are not analytics dimensions. */
-export const NAVIGATION_VARIANTS = ['canonical_customer_ia_v1'] as const;
+/** Canonical customer IA only. Variants preserve before/after ontology evidence. */
+export const NAVIGATION_VARIANTS = [
+  'canonical_customer_ia_v1',
+  'canonical_identity_work_v1',
+] as const;
 export type NavigationVariant = (typeof NAVIGATION_VARIANTS)[number];
 
 export const NAVIGATION_CONSENT_MODES = ['explicit', 'implicit'] as const;

@@ -22,22 +22,22 @@ enum AppShellTab: Equatable, Hashable, CaseIterable {
 
   var title: String {
     switch self {
-    case .chat: return "Chat"
-    case .library: return "Library"
+    case .chat: return "Home"
+    case .library: return "Work"
     case .calendar: return "Calendar"
     case .inbox: return "Inbox"
-    case .profile: return "My Jovie Card"
+    case .profile: return "Identity"
     case .audience: return "Audience"
     }
   }
 
   var systemImage: String {
     switch self {
-    case .chat: return "sparkles"
+    case .chat: return "house"
     case .library: return "square.stack"
     case .calendar: return "calendar"
     case .inbox: return "tray"
-    case .profile: return "qrcode.viewfinder"
+    case .profile: return "person.crop.square"
     case .audience: return "person.3"
     }
   }
@@ -298,7 +298,6 @@ struct AppShellView<
             isLoadingConversations: isLoadingConversations,
             activeConversationID: activeConversationID,
             drawerWidth: drawerWidth,
-            reduceMotion: isReduceMotionEnabled,
             onSelectTab: { tab in
               closeDrawerThenSelect(tab)
             },
@@ -865,9 +864,7 @@ struct AppShellView<
       selectedLibraryAsset = nil
     }
     closeDrawer()
-    DispatchQueue.main.asyncAfter(deadline: .now() + JovieMotion.cinematicDuration) {
-      selectTab(tab)
-    }
+    selectTab(tab)
   }
 
   private func dismissKeyboardIfNeeded() {
@@ -1135,11 +1132,11 @@ struct AppShellView<
           .foregroundStyle(JovieColor.textPrimary)
           .lineLimit(1)
 
-        if isOffline {
-          Text("Offline")
-            .font(JovieFont.body(size: 11, weight: .medium))
-            .foregroundStyle(JovieColor.textTertiary)
-        }
+        Text("Offline")
+          .font(JovieFont.body(size: 11, weight: .medium))
+          .foregroundStyle(JovieColor.textTertiary)
+          .opacity(isOffline ? 1 : 0)
+          .accessibilityHidden(!isOffline)
       }
 
       Spacer(minLength: 0)

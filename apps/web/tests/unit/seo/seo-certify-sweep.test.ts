@@ -1,7 +1,7 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   getPageRecordContracts,
   type PageRecordPageContract,
@@ -19,7 +19,12 @@ import {
   siblingPathMatcher,
   sweepTargets,
 } from '@/lib/seo/seo-certify-sweep';
-import { loadSeoCertifyBaseline } from '../../../scripts/seo-certify';
+import {
+  fetchPage,
+  loadSeoCertifyBaseline,
+  readBuildPage,
+  readSiteFile,
+} from '../../../scripts/seo-certify';
 
 const WORDS = Array.from({ length: 60 }, (_, i) => `word${i}`).join(' ');
 const NOW = new Date('2026-09-29T12:00:00.000Z');
@@ -274,6 +279,93 @@ describe('certifySweep', () => {
     expect(validateStageReceipt(result?.stageReceipt)).toEqual([]);
   });
 
+  it('audits llms.txt and robots.txt as site pseudo-routes (JOV-7259)', () => {
+    const results = certifySweep({
+      pages: [
+        {
+          target: target('/smart-links'),
+          html: html('/smart-links', GOOD_BODY, PRODUCT_LD),
+          status: 200,
+          source: 'x',
+        },
+      ],
+      sourceSha: SHA,
+      runRef: 'test-run',
+      now: NOW,
+      llmsTxt:
+        '# Jovie\n\n> one product for presence\n\n## Pages\n\n- [Smart links](https://jov.ie/smart-links)\n',
+      robotsTxt:
+        'User-agent: *\nAllow: /\n\nUser-agent: OAI-SearchBot\nAllow: /\n\nUser-agent: GPTBot\nAllow: /\n\nSitemap: https://jov.ie/sitemap.xml\n',
+      isSiblingPath: () => false,
+    });
+    const llms = results.find(result => result.target.pathname === '/llms.txt');
+    expect(llms?.certification.passed).toBe(true);
+    expect(llms?.certification.checks.map(check => check.id)).toEqual([
+      'llms-txt-h1',
+      'llms-txt-summary',
+      'llms-txt-links',
+    ]);
+    expect(llms?.packet.subject.kind).toBe('site-file');
+
+    const robots = results.find(
+      result => result.target.pathname === '/robots.txt'
+    );
+    const searchCheck = robots?.certification.checks.find(
+      check => check.id === 'robots-search-crawlers'
+    );
+    // Only one of five search crawlers has a rule → site evidence fails.
+    expect(searchCheck?.status).toBe('failed');
+    expect(robots?.certification.passed).toBe(false);
+    expect(
+      robots?.certification.checks.find(
+        check => check.id === 'robots-training-tokens'
+      )?.status
+    ).toBe('warn');
+  });
+
+  it('flags cohort-templated titles, failing record pages (JOV-7259)', () => {
+    const contract = getPageRecordContracts().find(
+      c => c.recordId === 'solutions.artists'
+    ) as PageRecordPageContract;
+    const results = certifySweep({
+      pages: [
+        {
+          target: { ...target('/solutions/artists'), recordContract: contract },
+          html: html('/solutions/artists', GOOD_BODY, PRODUCT_LD),
+          status: 200,
+          source: 'x',
+        },
+        {
+          target: target('/voice'),
+          html: html('/voice', GOOD_BODY, PRODUCT_LD),
+          status: 200,
+          source: 'x',
+        },
+      ],
+      sourceSha: SHA,
+      runRef: 'test-run',
+      now: NOW,
+      llmsTxt: null,
+    });
+    // Both pages render the same title/description from the html() fixture.
+    const recordPage = results.find(
+      result => result.target.pathname === '/solutions/artists'
+    );
+    const handPage = results.find(
+      result => result.target.pathname === '/voice'
+    );
+    expect(
+      recordPage?.certification.checks.find(
+        check => check.id === 'templated-metadata'
+      )?.status
+    ).toBe('failed');
+    expect(
+      handPage?.certification.checks.find(
+        check => check.id === 'templated-metadata'
+      )?.status
+    ).toBe('warn');
+  });
+
   it('skips GEO for pages outside the sitemap', () => {
     const [result] = sweep([
       {
@@ -370,5 +462,87 @@ describe('shrink-only baseline', () => {
     const path = join(mkdtempSync(join(tmpdir(), 'seo-baseline-')), 'b.json');
     writeFileSync(path, JSON.stringify({ schema: 'other/v1', failures: {} }));
     expect(() => loadSeoCertifyBaseline(path)).toThrow(/expected schema/);
+  });
+});
+
+describe('missing site evidence', () => {
+  it('fails requested site files whose fetch or build artifact is missing', () => {
+    const results = certifySweep({
+      pages: [],
+      sourceSha: SHA,
+      runRef: 'test-run',
+      now: NOW,
+      llmsTxt: null,
+      robotsTxt: null,
+    });
+    for (const pathname of ['/llms.txt', '/robots.txt']) {
+      const result = results.find(item => item.target.pathname === pathname);
+      expect(result?.certification.passed).toBe(false);
+      expect(
+        result?.certification.checks.some(check => check.status === 'failed')
+      ).toBe(true);
+    }
+  });
+});
+
+describe('SEO evidence readers', () => {
+  it('reads available artifacts and marks missing site/page evidence explicitly', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'seo-readers-'));
+    writeFileSync(join(dir, 'llms.txt.body'), '# Jovie');
+    writeFileSync(join(dir, 'index.html'), '<h1>Jovie</h1>');
+    writeFileSync(join(dir, 'index.meta'), JSON.stringify({ status: 404 }));
+    expect(await readSiteFile('/llms.txt', dir)).toBe('# Jovie');
+    expect(await readSiteFile('/robots.txt', dir)).toBeNull();
+    expect(readBuildPage(dir, target('/'))).toMatchObject({
+      html: '<h1>Jovie</h1>',
+      status: 404,
+    });
+    expect(readBuildPage(dir, target('/absent'))).toMatchObject({
+      html: null,
+      status: 0,
+    });
+  });
+
+  it('bounds HTTP reads and preserves absent, redirect, network and body failures', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    try {
+      fetchMock.mockResolvedValueOnce(new Response('# Jovie'));
+      expect(await readSiteFile('/llms.txt', '', 'https://jov.ie')).toBe(
+        '# Jovie'
+      );
+      expect(fetchMock).toHaveBeenLastCalledWith(
+        new URL('https://jov.ie/llms.txt'),
+        expect.objectContaining({
+          redirect: 'manual',
+          signal: expect.any(AbortSignal),
+        })
+      );
+      for (const status of [404, 302]) {
+        fetchMock.mockResolvedValueOnce(new Response('', { status }));
+        expect(
+          await readSiteFile('/robots.txt', '', 'https://jov.ie')
+        ).toBeNull();
+      }
+      fetchMock.mockRejectedValueOnce(new Error('network'));
+      expect(await readSiteFile('/llms.txt', '', 'https://jov.ie')).toBeNull();
+      const broken = new Response('');
+      vi.spyOn(broken, 'text').mockRejectedValue(new Error('body interrupted'));
+      fetchMock.mockResolvedValueOnce(broken);
+      expect(await readSiteFile('/llms.txt', '', 'https://jov.ie')).toBeNull();
+      fetchMock.mockResolvedValueOnce(new Response('<h1>Found</h1>'));
+      expect(
+        await fetchPage('https://jov.ie', target('/product'))
+      ).toMatchObject({
+        html: '<h1>Found</h1>',
+        status: 200,
+        source: 'https://jov.ie/product',
+      });
+      fetchMock.mockRejectedValueOnce(new Error('timeout'));
+      expect(
+        await fetchPage('https://jov.ie', target('/product'))
+      ).toMatchObject({ html: null, status: 0 });
+    } finally {
+      fetchMock.mockRestore();
+    }
   });
 });

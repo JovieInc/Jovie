@@ -18,6 +18,7 @@ import {
   runMergeGroupStorybookCertification,
   SHALLOW_DEEPEN_DEPTHS,
 } from '../../component-merge-group-storybook-cert.mjs';
+import { workflowDeclaresReadyForReviewType } from '../../invariants/pr-lifecycle-contract.mjs';
 import {
   EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES,
   EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
@@ -212,27 +213,6 @@ function parseExactCiFastFailureOperands(script) {
   return operands;
 }
 
-function workflowDeclaresReadyForReviewType(source) {
-  const lines = source.split('\n');
-  for (let index = 0; index < lines.length; index += 1) {
-    const match = lines[index].match(/^(\s*)types:\s*(.*?)\s*$/);
-    if (!match) continue;
-
-    const indentation = match[1].length;
-    const declaration = [match[2].replace(/\s+#.*$/, '')];
-    for (let next = index + 1; next < lines.length; next += 1) {
-      const line = lines[next];
-      if (line.trim() === '' || /^\s*#/.test(line)) continue;
-      const nextIndentation = line.match(/^\s*/)?.[0].length ?? 0;
-      if (nextIndentation <= indentation) break;
-      declaration.push(line.replace(/\s+#.*$/, '').trim());
-    }
-
-    if (/\bready_for_review\b/.test(declaration.join(' '))) return true;
-  }
-  return false;
-}
-
 const BLOBLESS_BASE_FETCH_JOBS = new Set([
   'ci-exact-head-coverage-shard',
   'ci-exact-head-coverage',
@@ -349,18 +329,29 @@ describe('merge_group workflow contract', () => {
     );
   });
 
-  it('ignores the ready transition in every workflow', () => {
+  it('reserves ready_for_review for auto-merge enable only', () => {
     const workflowDir = resolve(REPO_ROOT, '.github/workflows');
     const offenders = readdirSync(workflowDir)
       .filter(file => file.endsWith('.yml') || file.endsWith('.yaml'))
+      .filter(file => file !== 'auto-merge-default.yml')
       .filter(file => {
         const source = readFileSync(resolve(workflowDir, file), 'utf8');
         return workflowDeclaresReadyForReviewType(source);
       });
 
     // A ready transition must never earn an unchanged head a second CI
-    // flight. GitHub native merge queue owns admission without a subscriber.
+    // flight. auto-merge-default.yml is the sole subscriber: it enables
+    // native auto-merge and still skips drafts.
     expect(offenders).toEqual([]);
+    expect(
+      workflowDeclaresReadyForReviewType(AUTO_MERGE_DEFAULT_WORKFLOW)
+    ).toBe(true);
+    expect(AUTO_MERGE_DEFAULT_WORKFLOW).toContain(
+      'types: [opened, reopened, ready_for_review]'
+    );
+    expect(getJobBlock(AUTO_MERGE_DEFAULT_WORKFLOW, 'enable')).toContain(
+      'github.event.pull_request.draft == false'
+    );
   });
 
   it('rejects every valid YAML spelling of a ready_for_review type', () => {
@@ -1998,6 +1989,39 @@ ${selectedGateScript}`,
     );
     expect(iosCaller).toContain(
       "concurrency-key: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || '' }}"
+    );
+  });
+
+  it('avoids redundant SwiftPM uploads on persistent Mac runners (JOV-7346)', () => {
+    const iosGate = getJobBlock(IOS_CI_WORKFLOW, 'test');
+    const cache = getStepBlock(iosGate, 'Restore Swift package cache');
+    const resolvePackages = getStepBlock(
+      iosGate,
+      'Resolve Swift package dependencies'
+    );
+    const fastGate = getStepBlock(iosGate, 'Run fast unit and coverage gate');
+    const fullGate = getStepBlock(iosGate, 'Run full simulator regression');
+
+    // actions/cache saves in its post step too. Gating the action itself keeps
+    // both remote restore and upload off persistent runners, while hosted VMs
+    // still receive the lockfile- and toolchain-scoped package cache.
+    expect(cache).toContain("if: ${{ runner.environment == 'github-hosted' }}");
+    expect(cache).toContain('uses: actions/cache@');
+    expect(cache).toContain('.build/ios-ci/SourcePackages');
+    expect(cache).toContain('~/Library/Caches/org.swift.swiftpm');
+    expect(cache).toContain('steps.xcode-version.outputs.cache_key');
+    expect(cache).toContain('Package.resolved');
+    expect(cache).toContain('restore-keys:');
+
+    // Only remote caching is conditional on runner ownership. Both runner
+    // classes must resolve dependencies and execute their selected test gate.
+    expect(resolvePackages).not.toMatch(/^\s+if:/m);
+    expect(fastGate).toContain('if: ${{ !inputs.full-regression }}');
+    expect(fastGate).toContain('bash apps/ios/scripts/run-unit-tests.sh');
+    expect(fastGate).toContain('bash apps/ios/scripts/check_coverage.sh');
+    expect(fullGate).toContain('if: ${{ inputs.full-regression }}');
+    expect(iosGate).toContain(
+      'timeout-minutes: ${{ inputs.full-regression && 55 || 18 }}'
     );
   });
 

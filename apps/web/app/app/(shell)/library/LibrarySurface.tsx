@@ -763,7 +763,7 @@ function LibraryStageTabs({
   return (
     <div
       role='tablist'
-      aria-label='Library Stages'
+      aria-label='Work Stages'
       data-testid='library-stage-tabs'
       className='flex shrink-0 flex-nowrap items-center gap-1'
     >
@@ -887,7 +887,7 @@ function LibraryFilterPanel({
         className
       )}
     >
-      <legend className='sr-only'>Library Filters</legend>
+      <legend className='sr-only'>Work Filters</legend>
       <div className='min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <div className='pb-2'>
           <div className='flex items-center justify-between gap-2 pb-1 pt-2'>
@@ -1197,7 +1197,7 @@ function LibraryFiltersControl({
             <PopoverTrigger asChild>{trigger}</PopoverTrigger>
           </TooltipTrigger>
           <PopoverContent
-            aria-label='Library Filters'
+            aria-label='Work Filters'
             align='end'
             sideOffset={6}
             className='flex max-h-[min(36rem,var(--radix-popover-content-available-height))] w-80 overflow-hidden p-0'
@@ -1223,7 +1223,7 @@ function LibraryFiltersControl({
           testId='library-filter-sheet'
         >
           <SheetHeader className='shrink-0 border-b border-subtle px-4 py-3 text-left'>
-            <SheetTitle>Library Filters</SheetTitle>
+            <SheetTitle>Work Filters</SheetTitle>
             <SheetDescription className='sr-only'>
               Filter by saved view, approval, release status, type, asset, or
               provider.
@@ -1267,7 +1267,7 @@ function SortDropdown({
           align='end'
           side='bottom'
           sideOffset={6}
-          aria-label='Sort Library'
+          aria-label='Sort Work'
           className={TOOLBAR_MENU_CONTENT_CLASS}
         >
           {(Object.keys(SORT_LABELS) as LibrarySortKey[]).map(key => (
@@ -1303,7 +1303,7 @@ function ViewToggle({
 }) {
   return (
     <ViewModeSlider
-      aria-label='Library View'
+      aria-label='Work View'
       data-testid='library-view-mode-slider'
       value={view}
       onChange={onView}
@@ -1875,7 +1875,7 @@ function EmptyCatalog({
 }) {
   return (
     <WorkspacePage
-      aria-label='Library'
+      aria-label='Work'
       frame='content-container'
       contentPadding='none'
       surfaceMode='table'
@@ -1897,7 +1897,7 @@ function EmptyCatalog({
       <NavigationDestinationReady destination='library' />
       <EmptyState
         icon={<Music2 className='h-5 w-5' strokeWidth={2.25} />}
-        heading='No Library Items'
+        heading='No work yet'
         description='Releases, merch, images, videos, and audio will appear here as they land.'
         presentation='workspace'
         testId='library-workspace-empty-state'
@@ -1918,8 +1918,8 @@ function EmptyCatalog({
 function NoResults({ onReset }: { readonly onReset: () => void }) {
   return (
     <TableEmptyState
-      heading='No Assets Match'
-      description='No library items match the selected view or filters.'
+      heading='No work matches'
+      description='No releases, products, or files match the selected view or filters.'
       className='min-h-75'
       action={{
         label: 'Reset View',
@@ -2229,14 +2229,14 @@ function AssetDrawer({
     <InspectorShell
       isOpen={open}
       width={360}
-      ariaLabel='Library asset details'
+      ariaLabel='Work details'
       onKeyDown={handleDrawerKeyDown}
       contextMenuItems={convertToCommonDropdownItems(
         current ? getContextMenuItems(current) : []
       )}
       testId='library-asset-drawer'
       isEmpty={!current}
-      emptyMessage='Select a library item to view details.'
+      emptyMessage='Select a release, product, or file to view details.'
       tabs={LIBRARY_INSPECTOR_TABS}
       activeTab={activeTab}
       onTabChange={setActiveTab}
@@ -3102,10 +3102,10 @@ export function LibrarySurface({
             visibleCount: visibleAssets.length,
             triggerLabel:
               pills.length > 0
-                ? `Filter Library (${pills.length})`
-                : 'Filter Library',
-            ariaLabel: 'Filter library assets',
-            placeholder: 'Search library',
+                ? `Filter Work (${pills.length})`
+                : 'Filter Work',
+            ariaLabel: 'Filter work',
+            placeholder: 'Search work',
             allowedFields: [
               'artist',
               'title',
@@ -3330,7 +3330,7 @@ export function LibrarySurface({
 
   return (
     <WorkspacePage
-      aria-label='Library'
+      aria-label='Work'
       frame='content-container'
       contentPadding='none'
       surfaceMode='table'

@@ -12,6 +12,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -59,7 +60,8 @@ def fake_lane(shell, claimed=False):
         sh=shell, REPO_SLUG=runner.REPO_SLUG, PR_FIELDS=runner.PR_FIELDS, RED=runner.RED,
         MAX_FIX_ATTEMPTS=runner.MAX_FIX_ATTEMPTS, held_path=runner.held_path, update_json=runner.update_json,
         now_iso=runner.now_iso, best_per_issue=runner.best_per_issue, load_providers=lambda: PROVIDERS,
-        claimed_elsewhere=lambda number, sha, kind: claimed, post_claim=lambda number, sha, kind: posted.append(number))
+        claimed_elsewhere=lambda number, sha, kind: claimed, post_claim=lambda number, sha, kind: posted.append(number),
+        publication_revocation=runner.publication_revocation)
     module.posted = posted
     return module
 
@@ -105,6 +107,38 @@ class ReasonTest(unittest.TestCase):
 
 
 class RelayTest(unittest.TestCase):
+    def test_empty_ci_association_resolves_one_exact_same_repo_head_then_deduplicates(self):
+        sha = "a" * 40
+        workflow = {"event": "pull_request", "conclusion": "failure", "head_sha": sha,
+                    "head_branch": "codex/fix", "head_repository": {"full_name": events.REPO},
+                    "pull_requests": []}
+        candidate = {"number": 5, "state": "open",
+                     "head": {"sha": sha, "ref": "codex/fix", "repo": {"full_name": events.REPO}},
+                     "base": {"repo": {"full_name": events.REPO}}}
+        view = pr(branch="codex/fix", sha=sha)
+        shell = Shell({("gh", "api", f"repos/{events.REPO}/pulls"): [candidate],
+                       ("gh", "pr", "view"): lambda args: view})
+        payload = {"workflow_run": workflow}
+        self.assertEqual(events.relay("workflow_run", payload, shell, set()), [(5, "red")])
+        view["labels"] = [{"name": "lane-fix-red"}]
+        self.assertEqual(events.relay("workflow_run", payload, shell, set()), [])
+        self.assertEqual(len(shell.made("gh", "api", "-X", "POST")), 1)
+        for candidates in ([], [None], {}, [candidate, candidate], [{**candidate, "state": "closed"}],
+                           [{**candidate, "head": {**candidate["head"], "sha": "b" * 40}}],
+                           [{**candidate, "base": {"repo": {"full_name": "other/repo"}}}]):
+            rejected = Shell({("gh", "api", f"repos/{events.REPO}/pulls"): candidates})
+            self.assertEqual(events.relay("workflow_run", payload, rejected, set()), [])
+            self.assertEqual(rejected.made("gh", "pr", "view"), [])
+        for changed in ({"head_repository": {"full_name": "fork/repo"}}, {"head_sha": "bad"},
+                        {"head_branch": ""}, {"event": "push"}, {"conclusion": "cancelled"}):
+            rejected = Shell()
+            self.assertEqual(events.relay("workflow_run", {"workflow_run": {**workflow, **changed}},
+                                          rejected, set()), [])
+            self.assertEqual(rejected.calls, [])
+        failed = Shell({("gh", "api", f"repos/{events.REPO}/pulls"): (1, "")})
+        with self.assertRaisesRegex(RuntimeError, "cannot resolve"):
+            events.relay("workflow_run", payload, failed, set())
+
     def test_ci_failure_and_success_on_a_pr_become_red_and_green(self):
         run = {"event": "pull_request", "conclusion": "failure", "head_sha": "h1", "pull_requests": [{"number": 5}]}
         self.assertEqual(events.relay_targets("workflow_run", {"workflow_run": run}), [(5, "red", "h1")])
@@ -367,6 +401,15 @@ class TickTest(unittest.TestCase):
         self.assertEqual([call[:3] for call in shell.calls], [["gh", "pr", "ready"], ["gh", "pr", "merge"]])
         ledger = [json.loads(line) for line in (self.host.state / "runs/ledger.jsonl").read_text().splitlines()]
         self.assertEqual((ledger[0]["kind"], ledger[0]["verdict"]), ("ready-green", "landing"))
+
+    def test_a_revoked_branch_is_never_readied_enrolled_or_resynced(self):
+        runner.revoke_publication(self.host, branch="devin/jov-1-20260926t0900", reason="run-stopped")
+        shell = Shell()
+        self.assertEqual(events.ready_green(self.host, fake_lane(shell), pr(draft=True, merge="CLEAN"),
+                                            {}, NOW), "revoked:run-stopped")
+        self.assertEqual(events.sync_main(self.host, fake_lane(shell), pr(merge="CLEAN"), NOW),
+                         "revoked:run-stopped")
+        self.assertFalse(shell.calls, "a revoked branch takes no publication mutation")
 
     def test_a_failed_enqueue_is_handed_to_the_requeue_retry(self):
         shell = Shell({("gh", "pr", "merge"): (1, "")})
@@ -786,6 +829,11 @@ class GapTest(unittest.TestCase):
 
 class RunnerHookTest(unittest.TestCase):
     """The hook-in points in lane_runner.py: structured held records, exhausted orphans, the tick."""
+
+    def setUp(self):
+        disk = patch.object(runner.disk_guard, "free_pct", return_value=50.0)
+        disk.start()
+        self.addCleanup(disk.stop)
 
     def test_record_held_and_failures_are_structured(self):
         with tempfile.TemporaryDirectory() as tmp:

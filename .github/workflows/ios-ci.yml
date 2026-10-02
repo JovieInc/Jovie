@@ -137,7 +137,10 @@ jobs:
       # resolution/checkouts, never the mutable build products in DerivedData.
       # The Xcode version and Package.resolved are both part of the key so a
       # toolchain or dependency change cannot restore an incompatible cache.
+      # Persistent Mac runners already retain these packages locally; uploading
+      # their multi-GB cache can exhaust the job budget after tests pass.
       - name: Restore Swift package cache
+        if: ${{ runner.environment == 'github-hosted' }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |

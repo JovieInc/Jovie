@@ -57,8 +57,8 @@ describe('DashboardNav route warming', () => {
       'Inbox',
       'New Chat',
       'Home',
-      'Presence',
-      'Links',
+      'Identity',
+      'Work',
       'Audience',
     ]) {
       expect(screen.getByRole('link', { name: label })).toHaveAttribute(
@@ -66,7 +66,7 @@ describe('DashboardNav route warming', () => {
         'true'
       );
     }
-    for (const label of ['Library', 'Contacts', 'Calendar', 'Tasks']) {
+    for (const label of ['Library', 'Links', 'Contacts', 'Calendar', 'Tasks']) {
       expect(
         screen.queryByRole('link', { name: label })
       ).not.toBeInTheDocument();

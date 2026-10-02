@@ -77,7 +77,7 @@ async function resolveVerifiedSource(params: {
   if (requiresAssetPreservingRender(params.source)) {
     return {
       error:
-        'Jovie will not recreate an uploaded logo from a prompt. This Library asset needs the asset-preserving render path before it can be used for merch.',
+        'Jovie will not recreate an uploaded logo from a prompt. This Work asset needs the asset-preserving render path before it can be used for merch.',
     };
   }
 

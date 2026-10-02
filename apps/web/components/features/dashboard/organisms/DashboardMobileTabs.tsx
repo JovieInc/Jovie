@@ -52,7 +52,7 @@ export function DashboardMobileTabs({
     () => ({
       isElectron,
       isMobile: true,
-      navVariant: 'canonical_customer_ia_v1',
+      navVariant: 'canonical_identity_work_v1',
     }),
     [isElectron]
   );

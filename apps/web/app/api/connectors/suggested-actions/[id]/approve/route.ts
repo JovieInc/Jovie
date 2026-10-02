@@ -157,11 +157,14 @@ export async function POST(_request: Request, { params }: RouteParams) {
             approvalId: id,
             status:
               dispatch.mode === 'decision-only' &&
-              dispatch.family === 'youtube-thumbnail'
-                ? candidate.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND
-                  ? 'approved-publication-blocked'
-                  : 'approved-for-generation'
-                : 'approved-for-preparation',
+              dispatch.family === 'social-reply'
+                ? 'approved-for-send'
+                : dispatch.mode === 'decision-only' &&
+                    dispatch.family === 'youtube-thumbnail'
+                  ? candidate.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND
+                    ? 'approved-publication-blocked'
+                    : 'approved-for-generation'
+                  : 'approved-for-preparation',
           },
           { status: 200, headers: NO_STORE_HEADERS }
         );
@@ -259,11 +262,13 @@ export async function POST(_request: Request, { params }: RouteParams) {
           ok: true,
           approvalId: id,
           status:
-            dispatch.family === 'brand-deal'
-              ? 'approved-for-preparation'
-              : candidate.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND
-                ? 'approved-publication-blocked'
-                : 'approved-for-generation',
+            dispatch.family === 'social-reply'
+              ? 'approved-for-send'
+              : dispatch.family === 'brand-deal'
+                ? 'approved-for-preparation'
+                : candidate.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND
+                  ? 'approved-publication-blocked'
+                  : 'approved-for-generation',
         },
         { status: 200, headers: NO_STORE_HEADERS }
       );

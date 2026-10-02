@@ -64,6 +64,14 @@ export const ServerEnvSchema = z.object({
         'VERCEL_BRANCH_URL must be a hostname or hostname:port without a scheme or path',
     })
     .optional(),
+  VERCEL_PROJECT_PRODUCTION_URL: z
+    .string()
+    .trim()
+    .refine(isHostWithOptionalPort, {
+      message:
+        'VERCEL_PROJECT_PRODUCTION_URL must be a hostname or hostname:port without a scheme or path',
+    })
+    .optional(),
   VERCEL_AUTOMATION_BYPASS_SECRET: z.string().optional(),
   PUBLIC_NOAUTH_SMOKE: z.string().optional(),
   /**
@@ -213,6 +221,9 @@ export const ServerEnvSchema = z.object({
   // URL encryption (required in production/preview)
   LEAD_ATTRIBUTION_SECRET: z.string().optional(),
   URL_ENCRYPTION_KEY: z.string().optional(),
+  // Passive first-touch acquisition envelope signing (JOV-5036). Falls back
+  // to LEAD_ATTRIBUTION_SECRET, then URL_ENCRYPTION_KEY, when unset.
+  ACQUISITION_FIRST_TOUCH_SECRET: z.string().min(32).optional(),
 
   // Cron job authentication
   CRON_SECRET: z.string().optional(),
@@ -502,6 +513,7 @@ export const ENV_KEYS = [
   'VERCEL_DEPLOYMENT_TIME',
   'VERCEL_URL',
   'VERCEL_BRANCH_URL',
+  'VERCEL_PROJECT_PRODUCTION_URL',
   'VERCEL_AUTOMATION_BYPASS_SECRET',
   'PUBLIC_NOAUTH_SMOKE',
   'CHAT_LLM_FAILURE_INJECTION',

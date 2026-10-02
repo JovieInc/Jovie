@@ -6,6 +6,10 @@ import { db } from '@/lib/db';
 import { workflowRuns } from '@/lib/db/schema/connectors';
 import { merchGenerationBatches } from '@/lib/db/schema/merch';
 import { publicEnv } from '@/lib/env-public';
+import {
+  computeDraftPayloadDigest,
+  deliverApprovedDistributionDraft,
+} from '@/lib/release-to-revenue/distribution-delivery';
 import { RELEASE_AUTOPILOT_MERCH_COMMAND } from '@/lib/services/release-autopilot/types';
 import { logger } from '@/lib/utils/logger';
 import type {
@@ -144,7 +148,15 @@ export async function generateDistributionDraftsForRun(input: {
 function isTerminalDraftStatus(
   status: ReleaseDistributionDraft['status']
 ): boolean {
-  return status === 'dispatched' || status === 'rejected';
+  // `approved` is persisted but non-terminal: it means the provider attempt
+  // has not settled (e.g. crash between approval and dispatch). The run stays
+  // in waiting_for_approval until a retry resolves the delivery outcome.
+  return (
+    status === 'rejected' ||
+    status === 'dispatched' ||
+    status === 'failed' ||
+    status === 'undeliverable'
+  );
 }
 
 function allDraftsTerminal(
@@ -157,10 +169,20 @@ function allDraftsTerminal(
   return drafts.items.every(draft => isTerminalDraftStatus(draft.status));
 }
 
-function hasDispatchedDraft(
+/**
+ * A `dispatched` status only counts as activation when it carries provider
+ * acceptance evidence. Legacy status-only receipts (pre-provider dispatch)
+ * are treated as unverified and never trigger outcome recording.
+ */
+function hasVerifiedDispatchedDraft(
   drafts: ReleaseDistributionDrafts | undefined
 ): boolean {
-  return Boolean(drafts?.items.some(draft => draft.status === 'dispatched'));
+  return Boolean(
+    drafts?.items.some(
+      draft =>
+        draft.status === 'dispatched' && draft.delivery?.state === 'accepted'
+    )
+  );
 }
 
 async function loadOwnedRun(input: {
@@ -280,7 +302,7 @@ async function persistStepOutputs(input: {
 
   if (
     input.nextRunStatus === 'completed' &&
-    hasDispatchedDraft(input.stepOutputs.distributionDrafts)
+    hasVerifiedDispatchedDraft(input.stepOutputs.distributionDrafts)
   ) {
     try {
       await recordWorkflowRunOutcome(input.runId);
@@ -293,43 +315,80 @@ async function persistStepOutputs(input: {
   }
 }
 
-export function dispatchDistributionDraft(
-  draft: ReleaseDistributionDraft
+function buildApprovedDraft(
+  draft: ReleaseDistributionDraft,
+  runId: string
 ): ReleaseDistributionDraft {
-  const dispatchedAt = new Date().toISOString();
-
-  logger.info('[release-to-revenue] distribution draft dispatched', {
-    draftId: draft.id,
-    channel: draft.channel,
-    platform: draft.platform,
-    variant: draft.variant,
-  });
-
   return {
     ...draft,
-    status: 'dispatched',
-    dispatchedAt,
+    status: 'approved',
+    decidedAt: new Date().toISOString(),
+    payloadDigest: computeDraftPayloadDigest(draft.body),
+    idempotencyKey: `${runId}:${draft.id}`,
   };
 }
 
 type DistributionDraftDecision = 'approve' | 'reject';
 
-function resolveDecidedDraft(
-  draft: ReleaseDistributionDraft,
-  decision: DistributionDraftDecision
-): ReleaseDistributionDraft {
-  if (decision === 'approve') {
-    return dispatchDistributionDraft({
-      ...draft,
-      decidedAt: new Date().toISOString(),
-    });
+/**
+ * Attempt provider delivery for an approved draft and persist the settled
+ * state. `dispatched` is only written with provider-acceptance evidence;
+ * otherwise the draft lands in `failed`/`undeliverable` with the reason.
+ */
+async function dispatchAndPersist(input: {
+  readonly runId: string;
+  readonly draftId: string;
+  readonly run: NonNullable<Awaited<ReturnType<typeof loadOwnedRun>>>;
+  readonly approvedDraft: ReleaseDistributionDraft;
+}): Promise<DecideDistributionDraftResult> {
+  const { runId, draftId, run, approvedDraft } = input;
+
+  const result = await deliverApprovedDistributionDraft({
+    draft: approvedDraft,
+    stepOutputs: run.stepOutputs,
+    runId,
+  });
+
+  logger.info('[release-to-revenue] distribution draft delivery settled', {
+    draftId,
+    runId,
+    channel: approvedDraft.channel,
+    platform: approvedDraft.platform,
+    status: result.status,
+    deliveryState: result.delivery.state,
+  });
+
+  const settledDraft: ReleaseDistributionDraft = {
+    ...approvedDraft,
+    status: result.status,
+    delivery: result.delivery,
+    ...(result.status === 'dispatched'
+      ? {
+          dispatchedAt: result.delivery.acceptedAt ?? new Date().toISOString(),
+        }
+      : {}),
+  };
+
+  const nextStepOutputs = updateDraftInStepOutputs(
+    run.stepOutputs,
+    draftId,
+    () => settledDraft
+  );
+  if (!nextStepOutputs) {
+    return { ok: false, code: 'draft-not-found' };
   }
 
-  return {
-    ...draft,
-    status: 'rejected',
-    decidedAt: new Date().toISOString(),
-  };
+  const nextRunStatus = allDraftsTerminal(nextStepOutputs.distributionDrafts)
+    ? 'completed'
+    : 'waiting_for_approval';
+
+  await persistStepOutputs({
+    runId,
+    stepOutputs: nextStepOutputs,
+    nextRunStatus,
+  });
+
+  return { ok: true, draft: settledDraft, runStatus: nextRunStatus };
 }
 
 async function decideDistributionDraft(input: {
@@ -338,9 +397,6 @@ async function decideDistributionDraft(input: {
   readonly userId: string;
   readonly decision: DistributionDraftDecision;
 }): Promise<DecideDistributionDraftResult> {
-  const terminalStatus =
-    input.decision === 'approve' ? 'dispatched' : 'rejected';
-
   const run = await loadOwnedRun(input);
   if (!run) {
     return { ok: false, code: 'not-found' };
@@ -352,39 +408,87 @@ async function decideDistributionDraft(input: {
     return { ok: false, code: 'draft-not-found' };
   }
 
-  if (draft.status === terminalStatus) {
+  if (input.decision === 'reject') {
+    if (draft.status === 'rejected') {
+      return { ok: true, draft, runStatus: run.status };
+    }
+    if (draft.status !== 'pending') {
+      return { ok: false, code: 'already-decided' };
+    }
+
+    const rejectedDraft: ReleaseDistributionDraft = {
+      ...draft,
+      status: 'rejected',
+      decidedAt: new Date().toISOString(),
+    };
+    const nextStepOutputs = updateDraftInStepOutputs(
+      run.stepOutputs,
+      input.draftId,
+      () => rejectedDraft
+    );
+    if (!nextStepOutputs) {
+      return { ok: false, code: 'draft-not-found' };
+    }
+
+    const nextRunStatus = allDraftsTerminal(nextStepOutputs.distributionDrafts)
+      ? 'completed'
+      : 'waiting_for_approval';
+
+    await persistStepOutputs({
+      runId: input.runId,
+      stepOutputs: nextStepOutputs,
+      nextRunStatus,
+    });
+
+    return { ok: true, draft: rejectedDraft, runStatus: nextRunStatus };
+  }
+
+  // approve
+  if (draft.status === 'dispatched') {
     return { ok: true, draft, runStatus: run.status };
   }
 
+  if (draft.status === 'approved') {
+    // Approval was persisted but the provider attempt never settled (crash or
+    // retry). Re-attempt delivery under the same idempotency key.
+    return dispatchAndPersist({
+      runId: input.runId,
+      draftId: input.draftId,
+      run,
+      approvedDraft: draft,
+    });
+  }
+
   if (draft.status !== 'pending') {
+    // failed/undeliverable are terminal: no auto-retry, so a provider that may
+    // have accepted a timed-out send is never double-posted.
     return { ok: false, code: 'already-decided' };
   }
 
-  const decidedDraft = resolveDecidedDraft(draft, input.decision);
-  const nextStepOutputs = updateDraftInStepOutputs(
+  const approvedDraft = buildApprovedDraft(draft, input.runId);
+  const approvedStepOutputs = updateDraftInStepOutputs(
     run.stepOutputs,
     input.draftId,
-    () => decidedDraft
+    () => approvedDraft
   );
-  if (!nextStepOutputs) {
+  if (!approvedStepOutputs) {
     return { ok: false, code: 'draft-not-found' };
   }
 
-  const nextRunStatus = allDraftsTerminal(nextStepOutputs.distributionDrafts)
-    ? 'completed'
-    : 'waiting_for_approval';
-
+  // Persist the approved intent (payload digest + idempotency key) BEFORE the
+  // provider call, so a crash mid-send leaves a replayable approved record.
   await persistStepOutputs({
     runId: input.runId,
-    stepOutputs: nextStepOutputs,
-    nextRunStatus,
+    stepOutputs: approvedStepOutputs,
+    nextRunStatus: 'waiting_for_approval',
   });
 
-  return {
-    ok: true,
-    draft: decidedDraft,
-    runStatus: nextRunStatus,
-  };
+  return dispatchAndPersist({
+    runId: input.runId,
+    draftId: input.draftId,
+    run,
+    approvedDraft,
+  });
 }
 
 export async function approveDistributionDraft(input: {
