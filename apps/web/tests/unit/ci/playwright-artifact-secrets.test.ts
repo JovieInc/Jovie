@@ -2321,9 +2321,14 @@ ${fixtureCheckout}
       chromiumConfig,
       "import{defineConfig}from'@playwright/test';export default defineConfig({captureGitInfo:{commit:false,diff:false},testDir:'.',outputDir:'test-results',reporter:'line',use:{trace:'off',video:'off',screenshot:'off',viewport:{width:1440,height:900},deviceScaleFactor:2}})"
     );
+    // Under runner CPU contention headless Chromium intermittently rejects a
+    // 2880x14000 full-page capture with "Protocol error
+    // (Page.captureScreenshot): Unable to capture screenshot" (merge-queue
+    // structural-web jobs 108805269012 and 108870253303). Retry only that
+    // transient, at most twice; any other error, or a third failure, fails.
     write(
       join(chromiumDir, 'route.spec.ts'),
-      "import{test}from'@playwright/test';test('route',async({page},info)=>{await page.setContent('<style>html,body{margin:0}</style><div style=\"height:7000px;background:#111\"></div>');await page.screenshot({animations:'disabled',fullPage:true,path:info.outputPath('marketing-route.png'),type:'png'})})"
+      "import{test}from'@playwright/test';test('route',async({page},info)=>{await page.setContent('<style>html,body{margin:0}</style><div style=\"height:7000px;background:#111\"></div>');for(let attempt=1;;attempt++){try{await page.screenshot({animations:'disabled',fullPage:true,path:info.outputPath('marketing-route.png'),type:'png'});break}catch(error){if(attempt>=3||!String(error).includes('Unable to capture screenshot'))throw error}}})"
     );
     const chromiumRun = spawnSync(
       'pnpm',

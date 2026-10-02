@@ -7,6 +7,10 @@
 import { gateCopy, modelFamily, RUBRIC_VERSION } from '@jovie/copy';
 import { resolveComposition } from '../../data/marketing/composition';
 import { selectHeroDecision } from '../../data/marketing/factory/heroDecision';
+import {
+  buildPersuasionPlan,
+  persuasionJobToken,
+} from '../../data/marketing/factory/persuasionBrief';
 import { detectSectionGaps } from '../../data/marketing/factory/sectionRequest';
 import {
   FACTORY_HERO_VARIANT_IDS,
@@ -92,6 +96,51 @@ async function truthStage(ctx: StageContext): Promise<StageResult> {
   return result(checks, { pageId: ctx.pageId, claims });
 }
 
+/**
+ * Competitive persuasion brief (JOV-7335): compiles the authored research
+ * into the minimum persuasive section plan. Fails on stale or narrow
+ * research, a benchmark that skips primitives, an icp/generic taxonomy leak,
+ * or a plan that would market a job Jovie cannot truthfully perform.
+ */
+async function persuasionStage(ctx: StageContext): Promise<StageResult> {
+  const checks = new Checks();
+  const research = ctx.brief.persuasion;
+  const { plan, failures } = buildPersuasionPlan({
+    research,
+    asOf: ctx.brief.asOf,
+  });
+  for (const failure of failures) {
+    checks.check(failure.id, false, failure.message);
+  }
+  const known = claimIdsOf(ctx);
+  for (const entry of research.benchmark) {
+    if (entry.claimIds.length === 0) continue;
+    checks.check(
+      `persuasion-claims:${entry.primitive}`,
+      allIn(entry.claimIds, known).length === 0,
+      'persuasion jobs may lean only on truth-stage claim ids'
+    );
+  }
+  checks.check(
+    'persuasion-brief',
+    failures.length === 0,
+    'the competitive persuasion brief must pass before composition'
+  );
+  return result(
+    checks,
+    {
+      pageId: ctx.pageId,
+      researchedAt: research.researchedAt,
+      classification: research.classification,
+      differentiator: research.differentiator,
+      requiredJobs: plan.requiredJobs,
+      sectionRequests: plan.sectionRequests,
+      proofGaps: plan.proofGaps,
+    },
+    { notes: { registryGaps: plan.registryGaps } }
+  );
+}
+
 function outcomesStage(ctx: StageContext): Promise<StageResult> {
   const truth = artifactOf(ctx, 'truth');
   return modelStage(
@@ -142,12 +191,17 @@ function outcomesStage(ctx: StageContext): Promise<StageResult> {
 
 function narrativeStage(ctx: StageContext): Promise<StageResult> {
   const outcomes = artifactOf(ctx, 'outcomes');
+  const persuasion = artifactOf(ctx, 'persuasion');
   return modelStage(
     ctx,
     'narrative',
     'narrative-architect',
     'Write {sections:[{sectionInstanceId,sectionId,question,sectionJob,primaryResponsibility,newInformation,customerBelief,evidenceRefs,mustNotRepeat}]}, hero first.',
-    { outcomes: outcomes.outcomes, sectionJobs: ctx.brief.sectionJobs },
+    {
+      outcomes: outcomes.outcomes,
+      sectionJobs: ctx.brief.sectionJobs,
+      persuasionJobs: persuasion.requiredJobs,
+    },
     async (value, checks, model) => {
       const artifact = { pageId: ctx.pageId, sections: value.sections ?? [] };
       const plan = artifact as FactoryStageArtifact<'narrative'>;
@@ -157,6 +211,21 @@ function narrativeStage(ctx: StageContext): Promise<StageResult> {
         checks.check(`narrative:${finding.code}`, false, finding.message);
       }
       if (findings.length === 0) checks.check('narrative-audit', true);
+      const sectionTokens = new Set(
+        sections.flatMap(section => [
+          persuasionJobToken(section.sectionId),
+          persuasionJobToken(section.sectionJob),
+        ])
+      );
+      checks.check(
+        'persuasion-jobs-covered',
+        persuasion.requiredJobs.every(
+          job =>
+            job.routed !== 'section' ||
+            sectionTokens.has(persuasionJobToken(job.job))
+        ),
+        'every section-routed persuasion job needs a narrative section'
+      );
       const known = new Set([
         ...claimIdsOf(ctx),
         ...outcomes.outcomes.map(o => o.id),
@@ -407,6 +476,7 @@ async function gapStage(ctx: StageContext): Promise<StageResult> {
 
 export const CONTENT_STAGE_RUNNERS = {
   truth: truthStage,
+  persuasion: persuasionStage,
   outcomes: outcomesStage,
   narrative: narrativeStage,
   copy: copyStage,

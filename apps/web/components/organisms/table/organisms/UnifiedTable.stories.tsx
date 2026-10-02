@@ -1,4 +1,6 @@
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
 import type { ColumnDef } from '@/lib/tanstack-table';
 import { UnifiedTable } from './UnifiedTable';
 
@@ -52,4 +54,25 @@ export const Loading: Story = {
     isLoading: true,
     skeletonRows: 2,
   },
+};
+
+function ResponsiveColumnsExample() {
+  const [showArtist, setShowArtist] = useState(true);
+  return (
+    <div className='space-y-3'>
+      <Button onClick={() => setShowArtist(value => !value)}>
+        {showArtist ? 'Hide artist column' : 'Show artist column'}
+      </Button>
+      <UnifiedTable
+        data={data}
+        columns={columns}
+        columnVisibility={{ artist: showArtist }}
+        enableVirtualization={false}
+      />
+    </div>
+  );
+}
+
+export const ResponsiveColumns: Story = {
+  render: () => <ResponsiveColumnsExample />,
 };
