@@ -4,9 +4,8 @@ import { borders, presets, tableAlignment } from '../table.styles';
 export const TABLE_CELL_CONTENT_CLASSNAME =
   'block h-8 max-h-8 min-w-0 content-center overflow-hidden text-ellipsis whitespace-nowrap leading-normal [&>*]:max-w-full';
 
-/** Opt in when a cell contains descriptions or stacked controls. */
-export const TABLE_CELL_MULTILINE_CONTENT_CLASSNAME =
-  'h-auto min-h-8 max-h-none whitespace-normal';
+/** Allow wrapping within the height budget selected by the table row mode. */
+export const TABLE_CELL_MULTILINE_CONTENT_CLASSNAME = 'whitespace-normal';
 
 export interface TableCellProps {
   readonly children: React.ReactNode;

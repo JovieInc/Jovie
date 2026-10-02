@@ -1,5 +1,7 @@
 'use client';
 
+import { TableIssueSummary } from '@/components/organisms/table/molecules/TableIssueSummary';
+
 // @coverage-via apps/web/tests/unit/app/admin-releases-table-normalization.test.ts
 
 import { Avatar, AvatarFallback, AvatarImage } from '@jovie/ui';
@@ -112,24 +114,7 @@ function IssuesPills({ row }: { readonly row: AdminReleaseRow }) {
     });
   }
 
-  if (issues.length === 0) {
-    return <span className='text-2xs text-tertiary-token'>—</span>;
-  }
-
-  return (
-    <div className='flex flex-wrap gap-1'>
-      {issues.map(issue => (
-        <span
-          key={issue.label}
-          className='inline-flex items-center gap-0.5 rounded-full bg-error/10 px-1.5 py-0.5 text-3xs font-medium text-error'
-          title={issue.label}
-        >
-          {issue.icon}
-          {issue.label}
-        </span>
-      ))}
-    </div>
-  );
+  return <TableIssueSummary issues={issues} />;
 }
 
 function formatDate(date: Date | string | null): string {
@@ -356,6 +341,7 @@ export function AdminReleasesTableUnified({
     >
       {() => (
         <AdminDataTable
+          rowMode='two-line'
           data={allReleases}
           columns={columns}
           getRowId={(row: AdminReleaseRow) => row.id}
@@ -366,8 +352,6 @@ export function AdminReleasesTableUnified({
           getContextMenuItems={(row: AdminReleaseRow) =>
             getContextMenuItems(row)
           }
-          rowHeight={52}
-          getRowClassName={() => 'h-13'}
           hasNextPage={hasNextPage ?? false}
           isFetchingNextPage={isFetchingNextPage}
           onLoadMore={fetchNextPage}

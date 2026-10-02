@@ -13,7 +13,7 @@ function renderInTable(child: React.ReactNode) {
 }
 
 describe('TableCell', () => {
-  it('allows stacked labels and controls to determine multiline cell height', () => {
+  it('allows multiline wrapping without removing the fixed content ceiling', () => {
     renderInTable(
       <TableCell multiline>
         <div>Investor</div>
@@ -24,13 +24,12 @@ describe('TableCell', () => {
     const content = screen.getByRole('button', {
       name: 'Copy token',
     }).parentElement;
-    expect(content).toHaveClass(
+    expect(content).toHaveClass('h-8', 'max-h-8', 'whitespace-normal');
+    expect(content).not.toHaveClass(
       'h-auto',
-      'min-h-8',
       'max-h-none',
-      'whitespace-normal'
+      'whitespace-nowrap'
     );
-    expect(content).not.toHaveClass('h-8', 'max-h-8', 'whitespace-nowrap');
   });
   it('uses the canonical table cell density and typography preset', () => {
     renderInTable(<TableCell>Title</TableCell>);

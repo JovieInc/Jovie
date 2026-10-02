@@ -262,7 +262,11 @@ describe('Popover', () => {
       );
 
       const content = screen.getByTestId('popover-content');
-      expect(content).toHaveClass('max-w-full');
+      expect(content).toHaveClass(
+        'max-w-(--radix-popover-content-available-width)',
+        'max-h-(--radix-popover-content-available-height)',
+        'overflow-y-auto'
+      );
       expect(content).toHaveClass('break-words');
     });
   });

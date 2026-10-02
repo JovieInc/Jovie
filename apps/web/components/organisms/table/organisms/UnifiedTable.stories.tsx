@@ -1,4 +1,7 @@
+import '@/styles/system-b-app.css';
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
 import type { ColumnDef } from '@/lib/tanstack-table';
 import { UnifiedTable } from './UnifiedTable';
 
@@ -52,4 +55,33 @@ export const Loading: Story = {
     isLoading: true,
     skeletonRows: 2,
   },
+};
+
+function RowModeScrollFixture() {
+  const [loading, setLoading] = useState(true);
+  return (
+    <div className='space-y-3'>
+      <Button onClick={() => setLoading(value => !value)}>
+        {loading ? 'Show rows' : 'Show loading'}
+      </Button>
+      <UnifiedTable
+        data={Array.from({ length: 200 }, (_, index) => ({
+          id: `row-${index}`,
+          title: `Release ${index + 1}`,
+          artist: 'Fixture artist',
+        }))}
+        columns={columns}
+        rowMode='two-line'
+        isLoading={loading}
+        skeletonRows={7}
+        enableVirtualization
+        containerClassName='h-96'
+        getRowId={row => row.id}
+      />
+    </div>
+  );
+}
+
+export const RowModeLoadingAndScroll: Story = {
+  render: () => <RowModeScrollFixture />,
 };

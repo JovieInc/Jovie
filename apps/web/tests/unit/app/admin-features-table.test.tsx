@@ -108,14 +108,18 @@ describe('AdminFeaturesTable', () => {
       screen
         .getByText('Connect Spotify accounts via OAuth.')
         .closest('[data-table-cell-content]')
-    ).toHaveClass('h-auto', 'max-h-none', 'whitespace-normal');
+    ).toHaveClass('whitespace-normal');
     expect(
       screen
         .getAllByTestId('flag-env-status-prod')[0]
         .closest('[data-table-cell-content]')
-    ).toHaveClass('h-auto', 'max-h-none');
+    ).toHaveClass('whitespace-normal');
 
     expect(screen.getByTestId('admin-features-table')).toBeInTheDocument();
+    expect(screen.getByRole('table')).toHaveAttribute(
+      'data-table-row-mode',
+      'controls'
+    );
     expect(
       screen.getByRole('button', { name: 'Copy flag key spotify_oauth' })
     ).toHaveTextContent('spotify_oauth');

@@ -20,7 +20,10 @@ export function InvestorTable({
 }>) {
   return (
     <div className='w-full min-w-0 overflow-x-auto'>
-      <TableRoot className={cn('w-full border-collapse text-app', minWidth)}>
+      <TableRoot
+        rowMode='two-line'
+        className={cn('w-full border-collapse text-app', minWidth)}
+      >
         {children}
       </TableRoot>
     </div>

@@ -11,8 +11,7 @@ const { mockUseAdminReleasesInfiniteQuery } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/components/organisms/table', () => ({
-  TABLE_CELL_MULTILINE_CONTENT_CLASSNAME:
-    'h-auto min-h-8 max-h-none whitespace-normal',
+  TABLE_CELL_MULTILINE_CONTENT_CLASSNAME: 'whitespace-normal',
   createMultiFieldFilterFn: () => () => true,
   PAGE_TOOLBAR_END_GROUP_CLASS: '',
   PAGE_TOOLBAR_META_TEXT_CLASS: '',
@@ -52,7 +51,7 @@ vi.mock('@/features/admin/table/AdminDataTable', () => ({
         data-testid='admin-data-table'
         data-multiline-columns={columns
           .filter(column =>
-            column.meta?.cellContentClassName?.includes('max-h-none')
+            column.meta?.cellContentClassName?.includes('whitespace-normal')
           )
           .map(column => column.id)
           .join(',')}
@@ -220,6 +219,6 @@ describe('AdminReleasesTableUnified artist identity rows', () => {
     );
 
     expect(source).not.toMatch(/\bred-\d/);
-    expect(source).toContain('text-error');
+    expect(source).toContain('TableIssueSummary');
   });
 });

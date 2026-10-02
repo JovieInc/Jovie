@@ -10,6 +10,7 @@ import {
   TABLE_CELL_MULTILINE_CONTENT_CLASSNAME,
   TableEmptyState,
 } from '@/components/organisms/table';
+import { TableDescription } from '@/components/organisms/table/molecules/TableDescription';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { copyToClipboard } from '@/hooks/useClipboard';
@@ -176,9 +177,7 @@ function FlagNameCell({
       >
         {flagKey}
       </Button>
-      <span className='line-clamp-2 block text-xs leading-snug text-secondary-token'>
-        {description}
-      </span>
+      <TableDescription text={description} label={`${name} description`} />
     </div>
   );
 }
@@ -365,6 +364,7 @@ export function AdminFeaturesTable({
       <AdminTableShell testId='admin-features-table' toolbar={toolbar}>
         {() => (
           <AdminDataTable
+            rowMode='controls'
             data={rows}
             columns={columns}
             enableVirtualization={false}

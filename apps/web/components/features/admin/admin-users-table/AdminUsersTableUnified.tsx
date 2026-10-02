@@ -657,6 +657,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
             </div>
           ) : (
             <AdminDataTable
+              rowMode='two-line'
               data={users}
               columns={columns}
               rowSelection={rowSelection}

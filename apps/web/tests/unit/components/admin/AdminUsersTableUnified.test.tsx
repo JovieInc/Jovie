@@ -65,8 +65,7 @@ vi.mock('@/hooks/useSearchUrlSync', () => ({
 }));
 
 vi.mock('@/components/organisms/table', () => ({
-  TABLE_CELL_MULTILINE_CONTENT_CLASSNAME:
-    'h-auto min-h-8 max-h-none whitespace-normal',
+  TABLE_CELL_MULTILINE_CONTENT_CLASSNAME: 'whitespace-normal',
   convertContextMenuItems: () => [],
   createMultiFieldFilterFn: () => () => true,
   ExportCSVButton: () => <button type='button'>Export</button>,
@@ -102,7 +101,7 @@ vi.mock('@/components/organisms/table', () => ({
       data-testid='desktop-table'
       data-multiline-columns={columns
         .filter(column =>
-          column.meta?.cellContentClassName?.includes('max-h-none')
+          column.meta?.cellContentClassName?.includes('whitespace-normal')
         )
         .map(column => column.id)
         .join(',')}

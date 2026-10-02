@@ -8,6 +8,7 @@ import {
   TABLE_CELL_MULTILINE_CONTENT_CLASSNAME,
   TableEmptyState,
 } from '@/components/organisms/table';
+import { TableDescription } from '@/components/organisms/table/molecules/TableDescription';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
@@ -42,9 +43,10 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
                 {info.getValue()}
               </span>
               {info.row.original.notes ? (
-                <span className='line-clamp-2 block max-w-[34rem] text-xs leading-[17px] text-secondary-token'>
-                  {info.row.original.notes}
-                </span>
+                <TableDescription
+                  text={info.row.original.notes}
+                  label={`${info.getValue()} notes`}
+                />
               ) : null}
             </div>
           ),
@@ -133,6 +135,7 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
     <AdminTableShell testId='admin-costs-table' toolbar={toolbar}>
       {() => (
         <AdminDataTable
+          rowMode='description'
           data={items}
           columns={columns}
           emptyState={

@@ -141,7 +141,7 @@ const PopoverContent = React.forwardRef<
           popoverContentClasses,
           // Keep rich content inside the collision-safe viewport on narrow
           // screens, including long unbroken values supplied by consumers.
-          'max-w-full break-words',
+          'max-w-(--radix-popover-content-available-width) max-h-(--radix-popover-content-available-height) overflow-y-auto break-words',
           className
         )}
         data-testid={testId}
