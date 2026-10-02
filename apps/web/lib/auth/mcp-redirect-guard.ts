@@ -1,6 +1,5 @@
 import type { BetterAuthPlugin } from 'better-auth';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
-import { BETTER_AUTH_OAUTH_PROVIDER_PATHS } from '@/constants/routes';
 import {
   acceptedMcpRedirectUris,
   isAllowedMcpRedirectUri,
@@ -11,9 +10,13 @@ import { isOAuthProviderTrustedClient } from './oauth-trusted-clients';
 const REGISTRATION_PATHS = new Set([
   '/oauth2/register',
   '/oauth2/create-client',
-  BETTER_AUTH_OAUTH_PROVIDER_PATHS.ADMIN_CREATE_CLIENT,
+  // Better Auth oauth-provider admin endpoints mounted under /api/auth.
+  // They are not Jovie app routes, and constants/routes is partially mocked.
+  // eslint-disable-next-line @jovie/no-hardcoded-routes -- provider path, not an app route
+  '/admin/oauth2/create-client',
   '/oauth2/update-client',
-  BETTER_AUTH_OAUTH_PROVIDER_PATHS.ADMIN_UPDATE_CLIENT,
+  // eslint-disable-next-line @jovie/no-hardcoded-routes -- provider path, not an app route
+  '/admin/oauth2/update-client',
 ]);
 
 type GuardContext = {
