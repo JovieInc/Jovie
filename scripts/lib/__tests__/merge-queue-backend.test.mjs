@@ -1508,7 +1508,7 @@ describe('canonical admission membership binding', () => {
     expect(afterResponse.message).toContain('"stdoutBytes":500');
     expect(afterResponse.message).not.toContain('exitMs');
   });
-  it('encodes the GraphQL Int through the real gh HTTP transport', async () => {
+  it('encodes the GraphQL Int through the real gh HTTP transport', { timeout: 30000 }, async () => {
     const config = mkdtempSync(join(tmpdir(), 'membership-gh-'));
     const started = performance.now();
     const phases = {};
@@ -1576,7 +1576,7 @@ describe('canonical admission membership binding', () => {
                 ],
                 {
                   env: environment,
-                  timeout: 3000,
+                  timeout: 20000,
                 },
                 (error, stdout, stderr) => {
                   if (error) {

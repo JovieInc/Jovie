@@ -1052,7 +1052,7 @@ export function buildAffectedTestPlan(
   {
     isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)),
     readFile = readRepoFile,
-    blogContentReceipt,
+    blogContentReceipt = undefined,
   } = {}
 ) {
   const files = unique(changedFiles.filter(Boolean)).sort();

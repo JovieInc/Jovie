@@ -193,7 +193,7 @@ export function collectRaw({ workflows, days }) {
 
     const run = runs.pull_request
       .filter(candidate => candidate.prNumbers?.includes(pr.number))
-      .toSorted((a, b) => b.id - a.id)[0];
+      .sort((a, b) => b.id - a.id)[0];
     if (run) {
       try {
         const jobs = gh([

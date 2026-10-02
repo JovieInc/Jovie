@@ -59,7 +59,7 @@
       "sources": [
         {
           "path": "docs/PR_FLOW.md",
-          "section": "## 1. Unit of work: one small PR → `main`",
+          "section": "## 1. Unit of work: one small PR \u2192 `main`",
           "sha256": "040d65d017d9e8e5b3d00a641fbffe00fadd4eaf1539b1124262e73527eb418e"
         }
       ]
@@ -211,7 +211,7 @@
       "sources": [
         {
           "path": "docs/PR_FLOW.md",
-          "section": "## 1. Unit of work: one small PR → `main`",
+          "section": "## 1. Unit of work: one small PR \u2192 `main`",
           "sha256": "040d65d017d9e8e5b3d00a641fbffe00fadd4eaf1539b1124262e73527eb418e"
         }
       ]
@@ -246,7 +246,7 @@
       "sources": [
         {
           "path": "docs/PR_FLOW.md",
-          "section": "## 1. Unit of work: one small PR → `main`",
+          "section": "## 1. Unit of work: one small PR \u2192 `main`",
           "sha256": "040d65d017d9e8e5b3d00a641fbffe00fadd4eaf1539b1124262e73527eb418e"
         }
       ]
