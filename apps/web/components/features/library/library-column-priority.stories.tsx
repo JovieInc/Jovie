@@ -203,7 +203,7 @@ const asset = {
   share: {
     shareUrl: 'https://jovie.link/tim/take-me-over',
   },
-} as LibraryReleaseAsset;
+} as unknown as LibraryReleaseAsset;
 
 function Frame({
   width,

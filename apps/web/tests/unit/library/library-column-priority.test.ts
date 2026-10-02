@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { LIBRARY_TABLE_COLUMNS } from '@/app/app/(shell)/library/LibrarySurface';
 import { LIBRARY_CATALOG_TABLE_COLUMNS } from '@/components/features/library/library-catalog-columns';
 import {
   columnPrioritySpecsFromDefs,
   resolveColumnPriorityLayout,
 } from '@/components/organisms/table/column-priority';
-import { LIBRARY_TABLE_COLUMNS } from './LibrarySurface';
 
 describe('library column priority', () => {
   it('drops the squeezed list columns when a detail panel narrows the table', () => {
