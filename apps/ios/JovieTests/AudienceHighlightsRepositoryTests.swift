@@ -239,6 +239,9 @@ private actor SuspendedHomeDataClient: MobileHomeDataClient {
   private var inbox: CheckedContinuation<MobileActionLoopInboxResponse, Error>?
   private var startWaiters: [CheckedContinuation<Void, Never>] = []
   private var surfaceWaiters: [Surface: [CheckedContinuation<Void, Never>]] = [:]
+  private var decision: CheckedContinuation<Void, Error>?
+  private var decisionWaiters: [CheckedContinuation<Void, Never>] = []
+  private var decisionStarted = false
   private(set) var started: Set<Surface> = []
   private(set) var requestedWorkspace: MobileWorkspaceMode?
 
@@ -266,6 +269,26 @@ private actor SuspendedHomeDataClient: MobileHomeDataClient {
   func failInbox() {
     inbox?.resume(throwing: APIClientError.transportFailed(code: -1009))
     inbox = nil
+  }
+
+  func submitDecision() async throws {
+    try await withCheckedThrowingContinuation {
+      decision = $0
+      decisionStarted = true
+      let waiters = decisionWaiters
+      decisionWaiters = []
+      for waiter in waiters { waiter.resume() }
+    }
+  }
+
+  func waitForDecision() async {
+    guard !decisionStarted else { return }
+    await withCheckedContinuation { decisionWaiters.append($0) }
+  }
+
+  func acceptDecision() {
+    decision?.resume(returning: ())
+    decision = nil
   }
 
   func fetchAudienceHighlights() async throws -> MobileAudienceHighlightsResponse {
@@ -316,6 +339,64 @@ private actor SuspendedHomeDataClient: MobileHomeDataClient {
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct MobileHomeDataStoreTests {
+  private func decisionInbox() -> MobileActionLoopInboxResponse {
+    MobileActionLoopInboxResponse(
+      pendingCount: 1,
+      items: [MobileActionLoopInboxItem(
+        id: "summer-card:card-1", typeLabel: "Approval", createdAt: "2026-10-02T00:00:00Z",
+        title: "Review", why: "Pending review", primaryActionLabel: "Approve", status: "pending"
+      )],
+      emptyActionCards: [], chatPrompt: "Review my inbox"
+    )
+  }
+
+  @Test(arguments: [false, true])
+  func acceptedDecisionStillSucceedsAfterContextChanges(changesAccount: Bool) async {
+    let store = MobileHomeDataStore(defaults: makeDefaults())
+    store.setContext(userID: "artist", workspace: .ovie)
+    let client = SuspendedHomeDataClient()
+    let decision = Task {
+      await store.decideSummerCard("card-1", userID: "artist", workspace: .ovie) {
+        try await client.submitDecision()
+      }
+    }
+    await client.waitForDecision()
+    store.setContext(
+      userID: changesAccount ? "other-artist" : "artist",
+      workspace: changesAccount ? .ovie : .jovie
+    )
+    let newInbox = decisionInbox()
+    store.showFixture(audience: .loaded(.preview), calendar: .preview, inbox: newInbox)
+    await client.acceptDecision()
+    #expect(await decision.value, "A successful server operation remains successful after context changes")
+    #expect(store.inbox == newInbox, "The old decision must not alter the new context's inbox")
+  }
+
+  @Test func failedDecisionReturnsFalseWithoutRemovingInboxCards() async {
+    let store = MobileHomeDataStore(defaults: makeDefaults())
+    store.setContext(userID: "artist", workspace: .ovie)
+    let inbox = decisionInbox()
+    store.showFixture(audience: .loaded(.preview), calendar: .preview, inbox: inbox)
+    let accepted = await store.decideSummerCard("card-1", userID: "artist", workspace: .ovie) {
+      throw APIClientError.transportFailed(code: -1009)
+    }
+    #expect(accepted == false)
+    #expect(store.inbox == inbox)
+  }
+
+  @Test func acceptedDecisionRemovesAndCachesTheCurrentContextCard() async {
+    let defaults = makeDefaults()
+    let store = MobileHomeDataStore(defaults: defaults)
+    store.setContext(userID: "artist", workspace: .ovie)
+    store.showFixture(audience: .loaded(.preview), calendar: .preview, inbox: decisionInbox())
+    let accepted = await store.decideSummerCard("card-1", userID: "artist", workspace: .ovie) {}
+    #expect(accepted)
+    #expect(store.inbox?.items.isEmpty == true)
+    #expect(store.inbox?.pendingCount == 0)
+    let cached = await ActionLoopCache(defaults: defaults).loadInbox(for: "artist", workspace: .ovie)
+    #expect(cached == store.inbox)
+  }
+
   private func makeDefaults() -> UserDefaults {
     UserDefaults(suiteName: "MobileHomeDataStoreTests-\(UUID().uuidString)")!
   }

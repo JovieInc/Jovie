@@ -88,6 +88,23 @@ final class MobileHomeDataStore {
     _ = await (audience, calendar, inbox)
   }
 
+  func decideSummerCard(
+    _ cardID: String,
+    userID: String,
+    workspace: MobileWorkspaceMode,
+    submit: @Sendable () async throws -> Void
+  ) async -> Bool {
+    do {
+      try await submit()
+    } catch {
+      return false
+    }
+    // The server owns the outcome. Context changes may suppress a local
+    // snapshot update, but cannot turn an accepted operation into a failure.
+    await removeDecidedCard(cardID, userID: userID, workspace: workspace)
+    return true
+  }
+
   func removeDecidedCard(_ cardID: String, userID: String, workspace: MobileWorkspaceMode) async {
     guard context == Context(userID: userID, workspace: workspace) else { return }
     decidedCardIDs.insert("summer-card:\(cardID)")

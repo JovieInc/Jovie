@@ -516,19 +516,14 @@ private struct AppContentView: View {
   ) async -> Bool {
     guard let userID = appState.activeUserID else { return false }
     let workspace = workspaceMode
+    let cardID = card.id
     let client = APIClient(
       baseURL: appState.configuration.apiBaseURL,
       tokenProvider: NativeSessionTokenProvider()
     )
-    guard (try? await client.decideSummerCard(
-      cardID: card.id,
-      decision: decision,
-      comment: comment
-    )) != nil else { return false }
-
-    guard appState.activeUserID == userID, workspaceMode == workspace else { return false }
-    await homeData.removeDecidedCard(card.id, userID: userID, workspace: workspace)
-    return true
+    return await homeData.decideSummerCard(cardID, userID: userID, workspace: workspace) {
+      _ = try await client.decideSummerCard(cardID: cardID, decision: decision, comment: comment)
+    }
   }
 
 
