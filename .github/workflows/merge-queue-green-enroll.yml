@@ -14,7 +14,7 @@ name: Merge Queue Green Enroll
 # on a PR, or a PR loses a hold label.
 # The ruleset's required checks on the merge group stay the only gate. Uses the
 # Jovie Bot app token because GITHUB_TOKEN-created merge groups start no CI.
-# Scans every open PR to main (paginated, newest first) on each event.
+# Automatic wakes inspect only the signaled PR. Manual dispatch scans the complete roster.
 
 on:
   workflow_run:
@@ -66,12 +66,39 @@ jobs:
             // the lanes remove it with their fix.
             const BLOCKING = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'queue-poison']);
             const { owner, repo } = context.repo;
-            // REST inventory avoids multiplying commits/timeline resolvers across
-            // 100 PRs, which exceeded GitHub's GraphQL resource limit in production.
-            // Complete inventory before mutating; paginate beyond 100 open PRs.
-            const prs = await github.paginate(github.rest.pulls.list, {
-              owner, repo, state: 'open', base: 'main', per_page: 100,
-            });
+            // Use the triggering PR for automatic wakes. Scanning every eligible PR
+            // on every check completion exhausts the shared app GraphQL quota.
+            const validNumber = n => Number.isSafeInteger(n) && n > 0;
+            let prs;
+            if (context.eventName === 'workflow_dispatch') {
+              // Explicit reconciliation retains a complete paginated inventory.
+              prs = await github.paginate(github.rest.pulls.list, {
+                owner, repo, state: 'open', base: 'main', per_page: 100,
+              });
+            } else {
+              let numbers = [];
+              if (context.eventName === 'pull_request_target') {
+                numbers = [context.payload.pull_request?.number].filter(validNumber);
+              } else if (context.eventName === 'workflow_run') {
+                const run = context.payload.workflow_run || {};
+                numbers = (run.pull_requests || []).map(pr => pr.number).filter(validNumber);
+                // PR-target workflow receipts can omit their pull_requests association.
+                // Resolve only the exact source SHA and branch, never a fallback full scan.
+                if (numbers.length === 0 && /^[a-f0-9]{40}$/.test(run.head_sha || '') && run.head_branch) {
+                  const associated = await github.paginate(github.rest.commits.listPullRequestsAssociatedWithCommit, {
+                    owner, repo, commit_sha: run.head_sha, per_page: 100,
+                  });
+                  numbers = associated.filter(pr => pr.state === 'open' && pr.base.ref === 'main' &&
+                    pr.head.sha === run.head_sha && pr.head.ref === run.head_branch &&
+                    pr.head.repo?.full_name === `${owner}/${repo}`).map(pr => pr.number).filter(validNumber);
+                }
+              }
+              prs = [];
+              for (const number of new Set(numbers)) {
+                const { data } = await github.rest.pulls.get({ owner, repo, pull_number: number });
+                if (data.state === 'open' && data.base.ref === 'main') prs.push(data);
+              }
+            }
             core.info(`scanned=${prs.length}`);
             let enqueued = 0;
             for (const candidate of prs) {

@@ -733,7 +733,7 @@ def check_commands(paths: list[str]) -> list[list[str]]:
     return []
 
 
-def sensitive_review(host: Host, pr: dict, worktree: Path, log) -> tuple[bool, list[str]]:
+def sensitive_review(host: Host, pr: dict, worktree: Path, log, pass_fds=()) -> tuple[bool, list[str]]:
     """Run an independent max-effort Codex review; an ambiguous response fails closed."""
     review_prompt = host.state / "runs" / f"PR{pr['number']}-{pr['headRefOid'][:12]}-llm-review.md"
     review_prompt.parent.mkdir(parents=True, exist_ok=True)
@@ -752,7 +752,7 @@ def sensitive_review(host: Host, pr: dict, worktree: Path, log) -> tuple[bool, l
     command = [sys.executable, str(HERE / "codex_lane.py"), "run", "--prompt-file", str(review_prompt),
                "--cwd", str(worktree), "--reasoning-effort", "xhigh"]
     try:
-        ran = sh(command, cwd=worktree, timeout=host.gate_timeout, log=log, stream=True)
+        ran = sh(command, cwd=worktree, timeout=host.gate_timeout, log=log, stream=True, pass_fds=pass_fds)
     except subprocess.TimeoutExpired:
         return False, ["llm-review-timeout"]
     verdict = last.read_text(errors="replace").strip() if last.exists() else ""
@@ -764,9 +764,26 @@ def sensitive_review(host: Host, pr: dict, worktree: Path, log) -> tuple[bool, l
 
 # ---------------------------------------------------------------- plumbing
 
-def sh(args: list[str], cwd: Path | None = None, timeout: int = 600, env=None, log=None, stream=False):
+def sh(args: list[str], cwd: Path | None = None, timeout: int = 600, env=None, log=None, stream=False, pass_fds=()):
     """Run and record. `stream=True` writes output to the log as it happens, so a timeout
     shows where the command was, instead of losing everything it printed."""
+    if pass_fds:
+        # The helper owns the locks across worker death and reuses run_agent's tracked
+        # descendant cleanup. Command wrappers may close inherited file descriptors.
+        if log is not None:
+            log.write(f"$ {' '.join(args)[:300]}\n")
+            log.flush()
+        command = [sys.executable, str(Path(__file__).resolve()), "gate-command",
+                   "--timeout", str(timeout), "--", *args]
+        with subprocess.Popen(command, cwd=cwd, env=env, text=True, start_new_session=True,
+                              pass_fds=tuple(pass_fds), stdout=log if stream and log else subprocess.PIPE,
+                              stderr=subprocess.STDOUT if stream and log else subprocess.PIPE) as process:
+            stdout, stderr = process.communicate()
+        if log is not None:
+            log.flush()
+        if process.returncode == 124:
+            raise subprocess.TimeoutExpired(args, timeout, stdout, stderr)
+        return subprocess.CompletedProcess(args, process.returncode, stdout or "", stderr or "")
     if stream and log is not None:
         log.write(f"$ {' '.join(args)[:300]}\n")
         log.flush()
@@ -1315,7 +1332,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     verdict = receipt.get("verdict")
     receipt["result"] = {"verdict": verdict, "commit": receipt.get("headSha"), "pr": receipt.get("pr"),
                          "prUrl": receipt.get("prUrl")}
-    result = "succeeded" if verdict in ("landing", "verified-not-queued", "held", "gate-timeout") \
+    result = "succeeded" if verdict in ("landing", "verified-not-queued", "held", "gate-timeout",
+                                        "gate-in-progress", "gate-deferred", "gate-already-completed") \
         else "no_op_stale" if verdict in ("no-change", "not-shippable") else "failed_unknown"
     receipt["execution"] = execution_attempt.finish(
         runs / "execution-attempts.jsonl", ident, claimed["fencingToken"], result,
@@ -1381,19 +1399,121 @@ def gate_slot(host: Host) -> tuple[Locked, float]:
         time.sleep(15)
 
 
+GATE_RESULT_SCHEMA = "jovie.lane-gate-result/v1"
+GATE_POLICY_DIGEST = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+
+
+@dataclass
+class GateClaim:
+    pr: dict
+    lock: Locked
+
+
+def reserve_gate(host: Host, pr: dict) -> GateClaim | None:
+    identity = hashlib.sha256(f"{REPO_SLUG}:{pr['number']}:{pr['headRefOid']}".encode()).hexdigest()
+    lock = Locked(host.state / "locks" / f"gate-head-{identity}.lock", blocking=False)
+    if lock.held:
+        return GateClaim(pr, lock)
+    lock.release()
+    return None
+
+
+def terminal_gate(pr: dict, verified: dict, sensitive: bool = False) -> dict | None:
+    result = verified.get(f"{pr['number']}:{pr['headRefOid']}")
+    # Old SHA strings were written at claim time, so they cannot certify anything.
+    if (isinstance(result, dict) and result.get("schema") == GATE_RESULT_SCHEMA
+            and result.get("headSha") == pr["headRefOid"]
+            and result.get("policyDigest") == GATE_POLICY_DIGEST
+            and result.get("verdict") in {"landing", "verified-not-queued", "held"}
+            and result.get("completedAt") and (not sensitive or result.get("sensitive") is True)):
+        return result
+    return None
+
+
+def gate_deferral(host: Host, pr: dict) -> str | None:
+    """Existing hold/repair ownership is not a new adoption or verification permit."""
+    labels = {label.lower() for label in pr_events.label_names(pr)}
+    if labels & (pr_events.HOLD_LABELS | {pr_events.PREFIX + pr_events.EXHAUSTED}):
+        return "existing-pr-hold"
+    held = held_path(host)
+    entry = (json.loads(held.read_text()) if held.exists() else {}).get(str(pr["number"]), {})
+    if entry.get("sha") == pr["headRefOid"]:
+        return "existing-gate-hold"
+    path = host.state / "fix-attempts.json"
+    attempt = (json.loads(path.read_text()) if path.exists() else {}).get(str(pr["number"]), {})
+    final_push = attempt.get("pushed") and attempt.get("pushedHead") == pr["headRefOid"] \
+        and attempt.get("sha") != pr["headRefOid"] and attempt.get("endedAt")
+    if pr_events.in_flight(attempt, pr, time.time()) or (
+            pr_events.spent(attempt, pr["headRefOid"], MAX_FIX_ATTEMPTS) and not final_push):
+        return "existing-fix-disposition"
+    return None
+
+
+def require_gate_authority(host: Host, pr: dict, stage: str, sensitive: bool) -> dict:
+    live = require_fix_target(pr, stage)
+    require_publishable(host, live.get("headRefName"), stage)
+    if not sensitive and SENSITIVE_PR_LABEL in {label.lower() for label in pr_events.label_names(live)}:
+        raise RepairStopped("sensitive-mode-changed", live, stage)
+    if reason := gate_deferral(host, live):
+        raise RepairStopped(reason, live, stage)
+    return live
+
+
 def gate_timeouts(host: Host, pr: dict, change: int = 0) -> int:
     """Consecutive gate timeouts for this PR head; a new head resets the count."""
     path = host.state / "gate-timeouts.json"
-    data = json.loads(path.read_text()) if path.exists() else {}
-    entry = data.get(str(pr["number"]), {})
-    count = (entry.get("count", 0) if entry.get("sha") == pr["headRefOid"] else 0) + change
-    if change:
-        data[str(pr["number"])] = {"sha": pr["headRefOid"], "count": count}
-        path.write_text(json.dumps(data))
+    count = 0
+    def update(data):
+        nonlocal count
+        key = f"{pr['number']}:{pr['headRefOid']}"
+        entry = data.get(key, data.get(str(pr["number"]), {}))
+        count = (entry.get("count", 0) if entry.get("sha") == pr["headRefOid"] else 0) + change
+        if change:
+            data[key] = {"sha": pr["headRefOid"], "count": count}
+    update_json(path, update)
     return count
 
 
-def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False) -> dict:
+def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False,
+            claim: GateClaim | None = None) -> dict:
+    """One host-local gate per exact head, from reservation through durable result."""
+    owned = claim is None
+    claim = reserve_gate(host, pr) if owned else claim
+    result = {"pr": pr["number"], "prUrl": pr.get("url"), "headSha": pr["headRefOid"]}
+    if claim is None:
+        return {**result, "verdict": "gate-in-progress", "reasons": ["exact-head-gate-reserved"]}
+    try:
+        if not claim.lock.held or any(claim.pr[key] != pr[key] for key in ("number", "headRefOid")):
+            raise RuntimeError("gate-reservation-mismatch")
+        live = require_fix_target(pr, "before-gate")
+        sensitive = sensitive or SENSITIVE_PR_LABEL in {label["name"].lower() for label in live.get("labels", [])}
+        revoked = publication_revocation(host, live.get("headRefName"))
+        if revoked:
+            return {**result, "verdict": "revoked", "reasons": [f"publication-revoked:{revoked.get('reason', '?')}"],
+                    "revocation": revoked}
+        path = host.state / "verified.json"
+        prior = terminal_gate(pr, json.loads(path.read_text()) if path.exists() else {}, sensitive)
+        if prior:
+            return {**result, "verdict": "gate-already-completed", "reasons": ["exact-head-terminal-gate"],
+                    "gateResult": prior}
+        if reason := gate_deferral(host, live):
+            raise RepairStopped(reason, live, "before-gate")
+        result = _gate_pr(host, live, worktree, log, sensitive, claim)
+        if result.get("verdict") in {"landing", "verified-not-queued", "held"}:
+            proof = {**result, "schema": GATE_RESULT_SCHEMA, "completedAt": now_iso(),
+                     "policyDigest": GATE_POLICY_DIGEST, "sensitive": sensitive}
+            update_json(path, lambda verified: verified.update({f"{pr['number']}:{pr['headRefOid']}": proof}))
+        return result
+    except RepairStopped as error:
+        return {**result, "verdict": "gate-deferred", "reasons": [str(error)], "stage": error.stage}
+    except PublicationRevoked as error:
+        return {**result, "verdict": "revoked", "reasons": [str(error)], "revocation": error.receipt}
+    finally:
+        if owned:
+            claim.lock.release()
+
+
+def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: GateClaim) -> dict:
     """The independent gate for one PR head: diff rules, the canonical repo gate, then land."""
     revoked = publication_revocation(host, pr.get("headRefName"))
     if revoked:
@@ -1401,8 +1521,13 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False) 
                 "verdict": "revoked",
                 "reasons": [f"publication-revoked:{revoked.get('reason', '?')}"],
                 "revocation": revoked}
-    sh(["git", "fetch", "-q", "origin", f"pull/{pr['number']}/head"], cwd=worktree, log=log)
-    sh(["git", "checkout", "-q", "--detach", pr["headRefOid"]], cwd=worktree, log=log)
+    for command in (["git", "fetch", "-q", "origin", f"pull/{pr['number']}/head"],
+                    ["git", "checkout", "-q", "--detach", pr["headRefOid"]]):
+        if sh(command, cwd=worktree, log=log).returncode != 0:
+            raise RepairStopped("gate-checkout-failed", pr, "before-gate-checks")
+    checked_head = sh(["git", "rev-parse", "HEAD"], cwd=worktree)
+    if checked_head.returncode or checked_head.stdout.strip() != pr["headRefOid"]:
+        raise RepairStopped("gate-checkout-head-mismatch", pr, "before-gate-checks")
     numstat = sh(["git", "diff", "--numstat", "origin/main...HEAD"], cwd=worktree).stdout
     changes = parse_numstat(numstat)
     reasons = gate_rules(changes, SENSITIVE_REVIEWABLE_LINES if sensitive else MAX_REVIEWABLE_LINES)
@@ -1418,7 +1543,8 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False) 
         try:
             for command in commands:
                 try:
-                    ran = sh(command, cwd=worktree, timeout=host.gate_timeout, log=log, stream=True)
+                    ran = sh(command, cwd=worktree, timeout=host.gate_timeout, log=log, stream=True,
+                             pass_fds=(claim.lock.handle.fileno(), seat.handle.fileno()))
                 except subprocess.TimeoutExpired:
                     # A slow gate is the host's problem, not the PR's: leave the head unverified so
                     # the adopt loop retries it, and only hold after repeated timeouts.
@@ -1434,13 +1560,18 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False) 
                     evidence += [line for line in log_tail(log).splitlines()
                                  if re.search(r"(?i)error|fail|missing|expected|✗|×", line)][-40:]
             if sensitive and not reasons:
-                passed, review_reasons = sensitive_review(host, pr, worktree, log)
+                passed, review_reasons = sensitive_review(host, pr, worktree, log,
+                    pass_fds=(claim.lock.handle.fileno(), *([seat.handle.fileno()] if seat else [])))
                 if not passed:
                     reasons.extend(review_reasons)
         finally:
             if seat is not None:
                 seat.release()
         result["reasons"] = reasons
+    live = require_gate_authority(host, pr, "after-gate", sensitive)
+    checked_head = sh(["git", "rev-parse", "HEAD"], cwd=worktree)
+    if checked_head.returncode or checked_head.stdout.strip() != pr["headRefOid"]:
+        raise RepairStopped("gate-checkout-head-mismatch", live, "after-gate")
     if reasons:
         sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG, "--body",
             "Lane gate held this PR (it stays draft):\n" + "\n".join(f"- `{r}`" for r in reasons)], log=log)
@@ -1451,8 +1582,11 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False) 
         return {**result, "verdict": "revoked",
                 "reasons": [f"publication-revoked:{revoked.get('reason', '?')}"],
                 "revocation": revoked}
+    require_gate_authority(host, pr, "before-ready", sensitive)
     sh(["gh", "pr", "ready", str(pr["number"]), "--repo", REPO_SLUG], log=log)
-    queued = sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto"], log=log)
+    require_gate_authority(host, pr, "before-enqueue", sensitive)
+    queued = sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto",
+                 "--match-head-commit", pr["headRefOid"]], log=log)
     if queued.returncode != 0:
         # Verified heads are never re-gated, so a failed enqueue (e.g. a GraphQL rate limit)
         # would strand a green PR; each worker pass retries it via requeue_verified.
@@ -1467,10 +1601,19 @@ UPDATE_RETRY_S = 1800
 
 
 def update_json(path: Path, change) -> None:
-    data = json.loads(path.read_text()) if path.exists() else {}
-    change(data)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data))
+    lock = Locked(path.with_suffix(path.suffix + ".lock"), blocking=True)
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        data = json.loads(path.read_text()) if path.exists() else {}
+        change(data)
+        with temporary.open("w") as handle:
+            json.dump(data, handle)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+        lock.release()
 
 
 def requeue_verified(host: Host, prs: list[dict]) -> None:
@@ -1480,6 +1623,7 @@ def requeue_verified(host: Host, prs: list[dict]) -> None:
         return
     heads = {str(pr["number"]): pr["headRefOid"] for pr in prs}
     branches = {str(pr["number"]): pr.get("headRefName") for pr in prs}
+    targets = {str(pr["number"]): pr for pr in prs}
     def retry(requeue: dict) -> None:
         for number, head in list(requeue.items()):
             if heads.get(number) != head:
@@ -1488,8 +1632,21 @@ def requeue_verified(host: Host, prs: list[dict]) -> None:
             if publication_revocation(host, branches.get(number)):
                 del requeue[number]  # revoked branches never re-enroll
                 continue
-            sh(["gh", "pr", "ready", number, "--repo", REPO_SLUG])
-            if sh(["gh", "pr", "merge", number, "--repo", REPO_SLUG, "--auto"]).returncode == 0:
+            pr = targets[number]
+            # Only current structured proof records sensitive review. Legacy requeue
+            # entries prove an old pass, but cannot authorize a newly sensitive head.
+            proof_path = host.state / "verified.json"
+            proofs = json.loads(proof_path.read_text()) if proof_path.exists() else {}
+            proof = terminal_gate(pr, proofs, sensitive=True)
+            sensitive = bool(proof and proof.get("verdict") != "held")
+            try:
+                require_gate_authority(host, pr, "before-requeue-ready", sensitive)
+                sh(["gh", "pr", "ready", number, "--repo", REPO_SLUG])
+                require_gate_authority(host, pr, "before-requeue-enqueue", sensitive)
+            except (RepairStopped, PublicationRevoked):
+                continue  # preserve the pending record; no new authority was granted
+            if sh(["gh", "pr", "merge", number, "--repo", REPO_SLUG, "--auto",
+                   "--match-head-commit", head]).returncode == 0:
                 del requeue[number]
     update_json(path, retry)
 
@@ -1530,9 +1687,7 @@ def record_held(host: Host, number: int, head: str, evidence: list[str]) -> None
     """The gate held this head; the lane's fix loop owns it next, on the same branch."""
     path = held_path(host)
     path.parent.mkdir(parents=True, exist_ok=True)
-    held = json.loads(path.read_text()) if path.exists() else {}
-    held[str(number)] = pr_events.held_record(head, evidence)
-    path.write_text(json.dumps(held))
+    update_json(path, lambda held: held.update({str(number): pr_events.held_record(head, evidence)}))
 
 
 def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | None:
@@ -1765,7 +1920,7 @@ def reconcile_fix_target(pr: dict) -> dict | None:
     """Read the target immediately before repair work; an unreadable target fails closed."""
     try:
         viewed = sh(["gh", "pr", "view", str(pr["number"]), "--repo", REPO_SLUG, "--json",
-                     "state,mergedAt,headRefName,headRefOid,url,isDraft,mergeStateStatus,reviewDecision,statusCheckRollup"], timeout=30)
+                     "state,mergedAt,headRefName,headRefOid,url,isDraft,mergeStateStatus,reviewDecision,statusCheckRollup,labels"], timeout=30)
     except (OSError, subprocess.SubprocessError):
         return None
     try:
@@ -2238,16 +2393,30 @@ def best_per_issue(prs: list[dict]) -> list[dict]:
 def unverified_pr(prs: list[dict], verified: dict) -> dict | None:
     """A lane draft whose head the gate has never seen, e.g. a remote agent that finished late."""
     for pr in sorted(best_per_issue(prs), key=lambda item: item["number"]):
-        if pr.get("isDraft") and verified.get(str(pr["number"])) != pr["headRefOid"]:
+        sensitive = SENSITIVE_PR_LABEL in {label["name"].lower() for label in pr.get("labels", [])}
+        if pr.get("isDraft") and not terminal_gate(pr, verified, sensitive):
             return pr
     return None
 
 
-def adopt_pr(host: Host, name: str, pr: dict) -> dict:
+def adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim | None = None) -> dict:
     if not provider_may_run(name, "adopt"):
+        if claim is not None:
+            claim.lock.release()
         return {"schema": "jovie-lane-run/v1", "provider": name, "kind": "adopt", "pr": pr["number"],
                 "verdict": "skipped", "reasons": ["implementation-only-lane:no-review-tasks"],
                 "startedAt": now_iso(), "endedAt": now_iso()}
+    claim = reserve_gate(host, pr) if claim is None else claim
+    if claim is None:
+        return {"provider": name, "kind": "adopt", "pr": pr["number"], "headSha": pr["headRefOid"],
+                "verdict": "gate-in-progress", "reasons": ["exact-head-gate-reserved"]}
+    try:
+        return _adopt_pr(host, name, pr, claim)
+    finally:
+        claim.lock.release()
+
+
+def _adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim) -> dict:
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-PR{pr['number']}-{name}-adopt-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
     runs.mkdir(parents=True, exist_ok=True)
@@ -2258,21 +2427,23 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
                "startedAt": now_iso()}
     with open(runs / f"{run_id}.log", "w") as log:
         try:
+            live = require_fix_target(pr, "before-adopt-checkout")
+            if reason := gate_deferral(host, live):
+                raise RepairStopped(reason, live, "before-adopt-checkout")
             require_disk(host, "adopt-checkout")
             sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
             add_worktree(host, ["--detach", str(worktree), "origin/main"], log)
             install_dependencies(host, worktree, log)
             labels = {label["name"].lower() for label in pr.get("labels", [])}
-            receipt.update(gate_pr(host, pr, worktree, log, sensitive=SENSITIVE_PR_LABEL in labels))
+            receipt.update(gate_pr(host, pr, worktree, log, sensitive=SENSITIVE_PR_LABEL in labels, claim=claim))
+        except RepairStopped as error:
+            receipt.update(verdict="gate-deferred", reasons=[str(error)], stage=error.stage)
         except WorktreeUnavailable as error:
             receipt.update(verdict="skipped", reasons=[f"worktree-unavailable:{error}"[:300]])
         except Exception as error:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
             remove_worktree(host, worktree)
-    if receipt.get("verdict") in ("gate-timeout", "failed", "skipped"):
-        # Not verified: forget the claim so the next adopt pass retries this head.
-        update_json(host.state / "verified.json", lambda verified: verified.pop(str(pr["number"]), None))
     receipt["endedAt"] = now_iso()
     receipt["result"] = {"verdict": receipt.get("verdict"), "commit": receipt.get("headSha"),
                          "pr": receipt.get("pr")}
@@ -2481,20 +2652,29 @@ def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> N
                                   "no push for 24 h); back to Todo.")
 
 
-def claim_adoptable_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
+def claim_adoptable_pr(host: Host, name: str, prs: list[dict]) -> GateClaim | None:
     path = host.state / "verified.json"
     verified = json.loads(path.read_text()) if path.exists() else {}
     pr = unverified_pr(prs, verified)
     # Another host gating a head skips it, not the whole pass: returning None here idled every
     # worker behind one claimed PR (2026-09-28, 0 running with 45 eligible PRs).
-    while pr and claimed_elsewhere(pr["number"], pr["headRefOid"], "gate"):
+    while pr:
+        reservation = reserve_gate(host, pr)
+        if reservation is not None:
+            try:
+                latest = json.loads(path.read_text()) if path.exists() else {}
+                sensitive = SENSITIVE_PR_LABEL in {label["name"].lower() for label in pr.get("labels", [])}
+                if not terminal_gate(pr, latest, sensitive) and not gate_deferral(host, pr) \
+                        and not claimed_elsewhere(pr["number"], pr["headRefOid"], "gate"):
+                    post_claim(pr["number"], pr["headRefOid"], "gate")
+                    return reservation
+            except BaseException:
+                reservation.lock.release()
+                raise
+            reservation.lock.release()
         prs = [other for other in prs if other["number"] != pr["number"]]
         pr = unverified_pr(prs, verified)
-    if pr:
-        verified[str(pr["number"])] = pr["headRefOid"]
-        path.write_text(json.dumps(verified))
-        post_claim(pr["number"], pr["headRefOid"], "gate")
-    return pr
+    return None
 
 
 def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict | None:
@@ -2595,7 +2775,7 @@ def worker(host: Host, name: str) -> int:
         if red is not None:
             fix_red_pr(host, name, spec, red)
         else:
-            adopt_pr(host, name, adopt)
+            adopt_pr(host, name, adopt.pr, claim=adopt)
         slot.release()
         return reexec(host, name)
     if issue is None:
@@ -2642,7 +2822,10 @@ def worker(host: Host, name: str) -> int:
                                  "once a healthy lane or a human clears it.")
         slot.release()
         return 1
-    if verdict == "not-shippable":
+    if verdict in {"gate-in-progress", "gate-deferred", "gate-already-completed"}:
+        linear.comment(issue.id, f"🤖 lane `{name}`: PR {receipt.get('prUrl')} remains with its exact-head gate "
+                                 f"({verdict}); no issue retry charged and no new certification claimed.")
+    elif verdict == "not-shippable":
         linear.move(issue.id, "Backlog")
         linear.comment(issue.id, f"🤖 lane `{name}` judged this not code-shippable: {receipt['reasons'][0]}\n"
                                  "Disposition: obsolete/invalid — needs a human decision, not a work queue.")
@@ -2962,11 +3145,33 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("dispatch")
     sub.add_parser("update")
+    gate = sub.add_parser("gate-command", help="run one gate command while retaining inherited locks")
+    gate.add_argument("--timeout", type=float, required=True)
+    gate.add_argument("args", nargs=argparse.REMAINDER)
     context = sub.add_parser("context-manifest", help="check or generate the local context contract")
     context.add_argument("--write", action="store_true")
     work = sub.add_parser("worker")
     work.add_argument("--provider", required=True)
     args = parser.parse_args(argv)
+    if args.command == "gate-command":
+        command = args.args[1:] if args.args[:1] == ["--"] else args.args
+        try:
+            code = run_agent(command, Path.cwd(), sys.stdout, args.timeout, guard_interval=.1).returncode
+            return 125 if code == 124 else code  # 124 is reserved for a drained timeout
+        except subprocess.TimeoutExpired:
+            return 124  # run_agent has drained its observed descendants before raising
+        except RunStopped:
+            return 143  # explicit stop also completes the existing drain protocol
+        except BaseException as error:
+            # A cleanup error is not proof that the descendants stopped. Keep the
+            # inherited locks and leave an observable operator boundary, not a retry.
+            try:
+                print(f"gate-cleanup-unproven:{type(error).__name__}:{error}; locks retained; operator required",
+                      file=sys.stderr, flush=True)
+            except OSError:
+                pass
+            while True:
+                time.sleep(60)
     if args.command == "context-manifest":
         path = HERE / "context-manifest.json"
         generated = context_manifest_json()
