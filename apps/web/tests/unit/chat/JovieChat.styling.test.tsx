@@ -14,6 +14,7 @@ import {
 import { CHAT_COMPOSER_DOCK_CLASSNAME } from '@/components/jovie/chat-layout';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { CHAT_TRANSCRIPT_ROW_ESTIMATE_PX } from '@/lib/chat/transcript-window';
+import { getDesktopWorkState } from '@/lib/desktop/session-work-state';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 
 const virtualizerSpy = vi.hoisted(() => ({
@@ -290,6 +291,24 @@ afterAll(() => {
 });
 
 describe('JovieChat styling regressions', () => {
+  it('publishes live conversation work and revokes idle evidence on route unmount', () => {
+    const streaming = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+    expect(getDesktopWorkState()?.isStreaming).toBe(true);
+    streaming.unmount();
+    expect(getDesktopWorkState()).toBeNull();
+    mockChatState.isLoading = false;
+    mockChatState.status = 'ready';
+    mockChatState.isSubmitting = true;
+    const submitting = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+    expect(getDesktopWorkState()?.hasPendingAction).toBe(true);
+    expect(getDesktopWorkState()?.isStreaming).toBe(false);
+    submitting.unmount();
+    expect(getDesktopWorkState()).toBeNull();
+  });
   it('renders thinking placeholder as a ChatMessage with isThinking when loading', () => {
     const { container } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />

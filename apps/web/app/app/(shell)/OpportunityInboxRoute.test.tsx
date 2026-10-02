@@ -29,6 +29,10 @@ vi.mock(
       readonly connectedDSPs: readonly { readonly id: string }[];
       readonly inbox: {
         readonly cards: readonly unknown[];
+        readonly availability?: {
+          readonly suggestedActions: string;
+          readonly tourDates: string;
+        };
         readonly tourDates?: { readonly pending: readonly unknown[] };
       };
       readonly initialLinks: readonly { readonly id: string }[];
@@ -36,6 +40,8 @@ vi.mock(
       <div
         data-testid='opportunity-inbox-client'
         data-card-count={inbox.cards.length}
+        data-suggestion-availability={inbox.availability?.suggestedActions}
+        data-tour-availability={inbox.availability?.tourDates}
         data-connected-dsp-count={connectedDSPs.length}
         data-initial-link-count={initialLinks.length}
         data-pending-tour-date-count={inbox.tourDates?.pending.length ?? 0}
@@ -70,11 +76,13 @@ vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
 import { OpportunityInboxRoute } from './OpportunityInboxRoute';
 
 const BASE_INBOX = {
+  availability: { suggestedActions: 'available', tourDates: 'not_requested' },
   cards: [{ id: 'card-1' }],
   emptyActionCards: [],
 };
 
 const TOUR_DATES = {
+  availability: 'available',
   pending: [{ id: 'tour-1' }],
   confirmed: [],
   rejected: [],
@@ -105,6 +113,45 @@ describe('OpportunityInboxRoute', () => {
     mocks.getProfileSocialLinks.mockResolvedValue([{ id: 'link-1' }]);
     mocks.loadOpportunityInboxTourDateSections.mockResolvedValue(TOUR_DATES);
     mocks.getCanonicalProfileDSPs.mockReturnValue([{ id: 'spotify' }]);
+  });
+
+  it('forwards failed and missing attempted-read metadata without losing loaded cards', async () => {
+    mocks.loadOpportunityInboxTourDateSections.mockResolvedValue({
+      ...TOUR_DATES,
+      availability: undefined,
+    });
+    render(await OpportunityInboxRoute());
+    expect(screen.getByTestId('opportunity-inbox-client')).toHaveAttribute(
+      'data-tour-availability',
+      'unknown'
+    );
+    expect(screen.getByTestId('opportunity-inbox-client')).toHaveAttribute(
+      'data-card-count',
+      '1'
+    );
+  });
+  it('does not certify tour availability when profile context fails to load', async () => {
+    mocks.getDashboardShellData.mockRejectedValue(
+      new Error('profile unavailable')
+    );
+    render(await OpportunityInboxRoute());
+    expect(screen.getByTestId('opportunity-inbox-client')).toHaveAttribute(
+      'data-tour-availability',
+      'unknown'
+    );
+    expect(mocks.loadOpportunityInboxTourDateSections).not.toHaveBeenCalled();
+  });
+  it('keeps an intentionally absent selected profile distinct from a failed read', async () => {
+    mocks.getDashboardShellData.mockResolvedValue({
+      dashboardLoadError: null,
+      selectedProfile: null,
+    });
+    render(await OpportunityInboxRoute());
+    expect(screen.getByTestId('opportunity-inbox-client')).toHaveAttribute(
+      'data-tour-availability',
+      'not_requested'
+    );
+    expect(mocks.loadOpportunityInboxTourDateSections).not.toHaveBeenCalled();
   });
 
   it('starts the inbox query before profile resolution completes', async () => {
