@@ -46,6 +46,8 @@ export const APP_ROUTES = {
   CALENDAR: '/app/calendar',
   AUDIENCE: '/app/audience',
   EARNINGS: '/app/earnings',
+  /** Private Money overview — individual financial owner only (JOV-4618). */
+  MONEY: '/app/money',
   LIBRARY: '/app/library',
   /** Legacy Tracks path. Keep as a redirect source only — Tracks folded into Library (JOV-4846). */
   LEGACY_TRACKS: '/app/tracks',
