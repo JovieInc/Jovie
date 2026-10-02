@@ -5,11 +5,16 @@ import {
   resetChatTimelineStateCacheForTests,
   useJovieChat,
 } from '@/components/jovie/hooks/useJovieChat';
-import { resetComposerDraftStoreForTests } from '@/lib/chat/composer-draft-store';
+import {
+  readComposerDraft,
+  resetComposerDraftStoreForTests,
+} from '@/lib/chat/composer-draft-store';
+
+const { routerPush } = vi.hoisted(() => ({ routerPush: vi.fn() }));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
-    push: vi.fn(),
+    push: routerPush,
     replace: vi.fn(),
     refresh: vi.fn(),
     prefetch: vi.fn().mockResolvedValue(undefined),
@@ -74,6 +79,7 @@ describe('useJovieChat draft persistence', () => {
     resetChatTimelineStateCacheForTests();
     sendMessageMock.mockReset();
     maybeExecuteMock.mockReset();
+    routerPush.mockReset();
     vi.useFakeTimers();
   });
 
@@ -121,5 +127,92 @@ describe('useJovieChat draft persistence', () => {
 
     expect(result.current.input).toBe('');
     expect(sendMessageMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves the newest draft when leaving before the debounce fires', () => {
+    const first = renderHook(() =>
+      useJovieChat({ conversationId: 'thread-a' })
+    );
+    act(() => first.result.current.setInput('Just typed before Command-comma'));
+    first.unmount();
+    const restored = renderHook(() =>
+      useJovieChat({ conversationId: 'thread-a' })
+    );
+    expect(restored.result.current.input).toBe(
+      'Just typed before Command-comma'
+    );
+    restored.unmount();
+  });
+
+  it('preserves an input update batched with unmount', () => {
+    const first = renderHook(() =>
+      useJovieChat({ conversationId: 'thread-a' })
+    );
+    act(() => {
+      first.result.current.setInput('Latest input before leaving');
+      first.unmount();
+    });
+    expect(readComposerDraft('thread-a')).toBe('Latest input before leaving');
+  });
+
+  it('does not restore a sent draft when send and unmount share one batch', () => {
+    sendMessageMock.mockResolvedValue(undefined);
+    const first = renderHook(() =>
+      useJovieChat({ conversationId: 'thread-a' })
+    );
+    act(() => first.result.current.setInput('Send me'));
+    act(() => {
+      void first.result.current.submitMessage('Send me');
+      first.unmount();
+    });
+    expect(sendMessageMock).toHaveBeenCalledTimes(1);
+    expect(readComposerDraft('thread-a')).toBe('');
+  });
+
+  it('does not restore a command draft when its navigation unmounts chat', () => {
+    const first = renderHook(() =>
+      useJovieChat({ conversationId: 'thread-a' })
+    );
+    act(() => first.result.current.setInput('Open settings'));
+    routerPush.mockImplementation(() => first.unmount());
+    act(() => {
+      void first.result.current.submitMessage('Open settings');
+    });
+    expect(routerPush).toHaveBeenCalledTimes(1);
+    expect(sendMessageMock).not.toHaveBeenCalled();
+    expect(readComposerDraft('thread-a')).toBe('');
+  });
+
+  it('flushes the latest value to the active thread without overwriting its predecessor', () => {
+    const first = renderHook(
+      ({ conversationId }: { conversationId: string }) =>
+        useJovieChat({ conversationId }),
+      { initialProps: { conversationId: 'thread-a' } }
+    );
+    act(() => first.result.current.setInput('Draft A'));
+    first.rerender({ conversationId: 'thread-b' });
+    act(() => {
+      first.result.current.setInput('Draft B');
+      first.unmount();
+    });
+    expect(readComposerDraft('thread-a')).toBe('Draft A');
+    expect(readComposerDraft('thread-b')).toBe('Draft B');
+  });
+
+  it('does not resurrect a sent draft when leaving before the debounce fires', async () => {
+    sendMessageMock.mockResolvedValue(undefined);
+    const first = renderHook(() =>
+      useJovieChat({ conversationId: 'thread-a' })
+    );
+    act(() => first.result.current.setInput('Send me'));
+    await act(async () => {
+      await first.result.current.submitMessage('Send me');
+    });
+    first.unmount();
+    const restored = renderHook(() =>
+      useJovieChat({ conversationId: 'thread-a' })
+    );
+    expect(restored.result.current.input).toBe('');
+    restored.unmount();
   });
 });
