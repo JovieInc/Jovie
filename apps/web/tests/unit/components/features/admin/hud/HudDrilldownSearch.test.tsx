@@ -1,10 +1,32 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HudDrilldownSearch } from '@/components/features/admin/hud/HudDrilldownSearch';
 import { APP_ROUTES } from '@/constants/routes';
 import { cockpitMetrics } from '@/tests/fixtures/hud-cockpit';
 
+beforeEach(() => {
+  vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-28T12:00:00.000Z'));
+});
+afterEach(() => vi.restoreAllMocks());
+
 describe('HudDrilldownSearch', () => {
+  it('clears the previous scope query so switching cannot hide active exceptions', () => {
+    render(
+      <HudDrilldownSearch
+        metrics={cockpitMetrics({
+          operations: { status: 'degraded', dbLatencyMs: 240 },
+        })}
+      />
+    );
+    fireEvent.change(screen.getByTestId('hud-drilldown-search'), {
+      target: { value: 'customer-only-query' },
+    });
+    fireEvent.click(screen.getByTestId('hud-drilldown-scope-exceptions'));
+    expect(screen.getByTestId('hud-drilldown-search')).toHaveValue('');
+    expect(
+      screen.getByTestId('hud-drilldown-exception-operations-degraded')
+    ).toBeVisible();
+  });
   it('defaults to customer search targeting the authoritative People record', () => {
     render(<HudDrilldownSearch metrics={cockpitMetrics()} />);
 
@@ -71,7 +93,7 @@ describe('HudDrilldownSearch', () => {
 
     fireEvent.click(screen.getByTestId('hud-drilldown-scope-exceptions'));
     expect(screen.getByTestId('hud-drilldowns')).toHaveTextContent(
-      'No exceptions match'
+      'Systems nominal.'
     );
   });
 });

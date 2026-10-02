@@ -11,7 +11,11 @@
 
 import { APP_ROUTES } from '@/constants/routes';
 import type { FounderFunnelData } from '@/lib/admin/types';
-import { formatSourceFreshness, isSourceStale } from '@/lib/hud/source-trust';
+import {
+  formatSourceFreshness,
+  getSourceFreshnessState,
+  isSourceStale,
+} from '@/lib/hud/source-trust';
 import type { HudMetricSourceTrust, HudMetrics } from '@/types/hud';
 
 export interface OpsException {
@@ -84,7 +88,7 @@ function sourceExceptions(
  */
 export function deriveOpsExceptions(
   metrics: HudMetrics,
-  now = Date.parse(metrics.generatedAtIso)
+  now = Date.now()
 ): OpsException[] {
   const exceptions: OpsException[] = [];
 
@@ -165,7 +169,11 @@ export function deriveOpsExceptions(
   // sources are false-green and cannot both be right.
   if (
     metrics.overview?.financialDataAvailable === false &&
-    moneySources.every(source => source?.state === 'ok')
+    moneySources.every(
+      source =>
+        source?.state === 'ok' &&
+        getSourceFreshnessState(source.fetchedAtIso, now) === 'fresh'
+    )
   ) {
     exceptions.push({
       id: 'money-sources-contradiction',

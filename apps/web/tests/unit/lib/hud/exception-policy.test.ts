@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deriveOpsExceptions } from '@/lib/hud/cockpit';
 import { HUD_SOURCE_STALE_AFTER_MS } from '@/lib/hud/source-trust';
 import type { HudMetricSourceTrust, HudMetrics } from '@/types/hud';
@@ -79,7 +79,24 @@ function labels(metrics: HudMetrics): string[] {
   return deriveOpsExceptions(metrics).map(entry => entry.label);
 }
 
+beforeEach(() => {
+  vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-28T12:00:00.000Z'));
+});
+afterEach(() => vi.restoreAllMocks());
+
 describe('Hud exception policy', () => {
+  it('uses wall-clock age and reports stale money observations without claiming contradiction', () => {
+    const metrics = healthyMetrics({
+      overview: { financialDataAvailable: false },
+    });
+    vi.mocked(Date.now).mockReturnValue(
+      GENERATED_AT_MS + HUD_SOURCE_STALE_AFTER_MS + 1
+    );
+    const ids = deriveOpsExceptions(metrics).map(entry => entry.id);
+    expect(ids).toContain('source-stale-stripe');
+    expect(ids).toContain('source-stale-mercury');
+    expect(ids).not.toContain('money-sources-contradiction');
+  });
   it('false-green: an ok-but-stale source still surfaces instead of passing as healthy', () => {
     const metrics = healthyMetrics();
     metrics.sources.stripe = okSource('stripe', 'Stripe', {

@@ -31,12 +31,16 @@ export default async function AdminActivityPage({
 }: Readonly<AdminActivityPageProps>) {
   await requireCurrentAdminPageAccess();
   const params = await searchParams;
-  const query = typeof params.q === 'string' ? params.q : '';
+  const query = typeof params.q === 'string' ? params.q.trim() : '';
 
   return (
     <AdminPage
       title='Timeline'
-      description='Semantic company events with their source evidence and observed outcomes.'
+      description={
+        query
+          ? 'Search covers the 200 most recent company events from the last 7 days.'
+          : 'The 50 most recent company events from the last 7 days, with source evidence and observed outcomes.'
+      }
       tabs={{
         param: 'view',
         value: 'activity',

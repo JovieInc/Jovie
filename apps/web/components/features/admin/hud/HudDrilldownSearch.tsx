@@ -4,7 +4,7 @@
 
 import { Button, Input } from '@jovie/ui';
 import { CircleAlert, Search } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { deriveOpsExceptions } from '@/lib/hud/cockpit';
@@ -28,10 +28,7 @@ export function HudDrilldownSearch({
   const [scope, setScope] = useState<HudDrilldownScope>('customers');
   const [query, setQuery] = useState('');
   const target = getHudDrilldownTarget(scope);
-  const exceptions = useMemo(
-    () => filterOpsExceptions(deriveOpsExceptions(metrics), query),
-    [metrics, query]
-  );
+  const exceptions = filterOpsExceptions(deriveOpsExceptions(metrics), query);
 
   return (
     <ContentSurfaceCard surface='details' data-testid='hud-drilldowns'>
@@ -50,7 +47,10 @@ export function HudDrilldownSearch({
               variant={scope === option ? 'secondary' : 'ghost'}
               size='sm'
               data-testid={`hud-drilldown-scope-${option}`}
-              onClick={() => setScope(option)}
+              onClick={() => {
+                setScope(option);
+                setQuery('');
+              }}
             >
               {HUD_DRILLDOWN_SCOPE_LABELS[option]}
             </Button>
@@ -69,7 +69,9 @@ export function HudDrilldownSearch({
             />
             {exceptions.length === 0 ? (
               <p className='text-xs text-secondary-token'>
-                No exceptions match — systems nominal.
+                {query.trim()
+                  ? 'No exceptions match your search.'
+                  : 'Systems nominal.'}
               </p>
             ) : (
               <ul className='grid gap-2'>

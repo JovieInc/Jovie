@@ -1024,16 +1024,14 @@ export function HudDashboardClient({
         );
       case 'drilldowns':
         return presentation === 'token' ? (
-          <ContentSurfaceCard
-            surface='details'
-            className='space-y-3 p-3'
-            data-testid={section.testId}
-          >
-            <SectionLabel>Search records</SectionLabel>
-            <p className='text-app text-secondary-token'>
-              Customer, release, event, and exception drill-downs stay on the
-              signed-in operator path.
-            </p>
+          <ContentSurfaceCard surface='details' data-testid={section.testId}>
+            <div className='space-y-3 p-3'>
+              <SectionLabel>Search records</SectionLabel>
+              <p className='text-app text-secondary-token'>
+                Customer, release, event, and exception drill-downs stay on the
+                signed-in operator path.
+              </p>
+            </div>
           </ContentSurfaceCard>
         ) : (
           <div data-testid={section.testId}>
