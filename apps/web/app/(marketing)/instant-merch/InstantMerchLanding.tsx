@@ -10,6 +10,7 @@ import {
 } from '@/components/marketing';
 import { APP_ROUTES } from '@/constants/routes';
 import { INSTANT_MERCH_COPY as copy } from '@/data/instantMerchCopy';
+import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import type { MerchDesignCarouselResult } from '@/lib/merch/types';
 
 const CREATE_MERCH_HREF = `${APP_ROUTES.CHAT}?q=${encodeURIComponent('Make me merch')}`;
@@ -185,6 +186,7 @@ export function InstantMerchLanding() {
             <Button asChild className='mt-8' data-primary-action='true'>
               <Link
                 href={CREATE_MERCH_HREF}
+                prefetch={resolveMarketingAuthPrefetch(CREATE_MERCH_HREF)}
                 data-testid='instant-merch-final-cta'
               >
                 {copy.cta.primaryCta}
