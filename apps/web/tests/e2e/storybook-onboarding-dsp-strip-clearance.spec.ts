@@ -76,6 +76,9 @@ for (const viewport of VIEWPORTS) {
     await expect(phone).toBeVisible();
     await expect(strip).toBeVisible();
     await expect(cta).toBeVisible();
+    // The inline phone is shorter than the home card, so Listen now starts
+    // below the scrollport. Bring it into the phone before measuring.
+    await cta.scrollIntoViewIfNeeded();
 
     const phoneBox = await readBox(phone);
     const stripBox = await readBox(strip);
