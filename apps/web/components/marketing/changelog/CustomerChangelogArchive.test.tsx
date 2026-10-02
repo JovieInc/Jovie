@@ -113,8 +113,135 @@ describe('CustomerChangelogArchive', () => {
     expect(
       screen.getByText('New', { selector: '.changelog-entry__category' })
     ).toBeVisible();
-    expect(screen.getAllByText('Product update')).toHaveLength(2);
+    // One announcement, told once: a single heading and no decorative
+    // placeholder card repeating the entry inside itself. The archive jump
+    // nav link is the only other legitimate title surface.
+    expect(
+      screen.getAllByRole('heading', {
+        name: 'Review qualified brand deals in your Inbox',
+      })
+    ).toHaveLength(1);
+    expect(screen.queryByText('Product update')).not.toBeInTheDocument();
+    expect(document.querySelector('.changelog-entry__card')).toBeNull();
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it('renders one real media asset per entry through the projected contract', () => {
+    render(
+      <CustomerChangelogArchive
+        months={[
+          {
+            ...MONTHS[0],
+            entries: [
+              {
+                ...MONTHS[0].entries[0],
+                media: {
+                  kind: 'image',
+                  src: '/images/auth/noir-studio.webp',
+                  alt: 'Inbox showing a qualified brand deal',
+                },
+              },
+            ],
+          },
+        ]}
+      />
+    );
+
+    const img = screen.getByRole('img', {
+      name: 'Inbox showing a qualified brand deal',
+    });
+    expect(img.getAttribute('src')).toContain('/images/auth/noir-studio.webp');
+    expect(img).toHaveAttribute('loading', 'lazy');
+    expect(img).toHaveAttribute('decoding', 'async');
+    // Exactly one media region: the reserved-aspect frame, no second card.
+    expect(document.querySelectorAll('.changelog-entry-media')).toHaveLength(1);
+    expect(document.querySelector('.changelog-entry__card')).toBeNull();
+  });
+
+  it('removes the media region instead of leaving a placeholder gap when the asset fails', () => {
+    render(
+      <CustomerChangelogArchive
+        months={[
+          {
+            ...MONTHS[0],
+            entries: [
+              {
+                ...MONTHS[0].entries[0],
+                media: {
+                  kind: 'image',
+                  src: '/images/auth/missing-asset.webp',
+                  alt: 'Unavailable screenshot',
+                },
+              },
+            ],
+          },
+        ]}
+      />
+    );
+
+    const img = screen.getByRole('img', { name: 'Unavailable screenshot' });
+    fireEvent.error(img);
+    expect(
+      screen.queryByRole('img', { name: 'Unavailable screenshot' })
+    ).not.toBeInTheDocument();
+    expect(document.querySelector('.changelog-entry-media')).toBeNull();
+    expect(
+      screen.getByRole('heading', {
+        name: 'Review qualified brand deals in your Inbox',
+      })
+    ).toBeVisible();
+  });
+
+  it('renders contracted video with controls and no autoplay', () => {
+    render(
+      <CustomerChangelogArchive
+        months={[
+          {
+            ...MONTHS[0],
+            entries: [
+              {
+                ...MONTHS[0].entries[0],
+                media: {
+                  kind: 'video',
+                  src: '/videos/inbox-tour.mp4',
+                  alt: 'Inbox walkthrough',
+                },
+              },
+            ],
+          },
+        ]}
+      />
+    );
+
+    const video = document.querySelector(
+      '.changelog-entry-media video'
+    ) as HTMLVideoElement;
+    expect(video).not.toBeNull();
+    expect(video).toHaveAttribute('controls');
+    expect(video).toHaveAttribute('playsinline');
+    expect(video).toHaveAttribute('preload', 'metadata');
+    expect(video.autoplay).toBe(false);
+    expect(video).toHaveAttribute('aria-label', 'Inbox walkthrough');
+  });
+
+  it('keeps long titles readable in a single text-first column', () => {
+    const longTitle =
+      'Review qualified brand deals in your Inbox with buyer context, budget signals, and source attribution across every connected profile';
+    render(
+      <CustomerChangelogArchive
+        months={[
+          {
+            ...MONTHS[0],
+            entries: [{ ...MONTHS[0].entries[0], title: longTitle }],
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByRole('heading', { name: longTitle })).toBeVisible();
+    expect(screen.getAllByRole('heading', { name: longTitle })).toHaveLength(1);
+    expect(document.querySelector('.changelog-entry__card')).toBeNull();
+    expect(document.querySelector('.changelog-entry-media')).toBeNull();
   });
 
   it('shows one month then loads earlier updates without 1-of-N theater', () => {

@@ -55,16 +55,10 @@ export default function ChangelogLoading() {
                   <div className='changelog-entry__content'>
                     <div className='h-3 w-16 skeleton rounded' />
                     <div className='h-8 w-2/3 skeleton rounded' />
-                    <div className='changelog-skeleton-media skeleton' />
                     <div className='space-y-2'>
                       <div className='h-4 w-full skeleton rounded' />
                       <div className='h-4 w-5/6 skeleton rounded' />
                     </div>
-                  </div>
-                  <div className='changelog-entry__card'>
-                    <div className='changelog-skeleton-card-media skeleton' />
-                    <div className='h-5 w-3/4 skeleton rounded' />
-                    <div className='h-3 w-1/2 skeleton rounded' />
                   </div>
                 </div>
               </div>
