@@ -1108,6 +1108,10 @@ export function buildAffectedTestPlan(changedFiles, options) {
     pythonTests: [],
     pythonUnittestTests: [],
     scriptVitestTests: [],
+    scriptVitestCoverageArgs: [],
+    nodeTests: [],
+    nodeTestArgs: [],
+    retouchPromptCoverage: false,
     ...plan,
     ...(lanePythonCoverage
       ? {
