@@ -367,6 +367,7 @@ export function nextLink(header) {
  *   readonly mergingPull: { readonly number: number, readonly url: string, readonly sha: string },
  *   readonly allowlist?: ReadonlySet<string>,
  *   readonly scanComplete?: boolean,
+ *   readonly checkGreen?: boolean,
  * }} input
  * @returns {{ action: 'close' | 'skip', comment: string, blockingNumbers: number[] }}
  */
