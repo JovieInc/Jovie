@@ -3,6 +3,7 @@ import { connection } from 'next/server';
 import { Suspense } from 'react';
 import { getAuthenticatedAuthEntryRedirectFromParams } from '@/lib/auth/access-route-redirect';
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { SigninModalClient } from './SigninModalClient';
 
 export default async function SigninModalPage({
@@ -24,7 +25,9 @@ export default async function SigninModalPage({
 
   return (
     <Suspense fallback={null}>
-      <SigninModalClient />
+      <SigninModalClient
+        showOfferSummary={isCodeFlagEnabled('AUTH_OFFER_SUMMARY')}
+      />
     </Suspense>
   );
 }
