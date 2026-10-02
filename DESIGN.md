@@ -15,6 +15,27 @@ Current direction: one System B token foundation, compact product and editorial
 marketing languages. Inter is the body/UI face; Satoshi is the approved display
 exception. Do not revive System A or DM Sans from historical examples.
 
+## Settings decisions (founder-locked 2026-10-02)
+
+- A user decision must earn a control or screen. Explain the user job, scope,
+  consequence and why the existing task context or grouped screen is insufficient.
+  Do not use a fixed number of controls as a screen-admission rule.
+- Prefer sensible automatic behavior. Preserve informed consent, privacy controls,
+  data export/deletion and meaningful manual overrides; explain an override when
+  documenting an automatic default. Convenience must not silently grant consent.
+- Group related decisions and disclose advanced choices progressively. Keep task
+  options and approvals in their workflow. Keep operator controls in Ovie.
+- Connections owns service status, permissions, consent and access recovery.
+  Suggested content or booking approvals belong to their appropriate inbox cards.
+- Reuse the live settings lists in `dashboard-nav/config.ts`, shared admission
+  metadata in `settings-sidebar-config.ts`, and UnifiedSidebar renderer.
+  Admission joins the existing app-screen registry; aliases do not earn
+  duplicate screens. Update the existing snapshot/admission tests deliberately.
+- Contextual menus contain relevant secondary actions, not unrelated settings or
+  hidden essential consent. Usage surfaces show one truthful snapshot and status.
+- Verify behavior through existing local, weekly and shadow checks. Metadata and
+  structural validation are review evidence, not runtime or app-wide certification.
+
 ## Authority and precedence
 
 After `canon/OPERATING_SYSTEM.md` and `canon/DESIGN.md`, this file is the
