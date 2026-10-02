@@ -920,11 +920,14 @@ headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue isCrossRep
 commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}"""
 
 
-def open_prs_state(lane) -> list[dict] | None:
+def open_prs_state(lane, report: dict | None = None) -> list[dict] | None:
     """Every open PR's merge state, queue membership, labels and rollup state (not per-check
-    contexts), a few GraphQL pages. None when GitHub is unreadable."""
+    contexts), a few GraphQL pages. None when GitHub is unreadable. `report["complete"]` is
+    false when the page cap is hit, so a hold prune must not treat missing numbers as closed."""
     owner, name = lane.REPO_SLUG.split("/")
     prs, cursor = [], None
+    if report is not None:
+        report["complete"] = False
     for _ in range(10):
         args = ["gh", "api", "graphql", "-f", f"query={OPEN_PRS_QUERY}", "-F", f"owner={owner}", "-F", f"name={name}"]
         if cursor:
@@ -942,6 +945,8 @@ def open_prs_state(lane) -> list[dict] | None:
             node["labels"] = node.get("labels", {}).get("nodes", [])
             prs.append(node)
         if not page["pageInfo"]["hasNextPage"]:
+            if report is not None:
+                report["complete"] = True
             return prs
         cursor = page["pageInfo"]["endCursor"]
     return prs
@@ -1045,9 +1050,13 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
     previous = read_state(host, "reconcile.json")
     if not force and now - float(previous.get("atEpoch") or 0) < RECONCILE_S:
         return None
-    prs = open_prs_state(lane)
+    report: dict = {}
+    prs = open_prs_state(lane, report)
     if prs is None:
         return None
+    prune_held = getattr(lane, "prune_held", None)
+    if prune_held is not None:
+        prune_held(host, prs, now, complete=bool(report.get("complete")))
     providers = lane.load_providers()
     disabled = set(providers) - set(cost_order(providers))
     deps = open_dependencies(prs, now, lane.sh)
