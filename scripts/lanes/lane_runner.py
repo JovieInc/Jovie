@@ -27,6 +27,7 @@ import socket
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 import uuid
 from dataclasses import dataclass, field
@@ -37,6 +38,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import continuity_clock  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
+import autoscale  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
 import pr_events  # noqa: E402
@@ -82,7 +84,8 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py",
-              "scripts/tests/test_disk_guard.py", "scripts/tests/test_continuity_clock.py"]
+              "scripts/tests/test_disk_guard.py", "scripts/tests/test_continuity_clock.py",
+              "scripts/tests/test_autoscale.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
@@ -431,8 +434,11 @@ class Host:
     # once only makes all of them time out.
     gate_slots: int = int(os.environ.get("LANES_GATE_SLOTS", 2))
 
-    def slots(self, provider: str, default: int) -> int:
+    def base_slots(self, provider: str, default: int) -> int:
         return int(os.environ.get(f"LANES_SLOTS_{provider.upper()}", default))
+
+    def slots(self, provider: str, default: int) -> int:
+        return autoscale.effective_slots(self.state, provider, self.base_slots(provider, default))
 
 
 def load_providers(path: Path = HERE / "providers.json") -> dict:
@@ -851,11 +857,32 @@ class Linear:
             data=json.dumps({"query": query, "variables": variables}).encode(),
             headers={"Content-Type": "application/json", "Authorization": self.key},
         )
-        with urllib.request.urlopen(request, timeout=30) as response:
-            payload = json.load(response)
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                raw = response.read()
+                self._capture_budget(getattr(response, "headers", None), getattr(response, "status", 200), raw)
+                payload = json.loads(raw)
+        except urllib.error.HTTPError as error:
+            raw = b""
+            try:
+                raw = error.read()
+            except Exception:
+                raw = b""
+            self._capture_budget(getattr(error, "headers", None), getattr(error, "code", 0), raw)
+            raise
         if payload.get("errors"):
             raise RuntimeError(f"linear: {payload['errors'][0].get('message')}")
         return payload["data"]
+
+    def _capture_budget(self, headers, status: int, raw: bytes) -> None:
+        """Linear rate-limit headers are local input for autoscale. Capture never changes gql's result."""
+        try:
+            state = getattr(self, "state", None)
+            if state is None:
+                state = Path(os.environ.get("LANES_STATE", Path.home() / ".local/state/jovie-lanes"))
+            autoscale.record_linear_budget(state, headers, status, raw)
+        except Exception:
+            return
 
     def lane_issues(self, label: str) -> list[Issue]:
         """Todo issues carrying the lane's own label or the shared pool label.
@@ -2842,6 +2869,7 @@ def worker(host: Host, name: str) -> int:
         slot.release()
         return 1
     linear = Linear(host.linear_env)
+    linear.state = host.state
     claim = Locked(host.state / "claim.lock", blocking=True)
     try:
         # Finish before starting: PRs a GitHub event queued, red PRs (any open PR in the repo),
@@ -2855,7 +2883,9 @@ def worker(host: Host, name: str) -> int:
         adopt = None if red or not provider_may_run(name, "adopt") else claim_adoptable_pr(host, name, prs)
         issue = None
         sweep_lane_prs(host, name, linear)
-        budget = None if red or adopt else read_new_issue_budget(name, host.slots(name, spec.get("slots", 1)))
+        # JOV-7514 budgets stay on configured base slots. Scaling the cap with the
+        # autoscaled count would admit more parked PRs as capacity rises.
+        budget = None if red or adopt else read_new_issue_budget(name, host.base_slots(name, spec.get("slots", 1)))
         blocked = budget is not None and not budget["allowed"]
         in_flight = None if red or adopt or blocked else in_flight_issues()
         if in_flight is not None:
@@ -2978,6 +3008,13 @@ def dispatch(host: Host) -> int:
     tick = {"at": now_iso(), "release": read_marker(host), "unhealthy": [], "spawned": [], "error": None}
     try:
         tick["disk"] = disk_guard.check(host)
+        if autoscale.mode() != "off":
+            try:
+                bases = {name: (host.base_slots(name, spec.get("slots", 1)) if spec.get("enabled", True) else 0)
+                         for name, spec in load_providers().items()}
+                tick["autoscale"] = autoscale.apply_tick(host.state, tick, bases)
+            except Exception as error:  # a bad sample never blocks the spawn loop
+                tick["autoscaleError"] = f"{type(error).__name__}: {error}"[:200]
         if not tick["disk"].get("admitted"):
             raise DiskAdmissionError(tick["disk"].get("reason", "disk-unobservable"))
         ensure_full_history(host)

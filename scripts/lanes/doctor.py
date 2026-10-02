@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import autoscale  # noqa: E402  (sibling module of the release)
 import pr_events  # noqa: E402  (sibling module of the release)
 
 COOL_OFF_S = 6 * 3600
@@ -70,9 +71,12 @@ def host_capacity(host, lane) -> dict:
     """Configured seats, including draining workers but not stale lock files."""
     capacity = {}
     for name, spec in lane.load_providers().items():
-        slots = max(0, host.slots(name, spec.get("slots", 1))) if spec.get("enabled", True) else 0
+        enabled = spec.get("enabled", True)
+        configured = spec.get("slots", 1)
+        base = host.base_slots(name, configured) if enabled else 0
+        slots = max(0, host.slots(name, configured)) if enabled else 0
         running = sum(_locked(path) for path in (host.state / "slots").glob(f"{name}.*.lock"))
-        capacity[name] = {"slots": slots, "running": running}
+        capacity[name] = {"slots": slots, "running": running, "base": base}
     return capacity
 
 
@@ -135,7 +139,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         qualified_by_provider, candidate_pool, candidate_counts, rejected = qualified_pool(host, lane, capacity_by_provider, now)
         eligible_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
         eligible_pool = len({issue.identifier for issues in qualified_by_provider.values() for issue in issues})
-        budgets = {name: lane.read_new_issue_budget(name, seats["slots"])
+        budgets = {name: lane.read_new_issue_budget(name, seats["base"] if "base" in seats else seats["slots"])
                    for name, seats in capacity_by_provider.items()}
         qualified_by_provider = {name: issues if budgets[name]["allowed"] else []
                                  for name, issues in qualified_by_provider.items()}
@@ -723,7 +727,18 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "orphan_prs": (obs.get("reconcile") or {}).get("orphans") or [],
             "oldest_prs": [row for row in (obs.get("reconcile") or {}).get("dispositions") or []][:10],
             "dep_holds": (obs.get("reconcile") or {}).get("depHolds") or [],
-            "slo": obs.get("slo")}
+            "slo": obs.get("slo"),
+            "autoscale": _autoscale_block(host)}
+
+
+def _autoscale_block(host) -> dict:
+    state = getattr(host, "state", None)
+    if state is None:
+        return {"mode": autoscale.mode(), "lanes": {}, "history": []}
+    try:
+        return autoscale.public_block(state)
+    except Exception:
+        return {"mode": autoscale.mode(), "lanes": {}, "history": []}
 
 
 PRIMARY_FLAG = Path.home() / ".config/jovie-lanes/primary"
@@ -788,6 +803,7 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     result["codexIdleSince"] = previous["codexIdleSince"]
     result["providerIdleSince"] = previous["providerIdleSince"]
     result["observed"] = {k: v for k, v in obs.items() if k not in ("tick", "codex", "_receipts24h", "_allReceipts")}
+    result["autoscale"] = _autoscale_block(host)
     if not os.environ.get("LANES_SELFTEST"):
         try:
             obs["slo"] = fetch_slo(host, lane)
