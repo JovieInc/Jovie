@@ -287,7 +287,7 @@ export async function loadCapabilityEvidence(
   now: Date = new Date()
 ): Promise<CapabilityEvidenceRecord> {
   const registryTitle = 'Public profile pages';
-  const build = getDeployedBuildInfo();
+  const build = await getDeployedBuildInfo();
 
   let certification: CapabilityCertification | null = null;
   let gate: string | null = null;

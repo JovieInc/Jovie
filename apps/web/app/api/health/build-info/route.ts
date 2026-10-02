@@ -19,9 +19,9 @@ export const BUILD_INFO_CACHE_HEADERS = {
   expires: '0',
 } as const;
 
-export function GET() {
+export async function GET() {
   const worktree = getWorktreeIdentity();
-  const build = getDeployedBuildInfo();
+  const build = await getDeployedBuildInfo();
 
   return NextResponse.json(
     {

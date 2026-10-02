@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { env } from '@/lib/env';
 // Compile-time release version from monorepo root. Bundled in so the value
@@ -17,7 +17,7 @@ export interface DeployedBuildInfo {
   readonly deployedAt: string | number;
 }
 
-let _cachedBuildId: string | undefined;
+let _cachedBuildId: Promise<string> | undefined;
 
 export function resolveAppVersion(): string {
   // Prefer static process.env access so Next.js can inline the next.config.js
@@ -44,30 +44,26 @@ export function resolveCommitSha(): string | undefined {
   );
 }
 
-export function resolveBuildId(): string {
+export function resolveBuildId(): Promise<string> {
   if (_cachedBuildId === undefined) {
-    try {
-      _cachedBuildId = readFileSync(
-        join(process.cwd(), '.next/BUILD_ID'),
-        'utf-8'
-      ).trim();
-    } catch {
-      if (env.NODE_ENV !== 'production') {
-        _cachedBuildId = 'development';
-      } else {
+    _cachedBuildId = readFile(join(process.cwd(), '.next/BUILD_ID'), 'utf-8')
+      .then(contents => contents.trim())
+      .catch(() => {
+        if (env.NODE_ENV !== 'production') {
+          return 'development';
+        }
         console.warn('[build-info] BUILD_ID not found — using fallback');
-        _cachedBuildId = 'unknown';
-      }
-    }
+        return 'unknown';
+      });
   }
   return _cachedBuildId;
 }
 
 /** The deployed build this server is actually running — the exact deployment
  * half of the capability evidence chain (JOV-7485). */
-export function getDeployedBuildInfo(): DeployedBuildInfo {
+export async function getDeployedBuildInfo(): Promise<DeployedBuildInfo> {
   return {
-    buildId: resolveBuildId(),
+    buildId: await resolveBuildId(),
     version: resolveAppVersion(),
     commitSha: resolveCommitSha(),
     deploymentId: env.VERCEL_DEPLOYMENT_ID,
