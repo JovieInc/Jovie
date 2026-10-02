@@ -31,7 +31,7 @@ export const summerDelegationInputSchema = z
   .object({
     workerIds: z.array(workerIdSchema).min(2).max(100),
     issueIds: z
-      .array(z.string().regex(/^JOV-[1-9][0-9]*$/))
+      .array(z.string().regex(/^JOV-(?:[1-9][0-9]*)$/))
       .min(1)
       .max(50),
     allowedCommands: z.array(commands).min(1).max(4),

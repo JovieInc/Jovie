@@ -12,6 +12,7 @@ import {
   type FleetResult,
 } from './dispatcher';
 import { handleFleetControl, handleFleetInvocation } from './http';
+import { summerDelegationInputSchema } from './summer';
 import { handleSummerFleetEvents } from './summer-http';
 
 const profileId = '11111111-1111-4111-a111-111111111111';
@@ -205,6 +206,29 @@ async function commissioned(scope = profileId, archival = false) {
 }
 
 describe('delegated Summer fleet event admission', () => {
+  it('keeps delegation issue identifiers restricted to canonical positive Jovie IDs', () => {
+    const input = fixture().delegation();
+    for (const issueId of ['JOV-1', 'JOV-7393']) {
+      expect(
+        summerDelegationInputSchema.safeParse({ ...input, issueIds: [issueId] })
+          .success
+      ).toBe(true);
+    }
+    for (const issueId of [
+      'JOV-0',
+      'JOV-01',
+      'JOV-1x',
+      'LYB-1',
+      'JOV--1',
+      ' JOV-1',
+      'JOV-1 ',
+    ]) {
+      expect(
+        summerDelegationInputSchema.safeParse({ ...input, issueIds: [issueId] })
+          .success
+      ).toBe(false);
+    }
+  });
   it('replays the immutable rejection when concurrent validation outlives archival', async () => {
     const f = await commissioned(profileId, true);
     const input = f.request();
