@@ -436,6 +436,26 @@
   color: var(--color-text-primary-token);
 }
 
+.changelog-entry__action-row {
+  margin-top: var(--space-2);
+}
+
+.changelog-entry__action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.75rem;
+  font-size: var(--text-app);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary-token);
+  border-radius: var(--radius-xs);
+  transition: color var(--duration-subtle, 150ms) ease;
+}
+
+.changelog-entry__action:hover {
+  color: var(--color-text-secondary-token);
+}
+
 .changelog-entry__tertiary {
   font-size: var(--text-xs);
   color: var(--color-text-quaternary-token);

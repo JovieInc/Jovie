@@ -202,6 +202,7 @@ export async function GET(request: Request) {
       day: spend.day,
       totalUsd: spend.totalUsd,
       observed30dUsd: spend.observed30dUsd,
+      cacheShare: spend.cacheShare,
       topTags: spend.byTag.slice(0, 5),
       alerts: spend.alerts,
     };

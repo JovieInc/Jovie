@@ -2586,6 +2586,50 @@ def over_budget(name: str, prs: list[dict], slots: int) -> bool:
     return sum(not is_green(pr) for pr in own) >= slots * OPEN_PRS_PER_SLOT
 
 
+def new_issue_budget(name: str, slots: int, inventory: list[dict] | None) -> dict:
+    """One owning lane's new-issue budget; maintenance/orphan work is separate."""
+    cap = max(0, slots) * OPEN_PRS_PER_SLOT
+    if slots <= 0:
+        return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": cap}
+    if inventory is None:
+        return {"allowed": False, "reason": "pr-inventory-unavailable", "used": None, "cap": cap}
+    dated = re.compile(rf"^{re.escape(name)}/jov-\d+-\d{{8}}")
+    own = {pr["number"]: pr for pr in inventory if dated.match(pr["headRefName"])}
+    used = sum(not is_green(pr) for pr in own.values())
+    return {"allowed": used < cap, "reason": "within-budget" if used < cap else "over-budget",
+            "used": used, "cap": cap}
+
+
+def read_new_issue_budget(name: str, slots: int) -> dict:
+    """Fail closed on incomplete budget reads without disrupting maintenance reads."""
+    inventory, error = None, None
+    if slots <= 0:
+        return new_issue_budget(name, slots, [])
+    try:
+        listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open",
+                     "--search", f"head:{name}/", "--limit", "200", "--json", LIGHT_PR_FIELDS],
+                    timeout=60)
+        if listed.returncode:
+            raise ValueError("pr-read-failed")
+        rows = json.loads(listed.stdout)
+        # Validate before filtering: 200 manual rows can hide dated lane PRs.
+        if not isinstance(rows, list) or len(rows) >= 200:
+            raise ValueError("pr-inventory-incomplete")
+        for row in rows:
+            if (not isinstance(row, dict) or type(row.get("number")) is not int or row["number"] <= 0
+                    or not isinstance(row.get("headRefName"), str) or not row["headRefName"].strip()
+                    or type(row.get("isDraft")) is not bool
+                    or not isinstance(row.get("mergeStateStatus"), str) or not row["mergeStateStatus"].strip()):
+                raise ValueError("pr-inventory-malformed")
+        if len({row["number"] for row in rows}) != len(rows):
+            raise ValueError("pr-inventory-duplicate")
+        inventory = rows
+    except (OSError, ValueError, subprocess.SubprocessError) as failure:
+        error = str(failure) if isinstance(failure, ValueError) else type(failure).__name__
+    result = new_issue_budget(name, slots, inventory)
+    return {**result, "observedAt": now_iso(), "error": error}
+
+
 def last_pushes() -> dict[int, float]:
     """Open PR number -> head commit time, in one paginated query (`gh pr list --json commits`
     over 200 PRs exceeds GitHub's GraphQL node limit). Empty when GitHub cannot be read."""
@@ -2758,9 +2802,9 @@ def worker(host: Host, name: str) -> int:
         adopt = None if red or not provider_may_run(name, "adopt") else claim_adoptable_pr(host, name, prs)
         issue = None
         sweep_lane_prs(host, name, linear)
-        full = not (red or adopt) and over_budget(name, lane_prs(name, fields=LIGHT_PR_FIELDS),
-                                                  host.slots(name, spec.get("slots", 1)))
-        in_flight = None if red or adopt or full else in_flight_issues()
+        budget = None if red or adopt else read_new_issue_budget(name, host.slots(name, spec.get("slots", 1)))
+        blocked = budget is not None and not budget["allowed"]
+        in_flight = None if red or adopt or blocked else in_flight_issues()
         if in_flight is not None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
             issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
@@ -2779,7 +2823,7 @@ def worker(host: Host, name: str) -> int:
         slot.release()
         return reexec(host, name)
     if issue is None:
-        record_idle_exit(host, name, "over-budget" if full else
+        record_idle_exit(host, name, budget["reason"] if blocked else
                          "in-flight-unknown" if in_flight is None else "none-eligible")
         slot.release()
         return 0
