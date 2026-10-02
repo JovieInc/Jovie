@@ -266,6 +266,139 @@ struct APIClientTests {
     }
   }
 
+  enum PinnedPushOperation: CaseIterable, Sendable {
+    case register, unregister
+
+    var method: String { self == .register ? "PUT" : "DELETE" }
+
+    var payload: [String: String] {
+      if self == .register {
+        return [
+          "token": "0123456789abcdef",
+          "environment": "sandbox",
+          "timezone": "America/Los_Angeles",
+        ]
+      }
+      return ["token": "0123456789abcdef"]
+    }
+
+    func perform(on client: APIClient, authorization: NativeRequestAuthorization) async throws {
+      switch self {
+      case .register:
+        try await client.registerPushDevice(
+          token: "0123456789abcdef", environment: .sandbox, timezone: "America/Los_Angeles",
+          authorization: authorization
+        )
+      case .unregister:
+        try await client.unregisterPushDevice(token: "0123456789abcdef", authorization: authorization)
+      }
+    }
+  }
+
+  @Test func pushOwnershipAllowsRotationButNotReloginOrSignedOutAdoption() async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      let expiry = Date().addingTimeInterval(3_600)
+      NativeSessionTokenStore.save(token: "request-a", userID: "user-a", expiresAt: expiry)
+      let initial = NativeSessionTokenStore.captureSessionContext()
+      let authorization = try #require(initial.authorization)
+      let response = HTTPURLResponse(
+        url: URL(string: "https://jov.ie/api/mobile/v1/push-devices")!,
+        statusCode: 204, httpVersion: nil, headerFields: ["set-auth-token": "rotated-a"]
+      )!
+      NativeSessionTokenStore.refresh(from: response, authorizedBy: authorization)
+      #expect(NativeSessionTokenStore.isCurrent(initial.ownership))
+      #expect(
+        NativeSessionTokenStore.requestAuthorization(ifOwnedBy: initial.ownership)?.bearerToken == "rotated-a"
+      )
+
+      NativeSessionTokenStore.save(token: "rotated-a", userID: "user-a", expiresAt: expiry)
+      #expect(!NativeSessionTokenStore.isCurrent(initial.ownership))
+      #expect(NativeSessionTokenStore.requestAuthorization(ifOwnedBy: initial.ownership) == nil)
+      NativeSessionTokenStore.clear()
+      let signedOut = NativeSessionTokenStore.captureSessionContext()
+      #expect(signedOut.authorization == nil)
+      #expect(NativeSessionTokenStore.isCurrent(signedOut.ownership))
+      NativeSessionTokenStore.save(token: "login-b", userID: "user-b", expiresAt: expiry)
+      #expect(!NativeSessionTokenStore.isCurrent(signedOut.ownership))
+      #expect(NativeSessionTokenStore.requestAuthorization(ifOwnedBy: signedOut.ownership) == nil)
+    }
+  }
+
+  @Test(arguments: PinnedPushOperation.allCases, [204, 401])
+  func pinnedPushRequestsKeepTheirAuthorizationWithoutRetryOrGlobalClear(
+    operation: PinnedPushOperation,
+    statusCode: Int
+  ) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      // Same-user replacement also reuses the bearer, exercising login-generation ABA.
+      let replacementUserIDs: [String?] = [nil, "user-b", "user-a"]
+      for replacementUserID in replacementUserIDs {
+        let expiry = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded() + 3_600)
+        NativeSessionTokenStore.save(token: "request-a", userID: "user-a", expiresAt: expiry)
+        let dispatchedAuthorization = try #require(NativeSessionTokenStore.requestAuthorization())
+        var expectedStored = try #require(NativeSessionTokenStore.load())
+        var expectedAuthorization = dispatchedAuthorization
+        var requestCount = 0
+        let tokenProvider = MockTokenProvider(tokens: ["must-not-be-used", "must-not-refresh"])
+        MockURLProtocol.requestHandler = { request in
+          requestCount += 1
+          #expect(request.url?.path == "/api/mobile/v1/push-devices")
+          #expect(request.httpMethod == operation.method)
+          #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer request-a")
+          #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
+          let payload = try #require(
+            JSONSerialization.jsonObject(with: requestBodyData(request)) as? [String: String]
+          )
+          #expect(payload == operation.payload)
+          // Only install B after observing A's actual dispatched credential.
+          if let replacementUserID {
+            NativeSessionTokenStore.save(
+              token: replacementUserID == "user-a" ? "request-a" : "login-b",
+              userID: replacementUserID,
+              expiresAt: expiry
+            )
+            expectedStored = try #require(NativeSessionTokenStore.load())
+            expectedAuthorization = try #require(NativeSessionTokenStore.requestAuthorization())
+          }
+          return (
+            HTTPURLResponse(
+              url: request.url!, statusCode: statusCode, httpVersion: nil,
+              headerFields: ["set-auth-token": "rolled-a"]
+            )!,
+            Data()
+          )
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+        let client = APIClient(
+          baseURL: URL(string: "https://jov.ie")!, session: makeSession(), tokenProvider: tokenProvider
+        )
+
+        if statusCode == 401 {
+          await #expect(throws: APIClientError.requestFailed(statusCode: 401)) {
+            try await operation.perform(on: client, authorization: dispatchedAuthorization)
+          }
+        } else {
+          try await operation.perform(on: client, authorization: dispatchedAuthorization)
+        }
+
+        #expect(requestCount == 1)
+        #expect(await tokenProvider.recordedForceRefreshValues().isEmpty)
+        let stored = try #require(NativeSessionTokenStore.load())
+        let authorization = try #require(NativeSessionTokenStore.requestAuthorization())
+        if replacementUserID == nil, statusCode == 204 {
+          #expect(stored.userID == "user-a")
+          #expect(stored.token == "rolled-a")
+          #expect(stored.expiresAt > expiry)
+          #expect(authorization.bearerToken == "rolled-a")
+          #expect(authorization != dispatchedAuthorization)
+        } else {
+          #expect(stored == expectedStored)
+          #expect(authorization == expectedAuthorization)
+        }
+      }
+    }
+  }
+
   @Test func injectsBearerToken() async throws {
     let tokenProvider = MockTokenProvider(tokens: ["token-1"])
     MockURLProtocol.requestHandler = { request in
