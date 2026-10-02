@@ -247,6 +247,28 @@ test('trusted job receipt prevents enrollment while status replication is empty'
     retry.statusWrites.map(item => item.description),
     ['spent:run=123;try=1']
   );
+  const synthetic = await fixture({
+    failureReceipt: JSON.stringify({
+      ...receipt,
+      classification: 'transient-infrastructure',
+    }),
+    eventName: 'workflow_run',
+    payload: {
+      workflow_run: {
+        event: 'merge_group',
+        head_sha: 'b'.repeat(40),
+        head_branch: `gh-readonly-queue/main/pr-1-${sha}`,
+        pull_requests: [],
+      },
+    },
+  });
+  assert.deepEqual(synthetic.gets, [1]);
+  assert.equal(synthetic.mutations.length, 1);
+  assert.deepEqual(
+    synthetic.statusWrites.map(item => item.description),
+    ['spent:run=123;try=1']
+  );
+  assert.deepEqual(synthetic.inventories, []);
   const changed = await fixture({
     failureReceipt: JSON.stringify({
       ...receipt,

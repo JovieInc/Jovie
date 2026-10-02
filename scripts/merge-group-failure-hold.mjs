@@ -222,7 +222,7 @@ function failureDescription({ classification, failureNumber, run }) {
 }
 
 /** Only consumes the trusted failure-hold job output, never PR-provided data. */
-export function failureReceiptStatus(raw, { repository, prNumber, headSha }) {
+export function readFailureReceipt(raw, repository) {
   if (raw === undefined || raw === '') return null;
   if (typeof raw !== 'string') fail('trusted failure receipt is malformed');
   const receipt = JSON.parse(raw);
@@ -241,6 +241,12 @@ export function failureReceiptStatus(raw, { repository, prNumber, headSha }) {
   ) {
     fail('trusted failure receipt is malformed');
   }
+  return receipt;
+}
+
+export function failureReceiptStatus(raw, { repository, prNumber, headSha }) {
+  const receipt = readFailureReceipt(raw, repository);
+  if (!receipt) return null;
   if (receipt.prNumber !== prNumber || receipt.sourceHeadSha !== headSha)
     return null;
   return {

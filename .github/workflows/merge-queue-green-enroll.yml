@@ -159,6 +159,10 @@ jobs:
               } else if (context.eventName === 'workflow_run') {
                 const run = context.payload.workflow_run || {};
                 numbers = (run.pull_requests || []).map(pr => pr.number).filter(validNumber);
+                const receipt = process.env.FAILURE_HOLD_RECEIPT;
+                if (run.event === 'merge_group' && receipt) {
+                  numbers = [failurePolicy.readFailureReceipt(receipt, `${owner}/${repo}`).prNumber];
+                }
                 // PR-target workflow receipts can omit their pull_requests association.
                 // Resolve only the exact source SHA and branch, never a fallback full scan.
                 if (numbers.length === 0 && /^[a-f0-9]{40}$/.test(run.head_sha || '') && run.head_branch) {
