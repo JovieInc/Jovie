@@ -1,6 +1,8 @@
+import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
 import { AdminWaitlistTableUnified } from './AdminWaitlistTableUnified';
+import { AdminWaitlistTableWithViews } from './AdminWaitlistTableWithViews';
 
 const entries: WaitlistEntryRow[] = [
   {
@@ -52,4 +54,21 @@ export const Empty: Story = {
     pageSize: 25,
     total: 0,
   },
+};
+
+export const IntegrityAndSelection: Story = {
+  render: () => (
+    <AdminWaitlistTableWithViews
+      entries={entries}
+      page={1}
+      pageSize={25}
+      total={entries.length}
+      integrity={{
+        totalIssues: 3,
+        usersMissingWaitlistEntry: 2,
+        entriesMissingUser: 1,
+        signedUpEntriesMissingUser: 0,
+      }}
+    />
+  ),
 };

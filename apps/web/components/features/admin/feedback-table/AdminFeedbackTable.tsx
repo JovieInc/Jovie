@@ -24,10 +24,7 @@ import {
 } from '@/components/organisms/table';
 import { convertContextMenuItems } from '@/components/organisms/table/molecules/TableContextMenu';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
-import {
-  AdminTableHeader,
-  AdminTableSubheader,
-} from '@/features/admin/table/AdminTableHeader';
+import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { useDismissFeedbackMutation } from '@/lib/queries';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
@@ -440,10 +437,6 @@ export function AdminFeedbackTable({
 
   return (
     <div className='h-full min-h-155 overflow-hidden bg-(--app-shell-content-surface)'>
-      <AdminTableHeader
-        title='Feedback'
-        subtitle='Triage product feedback and close the loop with clear status.'
-      />
       <AdminTableSubheader
         start={
           <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
