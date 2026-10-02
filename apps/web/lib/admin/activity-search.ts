@@ -9,9 +9,15 @@ export function filterAdminActivityItems(
   items: readonly AdminActivityItem[],
   query: string
 ): AdminActivityItem[] {
-  const needle = query.trim().toLowerCase();
+  const normalize = (text: string) =>
+    text
+      .trim()
+      .toLowerCase()
+      .replace(/[._-]+/g, ' ')
+      .replace(/\s+/g, ' ');
+  const needle = normalize(query);
   if (!needle) return [...items];
   return items.filter(item =>
-    `${item.user} ${item.action} ${item.status}`.toLowerCase().includes(needle)
+    normalize(`${item.user} ${item.action} ${item.status}`).includes(needle)
   );
 }

@@ -13,7 +13,7 @@ const items: AdminActivityItem[] = [
   {
     id: 'stripe-1',
     user: 'Stripe',
-    action: 'invoice.payment_failed',
+    action: 'Invoice payment failed',
     timestamp: '2026-09-28 11:00 UTC',
     status: 'error',
   },
@@ -28,6 +28,10 @@ describe('filterAdminActivityItems', () => {
   it('matches actor, action, and status case-insensitively', () => {
     expect(filterAdminActivityItems(items, 'ALICE')).toHaveLength(1);
     expect(filterAdminActivityItems(items, 'payment_failed')).toHaveLength(1);
+    expect(
+      filterAdminActivityItems(items, 'invoice.payment_failed')
+    ).toHaveLength(1);
+    expect(filterAdminActivityItems(items, 'payment failed')).toHaveLength(1);
     expect(filterAdminActivityItems(items, 'error')).toHaveLength(1);
     expect(filterAdminActivityItems(items, 'nomatch')).toHaveLength(0);
   });
