@@ -40,7 +40,14 @@ export function getDeploymentLabel(deployments: HudDeployments): string {
     return 'Deploy: error';
   }
   if (deployments.current) {
-    return `Deploy: ${deployments.current.status}`;
+    const labels: Record<HudDeploymentState, string> = {
+      success: 'successful',
+      in_progress: 'in progress',
+      failure: 'failed',
+      unknown: 'unknown',
+      not_configured: 'not configured',
+    };
+    return `Deploy: ${labels[deployments.current.status]}`;
   }
   return 'Deploy: unknown';
 }

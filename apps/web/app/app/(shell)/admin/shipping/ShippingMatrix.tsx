@@ -368,7 +368,6 @@ export function ShippingRowRail({
       scrollStrategy='shell'
       onClose={onClose}
       headerMode='minimal'
-      hideMinimalHeaderBar
       entityHeaderSurface='flat'
       isEmpty={!row}
       emptyMessage='Select a work item to inspect it.'
