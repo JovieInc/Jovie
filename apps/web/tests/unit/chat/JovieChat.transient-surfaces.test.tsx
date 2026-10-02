@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createComposerDraft } from '@/components/jovie/hooks/useComposerDraft';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 
@@ -151,7 +152,10 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
     await importOriginal<typeof import('@/components/jovie/hooks')>();
   return {
     ...actual,
-    useJovieChat: () => mockChatState,
+    useJovieChatController: () => ({
+      ...mockChatState,
+      draft: createComposerDraft(mockChatState.input),
+    }),
     useChatFileAttachments: useChatFileAttachmentsSpy,
     useStickToBottom: () => ({
       isStuckToBottom: true,
