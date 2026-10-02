@@ -452,6 +452,31 @@ describe('ProfileDesktopSurface', () => {
     expect(screen.getByTestId('profile-desktop-surface')).toBeInTheDocument();
   });
 
+  // JOV-7412: the document scrolls at desktop widths, so the card's inner
+  // scroll pane must chain overscroll to the page instead of trapping the
+  // wheel at its own edges.
+  it('chains overscroll to the document instead of trapping the wheel', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+      />
+    );
+
+    const scrollPane = screen.getByTestId('profile-desktop-content-scroll');
+    expect(scrollPane).toHaveClass('overflow-y-auto', 'overscroll-auto');
+    expect(scrollPane.className).not.toMatch(/\boverscroll-contain\b/);
+  });
+
   // JOV-6453: while the AnonCookieBootstrap fetch is still in flight the
   // variant-dependent hero CTA stays inert so it cannot morph post-paint.
   it('holds the hero subscribe CTA inert while the visitor assignment resolves', () => {

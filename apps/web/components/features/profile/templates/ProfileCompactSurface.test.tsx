@@ -551,7 +551,10 @@ describe('ProfileCompactSurface', () => {
       'flex',
       'flex-col',
       'overflow-y-auto',
-      'overscroll-contain'
+      'overscroll-contain',
+      // JOV-7412: md+ the document scrolls, so the pane must chain overscroll
+      // to the page instead of trapping the wheel at its own edges.
+      'md:overscroll-auto'
     );
   });
 

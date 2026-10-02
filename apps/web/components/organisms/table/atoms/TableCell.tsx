@@ -2,7 +2,7 @@ import { cn } from '@jovie/ui/lib/utils';
 import { borders, presets, tableAlignment } from '../table.styles';
 
 export const TABLE_CELL_CONTENT_CLASSNAME =
-  'block h-8 max-h-8 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap leading-8 [&>*]:max-w-full';
+  'block h-8 max-h-8 min-w-0 content-center overflow-hidden text-ellipsis whitespace-nowrap leading-normal [&>*]:max-w-full';
 
 export interface TableCellProps {
   readonly children: React.ReactNode;

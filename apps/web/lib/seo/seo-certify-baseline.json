@@ -2,7 +2,7 @@
   "schema": "jovie.seo-certify-baseline/v1",
   "failures": {
     "/": ["geo:geo-sibling-links"],
-    "/about": ["geo:geo-sibling-links", "technical:open-graph"],
+    "/about": ["technical:open-graph"],
     "/ai": ["agentic:structured-data"],
     "/alternatives": [
       "copy:copy-lint",

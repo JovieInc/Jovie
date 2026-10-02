@@ -107,6 +107,38 @@ class ReasonTest(unittest.TestCase):
 
 
 class RelayTest(unittest.TestCase):
+    def test_empty_ci_association_resolves_one_exact_same_repo_head_then_deduplicates(self):
+        sha = "a" * 40
+        workflow = {"event": "pull_request", "conclusion": "failure", "head_sha": sha,
+                    "head_branch": "codex/fix", "head_repository": {"full_name": events.REPO},
+                    "pull_requests": []}
+        candidate = {"number": 5, "state": "open",
+                     "head": {"sha": sha, "ref": "codex/fix", "repo": {"full_name": events.REPO}},
+                     "base": {"repo": {"full_name": events.REPO}}}
+        view = pr(branch="codex/fix", sha=sha)
+        shell = Shell({("gh", "api", f"repos/{events.REPO}/pulls"): [candidate],
+                       ("gh", "pr", "view"): lambda args: view})
+        payload = {"workflow_run": workflow}
+        self.assertEqual(events.relay("workflow_run", payload, shell, set()), [(5, "red")])
+        view["labels"] = [{"name": "lane-fix-red"}]
+        self.assertEqual(events.relay("workflow_run", payload, shell, set()), [])
+        self.assertEqual(len(shell.made("gh", "api", "-X", "POST")), 1)
+        for candidates in ([], [None], {}, [candidate, candidate], [{**candidate, "state": "closed"}],
+                           [{**candidate, "head": {**candidate["head"], "sha": "b" * 40}}],
+                           [{**candidate, "base": {"repo": {"full_name": "other/repo"}}}]):
+            rejected = Shell({("gh", "api", f"repos/{events.REPO}/pulls"): candidates})
+            self.assertEqual(events.relay("workflow_run", payload, rejected, set()), [])
+            self.assertEqual(rejected.made("gh", "pr", "view"), [])
+        for changed in ({"head_repository": {"full_name": "fork/repo"}}, {"head_sha": "bad"},
+                        {"head_branch": ""}, {"event": "push"}, {"conclusion": "cancelled"}):
+            rejected = Shell()
+            self.assertEqual(events.relay("workflow_run", {"workflow_run": {**workflow, **changed}},
+                                          rejected, set()), [])
+            self.assertEqual(rejected.calls, [])
+        failed = Shell({("gh", "api", f"repos/{events.REPO}/pulls"): (1, "")})
+        with self.assertRaisesRegex(RuntimeError, "cannot resolve"):
+            events.relay("workflow_run", payload, failed, set())
+
     def test_ci_failure_and_success_on_a_pr_become_red_and_green(self):
         run = {"event": "pull_request", "conclusion": "failure", "head_sha": "h1", "pull_requests": [{"number": 5}]}
         self.assertEqual(events.relay_targets("workflow_run", {"workflow_run": run}), [(5, "red", "h1")])
