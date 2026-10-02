@@ -14,7 +14,9 @@ type IntersectionCallback = (
 type ResizeCallback = (entries: ResizeObserverEntry[]) => void;
 
 describe('useStickToBottom', () => {
-  let intersectionCallback: IntersectionCallback | null = null;
+  let intersectionCallback:
+    | ((entries: IntersectionObserverEntry[]) => void)
+    | null = null;
   let resizeCallback: ResizeCallback | null = null;
   let rafQueue: FrameRequestCallback[] = [];
   let queuedIntersectionEntries: IntersectionObserverEntry[] = [];
@@ -34,7 +36,7 @@ describe('useStickToBottom', () => {
       this: IntersectionObserver,
       callback: IntersectionCallback
     ) {
-      intersectionCallback = callback;
+      intersectionCallback = entries => callback(entries, this);
       this.observe = vi.fn();
       this.unobserve = vi.fn();
       this.disconnect = vi.fn();
