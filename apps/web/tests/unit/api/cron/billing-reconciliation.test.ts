@@ -134,6 +134,13 @@ describe('GET /api/cron/billing-reconciliation', () => {
     expect(response.status).toBe(200);
     expect(data.success).toBeDefined();
     expect(data.stats).toBeDefined();
+    expect(mockDbInsertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'reconciliation_run',
+        source: 'reconciliation',
+        metadata: { action: 'reconciliation_run' },
+      })
+    );
   });
 
   it('links trialing subscriptions for pro users missing stripeSubscriptionId', async () => {

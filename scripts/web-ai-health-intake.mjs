@@ -2,7 +2,12 @@
 
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { upsertLinearIssueByTitleFingerprint } from './lib/linear-issue-intake.mjs';
+import {
+  closeLinearIssueByFingerprint,
+  logRemediationDryRun,
+  remediationTriggersEnabled,
+  upsertLinearIssueByTitleFingerprint,
+} from './lib/linear-issue-intake.mjs';
 
 function failureRows(receipt) {
   return receipt.results.filter(result => result.ok === false);
@@ -96,12 +101,40 @@ export async function fileWebAiHealthLinearIssue({
   });
 }
 
+const WEB_AI_KEY = 'web-ai-health';
+
 async function main() {
+  const statusOverride = process.env.WEB_AI_HEALTH_STATUS;
   const receiptPath = process.env.WEB_AI_HEALTH_RECEIPT_PATH;
-  if (!receiptPath) {
-    throw new Error('WEB_AI_HEALTH_RECEIPT_PATH is required');
+  const receipt = receiptPath
+    ? JSON.parse(await readFile(receiptPath, 'utf8'))
+    : { status: statusOverride };
+  const passed = receipt?.status === 'passed' || statusOverride === 'passed';
+  if (!remediationTriggersEnabled()) {
+    const dry = logRemediationDryRun({
+      action: passed ? 'resolve' : 'upsert',
+      key: WEB_AI_KEY,
+      fingerprint: passed
+        ? WEB_AI_KEY
+        : buildWebAiHealthSignalPayload(receipt, process.env.RUN_URL)
+            .fingerprint,
+    });
+    console.log(JSON.stringify(dry));
+    return;
   }
-  const receipt = JSON.parse(await readFile(receiptPath, 'utf8'));
+  if (passed) {
+    const result = await closeLinearIssueByFingerprint({
+      fingerprint: WEB_AI_KEY,
+      labelKey: WEB_AI_KEY,
+      comment: 'Web AI health receipt passed.',
+      runId: process.env.GITHUB_RUN_ID,
+    });
+    if (!result.ok) {
+      throw new Error(`Web AI health Linear resolve failed: ${result.reason}`);
+    }
+    console.log(JSON.stringify(result));
+    return;
+  }
   const result = await fileWebAiHealthLinearIssue({
     receipt,
     runUrl: process.env.RUN_URL,

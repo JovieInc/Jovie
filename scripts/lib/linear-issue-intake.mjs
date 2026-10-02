@@ -123,10 +123,43 @@ export async function listLinearIssueComments({
   };
 }
 
+const REMEDIATION_KEY_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const labelCache = new Map();
+
 /** Router intake label. Do not double-prefix fingerprints that already start with it. */
 export function remediationKey(fingerprint) {
   const name = String(fingerprint ?? '').trim();
   return name.startsWith('remediation:') ? name : `remediation:${name}`;
+}
+
+export function bareRemediationKey(value) {
+  const name = String(value ?? '').trim();
+  return name.startsWith('remediation:')
+    ? name.slice('remediation:'.length)
+    : name;
+}
+
+export function isValidRemediationKey(value) {
+  return REMEDIATION_KEY_RE.test(bareRemediationKey(value));
+}
+
+export function remediationTriggersEnabled(env = process.env) {
+  return env.REMEDIATION_TRIGGERS_ENABLED === 'true';
+}
+
+export function logRemediationDryRun(plan) {
+  const action = plan.action ?? 'upsert';
+  const key = plan.key ?? '';
+  const fingerprint = plan.fingerprint ?? '';
+  console.log(
+    `remediation dry-run ${action} key=${key} fingerprint=${fingerprint}`
+  );
+  console.log(JSON.stringify({ remediation: 'dry-run', ...plan }));
+  return { ok: true, action: 'dry-run', ...plan };
+}
+
+export function clearRemediationLabelCache() {
+  labelCache.clear();
 }
 
 const ISSUE_FIELDS = `
@@ -135,8 +168,12 @@ const ISSUE_FIELDS = `
   labels(first: 50) { nodes { id name } }
 `;
 
-export function resolveLinearIssueByFingerprint(nodes, fingerprint) {
-  const labelName = remediationKey(fingerprint);
+export function resolveLinearIssueByFingerprint(
+  nodes,
+  fingerprint,
+  labelFingerprint = fingerprint
+) {
+  const labelName = remediationKey(labelFingerprint);
   const terminalTypes = ['completed', 'canceled'];
   const matches = (nodes ?? []).filter(node => {
     if (String(node?.title ?? '').includes(fingerprint)) return true;
@@ -152,20 +189,34 @@ export function resolveLinearIssueByFingerprint(nodes, fingerprint) {
   );
 }
 
-export async function ensureLinearLabel({ name, nodes, apiKey, fetchImpl }) {
+export async function ensureLinearLabel({
+  name,
+  nodes,
+  apiKey,
+  fetchImpl,
+  color = '#E5484D',
+  teamId = JOVIE_TEAM_ID,
+}) {
+  const cacheKey = `${teamId}:${name}`;
+  if (labelCache.has(cacheKey)) {
+    return { ok: true, id: labelCache.get(cacheKey) };
+  }
   const existing = (nodes ?? []).find(label => label?.name === name);
-  if (existing?.id) return { ok: true, id: existing.id };
+  if (existing?.id) {
+    labelCache.set(cacheKey, existing.id);
+    return { ok: true, id: existing.id };
+  }
   const created = await linearGraphql(
     {
       query: `
-        mutation CreateRemediationLabel($name: String!, $teamId: String!) {
-          issueLabelCreate(input: { name: $name, teamId: $teamId }) {
+        mutation CreateRemediationLabel($name: String!, $teamId: String!, $color: String!) {
+          issueLabelCreate(input: { name: $name, teamId: $teamId, color: $color }) {
             success
             issueLabel { id }
           }
         }
       `,
-      variables: { name, teamId: JOVIE_TEAM_ID },
+      variables: { name, teamId, color },
       apiKey,
       fetchImpl,
     },
@@ -180,6 +231,7 @@ export async function ensureLinearLabel({ name, nodes, apiKey, fetchImpl }) {
       body: created.raw,
     };
   }
+  labelCache.set(cacheKey, id);
   return { ok: true, id };
 }
 
@@ -194,7 +246,10 @@ export async function upsertLinearIssueByTitleFingerprint({
   createStateName = null,
   // Optional label ids applied only when a new issue is created.
   createLabelIds = [],
-  reopenTerminal = false,
+  // undefined distinguishes "omitted" from an explicit false. A stable
+  // labelKey reopens unless the caller opts out.
+  reopenTerminal = undefined,
+  labelKey = null,
   apiKey = process.env.LINEAR_API_KEY,
   fetchImpl = fetch,
 }) {
@@ -205,7 +260,20 @@ export async function upsertLinearIssueByTitleFingerprint({
     return { ok: false, reason: 'missing_fingerprint' };
   }
 
-  const labelName = remediationKey(fingerprint);
+  const stableLabel = labelKey != null && String(labelKey).trim().length > 0;
+  if (stableLabel && !isValidRemediationKey(labelKey)) {
+    return { ok: false, reason: 'invalid_remediation_key' };
+  }
+  const labelSource = stableLabel ? bareRemediationKey(labelKey) : fingerprint;
+  const labelName = remediationKey(labelSource);
+  const shouldReopen = stableLabel
+    ? reopenTerminal !== false
+    : reopenTerminal === true;
+  const footer = `Fingerprint: remediation:${bareRemediationKey(labelSource)}`;
+  const descriptionBody =
+    stableLabel && !String(description ?? '').includes(footer)
+      ? `${description}\n\n${footer}`
+      : description;
   const found = await linearGraphql(
     {
       query: `
@@ -248,7 +316,8 @@ export async function upsertLinearIssueByTitleFingerprint({
   const manageLabels = Array.isArray(labelNodes);
   let match = resolveLinearIssueByFingerprint(
     found.data?.issues?.nodes,
-    fingerprint
+    fingerprint,
+    labelSource
   );
   if (!match && manageLabels) {
     const labeled = await linearGraphql(
@@ -278,7 +347,8 @@ export async function upsertLinearIssueByTitleFingerprint({
     if (!labeled.ok) return labeled;
     match = resolveLinearIssueByFingerprint(
       labeled.data?.issues?.nodes,
-      fingerprint
+      fingerprint,
+      labelSource
     );
   }
 
@@ -330,7 +400,7 @@ export async function upsertLinearIssueByTitleFingerprint({
         `,
         variables: {
           title,
-          description,
+          description: descriptionBody,
           priority,
           ...(createStateId ? { stateId: createStateId } : {}),
           ...(createIds.length > 0 ? { labelIds: createIds } : {}),
@@ -365,12 +435,12 @@ export async function upsertLinearIssueByTitleFingerprint({
   const todoState =
     states.find(state => state?.name === 'Todo') ??
     states.find(state => state?.type === 'unstarted');
-  if (terminal && reopenTerminal && !backlogState)
+  if (terminal && shouldReopen && !backlogState)
     return { ok: false, reason: 'linear_backlog_state_missing' };
   const existingLabelNodes = match.labels?.nodes;
   const input = {
-    description,
-    ...(terminal && reopenTerminal
+    description: descriptionBody,
+    ...(terminal && shouldReopen
       ? {
           stateId:
             createStateName === 'Todo' && todoState
@@ -416,9 +486,173 @@ export async function upsertLinearIssueByTitleFingerprint({
   return {
     ok: true,
     action: 'updated',
-    reopened: terminal && reopenTerminal,
+    reopened: terminal && shouldReopen,
     id: match.id,
     identifier: match.identifier,
     url: match.url,
+  };
+}
+
+const TERMINAL_STATE_TYPES = ['completed', 'canceled'];
+
+/**
+ * Green-run closer. `resolveLinearIssueByFingerprint` only picks a node;
+ * this posts one `recovered-run:<runId>` comment and moves the open issue
+ * to Done. A second call in the same run is a no-op.
+ */
+export async function closeLinearIssueByFingerprint({
+  fingerprint,
+  comment = 'Condition cleared.',
+  runId,
+  labelKey = null,
+  apiKey = process.env.LINEAR_API_KEY,
+  fetchImpl = fetch,
+}) {
+  if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
+  if (typeof fingerprint !== 'string' || fingerprint.trim().length === 0) {
+    return { ok: false, reason: 'missing_fingerprint' };
+  }
+  const stableLabel = labelKey != null && String(labelKey).trim().length > 0;
+  if (stableLabel && !isValidRemediationKey(labelKey)) {
+    return { ok: false, reason: 'invalid_remediation_key' };
+  }
+  const labelSource = stableLabel ? bareRemediationKey(labelKey) : fingerprint;
+  const labelName = remediationKey(labelSource);
+  const found = await linearGraphql(
+    {
+      query: `
+        query FindIssueToClose(
+          $teamId: String!
+          $teamFilterId: ID!
+          $fingerprint: String!
+          $labelName: String!
+        ) {
+          team(id: $teamId) {
+            states { nodes { id name type } }
+            labels(filter: { name: { eq: $labelName } }) { nodes { id name } }
+          }
+          issues(
+            filter: {
+              team: { id: { eq: $teamFilterId } }
+              title: { contains: $fingerprint }
+            }
+            first: 25
+          ) {
+            nodes { ${ISSUE_FIELDS} }
+          }
+        }
+      `,
+      variables: {
+        teamId: JOVIE_TEAM_ID,
+        teamFilterId: JOVIE_TEAM_ID,
+        fingerprint,
+        labelName,
+      },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_close_search'
+  );
+  if (!found.ok) return found;
+
+  const labelNodes = found.data?.team?.labels?.nodes;
+  const manageLabels = Array.isArray(labelNodes);
+  let nodes = found.data?.issues?.nodes ?? [];
+  if (
+    manageLabels &&
+    !resolveLinearIssueByFingerprint(nodes, fingerprint, labelSource)
+  ) {
+    const labeled = await linearGraphql(
+      {
+        query: `
+          query FindOpenIssueByRemediationLabel(
+            $teamFilterId: ID!
+            $labelName: String!
+          ) {
+            issues(
+              filter: {
+                team: { id: { eq: $teamFilterId } }
+                labels: { some: { name: { eq: $labelName } } }
+              }
+              first: 25
+            ) {
+              nodes { ${ISSUE_FIELDS} }
+            }
+          }
+        `,
+        variables: { teamFilterId: JOVIE_TEAM_ID, labelName },
+        apiKey,
+        fetchImpl,
+      },
+      'linear_close_label_search'
+    );
+    if (!labeled.ok) return labeled;
+    nodes = labeled.data?.issues?.nodes ?? [];
+  }
+
+  const match = resolveLinearIssueByFingerprint(
+    nodes,
+    fingerprint,
+    labelSource
+  );
+  if (!match || TERMINAL_STATE_TYPES.includes(match.state?.type)) {
+    return { ok: true, action: 'noop', reason: 'none_open' };
+  }
+
+  const marker = `recovered-run:${runId ?? 'unknown'}`;
+  const listed = await listLinearIssueComments({
+    issueId: match.id,
+    apiKey,
+    fetchImpl,
+  });
+  if (!listed.ok) return listed;
+  const already = listed.comments.some(entry => entry.body.includes(marker));
+  if (!already) {
+    const posted = await addLinearIssueComment({
+      issueId: match.id,
+      body: `${comment}\n\n<!-- ${marker} -->`,
+      apiKey,
+      fetchImpl,
+    });
+    if (!posted.ok) return posted;
+  }
+
+  const states = found.data?.team?.states?.nodes ?? [];
+  const done =
+    states.find(state => state?.name === 'Done') ??
+    states.find(state => state?.type === 'completed');
+  if (!done?.id) return { ok: false, reason: 'linear_done_state_missing' };
+
+  const updated = await linearGraphql(
+    {
+      query: `
+        mutation CloseRemediationIssue($id: String!, $stateId: String!) {
+          issueUpdate(id: $id, input: { stateId: $stateId }) {
+            success
+            issue { id identifier url }
+          }
+        }
+      `,
+      variables: { id: match.id, stateId: done.id },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_close'
+  );
+  if (!updated.ok) return updated;
+  if (!updated.data?.issueUpdate?.success) {
+    return {
+      ok: false,
+      reason: 'linear_close_unsuccessful',
+      body: updated.raw,
+    };
+  }
+  return {
+    ok: true,
+    action: 'resolved',
+    id: match.id,
+    identifier: match.identifier ?? updated.data.issueUpdate.issue?.identifier,
+    url: match.url ?? updated.data.issueUpdate.issue?.url,
+    commented: !already,
   };
 }

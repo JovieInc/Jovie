@@ -677,9 +677,11 @@ describe('POST /api/webhooks/sentry', () => {
     const firstDispatch = JSON.parse(
       String(mockServerFetch.mock.calls[0]?.[1]?.body)
     );
-    expect(Object.keys(firstDispatch.client_payload)).toHaveLength(8);
+    expect(Object.keys(firstDispatch.client_payload)).toHaveLength(10);
     expect(firstDispatch.client_payload).toMatchObject({
       issue_id: '101',
+      short_id: '',
+      linear_identifier: '',
       dedupe_key: dedupeKeys[0],
       context: {
         root_cause_fingerprint: dedupeKeys[0],

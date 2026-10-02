@@ -36,9 +36,9 @@ export const billingAuditLog = pgTable(
   'billing_audit_log',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').references(() => users.id, {
+      onDelete: 'cascade',
+    }),
     eventType: text('event_type').notNull(),
     previousState: jsonb('previous_state')
       .$type<Record<string, unknown>>()
