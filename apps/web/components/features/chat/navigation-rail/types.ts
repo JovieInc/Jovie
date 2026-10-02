@@ -5,6 +5,8 @@ export interface ChatNavMessage {
   readonly role: 'user' | 'assistant' | 'system';
   readonly parts: readonly MessagePart[];
   readonly clientTurnId?: string;
+  /** Canonical timeline revision, including updates that reuse a parts array. */
+  readonly streamRevision?: number;
 }
 
 export interface ThreadTurn {
