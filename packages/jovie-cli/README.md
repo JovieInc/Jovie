@@ -24,6 +24,7 @@ automated install. A repository build is not proof that npm has the package.
 | Command | Request |
 | --- | --- |
 | `profile create <url>` | `POST /api/agents/profiles` with a Spotify artist URL |
+| `link create <query>` | `POST /api/links` with a streaming URL, ISRC, or name. Same query returns the existing link. |
 | `artist get <username>` | `GET /api/v1/{username}` |
 | `artist llms <username>` | `GET /{username}/llms.txt` |
 | `api openapi` | `GET /api/v1/openapi.json` |
@@ -38,6 +39,12 @@ that Spotify artist. Otherwise it creates an unclaimed profile. The response
 has `profileUrl` and, when unclaimed, a `claimUrl`. The claim URL is not an
 ownership token: the artist still verifies that they own the Spotify artist.
 Creation is anonymous and rate limited per IP.
+
+`link create` is in this source tree. The published pin `@jovie/cli@26.9.16`
+does not include it, so that pin cannot run the command. Until an operator
+publishes a release that includes `link create`, callers use
+`POST https://jov.ie/api/links`. This repository change does not publish npm.
+The link stays unclaimed. `claimUrl` does not create an account.
 
 `--json` emits JSON for API responses and wraps text resources as
 `{"content":"..."}`. Failures print `{"error":{...}}`, and API failures carry
@@ -72,22 +79,23 @@ transport settings. Configure Node's proxy support in that application or pass
 { "mcpServers": { "jovie": { "command": "npx", "args": ["-y", "@jovie/cli", "mcp"] } } }
 ```
 
-Tools: `create_profile`, `get_artist`, `get_artist_guide`, `get_openapi`,
-`get_docs`, `report_issue`, `report_feedback`. `server.json` describes the package for the MCP registry.
+Tools: `create_profile`, `create_link`, `get_artist`, `get_artist_guide`, `get_openapi`,
+`get_docs`, `report_issue`, `report_feedback`. `create_link` is not in the published `@jovie/cli@26.9.16` pin. `server.json` describes the package for the MCP registry.
 
 ## JavaScript client
 
 ```js
-import { createProfile, fetchArtist } from '@jovie/cli';
+import { createLink, createProfile, fetchArtist } from '@jovie/cli';
 
 const profile = await createProfile('https://open.spotify.com/artist/<id>');
+const link = await createLink('https://open.spotify.com/track/<id>');
 const artist = await fetchArtist('artist-username');
 ```
 
 ## Boundary
 
 Public commands send no credentials, cache nothing, and send no telemetry beyond a
-`jovie-cli/<version>` User-Agent. `profile create` and `report` are their only writes. Reports carry only the CLI
+`jovie-cli/<version>` User-Agent. `profile create`, `link create`, and `report` are the writes. Writes are not retried. Reports carry only the CLI
 version, platform, runtime, and the fields you pass. `init`
 writes only `jovie/SKILL.md` into existing agent skill directories, or into
 `--dir`. Commands use Node 24 built-ins (`parseArgs`, `fetch`, `readline`) and

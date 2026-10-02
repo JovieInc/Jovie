@@ -1,4 +1,5 @@
 import {
+  createLink,
   createProfile,
   fetchArtist,
   fetchArtistLlms,
@@ -127,6 +128,28 @@ export const COMMANDS: readonly CommandSpec[] = [
     },
     readOnly: false,
     run: (input, options) => createProfile(required(input), options),
+  },
+  {
+    path: ['link', 'create'],
+    tool: 'create_link',
+    summary:
+      'Make one public Jovie link from a streaming URL, an ISRC, or text. A name returns candidates: ask the person to choose, then call again with the chosen URL. Return shortUrl. The link stays unclaimed until the artist opens claimUrl.',
+    arg: {
+      name: 'query',
+      description: 'Streaming URL, ISRC, or artist and track text',
+    },
+    flags: [
+      {
+        name: 'kind',
+        description: 'Optional track or artist when the query is ambiguous',
+      },
+    ],
+    readOnly: false,
+    run: (input, options) =>
+      createLink(required(input), {
+        ...options,
+        ...(input.flags?.kind ? { kind: input.flags.kind } : {}),
+      }),
   },
   {
     path: ['artist', 'get'],

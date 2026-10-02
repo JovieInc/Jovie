@@ -369,6 +369,16 @@ export async function runCli(
     }
     if (result && typeof result === 'object' && 'status' in result) {
       const status = (result as { status: string }).status;
+      // Jovie link results reuse `status` for a successful page, a choice,
+      // or a failed lookup. Those are not fleet job states.
+      if (
+        status === 'created' ||
+        status === 'existing' ||
+        status === 'needs_choice'
+      ) {
+        return 0;
+      }
+      if (status === 'not_found' || status === 'error') return 1;
       return status === 'completed' || status === 'handoff'
         ? 0
         : status === 'unavailable'

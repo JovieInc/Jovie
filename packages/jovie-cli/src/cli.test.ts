@@ -44,6 +44,7 @@ describe('jovie CLI', () => {
     expect(result).toBe(0);
     expect(stdout.read()).toContain('artist get <username>');
     expect(stdout.read()).toContain('profile create <url>');
+    expect(stdout.read()).toContain('link create <query>');
     expect(stdout.read()).toContain(
       'No login or API key is needed for public commands.'
     );
@@ -342,6 +343,51 @@ describe('jovie CLI', () => {
     });
   });
 
+  it('exits 0 when a Jovie link is created or needs a choice', async () => {
+    const created = createOutput();
+    const createFetchImpl = createFetch(
+      JSON.stringify({
+        status: 'created',
+        shortUrl: 'https://jov.ie/l/abc',
+        claimUrl: 'https://jov.ie/l/abc/claim',
+      })
+    );
+    await expect(
+      runCli(['link', 'create', 'Artist - Track', '--json'], {
+        fetchImpl: createFetchImpl.fetchImpl,
+        stdout: created.output,
+      })
+    ).resolves.toBe(0);
+    expect(JSON.parse(created.read()).status).toBe('created');
+
+    const choice = createOutput();
+    const choiceFetch = createFetch(
+      JSON.stringify({
+        status: 'needs_choice',
+        candidates: [{ name: 'Artist', url: 'https://music.apple.com/a' }],
+      })
+    );
+    await expect(
+      runCli(['link', 'create', 'Artist', '--json'], {
+        fetchImpl: choiceFetch.fetchImpl,
+        stdout: choice.output,
+      })
+    ).resolves.toBe(0);
+
+    const missing = createOutput();
+    const missingFetch = createFetch(
+      JSON.stringify({ status: 'not_found', code: 'NOT_FOUND' }),
+      404
+    );
+    await expect(
+      runCli(['link', 'create', 'nobody', '--json'], {
+        fetchImpl: missingFetch.fetchImpl,
+        stdout: missing.output,
+      })
+    ).resolves.toBe(1);
+    expect(JSON.parse(missing.read()).error.apiCode).toBe('NOT_FOUND');
+  });
+
   it('exits 2 for a non-Spotify profile URL without a request', async () => {
     const stdout = createOutput();
     const fetch = createFetch('{}');
@@ -373,6 +419,7 @@ describe('jovie CLI', () => {
       (tool: { name: string }) => tool.name
     );
     expect(tools).toContain('create_profile');
+    expect(tools).toContain('create_link');
   });
 
   it('installs the skill with init and rejects a bad MCP base URL', async () => {

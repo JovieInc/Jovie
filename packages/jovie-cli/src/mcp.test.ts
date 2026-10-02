@@ -74,6 +74,14 @@ describe('MCP server', () => {
     const create = tools.find(tool => tool.name === 'create_profile');
     expect(create?.inputSchema.required).toEqual(['url']);
     expect(create?.annotations.readOnlyHint).toBe(false);
+    const link = tools.find(tool => tool.name === 'create_link');
+    expect(link?.inputSchema.required).toEqual(['query']);
+    expect(link?.annotations).toEqual({
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    });
     expect(
       tools.find(tool => tool.name === 'get_artist')?.annotations
     ).toMatchObject({ readOnlyHint: true });

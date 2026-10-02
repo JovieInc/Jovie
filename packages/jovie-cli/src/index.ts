@@ -4,6 +4,7 @@ export {
   runCli,
 } from './cli.js';
 export {
+  createLink,
   createProfile,
   DEFAULT_BASE_URL,
   DEFAULT_TIMEOUT_MS,

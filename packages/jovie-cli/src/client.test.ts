@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createLink,
   createProfile,
   DEFAULT_BASE_URL,
   type FetchImplementation,
@@ -258,6 +259,49 @@ describe('Jovie public resource client', () => {
         body: '{"url":"https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb"}',
       },
     });
+  });
+
+  it('posts a query to make one Jovie link and does not retry', async () => {
+    let attempts = 0;
+    const fetchImpl: FetchImplementation = async () => {
+      attempts += 1;
+      throw new Error('network down');
+    };
+    await expect(
+      createLink('Radiohead - Creep', { fetchImpl })
+    ).rejects.toMatchObject({ code: 'REQUEST_FAILED' });
+    expect(attempts).toBe(1);
+
+    const { calls, fetchImpl: okFetch } = createFetch(
+      '{"status":"created","shortUrl":"https://jov.ie/l/abcd2345","claimUrl":"https://jov.ie/l/abcd2345/claim","claimed":false}',
+      200
+    );
+    await expect(
+      createLink('  https://open.spotify.com/track/70LcF31zb1H0PyJoS1Sx1r  ', {
+        fetchImpl: okFetch,
+        kind: 'track',
+      })
+    ).resolves.toMatchObject({
+      status: 'created',
+      shortUrl: 'https://jov.ie/l/abcd2345',
+      claimed: false,
+    });
+    expect(calls[0]).toMatchObject({
+      input: 'https://jov.ie/api/links',
+      init: {
+        method: 'POST',
+        body: '{"query":"https://open.spotify.com/track/70LcF31zb1H0PyJoS1Sx1r","kind":"track"}',
+      },
+    });
+  });
+
+  it('rejects an empty link query before any request', () => {
+    const { calls, fetchImpl } = createFetch('{}');
+    expect(() => createLink('   ', { fetchImpl })).toThrow(JovieInputError);
+    expect(() => createLink('ok', { fetchImpl, kind: 'album' })).toThrow(
+      JovieInputError
+    );
+    expect(calls).toHaveLength(0);
   });
 
   it('rejects non-Spotify-artist URLs before any request', () => {
