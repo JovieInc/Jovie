@@ -32,7 +32,10 @@ import { captureError } from '@/lib/error-tracking';
 import { createOnboardingReceiptPendingError } from '@/lib/errors/onboarding';
 import { attributeLeadSignupFromAppUserId } from '@/lib/leads/funnel-events';
 import { refreshFeaturedPlaylistFallbackCandidate } from '@/lib/profile/featured-playlist-fallback';
-import { lockSpotifyProfileIdentity } from '@/lib/profile/spotify-profile-identity';
+import {
+  assertSpotifyProfileIdentityAvailable,
+  SpotifyProfileIdentityConflictError,
+} from '@/lib/profile/spotify-profile-identity';
 import {
   isUnclaimedStructuredCreditProfile,
   markStructuredCreditProfileClaimed,
@@ -53,8 +56,6 @@ const DSP_DISCOVERY_PROVIDERS = [
   'deezer',
   'musicbrainz',
 ] as const;
-
-class SpotifyProfileIdentityConflictError extends Error {}
 
 async function requireFunnelDelivery(
   event: string,
@@ -137,22 +138,6 @@ async function getOtherExactSpotifyProfiles(
       )
     )
     .limit(2);
-}
-
-async function assertSpotifyProfileIdentityAvailable(
-  tx: DbOrTransaction,
-  spotifyArtistId: string,
-  currentProfileId: string
-): Promise<void> {
-  await lockSpotifyProfileIdentity(tx, spotifyArtistId);
-  const conflicts = await getOtherExactSpotifyProfiles(
-    tx,
-    spotifyArtistId,
-    currentProfileId
-  );
-  if (conflicts.length > 0) {
-    throw new SpotifyProfileIdentityConflictError();
-  }
 }
 
 function deriveSpotifyImportStatus(result: SpotifyImportResult) {

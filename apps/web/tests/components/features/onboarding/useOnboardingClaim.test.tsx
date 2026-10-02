@@ -43,6 +43,40 @@ describe('useOnboardingClaim', () => {
     vi.unstubAllGlobals();
   });
 
+  it.each([true, false])(
+    'keeps an identity conflict recoverable without checkout or a false reservation (pending=%s)',
+    async pending => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        jsonResponse(
+          pending
+            ? {
+                claimed: 1,
+                waitlist: { entryId: 'receipt' },
+                profileError: { errorCode: 'SPOTIFY_IDENTITY_CONFLICT' },
+              }
+            : { errorCode: 'SPOTIFY_IDENTITY_CONFLICT' },
+          { status: pending ? 200 : 409 }
+        )
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      const { rerender } = render(renderClaimHarness(0));
+      await waitFor(() =>
+        expect(screen.getByTestId('claim-status')).toHaveTextContent(
+          'identity-conflict'
+        )
+      );
+      expect(replaceMock).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      fetchMock.mockResolvedValue(
+        jsonResponse({ claimed: 1, alreadyClaimed: true })
+      );
+      rerender(renderClaimHarness(1));
+      await waitFor(() =>
+        expect(replaceMock).toHaveBeenCalledWith('/onboarding/checkout')
+      );
+    }
+  );
+
   it('retries a signed-in dev user claim after completed chat activity', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ claimed: 0 }));
     vi.stubGlobal('fetch', fetchMock);
