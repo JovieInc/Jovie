@@ -6,6 +6,7 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import os
 import subprocess
@@ -30,7 +31,91 @@ def issue(identifier="JOV-1", priority=2, created="2026-09-01T00:00:00Z", labels
     return lane.Issue("id-" + identifier, identifier, "Tab indicator collapses", "body", priority, created, list(labels))
 
 
+class ContextManifestTest(unittest.TestCase):
+    def test_repository_formatting_is_accepted_but_malformed_or_missing_contract_is_not(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "context-manifest.json"
+            self.assertFalse(lane.context_manifest_matches(path))
+            path.write_text(json.dumps(json.loads(lane.context_manifest_json()), separators=(",", ":")))
+            self.assertTrue(lane.context_manifest_matches(path))
+            path.write_text("not JSON")
+            self.assertFalse(lane.context_manifest_matches(path))
+
+    def test_manifest_binds_exact_prompt_and_inputs_without_copying_private_content(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "issue.prompt.md"
+            inputs = {"issue": "private issue", "gbrain": "prior private decision", "branch": "devin/jov-1"}
+            first = lane.write_agent_prompt(path, "exact prompt\n", "issue", "devin", inputs)
+            body = Path(first["path"]).read_bytes()
+            receipt = json.loads(body)
+            self.assertEqual(path.read_text(), "exact prompt\n")
+            self.assertEqual(receipt["prompt"]["sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
+            self.assertNotIn(b"private", body)
+            self.assertEqual(receipt["inputs"]["gbrain"]["sha256"], hashlib.sha256(inputs["gbrain"].encode()).hexdigest())
+            self.assertEqual(receipt["inputs"]["gbrain"]["status"], "present")
+            repeated = lane.write_agent_prompt(path, "exact prompt\n", "issue", "devin", inputs)
+            self.assertEqual(first["sha256"], repeated["sha256"])
+            self.assertTrue(first["qualification"]["ok"])
+            self.assertEqual(first["qualification"]["mode"], "qualification-only")
+            self.assertGreaterEqual(first["qualification"]["durationMs"], 0)
+            self.assertEqual(body, Path(first["path"]).read_bytes())
+            changed = lane.write_agent_prompt(path, "different prompt", "issue", "devin", inputs)
+            self.assertNotEqual(first["sha256"], changed["sha256"])
+
+    def test_missing_context_and_drift_are_explicit_nonblocking_findings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "issue.prompt.md"
+            inputs = {"issue": "task", "gbrain": "", "branch": "codex/jov-1"}
+            receipt = lane.write_agent_prompt(path, "prompt", "issue", "codex", inputs)
+            self.assertEqual(json.loads(Path(receipt["path"]).read_text())["inputs"]["gbrain"]["status"], "unavailable")
+            with patch.object(lane, "HERE", Path(tmp)):
+                for contract in [None, '{}', 'malformed']:
+                    if contract is not None:
+                        (Path(tmp) / "context-manifest.json").write_text(contract)
+                    drift = lane.write_agent_prompt(path, "still runs", "issue", "codex", inputs)
+                    self.assertEqual(path.read_text(), "still runs")
+                    self.assertFalse(drift["qualification"]["ok"])
+                    self.assertIn("context-manifest-drift", drift["qualification"]["findings"][0])
+                    self.assertIsNone(drift["path"])
+                with patch.object(lane.sys.stderr, "write", side_effect=OSError("closed log")):
+                    self.assertFalse(lane.write_agent_prompt(path, "still runs", "issue", "codex", inputs)["qualification"]["ok"])
+            for kind, data in [("issue", {"gbrain": ""}), ("unknown", inputs),
+                               ("issue", {**inputs, "issue": None})]:
+                failed = lane.write_agent_prompt(path, "still runs", kind, "codex", data)
+                self.assertFalse(failed["qualification"]["ok"])
+                self.assertIsNone(failed["sha256"])
+
+    def test_generator_does_not_load_credentials_or_query_services(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(lane, "HERE", Path(tmp)), \
+                patch.object(lane, "load_github_env", side_effect=AssertionError("credential access")):
+            self.assertEqual(lane.main(["context-manifest", "--write"]), 0)
+            self.assertEqual(lane.main(["context-manifest"]), 0)
+            (Path(tmp) / "context-manifest.json").write_text('{}')
+            self.assertEqual(lane.main(["context-manifest"]), 1)
+
+
 class SelectionTest(unittest.TestCase):
+    def test_rejection_reasons_match_final_worker_admission(self):
+        red = issue("JOV-RED")
+        red.title = "Rotate production credentials"
+        failures = {"JOV-EXHAUSTED": 3, "JOV-BACKOFF": {"count": 1, "at": 9990}}
+        cases = [(issue(labels=["Type:Epic"]), "excluded-label:type:epic"),
+                 (red, "sensitive-text"), (issue(labels=["AUTH"]), "sensitive-provider"),
+                 (issue("JOV-EXHAUSTED"), "retry-exhausted"),
+                 (issue("JOV-BACKOFF"), "retry-backoff"),
+                 (issue("JOV-OWNED"), "in-flight-pr"), (issue("JOV-GOOD"), None)]
+        for task, expected in cases:
+            with self.subTest(expected=expected):
+                self.assertEqual(lane.admission_rejection(task, failures, 10000,
+                                 frozenset({"jov-owned"}), "devin"), expected)
+                self.assertEqual(lane.pick_issue([task], failures, now=10000,
+                                 in_flight=frozenset({"jov-owned"}), provider="devin"),
+                                 task if expected is None else None)
+        self.assertIsNone(lane.admission_rejection(issue(labels=["AUTH"]), {}, 10000, provider="codex"))
+        # Exactly one reason per candidate, preserving the existing gate precedence.
+        self.assertEqual(lane.admission_rejection(issue(labels=["Type:Epic", "auth"]), {}, 10000,
+                         provider="devin"), "excluded-label:type:epic")
+
     def test_orders_like_symphony_priority_then_age_with_none_last(self):
         now = datetime(2026, 9, 4, tzinfo=timezone.utc).timestamp()
         picked = lane.pick_issue([
@@ -238,6 +323,20 @@ class GateTest(unittest.TestCase):
                 lane.sh = original
         self.assertFalse(passed)
         self.assertTrue(reasons[0].startswith("llm-review-failed"))
+
+    def test_context_drift_does_not_replace_the_sensitive_review_verdict(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            host = lane.Host(state=root)
+            for verdict, expected in [("LLM-REVIEW: FAIL", False), ("LLM-REVIEW: PASS", True)]:
+                def review(*args, **kwargs):
+                    (root / ".codex-last-message.txt").write_text(verdict)
+                    return SimpleNamespace(returncode=0)
+                with patch.object(lane, "context_manifest_matches", return_value=False), \
+                        patch.object(lane, "sh", side_effect=review) as reviewer:
+                    passed, _ = lane.sensitive_review(host, {"number": 7, "headRefOid": "abc"}, root, None)
+                self.assertEqual(passed, expected)
+                reviewer.assert_called_once()
 
     def test_numstat_parsing_handles_binary(self):
         changes = lane.parse_numstat("3\t1\ta.ts\n-\t-\timg.png\nnoise\n")
@@ -528,6 +627,44 @@ class RunIssueTest(unittest.TestCase):
         self.assertTrue(receipt["branch"].startswith("devin/jov-8-"))
         self.assertIn(receipt["runId"], receipt["worktree"])
         self.assertEqual(receipt["result"], {"verdict": "landing", "commit": None, "pr": 9, "prUrl": None})
+        manifest = receipt["contextManifests"][0]
+        body = Path(manifest["path"]).read_bytes()
+        context = json.loads(body)
+        self.assertEqual(manifest["sha256"], hashlib.sha256(body).hexdigest())
+        self.assertEqual(context["provider"], "devin")
+        self.assertEqual(context["prompt"]["sha256"], hashlib.sha256(prompt.encode()).hexdigest())
+        self.assertEqual(self.ledger()[0]["contextManifests"], receipt["contextManifests"])
+
+    def test_context_contract_drift_does_not_prevent_agent_execution(self):
+        lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 9, "reasons": []}
+        with patch.object(lane, "context_manifest_json", return_value="drift"), \
+                patch.object(lane, "run_agent", wraps=lane.run_agent) as agent:
+            receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]), issue())
+        self.assertEqual(receipt["verdict"], "landing")
+        self.assertIn("context-manifest-drift", receipt["contextManifests"][0]["qualification"]["findings"][0])
+        agent.assert_called_once()
+        self.assertEqual(self.ledger()[0]["contextManifests"], receipt["contextManifests"])
+
+    def test_context_receipt_failure_is_isolated_but_prompt_write_failure_still_blocks(self):
+        original = Path.write_bytes
+        lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 9, "reasons": []}
+        for index, (suffix, verdict) in enumerate([(".context.json", "landing"), (".prompt.md", "failed")]):
+            def write(path, data):
+                if path.name.endswith(suffix):
+                    raise OSError("volume unavailable")
+                return original(path, data)
+            with patch.object(Path, "write_bytes", write), \
+                    patch.object(lane, "run_agent", wraps=lane.run_agent) as agent:
+                receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]), issue(f"JOV-{index + 1}"))
+            self.assertEqual(receipt["verdict"], verdict)
+            if suffix == ".context.json":
+                agent.assert_called_once()
+                context = receipt["contextManifests"][0]
+                self.assertIsNone(context["path"])
+                self.assertIn("volume unavailable", context["qualification"]["findings"][0])
+            else:
+                agent.assert_not_called()
+                self.assertIn("volume unavailable", receipt["reasons"][0])
 
     def test_agent_that_never_worked_is_a_provider_error(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}
@@ -554,6 +691,10 @@ class RunIssueTest(unittest.TestCase):
         handoff = next((self.host.state / "runs").glob("*.handoff1.prompt.md")).read_text()
         self.assertIn("Do not start over", handoff)
         self.assertIn("ctx", handoff)
+        self.assertEqual(len(receipt["contextManifests"]), 2)
+        context = json.loads(Path(receipt["contextManifests"][1]["path"]).read_text())
+        self.assertEqual((context["kind"], context["provider"]), ("handoff", "devin"))
+        self.assertEqual(context["prompt"]["sha256"], hashlib.sha256(handoff.encode()).hexdigest())
 
     def test_next_provider_takes_the_cheapest_enabled_healthy_uncooled_lane(self):
         providers = {

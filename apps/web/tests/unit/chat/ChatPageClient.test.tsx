@@ -8,7 +8,6 @@ import {
 } from '@/app/app/(shell)/chat/ChatPageClient';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import type { ChatActionCard } from '@/components/jovie/types';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   FounderDoorProvider,
@@ -122,7 +121,6 @@ let capturedOnTitleChange: ((title: string | null) => void) | undefined;
 let capturedOnConversationCreate:
   | ((id: string, phase?: 'reserved' | 'completed') => void)
   | undefined;
-let capturedActionCards: readonly ChatActionCard[] | undefined;
 
 vi.mock('@/components/jovie/JovieChat', () => ({
   JovieChat: (props: {
@@ -132,7 +130,6 @@ vi.mock('@/components/jovie/JovieChat', () => ({
     onTitleChange?: (title: string | null) => void;
     initialQuery?: string;
     isFirstSession?: boolean;
-    actionCards?: readonly ChatActionCard[];
     chatMode?: 'ov';
   }) => {
     if (mockJovieChatShouldThrow) {
@@ -140,13 +137,11 @@ vi.mock('@/components/jovie/JovieChat', () => ({
     }
     capturedOnTitleChange = props.onTitleChange;
     capturedOnConversationCreate = props.onConversationCreate;
-    capturedActionCards = props.actionCards;
     return React.createElement('div', {
       'data-testid': 'jovie-chat',
       'data-profile-id': props.profileId,
       'data-conversation-id': props.conversationId ?? '',
       'data-is-first-session': props.isFirstSession ? 'true' : 'false',
-      'data-action-card-count': String(props.actionCards?.length ?? 0),
       'data-chat-mode': props.chatMode ?? '',
     });
   },
@@ -251,7 +246,6 @@ describe('ChatPageClient', () => {
     vi.useRealTimers();
     mockSearchParams = new URLSearchParams();
     capturedOnTitleChange = undefined;
-    capturedActionCards = undefined;
     mockSuccessNotification.mockReset();
     mockErrorNotification.mockReset();
     mockSetPreviewData.mockReset();
@@ -277,60 +271,6 @@ describe('ChatPageClient', () => {
     );
     expect(screen.getByTestId('chat-error-state').tagName).toBe('OUTPUT');
     expect(mockNavigationReady).not.toHaveBeenCalled();
-  });
-
-  it('passes ≥3 profile-aware action cards to new chat threads (JOV-3547)', () => {
-    const { getByTestId } = renderChatPage();
-    const chat = getByTestId('jovie-chat');
-
-    expect(chat.getAttribute('data-action-card-count')).toBe('3');
-    expect(capturedActionCards).toHaveLength(3);
-    expect(capturedActionCards?.[0]).toEqual(
-      expect.objectContaining({
-        id: 'build-artist-profile',
-        title: 'Build Artist Profile',
-        actionLabel: 'Build Profile',
-        prompt:
-          'Help me build my artist profile for Test Artist. Start by connecting my music catalog and give me the next setup step.',
-      })
-    );
-    expect(capturedActionCards?.map(card => card.id)).toEqual([
-      'build-artist-profile',
-      'plan-release',
-      'generate-album-art',
-    ]);
-  });
-
-  it('seeds starter action cards when catalog is connected and profile is complete', () => {
-    const dataWithConnectedMusic: DashboardData = {
-      ...baseDashboardData,
-      hasMusicLinks: false,
-      selectedProfile: {
-        ...baseDashboardData.selectedProfile!,
-        spotifyId: 'spotify-artist-123',
-      } as DashboardData['selectedProfile'],
-      profileCompletion: {
-        percentage: 100,
-        completedCount: 4,
-        totalCount: 4,
-        steps: [],
-        profileIsLive: true,
-      },
-    };
-
-    fastRender(
-      <DashboardDataProvider value={dataWithConnectedMusic}>
-        <ChatPageClient />
-      </DashboardDataProvider>
-    );
-
-    // Fully set-up profiles still get ≥3 grounded starters (no setup-gap lead).
-    expect(capturedActionCards).toHaveLength(3);
-    expect(capturedActionCards?.map(card => card.id)).toEqual([
-      'plan-release',
-      'generate-album-art',
-      'review-signals',
-    ]);
   });
 
   it('passes conversationId to JovieChat', () => {
