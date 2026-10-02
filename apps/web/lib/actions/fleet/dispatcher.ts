@@ -12,7 +12,9 @@ import {
   FLEET_ACTION_IDS,
   FLEET_SCOPES,
   type FleetActionId,
+  fleetAuthoritySchema,
   fleetMissionSchema,
+  fleetRequestSchema,
   fleetWorkerSchema,
   getActionDescriptor,
 } from '@jovie/action-contracts';
@@ -36,11 +38,20 @@ export interface FleetBackend {
 }
 type Worker = z.infer<typeof fleetWorkerSchema>;
 type Mission = z.infer<typeof fleetMissionSchema>;
+type Authority = z.infer<typeof fleetAuthoritySchema>;
+type HelpRequest = z.infer<typeof fleetRequestSchema>;
+export type FleetControlOperation =
+  | 'provision'
+  | 'revoke'
+  | 'assign'
+  | 'accept'
+  | 'reject';
 type Credential = {
   digest: string;
   scopes: string[];
   expiresAt: string;
   revokedAt?: string;
+  authority?: Authority;
 };
 type Lease = {
   leaseId: string;
@@ -98,6 +109,7 @@ type FleetState = {
   invocations: Record<string, InvocationRecord>;
   defects: Record<string, Issue>;
   pendingDefects: Record<string, DefectOperation>;
+  requests: Record<string, HelpRequest>;
   approvals: Record<
     string,
     { actor: string; hash: string; expiresAt: string; consumed?: boolean }
@@ -157,6 +169,7 @@ const CAPACITY = {
   receipts: 1000,
   invocations: 4000,
   approvals: 100,
+  requests: 200,
 };
 const CLAIM_WINDOW_MS = 60_000;
 const OPERATION_RETRY_MS = 30_000;
@@ -195,6 +208,7 @@ function empty(): FleetState {
     invocations: {},
     defects: {},
     pendingDefects: {},
+    requests: {},
     approvals: {},
   };
 }
@@ -205,7 +219,130 @@ function state(value: unknown): FleetState {
     (value as FleetState).schema !== 'jovie.summer.fleet/v1'
   )
     throw new FleetError('INTERNAL');
-  return structuredClone(value as FleetState);
+  const result = structuredClone(value as FleetState);
+  result.requests ??= {};
+  return result;
+}
+const acceptSchema = z
+  .object({
+    requestId: z.uuid(),
+    owner: z.string().trim().min(1).max(100),
+    founderIntentRef: z.string().min(1).max(500),
+  })
+  .strict();
+const rejectSchema = z
+  .object({
+    requestId: z.uuid(),
+    reason: z.enum([
+      'capacity',
+      'scope',
+      'identity',
+      'duplicate',
+      'unavailable',
+      'declined',
+    ]),
+  })
+  .strict();
+function liveCredential(c: Credential | undefined, now: number) {
+  return !!c && !c.revokedAt && Date.parse(c.expiresAt) > now;
+}
+function fresh(worker: Worker, now: number) {
+  return !worker.revoked && Date.parse(worker.updatedAt) > now - 300_000;
+}
+function within(
+  authority: Authority,
+  mission: Pick<
+    Mission,
+    'command' | 'maxDurationSeconds' | 'requiredTools' | 'requiredConnectors'
+  >
+) {
+  return (
+    authority.allowedCommands.includes(mission.command) &&
+    mission.maxDurationSeconds <= authority.maxDurationSeconds &&
+    mission.requiredTools.every(t => authority.allowedTools.includes(t)) &&
+    mission.requiredConnectors.every(t =>
+      authority.allowedConnectors.includes(t)
+    )
+  );
+}
+function visible(requester: Worker, peer: Worker) {
+  return (
+    !!peer.authority &&
+    (requester.authority?.identity.role === 'operator' ||
+      peer.authority.visibility === 'fleet')
+  );
+}
+function compatible(
+  s: FleetState,
+  request: HelpRequest,
+  peer: Worker,
+  now: number
+) {
+  const requester = s.workers[request.requesterWorkerId];
+  return (
+    !!requester?.authority &&
+    liveCredential(s.credentials[requester.workerId], now) &&
+    !!peer.authority &&
+    liveCredential(s.credentials[peer.workerId], now) &&
+    fresh(peer, now) &&
+    peer.workerId !== requester.workerId &&
+    visible(requester, peer) &&
+    within(peer.authority, request.proposal) &&
+    peer.capabilities.includes(request.proposal.command) &&
+    request.proposal.requiredTools.every(t => peer.tools.includes(t)) &&
+    request.proposal.requiredConnectors.every(t =>
+      peer.connectors.includes(t)
+    ) &&
+    peer.availability === 'available' &&
+    ['work:next', 'work:claim', 'work:report'].every(scope =>
+      s.credentials[peer.workerId].scopes.includes(scope)
+    ) &&
+    (!request.proposal.targetWorkerId ||
+      request.proposal.targetWorkerId === peer.workerId)
+  );
+}
+function requestView(
+  s: FleetState,
+  request: HelpRequest,
+  now: number
+): HelpRequest {
+  const receipt =
+    request.state === 'accepted'
+      ? Object.values(s.receipts).find(r => r.missionId === request.requestId)
+      : undefined;
+  if (receipt)
+    return {
+      ...request,
+      state: receipt.outcome as 'completed' | 'failed' | 'blocked',
+      receipt: receipt as HelpRequest['receipt'],
+    };
+  if (request.state === 'rejected') return request;
+  if (!liveCredential(s.credentials[request.requesterWorkerId], now))
+    return { ...request, state: 'unavailable', reason: 'identity' };
+  const target = request.proposal.targetWorkerId;
+  if (target && !liveCredential(s.credentials[target], now))
+    return { ...request, state: 'unavailable', reason: 'identity' };
+  if (Date.parse(request.proposal.notAfter) <= now)
+    return { ...request, state: 'expired' };
+  if (
+    target &&
+    s.workers[target] &&
+    (!fresh(s.workers[target], now) ||
+      s.workers[target].availability === 'offline')
+  )
+    return { ...request, state: 'unavailable', reason: 'unavailable' };
+  return request;
+}
+function admission(s: FleetState, input: unknown): Mission {
+  const accepted = acceptSchema.parse(input);
+  const request = s.requests[accepted.requestId];
+  if (!request || request.state !== 'pending') throw new FleetError('CONFLICT');
+  return fleetMissionSchema.parse({
+    ...request.proposal,
+    missionId: request.requestId,
+    owner: accepted.owner,
+    founderIntentRef: accepted.founderIntentRef,
+  });
 }
 function uuidFrom(value: string): string {
   const h = digest(value);
@@ -346,15 +483,16 @@ export class FleetDispatcher {
     profileId: string,
     actor: string,
     approvalId: string,
-    operation: 'provision' | 'revoke' | 'assign',
+    operation: FleetControlOperation,
     input: unknown
   ): Promise<Record<string, unknown>> {
     if (!this.deps.enabled) throw new FleetError('FEATURE_DISABLED');
     const provisionSchema = z
       .object({
         workerId: z.string().regex(/^[a-z][a-z0-9-]{2,63}$/),
-        scopes: z.array(z.enum(FLEET_SCOPES)).min(1).max(6),
+        scopes: z.array(z.enum(FLEET_SCOPES)).min(1).max(FLEET_SCOPES.length),
         expiresAt: z.iso.datetime(),
+        authority: fleetAuthoritySchema.optional(),
       })
       .strict();
     const revokeSchema = z
@@ -363,9 +501,13 @@ export class FleetDispatcher {
     const parsed = (
       operation === 'assign'
         ? fleetMissionSchema
-        : operation === 'provision'
-          ? provisionSchema
-          : revokeSchema
+        : operation === 'accept'
+          ? acceptSchema
+          : operation === 'reject'
+            ? rejectSchema
+            : operation === 'provision'
+              ? provisionSchema
+              : revokeSchema
     ).parse(input) as Record<string, unknown>;
     safeText(parsed);
     const token =
@@ -389,10 +531,33 @@ export class FleetDispatcher {
         if (expiry <= this.now() || expiry > this.now() + 30 * 24 * 60 * 60_000)
           throw new FleetError('VALIDATION_FAILED');
         capacity(s.credentials, CAPACITY.workers);
+        const authority = parsed.authority as Authority | undefined;
+        if (authority) {
+          evidenceSafe([
+            {
+              ref: authority.identity.attestationRef,
+              summary: 'Founder identity attestation',
+            },
+          ]);
+          if (
+            Object.values(s.credentials).some(
+              c =>
+                liveCredential(c, this.now()) &&
+                c.authority &&
+                c.authority.identity.provider === authority.identity.provider &&
+                c.authority.identity.accountRef ===
+                  authority.identity.accountRef &&
+                c.authority.identity.runtimeRef ===
+                  authority.identity.runtimeRef
+            )
+          )
+            throw new FleetError('CONFLICT');
+        }
         s.credentials[workerId] = {
           digest: digest(token!),
           scopes: parsed.scopes as string[],
           expiresAt: parsed.expiresAt as string,
+          ...(authority ? { authority } : {}),
         };
       } else if (operation === 'revoke') {
         const credential = s.credentials[parsed.workerId as string];
@@ -403,14 +568,30 @@ export class FleetDispatcher {
         for (const lease of Object.values(s.leases))
           if (lease.workerId === parsed.workerId && lease.state !== 'reported')
             lease.expiresAt = iso(this.now());
+      } else if (operation === 'reject') {
+        const request = s.requests[parsed.requestId as string];
+        if (!request || request.state !== 'pending')
+          throw new FleetError('CONFLICT');
+        request.state = 'rejected';
+        request.reason = parsed.reason as HelpRequest['reason'];
       } else {
-        const mission = parsed as Mission;
+        const mission =
+          operation === 'accept' ? admission(s, parsed) : (parsed as Mission);
+        if (
+          operation === 'accept' &&
+          !Object.values(s.workers).some(w =>
+            compatible(s, s.requests[mission.missionId], w, this.now())
+          )
+        )
+          throw new FleetError('CONFLICT');
         if (
           Date.parse(mission.notAfter) <= this.now() ||
           (mission.command.startsWith('artist.') && !mission.argument)
         )
           throw new FleetError('VALIDATION_FAILED');
         if (s.missions[mission.missionId]) throw new FleetError('CONFLICT');
+        if (operation === 'assign' && s.requests[mission.missionId])
+          throw new FleetError('CONFLICT');
         // One active admission per canonical Linear issue avoids duplicate work.
         if (
           Object.values(s.missions).some(
@@ -423,8 +604,15 @@ export class FleetDispatcher {
           throw new FleetError('CONFLICT');
         if (mission.targetWorkerId && !s.credentials[mission.targetWorkerId])
           throw new FleetError('FORBIDDEN');
+        const targetAuthority = mission.targetWorkerId
+          ? s.credentials[mission.targetWorkerId]?.authority
+          : undefined;
+        if (targetAuthority && !within(targetAuthority, mission))
+          throw new FleetError('FORBIDDEN');
         capacity(s.missions, CAPACITY.missions);
         s.missions[mission.missionId] = mission;
+        if (operation === 'accept')
+          s.requests[mission.missionId].state = 'accepted';
       }
       approval.consumed = true;
       return operation === 'provision'
@@ -446,7 +634,14 @@ export class FleetDispatcher {
       leases: Object.values(s.leases),
       receipts: Object.values(s.receipts),
       defects: Object.values(s.defects),
+      requests: Object.values(s.requests).map(r =>
+        requestView(s, r, this.now())
+      ),
     };
+  }
+  /** Founder HTTP admission validates the exact immutable proposal with Linear. */
+  async requestMission(profileId: string, input: unknown) {
+    return admission(state(await this.deps.backend.get(key(profileId))), input);
   }
   async invoke(
     id: FleetActionId,
@@ -491,19 +686,39 @@ export class FleetDispatcher {
         const replay = s.invocations[invocationId];
         if (replay) {
           if (replay.hash !== hash) throw new FleetError('CONFLICT');
-          if (replay.result.status !== 'in_progress') return replay.result;
+          if (
+            replay.result.status !== 'in_progress' &&
+            id !== 'fleet.directory' &&
+            id !== 'fleet.status'
+          )
+            return replay.result;
         }
         if (!replay) capacity(s.invocations, CAPACITY.invocations);
         safeText(input);
         let data: Record<string, unknown>;
         if (id === 'fleet.register') {
           if (input.workerId !== workerId) throw new FleetError('FORBIDDEN');
+          const authority = s.credentials[workerId].authority;
+          if (
+            authority &&
+            (!(input.capabilities as string[]).every(t =>
+              authority.allowedCommands.includes(t as Mission['command'])
+            ) ||
+              !(input.tools as string[]).every(t =>
+                authority.allowedTools.includes(t)
+              ) ||
+              !(input.connectors as string[]).every(t =>
+                authority.allowedConnectors.includes(t)
+              ))
+          )
+            throw new FleetError('FORBIDDEN');
           const worker = {
             ...input,
             scopes: s.credentials[workerId].scopes,
             registeredAt: s.workers[workerId]?.registeredAt ?? iso(this.now()),
             updatedAt: iso(this.now()),
             revoked: false,
+            ...(authority ? { authority } : {}),
           } as Worker;
           s.workers[workerId] = worker;
           data = { worker };
@@ -520,8 +735,101 @@ export class FleetDispatcher {
               receipts: Object.values(s.receipts).filter(
                 r => r.workerId === workerId
               ),
+              requests: Object.values(s.requests)
+                .filter(
+                  r =>
+                    r.requesterWorkerId === workerId ||
+                    Object.values(s.leases).some(
+                      l =>
+                        l.workerId === workerId &&
+                        l.mission.missionId === r.requestId
+                    )
+                )
+                .map(r => requestView(s, r, this.now())),
             };
-          else if (id === 'work.next') {
+          else if (id === 'fleet.directory') {
+            if (!worker.authority) throw new FleetError('REQUIRES_INPUT');
+            data = {
+              workers: Object.values(s.workers).filter(
+                w =>
+                  liveCredential(s.credentials[w.workerId], this.now()) &&
+                  fresh(w, this.now()) &&
+                  visible(worker, w)
+              ),
+              refreshedAt: iso(this.now()),
+              limits: {
+                maxPendingRequests: 5,
+                maxRequestHorizonSeconds: 86400,
+                heartbeatMaxAgeSeconds: 300,
+              },
+            };
+          } else if (id === 'work.request') {
+            if (!worker.authority) throw new FleetError('REQUIRES_INPUT');
+            const proposal = input.proposal as HelpRequest['proposal'];
+            if (
+              !within(worker.authority, proposal) ||
+              Date.parse(proposal.notAfter) <= this.now() ||
+              Date.parse(proposal.notAfter) >
+                Math.min(
+                  this.now() + 86400000,
+                  Date.parse(s.credentials[workerId].expiresAt)
+                ) ||
+              (proposal.command.startsWith('artist.') && !proposal.argument)
+            )
+              throw new FleetError('FORBIDDEN');
+            evidenceSafe(
+              proposal.existingWorkRefs.map(ref => ({
+                ref,
+                summary: 'Shared public work reference',
+              }))
+            );
+            if (proposal.targetWorkerId) {
+              const peer = s.workers[proposal.targetWorkerId];
+              if (!peer || peer.workerId === workerId || !visible(worker, peer))
+                throw new FleetError('FORBIDDEN');
+            }
+            const requestId = input.requestId as string;
+            const previous = s.requests[requestId];
+            if (previous) {
+              if (
+                previous.requesterWorkerId !== workerId ||
+                stable({
+                  requestId,
+                  kind: previous.kind,
+                  proposal: previous.proposal,
+                }) !== stable(input)
+              )
+                throw new FleetError('CONFLICT');
+              data = { request: requestView(s, previous, this.now()) };
+            } else {
+              if (
+                s.missions[requestId] ||
+                Object.values(s.receipts).some(r => r.missionId === requestId)
+              )
+                throw new FleetError('CONFLICT');
+              capacity(s.requests, CAPACITY.requests);
+              if (
+                Object.values(s.requests).filter(
+                  r =>
+                    r.requesterWorkerId === workerId &&
+                    ['pending', 'accepted'].includes(r.state) &&
+                    Date.parse(r.proposal.notAfter) > this.now() &&
+                    !Object.values(s.receipts).some(
+                      receipt => receipt.missionId === r.requestId
+                    )
+                ).length >= 5
+              )
+                throw new FleetError('QUOTA_EXHAUSTED');
+              const request = fleetRequestSchema.parse({
+                ...input,
+                requesterWorkerId: workerId,
+                createdAt: iso(this.now()),
+                state: 'pending',
+              });
+              s.requests[requestId] = request;
+              data = { request };
+            }
+          } else if (id === 'work.next') {
             if (current) data = { lease: current };
             else {
               const mission =
@@ -531,6 +839,16 @@ export class FleetDispatcher {
                         Date.parse(m.notAfter) > this.now() &&
                         (!m.targetWorkerId || m.targetWorkerId === workerId) &&
                         worker.capabilities.includes(m.command) &&
+                        (!worker.authority ||
+                          (fresh(worker, this.now()) &&
+                            within(worker.authority, m))) &&
+                        (!s.requests[m.missionId] ||
+                          compatible(
+                            s,
+                            s.requests[m.missionId],
+                            worker,
+                            this.now()
+                          )) &&
                         m.requiredTools.every(t => worker.tools.includes(t)) &&
                         m.requiredConnectors.every(t =>
                           worker.connectors.includes(t)

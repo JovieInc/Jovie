@@ -6,7 +6,7 @@ const NO_STORE = { 'Cache-Control': 'no-store' };
 const controlSchema = z
   .object({
     profileId: z.uuid(),
-    operation: z.enum(['provision', 'revoke', 'assign']),
+    operation: z.enum(['provision', 'revoke', 'assign', 'accept', 'reject']),
     input: z.unknown(),
     approvalId: z.uuid().optional(),
   })
@@ -116,8 +116,16 @@ export async function handleFleetControl(
       return response(await deps.dispatcher.inspect(parsed.profileId));
     const command = controlSchema.parse(parsed);
     if (
-      command.operation === 'assign' &&
-      (!deps.validateMission || !(await deps.validateMission(command.input)))
+      (command.operation === 'assign' || command.operation === 'accept') &&
+      (!deps.validateMission ||
+        !(await deps.validateMission(
+          command.operation === 'accept'
+            ? await deps.dispatcher.requestMission(
+                command.profileId,
+                command.input
+              )
+            : command.input
+        )))
     )
       return response({ error: { code: 'CONFLICT' } }, 409);
     if (kind === 'approve')
