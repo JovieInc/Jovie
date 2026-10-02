@@ -31,6 +31,7 @@ import {
   type SentryMode,
 } from '@/lib/sentry/init';
 import {
+  isMusicfetchCutoverCapture,
   isOpaqueUpstashErrorJsonBag,
   isSpotifyReleaseCreditBoundCapture,
   isUpstashQuotaNoise,
@@ -306,8 +307,17 @@ export async function captureError(
   const boundedCreditReceipt =
     isSpotifyReleaseCreditBoundCapture(resolvedError, resolvedContext) ||
     isSpotifyReleaseCreditBoundCapture(error, context);
+  const musicfetchCutover =
+    isMusicfetchCutoverCapture(resolvedError) ||
+    isMusicfetchCutoverCapture(message) ||
+    isMusicfetchCutoverCapture(errorData.message);
 
-  if (!opaqueBag && !quotaNoise && !boundedCreditReceipt) {
+  if (
+    !opaqueBag &&
+    !quotaNoise &&
+    !boundedCreditReceipt &&
+    !musicfetchCutover
+  ) {
     sendToSentry({
       error: resolvedError ?? message,
       errorMessage: errorData.message,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DESTINATION_STREAM_CLOSED_IGNORE_ERRORS,
+  isMusicfetchCutoverCapture,
   isNonActionableDestinationStreamEvent,
   isNonActionableDestinationStreamIssue,
   isNonActionableLoopbackBetterAuthHostEvent,
@@ -20,6 +21,8 @@ import {
   isUpstashQuotaNoise,
   isUpstashQuotaSentryEvent,
   LOOPBACK_BETTER_AUTH_HOST_IGNORE_ERRORS,
+  MUSICFETCH_CUTOVER_IGNORE_ERRORS,
+  MUSICFETCH_REMEDIATION_ISSUE,
   SPOTIFY_RELEASE_CREDIT_BOUND_IGNORE_ERRORS,
   UPSTASH_ERROR_JSON_BAG,
   VERCEL_IPC_SOCK_IGNORE_ERRORS,
@@ -594,6 +597,20 @@ describe('non-actionable Sentry issues', () => {
           },
         })
       ).toBe(false);
+    });
+  });
+
+  describe('MusicFetch cutover fingerprints (JOV-7323)', () => {
+    it('routes subscription failures to JOV-7323 and never a renewal issue', () => {
+      const message =
+        'MusicFetch API error: 401 - subscription not active (remediation:musicfetch-subscription-inactive)';
+      expect(isMusicfetchCutoverCapture(message)).toBe(true);
+      expect(isMusicfetchCutoverCapture(new Error(message))).toBe(true);
+      expect(
+        MUSICFETCH_CUTOVER_IGNORE_ERRORS.some(pattern => pattern.test(message))
+      ).toBe(true);
+      expect(MUSICFETCH_REMEDIATION_ISSUE).toBe('JOV-7323');
+      expect(message).not.toMatch(/renew/i);
     });
   });
 });

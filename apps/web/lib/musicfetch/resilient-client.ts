@@ -3,6 +3,12 @@ import 'server-only';
 import crypto from 'node:crypto';
 
 import { env } from '@/lib/env-server';
+import {
+  musicfetchDormantReason,
+  musicfetchRemediation,
+  noteMusicfetchHttpStatus,
+  noteMusicfetchMissingToken,
+} from '@/lib/music-resolver/musicfetch-gate';
 import { reserveMusicfetchBudget } from '@/lib/musicfetch/budget-guard';
 import { createRateLimiter } from '@/lib/rate-limit/rate-limiter';
 import { getRedis } from '@/lib/redis';
@@ -202,6 +208,7 @@ async function handleHttpResponse<T>(
 
   const errorBody = await response.text().catch(() => '');
   const details = extractMusicfetchErrorDetail(errorBody);
+  noteMusicfetchHttpStatus(response.status, details);
 
   throw new MusicfetchRequestError(
     details
@@ -220,7 +227,20 @@ async function requestWithRetries<T>(
 ): Promise<T> {
   const token = env.MUSICFETCH_API_TOKEN;
   if (!token) {
-    throw new MusicfetchRequestError('MusicFetch API token is not configured');
+    const remediation = noteMusicfetchMissingToken();
+    throw new MusicfetchRequestError(
+      `MusicFetch API token is not configured (${remediation.fingerprint} ${remediation.issue})`
+    );
+  }
+  const dormant = musicfetchDormantReason();
+  if (dormant) {
+    const remediation = musicfetchRemediation(dormant);
+    throw new MusicfetchRequestError(
+      `MusicFetch dormant ${remediation.fingerprint} ${remediation.issue}`,
+      401,
+      undefined,
+      remediation.fingerprint
+    );
   }
 
   const query = params.toString();

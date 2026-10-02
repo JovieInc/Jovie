@@ -102,6 +102,20 @@ export const LOOPBACK_BETTER_AUTH_HOST_IGNORE_ERRORS: ReadonlyArray<RegExp> = [
   /Host "(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?" is not in the allowed hosts list/i,
 ];
 
+/**
+ * MusicFetch is unpaid. A 401 "subscription not active" is the JOV-7323
+ * cutover, not a renewal. Drop the event so autofix does not file a new issue.
+ */
+export const MUSICFETCH_CUTOVER_IGNORE_ERRORS: ReadonlyArray<RegExp> = [
+  /subscription not active/i,
+  /remediation:musicfetch-/,
+];
+
+export const MUSICFETCH_REMEDIATION_FINGERPRINT_PREFIX =
+  'remediation:musicfetch-' as const;
+
+export const MUSICFETCH_REMEDIATION_ISSUE = 'JOV-7323' as const;
+
 function isSpotifyReleaseCreditBoundBag(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
@@ -428,6 +442,21 @@ export function isNonActionableDestinationStreamEvent(
   return collectSentryEventCaptureValues(event).some(
     value => typeof value === 'string' && isDestinationStreamClosedText(value)
   );
+}
+
+function isMusicfetchCutoverText(value: string | null | undefined): boolean {
+  if (!value) return false;
+  return MUSICFETCH_CUTOVER_IGNORE_ERRORS.some(pattern => pattern.test(value));
+}
+
+/**
+ * True when a capture is an unpaid MusicFetch failure. Route it to JOV-7323.
+ * Do not open a renewal issue.
+ */
+export function isMusicfetchCutoverCapture(value: unknown): boolean {
+  if (typeof value === 'string') return isMusicfetchCutoverText(value);
+  if (value instanceof Error) return isMusicfetchCutoverText(value.message);
+  return false;
 }
 
 function isLoopbackBetterAuthHostText(

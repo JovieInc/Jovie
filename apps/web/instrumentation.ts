@@ -325,12 +325,18 @@ export async function onRequestError(...args: unknown[]) {
   // Linear title. Nested wrappers keep the bag on `cause`. A raw quota
   // `UpstashError` (JOV-5181 / JOV-5184) files as `ERR max requests limit
   // exceeded` — the hourly operability canary owns the standing alert.
-  const [{ isOpaqueUpstashErrorJsonBag }, { isRedisQuotaFailure }] =
-    await Promise.all([
-      import('@/lib/sentry/non-actionable-issues'),
-      import('@/lib/utils/errors'),
-    ]);
-  if (isOpaqueUpstashErrorJsonBag(args[0]) || isRedisQuotaFailure(args[0])) {
+  const [
+    { isMusicfetchCutoverCapture, isOpaqueUpstashErrorJsonBag },
+    { isRedisQuotaFailure },
+  ] = await Promise.all([
+    import('@/lib/sentry/non-actionable-issues'),
+    import('@/lib/utils/errors'),
+  ]);
+  if (
+    isOpaqueUpstashErrorJsonBag(args[0]) ||
+    isRedisQuotaFailure(args[0]) ||
+    isMusicfetchCutoverCapture(args[0])
+  ) {
     return;
   }
 

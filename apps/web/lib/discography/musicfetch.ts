@@ -17,6 +17,7 @@ import {
   SERVICE_TO_PROVIDER,
 } from '@/lib/dsp-registry';
 import { env } from '@/lib/env-server';
+import { musicfetchNetworkAllowed } from '@/lib/music-resolver/musicfetch-gate';
 import {
   MusicfetchRequestError,
   musicfetchRequest,
@@ -131,7 +132,7 @@ export async function lookupByIsrc(
   options?: { services?: string[]; withLyrics?: boolean }
 ): Promise<MusicfetchLookupResult | null> {
   const token = env.MUSICFETCH_API_TOKEN;
-  if (!token) return null;
+  if (!token || !musicfetchNetworkAllowed()) return null;
 
   const services = options?.services ?? TARGET_SERVICES;
   const servicesParam = services.join(',');
