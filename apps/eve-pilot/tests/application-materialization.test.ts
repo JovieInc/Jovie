@@ -16,6 +16,16 @@ describe('independent application source export', () => {
         expect(receipt.status).toBe('prepared-not-commissioned');
         expect(receipt.sourceCommit).toMatch(/^[a-f0-9]{40}$/u);
         expect(existsSync(join(destination, 'pnpm-lock.yaml'))).toBe(true);
+        expect(existsSync(join(destination, 'patches/eve@0.68.0.patch'))).toBe(
+          true
+        );
+        expect(
+          existsSync(join(destination, 'tests/prompt-prefix-stability.test.ts'))
+        ).toBe(true);
+        expect(
+          JSON.parse(readFileSync(join(destination, 'package.json'), 'utf8'))
+            .pnpm.patchedDependencies['eve@0.68.0']
+        ).toBe('patches/eve@0.68.0.patch');
         // Eve 0.63 retired task_update; an orphan disableTool slot fails
         // discovery before the generated agent can enforce its tool boundary.
         expect(

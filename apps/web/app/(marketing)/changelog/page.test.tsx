@@ -148,7 +148,7 @@ describe('public changelog page', () => {
     expect(
       screen.getByLabelText('Subscribe To Changelog Updates')
     ).toBeVisible();
-    expect(screen.getAllByText('Product update')).toHaveLength(2);
+    expect(screen.queryByText('Product update')).not.toBeInTheDocument();
   });
 
   it('uses a descriptive product-update title for search and sharing', () => {

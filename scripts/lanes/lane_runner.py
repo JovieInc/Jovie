@@ -2472,7 +2472,7 @@ def lane_prs(name: str, providers: dict | None = None, fields: str = "") -> list
 PR_FIELDS = "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus,reviewDecision,isCrossRepository,labels"
 # Every lane PR without check rollups: rollups over ~90 PRs time out (HTTP 504), so the full
 # field set stays at gh's default page of 30 and the budget/sweep read this light set.
-LIGHT_PR_FIELDS = "number,url,isDraft,headRefName,mergeStateStatus"
+LIGHT_PR_FIELDS = "number,url,state,isDraft,headRefName,headRefOid,mergeStateStatus,labels"
 
 
 def repo_prs() -> list[dict]:
@@ -2586,6 +2586,50 @@ def over_budget(name: str, prs: list[dict], slots: int) -> bool:
     return sum(not is_green(pr) for pr in own) >= slots * OPEN_PRS_PER_SLOT
 
 
+def new_issue_budget(name: str, slots: int, inventory: list[dict] | None) -> dict:
+    """One owning lane's new-issue budget; maintenance/orphan work is separate."""
+    cap = max(0, slots) * OPEN_PRS_PER_SLOT
+    if slots <= 0:
+        return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": cap}
+    if inventory is None:
+        return {"allowed": False, "reason": "pr-inventory-unavailable", "used": None, "cap": cap}
+    dated = re.compile(rf"^{re.escape(name)}/jov-\d+-\d{{8}}")
+    own = {pr["number"]: pr for pr in inventory if dated.match(pr["headRefName"])}
+    used = sum(not is_green(pr) for pr in own.values())
+    return {"allowed": used < cap, "reason": "within-budget" if used < cap else "over-budget",
+            "used": used, "cap": cap}
+
+
+def read_new_issue_budget(name: str, slots: int) -> dict:
+    """Fail closed on incomplete budget reads without disrupting maintenance reads."""
+    inventory, error = None, None
+    if slots <= 0:
+        return new_issue_budget(name, slots, [])
+    try:
+        listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open",
+                     "--search", f"head:{name}/", "--limit", "200", "--json", LIGHT_PR_FIELDS],
+                    timeout=60)
+        if listed.returncode:
+            raise ValueError("pr-read-failed")
+        rows = json.loads(listed.stdout)
+        # Validate before filtering: 200 manual rows can hide dated lane PRs.
+        if not isinstance(rows, list) or len(rows) >= 200:
+            raise ValueError("pr-inventory-incomplete")
+        for row in rows:
+            if (not isinstance(row, dict) or type(row.get("number")) is not int or row["number"] <= 0
+                    or not isinstance(row.get("headRefName"), str) or not row["headRefName"].strip()
+                    or type(row.get("isDraft")) is not bool
+                    or not isinstance(row.get("mergeStateStatus"), str) or not row["mergeStateStatus"].strip()):
+                raise ValueError("pr-inventory-malformed")
+        if len({row["number"] for row in rows}) != len(rows):
+            raise ValueError("pr-inventory-duplicate")
+        inventory = rows
+    except (OSError, ValueError, subprocess.SubprocessError) as failure:
+        error = str(failure) if isinstance(failure, ValueError) else type(failure).__name__
+    result = new_issue_budget(name, slots, inventory)
+    return {**result, "observedAt": now_iso(), "error": error}
+
+
 def last_pushes() -> dict[int, float]:
     """Open PR number -> head commit time, in one paginated query (`gh pr list --json commits`
     over 200 PRs exceeds GitHub's GraphQL node limit). Empty when GitHub cannot be read."""
@@ -2609,14 +2653,14 @@ def last_pushes() -> dict[int, float]:
 
 
 def sweep_plan(prs: list[dict], now: float, pushes: dict[int, float]) -> tuple[list[tuple[dict, int]], list[dict]]:
-    """(duplicates to close as superseded by the kept PR, stale drafts to close).
-    Only lane-branch PRs; the kept PR per issue is best_per_issue's pick."""
+    """Rank only explicitly authorized duplicate lane PRs for live revalidation.
+    Age and same-issue ranking never grant retirement authority."""
     kept = {LANE_BRANCH.match(pr["headRefName"]).group("issue"): pr
             for pr in best_per_issue(prs) if LANE_BRANCH.match(pr.get("headRefName") or "")}
     superseded, stale = [], []
     for pr in prs:
         found = LANE_BRANCH.match(pr.get("headRefName") or "")
-        if not found:
+        if not found or not pr_events.duplicate_authorized(pr):
             continue
         keep = kept[found.group("issue")]
         if keep["number"] != pr["number"]:
@@ -2629,8 +2673,7 @@ def sweep_plan(prs: list[dict], now: float, pushes: dict[int, float]) -> tuple[l
 
 
 def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> None:
-    """On the existing lane tick (at most every SWEEP_EVERY_S per host): leave one open PR per
-    issue and close drafts with no green run and no push for a day, returning their issue to Todo."""
+    """Retire explicitly labeled duplicate lane PRs on the existing bounded sweep tick."""
     now = time.time() if now is None else now
     marker = host.state / f"sweep-{name}.json"
     if marker.exists() and now - json.loads(marker.read_text()).get("at", 0) < SWEEP_EVERY_S:
@@ -2638,15 +2681,12 @@ def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> N
     marker.write_text(json.dumps({"at": now}))
     superseded, stale = sweep_plan(lane_prs(name, fields=LIGHT_PR_FIELDS), now, last_pushes())
     for pr, keep in superseded:
-        sh(["gh", "pr", "close", str(pr["number"]), "--repo", REPO_SLUG, "--comment",
-            f"🤖 lane sweep: superseded by #{keep} (one open PR per Linear issue, JOV-6833)."])
+        pr_events.close_duplicate(THIS, pr, f"superseded by #{keep} for the same issue")
     for pr in stale:
         issue = LANE_BRANCH.match(pr["headRefName"]).group("issue").upper()
-        closed = sh(["gh", "pr", "close", str(pr["number"]), "--repo", REPO_SLUG, "--comment",
-                     "🤖 lane sweep: closing this draft; no green run and no push for 24 h (JOV-6833). "
-                     f"{issue} goes back to Todo for a fresh attempt."])
+        closed = pr_events.close_duplicate(THIS, pr, "stale draft explicitly labeled duplicate")
         # Only reopen work the lane still owns; a Done or Canceled issue stays closed.
-        if closed.returncode == 0 and linear.state_of(issue) == "In Progress":
+        if closed and linear.state_of(issue) == "In Progress":
             linear.move(issue, "Todo")
             linear.comment(issue, f"🤖 lane sweep closed stale draft {pr.get('url')} (no green run, "
                                   "no push for 24 h); back to Todo.")
@@ -2758,9 +2798,9 @@ def worker(host: Host, name: str) -> int:
         adopt = None if red or not provider_may_run(name, "adopt") else claim_adoptable_pr(host, name, prs)
         issue = None
         sweep_lane_prs(host, name, linear)
-        full = not (red or adopt) and over_budget(name, lane_prs(name, fields=LIGHT_PR_FIELDS),
-                                                  host.slots(name, spec.get("slots", 1)))
-        in_flight = None if red or adopt or full else in_flight_issues()
+        budget = None if red or adopt else read_new_issue_budget(name, host.slots(name, spec.get("slots", 1)))
+        blocked = budget is not None and not budget["allowed"]
+        in_flight = None if red or adopt or blocked else in_flight_issues()
         if in_flight is not None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
             issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
@@ -2779,7 +2819,7 @@ def worker(host: Host, name: str) -> int:
         slot.release()
         return reexec(host, name)
     if issue is None:
-        record_idle_exit(host, name, "over-budget" if full else
+        record_idle_exit(host, name, budget["reason"] if blocked else
                          "in-flight-unknown" if in_flight is None else "none-eligible")
         slot.release()
         return 0

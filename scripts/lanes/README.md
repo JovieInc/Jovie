@@ -16,7 +16,7 @@ The harness, not the model, owns:
 | Claim (serialised, `flock`), one PR per issue across hosts (GitHub is the truth), priority aging after each 24h wait | `worker()`, `pick_issue()`, `in_flight_issues()` |
 | One open PR per issue: branch or `linear-issue-id` marker; an unreadable PR list claims nothing | `in_flight_issues()` |
 | Open-PR budget: a lane holding `slots × 2` open non-green PRs only fixes/adopts until it drains | `over_budget()` |
-| Sweep (every 30 min per lane): close duplicate PRs as superseded, close drafts with no green run and no push for 24 h, issue back to Todo | `sweep_lane_prs()` |
+| Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
 | Lockfile-only conflicts: merge main, take its `pnpm-lock.yaml`, `pnpm install --lockfile-only`, push; no model, no force-push | `resolve_lockfile_conflict()` |
 | Slot locks that die with their holder | `Locked` |
 | Fresh worktree from `origin/main`, shared-store hardlink install, removal after | `run_issue()` |
@@ -32,7 +32,7 @@ The harness, not the model, owns:
 | Event queue: GitHub signals become `lane-fix-<kind>` labels; a worker takes a labeled PR first | `pr_events.py`, `lane-fix-relay.yml` |
 | Cheapest lane first: attempt n belongs to the n-th enabled lane in `providers.json` order | `pr_events.may_take()` |
 | Ready on green: a CLEAN lane draft gets `gh pr ready` plus its merge intent in one writer action | `pr_events.ready_green()` |
-| Disabled-lane drafts: closed when superseded or done, else adopted; closed and the issue returned to Todo once their fix attempts run out | `pr_events.retire_orphan()`, `return_to_pool()` |
+| Disabled-lane drafts: adopted for bounded repair; provider state, issue completion and exhausted attempts never authorize closing unlabelled work | `pr_events.retire_orphan()`, `return_to_pool()` |
 | Held and failed records carry `reason` + `next_action`; the status feed publishes `held_by_reason` | `pr_events.held_reason()`, `doctor.status_feed()` |
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
 | Disk admission on the tick and before installs: critical (at or below 5%) or unknown free space blocks work. Only a worker holding a slot may sweep under 15%, under one host-wide cleanup lock; cleanup preserves the shared pnpm store, unrelated checkouts and cancelled repair source | `disk_guard.py`, `dispatch()`, `worker()` |
@@ -46,6 +46,25 @@ The harness, not the model, owns:
 Event-driven: a worker that finishes re-execs the current release and pulls the next
 issue. The minute timer only restarts idle lanes and applies updates; it never signals a
 running worker. Production deploys are a separate track: only a red main stops shipping.
+
+New-issue admission reports three separate counts: raw Todo candidates, candidates
+passing the issue predicate, and new issues after the owning lane's PR budget.
+Worker and doctor share the same budget decision: each dated lane branch counts
+once while non-green, with a cap of effective slots × 2. Manual branches and
+disabled-lane orphan maintenance do not inflate that lane's budget. A failed,
+malformed or truncation-ambiguous inventory stays unknown and cannot admit new
+issues. Maintenance claims still run first and do not depend on that budget read.
+HUD labels this count as new issues; it is not total company demand or a claim of
+available worker capacity. Slot occupancy, account leases and PR work remain
+separate facts. Empty-demand alerts require known zero eligibility and no open
+PR maintenance; unknown evidence and backpressure reset the empty timer.
+
+Account attribution uses the existing status rows without changing account
+admission. Lease occupancy and cooldown are independent; an account can be both
+leased and in a recorded hold. The existing available flag means eligible under
+cooldown policy, not a fresh positive quota reading. An empty unleased-available
+list does not mean all quotas are exhausted. Usage-limit, auth, rate and unknown
+holds remain distinct, and stale or incomplete rows report unknown.
 
 Gate reservations use kernel locks for the PR number and head SHA. An adopter carries
 its reservation through checkout, install, checks and terminal receipt publication;
@@ -93,18 +112,18 @@ Gaps closed after the first week (no PR may sit unowned):
   Once per stuck episode; a second removal goes to a model with the merge group's failing log.
 - Every 30 minutes the tick reconciles all open PRs in a few GraphQL pages (missed events
   only): DIRTY gets `conflict`, a red rollup gets `red`, a CLEAN lane draft gets `green`, a lane
-  draft idle for 48h gets `stale` (or is closed when superseded or out of attempts, its issue
-  back to Todo), and a PR that went CLEAN or entered the queue starts a fresh episode.
+  draft idle for 48h gets `stale`; exhausted attempts retain a bounded repair disposition, and a PR that went CLEAN or entered the queue starts a fresh episode.
 - Age SLOs are per class (JOV-7079): queued/ready PRs live on the merge queue's clock, lane
   drafts on the 48h idle `stale` SLO, and non-lane agent drafts (`codex/…`, `tim/…`, `devin/…`,
-  etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). An aged-out agent
-  draft is closed as abandoned — unless its body names a still-open dependency
-  ("blocked by #n", "pull/n"), in which case it holds as `hold:dependency` and is revalidated
-  every sweep: the note is never authoritative once the dependency lands or closes. A human's
-  branch is never touched.
+  etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). Stalled agent
+  drafts receive `repair`, or `hold:dependency` while a named dependency is open.
+  A landed dependency releases repair; it never grants authority to discard the branch.
+  JOV-INV-011 requires an explicit `duplicate` label before automatic retirement. Every
+  close path re-reads the live source head, state, complete labels, fork and queue status;
+  revoked authority, holds, head movement and unreadable evidence preserve the PR.
 - Every open PR also gets one truthful disposition in `reconcile.json` (`dispositions`,
   oldest first: `advancing`, `queued`, `ready`, `hold:<reason>`, `hold:dependency`,
-  `closing`, `draft`, `orphaned`), and the doctor raises `aged-prs` for anything open past
+  `closing`, `repair`, `draft`, `orphaned`), and the doctor raises `aged-prs` for anything open past
   7 days that is still undecided — `hold:*` dispositions are already deliberate parks and
   stay named in `oldest_prs` — so the shipping cockpit always names the oldest open PRs
   and why they are still open.
@@ -203,6 +222,11 @@ Gem (systemd user timer) or a Mac (launchd), with a dedicated clone:
 git clone https://github.com/JovieInc/Jovie.git ~/devin-sweep/Jovie
 LANES_REPO=~/devin-sweep/Jovie scripts/lanes/install.sh
 ```
+
+Select the repository's pinned Node in the installing shell first. The installer
+puts that Node directory first in the timer PATH on both Linux and macOS.
+After changing the host's Node installation, rerun the installer so the timer
+does not retain a removed runtime directory.
 
 Per-host knobs: `LANES_SLOTS_<PROVIDER>`, `LANES_LINEAR_ENV`, `LANES_AGENT_TIMEOUT_S`,
 `LANES_GATE_TIMEOUT_S`, `LANES_GATE_SLOTS`. A host-specific GitHub token in

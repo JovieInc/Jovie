@@ -39,7 +39,7 @@ export interface FleetBackend {
 type Worker = z.infer<typeof fleetWorkerSchema>;
 type Mission = z.infer<typeof fleetMissionSchema>;
 type Authority = z.infer<typeof fleetAuthoritySchema>;
-type HelpRequest = z.infer<typeof fleetRequestSchema>;
+export type HelpRequest = z.infer<typeof fleetRequestSchema>;
 export type FleetControlOperation =
   | 'provision'
   | 'rotate'
@@ -56,7 +56,7 @@ type Credential = {
   revokedAt?: string;
   authority?: Authority;
 };
-type Lease = {
+export type Lease = {
   leaseId: string;
   workerId: string;
   mission: Mission;
@@ -65,12 +65,12 @@ type Lease = {
   expiresAt: string;
   claimedAt?: string;
 };
-type TerminalReceipt = {
+export type TerminalReceipt = {
   receiptId: string;
   workerId: string;
   missionId: string;
   leaseId: string;
-  outcome: string;
+  outcome: 'completed' | 'failed' | 'blocked';
   summary: string;
   evidence: Evidence[];
   reportedAt: string;
@@ -89,7 +89,11 @@ export type FleetResult =
       error: { code: ActionErrorCode; messageKey: string; retryable: boolean };
     }
   | { status: 'in_progress'; receipt: ActionReceipt; retryAfterMs: number };
-type InvocationRecord = { hash: string; result: FleetResult };
+export type InvocationRecord = {
+  hash: string;
+  result: FleetResult;
+  refresh?: true;
+};
 type DefectOperation = {
   attemptId: string;
   fingerprint: string;
@@ -102,7 +106,7 @@ type DefectOperation = {
   hash: string;
   receipt: ActionReceipt;
 };
-type FleetState = {
+export type FleetState = {
   schema: 'jovie.summer.fleet/v1';
   credentials: Record<string, Credential>;
   workers: Record<string, Worker>;
@@ -110,6 +114,11 @@ type FleetState = {
   leases: Record<string, Lease>;
   /** Private issuance binding, never included in the public lease contract. */
   leaseCredentials: Record<string, string>;
+  historySequences: Record<string, number>;
+  requestWorkers: Record<string, string[]>;
+  receiptHistoryRecorded: Record<string, boolean>;
+  // Pending Summer deliveries pin their source until authoritative resolution.
+  summer?: { events: Record<string, { requestId: string; state: string }> };
   receipts: Record<string, TerminalReceipt>;
   invocations: Record<string, InvocationRecord>;
   defects: Record<string, Issue>;
@@ -210,6 +219,9 @@ function empty(): FleetState {
     missions: {},
     leases: {},
     leaseCredentials: {},
+    historySequences: {},
+    requestWorkers: {},
+    receiptHistoryRecorded: {},
     receipts: {},
     invocations: {},
     defects: {},
@@ -228,6 +240,9 @@ function state(value: unknown): FleetState {
   const result = structuredClone(value as FleetState);
   result.requests ??= {};
   result.leaseCredentials ??= {};
+  result.historySequences ??= {};
+  result.requestWorkers ??= {};
+  result.receiptHistoryRecorded ??= {};
   return result;
 }
 const acceptSchema = z

@@ -30,6 +30,16 @@ struct NativeRequestAuthorization: Equatable, Sendable {
   }
 }
 
+/// Login ownership outlives bearer rotation, but never an explicit save or clear.
+struct NativeSessionOwnership: Equatable, Sendable {
+  fileprivate let generation: UUID
+}
+
+struct NativeSessionContext: Equatable, Sendable {
+  let ownership: NativeSessionOwnership
+  let authorization: NativeRequestAuthorization?
+}
+
 enum NativeSessionTokenStore {
   /// Every complete Keychain + metadata operation uses this same lock. Locked
   /// helpers never call a public operation, so expiry cleanup cannot re-enter it.
@@ -37,6 +47,7 @@ enum NativeSessionTokenStore {
     let lock = NSLock()
     var generation = UUID()
     var bearerRevision = UUID()
+    var passivelyExpiredProfileOwner: (originalGeneration: UUID, emptyGeneration: UUID)?
   }
 
   private static let state = State()
@@ -51,6 +62,7 @@ enum NativeSessionTokenStore {
     withLock {
       state.generation = UUID()
       state.bearerRevision = UUID()
+      state.passivelyExpiredProfileOwner = nil
       saveLocked(token: token, userID: userID, expiresAt: expiresAt)
     }
   }
@@ -86,8 +98,51 @@ enum NativeSessionTokenStore {
   }
 
   static func requestAuthorization() -> NativeRequestAuthorization? {
+    captureSessionContext().authorization
+  }
+
+  /// Also captures an empty store's generation so delayed local cleanup cannot
+  /// adopt a login that appears after capture.
+  static func captureSessionContext() -> NativeSessionContext {
     withLock {
-      guard let session = loadLocked() else { return nil }
+      let session = loadLocked()
+      return NativeSessionContext(
+        ownership: NativeSessionOwnership(generation: state.generation),
+        authorization: session.map {
+          NativeRequestAuthorization(
+            session: $0, generation: state.generation, bearerRevision: state.bearerRevision
+          )
+        }
+      )
+    }
+  }
+
+  static func isCurrent(_ ownership: NativeSessionOwnership) -> Bool {
+    withLock {
+      guard state.generation == ownership.generation else { return false }
+      _ = loadLocked()
+      return state.generation == ownership.generation
+    }
+  }
+
+  /// Presentation may continue after passive expiry until that exact empty
+  /// generation is replaced or explicitly cleared. This grants no authorization
+  /// and leaves the existing client/terminal path responsible for expiry.
+  static func canContinueProfileLoad(ownedBy ownership: NativeSessionOwnership) -> Bool {
+    withLock {
+      state.generation == ownership.generation || (
+        state.passivelyExpiredProfileOwner?.originalGeneration == ownership.generation &&
+        state.passivelyExpiredProfileOwner?.emptyGeneration == state.generation
+      )
+    }
+  }
+
+  /// A pending operation may use a rotated bearer only within its original login.
+  static func requestAuthorization(
+    ifOwnedBy ownership: NativeSessionOwnership
+  ) -> NativeRequestAuthorization? {
+    withLock {
+      guard state.generation == ownership.generation, let session = loadLocked() else { return nil }
       return NativeRequestAuthorization(
         session: session,
         generation: state.generation,
@@ -109,7 +164,9 @@ enum NativeSessionTokenStore {
     )
 
     guard expiresAt.timeIntervalSinceNow > expiryLeeway else {
+      let expiredGeneration = state.generation
       clearLocked()
+      state.passivelyExpiredProfileOwner = (expiredGeneration, state.generation)
       return nil
     }
 
@@ -123,6 +180,7 @@ enum NativeSessionTokenStore {
   private static func clearLocked() {
     state.generation = UUID()
     state.bearerRevision = UUID()
+    state.passivelyExpiredProfileOwner = nil
     clearToken()
     UserDefaults.standard.removeObject(forKey: fallbackTokenKey)
     UserDefaults.standard.removeObject(forKey: userIDKey)

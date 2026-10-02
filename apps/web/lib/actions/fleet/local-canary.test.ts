@@ -6,6 +6,7 @@ import {
   getActionDescriptor,
 } from '@jovie/action-contracts';
 import { afterAll, describe, expect, it, vi } from 'vitest';
+import { completedFleetResult } from '@/lib/ovie/mcp/postgres-canary.test-utils';
 import { type FleetControlOperation, FleetDispatcher } from './dispatcher';
 import { handleFleetInvocation } from './http';
 
@@ -96,15 +97,7 @@ describe.skipIf(!url)(
           },
           token
         );
-        expect(
-          actionResultSchema(getActionDescriptor(id).outputSchema).safeParse(
-            result
-          ).success
-        ).toBe(true);
-        expect(result.status).toBe('completed');
-        if (result.status !== 'completed')
-          throw new Error('Canary action did not complete');
-        return result.data;
+        return completedFleetResult(result, id);
       };
       for (const [workerId, token] of [
         ['requester', requester],
