@@ -138,7 +138,15 @@ function handleMusicfetchLookupError(error: unknown, spotifyUrl: string): null {
       message: error.message,
     });
 
-    if (error.statusCode === 400 && !isMusicfetchInvalidServicesError(error)) {
+    const errorDetail = error.details ?? error.message;
+    const isInactiveSubscription =
+      error.statusCode === 401 &&
+      errorDetail.toLowerCase().includes('subscription not active');
+
+    if (
+      isInactiveSubscription ||
+      (error.statusCode === 400 && !isMusicfetchInvalidServicesError(error))
+    ) {
       return null;
     }
 

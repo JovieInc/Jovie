@@ -679,6 +679,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
     nonMarketing:
       'ChatGPT directory MCP kill switch; anonymous public artist reads; default off',
   },
+  AUTH_OFFER_SUMMARY: {
+    nonMarketing:
+      'auth offer recap; default off; no price, trial, or entitlement change',
+  },
 } as const satisfies Readonly<Record<ProductFlagKey, FlagCapabilityBinding>>;
 
 /**

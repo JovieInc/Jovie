@@ -10,6 +10,7 @@ import {
 import type { ScreenshotFeatureFocus } from '@/lib/screenshots/types';
 import { cn } from '@/lib/utils';
 import './ProductScreenshotFrame.css';
+import './device/DeviceScreen.css';
 
 type FrameStatus = 'loading' | 'loaded' | 'error';
 
@@ -132,9 +133,12 @@ export function ProductScreenshotFrame({
       data-variant={variant}
       data-status={status}
       className={cn(
-        'psf relative overflow-hidden border border-(--color-bg-button) bg-surface-1 shadow-[0_30px_80px_rgba(0,0,0,0.5)]',
+        // Phone captures are mobile web: bezel-free screen, no simulated
+        // device or shadow (device policy: device/deviceBezels.ts).
+        isPhone
+          ? 'psf mobile-web-screen'
+          : 'psf relative overflow-hidden rounded-xl border border-(--color-bg-button) bg-surface-1 p-1 shadow-[0_30px_80px_rgba(0,0,0,0.5)]',
         variant === 'dark-glass' && 'psf--dark-glass',
-        isPhone ? 'rounded-3xl p-1.5' : 'rounded-xl p-1',
         fill && 'h-full w-full',
         className
       )}
@@ -169,9 +173,7 @@ export function ProductScreenshotFrame({
           onError={() => setStatus('error')}
           className={cn(
             'psf__image block h-full w-full bg-(--color-bg-base) object-contain',
-            isPhone
-              ? 'rounded-[calc(var(--radius-3xl)-0.375rem)]'
-              : 'rounded-lg'
+            !isPhone && 'rounded-lg'
           )}
         />
       )}

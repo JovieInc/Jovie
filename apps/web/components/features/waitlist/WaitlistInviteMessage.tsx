@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { APP_ROUTES } from '@/constants/routes';
+import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 
 interface WaitlistInviteMessageProps {
   readonly title: string;
@@ -17,7 +19,8 @@ export function WaitlistInviteMessage({
         </h1>
         <p className='text-base leading-7 text-secondary-token'>{body}</p>
         <Link
-          href='/waitlist'
+          href={APP_ROUTES.WAITLIST}
+          prefetch={resolveMarketingAuthPrefetch(APP_ROUTES.WAITLIST)}
           className='inline-flex rounded-md border border-subtle px-3 py-2 text-sm font-medium text-primary-token outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent'
         >
           Check waitlist status
