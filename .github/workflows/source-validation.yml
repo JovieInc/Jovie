@@ -13,6 +13,9 @@ jobs:
     name: Source Validation
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - &source-checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -27,6 +30,20 @@ jobs:
       # closed before any story is measured.
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
+      - name: Validate customer changelog decision from trusted base
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          trusted_ref="$(git rev-parse 'origin/${{ github.base_ref }}^{commit}')"
+          guard_root="$(mktemp -d "$RUNNER_TEMP/changelog-source-guard.XXXXXX")"
+          trap 'rm -rf "$guard_root"' EXIT
+          git archive "$trusted_ref" scripts | tar -x -C "$guard_root"
+          node "$guard_root/scripts/changelog-source-guard.mjs"
       - name: Run deterministic source contract
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}

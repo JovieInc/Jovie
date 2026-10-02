@@ -474,6 +474,28 @@ def issue_hits_red_line(issue: Issue) -> bool:
     return False
 
 
+def admission_rejection(issue: Issue, failures: dict, now: float,
+                        in_flight: frozenset[str] = frozenset(),
+                        provider: str | None = None) -> str | None:
+    """Final claim predicate; in_flight contains normalized lowercase identifiers."""
+    labels = {label.lower() for label in issue.labels}
+    excluded = sorted(HARD_EXCLUDED_LABELS & labels)
+    if excluded:
+        return "excluded-label:" + excluded[0]
+    if issue_hits_red_line(issue):
+        return "sensitive-text"
+    if SENSITIVE_LABELS & labels and provider != SENSITIVE_PROVIDER:
+        return "sensitive-provider"
+    record = failure_record(failures.get(issue.identifier))
+    if record["count"] >= MAX_FAILURES:
+        return "retry-exhausted"
+    if now - record["at"] < RETRY_BACKOFF_S:
+        return "retry-backoff"
+    if issue.identifier.lower() in in_flight:
+        return "in-flight-pr"
+    return None
+
+
 def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
                in_flight: frozenset[str] = frozenset(), provider: str | None = None) -> Issue | None:
     """Symphony orders by aged priority then age, while preserving urgent-first admission.
@@ -483,21 +505,9 @@ def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
     3x failures, retry backoff, and issues with an open lane PR remain ineligible.
     """
     now = time.time() if now is None else now
-    in_flight = {identifier.lower() for identifier in in_flight}
-
-    def retryable(identifier: str) -> bool:
-        record = failure_record(failures.get(identifier))
-        return record["count"] < MAX_FAILURES and now - record["at"] >= RETRY_BACKOFF_S
-
-    def admitted(issue: Issue) -> bool:
-        labels = {label.lower() for label in issue.labels}
-        if HARD_EXCLUDED_LABELS & labels or issue_hits_red_line(issue):
-            return False
-        if SENSITIVE_LABELS & labels and provider != SENSITIVE_PROVIDER:
-            return False
-        return retryable(issue.identifier) and issue.identifier.lower() not in in_flight
-
-    eligible = [issue for issue in issues if admitted(issue)]
+    in_flight = frozenset(identifier.lower() for identifier in in_flight)
+    eligible = [issue for issue in issues
+                if admission_rejection(issue, failures, now, in_flight, provider) is None]
 
     def admission_order(issue: Issue) -> tuple[int, float]:
         created_at = created_at_epoch(issue.created_at)

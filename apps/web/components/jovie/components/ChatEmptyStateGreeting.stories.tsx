@@ -31,7 +31,7 @@ export const GreetingOnly: Story = {
 };
 
 /** JOV-7150: a real, server-computed insight (release momentum, a stat
- * change, or similar) renders as one sentence below the greeting. */
+ * change, or similar) replaces the greeting as the single sentence. */
 export const WithInsight: Story = {
   args: {
     insight: 'Your streams are up 320% today.',

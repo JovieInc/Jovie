@@ -28,11 +28,13 @@ import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import {
+  NAVIGATION_DROP_OFF_MS,
   type NavigationTelemetryContext,
   navigationInputMethodFromClick,
   startNavigationTelemetry,
   trackNavigationImpressions,
 } from '@/lib/tracking/navigation-telemetry';
+import { cn } from '@/lib/utils';
 import {
   artistSettingsNavigation,
   canonicalSidebarNavigation,
@@ -54,6 +56,18 @@ function normalizeTrailingSlash(pathname: string): string {
   return pathname === '/' ? pathname : pathname.replace(/\/$/, '');
 }
 
+interface PendingNavigationRecord {
+  readonly itemId: string;
+  readonly startedAt: number;
+}
+
+// The paint-only nav acknowledgment stays visible for a minimum window so it
+// is observable even when a prefetched route commits the URL almost
+// immediately. A transition that fails without committing a URL recovers on
+// the same drop-off window navigation telemetry uses instead of sticking.
+const PENDING_NAVIGATION_MIN_VISIBLE_MS = 400;
+const PENDING_NAVIGATION_RECOVERY_MS = NAVIGATION_DROP_OFF_MS;
+
 export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   const { selectedProfile, inboxNavigation } = useDashboardData();
   const runtimeUpdate = useRuntimeUpdate();
@@ -65,6 +79,12 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     const query = searchParams.toString();
     return query ? `${pathname}?${query}` : pathname;
   }, [pathname, searchParams]);
+  const [pendingNavigation, setPendingNavigation] =
+    useState<PendingNavigationRecord | null>(null);
+  const pendingNavigationTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(
+    new Set()
+  );
+  const previousNavigationHrefRef = useRef(currentNavigationHref);
   const queryClient = useQueryClient();
   const isElectron = useIsElectronRuntime();
   // Persisted navigation state is a client-only enhancement. Reading it during
@@ -104,6 +124,69 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     setThreadReadAtById(readThreadReadState());
     setHasHydratedPersistedState(true);
   }, []);
+
+  const schedulePendingNavigationClear = useCallback(
+    (record: PendingNavigationRecord, delayMs: number) => {
+      const timer = setTimeout(() => {
+        pendingNavigationTimersRef.current.delete(timer);
+        setPendingNavigation(current => (current === record ? null : current));
+      }, delayMs);
+      pendingNavigationTimersRef.current.add(timer);
+    },
+    []
+  );
+
+  const beginPendingNavigation = useCallback(
+    (itemId: string) => {
+      const record: PendingNavigationRecord = {
+        itemId,
+        startedAt: Date.now(),
+      };
+      setPendingNavigation(record);
+      schedulePendingNavigationClear(record, PENDING_NAVIGATION_RECOVERY_MS);
+    },
+    [schedulePendingNavigationClear]
+  );
+
+  const cancelPendingNavigation = useCallback((itemId: string) => {
+    setPendingNavigation(current =>
+      current?.itemId === itemId ? null : current
+    );
+  }, []);
+
+  // Route segments keep authenticated content mounted during a warm
+  // transition, so the committed URL — not a loading surface — is what ends
+  // the acknowledgment. Hold the pending state for a minimum visible window
+  // once the URL commits so fast prefetched transitions still expose it.
+  useEffect(() => {
+    const hrefChanged =
+      previousNavigationHrefRef.current !== currentNavigationHref;
+    previousNavigationHrefRef.current = currentNavigationHref;
+    if (!hrefChanged || !pendingNavigation) return;
+
+    const remainingMs =
+      PENDING_NAVIGATION_MIN_VISIBLE_MS -
+      (Date.now() - pendingNavigation.startedAt);
+    if (remainingMs <= 0) {
+      setPendingNavigation(null);
+    } else {
+      schedulePendingNavigationClear(pendingNavigation, remainingMs);
+    }
+  }, [
+    currentNavigationHref,
+    pendingNavigation,
+    schedulePendingNavigationClear,
+  ]);
+
+  useEffect(
+    () => () => {
+      for (const timer of pendingNavigationTimersRef.current) {
+        clearTimeout(timer);
+      }
+      pendingNavigationTimersRef.current.clear();
+    },
+    []
+  );
 
   useEffect(() => {
     if (
@@ -232,6 +315,9 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     }
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
       return;
+    if (event.button === 0 && currentNavigationHref !== item.href) {
+      beginPendingNavigation(item.id);
+    }
     startNavigationTelemetry({
       itemId: item.id,
       sourcePathname: currentNavigationHref,
@@ -261,6 +347,17 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
           calm={!isInSettings}
           item={item}
           isActive={isActive}
+          pending={pendingNavigation?.itemId === item.id}
+          onNavigate={
+            demoUnavailable || isActive
+              ? undefined
+              : () => beginPendingNavigation(item.id)
+          }
+          onCancelNavigate={
+            demoUnavailable || isActive
+              ? undefined
+              : () => cancelPendingNavigation(item.id)
+          }
           shortcut={shortcut}
           // Warm the approved customer destinations without a route flash.
           // Next's automatic mode skips full payloads for dynamic routes;
@@ -287,8 +384,11 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
       );
     },
     [
+      beginPendingNavigation,
+      cancelPendingNavigation,
       currentNavigationHref,
       pathname,
+      pendingNavigation,
       handleDemoNavClick,
       handlePrefetch,
       isDemo,
@@ -340,6 +440,9 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                 href={APP_ROUTES.DASHBOARD}
                 onClick={event => handleCommandClick(event, inboxNavItem)}
                 prefetch={!isDemo}
+                aria-busy={
+                  pendingNavigation?.itemId === inboxNavItem.id || undefined
+                }
                 aria-label={
                   hasRuntimeUpdate ? 'Inbox — App Update Available' : 'Inbox'
                 }
@@ -348,7 +451,15 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                     ? 'available'
                     : (inboxNavigation?.state ?? 'unknown')
                 }
-                className='relative flex size-7 shrink-0 items-center justify-center rounded-full text-secondary-token hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2 after:lg:hidden'
+                data-navigation-item-id={inboxNavItem.id}
+                data-navigation-pending={
+                  pendingNavigation?.itemId === inboxNavItem.id || undefined
+                }
+                className={cn(
+                  'relative flex size-7 shrink-0 items-center justify-center rounded-full text-secondary-token transition-colors duration-subtle ease-subtle hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2 after:lg:hidden',
+                  pendingNavigation?.itemId === inboxNavItem.id &&
+                    'bg-sidebar-accent-active text-primary-token'
+                )}
               >
                 <Bell
                   className='size-(--app-shell-sidebar-icon-size)'
@@ -374,6 +485,9 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
               <Link
                 href={APP_ROUTES.CHAT}
                 onClick={event => handleCommandClick(event, chatNavItem)}
+                aria-busy={
+                  pendingNavigation?.itemId === chatNavItem.id || undefined
+                }
                 aria-current={
                   normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT &&
                   searchParams.get('panel') !== 'profile'
@@ -382,7 +496,14 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                 }
                 prefetch={!isDemo}
                 aria-label='New Chat'
-                className='relative flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-(--color-bg-base) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2.5 after:lg:hidden'
+                data-navigation-item-id={chatNavItem.id}
+                data-navigation-pending={
+                  pendingNavigation?.itemId === chatNavItem.id || undefined
+                }
+                className={cn(
+                  'relative flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-(--color-bg-base) transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2.5 after:lg:hidden',
+                  pendingNavigation?.itemId === chatNavItem.id && 'opacity-70'
+                )}
               >
                 <Plus className='size-3.5' aria-hidden='true' />
               </Link>
