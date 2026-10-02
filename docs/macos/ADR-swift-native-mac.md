@@ -44,7 +44,10 @@ Mac tokens or atoms. Platform shells and layouts can differ.
 
 ## Delivery sequence and acceptance
 
-| Stage | Ship | Evidence before advancing |
+Independent bounded foundations may proceed in parallel while earlier runtime
+acceptance remains open; completing one slice does not certify another stage.
+
+| Stage | Ship | Evidence to complete this stage |
 | --- | --- | --- |
 | 1. Improve the shipped app | Validated client navigation, incremental transcript derivation, conservative work-state reload/update guards, useful launch/resource evidence, and small native affordances. | Behavioral regressions plus representative packaged Mac observations. Source-level expected gains stay separate from measured gains. |
 | 2. Extract the shared core | Move existing iOS transport/model/stream/cache/state behavior into shared Swift code, one bounded consumer at a time. Preserve cancellation, optimistic messages, pagination, duplicate-send protection, and late-response isolation. | Both consumers use the same implementation; meaningful client tests retain those behaviors. A decoder extraction is a foundation slice, not native chat parity. |
