@@ -63,13 +63,24 @@ export function useStickToBottom(
 
     scrollRafRef.current = requestAnimationFrame(() => {
       scrollRafRef.current = null;
-      restoringPinnedRef.current = false;
-      if (!visualActiveRef.current || !isStuckRef.current) return;
+      if (!visualActiveRef.current || !isStuckRef.current) {
+        restoringPinnedRef.current = false;
+        return;
+      }
 
       const container = scrollContainerRef.current;
-      if (!container) return;
+      if (!container) {
+        restoringPinnedRef.current = false;
+        return;
+      }
 
       container.scrollTop = container.scrollHeight;
+      if (restoringPinnedRef.current) {
+        // IO callbacks can deliver hidden samples after this restoration frame.
+        // Drain those samples; subsequent user-scroll observations still apply.
+        intersectionObserverRef.current?.takeRecords();
+      }
+      restoringPinnedRef.current = false;
     });
   }, []);
 
@@ -121,7 +132,9 @@ export function useStickToBottom(
 
       const observer = new IntersectionObserver(
         entries => {
-          const entry = entries[0];
+          // This observer watches one sentinel; a delayed callback may batch
+          // several states, so the last sampled state is authoritative.
+          const entry = entries.at(-1);
           if (!entry) return;
           updateStuckFromIntersection(entry.isIntersecting);
         },

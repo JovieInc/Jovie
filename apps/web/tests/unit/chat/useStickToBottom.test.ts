@@ -17,11 +17,13 @@ describe('useStickToBottom', () => {
   let intersectionCallback: IntersectionCallback | null = null;
   let resizeCallback: ResizeCallback | null = null;
   let rafQueue: FrameRequestCallback[] = [];
+  let queuedIntersectionEntries: IntersectionObserverEntry[] = [];
 
   beforeEach(() => {
     intersectionCallback = null;
     resizeCallback = null;
     rafQueue = [];
+    queuedIntersectionEntries = [];
 
     vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation(cb => {
       rafQueue.push(cb);
@@ -36,7 +38,11 @@ describe('useStickToBottom', () => {
       this.observe = vi.fn();
       this.unobserve = vi.fn();
       this.disconnect = vi.fn();
-      this.takeRecords = vi.fn();
+      this.takeRecords = vi.fn(() => {
+        const entries = queuedIntersectionEntries;
+        queuedIntersectionEntries = [];
+        return entries;
+      });
       this.root = null;
       this.rootMargin = '';
       this.thresholds = [];
@@ -148,6 +154,25 @@ describe('useStickToBottom', () => {
       ]);
     });
 
+    expect(result.current.isStuckToBottom).toBe(true);
+  });
+
+  it('uses the latest sentinel sample when delayed delivery batches state changes', () => {
+    const { result } = renderHook(() => useStickToBottom());
+    attachSentinel(result);
+    act(() =>
+      intersectionCallback?.([
+        { isIntersecting: true } as IntersectionObserverEntry,
+        { isIntersecting: false } as IntersectionObserverEntry,
+      ])
+    );
+    expect(result.current.isStuckToBottom).toBe(false);
+    act(() =>
+      intersectionCallback?.([
+        { isIntersecting: false } as IntersectionObserverEntry,
+        { isIntersecting: true } as IntersectionObserverEntry,
+      ])
+    );
     expect(result.current.isStuckToBottom).toBe(true);
   });
 
@@ -328,6 +353,42 @@ describe('useStickToBottom', () => {
     flushRaf();
     expect(write).not.toHaveBeenCalled();
     expect(result.current.isStuckToBottom).toBe(true);
+  });
+
+  it('discards hidden samples delivered after restoration but honors a later user scroll', () => {
+    const visibility = installVisibilityBridge();
+    const { result } = renderHook(() => useStickToBottom());
+    const container = attachSentinel(result);
+    Object.defineProperty(container, 'scrollHeight', { value: 950 });
+    const write = vi.fn();
+    Object.defineProperty(container, 'scrollTop', { set: write });
+    act(() => result.current.totalSizeRef(document.createElement('div')));
+    const deliverQueuedEntries = () => {
+      const entries = queuedIntersectionEntries;
+      queuedIntersectionEntries = [];
+      if (entries.length) act(() => intersectionCallback?.(entries));
+    };
+
+    visibility.emit(false);
+    // Chromium samples offscreen growth, then delays its callback past rAF.
+    queuedIntersectionEntries.push({
+      isIntersecting: false,
+    } as IntersectionObserverEntry);
+    visibility.emit(true);
+    flushRaf();
+    expect(write).toHaveBeenCalledExactlyOnceWith(950);
+    deliverQueuedEntries();
+    expect(result.current.isStuckToBottom).toBe(true);
+
+    // A fresh post-restoration sample must still release the reader's pin.
+    queuedIntersectionEntries.push({
+      isIntersecting: false,
+    } as IntersectionObserverEntry);
+    deliverQueuedEntries();
+    expect(result.current.isStuckToBottom).toBe(false);
+    act(() => resizeCallback?.([]));
+    flushRaf();
+    expect(write).toHaveBeenCalledOnce();
   });
 
   it('preserves an unpinned reader across hide and restore', () => {
