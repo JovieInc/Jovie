@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { isCustomerCopy } from './changelog-filter-rules.mjs';
 import {
   DAILY_SOURCE_SCHEMA,
@@ -12,7 +13,103 @@ import {
 export const NOTE_SCHEMA = 'customer-changelog/v1';
 const NOTE_RE = /<!--\s*customer-changelog\/v1\s+([\s\S]*?)\s*-->/g;
 const SHA_RE = /^[a-f0-9]{40}$/;
+const OUTCOME_KEY_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const ENTRY_ID_RE = /^customer-update:[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const FRAGMENT_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SECTIONS = new Set(['Added', 'Changed', 'Fixed', 'Removed']);
+const permalinkMigrations = JSON.parse(
+  readFileSync(
+    new URL(
+      '../../apps/web/data/customer-changelog-permalink-migrations.json',
+      import.meta.url
+    ),
+    'utf8'
+  )
+);
+
+function customerStoryIdentity(outcomeKey) {
+  return {
+    entryId: `customer-update:${outcomeKey}`,
+    slug: `update-${outcomeKey}`,
+    aliases: [],
+  };
+}
+
+function validateCustomerStoryIdentity(value) {
+  return (
+    ENTRY_ID_RE.test(value?.entryId ?? '') &&
+    FRAGMENT_RE.test(value?.slug ?? '') &&
+    Array.isArray(value?.aliases) &&
+    value.aliases.length <= 20 &&
+    value.aliases.every(alias => FRAGMENT_RE.test(alias))
+  );
+}
+
+function persistedStoryIdentity(releaseKey, story) {
+  if (validateCustomerStoryIdentity(story)) {
+    return {
+      entryId: story.entryId,
+      slug: story.slug,
+      aliases: [...story.aliases],
+    };
+  }
+  const migration = permalinkMigrations.entries?.find(
+    candidate =>
+      candidate.releaseKey === releaseKey && candidate.storyId === story?.id
+  );
+  if (!validateCustomerStoryIdentity(migration)) {
+    throw new Error(
+      `Published customer permalink identity missing for ${releaseKey}/${story?.id ?? 'unknown'}`
+    );
+  }
+  return {
+    entryId: migration.entryId,
+    slug: migration.slug,
+    aliases: [...migration.aliases],
+  };
+}
+
+function normalizePersistedStories(receipts) {
+  const byReceipt = new Map();
+  const outcomeWindows = new Map();
+  const identities = new Map();
+  const fragments = new Map();
+  for (const receipt of receipts) {
+    const releaseKey = receipt.window?.key;
+    if (!releaseKey || !Array.isArray(receipt.stories)) continue;
+    const stories = receipt.stories.map(story => ({
+      ...story,
+      ...persistedStoryIdentity(releaseKey, story),
+    }));
+    byReceipt.set(receipt, stories);
+    for (const story of stories) {
+      const existingOutcome = outcomeWindows.get(story.id);
+      if (existingOutcome && existingOutcome !== releaseKey) {
+        throw new Error(
+          `Customer outcome ${story.id} was already published in ${existingOutcome}`
+        );
+      }
+      outcomeWindows.set(story.id, releaseKey);
+      const existingIdentity = identities.get(story.entryId);
+      if (existingIdentity) {
+        throw new Error(
+          `Customer changelog identity collision: ${story.entryId}`
+        );
+      }
+      identities.set(story.entryId, story.id);
+      for (const fragment of [story.slug, ...story.aliases]) {
+        const owner = fragments.get(fragment);
+        if (owner) {
+          throw new Error(
+            `Customer changelog permalink collision: ${fragment} (${owner}, ${story.id})`
+          );
+        }
+        fragments.set(fragment, story.id);
+      }
+    }
+  }
+  return { byReceipt, outcomeWindows };
+}
 
 /** PR/Linear metadata supplies approved copy; titles never become notes. */
 export function readCustomerNote(body) {
@@ -48,7 +145,8 @@ export function readCustomerNote(body) {
     note?.releaseWorthy !== true ||
     !/^JOV-\d+$/.test(note?.issueId ?? '') ||
     typeof note?.outcomeKey !== 'string' ||
-    !note.outcomeKey.trim() ||
+    !OUTCOME_KEY_RE.test(note.outcomeKey) ||
+    note.outcomeKey.length > 80 ||
     !SECTIONS.has(note?.section) ||
     typeof note?.text !== 'string' ||
     !note.text.trim() ||
@@ -175,10 +273,13 @@ export function planDailyPublication({
   const persisted = extractDailyReceipts(markdown);
   if (persisted.some(receipt => receipt.malformed))
     throw new Error('Malformed persisted daily receipt');
+  const normalized = normalizePersistedStories(persisted);
   const currentDay = persisted.find(
     receipt => receipt.window?.key === windowKey
   );
-  const publishedStories = currentDay?.stories ?? [];
+  const publishedStories = currentDay
+    ? (normalized.byReceipt.get(currentDay) ?? [])
+    : [];
   if (
     currentDay &&
     (!['stories', 'sourceReceiptIds', 'mergeShas', 'deployments'].every(field =>
@@ -202,6 +303,12 @@ export function planDailyPublication({
     if (!note) {
       audit.push({ id, reason });
       continue;
+    }
+    const existingWindow = normalized.outcomeWindows.get(note.outcomeKey);
+    if (existingWindow && existingWindow !== windowKey) {
+      throw new Error(
+        `Customer outcome ${note.outcomeKey} was already published in ${existingWindow}`
+      );
     }
     if (
       pr?.state !== 'MERGED' ||
@@ -244,14 +351,11 @@ export function planDailyPublication({
     const published = publishedById.get(note.outcomeKey);
     const existing = draftsByOutcome.get(note.outcomeKey);
     if (
-      [existing, published].some(
-        story =>
-          story &&
-          (story.summary !== note.text ||
-            story.section !== note.section ||
-            JSON.stringify(story.availability) !==
-              JSON.stringify(note.availability))
-      )
+      existing &&
+      (existing.summary !== note.text ||
+        existing.section !== note.section ||
+        JSON.stringify(existing.availability) !==
+          JSON.stringify(note.availability))
     ) {
       throw new Error(
         `Conflicting approved copy for outcome ${note.outcomeKey}`
@@ -264,6 +368,7 @@ export function planDailyPublication({
     } else {
       draftsByOutcome.set(note.outcomeKey, {
         id: note.outcomeKey,
+        ...(published ?? customerStoryIdentity(note.outcomeKey)),
         section: note.section,
         summary: note.text,
         availability: note.availability,
@@ -313,6 +418,10 @@ export function planDailyPublication({
       previous
         ? {
             ...previous,
+            ...scopedStory,
+            entryId: previous.entryId,
+            slug: previous.slug,
+            aliases: previous.aliases,
             sourceIds: [
               ...new Set([...previous.sourceIds, ...story.sourceIds]),
             ].sort(),

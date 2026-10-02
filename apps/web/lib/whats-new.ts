@@ -11,7 +11,10 @@
  */
 
 import { type ChangelogRelease, changelogInlineText } from './changelog-parser';
-import { projectCustomerChangelog } from './customer-changelog';
+import {
+  customerChangelogEntryPath,
+  projectCustomerChangelog,
+} from './customer-changelog';
 
 export const WHATS_NEW_CONTRACT_VERSION = 1;
 export const WHATS_NEW_ENTRY_LIMIT = 5;
@@ -64,7 +67,7 @@ export function projectWhatsNew(
         release.kind === 'daily'
           ? lead.summary
           : release.summary || lead.summary,
-      url: `${baseUrl}/changelog/${encodeURIComponent(release.version)}`,
+      url: `${baseUrl}${customerChangelogEntryPath(lead)}`,
       highlights: outcomes
         .slice(1, HIGHLIGHT_LIMIT + 1)
         .map(outcome => outcome.title),

@@ -25,10 +25,18 @@ const RELEASE_FIXTURE = {
 };
 
 Object.assign(RELEASE_FIXTURE, {
-  customerOutcomes: Object.fromEntries(
-    Object.values(RELEASE_FIXTURE.sections)
-      .flat()
-      .map(text => [text, { availability: 'unverified', prerequisites: [] }])
+  customerOutcomes: Object.entries(RELEASE_FIXTURE.sections).flatMap(
+    ([section, entries]) =>
+      entries.map((summary, index) => ({
+        storyId: `${section}-${index}`,
+        entryId: `customer-update:${section}-${index}`,
+        slug: `update-${section}-${index}`,
+        aliases: [],
+        summary,
+        section,
+        availability: 'unverified',
+        prerequisites: [],
+      }))
   ),
 });
 
@@ -57,7 +65,7 @@ describe('GET /changelog/whats-new.json', () => {
           title: "What's new on Mac",
           date: '2026-09-26',
           summary: 'A banner links the changelog post.',
-          url: 'https://jov.ie/changelog/26.9.0',
+          url: 'https://jov.ie/changelog#update-added-0',
           highlights: ['The Mac app recovers from blank screens.'],
           dogfood: ['Relaunch the Mac app and open the banner link'],
         },

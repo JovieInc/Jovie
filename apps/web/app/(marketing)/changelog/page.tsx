@@ -12,9 +12,10 @@ import { APP_ROUTES } from '@/constants/routes';
 import { getChangelogSnapshot } from '@/lib/changelog-source';
 import {
   type CustomerChangelogEntry,
+  customerChangelogEntryPath,
   formatCustomerChangelogDate,
   groupCustomerChangelogByMonth,
-  projectCustomerChangelog,
+  projectCustomerChangelogArchive,
 } from '@/lib/customer-changelog';
 import './changelog-editorial.css';
 
@@ -84,9 +85,9 @@ function ReleaseJournalHero({
             <div className='changelog-hero__timeline'>
               <ol className='changelog-hero__timeline-entries'>
                 {latest.map((entry, index) => (
-                  <li key={entry.slug}>
+                  <li key={entry.id}>
                     <Link
-                      href={`#${entry.slug}`}
+                      href={customerChangelogEntryPath(entry)}
                       className='changelog-hero__timeline-link'
                     >
                       <span
@@ -138,9 +139,8 @@ function ChangelogFreshnessNotice({
 
 export default async function ChangelogPage() {
   const snapshot = await getChangelogSnapshot();
-  const months = groupCustomerChangelogByMonth(
-    projectCustomerChangelog(snapshot.releases)
-  );
+  const projection = projectCustomerChangelogArchive(snapshot.sourceReleases);
+  const months = groupCustomerChangelogByMonth(projection.entries);
   const latest = months.flatMap(group => group.entries).slice(0, 3);
 
   return (
@@ -173,6 +173,7 @@ export default async function ChangelogPage() {
           <div className='changelog-entries'>
             <CustomerChangelogArchive
               months={months}
+              tombstones={projection.tombstones}
               technicalReleases={snapshot.releases.map(({ version, date }) => ({
                 version,
                 date,

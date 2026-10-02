@@ -49,7 +49,7 @@ function source(overrides = {}) {
 }
 
 function draft(overrides = {}) {
-  return {
+  const value = {
     id: 'story-1',
     section: 'Added',
     summary: 'You can find artists by searching your name.',
@@ -57,6 +57,12 @@ function draft(overrides = {}) {
     sourceIds: ['src-1'],
     claimIds: ['claim-search'],
     ...overrides,
+  };
+  return {
+    entryId: `customer-update:${value.id}`,
+    slug: `update-${value.id}`,
+    aliases: [],
+    ...value,
   };
 }
 
@@ -142,6 +148,11 @@ describe('evaluateDailyWindow', () => {
     expect(result.noChange).toBe(false);
     expect(result.idempotencyKey).toBe(`daily-changelog/${WINDOW}@UTC`);
     expect(result.stories[0].sourceIds).toEqual(['src-1']);
+    expect(result.stories[0]).toMatchObject({
+      entryId: 'customer-update:story-1',
+      slug: 'update-story-1',
+      aliases: [],
+    });
     expect(result.receipt.schema).toBe(DAILY_RECEIPT_SCHEMA);
     expect(result.receipt.sourceReceiptIds).toEqual(['src-1']);
     expect(result.receipt.mergeShas).toEqual([SHA_A]);

@@ -24,6 +24,7 @@
  */
 
 import { z } from 'zod';
+import permalinkMigrations from '../data/customer-changelog-permalink-migrations.json';
 import { isInternalEntry } from './changelog-filter-rules';
 
 export interface ChangelogSection {
@@ -37,6 +38,17 @@ export interface ChangelogSection {
 type ParsedSection = keyof ChangelogSection | 'dogfood';
 
 export type ChangelogReleaseKind = 'release' | 'daily';
+
+export interface CustomerChangelogPublication {
+  readonly storyId: string;
+  readonly entryId: string;
+  readonly slug: string;
+  readonly aliases: readonly string[];
+  readonly summary: string;
+  readonly section: keyof ChangelogSection;
+  readonly availability: 'ga' | 'preview' | 'limited' | 'unverified';
+  readonly prerequisites: readonly string[];
+}
 
 export interface ChangelogRelease {
   version: string;
@@ -52,13 +64,7 @@ export interface ChangelogRelease {
   /** Optional `### Dogfood` bullets; absent when the release has none. */
   dogfood?: string[];
   /** Reviewed customer copy from a verified daily publication receipt. */
-  customerOutcomes?: Record<
-    string,
-    {
-      availability: 'ga' | 'preview' | 'limited' | 'unverified';
-      prerequisites: string[];
-    }
-  >;
+  customerOutcomes?: CustomerChangelogPublication[];
 }
 
 const DAILY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -404,6 +410,59 @@ function processChangelogLine(
   return { current, currentSection, summaryConsumed };
 }
 
+const CUSTOMER_ENTRY_ID_RE = /^customer-update:[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const CUSTOMER_FRAGMENT_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+const CustomerPermalinkSchema = z.object({
+  entryId: z.string().regex(CUSTOMER_ENTRY_ID_RE),
+  slug: z.string().regex(CUSTOMER_FRAGMENT_RE),
+  aliases: z.array(z.string().regex(CUSTOMER_FRAGMENT_RE)).max(20),
+});
+
+const CustomerPermalinkMigrationSchema = z.object({
+  schema: z.literal('customer-changelog-permalink-migrations/v1'),
+  entries: z.array(
+    CustomerPermalinkSchema.extend({
+      releaseKey: z.string().min(1),
+      storyId: z.string().min(1),
+    })
+  ),
+});
+
+const customerPermalinkMigrations =
+  CustomerPermalinkMigrationSchema.parse(permalinkMigrations).entries;
+
+const PublicationStorySchema = z
+  .object({
+    id: z.string().min(1),
+    entryId: z.string().regex(CUSTOMER_ENTRY_ID_RE).optional(),
+    slug: z.string().regex(CUSTOMER_FRAGMENT_RE).optional(),
+    aliases: z.array(z.string().regex(CUSTOMER_FRAGMENT_RE)).max(20).optional(),
+    summary: z.string().min(1),
+    section: z.enum(['Added', 'Changed', 'Fixed', 'Removed']),
+    sourceIds: z.array(z.string()).min(1),
+    availability: z
+      .object({
+        status: z.enum(['ga', 'preview', 'limited']),
+        prerequisites: z.array(z.string().trim().min(1)).max(5),
+      })
+      .refine(
+        value => value.status !== 'limited' || value.prerequisites.length > 0
+      )
+      .optional()
+      .catch(undefined),
+  })
+  .refine(
+    story =>
+      [story.entryId, story.slug, story.aliases].every(
+        value => value === undefined
+      ) ||
+      (story.entryId !== undefined &&
+        story.slug !== undefined &&
+        story.aliases !== undefined),
+    { message: 'Customer permalink identity must be complete' }
+  );
+
 const PublicationReceiptSchema = z.object({
   schema: z.literal('daily-changelog-receipt/v1'),
   window: z.object({ key: z.string() }),
@@ -419,27 +478,23 @@ const PublicationReceiptSchema = z.object({
       })
     )
     .min(1),
-  stories: z
-    .array(
-      z.object({
-        summary: z.string().min(1),
-        section: z.enum(['Added', 'Changed', 'Fixed', 'Removed']),
-        sourceIds: z.array(z.string()).min(1),
-        availability: z
-          .object({
-            status: z.enum(['ga', 'preview', 'limited']),
-            prerequisites: z.array(z.string().trim().min(1)).max(5),
-          })
-          .refine(
-            value =>
-              value.status !== 'limited' || value.prerequisites.length > 0
-          )
-          .optional()
-          .catch(undefined),
-      })
-    )
-    .max(3),
+  stories: z.array(PublicationStorySchema).max(3),
 });
+
+function customerStoryPermalink(
+  releaseKey: string,
+  story: z.infer<typeof PublicationStorySchema>
+): z.infer<typeof CustomerPermalinkSchema> | null {
+  if (story.entryId && story.slug && story.aliases) {
+    return { entryId: story.entryId, slug: story.slug, aliases: story.aliases };
+  }
+  return (
+    customerPermalinkMigrations.find(
+      migration =>
+        migration.releaseKey === releaseKey && migration.storyId === story.id
+    ) ?? null
+  );
+}
 
 /** Engineering history remains readable; only receipted copy becomes a card. */
 function readCustomerPublication(
@@ -467,19 +522,23 @@ function readCustomerPublication(
       )
     )
       return;
-    const outcomes: NonNullable<ChangelogRelease['customerOutcomes']> = {};
+    const outcomes: NonNullable<ChangelogRelease['customerOutcomes']> = [];
     for (const story of receipt.stories) {
+      const permalink = customerStoryPermalink(release.version, story);
       if (
-        !story.sourceIds.every(id => receipt.sourceReceiptIds.includes(id)) ||
-        !release.sections[
-          story.section.toLowerCase() as keyof ChangelogSection
-        ].includes(story.summary)
-      )
+        !permalink ||
+        !story.sourceIds.every(id => receipt.sourceReceiptIds.includes(id))
+      ) {
         continue;
-      outcomes[story.summary] = {
+      }
+      outcomes.push({
+        storyId: story.id,
+        ...permalink,
+        summary: story.summary,
+        section: story.section.toLowerCase() as keyof ChangelogSection,
         availability: story.availability?.status ?? 'unverified',
         prerequisites: story.availability?.prerequisites ?? [],
-      };
+      });
     }
     release.customerOutcomes = outcomes;
   } catch {
