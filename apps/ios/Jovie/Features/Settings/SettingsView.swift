@@ -1,23 +1,9 @@
 import SwiftUI
 
-enum ReleaseChannel: String, Equatable {
-  case appStore
-  case testFlight
-  case development
-
-  var displayName: String {
-    switch self {
-    case .appStore: return "App Store"
-    case .testFlight: return "TestFlight"
-    case .development: return "Development"
-    }
-  }
-}
-
 struct AppBuildInfo: Equatable {
   let version: String
   let build: String
-  let channel: ReleaseChannel
+  let provenance: AppDistributionProvenance
   let commit: String?
 
   var shortCommit: String? {
@@ -25,11 +11,17 @@ struct AppBuildInfo: Equatable {
     return String(commit.prefix(7))
   }
 
+  /// The canonical release channel this binary rides on, or nil when the
+  /// install sits on no published rail (debug/development builds).
+  var channel: ReleaseChannel? {
+    ReleaseChannelResolver.channel(for: provenance)
+  }
+
   static func current(bundle: Bundle = .main) -> AppBuildInfo {
     AppBuildInfo(
       version: bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0",
       build: bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1",
-      channel: channel(bundle: bundle),
+      provenance: provenance(bundle: bundle),
       commit: gitCommit(bundle: bundle)
     )
   }
@@ -37,15 +29,15 @@ struct AppBuildInfo: Equatable {
   // Apple controls the install source: App Store installs carry a "receipt",
   // TestFlight installs carry a "sandboxReceipt". Nothing in-app can convert
   // one channel into the other; this only reports provenance.
-  static func channel(bundle: Bundle = .main) -> ReleaseChannel {
+  static func provenance(bundle: Bundle = .main) -> AppDistributionProvenance {
     #if DEBUG
       return .development
     #else
-      return channel(receiptName: bundle.appStoreReceiptURL?.lastPathComponent)
+      return provenance(receiptName: bundle.appStoreReceiptURL?.lastPathComponent)
     #endif
   }
 
-  static func channel(receiptName: String?) -> ReleaseChannel {
+  static func provenance(receiptName: String?) -> AppDistributionProvenance {
     switch receiptName {
     case "receipt": return .appStore
     case "sandboxReceipt": return .testFlight
@@ -61,6 +53,79 @@ struct AppBuildInfo: Equatable {
       !commit.isEmpty
     else { return nil }
     return commit
+  }
+}
+
+/// Canonical release-channel vocabulary (JOV-7535). Mirrors
+/// `@jovie/release-channel-contracts`; Swift surfaces must not invent
+/// per-platform synonyms that are absent from the canonical contract.
+enum ReleaseChannel: String, Equatable {
+  case stable
+  case beta
+  case nightly
+
+  var displayName: String {
+    switch self {
+    case .stable: "Stable"
+    case .beta: "Beta"
+    case .nightly: "Nightly"
+    }
+  }
+}
+
+/// How this iOS binary reached the device. The channel is derived from
+/// provenance, never toggled in-app — an App Store build cannot self-switch
+/// into TestFlight.
+enum AppDistributionProvenance: Equatable {
+  case appStore
+  case testFlight
+  case development
+
+  /// Honest install-source label (provenance, not a channel synonym).
+  var displayName: String {
+    switch self {
+    case .appStore: "App Store"
+    case .testFlight: "TestFlight"
+    case .development: "Development"
+    }
+  }
+}
+
+enum ReleaseChannelResolver {
+  static var isDebugBuild: Bool {
+    #if DEBUG
+      true
+    #else
+      false
+    #endif
+  }
+
+  static func provenance(
+    receiptLastPathComponent: String?,
+    isDebugBuild: Bool = ReleaseChannelResolver.isDebugBuild
+  ) -> AppDistributionProvenance {
+    if isDebugBuild { return .development }
+    if receiptLastPathComponent == "sandboxReceipt" { return .testFlight }
+    return .appStore
+  }
+
+  /// Debug/development builds sit on no published rail and report no channel.
+  static func channel(
+    for provenance: AppDistributionProvenance
+  ) -> ReleaseChannel? {
+    switch provenance {
+    case .appStore: .stable
+    case .testFlight: .beta
+    case .development: nil
+    }
+  }
+
+  static func currentChannel(bundle: Bundle = .main) -> ReleaseChannel? {
+    channel(
+      for: provenance(
+        receiptLastPathComponent: bundle.appStoreReceiptURL?.lastPathComponent
+      )
+    )
   }
 }
 
@@ -215,8 +280,10 @@ struct SettingsView: View {
     Section("App") {
       LabeledContent("Version", value: buildInfo.version)
       LabeledContent("Build", value: buildInfo.build)
-      LabeledContent("Channel", value: buildInfo.channel.displayName)
-        .accessibilityIdentifier("settings-release-channel")
+      if let channel = buildInfo.channel {
+        LabeledContent("Channel", value: channel.displayName)
+          .accessibilityIdentifier("settings-release-channel")
+      }
       if let shortCommit = buildInfo.shortCommit {
         LabeledContent("Commit", value: shortCommit)
           .accessibilityIdentifier("settings-build-commit")
@@ -225,7 +292,7 @@ struct SettingsView: View {
       // Admin-only dogfood rail entry. The link only opens Apple's own
       // TestFlight enrollment/install surface; channel switching stays
       // Apple-controlled (JOV-7534).
-      if showsWorkspaceSwitch, buildInfo.channel != .testFlight,
+      if showsWorkspaceSwitch, buildInfo.provenance != .testFlight,
         let testflight = SettingsExternalURL.testflight
       {
         SettingsLinkRow(
