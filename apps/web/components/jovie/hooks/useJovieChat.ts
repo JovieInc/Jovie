@@ -17,9 +17,13 @@ import { CHAT_STREAM_FAILED_USER_MESSAGE } from '@/lib/ai/gateway-errors';
 import { track } from '@/lib/analytics';
 import { matchCommand } from '@/lib/chat/command-registry';
 import {
+  type ComposerRecoveryContext,
   clearComposerDraft,
+  clearSummerTurnRecovery,
   readComposerDraft,
+  readSummerTurnRecovery,
   saveComposerDraft,
+  saveSummerTurnRecovery,
 } from '@/lib/chat/composer-draft-store';
 import {
   consumeModelRotationNotice,
@@ -39,6 +43,7 @@ import {
 } from '@/lib/ovie/summer-failure';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { queryKeys, useChatConversationQuery } from '@/lib/queries';
+import { subscribeCacheFence } from '@/lib/queries/cache-isolation';
 import { FetchError } from '@/lib/queries/fetch';
 import { captureException } from '@/lib/sentry/client-lite';
 import { logger } from '@/lib/utils/logger';
@@ -227,6 +232,22 @@ function toError(value: unknown): Error {
   return value instanceof Error ? value : new Error('Chat send failed');
 }
 
+function readRecoveryError(context: ComposerRecoveryContext): ChatError | null {
+  const recovery = readSummerTurnRecovery(context);
+  if (!recovery) return null;
+  return {
+    type: 'server',
+    message: summerRetryExplanation(recovery.retry),
+    errorCode: recovery.errorCode,
+    ...recovery.error,
+    requestId: recovery.requestId,
+    failedMessage: recovery.retry === 'none' ? undefined : recovery.message,
+    ...(recovery.retry === 'same-turn'
+      ? { retryClientTurnId: recovery.clientTurnId }
+      : {}),
+  };
+}
+
 function getMessageParts(message: UIMessage | undefined): UIMessage['parts'] {
   return Array.isArray(message?.parts) ? message.parts : [];
 }
@@ -338,6 +359,10 @@ export function useJovieChat({
 }: UseJovieChatOptions) {
   // The operator session is not a creator conversation or a customer cache key.
   const conversationId = chatMode === 'ov' ? null : requestedConversationId;
+  const recoveryContext = useMemo(
+    () => ({ chatMode, conversationId: conversationId ?? null, profileId }),
+    [chatMode, conversationId, profileId]
+  );
   const router = useRouter();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastAttemptedMessageRef = useRef<string>('');
@@ -346,6 +371,7 @@ export function useJovieChat({
   const pendingSendRef = useRef<Promise<void> | null>(null);
   const replacingTurnRef = useRef(false);
   const turnContextEpochRef = useRef(0);
+  const mountedRef = useRef(true);
   const activeChatLatencyRef = useRef<ActiveChatLatency | null>(null);
   // Assistant SDK message ids that existed BEFORE the active turn started.
   // Between send and stream start, the SDK's "last assistant message" is still
@@ -374,7 +400,9 @@ export function useJovieChat({
     setInputState(nextInput);
   }, []);
   const chipTray = useChipTray();
-  const [chatError, setChatError] = useState<ChatError | null>(null);
+  const [chatError, setChatError] = useState<ChatError | null>(() =>
+    readRecoveryError(recoveryContext)
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showRateLimitHint, setShowRateLimitHint] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<
@@ -385,7 +413,7 @@ export function useJovieChat({
     getCachedTimelineState(activeConversationId)
   );
   const [timelineMode, setTimelineMode] = useState(chatMode);
-  const resetTurnContext = useCallback(() => {
+  const invalidateTurnContext = useCallback(() => {
     turnContextEpochRef.current += 1;
     activeClientTurnIdRef.current = null;
     activeRequestIdRef.current = null;
@@ -393,9 +421,19 @@ export function useJovieChat({
     pendingSendRef.current = null;
     pendingSummerFailureRef.current = null;
     replacingTurnRef.current = false;
-    setIsSubmitting(false);
-    setChatError(null);
   }, []);
+  const resetTurnContext = useCallback(() => {
+    invalidateTurnContext();
+    setIsSubmitting(false);
+    setChatError(readRecoveryError(recoveryContext));
+  }, [invalidateTurnContext, recoveryContext]);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      invalidateTurnContext();
+    };
+  }, [invalidateTurnContext]);
   useEffect(() => {
     if (timelineMode === chatMode) return;
     setTimelineMode(chatMode);
@@ -693,6 +731,23 @@ export function useJovieChat({
         chatErrorType === 'tool' ||
         isRecoverableToolErrorCode(metadata.errorCode);
 
+      if (!suppressComposerPause || chatErrorType === 'rate_limit') {
+        saveSummerTurnRecovery(recoveryContext, {
+          clientTurnId,
+          message: lastAttemptedMessageRef.current,
+          retry: suppressComposerPause ? 'none' : 'same-turn',
+          requestId:
+            metadata.requestId ?? activeRequestIdRef.current ?? undefined,
+          error: {
+            type: chatErrorType,
+            message: getPreferredErrorMessage(error, chatErrorType, metadata),
+            retryAfter: metadata.retryAfter,
+            errorCode: metadata.errorCode,
+            suppressComposerPause,
+          },
+        });
+      }
+
       setChatError({
         type: chatErrorType,
         message: getPreferredErrorMessage(error, chatErrorType, metadata),
@@ -728,7 +783,14 @@ export function useJovieChat({
       activeChatLatencyRef.current = null;
       setIsSubmitting(false);
     },
-    [activeConversationId, chatMode, dispatchTimelineEvent, profileId, setInput]
+    [
+      activeConversationId,
+      chatMode,
+      dispatchTimelineEvent,
+      profileId,
+      recoveryContext,
+      setInput,
+    ]
   );
 
   /**
@@ -835,6 +897,13 @@ export function useJovieChat({
           ? parseSummerFailure(message.metadata.summerFailure)
           : null;
       if (summerFailure) {
+        saveSummerTurnRecovery(recoveryContext, {
+          clientTurnId,
+          message: lastAttemptedMessageRef.current,
+          retry: summerFailure.retry,
+          errorCode: summerFailure.hop,
+          requestId: metadata?.requestId,
+        });
         setChatError({
           type: 'server',
           message: summerRetryExplanation(summerFailure.retry),
@@ -848,6 +917,8 @@ export function useJovieChat({
             ? { retryClientTurnId: clientTurnId }
             : {}),
         });
+      } else {
+        clearSummerTurnRecovery(recoveryContext, clientTurnId);
       }
 
       // 👎 recovery loop (JOV-3362 / #11461): count clean assistant turns so
@@ -882,6 +953,7 @@ export function useJovieChat({
         clientTurnId &&
         shouldSuppressChatPauseForToolFailure(error, assistantParts)
       ) {
+        clearSummerTurnRecovery(recoveryContext, clientTurnId);
         dispatchTimelineEvent({
           type: 'assistant.stream.completed',
           conversationId: activeConversationId,
@@ -902,6 +974,13 @@ export function useJovieChat({
         chatMode === 'ov' ? pendingSummerFailureRef.current : null;
       pendingSummerFailureRef.current = null;
       if (summerFailure) {
+        saveSummerTurnRecovery(recoveryContext, {
+          clientTurnId,
+          message: lastAttemptedMessageRef.current,
+          retry: summerFailure.retry,
+          errorCode: summerFailure.hop,
+          requestId: activeRequestIdRef.current ?? undefined,
+        });
         setChatError({
           type: 'server',
           message: summerRetryExplanation(summerFailure.retry),
@@ -922,6 +1001,19 @@ export function useJovieChat({
       });
     },
   });
+
+  const previousProfileIdRef = useRef(profileId);
+  useEffect(() => {
+    if (previousProfileIdRef.current !== profileId) {
+      previousProfileIdRef.current = profileId;
+      rawStop();
+      resetTurnContext();
+    }
+    return subscribeCacheFence(() => {
+      rawStop();
+      resetTurnContext();
+    });
+  }, [profileId, rawStop, resetTurnContext]);
 
   // Query data merges into the canonical timeline. It must never replace the
   // rendered list wholesale because optimistic/streaming rows may be newer.
@@ -1256,6 +1348,7 @@ export function useJovieChat({
       files?: FileUIPart[],
       options?: SubmitChatMessageOptions
     ): Promise<boolean> => {
+      if (!mountedRef.current) return false;
       if (
         chatMode === 'ov' &&
         (isLoadingConversation || blocksOvieConversation)
@@ -1299,7 +1392,10 @@ export function useJovieChat({
       const trimmedText = text.trim();
 
       // Check for deterministic commands before hitting AI
-      if (!hasFiles && tryHandleCommand(trimmedText)) return true;
+      if (!hasFiles && tryHandleCommand(trimmedText)) {
+        clearSummerTurnRecovery(recoveryContext);
+        return true;
+      }
 
       const payload = {
         text: trimmedText,
@@ -1317,6 +1413,11 @@ export function useJovieChat({
           ? chatError.retryClientTurnId
           : undefined) ??
         crypto.randomUUID();
+      if (
+        readSummerTurnRecovery(recoveryContext)?.clientTurnId !== clientTurnId
+      ) {
+        clearSummerTurnRecovery(recoveryContext);
+      }
       activeClientTurnIdRef.current = clientTurnId;
       activeRequestIdRef.current = null;
       pendingSummerFailureRef.current = null;
@@ -1399,6 +1500,7 @@ export function useJovieChat({
       handleChatFailure,
       isLoading,
       isSubmitting,
+      recoveryContext,
       sendMessage,
       setInput,
       stop,
@@ -1501,10 +1603,17 @@ export function useJovieChat({
   // a repeated user action, so it bypasses the client-side rate limiter to
   // avoid consuming the first-message slot and blocking the user's first send.
   useEffect(() => {
-    const pendingPrompt = consumePendingChatPrompt();
-    if (!pendingPrompt) return;
-
-    doSubmit(pendingPrompt);
+    // Effect replay/unmount must settle before consuming the one-time prompt.
+    // Otherwise StrictMode aborts its only send and the prompt is already gone.
+    let canceled = false;
+    queueMicrotask(() => {
+      if (canceled) return;
+      const pendingPrompt = consumePendingChatPrompt();
+      if (pendingPrompt) void doSubmit(pendingPrompt);
+    });
+    return () => {
+      canceled = true;
+    };
   }, [doSubmit]);
 
   useEffect(() => {
