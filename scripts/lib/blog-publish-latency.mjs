@@ -118,7 +118,11 @@ export function buildBlogPublishLatency(raw) {
       const confirmedLiveAt = pr.productionVerifiedAt ?? null;
       return {
         pr: pr.number,
-        cohort: qualification ? 'content-only' : 'legacy',
+        cohort: qualification
+          ? 'content-only'
+          : pr.blogQualificationConfirmedAbsent === true
+            ? 'legacy'
+            : 'unknown',
         candidateSha: pr.mergeCommitSha,
         candidateCreatedAt: pr.candidateCreatedAt ?? pr.createdAt,
         qualificationStartedAt: qualification?.startedAt ?? null,
@@ -169,6 +173,7 @@ export function buildBlogPublishLatency(raw) {
     cohorts: {
       legacy: summary(legacy),
       contentOnly: summary(contentOnly),
+      unknown: summary(samples.filter(sample => sample.cohort === 'unknown')),
     },
     samples,
     claims: {

@@ -172,12 +172,12 @@
     ".claude/rules/macos.md": {
       "owner": "@itstimwhite",
       "claim": "Current Mac owners and planned Swift-native direction follow the stack receipt and accepted ADR; no native parity is certified.",
-      "documentSha256": "9cc005256ec7213695b5bee957165489f0f273249b4f3dff2b9a894eb956a4e6",
+      "documentSha256": "3e478342371997f9537a7194222b21221735e6ea564eee3651fb3dd9319945f9",
       "sources": [
         {
           "path": "docs/macos/swift-control-invariants.md",
           "section": "## Current Mac stack",
-          "sha256": "4734e9584f58bf5354e64b117b69cc74fd5f037d8ab4b7a059db9a37f153d6f4"
+          "sha256": "5c14a12977081c02bc0e7f8e6e8ca8fc9725cb20c9e604827324398d2cafdae6"
         },
         {
           "path": "docs/macos/ADR-swift-native-mac.md",
