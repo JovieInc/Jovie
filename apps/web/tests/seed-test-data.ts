@@ -64,6 +64,11 @@ export function buildPublicReleaseApprovalSeedRow(
   };
 }
 
+/** Reruns may reactivate a fixture, but may never replace its rights receipt. */
+export function buildPromoDownloadSeedConflictUpdate(now = new Date()) {
+  return { isActive: true, updatedAt: now };
+}
+
 interface TestProfile {
   username: string;
   displayName: string;
@@ -1766,10 +1771,7 @@ async function seedReleasesForProfile(
         })
         .onConflictDoUpdate({
           target: [promoDownloads.releaseId, promoDownloads.slug],
-          set: {
-            isActive: true,
-            updatedAt: new Date(),
-          },
+          set: buildPromoDownloadSeedConflictUpdate(),
         });
       console.log('    ✓ Ensured promo download fixture for Neon Skyline');
     } catch (error) {
