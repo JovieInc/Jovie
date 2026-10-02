@@ -242,15 +242,6 @@ export const APP_ROUTES = {
 
 export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];
 
-/**
- * Better Auth `@better-auth/oauth-provider` endpoint paths. These mount under
- * `/api/auth` and are not Jovie app screens, so they stay out of `APP_ROUTES`.
- */
-export const BETTER_AUTH_OAUTH_PROVIDER_PATHS = {
-  ADMIN_CREATE_CLIENT: '/admin/oauth2/create-client',
-  ADMIN_UPDATE_CLIENT: '/admin/oauth2/update-client',
-} as const;
-
 const SPOTIFY_CATALOG_CONNECTION_PARAM = 'connect';
 const SPOTIFY_CATALOG_CONNECTION_VALUE = 'spotify';
 
