@@ -47,6 +47,13 @@ function memoryStore(
   };
 }
 
+const onlyYouTube = (
+  youtube: SnapshotFetchers['youtube']
+): SnapshotFetchers => ({
+  youtube,
+  wikipedia: vi.fn(),
+});
+
 function clockedSleep() {
   let time = 0;
   return {
@@ -65,7 +72,7 @@ describe('runArtistDailySnapshots', () => {
       enabled: false,
       now: new Date('2026-10-02T09:15:00.000Z'),
       store,
-      fetchers: { youtube, wikipedia: vi.fn() },
+      fetchers: onlyYouTube(youtube),
     });
 
     expect(report.enabled).toBe(false);
@@ -132,7 +139,7 @@ describe('runArtistDailySnapshots', () => {
       enabled: true,
       now: new Date('2026-10-02T09:15:00.000Z'),
       store,
-      fetchers: { youtube, wikipedia: vi.fn() },
+      fetchers: onlyYouTube(youtube),
       captureFailure,
       sleep: async () => undefined,
       clock: () => 0,
@@ -161,10 +168,10 @@ describe('runArtistDailySnapshots', () => {
       enabled: true,
       now: new Date('2026-10-02T09:15:00.000Z'),
       store,
-      fetchers: {
-        youtube: async () => ({ kind: 'skip', reason: 'no_youtube_api_key' }),
-        wikipedia: vi.fn(),
-      },
+      fetchers: onlyYouTube(async () => ({
+        kind: 'skip',
+        reason: 'no_youtube_api_key',
+      })),
       captureFailure,
       sleep: async () => undefined,
       clock: () => 0,
@@ -182,14 +189,11 @@ describe('runArtistDailySnapshots', () => {
       enabled: true,
       now: new Date('2026-10-02T09:15:00.000Z'),
       store,
-      fetchers: {
-        youtube: async () => ({
-          kind: 'failure',
-          reason: 'logged_in_payload',
-          backoff: false,
-        }),
-        wikipedia: vi.fn(),
-      },
+      fetchers: onlyYouTube(async () => ({
+        kind: 'failure',
+        reason: 'logged_in_payload',
+        backoff: false,
+      })),
       captureFailure,
       sleep: async () => undefined,
       clock: () => 0,
@@ -202,14 +206,11 @@ describe('runArtistDailySnapshots', () => {
         enabled: true,
         now: new Date('2026-10-02T09:15:00.000Z'),
         store: memoryStore([candidate('artist-2')]),
-        fetchers: {
-          youtube: async () => ({
-            kind: 'ready',
-            rawValues: { cookie: 'session' },
-            provenance: provenance('youtube_data_api_v3'),
-          }),
-          wikipedia: vi.fn(),
-        },
+        fetchers: onlyYouTube(async () => ({
+          kind: 'ready',
+          rawValues: { cookie: 'session' },
+          provenance: provenance('youtube_data_api_v3'),
+        })),
         sleep: async () => undefined,
         clock: () => 0,
       })
@@ -226,14 +227,11 @@ describe('runArtistDailySnapshots', () => {
       enabled: true,
       now: new Date('2026-10-02T09:15:00.000Z'),
       store,
-      fetchers: {
-        youtube: async () => ({
-          kind: 'ready',
-          rawValues: { subscriberCount: 1, viewCount: 2, videoCount: 3 },
-          provenance: provenance('youtube_data_api_v3'),
-        }),
-        wikipedia: vi.fn(),
-      },
+      fetchers: onlyYouTube(async () => ({
+        kind: 'ready',
+        rawValues: { subscriberCount: 1, viewCount: 2, videoCount: 3 },
+        provenance: provenance('youtube_data_api_v3'),
+      })),
       sleep: async () => undefined,
       clock: () => 0,
     });

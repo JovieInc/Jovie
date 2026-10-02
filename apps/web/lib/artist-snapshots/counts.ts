@@ -1,6 +1,4 @@
-/**
- * Parsers for public counts. They never return HTML.
- */
+/** Parsers for public counts. They never return HTML. */
 
 const COMPACT_MULTIPLIERS: Record<string, number> = {
   K: 1_000,

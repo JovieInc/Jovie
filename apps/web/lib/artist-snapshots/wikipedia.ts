@@ -1,7 +1,4 @@
-/**
- * Wikidata QID from MusicBrainz url-rels, then Wikimedia pageviews.
- * This module does not fetch Wikipedia HTML.
- */
+/** Wikidata QID from MusicBrainz url-rels, then Wikimedia pageviews. No HTML. */
 
 import type { MusicBrainzRelation } from '@/lib/dsp-enrichment/types';
 

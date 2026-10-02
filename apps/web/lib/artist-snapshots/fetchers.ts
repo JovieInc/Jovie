@@ -86,8 +86,8 @@ export async function fetchYouTubeSnapshot(
   url.searchParams.set('part', 'statistics');
   url.searchParams.set('key', apiKey);
   if (ref.kind === 'handle') url.searchParams.set('forHandle', `@${ref.value}`);
-  if (ref.kind === 'id') url.searchParams.set('id', ref.value);
-  if (ref.kind === 'username') url.searchParams.set('forUsername', ref.value);
+  else if (ref.kind === 'id') url.searchParams.set('id', ref.value);
+  else url.searchParams.set('forUsername', ref.value);
 
   const response = await serverFetch(url, {
     method: 'GET',
