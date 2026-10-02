@@ -21,12 +21,14 @@ import fcntl
 import hashlib
 import json
 import os
+import random
 import re
 import shutil
 import socket
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 import uuid
 from dataclasses import dataclass, field
@@ -835,6 +837,373 @@ def log_tail(log, limit: int = 12000) -> str:
         return ""
 
 
+# Linear's shared 2500 req/h budget. Idle slots are respawned every dispatch tick, so a
+# rate limit has to outlive that tick or the next poll spends another request. Jitter
+# keeps recovered workers from retrying on the same second. Reset headers win when they
+# are later: waiting too long is safe, retrying early is not. The deadline is a file in
+# the state dir (hashed key, never the raw key) so every worker on the host skips until
+# it expires. No in-request sleep: the claim lock is held across the scan.
+LINEAR_API_URL = "https://api.linear.app/graphql"
+LINEAR_RATE_LIMIT_BASE_S = 60
+LINEAR_RATE_LIMIT_JITTER = 0.25
+LINEAR_BUDGET_HEADERS = (
+    ("X-RateLimit-Requests-Remaining", "X-RateLimit-Requests-Limit", "X-RateLimit-Requests-Reset"),
+    ("X-RateLimit-Complexity-Remaining", "X-RateLimit-Complexity-Limit", "X-RateLimit-Complexity-Reset"),
+)
+LINEAR_RESET_HEADERS = ("X-RateLimit-Requests-Reset", "X-RateLimit-Complexity-Reset")
+
+
+class LinearRateLimited(RuntimeError):
+    """The shared Linear budget is cooling down. Callers must not hit the API."""
+
+    def __init__(self, reset_at: float):
+        super().__init__("linear rate limited")
+        self.reset_at = reset_at
+
+
+def lane_state_dir() -> Path | None:
+    """Host state dir every lane worker shares. Tests without LANES_STATE must not touch it."""
+    configured = os.environ.get("LANES_STATE")
+    if configured:
+        return Path(configured)
+    if os.environ.get("LANES_EXECUTION_BACKEND") == "local-test" or os.environ.get("LANES_SELFTEST") == "1":
+        return None
+    return Path.home() / ".local/state/jovie-lanes"
+
+
+def _linear_key_id(key: str) -> str:
+    """Filename token for a credential. The raw key never leaves the process."""
+    return hashlib.sha256(key.encode()).hexdigest()
+
+
+def _header_value(headers, name: str) -> str | None:
+    getter = getattr(headers, "get", None)
+    if not callable(getter):
+        return None
+    try:
+        value = getter(name)
+    except Exception:
+        return None
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _header_number(headers, name: str) -> float | None:
+    raw = _header_value(headers, name)
+    if raw is None:
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        return None
+    if value != value or value in (float("inf"), float("-inf")):
+        return None
+    return value
+
+
+def _write_state_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(payload))
+    os.replace(tmp, path)
+
+
+def _budget_numbers(headers) -> dict:
+    for remaining_name, limit_name, reset_name in LINEAR_BUDGET_HEADERS:
+        remaining, limit, reset = (_header_number(headers, remaining_name),
+                                   _header_number(headers, limit_name),
+                                   _header_number(headers, reset_name))
+        if remaining is not None or limit is not None or reset is not None:
+            return {"remaining": remaining, "limit": limit, "reset": reset}
+    return {"remaining": None, "limit": None, "reset": None}
+
+
+def _linear_budget_view(payload: dict) -> dict:
+    return {key: payload.get(key) for key in ("remaining", "limit", "reset", "rateLimitedAt", "observedAt")}
+
+
+def record_linear_budget(headers, *, rate_limited: bool) -> None:
+    """Best-effort snapshot of Linear's request budget. Never raises and never blocks a lane."""
+    try:
+        state = lane_state_dir()
+        if state is None:
+            return
+        fresh = _budget_numbers(headers)
+        path = state / "api-budget.json"
+        previous = {}
+        try:
+            loaded = json.loads(path.read_text())
+            if isinstance(loaded, dict):
+                previous = loaded
+        except (OSError, ValueError):
+            previous = {}
+        if not rate_limited and all(fresh[key] is None for key in ("remaining", "limit", "reset")):
+            return
+        def whole(value):
+            if isinstance(value, float) and value == int(value):
+                return int(value)
+            return value
+        payload = {
+            "schema": 1,
+            "remaining": whole(fresh["remaining"] if fresh["remaining"] is not None else previous.get("remaining")),
+            "limit": whole(fresh["limit"] if fresh["limit"] is not None else previous.get("limit")),
+            "reset": whole(fresh["reset"] if fresh["reset"] is not None else previous.get("reset")),
+            "rateLimitedAt": now_iso() if rate_limited else previous.get("rateLimitedAt"),
+            "observedAt": now_iso(),
+        }
+        _write_state_json(path, payload)
+        _stamp_doctor_budget(state, payload)
+    except Exception:
+        return
+
+
+def _stamp_doctor_budget(state: Path, budget: dict) -> None:
+    """Fold the snapshot into an existing doctor.json. A missing report is left for the doctor.
+
+    The same doctor.lock the doctor holds around its own rewrite, so this cannot drop alerts.
+    If the lock or the file is unavailable, api-budget.json still holds the snapshot."""
+    handle = None
+    try:
+        state.mkdir(parents=True, exist_ok=True)
+        handle = open(state / "doctor.lock", "a")
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        current = json.loads((state / "doctor.json").read_text())
+        if not isinstance(current, dict):
+            return
+        current["linearBudget"] = _linear_budget_view(budget)
+        _write_state_json(state / "doctor.json", current)
+    except Exception:
+        return
+    finally:
+        if handle is not None:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+                handle.close()
+            except OSError:
+                pass
+
+
+def _retry_after_s(headers, now: float) -> float | None:
+    raw = _header_value(headers, "Retry-After")
+    if raw is None:
+        return None
+    if re.fullmatch(r"\d+(\.\d+)?", raw):
+        return float(raw)
+    try:
+        stamp = datetime.fromisoformat(raw.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+    return stamp - now
+
+
+def _hinted_reset_s(headers, now: float) -> float | None:
+    """Latest Retry-After / X-RateLimit-*-Reset hint, in epoch seconds."""
+    reset_at = None
+    retry_after = _retry_after_s(headers, now)
+    if retry_after is not None and retry_after >= 0:
+        reset_at = now + retry_after
+    for name in LINEAR_RESET_HEADERS:
+        value = _header_number(headers, name)
+        if value is None or value <= 0:
+            continue
+        epoch_s = value / 1000 if value >= 1e11 else value
+        if reset_at is None or epoch_s > reset_at:
+            reset_at = epoch_s
+    return reset_at
+
+
+def _cooldown_deadline_s(headers, now: float) -> float:
+    spread = LINEAR_RATE_LIMIT_BASE_S * LINEAR_RATE_LIMIT_JITTER * random.random()
+    deadline = now + LINEAR_RATE_LIMIT_BASE_S + spread
+    hinted = _hinted_reset_s(headers, now)
+    if hinted is not None and hinted > deadline:
+        return hinted
+    return deadline
+
+
+def _linear_scope_id(key: str) -> str:
+    """Same token the JS clients use: sha256(API URL + NUL + key)."""
+    return hashlib.sha256(f"{LINEAR_API_URL}\0{key}".encode()).hexdigest()
+
+
+def linear_cooldown_root() -> Path | None:
+    """Directory of per-key cooldown scopes. None when a test must not touch the host."""
+    explicit = os.environ.get("LINEAR_COOLDOWN_STATE_DIR")
+    if explicit:
+        return Path(explicit)
+    state = lane_state_dir()
+    if state is not None:
+        return state / "linear-cooldown"
+    legacy = os.environ.get("LINEAR_BACKOFF_STATE_DIR")
+    if legacy:
+        return Path(legacy)
+    return None
+
+
+def linear_cooldown_scope(key: str) -> Path | None:
+    root = linear_cooldown_root()
+    if root is None:
+        return None
+    return root / _linear_scope_id(key)
+
+
+def _legacy_cooldown_roots(canonical: Path | None) -> list[Path]:
+    roots = [Path.home() / ".local" / "state" / "jovie-linear-backoff"]
+    extra = os.environ.get("LINEAR_BACKOFF_STATE_DIR")
+    if extra:
+        roots.append(Path(extra))
+    seen = []
+    for root in roots:
+        if canonical is not None and root == canonical:
+            continue
+        if root not in seen:
+            seen.append(root)
+    return seen
+
+
+def _reset_ms(record: object) -> int | None:
+    if not isinstance(record, dict) or record.get("schema") != 1:
+        return None
+    reset_ms = record.get("resetAt")
+    if type(reset_ms) is not int or reset_ms <= 0:
+        return None
+    return reset_ms
+
+
+def _scan_scope(scope: Path, now_ms: int, *, limit: int = 1000) -> int:
+    """Latest future deadline in a scope directory. Malformed records are ignored."""
+    try:
+        names = list(scope.iterdir())
+    except OSError:
+        return 0
+    latest = 0
+    for path in names[:limit]:
+        if not path.is_file() or not re.fullmatch(r"\d+-[0-9a-f-]+\.json", path.name):
+            continue
+        try:
+            reset_ms = _reset_ms(json.loads(path.read_text()))
+        except (OSError, ValueError, TypeError):
+            continue
+        if reset_ms is None or not path.name.startswith(f"{reset_ms}-"):
+            continue
+        if reset_ms > now_ms:
+            latest = max(latest, reset_ms)
+    return latest
+
+
+def _legacy_file_reset_ms(root: Path, key: str, now_ms: int) -> int:
+    """The single-file cooldown shipped before the shared directory."""
+    path = root / f"{_linear_key_id(key)}.json"
+    try:
+        reset_ms = _reset_ms(json.loads(path.read_text()))
+    except (OSError, ValueError, TypeError):
+        return 0
+    if reset_ms is None or reset_ms <= now_ms:
+        return 0
+    return reset_ms
+
+
+def linear_cooldown_until(key: str, now: float | None = None) -> float | None:
+    root = linear_cooldown_root()
+    now = time.time() if now is None else now
+    now_ms = int(now * 1000)
+    latest = 0
+    if root is not None:
+        scope = root / _linear_scope_id(key)
+        latest = max(latest, _scan_scope(scope, now_ms), _legacy_file_reset_ms(root, key, now_ms))
+    for legacy in _legacy_cooldown_roots(root):
+        latest = max(latest, _scan_scope(legacy / _linear_scope_id(key), now_ms),
+                     _legacy_file_reset_ms(legacy, key, now_ms))
+    if latest <= now_ms:
+        return None
+    return latest / 1000
+
+
+def linear_cooldown_path(key: str) -> Path | None:
+    """Newest canonical record, for tests. None when this process has no state dir."""
+    scope = linear_cooldown_scope(key)
+    if scope is None or not scope.is_dir():
+        return None
+    records = sorted(path for path in scope.iterdir()
+                     if path.is_file() and re.fullmatch(r"\d+-[0-9a-f-]+\.json", path.name))
+    return records[-1] if records else None
+
+
+def _chmod_private(path: Path, mode: int) -> None:
+    try:
+        os.chmod(path, mode)
+    except OSError:
+        pass
+
+
+def publish_linear_cooldown(key: str, headers, now: float | None = None) -> float:
+    """Extend the shared deadline. A later writer must not shorten an earlier one."""
+    now = time.time() if now is None else now
+    reset_s = _cooldown_deadline_s(headers, now)
+    root = linear_cooldown_root()
+    if root is None:
+        return reset_s
+    scope = root / _linear_scope_id(key)
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        _chmod_private(root, 0o700)
+        scope.mkdir(parents=True, exist_ok=True)
+        _chmod_private(scope, 0o700)
+        with open(root / f"{scope.name}.lock", "a") as handle:
+            fcntl.flock(handle, fcntl.LOCK_EX)
+            try:
+                existing = linear_cooldown_until(key, now)
+                if existing is not None and existing > reset_s:
+                    reset_s = existing
+                reset_ms = int(reset_s * 1000)
+                record = scope / f"{reset_ms}-{uuid.uuid4()}.json"
+                fd = os.open(record, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                try:
+                    os.write(fd, json.dumps({"schema": 1, "resetAt": reset_ms}).encode())
+                finally:
+                    os.close(fd)
+                _chmod_private(record, 0o600)
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+    except Exception:
+        return reset_s
+    return reset_s
+
+
+def _data_is_rate_limited(data: object) -> bool:
+    if not isinstance(data, dict):
+        return False
+    if str(data.get("code") or "").upper() == "RATELIMITED":
+        return True
+    errors = data.get("errors")
+    if not isinstance(errors, list):
+        return False
+    for error in errors:
+        if not isinstance(error, dict):
+            continue
+        extensions = error.get("extensions") or {}
+        if not isinstance(extensions, dict):
+            continue
+        if str(extensions.get("code") or "").upper() == "RATELIMITED" or extensions.get("statusCode") == 429:
+            return True
+    return False
+
+
+def _body_is_rate_limited(status: int, raw: bytes) -> bool:
+    """HTTP 429, or HTTP 200/400 whose GraphQL body carries extensions.code RATELIMITED."""
+    if status == 429:
+        return True
+    if status not in (200, 400):
+        return False
+    try:
+        data = json.loads(raw.decode() or "{}")
+    except (UnicodeError, ValueError):
+        return False
+    return _data_is_rate_limited(data)
+
+
 class Linear:
     def __init__(self, env_file: Path):
         key = ""
@@ -846,23 +1215,40 @@ class Linear:
         self.key = key
 
     def gql(self, query: str, variables: dict) -> dict:
+        cooling = linear_cooldown_until(self.key)
+        if cooling is not None:
+            raise LinearRateLimited(cooling)
         request = urllib.request.Request(
-            "https://api.linear.app/graphql",
+            LINEAR_API_URL,
             data=json.dumps({"query": query, "variables": variables}).encode(),
             headers={"Content-Type": "application/json", "Authorization": self.key},
         )
-        with urllib.request.urlopen(request, timeout=30) as response:
-            payload = json.load(response)
+        try:
+            response = urllib.request.urlopen(request, timeout=30)
+        except urllib.error.HTTPError as error:
+            raw = b""
+            try:
+                raw = error.read()
+            except Exception:
+                raw = b""
+            if error.code == 429 or _body_is_rate_limited(error.code, raw):
+                record_linear_budget(getattr(error, "headers", None), rate_limited=True)
+                raise LinearRateLimited(publish_linear_cooldown(self.key, getattr(error, "headers", None))) from None
+            raise
+        with response as handle:
+            raw = handle.read()
+            headers = getattr(handle, "headers", None)
+        payload = json.loads(raw.decode() or "{}")
+        if _data_is_rate_limited(payload):
+            record_linear_budget(headers, rate_limited=True)
+            raise LinearRateLimited(publish_linear_cooldown(self.key, headers))
+        record_linear_budget(headers, rate_limited=False)
         if payload.get("errors"):
             raise RuntimeError(f"linear: {payload['errors'][0].get('message')}")
         return payload["data"]
 
-    def lane_issues(self, label: str) -> list[Issue]:
-        """Todo issues carrying the lane's own label or the shared pool label.
-
-        Paginated (bounded by LANE_ISSUE_PAGES): the leverage-first rank and duplicate
-        identity are pool properties, so admission must see the whole pool rather than
-        whichever 100 issues Linear returns first."""
+    def _paginated_lane_issues(self, label: str) -> list[dict]:
+        """Up to 500 Todo issues. Only the claim-scan cache fill calls this."""
         nodes, after = [], None
         for _ in range(LANE_ISSUE_PAGES):
             data = self.gql(
@@ -876,9 +1262,21 @@ class Linear:
             after = page.get("endCursor")
             if not page.get("hasNextPage") or not after:
                 break
-        return [Issue(n["id"], n["identifier"], n["title"], n.get("description") or "", n.get("priority") or 0,
-                      n["createdAt"], [l["name"] for l in n["labels"]["nodes"]])
+        return [{"id": n["id"], "identifier": n["identifier"], "title": n["title"],
+                 "description": n.get("description") or "", "priority": n.get("priority") or 0,
+                 "created_at": n["createdAt"], "labels": [l["name"] for l in n["labels"]["nodes"]]}
                 for n in nodes]
+
+    def lane_issues(self, label: str) -> list[Issue]:
+        """Todo issues carrying the lane's own label or the shared pool label.
+
+        The 500-issue read (JOV-7514) runs only as the shared claim-scan fill. A hit
+        within CLAIM_SCAN_TTL_S returns the stored pool and does not paginate."""
+        rows = shared(f"claim-lane-issues-{_cache_token(label)}", CLAIM_SCAN_TTL_S,
+                      lambda: self._paginated_lane_issues(label)) or []
+        return [Issue(row["id"], row["identifier"], row["title"], row.get("description") or "",
+                      row.get("priority") or 0, row["created_at"], list(row.get("labels") or []))
+                for row in rows]
 
     def create_triage(self, title: str, description: str, dedupe: str | None = None) -> str | None:
         """`dedupe`: a title fragment; an open issue already carrying it is returned instead of a new one."""
@@ -1723,6 +2121,59 @@ def held_path(host: Host) -> Path:
     return host.state / "held.json"
 
 
+HELD_PRUNE_LIMIT = 200
+HELD_STALE_HEAD_S = 24 * 3600
+
+
+def held_drop_keys(held: dict, open_prs: list[dict] | None, now: float, *, complete: bool) -> list[str]:
+    """Keys safe to drop. Closed PRs and holds whose head moved more than a day ago are
+    terminal or expired. A partial open-PR read never drops a numbered hold. Corrupt
+    records are always dropped. At most HELD_PRUNE_LIMIT keys, oldest first."""
+    heads = {}
+    if complete and open_prs is not None:
+        for pr in open_prs:
+            number = pr.get("number")
+            if isinstance(number, int):
+                heads[number] = pr.get("headRefOid")
+    ranked = []
+    for key, entry in (held or {}).items():
+        if not str(key).isdigit() or not isinstance(entry, dict):
+            ranked.append((0, str(key)))
+            continue
+        if not complete:
+            continue
+        number = int(key)
+        at = entry.get("at") if isinstance(entry, dict) else None
+        stamp = at if isinstance(at, (int, float)) else 0
+        if number not in heads:
+            ranked.append((stamp, str(key)))
+            continue
+        sha = entry.get("sha")
+        current = heads[number]
+        if sha and current and sha != current and isinstance(at, (int, float)) and now - at >= HELD_STALE_HEAD_S:
+            ranked.append((stamp, str(key)))
+    ranked.sort()
+    return [key for _, key in ranked[:HELD_PRUNE_LIMIT]]
+
+
+def prune_held(host: Host, open_prs: list[dict] | None, now: float, *, complete: bool) -> int:
+    """Drop expired or terminal held.json rows under the file lock. Never raises."""
+    dropped = 0
+
+    def change(data: dict) -> None:
+        nonlocal dropped
+        for key in held_drop_keys(data, open_prs, now, complete=complete):
+            if key in data:
+                del data[key]
+                dropped += 1
+
+    try:
+        update_json(held_path(host), change)
+    except (OSError, ValueError, TypeError):
+        return 0
+    return dropped
+
+
 def record_held(host: Host, number: int, head: str, evidence: list[str]) -> None:
     """The gate held this head; the lane's fix loop owns it next, on the same branch."""
     path = held_path(host)
@@ -2524,7 +2975,16 @@ def repo_prs() -> list[dict]:
 
 _SUMMARY: dict = {"at": 0.0, "prs": []}
 SUMMARY_TTL_S = 60
+# One claim scan per minute for every idle worker on the host. The 500-issue Linear
+# pagination runs only as this cache's fill, never as an uncached read.
+CLAIM_SCAN_TTL_S = 60
 SHARED_CACHE_DIR = Path(os.environ.get("LANES_STATE", Path.home() / ".local/state/jovie-lanes")) / "cache"
+
+
+def _cache_token(value: str) -> str:
+    if re.fullmatch(r"[A-Za-z0-9_-]{1,64}", value or ""):
+        return value
+    return hashlib.sha256(value.encode()).hexdigest()[:20]
 
 
 def shared(key: str, ttl: float, fetch):
@@ -2584,13 +3044,17 @@ def with_checks(pr: dict) -> dict:
 
 
 def fix_candidates(name: str) -> list[dict]:
-    """Lane PRs (all lanes) plus every other open non-draft PR, de-duplicated by number."""
-    seen, merged = set(), []
-    for pr in lane_prs(name) + repo_prs():
-        if pr["number"] not in seen:
-            seen.add(pr["number"])
-            merged.append(pr)
-    return merged
+    """Lane PRs (all lanes) plus every other open non-draft PR, de-duplicated by number.
+
+    Cached with the rest of the claim scan: N idle workers share one read per minute."""
+    def fetch():
+        seen, merged = set(), []
+        for pr in lane_prs(name) + repo_prs():
+            if pr["number"] not in seen:
+                seen.add(pr["number"])
+                merged.append(pr)
+        return merged
+    return shared(f"claim-fix-candidates-{_cache_token(name)}", CLAIM_SCAN_TTL_S, fetch) or []
 
 
 ISSUE_MARKER = re.compile(r"linear-issue-id:\s*(JOV-\d+)", re.IGNORECASE)
@@ -2604,7 +3068,7 @@ def in_flight_issues() -> frozenset[str] | None:
         listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--limit", "500",
                      "--json", "headRefName,body"])
         return json.loads(listed.stdout or "[]") if listed.returncode == 0 else None
-    prs = shared("in-flight", SUMMARY_TTL_S, fetch)
+    prs = shared("in-flight", CLAIM_SCAN_TTL_S, fetch)
     if prs is None:
         return None
     keys = set()
@@ -2729,6 +3193,12 @@ def sweep_plan(prs: list[dict], now: float, pushes: dict[int, float]) -> tuple[l
     return superseded, stale
 
 
+def cached_issue_state(linear, issue_id: str) -> str:
+    """One state read per minute per issue. The claim path still calls state_of directly."""
+    return shared(f"claim-issue-state-{_cache_token(issue_id)}", CLAIM_SCAN_TTL_S,
+                  lambda: linear.state_of(issue_id))
+
+
 def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> None:
     """Retire explicitly labeled duplicate lane PRs on the existing bounded sweep tick."""
     now = time.time() if now is None else now
@@ -2743,7 +3213,7 @@ def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> N
         issue = LANE_BRANCH.match(pr["headRefName"]).group("issue").upper()
         closed = pr_events.close_duplicate(THIS, pr, "stale draft explicitly labeled duplicate")
         # Only reopen work the lane still owns; a Done or Canceled issue stays closed.
-        if closed and linear.state_of(issue) == "In Progress":
+        if closed and cached_issue_state(linear, issue) == "In Progress":
             linear.move(issue, "Todo")
             linear.comment(issue, f"🤖 lane sweep closed stale draft {pr.get('url')} (no green run, "
                                   "no push for 24 h); back to Todo.")
@@ -2843,31 +3313,44 @@ def worker(host: Host, name: str) -> int:
         return 1
     linear = Linear(host.linear_env)
     claim = Locked(host.state / "claim.lock", blocking=True)
+    # The claim lock serializes the scan, so the shared cache fill happens once. A rate
+    # limit skips the API for every worker until the cooldown file expires.
+    red = adopt = issue = None
+    rate_limited = False
     try:
-        # Finish before starting: PRs a GitHub event queued, red PRs (any open PR in the repo),
-        # then ungated lane drafts, then new issues.
-        prs = lane_prs(name)
-        candidates = fix_candidates(name)
-        events = pr_events.queued_prs(THIS, pr_events.FIX_KINDS)
-        requeue_verified(host, prs)
-        escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
-        red = pr_events.claim_event_pr(host, THIS, name, events) or claim_red_pr(host, name, candidates)
-        adopt = None if red or not provider_may_run(name, "adopt") else claim_adoptable_pr(host, name, prs)
-        issue = None
-        sweep_lane_prs(host, name, linear)
-        budget = None if red or adopt else read_new_issue_budget(name, host.slots(name, spec.get("slots", 1)))
-        blocked = budget is not None and not budget["allowed"]
-        in_flight = None if red or adopt or blocked else in_flight_issues()
-        if in_flight is not None:
-            failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
-            issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
-                               provider=name)
-            if issue and linear.state_of(issue.id) != "Todo":
-                issue = None  # another host claimed it between our read and now
-            if issue:
-                linear.move(issue.id, "In Progress")
+        try:
+            # Finish before starting: PRs a GitHub event queued, red PRs (any open PR in the repo),
+            # then ungated lane drafts, then new issues.
+            prs = lane_prs(name)
+            candidates = fix_candidates(name)
+            events = pr_events.queued_prs(THIS, pr_events.FIX_KINDS)
+            requeue_verified(host, prs)
+            escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
+            red = pr_events.claim_event_pr(host, THIS, name, events) or claim_red_pr(host, name, candidates)
+            adopt = None if red or not provider_may_run(name, "adopt") else claim_adoptable_pr(host, name, prs)
+            issue = None
+            sweep_lane_prs(host, name, linear)
+            budget = None if red or adopt else read_new_issue_budget(name, host.slots(name, spec.get("slots", 1)))
+            blocked = budget is not None and not budget["allowed"]
+            in_flight = None if red or adopt or blocked else in_flight_issues()
+            if in_flight is not None:
+                failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
+                issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
+                                   provider=name)
+                if issue and linear.state_of(issue.id) != "Todo":
+                    issue = None  # another host claimed it between our read and now
+                if issue:
+                    linear.move(issue.id, "In Progress")
+        except LinearRateLimited:
+            # A repair already chosen can proceed without another Linear read. An idle scan stops.
+            issue = None
+            rate_limited = red is None and adopt is None
     finally:
         claim.release()
+    if rate_limited:
+        record_idle_exit(host, name, "linear-rate-limited")
+        slot.release()
+        return 0
     if red is not None or adopt is not None:
         if red is not None:
             fix_red_pr(host, name, spec, red)

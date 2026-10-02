@@ -708,9 +708,14 @@ def run_research(spec: dict, prompt: str, run=subprocess.run) -> dict:
 # ---------------------------------------------------------------- linear + drain
 
 def queued_jobs(linear, label: str) -> list[dict]:
-    data = linear.gql('query($l:String!){issues(first:20,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},'
-                      'labels:{name:{eq:$l}}}){nodes{id identifier title description createdAt}}}', {"l": label})
-    return sorted(data["issues"]["nodes"], key=lambda node: node["createdAt"])
+    import lane_runner as lane
+
+    def fetch():
+        data = linear.gql('query($l:String!){issues(first:20,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},'
+                          'labels:{name:{eq:$l}}}){nodes{id identifier title description createdAt}}}', {"l": label})
+        return sorted(data["issues"]["nodes"], key=lambda node: node["createdAt"])
+
+    return lane.shared(f"claim-reason-jobs-{lane._cache_token(label)}", lane.CLAIM_SCAN_TTL_S, fetch) or []
 
 
 def one_job(linear, issue: dict, config: dict, state: Path, run=subprocess.run) -> dict:
@@ -803,7 +808,8 @@ def drain(host, lane, config: dict | None = None, run=subprocess.run) -> dict:
             claim = lane.Locked(host.state / "claim.lock", blocking=True)
             try:
                 if linear.state_of(issue["id"]) != "Todo":
-                    continue  # another host took it
+                    attempted.add(issue["identifier"])
+                    continue  # another host took it; a cached queue must not spin on it
                 linear.move(issue["id"], "In Progress")
             finally:
                 claim.release()
