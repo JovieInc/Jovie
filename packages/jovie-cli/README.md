@@ -131,6 +131,26 @@ Use a new key for each new invocation; reuse the exact key and payload only to
 recover the same invocation. A repeated registration key replays the original
 registration; it is not a presence refresh.
 
+`fleet status` returns a bounded recent view plus durable terminal history.
+Pass `{"historyAfter":0,"historyLimit":50}` in `--input` for the first page;
+use `history.nextCursor` for subsequent pages, with a new invocation key for
+each page. Save the last entry's `sequence` to resume when more outcomes arrive.
+Pages respect both the requested item limit (1–100) and a response byte budget.
+`history.pending` means older hot records still need bounded archival; another
+status call continues that work. Every outcome remains durable during migration.
+Large current request lists also expose `requestsNextCursor`; pass it back as
+`requestsAfter`. Terminal request outcomes and receipts remain available in
+history after leaving the recent view. History is scoped to this worker and
+profile, including after credential rotation.
+
+The founder status endpoint can inspect history with
+`history: {workerId, after?, limit?}` after the existing session/owned-profile
+checks. Its `historyWorkers` inventory lists workers with recorded history.
+Archival preserves invocation payload conflicts, mission/request ID reservations,
+lease issuance bindings and provider-recovery evidence. It does not prune live
+leases or pending external operations. Genuine live capacity limits still fail
+closed.
+
 The operator supplies `JOVIE_WORKER_TOKEN` through the runtime's secret manager.
 Never pass it as a CLI argument, put it in a report, or share it between workers.
 The CLI sends it only to the selected fleet endpoint over HTTPS (HTTP is allowed

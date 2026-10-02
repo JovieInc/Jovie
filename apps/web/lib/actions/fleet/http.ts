@@ -1,4 +1,8 @@
-import { FLEET_ACTION_IDS, type FleetActionId } from '@jovie/action-contracts';
+import {
+  FLEET_ACTION_IDS,
+  type FleetActionId,
+  workerIdSchema,
+} from '@jovie/action-contracts';
 import { z } from 'zod';
 import type { FleetDispatcher } from './dispatcher';
 
@@ -115,12 +119,35 @@ export async function handleFleetControl(
     const raw = await body(request);
     const parsed =
       kind === 'status'
-        ? z.object({ profileId: z.uuid() }).strict().parse(raw)
+        ? z
+            .object({
+              profileId: z.uuid(),
+              history: z
+                .object({
+                  workerId: workerIdSchema,
+                  after: z
+                    .number()
+                    .int()
+                    .min(0)
+                    .max(Number.MAX_SAFE_INTEGER)
+                    .optional(),
+                  limit: z.number().int().min(1).max(100).optional(),
+                })
+                .strict()
+                .optional(),
+            })
+            .strict()
+            .parse(raw)
         : controlSchema.parse(raw);
     const actor = await deps.founder(request, parsed.profileId);
     if (!actor) return response({ error: { code: 'FORBIDDEN' } }, 403);
     if (kind === 'status')
-      return response(await deps.dispatcher.inspect(parsed.profileId));
+      return response(
+        await deps.dispatcher.inspect(
+          parsed.profileId,
+          'history' in parsed ? parsed.history : undefined
+        )
+      );
     const command = controlSchema.parse(parsed);
     if (
       (command.operation === 'assign' || command.operation === 'accept') &&
