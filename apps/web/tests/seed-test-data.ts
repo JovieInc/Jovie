@@ -1768,9 +1768,6 @@ async function seedReleasesForProfile(
           target: [promoDownloads.releaseId, promoDownloads.slug],
           set: {
             isActive: true,
-            rightsControlAttested: true,
-            rightsControlAttestedBy: profileOwner?.userId ?? null,
-            rightsControlAttestedAt: new Date(),
             updatedAt: new Date(),
           },
         });
