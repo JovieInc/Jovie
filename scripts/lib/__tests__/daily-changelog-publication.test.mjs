@@ -165,6 +165,33 @@ describe('customer release metadata', () => {
       expect(readCustomerNote(body(value)).note).toBeUndefined();
     expect(readCustomerNote(body(note)).note).toEqual(note);
   });
+  it('accepts optional details and a first-party action destination', () => {
+    const value = {
+      ...note,
+      details: ['Fans opt in per artist; nothing is sent without a signup.'],
+      action: {
+        label: 'See it on a demo profile',
+        href: '/demo/showcase/tim-white-profile?mode=subscribe',
+      },
+    };
+    expect(readCustomerNote(body(value)).note).toEqual(value);
+  });
+  it.each([
+    { action: { label: 'Go', href: 'javascript:alert(1)' } },
+    { action: { label: 'Go', href: 'https://example.com/' } },
+    { action: { label: 'Go', href: '//jov.ie.evil.test' } },
+    { action: { label: 'x'.repeat(81), href: '/support' } },
+    { action: { label: 'Go' } },
+    { action: '/support' },
+    { details: ['<img src=x onerror=alert(1)>'] },
+    { details: ['Codex shipper hardening: safer dispatch.'] },
+    { details: ['a'.repeat(241)] },
+    { details: 'not-an-array' },
+  ])('rejects malformed details or an unsafe action: %o', patch => {
+    expect(readCustomerNote(body({ ...note, ...patch })).reason).toBe(
+      'failed-validation'
+    );
+  });
 });
 describe('source → published changelog', () => {
   it('defers a verified superseded public generation while malformed bindings still fail', () => {
@@ -200,6 +227,29 @@ describe('source → published changelog', () => {
     expect(release.sections.added).toEqual([note.text]);
     expect(release.date).toBe('2026-10-02');
     expect(plan.content).not.toContain('undefined');
+  });
+  it('carries note details and the action destination into the published story', () => {
+    const value = {
+      ...note,
+      details: ['Fans opt in per artist; nothing is sent without a signup.'],
+      action: {
+        label: 'See it on a demo profile',
+        href: '/demo/showcase/tim-white-profile?mode=subscribe',
+      },
+    };
+    const plan = planDailyPublication(
+      input({
+        candidates: [
+          candidate({ pr: { ...candidate().pr, body: body(value) } }),
+        ],
+      })
+    );
+    expect(plan.status).toBe('publish');
+    const story = plan.result.stories[0];
+    expect(story.bullets).toEqual([
+      'Fans opt in per artist; nothing is sent without a signup.',
+    ]);
+    expect(story.action).toEqual(value.action);
   });
   it('appends within one daily identity, preserves published copy and consumes each source once', () => {
     const first = planDailyPublication(input());

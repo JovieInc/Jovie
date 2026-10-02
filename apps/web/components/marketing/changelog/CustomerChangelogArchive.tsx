@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { FilterChip } from '@/components/molecules/filters/FilterChip';
 import { APP_ROUTES } from '@/constants/routes';
+import { isSafeChangelogActionHref } from '@/lib/changelog-parser';
 import {
   CUSTOMER_CHANGELOG_CATEGORIES,
   CUSTOMER_CHANGELOG_CATEGORY_LABELS,
@@ -111,6 +112,46 @@ function EntryMedia({
   );
 }
 
+/**
+ * Receipt-approved next step (JOV-7493). The parser already fails closed on
+ * unsafe destinations; the render re-checks so a stale or hand-built entry
+ * can never mint an arbitrary link.
+ */
+function EntryActionLink({
+  action,
+}: {
+  readonly action: NonNullable<CustomerChangelogEntry['action']>;
+}) {
+  if (!isSafeChangelogActionHref(action.href)) return null;
+  const content = (
+    <>
+      {action.label}
+      <ArrowRight
+        aria-hidden='true'
+        size={16}
+        className='changelog-archive-nav__link-arrow'
+      />
+    </>
+  );
+  if (action.href.startsWith('/')) {
+    return (
+      <Link href={action.href} className='changelog-entry__action'>
+        {content}
+      </Link>
+    );
+  }
+  return (
+    <a
+      href={action.href}
+      target='_blank'
+      rel='noopener noreferrer'
+      className='changelog-entry__action'
+    >
+      {content}
+    </a>
+  );
+}
+
 function EntryRow({ entry }: { readonly entry: CustomerChangelogEntry }) {
   const tertiary = formatCustomerChangelogTertiary(
     entry.date,
@@ -121,6 +162,10 @@ function EntryRow({ entry }: { readonly entry: CustomerChangelogEntry }) {
     entry.supporting.length > 0 ||
     Boolean(entry.prerequisites?.length);
   const hasLevel3 = entry.technical.length > 0;
+  const action =
+    entry.action && isSafeChangelogActionHref(entry.action.href)
+      ? entry.action
+      : null;
 
   return (
     <article
@@ -170,6 +215,11 @@ function EntryRow({ entry }: { readonly entry: CustomerChangelogEntry }) {
                 </ul>
               ) : null}
             </div>
+          ) : null}
+          {action ? (
+            <p className='changelog-entry__action-row'>
+              <EntryActionLink action={action} />
+            </p>
           ) : null}
           <p className='changelog-entry__tertiary'>
             <Link href={versionHref(entry.technicalVersion)}>{tertiary}</Link>

@@ -25,6 +25,11 @@ the implementation slot only after its exact-head receipt is acknowledged.
 | Activation | Production controller | Exact deployed runtime proof |
 | Closure | Summer | Closure receipt referencing activation proof |
 
+For an issue labeled `escaped-defect`, the closure receipt must also satisfy
+[JOV-INV-041](quality/ESCAPED_DEFECT_CLOSURE.md): product repair and
+detector repair, including exact deployed-build retest and deliberate-red
+detector proof. The merge event deliberately leaves that issue open.
+
 Leaving draft (`ready_for_review`) is owned by `auto-merge-default.yml`, which
 enables native auto-merge and skips drafts. That event does not start another
 source CI flight.

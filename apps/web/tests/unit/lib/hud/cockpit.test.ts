@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FounderFunnelData } from '@/lib/admin/types';
 import {
   deriveOpsExceptions,
@@ -69,6 +69,11 @@ function healthyMetrics(overrides: Record<string, unknown> = {}): HudMetrics {
     ...overrides,
   } as unknown as HudMetrics;
 }
+
+beforeEach(() => {
+  vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-28T12:00:00.000Z'));
+});
+afterEach(() => vi.restoreAllMocks());
 
 describe('deriveOpsExceptions', () => {
   it('returns no exceptions for a healthy company', () => {

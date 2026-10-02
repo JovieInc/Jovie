@@ -3,18 +3,24 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, describe, it } from 'node:test';
-
+import {
+  evaluateEscapedDefectClosure,
+  MAX_AUTOMATIC_REMEDIATION_ATTEMPTS,
+} from './lib/escaped-defect-closure.mjs';
+import { transitionLinearIssue } from './linear-transition-issue.mjs';
 import {
   buildTestIndex,
   collectAll,
   collectChangedCodeGaps,
   collectComponentStateGaps,
   collectCoverageGaps,
+  collectEscapedDefectClosureGaps,
   collectEscapedDefectGaps,
   collectInvariantGaps,
   collectPostmortemGaps,
   collectRouteBudgetGaps,
   fetchExistingFingerprints,
+  fetchRecentDefects,
   fingerprintOf,
   hasTest,
   issueDescription,
@@ -44,6 +50,43 @@ after(() => {
 });
 
 const COMPONENT = 'export function Card() { return null; }\n';
+const DEPLOYED_SHA = 'a'.repeat(40);
+
+function escapedDefectEvidence(overrides = {}) {
+  const evidence = {
+    schema: 'jovie.escaped-defect-closure/v1',
+    originatingIssue: 'JOV-9',
+    reproduction: {
+      evidenceRef: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+    },
+    productRepair: {
+      fixRef: 'https://github.com/JovieInc/Jovie/pull/9',
+      deployedBuild: {
+        sha: DEPLOYED_SHA,
+        url: 'https://jovie-example-jovie.vercel.app',
+        deploymentId: 'dpl_exact_build_123',
+        evidenceRef:
+          'https://github.com/JovieInc/Jovie/actions/runs/1#production-verified',
+        verifiedAt: '2026-09-28T10:00:00Z',
+      },
+      journeyRetestRef:
+        'https://github.com/JovieInc/Jovie/actions/runs/2#original-report',
+    },
+    detection: {
+      originatingIssue: 'JOV-9',
+      gapClass: 'missing-invariant',
+      gapAnalysis:
+        'Certification covered render success but not the failed interaction outcome.',
+      detectorRef: 'scripts/quality-gap-finder.test.mjs',
+      coveredClass: 'escaped defects closed without paired detector evidence',
+      deliberateRedRef:
+        'https://github.com/JovieInc/Jovie/actions/runs/3#deliberate-red',
+    },
+    remediation: { mode: 'not-automatic' },
+    ...overrides,
+  };
+  return `<!-- escaped-defect-closure:v1\n${JSON.stringify(evidence)}\n-->`;
+}
 
 describe('quality-gap-finder', () => {
   it('fingerprints are stable per kind and key', () => {
@@ -268,6 +311,369 @@ describe('quality-gap-finder', () => {
     assert.equal(gaps[0].key, 'JOV-1:apps/web/components/organisms/Banner.tsx');
     assert.equal(gaps[0].confidence, 0.85);
     assert.equal(gaps[0].area, 'area:ovie');
+  });
+
+  describe('escaped defect closure', () => {
+    it('reports an invalid parent issue without blaming a valid nested link', () => {
+      for (const originatingIssue of ['', 'invalid']) {
+        const result = evaluateEscapedDefectClosure({
+          identifier: 'JOV-9',
+          description: escapedDefectEvidence({ originatingIssue }),
+          labels: ['escaped-defect'],
+        });
+        assert.equal(result.ok, false);
+        assert.ok(
+          result.errors.includes(
+            'originatingIssue must be a JOV issue identifier'
+          )
+        );
+        assert.equal(
+          result.errors.includes(
+            'detection.originatingIssue must link the originating defect'
+          ),
+          false
+        );
+      }
+    });
+    it('deliberate red: catches a completed defect with no paired closure evidence', () => {
+      const [gap] = collectEscapedDefectClosureGaps([
+        {
+          id: 'JOV-9',
+          title: 'reported journey failed in production',
+          description: 'The product fix shipped.',
+          statusType: 'completed',
+          labels: ['escaped-defect'],
+        },
+      ]);
+
+      assert.equal(gap.kind, 'escaped-defect-closure-unverified');
+      assert.equal(gap.originatingIssue, 'JOV-9');
+      assert.equal(gap.confidence, 1);
+      assert.match(gap.evidence.join('\n'), /missing escaped-defect-closure/);
+      assert.match(
+        issueDescription({ ...gap, lane: 'issue' }),
+        /Originating defect: JOV-9/
+      );
+    });
+
+    it('accepts paired exact-build repair and reusable detector evidence', () => {
+      const issue = {
+        identifier: 'JOV-9',
+        description: escapedDefectEvidence(),
+        labels: ['escaped-defect'],
+      };
+      const result = evaluateEscapedDefectClosure(issue, {
+        expectedDeploymentSha: DEPLOYED_SHA,
+      });
+
+      assert.equal(result.ok, true);
+      assert.deepEqual(result.errors, []);
+      const wrongBuild = evaluateEscapedDefectClosure(issue, {
+        expectedDeploymentSha: 'b'.repeat(40),
+      });
+      assert.equal(wrongBuild.ok, false);
+      assert.match(wrongBuild.errors.join('\n'), /must match/);
+      assert.deepEqual(
+        collectEscapedDefectClosureGaps([
+          {
+            ...issue,
+            id: 'JOV-9',
+            title: 'reported journey failed in production',
+            statusType: 'completed',
+          },
+        ]),
+        []
+      );
+    });
+
+    it('deliberate red: reintroduced failure is rejected without detector proof', () => {
+      const marker = escapedDefectEvidence({
+        detection: {
+          originatingIssue: 'JOV-9',
+          gapClass: 'missing-invariant',
+          gapAnalysis:
+            'Certification covered render success but not the failed interaction outcome.',
+          detectorRef: 'scripts/quality-gap-finder.test.mjs',
+          coveredClass: 'escaped interaction failures across product journeys',
+        },
+      });
+      const result = evaluateEscapedDefectClosure({
+        identifier: 'JOV-9',
+        description: marker,
+        labels: ['escaped-defect'],
+      });
+
+      assert.equal(result.ok, false);
+      assert.ok(
+        result.errors.some(error => error.includes('deliberateRedRef'))
+      );
+    });
+
+    it('requires bounded automatic remediation and an explicit blocked exhaustion state', () => {
+      const invalid = escapedDefectEvidence({
+        remediation: {
+          mode: 'automatic',
+          budget: {
+            maxAttempts: MAX_AUTOMATIC_REMEDIATION_ATTEMPTS + 1,
+            wallClockMs: Number.POSITIVE_INFINITY,
+            maxSpendUsd: Number.POSITIVE_INFINITY,
+          },
+          exhaustion: { state: 'retrying' },
+        },
+      });
+      const rejected = evaluateEscapedDefectClosure({
+        identifier: 'JOV-9',
+        description: invalid,
+        labels: ['escaped-defect'],
+      });
+      assert.equal(rejected.ok, false);
+      assert.match(rejected.errors.join('\n'), /maxAttempts/);
+      assert.match(rejected.errors.join('\n'), /wallClockMs/);
+      assert.match(rejected.errors.join('\n'), /maxSpendUsd/);
+      assert.match(rejected.errors.join('\n'), /state must be blocked/);
+      assert.match(rejected.errors.join('\n'), /nextAction is required/);
+
+      const bounded = escapedDefectEvidence({
+        remediation: {
+          mode: 'automatic',
+          budget: {
+            maxAttempts: MAX_AUTOMATIC_REMEDIATION_ATTEMPTS,
+            wallClockMs: 600_000,
+            maxSpendUsd: 5,
+          },
+          exhaustion: {
+            state: 'blocked',
+            reason: 'retry budget exhausted after three failed repairs',
+            owner: 'Summer',
+            evidenceRef: 'https://github.com/JovieInc/Jovie/actions/runs/4',
+            nextAction: 'route the exact receipt to the owning repair issue',
+          },
+        },
+      });
+      const accepted = evaluateEscapedDefectClosure({
+        identifier: 'JOV-9',
+        description: bounded,
+        labels: ['escaped-defect'],
+      });
+      assert.equal(accepted.ok, true);
+    });
+
+    it('accepts only an explicit evidenced detector non-applicability disposition', () => {
+      const marker = escapedDefectEvidence({
+        detection: {
+          originatingIssue: 'JOV-9',
+          gapAnalysis:
+            'The defect came from an external physical failure with no machine-observable product state.',
+          nonApplicability: {
+            justification:
+              'No reusable software detector can observe the external physical-only failure class.',
+            evidenceRef:
+              'https://linear.app/jovie/issue/JOV-9#non-applicability',
+            approvedBy: 'Summer',
+          },
+        },
+      });
+      const result = evaluateEscapedDefectClosure({
+        identifier: 'JOV-9',
+        description: marker,
+        labels: ['escaped-defect'],
+      });
+
+      assert.equal(result.ok, true);
+    });
+
+    it('guards the real Done transition and never mutates an incomplete escaped defect', async () => {
+      const incompleteCalls = [];
+      await assert.rejects(
+        transitionLinearIssue({
+          identifier: 'JOV-9',
+          apiKey: 'lin_test',
+          expectedDeploymentSha: DEPLOYED_SHA,
+          log: () => {},
+          fetchImpl: async (_url, init) => {
+            incompleteCalls.push(String(init?.body ?? ''));
+            return {
+              ok: true,
+              json: async () => ({
+                data: {
+                  issues: {
+                    nodes: [
+                      {
+                        id: 'issue-9',
+                        identifier: 'JOV-9',
+                        description: 'product fix only',
+                        labels: { nodes: [{ name: 'escaped-defect' }] },
+                        comments: { nodes: [] },
+                        team: {
+                          states: {
+                            nodes: [{ id: 'done-id', name: 'Done' }],
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              }),
+            };
+          },
+        }),
+        /Refusing to mark JOV-9 Done/
+      );
+      assert.equal(
+        incompleteCalls.some(call => call.includes('issueUpdate')),
+        false
+      );
+
+      const completeCalls = [];
+      const transitioned = await transitionLinearIssue({
+        identifier: 'JOV-9',
+        apiKey: 'lin_test',
+        expectedDeploymentSha: DEPLOYED_SHA,
+        log: () => {},
+        fetchImpl: async (_url, init) => {
+          const body = String(init?.body ?? '');
+          completeCalls.push(body);
+          if (body.includes('issueUpdate')) {
+            return {
+              ok: true,
+              json: async () => ({
+                data: { issueUpdate: { success: true } },
+              }),
+            };
+          }
+          return {
+            ok: true,
+            json: async () => ({
+              data: {
+                issues: {
+                  nodes: [
+                    {
+                      id: 'issue-9',
+                      identifier: 'JOV-9',
+                      description: escapedDefectEvidence(),
+                      labels: { nodes: [{ name: 'escaped-defect' }] },
+                      comments: { nodes: [] },
+                      team: {
+                        states: {
+                          nodes: [{ id: 'done-id', name: 'Done' }],
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            }),
+          };
+        },
+      });
+      assert.deepEqual(transitioned, { identifier: 'JOV-9', state: 'Done' });
+      assert.equal(
+        completeCalls.some(call => call.includes('issueUpdate')),
+        true
+      );
+    });
+
+    it('rejects another issue closure receipt fetched through the real Linear adapter', async () => {
+      const issues = await fetchRecentDefects(
+        'lin_test',
+        30,
+        async (_url, init) => {
+          const { query } = JSON.parse(String(init?.body ?? '{}'));
+          return {
+            ok: true,
+            json: async () => ({
+              data: query.includes('EscapedDefectClosureComments')
+                ? {
+                    i0: {
+                      identifier: 'JOV-10',
+                      comments: { nodes: [{ body: escapedDefectEvidence() }] },
+                    },
+                  }
+                : {
+                    issues: {
+                      nodes: [
+                        {
+                          identifier: 'JOV-10',
+                          title: 'different defect',
+                          state: { name: 'Done', type: 'completed' },
+                          labels: { nodes: [{ name: 'escaped-defect' }] },
+                        },
+                      ],
+                    },
+                  },
+            }),
+          };
+        }
+      );
+      const [gap] = collectEscapedDefectClosureGaps(issues);
+      assert.ok(gap, 'receipt for JOV-9 must not close JOV-10');
+      assert.equal(gap.originatingIssue, 'JOV-10');
+      assert.match(gap.evidence.join('\n'), /originatingIssue/);
+    });
+
+    it('fetches comments only for completed escaped-defect closure candidates', async () => {
+      const queries = [];
+      const issues = await fetchRecentDefects(
+        'lin_test',
+        30,
+        async (_url, init) => {
+          const body = JSON.parse(String(init?.body ?? '{}'));
+          queries.push(body.query);
+          if (body.query.includes('EscapedDefectClosureComments')) {
+            return {
+              ok: true,
+              json: async () => ({
+                data: {
+                  i0: {
+                    identifier: 'JOV-9',
+                    comments: { nodes: [{ body: escapedDefectEvidence() }] },
+                  },
+                },
+              }),
+            };
+          }
+          return {
+            ok: true,
+            json: async () => ({
+              data: {
+                issues: {
+                  nodes: [
+                    {
+                      identifier: 'JOV-9',
+                      title: 'escaped',
+                      description: '',
+                      state: { name: 'Done', type: 'completed' },
+                      labels: { nodes: [{ name: 'escaped-defect' }] },
+                    },
+                    {
+                      identifier: 'JOV-10',
+                      title: 'ordinary bug',
+                      description: '',
+                      state: { name: 'Done', type: 'completed' },
+                      labels: { nodes: [{ name: 'bug' }] },
+                    },
+                    {
+                      identifier: 'JOV-11',
+                      title: 'open escaped defect',
+                      description: '',
+                      state: { name: 'In Progress', type: 'started' },
+                      labels: { nodes: [{ name: 'escaped-defect' }] },
+                    },
+                  ],
+                },
+              },
+            }),
+          };
+        }
+      );
+
+      assert.equal(queries.length, 2);
+      assert.match(queries[1], /issue\(id: "JOV-9"\)/);
+      assert.doesNotMatch(queries[1], /JOV-10|JOV-11/);
+      assert.equal(issues[0].comments.length, 1);
+      assert.deepEqual(issues[1].comments, []);
+      assert.deepEqual(issues[2].comments, []);
+    });
   });
 
   it('flags a stale heatmap and module coverage drops', () => {

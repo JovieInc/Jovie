@@ -57,6 +57,8 @@ export interface ChangelogRelease {
     {
       availability: 'ga' | 'preview' | 'limited' | 'unverified';
       prerequisites: string[];
+      supporting?: string[];
+      action?: { label: string; href: string };
     }
   >;
 }
@@ -404,6 +406,28 @@ function processChangelogLine(
   return { current, currentSection, summaryConsumed };
 }
 
+const SAFE_ACTION_HOSTS = new Set(['jov.ie', 'docs.jov.ie']);
+
+/**
+ * Next-step destinations must stay customer-reachable: internal paths or
+ * https on first-party hosts. Anything else fails closed, never rendered.
+ */
+export function isSafeChangelogActionHref(href: string): boolean {
+  if (/^\/(?!\/)\S*$/.test(href)) return true;
+  try {
+    const url = new URL(href);
+    return (
+      url.protocol === 'https:' &&
+      !url.username &&
+      !url.password &&
+      !url.port &&
+      SAFE_ACTION_HOSTS.has(url.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 const PublicationReceiptSchema = z.object({
   schema: z.literal('daily-changelog-receipt/v1'),
   window: z.object({ key: z.string() }),
@@ -425,6 +449,15 @@ const PublicationReceiptSchema = z.object({
         summary: z.string().min(1),
         section: z.enum(['Added', 'Changed', 'Fixed', 'Removed']),
         sourceIds: z.array(z.string()).min(1),
+        bullets: z.array(z.string().trim().min(1)).max(5).optional(),
+        action: z
+          .object({
+            label: z.string().trim().min(1).max(80),
+            href: z.string().trim().min(1).max(400),
+          })
+          .refine(value => isSafeChangelogActionHref(value.href))
+          .optional()
+          .catch(undefined),
         availability: z
           .object({
             status: z.enum(['ga', 'preview', 'limited']),
@@ -479,6 +512,8 @@ function readCustomerPublication(
       outcomes[story.summary] = {
         availability: story.availability?.status ?? 'unverified',
         prerequisites: story.availability?.prerequisites ?? [],
+        supporting: story.bullets ?? [],
+        ...(story.action ? { action: story.action } : {}),
       };
     }
     release.customerOutcomes = outcomes;

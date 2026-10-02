@@ -890,13 +890,14 @@ class WorkerTest(unittest.TestCase):
         self.saved = (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
                       lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues,
                       lane.fix_candidates, lane.escalate_exhausted, lane.pr_events.queued_prs,
-                      lane.pr_events.claim_event_pr, lane.sweep_lane_prs)
+                      lane.pr_events.claim_event_pr, lane.sweep_lane_prs, lane.read_new_issue_budget)
         lane.sweep_lane_prs = lambda host, name, linear, now=None: None
         lane.pr_events.queued_prs = lambda module, kinds: []
         lane.pr_events.claim_event_pr = lambda host, module, name, prs: None
         lane.claim_red_pr = lambda host, name, prs=None: None
         lane.claim_adoptable_pr = lambda host, name, prs: None
         lane.lane_prs = lambda name, fields="": []
+        lane.read_new_issue_budget = lambda name, slots: lane.new_issue_budget(name, slots, lane.lane_prs(name, fields=lane.LIGHT_PR_FIELDS))
         lane.in_flight_issues = lambda: frozenset()  # never GitHub from a unit test
         lane.fix_candidates = lambda name: []
         lane.escalate_exhausted = lambda host, prs, linear: None
@@ -912,7 +913,7 @@ class WorkerTest(unittest.TestCase):
         (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
          lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues,
          lane.fix_candidates, lane.escalate_exhausted, lane.pr_events.queued_prs,
-         lane.pr_events.claim_event_pr, lane.sweep_lane_prs) = self.saved
+         lane.pr_events.claim_event_pr, lane.sweep_lane_prs, lane.read_new_issue_budget) = self.saved
         self.tmp.cleanup()
 
     def test_landing_claims_comments_and_pulls_the_next_issue(self):
@@ -1064,8 +1065,8 @@ class WorkerTest(unittest.TestCase):
         self.assertTrue(record["at"].endswith("Z"))
 
     def test_over_budget_and_unknown_in_flight_exits_name_their_reason(self):
-        lane.lane_prs = lambda name, fields="": [{"headRefName": "devin/a", "isDraft": True},
-                                                 {"headRefName": "devin/b", "isDraft": True}]
+        lane.lane_prs = lambda name, fields="": [{"number": 1, "headRefName": "devin/jov-1-20261002", "isDraft": True},
+                                                 {"number": 2, "headRefName": "devin/jov-2-20261002", "isDraft": True}]
         self.assertEqual(lane.worker(self.host, "devin"), 0)
         self.assertEqual(json.loads((self.host.state / "worker-idle.json").read_text())
                          ["devin"]["reason"], "over-budget")
@@ -1088,6 +1089,24 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(lane.worker(self.host, "devin"), 0)
         self.assertEqual(self.linear.moves, [])
 
+    def test_unknown_budget_defers_without_claim_or_failure_charge(self):
+        lane.read_new_issue_budget = lambda name, slots: lane.new_issue_budget(name, slots, None)
+        lane.run_issue = lambda *a: self.fail("unknown inventory cannot authorize new work")
+        self.assertEqual(lane.worker(self.host, "devin"), 0)
+        self.assertEqual(self.linear.moves, [])
+        self.assertFalse(lane.failures_path(self.host).exists())
+        self.assertEqual(json.loads((self.host.state / "worker-idle.json").read_text())["devin"]["reason"],
+                         "pr-inventory-unavailable")
+
+    def test_existing_repair_never_consults_new_issue_budget(self):
+        lane.claim_red_pr = lambda *a: {"number": 9}
+        fixed = []
+        lane.fix_red_pr = lambda *a: fixed.append(a[-1]["number"])
+        lane.read_new_issue_budget = lambda *a: self.fail("maintenance must not depend on new-issue read")
+        lane.worker(self.host, "devin")
+        self.assertEqual(fixed, [9])
+        self.assertEqual(self.linear.moves, [])
+
     def test_busy_slots_and_empty_queue_exit_quietly(self):
         held = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
         self.assertEqual(lane.worker(self.host, "devin"), 0)
@@ -1095,6 +1114,43 @@ class WorkerTest(unittest.TestCase):
         self.linear.issues = []
         self.assertEqual(lane.worker(self.host, "devin"), 0)
         self.assertEqual(self.linear.moves, [])
+
+
+class NewIssueBudgetTest(unittest.TestCase):
+    def row(self, number=1, branch=None, draft=True, state="CLEAN"):
+        return {"number": number, "headRefName": branch or f"codex/jov-{number}-20261002",
+                "isDraft": draft, "mergeStateStatus": state}
+
+    def test_dated_ownership_and_each_head_count_once_without_issue_collapse(self):
+        rows = [self.row(n, branch=f"codex/jov-7-20261002t00000{n}") for n in range(1, 7)]
+        rows += [self.row(8, branch="codex/manual-repair"), self.row(9, branch="devin/jov-9-20261002"),
+                 self.row(10, draft=False), self.row(11, draft=False, state="HAS_HOOKS")]
+        result = lane.new_issue_budget("codex", 3, rows)
+        self.assertEqual((result["used"], result["cap"], result["reason"]), (6, 6, "over-budget"))
+        self.assertFalse(result["allowed"])
+        self.assertTrue(lane.new_issue_budget("codex", 4, rows)["allowed"])
+        self.assertEqual(lane.new_issue_budget("codex", 0, None)["reason"], "provider-disabled")
+
+    def test_failed_malformed_and_truncated_reads_cannot_certify_empty_inventory(self):
+        cases = [(1, "[]"), (1, json.dumps([self.row()])), (0, ""), (0, "{}"), (0, "null"),
+                 (0, json.dumps([self.row(n, branch=f"codex/manual-{n}") for n in range(1, 201)])),
+                 (0, json.dumps([self.row(), self.row()]))]
+        for field, value in [("number", True), ("number", 0), ("headRefName", ""),
+                             ("isDraft", 1), ("mergeStateStatus", None)]:
+            row = self.row(branch="codex/manual")
+            row[field] = value
+            cases.append((0, json.dumps([row])))
+        for code, output in cases:
+            with self.subTest(code=code, output=output[:80]), patch.object(
+                    lane, "sh", return_value=subprocess.CompletedProcess([], code, output, "")):
+                result = lane.read_new_issue_budget("codex", 3)
+                self.assertEqual(result["reason"], "pr-inventory-unavailable")
+                self.assertIsNone(result["used"])
+                self.assertFalse(result["allowed"])
+        with patch.object(lane, "sh", return_value=subprocess.CompletedProcess([], 0, "[]", "")):
+            result = lane.read_new_issue_budget("codex", 3)
+            self.assertTrue(result["allowed"])
+            self.assertEqual(result["used"], 0)
 
 
 class RunAgentTest(unittest.TestCase):

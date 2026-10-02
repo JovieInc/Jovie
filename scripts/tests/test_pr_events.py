@@ -209,7 +209,11 @@ class RelayTest(unittest.TestCase):
 
         def relay_with(removals, labels=()):
             shell = Shell({("gh", "pr", "view"): {**view, "labels": [{"name": n} for n in labels]},
-                           ("gh", "api", "graphql"): removals})
+                           ("gh", "api", "graphql"): lambda args: removals if '--jq' in args else
+                           {"data": {"repository": {"pullRequest": {"headRefOid": "h7", "state": "OPEN", "timelineItems": {
+                               "nodes": [{"__typename": "PullRequestCommit", "commit": {"oid": "h7"}}] +
+                                        [{"__typename": "RemovedFromMergeQueueEvent", **item} for item in reversed(removals)],
+                               "pageInfo": {"hasPreviousPage": False, "startCursor": None}}}}}}})
             return events.relay("pull_request_target", payload, shell, set()), shell
 
         added, shell = relay_with([{"createdAt": stamp(60), "reason": "failed_checks"},
@@ -222,6 +226,63 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(len(shell.made("gh", "pr", "comment")), 1)
         added, shell = relay_with([{"createdAt": stamp(60), "reason": "failed_checks"}] * 3, labels=["queue-poison"])
         self.assertEqual(shell.made("gh", "pr", "comment"), [], "an already-poisoned PR is not re-announced")
+
+    def test_a_repaired_head_is_not_poisoned_by_old_revision_ejections(self):
+        removal = {"__typename": "RemovedFromMergeQueueEvent", "createdAt": "2033-05-18T03:32:20Z", "reason": "failed_checks"}
+        old = {"__typename": "PullRequestCommit", "commit": {"oid": "old"}}
+        new = {"__typename": "HeadRefForcePushedEvent", "afterCommit": {"oid": "h7"}}
+        view = pr(7, branch="tim/fix", sha="h7", state="OPEN")
+        nodes = [old, removal, removal, new, removal]
+        page = {"data": {"repository": {"pullRequest": {"headRefOid": "h7", "state": "OPEN", "timelineItems": {
+            "nodes": nodes, "pageInfo": {"hasPreviousPage": False, "startCursor": None}}}}}}
+        shell = Shell({("gh", "pr", "view"): view, ("gh", "api", "graphql"):
+                       lambda args: [removal] * 3 if '--jq' in args else page})
+        with patch.object(events.time, "time", return_value=NOW):
+            added = events.relay("pull_request_target", {"action": "dequeued", "pull_request": {"number": 7, "head": {"sha": "h7"}}}, shell, set())
+        self.assertEqual(added, [(7, "dequeued")])
+        self.assertEqual(shell.made("gh", "pr", "comment"), [])
+
+    def test_relay_never_poisons_explicitly_held_work(self):
+        view = pr(7, branch="tim/fix", sha="h7", state="OPEN", labels=["hold"])
+        removal = {"createdAt": "2033-05-18T03:32:20Z", "reason": "failed_checks"}
+        shell = Shell({("gh", "pr", "view"): view, ("gh", "api", "graphql"): [removal] * 2})
+        with patch.object(events.time, "time", return_value=NOW):
+            added = events.relay("pull_request_target", {"action": "dequeued", "pull_request": {"number": 7, "head": {"sha": "h7"}}}, shell, set())
+        self.assertEqual(added, [])
+        self.assertEqual(shell.made("gh", "api", "-X"), [])
+
+    def test_revision_ejections_paginate_back_to_the_actual_head_boundary(self):
+        removal = {"__typename": "RemovedFromMergeQueueEvent", "createdAt": "2033-05-18T03:32:20Z", "reason": "failed_checks"}
+        def page(nodes, previous=False, cursor=None, **extra):
+            return {"data": {"repository": {"pullRequest": {"headRefOid": "h7", "state": "OPEN", **extra,
+                "timelineItems": {"nodes": nodes, "pageInfo": {"hasPreviousPage": previous, "startCursor": cursor}}}}}}
+        replies = iter([page([removal], True, 'cursor"quoted'), page([
+            {"__typename": "PullRequestCommit", "commit": {"oid": "h7"}}, removal])])
+        def reply(args):
+            query = next(arg[6:] for arg in args if arg.startswith('query='))
+            self.assertEqual(query.count('{'), query.count('}'))
+            return next(replies)
+        shell = Shell({("gh", "api", "graphql"): reply})
+        self.assertEqual(events.queue_ejections(7, NOW, shell, head="h7"), 2)
+        self.assertIn('before:"cursor\\\"quoted"', shell.calls[1][-1])
+        for response in [page([removal]), page([removal], True), page([removal], headRefOid="changed"),
+                         {"errors": [{"message": "partial"}], **page([removal])}, 'malformed', (1, '')]:
+            self.assertIsNone(events.queue_ejections(7, NOW, Shell({("gh", "api", "graphql"): response}), head="h7"))
+        repeated = Shell({("gh", "api", "graphql"): page([removal], True, 'same')})
+        self.assertIsNone(events.queue_ejections(7, NOW, repeated, head="h7"))
+        self.assertEqual(len(repeated.calls), 2)
+
+    def test_poison_mutation_rechecks_live_head_and_hold_after_history_reads(self):
+        removal = {"__typename": "RemovedFromMergeQueueEvent", "createdAt": "2033-05-18T03:32:20Z", "reason": "failed_checks"}
+        page = {"data": {"repository": {"pullRequest": {"headRefOid": "h7", "state": "OPEN", "timelineItems": {
+            "nodes": [{"__typename": "PullRequestCommit", "commit": {"oid": "h7"}}, removal, removal],
+            "pageInfo": {"hasPreviousPage": False, "startCursor": None}}}}}}
+        initial = pr(7, branch="tim/fix", sha="h7", state="OPEN")
+        for live in [{**initial, "headRefOid": "changed"}, {**initial, "labels": [{"name": "hold"}]},
+                     {**initial, "state": "CLOSED"}, {**initial, "isCrossRepository": True}, (1, ''), 'malformed']:
+            shell = Shell({("gh", "api", "graphql"): page, ("gh", "pr", "view"): live})
+            self.assertFalse(events.mark_poison(7, initial, NOW, shell))
+            self.assertEqual(shell.made("gh", "api", "-X"), [])
 
     def test_a_push_to_main_labels_newly_conflicting_prs_after_mergeability_settles(self):
         reads = iter([
