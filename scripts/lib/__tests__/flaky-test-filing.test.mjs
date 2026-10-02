@@ -1,0 +1,51 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import {
+  githubIssueFilingRetired,
+  planFlakyTestFiling,
+} from '../flaky-test-filing.mjs';
+
+const retired = readFileSync(
+  '.github/workflows/test-flakiness-report.yml',
+  'utf8'
+);
+
+describe('flaky-test filing remediation', () => {
+  it('keeps GitHub issue filing retired', () => {
+    expect(githubIssueFilingRetired(retired)).toBe(true);
+    expect(retired).toContain("github.event_name == '__retired_linear_only__'");
+    expect(retired).not.toContain('issues: write');
+  });
+
+  it('files when the ratchet fails and GitHub filing is still off', () => {
+    const plan = planFlakyTestFiling({
+      workflowSource: retired,
+      ratchetFailed: true,
+      flakyCount: '4',
+      runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+    });
+    expect(plan.fingerprint).toBe('remediation:flaky-test-filing');
+    expect(plan.title).toContain('(remediation:flaky-test-filing)');
+    expect(plan.reopenTerminal).toBe(true);
+    expect(plan.createStateName).toBe('Todo');
+    expect(plan.description).toContain('JOV-6507');
+  });
+
+  it('does nothing when the ratchet passes or GitHub filing is re-enabled', () => {
+    expect(
+      planFlakyTestFiling({
+        workflowSource: retired,
+        ratchetFailed: false,
+      })
+    ).toBeNull();
+    expect(
+      planFlakyTestFiling({
+        workflowSource: retired.replaceAll(
+          '__retired_linear_only__',
+          'workflow_run'
+        ),
+        ratchetFailed: true,
+      })
+    ).toBeNull();
+  });
+});
