@@ -188,6 +188,15 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     []
   );
 
+  // Connectivity loss can retain the source URL. Clear its acknowledgment
+  // immediately; the existing per-navigation recovery timer remains bounded.
+  useEffect(() => {
+    if (!pendingNavigation) return;
+    const clearAcknowledgment = () => setPendingNavigation(null);
+    globalThis.addEventListener('offline', clearAcknowledgment);
+    return () => globalThis.removeEventListener('offline', clearAcknowledgment);
+  }, [pendingNavigation]);
+
   useEffect(() => {
     if (
       !hasHydratedPersistedState ||

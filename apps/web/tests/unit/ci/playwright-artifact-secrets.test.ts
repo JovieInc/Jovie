@@ -1588,13 +1588,20 @@ ${fixtureCheckout}
       nightlyAgent,
       'Publish evidence report and ops status'
     );
-    const commitReport = stepBlock(
+    const commitReport = stepBlock(nightlyAgent, 'Open nightly evidence PR');
+    const reportToken = stepBlock(
       nightlyAgent,
-      'Commit evidence report when changed'
+      'Generate report publication token'
     );
     const uploadReport = stepBlock(nightlyAgent, 'Upload final report');
     const reportJob = jobBlock(nightlyAgent, 'report');
-    for (const block of [publishReport, commitReport, uploadReport, reportJob])
+    for (const block of [
+      publishReport,
+      commitReport,
+      reportToken,
+      uploadReport,
+      reportJob,
+    ])
       expect(block).not.toBe('');
     const reportPaths = [
       'apps/web/test-results/nightly-agent/nightly-report.md',
@@ -1628,10 +1635,29 @@ ${fixtureCheckout}
     expect(nightlyAgent.indexOf(publishReport)).toBeLessThan(
       nightlyAgent.indexOf(uploadReport)
     );
-    expect(commitReport).toContain('GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}');
+    expect(nightlyAgent.indexOf(uploadReport)).toBeLessThan(
+      nightlyAgent.indexOf(reportToken)
+    );
+    expect(nightlyAgent.indexOf(reportToken)).toBeLessThan(
+      nightlyAgent.indexOf(commitReport)
+    );
+    expect(yamlPropertyBlock(reportJob, 'permissions', 4)).toContain(
+      'contents: read'
+    );
+    expect(reportToken).toContain('uses: actions/create-github-app-token@');
+    expect(reportToken).toContain('permission-contents: write');
+    expect(reportToken).toContain('permission-pull-requests: write');
+    expect(commitReport).toContain(
+      'GH_TOKEN: ${{ steps.report-token.outputs.token }}'
+    );
+    expect(commitReport).toContain(
+      "import { publishNightlyReport } from './scripts/lib/publish-coverage-report.mjs'"
+    );
+    expect(commitReport).toContain('console.log(publishNightlyReport())');
+    expect(commitReport).not.toContain('secrets.GITHUB_TOKEN');
     expect(commitReport).not.toContain('$GITHUB_ENV');
-    expect(hasCommandScopedGitAuth(commitReport, 'pull')).toBe(true);
-    expect(hasCommandScopedGitAuth(commitReport, 'push')).toBe(true);
+    expect(commitReport).not.toMatch(/\bgit\s+(?:pull|push)\b/);
+    expect(yamlPropertyBlock(reportJob, 'env', 4)).not.toContain('GH_TOKEN');
     expect(persistentGitCredentialViolations(commitReport)).toEqual([]);
     expect(
       persistentGitCredentialViolations(

@@ -262,6 +262,9 @@ describe('exact production Lighthouse evidence guard', () => {
     try {
       mkdirSync(reports);
       writeFileSync(outsideReceipt, 'opaque-cookie\n', { mode: 0o644 });
+      // Creation mode is masked by the host umask; make the unsafe fixture
+      // explicit so the negative control also runs under a restrictive 0077.
+      chmodSync(outsideReceipt, 0o644);
       expect(() => readSensitiveValues(outsideReceipt, reports)).toThrow(
         'mode-0600 regular file'
       );

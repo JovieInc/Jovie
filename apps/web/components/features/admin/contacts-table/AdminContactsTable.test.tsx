@@ -1,6 +1,16 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import {
   RightPanelProvider,
   useRightPanel,
@@ -12,14 +22,17 @@ import type {
 } from './AdminContactsTable';
 import { AdminContactsTable } from './AdminContactsTable';
 
-const { mockRefresh, mockToastError, mockToastSuccess } = vi.hoisted(() => ({
-  mockRefresh: vi.fn(),
-  mockToastError: vi.fn(),
-  mockToastSuccess: vi.fn(),
-}));
+const { mockRefresh, mockPush, mockToastError, mockToastSuccess } = vi.hoisted(
+  () => ({
+    mockRefresh: vi.fn(),
+    mockPush: vi.fn(),
+    mockToastError: vi.fn(),
+    mockToastSuccess: vi.fn(),
+  })
+);
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ refresh: mockRefresh }),
+  useRouter: () => ({ refresh: mockRefresh, push: mockPush }),
 }));
 
 vi.mock('@/components/feedback', () => ({
@@ -121,6 +134,32 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 describe('AdminContactsTable', () => {
+  const browserMethods = [
+    'hasPointerCapture',
+    'releasePointerCapture',
+    'setPointerCapture',
+    'scrollIntoView',
+  ] as const;
+  const originalMethods = browserMethods.map(name =>
+    Object.getOwnPropertyDescriptor(Element.prototype, name)
+  );
+  beforeAll(() => {
+    for (const name of browserMethods) {
+      if (!Element.prototype[name])
+        Object.defineProperty(Element.prototype, name, {
+          configurable: true,
+          value: vi.fn(() => false),
+        });
+    }
+  });
+  afterAll(() => {
+    browserMethods.forEach((name, index) => {
+      const descriptor = originalMethods[index];
+      if (descriptor)
+        Object.defineProperty(Element.prototype, name, descriptor);
+      else Reflect.deleteProperty(Element.prototype, name);
+    });
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal('fetch', vi.fn());
@@ -130,15 +169,29 @@ describe('AdminContactsTable', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders the filtered empty state and canonical stage links', () => {
-    renderTable({ rows: [], total: 0, search: 'missing' });
+  it('filters by stage while preserving search and resetting pagination', async () => {
+    const user = userEvent.setup();
+    renderTable({ rows: [], total: 0, search: 'missing', page: 3 });
 
     expect(screen.getByText('No contacts matching “missing”.')).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Paying (1)' })).toHaveAttribute(
-      'href',
+    await user.click(
+      screen.getByRole('combobox', { name: 'Filter By Lifecycle Stage' })
+    );
+    await user.click(screen.getByRole('option', { name: 'Paying (1)' }));
+    expect(mockPush).toHaveBeenCalledWith(
       '?view=contacts&q=missing&stage=paying'
     );
     expect(screen.getByText('Showing 0–0 of 0')).toBeVisible();
+  });
+
+  it('clears the stage filter without losing the search term', async () => {
+    const user = userEvent.setup();
+    renderTable({ stage: 'paying', search: 'ari', page: 2 });
+    await user.click(
+      screen.getByRole('combobox', { name: 'Filter By Lifecycle Stage' })
+    );
+    await user.click(screen.getByRole('option', { name: /All stages/ }));
+    expect(mockPush).toHaveBeenCalledWith('?view=contacts&q=ari');
   });
 
   it('opens lifecycle history and applies a manual stage transition', async () => {

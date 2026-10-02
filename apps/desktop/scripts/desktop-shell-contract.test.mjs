@@ -1,16 +1,26 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { readFile, unlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
+import { bundleDesktopPreload } from './bundle-preload.mjs';
 import { deriveStagingReleaseVersion } from './sync-version.mjs';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const execFileAsync = promisify(execFile);
+
+async function readBundledPreload(t) {
+  const directory = await mkdtemp(join(tmpdir(), 'jovie-shell-preload-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const outfile = join(directory, 'preload.js');
+  await bundleDesktopPreload({ outfile });
+  return readFile(outfile, 'utf8');
+}
 
 test('desktop window enters the authenticated chat shell instead of the web root', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
@@ -66,7 +76,7 @@ test('desktop polls build-info and reloads idle app windows on deploy drift', as
     'isWebBuildReloadWindow',
     'isWebBuildReloadPath',
     'shouldReloadWindowForWebBuild',
-    'UNSENT_INPUT_PROBE',
+    'SESSION_WORK_PROBE',
     'scheduleHudBuildAutoReload',
   ]) {
     assert.match(mainSource, new RegExp(`\\b${symbol}\\b`));
@@ -819,17 +829,8 @@ test('preload marks the hosted app as Electron after the document root is ready'
   );
 });
 
-test('compiled sandbox preload has no unsupported local module dependency', async () => {
-  const preloadSource = await readFile(
-    join(desktopRoot, 'src/preload.ts'),
-    'utf8'
-  );
-  const compiledPreload = ts.transpileModule(preloadSource, {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2022,
-    },
-  }).outputText;
+test('compiled sandbox preload has no unsupported local module dependency', async t => {
+  const compiledPreload = await readBundledPreload(t);
   const requiredModules = [
     ...compiledPreload.matchAll(/require\(["']([^"']+)["']\)/g),
   ].map(match => match[1]);
@@ -1507,14 +1508,8 @@ test('Ovie recovery main IPC binds the live main window and root frame without a
   assert.equal(request.isMainFrame, false);
 });
 
-test('Ovie recovery real preload sends zero arguments on its dedicated channel', async () => {
-  const source = await readFile(join(desktopRoot, 'src/preload.ts'), 'utf8');
-  const compiled = ts.transpileModule(source, {
-    compilerOptions: {
-      target: ts.ScriptTarget.ES2022,
-      module: ts.ModuleKind.CommonJS,
-    },
-  }).outputText;
+test('Ovie recovery real preload sends zero arguments on its dedicated channel', async t => {
+  const compiled = await readBundledPreload(t);
   let api;
   const calls = [];
   const response = { ok: false, reason: 'blocked-url' };

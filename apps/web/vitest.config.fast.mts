@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url';
 import react from '@vitejs/plugin-react';
 import dotenv from 'dotenv';
 import fs from 'fs';
@@ -6,7 +7,6 @@ import {
   defineConfig,
   type TestProjectInlineConfiguration,
 } from 'vitest/config';
-import RetryVisibilityReporter from '../../scripts/lib/vitest-retry-reporter.mjs';
 import DurationShardSequencer from './scripts/vitest-duration-sequencer.mjs';
 
 // Resolve the real filesystem path (handles Windows short-name paths like TIMWHI~1)
@@ -21,6 +21,12 @@ const realRoot = (() => {
 const workspaceRoot = realRoot.includes(`${path.sep}.stryker-tmp${path.sep}`)
   ? path.resolve(realRoot, '../../../..')
   : path.resolve(realRoot, '../..');
+// Stryker copies the app into a sandbox; shared reporters stay at the workspace root.
+const { default: RetryVisibilityReporter } = await import(
+  pathToFileURL(
+    path.resolve(workspaceRoot, 'scripts/lib/vitest-retry-reporter.mjs')
+  ).href
+);
 
 // Load environment variables from .env.test if it exists to keep parity with the
 // standard configuration while using the optimized defaults locally.

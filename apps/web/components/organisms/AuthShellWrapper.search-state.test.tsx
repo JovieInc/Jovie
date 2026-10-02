@@ -13,12 +13,15 @@ import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardData
 import { useHeaderActions } from '@/contexts/HeaderActionsContext';
 import { AuthShellWrapper } from './AuthShellWrapper';
 
-const { route, lifecycle, routeEscape, privacyState } = vi.hoisted(() => ({
-  route: { pathname: '/app/tasks' },
-  lifecycle: vi.fn(),
-  routeEscape: vi.fn(),
-  privacyState: vi.fn(),
-}));
+const { route, lifecycle, routeEscape, privacyState, routeConfig, railScope } =
+  vi.hoisted(() => ({
+    route: { pathname: '/app/tasks' },
+    lifecycle: vi.fn(),
+    routeEscape: vi.fn(),
+    privacyState: vi.fn(),
+    routeConfig: { isChatRoute: false, isArtistProfileSettings: false },
+    railScope: { current: undefined as string | undefined },
+  }));
 vi.mock('next/navigation', () => ({
   usePathname: () => route.pathname,
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
@@ -29,6 +32,8 @@ vi.mock('@/hooks/useAuthRouteConfig', () => ({
     breadcrumbs: [],
     showMobileTabs: false,
     isTableRoute: true,
+    isChatRoute: routeConfig.isChatRoute,
+    isArtistProfileSettings: routeConfig.isArtistProfileSettings,
   }),
 }));
 vi.mock('@/hooks/useDashboardShortcuts', () => ({
@@ -44,7 +49,16 @@ vi.mock('@/components/organisms/keyboard-shortcuts-sheet', () => ({
   KeyboardShortcutsSheet: () => null,
 }));
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
-  PreviewPanelProvider: ({ children }: { children: ReactNode }) => children,
+  PreviewPanelProvider: ({
+    children,
+    scope,
+  }: {
+    children: ReactNode;
+    scope?: string;
+  }) => {
+    railScope.current = scope;
+    return children;
+  },
 }));
 vi.mock('@/components/features/chat/Composer', () => ({
   ComposerFocusProvider: ({ children }: { children: ReactNode }) => children,
@@ -206,6 +220,9 @@ function closeSearch() {
 
 beforeEach(() => {
   route.pathname = '/app/tasks';
+  routeConfig.isChatRoute = false;
+  routeConfig.isArtistProfileSettings = false;
+  railScope.current = undefined;
   lifecycle.mockClear();
   routeEscape.mockClear();
   privacyState.mockReset();
@@ -332,6 +349,41 @@ describe('main-plane Search route recovery', () => {
     expect(screen.queryByTestId('cmdk-main-plane')).not.toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(routeEscape).not.toHaveBeenCalled();
+  });
+
+  it('scopes the profile rail to chat so it never opens unsolicited (JOV-7150)', () => {
+    routeConfig.isChatRoute = true;
+    render(
+      <DashboardDataProvider value={dashboard}>
+        <AuthShellWrapper mode='customer'>
+          <RouteDocument />
+        </AuthShellWrapper>
+      </DashboardDataProvider>
+    );
+    expect(railScope.current).toBe('chat');
+  });
+
+  it('keeps the app-shell rail scope on ordinary routes', () => {
+    render(
+      <DashboardDataProvider value={dashboard}>
+        <AuthShellWrapper mode='customer'>
+          <RouteDocument />
+        </AuthShellWrapper>
+      </DashboardDataProvider>
+    );
+    expect(railScope.current).toBe('app-shell');
+  });
+
+  it('keeps the artist-profile-settings rail scope on profile settings', () => {
+    routeConfig.isArtistProfileSettings = true;
+    render(
+      <DashboardDataProvider value={dashboard}>
+        <AuthShellWrapper mode='customer'>
+          <RouteDocument />
+        </AuthShellWrapper>
+      </DashboardDataProvider>
+    );
+    expect(railScope.current).toBe('artist-profile-settings');
   });
 
   it('never mounts private content or Search when the actual C boundary starts locked', () => {

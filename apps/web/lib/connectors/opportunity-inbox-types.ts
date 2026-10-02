@@ -120,6 +120,8 @@ export interface OpportunityInboxTourDateItem {
 }
 
 export interface OpportunityInboxTourDates {
+  /** Missing provenance cannot certify an attempted read as successful. */
+  readonly availability?: 'available' | 'unknown';
   readonly pending: readonly OpportunityInboxTourDateItem[];
   readonly confirmed: readonly OpportunityInboxTourDateItem[];
   readonly rejected: readonly OpportunityInboxTourDateItem[];
@@ -140,6 +142,10 @@ export interface OpportunityInboxEmptyActionCard {
 }
 
 export interface OpportunityInboxData {
+  readonly availability?: {
+    readonly suggestedActions: 'available' | 'unknown';
+    readonly tourDates: 'available' | 'unknown' | 'not_requested';
+  };
   readonly cards: readonly OpportunityInboxCardViewModel[];
   readonly emptyActionCards: readonly OpportunityInboxEmptyActionCard[];
   readonly tourDates?: OpportunityInboxTourDates;
