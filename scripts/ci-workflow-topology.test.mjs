@@ -57,3 +57,12 @@ test('workflow yaml is parsed into name, triggers and job topology (JOV-7290)', 
   assert.deepEqual(edges, [{ from: 'Producer', to: 'Consumer', type: 'workflow_run' }]);
   fs.rmSync(fixture, { recursive: true, force: true });
 });
+
+test('release opportunity requires one staging completion path and rejects parallel CI or duplicate triggers', () => {
+  for (const edge of [{ from: 'CI', to: 'Production Controller', type: 'workflow_run' }, { from: 'Staging Controller', to: 'Production Controller', type: 'workflow_run' }]) {
+    const topology = buildTopology(); topology.edges.push(edge);
+    assert.match(validateTopology(topology).errors.join('\n'), /exactly one Production Controller opportunity through completed staging/);
+  }
+  const topology = buildTopology(); topology.edges = topology.edges.filter(edge => edge.to !== 'Staging Controller');
+  assert.match(validateTopology(topology).errors.join('\n'), /exactly one Production Controller opportunity through completed staging/);
+});

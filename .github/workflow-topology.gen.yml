@@ -240,7 +240,6 @@ nodes:
       - iOS CI
       - Merge Queue Green Enroll
       - PR Conflict Handler
-      - Production Controller
       - Rolling CI Dispatch
       - Staging Controller
       - Test Flakiness Report
@@ -962,7 +961,7 @@ nodes:
     triggeringStateTransition:
       - workflow_run
     terminalReceipt: job:publish-customer-changelog
-    jobCount: 9
+    jobCount: 10
   - name: Production Marker Recovery
     path: .github/workflows/production-marker-recovery.yml
     active: true
@@ -1222,6 +1221,7 @@ nodes:
     authoritativeProducer: Production Controller
     authoritativeFor: []
     allowedConsumers:
+      - Production Controller
       - Production Release
     triggeringStateTransition:
       - workflow_run
@@ -1407,7 +1407,7 @@ edges:
   - from: PR Size Guard
     to: Merge Queue Green Enroll
     type: workflow_run
-  - from: CI
+  - from: Staging Controller
     to: Production Controller
     type: workflow_run
   - from: Production Controller
