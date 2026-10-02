@@ -1053,7 +1053,8 @@ extension APIClientTests {
       let client = APIClient(baseURL: URL(string: "https://jov.ie")!, session: makeSession(),
                              tokenProvider: provider)
       if succeed {
-        #expect(try await client.fetchMe(for: "a", ifOwnedBy: before.ownership) == .previewReady)
+        let response = try await client.fetchMe(for: "a", ifOwnedBy: before.ownership)
+        #expect(response == .previewReady)
       } else {
         await #expect(throws: APIClientError.requestFailed(statusCode: 401)) {
           try await client.fetchMe(for: "a", ifOwnedBy: before.ownership)
