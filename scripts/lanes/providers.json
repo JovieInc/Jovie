@@ -1,6 +1,7 @@
 {
   "devin": {
     "label": "devin",
+    "tier": 0,
     "model": "swe-2-medium",
     "slots": 4,
     "health": ["devin", "auth", "status"],
@@ -20,6 +21,7 @@
   },
   "codex": {
     "label": "codex",
+    "tier": 1,
     "model": "codex-default",
     "accountClass": "chatgpt-oauth",
     "reasoningEffort": "xhigh",
@@ -42,6 +44,7 @@
   },
   "claude": {
     "label": "claude",
+    "tier": 2,
     "model": "sonnet",
     "slots": 2,
     "health": ["claude", "auth", "status"],
@@ -58,11 +61,32 @@
   },
   "hyperagent": {
     "label": "hyperagent",
+    "tier": 3,
     "model": "z-ai/glm-5.3",
     "slots": 2,
     "health": ["hyperagent", "models", "--json"],
     "healthy": "glm-5\\.3",
     "cmd": ["hyperagent", "--model", "z-ai/glm-5.3", "-p", "{prompt}"],
+    "enabled": false
+  },
+  "grok": {
+    "label": "grok",
+    "tier": 4,
+    "model": "grok-4.7",
+    "slots": 1,
+    "health": ["grok", "models"],
+    "healthy": "logged in",
+    "cmd": ["grok", "-m", "grok-4.7", "--prompt-file", "{prompt_file}"],
+    "enabled": false
+  },
+  "kimi": {
+    "label": "kimi",
+    "tier": 5,
+    "model": "kimi-code/k3",
+    "slots": 1,
+    "health": ["kimi", "provider", "list", "--json"],
+    "healthy": "kimi-code/k3",
+    "cmd": ["kimi", "--model", "kimi-code/k3", "-p", "{prompt}"],
     "enabled": false
   }
 }
