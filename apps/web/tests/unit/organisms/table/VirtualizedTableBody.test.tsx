@@ -30,10 +30,15 @@ vi.mock('@/components/organisms/table/molecules/TableContextMenu', () => ({
 type TestRow = { id: string; name: string };
 
 const createRow = (id: string, name: string): Row<TestRow> =>
+  // The row renderer is mocked, so this fixture supplies only body-used fields.
   ({
     id,
     original: { id, name },
-  }) as Row<TestRow>;
+    getVisibleCells: () => [],
+  }) satisfies Pick<
+    Row<TestRow>,
+    'id' | 'original' | 'getVisibleCells'
+  > as unknown as Row<TestRow>;
 
 const baseProps = {
   shouldEnableKeyboardNav: false,
