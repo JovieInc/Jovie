@@ -42,11 +42,14 @@ type Authority = z.infer<typeof fleetAuthoritySchema>;
 type HelpRequest = z.infer<typeof fleetRequestSchema>;
 export type FleetControlOperation =
   | 'provision'
+  | 'rotate'
   | 'revoke'
   | 'assign'
   | 'accept'
   | 'reject';
 type Credential = {
+  /** Absent only on credentials issued before rotation support. */
+  credentialId?: string;
   digest: string;
   scopes: string[];
   expiresAt: string;
@@ -105,6 +108,8 @@ type FleetState = {
   workers: Record<string, Worker>;
   missions: Record<string, Mission>;
   leases: Record<string, Lease>;
+  /** Private issuance binding, never included in the public lease contract. */
+  leaseCredentials: Record<string, string>;
   receipts: Record<string, TerminalReceipt>;
   invocations: Record<string, InvocationRecord>;
   defects: Record<string, Issue>;
@@ -204,6 +209,7 @@ function empty(): FleetState {
     workers: {},
     missions: {},
     leases: {},
+    leaseCredentials: {},
     receipts: {},
     invocations: {},
     defects: {},
@@ -221,6 +227,7 @@ function state(value: unknown): FleetState {
     throw new FleetError('INTERNAL');
   const result = structuredClone(value as FleetState);
   result.requests ??= {};
+  result.leaseCredentials ??= {};
   return result;
 }
 const acceptSchema = z
@@ -505,13 +512,13 @@ export class FleetDispatcher {
           ? acceptSchema
           : operation === 'reject'
             ? rejectSchema
-            : operation === 'provision'
+            : operation === 'provision' || operation === 'rotate'
               ? provisionSchema
               : revokeSchema
     ).parse(input) as Record<string, unknown>;
     safeText(parsed);
     const token =
-      operation === 'provision'
+      operation === 'provision' || operation === 'rotate'
         ? `jwf.${profileId}.${parsed.workerId}.${randomBytes(32).toString('base64url')}`
         : undefined;
     return this.mutate(profileId, s => {
@@ -524,14 +531,31 @@ export class FleetDispatcher {
         approval.hash !== digest(stable({ profileId, operation, input }))
       )
         throw new FleetError('CONFIRMATION_REQUIRED');
-      if (operation === 'provision') {
+      if (operation === 'provision' || operation === 'rotate') {
         const workerId = parsed.workerId as string;
-        if (s.credentials[workerId]) throw new FleetError('CONFLICT');
+        const previous = s.credentials[workerId];
+        if (operation === 'provision' ? !!previous : !previous)
+          throw new FleetError('CONFLICT');
         const expiry = Date.parse(parsed.expiresAt as string);
         if (expiry <= this.now() || expiry > this.now() + 30 * 24 * 60 * 60_000)
           throw new FleetError('VALIDATION_FAILED');
-        capacity(s.credentials, CAPACITY.workers);
-        const authority = parsed.authority as Authority | undefined;
+        if (operation === 'provision')
+          capacity(s.credentials, CAPACITY.workers);
+        const authority =
+          (parsed.authority as Authority | undefined) ?? previous?.authority;
+        // Rotating credentials cannot relabel another account/runtime as this
+        // stable worker, nor erase an existing identity attestation.
+        if (
+          previous?.authority &&
+          (!authority ||
+            authority.identity.provider !==
+              previous.authority.identity.provider ||
+            authority.identity.accountRef !==
+              previous.authority.identity.accountRef ||
+            authority.identity.runtimeRef !==
+              previous.authority.identity.runtimeRef)
+        )
+          throw new FleetError('FORBIDDEN');
         if (authority) {
           evidenceSafe([
             {
@@ -540,8 +564,9 @@ export class FleetDispatcher {
             },
           ]);
           if (
-            Object.values(s.credentials).some(
-              c =>
+            Object.entries(s.credentials).some(
+              ([id, c]) =>
+                id !== workerId &&
                 liveCredential(c, this.now()) &&
                 c.authority &&
                 c.authority.identity.provider === authority.identity.provider &&
@@ -554,11 +579,28 @@ export class FleetDispatcher {
             throw new FleetError('CONFLICT');
         }
         s.credentials[workerId] = {
+          credentialId: randomUUID(),
           digest: digest(token!),
           scopes: parsed.scopes as string[],
           expiresAt: parsed.expiresAt as string,
           ...(authority ? { authority } : {}),
         };
+        if (operation === 'rotate') {
+          const worker = s.workers[workerId];
+          if (worker) {
+            worker.scopes = parsed.scopes as Worker['scopes'];
+            worker.authority = authority;
+            worker.capabilities = [];
+            worker.tools = [];
+            worker.connectors = [];
+            worker.availability = 'offline';
+            worker.revoked = false;
+            worker.updatedAt = iso(this.now());
+          }
+          for (const lease of Object.values(s.leases))
+            if (lease.workerId === workerId && lease.state !== 'reported')
+              lease.expiresAt = iso(this.now());
+        }
       } else if (operation === 'revoke') {
         const credential = s.credentials[parsed.workerId as string];
         if (!credential) throw new FleetError('FORBIDDEN');
@@ -615,7 +657,7 @@ export class FleetDispatcher {
           s.requests[mission.missionId].state = 'accepted';
       }
       approval.consumed = true;
-      return operation === 'provision'
+      return operation === 'provision' || operation === 'rotate'
         ? {
             workerId: parsed.workerId,
             scopes: parsed.scopes,
@@ -680,8 +722,11 @@ export class FleetDispatcher {
       const result = await this.mutate(profileId, s => {
         operation = undefined;
         const workerId = authenticate(s, token, profileId, scope, this.now());
+        const credentialId = s.credentials[workerId].credentialId;
+        // Preserve legacy replay IDs, but isolate every new credential issuance.
+        // A narrowed credential must never inherit earlier successful responses.
         const invocationId = digest(
-          `${profileId}:${workerId}:${id}:${envelope.idempotencyKey}`
+          `${profileId}:${workerId}:${id}:${envelope.idempotencyKey}${credentialId ? `:${credentialId}` : ''}`
         );
         const replay = s.invocations[invocationId];
         if (replay) {
@@ -883,12 +928,18 @@ export class FleetDispatcher {
                 };
                 capacity(s.leases, CAPACITY.receipts);
                 s.leases[lease.leaseId] = lease;
+                if (credentialId)
+                  s.leaseCredentials[lease.leaseId] = credentialId;
                 data = { lease };
               }
             }
           } else {
             const lease = s.leases[input.leaseId as string];
-            if (!lease || lease.workerId !== workerId)
+            if (
+              !lease ||
+              lease.workerId !== workerId ||
+              s.leaseCredentials[lease.leaseId] !== credentialId
+            )
               throw new FleetError('FORBIDDEN');
             if (id === 'work.claim') {
               if (lease.state === 'reported' || !active(lease, this.now()))

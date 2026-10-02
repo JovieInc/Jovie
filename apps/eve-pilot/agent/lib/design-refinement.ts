@@ -386,6 +386,7 @@ function calibrationFor(
   const actual: RouteActualOutcome = {
     routeId: route.selectedRoute.id,
     workloadClass: route.fullyLoadedCost.workloadClass,
+    riskTier: route.riskTier,
     observedAt: outcome.observedAt,
     sourceRef: outcome.sourceRef,
     laneOccupancyMinutes: outcome.laneOccupancyMinutes,

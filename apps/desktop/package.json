@@ -24,7 +24,7 @@
     "test:desktop-renderer-recovery": "vitest run --config vitest.config.mts scripts/renderer-recovery.test.ts",
     "test:desktop-remote-debugging-guard": "vitest run --config vitest.config.mts scripts/remote-debugging-guard.test.ts",
     "test:desktop-hud-build-reload": "vitest run --config vitest.config.mts scripts/hud-build-reload.test.ts scripts/session-work-state.test.ts",
-    "test:desktop-auto-update": "vitest run --config vitest.config.mts scripts/desktop-auto-update.test.ts",
+    "test:desktop-auto-update": "vitest run --config vitest.config.mts scripts/desktop-auto-update.test.ts scripts/startup-maintenance.test.ts",
     "test:desktop-csp-watchdog": "vitest run --config vitest.config.mts scripts/desktop-csp-watchdog.test.ts",
     "test:desktop-auth-security": "vitest run --config vitest.config.mts scripts/desktop-auth-security.test.ts",
     "test:desktop-auth-browser-route": "vitest run --config vitest.config.mts scripts/desktop-auth-browser-route.test.ts",

@@ -80,6 +80,7 @@ function buildMonthFixture(
           capabilities: [],
           surfaces: [],
           availability: 'ga',
+          action: null,
           media: null,
           technicalVersion: `${year}.${month}.0`,
           explanation: `Fixture outcome ${index + 1}.`,
