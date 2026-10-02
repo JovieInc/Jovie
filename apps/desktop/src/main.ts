@@ -1612,6 +1612,11 @@ async function persistDesktopBuildIdentityEvidence(): Promise<void> {
 }
 
 function showDesktopAboutWindow(): void {
+  if (process.platform === 'darwin') {
+    app.showAboutPanel();
+    return;
+  }
+
   if (aboutWindow && !aboutWindow.isDestroyed()) {
     showWindow(aboutWindow);
     return;

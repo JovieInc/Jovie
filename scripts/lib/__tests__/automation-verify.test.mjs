@@ -26,6 +26,153 @@ import {
 } from '../../run-affected-tests.mjs';
 
 describe('affected-test selector inventory', () => {
+  const certificationSource = 'apps/web/lib/ovie/certifications/normalize.ts';
+  const certificationTests = [
+    'apps/web/lib/ovie/certifications/normalize.test.ts',
+    'apps/web/lib/ovie/certifications/inventory.server.test.ts',
+    'apps/web/components/features/admin/certifications/CertificationDetailRail.test.tsx',
+  ];
+  const certificationComponentGuards = [
+    'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+    'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
+  ];
+  const certificationVirtualizerGuard =
+    'apps/web/tests/unit/virtualization/virtualizer-compiler-optout.test.ts';
+
+  it.each([
+    [certificationSource],
+    [certificationSource, certificationTests[0]],
+  ])(
+    'selects normalization and its inventory/rail consumers for %j',
+    (...files) => {
+      const plan = buildAffectedTestPlan(files);
+      expect(plan.mode).toBe('selected');
+      expect(plan.selectedTests).toEqual(certificationTests);
+      expect(buildSelectedTestCommands(plan, '2')).toEqual([
+        [
+          'pnpm',
+          [
+            '--filter',
+            '@jovie/web',
+            'exec',
+            'vitest',
+            'run',
+            ...certificationTests.map(file => file.replace(/^apps\/web\//, '')),
+            '--passWithNoTests',
+            '--maxWorkers',
+            '2',
+          ],
+        ],
+      ]);
+    }
+  );
+
+  it.each([
+    [certificationSource, certificationTests[2]],
+    [certificationSource, ...certificationTests],
+  ])('retains common component guards for %j', (...files) => {
+    const plan = buildAffectedTestPlan(files);
+    const expected = [...certificationTests, ...certificationComponentGuards];
+    expect(plan.mode).toBe('selected');
+    expect(plan.mandatoryTests).toEqual(expected);
+    expect(plan.selectedTests).toEqual(expected);
+    expect(buildSelectedTestCommands(plan, '2')[0][1]).toEqual([
+      '--filter',
+      '@jovie/web',
+      'exec',
+      'vitest',
+      'run',
+      ...expected.map(file => file.replace(/^apps\/web\//, '')),
+      '--passWithNoTests',
+      '--maxWorkers',
+      '2',
+    ]);
+  });
+
+  it.each([certificationSource, ...certificationTests])(
+    'retains the content-based virtualizer guard for %s',
+    virtualizedFile => {
+      const plan = buildAffectedTestPlan(
+        [certificationSource, virtualizedFile],
+        {
+          isFileAvailable: () => true,
+          readFile: file =>
+            file === virtualizedFile
+              ? 'const v = useVirtualizer({ count });'
+              : '',
+        }
+      );
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toContain(certificationVirtualizerGuard);
+      expect(plan.selectedTests).toContain(certificationVirtualizerGuard);
+    }
+  );
+
+  it.each([...certificationComponentGuards, certificationVirtualizerGuard])(
+    'fails closed when a triggered certification guard is missing: %s',
+    missing => {
+      const plan = buildAffectedTestPlan(
+        [certificationSource, certificationTests[2]],
+        {
+          isFileAvailable: file => file !== missing,
+          readFile: () => 'const v = useVirtualizer({ count });',
+        }
+      );
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toMatch(/proof.*unavailable/);
+    }
+  );
+
+  it.each([certificationSource, ...certificationTests])(
+    'keeps full verification when normalization proof is missing: %s',
+    missing => {
+      expect(
+        buildAffectedTestPlan([certificationSource], {
+          isFileAvailable: file => file !== missing,
+        }).mode
+      ).toBe('full');
+    }
+  );
+
+  it.each([
+    'apps/web/lib/unknown.ts',
+    'apps/web/components/atoms/Button.tsx',
+    'scripts/run-affected-tests.mjs',
+  ])('keeps mixed normalization changes fail-closed: %s', peer => {
+    expect(
+      buildAffectedTestPlan([certificationSource, certificationTests[0], peer])
+        .mode
+    ).toBe('full');
+  });
+
+  it('maps the Decisions benchmark fixture to the complete capability lane', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/capability-benchmark/decision-routing-benchmark.json',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+    expect(plan.nodeTests).toEqual([
+      'scripts/capability-benchmark/capability-benchmark.test.mjs',
+      'scripts/capability-benchmark/computer-use-decision.test.mjs',
+      'scripts/capability-benchmark/capability-reconciliation.test.mjs',
+    ]);
+  });
+
+  it('fails closed when a capability benchmark change has an unknown peer', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/capability-benchmark/decision-routing-benchmark.json',
+      'scripts/lib/unknown-capability-peer.mjs',
+    ]);
+
+    expect(plan.mode).toBe('full');
+    expect(plan.fallbackReason).toBe(
+      'Capability benchmark change exceeds its focused lane'
+    );
+  });
+
   it('enforces real merge-sync writer coverage in its existing focused CI selector', () => {
     const plan = buildAffectedTestPlan([
       'scripts/lib/linear-sync-on-merge.mjs',

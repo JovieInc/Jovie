@@ -51,18 +51,18 @@ describe('factory:run --dry end to end', () => {
     expect(manifest).toMatchObject({ status: 'complete', stoppedAt: null });
     expect(manifest.chain.map(link => link.stage)).toEqual([...FACTORY_STAGES]);
     expect(verifyFactoryRun(runDir())).toEqual([]);
-    expect(record('11-asset.attempt-1.json').artifact).toMatchObject({
+    expect(record('12-asset.attempt-1.json').artifact).toMatchObject({
       assets: [
         { id: 'capture:public-profile-desktop', mime: 'image/png' },
         { id: 'capture:tim-white-profile-subscribe-mobile' },
       ],
     });
-    expect(record('13-seo-agent.attempt-1.json').notes).toEqual({
+    expect(record('14-seo-agent.attempt-1.json').notes).toEqual({
       deferredToRamp: ['geo:geo-orphan'],
     });
-    const trust = record('14-adversarial-trust.attempt-1.json').receipt;
+    const trust = record('15-adversarial-trust.attempt-1.json').receipt;
     expect(new Set(trust.evaluators.map(e => e.family)).size).toBe(2);
-    expect(record('15-publish.attempt-1.json').artifact).toMatchObject({
+    expect(record('16-publish.attempt-1.json').artifact).toMatchObject({
       rampState: 'shadow',
     });
     const pageRecord = PageRecordSchema.parse(
@@ -126,7 +126,7 @@ describe('factory:run --dry end to end', () => {
     });
 
     expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'render' });
-    expect(record('12-render.attempt-2.json').feedbackIn.join('; ')).toContain(
+    expect(record('13-render.attempt-2.json').feedbackIn.join('; ')).toContain(
       'no solutions renderer for not-a-section'
     );
   });
@@ -141,7 +141,7 @@ describe('factory:run --dry end to end', () => {
 
     expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'render' });
     expect(
-      record('12-render.attempt-1.json').receipt.invariantsFailed
+      record('13-render.attempt-1.json').receipt.invariantsFailed
     ).toContain('page-record-schema');
   });
 
@@ -155,7 +155,7 @@ describe('factory:run --dry end to end', () => {
 
   it('catches a tampered artifact in a real run', async () => {
     await run();
-    const path = join(runDir(), '04-copy.attempt-1.json');
+    const path = join(runDir(), '05-copy.attempt-1.json');
     const tampered = readJson<StageAttemptRecord>(path);
     writeJson(path, {
       ...tampered,
@@ -210,7 +210,7 @@ describe('page stage gates', () => {
 
     expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'asset' });
     expect(generated).toBe(0);
-    expect(record('11-asset.attempt-1.json').receipt.invariantsFailed).toEqual([
+    expect(record('12-asset.attempt-1.json').receipt.invariantsFailed).toEqual([
       'asset-provenance:photo:founder-portrait',
     ]);
   });
@@ -246,7 +246,7 @@ describe('page stage gates', () => {
       status: 'failed',
       stoppedAt: 'adversarial-trust',
     });
-    expect(record('14-adversarial-trust.attempt-2.json').feedbackIn).toContain(
+    expect(record('15-adversarial-trust.attempt-2.json').feedbackIn).toContain(
       'no-unsupported-claims'
     );
   });
@@ -290,7 +290,7 @@ describe('page stage gates', () => {
     });
 
     expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'render' });
-    expect(record('12-render.attempt-1.json').receipt.invariantsFailed).toEqual(
+    expect(record('13-render.attempt-1.json').receipt.invariantsFailed).toEqual(
       [
         'render-cls:mobile',
         'render-lcp:mobile',
@@ -315,7 +315,7 @@ describe('page stage gates', () => {
       stoppedAt: 'adversarial-trust',
     });
     expect(
-      record('14-adversarial-trust.attempt-1.json').notes.tasteReceipts
+      record('15-adversarial-trust.attempt-1.json').notes.tasteReceipts
     ).toMatchObject([{ gateId: 'responsive-accessibility', verdict: 'pass' }]);
   });
 
@@ -356,10 +356,10 @@ describe('page stage gates', () => {
       stoppedAt: 'adversarial-trust',
     });
     expect(
-      record('14-adversarial-trust.attempt-1.json').receipt.invariantsFailed
+      record('15-adversarial-trust.attempt-1.json').receipt.invariantsFailed
     ).toContain('visual-taste-admission');
     expect(
-      record('14-adversarial-trust.attempt-2.json').feedbackIn.join(' ')
+      record('15-adversarial-trust.attempt-2.json').feedbackIn.join(' ')
     ).toMatch(/same-family-judge/);
   });
 
