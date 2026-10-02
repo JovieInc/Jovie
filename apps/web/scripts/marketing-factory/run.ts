@@ -43,6 +43,7 @@ import {
   FACTORY_RUNS_DIR,
   type FactoryRunManifest,
   FactoryRunManifestSchema,
+  factoryStageSourceDigest,
   readJson,
   type StageAttemptRecord,
   stageInputDigest,
@@ -237,7 +238,8 @@ export async function runFactory(
     }
     const inputDigest = stageInputDigest(
       briefDigest,
-      manifest.chain.map(link => link.outputDigest)
+      manifest.chain.map(link => link.outputDigest),
+      factoryStageSourceDigest(stage, brief)
     );
     let feedback: readonly string[] = [];
     let passed = false;
