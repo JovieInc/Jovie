@@ -3765,9 +3765,10 @@ describe('merge-queue green enroll scan window (JOV-6831)', () => {
   );
 
   it('pages through every open PR instead of one oldest-first window', () => {
-    expect(ENROLL).toContain('after: $cursor');
-    expect(ENROLL).toContain('pageInfo { hasNextPage endCursor }');
-    expect(ENROLL).toContain('} while (cursor);');
+    expect(ENROLL).toContain('github.paginate(github.rest.pulls.list');
+    expect(ENROLL).toContain("state: 'open', base: 'main', per_page: 100");
+    expect(ENROLL).toContain('pullRequest(number: $number)');
+    expect(ENROLL).not.toContain('pullRequests(');
     expect(ENROLL).not.toMatch(/direction:\s*ASC/);
   });
 

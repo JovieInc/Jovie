@@ -238,6 +238,7 @@ nodes:
       - Agent Pipeline
       - Auto-Ready Agent Drafts
       - iOS CI
+      - Merge Queue Green Enroll
       - PR Conflict Handler
       - Production Controller
       - Rolling CI Dispatch
@@ -466,6 +467,7 @@ nodes:
     allowedConsumers:
       - Auto-Ready Agent Drafts
       - Lane Fix Relay
+      - Merge Queue Green Enroll
     triggeringStateTransition:
       - merge_group
       - pull_request
@@ -713,6 +715,7 @@ nodes:
     triggeringStateTransition:
       - pull_request_target
       - workflow_dispatch
+      - workflow_run
     terminalReceipt: job:enroll
     jobCount: 1
   - name: Merge Queue Ruleset Verify
@@ -890,6 +893,7 @@ nodes:
     allowedConsumers:
       - Auto-Ready Agent Drafts
       - Lane Fix Relay
+      - Merge Queue Green Enroll
     triggeringStateTransition:
       - merge_group
       - pull_request
@@ -1204,7 +1208,9 @@ nodes:
     authoritativeFor:
       - source-validation
     allowedConsumers:
+      - Auto-Ready Agent Drafts
       - Lane Fix Relay
+      - Merge Queue Green Enroll
     triggeringStateTransition:
       - pull_request
     terminalReceipt: job:ready
@@ -1388,6 +1394,18 @@ edges:
     type: workflow_run
   - from: PR Size Guard
     to: Lane Fix Relay
+    type: workflow_run
+  - from: Source Validation
+    to: Merge Queue Green Enroll
+    type: workflow_run
+  - from: CI
+    to: Merge Queue Green Enroll
+    type: workflow_run
+  - from: Fork PR Gate
+    to: Merge Queue Green Enroll
+    type: workflow_run
+  - from: PR Size Guard
+    to: Merge Queue Green Enroll
     type: workflow_run
   - from: CI
     to: Production Controller

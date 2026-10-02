@@ -147,7 +147,10 @@ test('read failures abort without enqueue and a raced mutation does not stop the
 test('wakes both existing controllers on completed Source Validation without a polling schedule', () => {
   assert.ok(workflow.on.workflow_run.workflows.includes('Source Validation'));
   assert.deepEqual(workflow.on.workflow_run.types, ['completed']);
-  assert.ok(workflow.on.pull_request_target.types.includes('ready_for_review'));
+  assert.deepEqual(workflow.on.pull_request_target.types, [
+    'unlabeled',
+    'reopened',
+  ]);
   assert.equal(workflow.on.schedule, undefined);
   assert.match(workflow.jobs.enroll.if, /conclusion == 'success'/);
   const ready = load(

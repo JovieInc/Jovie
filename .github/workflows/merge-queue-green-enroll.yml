@@ -21,7 +21,7 @@ on:
     workflows: ['Source Validation', 'CI', 'Fork PR Gate', 'PR Size Guard']
     types: [completed]
   pull_request_target:
-    types: [unlabeled, ready_for_review, reopened]
+    types: [unlabeled, reopened]
   workflow_dispatch:
     inputs:
       dry_run:
