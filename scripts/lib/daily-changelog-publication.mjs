@@ -17,15 +17,20 @@ const OUTCOME_KEY_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ENTRY_ID_RE = /^customer-update:[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const FRAGMENT_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SECTIONS = new Set(['Added', 'Changed', 'Fixed', 'Removed']);
-const permalinkMigrations = JSON.parse(
-  readFileSync(
-    new URL(
-      '../../apps/web/data/customer-changelog-permalink-migrations.json',
-      import.meta.url
-    ),
-    'utf8'
-  )
-);
+let permalinkMigrations;
+
+function readPermalinkMigrations() {
+  permalinkMigrations ??= JSON.parse(
+    readFileSync(
+      new URL(
+        '../../apps/web/data/customer-changelog-permalink-migrations.json',
+        import.meta.url
+      ),
+      'utf8'
+    )
+  );
+  return permalinkMigrations;
+}
 
 function customerStoryIdentity(outcomeKey) {
   return {
@@ -53,7 +58,7 @@ function persistedStoryIdentity(releaseKey, story) {
       aliases: [...story.aliases],
     };
   }
-  const migration = permalinkMigrations.entries?.find(
+  const migration = readPermalinkMigrations().entries?.find(
     candidate =>
       candidate.releaseKey === releaseKey && candidate.storyId === story?.id
   );
