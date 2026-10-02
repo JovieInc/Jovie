@@ -9,7 +9,6 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PixelsSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { useSaveStatus } from '@/features/dashboard/hooks/useSaveStatus';
@@ -65,12 +64,20 @@ function PlatformSection({
   health,
 }: PlatformSectionProps) {
   const [showToken, setShowToken] = useState(false);
+  const headingId = `${platformKey}-pixel-heading`;
+  const tokenVisibilityLabel = `${showToken ? 'Hide' : 'Show'} ${platform} ${tokenLabel.toLowerCase()}`;
 
   return (
-    <ContentSurfaceCard className='space-y-4 bg-surface-0 p-4'>
+    <fieldset
+      aria-labelledby={headingId}
+      className='min-w-0 space-y-4 border-t border-subtle pt-5'
+    >
       <div className='flex flex-col items-start justify-between gap-3 sm:flex-row'>
         <div className='min-w-0'>
-          <h4 className='text-app font-caption text-primary-token'>
+          <h4
+            id={headingId}
+            className='text-app font-caption text-primary-token'
+          >
             {platform}
           </h4>
           <p className='mt-1 text-app leading-[18px] text-secondary-token'>
@@ -78,7 +85,7 @@ function PlatformSection({
           </p>
         </div>
         <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0 sm:justify-end'>
-          <Badge variant='outline'>
+          <Badge variant='outline' size='sm'>
             {isConfigured ? 'Configured' : 'Not configured'}
           </Badge>
           <HealthIndicator health={health} />
@@ -93,14 +100,14 @@ function PlatformSection({
         className='inline-flex items-center gap-1.5 text-xs font-caption text-secondary-token transition-colors hover:text-primary-token'
       >
         {helpText}
-        <ExternalLink className='h-3.5 w-3.5' />
+        <ExternalLink className='h-3.5 w-3.5' aria-hidden='true' />
       </a>
 
       <div className='grid gap-4 sm:grid-cols-2'>
         <div>
           <label
             htmlFor={pixelIdName}
-            className='mb-2 block text-2xs font-caption text-tertiary-token'
+            className='mb-2 block text-2xs font-caption text-secondary-token'
           >
             {pixelIdLabel}
           </label>
@@ -118,7 +125,7 @@ function PlatformSection({
         <div>
           <label
             htmlFor={tokenName}
-            className='mb-2 block text-2xs font-caption text-tertiary-token'
+            className='mb-2 block text-2xs font-caption text-secondary-token'
           >
             {tokenLabel}
           </label>
@@ -136,7 +143,9 @@ function PlatformSection({
               type='button'
               onClick={() => setShowToken(!showToken)}
               className='absolute inset-y-0 right-0 flex items-center pr-3 text-tertiary-token transition-colors hover:text-primary-token'
-              aria-label={showToken ? 'Hide token' : 'Show token'}
+              aria-label={tokenVisibilityLabel}
+              aria-pressed={showToken}
+              aria-controls={tokenName}
             >
               {showToken ? (
                 <EyeOff className='h-4 w-4' />
@@ -147,7 +156,7 @@ function PlatformSection({
           </div>
         </div>
       </div>
-    </ContentSurfaceCard>
+    </fieldset>
   );
 }
 
@@ -459,7 +468,7 @@ export function SettingsAdPixelsSection({
       <SettingsPanel
         title='Pixel tracking'
         description={PIXEL_TRACKING_DESCRIPTION}
-        bodyClassName='space-y-3 px-4 py-4 sm:px-5'
+        bodyClassName='space-y-5 px-4 py-4 sm:px-5'
       >
         <SettingsToggleRow
           title='Enable pixel tracking'
@@ -469,20 +478,16 @@ export function SettingsAdPixelsSection({
           ariaLabel='Enable pixel tracking'
         />
 
-        <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
-          <p className='text-app leading-[18px] text-secondary-token'>
-            Configure each retargeting destination independently.
-          </p>
-        </ContentSurfaceCard>
+        <p className='text-app leading-[18px] text-secondary-token'>
+          Configure each retargeting destination independently.
+        </p>
 
         {healthData && healthData.aggregate.totalEventsThisWeek > 0 && (
-          <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
-            <p className='text-app font-caption leading-[18px] text-primary-token'>
-              {healthData.aggregate.totalEventsThisWeek.toLocaleString()} events
-              forwarded this week &middot;{' '}
-              {healthData.aggregate.overallSuccessRate}% success rate
-            </p>
-          </ContentSurfaceCard>
+          <p className='text-app font-caption leading-[18px] text-primary-token'>
+            {healthData.aggregate.totalEventsThisWeek.toLocaleString()} events
+            forwarded this week &middot;{' '}
+            {healthData.aggregate.overallSuccessRate}% success rate
+          </p>
         )}
 
         <PlatformSection
@@ -564,13 +569,10 @@ export function SettingsAdPixelsSection({
           onTokenChange={value => handleInputChange('tiktokAccessToken', value)}
         />
 
-        <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
-          <p className='text-app leading-[18px] text-secondary-token'>
-            Events are sent server-side for better accuracy. No third-party
-            JavaScript is injected on your profile, and credentials are
-            encrypted.
-          </p>
-        </ContentSurfaceCard>
+        <p className='text-xs leading-relaxed text-secondary-token'>
+          Events are sent server-side for better accuracy. No third-party
+          JavaScript is injected on your profile, and credentials are encrypted.
+        </p>
       </SettingsPanel>
 
       <div className='flex items-center justify-end gap-3 pt-2'>
