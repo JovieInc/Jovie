@@ -131,6 +131,7 @@
 		CCA8CB157DC140048C2D28B9 /* MobileAuthCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA18C2D747C4D929F25DF70 /* MobileAuthCoordinator.swift */; };
 		FA8D45F4123178BDD33F82C5 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D156B3220339CAB0DBE1DD /* SplashView.swift */; };
 		FDD930D67ACF374B16E87FDE /* MeRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 191669F70597A1039C74C0B1 /* MeRepositoryTests.swift */; };
+		10CDA6A50000000000000001 /* MobileHomeDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10CDA6A50000000000000002 /* MobileHomeDataStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -278,6 +279,7 @@
 		EDFB0D6D1DA6A287207AC1A6 /* AuthScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthScreen.swift; sourceTree = "<group>"; };
 		BCA18C2D747C4D929F25DF70 /* MobileAuthCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileAuthCoordinator.swift; sourceTree = "<group>"; };
 		F4562819B40056163650929C /* JovieAppIntentsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieAppIntentsTests.swift; sourceTree = "<group>"; };
+		10CDA6A50000000000000002 /* MobileHomeDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHomeDataStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -545,6 +547,7 @@
 				A0J0V36380000000000000003 /* MobileAudienceHighlightsResponse.swift */,
 				A0GH12706000000000000001 /* MobileActionLoopInboxResponse.swift */,
 				A0GH12706000000000000003 /* MobileActionLoopCalendarResponse.swift */,
+				10CDA6A50000000000000002 /* MobileHomeDataStore.swift */,
 				A0B10F00000000000000000B /* Observability */,
 				44B3D151E21A49C2876932A8 /* NativeSessionTokenStore.swift */,
 				A0J0V26350000000000000001 /* MobileAuthFinalization.swift */,
@@ -875,6 +878,7 @@
 				A0J0V36380000000000000004 /* MobileAudienceHighlightsResponse.swift in Sources */,
 				A0GH12706000000000000002 /* MobileActionLoopInboxResponse.swift in Sources */,
 				A0GH12706000000000000004 /* MobileActionLoopCalendarResponse.swift in Sources */,
+				10CDA6A50000000000000001 /* MobileHomeDataStore.swift in Sources */,
 				DA0F3A9E1C4B4B149B7D4C21 /* NativeSessionTokenStore.swift in Sources */,
 				A0J0V26350000000000000002 /* MobileAuthFinalization.swift in Sources */,
 				ADC14533827EFD888D1ED50F /* QRCodeRenderer.swift in Sources */,

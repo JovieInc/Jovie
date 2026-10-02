@@ -1,8 +1,8 @@
 /**
  * Chat empty-state greeting + insight (JOV-7150). Replaces the "Just ask"
  * heading and chip/suggestion state with one personal sentence: a
- * time-of-day greeting by first name, plus a real insight sentence when one
- * exists. Never fabricates a number — the insight is either a real, active
+ * real insight sentence when one exists, otherwise a time-of-day greeting
+ * by first name. Never fabricates a number — the insight is either a real, active
  * `/api/insights/summary` entry or a real profile-completeness signal, or
  * omitted entirely.
  */

@@ -37,6 +37,7 @@ vi.mock('@/lib/desktop/electron-bridge', () => ({
   useIsElectronRuntime: () => false,
 }));
 vi.mock('@/lib/tracking/navigation-telemetry', () => ({
+  NAVIGATION_DROP_OFF_MS: 10_000,
   navigationInputMethodFromClick: (detail: number) =>
     detail === 0 ? 'keyboard' : 'pointer',
   startNavigationTelemetry: (...args: unknown[]) =>

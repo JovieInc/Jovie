@@ -10,13 +10,17 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { publishCoverageReport } from './lib/publish-coverage-report.mjs';
+import { load } from 'js-yaml';
+import {
+  publishCoverageReport,
+  publishNightlyReport,
+} from './lib/publish-coverage-report.mjs';
 
 const heatmap = 'docs/TEST_COVERAGE_HEATMAP.md';
 const snapshot = 'apps/web/reports/test-coverage-snapshot.json';
 const url = 'https://github.com/JovieInc/Jovie/pull/123';
 
-function fixture(t) {
+function fixture(t, nightly = false) {
   const root = mkdtempSync(join(tmpdir(), 'coverage-publication-test-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const cwd = join(root, 'checkout');
@@ -32,6 +36,17 @@ function fixture(t) {
   mkdirSync(join(cwd, 'apps/web/reports'), { recursive: true });
   writeFileSync(join(cwd, heatmap), 'before\n');
   writeFileSync(join(cwd, snapshot), '{}\n');
+  if (nightly) {
+    mkdirSync(join(cwd, 'apps/web/reports/nightly-agent'), { recursive: true });
+    writeFileSync(
+      join(cwd, 'docs/NIGHTLY_TESTING_AGENT_REPORT.md'),
+      'before\n'
+    );
+    writeFileSync(
+      join(cwd, 'apps/web/reports/nightly-agent/last-run.json'),
+      '{}\n'
+    );
+  }
   writeFileSync(join(cwd, 'source.txt'), 'measured\n');
   git('add', '.');
   git('commit', '--quiet', '-m', 'initial');
@@ -101,6 +116,96 @@ test('publishes only measured reports on an exact-source draft branch while main
   assert.match(readFileSync(f.env.GITHUB_STEP_SUMMARY, 'utf8'), /pull\/123/);
   for (const line of f.git('log', '-1', '--format=%B').split('\n'))
     assert.ok(line.length <= 100);
+});
+
+test('nightly evidence uses the existing exact-source draft publication with protected main', t => {
+  const f = fixture(t, true);
+  const report = 'docs/NIGHTLY_TESTING_AGENT_REPORT.md';
+  const lastRun = 'apps/web/reports/nightly-agent/last-run.json';
+  writeFileSync(join(f.cwd, report), 'Nightly workflow: failure\n');
+  writeFileSync(join(f.cwd, lastRun), '{"status":"fail"}\n');
+  const result = publishNightlyReport(f);
+  assert.equal(result.status, 'published');
+  assert.equal(result.branch, 'bot/nightly-evidence-12345-1');
+  assert.equal(f.git('rev-parse', 'HEAD^'), f.source);
+  assert.equal(f.git('rev-parse', 'origin/main'), f.source);
+  assert.equal(
+    f.git('rev-parse', `origin/${result.branch}`),
+    f.git('rev-parse', 'HEAD')
+  );
+  assert.deepEqual(
+    f
+      .git('diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD')
+      .split('\n'),
+    [lastRun, report]
+  );
+  assert.equal(f.git('show', `HEAD:${lastRun}`), '{"status":"fail"}');
+  const pr = f.calls.find(args => args[0] === 'pr');
+  assert.equal(
+    pr[pr.indexOf('--title') + 1],
+    'chore(testing): refresh nightly testing evidence'
+  );
+});
+
+test('nightly publication skips unchanged evidence and rejects unrelated coverage output', t => {
+  const f = fixture(t, true);
+  assert.equal(publishNightlyReport(f).status, 'unchanged');
+  f.change();
+  assert.throws(() => publishNightlyReport(f), /unrelated/);
+  assert.deepEqual(f.calls, []);
+});
+
+test('the actual nightly publication step succeeds with main protected', t => {
+  const f = fixture(t, true);
+  f.git('branch', '--set-upstream-to=origin/main');
+  writeFileSync(
+    join(f.cwd, 'docs/NIGHTLY_TESTING_AGENT_REPORT.md'),
+    'Nightly failed; evidence retained\n'
+  );
+  mkdirSync(join(f.cwd, 'scripts/lib'), { recursive: true });
+  writeFileSync(
+    join(f.cwd, 'scripts/lib/publish-coverage-report.mjs'),
+    readFileSync(new URL('./lib/publish-coverage-report.mjs', import.meta.url))
+  );
+  const bin = join(f.root, 'bin');
+  mkdirSync(bin);
+  writeFileSync(
+    join(bin, 'gh'),
+    `#!/bin/sh\nif [ "$1" = pr ]; then echo '${url}'; fi\n`,
+    { mode: 0o755 }
+  );
+  const workflow =
+    /** @type {{ jobs: { report: { steps: {name?: string, run?: string}[] } } }} */ (
+      load(
+        readFileSync(
+          new URL(
+            '../.github/workflows/nightly-testing-agent.yml',
+            import.meta.url
+          ),
+          'utf8'
+        )
+      )
+    );
+  const step = workflow.jobs.report.steps.find(
+    candidate =>
+      candidate.name === 'Commit evidence report when changed' ||
+      candidate.name === 'Open nightly evidence PR'
+  );
+  execFileSync('bash', ['-e', '-c', step.run], {
+    cwd: f.cwd,
+    env: {
+      ...f.env,
+      GH_TOKEN: 'synthetic-local-only',
+      PATH: `${bin}:${process.env.PATH}`,
+    },
+    encoding: 'utf8',
+  });
+  assert.equal(f.git('rev-parse', 'origin/main'), f.source);
+  assert.equal(f.git('rev-parse', 'HEAD^'), f.source);
+  assert.equal(
+    f.git('branch', '--show-current'),
+    'bot/nightly-evidence-12345-1'
+  );
 });
 
 test('does not mint git credentials or create a PR when the report is unchanged', t => {

@@ -961,8 +961,8 @@ nodes:
       - Production Release
     triggeringStateTransition:
       - workflow_run
-    terminalReceipt: job:production-verified
-    jobCount: 8
+    terminalReceipt: job:publish-customer-changelog
+    jobCount: 9
   - name: Production Marker Recovery
     path: .github/workflows/production-marker-recovery.yml
     active: true

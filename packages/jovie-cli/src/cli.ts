@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { readFileSync, realpathSync } from 'node:fs';
+import { setGlobalProxyFromEnv } from 'node:http';
 import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -358,7 +359,24 @@ const isMain =
     realpathSync(resolve(process.argv[1]));
 
 if (isMain) {
-  runCli(process.argv.slice(2)).then(code => {
-    process.exitCode = code;
-  });
+  const argv = process.argv.slice(2);
+  try {
+    // Only the standalone process owns its global transport configuration.
+    // Node also applies NO_PROXY and keeps the configured TLS trust intact.
+    setGlobalProxyFromEnv();
+    runCli(argv).then(code => {
+      process.exitCode = code;
+    });
+  } catch {
+    // Proxy parser errors can include the URL, including its credentials.
+    const error = new JovieInputError(
+      'Invalid proxy configuration. Check HTTP_PROXY and HTTPS_PROXY.'
+    );
+    if (argv.includes('--json')) {
+      writeLine(process.stdout, JSON.stringify({ error: errorPayload(error) }));
+    } else {
+      writeLine(process.stderr, error.message);
+    }
+    process.exitCode = 2;
+  }
 }

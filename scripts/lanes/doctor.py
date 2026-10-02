@@ -76,7 +76,7 @@ def host_capacity(host, lane) -> dict:
     return capacity
 
 
-def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int]:
+def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, dict, dict]:
     """Apply the worker predicate instead of treating label inventory as runnable."""
     linear = lane.Linear(host.linear_env)
     failures = read_json(host.state / "failures.json", {})
@@ -84,15 +84,21 @@ def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int]:
     in_flight = lane.in_flight_issues()
     if in_flight is None:
         raise RuntimeError("in-flight PR ownership unreadable; runnable pool unknown")
+    in_flight = frozenset(identifier.lower() for identifier in in_flight)
     specs = lane.load_providers()
     candidates = {name: linear.lane_issues(specs[name]["label"])
                   for name, seats in capacity.items() if seats["slots"] > 0}
-    qualified = {
-        name: [issue for issue in candidates.get(name, [])
-               if lane.pick_issue([issue], failures, now=now, in_flight=in_flight, provider=name)]
-        for name in capacity
-    }
-    return qualified, len({issue.identifier for issues in candidates.values() for issue in issues})
+    qualified, rejected = {}, {}
+    for name in capacity:
+        qualified[name], rejected[name] = [], {}
+        for issue in candidates.get(name, []):
+            reason = lane.admission_rejection(issue, failures, now, in_flight, name)
+            if reason is None:
+                qualified[name].append(issue)
+            else:
+                rejected[name][reason] = rejected[name].get(reason, 0) + 1
+    counts = {name: len(candidates.get(name, [])) for name in capacity}
+    return qualified, len({issue.identifier for issues in candidates.values() for issue in issues}), counts, rejected
 
 
 def observe(host, lane, codex, now: float | None = None) -> dict:
@@ -121,7 +127,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         accounts = {"error": str(error)[:80], "accounts": {}, "available": []}
     capacity_by_provider = host_capacity(host, lane)
     try:
-        qualified_by_provider, candidate_pool = qualified_pool(host, lane, capacity_by_provider, now)
+        qualified_by_provider, candidate_pool, candidate_counts, rejected = qualified_pool(host, lane, capacity_by_provider, now)
         pool_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
         qualified_jobs = {name: [issue.identifier for issue in issues]
                           for name, issues in qualified_by_provider.items()}
@@ -129,6 +135,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         linear_error = None
     except Exception as error:
         pool, candidate_pool, pool_by_provider, qualified_jobs, linear_error = None, None, {}, {}, f"{type(error).__name__}: {error}"[:100]
+        candidate_counts, rejected = {}, {}
     github = None
     merged, merged_error = [], None
     try:
@@ -169,6 +176,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "capacityByProvider": capacity_by_provider,
         "codex": accounts, "pool": pool, "candidatePool": candidate_pool, "poolByProvider": pool_by_provider,
         "qualifiedJobsByProvider": qualified_jobs,
+        "candidatePoolByProvider": candidate_counts, "rejectedByProvider": rejected,
         "linearError": linear_error, "githubRemaining": github,
         "merged24h": merged, "mergedAttributionError": merged_error,
         "diskFreePct": round(100 * disk.free / disk.total, 1),
@@ -595,6 +603,11 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "lanes": counts, "running": sum(c["running"] for c in counts.values()),
             "idle": sum(max(0, c["slots"] - c["running"]) for c in counts.values()),
             "pool": obs.get("pool"), "candidatePool": obs.get("candidatePool"), "lastLandingAgeS": obs.get("lastLandingAge"),
+            "admission": {"pool": obs.get("pool"), "candidatePool": obs.get("candidatePool"),
+                          "poolByProvider": obs.get("poolByProvider") or {},
+                          "candidatePoolByProvider": obs.get("candidatePoolByProvider") or {},
+                          "rejectedByProvider": obs.get("rejectedByProvider") or {},
+                          "error": obs.get("linearError")},
             "gateWaits24h": obs.get("gateWaits24h"),
             "gateWaitMedianS24h": obs.get("gateWaitMedianS24h"),
             "gateWaitMaxS24h": obs.get("gateWaitMaxS24h"),

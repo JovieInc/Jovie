@@ -1150,8 +1150,23 @@ export async function measureWarmNavigationRoute(
   const routeReadyPromise = waitForExpectedUrl(page, expectedPaths);
   await visibleTrigger.click({ noWaitAfter: true });
 
+  let warmShellResponse: number;
+  if (route.measureMode === 'warm-navigation') {
+    // The authenticated shell keeps the source route mounted until the
+    // destination commits, so the perceived response is the nav control's
+    // paint-only pending acknowledgment — not the URL commit, which also
+    // waits on the destination payload. The nav holds
+    // data-navigation-pending for a minimum visible window so this probe
+    // observes the acknowledgment even when a prefetched transition commits
+    // almost immediately.
+    await waitForAnyVisible(page, ['[data-navigation-pending="true"]']);
+    warmShellResponse = await readWarmNavigationElapsed(page);
+  } else {
+    await routeReadyPromise;
+    warmShellResponse = await readWarmNavigationElapsed(page);
+  }
+
   await routeReadyPromise;
-  const warmShellResponse = await readWarmNavigationElapsed(page);
   const shouldMeasureDestinationContent =
     hasTimingBudget(route, 'skeleton-to-content') ||
     (route.measureMode === 'profile-warm-transition' &&

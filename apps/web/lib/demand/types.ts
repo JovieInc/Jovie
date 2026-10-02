@@ -173,6 +173,109 @@ export interface DemandOutcome {
   readonly graphExpansionCount?: number;
 }
 
+// --- Autonomous demand judge (JOV-7421) ------------------------------------
+
+/**
+ * Certified-cone / domain gate status for the surface a cluster touches.
+ * Demand may reorder work inside governor constraints but can never silently
+ * override a 'red' mission-critical cone.
+ */
+export type DemandGateStatus = 'clear' | 'yellow' | 'red';
+
+/**
+ * Strategic context the judge needs that signals alone cannot derive.
+ * All numeric fields are normalized 0..1; cost fields are subtractive.
+ */
+export interface DemandJudgeContext {
+  /** Importance of the underlying job-to-be-done. */
+  readonly jobImportance?: number;
+  /** Graph/network-density leverage of the entity×capability cell. */
+  readonly graphLeverage?: number;
+  /** Proximity to revenue (billing-adjacent jobs score higher). */
+  readonly revenueProximity?: number;
+  /** Reusable-primitive leverage — does this compound shared capability? */
+  readonly primitiveReuse?: number;
+  /** Compounding proprietary-asset value (data, graph, trust). */
+  readonly assetCompounding?: number;
+  /** Implementation cost including integration surface. */
+  readonly implementationCost?: number;
+  /** Ongoing data/provider/maintenance cost. */
+  readonly ongoingCost?: number;
+  /** Risk of fragmenting the roadmap away from the certified cone. */
+  readonly fragmentationRisk?: number;
+  /** Current certified-cone/domain gate status. Default 'clear'. */
+  readonly gateStatus?: DemandGateStatus;
+}
+
+/** One explainable scoring component — evidence, not an opaque score. */
+export interface DemandScoreComponent {
+  readonly dimension: string;
+  /** Normalized 0..1 input value (1 for binary signals that fired). */
+  readonly value: number;
+  /** Points this dimension contributes at value 1 (signed). */
+  readonly weight: number;
+  /** value × weight, rounded. */
+  readonly contribution: number;
+  readonly note: string;
+}
+
+export type DemandConfidence = 'low' | 'medium' | 'high';
+
+export type DemandPriorArtStatus =
+  /** Disposition is routine; prior-art research not required. */
+  | 'not-required'
+  /** Researcher ran and returned a finding. */
+  | 'researched'
+  /** Consequential disposition but no finding was available. */
+  | 'unavailable';
+
+export interface DemandPriorArt {
+  readonly status: DemandPriorArtStatus;
+  /** Closest analogue attempted elsewhere, when known. */
+  readonly closestAnalogue?: string;
+  /** What happened to the analogue when evidence exists. */
+  readonly outcome?: 'persisted' | 'changed' | 'failed' | 'unknown';
+  readonly summary?: string;
+  /**
+   * What differs in Jovie's context vs the analogue. Prior art is evidence,
+   * not authority — this field is required for 'researched' findings.
+   */
+  readonly jovieDifference?: string;
+}
+
+/**
+ * Injectable prior-art researcher. Deterministic judge calls this only for
+ * consequential dispositions; wiring to real research is a later slice.
+ */
+export type DemandPriorArtResearcher = (
+  cluster: DemandCluster
+) => DemandPriorArt | null | undefined;
+
+/** Full judge output for one cluster: recommendation + explainable score. */
+export interface DemandJudgment {
+  readonly clusterKey: string;
+  readonly cluster: DemandCluster;
+  /**
+   * Strategic score after judge context is applied on top of the cluster's
+   * signal-derived score. Reproducible: same inputs → same score.
+   */
+  readonly judgedScore: number;
+  readonly confidence: DemandConfidence;
+  /**
+   * Final disposition after judge overrides (RED cone cap, ambiguous
+   * high-value escalation). May differ from cluster.disposition.
+   */
+  readonly disposition: DemandDisposition;
+  readonly recommendation: DemandRecommendation;
+  /** Explainable per-dimension evidence behind judgedScore. */
+  readonly evidence: readonly DemandScoreComponent[];
+  /** Strongest case against acting now, including judge-level counters. */
+  readonly countercase: string;
+  readonly priorArt: DemandPriorArt;
+  /** Why the judge overrode the cluster disposition, if it did. */
+  readonly overrideReasons: readonly string[];
+}
+
 export interface DemandBacktest {
   readonly clusterKey: string;
   readonly predictedScore: number;
