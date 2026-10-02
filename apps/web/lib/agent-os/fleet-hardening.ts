@@ -11,7 +11,7 @@ function hasUnredactedSecret(argv: readonly string[]): boolean {
   const secretFlag = /^--?(?:api[-_]?key|password|secret|token)$/i;
   return argv.some(
     (arg, index) =>
-      /^(?:bearer\s+\S+|jwf\.|sk-[a-z0-9_-]{16,})/i.test(arg) ||
+      /^(?:bearer\s+\S+|jwf\.|sk-(?:[a-z0-9_]|-){16,})/i.test(arg) ||
       (/^--?(?:api[-_]?key|password|secret|token)=/i.test(arg) &&
         !arg.endsWith('=[redacted]')) ||
       (secretFlag.test(arg) && argv[index + 1] !== '[redacted]')
