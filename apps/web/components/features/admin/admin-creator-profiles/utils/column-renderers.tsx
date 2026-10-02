@@ -12,7 +12,7 @@ import type { CellContext } from '@/lib/tanstack-table';
  */
 export function renderAvatarCell({
   row,
-}: CellContext<AdminCreatorProfileRow, unknown>) {
+}: CellContext<AdminCreatorProfileRow, string>) {
   const profile = row.original;
   const displayName =
     'displayName' in profile ? (profile.displayName ?? null) : null;

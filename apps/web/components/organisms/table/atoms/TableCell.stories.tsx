@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { renderAvatarCell } from '@/components/features/admin/admin-creator-profiles/utils/column-renderers';
 import type { AdminCreatorProfileRow } from '@/lib/admin/types';
-import type { ColumnDef } from '@/lib/tanstack-table';
+import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { UnifiedTable } from '../organisms/UnifiedTable';
 import { TableCell } from './TableCell';
 
@@ -92,9 +92,12 @@ const creator: AdminCreatorProfileRow = {
   activeSinceYear: null,
   lastIngestionError: null,
 };
-const creatorColumns: ColumnDef<AdminCreatorProfileRow>[] = [
-  { accessorKey: 'username', header: 'Creator', cell: renderAvatarCell },
-];
+const creatorColumns = [
+  createColumnHelper<AdminCreatorProfileRow>().accessor('username', {
+    header: 'Creator',
+    cell: renderAvatarCell,
+  }),
+] as ColumnDef<AdminCreatorProfileRow>[];
 
 export const CreatorIdentity: Story = {
   args: { children: null },
