@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { FLEET_ACTION_IDS } from './actions/fleet';
 
 import type { ActionId } from './ids';
 import { ACTION_CHANNELS } from './invocation';
@@ -181,6 +182,42 @@ export const CAPABILITY_COMPLETENESS: Record<
   ActionId,
   CapabilityCompletenessContract
 > = {
+  ...(Object.fromEntries(
+    FLEET_ACTION_IDS.map(id => [
+      id,
+      capabilityCompletenessContractSchema.parse({
+        capabilityId: id,
+        schemaVersion: 1,
+        promisedOutcome:
+          'A scoped worker coordinates a bounded mission through Summer.',
+        jobs: [
+          {
+            id: 'live-canary',
+            kind: 'trust',
+            critical: true,
+            state: 'missing',
+            surfaces: [],
+            evidence:
+              'Source and local test proof only; deployment, scoped identity provisioning and real Summer canary pending.',
+            gap: {
+              affectedUsers: 'ChatGPT dots',
+              workaround: 'founder dispatch',
+              owner: 'Tim White',
+              priority: 'p1',
+              linearRef: 'JOV-7331',
+            },
+          },
+        ],
+        nonGoals: [
+          'dot-to-dot chat',
+          'write or spend authority from a work lease',
+        ],
+      }),
+    ])
+  ) as Record<
+    (typeof FLEET_ACTION_IDS)[number],
+    CapabilityCompletenessContract
+  >),
   'chat.start': capabilityCompletenessContractSchema.parse({
     capabilityId: 'chat.start',
     schemaVersion: 1,

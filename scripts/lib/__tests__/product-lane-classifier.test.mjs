@@ -21,6 +21,14 @@ const pkg = (before, after) =>
   });
 
 describe('product lane classifier', () => {
+  it('builds and releases canonical changelog content through web while ordinary docs stay operational', () => {
+    expect(classifyProductLanes(['CHANGELOG.md']).selectedLanes).toEqual([
+      'web',
+    ]);
+    expect(
+      classifyProductLanes(['docs/changelog.md', 'README.md']).selectedLanes
+    ).toEqual(['operations']);
+  });
   it('routes all canary OTP worker artifacts through the web gate and rejects unknown workers', () => {
     const receipt = classifyProductLanes([
       'workers/canary-otp/src/index.ts',

@@ -33,7 +33,11 @@ import {
   type ProfileViewportBreakpoint,
 } from '../utils/profile-route-matrix';
 import { installPublicRouteMocks } from '../utils/public-surface-helpers';
-import { SMOKE_TIMEOUTS, waitForHydration } from '../utils/smoke-test-utils';
+import {
+  SMOKE_TIMEOUTS,
+  waitForAnyVisible,
+  waitForHydration,
+} from '../utils/smoke-test-utils';
 
 test.use({
   storageState: { cookies: [], origins: [] },
@@ -72,28 +76,6 @@ async function assertNoHorizontalOverflow(
       2
     )}`
   ).toHaveLength(0);
-}
-
-async function waitForAnyVisible(
-  page: Page,
-  selectors: readonly string[],
-  timeout = SMOKE_TIMEOUTS.VISIBILITY
-) {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    for (const selector of selectors) {
-      const visible = await page
-        .locator(selector)
-        .first()
-        .isVisible()
-        .catch(() => false);
-      if (visible) return selector;
-    }
-    await page.waitForTimeout(150);
-  }
-  throw new Error(
-    `None of the expected selectors became visible: ${selectors.join(', ')}`
-  );
 }
 
 async function assertBottomTabBarState(
@@ -204,7 +186,7 @@ test.describe('Public profile responsive shell @regression', () => {
           ).toBeLessThan(500);
 
           await waitForHydration(page);
-          await waitForAnyVisible(page, route.readySelectors);
+          await waitForAnyVisible(page, route.readySelectors, { label });
 
           await assertNoHorizontalOverflow(page, viewport, label);
           await assertBottomTabBarState(page, route, viewport, label);
@@ -305,7 +287,9 @@ test.describe('Public profile redirect parity @regression', () => {
         expect(response?.status() ?? 0).toBeLessThan(500);
 
         await waitForHydration(page);
-        await waitForAnyVisible(page, ['[data-testid="profile-header"]']);
+        await waitForAnyVisible(page, ['[data-testid="profile-header"]'], {
+          label: link.id,
+        });
 
         const finalUrl = new URL(page.url());
         const finalPath = finalUrl.pathname + finalUrl.search;
@@ -349,7 +333,9 @@ test.describe('Public profile redirect parity @regression', () => {
       });
       expect(aliasResponse?.status() ?? 0).toBe(200);
       await waitForHydration(page);
-      await waitForAnyVisible(page, ['[data-testid="profile-header"]']);
+      await waitForAnyVisible(page, ['[data-testid="profile-header"]'], {
+        label: 'alias-back-forward',
+      });
       expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe(
         expectedFinalPath
       );
@@ -371,10 +357,14 @@ test.describe('Public profile redirect parity @regression', () => {
         expect(forwardResponse.status()).toBe(200);
       }
       await waitForHydration(page);
-      await waitForAnyVisible(page, [
-        '[data-testid="profile-primary-tab-releases"]',
-        '[data-testid="profile-primary-tab-listen"]',
-      ]);
+      await waitForAnyVisible(
+        page,
+        [
+          '[data-testid="profile-primary-tab-releases"]',
+          '[data-testid="profile-primary-tab-listen"]',
+        ],
+        { label: 'alias-back-forward' }
+      );
       expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe(
         expectedFinalPath
       );

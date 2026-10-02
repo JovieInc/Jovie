@@ -23,7 +23,8 @@ export const FAILURE_CLASSES = Object.freeze([
 const SHA = /^[0-9a-f]{40}$/;
 const FAILURE_DESCRIPTION =
   /^class=(deterministic-source|retryable-product|transient-infrastructure|unclassified);n=([1-9][0-9]*);run=([1-9][0-9]*);try=([1-9][0-9]*)$/;
-const RETRY_DESCRIPTION = /^spent:run=([1-9][0-9]*);try=([1-9][0-9]*)$/;
+const RETRY_DESCRIPTION =
+  /^(spent|released):run=([1-9][0-9]*);try=([1-9][0-9]*)$/;
 const INFRASTRUCTURE_STEP =
   /^(?:Set up job|Initialize containers|Prepare all required actions|Complete job|Post |Checkout|Set up |Restore |Upload |Download )/i;
 
@@ -174,7 +175,7 @@ export function parseTrustedRetryStatus(status, repository) {
   }
   const match = RETRY_DESCRIPTION.exec(String(status.description ?? ''));
   if (!match) return null;
-  const runId = Number(match[1]);
+  const runId = Number(match[2]);
   if (
     actionsRunId(status.target_url ?? status.targetUrl, repository) !== runId
   ) {
@@ -182,7 +183,8 @@ export function parseTrustedRetryStatus(status, repository) {
   }
   return {
     runId,
-    runAttempt: Number(match[2]),
+    runAttempt: Number(match[3]),
+    released: match[1] === 'released',
     targetUrl: status.target_url ?? status.targetUrl,
   };
 }
@@ -221,11 +223,13 @@ export function revisionFailureDisposition({ statuses, repository }) {
       latest,
     };
   }
-  const retrySpent = retries.some(
+  // GitHub returns commit statuses newest first; a proven rejection releases
+  // only its reservation. Older spent records cannot override that receipt.
+  const latestRetry = retries.find(
     retry =>
       retry.runId === latest.runId && retry.runAttempt === latest.runAttempt
   );
-  return retrySpent
+  return latestRetry && !latestRetry.released
     ? {
         action: 'block',
         reason: 'revision-retry-spent',
@@ -246,6 +250,35 @@ function failureDescription({ classification, failureNumber, run }) {
 
 export function retrySpentDescription(record) {
   return `spent:run=${record.runId};try=${record.runAttempt}`;
+}
+
+export function retryReleasedDescription(record) {
+  return `released:run=${record.runId};try=${record.runAttempt}`;
+}
+
+/** Only an explicit mutation rejection may release a reserved retry. */
+export function enqueueWasRejected(error) {
+  if (!error || typeof error !== 'object') return false;
+  const response =
+    /** @type {{ data?: { enqueuePullRequest?: unknown }, errors?: unknown }} */ (
+      error
+    );
+  if (
+    response.data?.enqueuePullRequest !== null ||
+    !Array.isArray(response.errors) ||
+    response.errors.length === 0
+  )
+    return false;
+  return response.errors.every(
+    item =>
+      item &&
+      typeof item === 'object' &&
+      ['UNPROCESSABLE', 'FORBIDDEN', 'NOT_FOUND', 'RATE_LIMITED'].includes(
+        item.type
+      ) &&
+      Array.isArray(item.path) &&
+      item.path[0] === 'enqueuePullRequest'
+  );
 }
 
 function validateRun(run, repository) {

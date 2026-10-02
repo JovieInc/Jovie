@@ -19,6 +19,11 @@ roles, manager/label access, and admin-level creator permissions grant **zero**
 access to financial data. V1 supports no sharing; any future sharing model
 requires a separate explicit-consent, scoped, revocable design.
 
+The versioned entity, provenance, retention, migration, metric, and deliberately
+derived publication contract is in
+[`../finance/OWNER_DOMAIN_AND_METRICS.md`](../finance/OWNER_DOMAIN_AND_METRICS.md).
+Its JOV-4610 review is subordinate to every owner-only requirement below.
+
 This checklist must pass before any financial feature ships.
 
 ## Data layer (mandatory)

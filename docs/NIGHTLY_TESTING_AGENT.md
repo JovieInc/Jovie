@@ -47,6 +47,25 @@ GitHub Actions runner time is incurred only for changed evidence or manual diagn
 | Ops HUD snapshot | Redis key `nightly-agent:jovie:last_run` | `/app/admin/ops` |
 | CI artifacts | `nightly-agent-report-<run_id>` | Debugging, 90-day retention |
 
+### Reliability entropy receipt
+
+The existing `emit-delta` completion event adds `entropyProjection` to Jovie's
+`skill-delta.json`, already included in the report artifact. It composes the
+nightly detector result and the existing quarantine-ledger evaluation without
+starting another detector, job, service, or Redis write. All registered detectors
+appear in the projection; detectors without supplied execution results stay
+`unknown`. Existing detector and CI gate behavior is unchanged.
+The existing `publish-status` step refreshes that same receipt with the final
+workflow conclusion. A passing subset of tests cannot clear the nightly detector
+before workflow success; cancelled or incomplete runs remain unknown.
+
+Each result retains its source reference and observation time. Replaying old
+input cannot refresh it: results older than 30 hours, invalid/future timestamps,
+or conflicting simultaneous results stay unknown. Duplicate and out-of-order
+delivery produces the same snapshot. `attention` identifies existing failure,
+flake, or quarantine debt; its count is detector evidence, not a count of unique
+customer incidents. This receipt is not production or revenue certification.
+
 ## Local commands
 
 ```bash

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { attachFirstTouchReceipt } from '@/lib/acquisition/activation-receipt';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
@@ -57,6 +58,9 @@ export async function POST(request: Request) {
       displayName: payload.displayName,
       username: payload.username,
     });
+
+    // Passive first-touch receipt (JOV-5036): idempotent, best-effort.
+    await attachFirstTouchReceipt(userId);
 
     return NextResponse.json(result, {
       status: 200,

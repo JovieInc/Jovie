@@ -38,6 +38,10 @@ jobs:
               newer_runs="$(gh api "repos/$REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&status=completed&per_page=100")"
               while IFS=$'\t' read -r candidate_id candidate_attempt candidate_sha; do
                 [[ "$candidate_id" =~ ^[1-9][0-9]*$ ]] && [[ "$candidate_attempt" =~ ^[1-9][0-9]*$ ]] && [[ "$candidate_sha" =~ ^[0-9a-f]{40}$ ]] || continue
+                # A later CI run can replay an older SHA after a main rewind.
+                # Only a strict descendant may replace this staging generation.
+                replacement_status="$(gh api "repos/$REPOSITORY/compare/${EXPECTED_SHA}...${candidate_sha}" --jq '.status // empty')"
+                [ "$replacement_status" = ahead ] || continue
                 candidate_status="$(gh api "repos/$REPOSITORY/compare/${candidate_sha}...${current_main}" --jq '.status // empty')"
                 [[ "$candidate_status" =~ ^(ahead|identical)$ ]] || continue
                 candidate_name="product-lane-release-${candidate_sha}-${candidate_attempt}"

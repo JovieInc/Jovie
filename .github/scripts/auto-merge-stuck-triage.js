@@ -15,11 +15,15 @@
 //     [--enable-missing]
 //
 // `--enable-missing` first enables auto-merge (squash) on every open,
-// non-draft, same-repo PR that lacks it — this covers drafts that went
-// ready (ready_for_review is reserved for merge-queue-autoenroll.yml per
-// trigger-hygiene rule 3) and any missed enable events.
+// non-draft, same-repo PR that lacks it — backstop for a missed opened,
+// reopened, or ready_for_review event. auto-merge-default.yml is the sole
+// ready_for_review subscriber (trigger-hygiene rule 3 / JOV-INV-029).
 
 const { execFileSync } = require('node:child_process');
+const {
+  finishCustomerNotes,
+  BLOCKING_LABELS,
+} = require('./customer-notes-ready');
 
 const COMMENT_MARKER = '<!-- auto-merge-stuck-triage -->';
 const ISSUE_MARKER = '<!-- auto-merge-stuck-tracker -->';
@@ -84,6 +88,9 @@ query($owner: String!, $name: String!, $cursor: String) {
         mergeStateStatus
         isCrossRepository
         headRefOid
+        headRefName
+        baseRefName
+        files(first: 2) { totalCount nodes { path } }
         autoMergeRequest { enabledAt mergeMethod }
         labels(first: 30) { nodes { name } }
         comments(last: 100) {
@@ -323,14 +330,6 @@ function upsertTrackingIssue(repo, stuck, dryRun) {
 
 // Same set merge-queue-green-enroll.yml refuses. On a merge-queue repo,
 // enabling auto-merge on a CLEAN PR enqueues it at once, so a held PR must be skipped.
-const BLOCKING_LABELS = new Set([
-  'hold',
-  'gated',
-  'incident',
-  'do-not-merge',
-  'queue-poison',
-]);
-
 // Pure: a PR needs the enable pass when it is open, not a draft, lives in
 // this repo (fork tokens are read-only), carries no blocking label, and has no
 // autoMergeRequest yet.
@@ -347,7 +346,7 @@ function needsAutoMergeEnable(pr, statuses = [], repo = '') {
   );
 }
 
-function enableMissingAutoMerge(repo, prs, dryRun) {
+function enableMissingAutoMerge(repo, prs, dryRun, command = gh) {
   for (const pr of prs) {
     if (pr.isDraft || pr.isCrossRepository || pr.autoMergeRequest) continue;
     const statuses = listCommitStatuses(repo, pr.headRefOid);
@@ -356,7 +355,7 @@ function enableMissingAutoMerge(repo, prs, dryRun) {
       console.log(`[dry-run] would enable auto-merge on PR #${pr.number}`);
       continue;
     }
-    gh([
+    command([
       'pr',
       'merge',
       String(pr.number),
@@ -364,6 +363,9 @@ function enableMissingAutoMerge(repo, prs, dryRun) {
       repo,
       '--auto',
       '--squash',
+      ...(pr.customerNotesReadyHead
+        ? ['--match-head-commit', pr.customerNotesReadyHead]
+        : []),
     ]);
     console.log(`PR #${pr.number}: enabled auto-merge (squash).`);
   }
@@ -375,6 +377,12 @@ function main() {
 
   const openPrs = listOpenPrs(opts.repo);
   if (opts.enableMissing) {
+    finishCustomerNotes(
+      opts.repo,
+      opts.pr ? openPrs.filter(pr => pr.number === opts.pr) : openPrs,
+      opts.dryRun,
+      gh
+    );
     enableMissingAutoMerge(
       opts.repo,
       opts.pr ? openPrs.filter(pr => pr.number === opts.pr) : openPrs,
@@ -443,4 +451,5 @@ module.exports = {
   findMarkerComment,
   hasRevisionFailureHold,
   needsAutoMergeEnable,
+  enableMissingAutoMerge,
 };

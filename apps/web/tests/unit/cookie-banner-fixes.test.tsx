@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockMobile = vi.hoisted(() => ({ value: false }));
@@ -187,6 +187,240 @@ describe('CookieBannerSection consent sync', () => {
       });
     });
     expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument();
+  });
+
+  it.each(['Accept all', 'Reject all'])(
+    'returns keyboard focus to the originating page action after %s',
+    async name => {
+      let finishSave!: () => void;
+      mockSaveConsent.mockImplementationOnce(
+        () =>
+          new Promise<void>(resolveSave => {
+            finishSave = resolveSave;
+          })
+      );
+      const mod = await import('@/components/organisms/CookieBannerSection');
+      setCookie('jv_cc_required=1');
+      render(
+        <>
+          <main>
+            <button type='button'>Listen now</button>
+          </main>
+          <mod.CookieBannerSection />
+        </>
+      );
+      const origin = screen.getByRole('button', { name: 'Listen now' });
+      const action = screen.getByRole('button', { name });
+      origin.focus();
+      action.focus();
+      fireEvent.click(action);
+      // Native browsers blur a focused button when it becomes disabled.
+      action.blur();
+      await act(async () => {
+        finishSave();
+      });
+      expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument();
+      expect(origin).toHaveFocus();
+    }
+  );
+
+  it('does not steal focus moved elsewhere while consent is saving', async () => {
+    let finishSave!: () => void;
+    mockSaveConsent.mockImplementationOnce(
+      () =>
+        new Promise<void>(resolveSave => {
+          finishSave = resolveSave;
+        })
+    );
+    const mod = await import('@/components/organisms/CookieBannerSection');
+    setCookie('jv_cc_required=1');
+    render(
+      <>
+        <main>
+          <button type='button'>Claim yours</button>
+        </main>
+        <mod.CookieBannerSection />
+      </>
+    );
+    const action = screen.getByRole('button', { name: 'Reject all' });
+    action.focus();
+    fireEvent.click(action);
+    const destination = screen.getByRole('button', { name: 'Claim yours' });
+    destination.focus();
+    await act(async () => {
+      finishSave();
+    });
+    expect(destination).toHaveFocus();
+  });
+
+  it('keeps keyboard focus on the consent action after a recoverable save error', async () => {
+    let failSave!: (error: Error) => void;
+    mockSaveConsent.mockImplementationOnce(
+      () =>
+        new Promise<void>((_, rejectSave) => {
+          failSave = rejectSave;
+        })
+    );
+    const mod = await import('@/components/organisms/CookieBannerSection');
+    setCookie('jv_cc_required=1');
+    render(<mod.CookieBannerSection />);
+    const action = screen.getByRole('button', { name: 'Reject all' });
+    action.focus();
+    fireEvent.click(action);
+    action.blur();
+    await act(async () => {
+      failSave(new Error('Offline'));
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /could not save preferences/i
+    );
+    expect(action).toBeEnabled();
+    expect(action).toHaveFocus();
+    expect(localStorage.getItem('jv_cc')).toBeNull();
+  });
+
+  it('uses the page primary action when no prior external focus exists', async () => {
+    const mod = await import('@/components/organisms/CookieBannerSection');
+    setCookie('jv_cc_required=1');
+    render(
+      <>
+        <main>
+          <button type='button'>Listen now</button>
+        </main>
+        <mod.CookieBannerSection />
+      </>
+    );
+    const action = screen.getByRole('button', { name: 'Reject all' });
+    action.focus();
+    fireEvent.click(action);
+    await vi.waitFor(() =>
+      expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument()
+    );
+    expect(screen.getByRole('button', { name: 'Listen now' })).toHaveFocus();
+  });
+
+  it.each(['removed', 'disabled', 'hidden'])(
+    'falls back to an available page action when prior focus is %s',
+    async state => {
+      const mod = await import('@/components/organisms/CookieBannerSection');
+      setCookie('jv_cc_required=1');
+      render(
+        <>
+          <main>
+            <button type='button'>Previous</button>
+            <button type='button'>Listen now</button>
+          </main>
+          <mod.CookieBannerSection />
+        </>
+      );
+      const previous = screen.getByRole('button', { name: 'Previous' });
+      previous.focus();
+      const action = screen.getByRole('button', { name: 'Reject all' });
+      action.focus();
+      if (state === 'removed') previous.remove();
+      else if (state === 'disabled') previous.setAttribute('disabled', '');
+      else previous.setAttribute('hidden', '');
+      fireEvent.click(action);
+      await vi.waitFor(() =>
+        expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument()
+      );
+      expect(screen.getByRole('button', { name: 'Listen now' })).toHaveFocus();
+    }
+  );
+
+  it.each(['display', 'visibility'])(
+    'skips a prior action inside a CSS %s-hidden subtree',
+    async property => {
+      const mod = await import('@/components/organisms/CookieBannerSection');
+      setCookie('jv_cc_required=1');
+      render(
+        <>
+          <main>
+            <div data-testid='previous-surface'>
+              <button type='button'>Previous</button>
+            </div>
+            <button type='button'>Listen now</button>
+          </main>
+          <mod.CookieBannerSection />
+        </>
+      );
+      screen.getByRole('button', { name: 'Previous' }).focus();
+      const action = screen.getByRole('button', { name: 'Reject all' });
+      action.focus();
+      const surface = screen.getByTestId('previous-surface');
+      surface.style[property as 'display' | 'visibility'] =
+        property === 'display' ? 'none' : 'hidden';
+      fireEvent.click(action);
+      await vi.waitFor(() =>
+        expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument()
+      );
+      expect(screen.getByRole('button', { name: 'Listen now' })).toHaveFocus();
+    }
+  );
+
+  it.each([false, true])(
+    'waits for refreshed page actions without overriding a new focus choice (%s)',
+    async moveFocus => {
+      let finishSave!: () => void;
+      mockSaveConsent.mockImplementationOnce(
+        () =>
+          new Promise<void>(resolveSave => {
+            finishSave = resolveSave;
+          })
+      );
+      const mod = await import('@/components/organisms/CookieBannerSection');
+      setCookie('jv_cc_required=1');
+      render(
+        <>
+          <main data-testid='refreshing-surface'>
+            <button type='button'>Listen now</button>
+          </main>
+          <button type='button'>Visitor choice</button>
+          <mod.CookieBannerSection />
+        </>
+      );
+      const origin = screen.getByRole('button', { name: 'Listen now' });
+      const surface = screen.getByTestId('refreshing-surface');
+      const nativeFocus = origin.focus.bind(origin);
+      origin.focus();
+      // Match a browser refusing focus while React hides a pending subtree.
+      vi.spyOn(origin, 'focus').mockImplementation(options => {
+        if (surface.style.display !== 'none') nativeFocus(options);
+      });
+      const action = screen.getByRole('button', { name: 'Reject all' });
+      action.focus();
+      fireEvent.click(action);
+      action.blur();
+      surface.style.display = 'none';
+      await act(async () => {
+        finishSave();
+      });
+      expect(document.body).toHaveFocus();
+      const choice = screen.getByRole('button', { name: 'Visitor choice' });
+      if (moveFocus) choice.focus();
+      await act(async () => {
+        surface.style.display = '';
+      });
+      await vi.waitFor(() => expect(moveFocus ? choice : origin).toHaveFocus());
+    }
+  );
+
+  it('leaves page focus unchanged for an unfocused pointer dismissal', async () => {
+    const mod = await import('@/components/organisms/CookieBannerSection');
+    setCookie('jv_cc_required=1');
+    render(
+      <>
+        <main>
+          <button type='button'>Listen now</button>
+        </main>
+        <mod.CookieBannerSection />
+      </>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Reject all' }));
+    await vi.waitFor(() =>
+      expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument()
+    );
+    expect(document.body).toHaveFocus();
   });
 
   it('customizes analytics only and leaves marketing blocked', async () => {

@@ -207,7 +207,9 @@ export async function GET(request: Request) {
     };
   });
 
-  // Shadow-only resolver parity: durable cache, no product reads.
+  // Shadow-only resolver parity: durable cache, no product reads. The parity
+  // reference is built from official DSP APIs (Spotify/Apple Music/Deezer ISRC
+  // lookups); no third-party vendor is used as a benchmark oracle (JOV-7369).
   results.musicResolverParity = await runSubJob(
     'musicResolverParity',
     runMusicResolverParityCorpus

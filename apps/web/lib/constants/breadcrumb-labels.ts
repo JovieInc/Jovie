@@ -8,9 +8,10 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   // Dashboard routes
   dashboard: 'Dashboard',
   profile: 'Profile',
-  profiles: 'Presence',
+  profiles: 'Identity',
+  presence: 'Identity',
   contacts: 'Contacts',
-  library: 'Library',
+  library: 'Work',
   releases: 'Releases',
   audience: 'Audience',
   earnings: 'Earnings',

@@ -1,13 +1,15 @@
 import 'server-only';
 
-import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 
 import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
 import { stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, captureWarning } from '@/lib/error-tracking';
+import { INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN } from '@/lib/utils/email';
 import { getAdminMercuryMetrics } from './mercury-metrics';
 import { getAdminStripeOverviewMetrics } from './stripe-metrics';
 
@@ -45,7 +47,17 @@ async function getClaimedCreatorCount(): Promise<number> {
     const [row] = await db
       .select({ count: drizzleSql<number>`count(*)::int` })
       .from(creatorProfiles)
-      .where(eq(creatorProfiles.isClaimed, true));
+      .leftJoin(users, eq(users.id, creatorProfiles.userId))
+      .where(
+        and(
+          eq(creatorProfiles.isClaimed, true),
+          // Dogfood/QA and internal accounts never count as claimed customers
+          // (JOV-7362). Profiles with no linked user are still counted — a
+          // claimed profile with no user is a data anomaly, not an internal
+          // account.
+          drizzleSql`(${users.email} is null or lower(${users.email}) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})`
+        )
+      );
 
     return Number(row?.count ?? 0);
   } catch (error) {

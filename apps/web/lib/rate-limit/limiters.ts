@@ -376,6 +376,19 @@ export const libraryAssetShareAccessLimiter = createRateLimiter(
   }
 );
 
+/** Public rider reads/exports (`/api/rider/[username]`); Redis-backed. */
+export const riderPublicAccessLimiter = createRateLimiter(
+  RATE_LIMITERS.riderPublicAccess,
+  {
+    requireRedis: true,
+  }
+);
+
+/** Rider password unlocks; fails closed without Redis (brute-force guard). */
+export const riderUnlockLimiter = createRateLimiter(RATE_LIMITERS.riderUnlock, {
+  requireRedis: true,
+});
+
 /**
  * Rate limiter for public click endpoint
  * Limit: 50 requests per minute per IP

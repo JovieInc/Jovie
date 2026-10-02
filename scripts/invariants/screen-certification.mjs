@@ -12,6 +12,7 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { projectScreenDecisionRouting } from './screen-decision-routing.mjs';
 import {
   resolveTrustedArtifactId,
   resolveTrustedScreenProof,
@@ -265,8 +266,10 @@ web.youtube-channel-pilot|web|screen.youtube.channel-pilot|apps/web/app/app/(she
 web.shipping-statistics|web|shipping-statistics|apps/web/app/app/(shell)/admin/shipping/page.tsx|desktop,mobile
 web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx,apps/web/app/(dynamic)/start/layout.tsx|desktop,mobile
 web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
+web.chat|web|screen.chat|apps/web/app/app/(shell)/chat/page.tsx|desktop,mobile
 web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
 web.settings-billing|web|screen.settings.billing|apps/web/app/app/(shell)/settings/billing/page.tsx|desktop,mobile
+web.settings-connectors|web|settings-connectors|apps/web/app/app/(shell)/settings/connectors/|desktop,mobile
 web.settings|web|screen.settings|apps/web/app/app/(shell)/settings/layout.tsx|desktop,mobile
 web.onboarding-checkout|web|onboarding-checkout|apps/web/app/onboarding/checkout/page.tsx|desktop,mobile
 web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx|desktop,mobile
@@ -1297,6 +1300,13 @@ export function runScreenCertification(options = {}) {
       status,
       issues,
       changedScreens: changed.changedScreens,
+      // Shadow qualification cannot change the existing runtime-proof verdict.
+      decisionRouting: projectScreenDecisionRouting({
+        headSha,
+        changedPaths: normalizeChanged(changedFiles).map(file => file.path),
+        declarations: options.decisionDeclarations,
+        inputError: options.decisionInputError,
+      }),
       excludedChanges: changed.excludedChanges,
       removedScreens: changed.removedScreens,
       fixtures: red.receipts,
@@ -1316,13 +1326,15 @@ export function runScreenCertification(options = {}) {
  * The controlled resolver binds the candidate to the trusted workflow, the
  * completed producer job, the exact main head, the registered source paths,
  * and GitHub's artifact digest before the normal admission checks run.
- * @param {{ artifactId?: number; screenId?: string; repoRoot?: string; diffBase?: string }} options
+ * @param {{ artifactId?: number; screenId?: string; repoRoot?: string; diffBase?: string; decisionDeclarations?: object; decisionInputError?: boolean }} options
  */
 export function runScreenCertificationFromArtifact({
   artifactId,
   screenId,
   repoRoot = REPO_ROOT,
   diffBase,
+  decisionDeclarations,
+  decisionInputError,
 } = {}) {
   const headSha = resolveHeadSha(undefined, repoRoot);
   return runScreenCertification({
@@ -1331,6 +1343,8 @@ export function runScreenCertificationFromArtifact({
     diffBase,
     targetScreenIds: typeof screenId === 'string' && screenId ? [screenId] : [],
     proofRequests: [{ artifactId: Number(artifactId), screenId }],
+    decisionDeclarations,
+    decisionInputError,
   });
 }
 
@@ -1341,6 +1355,22 @@ if (isMain) {
   const diffBase = process.argv
     .find(arg => arg.startsWith('--diff-base='))
     ?.slice(12);
+  const decisionFile = process.argv
+    .find(arg => arg.startsWith('--decision-file='))
+    ?.slice('--decision-file='.length);
+  let decisionDeclarations;
+  let decisionInputError = false;
+  if (decisionFile) {
+    try {
+      decisionDeclarations = JSON.parse(
+        readFileSync(resolve(decisionFile), 'utf8')
+      );
+    } catch {
+      // Classification is shadow-only; record the failure without altering
+      // the current screen gate or mistaking missing data for ordinary work.
+      decisionInputError = true;
+    }
+  }
   const proofFile = process.argv
     .find(arg => arg.startsWith('--proof-file='))
     ?.slice('--proof-file='.length);
@@ -1383,9 +1413,13 @@ if (isMain) {
         artifactId: artifactId ? Number(artifactId) : undefined,
         screenId,
         diffBase,
+        decisionDeclarations,
+        decisionInputError,
       })
     : runScreenCertification({
         diffBase,
+        decisionDeclarations,
+        decisionInputError,
         proofs,
         registrationOnly,
         artifactRoot,
@@ -1400,6 +1434,9 @@ if (isMain) {
       `${JSON.stringify(result.receipt, null, 2)}\n`
     );
   }
+  process.stdout.write(
+    `[${activeGate}] decision-routing=${result.receipt.decisionRouting.status} mode=qualification-only founder-candidates=${result.receipt.decisionRouting.founderReviewCandidates.length} delivery=not-verified\n`
+  );
   if (result.ok) {
     process.stdout.write(
       `[${activeGate}] PASS head=${result.receipt.headSha} changed=${result.receipt.changedScreens.length} status=${result.receipt.status} certified=${result.receipt.certified}\n`

@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import {
   evaluateSourceAdmission,
@@ -16,6 +19,8 @@ function fixture() {
     complete: true,
     pr: {
       number: 7,
+      title: 'fix(automation): preserve commissioning acceptance',
+      body: /** @type {string | null} */ ('Refs JOV-7300.'),
       state: 'open',
       draft: false,
       labels: [],
@@ -65,6 +70,70 @@ test('qualified source remains eligible with unavailable Symphony, unbound produ
     'optional-test',
   ].map(context => ({ context, state: 'failure' }));
   assert.equal(evaluateSourceAdmission(input).allowed, true);
+});
+test('native closing instructions in conditional or negated prose block admission', () => {
+  for (const body of [
+    'Related to JOV-7300.\n\nVerify runtime before closing JOV-7300.',
+    'Related to JOV-7300.\n\nSource merge does not complete JOV-7300.',
+    'Refs JOV-7300.\n\nFixes https://linear.app/jovie/issue/JOV-7300/title',
+    'Refs JOV-7300.\n\nResolves [JOV-7300](https://linear.app/jovie/issue/JOV-7300/title)',
+    'Refs JOV-7300.\n\nCLOSED `jov-7300`',
+  ]) {
+    const input = fixture();
+    input.pr.body = body;
+    assert.deepEqual(
+      evaluateSourceAdmission(input).blockers,
+      ['linear-closing-reference:JOV-7300'],
+      body
+    );
+  }
+  const input = fixture();
+  input.pr.title = 'Fixes JOV-7300';
+  assert.equal(evaluateSourceAdmission(input).allowed, false);
+  for (const keyword of [
+    'close',
+    'closes',
+    'closed',
+    'closing',
+    'fix',
+    'fixes',
+    'fixed',
+    'fixing',
+    'resolve',
+    'resolves',
+    'resolved',
+    'resolving',
+    'complete',
+    'completes',
+    'completed',
+    'completing',
+    'implement',
+    'implements',
+    'implemented',
+    'implementing',
+    'linear issue',
+  ]) {
+    input.pr.title = `${keyword} JOV-7300`;
+    assert.deepEqual(
+      evaluateSourceAdmission(input).blockers,
+      ['linear-closing-reference:JOV-7300'],
+      keyword
+    );
+  }
+});
+test('non-closing references and acceptance prose remain eligible', () => {
+  for (const body of [
+    '',
+    null,
+    'Refs JOV-7300.\nRelated to JOV-7070.\nContributes to JOV-7386.',
+    'Related to JOV-7300. Verify runtime before declaring commissioning complete.',
+    'JOV-7300 remains open. Complete the source repair and verify runtime.',
+    'Fixes CVE-2026-1234. Refs JOV-7300.',
+  ]) {
+    const input = fixture();
+    input.pr.body = body;
+    assert.equal(evaluateSourceAdmission(input).allowed, true);
+  }
 });
 test('every mechanical hold blocks and removing it restores eligibility', () => {
   for (const name of [
@@ -140,6 +209,13 @@ test('missing and incomplete evidence fails closed', () => {
   const input = fixture();
   input.pr.changed_files = 2;
   assert.equal(evaluateSourceAdmission(input).allowed, false);
+  for (const key of ['title', 'body']) {
+    const incomplete = fixture();
+    delete incomplete.pr[key];
+    assert.deepEqual(evaluateSourceAdmission(incomplete).blockers, [
+      'incomplete-evidence',
+    ]);
+  }
 });
 test('latest opinionated reviewer state controls current-head change requests', () => {
   const input = fixture();
@@ -269,6 +345,16 @@ test('late hold blocks and concurrent push cannot inherit earlier evidence', asy
       );
   }
 });
+test('admission checks the final PR text even without a source push', async () => {
+  const mock = requester(fixture(), (_path, response, calls) => {
+    if (calls.length === 5) {
+      /** @type {ReturnType<typeof fixture>['pr']} */ (response.data).body =
+        'Related to JOV-7300. Do not complete JOV-7300.';
+    }
+  });
+  const result = await runSourceAdmission({ ...args, request: mock.request });
+  assert.deepEqual(result.blockers, ['linear-closing-reference:JOV-7300']);
+});
 test('pagination includes later-page review and fails closed on cap or malformed evidence', async () => {
   const mock = requester(fixture(), (path, response) => {
     if (path.includes('/reviews?')) {
@@ -338,4 +424,50 @@ test('CLI missing credentials emits an actionable fail-closed JSON receipt', () 
   const receipt = JSON.parse(child.stdout);
   assert.equal(receipt.allowed, false);
   assert.deepEqual(receipt.blockers, ['evidence-unavailable']);
+});
+
+test('authoring CLI validates a body file and title without credentials or publication', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'jovie-linear-reference-'));
+  const file = join(dir, 'body.md');
+  const invoke = (title, equals = false) =>
+    spawnSync(
+      process.execPath,
+      [
+        'scripts/lib/source-admission-policy.mjs',
+        ...(equals ? [`--body-file=${file}`] : ['--body-file', file]),
+        ...(title ? (equals ? [`--title=${title}`] : ['--title', title]) : []),
+      ],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, GH_TOKEN: '', GITHUB_TOKEN: '' },
+      }
+    );
+  try {
+    writeFileSync(file, 'Related to JOV-7300. Verify before closing JOV-7300.');
+    const rejected = invoke('fix(automation): preserve acceptance');
+    assert.equal(rejected.status, 1);
+    assert.deepEqual(JSON.parse(rejected.stdout).blockers, [
+      'linear-closing-reference:JOV-7300',
+    ]);
+    writeFileSync(
+      file,
+      'Related to JOV-7300. Verify before declaring commissioning complete.'
+    );
+    const accepted = invoke('fix(automation): preserve acceptance');
+    assert.equal(accepted.status, 0);
+    assert.equal(JSON.parse(accepted.stdout).allowed, true);
+    assert.equal(invoke('Fixes JOV-7300').status, 1);
+    assert.equal(invoke(null).status, 1);
+    const equalsAccepted = invoke('fix(automation): preserve acceptance', true);
+    assert.equal(equalsAccepted.status, 0);
+    assert.equal(JSON.parse(equalsAccepted.stdout).allowed, true);
+    const equalsRejected = invoke('Fixes JOV-7300', true);
+    assert.equal(equalsRejected.status, 1);
+    assert.deepEqual(JSON.parse(equalsRejected.stdout).blockers, [
+      'linear-closing-reference:JOV-7300',
+    ]);
+    assert.equal(invoke(null, true).status, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

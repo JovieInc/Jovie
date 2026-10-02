@@ -107,9 +107,9 @@ async function surfaceLibraryOpportunities(
   ];
 
   return {
-    title: 'Library opportunities',
+    title: 'Work opportunities',
     summary:
-      'Your Library presence queue is ready. Findings stay local and nothing was sent.',
+      'Your Work opportunity queue is ready. Findings stay local and nothing was sent.',
     facts,
   };
 }

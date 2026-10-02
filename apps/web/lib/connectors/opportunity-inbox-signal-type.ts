@@ -8,12 +8,14 @@
  */
 
 import { BRAND_DEAL_OPPORTUNITY_KIND } from './brand-deal-opportunity';
+import { SOCIAL_REPLY_DRAFT_KIND } from './suggested-action-kinds';
 
 export const OPPORTUNITY_SIGNAL_TYPES = [
   'new_song',
   'new_event',
   'new_profile_match',
   'brand_deal',
+  'fan_reply',
   'other',
 ] as const;
 
@@ -45,6 +47,7 @@ const KIND_PREFIX_RULES: readonly (readonly [
   ['new_event', ['calendar.', 'event.', 'tour.', 'booking.', 'show.']],
   ['new_profile_match', ['profile.', 'profile_match.', 'match.', 'collab.']],
   ['brand_deal', [BRAND_DEAL_OPPORTUNITY_KIND]],
+  ['fan_reply', [SOCIAL_REPLY_DRAFT_KIND]],
 ];
 
 const PROFILE_MATCH_PATTERN =
@@ -119,5 +122,6 @@ export const OPPORTUNITY_SIGNAL_TYPE_META: Readonly<
     filterLabel: 'Profile Matches',
   },
   brand_deal: { label: 'Brand Deal', filterLabel: 'Brand Deals' },
+  fan_reply: { label: 'Fan Reply', filterLabel: 'Fan Replies' },
   other: { label: 'Suggestion', filterLabel: 'Other' },
 };

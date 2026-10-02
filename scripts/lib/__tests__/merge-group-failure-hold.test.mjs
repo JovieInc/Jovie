@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   applyMergeGroupFailure,
   classifyMergeGroupFailure,
+  enqueueWasRejected,
   FAILURE_HOLD_CONTEXT,
   parseMergeQueueBranch,
+  retryReleasedDescription,
   retrySpentDescription,
   revisionFailureDisposition,
   sourceHeadForRun,
@@ -117,6 +119,89 @@ describe('failure classification and revision-scoped suppression', () => {
         failedSteps: [],
       })
     ).toBe('transient-infrastructure');
+  });
+
+  it('releases only an explicitly rejected enqueue, preserving ambiguous outcomes', () => {
+    const rejected = {
+      data: { enqueuePullRequest: null },
+      errors: [{ type: 'UNPROCESSABLE', path: ['enqueuePullRequest'] }],
+    };
+    expect(enqueueWasRejected(rejected)).toBe(true);
+    for (const error of [
+      new Error('socket timeout'),
+      {},
+      {
+        ...rejected,
+        data: { enqueuePullRequest: { mergeQueueEntry: { position: 1 } } },
+      },
+      {
+        ...rejected,
+        errors: [{ type: 'INTERNAL', path: ['enqueuePullRequest'] }],
+      },
+      {
+        ...rejected,
+        errors: [{ type: 'UNPROCESSABLE', path: ['anotherMutation'] }],
+      },
+      { ...rejected, errors: [] },
+    ])
+      expect(enqueueWasRejected(error)).toBe(false);
+  });
+
+  it('newest trusted release restores the unused retry; a later reservation blocks it', () => {
+    const first = status({ classification: 'transient-infrastructure' });
+    const spent = status({
+      context: 'jovie-queue-failure-retry/v1',
+      description: retrySpentDescription({ runId: 123, runAttempt: 1 }),
+    });
+    const released = {
+      ...spent,
+      description: retryReleasedDescription({ runId: 123, runAttempt: 1 }),
+    };
+    expect(
+      revisionFailureDisposition({
+        repository: REPOSITORY,
+        statuses: [released, spent, first],
+      })
+    ).toMatchObject({ action: 'retry-once' });
+    expect(
+      revisionFailureDisposition({
+        repository: REPOSITORY,
+        statuses: [spent, released, first],
+      })
+    ).toMatchObject({ action: 'block' });
+    expect(
+      revisionFailureDisposition({
+        repository: REPOSITORY,
+        statuses: [
+          { ...released, creator: { login: 'random', type: 'Bot' } },
+          spent,
+          first,
+        ],
+      })
+    ).toMatchObject({ action: 'block' });
+    expect(
+      revisionFailureDisposition({
+        repository: REPOSITORY,
+        statuses: [
+          released,
+          spent,
+          status({ classification: 'deterministic-source' }),
+        ],
+      })
+    ).toMatchObject({
+      action: 'block',
+      reason: 'deterministic-source-failure',
+    });
+    expect(
+      revisionFailureDisposition({
+        repository: REPOSITORY,
+        statuses: [
+          released,
+          spent,
+          status({ classification: 'transient-infrastructure', number: 2 }),
+        ],
+      })
+    ).toMatchObject({ action: 'block', reason: 'revision-retry-exhausted' });
   });
 
   it('blocks the unchanged deterministic head while a new head has no hold', () => {

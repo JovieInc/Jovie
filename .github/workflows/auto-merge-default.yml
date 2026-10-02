@@ -12,16 +12,17 @@
 # stuck ones get a single diagnostic comment plus one aggregate tracking issue.
 #
 # MECHANISM:
-# 1. `enable` job — fires on opened/reopened and runs
+# 1. `enable` job — fires on opened/reopened/ready_for_review and runs
 #    `gh pr merge --auto --squash` with GITHUB_TOKEN (GraphQL
 #    enablePullRequestAutoMerge; GITHUB_TOKEN is sufficient — the PAT workflow-
 #    scope gap that blocks pushing workflow-file changes does NOT apply to
-#    enabling auto-merge). Drafts are skipped here; `ready_for_review` is
-#    contractually reserved for merge-queue-autoenroll.yml (trigger-hygiene
-#    rule 3 / JOV-INV-029), so undrafted PRs are caught by the triage sweep.
+#    enabling auto-merge). Drafts are skipped here (`draft == false`). This
+#    workflow is the sole `ready_for_review` subscriber (trigger-hygiene rule 3
+#    / JOV-INV-029): leaving draft enables auto-merge and does not restart CI.
+#    The hourly triage sweep still covers missed enable events.
 # 2. `triage` job — hourly sweep + manual dispatch. First enables auto-merge
-#    on any open, non-draft, same-repo PR that lacks it (covers drafts that
-#    went ready and any missed enable events). Then PRs with auto-merge
+#    on any open, non-draft, same-repo PR that lacks it (backstop for a missed
+#    opened, reopened, or ready_for_review event). Then PRs with auto-merge
 #    enabled but unmerged after STUCK_THRESHOLD_HOURS get ONE upserted
 #    diagnostic comment naming the blocker (failing checks w/ links, pending
 #    checks, conflicts, behind-base) and are aggregated into ONE tracking
@@ -45,7 +46,7 @@ name: Auto-Merge Default
 
 on:
   pull_request:
-    types: [opened, reopened]
+    types: [opened, reopened, ready_for_review]
   schedule:
     - cron: '17 * * * *'
   workflow_dispatch:
@@ -167,7 +168,7 @@ jobs:
           persist-credentials: false
 
       - name: Run unit tests for triage script
-        run: node --test .github/scripts/auto-merge-stuck-triage.test.js
+        run: node --test --experimental-test-coverage --test-coverage-include=.github/scripts/customer-notes-ready.js --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 .github/scripts/auto-merge-stuck-triage.test.js .github/scripts/customer-notes-ready.test.js
 
       - name: Generate Jovie Bot token
         # See the enable job: GitHub starts no workflows for events GITHUB_TOKEN creates, and auto-merge enqueues
@@ -210,7 +211,7 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Run unit tests for triage script
-        run: node --test .github/scripts/auto-merge-stuck-triage.test.js
+        run: node --test --experimental-test-coverage --test-coverage-include=.github/scripts/customer-notes-ready.js --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 .github/scripts/auto-merge-stuck-triage.test.js .github/scripts/customer-notes-ready.test.js
 
       - name: Create throwaway draft PR
         id: pr

@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
+import { NAVIGATION_DROP_OFF_MS } from '@/lib/tracking/navigation-telemetry';
 import {
+  mockUsePathname,
   renderDashboardNav,
   resetDashboardNavTestMocks,
 } from '@/tests/utils/dashboard-nav-test-support';
@@ -46,6 +48,7 @@ describe('Linear-scale density (founder lock 2026-09-25)', () => {
 
 describe('DashboardNav route warming', () => {
   afterEach(() => {
+    vi.useRealTimers();
     runtimeUpdateState.available = false;
     resetDashboardNavTestMocks();
   });
@@ -57,8 +60,8 @@ describe('DashboardNav route warming', () => {
       'Inbox',
       'New Chat',
       'Home',
-      'Presence',
-      'Links',
+      'Identity',
+      'Work',
       'Audience',
     ]) {
       expect(screen.getByRole('link', { name: label })).toHaveAttribute(
@@ -66,11 +69,110 @@ describe('DashboardNav route warming', () => {
         'true'
       );
     }
-    for (const label of ['Library', 'Contacts', 'Calendar', 'Tasks']) {
+    for (const label of ['Library', 'Links', 'Contacts', 'Calendar', 'Tasks']) {
       expect(
         screen.queryByRole('link', { name: label })
       ).not.toBeInTheDocument();
     }
+  });
+
+  it('acknowledges New Chat immediately while retaining authenticated content', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
+    renderDashboardNav({
+      renderFn: render,
+      children: (
+        <main data-testid='authenticated-route-content'>Current route</main>
+      ),
+    });
+
+    const newChat = screen.getByRole('link', { name: 'New Chat' });
+    newChat.addEventListener('click', event => event.preventDefault());
+    fireEvent.click(newChat);
+
+    expect(newChat).toHaveAttribute('aria-busy', 'true');
+    expect(newChat).toHaveAttribute('data-navigation-item-id', 'chat');
+    expect(newChat).toHaveAttribute('data-navigation-pending', 'true');
+    expect(newChat).toHaveClass('size-6', 'rounded-full', 'opacity-70');
+    expect(screen.getByTestId('authenticated-route-content')).toHaveTextContent(
+      'Current route'
+    );
+  });
+
+  it('acknowledges a sidebar destination on click without changing row geometry', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
+    renderDashboardNav({ renderFn: render });
+
+    const work = screen.getByRole('link', { name: 'Work' });
+    work.addEventListener('click', event => event.preventDefault());
+    fireEvent.click(work);
+
+    expect(work).toHaveAttribute('aria-busy', 'true');
+    expect(work).toHaveAttribute('data-navigation-item-id', 'library');
+    expect(work).toHaveAttribute('data-navigation-pending', 'true');
+    expect(work.className).toContain('bg-sidebar-accent-active');
+  });
+
+  it('recovers the pending acknowledgment after a failed no-URL transition', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
+    renderDashboardNav({ renderFn: render });
+
+    const work = screen.getByRole('link', { name: 'Work' });
+    work.addEventListener('click', event => event.preventDefault());
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(work);
+      expect(work).toHaveAttribute('data-navigation-pending', 'true');
+
+      // The URL never commits (the transition failed or was aborted), so the
+      // acknowledgment must recover on the navigation drop-off window.
+      act(() => {
+        vi.advanceTimersByTime(10_000);
+      });
+      expect(work).not.toHaveAttribute('data-navigation-pending');
+      expect(work).not.toHaveAttribute('aria-busy');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(['Inbox', 'New Chat', 'Home'])(
+    'clears a stalled %s acknowledgment and accepts a retry without replacing the source content',
+    label => {
+      vi.useFakeTimers();
+      mockUsePathname.mockReturnValue(APP_ROUTES.CALENDAR);
+      renderDashboardNav({
+        renderFn: render,
+        children: <main data-testid='retained-route'>Source content</main>,
+      });
+      const link = screen.getByRole('link', { name: label });
+      link.addEventListener('click', event => event.preventDefault());
+      fireEvent.click(link);
+      expect(link).toHaveAttribute('aria-busy', 'true');
+
+      act(() => vi.advanceTimersByTime(NAVIGATION_DROP_OFF_MS));
+
+      expect(link).not.toHaveAttribute('aria-busy');
+      expect(link).not.toHaveAttribute('data-navigation-pending');
+      expect(screen.getByTestId('retained-route')).toHaveTextContent(
+        'Source content'
+      );
+      fireEvent.click(link);
+      expect(link).toHaveAttribute('aria-busy', 'true');
+    }
+  );
+
+  it('clears a pending acknowledgment immediately when connectivity is lost', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
+    renderDashboardNav({ renderFn: render });
+    const link = screen.getByRole('link', { name: 'New Chat' });
+    link.addEventListener('click', event => event.preventDefault());
+    fireEvent.click(link);
+    expect(link).toHaveAttribute('aria-busy', 'true');
+
+    act(() => globalThis.dispatchEvent(new Event('offline')));
+
+    expect(link).not.toHaveAttribute('aria-busy');
   });
 
   it('shows runtime update attention on the existing Inbox bell while preserving opportunity counts', () => {

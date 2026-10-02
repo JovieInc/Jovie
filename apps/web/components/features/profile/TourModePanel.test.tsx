@@ -83,14 +83,50 @@ describe('TourModePanel', () => {
 
     expect(screen.getByTestId('tour-drawer-list')).toBeInTheDocument();
     expect(screen.getByText('The Novo')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Tickets' })).toHaveAttribute(
-      'href',
-      'https://tickets.example.com/the-novo'
-    );
+    expect(
+      screen.getByRole('link', {
+        name: 'Tickets for The Novo — Los Angeles, CA',
+      })
+    ).toHaveAttribute('href', 'https://tickets.example.com/the-novo');
     // JOV-INV-019 image-contrast: the group label measured 4.5:1-adjacent
     // against a real photo background at text-tertiary-token; keep it on
     // text-secondary-token.
     expect(screen.getByText('Upcoming')).toHaveClass('text-secondary-token');
+  });
+
+  // JOV-4429: dates that share one ticketing URL must not collapse into a
+  // duplicate "Tickets" CTA cluster — each link gets a per-event name.
+  it('gives every Tickets link a unique accessible name when dates share a ticket URL', () => {
+    const sharedTicketUrl = 'https://tickets.example.com/tour';
+    render(
+      <TourModePanel
+        artist={PROFILE_STORY_ARTIST}
+        tourDates={[
+          makeTourDate({ ticketUrl: sharedTicketUrl }),
+          makeTourDate({
+            id: 'tour-2',
+            startDate: '2030-08-21T20:00:00.000Z',
+            venueName: 'The Wiltern',
+            ticketUrl: sharedTicketUrl,
+          }),
+          makeTourDate({
+            id: 'tour-3',
+            startDate: '2030-08-22T20:00:00.000Z',
+            venueName: 'Fox Theater',
+            city: 'Oakland',
+            ticketUrl: sharedTicketUrl,
+          }),
+        ]}
+      />
+    );
+
+    const names = screen
+      .getAllByRole('link')
+      .filter(link => link.getAttribute('href') === sharedTicketUrl)
+      .map(link => link.getAttribute('aria-label'));
+
+    expect(names).toHaveLength(3);
+    expect(new Set(names).size).toBe(names.length);
   });
 
   it('keeps the empty state quiet and cardless with the alerts CTA as the single action', () => {

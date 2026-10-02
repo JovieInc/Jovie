@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, GitPullRequest } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { HudStatusPill } from '@/app/app/(shell)/admin/ops/HudStatusPill';
+import { SummerReconcileSection } from '@/components/features/admin/hud/SummerReconcileSection';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   DrawerPropertyRow,
@@ -51,6 +52,8 @@ export type MatrixRow = {
   readonly sha: string | null;
   readonly createdAt: string | null;
   readonly updatedAt: string | null;
+  readonly attempt: number | null;
+  readonly retryAt: string | null;
   readonly transition: string | null;
 };
 
@@ -111,6 +114,8 @@ export function buildMatrixRows(feed: TaskFeed, nowMs: number): MatrixRow[] {
       sha: task.sourceRevision,
       createdAt: pr?.createdAt ?? null,
       updatedAt: task.updatedAt,
+      attempt: task.attempt,
+      retryAt: task.retryAt,
       transition: deltaLabel(deltas.get(task.id)),
     };
   });
@@ -238,6 +243,37 @@ function ShippingRowRailHeader({ row }: Readonly<{ row: MatrixRow }>) {
   );
 }
 
+/**
+ * The next expected transition for the task's current stage. Purely
+ * descriptive — presentation only, never a new control plane. Worker
+ * admission and priority stay with the runtime.
+ */
+function nextExpectedAction(row: MatrixRow): string {
+  switch (row.stage) {
+    case 'blocked':
+      return 'Resolve the failing dependency, then the runtime resumes.';
+    case 'retrying':
+      return row.retryAt
+        ? `Scheduled retry at ${new Date(row.retryAt).toLocaleTimeString(
+            'en-US',
+            { hour: 'numeric', minute: '2-digit' }
+          )}.`
+        : 'Scheduled backoff — a retry is queued by the runtime.';
+    case 'queued':
+      return 'Awaiting worker admission.';
+    case 'running':
+      return 'In flight — observe for completion or failure.';
+    case 'in-review':
+      return 'Awaiting review and required checks.';
+    case 'merge-queued':
+      return 'Awaiting the native merge queue.';
+    case 'merged':
+      return 'Awaiting production verification.';
+    case 'production-verified':
+      return 'None — verified in production.';
+  }
+}
+
 function ShippingRowRailContent({ row }: Readonly<{ row: MatrixRow }>) {
   const headSha = row.sha ? row.sha.slice(0, 7) : 'UNKNOWN';
   const opened = row.createdAt ? formatTimeAgo(row.createdAt) : 'UNKNOWN';
@@ -255,7 +291,14 @@ function ShippingRowRailContent({ row }: Readonly<{ row: MatrixRow }>) {
         <DrawerPropertyRow label='Branch' value={row.branch ?? 'UNKNOWN'} />
         <DrawerPropertyRow label='Head SHA' value={headSha} />
         <DrawerPropertyRow label='Opened' value={opened} />
+        {row.attempt == null ? null : (
+          <DrawerPropertyRow label='Attempt' value={row.attempt} />
+        )}
         <DrawerPropertyRow label='Last Transition' value={lastTransition} />
+        <DrawerPropertyRow
+          label='Next Expected Action'
+          value={nextExpectedAction(row)}
+        />
       </DrawerSection>
       {row.failingChecks.length > 0 ? (
         <DrawerSection title='Failing checks' sectionKind='details'>
@@ -307,11 +350,12 @@ function ShippingRowRailContent({ row }: Readonly<{ row: MatrixRow }>) {
           </p>
         ) : null}
       </DrawerSection>
+      <SummerReconcileSection indicated={row.attention !== 'ok'} />
     </>
   );
 }
 
-function ShippingRowRail({
+export function ShippingRowRail({
   row,
   onClose,
 }: Readonly<{ readonly row: MatrixRow | null; readonly onClose: () => void }>) {

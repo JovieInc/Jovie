@@ -713,13 +713,14 @@ or mutually exclusive surfaces, not additions to the four-item root IA.
 
 | Group | Item | Canonical destination | Behavior |
 |-------|------|-----------------------|----------|
-| Primary | Home | `/app` | Opens the opportunity and work queue without exposing its internal entity model |
-| Primary | Presence | `/app/presence` | Monitors identity across DSPs, social networks, and public surfaces |
-| Primary | Links | `/app/chat?panel=profile` | Opens the identity context where public links and attached entity views are managed |
+| Primary | Home | `/app` | Opens the opportunity and attention queue without exposing its internal entity model |
+| Primary | Identity | `/app/presence` | Owns bio, profile, social, contact, and search representation |
+| Primary | Work | `/app/library` | Owns releases, videos, merch, products, events, writing, campaigns, and shareable links |
 | Primary | Audience | `/app/contacts?tab=audience` | Opens the audience context inside the Contacts workspace |
 | Utility | Inbox | `/app` | Compact shell action for pending opportunities and runtime attention |
 | Utility | New Chat | `/app/chat` | Compact shell action that starts a conversation |
-| Contextual | Events, Products, Releases, Videos, and other entities | Existing workspace routes and entity rails | Materialize only when relevant data or an in-context action exists; never become permanent root rows by default |
+| Contextual | Links | `/app/chat?panel=profile` and existing destination routes | Represents or distributes Identity and Work without becoming a third top-level concept |
+| Contextual | Events, Products, Releases, Videos, and other entities | Existing workspace routes and entity rails | Materialize as concrete Work filters or in-context views instead of permanent peer rows |
 
 Any permanent IA change must update `primaryNavigation`, its exact structure
 test, this table, and the route coverage test in the same change. Desktop and
@@ -759,9 +760,9 @@ shift.
   or command-palette popup.
 - Release rows and other entity rows open the right detail rail; task workflows
   that are true multi-step workspaces retain their reviewed canonical route.
-- Library, Calendar, Tasks, Releases, and other entity/workflow routes remain
-  reachable from contextual links, search, Home, or chat after root-nav
-  consolidation; removal from the root never implies route deletion.
+- Calendar, Tasks, Releases, and other entity/workflow routes remain reachable
+  from Work, contextual links, search, Home, or chat. Root placement never
+  changes their canonical route contract.
 - Reuse the canonical `EmptyState` family. New bespoke `*EmptyState.tsx`
   components are blocked; compose an existing primitive or add a state variant.
 
@@ -769,7 +770,8 @@ shift.
 
 | Date | Decision | Operating trigger |
 |------|----------|-------------------|
-| 2026-09-29 | **EVENT: Job-level root IA.** The canonical customer root is Home, Presence, Links, Audience. Events, Products, Releases, Videos, and other entity types remain contextual views behind Links/identity and relevant workflows. | **Ship now:** keep the four-item root calm for sparse and data-rich accounts alike. **Re-evaluate when:** an entity type has sustained usage plus substantial actions or automation that form a first-class workflow. **Then:** graduate it only through an explicit IA decision with registry, route-coverage, desktop, and mobile evidence. |
+| 2026-09-30 | **EVENT: Identity / Work ontology.** The canonical customer root is Home, Identity, Work, Audience. Links represent or distribute Identity and Work. Existing presence and library routes remain canonical compatibility contracts. | **Ship now:** use the paired nouns in navigation and product copy. **Re-evaluate when:** the new telemetry variant has 200 consented activations per measured platform or 14 complete days of evidence, whichever takes longer. **Then:** retain the vocabulary only if destination-ready and short-return rates are no worse and the five audience fixtures do not read Work as tasks or a workspace. |
+| 2026-09-29 | **EVENT: Job-level root IA, superseded by JOV-7305 labels and ownership.** The four-slot capacity and contextual entity model remain valid. | Keep the four-item capacity and shared desktop/mobile source of truth. |
 | 2026-07-22 | **EVENT: One authenticated app shell.** Header, sidebar, content frame, and right rail are one system; routes may not introduce a parallel shell. | Ship now: extend the shared shell. Re-evaluate only for a mutually exclusive security boundary that cannot share authenticated navigation. Then: document that boundary before introducing another shell. |
 | 2026-07-22 | **Inbox is home.** `/app` renders the opportunity Inbox; JOV-7159 later names this root destination Home while retaining the route and outcome. | Ship now: keep `/app` as Home. Re-evaluate when 30 days of production navigation telemetry shows more than 25% of signed-in home visits immediately leave without an Inbox action. Then: test a different home entry while preserving one shell and one canonical `/app` route. |
 

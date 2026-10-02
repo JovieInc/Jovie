@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __testing,
   isDesktopEnvironment,
+  reportDesktopWorkState,
   useDesktopBuildIdentity,
 } from './electron-bridge';
 
@@ -66,6 +67,19 @@ afterEach(() => {
 });
 
 describe('electron-bridge — defensive guards', () => {
+  it('reports work only through a supported bridge and tolerates stale or throwing shells', () => {
+    expect(reportDesktopWorkState(null)).toBe(false);
+    setElectronAPI({ versions: { app: 'old' } });
+    expect(reportDesktopWorkState(null)).toBe(false);
+    const setWorkState = vi.fn();
+    setElectronAPI({ setWorkState });
+    expect(reportDesktopWorkState(null)).toBe(true);
+    expect(setWorkState).toHaveBeenCalledWith(null);
+    setWorkState.mockImplementation(() => {
+      throw new Error('disposed');
+    });
+    expect(reportDesktopWorkState(null)).toBe(false);
+  });
   it('isDesktopEnvironment returns false in pure browser context', () => {
     expect(isDesktopEnvironment()).toBe(false);
   });
