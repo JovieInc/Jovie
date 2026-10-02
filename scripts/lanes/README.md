@@ -331,3 +331,44 @@ Re-evaluate when observed dispatches and real workflow/check-in receipts prove
 recurrence, or native scheduling reliably supplies the cadence again. Then:
 remove unnecessary recovery calls while retaining the independent deadman.
 JOV-6909 remains commissioning until recurrence is observed after deployment.
+
+## Design gate (JOV-7541)
+
+UI and landing work does not enter a build lane until a design brief has
+finished the founder's IA-first pipeline (steps 1–9). The template is
+`docs/design/design-brief-template.md`. Step 2 may cite only certified
+capability ids from `scripts/lanes/certified-capabilities.json`, projected
+from `apps/web/data/product-truth/registry.ts`: publication `public`,
+`marketing.proofAuthorized` true, maturity not `proposed`, access not
+`unavailable`.
+
+`design_gate.py` is pure stdlib and does no I/O at import. An issue is gated
+when it carries `ws:ui-ia`, `ws:profiles-marketing`, or `ws:design-gate`, or
+when its title or description names a path in `GATED_PATH_PREFIXES` (marketing
+routes, the homepage, marketing components, `apps/web/data/marketing/**`) or
+clearly targets a homepage, landing page, or marketing page. When
+`workstreams.py` is importable, `explicit()` supplies the `ui-ia` and
+`profiles-marketing` label parse. `ws:design-gate` is not in that module's
+rank yet; adding it is a follow-up, not this gate.
+
+`worker()` calls `design_gate.pick_build_issue(...)` once, passing the
+existing `pick_issue`. A gated issue with an incomplete brief is not claimed.
+The runner writes `needs-design-brief` for the issue it would otherwise have
+picked, and adds Linear label `needs-design-brief`
+(`5fa70dd4-2c23-4ed7-a6db-73bf4910b333`) at most once. It does not relabel the
+rest of the pool. There is no design/brief provider in `providers.json`. The
+label is the route: whoever writes the brief (Pen or ImageGen, using the
+skills named in the template) leaves the issue in Todo, and the next claim
+admits it once steps 1–9 are complete. The label does not itself block.
+
+`doctor.py` adds `designGate` to the admission census: `gated`, `admitted`,
+`needsBrief`, and `missingSteps` (steps 1–9). Those counts are deduped.
+Incomplete briefs also increment `rejectedByProvider["needs-design-brief"]`
+and leave the runnable pool.
+
+CI (`.github/workflows/design-gate.yml`) flags pull requests that touch the
+same path list and have no completed brief. It warns and passes unless
+`DESIGN_GATE_ENFORCE` is truthy (`1`, `true`, `yes`, `on`). The default is
+off. A brief that cannot be read (no `LINEAR_API_KEY`, or a URL that is not a
+`docs/design/*.md` path) stays a warning even when enforcement is on. The
+workflow does not add a secret.

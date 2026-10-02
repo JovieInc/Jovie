@@ -42,6 +42,7 @@ import execution_attempt  # noqa: E402
 import pr_events  # noqa: E402
 import reason_lane  # noqa: E402
 import yc_corpus  # noqa: E402
+import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
 THIS = sys.modules[__name__]
@@ -81,7 +82,8 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py",
-              "scripts/tests/test_disk_guard.py", "scripts/tests/test_continuity_clock.py"]
+              "scripts/tests/test_disk_guard.py", "scripts/tests/test_continuity_clock.py",
+              "scripts/tests/test_design_gate.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
@@ -2803,8 +2805,9 @@ def worker(host: Host, name: str) -> int:
         in_flight = None if red or adopt or blocked else in_flight_issues()
         if in_flight is not None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
-            issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
-                               provider=name)
+            issue = design_gate.pick_build_issue(
+                linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
+                provider=name, pick=pick_issue, linear=linear, repo=host.repo)
             if issue and linear.state_of(issue.id) != "Todo":
                 issue = None  # another host claimed it between our read and now
             if issue:
