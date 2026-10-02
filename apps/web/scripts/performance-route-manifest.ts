@@ -230,6 +230,15 @@ export function assertValidPerfRouteDefinition(route: PerfRouteDefinition) {
     }
   }
 
+  if (
+    route.measureMode === 'warm-navigation' &&
+    !route.navigationItemId?.trim()
+  ) {
+    throw new TypeError(
+      `Warm-navigation route "${route.id}" must define navigationItemId for shell acknowledgment measurement.`
+    );
+  }
+
   if (route.measureMode === 'profile-warm-transition') {
     const timingBudgets = getRouteTimingBudgets(route);
     const interactiveBudget = timingBudgets.find(

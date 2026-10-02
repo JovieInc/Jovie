@@ -152,4 +152,33 @@ test('the production bundle command writes a sandbox-compatible preload', async 
   assert.match(source, /desktopRuntime/);
   assert.match(source, /notifyAppBooted/);
   assert.match(source, /getBuildIdentity/);
+
+  const loadDocument = () => {
+    const exposed = new Map();
+    vm.runInNewContext(source, {
+      process: { platform: 'darwin', versions: { electron: '44.0.0' } },
+      document: { documentElement: { dataset: {} } },
+      require: () => ({
+        contextBridge: {
+          exposeInMainWorld: (name, api) => exposed.set(name, api),
+        },
+        ipcRenderer: { send() {} },
+      }),
+    });
+    return exposed.get('electronAPI');
+  };
+  const currentDocument = loadDocument();
+  assert.equal(currentDocument.getWorkState(), null);
+  currentDocument.setWorkState({
+    hasDraft: false,
+    isStreaming: true,
+    isUploading: false,
+    hasPendingAction: false,
+    isAuthenticating: false,
+  });
+  assert.equal(currentDocument.getWorkState().state.isStreaming, true);
+  // A full navigation loads a fresh isolated world with no inherited idle claim.
+  assert.equal(loadDocument().getWorkState(), null);
+  currentDocument.setWorkState(null);
+  assert.equal(currentDocument.getWorkState(), null);
 });

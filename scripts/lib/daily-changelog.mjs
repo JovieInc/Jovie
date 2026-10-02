@@ -22,7 +22,7 @@ import { createHash } from 'node:crypto';
 
 export const DAILY_SOURCE_SCHEMA = 'daily-changelog-source/v1';
 export const DAILY_RECEIPT_SCHEMA = 'daily-changelog-receipt/v1';
-export const DAILY_EVALUATOR_VERSION = 'daily-changelog-eval/1';
+export const DAILY_EVALUATOR_VERSION = 'daily-changelog-eval/2';
 export const DAILY_MAX_BULLETS = 3;
 export const DAILY_FRESHNESS_SLA_MS = 25 * 60 * 60 * 1000;
 
@@ -134,10 +134,21 @@ export function validateDailySource(source) {
   }
 
   const deployment = source.deployment;
+  // Production coalesces several merges into one deployment. A merge need
+  // not equal the deployment head, but the collector must prove ancestry and
+  // bind that proof to the exact controller/deployment generation.
+  const membership = source.deploymentMembership;
+  const deployedMerge =
+    deployment?.sha === pr.mergeSha ||
+    (membership?.verified === true &&
+      membership.mergeSha === pr.mergeSha &&
+      membership.headSha === deployment?.sha &&
+      controller.sha === deployment?.sha);
   if (
     !isPlainObject(deployment) ||
     typeof deployment.id !== 'string' ||
-    deployment.sha !== pr.mergeSha
+    !SHA_RE.test(deployment.sha ?? '') ||
+    !deployedMerge
   ) {
     return fail('unavailable', id);
   }
@@ -463,12 +474,10 @@ export function renderDailyDigest(result) {
     if (!stories) continue;
     lines.push(`### ${section}`, '');
     for (const story of stories) {
-      if (story === lead) {
-        for (const bullet of story.bullets) lines.push(`- ${bullet}`);
-      } else {
-        lines.push(`- **${story.summary}**`);
-        for (const bullet of story.bullets) lines.push(`- ${bullet}`);
-      }
+      // A summary-only lead must still be a public entry. Both parsers hide
+      // releases with no bullets, even when their blockquote has real copy.
+      lines.push(`- ${story.summary}`);
+      for (const bullet of story.bullets) lines.push(`- ${bullet}`);
     }
     lines.push('');
   }

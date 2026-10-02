@@ -20,6 +20,111 @@ interface DeriveChatRailContextTargetsInput {
   readonly profile?: ChatRailProfileContext | null;
 }
 
+export interface ProjectChatRailContextTargetsInput
+  extends DeriveChatRailContextTargetsInput {
+  readonly conversationKey: string | null;
+  readonly messages: readonly (ChatRailMessage & {
+    readonly streamRevision: number;
+  })[];
+}
+
+interface CachedMessageContext {
+  readonly parts: readonly MessagePart[];
+  readonly streamRevision: number;
+  readonly targets: readonly ChatRailContextTarget[];
+}
+
+function contextTargetsEqual(
+  left: readonly ChatRailContextTarget[],
+  right: readonly ChatRailContextTarget[]
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((target, index) => {
+      const other = right[index];
+      return (
+        target.kind === other.kind &&
+        target.id === other.id &&
+        target.label === other.label &&
+        target.source === other.source &&
+        target.focusKey === other.focusKey &&
+        target.toolCallId === other.toolCallId
+      );
+    })
+  );
+}
+
+/**
+ * Cache expensive text/token/tool parsing for the current conversation only.
+ * The timeline replaces parts on history/tool updates and advances streamRevision
+ * for streamed text and tool deltas; both belong to the cache key. Checking those
+ * revisions remains O(messages), without rescanning completed message contents.
+ */
+export function createChatRailContextProjector() {
+  let conversationKey: string | null | undefined;
+  let profileId: string | undefined;
+  let profileLabel: string | null | undefined;
+  let entries = new Map<string, CachedMessageContext>();
+  let orderedTargets: readonly (readonly ChatRailContextTarget[])[] = [];
+  let targets: readonly ChatRailContextTarget[] = [];
+
+  return (input: ProjectChatRailContextTargetsInput) => {
+    if (
+      conversationKey !== input.conversationKey ||
+      profileId !== input.profile?.id ||
+      profileLabel !== input.profile?.label
+    ) {
+      conversationKey = input.conversationKey;
+      profileId = input.profile?.id;
+      profileLabel = input.profile?.label;
+      entries = new Map();
+      orderedTargets = [];
+      targets = [];
+    }
+
+    // Retain only messages present in this snapshot, including after pruning,
+    // retry, or conversation replacement. No cross-conversation cache accumulates.
+    const nextEntries = new Map<string, CachedMessageContext>();
+    const nextOrderedTargets: (readonly ChatRailContextTarget[])[] = [];
+    let changed = orderedTargets.length !== input.messages.length;
+
+    for (const [index, message] of input.messages.entries()) {
+      let entry = entries.get(message.id);
+      if (
+        !entry ||
+        entry.parts !== message.parts ||
+        entry.streamRevision !== message.streamRevision
+      ) {
+        const derived = deriveChatRailContextTargets({
+          messages: [message],
+          profile: input.profile,
+        });
+        entry = {
+          parts: message.parts,
+          streamRevision: message.streamRevision,
+          targets:
+            entry && contextTargetsEqual(entry.targets, derived)
+              ? entry.targets
+              : derived,
+        };
+      }
+      nextEntries.set(message.id, entry);
+      nextOrderedTargets.push(entry.targets);
+      changed ||= orderedTargets[index] !== entry.targets;
+    }
+
+    entries = nextEntries;
+    orderedTargets = nextOrderedTargets;
+    if (changed) {
+      const nextTargets = nextOrderedTargets.flat();
+      if (!contextTargetsEqual(targets, nextTargets)) {
+        targets = nextTargets;
+      }
+    }
+    return targets;
+  };
+}
+
 const PROFILE_CONTEXT_TOOL_NAMES = new Set([
   'proposeAvatarUpload',
   'proposeProfileEdit',

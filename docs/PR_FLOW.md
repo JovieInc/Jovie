@@ -25,6 +25,10 @@ the implementation slot only after its exact-head receipt is acknowledged.
 | Activation | Production controller | Exact deployed runtime proof |
 | Closure | Summer | Closure receipt referencing activation proof |
 
+Leaving draft (`ready_for_review`) is owned by `auto-merge-default.yml`, which
+enables native auto-merge and skips drafts. That event does not start another
+source CI flight.
+
 Missing ownership, stale/changed heads, failed checks, lost or duplicate events,
 and expired holds remain bounded repair/evidence outcomes. The policy digest is
 included in delivery receipts so a runtime can reject a mismatched contract.

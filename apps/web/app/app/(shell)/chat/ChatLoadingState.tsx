@@ -3,24 +3,19 @@ import {
   CHAT_COMPOSER_ATTACH_ARIA_LABEL,
   CHAT_COMPOSER_SEND_ARIA_LABEL,
 } from '@/components/jovie/chat-composer-copy';
-import {
-  CHAT_EMPTY_HEADING,
-  CHAT_EMPTY_STILL_SAMPLE,
-  DESKTOP_CONTENT_GRID_ANCHOR,
-} from '@/components/jovie/chat-empty-starters';
+import { DESKTOP_CONTENT_GRID_ANCHOR } from '@/components/jovie/chat-empty-starters';
 import {
   CHAT_CONTENT_SHELL_CLASSNAME,
   CHAT_EMPTY_TOP_SPACING_OWNER,
   CHAT_EMPTY_VIEWPORT_CLASSNAME,
 } from '@/components/jovie/chat-layout';
-import { ChatEmptyStateSamplePreview } from '@/components/jovie/components/ChatEmptyStateComposerRegion';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 /**
  * Chat page loading skeleton.
- * Matches the JovieChat empty state layout: Just ask heading, reserved
- * sample conversation, and empty composer. Nested shells do not add a
- * second top gap under the desktop header.
+ * Matches the JovieChat empty state layout (JOV-7150): one greeting line
+ * above an empty composer — no "Just ask" heading, no sample conversation.
+ * Nested shells do not add a second top gap under the desktop header.
  */
 export default function ChatLoading() {
   return (
@@ -37,24 +32,16 @@ export default function ChatLoading() {
           data-top-spacing-owner={CHAT_EMPTY_TOP_SPACING_OWNER}
         >
           <div
-            className={`${CHAT_CONTENT_SHELL_CLASSNAME} relative flex min-h-0 flex-1 flex-col items-center justify-center px-1 pt-0`}
+            className={`${CHAT_CONTENT_SHELL_CLASSNAME} relative flex min-h-0 flex-1 flex-col justify-end px-1 pb-3 pt-0`}
             data-grid-anchor={DESKTOP_CONTENT_GRID_ANCHOR}
             data-top-spacing-owner='none'
           >
             <div
-              className='flex min-h-40 w-full shrink-0 flex-col items-center justify-center gap-5 text-center'
-              data-testid='chat-empty-state-welcome'
+              aria-hidden='true'
+              className='flex w-full flex-col items-start gap-4'
+              data-testid='chat-empty-state-greeting-region'
             >
-              <h2
-                className='relative z-10 shrink-0 text-2xl font-semibold text-primary-token line-clamp-2'
-                aria-hidden='true'
-                data-testid='chat-empty-state-greeting'
-              >
-                {CHAT_EMPTY_HEADING}
-              </h2>
-              <div aria-hidden='true'>
-                <ChatEmptyStateSamplePreview sample={CHAT_EMPTY_STILL_SAMPLE} />
-              </div>
+              <LoadingSkeleton height='h-9' rounded='lg' width='w-64' />
             </div>
           </div>
 

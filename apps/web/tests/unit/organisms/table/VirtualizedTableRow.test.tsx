@@ -56,6 +56,24 @@ const baseProps = {
 };
 
 describe('VirtualizedTableRow', () => {
+  it('renders a fresh visible-cell snapshot without replacing the row', () => {
+    const row = createRow('1', 'One', false, undefined, {});
+    const visibleCells = row.getVisibleCells();
+    const view = (cells: typeof visibleCells) => (
+      <table>
+        <tbody>
+          <VirtualizedTableRow {...baseProps} row={row} visibleCells={cells} />
+        </tbody>
+      </table>
+    );
+    const { rerender } = render(view(visibleCells));
+    expect(screen.getByRole('cell')).toHaveTextContent('One');
+    rerender(view([]));
+    expect(screen.queryByRole('cell')).not.toBeInTheDocument();
+    rerender(view(visibleCells));
+    expect(screen.getByRole('cell')).toHaveTextContent('One');
+  });
+
   it('forwards extra HTML props onto the <tr> element', () => {
     render(
       <table>
