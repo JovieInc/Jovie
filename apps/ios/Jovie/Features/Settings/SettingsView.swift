@@ -12,6 +12,70 @@ struct AppBuildInfo: Equatable {
   }
 }
 
+/// Canonical release-channel vocabulary (JOV-7535). Mirrors
+/// `@jovie/release-channel-contracts`; Swift surfaces must not invent
+/// per-platform synonyms that are absent from the canonical contract.
+enum ReleaseChannel: String, Equatable {
+  case stable
+  case beta
+  case nightly
+
+  var displayName: String {
+    switch self {
+    case .stable: "Stable"
+    case .beta: "Beta"
+    case .nightly: "Nightly"
+    }
+  }
+}
+
+/// How this iOS binary reached the device. The channel is derived from
+/// provenance, never toggled in-app — an App Store build cannot self-switch
+/// into TestFlight.
+enum AppDistributionProvenance: Equatable {
+  case appStore
+  case testFlight
+  case development
+}
+
+enum ReleaseChannelResolver {
+  static var isDebugBuild: Bool {
+    #if DEBUG
+      true
+    #else
+      false
+    #endif
+  }
+
+  static func provenance(
+    receiptLastPathComponent: String?,
+    isDebugBuild: Bool = ReleaseChannelResolver.isDebugBuild
+  ) -> AppDistributionProvenance {
+    if isDebugBuild { return .development }
+    if receiptLastPathComponent == "sandboxReceipt" { return .testFlight }
+    return .appStore
+  }
+
+  /// Debug/development builds sit on no published rail and report no channel.
+  static func channel(
+    for provenance: AppDistributionProvenance
+  ) -> ReleaseChannel? {
+    switch provenance {
+    case .appStore: .stable
+    case .testFlight: .beta
+    case .development: nil
+    }
+  }
+
+  static func currentChannel(bundle: Bundle = .main) -> ReleaseChannel? {
+    channel(
+      for: provenance(
+        receiptLastPathComponent: bundle.appStoreReceiptURL?.lastPathComponent
+      )
+    )
+  }
+}
+
 enum SettingsLayout {
   static let reservedActionMinHeight: CGFloat = 48
 
@@ -29,6 +93,7 @@ enum SettingsExternalURL {
 struct SettingsView: View {
   let profile: AppShellProfile
   let buildInfo: AppBuildInfo
+  var releaseChannel: ReleaseChannel? = ReleaseChannelResolver.currentChannel()
   let accountURL: URL
   let billingURL: URL
   let onClose: () -> Void
@@ -162,6 +227,9 @@ struct SettingsView: View {
     Section("App") {
       LabeledContent("Version", value: buildInfo.version)
       LabeledContent("Build", value: buildInfo.build)
+      if let releaseChannel {
+        LabeledContent("Release channel", value: releaseChannel.displayName)
+      }
     }
   }
 
