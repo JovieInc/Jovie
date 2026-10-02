@@ -1858,6 +1858,18 @@ class RecoveryHandoff(RuntimeError):
 def preserved_run(host: Host, *, pr=None, issue=None):
     """Recover only from an ended ledger receipt; a marker alone is not ownership."""
     root = host.state / "worktrees"
+    try:
+        lines = (host.state / "runs/ledger.jsonl").read_text().splitlines()
+    except OSError:
+        lines = []
+    discovery_rows = []
+    for line in lines:
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(row, dict):
+            discovery_rows.append(row)
     matches = []
     for marker_path in root.glob(f"*/{disk_guard.PRESERVED_REPAIR}"):
         try:
@@ -1868,19 +1880,9 @@ def preserved_run(host: Host, *, pr=None, issue=None):
             # A damaged marker must not halt every unrelated lane on this host.
             # The ended ledger or canonical run name can identify the target for
             # a refusal, but neither substitutes for a valid recovery marker.
-            try:
-                lines = (host.state / "runs/ledger.jsonl").read_text().splitlines()
-            except OSError:
-                lines = []
-            rows = []
-            for line in lines:
-                try:
-                    rows.append(json.loads(line))
-                except ValueError:
-                    continue  # Keep readable bindings for refusal, never for admission.
-            bound = any(isinstance(row, dict) and row.get("preservedWorktree") == str(marker_path.parent)
+            bound = any(row.get("preservedWorktree") == str(marker_path.parent)
                         and ((pr is not None and row.get("pr") == pr) or (issue and row.get("issue") == issue))
-                        for row in rows)
+                        for row in discovery_rows)
             run_target = f"-PR{pr}-" if pr is not None else f"-{issue}-"
             if bound or run_target in marker_path.parent.name:
                 raise RecoveryHandoff("preserved-marker-unreadable", marker_path.parent)
@@ -1888,7 +1890,18 @@ def preserved_run(host: Host, *, pr=None, issue=None):
                               "worktree": str(marker_path.parent), "owner": HOST,
                               "nextAction": "Reconcile this unidentified marker; source retained."}), file=sys.stderr)
             continue
-        if (pr is not None and marker.get("pr") == pr) or (issue and marker.get("issue") == issue):
+        direct = (pr is not None and marker.get("pr") == pr) or (issue and marker.get("issue") == issue)
+        source_safe = marker.get("pr") is None and marker.get("issue") is None
+        prior = next((row for row in reversed(discovery_rows)
+                      if row.get("runId") == marker.get("runId")), None)
+        # Source-safe cleanup can retain only the run ID; the exact path in its
+        # original receipt supplies a candidate, then the normal guards qualify it.
+        recovered = (
+            source_safe and prior is not None
+            and ((pr is not None and prior.get("pr") == pr) or (issue and prior.get("issue") == issue))
+            and str(marker_path.parent) in {prior.get("worktree"), prior.get("preservedWorktree")}
+        )
+        if direct or recovered:
             matches.append((marker_path.parent, marker))
     if not matches:
         return None
@@ -1902,7 +1915,11 @@ def preserved_run(host: Host, *, pr=None, issue=None):
     except (OSError, ValueError):
         raise RecoveryHandoff("preserved-ledger-unreadable", path)
     prior = next((row for row in reversed(rows) if row.get("runId") == marker.get("runId")), None)
-    if not prior or not prior.get("endedAt") or prior.get("preservedWorktree") != str(path):
+    source_safe = marker.get("pr") is None and marker.get("issue") is None
+    bound_paths = {prior.get("preservedWorktree")} if prior else set()
+    if source_safe and prior:
+        bound_paths.add(prior.get("worktree"))
+    if not prior or not prior.get("endedAt") or str(path) not in bound_paths:
         raise RecoveryHandoff("preserved-owner-not-terminal", path)
     execution = prior.get("execution", {})
     if not isinstance(execution, dict) or execution.get("event") != "attempt_finished" or not all(execution.get(key) for key in
