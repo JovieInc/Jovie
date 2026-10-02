@@ -1314,6 +1314,16 @@ jobs:
           fi
           echo "is_current=true" >> "$GITHUB_OUTPUT"
 
+      - name: Security gate before production promotion
+        if: ${{ steps.final-current.outputs.is_current == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          SECURITY_GATE_ENABLED: ${{ vars.SECURITY_GATE_ENABLED }}
+          SECURITY_GATE_HEAD: ${{ inputs.expected_sha }}
+          SECURITY_GATE_MODE: production
+        run: node scripts/security/security-gate.mjs
+
       - name: Promote staged production deployment
         id: promote
         if: ${{ steps.final-current.outputs.is_current == 'true' }}
