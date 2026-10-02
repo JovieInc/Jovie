@@ -50,7 +50,7 @@ describe('resolveActionCapabilities', () => {
         profileOwned: true,
       });
       const fleetActions = result.filter(capability =>
-        capability.requirements.some(
+        capability.requirements?.some(
           state => state.requirement.type === 'worker_scope'
         )
       );
@@ -62,7 +62,7 @@ describe('resolveActionCapabilities', () => {
           retryable: false,
         });
         expect(
-          capability.requirements.find(
+          capability.requirements?.find(
             state => state.requirement.type === 'worker_scope'
           )?.satisfied
         ).toBe(false);
