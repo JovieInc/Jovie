@@ -199,7 +199,16 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
 
 vi.mock('@/components/jovie/components', async importOriginal => ({
   ...(await importOriginal<typeof import('@/components/jovie/components')>()),
-  ChatInput: () => <div data-testid='chat-input' />,
+  ChatInput: ({
+    desktopConversationReady,
+  }: {
+    desktopConversationReady?: boolean;
+  }) => (
+    <div
+      data-testid='chat-input'
+      data-desktop-conversation-ready={desktopConversationReady}
+    />
+  ),
   ChatMessage: (props: { isThinking?: boolean }) =>
     props.isThinking ? (
       <div data-testid='chat-message-thinking'>
@@ -352,6 +361,31 @@ describe('JovieChat styling regressions', () => {
       container.querySelector('[data-testid="chat-content"]')
     ).toBeTruthy();
     expect(container.querySelector('[data-testid="chat-input"]')).toBeTruthy();
+  });
+
+  it('enables passive desktop composer observation only after initial history loading ends', () => {
+    mockChatState.isLoadingConversation = true;
+    const loadingView = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+    expect(
+      loadingView.container
+        .querySelector('[data-testid="chat-input"]')
+        ?.getAttribute('data-desktop-conversation-ready')
+    ).toBe('false');
+    loadingView.unmount();
+
+    mockChatState.isLoadingConversation = false;
+    const readyView = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+    // Streaming remains active: observation concerns editable UI, not response completion.
+    expect(mockChatState.status).toBe('streaming');
+    expect(
+      readyView.container
+        .querySelector('[data-testid="chat-input"]')
+        ?.getAttribute('data-desktop-conversation-ready')
+    ).toBe('true');
   });
 
   it('windows the transcript once the thread exceeds the shared threshold', () => {

@@ -11,6 +11,8 @@ const QUIT_AND_INSTALL_CHANNEL = 'quit-and-install';
 const GO_BACK_CHANNEL = 'go-back';
 const GO_FORWARD_CHANNEL = 'go-forward';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
+const CLIENT_NAVIGATION_CHANNEL = 'desktop-client-navigation';
+const CLIENT_NAVIGATION_READY_CHANNEL = 'desktop-client-navigation-ready';
 const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
 const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
 const OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL = 'open-current-ovie-in-browser';
@@ -30,6 +32,7 @@ const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
 const TRAY_ACTION_CHANNEL = 'tray-action';
 const DESKTOP_NOTIFICATION_CHANNEL = 'desktop-notification-show';
 const APP_BOOTED_CHANNEL = 'app-booted';
+const DESKTOP_COMPOSER_READINESS_CHANNEL = 'desktop-composer-readiness';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
 const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity';
 const DESKTOP_UPDATE_STATE_CHANNEL = 'desktop-update-state';
@@ -119,6 +122,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   /** Navigate forward in the SPA history stack. */
   goForward: () => {
     return ipcRenderer.invoke(GO_FORWARD_CHANNEL);
+  },
+
+  /** Announce readiness only while a client-router listener is installed. */
+  onNavigate: (cb: (path: string) => void): (() => void) => {
+    if (typeof cb !== 'function') return () => undefined;
+    const listener = (_: unknown, path: unknown) => {
+      if (typeof path === 'string') cb(path);
+    };
+    ipcRenderer.on(CLIENT_NAVIGATION_CHANNEL, listener);
+    ipcRenderer.send(CLIENT_NAVIGATION_READY_CHANNEL, true);
+    return () => {
+      ipcRenderer.removeListener(CLIENT_NAVIGATION_CHANNEL, listener);
+      ipcRenderer.send(CLIENT_NAVIGATION_READY_CHANNEL, false);
+    };
   },
 
   /** Subscribe to nav-state changes (canGoBack / canGoForward). */
@@ -272,6 +289,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ok: boolean;
       reason?: string;
     }>,
+
+  notifyComposerReadiness: (phase: 'visible-editable' | 'focused') => {
+    if (phase !== 'visible-editable' && phase !== 'focused')
+      return Promise.resolve(false);
+    return ipcRenderer.invoke(
+      DESKTOP_COMPOSER_READINESS_CHANNEL,
+      phase
+    ) as Promise<boolean>;
+  },
 
   /**
    * First successful hosted-app paint (JOV-3595). Cancels the main-process
