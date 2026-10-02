@@ -231,10 +231,10 @@ describe('merge_group workflow contract', () => {
     );
     const directory = mkdtempSync(join(tmpdir(), 'changelog-ci-routing-'));
     try {
-      for (const [files, builds] of [
-        ['CHANGELOG.md', true],
-        ['docs/changelog.md', false],
-        ['README.md', false],
+      for (const { files, builds } of [
+        { files: 'CHANGELOG.md', builds: true },
+        { files: 'docs/changelog.md', builds: false },
+        { files: 'README.md', builds: false },
       ]) {
         const output = join(directory, 'outputs');
         writeFileSync(output, '');
