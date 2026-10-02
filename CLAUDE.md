@@ -48,6 +48,7 @@ per instruction. Context/checkpoint guidance: [agent context](docs/agent-context
 | UI/design | [DESIGN.md](DESIGN.md), [ui.md](.claude/rules/ui.md) |
 | Marketing pages (fully static) | [marketing guide](docs/marketing/AGENT_GUIDE.md) |
 | Writing/copy | [writing contract](docs/writing/SURFACE_COVERAGE.md) |
+| Strategy-sensitive planning (pricing, free tier, business model, delegation, substrate) | [strategy canon](canon/strategy/README.md) |
 | Tests/coverage | [testing.md](.claude/rules/testing.md) |
 | PR, CI, merge, deploy | [PR_FLOW.md](docs/PR_FLOW.md), [MERGE_QUEUE.md](.github/MERGE_QUEUE.md), [BRANCH_PROTECTION.md](.github/BRANCH_PROTECTION.md), [release.md](.claude/rules/release.md) |
 | iOS / macOS | [ios.md](.claude/rules/ios.md) / [macos.md](.claude/rules/macos.md) |
