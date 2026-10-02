@@ -182,6 +182,12 @@ import {
   type WindowState,
 } from './window-state';
 import {
+  GET_VISUAL_ACTIVITY_CHANNEL,
+  observeWindowVisualActivity,
+  trustedVisualActivityRequest,
+  VISUAL_ACTIVITY_CHANNEL,
+} from './visual-activity';
+import {
   createWindowStateStore,
   WINDOW_STATE_SHUTDOWN_FLUSH_MS,
 } from './window-state-store';
@@ -364,6 +370,7 @@ let desktopUpdatePhase: DesktopUpdatePhase = DESKTOP_UPDATE_INITIAL_STATE;
 let pendingManualUpdateCheck = false;
 let mainWindow: BrowserWindow | null = null;
 const desktopNavigation = new DesktopNavigationCoordinator();
+const visualActivityReaders = new Map<number, () => boolean>();
 let publicProfilePreviewWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
 let aboutWindow: BrowserWindow | null = null;
@@ -2515,6 +2522,18 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   win.webContents.on('destroyed', () => {
     desktopNavigation.setReady(navigationContentsId, false);
   });
+  const visualActivity = observeWindowVisualActivity(
+    win,
+    powerMonitor,
+    active => {
+      if (!win.webContents.isDestroyed()) {
+        win.webContents.send(VISUAL_ACTIVITY_CHANNEL, active);
+      }
+    }
+  );
+  const visualContentsId = win.webContents.id;
+  visualActivityReaders.set(visualContentsId, visualActivity.read);
+  win.once('closed', () => visualActivityReaders.delete(visualContentsId));
   const authNavigationRecovery = createAuthHandoffNavigationRecovery(APP_ORIGIN);
   const authNavigationContentsId = win.webContents.id;
   authNavigationRecoveries.set(authNavigationContentsId, authNavigationRecovery);
@@ -3107,6 +3126,31 @@ autoUpdater.on('error', error => {
   if (nightlyUpdateLaunch) {
     app.quit();
   }
+});
+
+// Native visibility stays truthful when backgroundThrottling disables Page Visibility.
+ipcMain.handle(GET_VISUAL_ACTIVITY_CHANNEL, (event, ...args: unknown[]) => {
+  const frame = event.senderFrame;
+  if (
+    !trustedVisualActivityRequest({
+      args,
+      isMainWindow: Boolean(
+        mainWindow &&
+          !mainWindow.isDestroyed() &&
+          event.sender === mainWindow.webContents
+      ),
+      isCurrentMainFrame: Boolean(
+        frame &&
+          !frame.detached &&
+          frame === event.sender.mainFrame &&
+          frame.parent === null
+      ),
+      senderUrl: frame?.url ?? '',
+      appOrigin: APP_ORIGIN,
+    })
+  )
+    return null;
+  return visualActivityReaders.get(event.sender.id)?.() ?? null;
 });
 
 // Return only the already-validated identity, and only to the trusted app origin.
