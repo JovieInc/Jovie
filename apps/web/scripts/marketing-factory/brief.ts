@@ -35,6 +35,8 @@ export const FactoryPageBriefSchema = z.object({
    */
   persuasion: CompetitiveResearchSchema,
   sectionJobs: z.array(SectionJobNeedSchema).default([]),
+  /** Repeated story families require a deliberate layout for each occurrence. */
+  sectionVariants: z.record(Id, Id).optional(),
   /** Typed by heroDecision.ts; the harness checks it through selectHeroDecision. */
   hero: z.custom<HeroDecisionInput>(
     value => typeof value === 'object' && value !== null && 'useCase' in value

@@ -75,9 +75,9 @@ describe('factory:run preflight', () => {
       'outcomes: outcomes needs 2 cross-family judge(s); seated 0',
       'narrative: anthropic/claude-opus-5.5 is not reachable from this machine',
       'narrative: narrative needs 2 cross-family judge(s); seated 0',
+      'proof: proof needs 1 cross-family judge(s); seated 0',
       'copy: anthropic/claude-opus-5.5 is not reachable from this machine',
       'copy: copy needs 2 cross-family judge(s); seated 0',
-      'proof: proof needs 1 cross-family judge(s); seated 0',
       'render: no render measurer (CLS/LCP) is wired',
       'adversarial-trust: adversarial-trust needs 2 cross-family judge(s); seated 0',
     ]);

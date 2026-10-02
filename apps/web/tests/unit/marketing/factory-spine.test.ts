@@ -75,11 +75,11 @@ describe('factory stage spine', () => {
       'persuasion',
       'outcomes',
       'narrative',
-      'copy',
       'layout',
       'hero-variant',
       'proof',
       'gap-detection',
+      'copy',
       'media-decision',
       'ref-sourcing',
       'asset',
@@ -115,11 +115,13 @@ describe('factory stage spine', () => {
     }
   );
 
-  it('keeps the generation alias order monotonic on the spine', () => {
-    const positions = MARKETING_GENERATION_STAGES.map(stage =>
-      FACTORY_STAGES.indexOf(MARKETING_GENERATION_STAGE_TO_FACTORY[stage])
+  it('requires the structural plan before copy regardless of legacy alias order', () => {
+    const copy = FACTORY_STAGES.indexOf(
+      MARKETING_GENERATION_STAGE_TO_FACTORY.copy
     );
-    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    for (const stage of ['layout', 'proof', 'gap-detection'] as const) {
+      expect(FACTORY_STAGES.indexOf(stage)).toBeLessThan(copy);
+    }
   });
 
   it('fails when a new marketing stage list appears outside the spine', () => {

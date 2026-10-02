@@ -57,26 +57,24 @@ describe('factory section requests', () => {
     expect(SECTION_REQUEST_GOVERNANCE.localComponentFallback).toBe('forbidden');
   });
 
-  it('omits an over-budget section through its degradation ladder', () => {
+  it('reports an over-budget section but refuses to omit a required story beat', () => {
     const baseline = resolveComposition(brief('Explain the product'));
     expect(baseline.sections.map(s => s.sectionId)).toContain('feature-split');
 
-    const composition = resolveComposition(brief('Explain the product'), {
-      sectionJobs: [
-        {
-          job: 'feature-split',
-          contentShape: { headline: 65, body: 221 },
-          mediaNeed: 'real-product-screenshot',
-          evidence: ['route:/product'],
-        },
-      ],
-    });
+    const sectionJobs = [
+      {
+        job: 'feature-split',
+        contentShape: { headline: 65, body: 221 },
+        mediaNeed: 'real-product-screenshot',
+        evidence: ['route:/product'],
+      },
+    ];
+    const report = detectSectionGaps(sectionJobs);
 
-    expect(composition.degraded).toBe(true);
-    expect(composition.sectionRequests?.[0]).toMatchObject({
+    expect(report.requests[0]).toMatchObject({
       sectionId: 'feature-split',
     });
-    expect(composition.sectionRequests?.[0]?.evidence).toEqual(
+    expect(report.requests[0]?.evidence).toEqual(
       expect.arrayContaining([
         expect.stringContaining(
           'section.feature-split headline=65 exceeds desktop=64 or mobile=44'
@@ -84,16 +82,9 @@ describe('factory section requests', () => {
         expect.stringContaining('design-gap:PROPOSED-SECTION-0001'),
       ])
     );
-    expect(composition.sections.map(s => s.sectionId)).not.toContain(
-      'feature-split'
-    );
-    expect(composition.sections[0]?.sectionId).toBe('hero');
-    expect(composition.trace).toContainEqual(
-      expect.objectContaining({
-        step: 'gap-degradation-omit',
-        reason: expect.stringContaining('product-screenshot ladder rung 3'),
-      })
-    );
+    expect(() =>
+      resolveComposition(brief('Explain the product'), { sectionJobs })
+    ).toThrow('Incomplete story');
   });
 
   it('keeps exactly one hero and requires shadow when the hero job has a gap', () => {

@@ -14,6 +14,8 @@ export type MarketingCompositionValidationCode =
   | 'hero-order'
   | 'unregistered-section'
   | 'unregistered-variant'
+  | 'incomplete-story'
+  | 'duplicate-instance'
   | 'duplicate-cardinality';
 
 export interface MarketingCompositionValidationIssue {
@@ -49,6 +51,27 @@ export function validateMarketingComposition(
   if (composition.sections.length === 0) {
     add('empty-composition', 'a marketing composition must contain a section');
   }
+  const body = composition.sections.filter(
+    section =>
+      !['hero', 'cta', 'logo-cloud', 'social-proof', 'stats', 'faq'].includes(
+        section.sectionId
+      )
+  );
+  if (body.length === 0) {
+    add(
+      'incomplete-story',
+      'a story needs a substantive explanation or conversion mechanism after its promise'
+    );
+  }
+  if (
+    composition.ctaCadence !== 'hero-only' &&
+    composition.sections.at(-1)?.sectionId !== 'cta'
+  ) {
+    add(
+      'incomplete-story',
+      'the declared CTA cadence requires a terminal conversion section'
+    );
+  }
 
   const heroIndexes = composition.sections.flatMap((section, index) =>
     section.sectionId === hero.sectionId ? [index] : []
@@ -69,7 +92,18 @@ export function validateMarketingComposition(
   }
 
   const counts = new Map<string, number>();
+  const instances = new Set<string>();
   for (const section of composition.sections) {
+    if (section.sectionInstanceId) {
+      if (instances.has(section.sectionInstanceId)) {
+        add(
+          'duplicate-instance',
+          `story instance ${section.sectionInstanceId} appears more than once`,
+          section.sectionId
+        );
+      }
+      instances.add(section.sectionInstanceId);
+    }
     const entry = getMarketingSectionRegistryEntry(section.sectionId);
     if (!entry) {
       add(

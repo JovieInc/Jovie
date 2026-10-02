@@ -226,19 +226,40 @@ describe('liveVisualJudges', () => {
     await expect(pair.cheap.run({} as never)).rejects.toThrow(/no reachable/);
   });
 
-  it('seats cross-family subscription vision judges', async () => {
-    const pair = await liveVisualJudges(
-      fixtureTransport(),
-      PRODUCER,
-      async () => ({
-        evaluateArt: vi.fn(),
-        subscriptionVisionTransport: () => vi.fn(),
-      })
-    );
+  it.each([
+    [PRODUCER, 'openai/gpt-5.6-luna'],
+    ['openai/gpt-5.6-sol', 'anthropic/claude-sonnet-5'],
+  ])(
+    'never seats the %s producer family as an escalation judge',
+    async (producer, cheap) => {
+      const pair = await liveVisualJudges(
+        fixtureTransport(),
+        producer,
+        async () => ({
+          evaluateArt: vi.fn(),
+          subscriptionVisionTransport: () => vi.fn(),
+        })
+      );
 
-    expect(pair.cheap.id).toBe('openai/gpt-5.6-luna');
-    expect(pair.flagship.id).toBe('anthropic/claude-opus-5.5');
-  });
+      expect(pair.cheap.id).toBe(cheap);
+      expect(pair.flagship.id).toBeNull();
+      await expect(
+        runVisualReview(
+          { ...request, producerModel: producer },
+          { ...pair, cheap: stage(pair.cheap.id, 0.5) }
+        )
+      ).resolves.toMatchObject({
+        status: 'credentials-unavailable',
+        reason: 'visual review at 390 undecided: credentials-unavailable',
+      });
+      await expect(
+        runVisualReview(
+          { ...request, producerModel: producer },
+          { ...pair, cheap: stage(pair.cheap.id, 0.9) }
+        )
+      ).resolves.toMatchObject({ status: 'reviewed', verdict: 'pass' });
+    }
+  );
 });
 
 describe('providers.reviewVisual', () => {
