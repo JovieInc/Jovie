@@ -135,6 +135,10 @@ export interface ElectronAPI {
    * boot watchdog (JOV-3595). Optional — older binaries ignore the channel.
    */
   readonly notifyAppBooted?: () => void;
+  /** Passive authenticated-composer milestone. Optional on older binaries. */
+  readonly notifyComposerReadiness?: (
+    phase: 'visible-editable' | 'focused'
+  ) => Promise<boolean>;
   /** Launch a preflighted Ovie web origin or SSH TUI. Optional on older binaries. */
   readonly launchOperatorControl?: (
     request: OperatorLaunchRequest
@@ -495,6 +499,20 @@ export function notifyDesktopAppBooted(): void {
     api.notifyAppBooted();
   } catch {
     // Non-fatal — the watchdog remains armed if send fails.
+  }
+}
+
+/** Old binaries and browsers silently omit optional launch evidence. */
+export async function notifyDesktopComposerReadiness(
+  phase: 'visible-editable' | 'focused'
+): Promise<boolean> {
+  if (!isElectronRuntime()) return false;
+  const api = getRawElectronAPI();
+  if (typeof api?.notifyComposerReadiness !== 'function') return false;
+  try {
+    return (await api.notifyComposerReadiness(phase)) === true;
+  } catch {
+    return false;
   }
 }
 
