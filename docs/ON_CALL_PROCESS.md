@@ -20,6 +20,20 @@ Primary detection channels:
 2. **Synthetic monitoring Slack alerts** (golden-path regressions)
 3. **Uptime monitor alerts** (availability / health endpoint failures)
 
+Live Sentry detectors and the October 2, 2026 notification wiring are listed in
+[Production Sentry monitors](COST_MONITORING.md#production-sentry-monitors-october-2-2026).
+Use those IDs during triage:
+
+- jov.ie error rate: monitor [10520248](https://jovie.sentry.io/monitors/10520248/), alert [2854889](https://jovie.sentry.io/monitors/alerts/2854889/)
+- summer.jov.ie error rate: monitor [10520461](https://jovie.sentry.io/monitors/10520461/), same alert 2854889. It sees Summer only when `jovie-web` events carry a `summer.jov.ie` url, transaction, or server name.
+- Uptime: [10520249](https://jovie.sentry.io/monitors/10520249/) (`https://jov.ie`), [10327180](https://jovie.sentry.io/monitors/10327180/) (`https://jov.ie/api/health/build-info`), [10327184](https://jovie.sentry.io/monitors/10327184/) (`https://summer.jov.ie/runtime/v1/health`), alert [6106070](https://jovie.sentry.io/monitors/alerts/6106070/)
+
+The deep production synthetic job is red because Doppler `jovie-web/prd` is
+missing the six waitlist canary secrets. That blocker, and the runs that show
+it, are in
+[Current production blocker](SYNTHETIC_MONITORING.md#current-production-blocker-october-2-2026).
+A green daily Web AI workflow run does not clear it.
+
 If multiple channels trigger for the same window, treat the incident as **P0 until proven otherwise**.
 
 ## Severity Model
