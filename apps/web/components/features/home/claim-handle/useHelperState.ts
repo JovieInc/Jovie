@@ -63,5 +63,5 @@ export const HELPER_TONE_CLASSES = {
   idle: 'text-secondary-token',
   pending: 'text-secondary-token',
   success: 'text-success',
-  error: 'text-destructive',
+  error: 'text-error',
 } as const;
