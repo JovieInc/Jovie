@@ -80,7 +80,7 @@
       "apps/ios/Packages/JovieKit/**",
       "docs/macos/**"
     ],
-    "bodySha256": "857b479a05f02e635aa5b779bea8f800f5c83bc8e724b2abeeda7d4710be8cf0"
+    "bodySha256": "d1f70045679136a6f2e7c273318e1d606163d570cdedb03094c7934d8b83ebd5"
   },
   {
     "file": ".claude/rules/motion.md",
