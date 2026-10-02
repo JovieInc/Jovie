@@ -89,10 +89,14 @@ describe('fixed Summer fleet wake transport', () => {
 
   it('fails on delivery denial so durable reconciliation retains responsibility', async () => {
     const deps = dependencies();
-    deps.fetch.mockResolvedValue(new Response(null, { status: 503 }));
+    const cancel = vi.fn(() => new Promise<void>(() => {}));
+    deps.fetch.mockResolvedValue(
+      new Response(new ReadableStream({ cancel }), { status: 503 })
+    );
     await expect(sendSummerFleetWake(profileId, eventId, deps)).rejects.toThrow(
       'summer_fleet_wake_unavailable'
     );
     expect(deps.fetch).toHaveBeenCalledTimes(1);
+    expect(cancel).toHaveBeenCalledTimes(1);
   });
 });

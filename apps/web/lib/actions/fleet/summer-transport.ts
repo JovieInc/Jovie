@@ -42,5 +42,8 @@ export async function sendSummerFleetWake(
       context: 'Summer fleet event wake',
     }
   );
+  // The wake needs only its acknowledgement status. Release either response
+  // body without allowing untrusted cleanup to extend the delivery deadline.
+  void response.body?.cancel().catch(() => undefined);
   if (!response.ok) throw new Error('summer_fleet_wake_unavailable');
 }
