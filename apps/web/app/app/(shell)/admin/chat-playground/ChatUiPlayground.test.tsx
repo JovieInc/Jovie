@@ -2,10 +2,21 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { ToolPartsRenderer } from '@/components/jovie/tool-ui';
+import type { MessagePart } from '@/components/jovie/types';
 
 vi.mock('@/components/jovie/components/ChatMessage', () => ({
-  ChatMessage: ({ id }: Pick<ComponentProps<'div'>, 'id'>) => (
-    <div data-testid={`fixture-message-${id}`}>{id}</div>
+  ChatMessage: ({
+    id,
+    parts,
+  }: Pick<ComponentProps<'div'>, 'id'> & { parts: readonly MessagePart[] }) => (
+    <div data-testid={`fixture-message-${id}`}>
+      {id === 'playground-tool-running' ? (
+        <ToolPartsRenderer parts={parts} />
+      ) : (
+        id
+      )}
+    </div>
   ),
 }));
 
@@ -16,6 +27,16 @@ import {
 } from './ChatUiPlayground';
 
 describe('ChatUiPlayground', () => {
+  it('uses the canonical running tool presentation without an unsupported summary', async () => {
+    const user = userEvent.setup();
+    render(<ChatUiPlayground />);
+    await user.click(screen.getByRole('button', { name: 'Tool lifecycle' }));
+    const running = within(screen.getByLabelText('Running'));
+    expect(running.getByText('Inspecting that source…')).toBeInTheDocument();
+    expect(
+      running.queryByText('Reading the supplied press page.')
+    ).not.toBeInTheDocument();
+  });
   it('keeps the critical state inventory and cleanup proposal connected', () => {
     expect(
       CHAT_PLAYGROUND_SCENARIOS.flatMap(scenario => scenario.coverage)

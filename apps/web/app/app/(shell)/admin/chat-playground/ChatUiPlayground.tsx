@@ -76,15 +76,19 @@ function toolPart({
   errorMessage,
   output,
   approval,
-}: Readonly<{
-  id: string;
-  toolName: string;
-  state: PersistedToolState;
-  summary?: string;
-  errorMessage?: string;
-  output?: Record<string, unknown>;
-  approval?: PersistedToolEvent['approval'];
-}>): MessagePart {
+}: Readonly<
+  {
+    id: string;
+    toolName: string;
+    errorMessage?: string;
+    output?: Record<string, unknown>;
+    approval?: PersistedToolEvent['approval'];
+  } & (
+    | { state: Exclude<PersistedToolState, 'running'>; summary?: string }
+    | { state: 'running'; summary?: never }
+  )
+>): MessagePart {
+  // Running SDK parts carry input only; their copy comes from the canonical tool registry.
   return toolEventToMessagePart({
     schemaVersion: 2,
     toolCallId: id,
@@ -213,7 +217,6 @@ function ToolLifecycleFixture() {
               id: 'tool-running',
               toolName: 'inspectPressSource',
               state: 'running',
-              summary: 'Reading the supplied press page.',
             }),
           ]}
           skipEntrance
@@ -276,7 +279,6 @@ function GroupedToolsFixture() {
             id: 'grouped-running',
             toolName: 'suggestRelatedArtists',
             state: 'running',
-            summary: 'Comparing adjacent audiences.',
           }),
           toolPart({
             id: 'grouped-failed',
