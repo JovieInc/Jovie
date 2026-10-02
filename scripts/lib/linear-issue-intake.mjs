@@ -12,7 +12,7 @@ async function readResponse(response) {
   }
 }
 
-async function linearGraphql(
+export async function linearGraphql(
   { query, variables, apiKey, fetchImpl = fetch },
   caller
 ) {

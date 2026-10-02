@@ -1,0 +1,203 @@
+name: DeepSec Security Scan
+# clock-class: upstream-advisory
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Summer
+# necessary-trust-boundary: The scan job holds only the AI Gateway key and never runs PR code; the record job runs trusted main code with contents write for the ledger branch, PR comment write, and the Linear key.
+# revisit-trigger: Revisit when the guarded lane (JOV-6696) owns security findings end to end, or after two months of ledger spend data.
+#
+# Advisory AI security scans (vercel-labs/deepsec); never blocks a PR or the
+# queue. PR: diff-only sensitive files. Daily: one budgeted full scan per new
+# DeepSecBench top-3 model. Weekly: cheap backlog scan + fix verification.
+# Caps, models, kill switch: scripts/security/deepsec/policy.json and the
+# DEEPSEC_SCAN_ENABLED=false repo variable.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'apps/web/app/**'
+      - 'apps/web/lib/**'
+      - 'apps/web/proxy.ts'
+      - 'apps/web/constants/platforms/cdn-domains.ts'
+      - 'packages/**'
+      - '.github/workflows/**'
+  schedule:
+    - cron: '41 6 * * *' # Daily: new frontier model on DeepSecBench?
+    - cron: '17 7 * * 1' # Weekly: cheap full scan + fix verification
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'frontier = once-per-model full scan; weekly = cheap full scan + verification'
+        type: choice
+        options: [frontier, weekly]
+        default: frontier
+      model:
+        description: 'frontier only: DeepSecBench gateway id (e.g. openai/gpt-6-sol); empty = next unscanned top-3 model'
+        type: string
+        default: ''
+      force:
+        description: 'frontier only: rescan a model the ledger already recorded'
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: deepsec-${{ github.event.pull_request.number || github.event.schedule || inputs.mode }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  WEEKLY_CRON: '17 7 * * 1'
+  # Trusted code always comes from main; PR source is only ever read.
+  TRUSTED_REF: ${{ github.event.pull_request.base.sha || github.sha }}
+
+jobs:
+  plan:
+    name: Plan (ledger + budget)
+    if: >-
+      vars.DEEPSEC_SCAN_ENABLED != 'false' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      run: ${{ steps.plan.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TRUSTED_REF }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Changed files (PR)
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" \
+            --jq '.[] | select(.status != "removed") | .filename' > "$RUNNER_TEMP/changed.txt"
+      - name: Plan
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+          INPUT_MODE: ${{ inputs.mode }}
+          INPUT_MODEL: ${{ inputs.model }}
+          INPUT_FORCE: ${{ inputs.force }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ github.event_name != 'pull_request' && secrets.LINEAR_API_KEY || '' }}
+          DEEPSEC_MONTHLY_CAP_USD: ${{ vars.DEEPSEC_MONTHLY_CAP_USD }}
+          DEEPSEC_PR_RUN_CAP_USD: ${{ vars.DEEPSEC_PR_RUN_CAP_USD }}
+          DEEPSEC_WEEKLY_RUN_CAP_USD: ${{ vars.DEEPSEC_WEEKLY_RUN_CAP_USD }}
+          DEEPSEC_FRONTIER_RUN_CAP_USD: ${{ vars.DEEPSEC_FRONTIER_RUN_CAP_USD }}
+          PLAN_FILE: ${{ runner.temp }}/plan.json
+        run: |
+          # Bootstrap: the PR that adds this loop runs before main has it.
+          if [ ! -f scripts/security/deepsec-run.mjs ]; then
+            echo "DeepSec loop is not on the trusted ref yet; skipping." >> "$GITHUB_STEP_SUMMARY"
+            echo '{"run":false}' > "$PLAN_FILE"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          CHANGED_FILES="$(cat "$RUNNER_TEMP/changed.txt" 2>/dev/null || true)"
+          export CHANGED_FILES
+          node scripts/security/deepsec-run.mjs plan
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: deepsec-plan
+          path: ${{ runner.temp }}/plan.json
+          retention-days: 7
+
+  scan:
+    name: Scan (advisory)
+    needs: plan
+    if: needs.plan.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    # Holds only the gateway key: no repo write, no Linear, no PR code executed.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TRUSTED_REF }}
+          path: trusted
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: src
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: trusted/.nvmrc
+      - name: Install pinned scanner (trusted lockfile, no install scripts)
+        working-directory: trusted/scripts/security/deepsec
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: deepsec-plan
+          path: ${{ runner.temp }}
+      - name: Scan within budget
+        env:
+          # A dedicated key (with its own Vercel budget) is preferred for
+          # attribution; the shared key is the fallback until it exists.
+          AI_GATEWAY_API_KEY: ${{ secrets.DEEPSEC_AI_GATEWAY_API_KEY || secrets.AI_GATEWAY_API_KEY }}
+          SRC_ROOT: ${{ github.workspace }}/src
+          PLAN_FILE: ${{ runner.temp }}/plan.json
+          RESULT_FILE: ${{ runner.temp }}/result.json
+        run: node trusted/scripts/security/deepsec-run.mjs scan
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: deepsec-result
+          path: ${{ runner.temp }}/result.json
+          retention-days: 7
+          if-no-files-found: ignore
+
+  record:
+    name: Record (ledger + Linear)
+    needs: [plan, scan]
+    if: always() && needs.plan.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Trusted code only; consumes the JSON result, never scanner output as code.
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TRUSTED_REF }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: deepsec-*
+          merge-multiple: true
+          path: ${{ runner.temp }}
+      - name: Update ledger and reconcile findings
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ github.event_name != 'pull_request' && secrets.LINEAR_API_KEY || '' }}
+          PLAN_FILE: ${{ runner.temp }}/plan.json
+          RESULT_FILE: ${{ runner.temp }}/result.json
+          PR_COMMENT_FILE: ${{ runner.temp }}/pr-comment.md
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/security/deepsec-run.mjs record
+      - name: PR comment (advisory)
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          [ -s "$RUNNER_TEMP/pr-comment.md" ] || exit 0
+          bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" deepsec "$(cat "$RUNNER_TEMP/pr-comment.md")"

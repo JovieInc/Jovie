@@ -32,7 +32,7 @@
 ^scripts/tests/test_(lane_runner|agent_workflow_hygiene|brand_scrub|gh_retry|runner_routing|vercel_prebuilt_deploy)\.py
 
 # Typed company composition must run its real coverage gate on future edits too.
-^scripts/security/deepsec-(policy|loop)(\.test)?\.mjs$
+^scripts/security/deepsec-(policy|loop|run)(\.test)?\.mjs$
 ^scripts/security/deepsec/
 ^scripts/summer-commissioning/
 
