@@ -132,25 +132,38 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         accounts = {"error": str(error)[:80], "accounts": {}, "available": []}
     account_observed_at = sample_clock()
     capacity_by_provider = host_capacity(host, lane)
+    linear_skipped = None
     try:
-        qualified_by_provider, candidate_pool, candidate_counts, rejected = qualified_pool(host, lane, capacity_by_provider, now)
-        eligible_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
-        eligible_pool = len({issue.identifier for issues in qualified_by_provider.values() for issue in issues})
-        budgets = {name: lane.read_new_issue_budget(name, seats["slots"])
-                   for name, seats in capacity_by_provider.items()}
-        qualified_by_provider = {name: issues if budgets[name]["allowed"] else []
-                                 for name, issues in qualified_by_provider.items()}
-        pool_by_provider = {name: (None if budgets[name]["used"] is None else len(issues))
-                            for name, issues in qualified_by_provider.items()}
-        qualified_jobs = {name: [issue.identifier for issue in issues]
-                          for name, issues in qualified_by_provider.items()}
-        pool = (None if any(value is None for value in pool_by_provider.values()) else
-                len({issue.identifier for issues in qualified_by_provider.values() for issue in issues}))
-        linear_error = None
-    except Exception as error:
-        pool, candidate_pool, pool_by_provider, qualified_jobs, linear_error = None, None, {}, {}, f"{type(error).__name__}: {error}"[:100]
+        client = lane.Linear(host.linear_env)
+        if lane.linear_cooldown_until(client.key) is not None:
+            linear_skipped = "cooldown"
+    except (Exception, SystemExit):
+        linear_skipped = None
+    if linear_skipped:
+        pool, candidate_pool, pool_by_provider, qualified_jobs = None, None, {}, {}
         candidate_counts, rejected = {}, {}
         eligible_pool, eligible_by_provider, budgets = None, {}, {}
+        linear_error = None
+    else:
+        try:
+            qualified_by_provider, candidate_pool, candidate_counts, rejected = qualified_pool(host, lane, capacity_by_provider, now)
+            eligible_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
+            eligible_pool = len({issue.identifier for issues in qualified_by_provider.values() for issue in issues})
+            budgets = {name: lane.read_new_issue_budget(name, seats["slots"])
+                       for name, seats in capacity_by_provider.items()}
+            qualified_by_provider = {name: issues if budgets[name]["allowed"] else []
+                                     for name, issues in qualified_by_provider.items()}
+            pool_by_provider = {name: (None if budgets[name]["used"] is None else len(issues))
+                                for name, issues in qualified_by_provider.items()}
+            qualified_jobs = {name: [issue.identifier for issue in issues]
+                              for name, issues in qualified_by_provider.items()}
+            pool = (None if any(value is None for value in pool_by_provider.values()) else
+                    len({issue.identifier for issues in qualified_by_provider.values() for issue in issues}))
+            linear_error = None
+        except Exception as error:
+            pool, candidate_pool, pool_by_provider, qualified_jobs, linear_error = None, None, {}, {}, f"{type(error).__name__}: {error}"[:100]
+            candidate_counts, rejected = {}, {}
+            eligible_pool, eligible_by_provider, budgets = None, {}, {}
     github = None
     merged, merged_error = [], None
     try:
@@ -196,7 +209,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "codexAttribution": codex_attribution(accounts, account_observed_at),
         "qualifiedJobsByProvider": qualified_jobs,
         "candidatePoolByProvider": candidate_counts, "rejectedByProvider": rejected,
-        "linearError": linear_error, "githubRemaining": github,
+        "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "merged24h": merged, "mergedAttributionError": merged_error,
         "diskFreePct": round(100 * disk.free / disk.total, 1),
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
@@ -808,7 +821,9 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     previous["codexIdleSince"] = previous["providerIdleSince"].get("codex")  # old readers
     alerts = judge(obs, previous)
     conditions = condition_receipts(alerts, previous, obs, lane.HOST)
-    if tracker is None and not os.environ.get("LANES_SELFTEST"):
+    if obs.get("linearSkipped"):
+        tracker = None
+    elif tracker is None and not os.environ.get("LANES_SELFTEST"):
         try:
             tracker = Tracker(lane.Linear(host.linear_env), lane.HOST)
         except Exception:
@@ -818,6 +833,8 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     result["codexIdleSince"] = previous["codexIdleSince"]
     result["providerIdleSince"] = previous["providerIdleSince"]
     result["observed"] = {k: v for k, v in obs.items() if k not in ("tick", "codex", "_receipts24h", "_allReceipts")}
+    if obs.get("linearSkipped"):
+        result["linearSkipped"] = obs["linearSkipped"]
     if not os.environ.get("LANES_SELFTEST"):
         try:
             obs["slo"] = fetch_slo(host, lane)
