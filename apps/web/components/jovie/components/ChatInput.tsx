@@ -75,7 +75,7 @@ export interface ChatInputProps {
   readonly onInterruptAndSend?: () => void;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
-  /** Opt in only for a loaded conversation in the authenticated chat owner. */
+  /** Opt in when the authenticated chat owner finishes initial history loading. */
   readonly desktopConversationReady?: boolean;
   readonly placeholder?: string;
   readonly variant?: 'default' | 'compact' | 'hero';
