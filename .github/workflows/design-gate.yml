@@ -1,3 +1,7 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Cursor
+# necessary-trust-boundary: Read-only pull_request listing of changed files via the ephemeral github.token (`gh api .../pulls/<n>/files`); permissions are contents:read + pull-requests:read only, so the hop can observe but cannot write labels, checks, code, or comments. No merge, deploy, or release authority is added.
+# revisit-trigger: Remove this workflow (and the exception) once the design gate is enforced by an existing controller or required check rather than a standalone pull_request hop; otherwise revisit if DESIGN_GATE_ENFORCE graduates to a merge-queue required check.
 name: Design gate
 
 # Warns when a PR touches a marketing or landing surface without a completed
