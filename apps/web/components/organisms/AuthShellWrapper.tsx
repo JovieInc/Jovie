@@ -111,9 +111,14 @@ function AuthShellWrapperInner({
     config.section === 'dashboard' &&
     !config.isChatRoute &&
     previewPanelDefaultOpen;
-  const previewPanelScope = config.isArtistProfileSettings
-    ? 'artist-profile-settings'
-    : 'app-shell';
+  // Chat gets its own rail scope: entering chat always starts with the
+  // profile rail closed — it only opens from an explicit action
+  // (rail toggle, `]`, or the ?panel=profile deep link). JOV-7150.
+  const previewPanelScope = config.isChatRoute
+    ? 'chat'
+    : config.isArtistProfileSettings
+      ? 'artist-profile-settings'
+      : 'app-shell';
 
   const showArtistProfileRailToggle =
     previewEnabled &&
@@ -255,9 +260,9 @@ function AuthShellWrapperInner({
         <ComposerFocusProvider>
           <RightPanelProvider>
             <PreviewPanelProvider
-              key={previewPanelScope}
               defaultOpen={shouldDefaultOpenPreviewPanel}
               enabled={previewEnabled}
+              scope={previewPanelScope}
             >
               <RightRailKeyboardHandler />
               <AuthShell

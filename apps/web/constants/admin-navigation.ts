@@ -79,11 +79,9 @@ export const ADMIN_SETTINGS_TOOL_IDS = [
   'activity',
   'investors',
   'feature_registry',
-  'screenshots',
   'share_studio',
   'costs',
   'revenue_lift',
-  'system_map',
   'features',
 ] as const satisfies readonly AdminWorkspaceId[];
 
@@ -183,13 +181,6 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     section: 'utilities',
   },
   {
-    id: 'screenshots',
-    label: 'Screenshots',
-    href: APP_ROUTES.ADMIN_SCREENSHOTS,
-    description: 'Generated docs and QA screenshots',
-    section: 'utilities',
-  },
-  {
     id: 'costs',
     label: 'Costs',
     href: APP_ROUTES.ADMIN_COSTS,
@@ -210,13 +201,6 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     label: 'Share Studio',
     href: APP_ROUTES.ADMIN_SHARE_STUDIO,
     description: 'Preview story assets, payloads, and tracked share outputs',
-    section: 'utilities',
-  },
-  {
-    id: 'system_map',
-    label: 'System Map',
-    href: APP_ROUTES.ADMIN_SYSTEM,
-    description: 'Read-only map of skills, connectors, tools, and memory',
     section: 'utilities',
   },
   {

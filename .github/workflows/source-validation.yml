@@ -13,6 +13,9 @@ jobs:
     name: Source Validation
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - &source-checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -29,6 +32,7 @@ jobs:
         uses: ./.github/actions/setup-playwright
       - name: Run deterministic source contract
         env:
+          GH_TOKEN: ${{ github.token }}
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
           TURBO_SCM_BASE: origin/${{ github.base_ref }}
           TURBO_SCM_HEAD: ${{ github.event.pull_request.head.sha }}
@@ -38,6 +42,7 @@ jobs:
           node scripts/verify-workflow-references.mjs
           node scripts/lockfile-specifier-preflight.mjs
           node scripts/ci-release-incident-contract.mjs
+          node scripts/changelog-source-guard.mjs
           pnpm ci:harness:check
           pnpm typecheck
           pnpm biome:check

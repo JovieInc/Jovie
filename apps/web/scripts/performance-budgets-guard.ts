@@ -23,6 +23,11 @@ import {
   type PerfTimingMetricName,
 } from './performance-route-manifest';
 import protectedOriginModule from './vercel-protected-origin.cjs';
+import {
+  clearWarmNavProbe,
+  installWarmNavigationProbe,
+  type WarmNavigationProbeWindow,
+} from './warm-navigation-probe';
 
 type SameSiteValue = 'Lax' | 'None' | 'Strict';
 
@@ -89,10 +94,8 @@ interface StorageStateFile {
   readonly cookies?: readonly AuthCookie[];
 }
 
-interface PerfPageWindow extends Window {
+interface PerfPageWindow extends WarmNavigationProbeWindow {
   __perfAliasPhaseProbe?: AliasPhaseProbeState;
-  __perfWarmNavFallbackStart?: number;
-  __perfWarmNavStart?: number;
 }
 
 export interface AliasPhaseTiming {
@@ -1059,35 +1062,7 @@ export async function waitForWarmDestinationReady(
 }
 
 async function armWarmNavigationStart(locator: Locator) {
-  await locator.evaluate(node => {
-    const perfWindow = window as PerfPageWindow;
-    perfWindow.__perfWarmNavStart = undefined;
-    perfWindow.__perfWarmNavFallbackStart = performance.now();
-    node.addEventListener(
-      'pointerdown',
-      () => {
-        if (typeof perfWindow.__perfWarmNavStart !== 'number') {
-          perfWindow.__perfWarmNavStart = performance.now();
-        }
-      },
-      {
-        capture: true,
-        once: true,
-      }
-    );
-    node.addEventListener(
-      'click',
-      () => {
-        if (typeof perfWindow.__perfWarmNavStart !== 'number') {
-          perfWindow.__perfWarmNavStart = performance.now();
-        }
-      },
-      {
-        capture: true,
-        once: true,
-      }
-    );
-  });
+  await locator.evaluate(installWarmNavigationProbe, null);
 }
 
 async function readWarmNavigationElapsed(page: Page) {
@@ -1104,6 +1079,19 @@ async function readWarmNavigationElapsed(page: Page) {
 
     return performance.now() - start;
   });
+}
+
+function getWarmNavigationAcknowledgmentItemId(
+  route: PerfRouteDefinition
+): string {
+  const navigationItemId = route.navigationItemId?.trim();
+  if (!navigationItemId) {
+    throw new TypeError(
+      `Warm-navigation route "${route.id}" is missing navigationItemId for shell acknowledgment measurement.`
+    );
+  }
+
+  return navigationItemId;
 }
 
 export async function measureWarmNavigationRoute(
@@ -1146,39 +1134,57 @@ export async function measureWarmNavigationRoute(
 
   const startedAt = Date.now();
   const expectedPaths = expectedRoutePaths(route, resolvedDestinationPath);
-  await armWarmNavigationStart(visibleTrigger);
+  const acknowledgmentItemId =
+    route.measureMode === 'warm-navigation'
+      ? getWarmNavigationAcknowledgmentItemId(route)
+      : null;
+  await visibleTrigger.evaluate(
+    installWarmNavigationProbe,
+    acknowledgmentItemId
+  );
   const routeReadyPromise = waitForExpectedUrl(page, expectedPaths);
-  await visibleTrigger.click({ noWaitAfter: true });
+  try {
+    const acknowledgmentReady = acknowledgmentItemId
+      ? page.waitForFunction(
+          () =>
+            typeof (window as PerfPageWindow).__perfWarmNavAcknowledgedAt ===
+            'number',
+          undefined,
+          { timeout: READY_TIMEOUT_MS }
+        )
+      : Promise.resolve();
+    await Promise.all([
+      visibleTrigger.click({ noWaitAfter: true }),
+      routeReadyPromise,
+      acknowledgmentReady,
+    ]);
 
-  let warmShellResponse: number;
-  if (route.measureMode === 'warm-navigation') {
-    // The authenticated shell keeps the source route mounted until the
-    // destination commits, so the perceived response is the nav control's
-    // paint-only pending acknowledgment — not the URL commit, which also
-    // waits on the destination payload. The nav holds
-    // data-navigation-pending for a minimum visible window so this probe
-    // observes the acknowledgment even when a prefetched transition commits
-    // almost immediately.
-    await waitForAnyVisible(page, ['[data-navigation-pending="true"]']);
-    warmShellResponse = await readWarmNavigationElapsed(page);
-  } else {
-    await routeReadyPromise;
-    warmShellResponse = await readWarmNavigationElapsed(page);
+    const warmShellResponse = acknowledgmentItemId
+      ? await page.evaluate(() => {
+          const probe = window as PerfPageWindow;
+          if (
+            typeof probe.__perfWarmNavStart !== 'number' ||
+            typeof probe.__perfWarmNavAcknowledgedAt !== 'number'
+          ) {
+            throw new Error(
+              'Warm-navigation acknowledgment receipt is missing.'
+            );
+          }
+          return probe.__perfWarmNavAcknowledgedAt - probe.__perfWarmNavStart;
+        })
+      : await readWarmNavigationElapsed(page);
+    const shouldMeasureDestinationContent =
+      hasTimingBudget(route, 'skeleton-to-content') ||
+      (route.measureMode === 'profile-warm-transition' &&
+        hasTimingBudget(route, 'interactive-shell-ready'));
+    const skeletonToContent = shouldMeasureDestinationContent
+      ? await waitForContentReady(page, route, startedAt, true)
+      : 0;
+
+    return { skeletonToContent, warmShellResponse };
+  } finally {
+    await page.evaluate(clearWarmNavProbe);
   }
-
-  await routeReadyPromise;
-  const shouldMeasureDestinationContent =
-    hasTimingBudget(route, 'skeleton-to-content') ||
-    (route.measureMode === 'profile-warm-transition' &&
-      hasTimingBudget(route, 'interactive-shell-ready'));
-  const skeletonToContent = shouldMeasureDestinationContent
-    ? await waitForContentReady(page, route, startedAt, true)
-    : 0;
-
-  return {
-    skeletonToContent,
-    warmShellResponse,
-  };
 }
 
 export async function measureSameRouteInteraction(
