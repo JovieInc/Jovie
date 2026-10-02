@@ -603,6 +603,11 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
         attention.append(rgb(RED, f"failed runs 24h {ledger['failed']}"))
     if ledger.get("gate-timeout"):
         attention.append(rgb(ORANGE, f"gate timeouts 24h {ledger['gate-timeout']}"))
+    escalation = local.get("doctor", {}).get("escalation") or {}
+    if escalation.get("escalating") or escalation.get("ladder_exhausted") or escalation.get("surfaced"):
+        attention.append(rgb(ORANGE, f"escalation {escalation.get('escalating', 0)} "
+                                     f"exhausted {escalation.get('ladder_exhausted', 0)} "
+                                     f"surfaced {len(escalation.get('surfaced') or [])}"))
     if not attention:
         attention.append(rgb(GREEN, "✓ nothing needs a human"))
     lines.append(rgb(FG, "NEEDS ATTENTION  ", bold=True) + rgb(DIM, f"held {len(local['held'])} · failures {len(local['failures'])} · ") + " · ".join(attention[:4]))

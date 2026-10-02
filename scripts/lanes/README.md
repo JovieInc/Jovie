@@ -29,7 +29,7 @@ The harness, not the model, owns:
 | Landing: only a gate-passing PR is marked ready and auto-merged; CI and the queue decide | `gate_pr()`, `requeue_verified()` |
 | Receipts (`runs/ledger.jsonl`) bind Linear issue, provider/account class and lease, worktree/branch, PR/head or terminal failure; per-run log and prompt, Linear handoff comments | `run_issue()`, `codex_lane.record_lease()`, `worker()` |
 | Retry to Todo, Triage after 3 failures; not-shippable goes to Triage once | `worker()` |
-| Fix loop owns every open non-draft PR in the repo (red checks, conflicts, changes requested), reconciles live state before checkout/install/push, 2 attempts per head, then one Triage issue | `fix_candidates()`, `reconcile_fix_target()`, `red_pr()`, `escalate_exhausted()` |
+| Fix loop owns every open non-draft PR in the repo (red checks, conflicts, changes requested), reconciles live state before checkout/install/push, 2 attempts per head, then the escalation ladder | `fix_candidates()`, `reconcile_fix_target()`, `red_pr()`, `escalate_exhausted()`, `remediation.py` |
 | Event queue: GitHub signals become `lane-fix-<kind>` labels; a worker takes a labeled PR first | `pr_events.py`, `lane-fix-relay.yml` |
 | Cheapest lane first: attempt n belongs to the n-th enabled lane in `providers.json` order | `pr_events.may_take()` |
 | Ready on green: a CLEAN lane draft gets `gh pr ready` plus its merge intent in one writer action | `pr_events.ready_green()` |
@@ -40,7 +40,7 @@ The harness, not the model, owns:
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
 | Codex accounts: lease one per run; a burst 429 backs off 2 min and rotates, a spent plan (usage limit / quota) banks until its reset, and only a failed run's closing lines can bank an account | `codex_lane.py` |
 | Provider throughput: matched-work offers, accepts, starts, productive/PR/first-pass rates, remediation, issue→PR→merge time, landed output, idle qualified capacity and failure reasons; landed attribution comes from receipts, never a branch prefix | `provider_throughput()`, `doctor.status_feed()`, `hud.py` |
-| Provider failover: a lane that exits non-zero mid-issue (every account spent, auth, crash) hands the same worktree to the next enabled, healthy, uncooled lane, up to 2 handoffs; the receipt records `handoffs` and `finishedBy` | `run_issue()`, `next_provider()` |
+| Provider failover: a lane that exits non-zero mid-issue (every account spent, auth, crash, HTTP 404, unhealthy) hands the same worktree to the next enabled, healthy, uncooled lane in `providers.json` tier order, up to 2 handoffs; the receipt records `handoffs` (with `reason`) and `finishedBy`. Disabled entries, including Hyperagent, are never chosen | `run_issue()`, `next_provider()`, `remediation.route_lane()` |
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
 | Stop revokes publication: a kill writes `runs/publication-revocations.jsonl` before the kill is acked, and every irreversible boundary (push, PR open, label, enqueue) revalidates it — revoked branches never ship (JOV-5060) | `run_agent(on_kill=)`, `revoke_publication()`, `require_publishable()` |
 
@@ -306,12 +306,50 @@ Repository documents remain on-demand references; the receipt does not claim the
 and retrieved text remain in the existing local prompt, not the checked-in
 contract or hash-only sidecar.
 
+## Remediation (JOV-7540)
+
+Stuck PRs, red main, scheduled CI (Golden Path Nightly; Production Synthetic Monitoring
+and Production Continuity Guard are telemetry observers and cannot `workflow_run` into
+the relay), deploy
+failures and Sentry `repository_dispatch` `sentry-issue` payloads become one
+`jovie.remediation-event/v1`. `classify_blocker` / `classify_event` name exactly one class:
+`ready`, `needs-rebase` (`lockfile-only` or `semantic`), `flaky-infra`, `fixable-by-model`,
+`needs-human-decision`, `obsolete`, plus `main-red` when main itself is the failure.
+
+The ladder (`plan_ladder`) runs deterministic rungs first — one `update-branch` per episode,
+the existing lockfile resolver, one `gh run rerun --failed` per head. Those spend no model
+attempt. The next model rung is the lowest enabled healthy `tier` strictly above every lane
+that already attempted the head (`select_escalation_lane`). Host-local lanes participate by
+tier. When nothing is stronger, one top-rung retry runs on the strongest enabled healthy lane.
+Caps, overridable by env: 2 model escalations per head (`LANES_ESCALATION_PER_HEAD`), 4 per PR
+(`LANES_ESCALATION_PER_PR`), 30 minutes between model escalations (`LANES_ESCALATION_COOLDOWN_S`).
+Spent caps are `ladder-exhausted`. Re-entry is a new external head, a cleared dependency, or
+main turning green; attempt history is kept on the `jovie-reentry/v1` receipt.
+
+Flags: `LANES_ESCALATION` default on; `LANES_ESCALATION_NOTIFY_TIM` default off (Linear
+`needs-human` label plus one comment); `LANES_ESCALATION_LIFT_HUMAN_HOLDS` default off.
+Needs-human, obsolete and ladder-exhausted share one PR comment marked
+`<!-- symphony-surface pr=N head=SHA -->`. Hold nags are at most one per PR per head per 24h.
+Escalating, ladder-exhausted and surfaced PRs count toward the terminal cap (`slots × 4`)
+via `lane-fix-escalating` / `lane-fix-exhausted`.
+
+Non-PR intake is a GitHub issue labeled `symphony-remediation` with a fingerprint marker
+(no new Actions secret). After a 30-minute claim window the tick converts it to one Linear
+issue labeled `remediation`, `agent-ready` and `ws:ci` / `ws:release-deploy` / `ws:reliability`.
+`ws:ci` is the first workstream rank, so those issues drain first.
+
+`doctor.json` always carries `escalation` (`by_class`, `escalating`, `ladder_exhausted`,
+`surfaced`, `attempts24h`, `landed_after_escalation24h`) and `remediation` (`by_source`,
+`by_class`, `routed_by_lane`, `failovers24h`, `escalations24h`, `ladder_exhausted`,
+`surfaced`). A non-empty `surfaced` list raises alert `escalation-needs-human`.
+
 ## Tests
 
 ```sh
 python3 -m unittest scripts/tests/test_lane_runner.py scripts/tests/test_codex_lane.py \
   scripts/tests/test_hud.py scripts/tests/test_doctor.py scripts/tests/test_pr_events.py \
-  scripts/tests/test_reason_lane.py scripts/tests/test_disk_guard.py
+  scripts/tests/test_reason_lane.py scripts/tests/test_disk_guard.py \
+  scripts/tests/test_remediation.py
 ```
 
 The same files run inside `update()` before a release is installed anywhere.

@@ -54,6 +54,11 @@ class JudgeTest(unittest.TestCase):
     def test_healthy_host_raises_nothing(self):
         self.assertEqual(doctor.judge(obs()), {})
 
+    def test_escalation_alert_names_the_pr_and_class(self):
+        alerts = doctor.judge(obs(escalation={"surfaced": [{"pr": 7, "cls": "needs-human-decision"}]}))
+        self.assertIn("#7 needs-human-decision", alerts["escalation-needs-human"])
+        self.assertEqual(doctor.judge(obs(escalation={"surfaced": []})), {})
+
     def test_each_rule_names_its_cause(self):
         alerts = doctor.judge(obs(
             tick={"at": "x", "unhealthy": ["devin"], "error": "Boom"},

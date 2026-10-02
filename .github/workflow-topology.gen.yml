@@ -238,6 +238,7 @@ nodes:
       - Agent Pipeline
       - Auto-Ready Agent Drafts
       - iOS CI
+      - Lane Fix Relay
       - Merge Queue Green Enroll
       - PR Conflict Handler
       - Production Controller
@@ -503,7 +504,8 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Lane Fix Relay
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
@@ -515,21 +517,11 @@ nodes:
     category: remediation-dispatch
     authoritativeProducer: Lane Fix Relay
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Lane Fix Relay
     triggeringStateTransition:
       - workflow_dispatch
     terminalReceipt: job:probe-and-autofix
-    jobCount: 1
-  - name: HA CI remediator poke
-    path: .github/workflows/ha-ci-remediator-poke.yml
-    active: true
-    category: remediation-dispatch
-    authoritativeProducer: Lane Fix Relay
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - workflow_dispatch
-    terminalReceipt: job:poke
     jobCount: 1
   - name: Help Center Recertification
     path: .github/workflows/help-center-recertification.yml
@@ -621,10 +613,12 @@ nodes:
       - remediation-dispatch
     allowedConsumers: []
     triggeringStateTransition:
+      - deployment_status
       - pull_request_review
       - pull_request_review_comment
       - pull_request_target
       - push
+      - repository_dispatch
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:relay
@@ -785,6 +779,7 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
+      - Lane Fix Relay
       - Test Flakiness Report
     triggeringStateTransition:
       - push
@@ -958,6 +953,7 @@ nodes:
       - Delivery Control Receipts
       - desktop-release
       - iOS TestFlight
+      - Lane Fix Relay
       - Production Release
     triggeringStateTransition:
       - workflow_run
@@ -1393,6 +1389,21 @@ edges:
     to: Lane Fix Relay
     type: workflow_run
   - from: PR Size Guard
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: CI
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: Golden Path Nightly
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: Golden Path Prod Autofix
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: Production Controller
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: Changed-Evidence Test Suites
     to: Lane Fix Relay
     type: workflow_run
   - from: Source Validation

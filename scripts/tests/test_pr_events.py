@@ -358,6 +358,26 @@ class RelayTest(unittest.TestCase):
         ]
         self.assertEqual(events.backlog_targets(prs, {"claude"}), [(1, "green"), (2, "orphan")])
 
+    def test_main_ci_failure_opens_one_intake_issue_without_a_new_secret(self):
+        run = {"name": "CI", "event": "push", "conclusion": "failure", "head_branch": "main",
+               "head_sha": "abc", "pull_requests": [], "html_url": "https://example.test/run/1",
+               "updated_at": "2026-10-02T00:00:00Z"}
+        payload = {"workflow_run": run}
+        event = events.remediation.non_pr_event("workflow_run", payload)
+        shell = Shell({("gh", "issue", "list"): [],
+                       ("gh", "issue", "create"): "https://github.com/JovieInc/Jovie/issues/4242\n"})
+        added = events.relay("workflow_run", payload, shell, set())
+        self.assertEqual(added, [(4242, "symphony-remediation")])
+        self.assertIn(event["fingerprint"], " ".join(shell.made("gh", "issue", "create")[0]))
+        again = Shell({("gh", "issue", "list"): [{
+            "number": 4242, "body": events.remediation.intake_body(event),
+            "updatedAt": "2026-10-02T00:00:00Z"}]})
+        self.assertEqual(events.relay("workflow_run", payload, again, set()), [])
+        self.assertEqual(again.made("gh", "issue", "create"), [])
+        sentry = events.remediation.event_from_sentry({"issue_id": "S1", "message": "boom", "url": "https://s"})
+        self.assertEqual((sentry["source"], sentry["ws"]), ("sentry", "reliability"))
+        self.assertIsNone(events.remediation.event_from_sentry({}))
+
     def test_push_event_runs_the_conflict_read(self):
         shell = Shell({("gh", "pr", "list"): []})
         self.assertEqual(events.relay("push", {}, shell, set()), [])
@@ -992,7 +1012,11 @@ class RunnerHookTest(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmp:
                 host = runner.Host(state=Path(tmp))
                 (host.state / "fix-attempts.json").write_text(json.dumps(
-                    {"7": {"sha": "h0", "count": 2, "pushed": True}}))
+                    {"7": {"sha": "h1", "count": 2, "pushed": True, "escalations": [
+                        {"kind": "deterministic", "rung": "update-branch", "head": "h1", "at": 1},
+                        {"kind": "model", "rung": "escalate", "lane": "devin", "head": "h1", "at": 2},
+                        {"kind": "model", "rung": "top-rung", "lane": "codex", "head": "h1", "at": 3, "topRung": True},
+                    ]}}))
                 runner.escalate_exhausted(host, [stuck], linear)
                 held = json.loads((host.state / "held.json").read_text())["7"]
                 runner.escalate_exhausted(host, [stuck], linear)

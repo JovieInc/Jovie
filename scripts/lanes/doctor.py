@@ -20,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pr_events  # noqa: E402  (sibling module of the release)
+import remediation  # noqa: E402
 
 COOL_OFF_S = 6 * 3600
 NO_LANDING_S = 6 * 3600
@@ -202,6 +203,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "heldByReason": pr_events.by_reason(held, open_numbers),
         "reconcile": read_json(state / "reconcile.json", {}),
         "failedByReason": failed_by_reason(failures),
+        "escalation": remediation.escalation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
+        "remediation": remediation.remediation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
         "_receipts24h": receipts, "_allReceipts": all_receipts,
     }
 
@@ -394,6 +397,9 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["disk-low"] = f"root disk {obs['diskFreePct']}% free; worktrees and installs will start failing"
     if obs.get("githubRemaining") is not None and obs["githubRemaining"] < GITHUB_MIN_REMAINING:
         alerts["github-quota"] = f"GitHub GraphQL budget {obs['githubRemaining']} left this hour; enqueues and listings will fail"
+    escalation_line = remediation.alert_reason(obs.get("escalation") or {})
+    if escalation_line:
+        alerts["escalation-needs-human"] = escalation_line
     sweep = obs.get("reconcile") or {}
     swept_age = obs["now"] - float(sweep.get("atEpoch") or 0) if obs.get("now") else None
     if sweep.get("orphans") and swept_age is not None and swept_age < 2 * pr_events.RECONCILE_S:
@@ -723,7 +729,9 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "orphan_prs": (obs.get("reconcile") or {}).get("orphans") or [],
             "oldest_prs": [row for row in (obs.get("reconcile") or {}).get("dispositions") or []][:10],
             "dep_holds": (obs.get("reconcile") or {}).get("depHolds") or [],
-            "slo": obs.get("slo")}
+            "slo": obs.get("slo"),
+            "escalation": obs.get("escalation") or remediation.empty_escalation(),
+            "remediation": obs.get("remediation") or remediation.empty_remediation()}
 
 
 PRIMARY_FLAG = Path.home() / ".config/jovie-lanes/primary"
@@ -787,6 +795,8 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     result["poolEmptySince"] = previous["poolEmptySince"]
     result["codexIdleSince"] = previous["codexIdleSince"]
     result["providerIdleSince"] = previous["providerIdleSince"]
+    result["escalation"] = obs.get("escalation") or remediation.empty_escalation()
+    result["remediation"] = obs.get("remediation") or remediation.empty_remediation()
     result["observed"] = {k: v for k, v in obs.items() if k not in ("tick", "codex", "_receipts24h", "_allReceipts")}
     if not os.environ.get("LANES_SELFTEST"):
         try:
