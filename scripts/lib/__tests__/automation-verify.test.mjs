@@ -472,9 +472,10 @@ describe('structural control stage execution', () => {
     const diagnostics = [];
     const writes = [];
     const originalWrite = process.stdout.write;
-    process.stdout.write = chunk => {
-      writes.push(String(chunk));
-      return true;
+    process.stdout.write = (chunk, callback) => {
+      if (chunk.length > 0) writes.push(String(chunk));
+      if (callback) queueMicrotask(callback);
+      return false;
     };
     let status;
     try {
@@ -497,6 +498,71 @@ describe('structural control stage execution', () => {
     expect(writes[0]).toContain('first');
     expect(writes[0]).toContain('second');
     expect(diagnostics.at(-1)).toContain('status=3');
+  });
+
+  it('preserves a failing stage diagnostic tail when the CLI exits immediately', async () => {
+    const payloadBytes = 1024 * 1024;
+    const sentinel = '\nFAILURE_DIAGNOSTIC_END\n';
+    const completion = 'PARENT_DIAGNOSTIC_END\n';
+    const childCode = `
+      process.stdout.write('x'.repeat(${payloadBytes}) + ${JSON.stringify(sentinel)});
+      process.exitCode = 3;
+    `;
+    const wrapperCode = `
+      import { runCommandStatus } from ${JSON.stringify(
+        new URL('../../run-affected-tests.mjs', import.meta.url).href
+      )};
+      const status = await runCommandStatus(process.execPath, ['-e', ${JSON.stringify(childCode)}], {
+        bufferOutput: true,
+        logger: message => {
+          if (message.includes('complete')) process.stdout.write(${JSON.stringify(completion)});
+        },
+      });
+      process.exit(status);
+    `;
+    const wrapper = spawn(
+      process.execPath,
+      ['--input-type=module', '-e', wrapperCode],
+      { stdio: ['ignore', 'pipe', 'pipe'], timeout: 5000 }
+    );
+    const output = [];
+    const errors = [];
+    wrapper.stdout.on('data', chunk => output.push(chunk));
+    wrapper.stderr.on('data', chunk => errors.push(chunk));
+    const status = await new Promise((resolveExit, rejectExit) => {
+      wrapper.once('error', rejectExit);
+      wrapper.once('close', resolveExit);
+    });
+    const stdout = Buffer.concat(output);
+    expect(Buffer.concat(errors).toString()).toBe('');
+    expect(status).toBe(3);
+    expect(stdout.byteLength).toBe(
+      payloadBytes + Buffer.byteLength(sentinel + completion)
+    );
+    expect(stdout.toString().endsWith(sentinel + completion)).toBe(true);
+  });
+
+  it('cleans up signal handlers before a buffered output write rejects', async () => {
+    const interruptListeners = process.listenerCount('SIGINT');
+    const terminateListeners = process.listenerCount('SIGTERM');
+    const error = new Error('parent output unavailable');
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (_chunk, callback) => {
+      queueMicrotask(() => callback(error));
+      return false;
+    };
+    try {
+      await expect(
+        runCommandStatus(process.execPath, ['-e', 'process.exit(3)'], {
+          bufferOutput: true,
+          logger: () => {},
+        })
+      ).rejects.toBe(error);
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+    expect(process.listenerCount('SIGINT')).toBe(interruptListeners);
+    expect(process.listenerCount('SIGTERM')).toBe(terminateListeners);
   });
 });
 

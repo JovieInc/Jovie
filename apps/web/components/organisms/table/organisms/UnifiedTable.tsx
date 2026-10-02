@@ -33,7 +33,14 @@ import {
   type ContextMenuItemType,
   TableContextMenu,
 } from '../molecules/TableContextMenu';
-import { cn, iconColors, zIndex } from '../table.styles';
+import {
+  cn,
+  iconColors,
+  TABLE_ROW_MODES,
+  type TableRowMode,
+  tableRowModeStyle,
+  zIndex,
+} from '../table.styles';
 import { useTableGrouping } from '../utils/useTableGrouping';
 import { UnifiedTableHeader } from './UnifiedTableHeader';
 import { useTableKeyboardNav } from './useTableKeyboardNav';
@@ -93,6 +100,8 @@ export interface UnifiedTableProps<TData extends RowData> {
    * @default 40
    */
   readonly rowHeight?: number;
+  /** Fixed geometry for content, loading rows, and virtualization. */
+  readonly rowMode?: TableRowMode;
 
   /**
    * Number of rows to render above/below viewport
@@ -407,6 +416,7 @@ export function UnifiedTable<TData extends RowData>({
   onSortingChange,
   enableVirtualization,
   rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
+  rowMode,
   overscan = 5,
   renderRow,
   getRowId,
@@ -446,6 +456,9 @@ export function UnifiedTable<TData extends RowData>({
   renderExpandedContent,
   getExpandableRowId,
 }: UnifiedTableProps<TData>) {
+  const resolvedRowHeight = rowMode
+    ? TABLE_ROW_MODES[rowMode].rowHeight
+    : rowHeight;
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [rowRefs] = useState(() => new Map<number, HTMLTableRowElement>());
   const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
@@ -563,7 +576,7 @@ export function UnifiedTable<TData extends RowData>({
   } = useTableVirtualization({
     rowCount: rows.length,
     scrollElementRef: tableContainerRef,
-    estimatedRowHeight: rowHeight,
+    estimatedRowHeight: resolvedRowHeight,
     overscan,
     enabled: shouldVirtualize,
   });
@@ -735,7 +748,7 @@ export function UnifiedTable<TData extends RowData>({
     // → populated transitions do not shift layout (JOV-4869).
     const loadingRowCount = Math.max(
       skeletonRows,
-      Math.ceil(TABLE_EMPTY_STATE_MIN_HEIGHT_PX / rowHeight)
+      Math.ceil(TABLE_EMPTY_STATE_MIN_HEIGHT_PX / resolvedRowHeight)
     );
     return (
       <div
@@ -743,7 +756,11 @@ export function UnifiedTable<TData extends RowData>({
         className={cn('w-full min-w-0 overflow-auto', containerClassName)}
       >
         {sortStatusNode}
-        <table className={tableClassName} style={{ minWidth }}>
+        <table
+          className={tableClassName}
+          data-table-row-mode={rowMode}
+          style={{ minWidth, ...tableRowModeStyle(rowMode) }}
+        >
           <caption className='sr-only'>
             {caption ?? 'Loading table data'}
           </caption>
@@ -754,7 +771,7 @@ export function UnifiedTable<TData extends RowData>({
             rows={loadingRowCount}
             columns={columnCount}
             columnConfig={skeletonColumnConfig}
-            rowHeight={`${rowHeight}px`}
+            rowHeight={`${resolvedRowHeight}px`}
           />
         </table>
       </div>
@@ -769,7 +786,11 @@ export function UnifiedTable<TData extends RowData>({
         className={cn('w-full min-w-0 overflow-auto', containerClassName)}
       >
         {sortStatusNode}
-        <table className={tableClassName} style={{ minWidth }}>
+        <table
+          className={tableClassName}
+          data-table-row-mode={rowMode}
+          style={{ minWidth, ...tableRowModeStyle(rowMode) }}
+        >
           <caption className='sr-only'>{caption ?? 'Empty table'}</caption>
           {!hideHeader && (
             <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
@@ -794,7 +815,11 @@ export function UnifiedTable<TData extends RowData>({
         className={cn('w-full min-w-0 overflow-auto', containerClassName)}
       >
         {sortStatusNode}
-        <table className={tableClassName} style={{ minWidth }}>
+        <table
+          className={tableClassName}
+          data-table-row-mode={rowMode}
+          style={{ minWidth, ...tableRowModeStyle(rowMode) }}
+        >
           <caption className='sr-only'>
             {caption ?? 'Grouped table data'}
           </caption>
@@ -820,7 +845,11 @@ export function UnifiedTable<TData extends RowData>({
       className={cn('w-full min-w-0 overflow-auto', containerClassName)}
     >
       {sortStatusNode}
-      <table className={tableClassName} style={{ minWidth }}>
+      <table
+        className={tableClassName}
+        data-table-row-mode={rowMode}
+        style={{ minWidth, ...tableRowModeStyle(rowMode) }}
+      >
         <caption className='sr-only'>{caption ?? 'Data table'}</caption>
         {!hideHeader && (
           <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />

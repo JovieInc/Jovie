@@ -791,8 +791,8 @@ jobs:
             exit 0
           fi
 
-          # Check if only docs changed (exclude .github/ — workflow changes must run CI)
-          if ! echo "$CHANGED_FILES" | grep -q -E '^\.github/' &&
+          # CHANGELOG.md is customer-facing web content, not documentation.
+          if ! echo "$CHANGED_FILES" | grep -q -E '^(\.github/|CHANGELOG\.md$)' &&
             ! echo "$CHANGED_FILES" | grep -q -v -E '\.(md|txt)$'; then
             echo "Only documentation files changed"
             for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
@@ -805,7 +805,7 @@ jobs:
           echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
 
           # Build paths
-          BUILD_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/constants/|apps/web/package.*\.json|apps/web/next\.config\.js|apps/web/tailwind\.config\.|apps/web/postcss\.config\.|apps/web/instrumentation.*\.ts|apps/web/sentry\..*\.config\.ts|apps/web/middleware\.ts|package.*\.json|turbo\.json)'
+          BUILD_PATTERN='^(CHANGELOG\.md$|apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/constants/|apps/web/package.*\.json|apps/web/next\.config\.js|apps/web/tailwind\.config\.|apps/web/postcss\.config\.|apps/web/instrumentation.*\.ts|apps/web/sentry\..*\.config\.ts|apps/web/middleware\.ts|package.*\.json|turbo\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$BUILD_PATTERN"; then
             RUN_BUILD=true
             echo "run_build=true" >> "$GITHUB_OUTPUT"

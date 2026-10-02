@@ -98,6 +98,12 @@ const PopoverAnchor = React.forwardRef<
 });
 PopoverAnchor.displayName = PopoverPrimitive.Anchor.displayName;
 
+const PopoverClose = React.forwardRef<
+  React.ComponentRef<typeof PopoverPrimitive.Close>,
+  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Close>
+>((props, ref) => <PopoverPrimitive.Close ref={ref} {...props} />);
+PopoverClose.displayName = PopoverPrimitive.Close.displayName;
+
 interface PopoverContentProps
   extends React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content> {
   readonly showArrow?: boolean;
@@ -141,7 +147,7 @@ const PopoverContent = React.forwardRef<
           popoverContentClasses,
           // Keep rich content inside the collision-safe viewport on narrow
           // screens, including long unbroken values supplied by consumers.
-          'max-w-full break-words',
+          'max-w-(--radix-popover-content-available-width) max-h-(--radix-popover-content-available-height) overflow-y-auto break-words',
           className
         )}
         data-testid={testId}
@@ -170,4 +176,4 @@ const PopoverContent = React.forwardRef<
 );
 PopoverContent.displayName = PopoverPrimitive.Content.displayName;
 
-export { Popover, PopoverAnchor, PopoverContent, PopoverTrigger };
+export { Popover, PopoverAnchor, PopoverClose, PopoverContent, PopoverTrigger };
