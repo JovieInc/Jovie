@@ -5,6 +5,7 @@ import {
   createAuthAnalyticsEvent,
   isAuthClient,
   isAuthIntent,
+  parseDesktopLoopbackPortParam,
   sanitizeReturnTo,
 } from '@jovie/auth-routing';
 import { NextResponse } from 'next/server';
@@ -309,6 +310,18 @@ export async function GET(request: Request) {
     );
   }
 
+  const rawDesktopLoopback = getStringParam(url, 'desktop_loopback');
+  const desktopLoopbackPort =
+    rawClient === 'electron'
+      ? parseDesktopLoopbackPortParam(rawDesktopLoopback)
+      : null;
+  if (rawClient === 'electron' && rawDesktopLoopback && !desktopLoopbackPort) {
+    return NextResponse.json(
+      { error: 'Invalid desktop_loopback' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
+
   try {
     const state = createState();
     const record = await createStoredAuthState({
@@ -320,6 +333,9 @@ export async function GET(request: Request) {
       desktopFlow,
       // Declared by Mac app builds that can redeem a typed return code.
       desktopReturnCode: getStringParam(url, 'desktop_return_code') === '1',
+      // Declared by Mac app builds running a pending-flow loopback listener
+      // (RFC 8252 section 7.3).
+      desktopLoopbackPort,
     });
 
     await trackAuthEvent('auth_started', {

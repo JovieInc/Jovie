@@ -1,6 +1,15 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
+
+function readWebSource(sourcePath: string): string {
+  const webRoot = process.cwd().endsWith('/apps/web')
+    ? process.cwd()
+    : resolve(process.cwd(), 'apps/web');
+  return readFileSync(resolve(webRoot, sourcePath), 'utf8');
+}
 
 describe('AppShellContentPanel', () => {
   it('renders a flat full-width content container by default', () => {
@@ -73,5 +82,13 @@ describe('AppShellContentPanel', () => {
 
     expect(screen.getByText('Scrollable panel')).toBeInTheDocument();
     expect(container.innerHTML).toContain('min-h-0 overflow-hidden');
+  });
+
+  it('imports LINEAR_SURFACE from the canonical token module', () => {
+    const source = readWebSource(
+      'components/organisms/AppShellContentPanel.tsx'
+    );
+    expect(source).toContain('@/components/tokens/linear-surface');
+    expect(source).not.toContain("dashboard/tokens'");
   });
 });

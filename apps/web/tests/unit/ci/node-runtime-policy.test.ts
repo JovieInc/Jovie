@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  engineAllowsMajor,
   evaluateOfficialReleases,
   getReleaseStatus,
   isPromotionReady,
@@ -184,5 +186,25 @@ describe('Node runtime lifecycle policy', () => {
     expect(workflow).toContain('gh issue create');
     expect(workflow).not.toContain('runner-setup-action.test.ts');
     expect(freshness).not.toContain('compatibility:');
+  });
+  it('declared-engine probes allow every compatibility candidate major', () => {
+    const candidateMajors = policy.compatibility.candidates.map(
+      (candidate: { major: number }) => candidate.major
+    );
+    for (const probe of policy.compatibility.declaredEngineProbes) {
+      const requireFromWorkspace = createRequire(
+        resolve(repoRoot, probe.workspace, 'package.json')
+      );
+      const packageJson = requireFromWorkspace(
+        `${probe.package}/package.json`
+      ) as { engines?: { node?: string } };
+      const engine = packageJson.engines?.node;
+      for (const major of candidateMajors) {
+        expect(
+          !engine || engineAllowsMajor(engine, major),
+          `${probe.package} declares Node ${engine}; candidate Node ${major} is unsupported`
+        ).toBe(true);
+      }
+    }
   });
 });

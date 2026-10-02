@@ -1,10 +1,28 @@
 # Finance privacy boundary — security review checklist (JOV-4609)
 
+> Release gate (JOV-4621): the `CREATOR_FINANCE` flag defaults **off** for
+> everyone including admins, and `FINANCE_DISABLE=true` is an environment
+> kill switch that forces every finance surface off immediately without a
+> flag write or deploy. `lib/finance/flags.ts` fails closed: flag-evaluation
+> errors resolve to disabled, and `assertCreatorFinanceEnabled` throws a
+> generic disabled error so off is indistinguishable from absent.
+>
+> Operational alerts are built only via `lib/finance/ops-alerts.ts`
+> (`buildFinanceAlert`): owners appear as pseudonymous `fin_<digest>`
+> references and sensitive keys (amounts, descriptions, institution/account
+> identifiers, provider payloads) are stripped at every depth. No alert or
+> dashboard payload may carry raw owner ids or financial values.
+
 Personal financial data in Jovie is **owner-only**. The financial owner is the
 authenticated user's `users.id`. Creator profiles, workspaces, collaborator
 roles, manager/label access, and admin-level creator permissions grant **zero**
 access to financial data. V1 supports no sharing; any future sharing model
 requires a separate explicit-consent, scoped, revocable design.
+
+The versioned entity, provenance, retention, migration, metric, and deliberately
+derived publication contract is in
+[`../finance/OWNER_DOMAIN_AND_METRICS.md`](../finance/OWNER_DOMAIN_AND_METRICS.md).
+Its JOV-4610 review is subordinate to every owner-only requirement below.
 
 This checklist must pass before any financial feature ships.
 

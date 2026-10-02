@@ -930,11 +930,6 @@ export function ProfileCompactTemplate({
         onProfilePacResolved={setResolvedProfilePacAssignment}
         onResolved={markVisitorAssignmentResolved}
       />
-      <ReleaseCreditsDrawer
-        open={creditsOpen}
-        onOpenChange={setCreditsOpen}
-        credits={visibleReleaseCredits}
-      />
       <PublicProfileLayoutShell
         artistName={artist.name}
         heroImageUrl={heroImageUrl}
@@ -961,6 +956,12 @@ export function ProfileCompactTemplate({
             }
             data-public-profile-nav={publicProfileNavIds}
           >
+            <ReleaseCreditsDrawer
+              open={creditsOpen && !isDesktopLayout}
+              onOpenChange={setCreditsOpen}
+              credits={visibleReleaseCredits}
+              presentation={drawerPresentation}
+            />
             {profileBanner && !isDesktopLayout ? (
               <div
                 className='relative z-20 w-full shrink-0'
@@ -971,6 +972,14 @@ export function ProfileCompactTemplate({
             ) : null}
             <div className='profile-compact-surface-slot relative min-h-0 flex-1'>
               <ProfileCompactSurface
+                proofClaimCta={
+                  proofClaim && claimFooterHref
+                    ? {
+                        href: claimFooterHref,
+                        label: claimFooterLabel ?? 'Claim yours',
+                      }
+                    : null
+                }
                 renderMode='interactive'
                 presentation={drawerPresentation}
                 onOpenReleaseCredits={
@@ -1050,53 +1059,64 @@ export function ProfileCompactTemplate({
         }
         desktopSurface={
           PROFILE_DESKTOP_SURFACE_ENABLED ? (
-            <ProfileDesktopSurface
-              presentation='modal'
-              overlaysEnabled={isDesktopLayout}
-              onReady={handleDesktopSurfaceReady}
-              artist={artist}
-              socialLinks={socialLinks}
-              contacts={contacts}
-              showPayButton={showPayButton}
-              latestRelease={latestRelease}
-              profileSettings={profileSettings}
-              alertOptInVariant={resolvedAlertOptInVariant}
-              allowFanCapture={allowFanCapture}
-              genres={genres}
-              pressPhotos={pressPhotos}
-              allowPhotoDownloads={allowPhotoDownloads}
-              creditSegments={creditSegments}
-              photoDownloadSizes={photoDownloadSizes}
-              tourDates={tourDates}
-              viewerCountryCode={resolvedViewerCountryCode}
-              visitorAssignmentResolved={visitorAssignmentResolved}
-              releases={releases}
-              catalogLoadFailed={catalogLoadFailed}
-              drawerOpen={drawerOpen}
-              drawerView={drawerView}
-              activeMode={requestedMode}
-              onModeSelect={nextMode => {
-                clearCloseResetTimer();
-                setRequestedMode(nextMode);
-              }}
-              onAlertsModalClose={() => setRequestedMode('profile')}
-              onDrawerOpenChange={handleDrawerOpenChange}
-              onDrawerViewChange={handleDrawerViewChange}
-              onOpenMenu={() => openDrawerMode('menu')}
-              onPlayClick={handlePlayClick}
-              onBack={handleBack}
-              profileHref={profileHref}
-              isSubscribed={isSubscribed}
-              contentPrefs={contentPrefs}
-              onTogglePref={handleTogglePref}
-              onUnsubscribe={handleUnsubscribe}
-              isUnsubscribing={unsubMutation.isPending}
-              onOpenReleaseCredits={
-                visibleReleaseCredits.length > 0
-                  ? () => setCreditsOpen(true)
-                  : undefined
-              }
-            />
+            <div
+              className='relative flex min-h-0 w-full flex-1 flex-col'
+              data-sheet-container
+            >
+              <ProfileDesktopSurface
+                presentation='modal'
+                overlaysEnabled={isDesktopLayout}
+                onReady={handleDesktopSurfaceReady}
+                artist={artist}
+                socialLinks={socialLinks}
+                contacts={contacts}
+                showPayButton={showPayButton}
+                latestRelease={latestRelease}
+                profileSettings={profileSettings}
+                alertOptInVariant={resolvedAlertOptInVariant}
+                allowFanCapture={allowFanCapture}
+                genres={genres}
+                pressPhotos={pressPhotos}
+                allowPhotoDownloads={allowPhotoDownloads}
+                creditSegments={creditSegments}
+                photoDownloadSizes={photoDownloadSizes}
+                tourDates={tourDates}
+                viewerCountryCode={resolvedViewerCountryCode}
+                visitorAssignmentResolved={visitorAssignmentResolved}
+                releases={releases}
+                catalogLoadFailed={catalogLoadFailed}
+                drawerOpen={drawerOpen}
+                drawerView={drawerView}
+                activeMode={requestedMode}
+                onModeSelect={nextMode => {
+                  clearCloseResetTimer();
+                  setRequestedMode(nextMode);
+                }}
+                onAlertsModalClose={() => setRequestedMode('profile')}
+                onDrawerOpenChange={handleDrawerOpenChange}
+                onDrawerViewChange={handleDrawerViewChange}
+                onOpenMenu={() => openDrawerMode('menu')}
+                onPlayClick={handlePlayClick}
+                onBack={handleBack}
+                profileHref={profileHref}
+                isSubscribed={isSubscribed}
+                contentPrefs={contentPrefs}
+                onTogglePref={handleTogglePref}
+                onUnsubscribe={handleUnsubscribe}
+                isUnsubscribing={unsubMutation.isPending}
+                onOpenReleaseCredits={
+                  visibleReleaseCredits.length > 0
+                    ? () => setCreditsOpen(true)
+                    : undefined
+                }
+              />
+              <ReleaseCreditsDrawer
+                open={creditsOpen && isDesktopLayout}
+                onOpenChange={setCreditsOpen}
+                credits={visibleReleaseCredits}
+                presentation='modal'
+              />
+            </div>
           ) : null
         }
       />

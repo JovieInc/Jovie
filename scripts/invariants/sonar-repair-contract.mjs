@@ -4,12 +4,18 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { load as loadYaml } from 'js-yaml';
 
 import { readInvariantRegistry } from './registry.mjs';
 
 export const SONAR_REPAIR_INVARIANT_ID = 'JOV-INV-036';
 export const SONAR_REPAIR_SCHEMA = 'jovie-sonar-repair-contract/v1';
 const DEFAULT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+
+/**
+ * @typedef {{ uses?: string, with?: { ref?: string, args?: string } }} ScanStep
+ * @typedef {{ jobs?: Record<string, { steps?: ScanStep[] }> }} ScanWorkflow
+ */
 
 function read(repoRoot, path) {
   return readFileSync(resolve(repoRoot, path), 'utf8');
@@ -53,6 +59,69 @@ export function validateSonarRepairSources(repoRoot = DEFAULT_ROOT) {
     );
   if (!missingCredentialStepFails) {
     errors.push('Sonar workflow can report green without a scan');
+  }
+
+  // SonarQube Cloud rejects CI analysis while project Automatic Analysis is
+  // enabled. The workflow must disable it via api/autoscan/activation before
+  // scanning, or a UI toggle re-enabling it fails main again (JOV-7287).
+  const disablesAutomaticAnalysis =
+    /autoscan\/activation/.test(workflow) && /enable=false/.test(workflow);
+  if (!disablesAutomaticAnalysis) {
+    errors.push(
+      'Sonar workflow does not disable Automatic Analysis before the CI scan'
+    );
+  }
+
+  // The scanner otherwise auto-detects the workflow_run wrapper's GITHUB_SHA.
+  // Bind its published revision to the same producer/fallback as checkout.
+  const revision = '${{ github.event.workflow_run.head_sha || github.sha }}';
+  let revisionBound = false;
+  try {
+    const parsed = /** @type {ScanWorkflow} */ (loadYaml(workflow));
+    const jobs = Object.values(parsed?.jobs ?? {});
+    const scans = jobs.flatMap(job =>
+      (job.steps ?? [])
+        .filter(step =>
+          step.uses?.startsWith('SonarSource/sonarqube-scan-action@')
+        )
+        .map(scan => ({ job, scan }))
+    );
+    revisionBound =
+      scans.length > 0 &&
+      scans.every(({ job, scan }) => {
+        const checkout = (job.steps ?? []).find(step =>
+          step.uses?.startsWith('actions/checkout@')
+        );
+        const args = scan.with?.args;
+        return (
+          checkout?.with?.ref === revision &&
+          typeof args === 'string' &&
+          args.trim() === `-Dsonar.scm.revision=${revision}`
+        );
+      });
+  } catch {
+    // Invalid workflow YAML cannot certify a scan's source identity.
+  }
+  if (!revisionBound) {
+    errors.push(
+      'Sonar scan revision must match the producer checkout with a workflow SHA fallback'
+    );
+  }
+
+  // JOV-6817: the default 4 GiB analyzer heap exhausted twice on the
+  // 16 GiB hosted runner. Reserve 8 GiB for Node and leave the remainder
+  // for the scanner JVM and OS; changing that budget requires revalidation.
+  const analyzerHeap = [
+    ...read(repoRoot, 'sonar-project.properties').matchAll(
+      /^[\t ]*sonar\.javascript\.node\.maxspace(?:[\t ]*[=:][\t ]*|[\t ]+)([^\r\n]*)$/gm
+    ),
+  ]
+    .at(-1)?.[1]
+    .trim();
+  if (analyzerHeap !== '8192') {
+    errors.push(
+      'Sonar CI analyzer heap must use the configured 8192 MB budget'
+    );
   }
 
   for (const propertyFile of propertyFiles) {

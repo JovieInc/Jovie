@@ -1,8 +1,12 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
-import type { UIMessage } from 'ai';
-import { and, desc, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
+import {
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  type UIMessage,
+} from 'ai';
+import { and, asc, desc, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
@@ -11,6 +15,7 @@ import {
 } from '@/lib/ai/gateway-errors';
 import { auth } from '@/lib/auth/better-auth';
 import {
+  confirmSelectedArtist,
   decideFallbackTurn,
   type FallbackTurn,
 } from '@/lib/chat/onboarding-script/engine';
@@ -23,8 +28,10 @@ import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
 import { sanitizeConversationTitle } from '@/lib/chat/title';
 import {
+  decodeToolEvents,
   encodeToolEvents,
   type PersistedToolEvent,
+  toolEventToMessagePart,
 } from '@/lib/chat/tool-events';
 import {
   buildOnboardingTools,
@@ -499,13 +506,29 @@ export async function tryHandleAnonymousOnboardingChat(
   }
 
   // --- Build the per-turn state accumulator and the onboarding tool palette ---
+  // JOV-7143: turn state (artist, followers, interview signals) feeds the
+  // access decision, so it comes from the tool calls this server persisted,
+  // never from tool outputs in the client-supplied history.
+  const serverToolHistory = await loadServerToolHistory(conversationId);
   const onboardingState = createOnboardingTurnState({
     sessionId,
     turnCount,
     accessControlled,
-    messages: uiMessages,
+    messages: serverToolHistory,
   });
   const tools = buildOnboardingTools(onboardingState);
+
+  // JOV-7134: the artist picker carries the real Spotify id only in message
+  // metadata, which never reaches the model. Confirm the pick here from that
+  // id, show the model the result as a completed tool call, and stream the
+  // same tool part to the client (profile rail) and persistence.
+  const serverArtistConfirmation = await confirmSelectedArtist(
+    uiMessages,
+    onboardingState
+  );
+  const modelUiMessages = serverArtistConfirmation
+    ? [...uiMessages, serverArtistConfirmation.historyMessage]
+    : uiMessages;
 
   // --- Telemetry hooks (mirror authenticated chat) ---
   const telemetry: ChatTelemetry = {
@@ -564,7 +587,7 @@ export async function tryHandleAnonymousOnboardingChat(
       sessionId,
       turnCount,
       accessControlled,
-      messages: uiMessages,
+      messages: serverToolHistory,
     });
     const turn: FallbackTurn = await decideFallbackTurn({
       uiMessages,
@@ -605,7 +628,7 @@ export async function tryHandleAnonymousOnboardingChat(
 
     let streamFailed = false;
     const turn = await executeChatTurn({
-      uiMessages,
+      uiMessages: modelUiMessages,
       artistContext: null,
       releases: [],
       resolvedProfileId: null,
@@ -640,24 +663,56 @@ export async function tryHandleAnonymousOnboardingChat(
       },
     });
 
+    const persistResponse = async ({
+      responseMessage,
+      outcome,
+    }: {
+      responseMessage: UIMessage;
+      outcome: { status: string };
+    }) => {
+      if (streamFailed || outcome.status === 'failed') {
+        return;
+      }
+      await persistAnonymousAssistantMessage({
+        conversationId,
+        latestUserClientMessageId: latestUserMessage.clientMessageId,
+        responseMessage,
+      });
+    };
+    // Mid-stream failures cannot swap the Response for the scripted
+    // fallback; the lint-clean script line is the recovery copy instead.
+    const streamErrorText = (error: unknown) =>
+      isGatewayBudgetExceededError(error)
+        ? resolveChatStreamErrorMessage(error)
+        : STREAM_ERROR_LINE.text;
+
+    if (serverArtistConfirmation) {
+      const stream = createUIMessageStream({
+        execute: ({ writer }) => {
+          writer.write({ type: 'start' });
+          for (const chunk of serverArtistConfirmation.chunks) {
+            writer.write(chunk);
+          }
+          writer.merge(
+            turn.streamResult.toUIMessageStream({
+              sendStart: false,
+              onError: streamErrorText,
+            })
+          );
+        },
+        onError: streamErrorText,
+        onFinish: persistResponse,
+      });
+      return createUIMessageStreamResponse({
+        stream,
+        headers: responseHeaders,
+      });
+    }
+
     return turn.streamResult.toUIMessageStreamResponse({
       headers: responseHeaders,
-      onFinish: async ({ responseMessage, outcome }) => {
-        if (streamFailed || outcome.status === 'failed') {
-          return;
-        }
-        await persistAnonymousAssistantMessage({
-          conversationId,
-          latestUserClientMessageId: latestUserMessage.clientMessageId,
-          responseMessage,
-        });
-      },
-      // Mid-stream failures cannot swap the Response for the scripted
-      // fallback; the lint-clean script line is the recovery copy instead.
-      onError: error =>
-        isGatewayBudgetExceededError(error)
-          ? resolveChatStreamErrorMessage(error)
-          : STREAM_ERROR_LINE.text,
+      onFinish: persistResponse,
+      onError: streamErrorText,
     });
   } catch (error) {
     if (isClientDisconnect(error, req.signal)) {
@@ -764,6 +819,33 @@ function extractUIMessageText(parts: UIMessage['parts']): string {
     .map(part => part.text)
     .join('');
 }
+
+/**
+ * JOV-7143: the tool calls this server streamed and persisted for the
+ * conversation, as UI messages for turn-state derivation. Oldest first.
+ */
+async function loadServerToolHistory(
+  conversationId: string
+): Promise<UIMessage[]> {
+  const rows = await db
+    .select({ id: chatMessages.id, toolCalls: chatMessages.toolCalls })
+    .from(chatMessages)
+    .where(
+      and(
+        eq(chatMessages.conversationId, conversationId),
+        eq(chatMessages.role, 'assistant')
+      )
+    )
+    .orderBy(asc(chatMessages.createdAt))
+    .limit(MAX_SERVER_TOOL_HISTORY_ROWS);
+  return rows.map(row => ({
+    id: String(row.id),
+    role: 'assistant' as const,
+    parts: decodeToolEvents(row.toolCalls).events.map(toolEventToMessagePart),
+  }));
+}
+
+const MAX_SERVER_TOOL_HISTORY_ROWS = 200;
 
 async function reserveAnonymousOnboardingConversation({
   sessionId,
@@ -953,8 +1035,10 @@ function validateMessageShape(msg: unknown, index: number): string | null {
     return `messages[${index}] must be an object`;
   }
   const m = msg as { role?: unknown; parts?: unknown };
-  if (m.role !== 'user' && m.role !== 'assistant' && m.role !== 'system') {
-    return `messages[${index}].role must be user/assistant/system`;
+  // JOV-7143: the onboarding client never sends system messages; accepting
+  // them let a caller inject instructions into the model's history.
+  if (m.role !== 'user' && m.role !== 'assistant') {
+    return `messages[${index}].role must be user/assistant`;
   }
   if (!Array.isArray(m.parts)) {
     return `messages[${index}].parts must be an array`;

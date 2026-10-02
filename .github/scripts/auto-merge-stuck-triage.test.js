@@ -8,6 +8,7 @@ const {
   diagnoseStuckPr,
   findMarkerComment,
   needsAutoMergeEnable,
+  enableMissingAutoMerge,
 } = require('./auto-merge-stuck-triage');
 
 const basePr = {
@@ -103,6 +104,20 @@ test('needsAutoMergeEnable: only same-repo non-draft PRs without auto-merge', ()
     false
   );
   assert.equal(needsAutoMergeEnable(basePr), false);
+  for (const name of ['hold', 'Queue-Poison', 'do-not-merge']) {
+    assert.equal(
+      needsAutoMergeEnable({ ...eligible, labels: { nodes: [{ name }] } }),
+      false,
+      name
+    );
+  }
+  assert.equal(
+    needsAutoMergeEnable({
+      ...eligible,
+      labels: { nodes: [{ name: 'codex' }] },
+    }),
+    true
+  );
 });
 
 test('issue body aggregates stuck PRs; empty state is explicit', () => {
@@ -111,4 +126,22 @@ test('issue body aggregates stuck PRs; empty state is explicit', () => {
   ]);
   assert.ok(stuckBody.includes('#42'));
   assert.ok(buildIssueBody([]).includes('No stuck PRs'));
+});
+
+test('the customer-notes handoff requests auto-merge only for its checked head', () => {
+  const calls = [];
+  const pr = {
+    ...basePr,
+    autoMergeRequest: null,
+    isDraft: false,
+    customerNotesReadyHead: 'checked-sha',
+  };
+  enableMissingAutoMerge('o/r', [pr], false, args => calls.push(args));
+  assert.deepEqual(calls[0].slice(-2), ['--match-head-commit', 'checked-sha']);
+  const before = calls.length;
+  enableMissingAutoMerge('o/r', [pr], true, args => calls.push(args));
+  enableMissingAutoMerge('o/r', [{ ...pr, isDraft: true }], false, args =>
+    calls.push(args)
+  );
+  assert.equal(calls.length, before);
 });

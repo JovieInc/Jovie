@@ -17,6 +17,8 @@ declare module '@tanstack/react-table' {
   > {
     /** Additional tokenized cell/header classes owned by the consumer. */
     readonly className?: string;
+    /** Override the default single-line cell-content geometry for this column. */
+    readonly cellContentClassName?: string;
     /** Horizontal alignment for dense numeric/action columns. */
     readonly align?: 'left' | 'center' | 'right';
     /** Keep the header in the accessibility tree but remove visible label chrome. */

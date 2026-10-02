@@ -9,7 +9,7 @@ struct MobileChatMerchOptionsView: View {
     case let .productOptions(payload):
       merchSection(
         title: "Merch Options",
-        subtitle: payload.nextStep ?? "Pick one to save it to Library"
+        subtitle: payload.nextStep ?? "Pick one to save it to Work"
       ) {
         ForEach(payload.options) { option in
           merchCard {

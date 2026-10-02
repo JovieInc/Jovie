@@ -52,7 +52,23 @@ describe('MarketingFooter', () => {
     themeState.setTheme.mockReset();
   });
 
+  it('keeps the current footer columns while the about refresh flag is off', () => {
+    mockUsePathname.mockReturnValue('/about');
+    render(<MarketingFooter />);
+
+    expect(screen.getByRole('link', { name: 'Blog' })).toHaveAttribute(
+      'href',
+      '/blog'
+    );
+    expect(screen.getByRole('heading', { name: 'Connect' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
+      'href',
+      '/product'
+    );
+  });
+
   it('renders the full marketing footer when the full-footer flag is enabled', () => {
+    mockUsePathname.mockReturnValue('/solutions');
     render(<MarketingFooter />);
 
     const footer = screen.getByTestId('marketing-footer');
@@ -83,10 +99,13 @@ describe('MarketingFooter', () => {
     expect(screen.getByRole('heading', { name: 'Product' })).toHaveClass(
       'line-clamp-2'
     );
-    expect(screen.getByRole('link', { name: 'Status' })).toHaveAttribute(
-      'href',
-      'https://status.jov.ie'
+    // DETAILS.md text casing: never ALL CAPS for column headings.
+    expect(screen.getByRole('heading', { name: 'Product' })).not.toHaveClass(
+      'mf-eyebrow--caps'
     );
+    // status.jov.ie currently serves Vercel DEPLOYMENT_NOT_FOUND; the public
+    // footer omits the link until the status deployment is restored (JOV-7135).
+    expect(screen.queryByRole('link', { name: 'Status' })).toBeNull();
   });
 
   it('renders the full homepage footer without the duplicate final CTA', () => {
@@ -167,6 +186,19 @@ describe('MarketingFooter', () => {
     ).not.toBeInTheDocument();
   });
 
+  it.each(['/about', '/ai', '/product'])(
+    'renders one final CTA on %s, owned by the page',
+    pathname => {
+      mockUsePathname.mockReturnValue(pathname);
+
+      render(<MarketingFooter />);
+
+      expect(
+        screen.queryByTestId('marketing-footer-cta')
+      ).not.toBeInTheDocument();
+    }
+  );
+
   it('omits the terminal CTA on the support route', () => {
     mockUsePathname.mockReturnValue('/support');
 
@@ -218,6 +250,7 @@ describe('MarketingFooter', () => {
   });
 
   it('honors the expanded footer variant when the full-footer flag is enabled', () => {
+    mockUsePathname.mockReturnValue('/solutions');
     render(<MarketingFooter variant='expanded' />);
 
     expect(screen.getByTestId('marketing-footer-cta')).toBeInTheDocument();

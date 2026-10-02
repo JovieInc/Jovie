@@ -337,7 +337,7 @@ export const adminAssetVerifiedParser = parseAsStringLiteral(
 ).withDefault('all');
 
 export const adminPeopleViewParser =
-  parseAsStringLiteral(adminPeopleViews).withDefault('waitlist');
+  parseAsStringLiteral(adminPeopleViews).withDefault('contacts');
 
 export const adminPeopleSortFields = [
   'created_asc',
@@ -368,6 +368,7 @@ export const adminPeopleSearchParams = createSearchParamsCache({
   view: adminPeopleViewParser,
   sort: adminPeopleSortParser,
   q: searchQueryParser,
+  stage: searchQueryParser,
   type: adminAssetTypeParser,
   issues: adminAssetIssuesParser,
   verified: adminAssetVerifiedParser,

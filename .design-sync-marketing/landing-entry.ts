@@ -14,7 +14,6 @@ export { ArtistProfileHowItWorks } from '../apps/web/components/marketing/artist
 export { ArtistProfileLandingPage } from '../apps/web/components/marketing/artist-profile/ArtistProfileLandingPage';
 export { ArtistProfileMonetizationSection } from '../apps/web/components/marketing/artist-profile/ArtistProfileMonetizationSection';
 export { ArtistProfileOutcomesCarousel } from '../apps/web/components/marketing/artist-profile/ArtistProfileOutcomesCarousel';
-export { ArtistProfilePayFlowVideoSection } from '../apps/web/components/marketing/artist-profile/ArtistProfilePayFlowVideoSection';
 export { ArtistProfileReactivationSection } from '../apps/web/components/marketing/artist-profile/ArtistProfileReactivationSection';
 export { ArtistProfileSocialProof } from '../apps/web/components/marketing/artist-profile/ArtistProfileSocialProof';
 export { ArtistProfileSpecWall } from '../apps/web/components/marketing/artist-profile/ArtistProfileSpecWall';

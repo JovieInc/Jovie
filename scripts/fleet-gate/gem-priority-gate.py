@@ -46,6 +46,10 @@ from closure_health import SCHEMA as CLOSURE_HEALTH_SCHEMA  # noqa: E402
 from summer_ci_audit import observe_ci_audit  # noqa: E402
 from gem_gate_contract import (  # noqa: E402
     CAPACITY_MAX_TARGET,
+    GENERATION_MARKER_PREFIX,
+    MAIN_HEALTH_CONTRACT_SCHEMA,
+    MAIN_HEALTH_CONTRACT_VERSION,
+    REQUIRED_MAIN_CHECKS,
     V2_PROOF_SCHEMA,
     assert_repo_sidecar_path,
     fleet_sidecar_path,
@@ -307,26 +311,119 @@ def gh_json(repo: str, endpoint: str) -> dict[str, Any]:
 NO_VERDICT_CONCLUSIONS = frozenset({"skipped", "cancelled", "neutral"})
 
 
-def select_main_release_ready(attempts: list[dict[str, Any]]) -> dict[str, Any]:
-    """Pick the latest real Main Release Ready attempt.
+def latest_check_attempt(runs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Pick the latest real attempt of one check name.
 
     Merge-group / source-inactive jobs complete as ``skipped``. Those are not
     a red main — treating the newest skip as the source gate flips the fleet
     to draft-only after every land and zeroes enroll.
     """
-    if not attempts:
-        raise ValueError("Main Release Ready check is missing")
-
     def sort_key(run: dict[str, Any]) -> str:
         return str(run.get("started_at") or run.get("completed_at") or "")
 
-    scored = [
-        run
-        for run in attempts
-        if run.get("conclusion") not in {"skipped", "cancelled", "neutral"}
-    ]
-    pool = scored if scored else attempts
+    pool = _real_release_attempts(runs) or runs
     return max(pool, key=sort_key)
+
+
+def select_main_release_ready(attempts: list[dict[str, Any]]) -> dict[str, Any]:
+    if not attempts:
+        raise ValueError("Main Release Ready check is missing")
+    return latest_check_attempt(attempts)
+
+
+def check_verdict(run: dict[str, Any] | None) -> str:
+    """Classify one check-run attempt against the main-health contract."""
+    if run is None or run.get("status") != "completed":
+        return "pending"
+    conclusion = run.get("conclusion")
+    if conclusion == "success":
+        return "success"
+    if conclusion in NO_VERDICT_CONCLUSIONS:
+        return "no-verdict"
+    return "failed"
+
+
+def classify_main_checks(
+    check_runs: list[dict[str, Any]],
+    required_attempts: dict[str, list[dict[str, Any]]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Split every check run on the SHA into the required/optional contract.
+
+    JOV-4970: promotion binds only to REQUIRED_MAIN_CHECKS. Every other run is
+    advisory evidence — a pending or failed optional lane stays observable in
+    the receipt without flipping global main health.
+    """
+    by_name: dict[str, list[dict[str, Any]]] = {}
+    for run in check_runs:
+        name = run.get("name")
+        if isinstance(name, str) and name:
+            by_name.setdefault(name, []).append(run)
+    required: list[dict[str, Any]] = []
+    for name in sorted(REQUIRED_MAIN_CHECKS):
+        attempts = required_attempts.get(name, by_name.get(name) or [])
+        if not attempts:
+            required.append(
+                {"name": name, "classification": "required", "verdict": "missing"}
+            )
+            continue
+        latest = latest_check_attempt(attempts)
+        required.append(
+            {
+                "name": name,
+                "classification": "required",
+                "verdict": check_verdict(latest),
+                "status": latest.get("status"),
+                "conclusion": latest.get("conclusion"),
+            }
+        )
+    optional: list[dict[str, Any]] = []
+    for name in sorted(by_name):
+        if name in REQUIRED_MAIN_CHECKS:
+            continue
+        latest = latest_check_attempt(by_name[name])
+        optional.append(
+            {
+                "name": name,
+                "classification": "optional",
+                "verdict": check_verdict(latest),
+                "status": latest.get("status"),
+                "conclusion": latest.get("conclusion"),
+            }
+        )
+    return required, optional
+
+
+def observe_generation_marker(repo: str, sha: object) -> dict[str, Any]:
+    """Read the exact production-generation-verified-<sha> artifact marker.
+
+    The Production Controller preserves this artifact after its final marker
+    decision for the exact generation. An artifact bound to an older SHA never
+    matches the name filter; an expired artifact is stale evidence, not proof.
+    """
+    name = f"{GENERATION_MARKER_PREFIX}{sha}"
+    try:
+        listing = gh_json(repo, f"actions/artifacts?per_page=100&name={name}")
+    except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as error:
+        return {
+            "name": name,
+            "verified": False,
+            "stale": False,
+            "error": f"generation-marker-observation-failed: {error}",
+        }
+    artifacts = [
+        artifact
+        for artifact in listing.get("artifacts") or []
+        if isinstance(artifact, dict) and artifact.get("name") == name
+    ]
+    live = [artifact for artifact in artifacts if artifact.get("expired") is False]
+    result: dict[str, Any] = {
+        "name": name,
+        "verified": bool(live),
+        "stale": bool(artifacts) and not live,
+    }
+    if live:
+        result["artifactId"] = live[0].get("id")
+    return result
 
 
 def observe_main_release_ready_jobs(repo: str, sha: object) -> list[dict[str, Any]]:
@@ -384,10 +481,12 @@ def observe_main(repo: str) -> dict[str, Any]:
         if not sha:
             raise ValueError("main SHA missing")
         combined = gh_json(repo, f"commits/{sha}/status")
+        check_runs: list[dict[str, Any]] = []
         release_attempts: list[dict[str, Any]] = []
         for page in range(1, 11):
             checks = gh_json(repo, f"commits/{sha}/check-runs?per_page=100&page={page}")
             page_runs = checks.get("check_runs", [])
+            check_runs.extend(page_runs)
             release_attempts.extend(
                 run for run in page_runs if run.get("name") == "Main Release Ready"
             )
@@ -415,24 +514,47 @@ def observe_main(repo: str) -> dict[str, Any]:
                         "conclusion": combined_state,
                     },
                 }
+        # JOV-4970: main health binds to the versioned required-check contract
+        # and the exact generation marker, not to every check run on the SHA.
+        # Optional lanes (Generate Screenshots, agent suites) stay observable
+        # in pendingChecks/failedChecks without classifying main.
         latest = select_main_release_ready(release_attempts)
+        marker = observe_generation_marker(repo, sha)
+        required_checks, optional_checks = classify_main_checks(
+            check_runs,
+            {"Main Release Ready": release_attempts},
+        )
+        failed = [entry["name"] for entry in required_checks if entry["verdict"] == "failed"]
+        unresolved = [
+            entry["name"]
+            for entry in required_checks
+            if entry["verdict"] in {"missing", "pending", "no-verdict"}
+        ]
         combined_state = str(combined.get("state") or "unknown")
         conclusion = latest.get("conclusion")
-        if latest.get("status") != "completed":
-            status = "unknown"
-        elif conclusion == "success":
-            status = "green"
-        elif conclusion in NO_VERDICT_CONCLUSIONS:
-            # A skipped/cancelled/neutral source gate is the absence of a
-            # verdict (merge_group or source-inactive job, cancelled attempt),
-            # not a red main. Freezing promotion on unknown is correct; flipping
-            # the fleet to main-not-green/draft-only on it is a false red.
-            status = "unknown"
-        else:
+        if failed:
             status = "red"
+            reason = "required-check-failed"
+        elif unresolved:
+            status = "unknown"
+            reason = (
+                "required-check-missing"
+                if any(entry["verdict"] == "missing" for entry in required_checks)
+                else "required-check-pending"
+                if any(entry["verdict"] == "pending" for entry in required_checks)
+                else "required-check-no-verdict"
+            )
+        else:
+            status = "green"
+            reason = (
+                "required-checks-green-generation-verified"
+                if marker.get("verified") is True
+                else "required-checks-green-generation-unverified"
+            )
         observed = {
             "status": status,
             "sha": sha,
+            "reason": reason,
             "combinedStatus": combined_state,
             "sourceGate": {
                 "name": "Main Release Ready",
@@ -441,11 +563,39 @@ def observe_main(repo: str) -> dict[str, Any]:
                 "startedAt": latest.get("started_at"),
                 "completedAt": latest.get("completed_at"),
             },
+            "contract": {
+                "schema": MAIN_HEALTH_CONTRACT_SCHEMA,
+                "version": MAIN_HEALTH_CONTRACT_VERSION,
+                "requiredChecks": sorted(REQUIRED_MAIN_CHECKS),
+            },
+            "requiredChecks": required_checks,
+            "optionalChecks": optional_checks,
+            "checks": required_checks + optional_checks,
+            "pendingChecks": sorted(
+                entry["name"]
+                for entry in required_checks + optional_checks
+                if entry["verdict"] == "pending"
+            ),
+            "failedChecks": sorted(
+                entry["name"]
+                for entry in required_checks + optional_checks
+                if entry["verdict"] == "failed"
+            ),
+            "generationVerified": marker.get("verified") is True,
+            "marker": marker,
         }
         if status == "unknown" and conclusion in NO_VERDICT_CONCLUSIONS:
             observed["error"] = (
                 f"Main Release Ready has no real attempt for {sha} "
                 f"(latest conclusion: {conclusion})"
+            )
+        elif status == "unknown" and any(
+            entry["verdict"] == "missing" for entry in required_checks
+        ):
+            missing = [entry["name"] for entry in required_checks if entry["verdict"] == "missing"]
+            observed["error"] = (
+                f"Required main check is missing for {sha}: "
+                f"{', '.join(missing)}"
             )
         return observed
 
@@ -595,6 +745,33 @@ def observe_lease(guard_bin: str) -> dict[str, Any]:
 
 
 def observe_production(url: str) -> dict[str, Any]:
+    def dependencies(final_url: str, value: object) -> dict[str, Any]:
+        alias_ok = (
+            isinstance(value, dict)
+            and final_url.rstrip("/") == url.rstrip("/")
+        )
+        checks = value.get("checks") if isinstance(value, dict) else None
+        database = checks.get("database") if isinstance(checks, dict) else None
+        database_ok = database.get("ok") if isinstance(database, dict) else None
+        return {
+            "vercel-alias": {
+                "status": "green" if alias_ok else "red",
+                "detail": "canonical alias resolved without redirect"
+                if alias_ok
+                else f"canonical alias redirected to {final_url}",
+            },
+            "database": {
+                "status": "green"
+                if database_ok is True
+                else "red"
+                if database_ok is False
+                else "unknown",
+                "detail": database.get("error")
+                if isinstance(database, dict) and database.get("error")
+                else "deploy health database check",
+            },
+        }
+
     try:
         with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 - configured health URL
             if response.status < 200 or response.status >= 300:
@@ -615,13 +792,19 @@ def observe_production(url: str) -> dict[str, Any]:
             "status": "green" if reported_status in ("healthy", "ok") else "red",
             "url": url,
             "reportedStatus": reported_status,
+            "dependencies": dependencies(final_url, value),
         }
     except urllib.error.HTTPError as error:
+        try:
+            value = json.loads(error.read().decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            value = None
         return {
             "status": "red",
             "url": url,
             "httpStatus": error.code,
             "error": "production-observation-http-error",
+            "dependencies": dependencies(error.geturl(), value),
         }
     except (OSError, ValueError, json.JSONDecodeError, urllib.error.URLError) as error:
         return {

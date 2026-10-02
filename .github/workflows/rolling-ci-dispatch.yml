@@ -820,6 +820,8 @@ jobs:
             scripts/lib/repo-hygiene-limits.mjs
             scripts/ci-fast-lanes.mjs
             scripts/invariants/scanned-paths.mjs
+            LESSONS.guards.json
+            scripts/invariants/overlay-layer-contract.mjs
             scripts/invariants/design-surfaces.mjs
             scripts/invariants/done-sprint-invariants.mjs
             scripts/invariants/ios-web-no-scroll-jank.mjs

@@ -36,6 +36,17 @@ describe('public profile Liquid Glass navigation', () => {
     );
     expect(NAV.match(/profile-bottom-nav-indicator/g)).toHaveLength(1);
     expect(SURFACE).toContain('CONTENT_SAFE_AREA_BOTTOM_PADDING');
+    const desktopHomeLayoutStart = CSS.indexOf(
+      '/* From md up the compact surface'
+    );
+    expect(desktopHomeLayoutStart).toBeGreaterThan(0);
+    const compactHomeBaseLayout = CSS.slice(0, desktopHomeLayoutStart);
+    expect(compactHomeBaseLayout).toMatch(
+      /\.profile-home-content-column\s*\n\s*\) \{\s*margin-bottom:\s*var\(--profile-bottom-nav-height\)/
+    );
+    expect(compactHomeBaseLayout).toMatch(
+      /\.profile-home-content-scroll \{\s*padding-bottom:\s*0;/
+    );
     expect(CSS).toMatch(
       /\.profile-floating-tab-bar\)[\s\S]{0,180}position:\s*absolute[\s\S]{0,120}pointer-events:\s*none/
     );

@@ -356,11 +356,12 @@
     },
     {
       "id": "neon-db",
-      "name": "Neon DB",
-      "tier": "risk-triggered-smoke",
-      "mergeGate": false,
-      "nextLocalCommand": "gh run view --log-failed",
-      "remediation": "The ephemeral Neon branch producer failed or hit the branch limit. Inspect the cleanup and admission-probe output; downstream manual evidence lanes cannot start without its connection artifact."
+      "name": "Database Certification (isolated Neon)",
+      "tier": "combined-integration",
+      "mergeGate": true,
+      "gateStage": "merge-group",
+      "nextLocalCommand": "pnpm --filter=@jovie/web run test:truth",
+      "remediation": "The DB-risk combined head failed migration, drift, least-privilege, or integration proof. Inspect the retained JUnit evidence and repair the guard instead of skipping the lane."
     },
     {
       "id": "ci-pr-vercel-preview",

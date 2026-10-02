@@ -48,6 +48,21 @@ export type FounderCertificationDecisionKind =
   | 'changes_requested'
   | 'rejected';
 
+/**
+ * Who certified a decision. Absent means 'human' — every decision recorded
+ * before this field existed was a founder/human call, and every existing
+ * caller keeps that behavior unless it explicitly opts a decision into
+ * 'machine'. Only a 'machine' authority can move a never-certified subject
+ * forward without ever establishing the protected founder baseline
+ * (JOV-6947); it can never retroactively become that baseline.
+ */
+export const CERTIFICATION_CERTIFIER_AUTHORITIES = [
+  'human',
+  'machine',
+] as const;
+export type CertificationCertifierAuthority =
+  (typeof CERTIFICATION_CERTIFIER_AUTHORITIES)[number];
+
 export type CertificationBlockerCode =
   | 'contract_mismatch'
   | 'source_missing'
@@ -211,6 +226,8 @@ export interface FounderCertificationDecision {
   readonly decidedAt: string;
   readonly reviewer: string;
   readonly notes: string | null;
+  /** Defaults to 'human' when omitted. See {@link CertificationCertifierAuthority}. */
+  readonly certifierAuthority?: CertificationCertifierAuthority;
 }
 
 export interface CertificationAuditEvent {
@@ -251,6 +268,23 @@ export interface CertificationTransitionResult {
   readonly blockers: readonly CertificationBlocker[];
 }
 
+/**
+ * JOV-6947: distinguishes a subject that has never had a human certification
+ * from one that is currently live on machine evidence alone, one whose
+ * current evidence digest *is* the founder-approved baseline, and one whose
+ * evidence has moved on since a founder baseline was established. Derived
+ * every evaluation from the same decisions ledger `evaluateCertificationAdmission`
+ * already consumes — this is not a second certification store.
+ */
+export const CERTIFICATION_BASELINE_STATUSES = [
+  'never_human_certified',
+  'machine_certified_live',
+  'human_certified_baseline',
+  'candidate_pending_recertification',
+] as const;
+export type CertificationBaselineStatus =
+  (typeof CERTIFICATION_BASELINE_STATUSES)[number];
+
 export interface CertificationAdmission {
   readonly contract: typeof JOVIE_CERTIFICATION_CONTRACT;
   readonly state: CertificationState;
@@ -259,6 +293,13 @@ export interface CertificationAdmission {
   readonly blockers: readonly CertificationBlocker[];
   readonly staleFounderLock: FounderCertificationDecision | null;
   readonly currentDecision: FounderCertificationDecision | null;
+  /**
+   * The most recent human-authority 'approved' decision for this subject,
+   * at any past evidence digest — the protected canonical baseline once one
+   * exists. Null until a human certifies this subject for the first time.
+   */
+  readonly founderBaseline: FounderCertificationDecision | null;
+  readonly baselineStatus: CertificationBaselineStatus;
   readonly transition: CertificationTransitionResult;
   readonly auditHistory: readonly CertificationAuditEvent[];
 }
@@ -760,6 +801,13 @@ function findCurrentDecision(
   return decisions.find(decision => decision.evidenceDigest === digest) ?? null;
 }
 
+/** Absent 'certifierAuthority' predates this field and was always human. */
+function certifierAuthorityOf(
+  decision: FounderCertificationDecision
+): CertificationCertifierAuthority {
+  return decision.certifierAuthority ?? 'human';
+}
+
 function findStaleFounderLock(
   packet: CertificationReviewPacket,
   digest: string,
@@ -770,9 +818,62 @@ function findStaleFounderLock(
       decision =>
         decision.subjectId === packet.subject.id &&
         decision.decision === 'approved' &&
+        certifierAuthorityOf(decision) === 'human' &&
         decision.evidenceDigest !== digest
     ) ?? null
   );
+}
+
+/**
+ * JOV-6947: the protected canonical baseline — the most recent human-authority
+ * approval for this subject, regardless of the evidence digest it bound to.
+ * A machine-authority approval never qualifies: only an explicit human
+ * certification can establish or replace this baseline.
+ */
+function findFounderBaseline(
+  packet: CertificationReviewPacket,
+  decisions: readonly FounderCertificationDecision[]
+): FounderCertificationDecision | null {
+  return decisions
+    .filter(
+      decision =>
+        decision.subjectId === packet.subject.id &&
+        decision.decision === 'approved' &&
+        certifierAuthorityOf(decision) === 'human'
+    )
+    .reduce<FounderCertificationDecision | null>((latest, candidate) => {
+      if (!latest) return candidate;
+      return Date.parse(candidate.decidedAt) >= Date.parse(latest.decidedAt)
+        ? candidate
+        : latest;
+    }, null);
+}
+
+/**
+ * JOV-6947: derive the registry's human-certification axis from the same
+ * decisions ledger `evaluateCertificationAdmission` already evaluates —
+ * never a second store, and never a reinterpretation of machine-green as
+ * human-certified.
+ */
+function evaluateBaselineStatus({
+  state,
+  currentDecision,
+  founderBaseline,
+}: {
+  readonly state: CertificationState;
+  readonly currentDecision: FounderCertificationDecision | null;
+  readonly founderBaseline: FounderCertificationDecision | null;
+}): CertificationBaselineStatus {
+  if (
+    currentDecision?.decision === 'approved' &&
+    certifierAuthorityOf(currentDecision) === 'human'
+  ) {
+    return 'human_certified_baseline';
+  }
+  if (founderBaseline) return 'candidate_pending_recertification';
+  return state === 'working' || state === 'review_ready'
+    ? 'never_human_certified'
+    : 'machine_certified_live';
 }
 
 function tasteInboxCard(
@@ -985,7 +1086,15 @@ export function evaluateCertificationAdmission({
   const staleFounderLock = digest
     ? findStaleFounderLock(packet, digest, decisions)
     : null;
+  const founderBaseline = digest
+    ? findFounderBaseline(packet, decisions)
+    : null;
   const state = maxAdmittedState(packet, currentDecision, blockers);
+  const baselineStatus = evaluateBaselineStatus({
+    currentDecision,
+    founderBaseline,
+    state,
+  });
   const requestedBlockers = blockersForRequestedState(
     packet,
     requestedState,
@@ -996,10 +1105,12 @@ export function evaluateCertificationAdmission({
     requestedState === null || stateRank(requestedState) <= stateRank(state);
 
   return {
+    baselineStatus,
     blockers,
     contract: JOVIE_CERTIFICATION_CONTRACT,
     currentDecision,
     decisionEvidenceDigest: digest,
+    founderBaseline,
     staleFounderLock,
     state,
     tasteInboxCard: digest ? tasteInboxCard(packet, digest, state) : null,

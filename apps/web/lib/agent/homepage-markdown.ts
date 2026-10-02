@@ -30,7 +30,7 @@ export function buildHomepageMarkdown(): string {
 
 ${hero.subhead}
 
-${hero.search.placeholder} → ${hero.search.action}: ${toAbsolutePublicUrl(APP_ROUTES.START)}
+${hero.claim.action} ${hero.claim.domain}${hero.claim.placeholder}: ${toAbsolutePublicUrl(APP_ROUTES.START)}
 
 ## ${workspace.kicker}
 

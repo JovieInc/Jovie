@@ -100,7 +100,9 @@ export function getLiteClientConfig(
       ...defaultIntegrations.filter(
         integration =>
           !LITE_DISABLED_INTEGRATIONS.has(integration.name) &&
-          (enableBreadcrumbs || integration.name !== 'Breadcrumbs')
+          (enableBreadcrumbs ||
+            (integration.name !== 'Breadcrumbs' &&
+              integration.name !== 'Console'))
       ),
       ...additionalIntegrations,
     ],

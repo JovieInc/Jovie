@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { withSignedInSession } from '@/.storybook/signed-in-session';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { SidebarProvider } from '@/components/organisms/sidebar';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { ShellSidebarOverrideProvider } from '@/contexts/ShellSidebarOverrideContext';
 import { JovieAuthValuesProvider } from '@/hooks/useJovieAuth';

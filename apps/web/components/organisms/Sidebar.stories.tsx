@@ -11,7 +11,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-} from '@/components/organisms/Sidebar';
+} from '@/components/organisms/sidebar';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
 
 const mockDashboardData: DashboardData = {
@@ -30,6 +30,13 @@ const mockDashboardData: DashboardData = {
     tipsSubmitted: 0,
     totalReceivedCents: 0,
     monthReceivedCents: 0,
+  },
+  profileCompletion: {
+    percentage: 0,
+    completedCount: 0,
+    totalCount: 6,
+    steps: [],
+    profileIsLive: false,
   },
 };
 

@@ -176,6 +176,13 @@ function parseStoredAuthState(value: unknown): AuthStateRecord | null {
     desktopFlow:
       typeof record.desktopFlow === 'string' ? record.desktopFlow : null,
     desktopReturnCode: record.desktopReturnCode === true,
+    desktopLoopbackPort:
+      typeof record.desktopLoopbackPort === 'number' &&
+      Number.isInteger(record.desktopLoopbackPort) &&
+      record.desktopLoopbackPort >= 1 &&
+      record.desktopLoopbackPort <= 65535
+        ? record.desktopLoopbackPort
+        : undefined,
     createdAt: record.createdAt,
     expiresAt: record.expiresAt,
     consumedAt:
@@ -241,6 +248,7 @@ export async function createStoredAuthState(input: {
   readonly codeChallenge?: string | null;
   readonly desktopFlow?: string | null;
   readonly desktopReturnCode?: boolean;
+  readonly desktopLoopbackPort?: number | null;
   readonly now?: number;
 }): Promise<AuthStateRecord> {
   const record = createAuthStateRecord({
@@ -251,6 +259,7 @@ export async function createStoredAuthState(input: {
     codeChallenge: input.codeChallenge,
     desktopFlow: input.desktopFlow,
     desktopReturnCode: input.desktopReturnCode,
+    desktopLoopbackPort: input.desktopLoopbackPort,
     now: input.now ?? Date.now(),
   });
 

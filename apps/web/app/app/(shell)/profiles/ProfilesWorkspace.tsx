@@ -149,6 +149,13 @@ interface SuggestionMutationResponse {
   readonly error?: string;
 }
 
+interface IdentityDecisionResponse {
+  readonly ok: boolean;
+  readonly error?: string;
+}
+
+type IdentityDecision = 'yes' | 'no' | 'unsure';
+
 type SuggestionAction = 'accept' | 'reject';
 
 const CONNECTION_SUGGESTION_PLATFORM_PRIORITY: Readonly<
@@ -589,11 +596,16 @@ function ConnectionRail({
   data,
   row,
   onClose,
+  onIdentityDecision,
   contextMenuItems,
 }: Readonly<{
   data: ProfilesWorkspaceData;
   row: ProfileWorkspaceRow | null;
   onClose: () => void;
+  onIdentityDecision: (
+    surfaceId: string,
+    decision: IdentityDecision
+  ) => Promise<void>;
   contextMenuItems: CommonDropdownItem[];
 }>) {
   const primaryAction = row ? getConnectionPrimaryAction(row) : null;
@@ -708,6 +720,14 @@ function ConnectionRail({
             row={row}
             providerAvailable={data.providerAvailable}
           />
+          {row.rowType === 'surface' &&
+          (row.qualificationStatus === 'suggested' ||
+            row.qualificationStatus === 'conflicting') ? (
+            <IdentityConfirmationSection
+              row={row}
+              onDecision={onIdentityDecision}
+            />
+          ) : null}
           <DrawerSection sectionKind='details'>
             <div
               className={cn(
@@ -757,6 +777,95 @@ function ConnectionRail({
         </div>
       ) : null}
     </EntitySidebarShell>
+  );
+}
+
+const IDENTITY_SOURCE_LABELS: Readonly<Record<string, string>> = {
+  creator_profile: 'Jovie profile',
+  dsp_match: 'DSP match',
+  identity_link: 'public identity link',
+  social_link: 'linked social profile',
+};
+
+function IdentityConfirmationSection({
+  row,
+  onDecision,
+}: Readonly<{
+  row: ProfileWorkspaceSurfaceRow;
+  onDecision: (surfaceId: string, decision: IdentityDecision) => Promise<void>;
+}>) {
+  const [pendingDecision, setPendingDecision] =
+    useState<IdentityDecision | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const evidence = row.identityEvidence ?? {
+    sourceCount: 0,
+    sourceTypes: [],
+    confidence: null,
+  };
+  const sourceSummary = evidence.sourceTypes
+    .map(
+      sourceType =>
+        IDENTITY_SOURCE_LABELS[sourceType] ?? sourceType.replaceAll('_', ' ')
+    )
+    .join(', ');
+  const confidence =
+    evidence.confidence === null
+      ? null
+      : `${Math.round(evidence.confidence * 100)}% match`;
+  const evidenceSummary =
+    evidence.sourceCount === 0
+      ? 'No live source claim is currently available.'
+      : [
+          `${evidence.sourceCount} live ${evidence.sourceCount === 1 ? 'source' : 'sources'}`,
+          sourceSummary,
+          confidence,
+        ]
+          .filter(Boolean)
+          .join(' · ');
+
+  const decide = async (decision: IdentityDecision) => {
+    setPendingDecision(decision);
+    setError(null);
+    try {
+      await onDecision(row.id, decision);
+    } catch {
+      setError('Could not save your answer. Try again.');
+    } finally {
+      setPendingDecision(null);
+    }
+  };
+
+  return (
+    <DrawerSection title='Identity Check' sectionKind='details'>
+      <div className='space-y-3 px-1'>
+        <div className='space-y-1'>
+          <p className='text-sm font-medium text-primary-token'>Is this you?</p>
+          <p className='text-xs text-tertiary-token'>{evidenceSummary}</p>
+        </div>
+        <div className='grid grid-cols-3 gap-2'>
+          {(['yes', 'no', 'unsure'] as const).map(decision => (
+            <Button
+              key={decision}
+              type='button'
+              size='sm'
+              variant={decision === 'yes' ? 'primary' : 'secondary'}
+              loading={pendingDecision === decision}
+              disabled={pendingDecision !== null}
+              onClick={() => void decide(decision)}
+            >
+              {decision === 'yes' ? 'Yes' : decision === 'no' ? 'No' : 'Unsure'}
+            </Button>
+          ))}
+        </div>
+        <p
+          className='min-h-4 text-xs text-error'
+          role={error ? 'alert' : 'status'}
+          aria-live='polite'
+        >
+          {error}
+        </p>
+      </div>
+    </DrawerSection>
   );
 }
 
@@ -1121,7 +1230,7 @@ export function ProfilesWorkspace({
     setPendingCandidate(null);
     setIsAddConnectionOpen(false);
     setFilter('suggested');
-    router.replace(APP_ROUTES.PROFILES);
+    router.replace(APP_ROUTES.PRESENCE);
   }, [router, searchParams]);
   useEffect(() => {
     const target = pendingSuggestionFocusTargetRef.current;
@@ -1232,6 +1341,24 @@ export function ProfilesWorkspace({
       queryClient,
       router,
     ]
+  );
+  const handleIdentityDecision = useCallback(
+    async (surfaceId: string, decision: IdentityDecision) => {
+      const response = await fetchWithTimeout<IdentityDecisionResponse>(
+        `/api/profile-surfaces/${encodeURIComponent(surfaceId)}/qualification`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision }),
+        }
+      );
+      if (!response.ok) {
+        throw new Error(response.error ?? 'Unable to save identity decision');
+      }
+      setSelected(null);
+      router.refresh();
+    },
+    [router]
   );
   const pendingRow = useMemo<ProfileWorkspaceRow | null>(() => {
     if (!pendingCandidate) return null;
@@ -1512,6 +1639,7 @@ export function ProfilesWorkspace({
           data={data}
           row={selected}
           onClose={() => setSelected(null)}
+          onIdentityDecision={handleIdentityDecision}
           contextMenuItems={convertToCommonDropdownItems(
             getContextMenuItems(selected)
           )}
@@ -1529,11 +1657,11 @@ export function ProfilesWorkspace({
       >
         <EmptyState
           icon={<UserRound className='h-5 w-5' aria-hidden />}
-          heading='No Artist Profile Selected'
-          description='Set up an artist profile to monitor its presence.'
+          heading='No Identity Selected'
+          description='Set up an identity to manage its presence.'
           presentation='workspace'
           action={{
-            label: 'Set Up Artist Profile',
+            label: 'Set Up Identity',
             href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
           }}
           testId='profiles-workspace-empty-state'

@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 const mockGetCurrentUserEntitlements = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  getOvieOperatorEntitlements: mockGetCurrentUserEntitlements,
 }));
 
 describe('POST /api/admin/test-user/set-plan', () => {

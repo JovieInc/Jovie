@@ -7,7 +7,7 @@ import { useMemo } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { useComposerFocus } from '@/components/features/chat/Composer';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton';
-import { SidebarProvider, useSidebar } from '@/components/organisms/Sidebar';
+import { SidebarProvider, useSidebar } from '@/components/organisms/sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
 import { RuntimeUpdateProvider } from '@/components/shell/RuntimeUpdateProvider';
 import { useRightPanel } from '@/contexts/RightPanelContext';
@@ -84,9 +84,14 @@ function AuthShellInner({
     isElectron,
     isAutomatedTest: env.IS_TEST || env.IS_E2E,
   });
-  const sidebarTrigger = isMobile ? null : sidebarState === 'closed' ? (
-    <SidebarCollapseButton />
-  ) : null;
+  // The desktop window-control row (DesktopTitlebar) owns the single canonical
+  // left-sidebar toggle in Electron. Keep the initial client tree identical to
+  // SSR; the runtime CSS hides the header slot before paint, and this hook
+  // removes it after hydration without replacing the shell or losing drafts.
+  const sidebarTrigger =
+    isMobile || isElectron ? null : sidebarState === 'closed' ? (
+      <SidebarCollapseButton />
+    ) : null;
 
   const isInSettings = section === 'settings';
   const hideTopHeader = isInSettings || isLyricsRoute;

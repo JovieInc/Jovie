@@ -3,14 +3,14 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { SidebarProvider } from '@/components/organisms/sidebar';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { ShellSidebarOverrideProvider } from '@/contexts/ShellSidebarOverrideContext';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { AuthShell } from './AuthShell';
 
-const dashboardData = {
+const dashboardData: DashboardData = {
   user: { id: 'story-user' },
   creatorProfiles: [],
   selectedProfile: null,
@@ -19,7 +19,22 @@ const dashboardData = {
   hasSocialLinks: false,
   hasMusicLinks: false,
   isAdmin: false,
-} as DashboardData;
+  tippingStats: {
+    tipClicks: 0,
+    qrTipClicks: 0,
+    linkTipClicks: 0,
+    tipsSubmitted: 0,
+    totalReceivedCents: 0,
+    monthReceivedCents: 0,
+  },
+  profileCompletion: {
+    percentage: 0,
+    completedCount: 0,
+    totalCount: 6,
+    steps: [],
+    profileIsLive: false,
+  },
+};
 
 const meta = {
   title: 'Organisms/AuthShell',

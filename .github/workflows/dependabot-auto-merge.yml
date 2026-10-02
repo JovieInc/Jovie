@@ -15,8 +15,6 @@ name: Dependabot Auto-Merge
 # check makes mergeStateStatus UNSTABLE and blocks native auto-merge even when
 # every required gate is green. Do not disable commit certification — uncertified
 # heads must not receive patch/minor native intent from this job. A successful
-# source-CI completion is the bounded retry signal when checks were not visible
-# on the initial PR event.
 #
 # Patch updates and metadata-confirmed stable-version minors may record native
 # merge intent. Pre-1.0 minors and majors remain open for review. Confirmed
@@ -30,9 +28,6 @@ on:
   # trusted base policy, never action refs proposed by the dependency PR.
   pull_request_target:
     types: [opened, reopened, synchronize, labeled, unlabeled, closed]
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
 
 concurrency:
   group: dependabot-native-intent-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha }}

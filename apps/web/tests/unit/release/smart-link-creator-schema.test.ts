@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getCreatorByUsername } from '@/app/[username]/[slug]/_lib/data';
 
 const {
   doesColumnExistMock,
@@ -11,7 +12,9 @@ const {
   const limitMock = vi.fn();
   const whereMock = vi.fn(() => ({ limit: limitMock }));
   const fromMock = vi.fn(() => ({ where: whereMock }));
-  const selectMock = vi.fn(() => ({ from: fromMock }));
+  const selectMock = vi.fn((_selection: Record<string, unknown>) => ({
+    from: fromMock,
+  }));
 
   return {
     doesColumnExistMock: vi.fn(),
@@ -43,7 +46,6 @@ vi.mock('@/lib/db', () => ({
 
 describe('smart-link creator schema compatibility', () => {
   beforeEach(() => {
-    vi.resetModules();
     doesColumnExistMock.mockReset();
     selectMock.mockClear();
     fromMock.mockClear();
@@ -64,10 +66,6 @@ describe('smart-link creator schema compatibility', () => {
         settings: {},
       },
     ]);
-
-    const { getCreatorByUsername } = await import(
-      '@/app/[username]/[slug]/_lib/data'
-    );
 
     await expect(getCreatorByUsername('dualipa')).resolves.toMatchObject({
       usernameNormalized: 'dualipa',
@@ -97,10 +95,6 @@ describe('smart-link creator schema compatibility', () => {
       },
     ]);
 
-    const { getCreatorByUsername } = await import(
-      '@/app/[username]/[slug]/_lib/data'
-    );
-
     await expect(getCreatorByUsername('dualipa')).resolves.toMatchObject({
       usernameNormalized: 'dualipa',
       isClaimed: false,
@@ -108,5 +102,40 @@ describe('smart-link creator schema compatibility', () => {
 
     const selection = selectMock.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(Object.keys(selection)).toContain('isClaimed');
+  });
+
+  it('omits each missing optional column instead of failing the query', async () => {
+    doesColumnExistMock.mockImplementation(
+      async (_table: string, column: string) =>
+        !['musicbrainz_id', 'youtube_url'].includes(column)
+    );
+    limitMock.mockResolvedValue([
+      {
+        id: 'creator-1',
+        userId: 'user-1',
+        displayName: 'Dua Lipa',
+        username: 'dualipa',
+        usernameNormalized: 'dualipa',
+        avatarUrl: null,
+        settings: {},
+        isClaimed: true,
+      },
+    ]);
+
+    await expect(getCreatorByUsername('dualipa')).resolves.toMatchObject({
+      usernameNormalized: 'dualipa',
+      isClaimed: true,
+      youtubeUrl: null,
+      musicbrainzId: null,
+    });
+
+    const selection = selectMock.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(Object.keys(selection)).not.toContain('musicbrainzId');
+    expect(Object.keys(selection)).not.toContain('youtubeUrl');
+    expect(Object.keys(selection)).toContain('spotifyUrl');
+    expect(doesColumnExistMock).toHaveBeenCalledWith(
+      'creator_profiles',
+      'musicbrainz_id'
+    );
   });
 });

@@ -1,8 +1,9 @@
 import 'server-only';
 
-import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { getFreshAuth } from '@/lib/auth/cached';
 import { env } from '@/lib/env-server';
+import { requireOvieApiAccess } from '@/lib/ovie/privacy-lock/access';
+import { assertOviePrivacyUnlocked } from '@/lib/ovie/privacy-lock/server';
 import type { HudAccessMode } from '@/types/hud';
 
 export type HudAuthResult =
@@ -11,22 +12,30 @@ export type HudAuthResult =
 
 export async function authorizeHud(
   kioskToken: string | null,
-  options?: { session?: 'cookie' | 'fresh' }
+  options?: { session?: 'cookie' | 'fresh'; privileged?: boolean }
 ): Promise<HudAuthResult> {
   const expectedToken = env.HUD_KIOSK_TOKEN;
   if (kioskToken && kioskToken === expectedToken) {
-    return { ok: true, mode: 'kiosk' };
+    // Token-only signage is independent machine authority. An interactive
+    // signed-in browser still obeys its own optional privacy policy.
+    try {
+      const auth = await getFreshAuth();
+      if (auth.userId && auth.sessionId)
+        await assertOviePrivacyUnlocked({
+          userId: auth.userId,
+          sessionId: auth.sessionId,
+        });
+      return { ok: true, mode: 'kiosk' };
+    } catch {
+      return { ok: false, reason: 'unauthorized' };
+    }
   }
 
   try {
-    const entitlements = await getCurrentUserEntitlements(options);
-    if (
-      entitlements.isAuthenticated &&
-      entitlements.userId &&
-      (entitlements.isAdmin || (await checkAdminRole(entitlements.userId)))
-    ) {
-      return { ok: true, mode: 'admin' };
-    }
+    const denied = await requireOvieApiAccess({
+      privileged: options?.privileged ?? false,
+    });
+    if (!denied) return { ok: true, mode: 'admin' };
   } catch {
     // Fail closed to the HUD fallback UI when Clerk context is unavailable.
   }

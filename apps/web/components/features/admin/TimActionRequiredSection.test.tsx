@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TimActionRequiredSection } from './TimActionRequiredSection';
@@ -26,5 +28,58 @@ describe('TimActionRequiredSection', () => {
     expect(await screen.findByText('Needs You')).toBeInTheDocument();
     expect(screen.getByText('Nothing needs you.')).toBeInTheDocument();
     expect(screen.queryByText('Needs Tim')).not.toBeInTheDocument();
+  });
+
+  it('uses the existing page heading and flat rows for the standalone route', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          issues: [
+            {
+              id: 'decision-1',
+              identifier: 'JOV-1',
+              title: 'Review release',
+              url: 'https://linear.app/jovie/issue/JOV-1',
+              priority: 2,
+              daysOld: 1,
+            },
+          ],
+          available: true,
+          observation: 'ok',
+          fetchedAt: new Date().toISOString(),
+        }),
+        { status: 200 }
+      )
+    );
+
+    render(
+      <>
+        <h1>Needs You</h1>
+        <TimActionRequiredSection presentation='page' />
+      </>
+    );
+    expect(
+      await screen.findByRole('link', { name: 'Review release' })
+    ).toHaveAttribute('href', 'https://linear.app/jovie/issue/JOV-1');
+    expect(screen.getAllByText('Needs You')).toHaveLength(1);
+    expect(screen.getByText('1 decision')).toBeInTheDocument();
+    const region = screen.getByRole('region', { name: 'Founder Decisions' });
+    expect(region).not.toHaveClass('bg-surface-1');
+    expect(region.querySelector('[data-shell-list-row]')).not.toHaveClass(
+      'bg-surface-0',
+      'border-subtle'
+    );
+    expect(
+      screen.getByRole('button', { name: 'Mark "Review release" as done' })
+    ).toBeEnabled();
+  });
+
+  it('does not keep raw red-* priority/overdue classes in source (JOV-6773)', () => {
+    const source = readFileSync(
+      resolve(__dirname, './TimActionRequiredSection.tsx'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/\bred-\d/);
+    expect(source).toContain('text-error');
   });
 });

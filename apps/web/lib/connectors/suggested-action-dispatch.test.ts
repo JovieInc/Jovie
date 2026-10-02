@@ -92,8 +92,33 @@ describe('resolveSuggestedActionDispatch', () => {
     ).toEqual({ mode: 'next-step-only' });
   });
 
+  it('keeps social reply drafts decision-only so approval never sends itself', () => {
+    expect(
+      resolveSuggestedActionDispatch({
+        kind: 'social_reply.draft',
+        payload: {
+          schemaVersion: 1,
+          title: 'Reply to @superfan on YouTube',
+          platform: 'youtube',
+          sourceId: 'video-123',
+          targetId: 'comment-456',
+          authorLabel: '@superfan',
+          inboundText: 'This track got me through the week.',
+          inboundAt: '2026-09-30T14:00:00.000Z',
+          draftedText: 'Means a lot — thank you for listening.',
+        },
+      })
+    ).toEqual({ mode: 'decision-only', family: 'social-reply' });
+  });
+
   it.each([
     ['unknown kind', 'agent.unregistered', {}, 'unsupported-action-kind'],
+    [
+      'malformed social reply',
+      'social_reply.draft',
+      { title: 'Missing draft copy' },
+      'invalid-social-reply-draft',
+    ],
     [
       'malformed calendar',
       'calendar.create_event',

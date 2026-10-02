@@ -18,6 +18,9 @@ describe('waitlist email route contracts', () => {
       'https://jovie.test/waitlist/invite?token=secure-token'
     );
     expect(result.message.subject).toBe("You're off the waitlist!");
+    expect(result.message.channels).toEqual(['email', 'push']);
+    expect(result.message.pushTitle).toBe("You're off the waitlist!");
+    expect(result.message.pushBody).toContain('access is ready');
     expect(result.message.text).toContain(
       'Use this secure link to finish signup:'
     );

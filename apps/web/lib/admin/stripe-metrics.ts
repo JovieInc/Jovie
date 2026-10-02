@@ -5,6 +5,7 @@ import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
 import { isActiveSubscription } from '@/lib/stripe/webhooks/utils';
+import { isInternalOrTestAccountEmail } from '@/lib/utils/email';
 
 export interface AdminStripeOverviewMetrics {
   mrrUsd: number;
@@ -294,8 +295,18 @@ function buildErrorResponse(message: string): AdminStripeOverviewMetrics {
   };
 }
 
+/**
+ * Every MRR surface excludes internal/test customers (jov.ie team, dogfood and
+ * QA accounts) unless a caller passes a stricter classifier. Previously only
+ * Summer's read passed one, so the HUD/overview counted the founder's own
+ * comped Pro subscription as revenue.
+ */
+const DEFAULT_INTERNAL_FILTER: StripeMetricsFilter = {
+  isInternalCustomer: ({ email }) => isInternalOrTestAccountEmail(email),
+};
+
 export async function getAdminStripeOverviewMetrics(
-  filter?: StripeMetricsFilter
+  filter: StripeMetricsFilter = DEFAULT_INTERNAL_FILTER
 ): Promise<AdminStripeOverviewMetrics> {
   if (!isStripeConfigured()) {
     return buildUnconfiguredResponse();
@@ -324,6 +335,10 @@ export async function getAdminStripeOverviewMetrics(
         status: 'all',
         expand: [
           'data.items.data.price',
+          // Coupons must be expanded objects or getFirstCoupon skips them and a
+          // 100%-off subscription counts at full list price (JOV-1089).
+          'data.discounts',
+          'data.discounts.source.coupon',
           ...(filter?.isInternalCustomer ? ['data.customer'] : []),
         ],
         limit: 100,

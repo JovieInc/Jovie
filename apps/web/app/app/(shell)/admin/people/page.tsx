@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
+import dynamic from 'next/dynamic';
 import type { SearchParams } from 'nuqs/server';
 import { AdminPeopleRightPanelProvider } from '@/components/features/admin/AdminPeopleRightPanelProvider';
-import { AdminAssetsPageWrapper } from '@/components/features/admin/admin-assets-table';
 import { AdminCreatorsPageWrapper } from '@/components/features/admin/admin-creator-profiles/AdminCreatorsPageWrapper';
 import { AdminReleasesPageWrapper } from '@/components/features/admin/admin-releases-table';
 import { AdminUsersTableUnified } from '@/components/features/admin/admin-users-table/AdminUsersTableUnified';
+import { AdminContactsTable } from '@/components/features/admin/contacts-table/AdminContactsTable';
 import { AdminFeedbackTable } from '@/components/features/admin/feedback-table/AdminFeedbackTable';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { WaitlistMetrics } from '@/components/features/admin/WaitlistMetrics';
@@ -22,6 +23,7 @@ import {
   adminAssetSortFields,
   getAdminAssets,
 } from '@/lib/admin/assets';
+import { getCanonicalContacts } from '@/lib/admin/contacts';
 import { getAdminCreatorProfiles } from '@/lib/admin/creator-profiles';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { getAdminReleases } from '@/lib/admin/releases';
@@ -54,13 +56,19 @@ export const metadata: Metadata = {
 
 export const runtime = 'nodejs';
 
+const AdminAssetsPageWrapper = dynamic(() =>
+  import('@/components/features/admin/admin-assets-table').then(mod => ({
+    default: mod.AdminAssetsPageWrapper,
+  }))
+);
+
 const peopleTabs = adminPeopleViews.map(view => ({
   value: view,
   label: getAdminPeopleViewLabel(view),
 }));
 
 function resolvePeopleView(view: string): AdminPeopleView {
-  return isAdminPeopleView(view) ? view : 'waitlist';
+  return isAdminPeopleView(view) ? view : 'contacts';
 }
 
 function resolveCreatorSort(sort: AdminPeopleSort): AdminCreatorsSort {
@@ -96,6 +104,43 @@ async function renderPeopleView(
   const search = params.q ?? '';
 
   switch (view) {
+    case 'contacts': {
+      const { contacts, metrics, total } = await getCanonicalContacts({
+        page,
+        pageSize,
+        search,
+        stage: params.stage,
+      });
+
+      return (
+        <AdminContactsTable
+          rows={contacts.map(contact => ({
+            dedupeKey: contact.dedupeKey,
+            stage: contact.stage,
+            overrideStage: contact.overrideStage,
+            displayName: contact.displayName,
+            email: contact.email,
+            handle: contact.handle,
+            avatarUrl: contact.avatarUrl,
+            sources: contact.sources,
+            certifiedAt: contact.certifiedAt?.toISOString() ?? null,
+            stageAt: contact.stageAt?.toISOString() ?? null,
+            activityAt: contact.activityAt?.toISOString() ?? null,
+            firstSeenAt: contact.firstSeenAt?.toISOString() ?? null,
+            userId: contact.userId,
+            creatorProfileId: contact.creatorProfileId,
+            leadId: contact.leadId,
+            waitlistEntryId: contact.waitlistEntryId,
+          }))}
+          total={total}
+          page={page}
+          pageSize={pageSize}
+          stage={params.stage ?? null}
+          search={search}
+          metrics={metrics}
+        />
+      );
+    }
     case 'waitlist': {
       const [
         { entries, pageSize: resolvedPageSize, total },

@@ -225,7 +225,7 @@ function ChatAlbumArtCardSuccess({
         </Button>
       </div>
       {applyMutation.isError || createMutation.isError ? (
-        <output className='mt-2 block text-xs text-red-500'>
+        <output className='mt-2 block text-xs text-error'>
           Could not apply artwork. Try again.
         </output>
       ) : null}

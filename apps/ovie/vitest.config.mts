@@ -17,6 +17,7 @@ export default defineConfig({
         'proxy.ts',
         'lib/access.ts',
         'scripts/routes.mjs',
+        'scripts/desktop-sidebar-contract.mjs',
         'next.config.mjs',
         'app/signin/page.tsx',
       ],

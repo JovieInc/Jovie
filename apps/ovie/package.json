@@ -8,12 +8,13 @@
     "dev": "node scripts/routes.mjs && next dev --port 3105",
     "build": "node scripts/routes.mjs && NODE_OPTIONS=--max-old-space-size=8192 next build --turbopack",
     "start": "next start --port 3105",
+    "certify:shell": "node scripts/app-shell-invariants.mjs",
     "typecheck": "node scripts/routes.mjs && next typegen && tsc --noEmit",
     "test": "vitest run --coverage",
     "lint": "biome check ."
   },
   "dependencies": {
-    "next": "16.3.6",
+    "next": "16.3.8",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "@jovie/ui": "workspace:*",
@@ -23,8 +24,8 @@
     "@tailwindcss/postcss": "^4.3.3",
     "tailwindcss": "^4.3.3",
     "autoprefixer": "^10.6.1",
-    "@statsig/statsig-node-core": "^0.23.0",
-    "workflow": "4.8.9"
+    "@statsig/statsig-node-core": "^0.23.1",
+    "workflow": "4.8.10"
   },
   "devDependencies": {
     "@types/node": "^26.6.3",

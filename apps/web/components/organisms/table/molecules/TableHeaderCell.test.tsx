@@ -124,6 +124,16 @@ describe('TableHeaderCell (molecule)', () => {
     expect(header).not.toHaveClass('text-secondary-token');
   });
 
+  it('insets sortable cells so the pill label aligns with body cell text', () => {
+    const { container } = renderCell({ canSort: true });
+    expect(container.querySelector('th')).toHaveClass('px-1.5');
+  });
+
+  it('does not inset non-sortable cells', () => {
+    const { container } = renderCell({ canSort: false });
+    expect(container.querySelector('th')).not.toHaveClass('px-1.5');
+  });
+
   it('keeps column heading cells bounded to one line', () => {
     const { container } = renderCell();
     expect(container.querySelector('th')).toHaveClass('whitespace-nowrap');

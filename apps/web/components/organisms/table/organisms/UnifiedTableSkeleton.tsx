@@ -39,7 +39,7 @@ export interface UnifiedTableSkeletonProps<TData extends RowData> {
   /**
    * Row height in pixels. Must match the loaded table's rowHeight to avoid
    * layout shift on data arrival.
-   * @default 32
+   * @default 40
    */
   readonly rowHeight?: number;
 

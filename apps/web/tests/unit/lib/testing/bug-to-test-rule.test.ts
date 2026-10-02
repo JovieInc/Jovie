@@ -82,6 +82,24 @@ describe('bug-to-test rule', () => {
     expect(evaluation.hasRegressionTestEvidence).toBe(true);
   });
 
+  it('accepts the repository Python unittest convention', () => {
+    const evaluation = evaluateBugToTestRule({
+      changedFiles: [
+        'scripts/lanes/lane_runner.py',
+        'scripts/tests/test_lane_runner.py',
+      ],
+      commitMessages: ['fix(lanes): cancel stale repair'],
+      prBody:
+        'Regression test: `scripts/tests/test_lane_runner.py` covers merged targets',
+    });
+
+    expect(evaluation.passed).toBe(true);
+    expect(evaluation.regressionTestSignals).toEqual([
+      'changed test files: scripts/tests/test_lane_runner.py',
+      'PR body references changed regression test: scripts/tests/test_lane_runner.py',
+    ]);
+  });
+
   it('rejects non-test lookalike extensions', () => {
     const evaluation = evaluateBugToTestRule({
       changedFiles: [

@@ -6,6 +6,7 @@ type SearchParamRecord = Record<
 >;
 
 export const adminPeopleViews = [
+  'contacts',
   'waitlist',
   'creators',
   'users',
@@ -78,11 +79,9 @@ export const ADMIN_SETTINGS_TOOL_IDS = [
   'activity',
   'investors',
   'feature_registry',
-  'screenshots',
   'share_studio',
   'costs',
   'revenue_lift',
-  'system_map',
   'features',
 ] as const satisfies readonly AdminWorkspaceId[];
 
@@ -182,13 +181,6 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     section: 'utilities',
   },
   {
-    id: 'screenshots',
-    label: 'Screenshots',
-    href: APP_ROUTES.ADMIN_SCREENSHOTS,
-    description: 'Generated docs and QA screenshots',
-    section: 'utilities',
-  },
-  {
     id: 'costs',
     label: 'Costs',
     href: APP_ROUTES.ADMIN_COSTS,
@@ -212,13 +204,6 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     section: 'utilities',
   },
   {
-    id: 'system_map',
-    label: 'System Map',
-    href: APP_ROUTES.ADMIN_SYSTEM,
-    description: 'Read-only map of skills, connectors, tools, and memory',
-    section: 'utilities',
-  },
-  {
     id: 'features',
     label: 'Features',
     href: APP_ROUTES.ADMIN_FEATURES,
@@ -228,6 +213,7 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
 ] as const;
 
 export const ADMIN_PEOPLE_VIEW_LABELS: Record<AdminPeopleView, string> = {
+  contacts: 'Customers',
   waitlist: 'Waitlist',
   creators: 'Creators',
   users: 'Users',

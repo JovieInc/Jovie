@@ -1,5 +1,8 @@
 import { ImageResponse } from 'next/og';
-import { getBlogPost } from '@/lib/blog/getBlogPosts';
+import {
+  getBlogPost,
+  isBlogPostUnavailableError,
+} from '@/lib/blog/getBlogPosts';
 import { loadSatoshiFont, OG_SIZE, THEME } from '@/lib/share/image-utils';
 
 export const runtime = 'nodejs';
@@ -31,7 +34,8 @@ export default async function Image({
     const post = await getBlogPost(slug);
     title = post.title;
     excerpt = post.excerpt;
-  } catch {
+  } catch (error) {
+    if (!isBlogPostUnavailableError(error)) throw error;
     // Fallback to generic card if post not found
   }
 

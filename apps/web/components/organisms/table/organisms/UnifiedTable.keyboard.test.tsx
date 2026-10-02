@@ -4,6 +4,18 @@ import type { ColumnDef } from '@/lib/tanstack-table';
 import { TABLE_EMPTY_STATE_MIN_HEIGHT_PX } from '../atoms/TableEmptyState';
 import { UnifiedTable } from './UnifiedTable';
 
+vi.mock('./useTableVirtualization', () => ({
+  useTableVirtualization: ({ enabled }: { readonly enabled: boolean }) => ({
+    virtualizer: { measureElement: vi.fn() },
+    virtualRows: enabled
+      ? [{ index: 1, start: 44, size: 44, end: 88, key: 'two', lane: 0 }]
+      : [],
+    totalSize: enabled ? 132 : 0,
+    paddingTop: enabled ? 44 : 0,
+    paddingBottom: enabled ? 44 : 0,
+  }),
+}));
+
 type TestRow = { id: string; name: string };
 type AlignedTestRow = TestRow & { count: number };
 
@@ -38,6 +50,49 @@ describe('UnifiedTable keyboard interaction', () => {
   beforeEach(() => {
     HTMLElement.prototype.scrollIntoView = vi.fn();
     window.matchMedia = vi.fn().mockReturnValue({ matches: false });
+  });
+
+  it('fills the available content width without a route-owned max width', () => {
+    const { container } = render(
+      <UnifiedTable
+        data={data}
+        columns={columns}
+        enableVirtualization={false}
+      />
+    );
+
+    expect(container.firstElementChild).toHaveClass('w-full', 'min-w-0');
+    expect(container.firstElementChild).not.toHaveClass('max-w-full');
+    expect(container.querySelector('table')).toHaveClass('w-full');
+    expect(container.querySelector('table')).not.toHaveClass('max-w-full');
+  });
+
+  it('keeps virtualized rows in table flow between spacer rows', () => {
+    const { container } = render(
+      <UnifiedTable
+        data={data}
+        columns={columns}
+        hideHeader
+        enableVirtualization
+        rowHeight={44}
+        getRowId={row => row.id}
+        getRowTestId={row => `row-${row.id}`}
+      />
+    );
+
+    const tbody = container.querySelector('tbody');
+    expect(tbody).not.toBeNull();
+    expect(tbody?.style.position).toBe('');
+    expect(tbody?.style.height).toBe('');
+
+    const bodyRows = [...(tbody?.children ?? [])] as HTMLTableRowElement[];
+    const virtualRow = screen.getByTestId('row-two');
+    expect(bodyRows).toHaveLength(3);
+    expect(bodyRows[0].querySelector('td')?.style.height).toBe('44px');
+    expect(bodyRows[1]).toBe(virtualRow);
+    expect(bodyRows[2].querySelector('td')?.style.height).toBe('44px');
+    expect(virtualRow.style.position).toBe('');
+    expect(virtualRow.style.transform).toBe('');
   });
 
   it('uses instant scrolling when reduced motion is requested', () => {

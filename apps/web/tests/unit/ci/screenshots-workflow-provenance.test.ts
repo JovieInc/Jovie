@@ -200,6 +200,195 @@ describe('Product Screenshots provenance cleanliness', () => {
     ).toBeLessThan(stepIndex(workflow, 'Certify exact screen captures'));
   });
 
+  it('emits and certifies a source-bound /artists browser proof', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const capture = getStepBlock(workflow, 'Capture /artists screen proof');
+    const bind = getStepBlock(
+      workflow,
+      'Bind /artists proof to producer provenance'
+    );
+    const upload = getStepBlock(workflow, 'Upload /artists screen proof');
+    const certify = getStepBlock(workflow, 'Certify exact screen captures');
+
+    expect(workflow).toContain("- 'apps/web/app/artists/**'");
+    expect(workflow).toContain(
+      'artists-artifact-id: ${{ steps.artists-proof.outputs.artifact-id }}'
+    );
+    expect(capture).toContain('artists-screen-proof.spec.ts');
+    expect(bind).toContain('--screen=web.artists');
+    expect(bind).toContain('--producer-job-id="$PRODUCER_JOB_ID"');
+    expect(bind).toContain('if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]');
+    expect(bind).toContain('Could not resolve the current producer job ID.');
+    expect(bind).toContain('exit 1');
+    expect(upload).toContain('name: screen-browser-proof-artists');
+    expect(upload).toContain('screenshots/desktop.png');
+    expect(upload).toContain('screenshots/mobile.png');
+    expect(certify).toContain('--screen-id=web.artists');
+    expect(certify).toContain('needs.generate.outputs.artists-artifact-id');
+    expect(
+      stepIndex(workflow, 'Capture public-profile screen proof')
+    ).toBeLessThan(stepIndex(workflow, 'Capture /artists screen proof'));
+    expect(stepIndex(workflow, 'Upload /artists screen proof')).toBeLessThan(
+      stepIndex(workflow, 'Certify exact screen captures')
+    );
+    expect(stepIndex(workflow, 'Upload /artists screen proof')).toBeLessThan(
+      stepIndex(
+        workflow,
+        'Verify public screenshot exports from production build'
+      )
+    );
+  });
+
+  it('emits and certifies a source-bound hud-isolated browser proof (JOV-7126)', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const capture = getStepBlock(workflow, 'Capture hud-isolated screen proof');
+    const bind = getStepBlock(
+      workflow,
+      'Bind hud-isolated proof to producer provenance'
+    );
+    const upload = getStepBlock(workflow, 'Upload hud-isolated screen proof');
+    const certify = getStepBlock(workflow, 'Certify exact screen captures');
+
+    expect(workflow).toContain("- 'apps/web/app/hud/**'");
+    expect(workflow).toContain(
+      'hud-isolated-artifact-id: ${{ steps.hud-isolated-proof.outputs.artifact-id }}'
+    );
+    // The secretless dev-test-auth admin bypass (JOV-7126) must be visible to
+    // the long-lived production server process, which only ever reads the
+    // job-level env (or its own step's env) — a later step's env cannot
+    // reach an already-running server. It must be set before that server
+    // starts.
+    expect(workflow).toContain("E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'");
+    expect(
+      workflow.indexOf("E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'")
+    ).toBeLessThan(stepIndex(workflow, 'Start production server'));
+    expect(capture).toContain('hud-isolated-screen-proof.spec.ts');
+    expect(bind).toContain('--screen=web.hud-isolated');
+    expect(bind).toContain('--producer-job-id="$PRODUCER_JOB_ID"');
+    // Each screen's proof gets its own GH artifact name (upload-artifact
+    // forbids reusing another screen's name within this run).
+    expect(upload).toContain('name: screen-browser-proof-hud-isolated');
+    expect(upload).toContain('screenshots/desktop.png');
+    expect(upload).toContain('screenshots/mobile.png');
+    expect(certify).toContain('--screen-id=web.hud-isolated');
+    expect(certify).toContain(
+      'needs.generate.outputs.hud-isolated-artifact-id'
+    );
+    expect(stepIndex(workflow, 'Capture /artists screen proof')).toBeLessThan(
+      stepIndex(workflow, 'Capture hud-isolated screen proof')
+    );
+    expect(
+      stepIndex(workflow, 'Upload hud-isolated screen proof')
+    ).toBeLessThan(stepIndex(workflow, 'Certify exact screen captures'));
+    expect(
+      stepIndex(workflow, 'Upload hud-isolated screen proof')
+    ).toBeLessThan(
+      stepIndex(
+        workflow,
+        'Verify public screenshot exports from production build'
+      )
+    );
+  });
+
+  it('emits and certifies a source-bound tasks browser proof', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const capture = getStepBlock(workflow, 'Capture tasks screen proof');
+    const bind = getStepBlock(
+      workflow,
+      'Bind tasks proof to producer provenance'
+    );
+    const upload = getStepBlock(workflow, 'Upload tasks screen proof');
+    const certify = getStepBlock(workflow, 'Certify exact screen captures');
+
+    expect(workflow).toContain("- 'apps/web/app/app/(shell)/tasks/**'");
+    expect(workflow).toContain(
+      'tasks-artifact-id: ${{ steps.tasks-proof.outputs.artifact-id }}'
+    );
+    // The reserved-fixture profile only activates once E2E_FAST_ONBOARDING
+    // is visible to the long-lived production server process, same
+    // ordering constraint as E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH above.
+    expect(workflow).toContain("E2E_FAST_ONBOARDING: '1'");
+    expect(workflow.indexOf("E2E_FAST_ONBOARDING: '1'")).toBeLessThan(
+      stepIndex(workflow, 'Start production server')
+    );
+    expect(capture).toContain('tasks-screen-proof.spec.ts');
+    expect(bind).toContain('--screen=web.tasks');
+    expect(bind).toContain('--producer-job-id="$PRODUCER_JOB_ID"');
+    expect(upload).toContain('name: screen-browser-proof-tasks');
+    expect(upload).toContain('screenshots/desktop.png');
+    expect(upload).toContain('screenshots/mobile.png');
+    expect(certify).toContain('--screen-id=web.tasks');
+    expect(certify).toContain('needs.generate.outputs.tasks-artifact-id');
+    expect(
+      stepIndex(workflow, 'Capture hud-isolated screen proof')
+    ).toBeLessThan(stepIndex(workflow, 'Capture tasks screen proof'));
+    expect(stepIndex(workflow, 'Upload tasks screen proof')).toBeLessThan(
+      stepIndex(workflow, 'Certify exact screen captures')
+    );
+    expect(stepIndex(workflow, 'Upload tasks screen proof')).toBeLessThan(
+      stepIndex(
+        workflow,
+        'Verify public screenshot exports from production build'
+      )
+    );
+  });
+
+  it('emits and certifies a source-bound contacts browser proof', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const capture = getStepBlock(workflow, 'Capture contacts screen proof');
+    const bind = getStepBlock(
+      workflow,
+      'Bind contacts proof to producer provenance'
+    );
+    const upload = getStepBlock(workflow, 'Upload contacts screen proof');
+    const certify = getStepBlock(workflow, 'Certify exact screen captures');
+
+    expect(workflow).toContain("- 'apps/web/app/app/(shell)/contacts/**'");
+    expect(workflow).toContain("- 'apps/web/app/api/dashboard/contacts/**'");
+    expect(workflow).toContain(
+      'contacts-artifact-id: ${{ steps.contacts-proof.outputs.artifact-id }}'
+    );
+    expect(capture).toContain('contacts-screen-proof.spec.ts');
+    expect(bind).toContain('--screen=web.contacts');
+    expect(bind).toContain('--producer-job-id="$PRODUCER_JOB_ID"');
+    expect(upload).toContain('name: screen-browser-proof-contacts');
+    expect(upload).toContain('screenshots/desktop.png');
+    expect(upload).toContain('screenshots/mobile.png');
+    expect(certify).toContain('--screen-id=web.contacts');
+    expect(certify).toContain('needs.generate.outputs.contacts-artifact-id');
+    expect(stepIndex(workflow, 'Capture tasks screen proof')).toBeLessThan(
+      stepIndex(workflow, 'Capture contacts screen proof')
+    );
+    expect(stepIndex(workflow, 'Upload contacts screen proof')).toBeLessThan(
+      stepIndex(workflow, 'Certify exact screen captures')
+    );
+    expect(stepIndex(workflow, 'Upload contacts screen proof')).toBeLessThan(
+      stepIndex(
+        workflow,
+        'Verify public screenshot exports from production build'
+      )
+    );
+  });
+
+  it('pins the production server to a loopback hostname', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const start = getStepBlock(workflow, 'Start production server');
+
+    // request.nextUrl.hostname reflects the server's own configured
+    // hostname (Next.js passes it straight into startServer()), not the
+    // incoming Host header — an unset/0.0.0.0 bind address makes every
+    // request look like it came from "0.0.0.0", which
+    // isLocalDevelopmentAutomationHostname (lib/security/development-only.ts)
+    // correctly refuses to trust as a loopback client. That silently 403'd
+    // the dev-test-auth bypass hud-isolated depends on. `next start` reads
+    // the same HOSTNAME env var, so one job-env value covers both server
+    // commands this step can run.
+    expect(start).toContain('HOSTNAME: localhost');
+    expect(start).not.toMatch(
+      /HOSTNAME:\s*(0\.0\.0\.0|'0\.0\.0\.0'|"0\.0\.0\.0")/
+    );
+  });
+
   it('still emits a blocked receipt when screenshot generation fails', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const certifyJob = workflow.slice(workflow.indexOf('\n  certify:'));
@@ -213,6 +402,12 @@ describe('Product Screenshots provenance cleanliness', () => {
     expect(certifyJob).toContain(
       "if: always() && hashFiles('.artifacts/screen-certification/*.json') != ''"
     );
+    // JOV-7126: a blocked receipt for an earlier --screen-id call must not
+    // abort the shell before a later one runs, or that screen's evidence
+    // silently never gets attempted.
+    const certify = getStepBlock(workflow, 'Certify exact screen captures');
+    expect(certify).toContain('|| STATUS=$?');
+    expect(certify).toContain('exit "$STATUS"');
   });
 
   it('keeps trusted proof production independent from catalog publication', () => {

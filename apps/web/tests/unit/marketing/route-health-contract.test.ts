@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   getMarketingRouteHealthTarget,
+  getRouteManifestEntry,
+  getRouteRecipeParity,
+  isExempt,
+  isRecipeRoute,
   MARKETING_EXACT_PUBLIC_ROUTE_TARGETS,
   MARKETING_ROUTE_DISPOSITION_LEDGER,
   MARKETING_ROUTE_HEALTH_TARGETS,
@@ -49,6 +53,72 @@ describe('marketing route health contract', () => {
         healthCheck: undefined,
       })
     ).toThrow(/concrete absolute path/);
+  });
+
+  it('rejects relative and wildcard redirect destinations before browser admission', () => {
+    for (const finalPath of ['login', '/future/*']) {
+      expect(() =>
+        getMarketingRouteHealthTarget({
+          ...MARKETING_ROUTE_MANIFEST[0],
+          healthCheck: {
+            path: '/legacy',
+            expected: 'redirect',
+            allowedFinalPaths: [finalPath],
+          },
+        })
+      ).toThrow(/invalid redirect target/);
+    }
+    expect(
+      getMarketingRouteHealthTarget({
+        ...MARKETING_ROUTE_MANIFEST[0],
+        healthCheck: {
+          path: '/legacy',
+          expected: 'redirect',
+          allowedFinalPaths: ['/pricing'],
+        },
+      })
+    ).toMatchObject({ expected: 'redirect', allowedFinalPaths: ['/pricing'] });
+  });
+
+  it('returns real route ownership and fails closed for unknown source paths', () => {
+    const pricing = MARKETING_ROUTE_MANIFEST.find(
+      entry => entry.url === '/pricing'
+    );
+    const developers = MARKETING_ROUTE_MANIFEST.find(
+      entry => entry.url === '/developers'
+    );
+    expect(pricing).toBeDefined();
+    expect(developers).toBeDefined();
+    expect(getRouteManifestEntry(pricing!.glob)).toBe(pricing);
+    expect(isRecipeRoute(pricing!.glob)).toBe(true);
+    expect(isExempt(pricing!.glob)).toBe(false);
+    expect(isExempt(developers!.glob)).toBe(true);
+    expect(isRecipeRoute(developers!.glob)).toBe(false);
+    expect(
+      getRouteManifestEntry('(marketing)/unregistered/page.tsx')
+    ).toBeNull();
+    expect(isExempt('(marketing)/unregistered/page.tsx')).toBe(false);
+    expect(isRecipeRoute('(marketing)/unregistered/page.tsx')).toBe(false);
+  });
+
+  it('never projects an unverified or non-recipe binding as matching recipe proof', () => {
+    const pricing = MARKETING_ROUTE_MANIFEST.find(
+      entry => entry.url === '/pricing'
+    )!;
+    expect(
+      getRouteRecipeParity({
+        ...pricing,
+        bindingEvidence: { ...pricing.bindingEvidence, status: 'unverified' },
+      })
+    ).toMatchObject({ evidenceStatus: 'unverified', matches: null });
+    const developers = MARKETING_ROUTE_MANIFEST.find(
+      entry => entry.url === '/developers'
+    )!;
+    expect(getRouteRecipeParity(developers)).toMatchObject({
+      expectedSectionIds: [],
+      matches: null,
+    });
+    expect(getRouteRecipeParity(pricing).matches).toBe(false);
   });
 
   it('keeps pay, support, and the public waitlist source-bound and renderable', () => {

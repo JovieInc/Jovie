@@ -5,7 +5,10 @@ vi.mock('next/cache', () => ({
   revalidateTag: vi.fn(),
 }));
 
-import { invalidateReleaseCaches } from '@/lib/cache/releases';
+import {
+  invalidateReleaseCaches,
+  invalidateSmartLinkContentCache,
+} from '@/lib/cache/releases';
 import { createReleasesTag } from '@/lib/cache/tags';
 
 const USER_ID = 'user-1';
@@ -54,5 +57,15 @@ describe('invalidateReleaseCaches (JOV-6272)', () => {
     // The family is keyed by (userId, profileId) only — exactly two
     // segments after the prefix.
     expect(releaseTags[0]?.split(':')).toHaveLength(3);
+  });
+
+  it('invalidates the canonical SmartLink payload after credit reconciliation', () => {
+    invalidateSmartLinkContentCache(PROFILE_ID);
+
+    expect(revalidateTag).toHaveBeenCalledTimes(1);
+    expect(revalidateTag).toHaveBeenCalledWith(
+      `smartlink-content:${PROFILE_ID}`,
+      'max'
+    );
   });
 });

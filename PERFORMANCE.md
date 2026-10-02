@@ -30,3 +30,59 @@ hydration, and virtualization.
 | iOS | Launch under 2 seconds, no frame drops, no memory leaks. | Launch baseline captured at average `3.01s` to signed-out shell under UI-test automation; runtime baseline captured shell transition clock, CPU, and memory metrics and now requests the iOS 26+ hitch metric, but no hitch/frame lines were emitted; frame-drop and leak evidence required under JOV-2712 |
 | Electron | Startup under 3 seconds, stable memory footprint, no renderer crashes. | Evidence required under JOV-2712 |
 | Chrome Extension | Fast popup open, fast background execution, minimal memory usage. | Evidence required under JOV-2712 |
+
+## Installed desktop resource collector (JOV-4400)
+
+`pnpm desktop:memory` remains the development smoke harness (GPU disabled,
+fixed settling delay). It does not establish authenticated chat readiness.
+
+`pnpm desktop:performance` attaches to a running, installed production Mac app
+without changing its launch flags, enabling remote debugging, or quitting it.
+The collector verifies the packaged build identity against the bundle and the
+selected main process. It rejects missing renderer/GPU processes, explicit GPU
+overrides on the main process, and software-rendering/debug flags in the tree.
+A GPU process alone does not prove hardware acceleration.
+
+On a Mac, open the production app normally using an authorized test account.
+Find the main `Jovie` PID in Activity Monitor (not a Helper process), then run
+from the repository root, substituting that PID:
+
+```bash
+pnpm desktop:performance --pid 12345 --messages 200 --scenario foreground-idle
+```
+
+At the interactive prompt, verify the fixture is loaded, focus the composer,
+type and clear a short draft, and confirm the requested work state by entering
+`ready`. Sampling starts only after this confirmation and after the collector
+brings the app forward or hides it. Keep the requested state for the capture;
+streaming scenarios require a controlled test prompt that is still streaming
+at confirmation. No message is sent by the collector. Visibility preparation and per-sample checks use
+macOS System Events and require the terminal's Automation/Accessibility access;
+a failure produces an incomplete report. The app remains running in the chosen
+visibility state afterward.
+
+Repeat with `--messages 20`, `200`, and `2000`, using histories with tool results
+and attachments. Choose `--scenario foreground-idle`, `hidden-idle`,
+`foreground-streaming`, or `hidden-streaming`. Defaults are ten samples, two
+seconds apart; `--samples` (2–60) and `--interval-ms` (250–10000) bound the run.
+`--app` selects another installed production `.app`; `--output` selects the
+artifact directory. JSON metadata and a Markdown summary otherwise go to
+`artifacts/desktop-test-results/production-baseline/<timestamp>/`.
+
+Each sample verifies that the selected PID is hidden, or foreground with an
+unminimized window, and records per-process and aggregate RSS/OS CPU estimates for main,
+renderer, GPU, utility, and other descendants. Raw commands and conversation
+contents are not persisted. Summed RSS includes shared pages; it is not unique
+physical footprint. macOS `ps` CPU percentages are OS-defined recent estimates,
+not CPU deltas over the sample interval. Readiness and message counts are
+operator attestations. Work state is attested at confirmation, not verified
+throughout sampling; a response can end during the run. The loaded hosted-web
+revision is also unverified. A captured baseline is not a performance gate,
+startup measurement, interaction latency result, or leak proof.
+
+**Ship now:** collect bounded resource evidence from the real installed app.
+**Re-evaluate when:** [JOV-7463](https://linear.app/jovie/issue/JOV-7463) captures
+authenticated focused-composer launch instrumentation and the real Mac workload
+matrix. **Then:** set measured regression budgets, including input/paint and
+conversation-switch latency. This collector's source tests do not close the
+open Electron runtime-evidence rows above.

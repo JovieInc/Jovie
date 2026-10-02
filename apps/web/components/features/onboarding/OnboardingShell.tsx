@@ -1,10 +1,12 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/onboarding/OnboardingShell.sign-in-placement.test.tsx
+
 import { Skeleton } from '@jovie/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
-import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { SidebarProvider } from '@/components/organisms/sidebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { publicEnv } from '@/lib/env-public';
@@ -20,6 +22,7 @@ import {
   EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
   type OnboardingProfileBuilderState,
   OnboardingProfileRail,
+  resolvePreviewArtist,
 } from './OnboardingProfileRail';
 import {
   isOnboardingTurnstilePanelVisible,
@@ -58,7 +61,7 @@ export function OnboardingShell({
   const [turnstileState, setTurnstileState] =
     useState<OnboardingTurnstileState>({
       status: 'loading',
-      message: 'Checking your browser before the first message.',
+      message: 'Starting your chat.',
     });
   const [turnstileInstruction, setTurnstileInstruction] = useState<
     string | null
@@ -96,7 +99,7 @@ export function OnboardingShell({
   );
 
   const requestTurnstileVerification = useCallback(
-    (message = 'Verify you are human to send') => {
+    (message = 'One quick check before we send') => {
       setTurnstileInstruction(message);
       setTurnstileFocusSignal(current => current + 1);
     },
@@ -104,7 +107,7 @@ export function OnboardingShell({
   );
 
   const resetTurnstileVerification = useCallback(
-    (message = 'Verify you are human to send') => {
+    (message = 'One quick check before we send') => {
       setTurnstileToken(null);
       setTurnstileInstruction(message);
       setTurnstileResetSignal(current => current + 1);
@@ -137,7 +140,8 @@ export function OnboardingShell({
     turnstileState.status === 'unsupported' ||
     turnstileState.status === 'unconfigured';
   const turnstileFailureMessage = isTurnstileUnavailable
-    ? (turnstileState.message ?? 'Verification failed. Try again.')
+    ? (turnstileState.message ??
+      "We couldn't start your chat. Refresh the page to try again.")
     : null;
 
   const handleTurnstileRequired = useCallback(
@@ -148,7 +152,7 @@ export function OnboardingShell({
   );
 
   const handleTurnstileRejected = useCallback(() => {
-    resetTurnstileVerification('Verify you are human to send');
+    resetTurnstileVerification('One quick check before we send');
   }, [resetTurnstileVerification]);
 
   // Auto-claim any anonymous transcript once Better Auth reports the user is
@@ -158,7 +162,7 @@ export function OnboardingShell({
   const claimStatus = useOnboardingClaim(claimTrigger);
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
-  const sideProfileRail = profileBuilderState.artist ? (
+  const sideProfileRail = resolvePreviewArtist(profileBuilderState) ? (
     <OnboardingProfileRail state={profileBuilderState} />
   ) : null;
 
@@ -170,12 +174,12 @@ export function OnboardingShell({
         contentClassName='overflow-hidden!'
         main={
           <div
-            className='relative flex min-h-0 flex-1'
+            className='relative flex min-h-0 flex-1 flex-col'
             data-onboarding-session={sessionLabel}
           >
             {!isSignedIn ? (
               <div
-                className='absolute right-3 top-3 z-30 sm:right-4 sm:top-4'
+                className='flex min-h-11 shrink-0 items-center justify-end px-3 sm:px-4'
                 data-testid='onboarding-sign-in-header'
               >
                 <Link
@@ -187,6 +191,7 @@ export function OnboardingShell({
               </div>
             ) : null}
             <OnboardingChat
+              headerOverlay={!isSignedIn}
               intentId={intentId}
               onConversationActivity={handleConversationActivity}
               onProfileBuilderChange={setProfileBuilderState}
@@ -254,7 +259,7 @@ function OnboardingShellStatus({
     <p
       className={cn(
         'pointer-events-none absolute right-3 top-3 z-40 max-w-[min(28rem,calc(100%-1.5rem))] rounded-full border bg-surface-0 px-3 py-1.5 text-xs leading-5 shadow-card sm:right-4 sm:top-4',
-        'border-red-500/20 text-error'
+        'border-error/20 text-error'
       )}
       role='alert'
       aria-live='assertive'

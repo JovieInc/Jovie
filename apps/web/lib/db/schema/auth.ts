@@ -78,6 +78,13 @@ export const userSettings = pgTable('user_settings', {
     .references(() => users.id, { onDelete: 'cascade' }),
   themeMode: themeModeEnum('theme_mode').notNull().default('system'),
   sidebarCollapsed: boolean('sidebar_collapsed').notNull().default(false),
+  oviePrivacyLockEnabled: boolean('ovie_privacy_lock_enabled')
+    .notNull()
+    .default(false),
+  oviePrivacyLockVersion: integer('ovie_privacy_lock_version')
+    .notNull()
+    .default(0),
+  oviePrivacyLockedAt: timestamp('ovie_privacy_locked_at'),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 

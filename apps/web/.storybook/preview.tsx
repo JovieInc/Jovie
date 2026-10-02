@@ -21,7 +21,7 @@ function installProcessPolyfill(): void {
   // Chromatic story extraction runs in a browser. Vite `define` rewrites most
   // process.env.* references, but a global fallback prevents hard crashes if
   // any residual bare `process` access remains in the story graph.
-  const g = globalThis as typeof globalThis & {
+  const g = globalThis as unknown as {
     process?: { env?: Record<string, string | undefined> };
   };
   if (!g.process) {
@@ -221,7 +221,8 @@ const preview: Preview = {
   },
   tags: ['autodocs'],
   decorators: [
-    Story => {
+    (Story, context) => {
+      const themeOverride = context.parameters?.themes?.themeOverride;
       const [queryClient] = React.useState(
         () =>
           new QueryClient({
@@ -245,8 +246,12 @@ const preview: Preview = {
             <ThemeProvider
               attribute='class'
               defaultTheme='dark'
+              forcedTheme={
+                themeOverride === 'light' || themeOverride === 'dark'
+                  ? themeOverride
+                  : undefined
+              }
               enableSystem={false}
-              disableTransitionOnChange
               storageKey='jovie-theme-storybook'
             >
               <TooltipProvider delayDuration={0} skipDelayDuration={0}>

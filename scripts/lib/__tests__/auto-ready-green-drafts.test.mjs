@@ -250,7 +250,7 @@ describe('green-source controller contract', () => {
     expect(workflow).toContain('workflow_run:');
     expect(workflow).toContain('check_suite:');
     expect(workflow).toContain(
-      "workflows: ['CI', 'Fork PR Gate', 'PR Size Guard']"
+      "workflows: ['Source Validation', 'CI', 'Fork PR Gate', 'PR Size Guard']"
     );
     expect(workflow).toContain('scripts/auto-ready-green-drafts.sh');
     expect(workflow).toContain("github.event_name == 'workflow_dispatch'");

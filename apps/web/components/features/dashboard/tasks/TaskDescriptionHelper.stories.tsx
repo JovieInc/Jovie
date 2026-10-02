@@ -15,4 +15,13 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  args: {
+    helper: {
+      title: 'What to include',
+      intro: ['Add a short summary of the release.'],
+      bullets: ['Release date', 'Primary artist', 'Feature credits'],
+    },
+    onBeginEditing: () => {},
+  },
+};

@@ -1,7 +1,7 @@
 'use client';
 
-import { Check, Minus } from 'lucide-react';
 import { Fragment, useState } from 'react';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import {
   ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
   formatPublicPriceDisplay,
@@ -45,21 +45,14 @@ function CellValue({
   }
 
   if (value === true) {
-    return (
-      <Check
-        aria-label='Included'
-        className='system-b-pricing-inclusion-icon'
-      />
-    );
+    return <span className='system-b-pricing-chart-value'>Included</span>;
   }
 
   if (comingSoon) {
     return <span className='system-b-pricing-chart-badge'>Soon</span>;
   }
 
-  return (
-    <Minus aria-label='Not Included' className='system-b-pricing-minus-icon' />
-  );
+  return <span className='system-b-pricing-chart-value'>Not included</span>;
 }
 
 function MobileFeatureRow({
@@ -73,7 +66,8 @@ function MobileFeatureRow({
     <tr className='system-b-pricing-chart-row'>
       <th
         scope='row'
-        className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature whitespace-nowrap'
+        data-wrap='feature-label'
+        className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature'
       >
         {feature.name}
       </th>
@@ -142,10 +136,12 @@ export function PricingComparisonChart() {
   ];
   const selectedPlanOption =
     planOptions.find(option => option.id === selectedPlan) ?? planOptions[0];
+  const selectedPlanClaim = selectedPlan === 'free' ? freeClaim : proClaim;
 
   return (
     <div
       className='system-b-pricing-chart'
+      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.comparison}
       data-offer-contract={ARTIST_VISIBILITY_OFFER_CONTRACT_ID}
     >
       <div className='system-b-pricing-mobile-selector'>
@@ -173,7 +169,12 @@ export function PricingComparisonChart() {
           <caption className='sr-only'>Feature comparison by plan</caption>
           <thead>
             <tr className='system-b-pricing-chart-row'>
-              <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature-heading whitespace-nowrap' />
+              <th
+                scope='col'
+                className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature-heading whitespace-nowrap'
+              >
+                <span className='sr-only'>Feature</span>
+              </th>
               <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan whitespace-nowrap'>
                 <div className='system-b-pricing-plan-name'>
                   {freeClaim.displayName}
@@ -224,7 +225,12 @@ export function PricingComparisonChart() {
           </caption>
           <thead>
             <tr className='system-b-pricing-chart-row'>
-              <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature-heading whitespace-nowrap' />
+              <th
+                scope='col'
+                className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature-heading whitespace-nowrap'
+              >
+                <span className='sr-only'>Feature</span>
+              </th>
               <th
                 className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan whitespace-nowrap'
                 data-selected={selectedPlan === 'pro' ? 'true' : undefined}
@@ -233,7 +239,10 @@ export function PricingComparisonChart() {
                   {selectedPlanOption.name}
                 </div>
                 <div className='system-b-pricing-plan-price'>
-                  {selectedPlanOption.price}
+                  {selectedPlanClaim.priceLabel}
+                  {selectedPlanClaim.cadence ? (
+                    <span>{selectedPlanClaim.cadence}</span>
+                  ) : null}
                 </div>
               </th>
             </tr>

@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import AdminPeoplePage from '@/app/app/(shell)/admin/people/page';
 
 const { mockGetAdminAssets, mockAssetsWrapper } = vi.hoisted(() => ({
   mockGetAdminAssets: vi.fn(),
@@ -73,6 +74,13 @@ vi.mock('@/lib/admin/page-access', () => ({
 }));
 vi.mock('@/lib/admin/releases', () => ({ getAdminReleases: vi.fn() }));
 vi.mock('@/lib/admin/users', () => ({ getAdminUsers: vi.fn() }));
+vi.mock('@/lib/admin/contacts', () => ({ getCanonicalContacts: vi.fn() }));
+vi.mock(
+  '@/components/features/admin/contacts-table/AdminContactsTable',
+  () => ({
+    AdminContactsTable: () => null,
+  })
+);
 vi.mock('@/lib/admin/waitlist', () => ({
   getAdminWaitlistEntries: vi.fn(),
   getWaitlistIntegritySummary: vi.fn(),
@@ -116,9 +124,6 @@ describe('admin people page — assets view', () => {
   });
 
   it('loads assets with URL filters and renders the wrapper', async () => {
-    const { default: AdminPeoplePage } = await import(
-      '@/app/app/(shell)/admin/people/page'
-    );
     render(await AdminPeoplePage({ searchParams: Promise.resolve({}) }));
 
     expect(mockGetAdminAssets).toHaveBeenCalledWith({
@@ -130,7 +135,9 @@ describe('admin people page — assets view', () => {
       issues: 'issues',
       verified: 'verified',
     });
-    expect(screen.getByTestId('admin-assets-wrapper')).toBeInTheDocument();
+    expect(
+      await screen.findByTestId('admin-assets-wrapper')
+    ).toBeInTheDocument();
     expect(mockAssetsWrapper).toHaveBeenCalledWith(
       expect.objectContaining({
         sort: 'title_asc',
@@ -143,9 +150,6 @@ describe('admin people page — assets view', () => {
 
   it('falls back to created_desc for an unknown sort', async () => {
     parsedParams.value = { ...parsedParams.value, sort: 'bogus' };
-    const { default: AdminPeoplePage } = await import(
-      '@/app/app/(shell)/admin/people/page'
-    );
     render(await AdminPeoplePage({ searchParams: Promise.resolve({}) }));
     expect(mockGetAdminAssets).toHaveBeenCalledWith(
       expect.objectContaining({ sort: 'created_desc' })

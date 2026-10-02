@@ -31,6 +31,7 @@ import {
   NODE_RUNTIME_CONTRACT_COMMAND,
   NODE_RUNTIME_CONTRACT_PATHS,
   OFFLINE_FAILURE_COVERAGE_COMMAND,
+  SOURCE_GUARDS_COMMAND,
   STRUCTURAL_PYTEST_FILES,
   STRUCTURAL_PYTEST_SHARD_COMMANDS,
   STRUCTURAL_PYTEST_SHARD_EXPRESSION,
@@ -415,7 +416,10 @@ describe('ci-fast bounded parallel workflow', () => {
         spotify: 'false',
         kbd: 'false',
         crawler: 'true',
+        desktop_update: 'false',
         overlay: 'false',
+        privacy: 'false',
+        tasks: 'false',
       });
 
       const runner = remaining
@@ -436,6 +440,8 @@ describe('ci-fast bounded parallel workflow', () => {
             RUN_KBD: 'false',
             RUN_CRAWLER: 'true',
             RUN_OVERLAY: 'false',
+            RUN_TASKS: 'false',
+            RUN_PRIVACY: 'false',
           },
         }
       );
@@ -503,6 +509,249 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(chosen.stdout.trim().split('\n')).toEqual([
       'tests/e2e/storybook-overlay-collisions.spec.ts',
     ]);
+  });
+
+  it('selects the desktop updater geometry proof for modal changes', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(
+      /DESKTOP_UPDATE_STORYBOOK_PATTERN='([^']+)'/
+    )?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'apps/web/components/organisms/desktop-update/DesktopUpdateModal.tsx',
+      'apps/web/components/organisms/desktop-update/DesktopUpdateModal.stories.tsx',
+      'apps/web/tests/e2e/storybook-desktop-update-modal.spec.ts',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern ?? 'a^'], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(
+      spawnSync('grep', ['-qE', pattern ?? 'a^'], {
+        input: 'apps/web/components/organisms/Other.tsx\n',
+        encoding: 'utf8',
+      }).status
+    ).not.toBe(0);
+    expect(remaining).toContain(
+      'RUN_DESKTOP_UPDATE: ${{ steps.storybook-browser.outputs.desktop_update }}'
+    );
+    expect(remaining).toContain(
+      'specs+=(tests/e2e/storybook-desktop-update-modal.spec.ts)'
+    );
+    expect(
+      jobBlock('ci-storybook-surfaces', 'ci-cross-product-integration')
+    ).toContain('tests/e2e/storybook-desktop-update-modal.spec.ts');
+  });
+
+  it('selects the Tasks row geometry proof for its shared cell and feature surfaces', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(/TASKS_STORYBOOK_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'apps/web/components/features/dashboard/tasks/TaskDataTable.tsx',
+      'apps/web/components/features/dashboard/tasks/TaskDataTable.stories.tsx',
+      'apps/web/components/features/dashboard/tasks/TaskListRow.tsx',
+      'apps/web/components/features/dashboard/tasks/TasksPageClient.tsx',
+      'apps/web/components/organisms/table/atoms/TableCell.tsx',
+      'apps/web/components/organisms/table/table.types.ts',
+      'apps/web/components/organisms/table/organisms/VirtualizedTableRow.tsx',
+      'apps/web/components/organisms/table/molecules/TaskProjectionListRow.tsx',
+      'apps/web/tests/e2e/storybook-task-row-geometry.spec.ts',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(
+      spawnSync('grep', ['-qE', pattern], {
+        input:
+          'apps/web/components/features/dashboard/releases/ReleaseList.tsx\n',
+        encoding: 'utf8',
+      }).status
+    ).not.toBe(0);
+
+    const selector = remaining
+      .split('id: storybook-browser\n')[1]
+      .split('      - name: Start ci-fast lanes')[0];
+    const command = selector
+      .split('run: |\n')[1]
+      .replaceAll('${{ github.event_name }}', 'pull_request')
+      .replaceAll('${{ github.base_ref }}', 'main');
+    const root = mkdtempSync(join(tmpdir(), 'tasks-storybook-selection-'));
+    try {
+      const output = join(root, 'output');
+      const result = spawnSync(
+        'bash',
+        ['-c', 'git() { printf "%s\\n" "$CHANGED_PATHS"; }\n' + command],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CHANGED_PATHS:
+              'apps/web/components/organisms/table/organisms/VirtualizedTableRow.tsx',
+            RUNNER_TEMP: root,
+            GITHUB_OUTPUT: output,
+          },
+        }
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(
+        Object.fromEntries(
+          readFileSync(output, 'utf8')
+            .trim()
+            .split('\n')
+            .map(line => line.split('='))
+        )
+      ).toEqual({
+        run: 'true',
+        spotify: 'false',
+        kbd: 'false',
+        crawler: 'false',
+        overlay: 'false',
+        tasks: 'true',
+        desktop_update: 'false',
+        privacy: 'false',
+      });
+
+      const runner = remaining
+        .split('id: storybook-browser-test')[1]
+        .split('      - name: Upload Storybook browser evidence')[0];
+      const selection = runner.slice(
+        runner.indexOf('          specs=()'),
+        runner.indexOf('          pnpm exec storybook dev')
+      );
+      const chosen = spawnSync(
+        'bash',
+        ['-c', selection + '\nprintf "%s\\n" "${specs[@]}"'],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            RUN_SPOTIFY: 'false',
+            RUN_KBD: 'false',
+            RUN_CRAWLER: 'false',
+            RUN_OVERLAY: 'false',
+            RUN_TASKS: 'true',
+            RUN_PRIVACY: 'false',
+          },
+        }
+      );
+      expect(chosen.status, chosen.stderr).toBe(0);
+      expect(chosen.stdout.trim().split('\n')).toEqual([
+        'tests/e2e/storybook-task-row-geometry.spec.ts',
+      ]);
+      expect(
+        jobBlock('ci-storybook-surfaces', 'ci-cross-product-integration')
+      ).toContain('tests/e2e/storybook-task-row-geometry.spec.ts');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('selects real Ovie privacy browser proof for its boundary and keeps combined coverage', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(/PRIVACY_STORYBOOK_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'apps/web/app/app/(shell)/DashboardShellPrivacyBoundary.tsx',
+      'apps/web/app/app/(shell)/DashboardShellPrivacyBoundary.test.tsx',
+      'apps/web/lib/workspace-lock/workspace-lock.ts',
+      'apps/web/components/organisms/user-button/OviePrivacyLockControl.tsx',
+      'apps/web/components/organisms/user-button/OviePrivacyLockControl.test.tsx',
+      'apps/web/.storybook/main.ts',
+      'apps/web/tests/unit/storybook/dashboard-layout-client-mock.test.tsx',
+      'apps/web/.storybook/stories/ovie-privacy-boundary.stories.tsx',
+      'apps/web/tests/e2e/storybook-ovie-privacy-boundary.spec.ts',
+    ])
+      expect(
+        spawnSync('grep', ['-qE', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    expect(
+      spawnSync('grep', ['-qE', pattern], {
+        input: 'apps/web/components/Other.tsx\n',
+        encoding: 'utf8',
+      }).status
+    ).not.toBe(0);
+    const selector = remaining
+      .split('id: storybook-browser\n')[1]
+      .split('      - name: Start ci-fast lanes')[0];
+    const command = selector
+      .split('run: |\n')[1]
+      .replaceAll('${{ github.event_name }}', 'pull_request')
+      .replaceAll('${{ github.base_ref }}', 'main');
+    const root = mkdtempSync(join(tmpdir(), 'privacy-storybook-selection-'));
+    try {
+      const output = join(root, 'output');
+      const result = spawnSync(
+        'bash',
+        ['-c', 'git() { printf "%s\\n" "$CHANGED_PATHS"; }\n' + command],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CHANGED_PATHS:
+              'apps/web/app/app/(shell)/DashboardShellPrivacyBoundary.tsx',
+            RUNNER_TEMP: root,
+            GITHUB_OUTPUT: output,
+          },
+        }
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(readFileSync(output, 'utf8')).toContain('privacy=true\nrun=true');
+      const runner = remaining
+        .split('id: storybook-browser-test')[1]
+        .split('      - name: Upload Storybook browser evidence')[0];
+      const selection = runner.slice(
+        runner.indexOf('          specs=()'),
+        runner.indexOf('          pnpm exec storybook dev')
+      );
+      const chosen = spawnSync(
+        'bash',
+        ['-c', selection + '\nprintf "%s\\n" "${specs[@]}"'],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            RUN_SPOTIFY: 'false',
+            RUN_KBD: 'false',
+            RUN_CRAWLER: 'false',
+            RUN_OVERLAY: 'false',
+            RUN_PRIVACY: 'true',
+            RUN_TASKS: 'false',
+          },
+        }
+      );
+      expect(chosen.status, chosen.stderr).toBe(0);
+      expect(chosen.stdout.trim()).toBe(
+        'tests/e2e/storybook-ovie-privacy-boundary.spec.ts'
+      );
+      expect(
+        jobBlock('ci-storybook-surfaces', 'ci-cross-product-integration')
+      ).toContain('tests/e2e/storybook-ovie-privacy-boundary.spec.ts');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('runs existing Kbd and Spotify Storybook specs through the scanned evidence path', () => {
@@ -628,8 +877,10 @@ describe('ci-fast bounded parallel workflow', () => {
       'profile-admission',
       'scripts-typecheck',
       'shadcn-lint-contracts',
+      'source-guards',
       'structural',
       'typecheck',
+      'web-stories-typecheck',
       'web-tests-typecheck',
     ]);
     expect(validateLaneGroups(LANE_GROUPS)).toBe(true);
@@ -725,6 +976,10 @@ describe('ci-fast bounded parallel workflow', () => {
           id: 'web-tests-typecheck',
           status: 'skipped',
         }),
+        expect.objectContaining({
+          id: 'web-stories-typecheck',
+          status: 'skipped',
+        }),
       ]);
       for (const lane of payload.lanes) {
         expect(lane.logExcerpt).toContain('ci-path-changes preselection');
@@ -734,15 +989,15 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('overlaps the two typecheck lanes, each under its own singleflight lock', () => {
+  it('overlaps the three typecheck lanes, each under its own singleflight lock', () => {
     const repo = mkdtempSync(join(tmpdir(), 'ci-fast-overlap-'));
     const binDir = join(repo, 'bin');
     try {
       mkdirSync(binDir);
-      // Each call waits for the other to start; a serial runner exits 9.
+      // Each call waits for the others to start; a serial runner exits 9.
       writeFileSync(
         join(binDir, 'pnpm'),
-        `#!/bin/sh\ntouch "$0.$$"\nfor i in 1 2 3 4 5 6 7 8 9 10; do\n  [ "$(ls "${binDir}" | wc -l)" -ge 3 ] && { echo "dir=$TYPECHECK_SINGLEFLIGHT_DIR"; exit 0; }\n  sleep 0.5\ndone\nexit 9\n`
+        `#!/bin/sh\ntouch "$0.$$"\nfor i in 1 2 3 4 5 6 7 8 9 10; do\n  [ "$(ls "${binDir}" | wc -l)" -ge 4 ] && { echo "dir=$TYPECHECK_SINGLEFLIGHT_DIR"; exit 0; }\n  sleep 0.5\ndone\nexit 9\n`
       );
       chmodSync(join(binDir, 'pnpm'), 0o755);
       const result = spawnSync(
@@ -769,6 +1024,7 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(lanes.map(lane => [lane.id, lane.logExcerpt])).toEqual([
         ['typecheck', 'dir='],
         ['web-tests-typecheck', 'dir=.cache/typecheck-singleflight-tests'],
+        ['web-stories-typecheck', 'dir=.cache/typecheck-singleflight-stories'],
       ]);
     } finally {
       rmSync(repo, { recursive: true, force: true });
@@ -919,6 +1175,10 @@ describe('ci-fast bounded parallel workflow', () => {
           id: 'web-tests-typecheck',
           status: 'failure',
         }),
+        expect.objectContaining({
+          id: 'web-stories-typecheck',
+          status: 'failure',
+        }),
       ]);
       for (const lane of payload.lanes) {
         expect(lane.logExcerpt).toMatch(/pnpm.*not found/i);
@@ -970,7 +1230,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(restore).toContain(`uses: actions/cache/restore@${cacheSha}`);
     expect(restore).toContain('path: apps/web/.cache/tsbuildinfo*\n');
     const configHash =
-      "hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json')";
+      "hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json', 'apps/web/tsconfig.stories.json')";
     expect(restore).toContain(
       `key: jovie-web-tsbuildinfo-v2-\${{ runner.os }}-\${{ ${configHash} }}-\${{ github.sha }}`
     );
@@ -1048,7 +1308,7 @@ describe('ci-fast bounded parallel workflow', () => {
     ).toHaveLength(2);
     const order = [
       'Restore web tsc incremental state',
-      'run: |\n          pnpm --filter @jovie/web run typecheck\n          pnpm --filter @jovie/web run typecheck:tests\n',
+      'run: |\n          pnpm --filter @jovie/web run typecheck\n          pnpm --filter @jovie/web run typecheck:tests\n          pnpm --filter @jovie/web run typecheck:stories\n',
       'uses: actions/cache/save@',
       'key: ${{ steps.web-tsbuildinfo.outputs.cache-primary-key }}',
     ].map(marker => warm.indexOf(marker));
@@ -1142,6 +1402,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'shadcn-lint-contracts',
       'typecheck',
       'web-tests-typecheck',
+      'web-stories-typecheck',
       'scripts-typecheck',
       'guardrails',
       'design-system-source-ratchet',
@@ -1153,12 +1414,14 @@ describe('ci-fast bounded parallel workflow', () => {
       'merge-group-guards',
       'billing-coverage',
       'copy-gate',
+      'source-guards',
       'node-runtime-contracts',
       'structural',
     ]);
     expect(selectLanes('typecheck').map(lane => lane.id)).toEqual([
       'typecheck',
       'web-tests-typecheck',
+      'web-stories-typecheck',
     ]);
     expect(selectLanes('remaining').map(lane => lane.id)).toEqual(
       LANE_GROUPS.remaining
@@ -1177,6 +1440,7 @@ describe('ci-fast bounded parallel workflow', () => {
         'pnpm --filter=@jovie/web run lint:shadcn-contracts',
       typecheck: 'pnpm run typecheck',
       'web-tests-typecheck': 'pnpm --filter=@jovie/web run typecheck:tests',
+      'web-stories-typecheck': 'pnpm --filter=@jovie/web run typecheck:stories',
       'scripts-typecheck': 'pnpm run typecheck:scripts',
       guardrails: 'pnpm next:proxy-guard',
       'design-system-source-ratchet': 'pnpm design:source-count-ratchet',
@@ -1185,11 +1449,12 @@ describe('ci-fast bounded parallel workflow', () => {
         'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target',
       'ios-fast': 'pnpm run ios:lint',
       'merge-group-guards':
-        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts',
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts',
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx components/providers/QueryProvider.test.tsx --coverage --coverage.include="components/providers/QueryProvider.tsx" --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-profile-admission-coverage" --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
       'billing-coverage': BILLING_COVERAGE_COMMAND,
       'copy-gate': COPY_GATE_COMMAND,
+      'source-guards': SOURCE_GUARDS_COMMAND,
       'node-runtime-contracts': NODE_RUNTIME_CONTRACT_COMMAND,
       structural:
         'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
@@ -1207,6 +1472,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain(
       "'pnpm design:shared-ui-visual-arbitrary:check'"
     );
+    expect(CI_FAST_SOURCE).toContain("'pnpm design:overlay-layers:check'");
   });
 
   it('keeps the iOS design gate independent from Ubuntu operations', () => {
@@ -1503,9 +1769,27 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
+  it('selects coverage publication execution tests for helper-only changes', () => {
+    const pattern = new RegExp(structuralControlPattern());
+    expect(pattern.test('scripts/lib/publish-coverage-report.mjs')).toBe(true);
+    expect(pattern.test('scripts/publish-coverage-report.test.mjs')).toBe(true);
+    expect(buildControlTestCommands()).toContainEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
+        '--test-coverage-include=scripts/lib/publish-coverage-report.mjs',
+        '--test-coverage-lines=95',
+        '--test-coverage-branches=90',
+        '--test-coverage-functions=90',
+        'scripts/publish-coverage-report.test.mjs',
+      ],
+    ]);
+  });
+
   it('keeps workflow contracts in the bounded CI control suite', () => {
     expect(PACKAGE_JSON.scripts['ci:control:test']).toBe(
-      'node scripts/run-affected-tests.mjs --control'
+      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs && node scripts/ci-workflow-topology.mjs'
     );
     const controlStages = buildControlTestCommands();
     expect(controlStages).toContainEqual([

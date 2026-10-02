@@ -26,11 +26,23 @@ enum APIClientError: Error, Equatable, LocalizedError {
   }
 }
 
+enum IOSPushEnvironment: String, Encodable, Sendable {
+  case sandbox
+  case production
+}
+
 protocol TokenProviding: Sendable {
   func bearerToken(forceRefresh: Bool) async throws -> String
+  func requestAuthorization(forceRefresh: Bool) async throws -> NativeRequestAuthorization
 }
 
 extension TokenProviding {
+  func requestAuthorization(forceRefresh: Bool) async throws -> NativeRequestAuthorization {
+    NativeRequestAuthorization(
+      unmanagedBearerToken: try await bearerToken(forceRefresh: forceRefresh)
+    )
+  }
+
   /// Throws `missingToken` when force-refresh cannot mint a different token.
   func refreshedBearerToken(after failedToken: String) async throws -> String {
     let token = try await bearerToken(forceRefresh: true)
@@ -84,6 +96,16 @@ struct APIClient: APIClientProtocol, Sendable {
     let error: String
   }
 
+  private struct RegisterPushDeviceRequest: Encodable {
+    let token: String
+    let environment: IOSPushEnvironment
+    let timezone: String
+  }
+
+  private struct UnregisterPushDeviceRequest: Encodable {
+    let token: String
+  }
+
   private let baseURL: URL
   private let session: URLSession
   private let tokenProvider: TokenProviding
@@ -104,35 +126,6 @@ struct APIClient: APIClientProtocol, Sendable {
   }
 
   /**
-   * Refresh the stored native session token + expiry from the bearer
-   * plugin's `set-auth-token` response header. The server emits this header when the session
-   * cookie rolls (per `updateAge`); the iOS client never needs to force a
-   * refresh — every API call that returns the header updates Keychain
-   * in-place. Returns silently when the header is absent (no roll this
-   * call) or malformed (kept token stays authoritative).
-   */
-  private func refreshStoredSessionFromResponse(
-    _ response: URLResponse,
-    expectedUserID: String? = nil
-  ) {
-    guard let httpResponse = response as? HTTPURLResponse else { return }
-    guard let newToken = httpResponse.value(forHTTPHeaderField: "set-auth-token"),
-          newToken.isEmpty == false
-    else { return }
-
-    let stored = NativeSessionTokenStore.load()
-    let userID = expectedUserID ?? stored?.userID ?? ""
-    guard userID.isEmpty == false else { return }
-
-    // Preserve the existing expiry if the server doesn't send a new one;
-    // BA's session.expiresIn (7 days) is the source of truth, and the
-    // header doesn't currently carry a new expiry — we extend the existing
-    // expiry by 7 days from now to match the server's roll cadence.
-    let newExpiry = Date().addingTimeInterval(60 * 60 * 24 * 7)
-    NativeSessionTokenStore.save(token: newToken, userID: userID, expiresAt: newExpiry)
-  }
-
-  /**
    * Terminal 401 path (eng row 31): a 401 even after `forceRefresh` means
    * the session is revoked or expired beyond client-side refresh. Clear
    * Keychain so the next launch shows the signed-out state. The caller is
@@ -143,11 +136,15 @@ struct APIClient: APIClientProtocol, Sendable {
     MobileAuthDiagnostics.record("native_session_cleared_terminal_401")
   }
 
-  private func resolveToken(forceRefresh: Bool, tokenOverride: String?) async throws -> String {
+  private func resolveAuthorization(
+    forceRefresh: Bool,
+    tokenOverride: String?
+  ) async throws -> NativeRequestAuthorization {
     if let tokenOverride {
-      return tokenOverride
+      // A retry token cannot inherit authority from whichever login is current.
+      return NativeRequestAuthorization(unmanagedBearerToken: tokenOverride)
     }
-    return try await tokenProvider.bearerToken(forceRefresh: forceRefresh)
+    return try await tokenProvider.requestAuthorization(forceRefresh: forceRefresh)
   }
 
   private func retryTokenOrTerminal(after failedToken: String) async throws -> String {
@@ -161,6 +158,30 @@ struct APIClient: APIClientProtocol, Sendable {
 
   func fetchMe() async throws -> MobileMeResponse {
     try await sendMeRequest(forceRefresh: false)
+  }
+
+  func registerPushDevice(
+    token: String,
+    environment: IOSPushEnvironment,
+    timezone: String
+  ) async throws {
+    try await sendPushDeviceRequest(
+      method: "PUT",
+      body: RegisterPushDeviceRequest(
+        token: token,
+        environment: environment,
+        timezone: timezone
+      ),
+      forceRefresh: false
+    )
+  }
+
+  func unregisterPushDevice(token: String) async throws {
+    try await sendPushDeviceRequest(
+      method: "DELETE",
+      body: UnregisterPushDeviceRequest(token: token),
+      forceRefresh: false
+    )
   }
 
   func fetchAppleWalletProfilePass() async throws -> Data {
@@ -196,6 +217,55 @@ struct APIClient: APIClientProtocol, Sendable {
     )
   }
 
+  private func sendPushDeviceRequest<Body: Encodable>(
+    method: String,
+    body: Body,
+    forceRefresh: Bool,
+    tokenOverride: String? = nil
+  ) async throws {
+    let authorization = try await resolveAuthorization(
+      forceRefresh: forceRefresh, tokenOverride: tokenOverride
+    )
+    let token = authorization.bearerToken
+    var request = URLRequest(url: baseURL.appending(path: "/api/mobile/v1/push-devices"))
+    request.httpMethod = method
+    request.timeoutInterval = requestTimeout
+    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    request.setValue("application/json", forHTTPHeaderField: "Accept")
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.httpBody = try JSONEncoder().encode(body)
+
+    let response: URLResponse
+    do {
+      (_, response) = try await session.data(for: request)
+    } catch let error as URLError {
+      throw APIClientError.transportFailed(code: error.code.rawValue)
+    } catch {
+      throw APIClientError.invalidResponse
+    }
+
+    guard let httpResponse = response as? HTTPURLResponse else {
+      throw APIClientError.invalidResponse
+    }
+    if httpResponse.statusCode == 401, !forceRefresh {
+      let refreshed = try await retryTokenOrTerminal(after: token)
+      return try await sendPushDeviceRequest(
+        method: method,
+        body: body,
+        forceRefresh: true,
+        tokenOverride: refreshed
+      )
+    }
+    if httpResponse.statusCode == 401, forceRefresh {
+      handleTerminalUnauthorized()
+    }
+    guard (200 ... 299).contains(httpResponse.statusCode) else {
+      throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
+    }
+
+    NativeSessionTokenStore.refresh(from: response, authorizedBy: authorization)
+  }
+
   private struct SummerCardDecisionRequest: Encodable {
     let decision: String
     let comment: String?
@@ -208,7 +278,10 @@ struct APIClient: APIClientProtocol, Sendable {
     forceRefresh: Bool,
     tokenOverride: String? = nil
   ) async throws -> SummerCardDecisionResult {
-    let token = try await resolveToken(forceRefresh: forceRefresh, tokenOverride: tokenOverride)
+    let authorization = try await resolveAuthorization(
+      forceRefresh: forceRefresh, tokenOverride: tokenOverride
+    )
+    let token = authorization.bearerToken
     var request = URLRequest(
       url: baseURL.appending(path: "/api/ovie/summer-cards/\(cardID)/decision")
     )
@@ -250,7 +323,7 @@ struct APIClient: APIClientProtocol, Sendable {
     }
 
     if httpResponse.statusCode == 409 {
-      refreshStoredSessionFromResponse(response)
+      NativeSessionTokenStore.refresh(from: response, authorizedBy: authorization)
       return .alreadyDecided
     }
 
@@ -258,7 +331,7 @@ struct APIClient: APIClientProtocol, Sendable {
       throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
     }
 
-    refreshStoredSessionFromResponse(response)
+    NativeSessionTokenStore.refresh(from: response, authorizedBy: authorization)
     return .decided
   }
 
@@ -276,7 +349,10 @@ struct APIClient: APIClientProtocol, Sendable {
     forceRefresh: Bool,
     tokenOverride: String? = nil
   ) async throws {
-    let token = try await resolveToken(forceRefresh: forceRefresh, tokenOverride: tokenOverride)
+    let authorization = try await resolveAuthorization(
+      forceRefresh: forceRefresh, tokenOverride: tokenOverride
+    )
+    let token = authorization.bearerToken
     var request = URLRequest(
       url: baseURL.appending(path: "/api/mobile/v1/profile/complete")
     )
@@ -325,7 +401,7 @@ struct APIClient: APIClientProtocol, Sendable {
       )
     }
 
-    refreshStoredSessionFromResponse(response)
+    NativeSessionTokenStore.refresh(from: response, authorizedBy: authorization)
     guard (try? decoder.decode(ProfileCompletionResponse.self, from: data)) != nil else {
       throw APIClientError.decodingFailed
     }
@@ -335,7 +411,10 @@ struct APIClient: APIClientProtocol, Sendable {
     forceRefresh: Bool,
     tokenOverride: String? = nil
   ) async throws -> MobileMeResponse {
-    let token = try await resolveToken(forceRefresh: forceRefresh, tokenOverride: tokenOverride)
+    let authorization = try await resolveAuthorization(
+      forceRefresh: forceRefresh, tokenOverride: tokenOverride
+    )
+    let token = authorization.bearerToken
     var request = URLRequest(url: baseURL.appending(path: "/api/mobile/v1/me"))
     request.httpMethod = "GET"
     request.timeoutInterval = requestTimeout
@@ -379,7 +458,7 @@ struct APIClient: APIClientProtocol, Sendable {
       throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
     }
 
-    refreshStoredSessionFromResponse(response)
+    NativeSessionTokenStore.refresh(from: response, authorizedBy: authorization)
 
     do {
       MobileAuthDiagnostics.record(
@@ -397,7 +476,10 @@ struct APIClient: APIClientProtocol, Sendable {
     forceRefresh: Bool,
     tokenOverride: String? = nil
   ) async throws -> Data {
-    let token = try await resolveToken(forceRefresh: forceRefresh, tokenOverride: tokenOverride)
+    let authorization = try await resolveAuthorization(
+      forceRefresh: forceRefresh, tokenOverride: tokenOverride
+    )
+    let token = authorization.bearerToken
     var request = URLRequest(url: baseURL.appending(path: "/api/wallet/apple/profile-pass"))
     request.httpMethod = "GET"
     request.timeoutInterval = requestTimeout
@@ -434,7 +516,7 @@ struct APIClient: APIClientProtocol, Sendable {
       throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
     }
 
-    refreshStoredSessionFromResponse(response)
+    NativeSessionTokenStore.refresh(from: response, authorizedBy: authorization)
 
     return data
   }
@@ -443,7 +525,10 @@ struct APIClient: APIClientProtocol, Sendable {
     forceRefresh: Bool,
     tokenOverride: String? = nil
   ) async throws -> MobileAudienceHighlightsResponse {
-    let token = try await resolveToken(forceRefresh: forceRefresh, tokenOverride: tokenOverride)
+    let authorization = try await resolveAuthorization(
+      forceRefresh: forceRefresh, tokenOverride: tokenOverride
+    )
+    let token = authorization.bearerToken
     var request = URLRequest(
       url: baseURL.appending(path: "/api/mobile/v1/audience/highlights")
     )
@@ -482,7 +567,7 @@ struct APIClient: APIClientProtocol, Sendable {
       throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
     }
 
-    refreshStoredSessionFromResponse(response)
+    NativeSessionTokenStore.refresh(from: response, authorizedBy: authorization)
 
     do {
       return try decoder.decode(MobileAudienceHighlightsResponse.self, from: data)
@@ -496,7 +581,10 @@ struct APIClient: APIClientProtocol, Sendable {
     forceRefresh: Bool,
     tokenOverride: String? = nil
   ) async throws -> MobileActionLoopInboxResponse {
-    let token = try await resolveToken(forceRefresh: forceRefresh, tokenOverride: tokenOverride)
+    let authorization = try await resolveAuthorization(
+      forceRefresh: forceRefresh, tokenOverride: tokenOverride
+    )
+    let token = authorization.bearerToken
     var components = URLComponents(
       url: baseURL.appending(path: "/api/mobile/v1/inbox"),
       resolvingAgainstBaseURL: false
@@ -544,7 +632,7 @@ struct APIClient: APIClientProtocol, Sendable {
       throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
     }
 
-    refreshStoredSessionFromResponse(response)
+    NativeSessionTokenStore.refresh(from: response, authorizedBy: authorization)
 
     do {
       return try decoder.decode(MobileActionLoopInboxResponse.self, from: data)
@@ -557,7 +645,10 @@ struct APIClient: APIClientProtocol, Sendable {
     forceRefresh: Bool,
     tokenOverride: String? = nil
   ) async throws -> MobileActionLoopCalendarResponse {
-    let token = try await resolveToken(forceRefresh: forceRefresh, tokenOverride: tokenOverride)
+    let authorization = try await resolveAuthorization(
+      forceRefresh: forceRefresh, tokenOverride: tokenOverride
+    )
+    let token = authorization.bearerToken
     var request = URLRequest(url: baseURL.appending(path: "/api/mobile/v1/calendar"))
     request.httpMethod = "GET"
     request.timeoutInterval = requestTimeout
@@ -594,7 +685,7 @@ struct APIClient: APIClientProtocol, Sendable {
       throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
     }
 
-    refreshStoredSessionFromResponse(response)
+    NativeSessionTokenStore.refresh(from: response, authorizedBy: authorization)
 
     do {
       return try decoder.decode(MobileActionLoopCalendarResponse.self, from: data)

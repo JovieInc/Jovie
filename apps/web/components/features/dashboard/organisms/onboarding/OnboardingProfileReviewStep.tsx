@@ -415,7 +415,7 @@ export function OnboardingProfileReviewStep({
                         />
                       </div>
                       {nameError && (
-                        <p className='text-2xs text-red-500'>{nameError}</p>
+                        <p className='text-2xs text-error'>{nameError}</p>
                       )}
                     </div>
                   ) : (

@@ -1,7 +1,7 @@
 'use client';
 
 import { RailToggleButton } from '@/components/atoms/RailToggleButton';
-import { useSidebar } from '@/components/organisms/Sidebar';
+import { useSidebar } from '@/components/organisms/sidebar';
 import { SIDEBAR_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useSidebarKeyboardShortcut';
 
 interface SidebarCollapseButtonProps {

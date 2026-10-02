@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
   CERTIFICATION_OPERATIONAL_EVIDENCE_TIERS,
@@ -11,7 +11,10 @@ import {
   MarketingCertificationRegistryDriftError,
 } from '@/lib/agent-os/certification-adapter';
 import { ingestMarketingCertificationPacket } from '@/lib/agent-os/certification-runtime-store';
-import { verifyCronRequest } from '@/lib/cron/auth';
+import {
+  handleCronEvidencePost,
+  jsonResponse,
+} from '@/lib/cron/evidence-route';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -27,7 +30,6 @@ export const dynamic = 'force-dynamic';
 
 const ROUTE = '/api/internal/ovie/certification-evidence';
 const MAX_BODY_BYTES = 64 * 1024;
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const sha = z.string().regex(/^[0-9a-f]{40}$/u);
 const digest = z
@@ -120,50 +122,38 @@ const bodySchema = z
   })
   .strict();
 
-function json(body: unknown, status: number) {
-  return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
-}
-
 export async function POST(request: Request): Promise<NextResponse> {
-  const authError = verifyCronRequest(request, { route: ROUTE });
-  if (authError) return authError;
-
-  const raw = await request.text();
-  if (Buffer.byteLength(raw, 'utf8') > MAX_BODY_BYTES) {
-    return json({ error: 'payload_too_large' }, 413);
-  }
-
-  let parsedJson: unknown;
-  try {
-    parsedJson = JSON.parse(raw);
-  } catch {
-    return json({ error: 'invalid_json' }, 400);
-  }
-  const parsed = bodySchema.safeParse(parsedJson);
-  if (!parsed.success) {
-    return json(
-      { error: 'invalid_packet', issues: parsed.error.issues.slice(0, 10) },
-      400
-    );
-  }
-
-  try {
-    const row = await ingestMarketingCertificationPacket(
-      parsed.data.packet as CertificationReviewPacket,
-      parsed.data.evaluatedAt
-    );
-    return json({ ok: true, row }, 200);
-  } catch (error) {
-    if (error instanceof MarketingCertificationRegistryDriftError) {
-      return json({ error: 'unknown_subject', message: error.message }, 422);
-    }
-    if (error instanceof MarketingCertificationPersistenceError) {
-      // Identity/source mismatch, or a packet not newer than the ledger's.
-      return json({ error: 'rejected', message: error.message }, 422);
-    }
-    logger.error('[certification-evidence] ingest failed', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return json({ error: 'ingest_failed' }, 503);
-  }
+  return handleCronEvidencePost(request, {
+    route: ROUTE,
+    maxBytes: MAX_BODY_BYTES,
+    schema: bodySchema,
+    invalidLabel: 'invalid_packet',
+    handle: async data => {
+      try {
+        const row = await ingestMarketingCertificationPacket(
+          data.packet as CertificationReviewPacket,
+          data.evaluatedAt
+        );
+        return jsonResponse({ ok: true, row }, 200);
+      } catch (error) {
+        if (error instanceof MarketingCertificationRegistryDriftError) {
+          return jsonResponse(
+            { error: 'unknown_subject', message: error.message },
+            422
+          );
+        }
+        if (error instanceof MarketingCertificationPersistenceError) {
+          // Identity/source mismatch, or a packet not newer than the ledger's.
+          return jsonResponse(
+            { error: 'rejected', message: error.message },
+            422
+          );
+        }
+        logger.error('[certification-evidence] ingest failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return jsonResponse({ error: 'ingest_failed' }, 503);
+      }
+    },
+  });
 }

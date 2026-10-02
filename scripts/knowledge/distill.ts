@@ -427,25 +427,40 @@ async function distillTopic(
     `  Distilling ${topic.id}: ${articles.length} articles, ~${approxTokens.toLocaleString()} tokens input`
   );
 
-  const apiKey =
-    process.env.ANTHROPIC_API_KEY ?? process.env.AI_GATEWAY_API_KEY;
+  // OpenAI/Anthropic billing is banned (JOV-7119): distill via the Vercel AI
+  // Gateway on the approved zai model, never the Anthropic API directly.
+  const apiKey = process.env.AI_GATEWAY_API_KEY;
   if (!apiKey) {
     throw new Error(
-      'Missing API credentials. Set ANTHROPIC_API_KEY or AI_GATEWAY_API_KEY via Doppler.'
+      'Missing API credentials. Set AI_GATEWAY_API_KEY via Doppler.'
     );
   }
 
-  const { default: Anthropic } = await import('@anthropic-ai/sdk');
-  const client = new Anthropic({ apiKey });
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 16384,
-    temperature: 0.3,
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const block = response.content.find(b => b.type === 'text');
-  return block && 'text' in block ? block.text : '';
+  const response = await fetch(
+    'https://ai-gateway.vercel.sh/v1/chat/completions',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'zai/glm-5.3',
+        max_tokens: 16384,
+        temperature: 0.3,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    }
+  );
+  if (!response.ok) {
+    throw new Error(
+      `Gateway distill request failed: ${response.status} ${await response.text()}`
+    );
+  }
+  const data = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  return data.choices?.[0]?.message?.content ?? '';
 }
 
 // ---------------------------------------------------------------------------

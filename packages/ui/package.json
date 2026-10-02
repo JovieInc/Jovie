@@ -1,6 +1,6 @@
 {
   "name": "@jovie/ui",
-  "version": "26.9.15",
+  "version": "26.10.0",
   "private": true,
   "sideEffects": [
     "*.css"
@@ -41,7 +41,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.48.0",
-    "react-hook-form": "^7.88.0",
+    "react-hook-form": "^7.89.0",
     "tailwind-merge": "^3.7.0"
   },
   "peerDependencies": {

@@ -32,6 +32,7 @@ function FrameCopy() {
 }
 
 export const Default: Story = {
+  args: { children: null },
   render: () => (
     <MarketingSectionFrame>
       <FrameCopy />
@@ -40,7 +41,7 @@ export const Default: Story = {
 };
 
 export const WithEyebrow: Story = {
-  args: { eyebrow: 'Inside Jovie' },
+  args: { eyebrow: 'Inside Jovie', children: null },
   render: args => (
     <MarketingSectionFrame eyebrow={args.eyebrow}>
       <FrameCopy />
@@ -49,7 +50,7 @@ export const WithEyebrow: Story = {
 };
 
 export const Reversed: Story = {
-  args: { eyebrow: 'The platform', reverse: true },
+  args: { eyebrow: 'The platform', reverse: true, children: null },
   render: args => (
     <MarketingSectionFrame eyebrow={args.eyebrow} reverse={args.reverse}>
       <FrameCopy />

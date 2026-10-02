@@ -1,27 +1,28 @@
 import {
-  Activity,
   Banknote,
   CalendarDays,
   CheckSquare,
   Gauge,
   HandCoins,
+  Home,
   IdCard,
   Inbox,
-  Library,
+  Layers,
+  Link,
   Lock,
   MailCheck,
-  Music,
   PieChart,
   Plug,
   Settings,
   ShieldCheck,
   SquarePen,
+  User,
   UserCircle,
   Users,
-  Waypoints,
 } from 'lucide-react';
 
 import { APP_ROUTES } from '@/constants/routes';
+import { PRODUCT_ONTOLOGY } from '@/data/productOntology';
 
 import { CUSTOMER_NAV_CAPACITY, partitionCustomerNavigation } from './capacity';
 import type { NavItem } from './types';
@@ -52,14 +53,24 @@ export const chatNavItem: NavItem = {
   description: 'Start a new conversation',
 };
 
+export const homeNavItem: NavItem = {
+  name: 'Home',
+  href: APP_ROUTES.DASHBOARD,
+  id: 'home',
+  icon: Home,
+  iconName: 'Home',
+  tier: 'core',
+  description: 'Open your Jovie home',
+};
+
 export const libraryNavItem: NavItem = {
-  name: 'Library',
+  name: PRODUCT_ONTOLOGY.work.label,
   href: APP_ROUTES.LIBRARY,
   id: 'library',
-  icon: Music,
-  iconName: 'Music',
+  icon: Layers,
+  iconName: 'Layers',
   tier: 'core',
-  description: 'Browse releases, audio, video, images, and files',
+  description: PRODUCT_ONTOLOGY.work.definition,
 };
 
 export const contactsNavItem: NavItem = {
@@ -72,22 +83,35 @@ export const contactsNavItem: NavItem = {
   description: 'Manage artist contacts',
 };
 
-export const profilesNavItem: NavItem = {
-  name: 'Presence',
-  href: APP_ROUTES.PROFILES,
-  id: 'profiles',
-  icon: Waypoints,
-  iconName: 'Waypoints',
+export const presenceNavItem: NavItem = {
+  name: PRODUCT_ONTOLOGY.identity.label,
+  href: APP_ROUTES.PRESENCE,
+  id: 'presence',
+  icon: User,
+  iconName: 'User',
   tier: 'core',
-  description: 'Monitor DSP profiles, social networks, and artist presence',
+  description: PRODUCT_ONTOLOGY.identity.definition,
 };
 
-/** Founder-locked desktop composition, Pen OqZTF. Mobile retains its own rail. */
-export const canonicalSidebarNavigation = [
-  { ...libraryNavItem, icon: Library, iconName: undefined },
-  { ...contactsNavItem, icon: Users, iconName: undefined },
-  { ...profilesNavItem, icon: Activity, iconName: undefined },
-] as const satisfies readonly NavItem[];
+export const linksNavItem: NavItem = {
+  name: 'Links',
+  href: APP_ROUTES.CHAT_PROFILE_PANEL,
+  id: 'links',
+  icon: Link,
+  iconName: 'Link',
+  tier: 'core',
+  description: 'Manage links that represent your identity and work',
+};
+
+export const audienceNavItem: NavItem = {
+  name: 'Audience',
+  href: APP_ROUTES.CONTACTS_AUDIENCE,
+  id: 'audience',
+  icon: Users,
+  iconName: undefined,
+  tier: 'core',
+  description: 'Understand and reach your audience',
+};
 
 export const calendarNavItem: NavItem = {
   name: 'Calendar',
@@ -109,35 +133,29 @@ export const tasksNavItem: NavItem = {
   description: 'Open the task workspace',
 };
 
-/**
- * Contextual artist-scoped destinations rendered in the artist group, not the
- * primary rail. Presence (`/app/profiles`) is the sole contextual entry per
- * the JOV-4866 IA decision (Tasks is primary, Presence contextual).
- */
-export const artistNavigation = [
-  profilesNavItem,
-] as const satisfies readonly NavItem[];
+/** Contextual artist destinations may materialize without growing root IA. */
+export const artistNavigation = [] as const satisfies readonly NavItem[];
 
 /**
- * Founder-approved canonical customer shell IA (DESIGN.md "App IA & Page
- * Scaffold"), realigned in JOV-4866: one ordered tuple — Inbox, Chat,
- * Library, Contacts, Calendar, Tasks — shared by desktop, mobile, and the
- * route coverage test. Presence (`/app/profiles`) is contextual and lives in
- * `artistNavigation`.
+ * Founder-approved top-level product ontology (JOV-7305): one ordered tuple
+ * shared by desktop, mobile, and route coverage. Entity collections such as
+ * links, releases, products, events, and videos remain contextual views or
+ * representations instead of permanent root destinations.
  *
  * Capacity (JOV-4515): every entry here is `core` and must fit the desktop
  * primary rail. Mark new trial destinations `experimental` so they overflow
- * into the single shared More menu after the documented cap — do not grow
- * permanent IA without an explicit product decision.
+ * into the single shared More menu after the documented cap. An entity type
+ * graduates only with an explicit product decision and a substantial workflow.
  */
 export const primaryNavigation = [
-  inboxNavItem,
-  chatNavItem,
+  homeNavItem,
+  presenceNavItem,
   libraryNavItem,
-  contactsNavItem,
-  calendarNavItem,
-  tasksNavItem,
+  audienceNavItem,
 ] as const satisfies readonly NavItem[];
+
+/** Desktop and mobile consume the same ordered job-level destination set. */
+export const canonicalSidebarNavigation = primaryNavigation;
 
 export const settingsNavItem: NavItem = {
   name: 'Settings',

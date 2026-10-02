@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { dismissFeedbackItem } from '@/lib/feedback';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 export const runtime = 'nodejs';
 
@@ -8,7 +8,7 @@ export async function POST(
   _request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
+  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
 
   if (!entitlements.isAuthenticated) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

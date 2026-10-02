@@ -6,15 +6,11 @@ name: Golden Path Prod Autofix
 
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# necessary-trust-boundary: Trusted-main workflow_run observes deployed runtime; only this bounded job receives Linear/Cursor mutation credentials and it never deploys or merges.
-# removal-trigger: Remove when Production Controller emits the same durable attempt receipt and dispatches this bounded autofix without a downstream workflow hop.
+# necessary-trust-boundary: Manual trusted-main dispatch observes deployed runtime; only this bounded job receives Linear/Cursor mutation credentials and it never deploys or merges.
+# compatibility-expiry: 2026-10-31; delete after the probe is owned in-band by Production Controller.
 # Does not read signup-account secrets. Missing CURSOR_API_KEY fails closed.
 
 on:
-  workflow_run:
-    workflows: [Production Controller]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
 
 permissions: {}
@@ -26,13 +22,6 @@ concurrency:
 jobs:
   probe-and-autofix:
     name: Probe live golden path
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (
-        github.event_name == 'workflow_run' &&
-        github.event.workflow_run.head_branch == 'main' &&
-        github.event.workflow_run.path == '.github/workflows/production-controller.yml'
-      )
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

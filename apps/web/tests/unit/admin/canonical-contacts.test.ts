@@ -8,10 +8,13 @@ const TABLES = vi.hoisted(() => ({
   users: { __table: 'users' },
   creatorProfiles: { __table: 'creator_profiles' },
   contacts: { __table: 'contacts' },
+  contactStageTransitions: { __table: 'contact_stage_transitions' },
 }));
 
 const state = vi.hoisted(() => ({
   rowsByTable: new Map<object, unknown[]>(),
+  inserts: [] as { table: object; values: unknown }[],
+  updates: [] as { table: object; values: unknown }[],
   tableExists: true,
 }));
 
@@ -31,6 +34,22 @@ vi.mock('@/lib/db', () => ({
     select: () => ({
       from: (table: object) => thenable(state.rowsByTable.get(table) ?? []),
     }),
+    insert: (table: object) => ({
+      values: (values: unknown) => {
+        state.inserts.push({ table, values });
+        return {
+          returning: async () => [{ id: 'contact-new' }],
+          then: (resolve: (value: unknown) => unknown) => resolve(values),
+        };
+      },
+    }),
+    update: (table: object) => ({
+      set: (values: unknown) => ({
+        where: async () => {
+          state.updates.push({ table, values });
+        },
+      }),
+    }),
   },
 }));
 
@@ -47,12 +66,17 @@ vi.mock('@/lib/db/schema/auth', () => ({ users: TABLES.users }));
 vi.mock('@/lib/db/schema/profiles', () => ({
   creatorProfiles: TABLES.creatorProfiles,
 }));
-vi.mock('@/lib/db/schema/contacts', () => ({ contacts: TABLES.contacts }));
+vi.mock('@/lib/db/schema/contacts', () => ({
+  contacts: TABLES.contacts,
+  contactStageTransitions: TABLES.contactStageTransitions,
+}));
 vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
 
 import {
   getCanonicalContactMetrics,
   getCanonicalContacts,
+  getContactStageTimeline,
+  setCanonicalContactStage,
 } from '@/lib/admin/contacts';
 
 const NOW = new Date('2026-09-28T00:00:00Z');
@@ -86,16 +110,20 @@ function seed(rows: {
   users?: unknown[];
   profiles?: unknown[];
   contacts?: unknown[];
+  transitions?: unknown[];
 }) {
   state.rowsByTable.set(TABLES.waitlistEntries, rows.waitlist ?? []);
   state.rowsByTable.set(TABLES.leads, rows.leads ?? []);
   state.rowsByTable.set(TABLES.users, rows.users ?? []);
   state.rowsByTable.set(TABLES.creatorProfiles, rows.profiles ?? []);
   state.rowsByTable.set(TABLES.contacts, rows.contacts ?? []);
+  state.rowsByTable.set(TABLES.contactStageTransitions, rows.transitions ?? []);
 }
 
 beforeEach(() => {
   state.rowsByTable.clear();
+  state.inserts.length = 0;
+  state.updates.length = 0;
   state.tableExists = true;
 });
 
@@ -105,7 +133,7 @@ describe('canonical contacts read model (JOV-6888)', () => {
       waitlist: [
         waitlistRow({
           fullName: 'Ada Lovelace',
-          emailNormalized: 'ada@example.com',
+          emailNormalized: 'ada@analytical-engine.co',
           status: 'approved',
           socialUrl: 'instagram.com/ada',
           approvedAt: NOW,
@@ -115,7 +143,7 @@ describe('canonical contacts read model (JOV-6888)', () => {
       users: [
         userRow({
           name: 'Ada Lovelace',
-          email: 'ada@example.com',
+          email: 'ada@analytical-engine.co',
           userStatus: 'active',
           isPro: true,
           plan: 'pro',
@@ -148,9 +176,11 @@ describe('canonical contacts read model (JOV-6888)', () => {
 
     const result = await getCanonicalContacts({ pageSize: 50 });
 
-    // waitlist + user + profile share the ada@example.com dedupe key.
+    // waitlist + user + profile share the ada@analytical-engine.co dedupe key.
     expect(result.total).toBe(2);
-    const ada = result.contacts.find(c => c.email === 'ada@example.com');
+    const ada = result.contacts.find(
+      c => c.email === 'ada@analytical-engine.co'
+    );
     expect(ada).toBeDefined();
     expect(ada!.stage).toBe('paying');
     expect(ada!.sources).toContain('waitlist');
@@ -221,6 +251,35 @@ describe('canonical contacts read model (JOV-6888)', () => {
     expect(filtered.metrics.total).toBe(2);
   });
 
+  it('never counts dogfood or comped accounts as paying (Tim 2026-09-30)', async () => {
+    seed({
+      users: [
+        userRow({
+          id: 'u_founder',
+          name: 'Founder',
+          email: 'tim@jov.ie',
+          userStatus: 'active',
+          isPro: true,
+          plan: 'pro',
+          stripeSubscriptionId: 'sub_comp',
+        }),
+        userRow({
+          id: 'u_comp',
+          name: 'Comped Artist',
+          email: 'artist@indie-label.co',
+          userStatus: 'active',
+          isPro: true,
+          plan: 'pro',
+          stripeSubscriptionId: null,
+        }),
+      ],
+    });
+
+    const result = await getCanonicalContacts({});
+
+    expect(result.metrics.paying).toBe(0);
+  });
+
   it('fails soft with empty result when source reads throw', async () => {
     state.tableExists = false; // contacts table missing
     seed({
@@ -236,5 +295,106 @@ describe('canonical contacts read model (JOV-6888)', () => {
     const metrics = await getCanonicalContactMetrics();
     expect(metrics.total).toBe(1);
     expect(metrics.suggested).toBe(1);
+  });
+});
+
+describe('setCanonicalContactStage', () => {
+  it('inserts a new contact and appends transition provenance', async () => {
+    seed({});
+    const result = await setCanonicalContactStage({
+      dedupeKey: 'email:new@example.com',
+      toStage: 'certified',
+      actorUserId: 'admin-1',
+      actorType: 'founder',
+      reason: 'manual review',
+      identity: { displayName: 'New', emailNormalized: 'new@example.com' },
+    });
+    expect(result).toEqual({ ok: true, stage: 'certified' });
+    expect(
+      state.inserts.find(i => i.table === TABLES.contacts)?.values
+    ).toMatchObject({ dedupeKey: 'email:new@example.com', stage: 'certified' });
+    expect(
+      state.inserts.find(i => i.table === TABLES.contactStageTransitions)
+        ?.values
+    ).toMatchObject({
+      contactId: 'contact-new',
+      fromStage: null,
+      toStage: 'certified',
+      actorId: 'admin-1',
+      reason: 'manual review',
+    });
+  });
+
+  it('updates an existing contact row and keeps prior certification', async () => {
+    seed({
+      contacts: [
+        {
+          id: 'c9',
+          dedupeKey: 'k',
+          stage: 'certified',
+          certifiedAt: NOW,
+          certifiedByUserId: 'f1',
+        },
+      ],
+    });
+    const result = await setCanonicalContactStage({
+      dedupeKey: 'k',
+      toStage: 'churned',
+      actorUserId: 'f2',
+    });
+    expect(result).toEqual({ ok: true, stage: 'churned' });
+    expect(state.updates[0]?.values).toMatchObject({
+      stage: 'churned',
+      certifiedAt: NOW,
+      certifiedByUserId: 'f1',
+    });
+    expect(
+      state.inserts.find(i => i.table === TABLES.contactStageTransitions)
+        ?.values
+    ).toMatchObject({ contactId: 'c9', fromStage: 'certified' });
+  });
+
+  it('returns ok:false when the contacts table is missing', async () => {
+    state.tableExists = false;
+    expect(
+      await setCanonicalContactStage({ dedupeKey: 'k', toStage: 'approved' })
+    ).toEqual({ ok: false });
+    expect(state.inserts).toHaveLength(0);
+  });
+});
+
+describe('getContactStageTimeline', () => {
+  it('maps transition rows to timeline items', async () => {
+    seed({
+      transitions: [
+        {
+          id: 't1',
+          fromStage: 'approved',
+          toStage: 'certified',
+          actorType: 'founder',
+          actorId: 'f1',
+          source: 'admin_contacts',
+          reason: 'verified',
+          createdAt: NOW,
+        },
+      ],
+    });
+    expect(await getContactStageTimeline('k')).toEqual([
+      {
+        id: 't1',
+        fromStage: 'approved',
+        toStage: 'certified',
+        actorType: 'founder',
+        actorId: 'f1',
+        source: 'admin_contacts',
+        reason: 'verified',
+        createdAt: NOW,
+      },
+    ]);
+  });
+
+  it('returns empty when the transitions table is missing', async () => {
+    state.tableExists = false;
+    expect(await getContactStageTimeline('k')).toEqual([]);
   });
 });

@@ -258,6 +258,8 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/admin/system/page.tsx',
   'apps/web/app/app/(shell)/admin/users/page.tsx',
   'apps/web/app/app/(shell)/admin/waitlist/page.tsx',
+  'apps/web/app/app/(shell)/admin/wiki/[...slug]/page.tsx',
+  'apps/web/app/app/(shell)/admin/wiki/page.tsx',
   'apps/web/app/app/(shell)/audience/page.tsx',
   'apps/web/app/app/(shell)/calendar/page.tsx',
   'apps/web/app/app/(shell)/chat/[id]/page.tsx',
@@ -327,7 +329,7 @@ const LEGACY_SOURCES = new Set<string>([
   'apps/web/app/app/(shell)/audience/page.tsx',
   'apps/web/app/app/(shell)/contact/page.tsx',
   'apps/web/app/app/(shell)/feature-flags/page.tsx',
-  'apps/web/app/app/(shell)/presence/page.tsx',
+  'apps/web/app/app/(shell)/profiles/page.tsx',
   'apps/web/app/app/(shell)/profile/page.tsx',
   'apps/web/app/app/(shell)/releases/page.tsx',
   'apps/web/app/app/(shell)/threads/page.tsx',
@@ -366,6 +368,8 @@ const NON_REFERENCE_SOURCES = new Set<string>([
   'apps/web/app/app/(shell)/admin/shipping/page.tsx',
   'apps/web/app/app/(shell)/admin/users/page.tsx',
   'apps/web/app/app/(shell)/admin/waitlist/page.tsx',
+  'apps/web/app/app/(shell)/admin/wiki/[...slug]/page.tsx',
+  'apps/web/app/app/(shell)/admin/wiki/page.tsx',
   'apps/web/app/app/(shell)/audience/page.tsx',
   'apps/web/app/app/(shell)/contact/page.tsx',
   'apps/web/app/app/(shell)/dashboard/audience/page.tsx',
@@ -382,7 +386,7 @@ const NON_REFERENCE_SOURCES = new Set<string>([
   'apps/web/app/app/(shell)/dashboard/tipping/page.tsx',
   'apps/web/app/app/(shell)/dashboard/tour-dates/page.tsx',
   'apps/web/app/app/(shell)/feature-flags/page.tsx',
-  'apps/web/app/app/(shell)/presence/page.tsx',
+  'apps/web/app/app/(shell)/profiles/page.tsx',
   'apps/web/app/app/(shell)/profile/page.tsx',
   'apps/web/app/app/(shell)/releases/page.tsx',
   'apps/web/app/app/(shell)/settings/admin/page.tsx',
@@ -425,9 +429,9 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
     conceptId: '/app/admin/features',
     redirectTo: '/app/ov/features',
   },
-  'apps/web/app/app/(shell)/presence/page.tsx': {
-    conceptId: '/app/profiles',
-    redirectTo: '/app/profiles',
+  'apps/web/app/app/(shell)/profiles/page.tsx': {
+    conceptId: '/app/presence',
+    redirectTo: '/app/presence',
   },
   'apps/web/app/app/(shell)/profile/page.tsx': {
     conceptId: '/app/chat',
@@ -454,7 +458,7 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
     redirectTo: '/app/audience',
   },
   'apps/web/app/app/(shell)/dashboard/catalog-scan/page.tsx': {
-    conceptId: '/app/profiles',
+    conceptId: '/app/presence',
     redirectTo: '/app/presence',
   },
   'apps/web/app/app/(shell)/dashboard/chat/page.tsx': {
@@ -486,8 +490,8 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
     redirectTo: '/app',
   },
   'apps/web/app/app/(shell)/dashboard/presence/page.tsx': {
-    conceptId: '/app/profiles',
-    redirectTo: '/app/profiles',
+    conceptId: '/app/presence',
+    redirectTo: '/app/presence',
   },
   'apps/web/app/app/(shell)/dashboard/profile/page.tsx': {
     conceptId: '/app/chat',

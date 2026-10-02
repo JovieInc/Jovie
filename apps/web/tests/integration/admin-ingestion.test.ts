@@ -63,8 +63,8 @@ vi.mock('@/lib/services/profile/queries', async () => {
   };
 });
 
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: vi.fn(async () => adminEntitlements),
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  getOvieOperatorEntitlements: vi.fn(async () => adminEntitlements),
 }));
 
 vi.mock('@/lib/rate-limit', () => ({

@@ -1,10 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { EntityCardModel } from '@/components/organisms/entity-card';
-import {
-  __profileHomeRailTestUtils,
-  ProfileHomeRail,
-} from '@/features/profile/ProfileHomeRail';
+import { ProfileHomeRail } from '@/features/profile/ProfileHomeRail';
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import type { PublicMerchCard } from '@/lib/merch/types';
@@ -106,73 +102,12 @@ function makeTourDate(ticketUrl: string | null): TourDateViewModel {
 }
 
 describe('ProfileHomeRail', () => {
-  it('orders approved S2 cards by PAC slot without duplicating ticket and RSVP buckets', () => {
-    const merchCard = {
-      id: 'merch-1',
-      kind: 'merch',
-      imageAlt: 'Merch',
-      title: 'Tour Tee',
-    } satisfies EntityCardModel;
-    const showCard = {
-      id: 'show-1',
-      kind: 'show',
-      imageAlt: 'Show',
-      title: 'The Novo',
-    } satisfies EntityCardModel;
-
-    expect(
-      __profileHomeRailTestUtils
-        .getS2OrderedItems({
-          assignedSlot: 'tickets',
-          merchItems: [merchCard],
-          showItems: [showCard],
-        })
-        .map(item => item.id)
-    ).toEqual(['show-1', 'merch-1']);
-
-    expect(
-      __profileHomeRailTestUtils
-        .getS2OrderedItems({
-          assignedSlot: 'rsvp',
-          merchItems: [merchCard],
-          showItems: [showCard],
-        })
-        .map(item => item.id)
-    ).toEqual(['show-1', 'merch-1']);
-  });
-
-  it('falls back to existing merch and show order when the assigned S2 slot is unavailable', () => {
-    const merchCard = {
-      id: 'merch-1',
-      kind: 'merch',
-      imageAlt: 'Merch',
-      title: 'Tour Tee',
-    } satisfies EntityCardModel;
-    const showCard = {
-      id: 'show-1',
-      kind: 'show',
-      imageAlt: 'Show',
-      title: 'The Novo',
-    } satisfies EntityCardModel;
-
-    expect(
-      __profileHomeRailTestUtils
-        .getS2OrderedItems({
-          assignedSlot: 'tip',
-          merchItems: [merchCard],
-          showItems: [showCard],
-        })
-        .map(item => item.id)
-    ).toEqual(['merch-1', 'show-1']);
-  });
-
-  it('renders the PAC as the featured mode card above the carousel, with the alerts card last', () => {
+  it('renders the PAC as the single featured card surface — no carousel stack', () => {
     render(
       <ProfileHomeRail
         artist={makeArtist()}
         latestRelease={makeRelease({ title: 'Never Say A Word' })}
         profileSettings={{ showOldReleases: true }}
-        featuredPlaylistFallback={null}
         tourDates={[]}
         hasPlayableDestinations
         renderMode='preview'
@@ -180,9 +115,7 @@ describe('ProfileHomeRail', () => {
       />
     );
 
-    const carousel = screen.getByTestId('profile-home-carousel');
     const pacCard = screen.getByTestId('profile-pac');
-    const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
 
     expect(
       screen.getByRole('heading', {
@@ -191,17 +124,15 @@ describe('ProfileHomeRail', () => {
       })
     ).toBeInTheDocument();
 
-    // Pen parity: the PAC is the featured Listen mode card, first in the
-    // rail; the rest of the highlights stay in the carousel below it.
+    // JOV-7123: the featured editorial card is the only card surface on the
+    // home rail. The highlights carousel and trailing alerts card are gone —
+    // fan capture lives inside the PAC prompt state.
     expect(pacCard).toHaveAttribute('data-presentation', 'featured');
-    expect(carousel.contains(pacCard)).toBe(false);
-    expect(carousel.contains(alertsCard)).toBe(true);
-    expect(pacCard.compareDocumentPosition(carousel)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    );
-    expect(carousel).toHaveAttribute('data-layout', 'profile-landscape');
-    const footprints = [...carousel.querySelectorAll(':scope > li')];
-    expect(footprints[footprints.length - 1]?.contains(alertsCard)).toBe(true);
+    expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
+    expect(
+      screen.queryByTestId('profile-home-alerts-fallback-card')
+    ).toBeNull();
+    expect(screen.queryByTestId('entity-card-music')).toBeNull();
     expect(within(pacCard).getByText('Featured')).toBeInTheDocument();
     // Featured anatomy: centered art that is never cropped, title, artist,
     // and one full-width neutral CTA (28px face inside a 44px hit area).
@@ -220,78 +151,8 @@ describe('ProfileHomeRail', () => {
     const listen = within(pacCard).getByRole('link', { name: 'Listen now' });
     expect(listen).toHaveClass('h-11', 'w-full');
     expect(listen.firstElementChild).toHaveClass('h-7', 'rounded-full');
-    // The featured release renders once, inside the PAC card (not as a
-    // duplicate plain catalog card).
+    // The featured release renders once, inside the PAC card.
     expect(screen.getAllByText('Never Say A Word')).toHaveLength(1);
-  });
-
-  it('omits the alerts card when fan capture is unavailable', () => {
-    render(
-      <ProfileHomeRail
-        artist={makeArtist()}
-        latestRelease={makeRelease()}
-        profileSettings={{ showOldReleases: true }}
-        featuredPlaylistFallback={null}
-        tourDates={[]}
-        hasPlayableDestinations
-        renderMode='preview'
-        isSubscribed={false}
-        showAlertsCard={false}
-      />
-    );
-
-    expect(
-      screen.queryByTestId('profile-home-alerts-fallback-card')
-    ).not.toBeInTheDocument();
-  });
-
-  it('renders alerts as the same compact landscape row (no gradient)', () => {
-    render(
-      <ProfileHomeRail
-        artist={makeArtist()}
-        latestRelease={null}
-        profileSettings={{ showOldReleases: true }}
-        featuredPlaylistFallback={null}
-        tourDates={[]}
-        hasPlayableDestinations
-        renderMode='preview'
-        isSubscribed={false}
-      />
-    );
-
-    const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
-    // Standard row: pearl surface, no accent gradient or redundant media
-    // panel, with the same compact action geometry as other Latest items.
-    expect(alertsCard.style.background).toBe('');
-    expect(alertsCard.className).toContain('bg-(--profile-pearl-bg)');
-    expect(alertsCard).toHaveTextContent('Alerts');
-    const cta = screen.getByText('Get Updates');
-    expect(cta.className).toContain('h-11');
-    expect(cta.className).toContain('w-auto');
-  });
-
-  it('can suppress fan capture without pretending the visitor follows the artist', () => {
-    render(
-      <ProfileHomeRail
-        artist={makeArtist()}
-        latestRelease={null}
-        profileSettings={{ showOldReleases: true }}
-        featuredPlaylistFallback={null}
-        tourDates={[]}
-        hasPlayableDestinations
-        renderMode='preview'
-        isSubscribed={false}
-        showAlertsCard={false}
-      />
-    );
-
-    expect(
-      screen.queryByTestId('profile-home-alerts-fallback-card')
-    ).toBeNull();
-    expect(screen.queryByText('Following')).toBeNull();
-    // Only the featured card remains; an empty carousel never renders.
-    expect(screen.getByTestId('profile-pac')).toBeInTheDocument();
-    expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
   });
 
   it('renders no false Latest or Listen card when the profile has no inventory', () => {
@@ -300,12 +161,10 @@ describe('ProfileHomeRail', () => {
         artist={makeArtist()}
         latestRelease={null}
         profileSettings={{ showOldReleases: true }}
-        featuredPlaylistFallback={null}
         tourDates={[]}
         hasPlayableDestinations={false}
         renderMode='preview'
         isSubscribed={false}
-        showAlertsCard={false}
       />
     );
 
@@ -320,11 +179,9 @@ describe('ProfileHomeRail', () => {
       <ProfileHomeRail
         artist={makeArtist()}
         latestRelease={null}
-        featuredPlaylistFallback={null}
         tourDates={[]}
         hasPlayableDestinations={false}
         renderMode='preview'
-        showAlertsCard={false}
         merchCards={[makeMerchCard()]}
       />
     );
@@ -337,42 +194,15 @@ describe('ProfileHomeRail', () => {
     expect(screen.queryByRole('link', { name: 'Listen' })).toBeNull();
   });
 
-  it('passes the venue timezone to the mobile show date pill', () => {
-    render(
-      <ProfileHomeRail
-        artist={makeArtist()}
-        latestRelease={null}
-        featuredPlaylistFallback={null}
-        tourDates={[
-          {
-            ...makeTourDate('https://tickets.example.com/radius'),
-            startDate: '2030-09-24T03:00:00Z',
-            timezone: 'America/Chicago',
-          },
-        ]}
-        hasPlayableDestinations={false}
-        renderMode='preview'
-        resolveNearbyTour={false}
-        showAlertsCard={false}
-      />
-    );
-    const show = within(screen.getByTestId('entity-card-show'));
-    expect(show.getByText('Sep')).toBeVisible();
-    expect(show.getByText('23')).toBeVisible();
-    expect(show.queryByText('24')).toBeNull();
-  });
-
   it('renders show-only inventory as a ticket PAC instead of a blank Listen card', () => {
     render(
       <ProfileHomeRail
         artist={makeArtist()}
         latestRelease={null}
-        featuredPlaylistFallback={null}
         tourDates={[makeTourDate('https://tickets.example.com/the-novo')]}
         hasPlayableDestinations={false}
         renderMode='preview'
         resolveNearbyTour={false}
-        showAlertsCard={false}
       />
     );
 
@@ -389,11 +219,9 @@ describe('ProfileHomeRail', () => {
       <ProfileHomeRail
         artist={makeArtist()}
         latestRelease={null}
-        featuredPlaylistFallback={null}
         tourDates={[]}
         hasPlayableDestinations={false}
         renderMode='preview'
-        showAlertsCard={false}
         hasTip
       />
     );
@@ -415,11 +243,9 @@ describe('ProfileHomeRail', () => {
         artist={makeArtist()}
         latestRelease={makeRelease()}
         profileSettings={{ showOldReleases: true }}
-        featuredPlaylistFallback={null}
         tourDates={[]}
         hasPlayableDestinations
         renderMode='preview'
-        showAlertsCard={false}
         pacArtPriority={false}
       />
     );
@@ -435,11 +261,9 @@ describe('ProfileHomeRail', () => {
       <ProfileHomeRail
         artist={makeArtist()}
         latestRelease={null}
-        featuredPlaylistFallback={null}
         tourDates={[]}
         hasPlayableDestinations={false}
         renderMode='preview'
-        showAlertsCard={false}
         hasTip
       />
     );
@@ -454,70 +278,12 @@ describe('ProfileHomeRail', () => {
     expect(screen.queryByRole('link', { name: 'Listen' })).toBeNull();
   });
 
-  it('keeps the carousel shell with PAC and alerts cards even when the catalog is empty', () => {
-    render(
-      <ProfileHomeRail
-        artist={makeArtist()}
-        latestRelease={null}
-        profileSettings={{ showOldReleases: true }}
-        featuredPlaylistFallback={null}
-        tourDates={[]}
-        hasPlayableDestinations
-        renderMode='preview'
-        isSubscribed={false}
-      />
-    );
-
-    const carousel = screen.getByTestId('profile-home-carousel');
-    const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
-    expect(alertsCard).toBeInTheDocument();
-    // The alerts card shares the compact row anatomy and omits redundant art.
-    expect(alertsCard.className).toContain('p-0');
-    expect(screen.getByText('Get Updates')).toBeInTheDocument();
-    // No entity items → the carousel still hosts the slot cards.
-    expect(carousel.querySelectorAll(':scope > li').length).toBeGreaterThan(0);
-    expect(screen.queryByTestId('entity-card-music')).not.toBeInTheDocument();
-  });
-
-  it('renders the latest release as the featured PAC card, not a catalog card', () => {
+  it('leads with the visible latest release even when the catalog has newer entries', () => {
     render(
       <ProfileHomeRail
         artist={makeArtist()}
         latestRelease={makeRelease()}
         profileSettings={{ showOldReleases: true }}
-        featuredPlaylistFallback={null}
-        tourDates={[]}
-        hasPlayableDestinations
-        renderMode='preview'
-        isSubscribed={false}
-      />
-    );
-
-    const pacCard = screen.getByTestId('profile-pac');
-    const carousel = screen.getByTestId('profile-home-carousel');
-    const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
-
-    expect(pacCard).toBeInTheDocument();
-    expect(pacCard.dataset.state).toBe('idle');
-    expect(carousel).toBeInTheDocument();
-    expect(alertsCard).toBeInTheDocument();
-    // Featured release title lives in the PAC card only, as its heading.
-    expect(screen.getAllByText('The Deep End')).toHaveLength(1);
-    expect(
-      within(pacCard).getByRole('heading', { name: 'The Deep End' })
-    ).toBeInTheDocument();
-    expect(pacCard.compareDocumentPosition(alertsCard)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    );
-  });
-
-  it('adds back-catalog releases without duplicating the featured release', () => {
-    render(
-      <ProfileHomeRail
-        artist={makeArtist()}
-        latestRelease={makeRelease()}
-        profileSettings={{ showOldReleases: true }}
-        featuredPlaylistFallback={null}
         tourDates={[]}
         hasPlayableDestinations
         renderMode='preview'
@@ -537,19 +303,23 @@ describe('ProfileHomeRail', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-home-carousel')).toBeInTheDocument();
-    // The featured release appears exactly once (inside the PAC card).
+    const pacCard = screen.getByTestId('profile-pac');
+    expect(pacCard.dataset.state).toBe('idle');
+    // The featured release appears exactly once (inside the PAC card); the
+    // back catalog stays off the home surface — it lives on Music.
     expect(screen.getAllByText('The Deep End')).toHaveLength(1);
-    expect(screen.getByText('Under Lights')).toBeInTheDocument();
+    expect(
+      within(pacCard).getByRole('heading', { name: 'The Deep End' })
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Under Lights')).not.toBeInTheDocument();
   });
 
-  it('hides the alerts card once subscribed and drops the empty carousel', () => {
+  it('resolves the PAC to the following state for a subscribed visitor', () => {
     render(
       <ProfileHomeRail
         artist={makeArtist()}
         latestRelease={makeRelease()}
         profileSettings={{ showOldReleases: true }}
-        featuredPlaylistFallback={null}
         tourDates={[]}
         hasPlayableDestinations
         renderMode='preview'
@@ -557,11 +327,6 @@ describe('ProfileHomeRail', () => {
       />
     );
 
-    expect(
-      screen.queryByTestId('profile-home-alerts-fallback-card')
-    ).not.toBeInTheDocument();
-    expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
-    // Subscribed visitor: the PAC card resolves to the S2 'following' state.
     const pacCard = screen.getByTestId('profile-pac');
     expect(pacCard.dataset.state).toBe('following');
     expect(screen.getByText('You follow Tim White')).toBeInTheDocument();

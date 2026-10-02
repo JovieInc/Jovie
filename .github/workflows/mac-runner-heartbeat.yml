@@ -1,0 +1,34 @@
+name: Mac Runner Heartbeat
+# clock-class: production-liveness
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Tim
+# necessary-trust-boundary: A hosted schedule proves the single self-hosted Mac runner can accept work without granting it any credentials.
+# revisit-trigger: Remove when the Mac pool has a native GitHub capacity signal or is retired.
+
+on:
+  # GitHub cron delivery is best-effort. Mac-bound callers treat a stale,
+  # queued, or in-progress probe as down and fall back to hosted macOS, so a
+  # busy, asleep, or offline Mac never blocks the merge queue.
+  push:
+    branches: [main]
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mac-runner-heartbeat
+  # A busy/offline Mac retains only the newest queued probe, which observers
+  # read as down until the runner drains it.
+  cancel-in-progress: true
+
+jobs:
+  heartbeat:
+    name: Self-hosted Mac runner heartbeat
+    runs-on: [self-hosted, macOS, ARM64, jovie-mac]
+    timeout-minutes: 2
+    steps:
+      - name: Record heartbeat
+        run: echo "Self-hosted Mac heartbeat from $RUNNER_NAME"

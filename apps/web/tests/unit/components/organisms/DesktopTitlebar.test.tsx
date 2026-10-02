@@ -1,0 +1,648 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { TooltipProvider } from '@jovie/ui';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import postcss from 'postcss';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  DesktopReleaseIdentity,
+  DesktopTitlebar,
+} from '@/components/organisms/DesktopTitlebar';
+import { SidebarContext } from '@/components/organisms/sidebar/context';
+
+const electronRuntimeMock = vi.hoisted(() => ({
+  isElectronRuntime: true,
+}));
+
+vi.mock('@/lib/desktop/electron-bridge', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/desktop/electron-bridge')>();
+  return {
+    ...actual,
+    useIsElectronRuntime: () => electronRuntimeMock.isElectronRuntime,
+    useDesktopNavigation: () => ({
+      canGoBack: true,
+      canGoForward: true,
+      goBack: vi.fn(),
+      goForward: vi.fn(),
+    }),
+  };
+});
+
+vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
+  UpdateAvailablePill: () => (
+    <button type='button' data-testid='update-available-pill'>
+      Update
+    </button>
+  ),
+}));
+
+function renderTitlebar(
+  overrides: Partial<
+    import('@/components/organisms/sidebar/context').SidebarContextValue
+  > = {}
+) {
+  return render(
+    <SidebarContext.Provider
+      value={{
+        state: 'open',
+        open: true,
+        setOpen: vi.fn(),
+        openMobile: false,
+        setOpenMobile: vi.fn(),
+        isMobile: false,
+        toggleSidebar: vi.fn(),
+        ...overrides,
+      }}
+    >
+      <TooltipProvider>
+        <DesktopTitlebar />
+        <DesktopReleaseIdentity />
+      </TooltipProvider>
+    </SidebarContext.Provider>
+  );
+}
+
+describe('DesktopTitlebar', () => {
+  beforeEach(() => {
+    electronRuntimeMock.isElectronRuntime = true;
+    Reflect.deleteProperty(window, 'electronAPI');
+    document.documentElement.removeAttribute('data-desktop-channel');
+    document.documentElement.removeAttribute('data-desktop-version');
+    document.documentElement.removeAttribute('data-desktop-source-revision');
+    document.documentElement.removeAttribute('data-desktop-built-at');
+  });
+
+  it('renders Electron titlebar navigation without duplicating sidebar notifications', () => {
+    renderTitlebar();
+
+    expect(screen.getByTestId('electron-titlebar-row')).toBeInTheDocument();
+
+    // Sidebar toggle is in the sidebar cell (single canonical toggle)
+    expect(
+      screen.getByTestId('electron-titlebar-sidebar-cell')
+    ).toContainElement(screen.getByTestId('electron-sidebar-toggle'));
+    expect(
+      screen.getByTestId('electron-titlebar-sidebar-cell')
+    ).toContainElement(screen.getByTestId('electron-traffic-light-safe-area'));
+    expect(screen.getByTestId('electron-traffic-light-safe-area')).toHaveClass(
+      'w-(--electron-traffic-light-safe-width)'
+    );
+    expect(
+      screen.getByTestId('electron-titlebar-sidebar-cell')
+    ).toContainElement(screen.getByTestId('electron-nav-back'));
+    expect(
+      screen.getByTestId('electron-titlebar-sidebar-cell')
+    ).toContainElement(screen.getByTestId('electron-nav-forward'));
+
+    expect(
+      screen.queryByTestId('update-available-pill')
+    ).not.toBeInTheDocument();
+
+    expect(
+      screen.getByRole('button', { name: 'Collapse sidebar' })
+    ).toBeInTheDocument();
+    // The desktop toggle is the canonical rail-control primitive — same
+    // pressed/expanded semantics and icon family as the header's control.
+    const sidebarToggle = screen.getByTestId('electron-sidebar-toggle');
+    expect(sidebarToggle).toHaveAttribute('data-rail-toggle', 'left');
+    expect(sidebarToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(sidebarToggle.querySelector('svg')).toBeTruthy();
+    expect(
+      screen.queryByRole('link', { name: 'New Chat' })
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    [{ isMobile: true, openMobile: false }, 'Expand sidebar', 'false'],
+    [{ isMobile: true, openMobile: true }, 'Collapse sidebar', 'true'],
+  ])(
+    'labels the mobile drawer from its own state, not the desktop rail state',
+    (overrides, expectedLabel, expectedExpanded) => {
+      // Keep the desktop rail open in both fixtures. On compact layouts the
+      // titlebar button controls openMobile, so its name and expanded state
+      // must follow the drawer instead.
+      renderTitlebar(overrides);
+
+      const toggle = screen.getByRole('button', { name: expectedLabel });
+      expect(toggle).toHaveAttribute('aria-expanded', expectedExpanded);
+      expect(toggle).toHaveAttribute('aria-pressed', expectedExpanded);
+    }
+  );
+
+  it('renders no Electron controls in the browser runtime', () => {
+    electronRuntimeMock.isElectronRuntime = false;
+
+    renderTitlebar();
+
+    expect(screen.getByTestId('electron-titlebar-row')).toBeEmptyDOMElement();
+    expect(
+      screen.queryByTestId('electron-titlebar-sidebar-cell')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('electron-sidebar-toggle')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('electron-nav-pill')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('update-available-pill')
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps back/forward nav in the sidebar titlebar cell', () => {
+    renderTitlebar();
+
+    expect(screen.getByTestId('electron-nav-pill')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('electron-titlebar-sidebar-cell')
+    ).toContainElement(screen.getByTestId('electron-nav-pill'));
+    expect(
+      screen.queryByTestId('electron-titlebar-main-cell')
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([{ state: 'closed' as const, open: false }, { isMobile: true }])(
+    'reserves main-header space when the sidebar does not own a visible rail',
+    overrides => {
+      renderTitlebar(overrides);
+      expect(screen.getByTestId('electron-titlebar-row')).toHaveAttribute(
+        'data-main-header-inset',
+        'true'
+      );
+    }
+  );
+
+  it.each([
+    [{ state: 'closed' as const, open: false }, 'transparent'],
+    [{ isMobile: true }, 'transparent'],
+    [{}, 'rgb(var(--sidebar-background))'],
+  ])(
+    'paints window controls on the surface that owns them',
+    (overrides, expected) => {
+      document.documentElement.dataset.desktopRuntime = 'electron';
+      const { container, unmount } = renderTitlebar(overrides);
+      container.dataset.appShellFrame = 'true';
+      const titlebar = screen.getByTestId('electron-titlebar-row');
+      const css = postcss.parse(
+        readFileSync(resolve(__dirname, '../../../../app/globals.css'), 'utf8')
+      );
+      const backgrounds: string[] = [];
+      css.walkRules(rule => {
+        // Evaluate the actual CSS selectors against the rendered sidebar state.
+        // This must not make the expanded sidebar transparent as a side effect.
+        if (
+          rule.selector.includes('[data-electron-titlebar=') &&
+          titlebar.matches(rule.selector)
+        ) {
+          rule.walkDecls('background', declaration => {
+            backgrounds.push(declaration.value);
+          });
+        }
+      });
+      expect(backgrounds.at(-1)).toBe(expected);
+      unmount();
+      document.documentElement.removeAttribute('data-desktop-runtime');
+    }
+  );
+
+  it('keeps release identity outside the window-control row', () => {
+    renderTitlebar();
+    expect(screen.getByTestId('electron-titlebar-row')).not.toContainElement(
+      screen.getByTestId('electron-release-identity')
+    );
+  });
+
+  it('renders release identity as secondary diagnostics without a badge chip', () => {
+    renderTitlebar();
+
+    const identity = screen.getByTestId('electron-release-identity');
+    expect(identity).toHaveClass(
+      'pointer-events-none',
+      'max-w-64',
+      'truncate',
+      'text-2xs',
+      'text-tertiary-token'
+    );
+    expect(identity.className).not.toContain('hidden');
+    expect(identity.className).not.toContain('lg:inline-block');
+    expect(identity.className).not.toContain('rounded-md');
+    expect(identity.className).not.toContain('bg-surface-1');
+  });
+
+  it('merges a className override onto the release identity', () => {
+    render(
+      <SidebarContext.Provider
+        value={{
+          state: 'open',
+          open: true,
+          setOpen: vi.fn(),
+          openMobile: false,
+          setOpenMobile: vi.fn(),
+          isMobile: false,
+          toggleSidebar: vi.fn(),
+        }}
+      >
+        <DesktopReleaseIdentity className='max-w-40' />
+      </SidebarContext.Provider>
+    );
+
+    const identity = screen.getByTestId('electron-release-identity');
+    expect(identity).toHaveClass('max-w-40', 'text-tertiary-token');
+    expect(identity.className).not.toContain('max-w-64');
+  });
+
+  it.each([
+    ['production', 'Stable'],
+    ['staging', 'Canary'],
+    ['local', 'Local'],
+  ])(
+    'renders the %s build as a persistent %s release identity',
+    async (channel, label) => {
+      const version = channel === 'staging' ? '26.8.2-staging.1.1' : '26.8.1';
+      Object.defineProperty(window, 'electronAPI', {
+        configurable: true,
+        value: {
+          getBuildIdentity: vi.fn().mockResolvedValue({
+            channel,
+            version,
+            sourceRevision: '8e42ec8d79cbee578971636b78bb80dc32c78b39',
+            builtAt: channel === 'local' ? null : '2026-08-16T18:20:00.000Z',
+            provenance: channel === 'local' ? 'development' : 'verified',
+          }),
+        },
+      });
+
+      renderTitlebar();
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('electron-release-identity')
+        ).toHaveTextContent(`${label} · ${version} · 8e42ec8`);
+        expect(
+          screen.getByLabelText(
+            `${label} environment, version ${version}, source revision 8e42ec8d79cbee578971636b78bb80dc32c78b39`
+          )
+        ).toBeInTheDocument();
+      });
+    }
+  );
+
+  it('reads exact package provenance from the validated main-process bridge', async () => {
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        getBuildIdentity: vi.fn().mockResolvedValue({
+          channel: 'production',
+          version: '26.8.2',
+          sourceRevision: '46b0f1404837f9e20080a49b7577e554f5f5b778',
+          builtAt: '2026-09-04T03:51:18.184Z',
+          provenance: 'verified',
+        }),
+      },
+    });
+
+    renderTitlebar();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('electron-release-identity')).toHaveTextContent(
+        'Stable · 26.8.2 · 46b0f14'
+      );
+      expect(
+        screen.getByLabelText(
+          'Stable environment, version 26.8.2, source revision 46b0f1404837f9e20080a49b7577e554f5f5b778'
+        )
+      ).toBeInTheDocument();
+    });
+  });
+
+  it.each([
+    ['unverified', 'missing or mismatched packaged identity'],
+    ['unverified', 'runtime version drift'],
+  ])('fails closed for %s main-process provenance: %s', async provenance => {
+    document.documentElement.dataset.desktopChannel = 'production';
+    document.documentElement.dataset.desktopVersion = '26.8.2';
+    document.documentElement.dataset.desktopSourceRevision =
+      '8e42ec8d79cbee578971636b78bb80dc32c78b39';
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        getBuildIdentity: vi.fn().mockResolvedValue({
+          channel: 'production',
+          version: '26.8.2',
+          sourceRevision: '46b0f1404837f9e20080a49b7577e554f5f5b778',
+          builtAt: '2026-09-04T03:51:18.184Z',
+          provenance,
+        }),
+      },
+    });
+
+    renderTitlebar();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('electron-release-identity')).toHaveTextContent(
+        'Desktop · Version Unknown · Unverified'
+      );
+    });
+  });
+
+  it('rejects an invalid builtAt payload from the bridge', async () => {
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        getBuildIdentity: vi.fn().mockResolvedValue({
+          channel: 'production',
+          version: '26.8.2',
+          sourceRevision: '46b0f1404837f9e20080a49b7577e554f5f5b778',
+          builtAt: 42,
+          provenance: 'verified',
+        }),
+      },
+    });
+
+    renderTitlebar();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('electron-release-identity')).toHaveTextContent(
+        'Desktop · Version Unknown · Unverified'
+      );
+    });
+  });
+
+  it.each([
+    ['unknown channel', { channel: 'nightly' }],
+    ['invalid version', { version: 'next' }],
+    ['short revision', { sourceRevision: '46b0f14' }],
+    ['missing verified revision', { sourceRevision: null }],
+    ['missing verified build time', { builtAt: null }],
+    ['verified local channel', { channel: 'local', builtAt: null }],
+  ])('fails closed for a trusted payload with %s', async (_, override) => {
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        getBuildIdentity: vi.fn().mockResolvedValue({
+          channel: 'production',
+          version: '26.8.2',
+          sourceRevision: '46b0f1404837f9e20080a49b7577e554f5f5b778',
+          builtAt: '2026-09-04T03:51:18.184Z',
+          provenance: 'verified',
+          ...override,
+        }),
+      },
+    });
+
+    renderTitlebar();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('electron-release-identity')).toHaveTextContent(
+        'Desktop · Version Unknown · Unverified'
+      );
+    });
+  });
+
+  it('fails closed when the identity IPC request rejects', async () => {
+    const getBuildIdentity = vi.fn().mockRejectedValue(new Error('IPC closed'));
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: { getBuildIdentity },
+    });
+
+    renderTitlebar();
+
+    await waitFor(() => expect(getBuildIdentity).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId('electron-release-identity')).toHaveTextContent(
+      'Desktop · Version Unknown · Unverified'
+    );
+  });
+
+  it.each([null, 'invalid'])(
+    'fails closed for a non-object identity payload',
+    async value => {
+      Object.defineProperty(window, 'electronAPI', {
+        configurable: true,
+        value: { getBuildIdentity: vi.fn().mockResolvedValue(value) },
+      });
+
+      renderTitlebar();
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('electron-release-identity')
+        ).toHaveTextContent('Desktop · Version Unknown · Unverified');
+      });
+    }
+  );
+
+  it('ignores a stale identity response after the bridge changes', async () => {
+    let resolveIdentity: ((value: object) => void) | undefined;
+    const firstGetBuildIdentity = vi.fn(
+      () =>
+        new Promise<object>(resolve => {
+          resolveIdentity = resolve;
+        })
+    );
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: { getBuildIdentity: firstGetBuildIdentity },
+    });
+
+    const view = renderTitlebar();
+    await waitFor(() => expect(firstGetBuildIdentity).toHaveBeenCalledTimes(1));
+
+    const secondGetBuildIdentity = vi.fn().mockResolvedValue({
+      channel: 'staging',
+      version: '26.8.3-staging.1.1',
+      sourceRevision: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      builtAt: '2026-09-04T04:00:00.000Z',
+      provenance: 'verified',
+    });
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: { getBuildIdentity: secondGetBuildIdentity },
+    });
+    view.rerender(
+      <SidebarContext.Provider
+        value={{
+          state: 'open',
+          open: true,
+          setOpen: vi.fn(),
+          openMobile: false,
+          setOpenMobile: vi.fn(),
+          isMobile: false,
+          toggleSidebar: vi.fn(),
+        }}
+      >
+        <TooltipProvider>
+          <DesktopTitlebar />
+          <DesktopReleaseIdentity />
+        </TooltipProvider>
+      </SidebarContext.Provider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('electron-release-identity')).toHaveTextContent(
+        'Canary · 26.8.3-staging.1.1 · bbbbbbb'
+      );
+    });
+
+    await act(async () => {
+      resolveIdentity?.({
+        channel: 'production',
+        version: '26.8.2',
+        sourceRevision: '46b0f1404837f9e20080a49b7577e554f5f5b778',
+        builtAt: '2026-09-04T03:51:18.184Z',
+        provenance: 'verified',
+      });
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId('electron-release-identity')).toHaveTextContent(
+      'Canary · 26.8.3-staging.1.1 · bbbbbbb'
+    );
+  });
+
+  it('clears the old identity while a replacement bridge is pending', async () => {
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        getBuildIdentity: vi.fn().mockResolvedValue({
+          channel: 'production',
+          version: '26.8.2',
+          sourceRevision: '46b0f1404837f9e20080a49b7577e554f5f5b778',
+          builtAt: '2026-09-04T03:51:18.184Z',
+          provenance: 'verified',
+        }),
+      },
+    });
+    const view = renderTitlebar();
+    await waitFor(() => {
+      expect(screen.getByTestId('electron-release-identity')).toHaveTextContent(
+        'Stable · 26.8.2 · 46b0f14'
+      );
+    });
+
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: { getBuildIdentity: vi.fn(() => new Promise(() => undefined)) },
+    });
+    view.rerender(
+      <SidebarContext.Provider
+        value={{
+          state: 'open',
+          open: true,
+          setOpen: vi.fn(),
+          openMobile: false,
+          setOpenMobile: vi.fn(),
+          isMobile: false,
+          toggleSidebar: vi.fn(),
+        }}
+      >
+        <TooltipProvider>
+          <DesktopTitlebar />
+          <DesktopReleaseIdentity />
+        </TooltipProvider>
+      </SidebarContext.Provider>
+    );
+
+    expect(screen.getByTestId('electron-release-identity')).toHaveTextContent(
+      'Desktop · Version Unknown · Unverified'
+    );
+  });
+
+  it('ignores a stale identity rejection after the bridge changes', async () => {
+    let rejectIdentity: ((reason: Error) => void) | undefined;
+    const firstGetBuildIdentity = vi.fn(
+      () =>
+        new Promise<object>((_, reject) => {
+          rejectIdentity = reject;
+        })
+    );
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: { getBuildIdentity: firstGetBuildIdentity },
+    });
+
+    const view = renderTitlebar();
+    await waitFor(() => expect(firstGetBuildIdentity).toHaveBeenCalledTimes(1));
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        getBuildIdentity: vi.fn().mockResolvedValue({
+          channel: 'production',
+          version: '26.8.2',
+          sourceRevision: '46b0f1404837f9e20080a49b7577e554f5f5b778',
+          builtAt: '2026-09-04T03:51:18.184Z',
+          provenance: 'verified',
+        }),
+      },
+    });
+    view.rerender(
+      <SidebarContext.Provider
+        value={{
+          state: 'open',
+          open: true,
+          setOpen: vi.fn(),
+          openMobile: false,
+          setOpenMobile: vi.fn(),
+          isMobile: false,
+          toggleSidebar: vi.fn(),
+        }}
+      >
+        <TooltipProvider>
+          <DesktopTitlebar />
+          <DesktopReleaseIdentity />
+        </TooltipProvider>
+      </SidebarContext.Provider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('electron-release-identity')).toHaveTextContent(
+        'Stable · 26.8.2 · 46b0f14'
+      );
+    });
+
+    await act(async () => {
+      rejectIdentity?.(new Error('stale IPC closed'));
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId('electron-release-identity')).toHaveTextContent(
+      'Stable · 26.8.2 · 46b0f14'
+    );
+  });
+
+  it('does not let a stale document marker override an unverified bridge revision', async () => {
+    document.documentElement.dataset.desktopSourceRevision =
+      '8e42ec8d79cbee578971636b78bb80dc32c78b39';
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        getBuildIdentity: vi.fn().mockResolvedValue({
+          channel: 'local',
+          version: '26.8.2',
+          sourceRevision: null,
+          builtAt: null,
+          provenance: 'development',
+        }),
+      },
+    });
+
+    renderTitlebar();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('electron-release-identity')).toHaveTextContent(
+        'Local · 26.8.2 · Unverified'
+      );
+    });
+  });
+
+  it('fails visibly when the installed shell lacks the validated identity bridge', () => {
+    document.documentElement.dataset.desktopChannel = 'production';
+    document.documentElement.dataset.desktopVersion = '26.8.1';
+
+    renderTitlebar();
+
+    expect(screen.getByTestId('electron-release-identity')).toHaveTextContent(
+      'Desktop · Version Unknown · Unverified'
+    );
+    expect(
+      screen.getByLabelText(
+        'Desktop environment, version unknown, source revision unverified'
+      )
+    ).toBeInTheDocument();
+  });
+});

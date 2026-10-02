@@ -214,6 +214,17 @@ function queuePostPersistWrites() {
   mockDbInsert.mockReturnValueOnce({ values: auditValues });
 }
 
+// Reserved mode skips the users.activeProfileId update and the
+// userProfileClaims row — only the conversation link and audit write remain.
+function queueReservedPostPersistWrites() {
+  const conversationWhere = vi.fn().mockResolvedValue(undefined);
+  const conversationSet = vi.fn().mockReturnValue({ where: conversationWhere });
+  mockDbUpdate.mockReturnValueOnce({ set: conversationSet });
+
+  const auditValues = vi.fn().mockResolvedValue(undefined);
+  mockDbInsert.mockReturnValueOnce({ values: auditValues });
+}
+
 describe('materializeClaimedOnboardingProfile', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -475,5 +486,122 @@ describe('materializeClaimedOnboardingProfile', () => {
     });
 
     expect(mockReserveOnboardingHandle).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('materializeClaimedOnboardingProfile — reserved waitlist hold (JOV-7204)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
+      artist: null,
+      handle: 'coolartist',
+      socialLinks: [],
+      interviewSignals: [],
+    });
+    mockReserveOnboardingHandle.mockResolvedValue('coolartist1');
+    mockFetchArtistBySpotifyUrl.mockResolvedValue(null);
+  });
+
+  it('creates a hidden, unclaimed profile that holds the handle for the waitlist entry', async () => {
+    setupOwnedConversationAndMessages();
+    setupExistingProfileSelect(null);
+    const [insertValues] = queueProfileInsert({ id: 'profile_reserved' });
+    queueReservedPostPersistWrites();
+
+    await expect(
+      materializeClaimedOnboardingProfile({
+        userId: 'user_1',
+        conversationId: 'conv_1',
+        ipAddress: null,
+        userAgent: null,
+        visibility: 'reserved',
+        waitlistEntryId: 'entry_1',
+      })
+    ).resolves.toEqual({
+      profileId: 'profile_reserved',
+      handle: 'coolartist',
+      status: 'created',
+    });
+
+    expect(insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: 'coolartist',
+        usernameNormalized: 'coolartist',
+        isPublic: false,
+        isClaimed: false,
+        claimedAt: null,
+        onboardingCompletedAt: null,
+        waitlistEntryId: 'entry_1',
+      })
+    );
+    // No ownership-publish writes: only the conversation link update ran.
+    expect(mockDbUpdate).toHaveBeenCalledTimes(1);
+    // Only the profile insert + audit log — no userProfileClaims row.
+    expect(mockDbInsert).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses a second claimant the held handle and reserves a fallback instead', async () => {
+    setupOwnedConversationAndMessages('user_2');
+    setupExistingProfileSelect(null);
+    queueProfileInsert([
+      { error: HANDLE_UNIQUE_VIOLATION },
+      { id: 'profile_second' },
+    ]);
+    queueReservedPostPersistWrites();
+
+    await expect(
+      materializeClaimedOnboardingProfile({
+        userId: 'user_2',
+        conversationId: 'conv_1',
+        ipAddress: null,
+        userAgent: null,
+        visibility: 'reserved',
+        waitlistEntryId: 'entry_2',
+      })
+    ).resolves.toEqual({
+      profileId: 'profile_second',
+      handle: 'coolartist1',
+      status: 'created',
+    });
+
+    expect(mockReserveOnboardingHandle).toHaveBeenCalledWith(
+      'coolartist',
+      'user_2'
+    );
+  });
+
+  it('publishes the held profile when the admitted claim path runs after approval', async () => {
+    setupOwnedConversationAndMessages();
+    setupExistingProfileSelect({
+      id: 'profile_held',
+      userId: 'user_1',
+      displayName: null,
+      displayNameLocked: false,
+      isClaimed: false,
+      claimedAt: null,
+      onboardingCompletedAt: null,
+      settings: {},
+      avatarLockedByUser: false,
+      avatarUrl: null,
+    });
+    const [setSpy] = queueProfileUpdate({ id: 'profile_held' });
+    queuePostPersistWrites();
+
+    await expect(
+      materializeClaimedOnboardingProfile({
+        userId: 'user_1',
+        conversationId: 'conv_1',
+        ipAddress: null,
+        userAgent: null,
+      })
+    ).resolves.toEqual({
+      profileId: 'profile_held',
+      handle: 'coolartist',
+      status: 'updated',
+    });
+
+    expect(setSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ isPublic: true, isClaimed: true })
+    );
   });
 });

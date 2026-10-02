@@ -1,3 +1,7 @@
+vi.mock('@/lib/ovie/privacy-lock/server', () => ({
+  assertOviePrivacyUnlocked: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -39,9 +43,6 @@ vi.mock('@/components/features/admin/hud/HudFullscreenControl', () => ({
 }));
 vi.mock('@/components/features/admin/OperationalControlPanel', () => ({
   OperationalControlPanel: () => null,
-}));
-vi.mock('@/app/app/(shell)/admin/ops/OpsCockpitClient', () => ({
-  OpsCockpitClient: () => null,
 }));
 vi.mock('@/components/features/admin/layout/AdminPage', () => ({
   AdminPage: ({ children }: { children: unknown }) => children,

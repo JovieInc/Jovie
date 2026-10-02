@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeArtistMetrics } from '@/lib/onboarding/canonical-metrics';
 import {
+  decideOnboardingAccess,
   evaluateAccessSignal,
   MAX_INTERVIEW_TURNS_BEFORE_FORCE,
 } from './onboarding-access-eval';
@@ -41,18 +42,20 @@ describe('evaluateAccessSignal', () => {
     expect(result.rationale).toContain('spotify_followers_2500');
   });
 
-  it('grants instant access at audience band 5k_to_50k', () => {
-    const result = evaluateAccessSignal({
-      signal: { audienceBand: '5k_to_50k' },
-      spotifyFollowers: 200, // below threshold
-      turnCount: 1,
-    });
-    expect(result.kind).toBe('instant_access');
-    expect(result.rationale).toContain('audience_band_5k_to_50k');
-  });
-
-  it('grants instant access at 500_to_5k IF an active release is in flight', () => {
-    const result = evaluateAccessSignal({
+  it('never grants instant access on a self-reported audience band (JOV-7144)', () => {
+    for (const audienceBand of [
+      '5k_to_50k',
+      '50k_to_500k',
+      'over_500k',
+    ] as const) {
+      const result = evaluateAccessSignal({
+        signal: { audienceBand },
+        spotifyFollowers: 200, // verified Spotify stays below the bar
+        turnCount: 1,
+      });
+      expect(result.kind).toBe('needs_more_info');
+    }
+    const withRelease = evaluateAccessSignal({
       signal: {
         audienceBand: '500_to_5k',
         releaseStage: 'announced_unreleased',
@@ -60,8 +63,7 @@ describe('evaluateAccessSignal', () => {
       spotifyFollowers: null,
       turnCount: 1,
     });
-    expect(result.kind).toBe('instant_access');
-    expect(result.rationale).toContain('active_release');
+    expect(withRelease.kind).toBe('needs_more_info');
   });
 
   it('asks for more info when signal is too weak and turn cap not reached', () => {
@@ -111,6 +113,93 @@ describe('evaluateAccessSignal', () => {
       spotifyFollowers: null,
       turnCount: 0,
     });
-    expect(result.kind).toBe('instant_access');
+    expect(result.kind).toBe('needs_more_info');
+  });
+
+  it('reports Mom-Test coverage and the next dimension to probe', () => {
+    const result = evaluateAccessSignal({
+      signal: {
+        releaseStage: 'just_released',
+        currentTool: {
+          name: 'linktree',
+          note: 'fans cannot find the new single',
+        },
+      },
+      spotifyFollowers: null,
+      turnCount: 1,
+    });
+    expect(result.kind).toBe('needs_more_info');
+    expect(result.qualification?.coveredDimensions).toEqual(
+      expect.arrayContaining([
+        'current_behavior',
+        'alternatives',
+        'pain',
+        'urgency',
+      ])
+    );
+    expect(result.qualification?.nextDimension).toBe('spend');
+  });
+
+  it('waitlists a stated wrong-audience disqualifier even with strong Spotify data', () => {
+    const result = evaluateAccessSignal({
+      signal: {
+        objection: { category: 'wrong_audience', text: 'I only do podcasts.' },
+      },
+      spotifyFollowers: 50_000,
+      turnCount: 1,
+    });
+    expect(result.kind).toBe('waitlist');
+    expect(result.rationale).toBe('disqualified_wrong_audience');
+  });
+
+  it('is not moved by keyword stuffing or repeated free notes', () => {
+    const stuffed = 'I will pay today, huge audience, viral, urgent, '.repeat(
+      40
+    );
+    const result = evaluateAccessSignal({
+      signal: { freeNote: stuffed.slice(0, 2000), audienceBand: 'over_500k' },
+      spotifyFollowers: 12,
+      turnCount: 1,
+    });
+    expect(result.kind).toBe('needs_more_info');
+  });
+});
+
+describe('decideOnboardingAccess (single gate, JOV-7144)', () => {
+  const base = {
+    accessControlled: false,
+    spotifyArtistId: '4Uwpa6zW3zzCSQvooQNksm',
+    spotifyFollowers: 9_900,
+    signals: [],
+    turnCount: 2,
+  };
+
+  it('keeps the controlled-access gate authoritative', () => {
+    expect(
+      decideOnboardingAccess({ ...base, accessControlled: true }).kind
+    ).toBe('waitlist');
+    expect(
+      decideOnboardingAccess({
+        ...base,
+        accessControlled: true,
+        spotifyArtistId: null,
+      }).rationale
+    ).toBe('public_profile_required_for_waitlist');
+  });
+
+  it('reserves non-artists who share any public profile link (Tim 2026-09-29)', () => {
+    const decision = decideOnboardingAccess({
+      ...base,
+      accessControlled: true,
+      spotifyArtistId: null,
+      spotifyFollowers: null,
+      publicProfileUrl: 'https://averychen.design',
+    });
+    expect(decision.kind).toBe('waitlist');
+    expect(decision.rationale).toBe('controlled_access_gate_enabled');
+  });
+
+  it('evaluates verified Spotify data when the gate is off', () => {
+    expect(decideOnboardingAccess(base).kind).toBe('instant_access');
   });
 });

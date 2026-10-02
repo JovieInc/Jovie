@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { ABOUT_FAQ_ITEMS, AboutPageContent } from './AboutPageContent';
 import { ABOUT_STORY_RECEIPT } from './AboutPageContent.stories';
 
@@ -12,15 +13,39 @@ vi.mock('@/lib/analytics', () => ({
 }));
 
 describe('AboutPageContent', () => {
+  it('answers what Jovie does and whom it serves before the founder story', () => {
+    const { container } = render(<AboutPageContent />);
+    const opening = container.querySelector('h1')?.nextElementSibling;
+    expect(opening).toHaveTextContent(COMPANY_IDENTITY.definition);
+    expect(opening).toHaveTextContent(COMPANY_IDENTITY.seoDescription);
+    expect(opening?.textContent).not.toMatch(/#1|number one|guaranteed/i);
+  });
+
+  it('lets readers inspect product details and the founder without JavaScript actions', () => {
+    render(<AboutPageContent />);
+    for (const [name, href] of [
+      ['Living Profile', '/product'],
+      ['Relationships', '/product'],
+      ['Audience', '/product'],
+      ['Adaptive', '/product'],
+      ['For Artists', '/artist-profiles'],
+      ['Payments', '/pay'],
+      ['Tim White, Founder', '/tim/about'],
+    ]) {
+      expect(screen.getByRole('link', { name })).toHaveAttribute('href', href);
+    }
+  });
+
   it('renders the exact shipped body in hero, story, features, FAQ order', () => {
     const { container } = render(<AboutPageContent />);
 
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'Presence, Relationships, And Growth.',
+        name: 'Presence, relationships, and growth.',
       })
     ).toBeVisible();
+    expect(screen.queryByTestId('about-page-refresh')).toBeNull();
     const sectionHeadings = Array.from(container.querySelectorAll('section'))
       .map(section => section.querySelector('h2')?.textContent?.trim())
       .filter((heading): heading is string => heading !== undefined);
@@ -31,7 +56,15 @@ describe('AboutPageContent', () => {
       'Frequently Asked Questions',
       'Ready to build your Jovie profile?',
     ]);
-    expect(screen.getByText('— Tim White, Founder')).toBeVisible();
+    expect(screen.getByText('Tim White, Founder')).toBeVisible();
+    expect(
+      screen.getByRole('img', { name: 'Tim White, founder of Jovie' })
+    ).toBeVisible();
+    const originSection = screen
+      .getByRole('heading', { level: 2, name: 'Why Jovie Exists' })
+      .closest('section');
+    expect(originSection?.className).toContain('lg:flex-row');
+    expect(originSection?.className).not.toContain('grid-cols-[');
     for (const feature of [
       'Living Profile',
       'Relationships',
@@ -61,7 +94,7 @@ describe('AboutPageContent', () => {
       {
         question: 'Who founded Jovie?',
         answer:
-          'Jovie was founded by Tim White, a music marketing veteran with 15+ years of experience working with labels like Armada Music and Universal Music, and running digital campaigns for artists like Tory Lanez and Megan Thee Stallion, and brands like Google and the NFL.',
+          'Jovie was founded by Tim White, an artist, producer, and engineer with 15+ years in music: 500+ live shows, five singles signed to Armada Music, songwriting and production for We Are Loud, Justin Prime, and Orjan Nilsen, engineering for Lauryn Hill, and a Clio Award for Hulu Pride Fest 2020.',
       },
       {
         question: 'What does Jovie do?',
@@ -71,12 +104,12 @@ describe('AboutPageContent', () => {
       {
         question: 'Is Jovie free?',
         answer:
-          'Yes, Jovie offers a free tier that lets you create a profile and start from your name. Paid plans unlock advanced analytics, notifications, contact export, and more.',
+          'Yes, Jovie offers a free tier that lets you create a profile and start with your name. Paid plans add advanced analytics, notifications, and contact export.',
       },
       {
         question: 'How is Jovie different from Linktree?',
         answer:
-          'Linktree is a general-purpose link list. Jovie is a living profile for presence and relationships — work, links, and a next step in one place. For artists, that includes smart links for releases, fan capture, and notifications when new music drops.',
+          'Linktree is a general-purpose link list. Jovie keeps your work, links, and a clear next step in one living profile. For artists, that includes smart links for releases, fan capture, and notifications when new music drops.',
       },
     ]);
 
@@ -84,6 +117,14 @@ describe('AboutPageContent', () => {
     for (const { question } of ABOUT_FAQ_ITEMS) {
       expect(screen.getByRole('button', { name: question })).toBeVisible();
     }
+  });
+
+  it('does not name unverified artists in founder copy', () => {
+    const founderAnswer = ABOUT_FAQ_ITEMS.find(
+      item => item.question === 'Who founded Jovie?'
+    )?.answer;
+    expect(founderAnswer).toBeDefined();
+    expect(founderAnswer).not.toMatch(/artists like /);
   });
 
   it('keeps metadata and schema ownership in the route and binds the exact story', () => {

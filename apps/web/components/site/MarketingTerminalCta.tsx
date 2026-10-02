@@ -1,4 +1,5 @@
 // @coverage-via apps/web/tests/unit/marketing/component-registry.test.ts
+import './MarketingTerminalCta.css';
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
@@ -8,6 +9,7 @@ import type { MarketingPenContractId } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 
 export interface MarketingTerminalCtaProps {
+  readonly sectionVariant?: string;
   readonly title: string;
   readonly body?: string;
   readonly ctaLabel: string;
@@ -79,7 +81,7 @@ function MarketingTerminalCtaAction({
 const styles = {
   cinematic: {
     section:
-      'homepage-story-final-cta relative isolate overflow-hidden bg-black dark:bg-black',
+      'homepage-story-final-cta marketing-terminal-cta--cinematic relative isolate overflow-hidden bg-black dark:bg-black',
     content: 'homepage-final-cta-copy mx-auto',
     title:
       'text-balance text-[clamp(2rem,3.4vw,3rem)] font-bold leading-[1.05] tracking-[-0.025em] text-(--color-text-tooltip)',
@@ -92,8 +94,10 @@ const styles = {
       'homepage-story-final-cta system-b-mounted-home-footer-cta relative isolate overflow-hidden',
     content:
       'homepage-final-cta-copy system-b-mounted-home-footer-cta-copy mx-auto',
+    // The homepage keeps its locked two-line bound; other variants render
+    // the full closing headline (see data-wrap below).
     title:
-      'homepage-final-cta-heading system-b-mounted-home-footer-cta-heading text-balance',
+      'homepage-final-cta-heading system-b-mounted-home-footer-cta-heading line-clamp-2 text-balance',
     body: 'homepage-story-body mx-auto',
     actions: 'contents',
     primary:
@@ -131,13 +135,15 @@ export function MarketingTerminalCta({
   ctaSignUp,
   variant = 'standard',
   penContractId,
+  sectionVariant,
 }: Readonly<MarketingTerminalCtaProps>) {
   const variantStyles = styles[variant];
 
   const content = (
     <div className={variantStyles.content}>
       <h2
-        className={`${variantStyles.title} line-clamp-2`}
+        className={variantStyles.title}
+        data-wrap='editorial-title'
         data-testid={headingTestId}
         data-homepage-section-heading={
           variant === 'homepage-v2' ? true : undefined
@@ -192,7 +198,13 @@ export function MarketingTerminalCta({
   return (
     <MarketingCtaSection
       data-pen-contract={penContractId}
-      data-testid={testId}
+      data-testid={sectionVariant ? 'marketing-section-cta' : testId}
+      data-marketing-owner={
+        sectionVariant
+          ? 'apps/web/components/site/MarketingTerminalCta.tsx'
+          : undefined
+      }
+      data-marketing-variant={sectionVariant}
       className={cn(variantStyles.section, className)}
     >
       {decoration}

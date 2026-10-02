@@ -39,6 +39,8 @@ export const APP_ROUTES = {
   /** @deprecated Profile is now a drawer on the chat route. Use CHAT instead. */
   PROFILE: '/app/chat',
   CONTACTS: '/app/contacts',
+  /** Audience context inside the Contacts workspace. */
+  CONTACTS_AUDIENCE: '/app/contacts?tab=audience',
   RELEASES: '/app/releases',
   TOUR_DATES: '/app/tour-dates',
   CALENDAR: '/app/calendar',
@@ -55,8 +57,9 @@ export const APP_ROUTES = {
   YOUTUBE_REVIVAL: '/app/youtube',
   JOVIE_WORK: '/app/jovie-work',
   LYRICS: '/app/lyrics',
+  /** Legacy Presence workspace path. Keep for old bookmarks; use PRESENCE for navigation. */
   PROFILES: '/app/profiles',
-  /** Legacy profile-presence route. Use PROFILES for navigation. */
+  /** Public-facing output generated for the active identity. */
   PRESENCE: '/app/presence',
 
   // Settings

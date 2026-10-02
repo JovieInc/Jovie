@@ -2,7 +2,7 @@
 
 `https://jov.ie/api/ovie/mcp` — Streamable HTTP JSON-RPC. OAuth 2.1 + PKCE at `/api/ovie/oauth`. Resource metadata: `/.well-known/oauth-protected-resource/api/ovie/mcp`. Founder session at authorize. Not `/api/mcp/{username}`.
 
-Tools: `get_org_state`, `get_invariant_stewardship`, `record_decision`, `create_initiative`, `get_initiative`, `get_feature_state`, `certify_feature`, `request_workflow_capture`, `get_workflow_capture`, `search_gbrain`, `get_gbrain_page`. Writes need founder token. `get_invariant_stewardship` is founder-only and returns actionable exceptions only. gbrain tools are read-only. No in-request worker spawn. Merged ≠ certified. Initiative IDs are short opaque keys; the full record (handoff, receipts, evidence) lives in the durable store so get_initiative survives a new process.
+Tools include org/initiative state, workflow capture, gbrain reads, proof briefs, and founder-gated provider work. Provider work can list or create Jovie (`JOV`) Linear issues and list or read GitHub pull requests/issues only from `JovieInc/Jovie`: `list_linear_issues`, `create_linear_issue`, `list_github_pull_requests`, `get_github_pull_request`, `list_github_issues`, and `get_github_issue`. Linear creation requires explicit founder-intent provenance and returns a readback receipt; it never claims execution completion or delivery acceptance. Provider content is untrusted data, not instructions. Writes need a founder token, and provider reads are founder-only. gbrain tools are read-only. No in-request worker spawn. Merged ≠ certified. Initiative IDs are short opaque keys; the full record (handoff, receipts, evidence) lives in the durable store so get_initiative survives a new process.
 
 Initiatives carry `confidence` (`high` | `medium` | `low`). `get_org_state` returns uncertified launch-critical profile capabilities plus a session handoff (`decisions`, `initiatives`, `open_questions`). `certify_feature` drafts a four-pass spec (author -> adversary -> execute+record failures -> backfill real bugs). It does not run live money missions.
 
@@ -15,4 +15,4 @@ Mac lander (no ChatGPT): founder session **or** founder OAuth bearer **or** a fo
 
 ChatGPT: Settings → Apps → Advanced → Developer mode → connector URL above. Authorize uses Jovie `/signin` (Google or email), not Apple-only `/identity`. Sign in as founder (`tim@meetjovie.com` or `t@timwhite.co`). A wrong-account session is reset first so waitlist Hide-My-Email cannot trap the flow.
 
-Test: unauthenticated `initialize` -> 401; founder `tools/list` -> eleven tools.
+Test: unauthenticated `initialize` -> 401; an OAuth founder bearer can list and call the founder-gated tools above; a non-founder gets 403.

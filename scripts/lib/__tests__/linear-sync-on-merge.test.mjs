@@ -70,6 +70,138 @@ const MERGING_FOUNDATION = {
 };
 
 describe('linear sync on merge', () => {
+  it.each([
+    [
+      {
+        title: 'Codex goal: increase verified shipping throughput',
+        description: '/goal Deliver six outcomes',
+      },
+      'skip',
+    ],
+    [{ title: 'Implementation repair', description: '' }, 'close'],
+    [
+      {
+        title: 'Implementation repair',
+        description: '',
+        children: { nodes: [{ id: 'child', identifier: 'JOV-7286' }] },
+      },
+      'skip',
+    ],
+    [
+      { title: 'Implementation repair', description: '', children: null },
+      'skip',
+    ],
+    [
+      {
+        title: 'Implementation repair',
+        description: '',
+        labels: { nodes: [null] },
+      },
+      'skip',
+    ],
+    [
+      {
+        title: 'Implementation repair',
+        description: '',
+        labels: { nodes: [{ name: null }] },
+      },
+      'skip',
+    ],
+  ])(
+    'reads canonical acceptance metadata before merge-sync mutation: %j',
+    async (metadata, action) => {
+      const calls = [];
+      const result = await syncLinearIssueOnMerge({
+        env: {
+          LINEAR_API_KEY: 'test',
+          GITHUB_TOKEN: 'test',
+          GITHUB_REPOSITORY: 'JovieInc/Jovie',
+          PR_NUMBER: '19587',
+          PR_URL: MERGE_URL,
+          HEAD_REF: 'codex/jov-7227-repair',
+          PR_BODY:
+            'Refs JOV-7227.\n\n<!-- linear-issue-id:uuid -->\n<!-- linear-issue-identifier:JOV-7227 -->',
+          MERGE_SHA,
+        },
+        log: () => {},
+        fetchImpl: async (url, init) => {
+          const body = JSON.parse(String(init?.body ?? '{}'));
+          calls.push(body.query ?? 'GitHub');
+          if (String(url).includes('api.github.com'))
+            return {
+              ok: true,
+              headers: { get: () => '' },
+              json: async () => [],
+            };
+          if (body.query.includes('IssueDoneState')) {
+            expect(body.query).toContain('title');
+            expect(body.query).toContain('description');
+            return {
+              ok: true,
+              json: async () => ({
+                data: {
+                  issue: {
+                    id: 'uuid',
+                    identifier: 'JOV-7227',
+                    labels: { nodes: [] },
+                    children: { nodes: [] },
+                    team: {
+                      states: {
+                        nodes: [
+                          { id: 'done', name: 'Done', type: 'completed' },
+                        ],
+                      },
+                    },
+                    ...metadata,
+                  },
+                },
+              }),
+            };
+          }
+          return {
+            ok: true,
+            json: async () => ({
+              data: {
+                issueUpdate: { success: true },
+                commentCreate: { success: true },
+              },
+            }),
+          };
+        },
+      });
+      expect(result.action).toBe(action);
+      expect(calls.some(query => query.includes('issueUpdate'))).toBe(
+        action === 'close'
+      );
+    }
+  );
+
+  it.each([
+    {
+      title: 'Codex goal: increase verified shipping throughput',
+      description:
+        '/goal Increase shipping\n## Done means\n1. Production verified\n2. Hyperagent canary',
+    },
+    {
+      title: 'Repair throughput',
+      description: '/goal Deliver multiple outcomes',
+    },
+    { title: 'Epic: Marketing Page Factory' },
+    { title: 'Commission Summer: operational readiness' },
+    { labels: ['type:epic'] },
+  ])(
+    'holds unlabeled goal and parent acceptance beyond a supporting merge: %j',
+    metadata => {
+      const result = decideLinearCloseOnMerge({
+        issue: { ...JOV_6586_ISSUE, identifier: 'JOV-7227', ...metadata },
+        pullRequests: [],
+        mergingPull: MERGING_FOUNDATION,
+      });
+      expect(result.action).toBe('skip');
+      expect(result.comment).toContain('stays open');
+    }
+  );
+
   it('reads the JOV-6586 branch the way the merge workflow did', () => {
     expect(
       extractMergeIssueRef({
@@ -185,6 +317,32 @@ describe('linear sync on merge', () => {
     );
   });
 
+  it('keeps an escaped defect open for exact-build product and detector proof', () => {
+    const decision = decideLinearCloseOnMerge({
+      issue: {
+        id: 'issue-7200',
+        identifier: 'JOV-7200',
+        labels: ['escaped-defect'],
+        description: 'The product fix merged, but no deployment proof exists.',
+        comments: [],
+        children: [],
+        hasChildren: false,
+      },
+      pullRequests: [],
+      mergingPull: {
+        number: 19000,
+        url: 'https://github.com/JovieInc/Jovie/pull/19000',
+        sha: 'merged-is-not-deployed',
+      },
+    });
+
+    expect(decision.action).toBe('skip');
+    expect(decision.blockingNumbers).toEqual([]);
+    expect(decision.comment).toContain('Escaped defects stay open at merge');
+    expect(decision.comment).toContain('Closure evidence is incomplete');
+    expect(decision.comment).toContain('escaped-defect-closure:v1');
+  });
+
   it('does not close commissioning parent JOV-5853 when a child pull request merges', () => {
     expect(COMMISSIONING_PARENT_ALLOWLIST.has('JOV-5853')).toBe(true);
     const decision = decideLinearCloseOnMerge({
@@ -219,6 +377,33 @@ describe('linear sync on merge', () => {
     );
     expect(decision.comment).toContain('allowlist');
     expect(decision.comment).toContain('Did not mark JOV-5853 Done');
+  });
+
+  it('does not close proof-gated liveness owner JOV-6004 from a merge', () => {
+    expect(COMMISSIONING_PARENT_ALLOWLIST.has('JOV-6004')).toBe(true);
+    const decision = decideLinearCloseOnMerge({
+      issue: {
+        id: 'issue-6004',
+        identifier: 'JOV-6004',
+        labels: [],
+        children: [],
+        hasChildren: false,
+      },
+      pullRequests: [],
+      mergingPull: {
+        number: 19317,
+        url: 'https://github.com/JovieInc/Jovie/pull/19317',
+        sha: 'merged-but-not-runtime-proven',
+      },
+    });
+
+    expect(decision.action).toBe('skip');
+    expect(decision.blockingNumbers).toEqual([]);
+    expect(decision.comment).toContain(
+      'JOV-6004 is a commissioning or parent issue'
+    );
+    expect(decision.comment).toContain('allowlist');
+    expect(decision.comment).toContain('Did not mark JOV-6004 Done');
   });
 
   it('holds a parent by commissioning label or sub-issues without the allowlist', () => {
@@ -309,6 +494,8 @@ describe('linear sync on merge', () => {
                 issue: {
                   id: 'uuid-6586',
                   identifier: 'JOV-6586',
+                  title: 'Implementation repair',
+                  description: '',
                   labels: { nodes: [] },
                   children: { nodes: [] },
                   team: {
@@ -383,6 +570,8 @@ describe('linear sync on merge', () => {
                 issue: {
                   id: 'uuid-5853',
                   identifier: 'JOV-5853',
+                  title: 'Commission Summer',
+                  description: '',
                   labels: { nodes: [{ name: 'commissioning' }] },
                   children: { nodes: [{ identifier: 'JOV-6586' }] },
                   team: {
@@ -486,6 +675,8 @@ describe('linear sync on merge', () => {
                   issue: {
                     id: 'uuid-6586',
                     identifier: 'JOV-6586',
+                    title: 'Implementation repair',
+                    description: '',
                     labels: { nodes: [] },
                     children: { nodes: [] },
                     team: {
