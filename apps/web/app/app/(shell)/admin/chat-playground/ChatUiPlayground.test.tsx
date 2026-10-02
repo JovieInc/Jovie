@@ -12,7 +12,7 @@ vi.mock('@/components/jovie/components/ChatMessage', () => ({
   }: Pick<ComponentProps<'div'>, 'id'> & { parts: readonly MessagePart[] }) => (
     <div data-testid={`fixture-message-${id}`}>
       {id === 'playground-tool-running' ? (
-        <ToolPartsRenderer parts={parts} />
+        <ToolPartsRenderer parts={parts} variant='chat' />
       ) : (
         id
       )}
