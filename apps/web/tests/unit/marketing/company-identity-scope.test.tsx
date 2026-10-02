@@ -102,8 +102,11 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
       })
     ).toBeVisible();
     expect(
-      screen.getByText(COMPANY_IDENTITY.support, { exact: false })
-    ).toBeVisible();
+      screen.getByRole('heading', {
+        level: 1,
+        name: COMPANY_IDENTITY.headline,
+      }).nextElementSibling
+    ).toHaveTextContent(COMPANY_IDENTITY.definition);
     expect(
       screen.getByRole('heading', { level: 3, name: 'For Artists' })
     ).toBeVisible();

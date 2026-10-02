@@ -24,14 +24,25 @@ describe('TableCell', () => {
     expect(cell).not.toHaveClass('py-0.5');
   });
 
-  it('applies right alignment without dropping the canonical cell preset', () => {
-    renderInTable(<TableCell align='right'>42</TableCell>);
+  it.each(['left', 'center', 'right'] as const)(
+    'preserves %s alignment for inline content within the stable cell',
+    align => {
+      renderInTable(
+        <TableCell align={align}>
+          <span>High</span>
+        </TableCell>
+      );
 
-    const cell = screen.getByRole('cell');
-    expect(cell).toHaveClass('text-right');
-    expect(cell).toHaveClass('px-3');
-    expect(cell).toHaveClass('py-1');
-  });
+      const cell = screen.getByRole('cell');
+      expect(cell).toHaveClass(`text-${align}`);
+      expect(cell).toHaveClass('px-3');
+      expect(cell).toHaveClass('py-1');
+      expect(screen.getByText('High').parentElement).toHaveAttribute(
+        'data-table-cell-content',
+        'stable'
+      );
+    }
+  );
 
   it('lets consumer tone overrides replace the canonical cell tone', () => {
     renderInTable(

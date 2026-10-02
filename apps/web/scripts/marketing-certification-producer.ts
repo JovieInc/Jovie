@@ -19,7 +19,7 @@ import {
   statSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, relative } from 'node:path';
+import { basename, dirname, join, matchesGlob, relative } from 'node:path';
 import { parseArgs } from 'node:util';
 import type {
   CertificationEvidenceReceipt,
@@ -44,6 +44,107 @@ const INVARIANT_SUITES = [
   'tests/unit/marketing/landing-page-grammar.test.ts',
   'tests/unit/marketing/recipe-manifest.test.ts',
 ];
+
+/**
+ * Input envelope shared with the hosted trigger (parity-tested). Runtime
+ * dependencies are deliberately conservative: the component registry is not an
+ * import graph, so a changed shared input must never leave a green certificate
+ * stale. This runs after main, not in the source PR or merge-queue gate.
+ * Authenticated routes and API implementations are outside this marketing
+ * render envelope; shared libraries/components remain inside it.
+ */
+export const CERTIFICATION_INPUT_GLOBS = [
+  'apps/web/components/**',
+  'apps/web/data/**',
+  'apps/web/styles/**',
+  'apps/web/lib/**',
+  'apps/web/hooks/**',
+  'apps/web/constants/**',
+  'apps/web/public/**',
+  'apps/web/app/(home)/**',
+  'apps/web/app/(marketing)/**',
+  'apps/web/app/*.*',
+  'apps/web/tests/**',
+  'apps/web/scripts/marketing-certification-producer*',
+  'apps/web/*.config.*',
+  'apps/web/tsconfig*.json',
+  'apps/web/package.json',
+  'apps/web/.storybook/**',
+  'packages/ui/**',
+  'packages/copy/**',
+  'canon/invariants.jsonl',
+  'docs/marketing/**',
+  'docs/design-system/molecule-ownership-receipt.json',
+  'scripts/agent/pen-workspace-locks.json',
+  '.github/actions/setup-node-pnpm/**',
+  '.nvmrc',
+  '.node-version',
+  'scripts/invariants/**',
+  'design.tokens.json',
+  'package.json',
+  'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
+  '.github/workflows/marketing-certification-producer.yml',
+] as const;
+
+const isTestOrStory = (path: string) =>
+  /\.(?:test|spec|stories)\.[cm]?[jt]sx?$/u.test(path);
+
+/** Unmapped test changes are conservative only inside the marketing domain. */
+export function requiresFullRecertification(path: string): boolean {
+  if (!CERTIFICATION_INPUT_GLOBS.some(glob => matchesGlob(path, glob)))
+    return false;
+  if (
+    path.startsWith('apps/web/scripts/marketing-certification-producer') ||
+    path.startsWith('scripts/invariants/')
+  )
+    return true;
+  if (isTestOrStory(path)) return false;
+  // Shared setup, fixtures and helpers can change every test's meaning.
+  return true;
+}
+
+export interface CertificationSelection<T> {
+  readonly plans: T[];
+  readonly reason:
+    | 'explicit-all'
+    | 'shared-input'
+    | 'direct-dependency'
+    | 'unaffected';
+  readonly invalidatedBy: readonly string[];
+}
+
+/** Inspect the entire push: a direct hit must not hide a later shared input. */
+export function selectCertificationPlans<
+  T extends { readonly dependencies: readonly string[] },
+>(
+  plans: readonly T[],
+  changed: readonly string[],
+  all: boolean
+): CertificationSelection<T> {
+  if (all)
+    return { plans: [...plans], reason: 'explicit-all', invalidatedBy: [] };
+  const shared = changed.filter(
+    path =>
+      requiresFullRecertification(path) ||
+      INVARIANT_SUITES.some(suite => path === `apps/web/${suite}`) ||
+      (isTestOrStory(path) &&
+        /^apps\/web\/(?:tests\/(?:unit\/(?:marketing|home)\/|product-screenshots\/|visual-qa\/)|components\/|data\/marketing\/)/u.test(
+          path
+        ) &&
+        !plans.some(plan => plan.dependencies.includes(path)))
+  );
+  if (shared.length > 0)
+    return { plans: [...plans], reason: 'shared-input', invalidatedBy: shared };
+  const selected = affectedEntries(plans, changed);
+  return {
+    plans: selected,
+    reason: selected.length > 0 ? 'direct-dependency' : 'unaffected',
+    invalidatedBy: changed.filter(path =>
+      selected.some(plan => plan.dependencies.includes(path))
+    ),
+  };
+}
 
 interface VitestJson {
   readonly testResults: readonly {
@@ -108,12 +209,16 @@ export function testFilesFor(
   exists: (repoPath: string) => boolean
 ): string[] {
   const sibling = resolvedSource.replace(/\.tsx?$/u, '.test.tsx');
-  const declared = [...source.matchAll(/@coverage-via\s+(\S+)/gu)].map(
-    match => match[1] ?? ''
-  );
+  const declared = declaredTestFiles(source);
   return [...new Set([sibling, ...declared])].filter(
     path => path.length > 0 && exists(path)
   );
+}
+
+function declaredTestFiles(source: string): string[] {
+  return [...source.matchAll(/@coverage-via\s+(\S+)/gu)]
+    .map(match => match[1] ?? '')
+    .filter(Boolean);
 }
 
 interface CertificationPlanItem {
@@ -141,11 +246,19 @@ export function certificationPlans(input: {
 }): CertificationPlanItem[] {
   const plans = input.entries.flatMap(entry => {
     if (!entry.resolvedSource) return [];
-    const tests = testFilesFor(
-      entry.resolvedSource,
-      input.readSource(entry.resolvedSource) ?? '',
-      input.exists
-    );
+    const source = input.readSource(entry.resolvedSource) ?? '';
+    const sibling = entry.resolvedSource.replace(/\.tsx?$/u, '.test.tsx');
+    const tests = [
+      ...new Set([
+        ...testFilesFor(entry.resolvedSource, source, input.exists),
+        // Keep declared missing/deleted tests: their evidence must stay missing,
+        // never silently disappear from a surviving test's passing packet.
+        ...declaredTestFiles(source),
+        ...(input.changed.includes(sibling) && !input.exists(sibling)
+          ? [sibling]
+          : []),
+      ]),
+    ];
     const story = storyFileFor(entry.storybookTitle, input.storyFiles);
     return [
       {
@@ -154,13 +267,14 @@ export function certificationPlans(input: {
         ownTestFiles: tests.map(webRelative),
         dependencies: [
           entry.resolvedSource,
+          sibling,
           ...tests,
           ...(story ? [`apps/web/${story.path}`] : []),
         ],
       },
     ];
   });
-  return input.all ? plans : affectedEntries(plans, input.changed);
+  return selectCertificationPlans(plans, input.changed, input.all).plans;
 }
 
 function listStoryFiles(dir: string, found: string[] = []): string[] {
@@ -482,7 +596,7 @@ async function main() {
   const plan = certificationPlans({
     entries: MARKETING_COMPONENT_REGISTRY,
     storyFiles,
-    all: values.all ?? false,
+    all: true,
     changed,
     exists: path => existsSync(join(REPO_ROOT, path)),
     readSource: path => {
@@ -490,7 +604,15 @@ async function main() {
       return existsSync(sourcePath) ? readFileSync(sourcePath, 'utf8') : null;
     },
   });
-  if (plan.length === 0) {
+  const selection = selectCertificationPlans(
+    plan,
+    changed,
+    values.all ?? false
+  );
+  console.log(
+    `[marketing-cert] selection=${selection.reason} entries=${selection.plans.length}/${plan.length} invalidatedBy=${JSON.stringify(selection.invalidatedBy)}`
+  );
+  if (selection.plans.length === 0) {
     console.log('[marketing-cert] no registry entry affected');
     return;
   }
@@ -499,10 +621,14 @@ async function main() {
     validateMarketingPenRegistry().map(issue => issue.id)
   );
   const invariants = runVitest(INVARIANT_SUITES);
-  const ownTestFiles = [...new Set(plan.flatMap(item => item.ownTestFiles))];
+  const ownTestFiles = [
+    ...new Set(selection.plans.flatMap(item => item.ownTestFiles)),
+  ];
   const ownTests = ownTestFiles.length > 0 ? runVitest(ownTestFiles) : null;
   const storyPaths = [
-    ...new Set(plan.flatMap(item => (item.story ? [item.story.path] : []))),
+    ...new Set(
+      selection.plans.flatMap(item => (item.story ? [item.story.path] : []))
+    ),
   ];
   const stories =
     storyPaths.length > 0
@@ -511,7 +637,7 @@ async function main() {
 
   const secret = process.env.CRON_SECRET;
   let failures = 0;
-  for (const item of plan) {
+  for (const item of selection.plans) {
     const sourcePath = item.entry.resolvedSource
       ? join(REPO_ROOT, item.entry.resolvedSource)
       : null;
