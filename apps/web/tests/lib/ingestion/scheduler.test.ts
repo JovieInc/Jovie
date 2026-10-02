@@ -85,6 +85,20 @@ describe('ingestion scheduler helpers', () => {
     });
   });
 
+  it('classifies MusicFetch 401 and 403 as permanent vendor unavailable', () => {
+    for (const statusCode of [401, 403]) {
+      const error = new MusicfetchRequestError(
+        'MusicFetch vendor unavailable',
+        statusCode
+      );
+
+      expect(determineJobFailure(error)).toEqual({
+        message: 'MusicFetch vendor unavailable',
+        reason: 'permanent',
+      });
+    }
+  });
+
   it('classifies invalid-services MusicFetch 400 errors as permanent', () => {
     const error = new MusicfetchRequestError(
       'MusicFetch API error: 400 - services - Invalid value "soundCloud"',

@@ -372,7 +372,65 @@ describe('agent release resolution', () => {
     });
   });
 
-  it.each([400, 401, 402, 403, 422, 429, 500, 503])(
+  it.each([401, 403])(
+    'treats MusicFetch HTTP %i as non-retryable vendor unavailable',
+    async status => {
+      const { MusicfetchRequestError } = await import(
+        '@/lib/musicfetch/resilient-client'
+      );
+      request.mockRejectedValueOnce(
+        new MusicfetchRequestError('subscription not active', status)
+      );
+      const result = await resolveAgentRelease(
+        prepareReleaseLaunchSchema.parse({
+          ...draft,
+          release_url: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+        })
+      );
+      expect(result).toEqual({
+        status: 'error',
+        code: 'UPSTREAM_FAILURE',
+        retryable: false,
+      });
+      expect(request).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('falls back to supplied release metadata when MusicFetch is vendor-unavailable', async () => {
+    const { MusicfetchRequestError } = await import(
+      '@/lib/musicfetch/resilient-client'
+    );
+    request.mockRejectedValueOnce(
+      new MusicfetchRequestError('subscription not active', 401)
+    );
+    const result = await resolveAgentRelease(
+      prepareReleaseLaunchSchema.parse({
+        ...draft,
+        release_url: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+        release_metadata: {
+          title: 'Signal Fire',
+          artist_name: 'The Artist',
+          dsp_links: {
+            spotify: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+          },
+        },
+      })
+    );
+    expect(result).toMatchObject({
+      status: 'resolved',
+      facts: [
+        {
+          source: 'release_metadata',
+          title: 'Signal Fire',
+          dsp_links: {
+            spotify: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+          },
+        },
+      ],
+    });
+  });
+
+  it.each([400, 402, 422, 429, 500, 503])(
     'keeps provider HTTP %i failures distinct from a missing release',
     async status => {
       const { MusicfetchRequestError } = await import(

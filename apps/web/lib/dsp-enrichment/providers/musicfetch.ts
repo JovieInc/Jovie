@@ -14,6 +14,7 @@ import * as Sentry from '@sentry/nextjs';
 import { env } from '@/lib/env-server';
 import {
   isMusicfetchInvalidServicesError,
+  isMusicfetchVendorUnavailable,
   MusicfetchBudgetExceededError,
   MusicfetchRequestError,
   musicfetchRequest,
@@ -125,6 +126,10 @@ export function isMusicFetchAvailable(): boolean {
  * isMusicfetchInvalidServicesError().
  */
 function handleMusicfetchLookupError(error: unknown, spotifyUrl: string): null {
+  if (isMusicfetchVendorUnavailable(error)) {
+    return null;
+  }
+
   if (error instanceof MusicfetchRequestError) {
     logger.warn('MusicFetch request failed', {
       spotifyUrl,

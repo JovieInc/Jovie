@@ -16,6 +16,7 @@ import {
 } from '@/lib/dsp-enrichment/providers/musicfetch';
 import { captureError } from '@/lib/error-tracking';
 import { isHandleUniqueViolation } from '@/lib/errors/onboarding';
+import { isMusicfetchVendorUnavailable } from '@/lib/musicfetch/errors';
 import {
   type ClaimedOnboardingState,
   deriveClaimedOnboardingStateFromMessageRows,
@@ -163,6 +164,9 @@ async function fetchMusicFetchProfile(
   try {
     return await fetchArtistBySpotifyUrl(state.artist.url);
   } catch (error) {
+    if (isMusicfetchVendorUnavailable(error)) {
+      return null;
+    }
     await captureError(
       'MusicFetch profile import failed during chat claim',
       error,

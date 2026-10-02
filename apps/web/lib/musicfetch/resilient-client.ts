@@ -1,13 +1,16 @@
 import 'server-only';
 
 import crypto from 'node:crypto';
-
+import { musicfetchCircuitBreaker } from '@/lib/discography/musicfetch-circuit-breaker';
 import { env } from '@/lib/env-server';
 import { reserveMusicfetchBudget } from '@/lib/musicfetch/budget-guard';
 import { createRateLimiter } from '@/lib/rate-limit/rate-limiter';
 import { getRedis } from '@/lib/redis';
 import { logger } from '@/lib/utils/logger';
-import { MusicfetchRequestError } from './errors';
+import {
+  MusicfetchRequestError,
+  MusicfetchVendorUnavailableError,
+} from './errors';
 
 const MUSICFETCH_API_BASE = 'https://api.musicfetch.io';
 const MAX_RETRY_ATTEMPTS = 3;
@@ -32,6 +35,20 @@ const requestRateLimiter = createRateLimiter({
 });
 
 const inFlightRequests = new Map<string, Promise<unknown>>();
+let loggedMusicfetchVendorUnavailable = false;
+
+function noteMusicfetchVendorUnavailable(status: number | undefined): void {
+  if (musicfetchCircuitBreaker.getState() !== 'OPEN') {
+    musicfetchCircuitBreaker.forceOpen();
+  }
+  if (loggedMusicfetchVendorUnavailable) return;
+  loggedMusicfetchVendorUnavailable = true;
+  logger.warn('MusicFetch vendor unavailable', {
+    failureClass: 'vendor_unavailable',
+    retryable: false,
+    status,
+  });
+}
 
 interface MusicfetchRequestOptions {
   timeoutMs: number;
@@ -191,6 +208,17 @@ async function handleHttpResponse<T>(
     return { result: (await response.json()) as T };
   }
 
+  if (response.status === 401 || response.status === 403) {
+    const errorBody = await response.text().catch(() => '');
+    const details = extractMusicfetchErrorDetail(errorBody);
+    noteMusicfetchVendorUnavailable(response.status);
+    throw new MusicfetchVendorUnavailableError(
+      'MusicFetch vendor unavailable',
+      response.status,
+      details
+    );
+  }
+
   const retryAfterSeconds = parseRetryAfterSeconds(
     response.headers.get('retry-after')
   );
@@ -218,6 +246,10 @@ async function requestWithRetries<T>(
   params: URLSearchParams,
   options: MusicfetchRequestOptions
 ): Promise<T> {
+  if (!musicfetchCircuitBreaker.canExecute()) {
+    throw new MusicfetchVendorUnavailableError('MusicFetch vendor unavailable');
+  }
+
   const token = env.MUSICFETCH_API_TOKEN;
   if (!token) {
     throw new MusicfetchRequestError('MusicFetch API token is not configured');
@@ -295,8 +327,10 @@ async function requestWithRetries<T>(
 
 export {
   isMusicfetchInvalidServicesError,
+  isMusicfetchVendorUnavailable,
   MusicfetchBudgetExceededError,
   MusicfetchRequestError,
+  MusicfetchVendorUnavailableError,
 } from './errors';
 
 export async function musicfetchRequest<T>(
