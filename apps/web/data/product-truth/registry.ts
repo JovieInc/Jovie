@@ -663,12 +663,22 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   PAID_WELCOME_EMAIL: { nonMarketing: 'transactional email kill switch' },
   MERCH_QA_GATE: { capabilityId: 'instant-merch' },
   AGENT_PROFILE_CREATE: { capabilityId: 'cli' },
+  CREATOR_FINANCE: {
+    nonMarketing: 'owner-only finance release gate; no public claim (JOV-4621)',
+  },
   NEW_RELEASE_PAGE: { nonMarketing: 'UI layout toggle' },
   CANVAS_GRAIN: { nonMarketing: 'UI visual treatment' },
   CYAN_FOCUS_GLOW: { nonMarketing: 'UI visual treatment' },
   CHAT_COMPOSER_V2: { nonMarketing: 'UI layout toggle' },
   MEMORY_STUDIO_SESSION_V0: { nonMarketing: 'internal memory loop' },
   YOUTUBE_THUMBNAILS_PASTE_GENERATE: { capabilityId: 'youtube-thumbnails' },
+  OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: {
+    nonMarketing: 'OAuth dynamic client registration kill switch',
+  },
+  CHATGPT_APP_DIRECTORY_MCP: {
+    nonMarketing:
+      'ChatGPT directory MCP kill switch; anonymous public artist reads; default off',
+  },
 } as const satisfies Readonly<Record<ProductFlagKey, FlagCapabilityBinding>>;
 
 /**

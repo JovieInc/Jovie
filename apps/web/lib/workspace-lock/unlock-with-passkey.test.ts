@@ -85,6 +85,15 @@ afterEach(() => {
 });
 
 describe('unlockWithPasskey', () => {
+  it('requires an existing credential for OAuth recovery without enrolling one', async () => {
+    client.listUserPasskeys.mockResolvedValue({ data: [], error: null });
+    await expect(
+      unlockWithPasskey({ allowEnrollment: false })
+    ).rejects.toMatchObject({ code: 'setup-required' });
+    expect(client.addPasskey).not.toHaveBeenCalled();
+    expect(client.signInPasskey).not.toHaveBeenCalled();
+  });
+
   it('signs in with the passkey and confirms the step-up receipt', async () => {
     await unlockWithPasskey();
 

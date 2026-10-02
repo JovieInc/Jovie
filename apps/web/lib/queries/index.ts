@@ -75,7 +75,6 @@ export {
   getCacheGeneration,
   getCacheScope,
   isShareableAcrossProfileSwitch,
-  registerIsolatedCacheSurface,
   resetCacheIsolationForTests,
   subscribeCacheFence,
   withCacheScope,

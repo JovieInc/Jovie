@@ -54,7 +54,14 @@ final class AppState {
   private let audienceHighlightsCache: AudienceHighlightsCache
   private let actionLoopCache: ActionLoopCache
   private let launchDate = Date()
-  private var loadingUserID: String?
+  private struct ProfileLoadAttempt {
+    let id = UUID()
+    let userID: String
+    let canContinue: () -> Bool
+  }
+
+  private let captureProfileLoadCurrentness: () -> (() -> Bool)
+  private var profileLoadAttempt: ProfileLoadAttempt?
   // Matches SplashView's cinematic entrance (JovieMotion.cinematicDuration)
   // so the primary logo reveal completes before the route crossfade starts.
   private let minimumSplashDuration = JovieMotion.cinematicDuration
@@ -68,7 +75,11 @@ final class AppState {
     pushNotifications: PushNotificationCoordinating? = nil,
     chatCache: ChatCache? = nil,
     audienceHighlightsCache: AudienceHighlightsCache? = nil,
-    actionLoopCache: ActionLoopCache? = nil
+    actionLoopCache: ActionLoopCache? = nil,
+    captureProfileLoadCurrentness: @escaping () -> (() -> Bool) = {
+      let ownership = NativeSessionTokenStore.captureSessionContext().ownership
+      return { NativeSessionTokenStore.canContinueProfileLoad(ownedBy: ownership) }
+    }
   ) {
     self.configuration = configuration
     self.launchMode = launchMode
@@ -79,6 +90,7 @@ final class AppState {
     self.chatCache = chatCache ?? ChatCache()
     self.audienceHighlightsCache = audienceHighlightsCache ?? AudienceHighlightsCache()
     self.actionLoopCache = actionLoopCache ?? ActionLoopCache()
+    self.captureProfileLoadCurrentness = captureProfileLoadCurrentness
   }
 
   func completeLaunch() async {
@@ -162,7 +174,8 @@ final class AppState {
   func handleSignedInUserChange(_ userID: String?) async {
     guard launchMode.usesLiveAuth, didInitializeAuth else { return }
 
-    if let userID, loadingUserID == userID {
+    if let userID, let attempt = profileLoadAttempt,
+       attempt.userID == userID, attempt.canContinue() {
       return
     }
 
@@ -174,7 +187,7 @@ final class AppState {
         await pushNotifications.deactivate()
       }
       Observability.clearUser()
-      loadingUserID = nil
+      profileLoadAttempt = nil
       route = .signedOut
       dashboardState = .idle
       isOffline = false
@@ -187,10 +200,14 @@ final class AppState {
     Task {
       await pushNotifications.activate()
     }
-    loadingUserID = userID
+    let attempt = ProfileLoadAttempt(
+      userID: userID,
+      canContinue: captureProfileLoadCurrentness()
+    )
+    profileLoadAttempt = attempt
     defer {
-      if loadingUserID == userID {
-        loadingUserID = nil
+      if profileLoadAttempt?.id == attempt.id {
+        profileLoadAttempt = nil
       }
     }
 
@@ -198,7 +215,7 @@ final class AppState {
     // users never wait on the network to see their dashboard. The network
     // revalidation below silently swaps in fresh data when it lands.
     let cachedSnapshot = await repository.cachedSnapshot(for: userID)
-    guard activeUserID == userID, loadingUserID == userID else { return }
+    guard isActive(attempt), attempt.canContinue() else { return }
 
     if let cachedSnapshot {
       apply(response: cachedSnapshot)
@@ -218,7 +235,7 @@ final class AppState {
 
     do {
       let result = try await repository.loadMe(for: userID)
-      guard activeUserID == userID, loadingUserID == userID else { return }
+      guard isActive(attempt), attempt.canContinue() else { return }
       isOffline = result.isStale
 
       switch result.response.state {
@@ -251,13 +268,15 @@ final class AppState {
         )
       }
     } catch {
-      guard activeUserID == userID, loadingUserID == userID else { return }
+      guard isActive(attempt) else { return }
 
       var didTransportFail = false
 
       if let error = error as? APIClientError {
         switch error {
         case .missingToken, .requestFailed(statusCode: 401):
+          // The client may already have cleared a genuinely expired session.
+          // Preserve terminal handling before the presentation ownership check.
           await handleExpiredSession()
           return
         case .transportFailed:
@@ -267,11 +286,16 @@ final class AppState {
         }
       }
 
+      guard attempt.canContinue() else { return }
       route = .ready
       dashboardState = .error("Couldn't load your profile.")
       isOffline = didTransportFail
       MobileAuthDiagnostics.record("mobile_me_error", detail: error.localizedDescription)
     }
+  }
+
+  private func isActive(_ attempt: ProfileLoadAttempt) -> Bool {
+    activeUserID == attempt.userID && profileLoadAttempt?.id == attempt.id
   }
 
   /// Maps a resolved profile response onto the navigation route and dashboard
@@ -334,7 +358,7 @@ final class AppState {
     let userID = activeUserID
     Observability.clearUser()
     activeUserID = nil
-    loadingUserID = nil
+    profileLoadAttempt = nil
     route = .signedOut
     dashboardState = .idle
     isOffline = false

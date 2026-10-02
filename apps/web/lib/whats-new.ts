@@ -58,7 +58,12 @@ export function projectWhatsNew(
       id: release.version,
       title: lead.title,
       date: release.date,
-      summary: release.summary || lead.summary,
+      // Daily sections choose the customer lead; a different story's digest
+      // blockquote must not become that lead's explanation.
+      summary:
+        release.kind === 'daily'
+          ? lead.summary
+          : release.summary || lead.summary,
       url: `${baseUrl}/changelog/${encodeURIComponent(release.version)}`,
       highlights: outcomes
         .slice(1, HIGHLIGHT_LIMIT + 1)

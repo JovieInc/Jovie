@@ -18,6 +18,10 @@ import {
   type DogfoodReceipt,
   evaluateDogfoodReliability,
 } from '@/lib/agent-os/dogfood-receipt';
+import {
+  computeFleetHardeningMetrics,
+  type FleetHardeningMetrics,
+} from '@/lib/agent-os/fleet-hardening';
 import { computeRatePercent } from '@/lib/analytics/metrics';
 
 export const CERTIFICATION_METRICS_CONTRACT =
@@ -202,6 +206,8 @@ export interface SignalHealthMetric {
 }
 
 export interface CertificationScopeMetrics {
+  /** Real CLI/MCP fleet quality, including friction and repair closure. */
+  readonly fleetHardening: FleetHardeningMetrics;
   /** Minutes where the only missing input was Tim. Down. */
   readonly founderBlockingMinutes: number;
   /** Taste Inbox cards reaching Tim after escalation, per day. Down. */
@@ -598,6 +604,7 @@ function computeScopeMetrics(
   const decisionBySubject = latestDecisionsBySubject(facts);
 
   return {
+    fleetHardening: computeFleetHardeningMetrics(facts.receipts),
     founderBlockingMinutes,
     founderCardsPerDay,
     silencePromotionRegretPer100,

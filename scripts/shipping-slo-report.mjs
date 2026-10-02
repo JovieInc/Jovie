@@ -30,6 +30,11 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  buildBlogPublishLatency,
+  findBlogQualificationRun,
+  isStrictBlogContentPr,
+} from './lib/blog-publish-latency.mjs';
+import {
   buildGistSloBlock,
   ciWalltimeByEvent,
   evaluateShippingSlo,
@@ -51,6 +56,10 @@ const BASELINE_PATH = resolve(
   'docs/metrics/shipping-slo-baseline.json'
 );
 const LATEST_PATH = resolve(REPO_ROOT, 'docs/metrics/shipping-slo-latest.json');
+const BLOG_LATENCY_PATH = resolve(
+  REPO_ROOT,
+  'docs/metrics/blog-publish-latency-latest.json'
+);
 const TIMELINE_PR_LIMIT = 80;
 const DEPLOYMENT_LIMIT = 60;
 
@@ -93,7 +102,7 @@ export function collectRaw({ workflows, days }) {
           'api',
           `repos/${ghRepo}/actions/workflows/${wf}/runs?created=>=${encodeURIComponent(sinceIso)}&${params}&per_page=100`,
           '--jq',
-          '.workflow_runs[] | {id, event, status, conclusion, head_branch, created_at, updated_at, run_attempt}',
+          '[.workflow_runs[] | {id, event, path, status, conclusion, head_branch, head_sha, created_at, updated_at, run_started_at, run_attempt, prNumbers: [(.pull_requests // [])[].number]}]',
         ]);
         const parsed = typeof page === 'string' ? JSON.parse(page) : page;
         const list = Array.isArray(parsed) ? parsed : [parsed];
@@ -118,7 +127,7 @@ export function collectRaw({ workflows, days }) {
       '--search',
       `merged:>=${sinceIso.slice(0, 10)}`,
       '--json',
-      'number,title,headRefName,createdAt,mergedAt,mergeCommit',
+      'number,title,headRefName,headRefOid,createdAt,mergedAt,mergeCommit',
       '--limit',
       '300',
     ]).map(pr => ({ ...pr, mergeCommitSha: pr.mergeCommit?.oid ?? null }));
@@ -155,6 +164,76 @@ export function collectRaw({ workflows, days }) {
       );
     } catch {
       // Timeline is best-effort; missing PRs just reduce queue sample size.
+    }
+
+    try {
+      pr.files = gh([
+        'api',
+        `repos/${ghRepo}/pulls/${pr.number}/files?per_page=100`,
+        '--paginate',
+        '--slurp',
+        '--jq',
+        '[.[][] | {filename, status, previousFilename: .previous_filename}]',
+      ]);
+    } catch {
+      pr.files = null;
+    }
+    if (!isStrictBlogContentPr(pr)) continue;
+
+    try {
+      const commit = gh([
+        'api',
+        `repos/${ghRepo}/commits/${pr.headRefOid}`,
+        '--jq',
+        '{committedAt: .commit.committer.date}',
+      ]);
+      pr.candidateCreatedAt = commit.committedAt ?? null;
+    } catch {
+      pr.candidateCreatedAt = null;
+    }
+
+    const run = findBlogQualificationRun(
+      [...runs.pull_request, ...runs.merge_group],
+      pr
+    );
+    if (run) {
+      try {
+        const jobs = gh([
+          'api',
+          `repos/${ghRepo}/actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`,
+          '--paginate',
+          '--slurp',
+          '--jq',
+          '[.[].jobs[] | select(.name == "Blog Content Qualification") | {conclusion, startedAt: .started_at, completedAt: .completed_at}]',
+        ]);
+        const job = jobs.find(candidate => candidate.conclusion === 'success');
+        pr.blogQualificationConfirmedAbsent =
+          run.conclusion === 'success' &&
+          jobs.every(candidate => candidate.conclusion === 'skipped');
+        if (job) {
+          pr.blogQualification = {
+            ...job,
+            retries: Math.max(0, Number(run.run_attempt) - 1),
+            runnerSeconds:
+              (Date.parse(job.completedAt) - Date.parse(job.startedAt)) / 1000,
+            buildSeconds: null,
+          };
+        }
+      } catch {
+        // Missing evidence stays unknown, including an unreadable job page.
+      }
+    }
+
+    try {
+      const checks = gh([
+        'api',
+        `repos/${ghRepo}/commits/${pr.mergeCommitSha}/check-runs?per_page=100`,
+        '--jq',
+        '[.check_runs[] | select(.name == "Production Verified" and .conclusion == "success") | .completed_at]',
+      ]);
+      pr.productionVerifiedAt = checks.filter(Boolean).toSorted()[0] ?? null;
+    } catch {
+      pr.productionVerifiedAt = null;
     }
   }
 
@@ -249,6 +328,7 @@ export function buildReport(raw, baseline, { now = Date.now() } = {}) {
         Boolean(p.mergeCommitSha && verifiedSha.has(p.mergeCommitSha)),
     }),
   };
+  const blogPublishLatency = buildBlogPublishLatency(raw);
 
   // Top offenders for regression-issue bodies: slowest PRs by lead time and
   // slowest successful gate runs in the window.
@@ -288,6 +368,7 @@ export function buildReport(raw, baseline, { now = Date.now() } = {}) {
     generatedAt: new Date(nowMs).toISOString(),
     windowDays: 7,
     metrics,
+    blogPublishLatency,
     flat,
     evaluation: {
       regressions: evaluation.regressions,
@@ -303,6 +384,7 @@ export function buildReport(raw, baseline, { now = Date.now() } = {}) {
       mergedPrs: merged.length,
       timelines: Object.keys(raw.timelines ?? {}).length,
       deployments: (raw.deployments ?? []).length,
+      blogContentPrs: blogPublishLatency.sampleCount,
     },
     offenders: { slowestPrs: leadTimeRows, slowestCiRuns: slowRuns },
   };
@@ -349,6 +431,11 @@ export function markdownSummary(report) {
       `WoW growth ${t.wowGrowth === null ? 'n/a' : `${(t.wowGrowth * 100).toFixed(1)}%`} ` +
       `(target +8%) · trend ${t.growthTrend ?? 'unknown'}`,
     `**Queue ejection rate:** ${report.metrics.mergeQueue?.ejectionRate === null || report.metrics.mergeQueue?.ejectionRate === undefined ? 'n/a' : (report.metrics.mergeQueue.ejectionRate * 100).toFixed(1) + '%'}`
+  );
+  const blog = report.blogPublishLatency;
+  lines.push(
+    '',
+    `**Blog publish latency:** legacy n=${blog.cohorts.legacy.sampleCount}, content-only n=${blog.cohorts.contentOnly.sampleCount}; no SLA or improvement claim is emitted without complete samples in both cohorts.`
   );
   const regs = report.evaluation?.regressions ?? [];
   if (regs.length) {
@@ -463,8 +550,13 @@ function main() {
     );
   }
 
-  if (hasArg(args, '--write-latest'))
+  if (hasArg(args, '--write-latest')) {
     writeFileSync(LATEST_PATH, `${JSON.stringify(report.gistSlo, null, 2)}\n`);
+    writeFileSync(
+      BLOG_LATENCY_PATH,
+      `${JSON.stringify(report.blogPublishLatency, null, 2)}\n`
+    );
+  }
 
   const jsonOut = argValue(args, '--json', null);
   if (jsonOut) writeFileSync(jsonOut, `${JSON.stringify(report, null, 2)}\n`);

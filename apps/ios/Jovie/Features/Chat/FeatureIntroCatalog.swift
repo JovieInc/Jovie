@@ -56,7 +56,7 @@ struct FeatureIntroCatalog: Equatable, Sendable {
       ),
       FeatureIntroBullet(
         id: "one-shell",
-        text: "Library, Calendar, and Inbox stay together.",
+        text: "Work, Calendar, and Inbox stay together.",
         accent: .blue
       ),
       FeatureIntroBullet(

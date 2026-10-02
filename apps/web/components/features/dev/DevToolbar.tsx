@@ -274,6 +274,18 @@ export function DevToolbar({
   const [mounted, setMounted] = useState(false);
   const [search, setSearch] = useState('');
   const [copiedField, setCopiedField] = useState<'sha' | 'route' | null>(null);
+  const clipboardMountedRef = useRef(false);
+  const clipboardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    clipboardMountedRef.current = true;
+    return () => {
+      clipboardMountedRef.current = false;
+      if (clipboardTimerRef.current !== null) {
+        clearTimeout(clipboardTimerRef.current);
+        clipboardTimerRef.current = null;
+      }
+    };
+  }, []);
   const [syncClerkState, setSyncClerkState] = useState<
     'idle' | 'loading' | 'done' | 'noop' | 'error'
   >('idle');
@@ -654,8 +666,15 @@ export function DevToolbar({
   async function copyToClipboard(text: string, field: 'sha' | 'route') {
     try {
       await navigator.clipboard.writeText(text);
+      if (!clipboardMountedRef.current) return;
+      if (clipboardTimerRef.current !== null) {
+        clearTimeout(clipboardTimerRef.current);
+      }
       setCopiedField(field);
-      setTimeout(() => setCopiedField(null), 1500);
+      clipboardTimerRef.current = setTimeout(() => {
+        clipboardTimerRef.current = null;
+        setCopiedField(null);
+      }, 1500);
     } catch {
       // Clipboard not available — fail silently
     }

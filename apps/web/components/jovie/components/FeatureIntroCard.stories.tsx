@@ -29,7 +29,7 @@ const whatsNewPresentation = {
       kind: 'bullet',
       bullet: {
         id: '26.8.1:added:1',
-        text: 'Library, calendar, and inbox stay together.',
+        text: 'Work, calendar, and inbox stay together.',
         accent: 'blue',
       },
     },

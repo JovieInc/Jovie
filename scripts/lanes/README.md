@@ -16,13 +16,14 @@ The harness, not the model, owns:
 | Claim (serialised, `flock`), one PR per issue across hosts (GitHub is the truth), priority aging after each 24h wait | `worker()`, `pick_issue()`, `in_flight_issues()` |
 | One open PR per issue: branch or `linear-issue-id` marker; an unreadable PR list claims nothing | `in_flight_issues()` |
 | Open-PR budget: a lane holding `slots × 2` open non-green PRs only fixes/adopts until it drains | `over_budget()` |
-| Sweep (every 30 min per lane): close duplicate PRs as superseded, close drafts with no green run and no push for 24 h, issue back to Todo | `sweep_lane_prs()` |
+| Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
 | Lockfile-only conflicts: merge main, take its `pnpm-lock.yaml`, `pnpm install --lockfile-only`, push; no model, no force-push | `resolve_lockfile_conflict()` |
 | Slot locks that die with their holder | `Locked` |
 | Fresh worktree from `origin/main`, shared-store hardlink install, removal after | `run_issue()` |
 | GBrain context pack in the prompt, plus the repo contract | `context_pack()`, `render_prompt()` |
 | Independent verification: diff rules, then the repo's own `pre-push-gate.sh affected` | `gate_pr()` |
 | Gate seats (`LANES_GATE_SLOTS`, default 2 per host) and streamed gate logs | `gate_slot()`, `sh(stream=True)` |
+| Host-local exact-head gate reservation before adoption setup or original verification; claims are never proof | `reserve_gate()`, `claim_adoptable_pr()`, `gate_pr()` |
 | Gate timeouts are transient: re-gated by adopt, held only after 3 on one head | `gate_timeouts()` |
 | Landing: only a gate-passing PR is marked ready and auto-merged; CI and the queue decide | `gate_pr()`, `requeue_verified()` |
 | Receipts (`runs/ledger.jsonl`) bind Linear issue, provider/account class and lease, worktree/branch, PR/head or terminal failure; per-run log and prompt, Linear handoff comments | `run_issue()`, `codex_lane.record_lease()`, `worker()` |
@@ -31,7 +32,7 @@ The harness, not the model, owns:
 | Event queue: GitHub signals become `lane-fix-<kind>` labels; a worker takes a labeled PR first | `pr_events.py`, `lane-fix-relay.yml` |
 | Cheapest lane first: attempt n belongs to the n-th enabled lane in `providers.json` order | `pr_events.may_take()` |
 | Ready on green: a CLEAN lane draft gets `gh pr ready` plus its merge intent in one writer action | `pr_events.ready_green()` |
-| Disabled-lane drafts: closed when superseded or done, else adopted; closed and the issue returned to Todo once their fix attempts run out | `pr_events.retire_orphan()`, `return_to_pool()` |
+| Disabled-lane drafts: adopted for bounded repair; provider state, issue completion and exhausted attempts never authorize closing unlabelled work | `pr_events.retire_orphan()`, `return_to_pool()` |
 | Held and failed records carry `reason` + `next_action`; the status feed publishes `held_by_reason` | `pr_events.held_reason()`, `doctor.status_feed()` |
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
 | Disk admission on the tick and before installs: critical (at or below 5%) or unknown free space blocks work. Only a worker holding a slot may sweep under 15%, under one host-wide cleanup lock; cleanup preserves the shared pnpm store, unrelated checkouts and cancelled repair source | `disk_guard.py`, `dispatch()`, `worker()` |
@@ -40,10 +41,55 @@ The harness, not the model, owns:
 | Provider throughput: matched-work offers, accepts, starts, productive/PR/first-pass rates, remediation, issue→PR→merge time, landed output, idle qualified capacity and failure reasons; landed attribution comes from receipts, never a branch prefix | `provider_throughput()`, `doctor.status_feed()`, `hud.py` |
 | Provider failover: a lane that exits non-zero mid-issue (every account spent, auth, crash) hands the same worktree to the next enabled, healthy, uncooled lane, up to 2 handoffs; the receipt records `handoffs` and `finishedBy` | `run_issue()`, `next_provider()` |
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
+| Stop revokes publication: a kill writes `runs/publication-revocations.jsonl` before the kill is acked, and every irreversible boundary (push, PR open, label, enqueue) revalidates it — revoked branches never ship (JOV-5060) | `run_agent(on_kill=)`, `revoke_publication()`, `require_publishable()` |
 
 Event-driven: a worker that finishes re-execs the current release and pulls the next
 issue. The minute timer only restarts idle lanes and applies updates; it never signals a
 running worker. Production deploys are a separate track: only a red main stops shipping.
+
+New-issue admission reports three separate counts: raw Todo candidates, candidates
+passing the issue predicate, and new issues after the owning lane's PR budget.
+Worker and doctor share the same budget decision: each dated lane branch counts
+once while non-green, with a cap of effective slots × 2. Manual branches and
+disabled-lane orphan maintenance do not inflate that lane's budget. A failed,
+malformed or truncation-ambiguous inventory stays unknown and cannot admit new
+issues. Maintenance claims still run first and do not depend on that budget read.
+HUD labels this count as new issues; it is not total company demand or a claim of
+available worker capacity. Slot occupancy, account leases and PR work remain
+separate facts. Empty-demand alerts require known zero eligibility and no open
+PR maintenance; unknown evidence and backpressure reset the empty timer.
+
+Account attribution uses the existing status rows without changing account
+admission. Lease occupancy and cooldown are independent; an account can be both
+leased and in a recorded hold. The existing available flag means eligible under
+cooldown policy, not a fresh positive quota reading. An empty unleased-available
+list does not mean all quotas are exhausted. Usage-limit, auth, rate and unknown
+holds remain distinct, and stale or incomplete rows report unknown.
+
+Gate reservations use kernel locks for the PR number and head SHA. An adopter carries
+its reservation through checkout, install, checks and terminal receipt publication;
+another contender skips that head without taking a heavy seat or charging an issue
+retry. A small gate-command process inherits the reservation and seat, retaining them
+across worker death even when command wrappers close inherited descriptors. It reuses
+the existing provider process observer to drain observed descendants on completion or
+timeout. If cleanup cannot be proven, it retains the locks and logs an operator boundary.
+As with the existing observer, a child daemonizing before its first observation cannot
+be recovered from process metadata. Lock files must not be unlinked as stale cleanup.
+
+`verified.json` holds atomic terminal gate results under `PR:SHA` keys, bound to the
+gate policy digest and sensitive-review mode. Legacy SHA strings were claim markers,
+not certification, and are ignored. Failed setup and transient timeouts remain
+retryable; legacy held records, active repairs and spent generations retain their
+existing dispositions without being converted into certification. A changed or
+unreadable remote/local head cannot publish proof; enqueue requests bind the expected
+head with `--match-head-commit`. A reused terminal result is reported as
+`gate-already-completed`, not another landing.
+
+This reservation is host-local. It does not replace the cross-host claim policy or
+JOV-5257 admission serialization. During a drain-safe release update, old workers
+still run their old code; runtime singleflight is proven only after those workers
+and their gate descendants have naturally drained. Never kill or reset their work
+to make an activation claim.
 
 ## Event queue (JOV-6672)
 
@@ -66,18 +112,18 @@ Gaps closed after the first week (no PR may sit unowned):
   Once per stuck episode; a second removal goes to a model with the merge group's failing log.
 - Every 30 minutes the tick reconciles all open PRs in a few GraphQL pages (missed events
   only): DIRTY gets `conflict`, a red rollup gets `red`, a CLEAN lane draft gets `green`, a lane
-  draft idle for 48h gets `stale` (or is closed when superseded or out of attempts, its issue
-  back to Todo), and a PR that went CLEAN or entered the queue starts a fresh episode.
+  draft idle for 48h gets `stale`; exhausted attempts retain a bounded repair disposition, and a PR that went CLEAN or entered the queue starts a fresh episode.
 - Age SLOs are per class (JOV-7079): queued/ready PRs live on the merge queue's clock, lane
   drafts on the 48h idle `stale` SLO, and non-lane agent drafts (`codex/…`, `tim/…`, `devin/…`,
-  etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). An aged-out agent
-  draft is closed as abandoned — unless its body names a still-open dependency
-  ("blocked by #n", "pull/n"), in which case it holds as `hold:dependency` and is revalidated
-  every sweep: the note is never authoritative once the dependency lands or closes. A human's
-  branch is never touched.
+  etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). Stalled agent
+  drafts receive `repair`, or `hold:dependency` while a named dependency is open.
+  A landed dependency releases repair; it never grants authority to discard the branch.
+  JOV-INV-011 requires an explicit `duplicate` label before automatic retirement. Every
+  close path re-reads the live source head, state, complete labels, fork and queue status;
+  revoked authority, holds, head movement and unreadable evidence preserve the PR.
 - Every open PR also gets one truthful disposition in `reconcile.json` (`dispositions`,
   oldest first: `advancing`, `queued`, `ready`, `hold:<reason>`, `hold:dependency`,
-  `closing`, `draft`, `orphaned`), and the doctor raises `aged-prs` for anything open past
+  `closing`, `repair`, `draft`, `orphaned`), and the doctor raises `aged-prs` for anything open past
   7 days that is still undecided — `hold:*` dispositions are already deliberate parks and
   stay named in `oldest_prs` — so the shipping cockpit always names the oldest open PRs
   and why they are still open.
@@ -177,6 +223,11 @@ git clone https://github.com/JovieInc/Jovie.git ~/devin-sweep/Jovie
 LANES_REPO=~/devin-sweep/Jovie scripts/lanes/install.sh
 ```
 
+Select the repository's pinned Node in the installing shell first. The installer
+puts that Node directory first in the timer PATH on both Linux and macOS.
+After changing the host's Node installation, rerun the installer so the timer
+does not retain a removed runtime directory.
+
 Per-host knobs: `LANES_SLOTS_<PROVIDER>`, `LANES_LINEAR_ENV`, `LANES_AGENT_TIMEOUT_S`,
 `LANES_GATE_TIMEOUT_S`, `LANES_GATE_SLOTS`. A host-specific GitHub token in
 `~/.config/jovie-lanes/github.env` (`GH_TOKEN=...`) gives that host its own API budget.
@@ -184,6 +235,49 @@ State and receipts live under `~/.local/state/jovie-lanes`. Every gated run reco
 `gateWaitS` (seconds queued for a gate seat) on its receipt; the doctor aggregates
 `gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
 second host is decided on measured queue time, not on timeouts alone.
+
+## Preserved repairs (JOV-7347)
+
+Repair retries reuse a registered preserved checkout only after its ended run,
+execution identity, current target head, ancestry and idle process state agree.
+The existing coordinator still enforces the live lease and original retry budget;
+changing check failures does not grant a fresh budget. A host-local PR lock spans
+failure identities. Unverifiable or superseded work emits a recovery handoff.
+Damaged markers matched to the requested target still require a handoff;
+unidentified markers are logged for host reconciliation without blocking unrelated
+targets. Completed recovery clears its marker and checkout only when the source
+is clean, matches the verified remote head, and has no live working directory.
+Unpublished edits, unreadable evidence, and failed cleanup retain protection.
+Preserved issue implementations require execution reconciliation and remain on
+Backlog with their source and accountable issue reference intact.
+
+The runner tracks observed descendants by PID and start time across detached
+sessions, cleans them up on completion/cancellation, and never kills by pathname.
+A child that fully daemonizes before its first snapshot cannot be attributed this
+way; preserved-work admission therefore also checks live working directories.
+Cleanup retains protected, dirty or unreadable source. Installed-runtime evidence
+is required before calling this commissioned.
+
+## Context receipts
+
+The existing spawn preflight checks `context-manifest.json` before issue,
+handoff, repair, and sensitive-review agent execution. Regenerate the checked-in
+contract with `python3 scripts/lanes/lane_runner.py context-manifest --write`;
+omit `--write` to check it without credentials or network calls.
+
+Each local prompt has a `.context.json` sidecar binding its exact UTF-8 bytes,
+provider, contract, and source inputs by SHA-256. Missing GBrain context is
+explicitly marked unavailable. The contract hash uses canonical JSON; repository
+formatting changes do not count as drift. New contract drift, input mismatch and
+sidecar-write failures emit `jovie-lane-context-qualification/v1` findings without
+stopping the agent. Existing prompt-write, spend, security and authorization
+failures remain blocking. Failed sidecars have no asserted path or digest in the
+run receipt; findings also go to stderr for review-only calls.
+H-EX-02 remains partial until the ship cohort and staged promotion required by
+`canon/ENGINEERING.md` are verified; no promotion threshold is implied.
+Repository documents remain on-demand references; the receipt does not claim they were injected or read. Private issue
+and retrieved text remain in the existing local prompt, not the checked-in
+contract or hash-only sidecar.
 
 ## Tests
 
@@ -194,3 +288,46 @@ python3 -m unittest scripts/tests/test_lane_runner.py scripts/tests/test_codex_l
 ```
 
 The same files run inside `update()` before a release is installed anywhere.
+
+### Production continuity clock (JOV-6909)
+
+Gem's existing minute tick checks the fixed `production-continuity.yml` workflow
+at most once every five minutes. When its latest invocation is overdue and no
+active run is observed, it requests that existing workflow on `main`. A separate
+in-progress lookup catches runs outside the recent 30-run window; the workflow's
+existing concurrency group serializes a race with GitHub's native schedule.
+Only the hosted workflow performs probes, check-ins, alerts and recovery ingress.
+A `dispatch-requested` receipt is not a successful probe or restored service.
+
+The adapter runs even when disk admission prevents worker launches. Mac hosts
+return `not-owner`. A host-local file lock prevents overlapping ticks, atomic
+state records the budget before network calls, and an uncertain POST backs off
+15 minutes. Unreadable state and API errors never reset that budget or invent a
+successful observation. Inspect `continuity-clock.json` and `tick.json` in the
+existing lane state directory; the Sentry deadman remains authoritative when
+there are no accepted observations. There are no new credentials or timers.
+
+Adopt-first decision: **compose** the existing Gem/systemd clock, GitHub Actions
+workflow and Sentry monitor. Native schedule alone repeatedly omitted hours of
+invocations while delivered probes succeeded (run 36829224204; Sentry issue
+7750181397). GitHub documents that scheduled runs can be delayed or dropped:
+https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule
+That is a possible mechanism, not a proved cause for this incident. Webhooks,
+inline work and lazy evaluation cannot themselves observe absence of invocation.
+A new scheduler adds an owner and credential boundary without filling a gap that
+Gem's existing tick cannot cover. All components remain in the current operating
+and credential boundary; no new dependency or license is introduced. Removal is
+one adapter call after an alternative clock proves the same external liveness.
+
+Budget: at most 288 recent-run reads plus 288 active-run reads and 288 dispatches
+per day under continuous native-schedule absence (at most 25,920 API calls per
+30 days). Healthy native cadence normally skips the second read and POST. Each
+child has a 10-second timeout; an overdue attempt is bounded to 30 seconds of
+network subprocess time. Hosted run costs retain the existing five-minute probe
+cadence; a schedule race may enqueue one additional serialized invocation.
+
+Ship now: bounded missing-invocation recovery through the existing clock.
+Re-evaluate when observed dispatches and real workflow/check-in receipts prove
+recurrence, or native scheduling reliably supplies the cadence again. Then:
+remove unnecessary recovery calls while retaining the independent deadman.
+JOV-6909 remains commissioning until recurrence is observed after deployment.

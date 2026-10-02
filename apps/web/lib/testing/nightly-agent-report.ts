@@ -161,7 +161,20 @@ export function buildNightlyAgentStatusFromSkillDelta(
       }
     : undefined;
 
-  const pass = laneFailures === 0 && failureCount === 0;
+  const workflowPassed =
+    options.workflowConclusion === undefined ||
+    options.workflowConclusion === 'success';
+  const hasExecutedEvidence =
+    options.suites.some(suite => suite.passed > 0 || suite.failed > 0) ||
+    (mutation?.killed ?? 0) +
+      (mutation?.survived ?? 0) +
+      (mutation?.timedOut ?? 0) >
+      0;
+  const pass =
+    workflowPassed &&
+    hasExecutedEvidence &&
+    laneFailures === 0 &&
+    failureCount === 0;
 
   return {
     generatedAt: skillDelta.generatedAt,

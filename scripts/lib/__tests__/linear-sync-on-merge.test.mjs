@@ -119,6 +119,8 @@ describe('linear sync on merge', () => {
           PR_NUMBER: '19587',
           PR_URL: MERGE_URL,
           HEAD_REF: 'codex/jov-7227-repair',
+          PR_BODY:
+            'Refs JOV-7227.\n\n<!-- linear-issue-id:uuid -->\n<!-- linear-issue-identifier:JOV-7227 -->',
           MERGE_SHA,
         },
         log: () => {},
@@ -313,6 +315,32 @@ describe('linear sync on merge', () => {
     expect(decision.comment).toBe(
       'PR merged for JOV-6586: https://github.com/JovieInc/Jovie/pull/18293 (merge SHA: terminal-sha)'
     );
+  });
+
+  it('keeps an escaped defect open for exact-build product and detector proof', () => {
+    const decision = decideLinearCloseOnMerge({
+      issue: {
+        id: 'issue-7200',
+        identifier: 'JOV-7200',
+        labels: ['escaped-defect'],
+        description: 'The product fix merged, but no deployment proof exists.',
+        comments: [],
+        children: [],
+        hasChildren: false,
+      },
+      pullRequests: [],
+      mergingPull: {
+        number: 19000,
+        url: 'https://github.com/JovieInc/Jovie/pull/19000',
+        sha: 'merged-is-not-deployed',
+      },
+    });
+
+    expect(decision.action).toBe('skip');
+    expect(decision.blockingNumbers).toEqual([]);
+    expect(decision.comment).toContain('Escaped defects stay open at merge');
+    expect(decision.comment).toContain('Closure evidence is incomplete');
+    expect(decision.comment).toContain('escaped-defect-closure:v1');
   });
 
   it('does not close commissioning parent JOV-5853 when a child pull request merges', () => {

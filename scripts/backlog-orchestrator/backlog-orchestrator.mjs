@@ -49,8 +49,12 @@ import * as reporter from './reporter.mjs';
 import * as researchGate from './research-gate.mjs';
 import * as runtimeState from './runtime-state.mjs';
 import * as scorer from './scorer.mjs';
-import { gateShippingLeadRequest } from './shipping-lead-gate.mjs';
+import {
+  gateShippingLeadRequest,
+  materializeReviewedPlanAdmission,
+} from './shipping-lead-gate.mjs';
 import * as staleLeaseGuard from './stale-lease-guard.mjs';
+import { shippingTaskProfile } from './summer-shipping-lead-contract.mjs';
 import {
   buildRoutingReceipt,
   readCodexRotateCapacity,
@@ -908,11 +912,23 @@ async function evaluateGateCandidate(
 
 /** Existing single-issue pipeline; no pool sweep, stale-lease recovery, or new controller. */
 export async function admitShippingLeadRequest(task, options = {}) {
+  const profile = shippingTaskProfile(task);
+  const team = TEAM_CONFIGS.find(
+    candidate => candidate.key === profile?.teamKey
+  );
   return gateShippingLeadRequest(task, {
     client: linear,
     preflight: admissionPreflight,
-    evaluate: evaluateGateCandidate,
-    team: TEAM_CONFIGS.find(team => team.key === 'JOV'),
+    evaluate: profile?.approvalOnly
+      ? (_team, issue, _dryRun, _preflight, _staleLeaseRecovery, gate) =>
+          materializeReviewedPlanAdmission({
+            task,
+            issue,
+            client: gate.client,
+            teamId: team?.id || null,
+          })
+      : evaluateGateCandidate,
+    team,
     ...options,
   });
 }

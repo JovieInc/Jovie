@@ -11,20 +11,28 @@ export const DESKTOP_UPDATE_COPY = {
       `Downloading ${Math.round(percent)}%`,
   },
   modal: {
-    title: (version: string) => `Jovie ${version} is available`,
-    downloadingTitle: 'Downloading update',
-    readyTitle: 'Update ready to install',
-    errorTitle: 'Update failed',
-    notesHeading: 'What is new',
-    notesFallbackLabel: 'Read the release notes',
-    downloadAction: 'Download',
-    restartAction: 'Restart to update',
-    retryAction: 'Retry',
-    laterAction: 'Later',
-    progressLabel: 'Download progress',
-    errorDescription:
-      'The update could not be downloaded. Check your connection and try again.',
+    availableTitle: (version: string) => `Jovie ${version} Is Available`,
+    downloadingTitle: (version: string | null) =>
+      version ? `Downloading Jovie ${version}` : 'Downloading Update',
+    readyTitle: (version: string) => `Jovie ${version} Is Ready`,
+    errorTitle: 'Update Did Not Download',
+    released: (date: string) => `Released ${date}`,
+    downloadingDescription: 'Keep working. Jovie tells you when it is ready.',
+    // ShipIt aborts the install if Jovie is reopened mid-swap (2026-09-29).
     readyDescription:
-      'The update is downloaded. Restart Jovie to finish installing it.',
+      'Jovie closes, installs and reopens by itself. This can take a minute, so do not reopen it.',
+    errorDescription: 'Check your connection and try again.',
+    errorFinalDescription:
+      'Download the latest version from jov.ie/download to update.',
+    notesHeading: "What's New",
+    notesFallbackLabel: 'Read the Release Notes',
+    downloadAction: 'Download',
+    restartAction: 'Restart To Update',
+    retryAction: 'Try Again',
+    laterAction: 'Later',
+    hideAction: 'Hide',
+    progressLabel: 'Download Progress',
+    transferred: (done: string, total: string) => `${done} of ${total}`,
+    speed: (rate: string) => `${rate}/s`,
   },
 } as const;

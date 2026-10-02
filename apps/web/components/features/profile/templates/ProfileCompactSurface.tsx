@@ -74,18 +74,25 @@ import type { PressPhoto } from '@/types/press-photos';
 import type { NotificationSourceContext } from '../artist-notifications-cta/types';
 import { useProfileMobileOverflow } from './useProfileMobileOverflow';
 
-const ProfileUnifiedDrawer = dynamic(() =>
-  import('@/features/profile/ProfileUnifiedDrawer').then(mod => ({
-    default: mod.ProfileUnifiedDrawer,
-  }))
+// Optional overlays must suspend locally. A late visitor assignment can mount
+// their lazy modules after the profile is visible; without a local fallback,
+// the page-level loading boundary hides the artist and navigation together.
+const ProfileUnifiedDrawer = dynamic(
+  () =>
+    import('@/features/profile/ProfileUnifiedDrawer').then(mod => ({
+      default: mod.ProfileUnifiedDrawer,
+    })),
+  { loading: () => null }
 );
 
-const ProfileInlineNotificationsCTA = dynamic(() =>
-  import(
-    '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
-  ).then(mod => ({
-    default: mod.ProfileInlineNotificationsCTA,
-  }))
+const ProfileInlineNotificationsCTA = dynamic(
+  () =>
+    import(
+      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
+    ).then(mod => ({
+      default: mod.ProfileInlineNotificationsCTA,
+    })),
+  { loading: () => null }
 );
 
 const DEFAULT_CONTENT_PREFS: Record<NotificationContentType, boolean> = {
@@ -746,7 +753,11 @@ export function ProfileCompactSurface({
 
           <div
             className={cn(
-              'profile-content-scroll-region overflow-y-auto overscroll-contain',
+              // md+ the document scrolls (globals.css unlock), so the pane
+              // must chain overscroll to the page; contain trapped the wheel
+              // at the pane's edges (JOV-7412). Mobile keeps contain — the
+              // document is locked there anyway.
+              'profile-content-scroll-region overflow-y-auto overscroll-contain md:overscroll-auto',
               // Home and Music bleed this scrollport to the shell edge. With
               // overflow-y-auto, overflow-x computes to auto (CSS Overflow 3),
               // so the region clips at its own padding box. The parent column

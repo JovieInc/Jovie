@@ -88,7 +88,12 @@ export interface SmartLinkCreditEntry {
   role: SmartLinkCreditRole;
   position: number;
   spotifyId?: string | null;
+  appleMusicId?: string | null;
+  musicbrainzId?: string | null;
+  deezerId?: string | null;
   isPrimary?: boolean;
+  sourceType?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface SmartLinkCreditGroup {
@@ -106,7 +111,12 @@ export function groupReleaseCredits(
     role: ArtistRole;
     position: number;
     spotifyId?: string | null;
+    appleMusicId?: string | null;
+    musicbrainzId?: string | null;
+    deezerId?: string | null;
     isPrimary?: boolean;
+    sourceType?: string | null;
+    metadata?: Record<string, unknown> | null;
   }>
 ): SmartLinkCreditGroup[] {
   const groups = new Map<SmartLinkCreditRole, SmartLinkCreditEntry[]>();
@@ -141,7 +151,12 @@ export function groupReleaseCredits(
       role,
       position: row.position,
       spotifyId: row.spotifyId ?? null,
+      appleMusicId: row.appleMusicId ?? null,
+      musicbrainzId: row.musicbrainzId ?? null,
+      deezerId: row.deezerId ?? null,
       isPrimary: row.isPrimary ?? role === 'main_artist',
+      sourceType: row.sourceType ?? null,
+      metadata: row.metadata ?? null,
     });
     groups.set(role, entries);
   }
@@ -164,11 +179,16 @@ function flattenCreditGroups(
     group.entries.map(entry => ({
       artistId: entry.artistId,
       spotifyId: entry.spotifyId ?? null,
+      appleMusicId: entry.appleMusicId ?? null,
+      musicbrainzId: entry.musicbrainzId ?? null,
+      deezerId: entry.deezerId ?? null,
       name: entry.name,
       handle: entry.handle,
       role: group.role,
       position: entry.position,
       isPrimary: entry.isPrimary ?? group.role === 'main_artist',
+      sourceType: entry.sourceType ?? null,
+      metadata: entry.metadata ?? null,
     }))
   );
 }
@@ -177,13 +197,20 @@ function toSmartLinkPrimaryEntries(
   credits: readonly CanonicalReleaseCredit[]
 ): SmartLinkCreditEntry[] {
   return credits.map(credit => ({
-    artistId: credit.artistId ?? `provider:${credit.spotifyId ?? credit.name}`,
+    artistId:
+      credit.artistId ??
+      `provider:${credit.spotifyId ?? credit.appleMusicId ?? credit.musicbrainzId ?? credit.deezerId ?? credit.name}`,
     name: credit.name,
     handle: credit.handle,
     role: 'main_artist',
     position: credit.position,
     spotifyId: credit.spotifyId ?? null,
+    appleMusicId: credit.appleMusicId ?? null,
+    musicbrainzId: credit.musicbrainzId ?? null,
+    deezerId: credit.deezerId ?? null,
     isPrimary: true,
+    sourceType: credit.sourceType ?? null,
+    metadata: credit.metadata ?? null,
   }));
 }
 
@@ -255,7 +282,12 @@ async function fetchReleaseCredits(
       role: releaseArtists.role,
       position: releaseArtists.position,
       spotifyId: artists.spotifyId,
+      appleMusicId: artists.appleMusicId,
+      musicbrainzId: artists.musicbrainzId,
+      deezerId: artists.deezerId,
       isPrimary: releaseArtists.isPrimary,
+      sourceType: releaseArtists.sourceType,
+      metadata: releaseArtists.metadata,
     })
     .from(releaseArtists)
     .innerJoin(artists, eq(releaseArtists.artistId, artists.id))
@@ -278,7 +310,12 @@ async function fetchRecordingCredits(
       role: recordingArtists.role,
       position: recordingArtists.position,
       spotifyId: artists.spotifyId,
+      appleMusicId: artists.appleMusicId,
+      musicbrainzId: artists.musicbrainzId,
+      deezerId: artists.deezerId,
       isPrimary: recordingArtists.isPrimary,
+      sourceType: recordingArtists.sourceType,
+      metadata: recordingArtists.metadata,
     })
     .from(recordingArtists)
     .innerJoin(artists, eq(recordingArtists.artistId, artists.id))
@@ -377,6 +414,56 @@ export interface CachedContentData {
  */
 const fetchCreatorByUsername = async (usernameNormalized: string) => {
   return await withRetry(async () => {
+    // Columns added after the oldest supported creator_profiles schema.
+    // Gate each on information_schema so environments that predate their
+    // migration don't fail with 42703 ("Failed query: ... does not exist")
+    // (JOV-4394). doesColumnExist is TTL-cached, so the parallel checks are
+    // effectively free after first load.
+    const optionalColumns = [
+      {
+        key: 'settings',
+        name: 'settings',
+        ref: creatorProfiles.settings,
+        fallback: {},
+      },
+      {
+        key: 'spotifyUrl',
+        name: 'spotify_url',
+        ref: creatorProfiles.spotifyUrl,
+        fallback: null,
+      },
+      {
+        key: 'appleMusicUrl',
+        name: 'apple_music_url',
+        ref: creatorProfiles.appleMusicUrl,
+        fallback: null,
+      },
+      {
+        key: 'youtubeUrl',
+        name: 'youtube_url',
+        ref: creatorProfiles.youtubeUrl,
+        fallback: null,
+      },
+      {
+        key: 'musicbrainzId',
+        name: 'musicbrainz_id',
+        ref: creatorProfiles.musicbrainzId,
+        fallback: null,
+      },
+      {
+        key: 'isClaimed',
+        name: 'is_claimed',
+        ref: creatorProfiles.isClaimed,
+        fallback: true,
+      },
+    ] as const;
+
+    const availability = await Promise.all(
+      optionalColumns.map(column =>
+        doesColumnExist('creator_profiles', column.name)
+      )
+    );
+
     const smartLinkCreatorSelect = {
       id: creatorProfiles.id,
       userId: creatorProfiles.userId,
@@ -389,20 +476,15 @@ const fetchCreatorByUsername = async (usernameNormalized: string) => {
       appleMusicUrl: creatorProfiles.appleMusicUrl,
       youtubeUrl: creatorProfiles.youtubeUrl,
       musicbrainzId: creatorProfiles.musicbrainzId,
+      isClaimed: creatorProfiles.isClaimed,
     };
-
-    if (await doesColumnExist('creator_profiles', 'is_claimed')) {
-      const [creator] = await db
-        .select({
-          ...smartLinkCreatorSelect,
-          isClaimed: creatorProfiles.isClaimed,
-        })
-        .from(creatorProfiles)
-        .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
-        .limit(1);
-
-      return creator ?? null;
-    }
+    const fallbacks: Record<string, unknown> = {};
+    optionalColumns.forEach((column, index) => {
+      if (!availability[index]) {
+        delete (smartLinkCreatorSelect as Record<string, unknown>)[column.key];
+        fallbacks[column.key] = column.fallback;
+      }
+    });
 
     const [creator] = await db
       .select(smartLinkCreatorSelect)
@@ -411,8 +493,8 @@ const fetchCreatorByUsername = async (usernameNormalized: string) => {
       .limit(1);
 
     // Schema-rollout fallback only: this is not canonical profile state.
-    // Revisit once creator_profiles.is_claimed exists in every environment.
-    return creator ? { ...creator, isClaimed: true } : null;
+    // Revisit once these columns exist in every environment.
+    return creator ? { ...fallbacks, ...creator } : null;
   }, `smartLinkCreator(${usernameNormalized})`);
 };
 

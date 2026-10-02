@@ -8,8 +8,10 @@
  *  1. Production mode must NEVER include a global `Disallow: /` for the wildcard agent.
  *  2. Missing/undefined VERCEL_ENV must fail-safe to production rules (not blocking).
  *  3. Production mode must reference the sitemap URL.
- *  4. Production mode must explicitly welcome AI crawlers: GPTBot, Claude-Web,
- *     PerplexityBot, and Google-Extended.
+ *  4. Production mode must explicitly welcome AI crawlers: AI search crawlers
+ *     (OAI-SearchBot, ChatGPT-User, Claude-SearchBot, Claude-Web,
+ *     PerplexityBot) and training/control tokens (GPTBot, ClaudeBot,
+ *     Anthropic-AI, Google-Extended, Applebot-Extended).
  *  5. AI-crawler rules must include an Allow for '/' (not just block everything).
  *  6. Preview/development mode is allowed to block all (intentional behaviour).
  *
@@ -24,11 +26,14 @@ const EXPECTED_SITEMAP_URL = `${BASE_URL}/sitemap.xml`;
 
 // Required AI crawlers per issue #11044 / AEO epic #11029.
 const REQUIRED_AI_CRAWLERS = [
-  'GPTBot',
+  'OAI-SearchBot',
   'ChatGPT-User',
+  'GPTBot',
+  'Claude-SearchBot',
   'Claude-Web',
   'ClaudeBot',
   'Anthropic-AI',
+  'Applebot-Extended',
   'PerplexityBot',
   'Google-Extended',
 ];
@@ -330,6 +335,23 @@ describe('robots.ts — production behavior', () => {
       ).not.toContain(path);
       expect(disallows).not.toContain(`${path}/`);
     }
+  });
+
+  it('emits exactly the independently declared crawler policy', async () => {
+    const { REQUIRED_AI_CRAWLERS: declaredPolicy } = await import(
+      '@/lib/seo/guardrail-check'
+    );
+    const robots = await importRobots(undefined);
+    const result = robots();
+    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+    const agents = rules
+      .flatMap(rule =>
+        Array.isArray(rule.userAgent) ? rule.userAgent : [rule.userAgent]
+      )
+      .filter(agent => agent !== '*')
+      .sort();
+    expect(agents).toEqual([...REQUIRED_AI_CRAWLERS].sort());
+    expect(agents).toEqual([...declaredPolicy].sort());
   });
 
   it.each(REQUIRED_AI_CRAWLERS)(

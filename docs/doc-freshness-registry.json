@@ -39,5 +39,441 @@
       "computer": "scoped-rules-count",
       "gardeningOnly": true
     }
-  ]
+  ],
+  "documentReviews": {
+    ".claude/rules/auth.md": {
+      "owner": "@itstimwhite",
+      "claim": "Better Auth configuration is owned by the local server module, not a managed Neon auth service.",
+      "documentSha256": "76e4ef63032eff5b570481aba643f971774284094003d8473aa590b24d8f4e9e",
+      "sources": [
+        {
+          "path": "apps/web/lib/auth/better-auth.ts",
+          "sha256": "b3dd62354f49b7617a7e110f5cb74c88f00a2eda2d446cb3afe553230b5eac42"
+        }
+      ]
+    },
+    ".claude/rules/ci-branching.md": {
+      "owner": "@itstimwhite",
+      "claim": "The opening default points to the canonical PR flow; integration trains are an optional coordinated wave.",
+      "documentSha256": "2a93ab84e52fca801cb0ff22c3eaae09d5be18784f0c1750b0f175c8286b9131",
+      "sources": [
+        {
+          "path": "docs/PR_FLOW.md",
+          "section": "## 1. Unit of work: one small PR \u2192 `main`",
+          "sha256": "040d65d017d9e8e5b3d00a641fbffe00fadd4eaf1539b1124262e73527eb418e"
+        }
+      ]
+    },
+    ".claude/rules/code-style.md": {
+      "owner": "@itstimwhite",
+      "claim": "Engineering conventions inherit the engineering canon and executable lint boundaries.",
+      "documentSha256": "bc838516396834a1f42da71b879534a7fb3f1c4c40942d5427a2eea89e54e0df",
+      "sources": [
+        {
+          "path": "canon/ENGINEERING.md",
+          "sha256": "ef3b80900618e178419090a8ee322d646d81e8f952ceb14a9372b1ac79e9c120"
+        }
+      ]
+    },
+    ".claude/rules/db.md": {
+      "owner": "@itstimwhite",
+      "claim": "The canonical database import resolves through lib/db/index.ts.",
+      "documentSha256": "7159503b943c79d24363de87e947d05d3c9856b82580e7bfd49e9c4a92fc55e6",
+      "sources": [
+        {
+          "path": "apps/web/lib/db/index.ts",
+          "sha256": "f6edb53dd04065ea24cc3dcf2da4c8d3b1ba7b593a4acca4ac661327a043a47b"
+        }
+      ]
+    },
+    ".claude/rules/environment.md": {
+      "owner": "@itstimwhite",
+      "claim": "Runtime versions follow the checked-in pins. Branch switches stop the local dev server; competing editor writes are resolved before committing, as recorded in the corresponding lessons.",
+      "documentSha256": "05cf43adb22321fcf70cff341154d3224d082533dde122784b4bd524a86de9ea",
+      "sources": [
+        {
+          "path": ".nvmrc",
+          "documentValue": "24.21.0",
+          "sha256": "73fb1b615e2043a933be1c0895cde4358036acc28d785692509b822aa53c761f"
+        },
+        {
+          "path": "package.json",
+          "pointer": "/packageManager",
+          "sha256": "ff888b93ec153abe0268e99b431fc1fe7315d1be262e72b52e14c69a93bc4d25"
+        },
+        {
+          "path": "LESSONS.md",
+          "section": "### CSS cache corruption after git worktree switches",
+          "sha256": "0f18ff315cf35e5c45d18bd7b68f4b8fdd5d15959b706081f892a4e68ed1c3ba"
+        },
+        {
+          "path": "LESSONS.md",
+          "section": "### Windsurf IDE silently reverts external file edits",
+          "sha256": "e1baa9950547534fedcdd46395050557661eb2abe0caef9578e8174fe6614e49"
+        }
+      ]
+    },
+    ".claude/rules/gstack.md": {
+      "owner": "@itstimwhite",
+      "claim": "Skill templates and regeneration follow the existing context contract, not copied provider policy.",
+      "documentSha256": "c4c1bb356db65209505368048fc802d9d48ba1d1bb2199a96fed821b86318a14",
+      "sources": [
+        {
+          "path": "docs/agent-context/README.md",
+          "section": "## Skills and provider overlays",
+          "sha256": "78ed5a2d6178a77d141f16d9a3e994851af4cb8495aeb04145734f0a2411d44b"
+        }
+      ]
+    },
+    ".claude/rules/hermes-air.md": {
+      "owner": "@itstimwhite",
+      "claim": "Current Mac lane uses the existing fleet authority; historical gateway sections remain explicitly retired.",
+      "documentSha256": "77dcfcaa02d92c21d8cf7c632c0f9c41c05412c3e2422f0f8c919e6a163ff56f",
+      "sources": [
+        {
+          "path": "canon/FLEET.md",
+          "sha256": "48ca3bca6148df9f8464757dfec689f42678ea6a31aa9082cccf38362ab5ca61"
+        }
+      ]
+    },
+    ".claude/rules/infra.md": {
+      "owner": "@itstimwhite",
+      "claim": "Infra follows the existing engineering canon; new infrastructure requires explicit justification.",
+      "documentSha256": "3013e30e3b6cb9e2ebf4d2d71f01fda177e52f6d83eaf0c03a9e424009980266",
+      "sources": [
+        {
+          "path": "canon/ENGINEERING.md",
+          "sha256": "ef3b80900618e178419090a8ee322d646d81e8f952ceb14a9372b1ac79e9c120"
+        }
+      ]
+    },
+    ".claude/rules/ios.md": {
+      "owner": "@itstimwhite",
+      "claim": "The hard-invariant table is implemented by the existing iOS lint.",
+      "documentSha256": "575fd3bc9e10fd68ab624b374accd15510cce7c821aab7af5552a9f72382b81f",
+      "sources": [
+        {
+          "path": "scripts/ios-best-practices-lint.sh",
+          "sha256": "1baf41ad81fdfedfd05156140d7d44fde155798d1849e9915659bd64f1875ad7"
+        }
+      ]
+    },
+    ".claude/rules/linear.md": {
+      "owner": "@itstimwhite",
+      "claim": "Issue closure behavior is implemented by the existing merge synchronizer.",
+      "documentSha256": "1a49d7bbec185a719ec356a4ccf27bb7661a6032557d0c901cd21acec2fd4bbf",
+      "sources": [
+        {
+          "path": "scripts/lib/linear-sync-on-merge.mjs",
+          "sha256": "ee9ddb6898c98f75b426ba4bff01bde9fe8d95916b2f88b428d5b6633ecad64e"
+        }
+      ]
+    },
+    ".claude/rules/macos.md": {
+      "owner": "@itstimwhite",
+      "claim": "Current Mac owners and planned Swift-native direction follow the stack receipt and accepted ADR; no native parity is certified.",
+      "documentSha256": "3e478342371997f9537a7194222b21221735e6ea564eee3651fb3dd9319945f9",
+      "sources": [
+        {
+          "path": "docs/macos/swift-control-invariants.md",
+          "section": "## Current Mac stack",
+          "sha256": "5c14a12977081c02bc0e7f8e6e8ca8fc9725cb20c9e604827324398d2cafdae6"
+        },
+        {
+          "path": "docs/macos/ADR-swift-native-mac.md",
+          "section": "## Decision",
+          "sha256": "46bb06e4e265a3540909db29274e4bfeb64fc6a5732cbe610d927d577962b501"
+        }
+      ]
+    },
+    ".claude/rules/motion.md": {
+      "owner": "@itstimwhite",
+      "claim": "Motion uses the canonical design token source map.",
+      "documentSha256": "aaafbbd92a5b7d0abcb0b67448fbd4d2611726add8a57c50362638b042f4a3dc",
+      "sources": [
+        {
+          "path": "DESIGN.md",
+          "section": "## Source-of-Truth File Map",
+          "sha256": "f9ffaf9d908bdb8a980303f3d0f643296eea4431635614ffae2a7f47488e21d2"
+        }
+      ]
+    },
+    ".claude/rules/pen.md": {
+      "owner": "@itstimwhite",
+      "claim": "Promotion follows the existing Pen gate; editor receipt is not cold readback proof.",
+      "documentSha256": "a455e264ab199d44433eb86a890dc955c27e957eda221c70cfe297ba20c1d2ec",
+      "sources": [
+        {
+          "path": "scripts/agent/pen-promotion-gate.mjs",
+          "sha256": "af4f51029e3e1c385cb9402a3be857ef87b152c224d1f7b7870eed8765361b3f"
+        }
+      ]
+    },
+    ".claude/rules/pr-stacking.md": {
+      "owner": "@itstimwhite",
+      "claim": "Small main-based roots and dependent native stacks follow canonical PR flow.",
+      "documentSha256": "3852f09962db98c764018e2b390bb07426070a6ab96eab88ee23760f816449a2",
+      "sources": [
+        {
+          "path": "docs/PR_FLOW.md",
+          "section": "## 1. Unit of work: one small PR \u2192 `main`",
+          "sha256": "040d65d017d9e8e5b3d00a641fbffe00fadd4eaf1539b1124262e73527eb418e"
+        }
+      ]
+    },
+    ".claude/rules/release.md": {
+      "owner": "@itstimwhite",
+      "claim": "Draft publication and exact-head qualification are separate canonical phases.",
+      "documentSha256": "650a00c3a586814b757200e8b62652b33975f6602f88e393f6ba8e8d6dd4633b",
+      "sources": [
+        {
+          "path": "docs/PR_FLOW.md",
+          "section": "## Draft-first rolling CI contract",
+          "sha256": "b6018494305d756160ca712b99dceaf7881b5723fd5ec3ac574aecfc8c0fc8ae"
+        }
+      ]
+    },
+    ".claude/rules/security.md": {
+      "owner": "@itstimwhite",
+      "claim": "CSP provider domains are consumed by the existing CSP implementation.",
+      "documentSha256": "192c9a31384046b11edfe63e9cf94e6fd0dd4d788770ac65774b7275a204dace",
+      "sources": [
+        {
+          "path": "apps/web/lib/security/content-security-policy.ts",
+          "sha256": "af22d2363c75ed110c9a5d7c16b56059fe8c682835bdc15cfc675cad2d59cf39"
+        }
+      ]
+    },
+    ".claude/rules/swarm.md": {
+      "owner": "@itstimwhite",
+      "claim": "The ad-hoc parallel-work pattern remains subordinate to canonical PR flow.",
+      "documentSha256": "d85305f8b8a60f6e50350971087e795db6eeadbbc68d9b6e4f8dd0bcfe42b1fb",
+      "sources": [
+        {
+          "path": "docs/PR_FLOW.md",
+          "section": "## 1. Unit of work: one small PR \u2192 `main`",
+          "sha256": "040d65d017d9e8e5b3d00a641fbffe00fadd4eaf1539b1124262e73527eb418e"
+        }
+      ]
+    },
+    ".claude/rules/testing.md": {
+      "owner": "@itstimwhite",
+      "claim": "Reliability detector coverage follows its source registry. Removed UI assertions, complete hook mock types and actual executed-test evidence follow the corresponding lessons.",
+      "documentSha256": "eac05ce7047704de99f8eb27c5b43d0c9013ba49176b7f32719b07b13f0a3336",
+      "sources": [
+        {
+          "path": "apps/web/lib/testing/reliability-detectors.ts",
+          "sha256": "37c6c3578ed01de6f12c88bbc6f22110290beae1d755ce2141c301d50b743246"
+        },
+        {
+          "path": "LESSONS.md",
+          "section": "### Stale test mocks after UI removal",
+          "sha256": "7780867ee400b3ad3194025568de09d1e715f6cda0b1bd6181530abee79e8e3d"
+        },
+        {
+          "path": "LESSONS.md",
+          "section": "### Mock return types must match full hook return type",
+          "sha256": "ae9fb0287cec96d784fcda36065f8ee4c090172547267dc2c3d43ff7c96542ff"
+        },
+        {
+          "path": "LESSONS.md",
+          "section": "### `pnpm vitest --run --changed` exits 0 with no test files",
+          "sha256": "c90b1224f0b0ec1f224257c16c2a3ac405b0b0637da56d3cfe08cf274bca9e41"
+        }
+      ]
+    },
+    ".claude/rules/ui.md": {
+      "owner": "@itstimwhite",
+      "claim": "Operational UI policy inherits the design authority chain. Canonical founder identity, Tailwind utility registration, signup intent and visible opening proof follow their lesson contracts.",
+      "documentSha256": "269feca43a3956c3a353ae21c7e3dcfe7b4867388de86960e86cdfa2ce7ac590",
+      "sources": [
+        {
+          "path": "DESIGN.md",
+          "section": "## Authority and precedence",
+          "sha256": "c057c93caa3d21106882df68cb96d2386a214662f82c18b929543466404e639f"
+        },
+        {
+          "path": "LESSONS.md",
+          "section": "### Tim White homepage identity must come from one canonical source",
+          "sha256": "ce9631ad5935e8245c14ce017574df9908f8b9edc21c5dbe29d7277fc0dde345"
+        },
+        {
+          "path": "LESSONS.md",
+          "section": "### CSS variables in `:root` don't auto-register as Tailwind utilities",
+          "sha256": "e7a3d28e613f1af86f3face0e9192e317006e944c9827f6e174d1815f3a83bbe"
+        },
+        {
+          "path": "LESSONS.md",
+          "section": "### Never link to `/claim` from CTAs",
+          "sha256": "e565fb0035442f733ca0644314b31bb0a415bc4c98bf8e832fc858a601b3cd93"
+        },
+        {
+          "path": "LESSONS.md",
+          "section": "### Premium homepage heroes cannot hide proof below the fold",
+          "sha256": "f028f370a739dfaf6f27b13ba2eb85741e64e15668a5dc85d26b0d291b28f898"
+        }
+      ]
+    },
+    ".github/BRANCH_PROTECTION.md": {
+      "owner": "@itstimwhite",
+      "claim": "Checked-in native ruleset is source evidence; live applied state remains separately verified.",
+      "documentSha256": "c1b48dcdcf6a049dc16a2030c07ecae0621d26e58adf9f290603ee9104ebacc3",
+      "sources": [
+        {
+          "path": ".github/rulesets/branch-protection.yml",
+          "sha256": "e491722a51d611a5e727f0c15ce179af0a358b33fe5d7d7d976a6143818aa93f"
+        }
+      ]
+    },
+    ".github/MERGE_QUEUE.md": {
+      "owner": "@itstimwhite",
+      "claim": "Native queue settings derive from the ruleset; documented unapplied targets remain distinct.",
+      "documentSha256": "3124ec0a107afe37eefc7d4dbf2401e36d623ff346035dc052a085daba4c9c55",
+      "sources": [
+        {
+          "path": ".github/rulesets/branch-protection.yml",
+          "sha256": "e491722a51d611a5e727f0c15ce179af0a358b33fe5d7d7d976a6143818aa93f"
+        }
+      ]
+    },
+    "CLAUDE.md": {
+      "owner": "@itstimwhite",
+      "claim": "The top-level router implements the company constitution without replacing it.",
+      "documentSha256": "1b75c23c85e8d0b7431ff336dfa6211d9ef2f5e49649963530500ff0081222ec",
+      "sources": [
+        {
+          "path": "canon/OPERATING_SYSTEM.md",
+          "sha256": "405911b953ba432a2ef6d41efc69633ed330ba80a5d577865fe7027e9baf08f5"
+        }
+      ]
+    },
+    "CODEX.md": {
+      "owner": "@itstimwhite",
+      "claim": "Local hooks reference canonical setup and cleanup wrappers, with Node pinned locally.",
+      "documentSha256": "1f321d71333739508b611c530b0f08e9ce29ed63220642370942873aa779ae7f",
+      "sources": [
+        {
+          "path": ".codex/hooks.json",
+          "sha256": "1deb2d869cf69f74397714ce82d74705cb989c2d17ff24cb43a0687bc78c6425"
+        },
+        {
+          "path": ".nvmrc",
+          "documentValue": "24.21.0",
+          "sha256": "73fb1b615e2043a933be1c0895cde4358036acc28d785692509b822aa53c761f"
+        }
+      ]
+    },
+    "DESIGN.md": {
+      "owner": "@itstimwhite",
+      "claim": "Operational design authority derives from company design canon.",
+      "documentSha256": "ed3d2b71cc8b63c55fd026281877c1a89c1480a32eb858b4f376c7df5687d7ad",
+      "sources": [
+        {
+          "path": "canon/DESIGN.md",
+          "sha256": "e3d010ed5edb9255880135b51208537fd1f38fce623d83b2dab2cd62b209e99d"
+        }
+      ]
+    },
+    "canon/OPERATING_SYSTEM.md": {
+      "owner": "@itstimwhite",
+      "claim": "The constitution is founder-owned repository policy; ownership comes from CODEOWNERS, not an inferred external authority.",
+      "documentSha256": "405911b953ba432a2ef6d41efc69633ed330ba80a5d577865fe7027e9baf08f5",
+      "sources": [
+        {
+          "path": ".github/CODEOWNERS",
+          "sha256": "51df591ca0045febc8611492d07951a35202d46af197143e8ab18af914fb21e5"
+        }
+      ]
+    },
+    "canon/README.md": {
+      "owner": "@itstimwhite",
+      "claim": "Canon hierarchy starts with the operating constitution.",
+      "documentSha256": "0ed03926699ab056b615141b49aaec324b670942294a92f9525bb462b4c77afc",
+      "sources": [
+        {
+          "path": "canon/OPERATING_SYSTEM.md",
+          "sha256": "405911b953ba432a2ef6d41efc69633ed330ba80a5d577865fe7027e9baf08f5"
+        }
+      ]
+    },
+    "docs/AI_AGENT_GUIDE.md": {
+      "owner": "@itstimwhite",
+      "claim": "API inventory uses Better Auth per the canonical auth rule; inventories are not runtime certification.",
+      "documentSha256": "a72ff588f03a09c0abe10824f09192d5865f2b087f697ba8d0355397c1ed436e",
+      "sources": [
+        {
+          "path": ".claude/rules/auth.md",
+          "sha256": "76e4ef63032eff5b570481aba643f971774284094003d8473aa590b24d8f4e9e"
+        }
+      ]
+    },
+    "docs/DOCUMENTATION.md": {
+      "owner": "@itstimwhite",
+      "claim": "Local source parity and per-document reviews are not runtime proof. New review findings qualify nonblocking before promotion; existing freshness gates remain enforced.",
+      "documentSha256": "86d4ea8093eb834c379629c495b82e0883ca3f050be5aed1e43e13ec024ef938",
+      "sources": [
+        {
+          "path": "scripts/repository_docs.py",
+          "sha256": "578f1db8842d50b70bc2ec28bffb23cd8620222c8e9f8b896797f4de88f82d43"
+        },
+        {
+          "path": "scripts/lib/doc-review.mjs",
+          "sha256": "584ad2a3423c982601dc9af203a39a991be276af5ffa8bb3e4c2603c7b0fe42c"
+        },
+        {
+          "path": "scripts/lib/doc-freshness.mjs",
+          "sha256": "e4c869b8577d579f6934b11f17f0405e8c7bfc0f3851b672791080cd5bf00349"
+        },
+        {
+          "path": "canon/ENGINEERING.md",
+          "section": "### Qualify delivery gates in shadow before enforcement",
+          "sha256": "44292842cd76459716aed9f37fd0112b8ae4905ff4969da4e91bdd38619ae70b"
+        }
+      ]
+    },
+    "docs/PR_FLOW.md": {
+      "owner": "@itstimwhite",
+      "claim": "Native queue authority is represented in the checked-in ruleset; live operation needs separate receipts.",
+      "documentSha256": "86719983ab97b7497a9428a050642beb58049cd27d613144bf6bb0276b913dc9",
+      "sources": [
+        {
+          "path": ".github/rulesets/branch-protection.yml",
+          "sha256": "e491722a51d611a5e727f0c15ce179af0a358b33fe5d7d7d976a6143818aa93f"
+        }
+      ]
+    },
+    "docs/agent-context/README.md": {
+      "owner": "@itstimwhite",
+      "claim": "The existing context checker enforces bounded files and references; mechanical checks do not prove model quality.",
+      "documentSha256": "79300398b0ad99b70e9ee4a19f71602383bcbd24221cbdc20f75c41dca3a8372",
+      "sources": [
+        {
+          "path": "scripts/agent-context/check.mjs",
+          "sha256": "a30770da74c0ae9707811f20c7d6bba799fadc310d0b4181dac67d80f4613df2"
+        }
+      ]
+    },
+    "docs/marketing/AGENT_GUIDE.md": {
+      "owner": "@itstimwhite",
+      "claim": "Marketing briefs and composition use the typed source registry.",
+      "documentSha256": "3d55318b5a7ade0cf7326f72d7245f211e19ce6463ac57745078a10672fd1ba5",
+      "sources": [
+        {
+          "path": "apps/web/data/marketing/spec.ts",
+          "sha256": "1c5bbc5d8feb9637c1cdc4cf7cdeeb01a03a24ad423446a0d733a8507b335505"
+        }
+      ]
+    },
+    "docs/writing/SURFACE_COVERAGE.md": {
+      "owner": "@itstimwhite",
+      "claim": "Writing surface completeness is validated by the existing invariant consumer.",
+      "documentSha256": "1a1cf51249295ae88a750bc3a30254aec871c686ca555d01fe3f1d4583d0af68",
+      "sources": [
+        {
+          "path": "scripts/invariants/writing-surfaces.mjs",
+          "sha256": "91356a21ccf5164603191080d6fb3e4e03d7455b8d58ad0c08c5651965143145"
+        }
+      ]
+    }
+  }
 }

@@ -190,6 +190,8 @@ import {
   defaultRecipientPreferences,
   type RecipientPreferences,
 } from '@/lib/notifications/recipient-preferences';
+import { summerOpsCardSchema } from '@/lib/ovie/ops-card';
+import { buildProofBriefOpsCard, proofBriefImagePath } from './chat-card';
 import {
   assertProofBriefRenderable,
   type CertifiedProofBrief,
@@ -202,6 +204,7 @@ import {
   buildCustomerWeeklyRecap,
   CERTIFIED_PROOF_BRIEF,
   INSUFFICIENT_EVIDENCE_PROOF_BRIEF,
+  INVESTOR_PROOF_BRIEF,
 } from './fixture';
 import {
   clampProofBriefText,
@@ -215,7 +218,10 @@ import {
   LYB_INSUFFICIENT_PROOF_BRIEF,
   type LybProgressMeasurement,
 } from './lyb';
-import { resolveCertifiedProofBrief } from './resolve';
+import {
+  resolveCertifiedProofBrief,
+  resolveLatestCertifiedProofBrief,
+} from './resolve';
 import { renderProofBriefSocialDraft } from './social';
 import { renderProofBriefText } from './text';
 
@@ -688,5 +694,56 @@ describe('card, resolver, and image route', () => {
       });
       expect((await proofBriefGET(request(url))).status).toBe(status);
     }
+  });
+});
+
+describe('audience resolution and chat card (JOV-7213)', () => {
+  it('resolves the latest certified brief for the investor audience', () => {
+    expect(resolveLatestCertifiedProofBrief('investor', { now: NOW })).toBe(
+      INVESTOR_PROOF_BRIEF
+    );
+    expect(resolveLatestCertifiedProofBrief('founder', { now: NOW })).toBe(
+      INVESTOR_PROOF_BRIEF
+    );
+  });
+
+  it('keeps customer recaps out of investor resolution and vice versa', () => {
+    expect(resolveLatestCertifiedProofBrief('customer', { now: NOW })).toBe(
+      CERTIFIED_PROOF_BRIEF
+    );
+    expect(
+      resolveLatestCertifiedProofBrief('customer', { now: NOW })?.briefId
+    ).not.toBe(INVESTOR_PROOF_BRIEF.briefId);
+  });
+
+  it('returns null once every eligible brief is stale', () => {
+    const stale = new Date('2027-01-01T00:00:00.000Z');
+    expect(
+      resolveLatestCertifiedProofBrief('investor', { now: stale })
+    ).toBeNull();
+    expect(
+      resolveLatestCertifiedProofBrief('customer', { now: stale })
+    ).toBeNull();
+  });
+
+  it('builds a schema-valid ops card carrying the image path', () => {
+    const card = buildProofBriefOpsCard(INVESTOR_PROOF_BRIEF, { now: NOW });
+    expect(summerOpsCardSchema.safeParse(card).success).toBe(true);
+    expect(card.title).toContain(INVESTOR_PROOF_BRIEF.window.label);
+    expect(card.summary).toBe(INVESTOR_PROOF_BRIEF.hero.sentence);
+    expect(
+      card.facts.some(
+        f => f.value === proofBriefImagePath(INVESTOR_PROOF_BRIEF)
+      )
+    ).toBe(true);
+  });
+
+  it('omits the share image on private briefs', () => {
+    const privateBrief = {
+      ...INVESTOR_PROOF_BRIEF,
+      privacy: 'private' as const,
+    };
+    const card = buildProofBriefOpsCard(privateBrief, { now: NOW });
+    expect(card.facts.some(f => f.label === 'Share image')).toBe(false);
   });
 });

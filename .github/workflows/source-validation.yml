@@ -1,7 +1,7 @@
 name: Source Validation
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, edited]
     branches: [main, 'integration/**']
 permissions:
   contents: read
@@ -13,6 +13,9 @@ jobs:
     name: Source Validation
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - &source-checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -22,6 +25,25 @@ jobs:
           persist-credentials: false
       - &source-setup
         uses: ./.github/actions/setup-node-pnpm
+      # component-ship-gate's live-storybook-cert launches Chromium when the
+      # diff touches in-scope UI components; without browsers the gate fails
+      # closed before any story is measured.
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
+      - name: Validate customer changelog decision from trusted base
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          trusted_ref="$(git rev-parse 'origin/${{ github.base_ref }}^{commit}')"
+          guard_root="$(mktemp -d "$RUNNER_TEMP/changelog-source-guard.XXXXXX")"
+          trap 'rm -rf "$guard_root"' EXIT
+          git archive "$trusted_ref" scripts | tar -x -C "$guard_root"
+          node "$guard_root/scripts/changelog-source-guard.mjs"
       - name: Run deterministic source contract
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
@@ -35,10 +57,24 @@ jobs:
           node scripts/ci-release-incident-contract.mjs
           pnpm ci:harness:check
           pnpm typecheck
+          pnpm run typecheck:scripts
+          pnpm --filter @jovie/web run typecheck:tests
           pnpm biome:check
           ESLINT_CHANGED_BASE="origin/${{ github.base_ref }}" pnpm --filter @jovie/web run lint:eslint:changed
           pnpm component-ship-gate
           pnpm ci:control:test
+      - name: Verify changed CLI publication behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_sha="$(git merge-base 'origin/${{ github.base_ref }}' HEAD)"
+          changed_cli="$(git diff --name-only "$base_sha" HEAD -- packages/jovie-cli .github/workflows/npm-publish.yml .github/workflows/source-validation.yml)"
+          if [ -n "$changed_cli" ]; then
+            pnpm --filter @jovie/cli run test:coverage
+            pnpm --filter @jovie/cli run typecheck
+            pnpm --filter @jovie/cli run build
+            pnpm --filter @jovie/cli run pack:dry
+          fi
   security:
     name: Security Evidence
     runs-on: ubuntu-latest

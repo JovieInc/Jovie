@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FounderFunnelData } from '@/lib/admin/types';
 import {
   deriveOpsExceptions,
@@ -70,6 +70,11 @@ function healthyMetrics(overrides: Record<string, unknown> = {}): HudMetrics {
   } as unknown as HudMetrics;
 }
 
+beforeEach(() => {
+  vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-28T12:00:00.000Z'));
+});
+afterEach(() => vi.restoreAllMocks());
+
 describe('deriveOpsExceptions', () => {
   it('returns no exceptions for a healthy company', () => {
     expect(deriveOpsExceptions(healthyMetrics())).toEqual([]);
@@ -123,6 +128,7 @@ describe('rankOpsBottlenecks', () => {
     timeRange: '30d',
     biggestDropOffKey: 'accounts_created',
     errors: [],
+    definitionVersion: 'founder-funnel.v2',
     stages: [
       {
         key: 'onboarding_chats',
@@ -131,7 +137,8 @@ describe('rankOpsBottlenecks', () => {
         count: 100,
         conversionRate: null,
         dropOff: null,
-        drillDownHref: '/app/ov/people?stage=onboarding_chats',
+        identifiable: false,
+        drillDownHref: null,
       },
       {
         key: 'accounts_created',
@@ -140,7 +147,9 @@ describe('rankOpsBottlenecks', () => {
         count: 40,
         conversionRate: 0.4,
         dropOff: 60,
-        drillDownHref: '/app/ov/people?stage=accounts_created',
+        identifiable: true,
+        drillDownHref:
+          '/app/ov/growth?view=leads&funnelStage=accounts_created&funnelRange=30d',
       },
     ],
   };

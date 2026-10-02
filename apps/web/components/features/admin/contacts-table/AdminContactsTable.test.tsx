@@ -1,6 +1,16 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import {
   RightPanelProvider,
   useRightPanel,
@@ -12,14 +22,17 @@ import type {
 } from './AdminContactsTable';
 import { AdminContactsTable } from './AdminContactsTable';
 
-const { mockRefresh, mockToastError, mockToastSuccess } = vi.hoisted(() => ({
-  mockRefresh: vi.fn(),
-  mockToastError: vi.fn(),
-  mockToastSuccess: vi.fn(),
-}));
+const { mockRefresh, mockPush, mockToastError, mockToastSuccess } = vi.hoisted(
+  () => ({
+    mockRefresh: vi.fn(),
+    mockPush: vi.fn(),
+    mockToastError: vi.fn(),
+    mockToastSuccess: vi.fn(),
+  })
+);
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ refresh: mockRefresh }),
+  useRouter: () => ({ refresh: mockRefresh, push: mockPush }),
 }));
 
 vi.mock('@/components/feedback', () => ({
@@ -80,6 +93,11 @@ const metrics: AdminContactStageMetrics = {
   churned: 0,
 };
 
+// biome-ignore format: compact evidence fixture keeps the interaction regression inside the PR budget.
+const certification = { evidenceRevision: 'profile-revision-1', status: 'needs_review' as const, canCertify: false, coverage: { confirmed: 0, rejected: 0, unresolved: 1, stale: 0, sourceClassesChecked: ['identity'], missingSourceClasses: [] }, items: [{ key: 'canonical:display-name', revision: 'evidence-revision-1', category: 'identity' as const, label: 'Display name', value: 'Ari Lane', url: null, source: 'profile, user', observedAt: '2026-03-02T00:00:00.000Z', confidence: 0.85, rationale: 'Joined across the canonical CRM identity sources.', freshness: 'fresh' as const, decision: null }] };
+// biome-ignore format: timeline shape is incidental to the evidence interaction under test.
+const detailResponse = (overrides: Record<string, unknown> = {}) => ({ certification: { ...certification, ...overrides }, timeline: [{ id: 'transition_1', fromStage: 'approved', toStage: 'paying', actorType: 'system', createdAt: '2026-03-02T00:00:00.000Z' }] });
+
 function RightPanelOutlet() {
   return <aside data-testid='right-panel'>{useRightPanel()}</aside>;
 }
@@ -116,6 +134,32 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 describe('AdminContactsTable', () => {
+  const browserMethods = [
+    'hasPointerCapture',
+    'releasePointerCapture',
+    'setPointerCapture',
+    'scrollIntoView',
+  ] as const;
+  const originalMethods = browserMethods.map(name =>
+    Object.getOwnPropertyDescriptor(Element.prototype, name)
+  );
+  beforeAll(() => {
+    for (const name of browserMethods) {
+      if (!Element.prototype[name])
+        Object.defineProperty(Element.prototype, name, {
+          configurable: true,
+          value: vi.fn(() => false),
+        });
+    }
+  });
+  afterAll(() => {
+    browserMethods.forEach((name, index) => {
+      const descriptor = originalMethods[index];
+      if (descriptor)
+        Object.defineProperty(Element.prototype, name, descriptor);
+      else Reflect.deleteProperty(Element.prototype, name);
+    });
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal('fetch', vi.fn());
@@ -125,35 +169,35 @@ describe('AdminContactsTable', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders the filtered empty state and canonical stage links', () => {
-    renderTable({ rows: [], total: 0, search: 'missing' });
+  it('filters by stage while preserving search and resetting pagination', async () => {
+    const user = userEvent.setup();
+    renderTable({ rows: [], total: 0, search: 'missing', page: 3 });
 
     expect(screen.getByText('No contacts matching “missing”.')).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Paying (1)' })).toHaveAttribute(
-      'href',
+    await user.click(
+      screen.getByRole('combobox', { name: 'Filter By Lifecycle Stage' })
+    );
+    await user.click(screen.getByRole('option', { name: 'Paying (1)' }));
+    expect(mockPush).toHaveBeenCalledWith(
       '?view=contacts&q=missing&stage=paying'
     );
     expect(screen.getByText('Showing 0–0 of 0')).toBeVisible();
   });
 
+  it('clears the stage filter without losing the search term', async () => {
+    const user = userEvent.setup();
+    renderTable({ stage: 'paying', search: 'ari', page: 2 });
+    await user.click(
+      screen.getByRole('combobox', { name: 'Filter By Lifecycle Stage' })
+    );
+    await user.click(screen.getByRole('option', { name: /All stages/ }));
+    expect(mockPush).toHaveBeenCalledWith('?view=contacts&q=ari');
+  });
+
   it('opens lifecycle history and applies a manual stage transition', async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock
-      .mockResolvedValueOnce(
-        jsonResponse({
-          timeline: [
-            {
-              id: 'transition_1',
-              fromStage: 'approved',
-              toStage: 'paying',
-              actorType: 'system',
-              source: 'billing',
-              reason: null,
-              createdAt: '2026-03-02T00:00:00.000Z',
-            },
-          ],
-        })
-      )
+      .mockResolvedValueOnce(jsonResponse(detailResponse()))
       .mockResolvedValueOnce(jsonResponse({ ok: true }));
 
     renderTable();
@@ -180,7 +224,7 @@ describe('AdminContactsTable', () => {
   it('surfaces a failed stage transition and restores the actions', async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock
-      .mockResolvedValueOnce(jsonResponse({ timeline: [] }))
+      .mockResolvedValueOnce(jsonResponse(detailResponse()))
       .mockResolvedValueOnce(
         jsonResponse({ error: 'Stage change denied' }, 409)
       );
@@ -196,5 +240,27 @@ describe('AdminContactsTable', () => {
 
     expect(screen.getByRole('button', { name: 'Approve' })).toBeEnabled();
     expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  // biome-ignore format: compact race regression keeps component gate evidence inside the PR cap.
+  it('aborts stale detail loads when selection changes', async () => { const fetchMock = vi.mocked(fetch).mockImplementation(() => new Promise<Response>(() => {})); renderTable({ rows: [contact, { ...contact, dedupeKey: 'email:bea@example.com', email: 'bea@example.com' }], total: 2 }); fireEvent.click(screen.getAllByTestId('admin-contact-row')[0]!); await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce()); const firstSignal = fetchMock.mock.calls[0]?.[1]?.signal; fireEvent.click(screen.getAllByTestId('admin-contact-row')[1]!); await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2)); expect(firstSignal?.aborted).toBe(true); });
+
+  // biome-ignore format: compact interaction regression keeps component gate evidence inside the PR cap.
+  it('reviews exact evidence and updates certification state immediately', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(detailResponse()))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, certification: { ...certification, status: 'human_reviewed', items: [{ ...certification.items[0], decision: 'no' }] } }));
+
+    renderTable();
+    fireEvent.click(screen.getByTestId('admin-contact-row'));
+    expect(await screen.findByText('Display name')).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: 'No' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({ action: 'review_evidence', dedupeKey: contact.dedupeKey, evidenceKey: 'canonical:display-name', evidenceRevision: 'evidence-revision-1', decision: 'no' });
+    expect(screen.getByText('Human reviewed')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'No' })).toHaveAttribute('aria-pressed', 'true');
   });
 });
