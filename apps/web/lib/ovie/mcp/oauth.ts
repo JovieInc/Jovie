@@ -1,4 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { isOvieMcpDynamicClientRegistrationEnabled } from '@/lib/auth/mcp-dynamic-registration';
 import {
   acceptedMcpRedirectUris,
   isAllowedMcpRedirectUri,
@@ -68,7 +69,9 @@ export class OvieOAuthIssuer {
       issuer,
       authorization_endpoint: `${issuer}/authorize`,
       token_endpoint: `${issuer}/token`,
-      registration_endpoint: `${issuer}/register`,
+      ...(isOvieMcpDynamicClientRegistrationEnabled()
+        ? { registration_endpoint: `${issuer}/register` }
+        : {}),
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code'],
       code_challenge_methods_supported: ['S256'],

@@ -39,6 +39,7 @@ import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { adminPasskeyStepUp } from './admin-passkey-step-up';
 import { generateAppleClientSecret } from './apple-client-secret';
+import { mcpDynamicClientRegistrationOptions } from './mcp-dynamic-registration';
 import { mcpOAuthRedirectGuard } from './mcp-redirect-guard';
 import { oauthProviderErrorReturn } from './oauth-provider-error-return';
 import { OAUTH_PROVIDER_TRUSTED_CLIENT_IDS } from './oauth-trusted-clients';
@@ -347,8 +348,7 @@ function buildPlugins() {
       signup: { page: '/identity' },
       scopes: ['openid', 'profile', 'email', 'offline_access'],
       grantTypes: ['authorization_code', 'refresh_token'],
-      allowDynamicClientRegistration: false,
-      allowUnauthenticatedClientRegistration: false,
+      ...mcpDynamicClientRegistrationOptions(),
       accessTokenExpiresIn: 15 * 60,
       refreshTokenExpiresIn: 60 * 60 * 24 * 30,
       storeClientSecret: 'hashed',

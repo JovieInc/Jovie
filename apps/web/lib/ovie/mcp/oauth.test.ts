@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { MCP_REDIRECT_CLIENT_FAMILIES } from '@/lib/oauth/mcp-redirect-allowlist';
 import { getOvieOAuthIssuer, isAllowedRedirect } from './oauth';
 
@@ -31,6 +31,31 @@ describe('Ovie OAuth dynamic client registration', () => {
       })
     ).toThrow(
       `redirect_uri "https://evilcursor.com/cb" is not allowed. Allowed clients: ${MCP_REDIRECT_CLIENT_FAMILIES}.`
+    );
+  });
+});
+
+describe('Ovie OAuth discovery advertisement', () => {
+  const origin = 'https://jov.ie';
+
+  afterEach(() => {
+    delete process.env.FEATURE_OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION;
+  });
+
+  it('omits registration_endpoint when dynamic registration is off', () => {
+    const metadata = getOvieOAuthIssuer('test-secret').metadata(origin);
+    expect(metadata).not.toHaveProperty('registration_endpoint');
+    expect(metadata.authorization_endpoint).toBe(
+      `${origin}/api/ovie/oauth/authorize`
+    );
+    expect(metadata.token_endpoint).toBe(`${origin}/api/ovie/oauth/token`);
+  });
+
+  it('advertises registration_endpoint when the flag is on', () => {
+    process.env.FEATURE_OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION = 'true';
+    const metadata = getOvieOAuthIssuer('test-secret').metadata(origin);
+    expect(metadata.registration_endpoint).toBe(
+      `${origin}/api/ovie/oauth/register`
     );
   });
 });

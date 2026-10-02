@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   OVIE_MCP_RESOURCE_PATH,
   OVIE_OAUTH_AUTHORIZATION_SERVER_METADATA_PATH,
@@ -32,6 +32,9 @@ import { GET as getOpenIdMetadata } from './openid-configuration/route';
 
 describe('issuer discovery metadata', () => {
   beforeEach(() => vi.clearAllMocks());
+  afterEach(() => {
+    delete process.env.FEATURE_OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION;
+  });
 
   it('serves OAuth authorization-server metadata from the issuer root', async () => {
     getOAuthServerConfig.mockResolvedValue({
@@ -79,16 +82,30 @@ describe('issuer discovery metadata', () => {
     expect(response.headers.get('content-type')).toContain('application/json');
     expect(response.headers.get('access-control-allow-origin')).toBe('*');
     expect(response.headers.get('cache-control')).toBe('no-store');
-    await expect(response.json()).resolves.toEqual({
+    const body = await response.json();
+    expect(body).toEqual({
       issuer: `${origin}${OVIE_OAUTH_ISSUER_PATH}`,
       authorization_endpoint: `${origin}${OVIE_OAUTH_ISSUER_PATH}/authorize`,
       token_endpoint: `${origin}${OVIE_OAUTH_ISSUER_PATH}/token`,
-      registration_endpoint: `${origin}${OVIE_OAUTH_ISSUER_PATH}/register`,
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code'],
       code_challenge_methods_supported: ['S256'],
       token_endpoint_auth_methods_supported: ['none'],
       scopes_supported: [...OVIE_OAUTH_SCOPES],
+    });
+    expect(body).not.toHaveProperty('registration_endpoint');
+  });
+
+  it('advertises the Ovie registration endpoint only when the flag is on', async () => {
+    process.env.FEATURE_OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION = 'true';
+    const origin = 'https://staging.jov.ie';
+    const response = await getOvieAuthorizationServerMetadata(
+      new Request(`${origin}${OVIE_OAUTH_AUTHORIZATION_SERVER_METADATA_PATH}`)
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      registration_endpoint: `${origin}${OVIE_OAUTH_ISSUER_PATH}/register`,
     });
   });
 
