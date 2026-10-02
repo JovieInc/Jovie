@@ -236,6 +236,10 @@ platform :ios do
     )
     current_build_number = build_number
 
+    # Bind build provenance to the authorized release SHA, not whatever HEAD a
+    # later checkout mutation might report.
+    ENV["JOVIE_IOS_COMMIT_SHA"] = ENV["RELEASE_SHA"] if env_present?("RELEASE_SHA")
+
     write_ios_configuration(
       api_base_url: api_base_url,
       web_base_url: web_base_url,
