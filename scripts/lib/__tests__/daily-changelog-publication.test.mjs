@@ -9,6 +9,7 @@ import {
   planDailyPublication,
   readCustomerNote,
 } from '../daily-changelog-publication.mjs';
+
 const HEAD = 'a'.repeat(40),
   MERGE = 'b'.repeat(40);
 const observedAt = '2026-10-02T12:00:00Z';
