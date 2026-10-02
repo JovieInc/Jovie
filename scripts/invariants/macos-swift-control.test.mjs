@@ -13,6 +13,7 @@ const PROPOSED_SLUGS = [
 ];
 const REPORT_PATH = 'docs/macos/swift-control-invariants.md';
 const RULE_PATH = '.claude/rules/macos.md';
+const ADR_PATH = 'docs/macos/ADR-swift-native-mac.md';
 const ALLOWED_IOS_WKWEBVIEW = new Set([
   'apps/ios/Jovie/Features/Dashboard/PublicProfileBrowserView.swift',
 ]);
@@ -67,8 +68,8 @@ function macosSwiftTargetDirs() {
     .sort();
 }
 
-describe('Mac Swift-control invariants (JOV-5359)', () => {
-  it('names four proposed reviewed-invariant slugs without adopting them', () => {
+describe('Mac ownership during the Swift-native transition', () => {
+  it('records the superseded prohibition without adopting proposed registry slugs', () => {
     const report = read(REPORT_PATH);
     const rule = read(RULE_PATH);
     const registry = read('canon/invariants.jsonl');
@@ -78,13 +79,17 @@ describe('Mac Swift-control invariants (JOV-5359)', () => {
       assert.doesNotMatch(registry, new RegExp(`"id":"${slug}"`));
     }
     assert.match(report, /Transition plan/i);
-    assert.match(report, /\*\*None\.\*\*/);
+    assert.match(report, /`JOV-INV-013` \| \*\*Superseded\*\*/);
+    assert.match(report, /\*\*Swift-native, phased\.\*\*/);
+    assert.match(rule, /ADR-swift-native-mac\.md/);
+    assert.match(read(ADR_PATH), /3dde45bbe4d5fc657ace0bf551f0d99f7ad53674/);
+    assert.match(read(ADR_PATH), /Electron remains the shipped Mac app/);
     assert.match(report, /Electron/);
     assert.match(report, /MenuMonitor/);
     assert.match(report, /WKWebView/);
   });
 
-  it('keeps the packaged Mac product on Electron BrowserWindow, not WKWebView', () => {
+  it('keeps the shipped Mac app on Electron BrowserWindow until qualified cutover', () => {
     const desktopPkg = JSON.parse(read('apps/desktop/package.json'));
     assert.equal(desktopPkg.devDependencies?.electron !== undefined, true);
     const main = read('apps/desktop/src/main.ts');
@@ -96,7 +101,7 @@ describe('Mac Swift-control invariants (JOV-5359)', () => {
     assert.match(ovieDoor, /OVIE_OPERATOR_OPS_SEARCH = 'ovie=mac'/);
   });
 
-  it('keeps MenuMonitor as the only macOS Swift target and without a webview', () => {
+  it('keeps apps/macos Swift targets limited to the MenuMonitor accessory', () => {
     // The invariant is about Swift targets, not every top-level directory:
     // apps/macos/media-ingest (JOV-5370) is a plain TypeScript CLI with no
     // Package.swift, so it must not trip this check. Scoping to dirs with

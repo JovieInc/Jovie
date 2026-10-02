@@ -24,6 +24,14 @@ const RELEASE_FIXTURE = {
   dogfood: ['Relaunch the Mac app and open the banner link'],
 };
 
+Object.assign(RELEASE_FIXTURE, {
+  customerOutcomes: Object.fromEntries(
+    Object.values(RELEASE_FIXTURE.sections)
+      .flat()
+      .map(text => [text, { availability: 'unverified', prerequisites: [] }])
+  ),
+});
+
 describe('GET /changelog/whats-new.json', () => {
   beforeEach(() => {
     getChangelogSnapshot.mockResolvedValue({

@@ -81,18 +81,19 @@ export interface WebBuildReloadWindowState {
   readonly focused: boolean;
   readonly audible: boolean;
   readonly hasUnsentInput: boolean;
+  readonly workStateSafe: boolean;
   readonly systemIdleSeconds: number;
 }
 
 /**
- * The ambient HUD reloads as soon as a new build lands. App windows reload
- * only when nobody is using them: hidden, or unfocused after sustained idle,
- * and never while playing audio or holding unsent text.
+ * Every surface requires fresh idle work evidence. Eligible HUD/hidden windows
+ * can then reload immediately; visible app windows require sustained idle.
+ * Routes without a work owner stay unknown and cannot reload unattended.
  */
 export function shouldReloadWindowForWebBuild(
   input: WebBuildReloadWindowState
 ): boolean {
-  if (input.audible || input.hasUnsentInput) return false;
+  if (!input.workStateSafe || input.audible || input.hasUnsentInput) return false;
   if (input.isHud || !input.visible) return true;
   return (
     !input.focused && input.systemIdleSeconds >= WEB_BUILD_RELOAD_IDLE_SECONDS
@@ -110,3 +111,9 @@ export const UNSENT_INPUT_PROBE = `(() => {
     return typeof text === 'string' && text.trim().length > 0;
   });
 })()`;
+
+/** Read typed work and draft evidence in the same renderer turn. */
+export const SESSION_WORK_PROBE = `(() => ({
+  snapshot: globalThis.electronAPI?.getWorkState?.() ?? null,
+  hasUnsentInput: ${UNSENT_INPUT_PROBE}
+}))()`;
