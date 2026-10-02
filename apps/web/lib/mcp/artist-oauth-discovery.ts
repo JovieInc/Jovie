@@ -87,9 +87,10 @@ export function artistMcpWwwAuthenticate(
 }
 
 /**
- * Authorization and token endpoints are always advertised. Dynamic client
- * registration is advertised only when OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION
- * is on, matching Ovie issuer discovery.
+ * Authorization and token endpoints are always advertised. Better Auth
+ * dynamic client registration is advertised only when
+ * OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION is on. The founder Ovie issuer
+ * advertises its allowlisted /register independently.
  */
 export function ensureAuthorizationServerEndpoints(
   metadata: Record<string, unknown>,
