@@ -1,21 +1,24 @@
 import 'server-only';
-
 import { captureError } from '@/lib/error-tracking';
 import {
   ARTIST_SNAPSHOT_REMEDIATION_FINGERPRINT,
   ARTIST_SNAPSHOT_ROUTE,
   utcPageviewDay,
 } from './contract';
-import { fetchWikipediaSnapshot, fetchYouTubeSnapshot } from './fetchers';
+import {
+  fetchInstagramSnapshot,
+  fetchWikipediaSnapshot,
+  fetchYouTubeSnapshot,
+} from './fetchers';
 import { runArtistDailySnapshots } from './run';
 import { drizzleArtistSnapshotStore } from './store';
-
 export async function runLiveArtistDailySnapshots(now = new Date()) {
   return runArtistDailySnapshots({
     now,
     store: drizzleArtistSnapshotStore,
     fetchers: {
       youtube: candidate => fetchYouTubeSnapshot(candidate.youtubeUrl ?? ''),
+      instagram: () => fetchInstagramSnapshot(),
       wikipedia: candidate =>
         fetchWikipediaSnapshot({
           musicbrainzId: candidate.musicbrainzId ?? '',

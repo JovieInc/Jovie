@@ -1,10 +1,9 @@
 /**
- * Daily public-metric snapshots for known artists. Default-off until
- * ARTIST_DAILY_SNAPSHOTS=true. Collects official-API YouTube statistics and
- * Wikipedia pageviews (15 9 * * * UTC, after pageviews publish). Source
- * failures use the remediation:artist-snapshots fingerprint.
+ * Daily public-metric snapshots. Default-off until ARTIST_DAILY_SNAPSHOTS=true.
+ * YouTube Data API when YOUTUBE_DATA_API_KEY is set; otherwise that source
+ * skips. Social HTML waits for isolated egress. Wikipedia uses official APIs.
+ * Schedule: 15 9 * * * UTC.
  */
-
 import { NextResponse } from 'next/server';
 import {
   ARTIST_SNAPSHOT_REMEDIATION_FINGERPRINT,
@@ -14,25 +13,20 @@ import {
 import { runLiveArtistDailySnapshots } from '@/lib/artist-snapshots/live';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { captureError } from '@/lib/error-tracking';
-
 export const runtime = 'nodejs';
 export const maxDuration = 300;
-
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
 export async function GET(request: Request) {
   const authError = verifyCronRequest(request, {
     route: ARTIST_SNAPSHOT_ROUTE,
   });
   if (authError) return authError;
-
   if (!isArtistDailySnapshotsEnabled()) {
     return NextResponse.json(
       { ok: true, enabled: false, skipped: 'flag_off' },
       { headers: NO_STORE_HEADERS }
     );
   }
-
   try {
     const report = await runLiveArtistDailySnapshots();
     return NextResponse.json(

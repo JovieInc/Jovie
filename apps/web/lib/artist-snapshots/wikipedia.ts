@@ -1,11 +1,12 @@
-/** Wikidata QID from MusicBrainz url-rels, then Wikimedia pageviews. No HTML. */
-
+/**
+ * Wikidata QID from MusicBrainz url-rels, then Wikimedia pageviews.
+ * This module does not fetch Wikipedia HTML.
+ */
 import type { MusicBrainzRelation } from '@/lib/dsp-enrichment/types';
 
 const WIKIDATA_QID = /wikidata\.org\/(?:wiki|entity)\/(Q\d+)\b/i;
 const QID = /^Q\d+$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
-
 export function extractWikidataQid(
   relations: readonly MusicBrainzRelation[] | undefined
 ): string | null {
@@ -17,7 +18,6 @@ export function extractWikidataQid(
   }
   return null;
 }
-
 export function wikidataSitelinksUrl(qid: string): string {
   if (!QID.test(qid)) {
     throw new Error('Invalid Wikidata QID');
@@ -30,7 +30,6 @@ export function wikidataSitelinksUrl(qid: string): string {
   url.searchParams.set('format', 'json');
   return url.toString();
 }
-
 export function readEnwikiTitle(payload: unknown, qid: string): string | null {
   if (!payload || typeof payload !== 'object') return null;
   const entities = (payload as { entities?: unknown }).entities;
@@ -47,14 +46,12 @@ export function readEnwikiTitle(payload: unknown, qid: string): string | null {
   if (!trimmed || trimmed.length > 300) return null;
   return trimmed;
 }
-
 export function wikimediaPageviewsUrl(article: string, day: string): string {
   if (!DAY.test(day)) throw new Error('Invalid pageview day');
   const title = encodeURIComponent(article.replace(/ /g, '_'));
   const compact = day.replaceAll('-', '');
   return `https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia.org/all-access/user/${title}/daily/${compact}/${compact}`;
 }
-
 export function readPageviews(payload: unknown): number | null {
   if (!payload || typeof payload !== 'object') return null;
   const items = (payload as { items?: unknown }).items;

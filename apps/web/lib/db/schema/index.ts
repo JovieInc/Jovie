@@ -120,9 +120,7 @@ export {
   type ArtistDailySnapshotProvenance,
   type ArtistDailySnapshotSource,
   artistDailySnapshots,
-  insertArtistDailySnapshotSchema,
   type NewArtistDailySnapshot,
-  selectArtistDailySnapshotSchema,
 } from './artist-daily-snapshots';
 // Audit (Ingest Audit Logs)
 export {

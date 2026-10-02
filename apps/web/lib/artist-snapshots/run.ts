@@ -2,18 +2,18 @@ import type { ArtistDailySnapshotProvenance } from '@/lib/db/schema/artist-daily
 import {
   ARTIST_SNAPSHOT_PACE_MS,
   ARTIST_SNAPSHOT_REMEDIATION_FINGERPRINT,
-  ARTIST_SNAPSHOT_ROUTE,
   assertPublicSnapshotPayload,
   isArtistDailySnapshotsEnabled,
+  isSnapshotPrecision,
   resolveArtistSnapshotCap,
   utcSnapshotDay,
 } from './contract';
-
-export type ArtistSnapshotSourceName = 'youtube' | 'wikipedia';
+export type ArtistSnapshotSourceName = 'youtube' | 'instagram' | 'wikipedia';
 
 export interface ArtistSnapshotCandidate {
   readonly creatorProfileId: string;
   readonly youtubeUrl: string | null;
+  readonly instagramUrl: string | null;
   readonly musicbrainzId: string | null;
   readonly existingSources: readonly ArtistSnapshotSourceName[];
 }
@@ -51,6 +51,7 @@ export type SourceFetchResult =
 
 export interface SnapshotFetchers {
   youtube(candidate: ArtistSnapshotCandidate): Promise<SourceFetchResult>;
+  instagram(candidate: ArtistSnapshotCandidate): Promise<SourceFetchResult>;
   wikipedia(candidate: ArtistSnapshotCandidate): Promise<SourceFetchResult>;
 }
 
@@ -71,15 +72,19 @@ export interface ArtistSnapshotRunReport {
   readonly failures: readonly ArtistSnapshotFailure[];
 }
 
-const SOURCES: readonly ArtistSnapshotSourceName[] = ['youtube', 'wikipedia'];
+const SOURCES: readonly ArtistSnapshotSourceName[] = [
+  'youtube',
+  'instagram',
+  'wikipedia',
+];
 
 function hasIdentity(
   candidate: ArtistSnapshotCandidate,
   source: ArtistSnapshotSourceName
 ): boolean {
-  return Boolean(
-    source === 'youtube' ? candidate.youtubeUrl : candidate.musicbrainzId
-  );
+  if (source === 'youtube') return Boolean(candidate.youtubeUrl);
+  if (source === 'instagram') return Boolean(candidate.instagramUrl);
+  return Boolean(candidate.musicbrainzId);
 }
 
 function createPacer(sleep: (ms: number) => Promise<void>, now: () => number) {
@@ -119,7 +124,6 @@ export async function runArtistDailySnapshots(input: {
       failures: [],
     };
   }
-
   const candidates = await input.store.listCandidates(cap, snapshotDay);
   const pace = createPacer(
     input.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms))),
@@ -129,7 +133,6 @@ export async function runArtistDailySnapshots(input: {
   const failures: ArtistSnapshotFailure[] = [];
   let inserted = 0;
   let skipped = 0;
-
   for (const candidate of candidates) {
     for (const source of SOURCES) {
       if (
@@ -143,7 +146,6 @@ export async function runArtistDailySnapshots(input: {
         skipped += 1;
         continue;
       }
-
       await pace();
       let result: SourceFetchResult;
       try {
@@ -152,7 +154,6 @@ export async function runArtistDailySnapshots(input: {
         const reason = error instanceof Error ? error.name : 'fetch_threw';
         result = { kind: 'failure', reason, backoff: true };
       }
-
       if (result.kind === 'skip') {
         skipped += 1;
         continue;
@@ -167,13 +168,24 @@ export async function runArtistDailySnapshots(input: {
         });
         continue;
       }
-
-      assertPublicSnapshotPayload(result.rawValues);
-      assertPublicSnapshotPayload({ ...result.provenance });
-      if (result.provenance.access !== 'logged_out') {
-        throw new Error('Refusing to store a logged-in snapshot');
+      try {
+        assertPublicSnapshotPayload(result.rawValues);
+        assertPublicSnapshotPayload({ ...result.provenance });
+        if (result.provenance.access !== 'logged_out') {
+          throw new Error('logged_in_payload');
+        }
+        if (!isSnapshotPrecision(result.rawValues.precision)) {
+          throw new Error('missing_precision');
+        }
+      } catch (error) {
+        failures.push({
+          creatorProfileId: candidate.creatorProfileId,
+          source,
+          reason: error instanceof Error ? error.message : 'payload_rejected',
+          httpStatus: null,
+        });
+        continue;
       }
-
       const write = await input.store.insert({
         creatorProfileId: candidate.creatorProfileId,
         source,
@@ -186,14 +198,12 @@ export async function runArtistDailySnapshots(input: {
       else skipped += 1;
     }
   }
-
   if (failures.length > 0) {
     await input.captureFailure?.({
       fingerprint: ARTIST_SNAPSHOT_REMEDIATION_FINGERPRINT,
       failures,
     });
   }
-
   return {
     enabled: true,
     snapshotDay,
@@ -202,19 +212,5 @@ export async function runArtistDailySnapshots(input: {
     inserted,
     skipped,
     failures,
-  };
-}
-
-export function artistSnapshotFailureContext(report: ArtistSnapshotRunReport): {
-  readonly fingerprint: typeof ARTIST_SNAPSHOT_REMEDIATION_FINGERPRINT;
-  readonly route: typeof ARTIST_SNAPSHOT_ROUTE;
-  readonly failureCount: number;
-  readonly failures: readonly ArtistSnapshotFailure[];
-} {
-  return {
-    fingerprint: ARTIST_SNAPSHOT_REMEDIATION_FINGERPRINT,
-    route: ARTIST_SNAPSHOT_ROUTE,
-    failureCount: report.failures.length,
-    failures: report.failures.slice(0, 20),
   };
 }

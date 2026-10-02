@@ -1,32 +1,31 @@
-/**
- * Artist daily snapshot contract. The cron is default-off; failures use one
- * Sentry fingerprint so JOV-7540 remediation stays a single class.
- */
-
+/** Daily public artist snapshots. Default-off. Failures use one fingerprint. */
 export const ARTIST_SNAPSHOT_REMEDIATION_FINGERPRINT =
   'remediation:artist-snapshots' as const;
-
 export const ARTIST_SNAPSHOT_ROUTE =
   '/api/cron/artist-daily-snapshots' as const;
-
-/** Artists attempted in one invocation. Coverage rotates by oldest snapshot. */
 export const ARTIST_DAILY_SNAPSHOT_CAP = 25;
-
-/** Hard ceiling so a mis-set limit cannot blow the 300s cron budget. */
 export const ARTIST_DAILY_SNAPSHOT_HARD_CAP = 40;
-
-/** Minimum gap between outbound public fetches in one run. */
 export const ARTIST_SNAPSHOT_PACE_MS = 1_100;
-
+export const SNAPSHOT_PRECISIONS = ['exact', 'rounded'] as const;
+export type SnapshotPrecision = (typeof SNAPSHOT_PRECISIONS)[number];
+/** Rounded values must not be differenced as growth. */
+export function canReadSnapshotAsGrowth(rawValues: {
+  readonly precision?: unknown;
+}): boolean {
+  return rawValues.precision === 'exact';
+}
+export function isSnapshotPrecision(
+  value: unknown
+): value is SnapshotPrecision {
+  return value === 'exact' || value === 'rounded';
+}
 const ENABLED_VALUES = new Set(['1', 'true', 'on', 'yes']);
-
 export function isArtistDailySnapshotsEnabled(
   raw: string | undefined = process.env.ARTIST_DAILY_SNAPSHOTS
 ): boolean {
   if (!raw) return false;
   return ENABLED_VALUES.has(raw.trim().toLowerCase());
 }
-
 export function resolveArtistSnapshotCap(
   raw: string | undefined = process.env.ARTIST_DAILY_SNAPSHOT_LIMIT
 ): number {
@@ -35,16 +34,13 @@ export function resolveArtistSnapshotCap(
   if (!Number.isInteger(parsed) || parsed < 1) return ARTIST_DAILY_SNAPSHOT_CAP;
   return Math.min(parsed, ARTIST_DAILY_SNAPSHOT_HARD_CAP);
 }
-
 export function utcSnapshotDay(now: Date): string {
   return now.toISOString().slice(0, 10);
 }
-
 /** Wikimedia pageviews for the current UTC day are incomplete. */
 export function utcPageviewDay(now: Date): string {
   return utcSnapshotDay(new Date(now.getTime() - 24 * 60 * 60 * 1000));
 }
-
 export function publicUrlWithoutSecrets(raw: string): string | null {
   try {
     const url = new URL(raw);
@@ -58,7 +54,6 @@ export function publicUrlWithoutSecrets(raw: string): string | null {
     return null;
   }
 }
-
 const FORBIDDEN_PAYLOAD_KEYS = new Set([
   'html',
   'cookie',
@@ -73,7 +68,6 @@ const FORBIDDEN_PAYLOAD_KEYS = new Set([
   'apikey',
   'session',
 ]);
-
 export function assertPublicSnapshotPayload(
   value: Record<string, unknown>
 ): void {

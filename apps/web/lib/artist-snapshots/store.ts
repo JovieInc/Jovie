@@ -1,6 +1,5 @@
 import 'server-only';
-
-import { and, asc, sql as drizzleSql, eq, inArray, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, or, sql } from 'drizzle-orm';
 import type {
   ArtistSnapshotCandidate,
   ArtistSnapshotSourceName,
@@ -12,6 +11,7 @@ import { artistDailySnapshots } from '@/lib/db/schema/artist-daily-snapshots';
 import { artists } from '@/lib/db/schema/content';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { validateInstagramUrl } from '@/lib/ingestion/strategies/instagram';
 import { validateYouTubeChannelUrl } from '@/lib/ingestion/strategies/youtube';
 
 const MUSICBRAINZ_ID =
@@ -19,6 +19,7 @@ const MUSICBRAINZ_ID =
 
 const SNAPSHOT_SOURCES = new Set<ArtistSnapshotSourceName>([
   'youtube',
+  'instagram',
   'wikipedia',
 ]);
 
@@ -27,6 +28,14 @@ function firstYouTubeChannel(urls: readonly (string | null)[]): string | null {
     if (!url) continue;
     const channel = validateYouTubeChannelUrl(url);
     if (channel) return channel;
+  }
+  return null;
+}
+
+function firstInstagramProfile(urls: readonly string[]): string | null {
+  for (const url of urls) {
+    const profile = validateInstagramUrl(url);
+    if (profile) return profile;
   }
   return null;
 }
@@ -40,12 +49,11 @@ function firstMusicBrainzId(ids: readonly (string | null)[]): string | null {
 
 export const drizzleArtistSnapshotStore: ArtistSnapshotStore = {
   async listCandidates(limit, day) {
-    const lastSnapshotDay = drizzleSql<string | null>`(
+    const lastSnapshotDay = sql<string | null>`(
       select max(${artistDailySnapshots.snapshotDay})
       from ${artistDailySnapshots}
       where ${artistDailySnapshots.creatorProfileId} = ${creatorProfiles.id}
     )`;
-
     const profiles = await db
       .select({
         id: creatorProfiles.id,
@@ -57,16 +65,16 @@ export const drizzleArtistSnapshotStore: ArtistSnapshotStore = {
         and(
           eq(creatorProfiles.creatorType, 'artist'),
           or(
-            drizzleSql`${creatorProfiles.youtubeUrl} is not null`,
-            drizzleSql`${creatorProfiles.musicbrainzId} is not null`,
-            drizzleSql`exists (
+            sql`${creatorProfiles.youtubeUrl} is not null`,
+            sql`${creatorProfiles.musicbrainzId} is not null`,
+            sql`exists (
               select 1 from ${socialLinks}
               where ${socialLinks.creatorProfileId} = ${creatorProfiles.id}
-                and ${socialLinks.platform} = 'youtube'
+                and ${socialLinks.platform} in ('instagram', 'youtube')
                 and ${socialLinks.isActive} = true
                 and ${socialLinks.state} = 'active'
             )`,
-            drizzleSql`exists (
+            sql`exists (
               select 1 from ${artists}
               where ${artists.creatorProfileId} = ${creatorProfiles.id}
                 and ${artists.musicbrainzId} is not null
@@ -74,15 +82,10 @@ export const drizzleArtistSnapshotStore: ArtistSnapshotStore = {
           )
         )
       )
-      .orderBy(
-        drizzleSql`${lastSnapshotDay} asc nulls first`,
-        asc(creatorProfiles.id)
-      )
+      .orderBy(sql`${lastSnapshotDay} asc nulls first`, asc(creatorProfiles.id))
       .limit(limit);
-
     if (profiles.length === 0) return [];
     const ids = profiles.map(profile => profile.id);
-
     const [links, linkedArtists, existing] = await Promise.all([
       db
         .select({
@@ -94,7 +97,7 @@ export const drizzleArtistSnapshotStore: ArtistSnapshotStore = {
         .where(
           and(
             inArray(socialLinks.creatorProfileId, ids),
-            eq(socialLinks.platform, 'youtube'),
+            inArray(socialLinks.platform, ['instagram', 'youtube']),
             eq(socialLinks.isActive, true),
             eq(socialLinks.state, 'active')
           )
@@ -108,7 +111,7 @@ export const drizzleArtistSnapshotStore: ArtistSnapshotStore = {
         .where(
           and(
             inArray(artists.creatorProfileId, ids),
-            drizzleSql`${artists.musicbrainzId} is not null`
+            sql`${artists.musicbrainzId} is not null`
           )
         ),
       db
@@ -124,7 +127,6 @@ export const drizzleArtistSnapshotStore: ArtistSnapshotStore = {
           )
         ),
     ]);
-
     return profiles.flatMap((profile): ArtistSnapshotCandidate[] => {
       const profileLinks = links.filter(
         link => link.creatorProfileId === profile.id
@@ -132,9 +134,16 @@ export const drizzleArtistSnapshotStore: ArtistSnapshotStore = {
       const candidate: ArtistSnapshotCandidate = {
         creatorProfileId: profile.id,
         youtubeUrl: firstYouTubeChannel([
-          ...profileLinks.map(link => link.url),
+          ...profileLinks
+            .filter(link => link.platform === 'youtube')
+            .map(link => link.url),
           profile.youtubeUrl,
         ]),
+        instagramUrl: firstInstagramProfile(
+          profileLinks
+            .filter(link => link.platform === 'instagram')
+            .map(link => link.url)
+        ),
         musicbrainzId: firstMusicBrainzId([
           profile.musicbrainzId,
           ...linkedArtists
@@ -148,13 +157,16 @@ export const drizzleArtistSnapshotStore: ArtistSnapshotStore = {
             SNAPSHOT_SOURCES.has(source as ArtistSnapshotSourceName)
           ),
       };
-      if (!candidate.youtubeUrl && !candidate.musicbrainzId) {
+      if (
+        !candidate.youtubeUrl &&
+        !candidate.instagramUrl &&
+        !candidate.musicbrainzId
+      ) {
         return [];
       }
       return [candidate];
     });
   },
-
   async insert(row: StoredArtistSnapshot) {
     const inserted = await db
       .insert(artistDailySnapshots)

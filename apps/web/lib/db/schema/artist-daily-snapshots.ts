@@ -1,10 +1,7 @@
 /**
- * Append-only public metric history for known artists: one row per creator
- * profile, source, and UTC collection day; conflicts on the unique key are a
- * no-op. raw_values holds parsed public counts only; provenance records how
- * the row was fetched. Neither column may store cookies, tokens, or HTML.
+ * Append-only public metric history. raw_values includes precision
+ * `exact` or `rounded`. Rounded values must not be read as growth.
  */
-
 import { sql as drizzleSql } from 'drizzle-orm';
 import {
   check,
@@ -17,18 +14,14 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { creatorProfiles } from './profiles';
-
 export const ARTIST_DAILY_SNAPSHOT_SOURCES = [
   'youtube',
   'instagram',
   'wikipedia',
 ] as const;
-
 export type ArtistDailySnapshotSource =
   (typeof ARTIST_DAILY_SNAPSHOT_SOURCES)[number];
-
 export interface ArtistDailySnapshotProvenance {
   method: string;
   publicUrl: string | null;
@@ -40,7 +33,6 @@ export interface ArtistDailySnapshotProvenance {
   wikidataQid?: string;
   musicbrainzId?: string;
 }
-
 export const artistDailySnapshots = pgTable(
   'artist_daily_snapshots',
   {
@@ -70,11 +62,5 @@ export const artistDailySnapshots = pgTable(
     ),
   })
 );
-
-export const insertArtistDailySnapshotSchema =
-  createInsertSchema(artistDailySnapshots);
-export const selectArtistDailySnapshotSchema =
-  createSelectSchema(artistDailySnapshots);
-
 export type ArtistDailySnapshot = typeof artistDailySnapshots.$inferSelect;
 export type NewArtistDailySnapshot = typeof artistDailySnapshots.$inferInsert;
