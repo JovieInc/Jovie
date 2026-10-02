@@ -342,6 +342,11 @@ test('real publication retires an ancestor report but preserves divergent measur
   };
   const closes = [];
   const gh = args => {
+    if (args[0] === 'pr' && args[1] === 'edit') {
+      assert.deepEqual(args.slice(-2), ['--add-label', 'duplicate']);
+      remotePr.labels = [{ name: 'duplicate' }];
+      return '';
+    }
     if (args[0] === 'pr' && args[1] === 'list')
       return JSON.stringify([
         prior,
@@ -398,6 +403,11 @@ test('actual nightly publisher retires matching nightly evidence while retaining
   };
   const closed = [];
   const gh = args => {
+    if (args[0] === 'pr' && args[1] === 'edit') {
+      assert.deepEqual(args.slice(-2), ['--add-label', 'duplicate']);
+      metadata.labels = [{ name: 'duplicate' }];
+      return '';
+    }
     if (args[0] === 'pr' && args[1] === 'list')
       return JSON.stringify([coverage, nightly]);
     if (args[0] === 'pr' && args[1] === 'close') {
