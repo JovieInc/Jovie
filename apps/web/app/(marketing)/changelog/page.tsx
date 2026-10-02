@@ -155,7 +155,9 @@ export default async function ChangelogPage() {
             </p>
             <ChangelogFreshnessNotice
               latestPublished={latest}
-              hasUnpublishedReleases={snapshot.unpublishedReleases.length > 0}
+              hasUnpublishedReleases={snapshot.unpublishedReleases.some(
+                release => release.date > (latest[0]?.date ?? '')
+              )}
             />
           </div>
 

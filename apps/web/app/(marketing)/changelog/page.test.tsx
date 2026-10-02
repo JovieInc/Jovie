@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChangelogParseResult } from '@/lib/changelog-parser';
 
 const SNAPSHOT: ChangelogParseResult = {
@@ -50,6 +50,8 @@ const SNAPSHOT: ChangelogParseResult = {
   ],
 };
 
+let currentSnapshot = SNAPSHOT;
+
 vi.mock('next/link', () => ({
   default: ({
     href,
@@ -66,7 +68,7 @@ vi.mock('next/link', () => ({
 }));
 
 vi.mock('@/lib/changelog-source', () => ({
-  getChangelogSnapshot: async () => SNAPSHOT,
+  getChangelogSnapshot: async () => currentSnapshot,
 }));
 
 vi.mock('@/components/marketing/changelog/ChangelogSubscribeColumn', () => ({
@@ -80,6 +82,25 @@ vi.mock('@/components/site/MarketingFooterCta', () => ({
 import ChangelogPage, { metadata } from './page';
 
 describe('public changelog page', () => {
+  beforeEach(() => {
+    currentSnapshot = SNAPSHOT;
+  });
+  it('does not describe older empty slots as newer than a published daily update', async () => {
+    currentSnapshot = {
+      ...SNAPSHOT,
+      releases: [
+        {
+          ...SNAPSHOT.releases[0],
+          version: '2026-10-02',
+          kind: 'daily',
+          date: '2026-10-02',
+        },
+      ],
+    };
+    render(await ChangelogPage());
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'October 2026' })).toBeVisible();
+  });
   it('keeps one customer-facing heading and discloses unpublished source slots', async () => {
     render(await ChangelogPage());
 
