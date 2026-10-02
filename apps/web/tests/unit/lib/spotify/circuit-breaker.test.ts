@@ -44,7 +44,7 @@ describe('CircuitBreaker alert context', () => {
     );
   });
 
-  it('opens without a Sentry alert when notify is false, once per open window', async () => {
+  it('opens without a Sentry alert when notify is false, and only once while it stays open', async () => {
     const { CircuitBreaker } = await import('@/lib/spotify/circuit-breaker');
     const breaker = new CircuitBreaker({ name: 'musicfetch' });
 
