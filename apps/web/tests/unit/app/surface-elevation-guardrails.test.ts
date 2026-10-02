@@ -50,6 +50,20 @@ const APP_SHELL_GLOBS = [
 ];
 
 describe('surface elevation guardrails', () => {
+  it('lets the People shell own its page title instead of repeating it in each table', () => {
+    for (const file of [
+      'admin-creator-profiles/AdminCreatorProfilesUnified.tsx',
+      'admin-users-table/AdminUsersTableUnified.tsx',
+      'waitlist-table/AdminWaitlistTableWithViews.tsx',
+      'contacts-table/AdminContactsTable.tsx',
+      'feedback-table/AdminFeedbackTable.tsx',
+    ]) {
+      expect(readComponent(`components/features/admin/${file}`)).not.toContain(
+        '<AdminTableHeader'
+      );
+    }
+  });
+
   it('keeps the dark shell canvas separate from the shared card surface', () => {
     const designSystem = [
       readFileSync(join(ROOT, 'styles/design-system.css'), 'utf-8'),
