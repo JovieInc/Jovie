@@ -76,6 +76,196 @@ struct APIClientTests {
     return URLSession(configuration: configuration)
   }
 
+  enum ResponseRefreshOperation: CaseIterable, Sendable {
+    case me, profile, registerPush, unregisterPush, wallet, audience, inbox, calendar
+    case summerDecision, summerAlreadyDecided
+
+    var path: String {
+      switch self {
+      case .me: return "/api/mobile/v1/me"
+      case .profile: return "/api/mobile/v1/profile/complete"
+      case .registerPush, .unregisterPush: return "/api/mobile/v1/push-devices"
+      case .wallet: return "/api/wallet/apple/profile-pass"
+      case .audience: return "/api/mobile/v1/audience/highlights"
+      case .inbox: return "/api/mobile/v1/inbox"
+      case .calendar: return "/api/mobile/v1/calendar"
+      case .summerDecision, .summerAlreadyDecided:
+        return "/api/ovie/summer-cards/sc_0123456789abcdef0123456789abcdef/decision"
+      }
+    }
+
+    var method: String {
+      switch self {
+      case .registerPush: return "PUT"
+      case .unregisterPush: return "DELETE"
+      case .profile, .summerDecision, .summerAlreadyDecided: return "POST"
+      default: return "GET"
+      }
+    }
+
+    var statusCode: Int {
+      switch self {
+      case .registerPush, .unregisterPush: return 204
+      case .summerAlreadyDecided: return 409
+      default: return 200
+      }
+    }
+
+    func responseData() throws -> Data {
+      switch self {
+      case .me: return try JSONEncoder().encode(MobileMeResponse.previewReady)
+      case .profile: return Data(#"{"profileId":"profile-1"}"#.utf8)
+      case .registerPush, .unregisterPush: return Data()
+      case .wallet: return Data([0x50, 0x4B, 0x03, 0x04])
+      case .audience: return try JSONEncoder().encode(MobileAudienceHighlightsResponse.preview)
+      case .inbox: return try JSONEncoder().encode(MobileActionLoopInboxResponse.preview)
+      case .calendar: return try JSONEncoder().encode(MobileActionLoopCalendarResponse.preview)
+      case .summerDecision, .summerAlreadyDecided: return Data("{}".utf8)
+      }
+    }
+
+    func assertSuccessfulResponse(from client: APIClient) async throws {
+      switch self {
+      case .me:
+        #expect(try await client.fetchMe().state == .ready)
+      case .profile:
+        try await client.completeProfile(displayName: "Tim White", username: "tim")
+      case .registerPush:
+        try await client.registerPushDevice(
+          token: "0123456789abcdef", environment: .sandbox, timezone: "America/Los_Angeles"
+        )
+      case .unregisterPush:
+        try await client.unregisterPushDevice(token: "0123456789abcdef")
+      case .wallet:
+        #expect(try await client.fetchAppleWalletProfilePass() == Data([0x50, 0x4B, 0x03, 0x04]))
+      case .audience:
+        let response = try await client.fetchAudienceHighlights()
+        #expect(response.heroValue == 1284)
+        #expect(response.statTiles.count == 4)
+      case .inbox:
+        let response = try await client.fetchActionLoopInbox()
+        #expect(response.pendingCount == 1)
+        #expect(response.items.count == 1)
+      case .calendar:
+        let response = try await client.fetchActionLoopCalendar()
+        #expect(response.pendingReviewCount == 1)
+        #expect(response.upcomingReleases.count == 1)
+      case .summerDecision, .summerAlreadyDecided:
+        let response = try await client.decideSummerCard(
+          cardID: "sc_0123456789abcdef0123456789abcdef", decision: .approve, comment: nil
+        )
+        #expect(response == (self == .summerAlreadyDecided ? .alreadyDecided : .decided))
+      }
+    }
+  }
+
+  @Test(arguments: ResponseRefreshOperation.allCases, [false, true])
+  func responseHeaderOnlyRefreshesTheDispatchedSession(
+    operation: ResponseRefreshOperation,
+    replaceSessionBeforeResponse: Bool
+  ) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      let expiry = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded() + 3_600)
+      NativeSessionTokenStore.save(token: "request-a", userID: "user-a", expiresAt: expiry)
+      let dispatchedAuthorization = try #require(NativeSessionTokenStore.requestAuthorization())
+      var replacementAuthorization: NativeRequestAuthorization?
+      var requestCount = 0
+      let responseData = try operation.responseData()
+      MockURLProtocol.requestHandler = { request in
+        requestCount += 1
+        #expect(request.url?.path == operation.path)
+        #expect(request.httpMethod == operation.method)
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer request-a")
+        // Install B only after A's bearer has actually been dispatched.
+        if replaceSessionBeforeResponse {
+          NativeSessionTokenStore.save(token: "login-b", userID: "user-b", expiresAt: expiry)
+          replacementAuthorization = try #require(NativeSessionTokenStore.requestAuthorization())
+        }
+        return (
+          HTTPURLResponse(
+            url: request.url!, statusCode: operation.statusCode, httpVersion: nil,
+            headerFields: ["set-auth-token": "rolled-a"]
+          )!,
+          responseData
+        )
+      }
+      defer { MockURLProtocol.requestHandler = nil }
+
+      let client = APIClient(
+        baseURL: URL(string: "https://jov.ie")!,
+        session: makeSession(),
+        tokenProvider: NativeSessionTokenProvider()
+      )
+      try await operation.assertSuccessfulResponse(from: client)
+
+      #expect(requestCount == 1)
+      let stored = try #require(NativeSessionTokenStore.load())
+      let authorization = try #require(NativeSessionTokenStore.requestAuthorization())
+      if replaceSessionBeforeResponse {
+        #expect(stored == NativeStoredSession(userID: "user-b", token: "login-b", expiresAt: expiry))
+        #expect(authorization == (try #require(replacementAuthorization)))
+      } else {
+        #expect(stored.userID == "user-a")
+        #expect(stored.token == "rolled-a")
+        #expect(stored.expiresAt > expiry)
+        #expect(authorization.bearerToken == "rolled-a")
+        #expect(authorization != dispatchedAuthorization)
+      }
+    }
+  }
+
+  @Test(arguments: ResponseRefreshOperation.allCases, [false, true])
+  func unmanagedSuccessAndRetryCannotRefreshTheStoredSession(
+    operation: ResponseRefreshOperation,
+    retryAfterUnauthorized: Bool
+  ) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      let expiry = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded() + 3_600)
+      // Matching the stored bearer does not grant an unmanaged provider write authority.
+      NativeSessionTokenStore.save(token: "request-a", userID: "user-a", expiresAt: expiry)
+      let storedBeforeRequest = try #require(NativeSessionTokenStore.load())
+      let authorizationBeforeRequest = try #require(NativeSessionTokenStore.requestAuthorization())
+      let tokenProvider = MockTokenProvider(tokens: ["request-a", "retry-token"])
+      let responseData = try operation.responseData()
+      var requestCount = 0
+      MockURLProtocol.requestHandler = { request in
+        requestCount += 1
+        #expect(request.url?.path == operation.path)
+        #expect(request.httpMethod == operation.method)
+        #expect(
+          request.value(forHTTPHeaderField: "Authorization")
+            == (requestCount == 1 ? "Bearer request-a" : "Bearer retry-token")
+        )
+        #expect(NativeSessionTokenStore.load() == storedBeforeRequest)
+        #expect(NativeSessionTokenStore.requestAuthorization() == authorizationBeforeRequest)
+        let unauthorized = retryAfterUnauthorized && requestCount == 1
+        return (
+          HTTPURLResponse(
+            url: request.url!, statusCode: unauthorized ? 401 : operation.statusCode, httpVersion: nil,
+            headerFields: ["set-auth-token": "unmanaged-roll"]
+          )!,
+          unauthorized ? Data() : responseData
+        )
+      }
+      defer { MockURLProtocol.requestHandler = nil }
+
+      let client = APIClient(
+        baseURL: URL(string: "https://jov.ie")!,
+        session: makeSession(),
+        tokenProvider: tokenProvider
+      )
+      try await operation.assertSuccessfulResponse(from: client)
+
+      #expect(requestCount == (retryAfterUnauthorized ? 2 : 1))
+      #expect(
+        await tokenProvider.recordedForceRefreshValues()
+          == (retryAfterUnauthorized ? [false, true] : [false])
+      )
+      #expect(NativeSessionTokenStore.load() == storedBeforeRequest)
+      #expect(NativeSessionTokenStore.requestAuthorization() == authorizationBeforeRequest)
+    }
+  }
+
   @Test func injectsBearerToken() async throws {
     let tokenProvider = MockTokenProvider(tokens: ["token-1"])
     MockURLProtocol.requestHandler = { request in

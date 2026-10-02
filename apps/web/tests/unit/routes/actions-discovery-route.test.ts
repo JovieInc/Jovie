@@ -98,7 +98,7 @@ describe('GET /api/v1/actions', () => {
     const response = await GET(request());
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.actions).toHaveLength(4);
+    expect(body.actions).toHaveLength(12);
     const ids = body.actions.map(
       (capability: { action: { id: string } }) => capability.action.id
     );
@@ -107,9 +107,26 @@ describe('GET /api/v1/actions', () => {
       'contact.create',
       'release.create',
       'task.create',
+      'fleet.register',
+      'fleet.status',
+      'work.next',
+      'work.claim',
+      'work.report',
+      'defect.report',
+      'fleet.directory',
+      'work.request',
     ]);
     for (const capability of body.actions) {
-      expect(capability.available).toBe(true);
+      const workerScope = capability.requirements.find(
+        (state: { requirement: { type: string } }) =>
+          state.requirement.type === 'worker_scope'
+      );
+      expect(capability.available).toBe(!workerScope);
+      if (workerScope) {
+        expect(workerScope.satisfied).toBe(false);
+        expect(capability.reasonCode).toBe('FORBIDDEN');
+        expect(capability.visibility).toBe('hidden');
+      }
       expect(capability.action.schemaVersion).toBe(1);
     }
   });

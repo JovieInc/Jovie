@@ -1,3 +1,4 @@
+import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
 import { AdminWaitlistTableUnified } from './AdminWaitlistTableUnified';

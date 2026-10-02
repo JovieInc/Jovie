@@ -9,7 +9,6 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
-import { EmptyState } from '@/components/molecules/EmptyState';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   PAGE_TOOLBAR_MENU_TRIGGER_CLASS,
@@ -17,6 +16,7 @@ import {
   PageToolbarActionButton,
   PageToolbarTabButton,
   rowState,
+  TableEmptyState,
 } from '@/components/organisms/table';
 import { ShellDropdown } from '@/components/shell/ShellDropdown';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
@@ -424,32 +424,36 @@ export function OvieCertificationsWorkspace() {
   const loadFailed = query.isError && !inventory;
   const refreshFailed = query.isError && Boolean(inventory);
   const filtersActive = stateFilter !== 'all' || domainFilter !== 'all';
+  const domainLoadFailed = Boolean(
+    inventory?.domains.some(
+      domain =>
+        domain.status === 'error' &&
+        (domainFilter === 'all' || domain.domain === domainFilter)
+    )
+  );
 
   let emptyState = (
-    <EmptyState
+    <TableEmptyState
       icon={<ShieldCheck className='h-5 w-5' aria-hidden='true' />}
       heading='No certification items yet'
       description='Connected domains have no packets. Overnight workers add items as they land evidence.'
-      presentation='workspace'
     />
   );
-  if (loadFailed) {
+  if (loadFailed || domainLoadFailed || refreshFailed) {
     emptyState = (
-      <EmptyState
+      <TableEmptyState
         icon={<AlertTriangle className='h-5 w-5' aria-hidden='true' />}
         heading='Certifications unavailable'
-        description='The certification inventory could not load. Nothing here means zero items.'
+        description='Some certification sources could not load. Retry to check for items.'
         variant='error'
-        presentation='workspace'
         action={{ label: 'Retry', onClick: () => void query.refetch() }}
       />
     );
   } else if (filtersActive && allRows.length > 0) {
     emptyState = (
-      <EmptyState
+      <TableEmptyState
         icon={<ShieldCheck className='h-5 w-5' aria-hidden='true' />}
         heading='No items match these filters'
-        presentation='workspace'
         action={{
           label: 'Clear Filters',
           onClick: () => {
@@ -551,11 +555,7 @@ export function OvieCertificationsWorkspace() {
               getRowTestId={row => `certification-row-${row.id}`}
               onRowClick={row => setSelectedId(row.id)}
               onFocusedRowChange={handleFocusedRowChange}
-              emptyState={
-                <div className='flex min-h-55 flex-1 flex-col items-center justify-center border-t border-subtle bg-surface-0 px-4 py-6 text-center'>
-                  {emptyState}
-                </div>
-              }
+              emptyState={emptyState}
             />
           )}
         </AdminTableShell>

@@ -1,0 +1,135 @@
+{
+  "schema": "jovie.bounded-decision-benchmark/v1",
+  "issue": "JOV-7341",
+  "observedAt": "2026-10-01T08:00:00Z",
+  "promotionGate": "JOV-6414",
+  "access": {
+    "status": "limited-preview",
+    "evidenceUrl": "https://openai.com/index/devday-2026-recap/",
+    "limitation": "OpenAI describes finite-answer Decisions API classification and routing, but no public callable API reference or Jovie project admission was available for this run.",
+    "resumeEventClass": "external-capability-materially-changed",
+    "resumeEvent": "Resume when OpenAI publishes a callable Decisions API request/response reference and the Jovie project is admitted, with version identity, pricing, usage/provenance, retention and availability terms observable."
+  },
+  "workloads": [
+    {
+      "id": "release-task-clustering",
+      "cohort": {
+        "id": "release-task-corpus",
+        "version": "2026-09-26.1",
+        "sha256": "3e30848c87a83c1331e1b1b5115316fd522d6b03d08d4a693ff4ab0413298df7",
+        "ref": "scripts/invariants/fixtures/release-task-corpus.gen.mjs"
+      },
+      "bypass": {
+        "zeroOption": { "probabilisticCalls": 0 },
+        "oneOption": { "probabilisticCalls": 0 },
+        "deterministic": { "probabilisticCalls": 0 }
+      },
+      "candidates": [
+        {
+          "id": "deterministic-baseline",
+          "status": "complete",
+          "cohortSha256": "3e30848c87a83c1331e1b1b5115316fd522d6b03d08d4a693ff4ab0413298df7",
+          "strategy": "always abstain",
+          "evaluated": 210,
+          "macroF1": 0.023553507424475168,
+          "abstentionRate": 1,
+          "falseAutoAssignmentRate": 0
+        },
+        {
+          "id": "typesafe-jev",
+          "status": "shadow-only",
+          "cohortSha256": "3e30848c87a83c1331e1b1b5115316fd522d6b03d08d4a693ff4ab0413298df7",
+          "executedComparisons": 0
+        },
+        {
+          "id": "openai-decisions",
+          "status": "access-blocked",
+          "cohortSha256": "3e30848c87a83c1331e1b1b5115316fd522d6b03d08d4a693ff4ab0413298df7",
+          "executedComparisons": 0
+        }
+      ],
+      "evidenceByDimension": {
+        "taskCorrectnessAndCalibratedAbstention": "Deterministic safety floor: macro-F1 0.0236, abstention 100%, false auto-assignment 0%; Jev remains fixture/shadow-only and Decisions is unrun.",
+        "falsePositiveAndFalseNegativeCost": "Always-abstain prevents false routes but misses every classified task; supplier deltas are unavailable.",
+        "latencyAndAvailability": "Deterministic baseline is local; Jev live latency is unmeasured; Decisions is limited-preview and unavailable to Jovie.",
+        "fullyLoadedCost": "Deterministic machine cost is zero, but human handling caused by 100% abstention is unmeasured; live supplier, retry and correction costs are unknown, never treated as zero.",
+        "optionSetAndAuthoritySafety": "Frozen cluster sets plus abstain remain authoritative; zero/one/deterministic cases permit zero probabilistic calls.",
+        "observabilityAndProvenance": "Cohort version and digest are pinned; Jev uses existing gateway receipts; Decisions receipt identity is undocumented.",
+        "privacyAndDataHandling": "Existing sanitized text boundary remains; Decisions retention and data controls for this preview are unverified.",
+        "portabilityAndSwitchingCost": "Existing provider-neutral replay seam is reusable, but the Decisions wire contract and switching cost are unknown.",
+        "downstreamCertifiedOutcome": "No executed supplier comparison or certified downstream outcome exists; promotion is inadmissible."
+      },
+      "sourcingDecision": {
+        "id": "release-task-clustering-2026-10-01",
+        "state": "retain-internal-only",
+        "scope": "release-task-clustering",
+        "expectedEconomics": "Retain the zero-cost deterministic/incumbent path until a same-cohort executed comparison measures correction and total workflow cost.",
+        "dependencyRisk": "No Decisions dependency added; Jev stays shadow-only.",
+        "reversibility": "Fully reversible because no production route changes.",
+        "reEvaluateTrigger": "The Decisions resume event occurs or Jev gains authorized same-cohort live evidence.",
+        "decidedAt": "2026-10-01T08:00:00Z",
+        "expiresAt": "2026-10-15T08:00:00Z"
+      }
+    },
+    {
+      "id": "artist-inbox-triage",
+      "cohort": {
+        "id": "inbox-triage-corpus",
+        "version": "2026-09-28.1",
+        "sha256": "d08ce36503f2ef41fc70e4e145f14d5b9e4bea60f80f6e7f83b72578d22b4bf5",
+        "ref": "scripts/invariants/fixtures/inbox-triage-corpus.gen.mjs"
+      },
+      "bypass": {
+        "zeroOption": { "probabilisticCalls": 0 },
+        "oneOption": { "probabilisticCalls": 0 },
+        "deterministic": { "probabilisticCalls": 0 }
+      },
+      "candidates": [
+        {
+          "id": "deterministic-baseline",
+          "status": "complete",
+          "cohortSha256": "d08ce36503f2ef41fc70e4e145f14d5b9e4bea60f80f6e7f83b72578d22b4bf5",
+          "strategy": "always abstain",
+          "evaluated": 108,
+          "macroF1": 0.006493506493506493,
+          "abstentionRate": 1,
+          "highValueMissRate": 1
+        },
+        {
+          "id": "typesafe-jev",
+          "status": "shadow-only",
+          "cohortSha256": "d08ce36503f2ef41fc70e4e145f14d5b9e4bea60f80f6e7f83b72578d22b4bf5",
+          "executedComparisons": 0
+        },
+        {
+          "id": "openai-decisions",
+          "status": "access-blocked",
+          "cohortSha256": "d08ce36503f2ef41fc70e4e145f14d5b9e4bea60f80f6e7f83b72578d22b4bf5",
+          "executedComparisons": 0
+        }
+      ],
+      "evidenceByDimension": {
+        "taskCorrectnessAndCalibratedAbstention": "Deterministic safety floor: macro-F1 0.0065 and abstention 100%; it preserves uncertainty but cannot triage. Jev is fixture/shadow-only and Decisions is unrun.",
+        "falsePositiveAndFalseNegativeCost": "Always-abstain has no false suggestions but misses 100% of high-value mail; supplier deltas are unavailable.",
+        "latencyAndAvailability": "Deterministic baseline is local; Jev live latency is unmeasured; Decisions is limited-preview and unavailable to Jovie.",
+        "fullyLoadedCost": "The retained Haiku extraction call and human handling caused by 100% abstention mean whole-workflow cost is unknown, not zero; Decisions pricing is unavailable.",
+        "optionSetAndAuthoritySafety": "Frozen category/priority enums plus abstain remain authoritative; no supplier can send, grant access or expand the option set.",
+        "observabilityAndProvenance": "Cohort version and digest are pinned; Jev uses existing gateway receipts; Decisions receipt identity is undocumented.",
+        "privacyAndDataHandling": "Existing sender minimization and text redaction remain; Decisions preview retention and approved-data terms are unverified.",
+        "portabilityAndSwitchingCost": "Two bounded choice questions fit the existing seam, but a Decisions adapter is deferred until its wire contract is public.",
+        "downstreamCertifiedOutcome": "No executed supplier comparison, corrected triage outcome or downstream certified result exists; promotion is inadmissible."
+      },
+      "sourcingDecision": {
+        "id": "artist-inbox-triage-2026-10-01",
+        "state": "retain-internal-only",
+        "scope": "artist-inbox-triage",
+        "expectedEconomics": "Retain deterministic review plus the incumbent path until same-cohort live evidence reduces misses or correction burden at lower total cost.",
+        "dependencyRisk": "No Decisions dependency added; Jev stays shadow-only.",
+        "reversibility": "Fully reversible because no production route changes.",
+        "reEvaluateTrigger": "The Decisions resume event occurs or Jev gains authorized same-cohort live evidence.",
+        "decidedAt": "2026-10-01T08:00:00Z",
+        "expiresAt": "2026-10-15T08:00:00Z"
+      }
+    }
+  ]
+}

@@ -8,6 +8,8 @@ import {
   type ResourceOptions,
   reportIssue,
 } from './client.js';
+import { invokeFleetAction } from './fleet-client.js';
+import { FLEET_COMMANDS } from './fleet-contract.generated.js';
 
 export interface CommandInput {
   readonly arg?: string;
@@ -32,6 +34,7 @@ export interface CommandSpec {
   readonly acceptsFull?: boolean;
   readonly flags?: readonly FlagSpec[];
   readonly readOnly: boolean;
+  readonly internal?: boolean;
   readonly run: (
     input: CommandInput,
     options: ResourceOptions
@@ -76,6 +79,42 @@ function report(kind: ReportKind) {
 }
 
 export const COMMANDS: readonly CommandSpec[] = [
+  ...FLEET_COMMANDS.map(command => ({
+    internal: true,
+    path: command.path,
+    tool: command.tool,
+    summary: command.summary,
+    readOnly: command.readOnly,
+    flags: [
+      {
+        name: 'profile',
+        description: 'Provisioned worker profile UUID',
+        required: true,
+      },
+      {
+        name: 'idempotency-key',
+        description: 'Stable retry key for this invocation',
+        required: true,
+      },
+      {
+        name: 'input',
+        description: 'Canonical domain input as JSON',
+        required: true,
+      },
+    ],
+    run: (input: CommandInput, options: ResourceOptions) =>
+      invokeFleetAction(
+        command.id,
+        {
+          profile: input.flags?.profile ?? '',
+          key: input.flags?.['idempotency-key'] ?? '',
+          value: input.flags?.input ?? '',
+          channel: input.meta?.channel ?? 'cli',
+          version: input.meta?.version ?? '0.0.0',
+        },
+        options
+      ),
+  })),
   {
     path: ['profile', 'create'],
     tool: 'create_profile',

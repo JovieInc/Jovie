@@ -119,6 +119,7 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     ['mac'],
     /^(apps\/(desktop|macos)\/|\.github\/workflows\/desktop-release\.yml$|scripts\/desktop-(release|installed-apps)[^/]*\.(mjs|test\.mjs)$)/,
   ],
+  ['web-changelog', 'web', ['web'], /^CHANGELOG\.md$/],
   [
     'web-product',
     'web',

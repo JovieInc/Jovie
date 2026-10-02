@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { ABOUT_FAQ_ITEMS, AboutPageContent } from './AboutPageContent';
 import { ABOUT_STORY_RECEIPT } from './AboutPageContent.stories';
 
@@ -12,6 +13,29 @@ vi.mock('@/lib/analytics', () => ({
 }));
 
 describe('AboutPageContent', () => {
+  it('answers what Jovie does and whom it serves before the founder story', () => {
+    const { container } = render(<AboutPageContent />);
+    const opening = container.querySelector('h1')?.nextElementSibling;
+    expect(opening).toHaveTextContent(COMPANY_IDENTITY.definition);
+    expect(opening).toHaveTextContent(COMPANY_IDENTITY.seoDescription);
+    expect(opening?.textContent).not.toMatch(/#1|number one|guaranteed/i);
+  });
+
+  it('lets readers inspect product details and the founder without JavaScript actions', () => {
+    render(<AboutPageContent />);
+    for (const [name, href] of [
+      ['Living Profile', '/product'],
+      ['Relationships', '/product'],
+      ['Audience', '/product'],
+      ['Adaptive', '/product'],
+      ['For Artists', '/artist-profiles'],
+      ['Payments', '/pay'],
+      ['Tim White, Founder', '/tim/about'],
+    ]) {
+      expect(screen.getByRole('link', { name })).toHaveAttribute('href', href);
+    }
+  });
+
   it('renders the exact shipped body in hero, story, features, FAQ order', () => {
     const { container } = render(<AboutPageContent />);
 
@@ -21,6 +45,7 @@ describe('AboutPageContent', () => {
         name: 'Presence, relationships, and growth.',
       })
     ).toBeVisible();
+    expect(screen.queryByTestId('about-page-refresh')).toBeNull();
     const sectionHeadings = Array.from(container.querySelectorAll('section'))
       .map(section => section.querySelector('h2')?.textContent?.trim())
       .filter((heading): heading is string => heading !== undefined);

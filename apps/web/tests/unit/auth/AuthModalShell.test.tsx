@@ -95,7 +95,7 @@ describe('AuthModalShell', () => {
     const shell = container.querySelector('[data-auth-modal-shell]');
     // bg-background has no --color-background token and emits no CSS, which
     // left the modal without a page background.
-    expect(shell).toHaveClass('bg-base', 'sm:bg-base/96');
+    expect(shell).toHaveClass('bg-base', 'sm:bg-(--color-bg-base)/96');
     expect(shell).not.toHaveClass('bg-background');
     expect(shell).not.toHaveClass('sm:bg-background/96');
   });
@@ -167,21 +167,29 @@ describe('AuthModalShell', () => {
 
   it.each([
     '//evil.com',
+    '/%2fevil.com',
+    '/%5cevil.com',
+    '/\t/evil.com',
+    '/%09/evil.com',
+    '/%0a/evil.com',
     'https://evil.com',
     '/redirect#fragment\\..\\evil',
     '\\\\evil.com',
-  ])('refuses an unsafe backDestination (%j) and degrades to dismissal', unsafe => {
-    render(
-      <AuthModalShell backDestination={unsafe}>
-        <div>body</div>
-      </AuthModalShell>
-    );
+  ])(
+    'refuses an unsafe backDestination (%j) and degrades to dismissal',
+    unsafe => {
+      render(
+        <AuthModalShell backDestination={unsafe}>
+          <div>body</div>
+        </AuthModalShell>
+      );
 
-    fireEvent.click(screen.getByLabelText('Back to homepage'));
+      fireEvent.click(screen.getByLabelText('Back to homepage'));
 
-    expect(mockPush).not.toHaveBeenCalled();
-    expect(mockBack).toHaveBeenCalledTimes(1);
-  });
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(mockBack).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('degrades an unknown-label back control without a destination to dismissal', () => {
     // A label the shell cannot bind to a validated destination must not
@@ -198,6 +206,20 @@ describe('AuthModalShell', () => {
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
+  it.each(['constructor', 'toString', '__proto__'])(
+    'dismisses an inherited label key %j safely',
+    label => {
+      render(
+        <AuthModalShell backButtonLabel={label}>
+          <div>body</div>
+        </AuthModalShell>
+      );
+      fireEvent.click(screen.getByLabelText(label));
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(mockBack).toHaveBeenCalledTimes(1);
+    }
+  );
+
   it('keeps Escape dismissal separate from destination navigation', () => {
     // Escape/backdrop are modal-DISMISSAL (history pop of the intercepted
     // route) and must never navigate to the back destination.
@@ -210,7 +232,7 @@ describe('AuthModalShell', () => {
     const dialog = container.querySelector('dialog');
     expect(dialog).not.toBeNull();
 
-    fireEvent.cancel(dialog!);
+    fireEvent(dialog!, new Event('cancel', { cancelable: true }));
     fireEvent.mouseDown(dialog!);
 
     expect(mockBack).toHaveBeenCalledTimes(2);
@@ -299,20 +321,19 @@ describe('AuthModalShell', () => {
     expect(document.documentElement.style.overscrollBehavior).toBe('');
   });
 
-  it.each([
-    '',
-    '   ',
-    '\t\n',
-  ])('falls back to "Back to homepage" when backButtonLabel is whitespace-only (%j)', emptyish => {
-    // Guards the render-time fallback added in c9ae3ce. An empty or
-    // whitespace-only aria-label would otherwise leave the button
-    // unlabeled for assistive tech.
-    render(
-      <AuthModalShell backButtonLabel={emptyish}>
-        <div>body</div>
-      </AuthModalShell>
-    );
+  it.each(['', '   ', '\t\n'])(
+    'falls back to "Back to homepage" when backButtonLabel is whitespace-only (%j)',
+    emptyish => {
+      // Guards the render-time fallback added in c9ae3ce. An empty or
+      // whitespace-only aria-label would otherwise leave the button
+      // unlabeled for assistive tech.
+      render(
+        <AuthModalShell backButtonLabel={emptyish}>
+          <div>body</div>
+        </AuthModalShell>
+      );
 
-    expect(screen.getByLabelText('Back to homepage')).toBeInTheDocument();
-  });
+      expect(screen.getByLabelText('Back to homepage')).toBeInTheDocument();
+    }
+  );
 });

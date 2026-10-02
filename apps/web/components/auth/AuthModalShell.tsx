@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { useModalFocusBoundary } from '@/lib/a11y/modal-focus-boundary';
 import { AUTH_SHELL_KIND } from '@/lib/auth/auth-shell-layout-contract';
+import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 
 /**
  * Labels whose destination is fixed and validated. The visible back promise
@@ -46,20 +47,15 @@ function resolveBackDestination(
   label: string,
   destination: string | undefined
 ): string | null {
-  const candidate =
-    destination ??
-    KNOWN_BACK_DESTINATIONS[label as keyof typeof KNOWN_BACK_DESTINATIONS] ??
-    null;
+  const knownDestination = Object.hasOwn(KNOWN_BACK_DESTINATIONS, label)
+    ? KNOWN_BACK_DESTINATIONS[label as keyof typeof KNOWN_BACK_DESTINATIONS]
+    : null;
+  const candidate = destination ?? knownDestination;
   if (!candidate) return null;
   const trimmed = candidate.trim();
-  if (
-    !trimmed.startsWith('/') ||
-    trimmed.startsWith('//') ||
-    trimmed.includes('\\')
-  ) {
-    return null;
-  }
-  return trimmed;
+  return trimmed === APP_ROUTES.HOME
+    ? APP_ROUTES.HOME
+    : sanitizeRedirectUrl(trimmed);
 }
 
 export function AuthModalShell({
@@ -127,7 +123,6 @@ export function AuthModalShell({
   );
 
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: native <dialog> opened via showModal() is interactive; mouseDown is the documented way to detect ::backdrop clicks.
     <dialog
       ref={dialogRef}
       aria-label={ariaLabel}
@@ -135,7 +130,7 @@ export function AuthModalShell({
       data-auth-modal-shell
       data-auth-shell-kind={AUTH_SHELL_KIND.interceptedModal}
       onMouseDown={onBackdropMouseDown}
-      className='jovie-auth-modal fixed inset-0 m-0 h-dvh max-h-dvh w-[100dvw] max-w-none overflow-y-auto overscroll-contain rounded-none border-0 bg-base p-0 text-primary-token shadow-none backdrop:bg-black/70 backdrop:backdrop-blur-sm sm:m-auto sm:h-auto sm:max-h-[min(600px,calc(100svh-32px))] sm:w-[min(calc(100vw-32px),420px)] sm:rounded-[2rem] sm:border sm:border-white/[0.08] sm:bg-base/96 sm:p-4 sm:shadow-[0_36px_100px_rgba(0,0,0,0.5)]'
+      className='jovie-auth-modal fixed inset-0 m-0 h-dvh max-h-dvh w-[100dvw] max-w-none overflow-y-auto overscroll-contain rounded-none border-0 bg-base p-0 text-primary-token shadow-none backdrop:bg-black/70 backdrop:backdrop-blur-sm sm:m-auto sm:h-auto sm:max-h-[min(600px,calc(100svh-32px))] sm:w-[min(calc(100vw-32px),420px)] sm:rounded-[2rem] sm:border sm:border-white/[0.08] sm:bg-(--color-bg-base)/96 sm:p-4 sm:shadow-[0_36px_100px_rgba(0,0,0,0.5)]'
     >
       <div
         data-auth-modal-body

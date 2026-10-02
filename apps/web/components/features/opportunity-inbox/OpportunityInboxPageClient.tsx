@@ -9,9 +9,11 @@ import {
   useMemo,
   useRef,
   useState,
+  useTransition,
 } from 'react';
 import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
+import { ErrorBanner } from '@/components/features/feedback/ErrorBanner';
 import { PageShell } from '@/components/organisms/PageShell';
 import { useRuntimeUpdate } from '@/components/shell/RuntimeUpdateProvider';
 import { APP_ROUTES } from '@/constants/routes';
@@ -114,6 +116,13 @@ export function OpportunityInboxPageClient({
   const router = useRouter();
   const inboxHomeEnabled = useAppFlag('INBOX_HOME');
   const [cards, setCards] = useState(inbox.cards);
+  const [isRefreshing, startRefresh] = useTransition();
+  const retryFocusRecoveryRef = useRef(false);
+  const inboxReadUnavailable =
+    inbox.availability?.suggestedActions !== 'available' ||
+    !['available', 'not_requested'].includes(
+      inbox.availability?.tourDates ?? 'unknown'
+    );
   const [signalTypeFilter, setSignalTypeFilter] =
     useState<SignalTypeFilter>('all');
   const [signalFilterFocusIndex, setSignalFilterFocusIndex] = useState(0);
@@ -133,6 +142,37 @@ export function OpportunityInboxPageClient({
   const [rejectedTourDates, setRejectedTourDates] = useState(
     initialTourDates.rejected
   );
+  // RSC refresh supplies a new authoritative snapshot while retaining local
+  // filter/scroll state and the existing optimistic action handlers.
+  useEffect(() => setCards(inbox.cards), [inbox.cards]);
+  useEffect(() => {
+    setPendingTourDates(initialTourDates.pending);
+    setConfirmedTourDates(initialTourDates.confirmed);
+    setRejectedTourDates(initialTourDates.rejected);
+  }, [initialTourDates]);
+  useEffect(() => {
+    if (
+      inboxReadUnavailable ||
+      !retryFocusRecoveryRef.current ||
+      cards !== inbox.cards ||
+      pendingTourDates !== initialTourDates.pending
+    )
+      return;
+    retryFocusRecoveryRef.current = false;
+    (
+      signalFilterRefs.current[signalFilterFocusIndex] ??
+      inboxPageRef.current?.querySelector<HTMLElement>(
+        'button:not(:disabled), a[href]'
+      )
+    )?.focus();
+  }, [
+    cards,
+    inbox.cards,
+    inboxReadUnavailable,
+    initialTourDates.pending,
+    pendingTourDates,
+    signalFilterFocusIndex,
+  ]);
   const visibleCards = useMemo(
     () =>
       signalTypeFilter === 'all'
@@ -451,7 +491,7 @@ export function OpportunityInboxPageClient({
       stackKeyboardControlRef.current ??
       signalFilterRefs.current[signalFilterFocusIndex] ??
       inboxPageRef.current?.querySelector<HTMLElement>(
-        '[data-testid="opportunity-inbox-tour-date-review"] button, [data-testid="inbox-runtime-notification"] button:not(:disabled), [data-testid="opportunity-inbox-empty-state"] a, [data-testid="opportunity-inbox-empty-state"] button'
+        '[data-testid="opportunity-inbox-tour-date-review"] button, [data-testid="inbox-runtime-notification"] button:not(:disabled), [data-testid="opportunity-inbox-empty-state"] a, [data-testid="opportunity-inbox-empty-state"] button, [data-testid="opportunity-inbox-availability"] button'
       );
 
     recoveryTarget?.focus();
@@ -576,7 +616,9 @@ export function OpportunityInboxPageClient({
             )
           ) : null}
 
-          {!hasReviewableItems && !runtimeUpdate?.available ? (
+          {!hasReviewableItems &&
+          !runtimeUpdate?.available &&
+          !inboxReadUnavailable ? (
             <OpportunityInboxEmptyState
               actionCards={inbox.emptyActionCards}
               founderMode={inboxHomeEnabled}
@@ -589,6 +631,38 @@ export function OpportunityInboxPageClient({
             onUndoReject={handleUndoRejectTourDate}
             pendingUndoId={pendingUndoId}
           />
+          {inboxReadUnavailable ? (
+            <section
+              aria-busy={isRefreshing}
+              className='mt-3 min-h-24'
+              data-testid='opportunity-inbox-availability'
+            >
+              <ErrorBanner
+                title={
+                  hasReviewableItems
+                    ? 'Some Opportunities Couldn’t Be Checked'
+                    : 'Your Inbox Couldn’t Be Checked'
+                }
+                description={
+                  isRefreshing
+                    ? 'Checking your opportunities…'
+                    : hasReviewableItems
+                      ? 'Your loaded opportunities are still available. Try again to check for the rest.'
+                      : 'We couldn’t check your opportunities. Try again to refresh your inbox.'
+                }
+                actions={[
+                  {
+                    label: 'Try Again',
+                    onClick: () => {
+                      if (isRefreshing) return;
+                      retryFocusRecoveryRef.current = true;
+                      startRefresh(() => router.refresh());
+                    },
+                  },
+                ]}
+              />
+            </section>
+          ) : null}
         </div>
       </div>
     </PageShell>

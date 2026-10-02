@@ -1,9 +1,11 @@
+import { APP_ROUTES } from '@/constants/routes';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 export const ABOUT_COPY = {
   kicker: 'About',
   headline: COMPANY_IDENTITY.headline,
-  support: `${COMPANY_IDENTITY.support} ${COMPANY_IDENTITY.seoDescription}`,
+  support: `${COMPANY_IDENTITY.definition} ${COMPANY_IDENTITY.seoDescription}`,
   metadataTitle: `About Jovie: ${COMPANY_IDENTITY.headline.replace(/\.$/, '')}`,
   metadataDescription: `${COMPANY_IDENTITY.definition} Founded by Tim White. Not affiliated with Jovie childcare.`,
   openGraphDescription: `${COMPANY_IDENTITY.definition} Founded by Tim White.`,
@@ -25,36 +27,43 @@ export const ABOUT_COPY = {
       'Jovie is what I wish existed when I was an artist: one product for presence, relationships, and growth, without reducing you to a category. For musicians, Jovie routes fans to the right streaming platform, turns profile visits into relationships, surfaces audience signals, and gives AI the context of stream counts, tour dates, and collaborations.',
     ],
     signoff: 'Tim White, Founder',
+    href: `${TIM_WHITE_PROFILE.publicProfilePath}/about`,
   },
   featuresHeading: 'What Jovie Does',
   features: [
     {
       title: 'Living Profile',
+      href: APP_ROUTES.PRODUCT,
       description:
         'Your work, links, and story in one place people can actually find.',
     },
     {
       title: 'Relationships',
+      href: APP_ROUTES.PRODUCT,
       description:
         'Give each person the next step that fits: follow, subscribe, listen, buy, book, or reach out.',
     },
     {
       title: 'Audience',
+      href: APP_ROUTES.PRODUCT,
       description:
         'See who is paying attention, what brought them, and what they may want next.',
     },
     {
       title: 'Adaptive',
+      href: APP_ROUTES.PRODUCT,
       description:
         'Jovie adapts to your work without reducing you to a category.',
     },
     {
       title: 'For Artists',
+      href: APP_ROUTES.ARTIST_PROFILES,
       description:
         'Smart links, release notifications, and catalog tools when the work is music.',
     },
     {
       title: 'Payments',
+      href: APP_ROUTES.PAY,
       description:
         // ui-casing-allow: feature list copy with brand name
         'Let people tip you directly through your profile or a QR code, with payments handled by Stripe.',

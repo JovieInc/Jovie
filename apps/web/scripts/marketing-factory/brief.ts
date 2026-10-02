@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { MarketingBriefSchema } from '../../data/marketing/composition';
 import type { HeroDecisionInput } from '../../data/marketing/factory/heroDecision';
 import { FactoryMediaDecisionInputSchema } from '../../data/marketing/factory/mediaDecision';
+import { CompetitiveResearchSchema } from '../../data/marketing/factory/persuasionBrief';
 import { SectionJobNeedSchema } from '../../data/marketing/factory/sectionRequest';
 import { PROOF_KINDS } from '../../data/product-truth/proof';
 
@@ -28,6 +29,11 @@ export const FactoryPageBriefSchema = z.object({
   jobsToBeDone: z.array(Id).min(1),
   /** The only product-truth claims this page may make. */
   claimIds: z.array(Id).min(1),
+  /**
+   * Competitive persuasion research (JOV-7335). Required: the persuasion
+   * stage runs before composition and a page cannot render without it.
+   */
+  persuasion: CompetitiveResearchSchema,
   sectionJobs: z.array(SectionJobNeedSchema).default([]),
   /** Typed by heroDecision.ts; the harness checks it through selectHeroDecision. */
   hero: z.custom<HeroDecisionInput>(
