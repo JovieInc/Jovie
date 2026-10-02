@@ -3171,3 +3171,70 @@ class LockfileConflictTest(unittest.TestCase):
             self.assertNotIn(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], calls)
             self.assertFalse((work / ".git" / "MERGE_HEAD").exists(), "merge aborted")
             self.assertEqual(self.git("rev-parse", "devin/jov-1-20260927", cwd=origin), before)
+
+
+class TimerInstallerNodePathTests(unittest.TestCase):
+    def test_generated_timers_use_installer_node_and_keep_current_receipts(self):
+        import plistlib
+
+        source = (Path(__file__).resolve().parents[1] / "lanes/install.sh").read_text()
+        for platform in ("Linux", "Darwin"):
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                bin_dir = root / "selected-node-bin"
+                bin_dir.mkdir()
+                units = root / "units"
+                units.mkdir()
+                plist = root / "lanes.plist"
+                # Redirect only service output destinations; keep HOME and the
+                # actual installer logic intact. No host timer is installed.
+                script = source.replace("$HOME/.config/systemd/user", str(units))
+                script = script.replace("$HOME/Library/LaunchAgents/com.jovie.lanes.plist", str(plist))
+                installer = root / "install.sh"
+                installer.write_text(script)
+                commands = root / "commands.log"
+
+                def stub(name, body):
+                    path = bin_dir / name
+                    path.write_text(body)
+                    path.chmod(0o755)
+
+                stub("node", "#!/bin/sh\nprintf 'v24.21.0\\n'\n")
+                stub("uname", f"#!/bin/sh\nprintf '{platform}\\n'\n")
+                stub("git", "#!/bin/sh\nprintf '" + "b" * 40 + "\\n'\n")
+                for name in ("systemctl", "launchctl"):
+                    stub(name, f'#!/bin/sh\nprintf "{name} %s\\n" "$*" >> "$INSTALL_COMMAND_LOG"\n')
+                stub("python3", '''#!/usr/bin/python3
+import os, pathlib, sys
+state = pathlib.Path(os.environ['LANES_STATE'])
+current = state / 'current'
+current.mkdir(parents=True, exist_ok=True)
+(current / '.tree').write_text('a' * 40)
+with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
+    log.write('python3 ' + ' '.join(sys.argv[1:]) + '\\n')
+''')
+                result = subprocess.run(
+                    ["/bin/bash", str(installer)], capture_output=True, text=True,
+                    env={**os.environ, "PATH": f"{bin_dir}:/usr/bin:/bin",
+                         "LANES_STATE": str(root / "state"), "LANES_REPO": str(root / "repo"),
+                         "LANES_HUD": "0", "INSTALL_COMMAND_LOG": str(commands)},
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                if platform == "Darwin":
+                    config = plistlib.loads(plist.read_bytes())
+                    timer_path = config["EnvironmentVariables"]["PATH"]
+                    tick = config["ProgramArguments"][-1]
+                    self.assertEqual(config["EnvironmentVariables"]["CODEX_LEDGER_CADENCE_S"], "3600")
+                else:
+                    service = (units / "jovie-lanes.service").read_text()
+                    timer_path = next(line.removeprefix("Environment=PATH=") for line in service.splitlines() if line.startswith("Environment=PATH="))
+                    tick = service
+                    self.assertIn("KillMode=process", service)
+                    self.assertIn("Environment=CODEX_LEDGER_CADENCE_S=3600", service)
+                self.assertEqual(timer_path.split(":")[0], str(bin_dir))
+                self.assertIn("codex_lane.py reconcile --if-due 3600", tick)
+                self.assertIn("lane_runner.py dispatch", tick)
+                log = commands.read_text()
+                self.assertIn("install-receipt --source-commit " + "b" * 40, log)
+                self.assertIn("--source-tree " + "a" * 40, log)
+                self.assertIn("--cadence 3600", log)
