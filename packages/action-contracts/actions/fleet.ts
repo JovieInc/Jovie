@@ -162,6 +162,18 @@ export const fleetRequestSchema = fleetRequestInputSchema.extend({
     .optional(),
   receipt: fleetTerminalReceiptSchema.optional(),
 });
+export const fleetHistoryEntrySchema = z.discriminatedUnion('kind', [
+  z.object({
+    sequence: z.number().int().positive(),
+    kind: z.literal('receipt'),
+    receipt: fleetTerminalReceiptSchema,
+  }),
+  z.object({
+    sequence: z.number().int().positive(),
+    kind: z.literal('request'),
+    request: fleetRequestSchema,
+  }),
+]);
 export const fleetDefectInputSchema = z
   .object({
     leaseId: z.uuid(),
@@ -179,6 +191,14 @@ const output = {
     lease: fleetLeaseSchema.nullable(),
     receipts: z.array(fleetTerminalReceiptSchema),
     requests: z.array(fleetRequestSchema).optional(),
+    requestsNextCursor: z.uuid().nullable().optional(),
+    history: z
+      .object({
+        entries: z.array(fleetHistoryEntrySchema).max(100),
+        nextCursor: z.number().int().positive().nullable(),
+        pending: z.boolean().optional(),
+      })
+      .optional(),
   }),
   'work.next': z.object({ lease: fleetLeaseSchema.nullable() }),
   'work.claim': z.object({ lease: fleetLeaseSchema }),
@@ -202,7 +222,18 @@ const output = {
 };
 export const FLEET_INPUT_SCHEMAS = {
   'fleet.register': fleetRegistrationSchema,
-  'fleet.status': z.object({}).strict(),
+  'fleet.status': z
+    .object({
+      requestsAfter: z.uuid().optional(),
+      historyAfter: z
+        .number()
+        .int()
+        .min(0)
+        .max(Number.MAX_SAFE_INTEGER)
+        .optional(),
+      historyLimit: z.number().int().min(1).max(100).optional(),
+    })
+    .strict(),
   'work.next': z.object({}).strict(),
   'work.claim': z.object({ leaseId: z.uuid() }).strict(),
   'work.report': fleetReportInputSchema,
