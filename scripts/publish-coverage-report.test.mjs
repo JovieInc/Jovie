@@ -126,6 +126,10 @@ test('nightly evidence uses the existing exact-source draft publication with pro
   writeFileSync(join(f.cwd, lastRun), '{"status":"fail"}\n');
   const result = publishNightlyReport(f);
   assert.equal(result.status, 'published');
+  assert.equal(
+    f.calls.some(args => args[0] === 'pr' && args[1] === 'list'),
+    false
+  );
   assert.equal(result.branch, 'bot/nightly-evidence-12345-1');
   assert.equal(f.git('rev-parse', 'HEAD^'), f.source);
   assert.equal(f.git('rev-parse', 'origin/main'), f.source);
