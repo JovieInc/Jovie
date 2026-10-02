@@ -3,18 +3,26 @@
   Do not edit manually — changes are overwritten on the next scheduled run.
 -->
 
-> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/27411234883)
+> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/37055799545)
 
 # Nightly Testing Agent — Daily Report
 
 Repo: jovie
-Generated: 2026-06-12T11:31:02.768Z
+Generated: 2026-10-02T20:14:41.951Z
+Workflow conclusion: failure
+
+## Evidence warnings
+
+- Missing mutation report at /home/runner/work/Jovie/Jovie/apps/web/reports/mutation/mutation.json
 
 ## Suites
 
 | Lane | Total | Passed | Failed | Flaky | Skipped |
 |---|---:|---:|---:|---:|---:|
-| unit | 13741 | 13717 | 0 | 0 | 24 |
+| unit | 7609 | 7571 | 2 | 0 | 36 |
+| unit | 7508 | 7486 | 0 | 0 | 22 |
+| unit | 7042 | 7015 | 1 | 0 | 26 |
+| unit | 7534 | 7515 | 2 | 0 | 17 |
 
 ## Selected Targets
 
@@ -38,4 +46,8 @@ Generated: 2026-06-12T11:31:02.768Z
 
 | Lane | Test | File | Message |
 |---|---|---|---|
-| none | none | none | none |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > inherits child env without JSON disclosure and rejects a real credential trace |  |  Running 1 test using 1 worker F    1) .artifact-json-f9WdMu/sentinel.spec.ts:1:47 › env ─────────────────────────────────────────────       |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > accepts only decoded metadata-free Playwright PNG bytes |  |  Running 1 test using 1 worker  [1A[2K[1/1] .artifact-comparison-X9fHf3/comparison.spec.ts:1:47 › comparison [1A[2K  1) .artifact-comparison |
+| unit | tests/unit/storybook/story-quality-guard.test.ts storybook story quality guard > passes on the current product story library and provenance receipts |  | Test timed out in 60000ms. If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTime |
+| unit | eslint-rules/__tests__/shadcn-lint-changed.test.ts shadcn-lint-changed probe > sees a changed production apps/web TS file from git root and misses it from apps/ |  | probe at git root saw no production files for 504a3ef2aacbf847052c40abde90578b672c3ba8: expected null not to be null |
+| unit | tests/unit/design-system/story-source-sha-ancestry.test.ts story receipt SHA ancestry > keeps every literal receipt ancestral and able to replay its story path |  | expected 3 to be 5 // Object.is equality |
