@@ -1,11 +1,17 @@
 ---
+id: the-friday-problem
+slug: the-friday-problem
 title: The Friday Problem
+description: Most artists make the same mistake.
 date: 2025-01-15
 author: Tim White
 authorUsername: tim
 authorTitle: Founder at Jovie
+authorProfile: /tim
 category: Release Strategy
 tags: release strategy, momentum, content calendar, marketing
+image: /images/blog/friday-problem.svg
+imageAlt: Abstract artwork for The Friday Problem.
 ---
 
 # The Friday Problem

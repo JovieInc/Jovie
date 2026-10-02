@@ -46,7 +46,37 @@ export type DistributionDraftStatus =
   | 'pending'
   | 'approved'
   | 'rejected'
-  | 'dispatched';
+  | 'dispatched'
+  | 'failed'
+  | 'undeliverable';
+
+/**
+ * Observable outcome of a provider dispatch attempt. `dispatched` is only
+ * honest when `state === 'accepted'` — i.e. a provider actually accepted at
+ * least one send. Anything else means approval was recorded but the payload
+ * never reached a supported provider.
+ */
+export type DistributionDeliveryState =
+  | 'accepted'
+  | 'failed'
+  | 'unsupported-channel'
+  | 'provider-not-configured'
+  | 'no-consented-recipients'
+  | 'payload-mismatch';
+
+export interface DistributionDeliveryEvidence {
+  readonly provider: 'twilio' | null;
+  readonly state: DistributionDeliveryState;
+  readonly attemptedAt: string;
+  readonly acceptedAt?: string;
+  readonly attemptedRecipients: number;
+  readonly acceptedRecipients: number;
+  readonly suppressedRecipients: number;
+  /** Provider message/post IDs (capped). Never recipient identifiers. */
+  readonly providerMessageIds?: readonly string[];
+  readonly error?: string;
+  readonly retryable?: boolean;
+}
 
 export type DistributionDraftVariant =
   | 'announcement'
@@ -64,6 +94,12 @@ export interface ReleaseDistributionDraft {
   readonly createdAt: string;
   readonly decidedAt?: string;
   readonly dispatchedAt?: string;
+  /** SHA-256 hex of the exact body approved — dispatch refuses a mutated body. */
+  readonly payloadDigest?: string;
+  /** Stable dedupe key (`${runId}:${draftId}`) for replay-safe dispatch. */
+  readonly idempotencyKey?: string;
+  /** Provider dispatch evidence; absent on drafts never attempted. */
+  readonly delivery?: DistributionDeliveryEvidence;
 }
 
 export interface ReleaseDistributionDrafts {

@@ -73,7 +73,9 @@ function designRoute(
     tuple: {
       model: id,
       provider: 'fixture',
+      endpoint: 'fixture',
       cli: 'fixture-cli',
+      harness: 'eve',
       configVersion: 'v1',
       tools: ['design-skills'],
       reviewPlan: 'postflight',

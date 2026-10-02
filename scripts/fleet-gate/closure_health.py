@@ -42,7 +42,6 @@ ISSUE_BLOCKED_REASONS = frozenset(
         "closure-actions-pending",
         "queue-controller-red-over-10m",
         "lifecycle-action-inventory-incomplete",
-        "closure-observation-unknown",
     }
 )
 SYSTEMS_DOWN_REASONS = frozenset(
@@ -54,7 +53,10 @@ SYSTEMS_DOWN_REASONS = frozenset(
 
 
 def issue_intake_allowed(status: object, reasons: object) -> bool:
-    """Issue-blocked red keeps Jovie intake open; systems-down stays fail-closed."""
+    """Known issue-blocked red permits intake; unknown observation stays closed.
+
+    Observation uncertainty is repo-local, not a shared systems-down reason.
+    """
     if not isinstance(reasons, list) or not all(
         isinstance(reason, str) for reason in reasons
     ):

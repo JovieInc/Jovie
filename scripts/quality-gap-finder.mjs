@@ -2,7 +2,8 @@
 /**
  * Quality gap finder: proposes missing tests, guardrails, and invariants from
  * repo and tracker evidence. Deterministic and model-free; one filesystem
- * walk, one `git log`, and at most two Linear queries per run.
+ * walk, one `git log`, and at most four Linear queries per run.
+ * Invariant consumer: JOV-INV-041.
  *
  * Collectors (each returns proposals with a confidence in [0, 1]):
  *   invariant-evidence-unwired   canon invariant whose enforcing test no CI
@@ -12,6 +13,9 @@
  *                                invariant, incident ledger entry, or script
  *   escaped-defect-untested      bug/dogfood/Sentry issue naming a source file
  *                                that has no test
+ *   escaped-defect-closure-unverified
+ *                                completed escaped defect missing product +
+ *                                detector closure evidence
  *   component-state-untested     recently changed UI component with neither a
  *                                story nor a test
  *   changed-code-untested        recently changed API route / lib module with
@@ -53,8 +57,11 @@ import {
 } from 'node:fs';
 import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
 import { ownedHere } from './invariants/registry.mjs';
+import {
+  ESCAPED_DEFECT_LABEL,
+  evaluateEscapedDefectClosure,
+} from './lib/escaped-defect-closure.mjs';
 import {
   JOVIE_TEAM_ID,
   upsertLinearIssueByTitleFingerprint,
@@ -114,6 +121,7 @@ function proposal({
   area,
   evidence,
   suggestion,
+  originatingIssue = null,
 }) {
   return {
     fingerprint: fingerprintOf(kind, key),
@@ -126,6 +134,7 @@ function proposal({
     area,
     evidence,
     suggestion,
+    originatingIssue,
   };
 }
 
@@ -533,6 +542,36 @@ export function collectEscapedDefectGaps(issues, repoRoot, testIndex) {
   return out;
 }
 
+/** Completed escaped defects must carry product and detector repair proof. */
+export function collectEscapedDefectClosureGaps(issues) {
+  const out = [];
+  for (const issue of issues) {
+    const closed = ['completed', 'Done'].includes(
+      issue.statusType ?? issue.status
+    );
+    if (!closed) continue;
+    const closure = evaluateEscapedDefectClosure(issue);
+    if (!closure.applicable || closure.ok) continue;
+    out.push(
+      proposal({
+        kind: 'escaped-defect-closure-unverified',
+        key: issue.id,
+        title: `${issue.id} closed without verified product and detector repair evidence`,
+        confidence: 1,
+        impact: 5,
+        area: 'escaped-defects',
+        originatingIssue: issue.id,
+        evidence: [
+          `${issue.id}: ${issue.title}`,
+          ...closure.errors.map(error => `closure contract: ${error}`),
+        ],
+        suggestion: `Reopen ${issue.id}; attach the jovie.escaped-defect-closure/v1 receipt to that originating issue, then close it through the guarded transition after exact-build retest. Do not create a parallel repair record.`,
+      })
+    );
+  }
+  return out;
+}
+
 export function gitChurn(repoRoot, sinceDays, runGit = defaultGit) {
   const log = runGit(repoRoot, [
     'log',
@@ -830,6 +869,10 @@ export function issueDescription(item, runUrl = 'local run') {
       ? '\n**Low confidence: needs Tim.** Summer turns this into an Ovie inbox card. Accept by moving it to Todo; reject by canceling it. The finder never re-proposes a canceled fingerprint.'
       : '',
     '',
+    item.originatingIssue
+      ? `Originating defect: ${item.originatingIssue}`
+      : null,
+    item.originatingIssue ? '' : null,
     '## Evidence',
     ...item.evidence.map(line => `- ${line}`),
     '',
@@ -898,7 +941,7 @@ export async function fetchRecentDefects(apiKey, sinceDays, fetchImpl) {
   const since = new Date(Date.now() - sinceDays * 86_400_000).toISOString();
   const data = await linearQuery(
     `query($teamId: ID!, $since: DateTimeOrDuration!) {
-      issues(filter: { team: { id: { eq: $teamId } }, createdAt: { gte: $since } }, first: 250) {
+      issues(filter: { team: { id: { eq: $teamId } }, updatedAt: { gte: $since } }, first: 250) {
         nodes { identifier title description state { name type } labels { nodes { name } } }
       }
     }`,
@@ -906,13 +949,47 @@ export async function fetchRecentDefects(apiKey, sinceDays, fetchImpl) {
     apiKey,
     fetchImpl
   );
-  return (data?.issues?.nodes ?? []).map(node => ({
+  const issues = (data?.issues?.nodes ?? []).map(node => ({
     id: node.identifier,
+    identifier: node.identifier,
     title: node.title,
     description: node.description ?? '',
     status: node.state?.name,
     statusType: node.state?.type,
     labels: node.labels?.nodes?.map(label => label.name) ?? [],
+    comments: [],
+  }));
+  const closureCandidates = issues.filter(
+    issue =>
+      ['completed', 'Done'].includes(issue.statusType ?? issue.status) &&
+      issue.labels.some(
+        label => String(label).toLowerCase() === ESCAPED_DEFECT_LABEL
+      )
+  );
+  if (closureCandidates.length === 0) return issues;
+  const commentFields = closureCandidates
+    .map(
+      (issue, index) =>
+        `i${index}: issue(id: "${issue.id}") { identifier comments(first: 50) { nodes { body } } }`
+    )
+    .join('\n');
+  const commentData = await linearQuery(
+    `query EscapedDefectClosureComments { ${commentFields} }`,
+    {},
+    apiKey,
+    fetchImpl
+  );
+  const commentsByIssue = new Map(
+    Object.values(commentData ?? {})
+      .filter(Boolean)
+      .map(issue => [
+        issue.identifier,
+        issue.comments?.nodes?.map(comment => comment.body) ?? [],
+      ])
+  );
+  return issues.map(issue => ({
+    ...issue,
+    comments: commentsByIssue.get(issue.id) ?? [],
   }));
 }
 
@@ -997,6 +1074,7 @@ export function collectAll({
       guardCorpus,
       actionStates
     ),
+    ...collectEscapedDefectClosureGaps(issues),
     ...collectEscapedDefectGaps(issues, repoRoot, testIndex),
     ...collectComponentStateGaps(churn, repoRoot, testIndex),
     ...collectChangedCodeGaps(churn, repoRoot, testIndex),

@@ -7,6 +7,8 @@ import {
   formatDevRouteDiscoveryLog,
 } from './ensure-dev-next-cache.mjs';
 
+import { worktreeDevelopmentEnv } from './worktree-identity.mjs';
+
 const require = createRequire(import.meta.url);
 const nextBin = require.resolve('next/dist/bin/next');
 const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
@@ -44,6 +46,7 @@ const nextDev = spawn(
     cwd: webRoot,
     env: {
       ...process.env,
+      ...worktreeDevelopmentEnv(webRoot, port, process.env),
       NODE_OPTIONS: nodeOptions,
     },
     stdio: 'inherit',
