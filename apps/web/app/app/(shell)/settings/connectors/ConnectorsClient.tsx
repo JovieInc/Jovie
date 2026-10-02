@@ -17,6 +17,8 @@ import {
   getConnectorDefinitions,
 } from '@/lib/connectors/registry';
 
+import type { SettingsSuggestedActionPreview } from './connectors-data';
+
 const CONNECTOR_DEFINITIONS = getConnectorDefinitions();
 
 interface ConnectorState {
@@ -26,31 +28,10 @@ interface ConnectorState {
   readonly errorMessage?: string;
 }
 
-interface SuggestedActionPreview {
-  readonly id: string;
-  readonly title: string;
-  readonly startsAt: string;
-  readonly endsAt: string | null;
-  readonly venueName: string | null;
-  readonly city: string | null;
-  readonly region: string | null;
-  readonly country: string | null;
-  readonly confidence: number;
-  readonly rationale: string;
-  readonly sourceRef: { messageId: string; subject: string };
-  readonly status:
-    | 'pending'
-    | 'approved'
-    | 'executed'
-    | 'rejected'
-    | 'failed'
-    | 'expired';
-}
-
 interface ConnectorsClientProps {
   readonly connectors: Readonly<Record<ConnectorProviderId, ConnectorState>>;
   readonly creatorProfileId: string | null;
-  readonly suggestedActions: SuggestedActionPreview[];
+  readonly suggestedActions: SettingsSuggestedActionPreview[];
   readonly isDev: boolean;
 }
 
@@ -168,13 +149,14 @@ export function ConnectorsClient({
       {suggestedActions.length > 0 && (
         <SettingsPanel
           title='Suggested Actions'
-          bodyClassName='space-y-3 px-4 py-3 sm:px-5'
+          bodyClassName='divide-y divide-subtle px-4 sm:px-5'
         >
           {suggestedActions.map(action => (
             <SuggestedActionCard
               key={action.id}
               {...action}
-              // Approve/Reject handlers are wired in C-PR-3.
+              presentation='row'
+              reviewHref={APP_ROUTES.DASHBOARD}
             />
           ))}
         </SettingsPanel>

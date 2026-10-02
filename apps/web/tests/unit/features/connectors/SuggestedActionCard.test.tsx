@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -99,7 +100,9 @@ describe('SuggestedActionCard', () => {
     [0.96, 'High Confidence, 96%', 'success'],
     [0.75, 'Medium Confidence, 75%', 'warning'],
     [0.5, 'Low Confidence, 50%', 'error'],
-    [Number.NaN, 'Low Confidence, 0%', 'error'],
+    [Number.NaN, 'Confidence Unavailable', 'neutral'],
+    [null, 'Confidence Unavailable', 'neutral'],
+    [0, 'Low Confidence, 0%', 'error'],
   ] as const)(
     'exposes %s confidence through text and semantic tone',
     (confidence, accessibleName, tone) => {
@@ -111,6 +114,46 @@ describe('SuggestedActionCard', () => {
       );
     }
   );
+
+  it('keeps non-calendar suggestions free of booking metadata and fabricated confidence', () => {
+    render(
+      <SuggestedActionCard
+        {...BASE_PROPS}
+        kind='youtube.thumbnail_experiment'
+        title='Compare approved thumbnails'
+        confidence={null}
+      />
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Compare approved thumbnails' })
+    ).toBeVisible();
+    expect(screen.queryByRole('time')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Public Records, Brooklyn, NY, US')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(BASE_PROPS.sourceRef.subject)
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Confidence/)).not.toBeInTheDocument();
+  });
+
+  it('offers keyboard-accessible review instead of disabled approval controls in settings', async () => {
+    const user = userEvent.setup();
+    render(
+      <SuggestedActionCard
+        {...BASE_PROPS}
+        presentation='row'
+        reviewHref='/app'
+      />
+    );
+    const link = screen.getByRole('link', {
+      name: 'Review Late Set at Public Records in Inbox',
+    });
+    expect(link).toHaveAttribute('href', '/app');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    await user.tab();
+    expect(link).toHaveFocus();
+  });
 
   it('renders valid dates and composes a partial location without empty separators', () => {
     const { rerender } = render(

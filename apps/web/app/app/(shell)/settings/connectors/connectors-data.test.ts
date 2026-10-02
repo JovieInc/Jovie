@@ -1,3 +1,4 @@
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { YOUTUBE_OAUTH_SCOPES } from '@/lib/connectors/youtube/scopes';
 
@@ -53,7 +54,9 @@ describe('loadSettingsConnectorsData', () => {
         }),
       })
       .mockReturnValueOnce({
-        from: () => ({ where: () => ({ limit: async () => [] }) }),
+        from: () => ({
+          where: () => ({ orderBy: () => ({ limit: async () => [] }) }),
+        }),
       });
 
     const data = await loadSettingsConnectorsData(
@@ -75,5 +78,67 @@ describe('loadSettingsConnectorsData', () => {
         scopes: YOUTUBE_OAUTH_SCOPES,
       },
     });
+  });
+  it('preserves action kind and missing confidence, and excludes Ovie recordings before limiting results', async () => {
+    const where = vi.fn().mockReturnValue({
+      orderBy: () => ({
+        limit: async () => [
+          {
+            id: 'youtube',
+            kind: 'youtube.thumbnail_experiment',
+            payload: { title: 'Compare thumbnails' },
+            sourceRefs: [],
+            rationale: 'Compare approved artwork',
+            status: 'pending',
+          },
+          {
+            id: 'calendar',
+            kind: 'calendar.create_event',
+            payload: { title: 'Booking', confidence: 0 },
+            sourceRefs: [{ messageId: 'email', subject: 'Confirmed' }],
+            rationale: null,
+            status: 'pending',
+          },
+          {
+            id: 'malformed',
+            kind: 'unknown',
+            payload: null,
+            sourceRefs: {},
+            rationale: null,
+            status: 'pending',
+          },
+        ],
+      }),
+    });
+    select
+      .mockReturnValueOnce({ from: () => ({ where: async () => [] }) })
+      .mockReturnValueOnce({ from: () => ({ where }) });
+    const data = await loadSettingsConnectorsData('user', null);
+    expect(data?.suggestedActions).toMatchObject([
+      {
+        id: 'youtube',
+        kind: 'youtube.thumbnail_experiment',
+        title: 'Compare thumbnails',
+        confidence: null,
+      },
+      {
+        id: 'calendar',
+        kind: 'calendar.create_event',
+        confidence: 0,
+        sourceRef: { subject: 'Confirmed' },
+      },
+      {
+        id: 'malformed',
+        kind: 'unknown',
+        title: 'Untitled suggestion',
+        confidence: null,
+        sourceRef: { subject: '' },
+      },
+    ]);
+    const query = new PgDialect().sqlToQuery(where.mock.calls[0][0]);
+    expect(query.sql).toContain('"suggested_actions"."kind" <>');
+    expect(query.params).toContain('workflow_capture.request');
+    expect(query.params).toContain('database-user');
+    expect(query.params).toContain('pending');
   });
 });

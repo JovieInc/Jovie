@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
+import { APP_ROUTES } from '@/constants/routes';
 import { SuggestedActionCard } from './SuggestedActionCard';
 
 const meta: Meta<typeof SuggestedActionCard> = {
@@ -50,4 +52,40 @@ export const StateMatrix: Story = {
       ))}
     </div>
   ),
+};
+
+export const SettingsRows: Story = {
+  parameters: { layout: 'fullscreen' },
+  render: () => (
+    <div className='min-h-screen bg-surface-1 p-4 text-primary'>
+      <SettingsPanel
+        title='Suggested Actions'
+        bodyClassName='divide-y divide-subtle px-4 sm:px-5'
+      >
+        <SuggestedActionCard
+          {...BASE_ACTION}
+          status='pending'
+          confidence={null}
+          presentation='row'
+          reviewHref={APP_ROUTES.DASHBOARD}
+        />
+        <SuggestedActionCard
+          {...BASE_ACTION}
+          id='thumbnail'
+          kind='youtube.thumbnail_experiment'
+          title='Compare approved thumbnails for the next release'
+          status='pending'
+          confidence={null}
+          rationale='Review the approved candidates before starting a YouTube experiment.'
+          presentation='row'
+          reviewHref={APP_ROUTES.DASHBOARD}
+        />
+      </SettingsPanel>
+    </div>
+  ),
+};
+
+export const SettingsRowsLight: Story = {
+  ...SettingsRows,
+  parameters: { layout: 'fullscreen', themes: { themeOverride: 'light' } },
 };

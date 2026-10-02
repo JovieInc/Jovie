@@ -125,4 +125,38 @@ describe('ConnectorsClient', () => {
     expect(success).toHaveBeenCalledWith('YouTube disconnected');
     expect(refresh).toHaveBeenCalledOnce();
   });
+  it('routes a non-calendar suggestion to Inbox without disabled booking controls', () => {
+    render(
+      <ConnectorsClient
+        connectors={disconnectedConnectors}
+        creatorProfileId={null}
+        isDev={false}
+        suggestedActions={[
+          {
+            id: 'thumbnail',
+            kind: 'youtube.thumbnail_experiment',
+            title: 'Compare thumbnails',
+            startsAt: '',
+            endsAt: null,
+            venueName: null,
+            city: null,
+            region: null,
+            country: null,
+            confidence: null,
+            rationale: 'Review approved candidates',
+            sourceRef: { messageId: '', subject: '' },
+            status: 'pending',
+          },
+        ]}
+      />
+    );
+    expect(
+      screen.getByRole('link', { name: 'Review Compare thumbnails in Inbox' })
+    ).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
+    expect(screen.queryByText('Date unavailable')).not.toBeInTheDocument();
+    expect(screen.queryByText('Location unavailable')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Approve|Reject/ })
+    ).not.toBeInTheDocument();
+  });
 });

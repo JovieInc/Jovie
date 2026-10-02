@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, ne } from 'drizzle-orm';
 import type { ConnectorStatus } from '@/components/features/connectors/ConnectorCard';
 import {
   CONNECTOR_PROVIDER_IDS,
@@ -8,6 +8,7 @@ import {
   type ConnectorProviderId,
 } from '@/lib/connectors/registry';
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
+import { WORKFLOW_CAPTURE_REQUEST_KIND } from '@/lib/connectors/suggested-action-kinds';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import {
@@ -34,6 +35,7 @@ export interface SettingsConnectorState {
 
 export interface SettingsSuggestedActionPreview {
   readonly id: string;
+  readonly kind: string;
   readonly title: string;
   readonly startsAt: string;
   readonly endsAt: string | null;
@@ -41,7 +43,7 @@ export interface SettingsSuggestedActionPreview {
   readonly city: string | null;
   readonly region: string | null;
   readonly country: string | null;
-  readonly confidence: number;
+  readonly confidence: number | null;
   readonly rationale: string;
   readonly sourceRef: { messageId: string; subject: string };
   readonly status:
@@ -164,6 +166,7 @@ async function loadSettingsConnectorsDataForUser(
     db
       .select({
         id: suggestedActions.id,
+        kind: suggestedActions.kind,
         payload: suggestedActions.payload,
         rationale: suggestedActions.rationale,
         sourceRefs: suggestedActions.sourceRefs,
@@ -173,29 +176,51 @@ async function loadSettingsConnectorsDataForUser(
       .where(
         and(
           eq(suggestedActions.userId, userId),
-          eq(suggestedActions.status, 'pending')
+          eq(suggestedActions.status, 'pending'),
+          // Workflow recordings belong to Ovie, as in the canonical Inbox.
+          ne(suggestedActions.kind, WORKFLOW_CAPTURE_REQUEST_KIND)
         )
       )
+      .orderBy(desc(suggestedActions.createdAt))
       .limit(10),
   ]);
 
   const pendingActions = actionRows.map(row => {
-    const payload = row.payload as Record<string, unknown>;
-    const sourceRefs =
-      (row.sourceRefs as Array<{ messageId: string; subject: string }>) ?? [];
+    const payload =
+      row.payload &&
+      typeof row.payload === 'object' &&
+      !Array.isArray(row.payload)
+        ? (row.payload as Record<string, unknown>)
+        : {};
+    const sourceRefs = Array.isArray(row.sourceRefs) ? row.sourceRefs : [];
+    const source = sourceRefs.find(
+      ref => ref && typeof ref === 'object' && typeof ref.subject === 'string'
+    );
 
     return {
       id: row.id,
-      title: String(payload.title ?? 'Untitled event'),
+      kind: row.kind,
+      title:
+        typeof payload.title === 'string' && payload.title.trim()
+          ? payload.title.trim()
+          : 'Untitled suggestion',
       startsAt: String(payload.startsAt ?? ''),
       endsAt: (payload.endsAt as string | null) ?? null,
       venueName: (payload.venueName as string | null) ?? null,
       city: (payload.city as string | null) ?? null,
       region: (payload.region as string | null) ?? null,
       country: (payload.country as string | null) ?? null,
-      confidence: Number(payload.confidence ?? 0),
+      confidence:
+        typeof payload.confidence === 'number' &&
+        Number.isFinite(payload.confidence)
+          ? payload.confidence
+          : null,
       rationale: String(row.rationale ?? ''),
-      sourceRef: sourceRefs[0] ?? { messageId: '', subject: '' },
+      sourceRef: {
+        messageId:
+          typeof source?.messageId === 'string' ? source.messageId : '',
+        subject: typeof source?.subject === 'string' ? source.subject : '',
+      },
       status: row.status as 'pending',
     };
   });

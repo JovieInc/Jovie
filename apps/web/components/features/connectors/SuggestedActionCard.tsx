@@ -1,7 +1,9 @@
 'use client';
 
 import { Badge, Button } from '@jovie/ui';
-import { CalendarPlus, Clock, Mail, MapPin } from 'lucide-react';
+import { CalendarPlus, Clock, Mail, MapPin, Sparkles } from 'lucide-react';
+import Link from 'next/link';
+import { CALENDAR_CREATE_EVENT_KIND } from '@/lib/connectors/suggested-action-kinds';
 import { cn } from '@/lib/utils';
 
 interface SourceRef {
@@ -12,13 +14,16 @@ interface SourceRef {
 export interface SuggestedActionCardProps {
   readonly id: string;
   readonly title: string;
+  readonly kind?: string;
+  readonly presentation?: 'card' | 'row';
+  readonly reviewHref?: string;
   readonly startsAt: string;
   readonly endsAt?: string | null;
   readonly venueName?: string | null;
   readonly city?: string | null;
   readonly region?: string | null;
   readonly country?: string | null;
-  readonly confidence: number;
+  readonly confidence: number | null;
   readonly rationale: string;
   readonly sourceRef: SourceRef;
   readonly status:
@@ -28,9 +33,9 @@ export interface SuggestedActionCardProps {
     | 'rejected'
     | 'failed'
     | 'expired';
-  /** READ-ONLY for C-PR-2 — Approve/Reject endpoints are wired in C-PR-3. */
+  /** Supply a handler only when this surface can execute the action. */
   readonly onApprove?: () => void;
-  /** READ-ONLY for C-PR-2 — wired in C-PR-3. */
+  /** Supply a handler only when this surface can reject the action. */
   readonly onReject?: () => void;
   readonly className?: string;
 }
@@ -81,14 +86,19 @@ function buildLocationLine(
   return parts.length > 0 ? parts.join(', ') : null;
 }
 
-function getConfidencePresentation(confidence: number): {
+function getConfidencePresentation(confidence: number | null): {
   readonly label: string;
-  readonly percentage: number;
-  readonly tone: 'success' | 'warning' | 'error';
+  readonly percentage: number | null;
+  readonly tone: 'success' | 'warning' | 'error' | 'neutral';
 } {
-  const normalizedConfidence = Number.isFinite(confidence)
-    ? Math.min(1, Math.max(0, confidence))
-    : 0;
+  if (confidence === null || !Number.isFinite(confidence)) {
+    return {
+      label: 'Confidence Unavailable',
+      percentage: null,
+      tone: 'neutral',
+    };
+  }
+  const normalizedConfidence = Math.min(1, Math.max(0, confidence));
   const percentage = Math.round(normalizedConfidence * 100);
 
   if (normalizedConfidence >= 0.9) {
@@ -100,14 +110,12 @@ function getConfidencePresentation(confidence: number): {
   return { label: 'Low Confidence', percentage, tone: 'error' };
 }
 
-/**
- * Preview card for a suggested calendar event awaiting DJ approval.
- * READ-ONLY in C-PR-2: Approve/Reject endpoints are wired in C-PR-3.
- * The slot-based preview block is ready for v1.1 fan-facing side effects.
- */
 export function SuggestedActionCard({
   id,
   title,
+  kind = CALENDAR_CREATE_EVENT_KIND,
+  presentation = 'card',
+  reviewHref,
   startsAt,
   endsAt,
   venueName,
@@ -133,19 +141,28 @@ export function SuggestedActionCard({
     'Source email unavailable';
   const confidencePresentation = getConfidencePresentation(confidence);
   const isPending = status === 'pending';
+  const isCalendar = kind === CALENDAR_CREATE_EVENT_KIND;
+  const ActionIcon = isCalendar ? CalendarPlus : Sparkles;
+  const confidenceLabel =
+    confidencePresentation.percentage === null
+      ? confidencePresentation.label
+      : `${confidencePresentation.label}, ${confidencePresentation.percentage}%`;
 
   return (
     <article
       className={cn(
-        'space-y-3 rounded-lg border border-subtle bg-surface-0 p-4',
+        'space-y-3',
+        presentation === 'card'
+          ? 'rounded-lg border border-subtle bg-surface-0 p-4'
+          : 'py-4',
         className
       )}
       data-testid={`suggested-action-card-${id}`}
       data-status={status}
     >
-      <div className='flex items-start justify-between gap-2'>
+      <div className='flex flex-wrap items-start justify-between gap-2'>
         <div className='flex min-w-0 items-start gap-2'>
-          <CalendarPlus
+          <ActionIcon
             className='mt-0.5 h-4 w-4 shrink-0 text-secondary'
             aria-hidden='true'
           />
@@ -153,58 +170,74 @@ export function SuggestedActionCard({
             {title}
           </h3>
         </div>
-        <Badge
-          variant='outline'
-          size='sm'
-          tone={confidencePresentation.tone}
-          className='shrink-0'
-          aria-label={`${confidencePresentation.label}, ${confidencePresentation.percentage}%`}
-        >
-          {confidencePresentation.label} · {confidencePresentation.percentage}%
-        </Badge>
-      </div>
-
-      <div className='flex items-center gap-1.5 text-xs text-secondary'>
-        <Clock className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
-        {startsAtLabel ? (
-          <time dateTime={startsAt}>{startsAtLabel}</time>
-        ) : (
-          <span>Date unavailable</span>
-        )}
-        {endsAtLabel && (
-          <>
-            {' – '}
-            <time dateTime={endsAt ?? undefined}>{endsAtLabel}</time>
-          </>
+        {isCalendar && (
+          <Badge
+            variant='outline'
+            size='sm'
+            tone={confidencePresentation.tone}
+            className='shrink-0'
+            aria-label={confidenceLabel}
+          >
+            {confidencePresentation.label}
+            {confidencePresentation.percentage !== null &&
+              ` · ${confidencePresentation.percentage}%`}
+          </Badge>
         )}
       </div>
 
-      <div className='flex items-center gap-1.5 text-xs text-secondary'>
-        <MapPin className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
-        <span>{locationLine}</span>
-      </div>
+      {isCalendar && (
+        <>
+          <div className='flex flex-wrap items-center gap-1.5 text-xs text-secondary'>
+            <Clock className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
+            {startsAtLabel ? (
+              <time dateTime={startsAt}>{startsAtLabel}</time>
+            ) : (
+              <span>Date unavailable</span>
+            )}
+            {endsAtLabel && (
+              <>
+                {' – '}
+                <time dateTime={endsAt ?? undefined}>{endsAtLabel}</time>
+              </>
+            )}
+          </div>
 
-      <div className='flex items-center gap-1.5'>
-        <Mail className='h-3 w-3 shrink-0 text-tertiary' aria-hidden='true' />
-        <span
-          className='truncate text-xs text-tertiary'
-          title={
-            sourceSubject === 'Source email unavailable'
-              ? undefined
-              : sourceSubject
-          }
-        >
-          {sourceSubject}
-        </span>
-      </div>
+          <div className='flex items-center gap-1.5 text-xs text-secondary'>
+            <MapPin className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
+            <span>{locationLine}</span>
+          </div>
 
-      <p className='text-xs text-tertiary italic'>{rationale}</p>
+          <div className='flex items-center gap-1.5'>
+            <Mail
+              className='h-3 w-3 shrink-0 text-tertiary'
+              aria-hidden='true'
+            />
+            <span
+              className='truncate text-xs text-tertiary'
+              title={
+                sourceSubject === 'Source email unavailable'
+                  ? undefined
+                  : sourceSubject
+              }
+            >
+              {sourceSubject}
+            </span>
+          </div>
+        </>
+      )}
 
-      {/* v1.1 side-effects slot (empty in v1) */}
-      {/* When v1.1 ships, fill this slot with fan-facing side effect previews */}
+      {rationale && (
+        <p className='break-words text-xs text-secondary'>{rationale}</p>
+      )}
 
       <div className='flex min-h-7 items-center pt-1'>
-        {isPending ? (
+        {isPending && reviewHref ? (
+          <Button size='sm' variant='secondary' asChild>
+            <Link href={reviewHref} aria-label={`Review ${title} in Inbox`}>
+              Review in Inbox
+            </Link>
+          </Button>
+        ) : isPending ? (
           <div className='flex w-full gap-2'>
             <Button
               size='sm'
