@@ -1,7 +1,7 @@
 import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
-import { AdminWaitlistTableUnified } from './AdminWaitlistTableUnified';
+import { AdminWaitlistTableWithViews } from './AdminWaitlistTableWithViews';
 
 const entries: WaitlistEntryRow[] = [
   {
@@ -23,34 +23,38 @@ const entries: WaitlistEntryRow[] = [
   } as WaitlistEntryRow,
 ];
 
-const meta: Meta<typeof AdminWaitlistTableUnified> = {
-  title: 'Admin/Tables/Waitlist',
-  component: AdminWaitlistTableUnified,
-  parameters: {
-    layout: 'fullscreen',
-  },
+const meta: Meta<typeof AdminWaitlistTableWithViews> = {
+  title: 'Admin/Tables/WaitlistWithViews',
+  component: AdminWaitlistTableWithViews,
+  parameters: { layout: 'fullscreen' },
 };
-
 export default meta;
 type Story = StoryObj<typeof meta>;
-
-export const Default: Story = {
+export const IntegrityAndSelection: Story = {
   args: {
     entries,
     page: 1,
     pageSize: 25,
     total: entries.length,
-    hasNextPage: false,
-    isFetchingNextPage: false,
-    onLoadMore: () => undefined,
+    integrity: {
+      totalIssues: 3,
+      usersMissingWaitlistEntry: 2,
+      entriesMissingUser: 1,
+      signedUpEntriesMissingUser: 0,
+    },
   },
 };
-
-export const Empty: Story = {
+export const Healthy: Story = {
   args: {
-    entries: [],
-    page: 1,
-    pageSize: 25,
-    total: 0,
+    ...IntegrityAndSelection.args,
+    integrity: {
+      totalIssues: 0,
+      usersMissingWaitlistEntry: 0,
+      entriesMissingUser: 0,
+      signedUpEntriesMissingUser: 0,
+    },
   },
+};
+export const Empty: Story = {
+  args: { entries: [], page: 1, pageSize: 25, total: 0 },
 };
