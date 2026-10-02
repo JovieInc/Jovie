@@ -234,17 +234,14 @@ jobs:
                 core.notice(`[dry run] would enqueue #${pr.number}`);
                 continue;
               }
+              const writeRetry = description => github.rest.repos.createCommitStatus({
+                owner, repo, sha: pr.headRefOid, state: 'success',
+                context: failurePolicy.FAILURE_RETRY_CONTEXT,
+                description, target_url: failure.latest.targetUrl,
+              });
               try {
                 if (failure.action === 'retry-once') {
-                  await github.rest.repos.createCommitStatus({
-                    owner,
-                    repo,
-                    sha: pr.headRefOid,
-                    state: 'success',
-                    context: failurePolicy.FAILURE_RETRY_CONTEXT,
-                    description: failurePolicy.retrySpentDescription(failure.latest),
-                    target_url: failure.latest.targetUrl,
-                  });
+                  await writeRetry(failurePolicy.retrySpentDescription(failure.latest));
                   core.notice(`RESERVED bounded retry for #${pr.number}@${pr.headRefOid}`);
                 }
                 const r = await github.graphql(`
@@ -257,12 +254,7 @@ jobs:
                 core.notice(`ENQUEUED #${pr.number} at position ${r.enqueuePullRequest.mergeQueueEntry.position}`);
               } catch (error) {
                 if (failure.action === 'retry-once' && failurePolicy.enqueueWasRejected(error)) {
-                  await github.rest.repos.createCommitStatus({
-                    owner, repo, sha: pr.headRefOid, state: 'success',
-                    context: failurePolicy.FAILURE_RETRY_CONTEXT,
-                    description: failurePolicy.retryReleasedDescription(failure.latest),
-                    target_url: failure.latest.targetUrl,
-                  });
+                  await writeRetry(failurePolicy.retryReleasedDescription(failure.latest));
                   core.notice(`RELEASED rejected enqueue reservation for #${pr.number}@${pr.headRefOid}`);
                 }
                 core.warning(`#${pr.number} not enqueued: ${error.message}`);

@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { describe, expect, it, vi } from 'vitest';
 import {
   applyMergeGroupFailure,
   classifyMergeGroupFailure,
@@ -22,6 +22,10 @@ const NEW_SOURCE = 'b'.repeat(40);
 const BASE = 'c'.repeat(40);
 const GROUP = 'd'.repeat(40);
 const RUN_URL = 'https://github.com/JovieInc/Jovie/actions/runs/123';
+const classify = (conclusion, failedSteps = []) =>
+  classifyMergeGroupFailure({ conclusion, failedSteps });
+const disposition = statuses =>
+  revisionFailureDisposition({ repository: REPOSITORY, statuses });
 it('validates trusted failure receipts and never applies them to a different revision', () => {
   const receipt = {
     schema: 'jovie-merge-group-failure-hold/v1',
@@ -36,10 +40,7 @@ it('validates trusted failure receipts and never applies them to a different rev
   const scope = { repository: REPOSITORY, prNumber: 42, headSha: SOURCE };
   const convert = value => failureReceiptStatus(JSON.stringify(value), scope);
   const trusted = convert(receipt);
-  expect(
-    revisionFailureDisposition({ statuses: [trusted], repository: REPOSITORY })
-      .action
-  ).toBe('block');
+  expect(disposition([trusted]).action).toBe('block');
   expect(trusted.target_url).toBe(RUN_URL);
   expect(failureReceiptStatus('', scope)).toBeNull();
   expect(failureReceiptStatus(undefined, scope)).toBeNull();
@@ -88,6 +89,14 @@ const timeline = [
   { __typename: 'PullRequestCommit', commit: { oid: NEW_SOURCE } },
   { __typename: 'AddedToMergeQueueEvent', createdAt: '2026-09-30T10:20:00Z' },
 ];
+
+const failureInput = {
+  repository: REPOSITORY,
+  run,
+  timeline,
+  failedSteps: ['Run structural ci-fast lane'],
+  statuses: [],
+};
 
 it('passes the actual failure-hold CLI receipt to enrollment without a replicated status', () => {
   const dir = mkdtempSync(join(tmpdir(), 'failure-hold-cli-'));
@@ -160,12 +169,7 @@ process.stdout.write(JSON.stringify(result));
         headSha: SOURCE,
       }
     );
-    expect(
-      revisionFailureDisposition({
-        repository: REPOSITORY,
-        statuses: [trusted],
-      }).action
-    ).toBe('block');
+    expect(disposition([trusted]).action).toBe('block');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -209,11 +213,8 @@ describe('merge-group source revision mapping', () => {
     await expect(
       applyMergeGroupFailure(
         {
-          repository: REPOSITORY,
+          ...failureInput,
           run: { ...run, workflow_id: 1 },
-          timeline,
-          failedSteps: ['Run structural ci-fast lane'],
-          statuses: [],
         },
         {
           writeStatus: vi.fn(),
@@ -228,24 +229,11 @@ describe('merge-group source revision mapping', () => {
 
 describe('failure classification and revision-scoped suppression', () => {
   it('classifies deterministic source checks separately from infrastructure', () => {
-    expect(
-      classifyMergeGroupFailure({
-        conclusion: 'failure',
-        failedSteps: ['Run structural ci-fast lane'],
-      })
-    ).toBe('deterministic-source');
-    expect(
-      classifyMergeGroupFailure({
-        conclusion: 'failure',
-        failedSteps: ['Run unit tests'],
-      })
-    ).toBe('retryable-product');
-    expect(
-      classifyMergeGroupFailure({
-        conclusion: 'startup_failure',
-        failedSteps: [],
-      })
-    ).toBe('transient-infrastructure');
+    expect(classify('failure', ['Run structural ci-fast lane'])).toBe(
+      'deterministic-source'
+    );
+    expect(classify('failure', ['Run unit tests'])).toBe('retryable-product');
+    expect(classify('startup_failure')).toBe('transient-infrastructure');
   });
 
   it('releases only an explicitly rejected enqueue, preserving ambiguous outcomes', () => {
@@ -284,95 +272,66 @@ describe('failure classification and revision-scoped suppression', () => {
       ...spent,
       description: retryReleasedDescription({ runId: 123, runAttempt: 1 }),
     };
+    expect(disposition([released, spent, first])).toMatchObject({
+      action: 'retry-once',
+    });
+    expect(disposition([spent, released, first])).toMatchObject({
+      action: 'block',
+    });
     expect(
-      revisionFailureDisposition({
-        repository: REPOSITORY,
-        statuses: [released, spent, first],
-      })
-    ).toMatchObject({ action: 'retry-once' });
-    expect(
-      revisionFailureDisposition({
-        repository: REPOSITORY,
-        statuses: [spent, released, first],
-      })
+      disposition([
+        { ...released, creator: { login: 'random', type: 'Bot' } },
+        spent,
+        first,
+      ])
     ).toMatchObject({ action: 'block' });
     expect(
-      revisionFailureDisposition({
-        repository: REPOSITORY,
-        statuses: [
-          { ...released, creator: { login: 'random', type: 'Bot' } },
-          spent,
-          first,
-        ],
-      })
-    ).toMatchObject({ action: 'block' });
-    expect(
-      revisionFailureDisposition({
-        repository: REPOSITORY,
-        statuses: [
-          released,
-          spent,
-          status({ classification: 'deterministic-source' }),
-        ],
-      })
+      disposition([
+        released,
+        spent,
+        status({ classification: 'deterministic-source' }),
+      ])
     ).toMatchObject({
       action: 'block',
       reason: 'deterministic-source-failure',
     });
     expect(
-      revisionFailureDisposition({
-        repository: REPOSITORY,
-        statuses: [
-          released,
-          spent,
-          status({ classification: 'transient-infrastructure', number: 2 }),
-        ],
-      })
+      disposition([
+        released,
+        spent,
+        status({ classification: 'transient-infrastructure', number: 2 }),
+      ])
     ).toMatchObject({ action: 'block', reason: 'revision-retry-exhausted' });
   });
 
   it('blocks the unchanged deterministic head while a new head has no hold', () => {
-    expect(
-      revisionFailureDisposition({
-        repository: REPOSITORY,
-        statuses: [status()],
-      })
-    ).toMatchObject({
+    expect(disposition([status()])).toMatchObject({
       action: 'block',
       reason: 'deterministic-source-failure',
     });
-    expect(
-      revisionFailureDisposition({ repository: REPOSITORY, statuses: [] })
-    ).toMatchObject({ action: 'allow' });
+    expect(disposition([])).toMatchObject({ action: 'allow' });
   });
 
   it('allows one non-deterministic retry, then blocks the same revision', () => {
     const first = status({ classification: 'transient-infrastructure' });
-    expect(
-      revisionFailureDisposition({ repository: REPOSITORY, statuses: [first] })
-    ).toMatchObject({ action: 'retry-once' });
+    expect(disposition([first])).toMatchObject({ action: 'retry-once' });
     const spent = status({
       context: 'jovie-queue-failure-retry/v1',
       description: retrySpentDescription({ runId: 123, runAttempt: 1 }),
     });
+    expect(disposition([first, spent])).toMatchObject({
+      action: 'block',
+      reason: 'revision-retry-spent',
+    });
     expect(
-      revisionFailureDisposition({
-        repository: REPOSITORY,
-        statuses: [first, spent],
-      })
-    ).toMatchObject({ action: 'block', reason: 'revision-retry-spent' });
-    expect(
-      revisionFailureDisposition({
-        repository: REPOSITORY,
-        statuses: [
-          first,
-          status({
-            classification: 'transient-infrastructure',
-            number: 2,
-            runId: 124,
-          }),
-        ],
-      })
+      disposition([
+        first,
+        status({
+          classification: 'transient-infrastructure',
+          number: 2,
+          runId: 124,
+        }),
+      ])
     ).toMatchObject({ action: 'block', reason: 'revision-retry-exhausted' });
   });
 });
@@ -393,27 +352,18 @@ describe('terminal failure hold application', () => {
       expect(receipt.sha).toBe(SOURCE);
       expect(receipt.description).toContain('class=deterministic-source');
     });
-    const result = await applyMergeGroupFailure(
-      {
-        repository: REPOSITORY,
-        run,
-        timeline,
-        failedSteps: ['Run structural ci-fast lane'],
-        statuses: [],
-      },
-      {
-        writeStatus,
-        readPullRequest: vi.fn(async () => structuredClone(state)),
-        dequeuePullRequest: vi.fn(async () => {
-          order.push('dequeue');
-          state = { ...state, isInMergeQueue: false, mergeQueueEntry: null };
-        }),
-        disableAutoMerge: vi.fn(async () => {
-          order.push('disable');
-          state = { ...state, autoMergeRequest: null };
-        }),
-      }
-    );
+    const result = await applyMergeGroupFailure(failureInput, {
+      writeStatus,
+      readPullRequest: vi.fn(async () => structuredClone(state)),
+      dequeuePullRequest: vi.fn(async () => {
+        order.push('dequeue');
+        state = { ...state, isInMergeQueue: false, mergeQueueEntry: null };
+      }),
+      disableAutoMerge: vi.fn(async () => {
+        order.push('disable');
+        state = { ...state, autoMergeRequest: null };
+      }),
+    });
 
     expect(order).toEqual(['status', 'dequeue', 'disable']);
     expect(result).toMatchObject({
@@ -429,28 +379,19 @@ describe('terminal failure hold application', () => {
   it('records the old revision but never mutates an already-new source head', async () => {
     const dequeuePullRequest = vi.fn();
     const disableAutoMerge = vi.fn();
-    const result = await applyMergeGroupFailure(
-      {
-        repository: REPOSITORY,
-        run,
-        timeline,
-        failedSteps: ['Run structural ci-fast lane'],
-        statuses: [],
-      },
-      {
-        writeStatus: vi.fn(),
-        readPullRequest: vi.fn(async () => ({
-          id: 'PR_42',
-          state: 'OPEN',
-          headRefOid: NEW_SOURCE,
-          isInMergeQueue: false,
-          mergeQueueEntry: null,
-          autoMergeRequest: { enabledAt: '2026-09-30T10:30:00Z' },
-        })),
-        dequeuePullRequest,
-        disableAutoMerge,
-      }
-    );
+    const result = await applyMergeGroupFailure(failureInput, {
+      writeStatus: vi.fn(),
+      readPullRequest: vi.fn(async () => ({
+        id: 'PR_42',
+        state: 'OPEN',
+        headRefOid: NEW_SOURCE,
+        isInMergeQueue: false,
+        mergeQueueEntry: null,
+        autoMergeRequest: { enabledAt: '2026-09-30T10:30:00Z' },
+      })),
+      dequeuePullRequest,
+      disableAutoMerge,
+    });
 
     expect(result).toMatchObject({
       sourceHeadSha: SOURCE,

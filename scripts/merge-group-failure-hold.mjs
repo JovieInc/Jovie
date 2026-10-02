@@ -54,11 +54,8 @@ function sourceHeadFromItem(item) {
   return '';
 }
 
-/**
- * Resolve the source revision admitted for a synthetic run. Queue additions
- * are timestamped; source commit timeline items before the matching addition
- * preserve the exact PR head even when a later push has already arrived.
- */
+// Timestamped queue admission binds a synthetic run to its preceding source
+// commit, preserving the exact head even when a later push has arrived.
 export function sourceHeadForRun(timeline, runCreatedAt) {
   if (!Array.isArray(timeline) || !Number.isFinite(Date.parse(runCreatedAt))) {
     fail('source timeline evidence is incomplete');
@@ -92,9 +89,7 @@ export function classifyMergeGroupFailure({ conclusion, failedSteps = [] }) {
   if (conclusion === 'failure' || conclusion === 'action_required') {
     if (
       steps.some(step => DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS.has(step)) ||
-      // ci-fast contains the source-only namespace, coverage, and structural
-      // ratchets that caused the JOV-5117 recurrence. Unlike setup failures,
-      // those results cannot change until the source revision changes.
+      // ci-fast namespace, coverage and structural failures require source repair.
       steps.includes('Run structural ci-fast lane')
     ) {
       return 'deterministic-source';
@@ -189,10 +184,8 @@ export function parseTrustedRetryStatus(status, repository) {
   };
 }
 
-/**
- * The exact commit endpoint supplies revision scope. Deterministic failures
- * block immediately; other failures receive exactly one queue-authority retry.
- */
+// The exact commit endpoint scopes failures: deterministic blocks immediately;
+// other failures receive one queue-authority retry.
 export function revisionFailureDisposition({ statuses, repository }) {
   if (!Array.isArray(statuses)) fail('revision statuses are incomplete');
   const failures = statuses
@@ -207,41 +200,21 @@ export function revisionFailureDisposition({ statuses, repository }) {
   const latest = failures.reduce((current, candidate) =>
     candidate.failureNumber > current.failureNumber ? candidate : current
   );
+  const result = (action, reason) => ({ action, reason, failures, latest });
   if (failures.some(item => item.classification === 'deterministic-source')) {
-    return {
-      action: 'block',
-      reason: 'deterministic-source-failure',
-      failures,
-      latest,
-    };
+    return result('block', 'deterministic-source-failure');
   }
   if (latest.failureNumber >= 2) {
-    return {
-      action: 'block',
-      reason: 'revision-retry-exhausted',
-      failures,
-      latest,
-    };
+    return result('block', 'revision-retry-exhausted');
   }
-  // GitHub returns commit statuses newest first; a proven rejection releases
-  // only its reservation. Older spent records cannot override that receipt.
+  // Newest statuses win: a proven rejection releases only its reservation.
   const latestRetry = retries.find(
     retry =>
       retry.runId === latest.runId && retry.runAttempt === latest.runAttempt
   );
   return latestRetry && !latestRetry.released
-    ? {
-        action: 'block',
-        reason: 'revision-retry-spent',
-        failures,
-        latest,
-      }
-    : {
-        action: 'retry-once',
-        reason: 'bounded-infrastructure-recovery',
-        failures,
-        latest,
-      };
+    ? result('block', 'revision-retry-spent')
+    : result('retry-once', 'bounded-infrastructure-recovery');
 }
 
 function failureDescription({ classification, failureNumber, run }) {
@@ -343,11 +316,8 @@ function validateRun(run, repository) {
   return front;
 }
 
-/**
- * Record the exact-source failure before removing any native merge intent.
- * A concurrent new head keeps the old revision receipt but receives no
- * dequeue/disable mutation.
- */
+// Persist the exact-source failure before removing native merge intent. A new
+// head keeps the old receipt and receives no dequeue/disable mutation.
 export async function applyMergeGroupFailure(
   { repository, run, timeline, failedSteps, statuses },
   { writeStatus, readPullRequest, dequeuePullRequest, disableAutoMerge }
