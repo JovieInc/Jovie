@@ -864,6 +864,74 @@ def issue_open(issue: dict) -> bool:
     return _state_type(issue) not in CLOSED_STATE_TYPES
 
 
+ALERT_SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+REMEDIATION_LABEL_COLOR = "#E5484D"
+HISTORY_STATE_NAMES = frozenset({"done", "canceled", "cancelled", "closed"})
+
+
+def stuck_pr_escalation_enabled() -> bool:
+    """In-process stuck-PR ladder. Default off, and only while the router flag is on.
+
+    Detection belongs to remediation-sweep. It files ordinary labeled issues:
+    ``remediation:pr-<n>-hold`` and ``remediation:pr-<n>-conflict`` (the
+    lane-fix-exhausted case). ``LANES_ESCALATION_STUCK_PRS=1`` restores the
+    in-process ladder.
+    """
+    return escalation_enabled() and _flag("LANES_ESCALATION_STUCK_PRS", False)
+
+
+def alert_key_slug(key: str) -> str | None:
+    """Alert key as ``^[a-z0-9]+(-[a-z0-9]+)*$``. Colons become hyphens."""
+    slug = re.sub(r"[^a-z0-9]+", "-", str(key or "").strip().lower())
+    slug = re.sub(r"-{2,}", "-", slug).strip("-")
+    if not slug or ALERT_SLUG.fullmatch(slug) is None:
+        return None
+    return slug
+
+
+def remediation_label_for_alert(key: str) -> str | None:
+    slug = alert_key_slug(key)
+    if slug is None:
+        return None
+    return f"{LABEL_PREFIX}{slug}"
+
+
+def has_remediation_event_label(labels) -> bool:
+    """True for ``remediation:<fingerprint>``. The bare ``remediation`` label is not an event."""
+    for label in labels or []:
+        name = label.get("name") if isinstance(label, dict) else str(label)
+        if event_label({"labels": [{"name": name}]}):
+            return True
+    return False
+
+
+def issue_is_history(issue: dict) -> bool:
+    """Closed or Done. History for recurrence and attempt count, not an active duplicate."""
+    if not isinstance(issue, dict) or not issue_open(issue):
+        return True
+    name = str((issue.get("state") or {}).get("name") or "").strip().lower()
+    return name in HISTORY_STATE_NAMES
+
+
+def _active_and_history(group: list, recorded_id: str | None) -> tuple[dict | None, list, list]:
+    """Label group only. Titles are not a match key.
+
+    The active event is the recorded open issue, else the oldest open issue.
+    Closed and Done issues stay in history.
+    """
+    history, active = [], []
+    for issue in group:
+        if not isinstance(issue, dict):
+            continue
+        (history if issue_is_history(issue) else active).append(issue)
+    active.sort(key=lambda issue: issue.get("createdAt") or "9999")
+    chosen = next((issue for issue in active if recorded_id and issue.get("id") == recorded_id), None)
+    if chosen is None and active:
+        chosen = active[0]
+    others = [issue for issue in active if chosen is None or issue.get("id") != chosen.get("id")]
+    return chosen, others, history
+
+
 def _state_id(issue: dict, name: str) -> str | None:
     team = issue.get("team") or {}
     states = team.get("states") or {}
@@ -1067,20 +1135,51 @@ def plan_labeled_events(issues: list, recorded: dict | None, providers: dict, no
     comments, labels, reopens = [], [], []
     for fingerprint, group in _group_labeled(issues).items():
         row = dict(events.get(fingerprint) or {})
-        by_id = {issue.get("id"): issue for issue in group}
-        canonical = by_id.get(row.get("issueId")) or group[0]
-        _absorb_event(row, canonical, fingerprint)
-        for other in group:
-            if other.get("id") == canonical.get("id") or not issue_open(other):
+        recorded_id = row.get("issueId")
+        if escalation_enabled():
+            canonical, duplicates, history = _active_and_history(group, recorded_id)
+            prior_attempts = [item for item in (row.get("attempts") or []) if isinstance(item, dict)]
+            row["attempts"] = prior_attempts
+            row["recurrence"] = len(history)
+            row["attemptCount"] = len(prior_attempts)
+            if canonical is None:
+                if history:
+                    _absorb_event(row, history[0], fingerprint)
+                row["status"] = "done"
+                row["running"] = False
+                events[fingerprint] = row
                 continue
-            if _note(row, other.get("id")):
-                comments.append({
-                    "id": other.get("id"),
-                    "body": (f"Symphony remediation: `{LABEL_PREFIX}{fingerprint}` already has one event on "
-                             f"{canonical.get('identifier')}. This issue is not a second event.\n"
-                             + event_marker("dup", fingerprint)),
-                })
-        if not issue_open(canonical):
+            _absorb_event(row, canonical, fingerprint)
+            for other in duplicates:
+                if _note(row, other.get("id")):
+                    comments.append({
+                        "id": other.get("id"),
+                        "body": (f"Symphony remediation: `{LABEL_PREFIX}{fingerprint}` already has one event on "
+                                 f"{canonical.get('identifier')}. This issue is not a second event.\n"
+                                 + event_marker("dup", fingerprint)),
+                    })
+            if recorded_id and canonical.get("id") != recorded_id:
+                row["release"] = True
+                row["running"] = False
+                row["lane"] = None
+                if row.get("status") in {"done", "human", "exhausted"}:
+                    row["status"] = "open"
+                    row["asked"] = False
+        else:
+            by_id = {issue.get("id"): issue for issue in group}
+            canonical = by_id.get(recorded_id) or group[0]
+            _absorb_event(row, canonical, fingerprint)
+            for other in group:
+                if other.get("id") == canonical.get("id") or not issue_open(other):
+                    continue
+                if _note(row, other.get("id")):
+                    comments.append({
+                        "id": other.get("id"),
+                        "body": (f"Symphony remediation: `{LABEL_PREFIX}{fingerprint}` already has one event on "
+                                 f"{canonical.get('identifier')}. This issue is not a second event.\n"
+                                 + event_marker("dup", fingerprint)),
+                    })
+        if not escalation_enabled() and not issue_open(canonical):
             opener = next((issue for issue in group if issue.get("id") != canonical.get("id") and issue_open(issue)), None)
             if opener is None:
                 row["status"] = "done"
@@ -1157,6 +1256,9 @@ def events_summary(snapshot: dict | None) -> dict:
         report["byFingerprint"][str(fingerprint)] = {
             "state": status, "issue": row.get("identifier"), "cls": row.get("cls"),
             "lane": row.get("lane"), "ask": row.get("ask"),
+            "recurrence": int(row.get("recurrence") or 0),
+            "attemptCount": int(row.get("attemptCount") if row.get("attemptCount") is not None
+                                else len(row.get("attempts") or [])),
         }
         if status == "done":
             continue

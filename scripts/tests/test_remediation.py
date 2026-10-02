@@ -165,6 +165,7 @@ class RouterLadderTest(unittest.TestCase):
         self.assertTrue(remediation.escalation_enabled())
         self.assertFalse(remediation.notify_tim())
         self.assertFalse(remediation.lift_human_holds())
+        self.assertFalse(remediation.stuck_pr_escalation_enabled())
         os.environ["LANES_ESCALATION"] = "0"
         try:
             plan = remediation.plan_ladder({"cls": "fixable-by-model", "subtype": "check", "next_action": "escalate"},
@@ -323,12 +324,17 @@ class LabeledEventTest(unittest.TestCase):
         closed = linear_issue("JOV-1", "e2e-nightly", state="completed", created="2026-09-01T00:00:00Z")
         opened = linear_issue("JOV-8", "e2e-nightly", created="2026-10-02T00:00:00Z")
         recur = remediation.plan_labeled_events(
-            [opened, closed], {"e2e-nightly": {"issueId": "id-JOV-1", "status": "done"}},
+            [opened, closed], {"e2e-nightly": {"issueId": "id-JOV-1", "status": "done", "attempts": [
+                {"kind": "model", "lane": "codex", "head": "e2e-nightly", "at": NOW - 100},
+            ]}},
             providers(), NOW, healthy=lambda *_: True)
-        self.assertEqual(recur["events"]["e2e-nightly"]["identifier"], "JOV-1")
-        self.assertEqual(recur["reopens"], [{"id": "id-JOV-1", "stateId": "todo-JOV"}])
-        self.assertTrue(any("Reopened" in row["body"] for row in recur["comments"]))
-        self.assertNotIn("id-JOV-8", recur["events"]["e2e-nightly"]["issueId"])
+        self.assertEqual(recur["events"]["e2e-nightly"]["identifier"], "JOV-8")
+        self.assertEqual(recur["events"]["e2e-nightly"]["issueId"], "id-JOV-8")
+        self.assertEqual(recur["events"]["e2e-nightly"]["recurrence"], 1)
+        self.assertEqual(recur["events"]["e2e-nightly"]["attemptCount"], 1)
+        self.assertEqual(recur["reopens"], [])
+        self.assertFalse(any(row.get("id") == "id-JOV-8" and "not a second event" in row["body"]
+                             for row in recur["comments"]))
 
     def test_human_and_exhausted_ping_is_behind_the_flag(self):
         human = linear_issue("JOV-3", "asc-agreements", title="ASC agreements blocked")
@@ -446,6 +452,75 @@ class LabeledEventTest(unittest.TestCase):
         self.assertIn('"JOV"', reads[0])
         self.assertIn('"LYB"', reads[0])
         self.assertFalse(any(isinstance(query, str) and "issue(id:" in query for query in calls))
+
+    def test_closed_label_is_history_and_titles_do_not_match(self):
+        """JOV-7544's title uses the colon form. Match the label, including across JOV and LYB."""
+        titled = linear_issue(
+            "JOV-7544", "unrelated-gap", title="vercel-deploy-failed:jovie-docs", team="JOV")
+        labeled = linear_issue(
+            "LYB-4", "vercel-deploy-failed:jovie-docs", title="docs project ERROR",
+            team="LYB", created="2026-10-02T00:00:00Z")
+        done = linear_issue(
+            "JOV-1", "vercel-deploy-failed:jovie-docs", state="completed", title="old colon title",
+            created="2026-09-01T00:00:00Z")
+        plan = remediation.plan_labeled_events(
+            [titled, labeled, done],
+            {"vercel-deploy-failed:jovie-docs": {
+                "issueId": "id-JOV-1", "status": "done",
+                "attempts": [{"kind": "model", "lane": "codex", "head": "vercel-deploy-failed:jovie-docs", "at": 1},
+                             {"kind": "model", "lane": "devin", "head": "vercel-deploy-failed:jovie-docs", "at": 2}],
+            }},
+            providers(), NOW, healthy=lambda *_: True)
+        self.assertIn("unrelated-gap", plan["events"])
+        self.assertEqual(plan["events"]["unrelated-gap"]["identifier"], "JOV-7544")
+        event = plan["events"]["vercel-deploy-failed:jovie-docs"]
+        self.assertEqual(event["identifier"], "LYB-4")
+        self.assertEqual(event["team"], "LYB")
+        self.assertEqual(event["recurrence"], 1)
+        self.assertEqual(event["attemptCount"], 2)
+        self.assertEqual(plan["reopens"], [])
+        self.assertFalse(any(row.get("id") == "id-LYB-4" and "not a second event" in row["body"]
+                             for row in plan["comments"]))
+        self.assertNotEqual(event["fingerprint"], plan["events"]["unrelated-gap"]["fingerprint"])
+
+    def test_router_flag_off_still_reopens_the_canonical_issue(self):
+        os.environ["LANES_ESCALATION"] = "0"
+        try:
+            closed = linear_issue("JOV-1", "e2e-nightly", state="completed", created="2026-09-01T00:00:00Z")
+            opened = linear_issue("JOV-8", "e2e-nightly", created="2026-10-02T00:00:00Z")
+            recur = remediation.plan_labeled_events(
+                [opened, closed], {"e2e-nightly": {"issueId": "id-JOV-1", "status": "done"}},
+                providers(), NOW, healthy=lambda *_: True)
+        finally:
+            os.environ.pop("LANES_ESCALATION", None)
+        self.assertEqual(recur["events"]["e2e-nightly"]["identifier"], "JOV-1")
+        self.assertEqual(recur["reopens"], [{"id": "id-JOV-1", "stateId": "todo-JOV"}])
+
+    def test_stuck_pr_ladder_is_off_and_sweep_labels_are_ordinary_events(self):
+        os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
+        self.assertFalse(remediation.stuck_pr_escalation_enabled())
+        os.environ["LANES_ESCALATION"] = "0"
+        os.environ["LANES_ESCALATION_STUCK_PRS"] = "1"
+        try:
+            self.assertFalse(remediation.stuck_pr_escalation_enabled())
+        finally:
+            os.environ.pop("LANES_ESCALATION", None)
+            os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
+        os.environ["LANES_ESCALATION_STUCK_PRS"] = "1"
+        try:
+            self.assertTrue(remediation.stuck_pr_escalation_enabled())
+        finally:
+            os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
+        hold = linear_issue("JOV-7546", "pr-17708-hold", title="PR on hold")
+        exhausted = linear_issue(
+            "LYB-2", "pr-19776-conflict", title="lane-fix-exhausted", team="LYB")
+        plan = remediation.plan_labeled_events(
+            [hold, exhausted], {}, providers(), NOW, healthy=lambda *_: True)
+        self.assertEqual(plan["events"]["pr-17708-hold"]["status"], "claimed")
+        self.assertEqual(plan["events"]["pr-17708-hold"]["cls"], "fixable-by-agent")
+        self.assertEqual(plan["events"]["pr-19776-conflict"]["identifier"], "LYB-2")
+        self.assertEqual(plan["events"]["pr-19776-conflict"]["status"], "claimed")
+        self.assertNotIn("stuck-pr", plan)
 
 
 def json_providers():

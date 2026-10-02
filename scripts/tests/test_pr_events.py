@@ -1017,11 +1017,13 @@ class RunnerHookTest(unittest.TestCase):
                         {"kind": "model", "rung": "escalate", "lane": "devin", "head": "h1", "at": 2},
                         {"kind": "model", "rung": "top-rung", "lane": "codex", "head": "h1", "at": 3, "topRung": True},
                     ]}}))
+                os.environ["LANES_ESCALATION_STUCK_PRS"] = "1"
                 runner.escalate_exhausted(host, [stuck], linear)
                 held = json.loads((host.state / "held.json").read_text())["7"]
                 runner.escalate_exhausted(host, [stuck], linear)
         finally:
             runner.sh, runner.load_providers = saved
+            os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
         self.assertFalse(any(call[:3] == ["gh", "pr", "close"] for call in calls),
                          "retry exhaustion is evidence of a held generation, not redundant work")
         self.assertEqual(moves, [("iss", "Backlog")])
@@ -1043,12 +1045,14 @@ class RunnerHookTest(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmp:
                 host = runner.Host(state=Path(tmp))
                 runner.record_held(host, 7, "h1", ["diff-too-large:2000"])
+                os.environ["LANES_ESCALATION_STUCK_PRS"] = "1"
                 runner.escalate_exhausted(host, [stuck], linear)
                 runner.escalate_exhausted(host, [stuck], linear)  # intake once, not every pass
                 held = json.loads((host.state / "held.json").read_text())["7"]
                 attempts = json.loads((host.state / "fix-attempts.json").read_text())["7"]
         finally:
             runner.sh, runner.load_providers, events.return_to_pool = saved
+            os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
         self.assertEqual(triaged, [], "an unfixable hold gets a terminal disposition, not Triage inventory")
         self.assertEqual((held["reason"], held["sha"]), ("diff-too-large", "h1"),
                          "a zero-attempt hold keeps its real reason instead of fix-exhausted")

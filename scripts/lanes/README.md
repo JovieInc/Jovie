@@ -351,14 +351,55 @@ Examples: `remediation:asc-agreements`, `remediation:billing-health-public`,
 
 The bare label `remediation` (no colon) is the relay intake label, not an event.
 
+### Precedence over `no-symphony`
+
+An issue that carries any `remediation:*` label is never skipped because it also
+carries `no-symphony`. JOV-7540 and JOV-7551 carry `no-symphony`. The bare
+`remediation` label does not override that exclusion. `type:epic`,
+`codex-blocked`, and `reasoning-job` still exclude the issue. The exception
+follows `LANES_ESCALATION` (default on). When that flag is off, `no-symphony`
+excludes the issue again.
+
+### Dedupe is the label, and closed issues are history
+
+Events dedupe by the `remediation:<fingerprint>` label across JOV and LYB.
+Titles are not a match key. A title such as `vercel-deploy-failed:jovie-docs`
+(JOV-7544) does not join an event unless that issue carries the same label.
+A second **open** issue with the same label is a comment, not a second claim.
+A **closed** or **Done** issue that carries the label is history: it increments
+`recurrence` and its recorded attempts stay on `attemptCount`. It is not an
+active duplicate, and the router does not reopen it to absorb a newer open
+issue. The open issue is the active event. This history rule follows
+`LANES_ESCALATION`. When the flag is off, a recurrence reopens the canonical
+issue instead.
+
+### Doctor alert labels
+
+While `LANES_ESCALATION` is on, `scripts/lanes/doctor.py` Tracker applies
+`remediation:<alert-key-slug>` next to `symphony` when it opens, reopens, or
+closes the issue for that alert key. The slug matches
+`^[a-z0-9]+(-[a-z0-9]+)*$`: colons and other separators collapse to single
+hyphens (`provider-idle:codex` → `remediation:provider-idle-codex`). The label
+is created on the JOV team when it is missing, color `#E5484D`.
+
+### Stuck PRs stay on the sweep
+
+Stuck-PR detection lives in remediation-sweep. It files ordinary labeled
+issues: `remediation:pr-<n>-hold` and `remediation:pr-<n>-conflict` for a PR
+whose `lane-fix-exhausted` label has aged out. The router consumes those as
+normal remediation events. It does not run its own stuck-PR escalation unless
+`LANES_ESCALATION_STUCK_PRS=1` (and `LANES_ESCALATION` is on). That flag
+defaults off.
+
 On the next dispatch tick the router:
 
 1. Reads events with **one** label-filtered Linear query (`labels.name startsWith "remediation:"`,
    teams JOV and LYB, first 100, no per-issue follow-up read). The read goes through the
    cached claim scan (`shared`, key `remediation-events`) so workers do not repeat it.
-2. Dedupes by fingerprint. One open event per fingerprint. A second open issue is a
-   comment, not a second claim. A recurrence reopens the canonical issue and comments
-   instead of keeping a duplicate.
+2. Dedupes by the `remediation:<fingerprint>` label across JOV and LYB, never by
+   title. One open event per fingerprint. A second open issue is a comment, not a
+   second claim. A closed or Done issue with the label counts as history
+   (`recurrence`, `attemptCount`), not as an active duplicate.
 3. Classifies the event as `fixable-by-agent` or `human-only`. Human-only means Tim has
    to act: spend, billing actions, env/DNS/secrets, store submissions (including
    `asc-agreements`), outside humans, manual deploys.

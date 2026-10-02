@@ -170,6 +170,29 @@ class SelectionTest(unittest.TestCase):
         ], {"JOV-4": 3})
         self.assertEqual(picked.identifier, "JOV-3")
 
+    def test_remediation_label_is_not_skipped_for_no_symphony(self):
+        self.assertIsNone(lane.pick_issue([issue("JOV-7540", labels=["no-symphony"])], {}))
+        picked = lane.pick_issue([
+            issue("JOV-7540", labels=["no-symphony", "remediation:router"]),
+            issue("JOV-7551", labels=["no-symphony", "remediation:billing-health"]),
+        ], {})
+        self.assertEqual(picked.identifier, "JOV-7540")
+        self.assertIsNone(lane.admission_rejection(
+            issue("JOV-7540", labels=["no-symphony", "remediation:router"]), {}, 10000))
+        self.assertEqual(lane.admission_rejection(
+            issue("JOV-1", labels=["no-symphony", "remediation:router", "type:epic"]), {}, 10000),
+            "excluded-label:type:epic")
+        self.assertEqual(lane.admission_rejection(
+            issue("JOV-1", labels=["no-symphony", "remediation"]), {}, 10000),
+            "excluded-label:no-symphony")
+        os.environ["LANES_ESCALATION"] = "0"
+        try:
+            self.assertEqual(lane.admission_rejection(
+                issue("JOV-7540", labels=["no-symphony", "remediation:router"]), {}, 10000),
+                "excluded-label:no-symphony")
+        finally:
+            os.environ.pop("LANES_ESCALATION", None)
+
     def test_issues_with_an_open_lane_pr_anywhere_are_skipped(self):
         picked = lane.pick_issue([issue("JOV-1", priority=1), issue("JOV-2", priority=2)], {},
                                  in_flight=frozenset({"JOV-1"}))
@@ -2480,6 +2503,27 @@ class FixRedTest(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0][:4], ["gh", "pr", "view", "8"])
 
+    def test_stuck_pr_escalation_stays_off_unless_the_flag_is_on(self):
+        stuck = {**self.pr(number=7), "headRefName": "devin/jov-7-20260928000000",
+                 "isDraft": False, "mergeStateStatus": "DIRTY", "title": "stuck one"}
+        os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
+        real = lane.sh
+        calls = []
+        lane.sh = lambda args, **k: calls.append(args) or SimpleNamespace(returncode=0, stderr="", stdout="")
+        linear = FakeLinear([])
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                host = lane.Host(state=Path(tmp))
+                (host.state / "fix-attempts.json").write_text(json.dumps(
+                    {"7": {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS}}))
+                lane.escalate_exhausted(host, [stuck], linear)
+                self.assertFalse((host.state / "escalation.json").exists())
+        finally:
+            lane.sh = real
+        self.assertEqual(calls, [])
+        self.assertEqual(linear.moves, [])
+        self.assertEqual(linear.comments, [])
+
     def test_exhausted_heads_get_one_terminal_disposition_not_queue_inventory(self):
         stuck = {**self.pr(number=7), "headRefName": "devin/jov-7-20260928000000",
                  "isDraft": False, "mergeStateStatus": "DIRTY", "title": "stuck one"}
@@ -2502,6 +2546,7 @@ class FixRedTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))
             (host.state / "fix-attempts.json").write_text(json.dumps(attempts))
+            os.environ["LANES_ESCALATION_STUCK_PRS"] = "1"
             try:
                 lane.escalate_exhausted(host, [stuck], linear)
                 fresh = json.loads((host.state / "fix-attempts.json").read_text())["7"]
@@ -2519,6 +2564,7 @@ class FixRedTest(unittest.TestCase):
                 lane.escalate_exhausted(host, [stuck], linear)
             finally:
                 lane.sh = real
+                os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
             self.assertEqual(linear.triaged, [], "a terminal outcome is not generic Triage inventory (JOV-7089)")
             self.assertEqual(linear.moves, [("id-JOV-7", "Backlog")],
                              "the owning issue gets exactly one explicit disposition")
@@ -2548,10 +2594,12 @@ class FixRedTest(unittest.TestCase):
                     {"kind": "model", "rung": "escalate", "lane": "devin", "head": "h1", "at": 2},
                     {"kind": "model", "rung": "top-rung", "lane": "codex", "head": "h1", "at": 3, "topRung": True},
                 ]}}))
+            os.environ["LANES_ESCALATION_STUCK_PRS"] = "1"
             try:
                 lane.escalate_exhausted(host, [stuck], linear)
             finally:
                 lane.sh = real
+                os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
         self.assertEqual(linear.triaged, [], "no queue inventory for a terminal generation")
         self.assertEqual(linear.moves, [], "a receipted disposition is not applied twice")
 

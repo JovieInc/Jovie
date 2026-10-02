@@ -488,6 +488,11 @@ def admission_rejection(issue: Issue, failures: dict, now: float,
     """Final claim predicate; in_flight contains normalized lowercase identifiers."""
     labels = {label.lower() for label in issue.labels}
     excluded = sorted(HARD_EXCLUDED_LABELS & labels)
+    # `remediation:*` outranks `no-symphony` (JOV-7540, JOV-7551). Other hard
+    # exclusions still apply. The bare `remediation` label does not.
+    if ("no-symphony" in excluded and remediation.escalation_enabled()
+            and remediation.has_remediation_event_label(issue.labels)):
+        excluded = [name for name in excluded if name != "no-symphony"]
     if excluded:
         return "excluded-label:" + excluded[0]
     if issue_hits_red_line(issue):
@@ -1914,9 +1919,15 @@ def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, rea
 def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
     """Deterministic rungs, then a stronger lane, then one surface (JOV-7540 / JOV-7089).
 
-    `LANES_ESCALATION` unset stays on. Off restores the immediate terminal disposition.
-    A model rung records `pendingEscalation` and does not increment `count`.
+    Default off (`LANES_ESCALATION_STUCK_PRS`). Stuck-PR detection is
+    remediation-sweep, which files `remediation:pr-<n>-hold` and
+    `remediation:pr-<n>-conflict` (lane-fix-exhausted). Those are ordinary
+    labeled events. When the flag is on, `LANES_ESCALATION` unset stays on
+    and off restores the immediate terminal disposition. A model rung records
+    `pendingEscalation` and does not increment `count`.
     """
+    if not remediation.stuck_pr_escalation_enabled():
+        return
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
     held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
