@@ -19,6 +19,7 @@ import {
   screen,
   session,
   shell,
+  type WebContents,
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { openCurrentOvieInBrowser } from './ovie-browser-recovery';
@@ -79,6 +80,13 @@ import {
   shouldRunWakeUpdateCheck,
   shouldScheduleDesktopAutoUpdate,
 } from './desktop-auto-update';
+import {
+  createDesktopLaunchReadiness,
+  createLaunchReadinessWriter,
+  DESKTOP_COMPOSER_READINESS_CHANNEL,
+  DESKTOP_LAUNCH_READINESS_FILE,
+  type ReadinessSender,
+} from './desktop-launch-readiness';
 import { installDesktopCspWatchdog } from './desktop-csp-watchdog';
 import {
   parseDesktopNotificationRequest,
@@ -98,10 +106,15 @@ import {
   getHudBuildFingerprint,
   isHudRoutePath,
   isWebBuildReloadPath,
+  SESSION_WORK_PROBE,
   shouldReloadWindowForWebBuild,
-  UNSENT_INPUT_PROBE,
 } from './hud-build-reload';
 import { resolveIpcSenderUrl } from './ipc-sender';
+import {
+  probeAllWindowWorkSafety,
+  probeSessionWorkSafety,
+  singleFlight,
+} from './session-work-state';
 import {
   type MainLivenessMonitor,
   createMainLivenessMonitor,
@@ -109,6 +122,7 @@ import {
   summarizeUnhandledRejection,
 } from './main-liveness';
 import { installNightlyUpdateLaunchAgent } from './nightly-update-launch-agent';
+import { DesktopNavigationCoordinator } from './navigation-coordinator';
 import {
   getUrlDisposition as getDesktopUrlDisposition,
   isAllowedExternalUrl as isAllowedDesktopExternalUrl,
@@ -288,6 +302,8 @@ const TRAY_ACTION_CHANNEL = 'tray-action';
 const DESKTOP_NOTIFICATION_CHANNEL = 'desktop-notification-show';
 /** Renderer → main: first successful React paint of the hosted app (JOV-3595). */
 const APP_BOOTED_CHANNEL = 'app-booted';
+const CLIENT_NAVIGATION_CHANNEL = 'desktop-client-navigation';
+const CLIENT_NAVIGATION_READY_CHANNEL = 'desktop-client-navigation-ready';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
 const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity';
 type UpdateChannel =
@@ -347,6 +363,7 @@ let desktopUpdatePhase: DesktopUpdatePhase = DESKTOP_UPDATE_INITIAL_STATE;
 // (up to date / error) shows a dialog; silent background checks stay silent.
 let pendingManualUpdateCheck = false;
 let mainWindow: BrowserWindow | null = null;
+const desktopNavigation = new DesktopNavigationCoordinator();
 let publicProfilePreviewWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
 let aboutWindow: BrowserWindow | null = null;
@@ -368,6 +385,25 @@ let mainWindowHiddenForAuthHandoff = false;
 let currentHudBuildFingerprint: string | null = null;
 // webContents ids still showing the web build that preceded the current one.
 const webBuildReloadPending = new Set<number>();
+const workDocumentGenerations = new WeakMap<WebContents, number>();
+ipcMain.on('desktop-work-state-changed', event => {
+  if (event.senderFrame !== event.sender.mainFrame) return;
+  workDocumentGenerations.set(
+    event.sender,
+    (workDocumentGenerations.get(event.sender) ?? 0) + 1
+  );
+});
+app.on('web-contents-created', (_event, contents) => {
+  contents.on('did-start-navigation', (...args: unknown[]) => {
+    const navigation = parseDidStartNavigation(args);
+    if (navigation?.isMainFrame && !navigation.isInPlace) {
+      workDocumentGenerations.set(
+        contents,
+        (workDocumentGenerations.get(contents) ?? 0) + 1
+      );
+    }
+  });
+});
 let lastDesktopUpdateCheckMs: number | null = null;
 let summerRuntimeBridge: SummerRuntimeBridge | null = null;
 let mainLivenessMonitor: MainLivenessMonitor | null = null;
@@ -1778,24 +1814,43 @@ function isWebBuildReloadWindow(win: BrowserWindow): boolean {
   );
 }
 
-/** Unreadable renderers count as holding input: never drop text on a guess. */
-async function windowHasUnsentInput(win: BrowserWindow): Promise<boolean> {
-  try {
-    return (
-      (await win.webContents.executeJavaScript(UNSENT_INPUT_PROBE)) === true
-    );
-  } catch {
-    return true;
-  }
+/** Auth remains main-owned even when the chat renderer is hidden or idle. */
+function hasPendingDesktopAuthentication(): boolean {
+  return Boolean(
+    isAuthHandoffOpen() ||
+    desktopBrowserAuthRouteState.pendingPkce ||
+    desktopBrowserAuthRouteState.recoveryNavigationPending ||
+    pendingAuthCompletion ||
+    pendingLegacyAuthReturnRoute
+  );
 }
 
-async function anyWindowHasUnsentInput(): Promise<boolean> {
-  const results = await Promise.all(
-    BrowserWindow.getAllWindows()
-      .filter(isWebBuildReloadWindow)
-      .map(windowHasUnsentInput)
-  );
-  return results.some(Boolean);
+/** Unknown state, draft probe failures and navigation during a probe block reload. */
+async function windowWorkStateSafe(win: BrowserWindow): Promise<boolean> {
+  if (win.isDestroyed() || win.webContents.isLoadingMainFrame()) return false;
+  const contents = win.webContents;
+  const generation = workDocumentGenerations.get(contents);
+  return probeSessionWorkSafety({
+    read: () => contents.executeJavaScript(SESSION_WORK_PROBE),
+    isCurrentDocument: () =>
+      !win.isDestroyed() &&
+      !contents.isLoadingMainFrame() &&
+      generation === workDocumentGenerations.get(contents),
+    isAuthenticating: hasPendingDesktopAuthentication,
+    now: Date.now,
+  });
+}
+
+function allWindowWorkStateSafe(): Promise<boolean> {
+  return probeAllWindowWorkSafety({
+    getWindows: () => BrowserWindow.getAllWindows().filter(
+      win => win === mainWindow || isWebBuildReloadWindow(win)
+    ),
+    getGeneration: win => workDocumentGenerations.get(win.webContents),
+    isLoading: win => win.isDestroyed() || win.webContents.isLoadingMainFrame(),
+    probe: windowWorkStateSafe,
+    isAuthenticating: hasPendingDesktopAuthentication,
+  });
 }
 
 function anyWindowAudible(): boolean {
@@ -1805,7 +1860,6 @@ function anyWindowAudible(): boolean {
 }
 
 async function reloadIdleWindowsForWebBuildChange(): Promise<void> {
-  const systemIdleSeconds = powerMonitor.getSystemIdleTime();
   const liveIds = new Set<number>();
   for (const win of BrowserWindow.getAllWindows()) {
     if (!isWebBuildReloadWindow(win)) continue;
@@ -1813,14 +1867,17 @@ async function reloadIdleWindowsForWebBuildChange(): Promise<void> {
     liveIds.add(id);
     if (!webBuildReloadPending.has(id)) continue;
 
+    const workStateSafe = await windowWorkStateSafe(win);
+    if (win.isDestroyed()) continue;
     const isHud = isHudWindow(win);
     const reload = shouldReloadWindowForWebBuild({
       isHud,
       visible: win.isVisible() && !win.isMinimized(),
       focused: win.isFocused(),
       audible: win.webContents.isCurrentlyAudible(),
-      hasUnsentInput: isHud ? false : await windowHasUnsentInput(win),
-      systemIdleSeconds,
+      hasUnsentInput: false, // Included in the request-time work probe.
+      workStateSafe,
+      systemIdleSeconds: powerMonitor.getSystemIdleTime(),
     });
     if (reload && !win.isDestroyed()) {
       webBuildReloadPending.delete(id);
@@ -1832,7 +1889,7 @@ async function reloadIdleWindowsForWebBuildChange(): Promise<void> {
   }
 }
 
-async function checkHudBuildAndReload(): Promise<void> {
+const checkHudBuildAndReload = singleFlight(async () => {
   const reloadable = BrowserWindow.getAllWindows().filter(
     isWebBuildReloadWindow
   );
@@ -1856,7 +1913,7 @@ async function checkHudBuildAndReload(): Promise<void> {
   if (webBuildReloadPending.size > 0) {
     await reloadIdleWindowsForWebBuildChange();
   }
-}
+});
 
 function showPublicProfilePreview(urlString: string): boolean {
   const canonicalUrl = canonicalPublicProfileUrl(urlString);
@@ -2339,7 +2396,51 @@ function attachRendererRecovery(
   });
 }
 
+let launchReadiness: ReturnType<typeof createDesktopLaunchReadiness> | null =
+  null;
+
+function readinessSender(
+  event: IpcMainEvent | IpcMainInvokeEvent
+): ReadinessSender {
+  const frame = event.senderFrame;
+  const win = mainWindow;
+  const live = Boolean(win && !win.isDestroyed());
+  return {
+    isMainWindow: live && win?.webContents === event.sender,
+    frame: frame
+      ? {
+          isMainFrame: frame === event.sender.mainFrame,
+          detached: frame.detached,
+          url: frame.url,
+        }
+      : null,
+    appOrigin: APP_ORIGIN,
+    visible: live && Boolean(win?.isVisible()),
+    minimized: !live || Boolean(win?.isMinimized()),
+    focused: live && Boolean(win?.isFocused()),
+  };
+}
+
 function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
+  if (!launchReadiness) {
+    const writeReceipt = createLaunchReadinessWriter(
+      path.join(app.getPath('userData'), DESKTOP_LAUNCH_READINESS_FILE),
+      error =>
+        console.warn(
+          '[desktop-launch-readiness] Could not persist receipt',
+          error
+        )
+    );
+    launchReadiness = createDesktopLaunchReadiness({
+      pid: process.pid,
+      processTimeOrigin: new Date(performance.timeOrigin).toISOString(),
+      nativeBuild: desktopBuildIdentity,
+      now: () => performance.now(),
+      onChange: receipt => {
+        void writeReceipt(receipt);
+      },
+    });
+  }
   const windowState = windowStateStore.peek();
 
   const win = new BrowserWindow({
@@ -2394,6 +2495,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   }, 6000);
 
   win.once('ready-to-show', () => {
+    launchReadiness?.nativeWindowReadyToShow();
     clearTimeout(initialVisibilityFallback);
     if (isAuthHandoffInteractive()) {
       mainWindowHiddenForAuthHandoff = true;
@@ -2406,6 +2508,13 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   });
 
   mainWindow = win;
+  const navigationContentsId = win.webContents.id;
+  win.webContents.on('render-process-gone', () => {
+    desktopNavigation.setReady(navigationContentsId, false);
+  });
+  win.webContents.on('destroyed', () => {
+    desktopNavigation.setReady(navigationContentsId, false);
+  });
   const authNavigationRecovery = createAuthHandoffNavigationRecovery(APP_ORIGIN);
   const authNavigationContentsId = win.webContents.id;
   authNavigationRecoveries.set(authNavigationContentsId, authNavigationRecovery);
@@ -2416,6 +2525,9 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   win.webContents.on('did-start-navigation', (...args: unknown[]) => {
     const navigation = parseDidStartNavigation(args);
     if (!navigation) return;
+    if (navigation.isMainFrame && !navigation.isInPlace) {
+      desktopNavigation.setReady(navigationContentsId, false);
+    }
     authNavigationRecovery.navigationStarted({
       ...navigation,
       currentUrl: win.webContents.getURL(),
@@ -2523,7 +2635,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     if (disposition === 'profile-preview') {
       showPublicProfilePreview(url);
     } else if (disposition === 'in-app') {
-      void win.loadURL(url);
+      navigateInApp(win, url);
     } else if (disposition === 'external') {
       void openExternalUrl(url);
     }
@@ -2585,6 +2697,21 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   return win;
 }
 
+function navigateInApp(win: BrowserWindow, url: string): void {
+  if (win.isDestroyed()) return;
+  const action = desktopNavigation.resolve(
+    win.webContents.id,
+    win.webContents.getURL(),
+    url,
+    URL_DISPOSITION_OPTIONS
+  );
+  if (action?.kind === 'client') {
+    win.webContents.send(CLIENT_NAVIGATION_CHANNEL, action.path);
+  } else if (action?.kind === 'document') {
+    void win.loadURL(action.url);
+  }
+}
+
 function openPreferences(): void {
   // Mid-handoff the focused window is the small, non-resizable auth window and
   // the main window is intentionally hidden — loading settings into either
@@ -2596,7 +2723,7 @@ function openPreferences(): void {
     return;
   }
 
-  void mainWindow.loadURL(SETTINGS_URL);
+  navigateInApp(mainWindow, SETTINGS_URL);
   showWindow(mainWindow);
 }
 
@@ -2706,29 +2833,35 @@ function scheduleDesktopAutoUpdate(): void {
 }
 
 /** Restart into a downloaded update only overnight, idle, and with no work at risk. */
-async function installDownloadedUpdateIfIdle(): Promise<void> {
+const installDownloadedUpdateIfIdle = singleFlight(async () => {
   if (!updateReadyToInstall || nightlyUpdateLaunch) return;
-  const baseline = {
-    updateReadyToInstall,
-    localHour: new Date().getHours(),
-    systemIdleSeconds: powerMonitor.getSystemIdleTime(),
-    audible: anyWindowAudible(),
-  };
-  if (
-    !shouldInstallDownloadedUpdateWhileRunning({
-      ...baseline,
-      hasUnsentInput: false,
-    })
-  ) {
-    return;
-  }
+  const workStateSafe = await allWindowWorkStateSafe();
   if (
     shouldInstallDownloadedUpdateWhileRunning({
-      ...baseline,
-      hasUnsentInput: await anyWindowHasUnsentInput(),
+      updateReadyToInstall,
+      localHour: new Date().getHours(),
+      systemIdleSeconds: powerMonitor.getSystemIdleTime(),
+      audible: anyWindowAudible(),
+      hasUnsentInput: false, // Included in the request-time work probe.
+      workStateSafe,
     })
   ) {
     autoUpdater.quitAndInstall(true, true);
+  }
+});
+
+async function installNightlyDownloadedUpdate(): Promise<void> {
+  const workStateSafe = await allWindowWorkStateSafe();
+  if (
+    shouldInstallDownloadedUpdateNow({
+      nightlyLaunch: nightlyUpdateLaunch,
+      hasVisibleWindow: BrowserWindow.getAllWindows().some(
+        win => !win.isDestroyed() && win.isVisible() && !win.isMinimized()
+      ),
+      workStateSafe,
+    })
+  ) {
+    autoUpdater.quitAndInstall(true, false);
   }
 }
 
@@ -2953,16 +3086,8 @@ autoUpdater.on('update-downloaded', info => {
   sendToAppWindows(UPDATE_DOWNLOADED_CHANNEL);
   pushUpdateEvent({ type: 'update-downloaded', version: info.version });
 
-  const hasVisibleWindow = BrowserWindow.getAllWindows().some(
-    win => !win.isDestroyed() && win.isVisible() && !win.isMinimized()
-  );
-  if (
-    shouldInstallDownloadedUpdateNow({
-      nightlyLaunch: nightlyUpdateLaunch,
-      hasVisibleWindow,
-    })
-  ) {
-    autoUpdater.quitAndInstall(true, false);
+  if (nightlyUpdateLaunch) {
+    void installNightlyDownloadedUpdate();
     return;
   }
   void installDownloadedUpdateIfIdle();
@@ -3056,9 +3181,38 @@ ipcMain.handle(DESKTOP_UPDATE_INSTALL_CHANNEL, event => {
   return { ok: true };
 });
 
+// Only the live main document may announce a mounted client router.
+ipcMain.on(CLIENT_NAVIGATION_READY_CHANNEL, (event, ready: unknown) => {
+  if (
+    typeof ready !== 'boolean' ||
+    !mainWindow ||
+    mainWindow.isDestroyed() ||
+    event.sender !== mainWindow.webContents ||
+    !event.senderFrame ||
+    event.senderFrame.detached ||
+    event.senderFrame !== mainWindow.webContents.mainFrame ||
+    event.senderFrame.parent !== null ||
+    parseUrl(getIpcSenderUrl(event))?.origin !== APP_ORIGIN
+  ) {
+    return;
+  }
+  desktopNavigation.setReady(event.sender.id, ready);
+});
+
+// Optional composer evidence does not change the renderer recovery watchdog.
+ipcMain.handle(
+  DESKTOP_COMPOSER_READINESS_CHANNEL,
+  (event, ...args: unknown[]) => {
+    return (
+      launchReadiness?.composerReady(readinessSender(event), args) ?? false
+    );
+  }
+);
+
 // Hosted app first-paint heartbeat (JOV-3595). Uses send (not invoke) so a
 // missing main handler on a stale binary cannot reject the renderer promise.
 ipcMain.on(APP_BOOTED_CHANNEL, event => {
+  launchReadiness?.reactMounted(readinessSender(event));
   const parsed = parseUrl(getIpcSenderUrl(event));
   if (parsed?.origin !== APP_ORIGIN) return;
   rendererBootControllers.get(event.sender.id)?.markBooted();
@@ -3611,7 +3765,7 @@ function routeDesktopNotificationClick(urlString: string | undefined): void {
     URL_DISPOSITION_OPTIONS
   );
   if (action.kind === 'load-url') {
-    void win.loadURL(action.url);
+    navigateInApp(win, action.url);
   } else if (action.kind === 'profile-preview') {
     showPublicProfilePreview(action.url);
   } else if (action.kind === 'open-external') {

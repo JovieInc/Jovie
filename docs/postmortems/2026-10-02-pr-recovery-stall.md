@@ -31,7 +31,7 @@ and blocked subsequent combined builds with an orphan-page regression.
 | Start | Unverified; historical job failures predate this remediation. |
 | Time to detect | Historical duration unverified; incident recorded at 13:30 UTC on October 2. |
 | Time to own | JOV-7455 opened in the remediation session at 13:30 UTC. |
-| Time to repair | Pending hosted activation and combined-head validation. |
+| Time to repair | Enrollment repair merged at 16:18 UTC; source-admission and report-retirement runtime verification remain open. |
 | What was blocked | Automatic admission/promotion and PR backlog convergence; individual source proofs did not guarantee combined-head success. |
 
 ## Timeline (UTC)
@@ -42,6 +42,8 @@ and blocked subsequent combined builds with an orphan-page regression.
 | 13:22 | Published the enrollment and report-publication repair. | [PR #19958](https://github.com/JovieInc/Jovie/pull/19958). |
 | 13:27 | Source Validation rejected two outdated workflow-contract assertions in the repair; corrected before admission. | [Source run 37012682048](https://github.com/JovieInc/Jovie/actions/runs/37012682048). |
 | 13:30 | Recorded the incident and later linked three systemic controls. | [JOV-7455](https://linear.app/jovie/issue/JOV-7455). |
+| 16:18 | Enrollment/report-lifecycle repair landed through the native queue. | [Combined-head CI 37032224701](https://github.com/JovieInc/Jovie/actions/runs/37032224701), merge `a1b58fc1fe`. |
+| 16:31 | Updated completion controller succeeded on main. | [Enrollment 37034520385](https://github.com/JovieInc/Jovie/actions/runs/37034520385), main `811c851cf2`. |
 
 ## Root cause
 
@@ -122,11 +124,11 @@ preserving its branch and validation receipts.
 
 | Issue | Control | Class | State | Live verification receipt |
 | --- | --- | --- | --- | --- |
-| [JOV-7460](https://linear.app/jovie/issue/JOV-7460) | Bounded enrollment and completion wakes | non-convergent-control-loop | Implemented; activation pending | Original workflow fails the new 113-PR regression; repaired workflow passes. |
-| [JOV-7461](https://linear.app/jovie/issue/JOV-7461) | Superseded-report retirement | non-convergent-control-loop | Implemented; activation pending | Real Git publication regression fails against the original publisher; repaired publisher and retirement helper pass at 100% lines, branches and functions. |
+| [JOV-7460](https://linear.app/jovie/issue/JOV-7460) | Bounded enrollment and completion wakes | non-convergent-control-loop | Active on main; backlog convergence still monitored | Original workflow fails the new 113-PR regression; repaired workflow passes. |
+| [JOV-7461](https://linear.app/jovie/issue/JOV-7461) | Superseded-report retirement | non-convergent-control-loop | Landed; next real retirement receipt pending | Real Git publication regression fails against the original publisher; repaired publisher and retirement helper pass at 100% lines, branches and functions. |
 | [JOV-7462](https://linear.app/jovie/issue/JOV-7462) | Source script inventory | pre-merge-parity-gap | Implemented in #19945 source repair; validation pending | Existing inventory catches the original unwired inbound test; repaired inventory passes. |
 | [JOV-7468](https://linear.app/jovie/issue/JOV-7468) | Source script and web-test type checks | pre-merge-parity-gap | Implemented in #19945 source repair; activation pending | Executable workflow regression fails against the original workflow and passes for all three injected typecheck failures. |
-| [JOV-7469](https://linear.app/jovie/issue/JOV-7469) | Public release links | pre-merge-parity-gap | Consolidated on #19962; merge pending | #19962 has a real orphan-auditor red/green regression; redundant #19968 passed combined Build + Layout and exact-head coverage in run 37018692906 before closure. |
+| [JOV-7469](https://linear.app/jovie/issue/JOV-7469) | Public release links | pre-merge-parity-gap | Canonical #19962 merged; redundant #19968 closed | #19962 has a real orphan-auditor red/green regression; redundant #19968 passed combined Build + Layout and exact-head coverage in run 37018692906 before closure. |
 
 ## Open questions and unverified claims
 

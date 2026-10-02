@@ -7,7 +7,8 @@ Brief description of the changes in this PR.
 For a material customer change, include one approved, plain-language outcome
 in the metadata block described in [the publishing contract](../docs/CHANGELOG_PUBLICATION.md).
 Group related PRs under one outcome key. Include a public customer-path check;
-merge and deployment alone do not prove availability. Internal work uses
+declare GA, preview, or limited rollout and its prerequisites. Merge and
+deployment alone do not prove availability. Internal work uses
 `releaseWorthy: false`. Do not edit `CHANGELOG.md` on implementation branches.
 
 ## Type of Change

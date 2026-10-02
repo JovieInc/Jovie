@@ -64,6 +64,11 @@ export function buildPublicReleaseApprovalSeedRow(
   };
 }
 
+/** Reruns may reactivate a fixture, but may never replace its rights receipt. */
+export function buildPromoDownloadSeedConflictUpdate(now = new Date()) {
+  return { isActive: true, updatedAt: now };
+}
+
 interface TestProfile {
   username: string;
   displayName: string;
@@ -146,6 +151,12 @@ const REQUIRED_PUBLIC_QA_PROVIDERS = [
     displayName: 'Spotify',
     kind: 'music_streaming' as const,
     baseUrl: 'https://open.spotify.com',
+  },
+  {
+    id: 'apple_music',
+    displayName: 'Apple Music',
+    kind: 'music_streaming' as const,
+    baseUrl: 'https://music.apple.com',
   },
   {
     id: 'tiktok_sound',
@@ -1652,6 +1663,16 @@ async function seedReleasesForProfile(
         .insert(providerLinks)
         .values([
           {
+            // DSP admission must exercise at least one non-Spotify provider
+            // on the listen page (public-release/public-track surfaces).
+            providerId: 'apple_music',
+            ownerType: 'release',
+            releaseId,
+            url: 'https://music.apple.com/us/album/neon-skyline/1492291454',
+            isPrimary: false,
+            sourceType: 'manual',
+          },
+          {
             providerId: 'tiktok_sound',
             ownerType: 'release',
             releaseId,
@@ -1690,11 +1711,43 @@ async function seedReleasesForProfile(
       );
     }
 
+    if (release.slug === 'neon-skyline') {
+      const [neonTrack] = await db
+        .select({ id: discogTracks.id })
+        .from(discogTracks)
+        .where(
+          and(
+            eq(discogTracks.releaseId, releaseId),
+            eq(discogTracks.slug, 'neon-skyline')
+          )
+        );
+      if (neonTrack) {
+        await db
+          .insert(providerLinks)
+          .values({
+            providerId: 'apple_music',
+            ownerType: 'track',
+            trackId: neonTrack.id,
+            url: 'https://music.apple.com/us/song/neon-skyline/1492291455',
+            isPrimary: false,
+            sourceType: 'manual',
+          })
+          .onConflictDoNothing();
+      }
+    }
+
     console.log(`    ✓ Ensured Spotify link for ${release.title}`);
   }
 
   const promoReleaseId = existingBySlug.get('neon-skyline');
   if (promoReleaseId) {
+    // Promo downloads fail closed without an immutable rights-control
+    // attestation (migration 0098), so the public /download surface only
+    // exists when the fixture records both the attestation and active state.
+    const [profileOwner] = await db
+      .select({ userId: creatorProfiles.userId })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profileId));
     try {
       await db
         .insert(promoDownloads)
@@ -1709,11 +1762,17 @@ async function seedReleasesForProfile(
           fileMimeType: 'audio/mpeg',
           fileSizeBytes: 4_600_000,
           artworkUrl: DEFAULT_TEST_RELEASE_ARTWORK_URL,
-          isActive: false,
+          isActive: true,
+          rightsControlAttested: true,
+          rightsControlAttestedBy: profileOwner?.userId ?? null,
+          rightsControlAttestedAt: new Date(),
           position: 0,
           metadata: { fixture: true },
         })
-        .onConflictDoNothing();
+        .onConflictDoUpdate({
+          target: [promoDownloads.releaseId, promoDownloads.slug],
+          set: buildPromoDownloadSeedConflictUpdate(),
+        });
       console.log('    ✓ Ensured promo download fixture for Neon Skyline');
     } catch (error) {
       if (isMissingPromoDownloadsRelationError(error)) {
