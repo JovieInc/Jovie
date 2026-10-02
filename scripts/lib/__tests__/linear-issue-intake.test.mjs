@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  remediationLabelName,
+  remediationKey,
   upsertLinearIssueByTitleFingerprint,
 } from '../linear-issue-intake.mjs';
 
@@ -201,8 +201,8 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
   }
 
   it('reopens after Done and re-files the same remediation label', async () => {
-    const labelName = remediationLabelName(fingerprint);
-    expect(remediationLabelName(labelName)).toBe(labelName);
+    const labelName = remediationKey(fingerprint);
+    expect(remediationKey(labelName)).toBe(labelName);
     const team = {
       states: {
         nodes: [

@@ -124,7 +124,7 @@ export async function listLinearIssueComments({
 }
 
 /** Router intake label. Do not double-prefix fingerprints that already start with it. */
-export function remediationLabelName(fingerprint) {
+export function remediationKey(fingerprint) {
   const name = String(fingerprint ?? '').trim();
   return name.startsWith('remediation:') ? name : `remediation:${name}`;
 }
@@ -135,7 +135,8 @@ const ISSUE_FIELDS = `
   labels(first: 50) { nodes { id name } }
 `;
 
-function pickFingerprintIssue(nodes, fingerprint, labelName) {
+export function resolveLinearIssueByFingerprint(nodes, fingerprint) {
+  const labelName = remediationKey(fingerprint);
   const terminalTypes = ['completed', 'canceled'];
   const matches = (nodes ?? []).filter(node => {
     if (String(node?.title ?? '').includes(fingerprint)) return true;
@@ -151,13 +152,8 @@ function pickFingerprintIssue(nodes, fingerprint, labelName) {
   );
 }
 
-async function ensureRemediationLabelId({
-  labelNodes,
-  labelName,
-  apiKey,
-  fetchImpl,
-}) {
-  const existing = labelNodes.find(label => label?.name === labelName);
+export async function ensureLinearLabel({ name, nodes, apiKey, fetchImpl }) {
+  const existing = (nodes ?? []).find(label => label?.name === name);
   if (existing?.id) return { ok: true, id: existing.id };
   const created = await linearGraphql(
     {
@@ -169,7 +165,7 @@ async function ensureRemediationLabelId({
           }
         }
       `,
-      variables: { name: labelName, teamId: JOVIE_TEAM_ID },
+      variables: { name, teamId: JOVIE_TEAM_ID },
       apiKey,
       fetchImpl,
     },
@@ -209,7 +205,7 @@ export async function upsertLinearIssueByTitleFingerprint({
     return { ok: false, reason: 'missing_fingerprint' };
   }
 
-  const labelName = remediationLabelName(fingerprint);
+  const labelName = remediationKey(fingerprint);
   const found = await linearGraphql(
     {
       query: `
@@ -250,10 +246,9 @@ export async function upsertLinearIssueByTitleFingerprint({
   const labelNodes = found.data?.team?.labels?.nodes;
   // Missing team.labels means the caller mock predates the label contract.
   const manageLabels = Array.isArray(labelNodes);
-  let match = pickFingerprintIssue(
+  let match = resolveLinearIssueByFingerprint(
     found.data?.issues?.nodes,
-    fingerprint,
-    labelName
+    fingerprint
   );
   if (!match && manageLabels) {
     const labeled = await linearGraphql(
@@ -281,18 +276,17 @@ export async function upsertLinearIssueByTitleFingerprint({
       'linear_label_search'
     );
     if (!labeled.ok) return labeled;
-    match = pickFingerprintIssue(
+    match = resolveLinearIssueByFingerprint(
       labeled.data?.issues?.nodes,
-      fingerprint,
-      labelName
+      fingerprint
     );
   }
 
   let labelId = null;
   if (manageLabels) {
-    const ensured = await ensureRemediationLabelId({
-      labelNodes,
-      labelName,
+    const ensured = await ensureLinearLabel({
+      name: labelName,
+      nodes: labelNodes,
       apiKey,
       fetchImpl,
     });
