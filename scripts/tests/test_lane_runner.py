@@ -95,6 +95,27 @@ class ContextManifestTest(unittest.TestCase):
 
 
 class SelectionTest(unittest.TestCase):
+    def test_rejection_reasons_match_final_worker_admission(self):
+        red = issue("JOV-RED")
+        red.title = "Rotate production credentials"
+        failures = {"JOV-EXHAUSTED": 3, "JOV-BACKOFF": {"count": 1, "at": 9990}}
+        cases = [(issue(labels=["Type:Epic"]), "excluded-label:type:epic"),
+                 (red, "sensitive-text"), (issue(labels=["AUTH"]), "sensitive-provider"),
+                 (issue("JOV-EXHAUSTED"), "retry-exhausted"),
+                 (issue("JOV-BACKOFF"), "retry-backoff"),
+                 (issue("JOV-OWNED"), "in-flight-pr"), (issue("JOV-GOOD"), None)]
+        for task, expected in cases:
+            with self.subTest(expected=expected):
+                self.assertEqual(lane.admission_rejection(task, failures, 10000,
+                                 frozenset({"jov-owned"}), "devin"), expected)
+                self.assertEqual(lane.pick_issue([task], failures, now=10000,
+                                 in_flight=frozenset({"jov-owned"}), provider="devin"),
+                                 task if expected is None else None)
+        self.assertIsNone(lane.admission_rejection(issue(labels=["AUTH"]), {}, 10000, provider="codex"))
+        # Exactly one reason per candidate, preserving the existing gate precedence.
+        self.assertEqual(lane.admission_rejection(issue(labels=["Type:Epic", "auth"]), {}, 10000,
+                         provider="devin"), "excluded-label:type:epic")
+
     def test_orders_like_symphony_priority_then_age_with_none_last(self):
         now = datetime(2026, 9, 4, tzinfo=timezone.utc).timestamp()
         picked = lane.pick_issue([
