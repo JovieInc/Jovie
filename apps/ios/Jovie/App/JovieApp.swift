@@ -50,10 +50,10 @@ final class PushNotificationManager: PushNotificationCoordinating {
   private let defaults: UserDefaults
 
   init(
-    system: PushNotificationSystem = .live,
+    system: PushNotificationSystem? = nil,
     defaults: UserDefaults = .standard
   ) {
-    self.system = system
+    self.system = system ?? .live
     self.defaults = defaults
   }
 
