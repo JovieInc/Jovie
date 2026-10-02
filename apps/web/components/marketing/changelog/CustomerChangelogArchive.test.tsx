@@ -30,6 +30,7 @@ const MONTHS: readonly CustomerChangelogMonthGroup[] = [
         technicalVersion: '26.8.1',
         explanation: 'See the buyer, budget, and source.',
         supporting: [],
+        action: null,
         technical: [],
         prominence: 'featured',
       },
@@ -52,6 +53,7 @@ const MONTHS: readonly CustomerChangelogMonthGroup[] = [
         technicalVersion: '26.7.0',
         explanation: 'Customer sessions can still leave.',
         supporting: [],
+        action: null,
         technical: ['JOV-5260', 'Redis', 'admission'],
         prominence: 'small',
       },
@@ -82,6 +84,44 @@ describe('CustomerChangelogArchive', () => {
       screen.getByText('Eligible profiles with updates enabled')
     ).toBeVisible();
     expect(screen.queryByText('Generally available')).not.toBeInTheDocument();
+  });
+
+  it('renders a receipt-approved next step and never mints an unsafe link', () => {
+    const action = {
+      label: 'See it on a demo profile',
+      href: '/demo/showcase/tim-white-profile?mode=subscribe',
+    };
+    render(
+      <CustomerChangelogArchive
+        months={[
+          {
+            ...MONTHS[0],
+            entries: [{ ...MONTHS[0].entries[0], action }],
+          },
+          {
+            ...MONTHS[1],
+            entries: [
+              {
+                ...MONTHS[1].entries[0],
+                action: { label: 'Unsafe', href: 'javascript:alert(1)' },
+              },
+            ],
+          },
+        ]}
+      />
+    );
+    expect(
+      screen.getByRole('link', { name: /See it on a demo profile/ })
+    ).toHaveAttribute(
+      'href',
+      '/demo/showcase/tim-white-profile?mode=subscribe'
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Load Earlier Updates' })
+    );
+    expect(
+      screen.queryByRole('link', { name: /Unsafe/ })
+    ).not.toBeInTheDocument();
   });
 
   it('retains permanent engineering links when there are no approved customer outcomes', () => {
