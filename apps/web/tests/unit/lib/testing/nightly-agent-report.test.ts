@@ -91,6 +91,97 @@ describe('nightly-agent-report', () => {
     expect(formatNightlyAgentSummary(payload)).toContain('mutation 91.2%');
   });
 
+  it.each(['failure', 'cancelled', 'timed_out'] as const)(
+    'never reports a %s workflow as passing from partial green telemetry',
+    workflowConclusion => {
+      const status = buildNightlyAgentStatusFromSkillDelta(
+        { generatedAt: '2026-10-01T16:31:02Z', repo: 'jovie', failures: [] },
+        {
+          workflowConclusion,
+          suites: [
+            {
+              lane: 'unit',
+              total: 2,
+              passed: 2,
+              failed: 0,
+              flaky: 0,
+              skipped: 0,
+            },
+          ],
+        }
+      );
+      expect(status.pass).toBe(false);
+      expect(status.workflowConclusion).toBe(workflowConclusion);
+    }
+  );
+
+  it('requires executed test or mutation evidence even when the workflow says success', () => {
+    const status = buildNightlyAgentStatusFromSkillDelta(
+      { generatedAt: '2026-10-01T16:31:02Z', repo: 'jovie', failures: [] },
+      { workflowConclusion: 'success', suites: [] }
+    );
+    expect(status.pass).toBe(false);
+  });
+
+  it('does not count an entirely skipped suite as executed evidence', () => {
+    const status = buildNightlyAgentStatusFromSkillDelta(
+      { generatedAt: '2026-10-01T16:31:02Z', repo: 'jovie', failures: [] },
+      {
+        workflowConclusion: 'success',
+        suites: [
+          {
+            lane: 'unit',
+            total: 5,
+            passed: 0,
+            failed: 0,
+            flaky: 0,
+            skipped: 5,
+          },
+        ],
+      }
+    );
+    expect(status.pass).toBe(false);
+  });
+
+  it('accepts successful mutation-only execution', () => {
+    const status = buildNightlyAgentStatusFromSkillDelta(
+      {
+        generatedAt: '2026-10-01T16:31:02Z',
+        repo: 'jovie',
+        failures: [],
+        mutation: { score: 100, killed: 4, survived: 0, total: 4 },
+      },
+      { workflowConclusion: 'success', suites: [] }
+    );
+    expect(status.pass).toBe(true);
+    expect(status.mutation?.total).toBe(4);
+  });
+
+  it('rejects mutation evidence made entirely of uncovered mutants', () => {
+    const status = buildNightlyAgentStatusFromSkillDelta(
+      {
+        generatedAt: '2026-10-01T16:31:02Z',
+        repo: 'jovie',
+        failures: [],
+        mutation: { score: 0, killed: 0, survived: 0, total: 4 },
+      },
+      {
+        workflowConclusion: 'success',
+        suites: [
+          {
+            lane: 'mutation',
+            total: 4,
+            passed: 0,
+            failed: 0,
+            flaky: 0,
+            skipped: 4,
+          },
+        ],
+      }
+    );
+    expect(status.pass).toBe(false);
+  });
+
   it('rejects malformed redis payloads', () => {
     expect(parseNightlyAgentStatus({ pass: true })).toBeNull();
     expect(isNightlyAgentStatus(null)).toBe(false);

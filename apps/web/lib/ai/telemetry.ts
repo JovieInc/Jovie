@@ -1,3 +1,5 @@
+import { getWorktreeAttributes } from '@/lib/observability/worktree-runtime';
+
 /**
  * Shared Vercel AI SDK telemetry helpers for Agnost (via OpenTelemetry).
  *
@@ -31,6 +33,8 @@ export function buildAiTelemetry(options: AiTelemetryOptions) {
   for (const [key, value] of Object.entries(options.metadata ?? {})) {
     if (value != null) metadata[key] = String(value);
   }
+
+  Object.assign(metadata, getWorktreeAttributes());
 
   return {
     isEnabled: true,

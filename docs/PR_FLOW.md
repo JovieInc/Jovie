@@ -424,6 +424,21 @@ native linking semantics. For an already-linked issue, inspect its other PR
 relationships before editing; an older merged closing link can still affect
 status. Do not add a reconciliation loop or disable team-wide automation.
 
+Check the entire title and description, including negated or conditional prose.
+Native Linear still interprets a closing word immediately before an issue ID
+as an instruction even when the sentence says the work is incomplete. Put the
+ID in the explicit reference line and describe remaining acceptance without
+that syntax. Before `gh pr create` or a description edit, check the prepared
+body file and title without credentials or publication:
+
+```bash
+node scripts/lib/source-admission-policy.mjs --body-file /tmp/pr-body.md --title 'fix(scope): describe the repair'
+```
+
+The existing native-admission path checks current PR text again before landing.
+That later check cannot undo status changes caused by an earlier publication;
+inspect Linear's actual Related/Resolves relationship when repairing old links.
+
 1. **Small + focused**, targeting `main`. Dependent? Use the native GitHub
    retarget/rebase sequence in [`pr-stacking.md`](../.claude/rules/pr-stacking.md).
    Mechanical sweep? one `big-pr` PR. Never create an uncontrolled stack.

@@ -22,6 +22,7 @@ vi.mock('@/lib/blog/getBlogPosts', async importOriginal => {
     await importOriginal<typeof import('@/lib/blog/getBlogPosts')>();
   return {
     getBlogPosts,
+    isBlogPostIndexable: vi.fn().mockReturnValue(true),
     slugifyCategory: actual.slugifyCategory,
   };
 });
