@@ -181,5 +181,5 @@ export const BrainDump: Story = {
 
 export const Light: Story = {
   ...BrainDump,
-  globals: { theme: 'light' },
+  parameters: { themes: { themeOverride: 'light' } },
 };

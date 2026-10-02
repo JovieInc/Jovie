@@ -48,5 +48,5 @@ export const FounderBrainDump: Story = {
 
 export const FounderBrainDumpLight: Story = {
   ...FounderBrainDump,
-  globals: { theme: 'light' },
+  parameters: { themes: { themeOverride: 'light' } },
 };
