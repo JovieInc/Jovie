@@ -110,7 +110,7 @@ describe('blog publish latency', () => {
   });
 
   it('records each stage and keeps before/after claims null', () => {
-    const report = buildBlogPublishLatency({
+    const raw = {
       collectedAt: '2026-10-02T02:00:00Z',
       mergedPrs: [
         {
@@ -139,7 +139,8 @@ describe('blog publish latency', () => {
           createdAt: '2026-10-01T01:10:00Z',
         },
       ],
-    });
+    };
+    const report = buildBlogPublishLatency(raw);
 
     expect(report).toMatchObject({
       sampleCount: 1,
@@ -156,5 +157,15 @@ describe('blog publish latency', () => {
       candidateToLiveSeconds: 4800,
       retries: 1,
     });
+
+    // Missing API/run-history evidence cannot establish the legacy cohort.
+    delete raw.mergedPrs[0].blogQualification;
+    const unknown = buildBlogPublishLatency(raw);
+    expect(unknown.samples[0].cohort).toBe('unknown');
+    expect(unknown.cohorts.legacy.completeSampleCount).toBe(0);
+    raw.mergedPrs[0].blogQualificationConfirmedAbsent = true;
+    expect(
+      buildBlogPublishLatency(raw).cohorts.legacy.completeSampleCount
+    ).toBe(1);
   });
 });

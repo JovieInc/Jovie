@@ -15,7 +15,7 @@ is historical; its rewrite prohibition is superseded.
 | Surface | Current owner | Direction |
 | --- | --- | --- |
 | Shipped Mac app / Ovie door | `apps/desktop` Electron `BrowserWindow` | Keep improving it until a tested native cutover. |
-| Native Mac product | Planned `apps/ios/JovieMac` sibling target | SwiftUI/AppKit shell and native chat on shared iOS client behavior. |
+| Native Mac development | `apps/ios/JovieMac` sibling target with explicit Debug fixtures; default and Release unavailable | Live SwiftUI/AppKit product and native chat remain planned on shared iOS client behavior. |
 | Shared Swift core | Existing iOS clients/models/repositories | Extract into `apps/ios/Packages/JovieKit` in consumed, tested slices. |
 | Operator shipping menu | `apps/macos/MenuMonitor` `MenuBarExtra` | Accessory only; no second product HUD. |
 | Occasional complex web screens | Existing web surfaces | Isolated, registered, on-demand WebKit bridges. |
@@ -54,4 +54,4 @@ These remain proposed, not adopted into `canon/invariants.jsonl`:
 | `JOV-INV-016` | Source changes use path-selected lint/unit/build gates; signing, parity, and runtime claims require their own release evidence. |
 
 Do not revive the deprecated standalone Swift Ovie implementation, fold product UI
-into MenuMonitor, or infer that the planned native target already exists.
+into MenuMonitor, or treat the development target as a qualified live product.

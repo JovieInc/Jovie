@@ -78,6 +78,10 @@ private actor MockRepository: AppStateRepository {
     clearedUserIDs.append(userID)
   }
 
+  func clearCachedUser(_ userID: String, ifOwnedBy ownership: NativeSessionOwnership) {
+    NativeSessionTokenStore.performIfCurrent(ownership) { clearedUserIDs.append(userID) }
+  }
+
   func clearedUsers() -> [String] {
     clearedUserIDs
   }
@@ -2266,6 +2270,9 @@ private actor ControlledProfileRepository: AppStateRepository {
   }
 
   func clearCachedUser(_ userID: String) { cleared.append(userID) }
+  func clearCachedUser(_ userID: String, ifOwnedBy ownership: NativeSessionOwnership) {
+    NativeSessionTokenStore.performIfCurrent(ownership) { cleared.append(userID) }
+  }
   func loadCount() -> Int { loadCalls }
   func clearedUsers() -> [String] { cleared }
 }
@@ -2519,6 +2526,171 @@ extension AppStateTests {
       }
       let context = NativeSessionTokenStore.captureSessionContext()
       #expect(!NativeSessionTokenStore.canContinueProfileLoad(ownedBy: original))
+      #expect(NativeSessionTokenStore.captureSessionContext() == context)
+    }
+  }
+}
+
+private protocol CleanupTestCache: Actor {
+  func remove(for userID: String, ifOwnedBy ownership: NativeSessionOwnership)
+}
+
+extension MeCache: CleanupTestCache {}
+extension ChatCache: CleanupTestCache {}
+extension AudienceHighlightsCache: CleanupTestCache {}
+extension ActionLoopCache: CleanupTestCache {}
+
+private extension CleanupTestCache {
+  func removeAfterEntry(for userID: String, ownership: NativeSessionOwnership, gate: ProfileLoadGate) async {
+    _ = await gate.wait()
+    remove(for: userID, ifOwnedBy: ownership)
+  }
+}
+
+@MainActor
+private final class CleanupCacheHarness {
+  let userID = "same-user"
+  let suiteName: String
+  let defaults: UserDefaults
+  let me: MeCache
+  let chat: ChatCache
+  let audience: AudienceHighlightsCache
+  let actionLoop: ActionLoopCache
+  let api = MutableAPIClient(mode: .success(.previewReady))
+
+  init() {
+    let name = "OwnedCacheCleanup-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: name)!
+    suiteName = name
+    self.defaults = defaults
+    me = MeCache(defaults: defaults)
+    chat = ChatCache(defaults: defaults)
+    audience = AudienceHighlightsCache(defaults: defaults)
+    actionLoop = ActionLoopCache(defaults: defaults)
+  }
+
+  func cleanup() { defaults.removePersistentDomain(forName: suiteName) }
+
+  func seed(profile: MobileMeResponse = .previewReady) async {
+    await me.store(profile, for: userID)
+    await audience.store(.preview, for: userID)
+    await actionLoop.storeCalendar(.preview, for: userID)
+    for workspace in [MobileWorkspaceMode.jovie, .ovie] {
+      await chat.store(makeChatSnapshot(), for: userID, workspace: workspace)
+      await actionLoop.storeInbox(.preview, for: userID, workspace: workspace)
+    }
+  }
+
+  func expectContents(present: Bool, profile: MobileMeResponse = .previewReady) async {
+    // Read both warm actors and new instances: memory alone can hide a disk deletion.
+    for cache in [me, MeCache(defaults: defaults)] {
+      #expect(await cache.load(for: userID)?.response == (present ? profile : nil))
+    }
+    for cache in [audience, AudienceHighlightsCache(defaults: defaults)] {
+      #expect(await cache.load(for: userID)?.response == (present ? .preview : nil))
+    }
+    for cache in [chat, ChatCache(defaults: defaults)] {
+      for workspace in [MobileWorkspaceMode.jovie, .ovie] {
+        #expect(await cache.load(for: userID, workspace: workspace) == (present ? makeChatSnapshot() : nil))
+      }
+    }
+    for cache in [actionLoop, ActionLoopCache(defaults: defaults)] {
+      #expect(await cache.loadCalendar(for: userID) == (present ? .preview : nil))
+      for workspace in [MobileWorkspaceMode.jovie, .ovie] {
+        #expect(await cache.loadInbox(for: userID, workspace: workspace) == (present ? .preview : nil))
+      }
+    }
+  }
+}
+
+private struct DelayedCleanupRepository: AppStateRepository {
+  let base: MeRepository
+  let gate: ProfileLoadGate
+
+  func loadMe(for userID: String) async throws -> MeRepositoryResult { try await base.loadMe(for: userID) }
+  func cachedSnapshot(for userID: String) async -> MobileMeResponse? { await base.cachedSnapshot(for: userID) }
+  func clearCachedUser(_ userID: String) async {
+    // Also observe the legacy path so an unguarded-call regression fails instead of hanging.
+    _ = await gate.wait()
+    await base.clearCachedUser(userID)
+  }
+  func clearCachedUser(_ userID: String, ifOwnedBy ownership: NativeSessionOwnership) async {
+    _ = await gate.wait()
+    await base.clearCachedUser(userID, ifOwnedBy: ownership)
+  }
+}
+
+extension AppStateTests {
+  @Test(arguments: [false, true])
+  func actorCleanupRejectsReplacementOwnershipAndOtherwiseRemovesEveryScope(replaceSession: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let harness = CleanupCacheHarness()
+      defer { harness.cleanup() }
+      _ = try saveSession()
+      await harness.seed()
+      NativeSessionTokenStore.clear()
+      let owner = NativeSessionTokenStore.captureSessionContext().ownership
+      let caches: [any CleanupTestCache] = [harness.me, harness.chat, harness.audience, harness.actionLoop]
+      let userID = harness.userID
+      let gates = caches.map { _ in ProfileLoadGate() }
+      let tasks = zip(caches, gates).map { cache, gate in
+        Task { await cache.removeAfterEntry(for: userID, ownership: owner, gate: gate) }
+      }
+      for gate in gates { await gate.waitUntilEntered() }
+      if replaceSession {
+        _ = try saveSession() // Same user and bearer, different login ownership.
+        await harness.seed(profile: .previewNeedsOnboarding)
+      }
+      let context = NativeSessionTokenStore.captureSessionContext()
+      for gate in gates { await gate.complete(true) }
+      for task in tasks { await task.value }
+      await harness.expectContents(present: replaceSession, profile: .previewNeedsOnboarding)
+      #expect(NativeSessionTokenStore.captureSessionContext() == context)
+    }
+  }
+
+  @Test(arguments: [false, true], [false, true])
+  func appStateCleanupRetainsOneOwnerAcrossEveryAwait(replaceSession: Bool, expired: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let harness = CleanupCacheHarness()
+      defer { harness.cleanup() }
+      _ = try saveSession()
+      await harness.seed()
+      let gate = ProfileLoadGate()
+      let repository = DelayedCleanupRepository(base: MeRepository(apiClient: harness.api, cache: harness.me), gate: gate)
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = AppState(
+        configuration: .mock, launchMode: .live, repository: repository,
+        brightnessManager: MockBrightnessController(), sessionRevoker: revoker,
+        chatCache: harness.chat, audienceHighlightsCache: harness.audience, actionLoopCache: harness.actionLoop
+      )
+      state.didInitializeAuth = true
+      await state.handleSignedInUserChange(harness.userID)
+      let cleanup = Task {
+        if expired { await state.handleExpiredSession() } else { await state.signOut() }
+        await gate.ownerFinished()
+      }
+      let entered = await gate.waitUntilEntered()
+      #expect(entered, "AppState must forward cleanup through the profile repository")
+      guard entered else {
+        await gate.complete(true)
+        await cleanup.value
+        return
+      }
+      #expect(state.route == .signedOut)
+      if replaceSession {
+        _ = try saveSession()
+        await harness.seed(profile: .previewNeedsOnboarding)
+        await harness.api.updateMode(.success(.previewNeedsOnboarding))
+        await state.handleSignedInUserChange(harness.userID)
+      }
+      let context = NativeSessionTokenStore.captureSessionContext()
+      await gate.complete(true)
+      await cleanup.value
+      await harness.expectContents(present: replaceSession, profile: .previewNeedsOnboarding)
+      #expect(state.route == (replaceSession ? .needsOnboarding : .signedOut))
+      #expect(state.activeUserID == (replaceSession ? harness.userID : nil))
+      #expect(await revoker.calls() == (expired ? 0 : 1))
       #expect(NativeSessionTokenStore.captureSessionContext() == context)
     }
   }

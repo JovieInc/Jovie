@@ -48,4 +48,8 @@ struct MeRepository: MeRepositoryProtocol, Sendable {
   func clearCachedUser(_ userID: String) async {
     await cache.remove(for: userID)
   }
+
+  func clearCachedUser(_ userID: String, ifOwnedBy ownership: NativeSessionOwnership) async {
+    await cache.remove(for: userID, ifOwnedBy: ownership)
+  }
 }

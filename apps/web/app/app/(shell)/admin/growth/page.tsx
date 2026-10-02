@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import type { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
 import { CanonicalLifecycleFunnel } from '@/components/features/admin/contacts-table/CanonicalLifecycleFunnel';
-import { FounderFunnelBand } from '@/components/features/admin/hud/FounderFunnelBand';
+import { FounderFunnelDrilldown } from '@/components/features/admin/hud/FounderFunnelDrilldown';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { GtmCollapsibles } from '@/components/features/admin/leads/GtmCollapsibles';
 import {
@@ -14,9 +14,14 @@ import { LeadTable } from '@/components/features/admin/leads/LeadTable';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { buildAdminGrowthHref } from '@/constants/admin-navigation';
 import { getCanonicalContactMetrics } from '@/lib/admin/contacts';
-import { getFounderFunnelData } from '@/lib/admin/founder-funnel';
+import {
+  getFounderFunnelData,
+  getFounderFunnelStageRows,
+  isFounderFunnelDrilldownStage,
+} from '@/lib/admin/founder-funnel';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { adminGrowthSearchParams } from '@/lib/nuqs';
+import { GrowthFounderFunnel } from './GrowthFounderFunnel';
 
 interface AdminGrowthPageProps {
   readonly searchParams: Promise<SearchParams>;
@@ -34,11 +39,27 @@ export default async function AdminGrowthPage({
 }: Readonly<AdminGrowthPageProps>) {
   await requireCurrentAdminPageAccess();
 
-  const params = await adminGrowthSearchParams.parse(searchParams);
-  const [counts, funnel, lifecycleMetrics] = await Promise.all([
+  const rawParams = await searchParams;
+  const params = await adminGrowthSearchParams.parse(rawParams);
+  const urlParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(rawParams)) {
+    if (value === undefined) continue;
+    for (const item of Array.isArray(value) ? value : [value]) {
+      urlParams.append(key, item);
+    }
+  }
+  urlParams.set('funnelRange', params.funnelRange);
+  const urlSearchParams = urlParams.toString();
+  const drilldownStage = isFounderFunnelDrilldownStage(params.funnelStage)
+    ? params.funnelStage
+    : null;
+  const [counts, funnel, lifecycleMetrics, drilldown] = await Promise.all([
     getLeadFunnelCounts(),
-    getFounderFunnelData('30d'),
+    getFounderFunnelData(params.funnelRange),
     getCanonicalContactMetrics(),
+    drilldownStage
+      ? getFounderFunnelStageRows(drilldownStage, params.funnelRange)
+      : Promise.resolve(null),
   ]);
 
   return (
@@ -48,7 +69,16 @@ export default async function AdminGrowthPage({
       testId='admin-growth-page'
       viewTestId='admin-growth-view-leads'
     >
-      <FounderFunnelBand initialFunnel={funnel} />
+      <GrowthFounderFunnel
+        initialFunnel={funnel}
+        urlSearchParams={urlSearchParams}
+      />
+      {drilldown ? (
+        <FounderFunnelDrilldown
+          result={drilldown}
+          urlSearchParams={urlSearchParams}
+        />
+      ) : null}
       <CanonicalLifecycleFunnel metrics={lifecycleMetrics} />
       <ContentSurfaceCard surface='details'>
         <div className='p-3'>

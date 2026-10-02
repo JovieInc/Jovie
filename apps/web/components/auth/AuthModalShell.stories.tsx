@@ -46,6 +46,7 @@ export const WithStatusRow: Story = {
   args: {
     ariaLabel: 'Create your Jovie account',
     backButtonLabel: 'Back to chat',
+    backDestination: '/start',
     statusRow: <span>Continuing with “Test prompt”</span>,
     children: <SampleForm />,
   },

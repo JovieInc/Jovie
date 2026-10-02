@@ -5,6 +5,7 @@ import { AuthModalShell } from '@/components/auth/AuthModalShell';
 import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
 import { AuthShell } from '@/components/features/auth/AuthShell';
 import { APP_ROUTES } from '@/constants/routes';
+import { resolveAuthShellBackLink } from '@/lib/auth/auth-shell-intent';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 
@@ -20,12 +21,18 @@ export function SigninModalClient() {
   const redirectUrl =
     sanitizeRedirectUrl(searchParams.get('redirect_url')) ??
     APP_ROUTES.DASHBOARD;
+  // JOV-6225: bind the visible back label to the same validated entry
+  // context that decides its destination. Claim-origin sign-ins promise
+  // "Back to @handle" and land on the claim surface; everything else
+  // promises "Back to homepage" and lands on the homepage.
+  const backLink = resolveAuthShellBackLink(searchParams);
 
   return (
     <AuthenticatedAuthEntryGuard>
       <AuthModalShell
         ariaLabel='Log in to Jovie'
-        backButtonLabel='Back to homepage'
+        backButtonLabel={backLink?.label ?? 'Back to homepage'}
+        backDestination={backLink?.href ?? APP_ROUTES.HOME}
       >
         <AuthShell
           mode='sign-in'
