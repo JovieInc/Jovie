@@ -91,6 +91,8 @@ interface ReleaseLandingPageProps
     /** URL to the promo download gate page, shown when promo files exist */
     readonly downloadUrl?: string | null;
     readonly initialMenuOpen?: boolean;
+    /** Free-tier attribution. Omitted on profile-owned release pages. */
+    readonly makerHref?: string;
   }> {}
 
 function resolveReleaseUtmParams(
@@ -343,6 +345,7 @@ export function ReleaseLandingPage({
   claimBanner = null,
   downloadUrl = null,
   initialMenuOpen = false,
+  makerHref,
 }: Readonly<ReleaseLandingPageProps>) {
   const [menuOpen, setMenuOpen] = useState(initialMenuOpen);
   const [shareOpen, setShareOpen] = useState(false);
@@ -514,6 +517,7 @@ export function ReleaseLandingPage({
         <div className='shrink-0 pb-[max(env(safe-area-inset-bottom),8px)]'>
           <SmartLinkPoweredByFooter
             reportHref={`${APP_ROUTES.REPORT}?type=smart_link${tracking?.smartLinkSlug ? `&target=${encodeURIComponent(tracking.smartLinkSlug)}` : ''}`}
+            {...(makerHref ? { makerHref } : {})}
           />
         </div>
       </div>

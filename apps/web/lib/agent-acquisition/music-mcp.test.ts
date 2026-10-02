@@ -43,6 +43,7 @@ vi.mock('@/lib/flags/server', () => ({ getAppFlagValue: mocks.flag }));
 
 import { DELETE, GET, POST } from '@/app/api/music/mcp/route';
 import { BASE_URL } from '@/constants/app';
+import { MAKE_LINK_ANNOTATIONS } from '@/lib/smart-link-mvp/contract';
 import { MUSIC_READ_TIMEOUT_MS } from './music-mcp';
 import { musicFetchSchema, musicSearchSchema } from './music-read';
 
@@ -84,7 +85,10 @@ async function call(name: string, args: unknown) {
 }
 
 describe('public music identity MCP, real SDK and canonical resolver', () => {
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    delete process.env.FEATURE_SMART_LINK_MVP;
+    vi.useRealTimers();
+  });
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.limit.mockResolvedValue({ success: true });
@@ -129,6 +133,7 @@ describe('public music identity MCP, real SDK and canonical resolver', () => {
           )
         );
       }
+      delete process.env.FEATURE_SMART_LINK_MVP;
       const search = await client.callTool({
         name: 'search',
         arguments: { query: 'Radiohead' },
@@ -166,6 +171,36 @@ describe('public music identity MCP, real SDK and canonical resolver', () => {
       expect(mocks.flag).not.toHaveBeenCalled();
     } finally {
       await client.close();
+    }
+  });
+
+  it('lists make_link only while SMART_LINK_MVP is on', async () => {
+    process.env.FEATURE_SMART_LINK_MVP = 'true';
+    const transport = new StreamableHTTPClientTransport(new URL(url), {
+      fetch: async (input, init) => {
+        const req = new Request(
+          input instanceof Request ? input : String(input),
+          init
+        );
+        return req.method === 'GET' ? GET(req) : POST(req);
+      },
+    });
+    const client = new Client({ name: 'music-make-link', version: '1.0.0' });
+    await client.connect(transport);
+    try {
+      const tools = await client.listTools();
+      expect(tools.tools.map(tool => tool.name)).toEqual([
+        'search',
+        'fetch',
+        'make_link',
+      ]);
+      const makeLink = tools.tools.find(tool => tool.name === 'make_link');
+      expect(makeLink?.annotations).toEqual(MAKE_LINK_ANNOTATIONS);
+      expect(makeLink?.annotations?.readOnlyHint).toBe(false);
+      expect(makeLink?.annotations?.openWorldHint).toBe(true);
+    } finally {
+      await client.close();
+      delete process.env.FEATURE_SMART_LINK_MVP;
     }
   });
 
