@@ -159,8 +159,11 @@ describe('ChatGPT artist directory MCP', () => {
     expect(
       chatgptDirectoryOriginAllowed('https://chatgpt.com.evil.io', appOrigin)
     ).toBe(false);
+    const withUserinfo = new URL('https://chatgpt.com');
+    withUserinfo.username = 'user';
+    withUserinfo.password = 'pass';
     expect(
-      chatgptDirectoryOriginAllowed('https://user:pass@chatgpt.com', appOrigin)
+      chatgptDirectoryOriginAllowed(withUserinfo.toString(), appOrigin)
     ).toBe(false);
     expect(escapeLikeContains('100%_radio\\head')).toBe(
       '%100\\%\\_radio\\\\head%'
