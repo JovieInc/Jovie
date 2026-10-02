@@ -68,7 +68,10 @@ describe('retired queue release and retained fleet refresh', () => {
 
   it('keeps stack repair consumption fail-closed under trigger, checkout, and guard regressions', () => {
     const regressions = [
-      fleetGateRefreshWorkflow.replace(STACK_LIVENESS_CRON, "cron: '0 0 * * *'"),
+      fleetGateRefreshWorkflow.replace(
+        STACK_LIVENESS_CRON,
+        "cron: '0 0 * * *'"
+      ),
       fleetGateRefreshWorkflow.replace(
         'ref: main',
         'ref: ${{ github.event.pull_request.head.sha }}'
