@@ -113,7 +113,7 @@ struct AppRouteManifestTests {
     #expect(source.contains(#".accessibilityIdentifier("shell-drawer-new-chat")"#))
     #expect(source.contains(#".accessibilityIdentifier("shell-drawer-talk")"#))
     #expect(source.contains(".accessibilityAddTraits(isSelected ? [.isSelected] : [])"))
-    #expect(source.contains("AppShellPanePolicy.sidebarDestinations("))
+    #expect(source.contains("AppShellPanePolicy.rootDestinations("))
   }
 
   // Golden: the shell toolbar renders the drawer button, a single Actions
