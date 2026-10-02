@@ -50,7 +50,7 @@ export function fleetRuntime(): FleetHttpDependencies {
     validateMission: linear?.validateMission,
     async founder(request, profileId) {
       if (request.headers.has('authorization')) return null;
-      const { userId } = await getCachedAuth();
+      const { userId } = await getCachedAuth({ session: 'fresh' });
       if (!userId || !(await isAdmin(userId))) return null;
       return withDbSessionTx(async (tx, appUserId) => {
         const [owned] = await tx

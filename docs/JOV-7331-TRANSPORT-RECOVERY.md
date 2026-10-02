@@ -16,6 +16,17 @@ admission requires canonical Linear verification. Provider effects retain
 deterministic IDs, reauthorization, durable fencing and exact evidence proof.
 Automatic mutation retries are absent.
 
+Founder control now bypasses the session cookie cache before checking admin and
+profile ownership, so a revoked database session cannot approve or provision a
+worker. Both HTTP entry points share the existing durable general rate limiter
+on a trusted client IP key before body parsing or runtime construction. Exhaustion
+returns 429; unavailable storage fails closed with 503 and retry guidance.
+
+Current October 2 local verification confirms PostgreSQL registration and concurrent
+lease CAS. The unchanged public OpenAPI read is blocked by this environment's
+proxy (403), so the current complete canary remains unverified. No fixture replaces
+that public read; the earlier completed canary below remains historical evidence.
+
 The opt-in disposable Postgres canary covers concurrent lease/report calls,
 REST receipt replay, restart durability and revocation. It refuses remote
 database hosts and database names other than `jov7331_canary`. It remains
