@@ -25,7 +25,11 @@ import {
   PROFILE_METADATA_VIEWPORT,
 } from '../utils/profile-route-matrix';
 import { installPublicRouteMocks } from '../utils/public-surface-helpers';
-import { SMOKE_TIMEOUTS, waitForHydration } from '../utils/smoke-test-utils';
+import {
+  SMOKE_TIMEOUTS,
+  waitForAnyVisible,
+  waitForHydration,
+} from '../utils/smoke-test-utils';
 
 test.use({
   storageState: { cookies: [], origins: [] },
@@ -47,28 +51,6 @@ const PLACEHOLDER_PATTERNS: readonly RegExp[] = [
   /\bcoming soon — temporary\b/i,
   /\bdebug only\b/i,
 ];
-
-async function waitForAnyVisible(
-  page: Page,
-  selectors: readonly string[],
-  timeout = SMOKE_TIMEOUTS.VISIBILITY
-) {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    for (const selector of selectors) {
-      const visible = await page
-        .locator(selector)
-        .first()
-        .isVisible()
-        .catch(() => false);
-      if (visible) return selector;
-    }
-    await page.waitForTimeout(150);
-  }
-  throw new Error(
-    `None of the expected selectors became visible: ${selectors.join(', ')}`
-  );
-}
 
 async function collectVisibleButtonLabels(page: Page): Promise<string[]> {
   return page.evaluate(() => {
@@ -219,7 +201,7 @@ test.describe('Public profile copy regression @regression', () => {
         ).toBeLessThan(500);
 
         await waitForHydration(page);
-        await waitForAnyVisible(page, route.readySelectors);
+        await waitForAnyVisible(page, route.readySelectors, { label });
 
         await assertNoPlaceholderCopy(page, label);
         await assertNoDuplicateCtaClusters(page, label);

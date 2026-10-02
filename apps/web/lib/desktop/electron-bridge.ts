@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { captureWarning } from '@/lib/error-tracking';
+import type { DesktopWorkState } from './session-work-state';
 
 // ---------------------------------------------------------------------------
 // ElectronAPI contract — mirrors what apps/desktop/src/preload.ts exposes.
@@ -30,6 +31,12 @@ export interface ElectronAPI {
   readonly electronVersion: string;
   /** Main-process-validated package provenance. Optional for older shells. */
   readonly getBuildIdentity?: () => Promise<DesktopBuildIdentity | null>;
+  /** Per-document idle evidence, optional for installed older shells. */
+  readonly setWorkState?: (state: DesktopWorkState | null) => void;
+  readonly getWorkState?: () => {
+    readonly state: DesktopWorkState;
+    readonly reportedAt: number;
+  } | null;
   /** Register a callback that fires when electron-updater detects a new version. */
   readonly onUpdateAvailable: (cb: () => void) => void | (() => void);
   /** Register a callback that fires when the update download is complete. */
@@ -43,6 +50,8 @@ export interface ElectronAPI {
   readonly goBack: () => Promise<void>;
   /** Navigate forward in the SPA history stack. */
   readonly goForward: () => Promise<void>;
+  /** Validated application route commands. Optional on older binaries. */
+  readonly onNavigate?: (cb: (path: string) => void) => () => void;
   /** Subscribe to nav-state changes; returns unsubscribe. */
   readonly onNavStateChanged: (
     cb: (state: { canGoBack: boolean; canGoForward: boolean }) => void
@@ -248,6 +257,31 @@ export function getElectronAPI(): ElectronAPI | undefined {
  */
 export function isDesktopEnvironment(): boolean {
   return getRawElectronAPI() !== undefined;
+}
+
+/** Unknown/older shells remain safe and ordinary web tabs schedule no heartbeat. */
+export function reportDesktopWorkState(
+  state: DesktopWorkState | null
+): boolean {
+  const report = getRawElectronAPI()?.setWorkState;
+  if (typeof report !== 'function') return false;
+  try {
+    report(state);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Optional routing capability; stale binaries retain native load fallback. */
+export function supportsDesktopNavigation(): boolean {
+  return typeof getRawElectronAPI()?.onNavigate === 'function';
+}
+
+export function onDesktopNavigate(cb: (path: string) => void): () => void {
+  const subscribe = getRawElectronAPI()?.onNavigate;
+  if (typeof subscribe !== 'function') return noopUnsubscribe;
+  return subscribe(cb);
 }
 
 /**

@@ -101,6 +101,15 @@ describe('exclusive customer vs OV navigation', () => {
     );
   });
 
+  it.each([
+    ['screenshots', APP_ROUTES.ADMIN_SCREENSHOTS],
+    ['system_map', APP_ROUTES.ADMIN_SYSTEM],
+  ])('keeps the %s diagnostic outside founder navigation', (id, href) => {
+    expect(ADMIN_NAV_REGISTRY.some(item => item.href === href)).toBe(false);
+    expect(OPERATOR_NAV_ITEMS.some(item => item.href === href)).toBe(false);
+    expect(ADMIN_SETTINGS_TOOL_IDS).not.toContain(id);
+  });
+
   it('resolves OV routes to ov mode and customer routes to customer mode', () => {
     expect(resolveAppShellModeFromPathname(APP_ROUTES.DASHBOARD)).toBe(
       'customer'

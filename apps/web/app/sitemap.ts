@@ -8,7 +8,11 @@ import { getAlternativeSlugs } from '@/content/alternatives';
 import { getComparisonSlugs } from '@/content/comparisons';
 import { getIndexedSolutionsPages } from '@/content/pages/solutions';
 import { pageRecordPath } from '@/data/marketing/factory/pageRecord';
-import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
+import {
+  getBlogPosts,
+  isBlogPostIndexable,
+  slugifyCategory,
+} from '@/lib/blog/getBlogPosts';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { getChangelogReleases } from '@/lib/changelog-source';
 import { db } from '@/lib/db';
@@ -276,12 +280,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   editorialPages.push(
-    ...blogPosts.map(post =>
-      sitemapEntry(
-        `/blog/${post.slug}`,
-        toContentRevisionDate(post.updatedDate ?? post.date)
+    ...blogPosts
+      .filter(post => isBlogPostIndexable(post.slug))
+      .map(post =>
+        sitemapEntry(
+          `/blog/${post.slug}`,
+          toContentRevisionDate(post.updatedDate ?? post.date)
+        )
       )
-    )
   );
 
   const blogAuthors = [

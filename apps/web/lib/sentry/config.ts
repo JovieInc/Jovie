@@ -54,6 +54,10 @@
 
 import type * as Sentry from '@sentry/nextjs';
 import {
+  getWorktreeSentryOptions,
+  type WorktreeSentryOptions,
+} from '@/lib/observability/worktree-runtime';
+import {
   isNonActionableLoopbackBetterAuthHostEvent,
   isNonActionableSpotifyReleaseCreditBoundEvent,
   isNonActionableUpstashErrorBagEvent,
@@ -576,7 +580,7 @@ export function createBeforeSendHook(
  * - Lite SDK: Adds minimal breadcrumb integration
  * - Full SDK: Adds Replay, enhanced breadcrumbs, and profiling
  */
-export interface BaseSentryClientConfig {
+export interface BaseSentryClientConfig extends WorktreeSentryOptions {
   dsn: string | undefined;
   release: string | undefined;
   tracesSampleRate: number;
@@ -630,6 +634,7 @@ export interface BaseSentryClientConfig {
  */
 export function getBaseClientConfig(): BaseSentryClientConfig {
   return {
+    ...getWorktreeSentryOptions(),
     dsn: SENTRY_DSN_CLIENT,
     release: SENTRY_RELEASE,
     tracesSampleRate: TRACES_SAMPLE_RATE,
@@ -671,7 +676,7 @@ export function getBaseClientConfig(): BaseSentryClientConfig {
  * - Enables user context for richer errors (safely scrubbed)
  * - Does not have Replay (server-side rendering cannot record sessions)
  */
-export interface BaseSentryServerConfig {
+export interface BaseSentryServerConfig extends WorktreeSentryOptions {
   dsn: string | undefined;
   release: string | undefined;
   tracesSampleRate: number;
@@ -704,6 +709,7 @@ export interface BaseSentryServerConfig {
  */
 export function getBaseServerConfig(): BaseSentryServerConfig {
   return {
+    ...getWorktreeSentryOptions(),
     dsn: SENTRY_DSN_SERVER,
     release: SENTRY_RELEASE,
     tracesSampleRate: TRACES_SAMPLE_RATE,

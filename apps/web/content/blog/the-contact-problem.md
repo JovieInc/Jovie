@@ -1,11 +1,17 @@
 ---
+id: the-contact-problem
+slug: the-contact-problem
 title: The Contact Problem
+description: When I fired my manager, the first thing I realized wasn't emotional. It was logistical.
 date: 2026-03-18
 author: Tim White
 authorUsername: tim
 authorTitle: Founder at Jovie
+authorProfile: /tim
 category: Artist Management
 tags: contact info, manager changes, booking agents, music industry
+image: /images/blog/contact-problem.svg
+imageAlt: Abstract artwork for The Contact Problem.
 ---
 
 # The Contact Problem

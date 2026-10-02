@@ -269,11 +269,52 @@ Normalize the unstable token before sending the event.
     ]);
   });
 
+  it('deliberate red: distinguishes safe fixture context from forbidden action requests', () => {
+    const safe = issue({
+      description: issue().description.replace(
+        'Normalize the unstable token before sending the event.',
+        `Exercise a synthetic staging fixture from the checkout context and inspect its artifact bundle at checkout SHA.
+Review chat/payment/import risk cases from the iOS checkout/runner.
+Do not access credentials, API keys, billing, or production data. Do not purchase anything.`
+      ),
+    });
+    assert.equal(
+      deterministicGates.validateDeterministicPlanCandidate(safe),
+      null
+    );
+
+    for (const request of [
+      'Rotate the production credential after the safe fixture passes.',
+      'The plan says not to buy test data elsewhere. Charge the customer card.',
+      'Keep the bundle local, then delete production user data.',
+      'No production data is present, publish the result externally.',
+      'Do not access credentials, and publish the result externally.',
+      'Never read secrets, or deploy to production.',
+      'Implement checkout flow.',
+      'Billing integration.',
+      'Database migration.',
+    ]) {
+      const unsafe = issue({
+        description: issue().description.replace(
+          'Normalize the unstable token before sending the event.',
+          request
+        ),
+      });
+      assert.equal(
+        deterministicGates.validateDeterministicPlanCandidate(unsafe),
+        'sensitive-or-external-work',
+        request
+      );
+    }
+  });
+
   it('fails closed on team routing, ownership, epic, sensitive, stale, and incomplete work', () => {
     const cases = [
       issue({ identifier: 'OPS-1' }),
       issue({ assignee: { id: 'other', name: 'Other Owner' } }),
       issue({ labels: { nodes: [{ name: 'type:epic' }] } }),
+      issue({ labels: { nodes: [{ name: 'synthetic' }] } }),
+      issue({ labels: { nodes: [{ name: 'workstream' }] } }),
       issue({ title: 'Rotate a production credential' }),
       issue({ createdAt: '2025-01-01T00:00:00.000Z' }),
       issue({ description: 'No structured acceptance section' }),

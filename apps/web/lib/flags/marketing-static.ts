@@ -49,6 +49,9 @@ export const FEATURE_FLAGS = {
   // hero + sections that same PR enabled. Restore the pre-#11484 known-good state.
   SHOW_HOME_V1_DESIGN: false,
   SHOW_PUBLIC_PROFILE_V1_DESIGN: false,
+  // Public About body and commercial footer links. Stays off so production
+  // keeps the current page until this refresh is explicitly flipped.
+  SHOW_PUBLIC_ABOUT_FOOTER_REFRESH: false,
 } as const;
 
 export type MarketingStaticFlagName = keyof typeof FEATURE_FLAGS;

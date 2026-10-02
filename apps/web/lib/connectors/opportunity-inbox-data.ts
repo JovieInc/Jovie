@@ -19,8 +19,6 @@ import type {
 
 import { WORKFLOW_CAPTURE_REQUEST_KIND } from './suggested-action-kinds';
 
-const EMPTY_INBOX_DATA = buildOpportunityInboxData([]);
-
 const PENDING_TOUR_DATE_LIMIT = 20;
 const CONFIRMED_TOUR_DATE_LIMIT = 10;
 const REJECTED_TOUR_DATE_LIMIT = 20;
@@ -69,7 +67,7 @@ export async function loadOpportunityInboxTourDateSections(
   try {
     const now = new Date();
 
-    const [pending, confirmed, rejected] = await Promise.all([
+    const [pending, confirmed, rejected] = await Promise.allSettled([
       db
         .select(TOUR_DATE_SELECTION)
         .from(tourDates)
@@ -106,17 +104,43 @@ export async function loadOpportunityInboxTourDateSections(
         .limit(REJECTED_TOUR_DATE_LIMIT),
     ]);
 
+    const sections = [pending, confirmed, rejected];
+    for (const section of sections) {
+      if (section.status === 'rejected') {
+        logger.error(
+          '[opportunity-inbox] tour-date section unavailable',
+          section.reason
+        );
+      }
+    }
     return {
-      pending: pending.map(mapTourDateRowToInboxItem),
-      confirmed: confirmed.map(mapTourDateRowToInboxItem),
-      rejected: rejected.map(mapTourDateRowToInboxItem),
+      availability: sections.every(section => section.status === 'fulfilled')
+        ? 'available'
+        : 'unknown',
+      pending:
+        pending.status === 'fulfilled'
+          ? pending.value.map(mapTourDateRowToInboxItem)
+          : [],
+      confirmed:
+        confirmed.status === 'fulfilled'
+          ? confirmed.value.map(mapTourDateRowToInboxItem)
+          : [],
+      rejected:
+        rejected.status === 'fulfilled'
+          ? rejected.value.map(mapTourDateRowToInboxItem)
+          : [],
     };
   } catch (error) {
     logger.error(
       '[opportunity-inbox] tour-date sections load failed; degrading to empty',
       error
     );
-    return { pending: [], confirmed: [], rejected: [] };
+    return {
+      availability: 'unknown',
+      pending: [],
+      confirmed: [],
+      rejected: [],
+    };
   }
 }
 
@@ -149,9 +173,14 @@ export async function loadOpportunityInboxData(
     return buildOpportunityInboxData(rows, tourDateSections);
   } catch (error) {
     if (isMissingConnectorSchemaError(error)) {
-      return tourDateSections
-        ? buildOpportunityInboxData([], tourDateSections)
-        : EMPTY_INBOX_DATA;
+      const inbox = buildOpportunityInboxData([], tourDateSections);
+      return {
+        ...inbox,
+        availability: {
+          suggestedActions: 'unknown',
+          tourDates: inbox.availability?.tourDates ?? 'unknown',
+        },
+      };
     }
     if (isMissingSignalTypeColumnError(error)) {
       // Migration drift: prod DB predates the signal_type column. Degrade to
