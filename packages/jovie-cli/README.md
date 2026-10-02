@@ -54,6 +54,18 @@ Every command accepts `--base-url <url>` for a compatible deployment origin.
 The value must be an `http` or `https` origin without a path, credentials, or
 query parameters.
 
+## Proxies
+
+The standalone CLI and MCP server honor `HTTP_PROXY`, `HTTPS_PROXY`, and
+`NO_PROXY` (and their lowercase equivalents) through Node's built-in proxy
+support. No extra Node flags are needed. Existing TLS certificate settings
+remain in effect. A proxy must allow the deployment host (normally `jov.ie`);
+installing the CLI does not grant network access.
+
+Importing the JavaScript client does not change the host application's global
+transport settings. Configure Node's proxy support in that application or pass
+`fetchImpl` through the client options.
+
 ## MCP
 
 ```json
