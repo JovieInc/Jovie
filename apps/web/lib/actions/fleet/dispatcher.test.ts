@@ -116,6 +116,18 @@ const evidence = [
   { ref: 'urn:canary:openapi', summary: 'Valid contract retrieved' },
 ];
 describe('bounded fleet authority', () => {
+  it('rejects credential-shaped mission text without narrowing the boundary', async () => {
+    const f = fixture();
+    await expect(f.assign({ title: `sk-${'a'.repeat(16)}` })).rejects.toThrow(
+      'VALIDATION_FAILED'
+    );
+    await expect(f.assign({ title: `SK-${'A'.repeat(16)}` })).rejects.toThrow(
+      'VALIDATION_FAILED'
+    );
+    await expect(
+      f.assign({ title: `sk-${'a'.repeat(15)}` })
+    ).resolves.toBeDefined();
+  });
   async function claimed(f: ReturnType<typeof fixture>, workerId = 'aeon') {
     const token = await f.provision(workerId);
     data(await f.invoke('fleet.register', f.registration(workerId), token));

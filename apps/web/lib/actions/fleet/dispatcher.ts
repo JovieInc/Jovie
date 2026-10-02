@@ -218,7 +218,7 @@ function capacity(records: Record<string, unknown>, limit: number) {
 function safeText(value: unknown): void {
   const text = stable(value);
   if (
-    /(?:jovie-fleet-defect:|Bearer\s+[a-z0-9._-]+|jwf\.[a-z0-9.-]+|(?:api[_-]?key|password|access[_-]?token|secret)\s*[=:]\s*\S+|sk-[a-z0-9]{16,})/i.test(
+    /(?:jovie-fleet-defect:|Bearer\s+[a-z0-9._-]+|jwf\.[a-z0-9.-]+|(?:api[_-]?key|password|access[_-]?token|secret)\s*[=:]\s*\S+|sk-(?:[a-z0-9]){16,})/i.test(
       text
     )
   )
