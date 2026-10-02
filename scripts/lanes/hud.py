@@ -157,6 +157,11 @@ def local_model(host) -> dict:
     providers = lane.load_providers()
     enabled = {name: spec for name, spec in providers.items() if spec.get("enabled", True)}
     slots = {name: host.slots(name, spec.get("slots", 1)) for name, spec in enabled.items()}
+    # Fixture hosts in the HUD tests only implement slots(). Production Host.base_slots
+    # is the configured count; without it the display stays on the static line.
+    base_reader = getattr(host, "base_slots", None)
+    base_slots = ({name: base_reader(name, spec.get("slots", 1)) for name, spec in enabled.items()}
+                  if base_reader else dict(slots))
     tree = read_text(state / "current" / ".tree")
     current = (state / "current").resolve()
     all_receipts = ledger_rows(state)
@@ -183,7 +188,8 @@ def local_model(host) -> dict:
     return {
         "host": lane.HOST, "release": tree[:7] if tree else None,
         "releaseMatchesHud": current == HERE, "hudDir": str(HERE),
-        "providers": enabled, "slots": slots, "workers": running_workers(state),
+        "providers": enabled, "slots": slots, "baseSlots": base_slots,
+        "autoscaleMode": lane.autoscale.mode(), "workers": running_workers(state),
         "ledger24h": dict(verdicts), "runs24h": len(receipts),
         "receipts24h": receipts, "attributionReceipts": all_receipts,
         "lastLanding": landed[0].get("endedAt") if landed else None,
@@ -462,8 +468,18 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     workers = local["workers"]
     busy = [w for w in workers if w["run"]]
     total_slots = sum(local["slots"].values())
-    per = " · ".join(f"{name} {sum(1 for w in busy if w['provider'] == name)}/{count}" for name, count in local["slots"].items())
-    lines.append(section(f"ACTIVE SLOTS · {len(busy)} running / {total_slots} ({per}) · gate seats {local['gateSeats']}", width))
+    autoscale_mode = local.get("autoscaleMode") or "off"
+    bases = local.get("baseSlots") or {}
+    parts = []
+    for name, count in local["slots"].items():
+        label = f"{name} {sum(1 for w in busy if w['provider'] == name)}/{count}"
+        base = bases.get(name)
+        if autoscale_mode != "off" and isinstance(base, int) and base != count:
+            label += f"{'↑' if count > base else '↓'}{base}"
+        parts.append(label)
+    per = " · ".join(parts)
+    auto = f" · auto:{autoscale_mode}" if autoscale_mode != "off" else ""
+    lines.append(section(f"ACTIVE SLOTS · {len(busy)} running / {total_slots} ({per}){auto} · gate seats {local['gateSeats']}", width))
     rows_budget = max(3, min(total_slots, height - 30))
     shown = 0
     for name, count in local["slots"].items():
