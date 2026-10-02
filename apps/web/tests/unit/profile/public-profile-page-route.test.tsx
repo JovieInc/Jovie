@@ -19,9 +19,9 @@
  * Related surface: public-profile-isr (docs/TEST_RISK_REGISTER.md, 75% target).
  */
 
-import { createElement, type ReactNode } from 'react';
+import { createElement, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicProfileLoaderResult } from '@/app/[username]/_lib/public-profile-loader';
 
 const {
@@ -164,7 +164,9 @@ vi.mock('@/features/profile/StaticArtistPage', () => ({
   StaticArtistPage: (props: Record<string, unknown>) =>
     createElement('div', {
       'data-testid': 'static-artist-page',
-      'data-handle': String(props.artist?.handle ?? ''),
+      'data-handle': String(
+        (props.artist as { handle?: string })?.handle ?? ''
+      ),
     }),
 }));
 
@@ -189,8 +191,7 @@ vi.mock('@/components/features/ask-jovie/AskJovieWidget', () => ({
   AskJovieWidget: () => createElement('noscript', null, 'ask-jovie'),
 }));
 vi.mock('@/features/tracking/SignupFunnelBeacon', () => ({
-  SignupFunnelBeacon: () =>
-    createElement('noscript', null, 'signup-beacon'),
+  SignupFunnelBeacon: () => createElement('noscript', null, 'signup-beacon'),
 }));
 vi.mock('@/features/profile/ProfileAeoContent', () => ({
   ProfileAeoContent: () => createElement('noscript', null, 'aeo-content'),
@@ -277,7 +278,6 @@ const ERROR_RESULT: PublicProfileLoaderResult = {
 
 /** Await the async page (redirect/404 throws propagate) and render nothing. */
 async function executeArtistPage(username: string): Promise<ReactNode> {
-  vi.resetModules();
   const { default: ArtistPage } = await import('@/app/[username]/page');
   return ArtistPage({ params: Promise.resolve({ username }) });
 }
@@ -288,22 +288,24 @@ async function executeArtistPage(username: string): Promise<ReactNode> {
  * the async child directly (its own notFound()/redirect throws propagate),
  * and return its rendered element for static markup.
  */
-async function renderArtistPageContent(
-  username: string
-): Promise<string | null> {
-  const pageTree = (await executeArtistPage(username)) as {
-    props: { children: unknown };
-  };
-  const suspense = pageTree?.props?.children as
-    | { props: { children: unknown } }
-    | undefined;
-  const child = suspense?.props?.children as
-    | ((props: unknown) => Promise<ReactNode>)
-    | undefined;
-  if (typeof child !== 'function') return null;
-  const rendered = await child(suspense.props);
+async function renderArtistPageContent(username: string): Promise<string> {
+  const pageTree = (await executeArtistPage(username)) as ReactElement<{
+    children: ReactElement;
+  }>;
+  const child = pageTree.props.children as ReactElement<
+    Record<string, unknown>,
+    (props: Record<string, unknown>) => Promise<ReactNode>
+  >;
+  expect(typeof child.type).toBe('function');
+  const rendered = await child.type(child.props);
   return renderToStaticMarkup(rendered);
 }
+
+// Load the server import graph during suite setup; test deadlines measure
+// the route behavior rather than a cold transform of unrelated dependencies.
+beforeAll(async () => {
+  await import('@/app/[username]/page');
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -482,6 +484,10 @@ describe('public profile generateMetadata behavior (JOV-5778)', () => {
 
     const metadata = await generateMetadataFor('testartist');
 
-    expect(metadata.robots).toEqual({ index: false, follow: false });
+    expect(metadata.robots).toEqual({
+      index: false,
+      follow: false,
+      googleBot: { index: false, follow: false },
+    });
   });
 });

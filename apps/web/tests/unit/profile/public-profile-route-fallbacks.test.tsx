@@ -28,6 +28,11 @@ const { captureErrorInSentryMock, getTopProfilesForStaticGenerationMock } =
 
 vi.mock('server-only', () => ({}));
 
+vi.mock('@/components/site/PublicPageShell', () => ({
+  PublicPageShell: ({ children }: { children: import('react').ReactNode }) =>
+    createElement('main', null, children),
+}));
+
 vi.mock('@/lib/errors/capture', () => ({
   captureErrorInSentry: (...args: unknown[]) =>
     captureErrorInSentryMock(...args),
@@ -50,7 +55,10 @@ vi.mock('next/navigation', () => ({
 // The Icon atom is a pass-through for these assertions; keep renders cheap.
 vi.mock('@/components/atoms/Icon', () => ({
   Icon: ({ name }: { name: string }) =>
-    createElement('span', { 'data-testid': `icon-${name}`, 'aria-hidden': 'true' }),
+    createElement('span', {
+      'data-testid': `icon-${name}`,
+      'aria-hidden': 'true',
+    }),
 }));
 
 async function importNotFound() {
@@ -131,11 +139,9 @@ describe('smart-link error boundary (JOV-5778)', () => {
     expect(
       screen.getByRole('heading', { name: 'Something went wrong' })
     ).toBeInTheDocument();
-    expect(captureErrorInSentryMock).toHaveBeenCalledWith(
-      error,
-      'Content',
-      { digest: 'digest-1' }
-    );
+    expect(captureErrorInSentryMock).toHaveBeenCalledWith(error, 'Content', {
+      digest: 'digest-1',
+    });
   });
 });
 
@@ -149,11 +155,9 @@ describe('profile-level error boundary (JOV-5778)', () => {
     expect(
       screen.getByRole('heading', { name: 'Something went wrong' })
     ).toBeInTheDocument();
-    expect(captureErrorInSentryMock).toHaveBeenCalledWith(
-      error,
-      'Profile',
-      { digest: 'digest-2' }
-    );
+    expect(captureErrorInSentryMock).toHaveBeenCalledWith(error, 'Profile', {
+      digest: 'digest-2',
+    });
   });
 });
 
@@ -186,7 +190,8 @@ describe('sounds error boundary (JOV-5778)', () => {
 
 describe('notifications loading skeleton (JOV-5778)', () => {
   it('renders the loading skeleton without content flashes', async () => {
-    const { default: NotificationsLoading } = await importNotificationsLoading();
+    const { default: NotificationsLoading } =
+      await importNotificationsLoading();
 
     const { container } = render(createElement(NotificationsLoading));
 
@@ -204,7 +209,10 @@ describe('profile static params (JOV-5778)', () => {
 
     const params = await getProfileStaticParams(100);
 
-    expect(params).toEqual([{ username: 'dualipa' }, { username: 'testartist' }]);
+    expect(params).toEqual([
+      { username: 'dualipa' },
+      { username: 'testartist' },
+    ]);
     expect(getTopProfilesForStaticGenerationMock).toHaveBeenCalledWith(100);
   });
 

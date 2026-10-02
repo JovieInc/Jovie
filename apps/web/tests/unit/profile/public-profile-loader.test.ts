@@ -33,10 +33,12 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/cache', () => ({
   // unstable_cache wraps the fetcher; run it immediately and record the call
   // so cache-key/tag/TTL assertions can inspect the real configuration.
-  unstable_cache: ((fetcher: () => Promise<unknown>, keyParts: string[], options: unknown) => {
-    unstableCacheMock(keyParts, options);
-    return () => fetcher();
-  }) as never,
+  unstable_cache: vi.fn(
+    (fetcher: () => Promise<unknown>, keyParts: string[], options: unknown) => {
+      unstableCacheMock(keyParts, options);
+      return () => fetcher();
+    }
+  ),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -124,6 +126,7 @@ async function importLoader() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  getProfileWithLinksMock.mockReset();
   // The loader's unstable_cache path is skipped under NODE_ENV=test; the
   // cache-configuration assertions below run under a production-like env.
   process.env.NODE_ENV = 'test';
@@ -475,23 +478,24 @@ describe('non-ok payload unwrapping through the cache throw path', () => {
   it('falls back to a fresh fetch when the cache layer itself throws', async () => {
     process.env.NODE_ENV = 'production';
     delete process.env.PUBLIC_NOAUTH_SMOKE;
-    getProfileWithLinksMock
-      .mockResolvedValueOnce(buildProfileWithLinks({ isPublic: false }))
-      .mockResolvedValueOnce(buildProfileWithLinks());
+    getProfileWithLinksMock.mockResolvedValueOnce(buildProfileWithLinks());
     // Simulate an unstable_cache infrastructure failure: this invocation of
     // the mocked unstable_cache returns a fetcher that throws on call.
     const { unstable_cache } = await import('next/cache');
-    vi.mocked(unstable_cache).mockImplementationOnce(
-      (() => () => {
-        throw new Error('cache store unavailable');
-      }) as never
-    );
+    vi.mocked(unstable_cache).mockImplementationOnce((() => () => {
+      throw new Error('cache store unavailable');
+    }) as never);
     const loader = await importLoader();
 
     const result = await loader.getProfileAndLinks('testartist');
 
     expect(result.status).toBe('ok');
-    expect(getProfileWithLinksMock).toHaveBeenCalledTimes(2);
+    expect(getProfileWithLinksMock).toHaveBeenCalledExactlyOnceWith(
+      'testartist',
+      {
+        skipCache: true,
+      }
+    );
   });
 });
 
