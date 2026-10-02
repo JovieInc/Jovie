@@ -6,6 +6,7 @@ import {
   MarketingPageShell,
 } from '@/components/marketing';
 import { APP_ROUTES } from '@/constants/routes';
+import { SmartLinkMaker } from './SmartLinkMaker';
 import { SmartLinksDemo } from './SmartLinksDemo';
 
 const SMART_LINKS_HERO_PHOTO = {
@@ -32,7 +33,11 @@ const steps = [
   ],
 ] as const;
 
-export function SmartLinksLanding() {
+export function SmartLinksLanding({
+  showMaker = false,
+}: {
+  readonly showMaker?: boolean;
+}) {
   return (
     <MarketingPageShell className='bg-base text-primary-token'>
       <section
@@ -107,6 +112,64 @@ export function SmartLinksLanding() {
           </div>
         </MarketingContainer>
       </section>
+
+      {showMaker ? (
+        <>
+          {/* marketing-copy: draft — pending marketing-copy review */}
+          <section
+            aria-labelledby='make-jovie-link'
+            className='border-t border-subtle py-16 sm:py-22'
+          >
+            <MarketingContainer width='page'>
+              <h2
+                id='make-jovie-link'
+                className='text-balance text-3xl font-semibold tracking-tight sm:text-4xl'
+              >
+                Make a Jovie link
+              </h2>
+              <SmartLinkMaker />
+              <div className='mx-auto mt-8 max-w-xl text-sm leading-6 text-secondary-token'>
+                <p>Use it in ChatGPT, Claude, or your terminal.</p>
+                <p className='mt-2 font-mono text-xs'>
+                  https://jov.ie/api/chatgpt/mcp
+                </p>
+                <p className='mt-2 font-mono text-xs'>
+                  npx skills add JovieInc/Jovie --skill jovie-smart-link
+                </p>
+              </div>
+            </MarketingContainer>
+          </section>
+          <section
+            id='pricing'
+            aria-labelledby='jovie-link-plans'
+            className='border-t border-subtle py-16 sm:py-22'
+          >
+            <MarketingContainer width='page'>
+              <h2
+                id='jovie-link-plans'
+                className='text-balance text-3xl font-semibold tracking-tight sm:text-4xl'
+              >
+                Plans
+              </h2>
+              <div className='mt-8 grid gap-6 md:grid-cols-2'>
+                <article className='border-t border-subtle pt-5'>
+                  <h3 className='text-lg font-semibold'>Free</h3>
+                  <p className='mt-3 text-sm leading-6 text-secondary-token'>
+                    3 links a month. Jovie attribution on the page.
+                  </p>
+                </article>
+                <article className='border-t border-subtle pt-5'>
+                  <h3 className='text-lg font-semibold'>Links</h3>
+                  <p className='mt-3 text-sm leading-6 text-secondary-token'>
+                    $10/mo. Unlimited links, click analytics, no attribution,
+                    your own handle in the URL.
+                  </p>
+                </article>
+              </div>
+            </MarketingContainer>
+          </section>
+        </>
+      ) : null}
 
       <section
         aria-labelledby='smart-links-cta'

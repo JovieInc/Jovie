@@ -47,4 +47,30 @@ describe('SmartLinksLanding', () => {
       })
     ).toHaveAttribute('href', '/tim/the-deep-end?noredirect=1');
   });
+
+  it('hides the maker until the flag renders the section', () => {
+    const { rerender } = render(<SmartLinksLanding />);
+    expect(
+      screen.queryByRole('heading', { name: 'Make a Jovie link' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Paste a song link or type a name')
+    ).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Plans' })).toBeNull();
+
+    rerender(<SmartLinksLanding showMaker />);
+    expect(
+      screen.getByRole('heading', { name: 'Make a Jovie link' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Paste a song link or type a name')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Make my link' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Plans' })).toBeInTheDocument();
+    expect(
+      screen.getByText('3 links a month. Jovie attribution on the page.')
+    ).toBeInTheDocument();
+  });
 });

@@ -14,6 +14,10 @@ historical console cleanup.
 - Local route kill switches: `apps/web/app/api/chat/route.ts`
   (`CHAT_KILL_SWITCH_GATES`)
 
+`SMART_LINK_MVP` is an environment code flag in
+`apps/web/lib/flags/code-flags.ts` (`FEATURE_SMART_LINK_MVP`, default off).
+It is not a Statsig gate and is not listed in the inventory below.
+
 ## Gate Inventory
 
 | Gate key | Constant | Default behavior when Statsig is unavailable | Primary surface | Status |

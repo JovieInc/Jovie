@@ -1341,6 +1341,12 @@ export {
   selectCreatorSendingReputationSchema,
   selectEmailSendAttributionSchema,
 } from './sender';
+export {
+  type NewSmartLink,
+  type SmartLink,
+  type SmartLinkProviderRow,
+  smartLinks,
+} from './smart-links';
 // Suppression (Email Suppressions, Webhook Events, Delivery Logs)
 export {
   type CategorySubscription,

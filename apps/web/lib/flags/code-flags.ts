@@ -31,6 +31,11 @@ export const CODE_FLAGS = {
   // 404s and is not a live connector. FEATURE_CHATGPT_APP_DIRECTORY_MCP=true
   // enables the anonymous public-artist tools. Does not enable DCR.
   CHATGPT_APP_DIRECTORY_MCP: false,
+  // Public "make a Jovie link" API, /l/{code} pages, and the make_link MCP
+  // tool. Default off. FEATURE_SMART_LINK_MVP=true enables them. Turn this on
+  // together with CHATGPT_APP_DIRECTORY_MCP only after the directory package
+  // that describes make_link is merged. Does not create Stripe prices.
+  SMART_LINK_MVP: false,
 } as const satisfies Record<string, boolean>;
 
 export type CodeFlagName = keyof typeof CODE_FLAGS;

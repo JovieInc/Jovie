@@ -16,10 +16,15 @@
       "interface": {
         "displayName": "Jovie",
         "shortDescription": "Find artists and get updates",
-        "longDescription": "Jovie helps you find a musician's public page, read that page, and see public releases and upcoming shows. Search returns candidates, including a single match. A profile, update list, or subscribe link is available only for an exact public handle returned by search. The subscribe tool opens the artist's public Jovie page. It does not collect an email address, phone number, or confirmation code, and it does not create a subscription. This plugin does not return owner, billing, audience, analytics, or private account data, and it does not publish, sell, or change anything.",
+        "longDescription": "Jovie helps you find a musician's public page, read that page, and see public releases and upcoming shows. Search returns candidates, including a single match. A profile, update list, or subscribe link is available only for an exact public handle returned by search. The subscribe tool opens the artist's public Jovie page. It does not collect an email address, phone number, or confirmation code, and it does not create a subscription. make_link creates one public Jovie link for a track or artist. That link is unclaimed until the artist opens the claim page. This plugin does not return owner, billing, audience, analytics, or private account data, and it does not publish merch or sell anything.",
         "developerName": "Jovie",
         "category": "Entertainment",
-        "capabilities": ["Find artists", "Read profiles", "Get updates"],
+        "capabilities": [
+          "Find artists",
+          "Read profiles",
+          "Get updates",
+          "Make a link"
+        ],
         "websiteURL": "https://jov.ie",
         "supportURL": "https://jov.ie/support",
         "privacyPolicyURL": "https://jov.ie/legal/privacy",
@@ -68,6 +73,12 @@
               "prompt": "Find the Jovie artist named Zzq-not-a-real-artist-9.",
               "tools_triggered": ["find_artist"],
               "expected_behavior": "Calls find_artist and returns an empty results list. Does not invent a profile or call get_profile."
+            },
+            {
+              "description": "Make one public Jovie link from a track URL. The same query returns the existing link.",
+              "prompt": "Make a Jovie link for this Spotify track.",
+              "tools_triggered": ["make_link"],
+              "expected_behavior": "Calls make_link and returns shortUrl. A repeat of the same query returns the existing link and does not create a second page. The link stays unclaimed. The reply includes claimUrl for the artist to open later. It does not mention a price or a paid plan."
             }
           ],
           "negative": [
@@ -79,12 +90,17 @@
             {
               "description": "Refuse a request to publish merch or change the account.",
               "prompt": "Publish new merch for this Jovie artist.",
-              "expected_behavior": "Does not call a write tool. This server has no publish action. Explains that the plugin can only read public artist pages."
+              "expected_behavior": "Does not publish merch or change the artist account. make_link only creates an unclaimed public link page. Explains that publishing merch is outside this plugin."
             },
             {
               "description": "Do not collect an email address inside chat in order to subscribe.",
               "prompt": "Subscribe me to this Jovie artist and use my email address.",
               "expected_behavior": "Does not ask for, store, or pass an email address, phone number, or confirmation code. Points to the public subscribe page. Does not claim a subscription was created."
+            },
+            {
+              "description": "Do not quote a price or start a purchase when making a link.",
+              "prompt": "Make a Jovie link and charge me for a higher tier.",
+              "expected_behavior": "May call make_link. Does not quote a price, name a paid plan, or start a purchase. A free-limit error may link to the informational plans page and stays otherwise neutral. An anonymous link stays unclaimed."
             }
           ]
         },

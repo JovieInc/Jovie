@@ -1,8 +1,11 @@
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { SmartLinksLanding } from './SmartLinksLanding';
 
+// Fully static. The maker section is included only when SMART_LINK_MVP is on
+// at build time. Turning the flag on in production requires a redeploy.
 export const revalidate = false;
 
 const title = 'Smart Links';
@@ -25,5 +28,5 @@ export const metadata: Metadata = {
 };
 
 export default function SmartLinksPage() {
-  return <SmartLinksLanding />;
+  return <SmartLinksLanding showMaker={isCodeFlagEnabled('SMART_LINK_MVP')} />;
 }

@@ -42,6 +42,10 @@ import { DELETE, GET, POST } from '@/app/api/chatgpt/mcp/route';
 import { BASE_URL } from '@/constants/app';
 import { CODE_FLAGS } from '@/lib/flags/code-flags';
 import {
+  MAKE_LINK_ANNOTATIONS,
+  MAKE_LINK_DIRECTORY_INSTRUCTIONS,
+} from '@/lib/smart-link-mvp/contract';
+import {
   CHATGPT_DIRECTORY_INSTRUCTIONS,
   CHATGPT_DIRECTORY_LISTING,
   CHATGPT_DIRECTORY_TOOL_SPECS,
@@ -135,6 +139,7 @@ describe('ChatGPT artist directory MCP', () => {
 
   afterEach(() => {
     delete process.env.FEATURE_CHATGPT_APP_DIRECTORY_MCP;
+    delete process.env.FEATURE_SMART_LINK_MVP;
     vi.clearAllMocks();
   });
 
@@ -381,6 +386,46 @@ describe('ChatGPT artist directory MCP', () => {
     }
   });
 
+  it('lists make_link as a flagged write beside the four read-only tools', async () => {
+    process.env.FEATURE_SMART_LINK_MVP = 'true';
+    expect(MAKE_LINK_DIRECTORY_INSTRUCTIONS.length).toBeLessThanOrEqual(512);
+    const transport = new StreamableHTTPClientTransport(new URL(endpoint), {
+      fetch: async (input, init) => {
+        const req = new Request(
+          input instanceof Request ? input : String(input),
+          init
+        );
+        if (req.method === 'GET') return GET(req);
+        if (req.method === 'DELETE') return DELETE(req);
+        return POST(req);
+      },
+    });
+    const client = new Client({
+      name: 'directory-make-link',
+      version: '1.0.0',
+    });
+    await client.connect(transport);
+    try {
+      const tools = await client.listTools();
+      expect(tools.tools.map(tool => tool.name)).toEqual([
+        'find_artist',
+        'get_profile',
+        'get_updates',
+        'subscribe_to_updates',
+        'make_link',
+      ]);
+      const makeLink = tools.tools.find(tool => tool.name === 'make_link');
+      expect(makeLink?.annotations).toEqual(MAKE_LINK_ANNOTATIONS);
+      expect(makeLink?.title).toBe('Make a Jovie link');
+      for (const tool of tools.tools) {
+        if (tool.name === 'make_link') continue;
+        expect(tool.annotations).toEqual(PUBLIC_ARTIST_TOOL_ANNOTATIONS);
+      }
+    } finally {
+      await client.close();
+    }
+  });
+
   it('serves a square listing package with the production policy URLs', () => {
     const manifest = JSON.parse(
       readFileSync(path.join(pluginRoot, 'plugin.json'), 'utf8')
@@ -424,8 +469,11 @@ describe('ChatGPT artist directory MCP', () => {
     expect(face.websiteURL).toBe(CHATGPT_DIRECTORY_LISTING.websiteUrl);
     expect(face.screenshots).toBeUndefined();
     expect(openai.review.commerce).toBe(false);
-    expect(openai.review.test_cases.positive).toHaveLength(5);
-    expect(openai.review.test_cases.negative).toHaveLength(3);
+    expect(openai.review.test_cases.positive).toHaveLength(6);
+    expect(openai.review.test_cases.negative).toHaveLength(4);
+    const cases = JSON.stringify(openai.review.test_cases);
+    expect(cases).toContain('make_link');
+    expect(cases).not.toMatch(/\$\d|upgrade|checkout/i);
     expect(openai.review.demo_recording_url).toBeUndefined();
     for (const file of [
       face.logo,

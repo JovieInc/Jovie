@@ -81,13 +81,13 @@ describe('server analytics contract', () => {
     expect(SERVER_ANALYTICS_CONSENT_POLICY).toBe(
       'first_party_operational_measurement'
     );
-    expect(countProductionCallSites(WEB_ROOT)).toBe(36);
+    expect(countProductionCallSites(WEB_ROOT)).toBe(37);
     expect(
       SERVER_ANALYTICS_CALLSITE_INVENTORY.reduce(
         (total, entry) => total + entry.invocations,
         0
       )
-    ).toBe(36);
+    ).toBe(37);
 
     for (const entry of SERVER_ANALYTICS_CALLSITE_INVENTORY) {
       const source = readFileSync(join(WEB_ROOT, entry.path), 'utf8');
@@ -200,6 +200,26 @@ describe('server analytics contract', () => {
       'attacker@example.com'
     );
     expect(JSON.stringify(mocks.values.mock.calls[0])).not.toContain('415');
+  });
+
+  it('records an unclaimed Jovie link click without a release id', async () => {
+    await trackServerEvent('smart_link_clicked', {
+      smartLinkCode: 'abcd2345',
+      kind: 'track',
+      unclaimed: true,
+    });
+
+    expect(mocks.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        properties: {
+          smartLinkCode: 'abcd2345',
+          kind: 'track',
+          unclaimed: true,
+        },
+        sourceEntityId: null,
+        sourceEntityType: null,
+      })
+    );
   });
 
   it('normalizes country codes and never source-links notification payloads', async () => {

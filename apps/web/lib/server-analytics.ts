@@ -155,6 +155,9 @@ export const SERVER_ANALYTICS_EVENTS = {
       'utm_medium',
       'utm_content',
       'utm_campaign_matches_release',
+      'smartLinkCode',
+      'kind',
+      'unclaimed',
     ],
     source: { property: 'releaseId', type: 'release' },
   },
@@ -376,6 +379,11 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     ],
   },
   {
+    path: 'app/l/[code]/page.tsx',
+    invocations: 1,
+    events: ['smart_link_clicked'],
+  },
+  {
     path: 'app/r/[slug]/page.tsx',
     invocations: 1,
     events: ['smart_link_clicked'],
@@ -460,6 +468,7 @@ const SAFE_TOKEN_PROPERTY_NAMES = new Set([
   'reason',
   'result',
   'share_id',
+  'smartLinkCode',
   'source',
   'stripeEventId',
   'toolName',
@@ -471,6 +480,7 @@ const ENUM_PROPERTY_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
   client: new Set(['web', 'ios', 'electron']),
   contract_version: new Set([LIMITED_DROP_FUNNEL_CONTRACT_VERSION]),
   intent: new Set(['sign_in', 'sign_up']),
+  kind: new Set(['track', 'artist']),
   method: new Set(['email_link', 'dashboard', 'api', 'dropdown']),
   funnel_id: new Set(SIGNUP_FUNNEL_IDS),
   step: new Set(SIGNUP_FUNNEL_ALL_STEPS),
@@ -676,8 +686,14 @@ function prepareServerAnalyticsInsert(
   const sourceEntityId = definition.source
     ? sanitized[definition.source.property]
     : undefined;
+  const unclaimedLink =
+    event === 'smart_link_clicked' && sanitized.unclaimed === true;
 
-  if (definition.source && typeof sourceEntityId !== 'string') {
+  if (
+    definition.source &&
+    typeof sourceEntityId !== 'string' &&
+    !unclaimedLink
+  ) {
     Sentry.captureException(new Error('Invalid server analytics source'), {
       tags: {
         context: 'server_analytics_contract',
@@ -726,9 +742,12 @@ function prepareServerAnalyticsInsert(
       category: definition.category,
       privacyClass: SERVER_ANALYTICS_PRIVACY_CLASS,
       consentPolicy: SERVER_ANALYTICS_CONSENT_POLICY,
-      sourceEntityType: definition.source?.type ?? null,
+      sourceEntityType:
+        unclaimedLink || !definition.source ? null : definition.source.type,
       sourceEntityId:
-        typeof sourceEntityId === 'string' ? sourceEntityId : null,
+        unclaimedLink || typeof sourceEntityId !== 'string'
+          ? null
+          : sourceEntityId,
       ...(options?.eventIdentity === undefined
         ? {}
         : { eventIdentity: options.eventIdentity }),

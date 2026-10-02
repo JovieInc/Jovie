@@ -594,6 +594,20 @@ export const DATA_CLASSES: DataClass[] = [
     deletion: ['fk-cascade', 'unmanaged'],
     export: ['none'],
   },
+  {
+    id: 'unclaimed-jovie-links',
+    title: 'Unclaimed public Jovie links',
+    purpose:
+      'Anonymous subject hash used to cap free link creation. The hash is sha256 of a prefix plus the caller IP. The raw address is not stored. A signed-in creator id is optional and does not prove the person is the artist.',
+    owner: 'app/links',
+    classification: 'telemetry',
+    tables: ['smart_links'],
+    retention: 'Kept with the public link page until the row is deleted.',
+    deletion: ['unmanaged'],
+    export: ['none'],
+    notes:
+      'created_by_user_id is a nullable users.id. claimUrl does not create an account. No Stripe objects.',
+  },
 ];
 
 const registeredTables = new Set(DATA_CLASSES.flatMap(c => c.tables));
