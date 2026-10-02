@@ -260,7 +260,7 @@ describe('ChatThreadNavigationRail', () => {
   it('stays hidden until the thread crosses the long-thread threshold', () => {
     const shortMessages = Array.from(
       { length: THREAD_NAV_RAIL_MIN_MESSAGES - 1 },
-      (_, index) => ({
+      (_, index): ChatNavMessage => ({
         id: `m-${index}`,
         role: index % 2 === 0 ? ('user' as const) : ('assistant' as const),
         parts: [{ type: 'text', text: `Message ${index}` }],
