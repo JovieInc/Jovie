@@ -22,6 +22,7 @@ import {
   measureChatTranscriptRow,
 } from '@/lib/chat/transcript-window';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
+import { useDesktopChatWorkState } from '@/lib/desktop/chat-work-state';
 import { useAppFlag } from '@/lib/flags/client';
 import {
   useInsightsSummaryQuery,
@@ -221,6 +222,17 @@ export function JovieChat({
     onError: error => setChatError({ type: 'unknown', message: error }),
     onAudioUploaded: handleAudioUploaded,
     resetKey: activeConversationId ?? conversationId ?? null,
+  });
+
+  useDesktopChatWorkState({
+    input,
+    hasAttachments: pendingFiles.length > 0,
+    isUploading,
+    isLoading,
+    isSubmitting,
+    isLoadingConversation,
+    status,
+    messages,
   });
 
   // Manifest collapse state: when uploading and user scrolls/types, show collapsed bar
