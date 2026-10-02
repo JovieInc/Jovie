@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/tour-date-sidebar-analytics.test.tsx
+
 import {
   Button,
   type CommonDropdownItem,
