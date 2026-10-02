@@ -629,7 +629,11 @@ function createInteractivePage({
 
   const page = {
     addInitScript: vi.fn().mockResolvedValue(undefined),
-    evaluate: vi.fn(async () => {
+    evaluate: vi.fn(async (callback: () => unknown) => {
+      if (callback.name === 'clearWarmNavProbe') {
+        events.push('cleanup');
+        return;
+      }
       const elapsed = elapsedValues.shift();
       if (elapsed === undefined) {
         throw new Error('Unexpected elapsed-time evaluation');
@@ -656,6 +660,9 @@ function createInteractivePage({
     }),
     url: vi.fn(() => finalUrl),
     waitForLoadState: vi.fn().mockResolvedValue(undefined),
+    waitForFunction: vi.fn(async () => {
+      events.push('acknowledgment-receipt');
+    }),
     waitForTimeout: vi.fn().mockResolvedValue(undefined),
     waitForURL: vi.fn(async (predicate: (url: URL) => boolean) => {
       events.push('url-ready');
@@ -1186,14 +1193,16 @@ describe('performance budgets guard', () => {
     expect(fixture.events.indexOf('goto')).toBeLessThan(
       fixture.events.indexOf('click')
     );
-    const acknowledgmentSelector =
-      '[data-navigation-item-id="library"][data-navigation-pending="true"]';
-    expect(
-      fixture.events.indexOf(`visible:${acknowledgmentSelector}`)
-    ).toBeLessThan(fixture.events.indexOf('elapsed:12'));
+    expect(fixture.events.indexOf('arm')).toBeLessThan(
+      fixture.events.indexOf('click')
+    );
+    expect(fixture.events.indexOf('acknowledgment-receipt')).toBeLessThan(
+      fixture.events.indexOf('elapsed:12')
+    );
     expect(fixture.events.indexOf('elapsed:12')).toBeLessThan(
       fixture.events.indexOf(`visible:${fixture.contentSelector}`)
     );
+    expect(fixture.events.at(-1)).toBe('cleanup');
   });
 
   it('resolves dynamic profile starts and clicks the visible mobile tab', async () => {

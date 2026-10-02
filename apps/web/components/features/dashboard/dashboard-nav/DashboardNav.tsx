@@ -28,6 +28,7 @@ import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import {
+  NAVIGATION_DROP_OFF_MS,
   type NavigationTelemetryContext,
   navigationInputMethodFromClick,
   startNavigationTelemetry,
@@ -115,6 +116,19 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   useEffect(() => {
     setPendingNavigationItemId(null);
   }, [currentNavigationHref]);
+
+  // App Router failures can retain the source URL. This acknowledgment must
+  // expire with the existing navigation drop-off window, even in that case.
+  useEffect(() => {
+    if (!pendingNavigationItemId) return;
+    const clearAcknowledgment = () => setPendingNavigationItemId(null);
+    const timeout = setTimeout(clearAcknowledgment, NAVIGATION_DROP_OFF_MS);
+    globalThis.addEventListener('offline', clearAcknowledgment);
+    return () => {
+      clearTimeout(timeout);
+      globalThis.removeEventListener('offline', clearAcknowledgment);
+    };
+  }, [pendingNavigationItemId]);
 
   useEffect(() => {
     if (
