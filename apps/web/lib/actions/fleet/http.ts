@@ -6,7 +6,14 @@ const NO_STORE = { 'Cache-Control': 'no-store' };
 const controlSchema = z
   .object({
     profileId: z.uuid(),
-    operation: z.enum(['provision', 'revoke', 'assign', 'accept', 'reject']),
+    operation: z.enum([
+      'provision',
+      'rotate',
+      'revoke',
+      'assign',
+      'accept',
+      'reject',
+    ]),
     input: z.unknown(),
     approvalId: z.uuid().optional(),
   })
