@@ -378,21 +378,82 @@ describe('chat timeline reducer', () => {
       now: 200,
     });
 
-    expect(selectRenderableMessages(failed)).toMatchObject([
+    expect(failed.messages).toMatchObject([
       {
         id: 'user:turn_client_1',
         role: 'user',
         status: 'failed',
+        failedReason: 'Server failed',
       },
       {
         id: 'assistant:turn_client_1',
         role: 'assistant',
         status: 'failed',
+        failedReason: 'Server failed',
+        parts: [],
       },
     ]);
-    expect(selectRenderableMessages(failed)[0]?.parts).toEqual([
-      textPart('Please answer'),
+    expect(selectRenderableMessages(failed)).toMatchObject([
+      { role: 'user', parts: [textPart('Please answer')] },
     ]);
+    expect(selectRenderableMessages(failed)).toHaveLength(1);
+    expect(failed.activeClientTurnId).toBeNull();
+
+    const retrying = reduceChatTimeline(failed, {
+      type: 'message.send.started',
+      clientTurnId: 'turn_client_1',
+      clientMessageId: 'turn_client_1:user',
+      parts: [textPart('Please answer')],
+      now: 300,
+    });
+    expect(selectRenderableMessages(retrying)).toMatchObject([
+      { id: 'user:turn_client_1', status: 'sending' },
+      { id: 'assistant:turn_client_1', status: 'pending', parts: [] },
+    ]);
+    expect(selectRenderableMessages(retrying)).toHaveLength(2);
+
+    const recovered = reduceChatTimeline(retrying, {
+      type: 'assistant.stream.completed',
+      clientTurnId: 'turn_client_1',
+      parts: [textPart('Recovered answer')],
+      now: 400,
+    });
+    expect(selectRenderableMessages(recovered)).toHaveLength(2);
+    expect(selectRenderableMessages(recovered)[1]).toMatchObject({
+      id: 'assistant:turn_client_1',
+      status: 'complete',
+      parts: [textPart('Recovered answer')],
+    });
+  });
+
+  it('preserves partial assistant output and its failure state after a disconnect', () => {
+    const sending = reduceChatTimeline(createInitialChatTimelineState(), {
+      type: 'message.send.started',
+      clientTurnId: 'turn_client_1',
+      clientMessageId: 'turn_client_1:user',
+      parts: [textPart('Please answer')],
+      now: 100,
+    });
+    const streaming = reduceChatTimeline(sending, {
+      type: 'assistant.stream.delta',
+      clientTurnId: 'turn_client_1',
+      parts: [textPart('Here is what I found so far')],
+      now: 200,
+    });
+    const failed = reduceChatTimeline(streaming, {
+      type: 'assistant.stream.failed',
+      clientTurnId: 'turn_client_1',
+      error: 'Connection lost',
+      now: 300,
+    });
+
+    expect(selectRenderableMessages(failed)).toHaveLength(2);
+    expect(selectRenderableMessages(failed)[1]).toMatchObject({
+      role: 'assistant',
+      status: 'failed',
+      failedReason: 'Connection lost',
+      parts: [textPart('Here is what I found so far')],
+    });
   });
 
   // Regression guard for JOV-3528: an on-send refetch (title polling, post-stream

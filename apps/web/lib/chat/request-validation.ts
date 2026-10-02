@@ -101,7 +101,9 @@ function measureChatRequestBodyBytes(
 
 /**
  * Trim chat messages so the serialized POST body stays within server limits.
- * Drops oldest messages first while preserving the most recent turn.
+ * Summer owns operator history; only the newest user message is transported.
+ * Creator requests drop oldest messages first, preserving the newest message
+ * unchanged even if it must be rejected by the server on its own.
  */
 export function trimMessagesForChatRequest(
   messages: readonly UIMessage[],
@@ -111,16 +113,20 @@ export function trimMessagesForChatRequest(
     return [];
   }
 
-  let trimmed = [...messages];
-  while (
-    trimmed.length > 1 &&
-    measureChatRequestBodyBytes(trimmed, staticBody) > MAX_CHAT_BODY_SIZE
-  ) {
-    trimmed = trimmed.slice(1);
+  if (staticBody.chatMode === 'ov') {
+    const newestUserMessage = messages.findLast(
+      message => message.role === 'user'
+    );
+    return newestUserMessage ? [newestUserMessage] : [];
   }
 
-  if (trimmed.length > MAX_MESSAGES_PER_REQUEST) {
-    trimmed = trimmed.slice(-MAX_MESSAGES_PER_REQUEST);
+  let trimmed = messages.slice(-MAX_MESSAGES_PER_REQUEST);
+  while (
+    trimmed.length > 1 &&
+    (validateMessagesArray(trimmed) !== null ||
+      measureChatRequestBodyBytes(trimmed, staticBody) > MAX_CHAT_BODY_SIZE)
+  ) {
+    trimmed = trimmed.slice(1);
   }
 
   return trimmed;
