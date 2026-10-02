@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { AdminReadUnavailable } from '@/components/features/admin/AdminReadUnavailable';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { captureError } from '@/lib/error-tracking';
@@ -23,7 +24,7 @@ export const runtime = 'nodejs';
 export default async function AdminFeaturesPage() {
   await requireCurrentAdminPageAccess();
 
-  let rows: FeatureFlagAdminRow[] = [];
+  let rows: FeatureFlagAdminRow[] | null = null;
   try {
     rows = await getFeatureFlagAdminRows();
   } catch (error) {
@@ -32,7 +33,7 @@ export default async function AdminFeaturesPage() {
     });
   }
 
-  let auditEvents: FeatureFlagAuditEvent[] = [];
+  let auditEvents: FeatureFlagAuditEvent[] | null = null;
   try {
     auditEvents = await getFeatureFlagAuditEvents();
   } catch (error) {
@@ -52,11 +53,19 @@ export default async function AdminFeaturesPage() {
       testId='admin-features-page'
     >
       <div className='space-y-8'>
-        <AdminFeaturesTable initialRows={rows} currentTier={currentTier} />
-        <FeatureFlagAuditSection
-          events={auditEvents}
-          currentTier={currentTier}
-        />
+        {rows === null ? (
+          <AdminReadUnavailable message='Feature flag values could not be read. Changes are unavailable until the current values can be verified.' />
+        ) : (
+          <AdminFeaturesTable initialRows={rows} currentTier={currentTier} />
+        )}
+        {auditEvents === null ? (
+          <AdminReadUnavailable message='Flag audit history could not be read. This does not mean there are no recorded changes.' />
+        ) : (
+          <FeatureFlagAuditSection
+            events={auditEvents}
+            currentTier={currentTier}
+          />
+        )}
       </div>
     </AdminPage>
   );

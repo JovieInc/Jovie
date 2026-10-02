@@ -34,6 +34,8 @@ vi.mock('@/components/features/admin/layout/AdminPage', () => ({
   ),
 }));
 
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
 }));
@@ -87,7 +89,7 @@ describe('AdminPlatformConnectionsPage', () => {
     });
   });
 
-  it('renders safe fallback props when optional platform status loading fails', async () => {
+  it('withholds configuration controls when platform status cannot be read', async () => {
     mockLoadAdminPlatformConnectionsData.mockRejectedValueOnce(
       new Error('platform connections unavailable')
     );
@@ -111,32 +113,25 @@ describe('AdminPlatformConnectionsPage', () => {
       expect.any(Error),
       expect.objectContaining({ route: 'admin/platform-connections' })
     );
+    expect(mockPlatformConnectionsClient).not.toHaveBeenCalled();
+    expect(screen.getByText(/Their status is unknown/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+  it('preserves verified connected settings and the selected tab', async () => {
+    const { default: Page } = await import(
+      '@/app/app/(shell)/admin/platform-connections/page'
+    );
+    render(await Page({ searchParams: Promise.resolve({ tab: 'engine' }) }));
     expect(mockPlatformConnectionsClient).toHaveBeenCalledWith(
       expect.objectContaining({
         currentTab: 'engine',
-        spotifyStatus: expect.objectContaining({
-          connected: false,
-          healthy: false,
-          source: 'missing',
-          accountLabel: null,
-          approvedScopes: [],
-          missingScopes: [],
-          error: null,
-        }),
-        engineSettings: expect.objectContaining({
-          enabled: false,
-          intervalValue: 3,
-          intervalUnit: 'days',
-          lastGeneratedAt: null,
-          nextEligibleAt: null,
-        }),
-        currentUser: expect.objectContaining({
-          hasSpotify: false,
-          label: null,
-          missingScopes: [],
-        }),
+        spotifyStatus: expect.objectContaining({ connected: true }),
+        engineSettings: expect.objectContaining({ enabled: true }),
       }),
       undefined
     );
+    expect(
+      screen.queryByRole('button', { name: 'Retry' })
+    ).not.toBeInTheDocument();
   });
 });
