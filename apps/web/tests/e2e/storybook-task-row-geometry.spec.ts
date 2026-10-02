@@ -6,6 +6,150 @@ const VIEWPORTS = [
   { name: 'narrow desktop split', width: 390 },
 ] as const;
 
+for (const viewport of VIEWPORTS) {
+  for (const theme of ['dark', 'light']) {
+    const suffix = theme === 'light' ? '-light' : '';
+    test(`contains padded inline badges in a ${viewport.name} (${theme})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: viewport.width, height: 820 });
+      await page.goto(
+        `/iframe.html?id=organisms-table-atoms-tablecell--inline-badges${suffix}&viewMode=story`,
+        { waitUntil: 'domcontentloaded' }
+      );
+      await expect(page.getByTestId('inline-badge-table')).toBeVisible();
+
+      for (const align of ['left', 'center', 'right']) {
+        const badge = page.getByTestId(`badge-${align}`);
+        const geometry = await badge.evaluate(element => {
+          const content = element.closest(
+            '[data-table-cell-content="stable"]'
+          )!;
+          const bounds = element.getBoundingClientRect();
+          const container = content.getBoundingClientRect();
+          const longLabel = element
+            .closest('tr')!
+            .lastElementChild!.querySelector(
+              '[data-table-cell-content="stable"]'
+            )!;
+          return {
+            top: bounds.top - container.top,
+            bottom: container.bottom - bounds.bottom,
+            left: bounds.left - container.left,
+            right: container.right - bounds.right,
+            labelScrollWidth: longLabel.scrollWidth,
+            labelClientWidth: longLabel.clientWidth,
+            labelScrollHeight: longLabel.scrollHeight,
+            labelClientHeight: longLabel.clientHeight,
+          };
+        });
+        expect(geometry.top, `${align} badge top`).toBeGreaterThanOrEqual(0);
+        expect(geometry.bottom, `${align} badge bottom`).toBeGreaterThanOrEqual(
+          0
+        );
+        expect(Math.abs(geometry.top - geometry.bottom)).toBeLessThanOrEqual(2);
+        if (align === 'center') {
+          expect(Math.abs(geometry.left - geometry.right)).toBeLessThanOrEqual(
+            1
+          );
+        } else {
+          expect(geometry[align as 'left' | 'right']).toBeLessThanOrEqual(1);
+        }
+        expect(geometry.labelScrollWidth).toBeGreaterThan(
+          geometry.labelClientWidth
+        );
+        expect(geometry.labelScrollHeight).toBeLessThanOrEqual(
+          geometry.labelClientHeight
+        );
+      }
+    });
+    test(`keeps creator avatars and focused actions whole in a ${viewport.name} (${theme})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: viewport.width, height: 820 });
+      await page.goto(
+        `/iframe.html?id=organisms-table-atoms-tablecell--creator-identity${suffix}&viewMode=story`,
+        { waitUntil: 'domcontentloaded' }
+      );
+      const table = page.getByTestId('creator-identity-table');
+      await expect(table).toBeVisible();
+      const avatar = table.locator('[data-slot="app-avatar"]');
+      await expect(avatar).toBeVisible();
+      // Measure the whole circular frame, not pixels intentionally masked by its radius.
+      const clipping = await avatar.evaluate(element => {
+        const bounds = element.getBoundingClientRect();
+        const violations: string[] = [];
+        for (
+          let parent = element.parentElement;
+          parent && parent.tagName !== 'TABLE';
+          parent = parent.parentElement
+        ) {
+          const style = getComputedStyle(parent);
+          const rect = parent.getBoundingClientRect();
+          if (
+            ['hidden', 'clip', 'auto', 'scroll'].includes(style.overflowY) &&
+            (bounds.top < rect.top - 1 || bounds.bottom > rect.bottom + 1)
+          )
+            violations.push(parent.className);
+          if (
+            ['hidden', 'clip', 'auto', 'scroll'].includes(style.overflowX) &&
+            (bounds.left < rect.left - 1 || bounds.right > rect.right + 1)
+          )
+            violations.push(parent.className);
+        }
+        return violations;
+      });
+      expect(
+        clipping,
+        'interior avatar must fit every clipping ancestor'
+      ).toEqual([]);
+      for (const action of [
+        table.getByRole('button', {
+          name: 'Copy link for @long_creator_username',
+        }),
+        table.getByRole('link', {
+          name: 'Open profile for @long_creator_username',
+        }),
+      ]) {
+        await action.focus();
+        await expect(action).toBeFocused();
+        await expect(action).toHaveCSS('opacity', '1');
+        const bounds = await action.evaluate(element => {
+          const rect = element.getBoundingClientRect();
+          const content = element
+            .closest('[data-table-cell-content="stable"]')!
+            .getBoundingClientRect();
+          return {
+            top: rect.top - content.top,
+            bottom: content.bottom - rect.bottom,
+            left: rect.left - content.left,
+            right: content.right - rect.right,
+            hitAtLeft:
+              document
+                .elementFromPoint(rect.left + 1, rect.top + rect.height / 2)
+                ?.closest('button, a') === element,
+            hitAtRight:
+              document
+                .elementFromPoint(rect.right - 1, rect.top + rect.height / 2)
+                ?.closest('button, a') === element,
+          };
+        });
+        // The canonical focus ring is 2px plus a 2px offset.
+        for (const inset of [
+          bounds.top,
+          bounds.bottom,
+          bounds.left,
+          bounds.right,
+        ]) {
+          expect(inset).toBeGreaterThanOrEqual(4);
+        }
+        expect(bounds.hitAtLeft).toBe(true);
+        expect(bounds.hitAtRight).toBe(true);
+      }
+    });
+  }
+}
+
 test.describe('Tasks multiline row geometry', () => {
   for (const viewport of VIEWPORTS) {
     test(`keeps title and wrapped metadata visible in a ${viewport.name}`, async ({
