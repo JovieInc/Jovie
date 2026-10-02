@@ -56,6 +56,12 @@ describe('ChatUiPlayground', () => {
     const search = screen.getByRole('searchbox', {
       name: 'Search Scenarios',
     });
+    await user.type(search, 'shell-states');
+    expect(screen.getByText('1 of 12 scenarios')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Shell and access states' })
+    ).toBeInTheDocument();
+    await user.clear(search);
     await user.type(search, 'permission denied');
     expect(screen.getByText('1 of 12 scenarios')).toBeInTheDocument();
 

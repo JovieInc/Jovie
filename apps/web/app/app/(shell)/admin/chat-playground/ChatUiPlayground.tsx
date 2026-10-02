@@ -870,6 +870,7 @@ function matchesQuery(
     scenario.summary,
     scenario.group,
     ...scenario.keywords,
+    ...scenario.coverage,
   ]
     .join(' ')
     .toLowerCase()
