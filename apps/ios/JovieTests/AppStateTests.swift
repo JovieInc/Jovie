@@ -171,7 +171,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -203,7 +204,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -240,7 +242,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -262,7 +265,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -298,7 +302,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -319,7 +324,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -356,7 +362,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -378,7 +385,8 @@ struct AppStateTests {
       launchMode: .live,
       repository: repository,
       brightnessManager: MockBrightnessController(),
-      sessionRevoker: sessionRevoker
+      sessionRevoker: sessionRevoker,
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -407,7 +415,8 @@ struct AppStateTests {
       launchMode: .live,
       repository: repository,
       brightnessManager: MockBrightnessController(),
-      sessionRevoker: sessionRevoker
+      sessionRevoker: sessionRevoker,
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -434,7 +443,8 @@ struct AppStateTests {
       launchMode: .live,
       repository: repository,
       brightnessManager: MockBrightnessController(),
-      sessionRevoker: sessionRevoker
+      sessionRevoker: sessionRevoker,
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -466,7 +476,8 @@ struct AppStateTests {
       launchMode: .live,
       repository: repository,
       brightnessManager: MockBrightnessController(),
-      chatCache: chatCache
+      chatCache: chatCache,
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -496,7 +507,8 @@ struct AppStateTests {
       launchMode: .live,
       repository: repository,
       brightnessManager: MockBrightnessController(),
-      chatCache: chatCache
+      chatCache: chatCache,
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -536,7 +548,8 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController(),
       audienceHighlightsCache: audienceCache,
-      actionLoopCache: actionLoopCache
+      actionLoopCache: actionLoopCache,
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -578,7 +591,8 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController(),
       audienceHighlightsCache: audienceCache,
-      actionLoopCache: actionLoopCache
+      actionLoopCache: actionLoopCache,
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -609,7 +623,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -632,7 +647,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -653,7 +669,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -676,7 +693,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -701,7 +719,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -734,7 +753,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .uiTestingProfileError,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
 
     await appState.completeLaunch()
@@ -759,7 +779,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -793,7 +814,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -823,7 +845,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -848,7 +871,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
     appState.didInitializeAuth = true
 
@@ -1279,7 +1303,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .uiTestingChat,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
 
     await appState.completeLaunch()
@@ -1299,7 +1324,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .uiTestingChatAllComponents,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
 
     await appState.completeLaunch()
@@ -1322,7 +1348,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .uiTestingChatEntityFixture,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
 
     await appState.completeLaunch()
@@ -1342,7 +1369,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .uiTestingChatOffline,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
 
     await appState.completeLaunch()
@@ -1363,7 +1391,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .uiTestingLibrary,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
 
     await appState.completeLaunch()
@@ -1385,7 +1414,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .uiTestingLibraryEmpty,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
 
     await appState.completeLaunch()
@@ -1407,7 +1437,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .uiTestingInbox,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
 
     await appState.completeLaunch()
@@ -1428,7 +1459,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .uiTestingInboxOffline,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
 
     await appState.completeLaunch()
@@ -1449,7 +1481,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .uiTestingInboxLoading,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
 
     await appState.completeLaunch()
@@ -1471,7 +1504,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .uiTestingCalendar,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
 
     await appState.completeLaunch()
@@ -1492,7 +1526,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .uiTestingCalendarLoading,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
 
     await appState.completeLaunch()
@@ -1514,7 +1549,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .uiTestingCalendarOffline,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
 
     await appState.completeLaunch()
@@ -1535,7 +1571,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .uiTestingQRUnavailable,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
 
     await appState.completeLaunch()
@@ -1559,7 +1596,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
 
     #expect(appState.billingURL.absoluteString == "https://jov.ie/app/settings/billing")
@@ -1575,7 +1613,8 @@ struct AppStateTests {
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      captureProfileLoadCurrentness: { { true } }
     )
 
     #expect(appState.accountURL.absoluteString == "https://jov.ie/app/settings/account")
@@ -2143,6 +2182,344 @@ struct PushNotificationManagerTests {
       #expect(harness.storedToken == "bb")
       #expect(after.uploads == before.uploads && after.deletions == before.deletions)
       #expect(NativeSessionTokenStore.requestAuthorization() == replacement)
+    }
+  }
+}
+
+// Profile requests can finish without entering their gate when deduplication is wrong.
+// Buffer release so failure cleanup also drains a later, incorrectly started load.
+private actor ProfileLoadGate {
+  private var result: Bool?
+  private var completion: CheckedContinuation<Bool, Never>?
+  private var entered: Bool?
+  private var entryObserver: CheckedContinuation<Bool, Never>?
+
+  func wait() async -> Bool {
+    entered = true
+    entryObserver?.resume(returning: true)
+    entryObserver = nil
+    if let result { return result }
+    return await withCheckedContinuation { completion = $0 }
+  }
+
+  @discardableResult
+  func waitUntilEntered() async -> Bool {
+    if let entered { return entered }
+    return await withCheckedContinuation { entryObserver = $0 }
+  }
+
+  func ownerFinished() {
+    guard entered == nil else { return }
+    entered = false
+    entryObserver?.resume(returning: false)
+    entryObserver = nil
+  }
+
+  func complete(_ result: Bool) {
+    self.result = result
+    completion?.resume(returning: result)
+    completion = nil
+  }
+}
+
+private actor ControlledProfileRepository: AppStateRepository {
+  private let firstCacheGate: ProfileLoadGate?
+  private let loadGates: [ProfileLoadGate]
+  private let firstResult: Result<MeRepositoryResult, APIClientError>
+  private let requiresAuthorization: Bool
+  private var cacheCalls = 0
+  private var loadCalls = 0
+  private var cleared: [String] = []
+
+  init(
+    firstCacheGate: ProfileLoadGate? = nil,
+    loadGates: [ProfileLoadGate],
+    firstResult: Result<MeRepositoryResult, APIClientError> = .success(
+      MeRepositoryResult(response: .previewReady, isStale: false)
+    ),
+    requiresAuthorization: Bool = false
+  ) {
+    self.requiresAuthorization = requiresAuthorization
+    self.firstCacheGate = firstCacheGate
+    self.loadGates = loadGates
+    self.firstResult = firstResult
+  }
+
+  func cachedSnapshot(for userID: String) async -> MobileMeResponse? {
+    cacheCalls += 1
+    guard cacheCalls == 1, let firstCacheGate else { return nil }
+    _ = await firstCacheGate.wait()
+    return .previewNeedsOnboarding
+  }
+
+  func loadMe(for userID: String) async throws -> MeRepositoryResult {
+    let index = loadCalls
+    loadCalls += 1
+    // Unexpected duplicate loads fail promptly instead of leaving a test suspended.
+    guard index < loadGates.count else { throw APIClientError.invalidResponse }
+    _ = await loadGates[index].wait()
+    if requiresAuthorization, NativeSessionTokenStore.requestAuthorization() == nil {
+      throw APIClientError.missingToken
+    }
+    if index == 0 { return try firstResult.get() }
+    return MeRepositoryResult(response: .previewReady, isStale: false)
+  }
+
+  func clearCachedUser(_ userID: String) { cleared.append(userID) }
+  func loadCount() -> Int { loadCalls }
+  func clearedUsers() -> [String] { cleared }
+}
+
+// Keep these in the existing serialized AppState suite: its observability fixtures
+// also share a process-wide provider with live profile loading.
+extension AppStateTests {
+  private func saveSession() throws -> NativeRequestAuthorization {
+    NativeSessionTokenStore.save(
+      token: "same-token", userID: "same-user", expiresAt: Date().addingTimeInterval(3_600)
+    )
+    return try #require(NativeSessionTokenStore.requestAuthorization())
+  }
+
+  private func makeState(
+    _ repository: ControlledProfileRepository,
+    sessionRevoker: NativeSessionRevoking? = nil
+  ) -> AppState {
+    let state = AppState(
+      configuration: .mock, launchMode: .live, repository: repository,
+      brightnessManager: MockBrightnessController(), sessionRevoker: sessionRevoker
+    )
+    state.didInitializeAuth = true
+    return state
+  }
+
+  @Test func oldCachedSnapshotCannotPaintOverSameUserReplacementOrReleaseItsLoad() async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      _ = try saveSession()
+      let cacheGate = ProfileLoadGate()
+      let replacementLoad = ProfileLoadGate()
+      let repository = ControlledProfileRepository(firstCacheGate: cacheGate, loadGates: [replacementLoad])
+      let state = makeState(repository)
+      let oldTask = Task { await state.handleSignedInUserChange("same-user") }
+      await cacheGate.waitUntilEntered()
+      let replacement = try saveSession()
+      let newTask = Task {
+        await state.handleSignedInUserChange("same-user")
+        await replacementLoad.ownerFinished()
+      }
+      let entered = await replacementLoad.waitUntilEntered()
+      #expect(entered, "A replacement login must start its own profile load")
+      guard entered else {
+        await cacheGate.complete(true)
+        await replacementLoad.complete(true)
+        await oldTask.value
+        await newTask.value
+        return
+      }
+      await cacheGate.complete(true)
+      await oldTask.value
+      #expect(state.route == .ready)
+      #expect(state.dashboardState == .loading)
+      #expect(!state.isOffline)
+      await state.handleSignedInUserChange("same-user")
+      #expect(await repository.loadCount() == 1)
+      await replacementLoad.complete(true)
+      await newTask.value
+      #expect(state.dashboardState == .loaded(.previewReady))
+      #expect(NativeSessionTokenStore.requestAuthorization() == replacement)
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func oldNetworkCompletionCannotPublishOrClearSameUserReplacementLoad(fails: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      _ = try saveSession()
+      let oldLoad = ProfileLoadGate()
+      let newLoad = ProfileLoadGate()
+      let firstResult: Result<MeRepositoryResult, APIClientError> = fails
+        ? .failure(.transportFailed(code: URLError.notConnectedToInternet.rawValue))
+        : .success(MeRepositoryResult(response: .previewNeedsOnboarding, isStale: true))
+      let repository = ControlledProfileRepository(loadGates: [oldLoad, newLoad], firstResult: firstResult)
+      let state = makeState(repository)
+      let oldTask = Task { await state.handleSignedInUserChange("same-user") }
+      await oldLoad.waitUntilEntered()
+      let replacement = try saveSession()
+      let newTask = Task {
+        await state.handleSignedInUserChange("same-user")
+        await newLoad.ownerFinished()
+      }
+      let entered = await newLoad.waitUntilEntered()
+      #expect(entered, "A replacement login must not be deduplicated against the old load")
+      guard entered else {
+        await oldLoad.complete(true)
+        await newLoad.complete(true)
+        await oldTask.value
+        await newTask.value
+        return
+      }
+      await oldLoad.complete(true)
+      await oldTask.value
+      #expect(state.route == .ready)
+      #expect(state.dashboardState == .loading)
+      #expect(!state.isOffline)
+      // A's defer must not release B's dedupe marker while B is still suspended.
+      await state.handleSignedInUserChange("same-user")
+      #expect(await repository.loadCount() == 2)
+      await newLoad.complete(true)
+      await newTask.value
+      #expect(state.dashboardState == .loaded(.previewReady))
+      #expect(NativeSessionTokenStore.requestAuthorization() == replacement)
+    }
+  }
+
+  enum PendingProfilePhase: CaseIterable, Sendable { case cache, success, transportFailure }
+
+  @Test(arguments: PendingProfilePhase.allCases)
+  func replacementLoginRejectsOldWorkBeforeItsProfileLoadBegins(phase: PendingProfilePhase) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      _ = try saveSession()
+      let gate = ProfileLoadGate()
+      let firstResult: Result<MeRepositoryResult, APIClientError> = phase == .transportFailure
+        ? .failure(.transportFailed(code: URLError.notConnectedToInternet.rawValue))
+        : .success(MeRepositoryResult(response: .previewNeedsOnboarding, isStale: true))
+      let repository = ControlledProfileRepository(
+        firstCacheGate: phase == .cache ? gate : nil,
+        loadGates: phase == .cache ? [] : [gate], firstResult: firstResult
+      )
+      let state = makeState(repository)
+      let task = Task { await state.handleSignedInUserChange("same-user") }
+      await gate.waitUntilEntered()
+      let priorRoute = state.route
+      let priorDashboard = state.dashboardState
+      let replacement = try saveSession()
+      // No B load has replaced A's attempt ID: rejection requires the native owner check.
+      await gate.complete(true)
+      await task.value
+      #expect(state.route == priorRoute)
+      #expect(state.dashboardState == priorDashboard)
+      #expect(!state.isOffline)
+      #expect(await repository.loadCount() == (phase == .cache ? 0 : 1))
+      #expect(NativeSessionTokenStore.requestAuthorization() == replacement)
+    }
+  }
+
+  @Test func bearerRotationKeepsTheSameProfileLoadCurrentAndDeduplicated() async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let original = try saveSession()
+      let gate = ProfileLoadGate()
+      let repository = ControlledProfileRepository(loadGates: [gate])
+      let state = makeState(repository)
+      let task = Task { await state.handleSignedInUserChange("same-user") }
+      await gate.waitUntilEntered()
+      let response = try #require(HTTPURLResponse(
+        url: URL(string: "https://jov.ie/api/mobile/v1/me")!, statusCode: 200,
+        httpVersion: nil, headerFields: ["set-auth-token": "rotated-token"]
+      ))
+      NativeSessionTokenStore.refresh(from: response, authorizedBy: original)
+      await state.handleSignedInUserChange("same-user")
+      #expect(await repository.loadCount() == 1)
+      await gate.complete(true)
+      await task.value
+      #expect(state.route == .ready)
+      #expect(state.dashboardState == .loaded(.previewReady))
+      #expect(NativeSessionTokenStore.load()?.token == "rotated-token")
+    }
+  }
+
+  @Test(arguments: [APIClientError.missingToken, .requestFailed(statusCode: 401)])
+  func currentTerminalFailureStillExpiresAfterTheClientClearsCredentials(error: APIClientError) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      _ = try saveSession()
+      let gate = ProfileLoadGate()
+      let repository = ControlledProfileRepository(loadGates: [gate], firstResult: .failure(error))
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = makeState(repository, sessionRevoker: revoker)
+      let task = Task { await state.handleSignedInUserChange("same-user") }
+      await gate.waitUntilEntered()
+      NativeSessionTokenStore.clear()
+      await gate.complete(true)
+      await task.value
+      #expect(state.route == .signedOut)
+      #expect(state.dashboardState == .idle)
+      #expect(state.activeUserID == nil)
+      #expect(!state.isOffline)
+      #expect(await repository.clearedUsers() == ["same-user"])
+      #expect(await revoker.calls() == 0)
+      #expect(NativeSessionTokenStore.load() == nil)
+    }
+  }
+}
+
+extension AppStateTests {
+  private func expirePersistedSession() {
+    // Advance only expiry metadata: saving an expired token would create a new login.
+    UserDefaults.standard.set(1, forKey: "ie.jov.Jovie.nativeSession.expiresAt")
+  }
+
+  @Test(arguments: [false, true], [false, true])
+  func passiveExpiryKeepsProfileLoadingOnItsExistingResultPath(externalExpiryReader: Bool, succeeds: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      _ = try saveSession()
+      let owner = NativeSessionTokenStore.captureSessionContext().ownership
+      let cacheGate = ProfileLoadGate()
+      let loadGate = ProfileLoadGate()
+      let repository = ControlledProfileRepository(
+        firstCacheGate: cacheGate, loadGates: [loadGate], requiresAuthorization: !succeeds
+      )
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = makeState(repository, sessionRevoker: revoker)
+      let task = Task {
+        await state.handleSignedInUserChange("same-user")
+        await loadGate.ownerFinished()
+      }
+      await cacheGate.waitUntilEntered()
+      expirePersistedSession()
+      if externalExpiryReader { #expect(NativeSessionTokenStore.load() == nil) }
+      await cacheGate.complete(true)
+      let entered = await loadGate.waitUntilEntered()
+      #expect(entered, "Passive expiry must still reach the existing profile result/terminal path")
+      if entered, !externalExpiryReader {
+        #expect(UserDefaults.standard.double(forKey: "ie.jov.Jovie.nativeSession.expiresAt") == 1)
+      }
+      // Buffered release also drains the task when a regressed owner check skips loadMe.
+      await loadGate.complete(true)
+      await task.value
+      #expect(state.route == (succeeds ? .ready : .signedOut))
+      #expect(state.dashboardState == (succeeds ? .loaded(.previewReady) : .idle))
+      #expect(state.activeUserID == (succeeds ? "same-user" : nil))
+      #expect(!state.isOffline)
+      #expect(await repository.clearedUsers() == (succeeds ? [] : ["same-user"]))
+      #expect(await revoker.calls() == 0)
+      #expect(NativeSessionTokenStore.requestAuthorization() == nil)
+      #expect(NativeSessionTokenStore.canContinueProfileLoad(ownedBy: owner) == succeeds)
+    }
+  }
+
+  enum AfterPassiveExpiry: CaseIterable, Sendable { case explicitClear, sameUserLogin, replacementExpires }
+
+  @Test(arguments: AfterPassiveExpiry.allCases)
+  func passiveExpiryContinuationCannotSurviveAnExplicitOwnershipChange(change: AfterPassiveExpiry) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      _ = try saveSession()
+      let original = NativeSessionTokenStore.captureSessionContext().ownership
+      expirePersistedSession()
+      #expect(NativeSessionTokenStore.load() == nil)
+      #expect(NativeSessionTokenStore.canContinueProfileLoad(ownedBy: original))
+      #expect(!NativeSessionTokenStore.isCurrent(original))
+      #expect(NativeSessionTokenStore.requestAuthorization(ifOwnedBy: original) == nil)
+      if change == .explicitClear {
+        NativeSessionTokenStore.clear()
+      } else {
+        _ = try saveSession() // Identical user and bearer still replace login ownership.
+        let replacement = NativeSessionTokenStore.captureSessionContext().ownership
+        if change == .replacementExpires {
+          expirePersistedSession()
+          #expect(NativeSessionTokenStore.load() == nil)
+        }
+        #expect(NativeSessionTokenStore.canContinueProfileLoad(ownedBy: replacement))
+      }
+      let context = NativeSessionTokenStore.captureSessionContext()
+      #expect(!NativeSessionTokenStore.canContinueProfileLoad(ownedBy: original))
+      #expect(NativeSessionTokenStore.captureSessionContext() == context)
     }
   }
 }

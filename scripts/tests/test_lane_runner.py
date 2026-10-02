@@ -3143,10 +3143,11 @@ class OnePrPerIssueTest(unittest.TestCase):
 
     def test_sweep_supersedes_duplicates_and_closes_stale_red_drafts(self):
         day = lane.STALE_DRAFT_S
-        prs = [self.pr(1), self.pr(2, draft=False, state="CLEAN"),          # jov-7: keep the green one
-               self.pr(3, issue="jov-8", pushed_ago=day + 1),                # stale red draft
+        prs = [{**self.pr(1), "labels": [{"name": "duplicate"}]}, self.pr(2, draft=False, state="CLEAN"),          # jov-7: keep the green one
+               {**self.pr(3, issue="jov-8", pushed_ago=day + 1), "labels": [{"name": "duplicate"}]},                # stale red draft
                self.pr(4, issue="jov-9", pushed_ago=day - 60),               # recent: keep
                self.pr(5, issue="jov-10", draft=False, pushed_ago=day * 3)]  # ready PRs are not stale
+        prs.append(self.pr(6, issue="jov-11", pushed_ago=day * 3))
         pushes = {pr["number"]: self.NOW - pr.pop("pushedAgo") for pr in prs}
         superseded, stale = lane.sweep_plan(prs, self.NOW, pushes)
         self.assertEqual([(pr["number"], keep) for pr, keep in superseded], [(1, 2)])
@@ -3159,12 +3160,22 @@ class OnePrPerIssueTest(unittest.TestCase):
 
         def fake_sh(args, **k):
             calls.append(args)
-            out = f"3 {stale_at}\n4 {stale_at}\n1 {stale_at}" if args[:3] == ["gh", "api", "graphql"] else ""
+            out = ""
+            if args[:3] == ["gh", "api", "graphql"]:
+                if any("pullRequest(number:" in str(arg) for arg in args):
+                    number = int(next(arg.split("=", 1)[1] for arg in args if str(arg).startswith("number=")))
+                    live = {**self.pr(number, issue={3: "jov-8", 4: "jov-9"}.get(number, "jov-7")),
+                            "headRefOid": "h", "state": "OPEN", "isCrossRepository": False,
+                            "isInMergeQueue": False,
+                            "labels": {"nodes": [{"name": "duplicate"}], "pageInfo": {"hasNextPage": False}}}
+                    out = json.dumps({"data": {"repository": {"pullRequest": live}}})
+                else:
+                    out = f"3 {stale_at}\n4 {stale_at}\n1 {stale_at}"
             return SimpleNamespace(returncode=0, stdout=out, stderr="")
         lane.sh = fake_sh
-        lane.lane_prs = lambda name, fields="": [self.pr(1), self.pr(2),
+        lane.lane_prs = lambda name, fields="": [{**pr, "headRefOid": "h", "labels": [{"name": "duplicate"}]} for pr in [self.pr(1), self.pr(2),
                                                    self.pr(3, issue="jov-8", pushed_ago=lane.STALE_DRAFT_S * 2),
-                                                   self.pr(4, issue="jov-9", pushed_ago=lane.STALE_DRAFT_S * 2)]
+                                                   self.pr(4, issue="jov-9", pushed_ago=lane.STALE_DRAFT_S * 2)]]
         linear = FakeLinear([])
         linear.states = {"JOV-8": "In Progress", "JOV-9": "Done"}
         try:
