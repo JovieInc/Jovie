@@ -164,6 +164,14 @@ jobs:
       - name: Test shared JovieKit package
         run: swift test --package-path apps/ios/Packages/JovieKit --enable-code-coverage
 
+      - name: Compile shared theme for macOS
+        timeout-minutes: 3
+        run: |
+          mac_theme_sdk="$(xcrun --sdk macosx --show-sdk-path)"
+          xcrun swiftc -typecheck -swift-version 5 \
+            -sdk "$mac_theme_sdk" -target "$(uname -m)-apple-macosx14.0" \
+            apps/ios/Jovie/DesignSystem/JovieTheme.swift
+
       - name: Run fast unit and coverage gate
         if: ${{ !inputs.full-regression }}
         timeout-minutes: 15

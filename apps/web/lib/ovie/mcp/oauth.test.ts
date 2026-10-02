@@ -42,16 +42,18 @@ describe('Ovie OAuth discovery advertisement', () => {
     delete process.env.FEATURE_OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION;
   });
 
-  it('omits registration_endpoint when dynamic registration is off', () => {
+  it('advertises registration_endpoint from the issuer origin while the Better Auth flag is off', () => {
     const metadata = getOvieOAuthIssuer('test-secret').metadata(origin);
-    expect(metadata).not.toHaveProperty('registration_endpoint');
+    expect(metadata.registration_endpoint).toBe(
+      `${origin}/api/ovie/oauth/register`
+    );
     expect(metadata.authorization_endpoint).toBe(
       `${origin}/api/ovie/oauth/authorize`
     );
     expect(metadata.token_endpoint).toBe(`${origin}/api/ovie/oauth/token`);
   });
 
-  it('advertises registration_endpoint when the flag is on', () => {
+  it('keeps the same registration_endpoint when the Better Auth flag is on', () => {
     process.env.FEATURE_OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION = 'true';
     const metadata = getOvieOAuthIssuer('test-secret').metadata(origin);
     expect(metadata.registration_endpoint).toBe(

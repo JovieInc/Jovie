@@ -73,6 +73,14 @@ describe('POST /api/internal/release-communications/merge-events', () => {
     expect(ingest).not.toHaveBeenCalled();
   });
 
+  it('rejects events from unregistered repositories', async () => {
+    const res = await POST(
+      request({ ...BODY, repository: 'JovieInc/unknown' })
+    );
+    expect(res.status).toBe(422);
+    expect(ingest).not.toHaveBeenCalled();
+  });
+
   it('ingests a signed verified merge event', async () => {
     const res = await POST(request(BODY));
     expect(res.status).toBe(200);

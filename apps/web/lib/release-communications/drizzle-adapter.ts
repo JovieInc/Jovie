@@ -9,6 +9,7 @@ import {
   releaseMergeEvents,
 } from '@/lib/db/schema/release-communications';
 import {
+  type ChangelogFilter,
   classifyMergeEvent,
   type DailyPost,
   type DailyPostEntry,
@@ -108,6 +109,32 @@ export class DrizzleReleaseCommunicationsAdapter
     return this.withEntries(post);
   }
 
+  /**
+   * Consolidated changelog across products and source repositories. A
+   * `repository` or `app` filter also scopes the returned entries to that
+   * source; posts left with no matching entries are omitted when a
+   * repository filter is applied.
+   */
+  async listChangelog(filter: ChangelogFilter): Promise<readonly DailyPost[]> {
+    const conditions = [];
+    if (filter.product)
+      conditions.push(eq(releaseDailyPosts.product, filter.product));
+    if (filter.app) conditions.push(eq(releaseDailyPosts.app, filter.app));
+    if (filter.localDate)
+      conditions.push(eq(releaseDailyPosts.localDate, filter.localDate));
+    const posts = await this.database
+      .select()
+      .from(releaseDailyPosts)
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(desc(releaseDailyPosts.localDate), desc(releaseDailyPosts.id));
+    const withEntries = await Promise.all(
+      posts.map(post => this.withEntries(post, filter))
+    );
+    return filter.repository
+      ? withEntries.filter(post => post.entries.length > 0)
+      : withEntries;
+  }
+
   async dismissPost(input: { postId: string; userId: string }): Promise<void> {
     await this.database
       .insert(releaseDailyPostDismissals)
@@ -185,12 +212,20 @@ export class DrizzleReleaseCommunicationsAdapter
   }
 
   private async withEntries(
-    post: typeof releaseDailyPosts.$inferSelect
+    post: typeof releaseDailyPosts.$inferSelect,
+    filter: Pick<ChangelogFilter, 'repository' | 'app'> = {}
   ): Promise<DailyPost> {
+    const conditions = [eq(releaseDailyPostEntries.postId, post.id)];
+    if (filter.repository)
+      conditions.push(
+        eq(releaseDailyPostEntries.repository, filter.repository)
+      );
+    if (filter.app)
+      conditions.push(eq(releaseDailyPostEntries.app, filter.app));
     const rows = await this.database
       .select()
       .from(releaseDailyPostEntries)
-      .where(eq(releaseDailyPostEntries.postId, post.id))
+      .where(and(...conditions))
       .orderBy(releaseDailyPostEntries.createdAt);
 
     const entries: DailyPostEntry[] = rows.map(row => ({

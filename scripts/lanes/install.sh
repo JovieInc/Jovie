@@ -11,7 +11,9 @@ here="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$state"
 LANES_STATE="$state" LANES_REPO="$repo" python3 "$here/lane_runner.py" update
 tick="python3 $state/current/lane_runner.py update; python3 $state/current/codex_lane.py reconcile --if-due $ledger_cadence; exec python3 $state/current/lane_runner.py dispatch"
-path="$HOME/.local/bin:$HOME/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+# Pin timers to the Node selected by the installing shell.
+node_dir="$(dirname "$(command -v node)")"
+path="$node_dir:$HOME/.local/bin:$HOME/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 source_tree="$(cat "$state/current/.tree")"
 source_commit="$(git -C "$repo" rev-parse origin/main)"
 LANES_STATE="$state" python3 "$state/current/codex_lane.py" install-receipt \
