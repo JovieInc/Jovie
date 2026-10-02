@@ -29,16 +29,14 @@ vi.mock('@/components/organisms/table/molecules/TableContextMenu', () => ({
 
 type TestRow = { id: string; name: string };
 
+// The renderer is mocked; check the fields supplied by this partial row fixture.
+const rowFixture = (fields: Partial<Row<TestRow>>) => fields;
+
 const createRow = (id: string, name: string): Row<TestRow> =>
-  // The row renderer is mocked, so this fixture supplies only body-used fields.
-  ({
+  rowFixture({
     id,
     original: { id, name },
-    getVisibleCells: () => [],
-  }) satisfies Pick<
-    Row<TestRow>,
-    'id' | 'original' | 'getVisibleCells'
-  > as unknown as Row<TestRow>;
+  }) as Row<TestRow>;
 
 const baseProps = {
   shouldEnableKeyboardNav: false,
