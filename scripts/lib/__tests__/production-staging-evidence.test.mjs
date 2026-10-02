@@ -148,6 +148,40 @@ describe('production staging proof selection', () => {
     expect(f.inspect()).toMatchObject({ state: 'verified', sha: B });
     expect(f.options.expectedSha).toBe(C);
   });
+  it('binds controller revision C separately from deployed source B when main advances during source CI', () => {
+    const f = fixture();
+    f.artifact.workflow_run.head_sha = C;
+    f.controller.head_sha = C;
+    for (const job of f.controllerJobs) job.head_sha = C;
+    expect(f.inspect()).toMatchObject({
+      state: 'verified',
+      sha: B,
+      controllerSha: C,
+      sourceCiRunId: '20',
+      controllerRunId: '30',
+    });
+  });
+  it.each(['artifact', 'controller', 'job'])(
+    'rejects a mismatched %s controller revision even when deployed source B is valid',
+    kind => {
+      const f = fixture();
+      f.artifact.workflow_run.head_sha = C;
+      f.controller.head_sha = C;
+      for (const job of f.controllerJobs) job.head_sha = C;
+      if (kind === 'artifact') f.artifact.workflow_run.head_sha = A;
+      if (kind === 'controller') f.controller.head_sha = A;
+      if (kind === 'job') f.controllerJobs[0].head_sha = A;
+      expect(f.inspect).toThrow(/exact successful workflow|lacks successful/);
+    }
+  );
+  it.each(['', 'invalid', undefined])(
+    'rejects a missing or malformed controller revision: %s',
+    sha => {
+      const f = fixture();
+      f.artifact.workflow_run.head_sha = sha;
+      expect(f.inspect).toThrow('bound to its controller');
+    }
+  );
   it('retains exact ancestor staging proof for a live-unbound operations-only range', () => {
     const f = fixture();
     f.options.lowerBoundSha = null;

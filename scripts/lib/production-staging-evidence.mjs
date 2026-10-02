@@ -200,9 +200,13 @@ export function inspectProductionStagingEvidence({
       ].every(value => ID.test(value)),
     'Staging receipt identity or verification is invalid'
   );
+  // workflow_run executes at the default-branch revision, which can advance
+  // after source CI began. Bind controller metadata to that distinct revision;
+  // the receipt and exact source CI below still bind the deployed revision.
+  const controllerSha = artifact.workflow_run?.head_sha;
   requireProof(
     String(artifact.workflow_run?.id) === receipt.controllerRunId &&
-      artifact.workflow_run?.head_sha === sha,
+      SHA.test(controllerSha),
     'Staging artifact is not bound to its controller'
   );
   const controller = ghJsonImpl(
@@ -213,7 +217,7 @@ export function inspectProductionStagingEvidence({
     return { state: 'pending', sha, reason: 'staging controller pending' };
   exactRun(controller, {
     repository,
-    sha,
+    sha: controllerSha,
     id: receipt.controllerRunId,
     attempt: receipt.controllerRunAttempt,
     path: '.github/workflows/staging-controller.yml',
@@ -231,7 +235,7 @@ export function inspectProductionStagingEvidence({
     'Alias verified preview to staging.jov.ie',
     'Preserve exact staging deployment receipt',
   ]) {
-    exactJob(jobs, `staging-release / ${name}`, controller, sha);
+    exactJob(jobs, `staging-release / ${name}`, controller, controllerSha);
   }
   const source = ghJsonImpl(
     `repos/${repository}/actions/runs/${receipt.sourceCiRunId}/attempts/${receipt.sourceCiRunAttempt}`
@@ -258,6 +262,7 @@ export function inspectProductionStagingEvidence({
     artifactId: artifact.id,
     sourceCiRunId: receipt.sourceCiRunId,
     controllerRunId: receipt.controllerRunId,
+    controllerSha,
   };
 }
 
