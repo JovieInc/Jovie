@@ -18,6 +18,7 @@ import {
   runMergeGroupStorybookCertification,
   SHALLOW_DEEPEN_DEPTHS,
 } from '../../component-merge-group-storybook-cert.mjs';
+import { workflowDeclaresReadyForReviewType } from '../../invariants/pr-lifecycle-contract.mjs';
 import {
   EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES,
   EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
@@ -212,27 +213,6 @@ function parseExactCiFastFailureOperands(script) {
   return operands;
 }
 
-function workflowDeclaresReadyForReviewType(source) {
-  const lines = source.split('\n');
-  for (let index = 0; index < lines.length; index += 1) {
-    const match = lines[index].match(/^(\s*)types:\s*(.*?)\s*$/);
-    if (!match) continue;
-
-    const indentation = match[1].length;
-    const declaration = [match[2].replace(/\s+#.*$/, '')];
-    for (let next = index + 1; next < lines.length; next += 1) {
-      const line = lines[next];
-      if (line.trim() === '' || /^\s*#/.test(line)) continue;
-      const nextIndentation = line.match(/^\s*/)?.[0].length ?? 0;
-      if (nextIndentation <= indentation) break;
-      declaration.push(line.replace(/\s+#.*$/, '').trim());
-    }
-
-    if (/\bready_for_review\b/.test(declaration.join(' '))) return true;
-  }
-  return false;
-}
-
 const BLOBLESS_BASE_FETCH_JOBS = new Set([
   'ci-exact-head-coverage-shard',
   'ci-exact-head-coverage',
@@ -349,18 +329,29 @@ describe('merge_group workflow contract', () => {
     );
   });
 
-  it('ignores the ready transition in every workflow', () => {
+  it('reserves ready_for_review for auto-merge enable only', () => {
     const workflowDir = resolve(REPO_ROOT, '.github/workflows');
     const offenders = readdirSync(workflowDir)
       .filter(file => file.endsWith('.yml') || file.endsWith('.yaml'))
+      .filter(file => file !== 'auto-merge-default.yml')
       .filter(file => {
         const source = readFileSync(resolve(workflowDir, file), 'utf8');
         return workflowDeclaresReadyForReviewType(source);
       });
 
     // A ready transition must never earn an unchanged head a second CI
-    // flight. GitHub native merge queue owns admission without a subscriber.
+    // flight. auto-merge-default.yml is the sole subscriber: it enables
+    // native auto-merge and still skips drafts.
     expect(offenders).toEqual([]);
+    expect(
+      workflowDeclaresReadyForReviewType(AUTO_MERGE_DEFAULT_WORKFLOW)
+    ).toBe(true);
+    expect(AUTO_MERGE_DEFAULT_WORKFLOW).toContain(
+      'types: [opened, reopened, ready_for_review]'
+    );
+    expect(getJobBlock(AUTO_MERGE_DEFAULT_WORKFLOW, 'enable')).toContain(
+      'github.event.pull_request.draft == false'
+    );
   });
 
   it('rejects every valid YAML spelling of a ready_for_review type', () => {
