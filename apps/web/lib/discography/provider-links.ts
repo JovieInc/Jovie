@@ -5,6 +5,8 @@ import {
   STREAMING_DSP_KEYS,
 } from '@/lib/dsp-registry';
 import { captureError } from '@/lib/error-tracking';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
+import { musicfetchNetworkAllowed } from '@/lib/music-resolver/musicfetch-gate';
 import { buildSpotifyTrackUrl } from '@/lib/spotify';
 import { spotifyClient } from '@/lib/spotify/client';
 
@@ -340,8 +342,34 @@ async function runIsrcLookups(
     );
   }
 
-  // Musicfetch ISRC lookup (supplementary — resolves all other DSPs in one call)
-  if (isMusicfetchAvailable()) {
+  const inHouse = isCodeFlagEnabled('IN_HOUSE_RESOLVER');
+  if (
+    inHouse &&
+    spotifyClient.isAvailable() &&
+    providers.includes('spotify') &&
+    !seenProviders.has('spotify')
+  ) {
+    lookupPromises.push(
+      lookupSpotifyByIsrc(track.isrc).then(result => {
+        if (!result) return;
+        links.push({
+          provider: 'spotify',
+          url: result.url,
+          quality: 'canonical',
+          discovered_from: 'spotify_isrc',
+          provider_id: result.trackId,
+        });
+        seenProviders.add('spotify');
+      })
+    );
+  }
+
+  // MusicFetch fills DSPs we do not call directly. It stays off when the
+  // token is missing or a 401 has already marked the vendor dormant, and
+  // it runs only after the in-house ladder when that cutover is on.
+  const musicfetchAllowed =
+    isMusicfetchAvailable() && musicfetchNetworkAllowed();
+  if (musicfetchAllowed && !inHouse) {
     lookupPromises.push(
       musicfetchLookupByIsrc(track.isrc, { withLyrics: true }).then(result => {
         if (!result) return;
@@ -373,6 +401,36 @@ async function runIsrcLookups(
   for (const result of results) {
     if (result.status === 'rejected') {
       captureError('DSP ISRC lookup failed', result.reason, {
+        route: 'discography',
+        isrc: track.isrc,
+      });
+    }
+  }
+
+  if (
+    inHouse &&
+    musicfetchAllowed &&
+    providers.some(provider => !seenProviders.has(provider))
+  ) {
+    try {
+      const result = await musicfetchLookupByIsrc(track.isrc, {
+        withLyrics: true,
+      });
+      if (result?.lyrics) discoveredLyrics = result.lyrics;
+      for (const [providerKey, url] of Object.entries(result?.links ?? {})) {
+        const key = providerKey as ProviderKey;
+        if (providers.includes(key) && !seenProviders.has(key)) {
+          links.push({
+            provider: key,
+            url,
+            quality: 'canonical',
+            discovered_from: 'musicfetch_isrc',
+          });
+          seenProviders.add(key);
+        }
+      }
+    } catch (error) {
+      captureError('DSP ISRC lookup failed', error, {
         route: 'discography',
         isrc: track.isrc,
       });

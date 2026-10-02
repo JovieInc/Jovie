@@ -31,6 +31,11 @@ export const CODE_FLAGS = {
   // 404s and is not a live connector. FEATURE_CHATGPT_APP_DIRECTORY_MCP=true
   // enables the anonymous public-artist tools. Does not enable DCR.
   CHATGPT_APP_DIRECTORY_MCP: false,
+  // JOV-7323: legacy release and provider-link reads use the in-house
+  // cross-DSP ladder before MusicFetch. Default off. Smart-link creation
+  // does not call MusicFetch either way. FEATURE_IN_HOUSE_RESOLVER=true
+  // turns the product cutover on; false is the kill switch.
+  IN_HOUSE_RESOLVER: false,
 } as const satisfies Record<string, boolean>;
 
 export type CodeFlagName = keyof typeof CODE_FLAGS;
