@@ -2,8 +2,9 @@
 
 Tracking: [JOV-7310](https://linear.app/jovie/issue/JOV-7310), prerequisite to
 [JOV-7309](https://linear.app/jovie/issue/JOV-7309).
-Status: proposed decision packet; architecture approval and independent reviews
-are not yet recorded. Owner: Tim White for initial design/publication authority;
+Status: proposed decision packet; initial independent objections are reconciled
+below; final review and architecture approval remain pending.
+Owner: Tim White for initial design/publication authority;
 engineering for contracts, certification and adapters; operations for recovery.
 Source inspection: `d488897b7944e54a5b6bb58768148a88fdc39204`, October 2, 2026.
 
@@ -125,7 +126,8 @@ Every candidate and publication attempt binds this full tuple:
 capabilityId, capabilityRevisionDigest, executionContractDigest,
 runtimeRepository, runtimeCommitSha, deploymentId, runtimeEnvironment,
 channelId, profileRevisionDigest, packagingAdapterRevision,
-artifactSha256, policyEpoch
+artifactSha256, targetProviderAccount, targetProviderOrganization,
+targetProviderEnvironment, allowedOperation, policyEpoch
 ```
 
 Capability revision is a digest of the canonical distribution declaration and
@@ -175,7 +177,12 @@ reliability uses the existing dogfood evaluator, including kind and driver rules
 Initial publication and authority expansion require the existing authenticated
 human decision path. JOV-7313 may subsequently propose narrowly earned automatic
 updates, but telemetry alone never grants them. Scope includes channel, capability,
-risk class, update class, evidence version, expiry and revocation. Listing/public
+risk class, update class, server-resolved provider account/organization/environment,
+allowed operation, evidence version, expiry and revocation. The same destination
+and operation binding applies to initial and recovery authority. Compare it with
+the actual credential/provider identity immediately before dispatch and at
+readback; changing destination requires a new decision or explicitly matching
+earned scope. An operation key is deduplication, not permission. Listing/public
 marketing permission does not imply permission to submit or invoke.
 
 The operation key is the tuple digest plus operation (`submit`, `update`,
@@ -185,6 +192,17 @@ is a conflict. Persist intent before external dispatch. Reuse provider idempoten
 where documented; without it, resolve unknown outcomes by readback rather than
 blindly retrying. CAS retry functions are pure and must never call providers.
 
+One CAS reservation owns dispatch or reconciliation per operation key. Its record
+contains a server-resolved owner, attempt ID, monotonic fencing token, server-time
+lease expiry, request digest and epoch. Only the current unexpired fence may
+dispatch or admit exposure. Expired `submitting` becomes `submission_unknown`;
+one new CAS claimant increments the fence and reads provider state before any
+new dispatch. An absent reliable readback blocks retry and routes to operations.
+Old workers cannot renew a superseded fence or commit an exposure decision;
+their late responses are bounded audit evidence requiring fresh independent
+reconciliation. Provider idempotency remains necessary for the remote race;
+local fencing alone cannot promise remote exactly-once behavior.
+
 Persist `policyEpoch` with intent. A capability/profile/authority/runtime change
 increments the affected epoch and invalidates unexecuted reservations. Recheck
 before dispatch and after provider readback; an in-flight epoch change triggers
@@ -192,6 +210,21 @@ quarantine even if the remote operation succeeds. Local CAS cannot atomically
 control a marketplace: the local deny switch is the immediate safety boundary,
 and readback/withdrawal handles the remote race. Publishers must refuse work
 when the invocation runtime cannot enforce that switch.
+
+Privacy applies to packaged bytes, intent, readback, evidence and receipts as well
+as generic telemetry. The certification CAS's current TTL is 315,576,000 seconds
+(about ten years); it must never receive raw provider responses, credentials,
+draft tokens, private user arguments or retained conversation/account content.
+Persist only schema-allowlisted public listing metadata, nonsecret immutable
+evidence references, redacted operation identifiers, digests, owner/fence/epoch
+and bounded outcome/reason fields. Resolve credentials by existing vault reference
+at dispatch and keep values outside packets, artifacts and logs. Reject/redact
+sensitive content before persistence or artifact emission. Engineering's existing
+certification ingestion owner owns the field allowlist and retention/redaction
+policy; operations owns sanitized provider readback. Private proof remains in its
+existing access-controlled evidence store under its existing retention policy,
+referenced rather than copied into the long-lived ledger. No new evidence store
+is introduced, and absent approved retention/redaction handling blocks release.
 
 Rollback is not unconditional replay of a once-green artifact. Recheck current
 platform rules, authority, data rights and runtime compatibility first. Pin the
@@ -247,19 +280,29 @@ stays with JOV-7315/JOV-7311. Data-provider channels (Exa Connect, JOV-7317) add
 rights/provenance, redistribution constraints, request/response contract,
 per-call economics and payout; plugin policy cannot substitute for those fields.
 
-JOV-7316 starts with resolving a confirmed identity and retrieving an existing
-public Smart Link, if the canonical handler actually supports that job. Missing
-lookup support is a canonical product gap, not permission to add marketplace-only
-business logic. Creation/reuse is a separate write-bearing extension requiring
-ownership, durable idempotency and reversible recovery. Draft preparation cannot
-pass the published-URL mission. Keep existing pricing unchanged.
+JOV-7316 may begin with a retrieval-only preliminary stage; that stage cannot
+complete the issue. The existing [Smart Link page reads](../../apps/web/app/[username]/[slug]/_lib/data.ts)
+resolve creator and content by username/slug, but their helper payload includes
+internal creator fields and is not an agent-safe wire contract. The product owner
+under JOV-7316 must identify/extract the canonical lookup/create execution with
+the page's existing eligibility/visibility rules, explicit public output schema,
+authenticated ownership and durable write replay before marketplace adapters
+expose it. Current public artist/music discovery and unpublished draft preparation
+do not implement that missing Smart Link invocation contract. No marketplace-only
+business logic is allowed. Keep existing pricing unchanged.
 
 Required production missions cover selected identity and ambiguity; valid release
-input; existing-link reuse; authorized new creation when supported; malformed and
+input; existing-link reuse; authorized new creation; malformed and
 private/unauthorized input; retry/concurrency; provider failure/cancellation; and
 the returned URL actually resolving. Prove each supported operation through
-internal API/CLI/MCP and then each exact external artifact. Missing auth transport
-or write capability remains a reported gap. Two materially different ecosystems
+authenticated internal API/CLI/MCP on the same execution contract and then each
+exact external artifact. JOV-7316 remains blocked/open until the missing canonical
+handler, all three authenticated paths, new creation, reuse, durable retry and
+real public URL outcome pass its unchanged final acceptance. A retrieval-only
+slice is preliminary proof, never permission to omit these missions. External
+workflow certification must also prove correct intent/tool selection, restrained
+triggering, safe write confirmation, understandable auth and useful errors,
+truthful metadata and measured latency. Two materially different ecosystems
 must produce independent observed runtime receipts; two local manifests do not
 satisfy JOV-7316.
 
@@ -287,7 +330,10 @@ observed provider withdrawal second; reverting metadata cannot undo a submission
 The downstream regression matrix must include swapped artifact bytes; stale
 runtime/deployment/profile; spoofed dogfood producer; retained secret data;
 failed privileged dogfood with green platform tests; unknown rule impact; reused
-or revoked authority; cross-tenant/account operation keys; CAS contention; crash
+or revoked authority; destination account/organization/environment swaps with
+unchanged artifact bytes; secret/PII-bearing provider readback and artifacts;
+cross-tenant/account operation keys; CAS contention and competing reconciliers;
+expired leases and stale fences; crash
 before/after remote submission; missing readback; epoch change during submission;
 rejected provider review; unsupported automated withdrawal; and rollback invalid
 under current rules. Verify the source fixtures, hosted checks, exact deploy,
@@ -310,20 +356,44 @@ the existing owner that can.
 
 ## Independent adversarial review and approval receipts
 
-No independent review has been recorded in this revision. The author cannot
-self-certify these perspectives. Two independent reviewers may cover three roles
-each; record actual reviewer identities, inspected document digest, source
-revision, objections and their disposition. Use multiple model perspectives when
-available without claiming they ran when they did not.
+Two independent agents actually reviewed the initial packet at source commit
+`536d6359fede80dfb858c0cf4d88a9170e43396e`, document SHA-256
+`654d7f390f3b03518d495088d4afec326aff30e4fd0e38e977aabef64bedfc2a`.
+`/root/p0_control` covered security, platform policy and product usefulness;
+`/root/p0_seo_blocker` covered security, platform policy and reliability/recovery.
+These are actual role inspections by two reviewers, not six independent agents
+or multiple model claims. The author cannot self-certify these perspectives.
 
-| Required role                          | Questions that can invalidate this plan                                                                                                  | Receipt |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| Security/privacy/permissions           | Can forged receipts, draft tokens, tenant mixups or retained PII grant exposure? Is invocation denial enforced by its actual owner?      | Pending |
-| Platform policy/marketplace review     | Are unknown rules treated as pass? Are protocol support, directory admission and publication permission distinguished?                   | Pending |
-| Reliability/rollback/stale artifacts   | Can a timeout duplicate a submission? Can an in-flight epoch change or newly prohibited old artifact escape quarantine?                  | Pending |
-| Product/distribution usefulness        | Does the canary complete a real Smart Link job? Are draft URLs or two manifests being counted as user outcomes?                          | Pending |
-| Certification integrity/false green    | Are universal, platform, deployed/runtime and privileged dogfood receipts all independently bound? Can confidence outvote a failed gate? | Pending |
-| Operational ownership/failure recovery | Which existing owner reconciles unknown submission, failed withdrawal and absent runtime enforcement? Is any new controller hiding here? | Pending |
+Material objections and reconciliation:
+
+- Control S1: approval could drift to another provider destination. The exact
+  tuple and initial/earned/recovery scope now include provider account,
+  organization, environment and allowed operation; dispatch/readback must match
+  the resolved credential identity. Swapped-destination red cases are mandatory.
+- Control P1: retrieval-first could weaken final Smart Link acceptance. The
+  canary now names the missing canonical handler under JOV-7316, mandates all
+  authenticated API/CLI/MCP paths plus creation/reuse/URL outcomes, and includes
+  external workflow quality. Preliminary retrieval cannot complete the issue.
+- SEO privacy: telemetry-only redaction left long-lived intent/readback and
+  artifacts exposed. The packet now requires ingestion/artifact allowlists,
+  vault references, redaction/retention ownership and sensitive-content red cases.
+- SEO reliability: unknown-submission recovery lacked a single claimant. The
+  packet now specifies CAS lease/fencing, expiry into unknown, readback before
+  redispatch, and rejection of stale-worker exposure decisions.
+
+Final revision-bound reviewer confirmation remains external to this document so
+embedding its own digest cannot change that digest. Record the final document
+digest, reviewer identity/roles and disposition in the PR/Linear evidence. Initial
+architecture approval remains separate from these reviews.
+
+| Required role                          | Questions that can invalidate this plan                                                                                                  | Receipt                                                                                   |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Security/privacy/permissions           | Can forged receipts, draft tokens, tenant mixups or retained PII grant exposure? Is invocation denial enforced by its actual owner?      | Control + SEO initial reviews; objections reconciled above; final confirmation pending    |
+| Platform policy/marketplace review     | Are unknown rules treated as pass? Are protocol support, directory admission and publication permission distinguished?                   | Control + SEO initial reviews: no policy blocker; final confirmation pending              |
+| Reliability/rollback/stale artifacts   | Can a timeout duplicate a submission? Can an in-flight epoch change or newly prohibited old artifact escape quarantine?                  | SEO initial review; lease/fence objection reconciled; final confirmation pending          |
+| Product/distribution usefulness        | Does the canary complete a real Smart Link job? Are draft URLs or two manifests being counted as user outcomes?                          | Control initial review; final acceptance objection reconciled; final confirmation pending |
+| Certification integrity/false green    | Are universal, platform, deployed/runtime and privileged dogfood receipts all independently bound? Can confidence outvote a failed gate? | Pending                                                                                   |
+| Operational ownership/failure recovery | Which existing owner reconciles unknown submission, failed withdrawal and absent runtime enforcement? Is any new controller hiding here? | Pending                                                                                   |
 
 Architecture approval: **not recorded**. Approval must identify this packet's
 exact reviewed revision/digest and the reconciled independent-review evidence.
