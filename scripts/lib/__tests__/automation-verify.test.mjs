@@ -32,11 +32,16 @@ describe('affected-test selector inventory', () => {
     'apps/web/lib/ovie/certifications/inventory.server.test.ts',
     'apps/web/components/features/admin/certifications/CertificationDetailRail.test.tsx',
   ];
+  const certificationComponentGuards = [
+    'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+    'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
+  ];
+  const certificationVirtualizerGuard =
+    'apps/web/tests/unit/virtualization/virtualizer-compiler-optout.test.ts';
 
   it.each([
     [certificationSource],
     [certificationSource, certificationTests[0]],
-    [certificationSource, ...certificationTests],
   ])(
     'selects normalization and its inventory/rail consumers for %j',
     (...files) => {
@@ -62,7 +67,63 @@ describe('affected-test selector inventory', () => {
     }
   );
 
-  it.each(certificationTests)(
+  it.each([
+    [certificationSource, certificationTests[2]],
+    [certificationSource, ...certificationTests],
+  ])('retains common component guards for %j', (...files) => {
+    const plan = buildAffectedTestPlan(files);
+    const expected = [...certificationTests, ...certificationComponentGuards];
+    expect(plan.mode).toBe('selected');
+    expect(plan.mandatoryTests).toEqual(expected);
+    expect(plan.selectedTests).toEqual(expected);
+    expect(buildSelectedTestCommands(plan, '2')[0][1]).toEqual([
+      '--filter',
+      '@jovie/web',
+      'exec',
+      'vitest',
+      'run',
+      ...expected.map(file => file.replace(/^apps\/web\//, '')),
+      '--passWithNoTests',
+      '--maxWorkers',
+      '2',
+    ]);
+  });
+
+  it.each([certificationSource, ...certificationTests])(
+    'retains the content-based virtualizer guard for %s',
+    virtualizedFile => {
+      const plan = buildAffectedTestPlan(
+        [certificationSource, virtualizedFile],
+        {
+          isFileAvailable: () => true,
+          readFile: file =>
+            file === virtualizedFile
+              ? 'const v = useVirtualizer({ count });'
+              : '',
+        }
+      );
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toContain(certificationVirtualizerGuard);
+      expect(plan.selectedTests).toContain(certificationVirtualizerGuard);
+    }
+  );
+
+  it.each([...certificationComponentGuards, certificationVirtualizerGuard])(
+    'fails closed when a triggered certification guard is missing: %s',
+    missing => {
+      const plan = buildAffectedTestPlan(
+        [certificationSource, certificationTests[2]],
+        {
+          isFileAvailable: file => file !== missing,
+          readFile: () => 'const v = useVirtualizer({ count });',
+        }
+      );
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toMatch(/proof.*unavailable/);
+    }
+  );
+
+  it.each([certificationSource, ...certificationTests])(
     'keeps full verification when normalization proof is missing: %s',
     missing => {
       expect(
