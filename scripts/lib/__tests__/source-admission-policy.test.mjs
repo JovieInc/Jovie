@@ -18,6 +18,16 @@ import {
 
 const { load } = createRequire(import.meta.url)('js-yaml');
 
+test('source and size checks wake when the PR base or contract text is edited', () => {
+  for (const file of ['source-validation.yml', 'pr-size-guard.yml']) {
+    const workflow = load(readFileSync(`.github/workflows/${file}`, 'utf8'));
+    assert.ok(
+      workflow.on.pull_request.types.includes('edited'),
+      `${file} must revalidate a retargeted PR at the unchanged source head`
+    );
+  }
+});
+
 test('source admission loads the actual changelog guard from trusted base when an older head lacks it', () => {
   const workflow = load(
     readFileSync('.github/workflows/source-validation.yml', 'utf8')
