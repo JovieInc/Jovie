@@ -4437,5 +4437,118 @@ class PerRepoStateIsolationTests(unittest.TestCase):
             self.assertEqual(jovie_args.state_dir, jovie_state)
 
 
+class ClosureObservationContractTests(unittest.TestCase):
+    def test_unknown_observation_survives_gate_and_wire_projection(self):
+        import closure_health
+        from fleet_admission_receipt import project_fleet_admission_receipt
+
+        now = MODULE.utc_now()
+        for controller in ({"status": "green"}, None, {}, {"status": "unknown"}):
+            with self.subTest(controller=controller), mock.patch.object(
+                closure_health, "_run_graphql_snapshot",
+                side_effect=ValueError("fixture observation unavailable"),
+            ) as snapshot_read:
+                closure = MODULE.observe_closure_health(
+                    "JovieInc/Jovie", None, now,
+                    controller_observation=controller,
+                )
+            self.assertEqual(
+                snapshot_read.call_count, int(controller == {"status": "green"})
+            )
+            self.assertEqual(closure["status"], "red")
+            self.assertFalse(closure["newIssueIntakeAllowed"])
+            self.assertEqual(closure["reasons"], ["closure-observation-unknown"])
+            validated = MODULE.validate_closure_health(closure)
+            self.assertEqual(validated["reasons"], closure["reasons"])
+            self.assertEqual(validated["repository"], "JovieInc/Jovie")
+
+            signals = {**GREEN_SIGNALS, "closureHealth": closure}
+            receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
+            self.assertIsNone(MODULE.live_persist_rejection_reason(receipt))
+            projected = project_fleet_admission_receipt(receipt)
+            for result in (receipt, projected):
+                products = result["closureAdmission"]["products"]
+                self.assertFalse(products["jovie"]["newIssueIntakeAllowed"])
+                self.assertEqual(products["jovie"]["status"], "red")
+                self.assertEqual(products["jovie"]["reasons"], closure["reasons"])
+                for peer in ("logyourbody", "ovie"):
+                    self.assertTrue(products[peer]["newIssueIntakeAllowed"])
+            self.assertTrue(receipt["remediationAdmission"]["allowed"])
+
+            independent = {
+                **GREEN_SIGNALS["closureHealth"],
+                "repository": "JovieInc/LogYourBody", "productId": "logyourbody",
+            }
+            supplied = MODULE.evaluate(
+                {**signals, "productClosureHealth": {"logyourbody": independent}},
+                MODULE.isoformat(now),
+            )
+            self.assertTrue(
+                supplied["closureAdmission"]["products"]["logyourbody"]
+                ["newIssueIntakeAllowed"]
+            )
+
+    def test_malformed_evaluated_observation_never_authorizes_intake(self):
+        import closure_health
+
+        for snapshot in ({}, {"classifications": {"expiredHolds": [7]}}):
+            with self.subTest(snapshot=snapshot):
+                closure = closure_health.evaluate_closure_health(
+                    snapshot, None, MODULE.utc_now()
+                )
+                self.assertEqual(closure["status"], "red")
+                self.assertIn("closure-observation-unknown", closure["reasons"])
+                self.assertFalse(closure["newIssueIntakeAllowed"])
+                self.assertEqual(
+                    MODULE.validate_closure_health(closure)["reasons"],
+                    closure["reasons"],
+                )
+
+    def test_unknown_does_not_weaken_existing_admission_guards(self):
+        import closure_health
+
+        now = MODULE.utc_now()
+        closure = MODULE.observe_closure_health("JovieInc/Jovie", None, now)
+        contradictory = {**closure, "newIssueIntakeAllowed": True}
+        self.assertEqual(
+            MODULE.validate_closure_health(contradictory)["reasons"],
+            [MODULE.CLOSURE_HEALTH_PLACEHOLDER_REASON],
+        )
+        for status in ("red", "grace"):
+            for reasons in (
+                ["closure-observation-unknown"],
+                ["closure-observation-unknown", "expired-held-prs"],
+            ):
+                self.assertFalse(closure_health.issue_intake_allowed(status, reasons))
+            self.assertTrue(
+                closure_health.issue_intake_allowed(status, ["expired-held-prs"])
+            )
+        for reason in closure_health.SYSTEMS_DOWN_REASONS:
+            blocked = MODULE.evaluate(
+                {**GREEN_SIGNALS, "closureHealth": {**closure, "reasons": [reason]}},
+                MODULE.isoformat(now),
+            )
+            self.assertFalse(any(
+                row["newIssueIntakeAllowed"]
+                for row in blocked["closureAdmission"]["products"].values()
+            ))
+        for reason in MODULE.SEVERE_REASONS:
+            blocked = MODULE.evaluate(
+                {**GREEN_SIGNALS, "closureHealth": closure,
+                 "integrity": {"status": "active", "reason": reason}},
+                MODULE.isoformat(now),
+            )
+            self.assertEqual(blocked["state"], "RED")
+            self.assertFalse(any(
+                blocked["workAdmission"]["productNewIssueLeaseAllowed"].values()
+            ))
+        no_capacity = MODULE.evaluate(
+            {**GREEN_SIGNALS, "closureHealth": closure, "concurrencyEvidence": None},
+            MODULE.isoformat(now),
+        )
+        self.assertEqual(no_capacity["concurrency"]["gem"]["maxConcurrent"], 0)
+        self.assertFalse(no_capacity["concurrency"]["gem"]["evidenceAccepted"])
+
+
 if __name__ == "__main__":
     unittest.main()

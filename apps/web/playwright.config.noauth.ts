@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { worktreeMetadata } from './scripts/playwright-worktree';
 import { resolveWebServerWarmupProfile } from './tests/e2e/utils/warmup-profile';
 
 const isCI = !!process.env.CI;
@@ -26,6 +27,11 @@ process.env.PUBLIC_NOAUTH_SMOKE = '1';
 const shouldSkipManagedWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
 
 export default defineConfig({
+  metadata: worktreeMetadata(
+    managedWebServerUrl.origin,
+    Boolean(!shouldSkipManagedWebServer && !(isCI && process.env.BASE_URL)),
+    __dirname
+  ),
   captureGitInfo: { commit: false, diff: false },
   testDir: './tests/e2e',
   // Only collect Playwright specs. tests/e2e/utils contains node:test suites

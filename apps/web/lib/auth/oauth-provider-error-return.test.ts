@@ -6,6 +6,7 @@ import {
   type OAuthProvider,
 } from 'better-auth';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mcpOAuthRedirectGuard } from './mcp-redirect-guard';
 import { oauthProviderErrorReturn } from './oauth-provider-error-return';
 
 const ORIGIN = 'https://auth.test';
@@ -85,6 +86,7 @@ async function createHarness() {
     rateLimit: { enabled: false },
     telemetry: { enabled: false },
     plugins: [
+      mcpOAuthRedirectGuard(),
       oauthProvider({
         loginPage: '/identity',
         consentPage: '/identity',

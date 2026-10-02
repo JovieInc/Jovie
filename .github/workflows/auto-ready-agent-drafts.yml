@@ -94,7 +94,7 @@ jobs:
   green-source:
     # Event-driven undraft when required source checks succeed. Job-level
     # filters keep failed/cancelled/unrelated suites from provisioning a runner.
-    # No ready_for_review listener — Auto-Enroll owns that event.
+    # No ready_for_review listener — auto-merge-default.yml owns that event.
     if: >-
       (github.event_name == 'workflow_dispatch' && inputs.pr_number != '') ||
       (
