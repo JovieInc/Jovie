@@ -16,6 +16,8 @@ export const ACTION_IDS = [
   'work.claim',
   'work.report',
   'defect.report',
+  'fleet.directory',
+  'work.request',
 ] as const;
 
 export type ActionId = (typeof ACTION_IDS)[number];
