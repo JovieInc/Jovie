@@ -7,39 +7,20 @@ system.
 
 ## Baseline recorded on 2026-10-01
 
-Before this change, a diff containing only `apps/web/content/blog/*.md` was
-`mode: none` in `scripts/run-affected-tests.mjs`. The product classifier still
-selected the Web lane, so an admitted merge-group head ran 15 Web unit matrix
-entries plus Build + Layout, Ovie build, Ovie typecheck, and Storybook surfaces.
-There was no rendered blog candidate gate and no blog-specific end-to-end
-latency receipt.
+Previously, Markdown-only blog diffs selected no affected tests but still ran
+15 Web merge-group matrix entries plus Build + Layout, Ovie build/typecheck and
+Storybook. There was no blog candidate gate or latency receipt. The required
+contexts remain `PR Ready`, `Migration Guard`, `Fork PR Gate` and `PR Size Guard`.
+Recent blog PRs also changed source or tests, so the strict cohort has `n=0` in
+`docs/metrics/blog-publish-latency-latest.json`; it proves no improvement or SLA.
 
-The stable required contexts were and remain `PR Ready`, `Migration Guard`,
-`Fork PR Gate`, and `PR Size Guard`; branch protection is unchanged.
-
-The historical strict cohort contains zero qualifying PRs: inspected recent
-blog PRs also changed tests, renderers, components, or other source. Therefore
-both the representative before and after sample counts are `n=0` in
-`docs/metrics/blog-publish-latency-latest.json`. That is the actual baseline;
-it is not a latency win or a publishing SLA.
-
-The build dependency remains:
-
-```text
-plain Markdown + publication metadata + safe raster assets
-  -> shared blog catalog/publication policy
-  -> article, listing, category, author, related, feed, sitemap, share
-  -> Next.js candidate build
-  -> native merge queue
-  -> normal production controller and Production Verified
-```
-
-Markdown is bundled into the application build. Faster qualification does not
-make it independently publishable and does not change queue ordering,
-coalescing, deployment, rollback, or post-deploy verification.
-The receipt reserves `feed` as an affected output family, but the audited tree
-has no dedicated blog feed endpoint today; adding one is a renderer/source
-change and therefore takes the full path.
+The build remains plain Markdown, metadata and safe raster assets through the
+shared catalog/publication policy, article/discovery/share outputs, a Next.js
+candidate build, native merge queue, and normal production controller with
+Production Verified. Markdown remains bundled into the app. Qualification does
+not change queue ordering, deployment, rollback or post-deploy verification.
+The receipt reserves `feed`, but this tree has no dedicated blog feed endpoint;
+adding one is a source change that requires the full path.
 
 ## Selection contract
 
@@ -84,11 +65,6 @@ representative samples, and p50/p95 candidate-to-confirmed-live time separately
 for legacy and content-only cohorts. It emits no improvement or SLA claim until
 both cohorts have complete samples.
 
-**Ship now:** the fail-closed classifier, certification/build profile, stable
-aggregate wiring, and measurement scaffold.
-
-**Re-evaluate when:** representative certified content-only samples show where
-candidate-to-live time and cost are actually spent, including queue and deploy.
-
-**Then:** use those measurements under JOV-7244 to decide whether decoupled
-content delivery is justified. Do not infer that decision from faster CI alone.
+The shipped scope is the classifier, certification/build profile, aggregate
+wiring and measurement scaffold. Use representative complete samples under
+JOV-7244 to assess decoupled delivery; faster CI alone does not establish it.
