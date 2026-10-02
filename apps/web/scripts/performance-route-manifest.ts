@@ -230,6 +230,15 @@ export function assertValidPerfRouteDefinition(route: PerfRouteDefinition) {
     }
   }
 
+  if (
+    route.measureMode === 'warm-navigation' &&
+    !route.navigationItemId?.trim()
+  ) {
+    throw new TypeError(
+      `Warm-navigation route "${route.id}" must define navigationItemId for shell acknowledgment measurement.`
+    );
+  }
+
   if (route.measureMode === 'profile-warm-transition') {
     const timingBudgets = getRouteTimingBudgets(route);
     const interactiveBudget = timingBudgets.find(
@@ -1333,18 +1342,21 @@ const CREATOR_SHELL_ROUTES = [
     surface: 'creator-app',
     path: APP_ROUTES.CHAT_PROFILE_PANEL,
     navigationItemId: 'links',
-    warmNavigationStartPath: APP_ROUTES.DASHBOARD,
     requiresAuth: true,
-    warmupStrategy: 'authenticated-shell',
-    measureMode: 'warm-navigation',
+    // Links is a contextual Identity representation after JOV-7305. It uses a
+    // direct route-load contract because it is no longer a root navigation link.
+    warmupStrategy: 'authenticated-route',
+    measureMode: 'page-load',
     readySelectors: {
-      shell: ['[data-app-shell-frame="true"]'],
       content: ['[data-testid="profile-contact-sidebar"]'],
       loading: ['[data-testid="chat-loading"]'],
-      navTrigger: [`a[href="${APP_ROUTES.CHAT_PROFILE_PANEL}"]`],
     },
     timings: [
-      { metric: 'warm-shell-response', budget: 100 },
+      { metric: 'first-contentful-paint', budget: 1500 },
+      { metric: 'largest-contentful-paint', budget: 3000 },
+      { metric: 'cumulative-layout-shift', budget: 0.02 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1500 },
       { metric: 'skeleton-to-content', budget: 1200 },
     ],
     resourceSizes: CHAT_RESOURCE_BUDGETS,
@@ -1502,7 +1514,7 @@ const CREATOR_SHELL_ROUTES = [
     measureMode: 'page-load',
     readySelectors: {
       content: ['[data-testid="library-surface"]'],
-      loading: ['main[aria-label="Loading Library"]'],
+      loading: ['main[aria-label="Loading Work"]'],
     },
     timings: [
       { metric: 'first-contentful-paint', budget: 1800 },
@@ -1521,19 +1533,22 @@ const CREATOR_SHELL_ROUTES = [
     group: 'creator-shell',
     surface: 'creator-app',
     path: APP_ROUTES.LIBRARY,
+    navigationItemId: 'library',
+    warmNavigationStartPath: APP_ROUTES.DASHBOARD,
     requiresAuth: true,
-    warmupStrategy: 'authenticated-route',
-    measureMode: 'page-load',
+    warmupStrategy: 'authenticated-shell',
+    measureMode: 'warm-navigation',
     readySelectors: {
+      shell: ['[data-app-shell-frame="true"]'],
       content: ['[data-testid="library-surface"]'],
-      loading: ['main[aria-label="Loading Library"]'],
+      loading: ['main[aria-label="Loading Work"]'],
+      navTrigger: [
+        `a[href="${APP_ROUTES.LIBRARY}"]`,
+        `a[href^="${APP_ROUTES.LIBRARY}?"]`,
+      ],
     },
     timings: [
-      { metric: 'first-contentful-paint', budget: 1800 },
-      { metric: 'largest-contentful-paint', budget: 3000 },
-      { metric: 'cumulative-layout-shift', budget: 0.05 },
-      { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1600 },
+      { metric: 'warm-shell-response', budget: 100 },
       { metric: 'skeleton-to-content', budget: 1000 },
     ],
     resourceSizes: RELEASES_RESOURCE_BUDGETS,

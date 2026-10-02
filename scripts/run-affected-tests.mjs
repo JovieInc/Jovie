@@ -5,6 +5,11 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DELIVERY_CONTROLLER_COVERAGE_ARGS } from './ci-fast-lanes.mjs';
+import {
+  BLOG_CERTIFICATION_PROOFS,
+  classifyBlogContentDiff,
+  isBlogContentCandidatePath,
+} from './lib/blog-content-ci.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -210,6 +215,10 @@ const SUMMER_COMMISSIONING_LANE = new Set([
 ]);
 const CAPABILITY_BENCHMARK_PRIMARY_INPUTS = new Set([
   'scripts/capability-benchmark/capability-benchmark-registry.json',
+  'scripts/capability-benchmark/decision-routing-benchmark.json',
+  'scripts/capability-benchmark/computer-use-decision.jsonl',
+  'scripts/capability-benchmark/computer-use-decision.mjs',
+  'scripts/capability-benchmark/computer-use-decision.test.mjs',
   'scripts/capability-benchmark/capability-reconciliation.mjs',
   'scripts/capability-benchmark/capability-reconciliation.test.mjs',
   'scripts/capability-benchmark/capability-benchmark.mjs',
@@ -223,6 +232,7 @@ const CAPABILITY_BENCHMARK_LANE = new Set([
 ]);
 const CAPABILITY_BENCHMARK_NODE_TESTS = [
   'scripts/capability-benchmark/capability-benchmark.test.mjs',
+  'scripts/capability-benchmark/computer-use-decision.test.mjs',
   'scripts/capability-benchmark/capability-reconciliation.test.mjs',
 ];
 const SUMMER_COMMISSIONING_NODE_TESTS = [
@@ -327,6 +337,7 @@ const CI_UI_DRIFT_GUARDRAIL_NODE_TESTS = [
 const OWNERLESS_RECOVERY_POLICY_TEST =
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs';
 const CI_CONTROL_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
   'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
   'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
   'scripts/lib/__tests__/native-queue-eval.test.mjs',
@@ -521,6 +532,24 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
     [
       '--test-coverage-lines=100',
       '--test-coverage-branches=100',
+      '--test-coverage-functions=100',
+    ],
+  ],
+  [
+    '.github/scripts/internal-pr-review.test.mjs',
+    '.github/scripts/internal-pr-review.mjs',
+    [
+      '--test-coverage-lines=85',
+      '--test-coverage-branches=80',
+      '--test-coverage-functions=85',
+    ],
+  ],
+  [
+    'scripts/lib/__tests__/source-admission-policy.test.mjs',
+    'scripts/lib/source-admission-policy.mjs',
+    [
+      '--test-coverage-lines=95',
+      '--test-coverage-branches=90',
       '--test-coverage-functions=100',
     ],
   ],
@@ -884,6 +913,17 @@ const VISUAL_QA_DIFF_ARTIFACTS_MANIFEST = new Set([
   VISUAL_QA_DIFF_ARTIFACTS_SOURCE,
   VISUAL_QA_DIFF_ARTIFACTS_TEST,
 ]);
+const CERTIFICATION_NORMALIZATION_SOURCE =
+  'apps/web/lib/ovie/certifications/normalize.ts';
+const CERTIFICATION_NORMALIZATION_TESTS = [
+  'apps/web/lib/ovie/certifications/normalize.test.ts',
+  'apps/web/lib/ovie/certifications/inventory.server.test.ts',
+  'apps/web/components/features/admin/certifications/CertificationDetailRail.test.tsx',
+];
+const CERTIFICATION_NORMALIZATION_MANIFEST = new Set([
+  CERTIFICATION_NORMALIZATION_SOURCE,
+  ...CERTIFICATION_NORMALIZATION_TESTS,
+]);
 const MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST = new Set([
   'apps/web/tests/e2e/mobile-overflow.spec.ts',
   'apps/web/tests/e2e/utils/mobile-overflow.ts',
@@ -1020,17 +1060,66 @@ const LINEAR_SYNC_ON_MERGE_LANE = new Set([
   'scripts/run-affected-tests.mjs',
 ]);
 
+export function classifyBlogContentForAffectedTests(base, head, options) {
+  try {
+    return classifyBlogContentDiff(base, head, options);
+  } catch {
+    console.warn(
+      '[affected-tests] Blog diff classification failed; requiring the full suite.'
+    );
+    return undefined;
+  }
+}
+
 export function buildAffectedTestPlan(
   changedFiles,
   {
     isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)),
     readFile = readRepoFile,
+    blogContentReceipt = undefined,
   } = {}
 ) {
   const files = unique(changedFiles.filter(Boolean)).sort();
   const globalTestInput = files.find(file => GLOBAL_TEST_INPUTS.has(file));
   if (globalTestInput) {
     return fullSuitePlan(`global test input changed: ${globalTestInput}`);
+  }
+  if (files.some(isBlogContentCandidatePath)) {
+    if (
+      !blogContentReceipt?.contentOnly ||
+      files.length !== blogContentReceipt.changedPaths?.length ||
+      files.some(file => !blogContentReceipt.changedPaths.includes(file))
+    ) {
+      return fullSuitePlan(
+        'blog content diff was mixed, unsafe, or lacked status-aware qualification'
+      );
+    }
+    if (!BLOG_CERTIFICATION_PROOFS.every(isFileAvailable)) {
+      return fullSuitePlan('blog certification proof is unavailable');
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [...BLOG_CERTIFICATION_PROOFS],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: [],
+      nodeTests: [],
+      blogCandidateBuild: true,
+    };
+  }
+  const isBoundedCertificationNormalizationChange = files.includes(
+    CERTIFICATION_NORMALIZATION_SOURCE
+  );
+  if (isBoundedCertificationNormalizationChange) {
+    if (!files.every(file => CERTIFICATION_NORMALIZATION_MANIFEST.has(file))) {
+      return fullSuitePlan('mixed certification normalization source changes');
+    }
+    if (![...CERTIFICATION_NORMALIZATION_MANIFEST].every(isFileAvailable)) {
+      return fullSuitePlan('certification normalization proof is unavailable');
+    }
   }
   const isLinearSyncOnMerge =
     files.some(file => LINEAR_SYNC_ON_MERGE_PRIMARY.has(file)) &&
@@ -1148,6 +1237,11 @@ export function buildAffectedTestPlan(
       scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
       nodeTests: CAPABILITY_BENCHMARK_NODE_TESTS,
     };
+  }
+  if (files.some(file => CAPABILITY_BENCHMARK_PRIMARY_INPUTS.has(file))) {
+    return fullSuitePlan(
+      'Capability benchmark change exceeds its focused lane'
+    );
   }
   const isBoundedSummerCommissioningChange =
     files.some(file => SUMMER_COMMISSIONING_PRIMARY_INPUTS.has(file)) &&
@@ -1599,7 +1693,9 @@ export function buildAffectedTestPlan(
         manifest.has(file) &&
         (hasUnsupportedAutomationPeer || !directlyRunnableTestFiles.has(file))
     );
-  const mandatoryTests = [];
+  const mandatoryTests = isBoundedCertificationNormalizationChange
+    ? [...CERTIFICATION_NORMALIZATION_TESTS]
+    : [];
   const hasSeedConfirmationChange = files.some(
     file =>
       file === 'apps/web/tests/seed-test-data.ts' ||
@@ -1707,7 +1803,19 @@ export function buildAffectedTestPlan(
     mandatoryTests.push(...RUNNER_PREREQUISITE_CONTRACT_TESTS);
   }
 
-  const selectedTests = unique([...directTests, ...mandatoryTests]);
+  if (
+    isBoundedCertificationNormalizationChange &&
+    !mandatoryTests.every(isFileAvailable)
+  ) {
+    return fullSuitePlan('certification normalization proof is unavailable');
+  }
+  const selectedTests = unique([
+    ...(isBoundedCertificationNormalizationChange
+      ? CERTIFICATION_NORMALIZATION_TESTS
+      : []),
+    ...directTests,
+    ...mandatoryTests,
+  ]);
   const rootVitestTests = unique([
     ...(isExactVercelCongestionControl
       ? VERCEL_CONGESTION_CONTROL_ROOT_VITEST_TESTS
@@ -1762,6 +1870,11 @@ export function buildAffectedTestPlan(
   ]);
   const isCoveredSource = file => {
     if (VITEST_TEST_FILE.test(file)) return true;
+    if (
+      isBoundedCertificationNormalizationChange &&
+      CERTIFICATION_NORMALIZATION_MANIFEST.has(file)
+    )
+      return true;
     const fixtureTests = KNOWN_VITEST_FIXTURE_TESTS.get(file);
     if (fixtureTests) return fixtureTests.every(isFileAvailable);
     if (file.startsWith('apps/web/components/features/profile/')) return true;
@@ -2194,6 +2307,16 @@ export async function runCommandStatus(
   logger(
     `[affected-tests] complete ${label} status=${status} elapsedMs=${Date.now() - startedAt} pid=${child.pid ?? 'unknown'} command=${commandText}`
   );
+  if (bufferOutput) {
+    // Queue a barrier after both the stage output and completion log. The CLI
+    // can exit immediately, so its parent pipe must finish writing first.
+    await new Promise((resolveWrite, rejectWrite) => {
+      process.stdout.write('', error => {
+        if (error) rejectWrite(error);
+        else resolveWrite();
+      });
+    });
+  }
   return status;
 }
 
@@ -2479,6 +2602,25 @@ export function buildSelectedTestCommands(
       ],
     ]);
   }
+  if (plan.blogCandidateBuild) {
+    commands.push([
+      'env',
+      [
+        'NEXT_PUBLIC_APP_URL=http://localhost:3100',
+        'NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3100',
+        'NEXT_PUBLIC_CLERK_MOCK=1',
+        'NEXT_PUBLIC_CLERK_PROXY_DISABLED=1',
+        'NEXT_PUBLIC_E2E_MODE=1',
+        'NEXT_IGNORE_ESLINT=1',
+        'NEXT_IGNORE_TYPECHECK=1',
+        'NEXT_PRIVATE_SKIP_SIZE_CHECK=true',
+        'pnpm',
+        'turbo',
+        'build',
+        '--filter=@jovie/web',
+      ],
+    ]);
+  }
   return commands;
 }
 
@@ -2641,9 +2783,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     DEFAULT_PROGRESS_INTERVAL_MS
   );
   const explicitFiles = argValue(args, '--changed-files-json', '');
-  const plan = buildAffectedTestPlan(
-    explicitFiles ? JSON.parse(explicitFiles) : changedFiles(base)
+  const files = explicitFiles ? JSON.parse(explicitFiles) : changedFiles(base);
+  const prerequisitesAvailable = BLOG_CERTIFICATION_PROOFS.every(file =>
+    existsSync(resolve(REPO_ROOT, file))
   );
+  const blogContentReceipt =
+    !explicitFiles && files.some(isBlogContentCandidatePath)
+      ? classifyBlogContentForAffectedTests(base, 'HEAD', {
+          prerequisitesAvailable,
+        })
+      : undefined;
+  const plan = buildAffectedTestPlan(files, { blogContentReceipt });
   if (args.includes('--dry-run')) {
     console.log(JSON.stringify(plan, null, 2));
     process.exit(0);

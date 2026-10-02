@@ -167,11 +167,12 @@ describe('GET /api/cron/daily-maintenance', () => {
       day: '2026-03-28',
       totalUsd: 1.25,
       observed30dUsd: 30,
+      cacheShare: 0.4,
       byTag: [{ key: 'feature:jovie-chat', costUsd: 1, requests: 10 }],
       byModel: [],
       alerts: [],
     });
-    mockRunMusicResolverParityCorpus.mockResolvedValue([{ version: 1 }]);
+    mockRunMusicResolverParityCorpus.mockResolvedValue([{ version: 2 }]);
   });
 
   afterEach(() => {
@@ -258,15 +259,15 @@ describe('GET /api/cron/daily-maintenance', () => {
         day: '2026-03-28',
         totalUsd: 1.25,
         observed30dUsd: 30,
+        cacheShare: 0.4,
         topTags: [{ key: 'feature:jovie-chat', costUsd: 1, requests: 10 }],
         alerts: [],
       },
     });
-    expect(mockRunMusicResolverParityCorpus).not.toHaveBeenCalled();
+    expect(mockRunMusicResolverParityCorpus).toHaveBeenCalledTimes(1);
     expect(data.results.musicResolverParity).toEqual({
       success: true,
-      skipped: true,
-      data: { reason: 'independent-benchmark-source-required' },
+      data: [{ version: 2 }],
     });
     expect(data.results.dataRetention.success).toBe(true);
   });

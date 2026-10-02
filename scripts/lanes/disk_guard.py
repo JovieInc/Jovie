@@ -79,6 +79,53 @@ def is_clean(path: Path, run) -> bool:
     return result.returncode == 0 and not result.stdout.strip()
 
 
+def index_locked(path: Path) -> bool:
+    """A live git operation holds `<gitdir>/index.lock`; linked worktrees resolve
+    their real git dir through the `.git` pointer file."""
+    gitdir = path / ".git"
+    try:
+        pointer = gitdir.read_text()
+    except (OSError, UnicodeDecodeError):
+        pass  # embedded repo dir or unreadable pointer: check the literal path
+    else:
+        if pointer.startswith("gitdir:"):
+            target = Path(pointer.split(":", 1)[1].strip())
+            gitdir = target if target.is_absolute() else (path / target).resolve()
+    try:
+        return (gitdir / "index.lock").exists()
+    except OSError:
+        return False
+
+
+def busy_reason(path: Path, run=subprocess.run) -> str | None:
+    """Why a worktree must not be destroyed; None only when it is provably idle.
+
+    Path-based, never PID-based: a stale PID can be reused after a reboot, but a
+    live process holding this directory as its cwd means an agent is still working.
+    Any failed observation fails closed — an unreadable process inventory is not
+    proof of idleness."""
+    if index_locked(path):
+        return "git-index-locked"
+    try:
+        active = run(["lsof", "-nP", "-a", "-d", "cwd", "-F", "pn"],
+                     capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return "process-state-unavailable"
+    if getattr(active, "returncode", None) not in (0, 1) or getattr(active, "stderr", ""):
+        return "process-state-unavailable"
+    resolved = path.resolve()
+    for line in active.stdout.splitlines():
+        if not line.startswith("n"):
+            continue
+        try:
+            cwd = Path(line[1:]).resolve()
+        except OSError:
+            continue
+        if cwd == resolved or resolved in cwd.parents:
+            return "process-still-running"
+    return None
+
+
 def prune_build_dirs(path: Path, report: dict) -> None:
     for root, dirs, _files in os.walk(path):
         keep = []
@@ -113,6 +160,10 @@ def sweep_worktrees(host, run, now: float, report: dict) -> None:
         if (path / PRESERVED_REPAIR).exists():
             continue
         if not path.exists() or recently_touched(path, WORKTREE_IDLE_S, now):
+            continue
+        busy = busy_reason(path, run)
+        if busy:
+            report["actions"].append(f"preserved busy worktree {path}: {busy}")
             continue
         if is_clean(path, run):
             removed = run(["git", "worktree", "remove", "--force", str(path)],

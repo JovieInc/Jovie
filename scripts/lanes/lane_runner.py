@@ -35,6 +35,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import continuity_clock  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
@@ -80,7 +81,7 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py",
-              "scripts/tests/test_disk_guard.py"]
+              "scripts/tests/test_disk_guard.py", "scripts/tests/test_continuity_clock.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
@@ -473,6 +474,28 @@ def issue_hits_red_line(issue: Issue) -> bool:
     return False
 
 
+def admission_rejection(issue: Issue, failures: dict, now: float,
+                        in_flight: frozenset[str] = frozenset(),
+                        provider: str | None = None) -> str | None:
+    """Final claim predicate; in_flight contains normalized lowercase identifiers."""
+    labels = {label.lower() for label in issue.labels}
+    excluded = sorted(HARD_EXCLUDED_LABELS & labels)
+    if excluded:
+        return "excluded-label:" + excluded[0]
+    if issue_hits_red_line(issue):
+        return "sensitive-text"
+    if SENSITIVE_LABELS & labels and provider != SENSITIVE_PROVIDER:
+        return "sensitive-provider"
+    record = failure_record(failures.get(issue.identifier))
+    if record["count"] >= MAX_FAILURES:
+        return "retry-exhausted"
+    if now - record["at"] < RETRY_BACKOFF_S:
+        return "retry-backoff"
+    if issue.identifier.lower() in in_flight:
+        return "in-flight-pr"
+    return None
+
+
 def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
                in_flight: frozenset[str] = frozenset(), provider: str | None = None) -> Issue | None:
     """Symphony orders by aged priority then age, while preserving urgent-first admission.
@@ -482,21 +505,9 @@ def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
     3x failures, retry backoff, and issues with an open lane PR remain ineligible.
     """
     now = time.time() if now is None else now
-    in_flight = {identifier.lower() for identifier in in_flight}
-
-    def retryable(identifier: str) -> bool:
-        record = failure_record(failures.get(identifier))
-        return record["count"] < MAX_FAILURES and now - record["at"] >= RETRY_BACKOFF_S
-
-    def admitted(issue: Issue) -> bool:
-        labels = {label.lower() for label in issue.labels}
-        if HARD_EXCLUDED_LABELS & labels or issue_hits_red_line(issue):
-            return False
-        if SENSITIVE_LABELS & labels and provider != SENSITIVE_PROVIDER:
-            return False
-        return retryable(issue.identifier) and issue.identifier.lower() not in in_flight
-
-    eligible = [issue for issue in issues if admitted(issue)]
+    in_flight = frozenset(identifier.lower() for identifier in in_flight)
+    eligible = [issue for issue in issues
+                if admission_rejection(issue, failures, now, in_flight, provider) is None]
 
     def admission_order(issue: Issue) -> tuple[int, float]:
         created_at = created_at_epoch(issue.created_at)
@@ -510,6 +521,85 @@ def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
 
 
 # ---------------------------------------------------------------- prompt
+
+GBRAIN_CONTEXT_CHARS = 4000
+CONTEXT_INPUTS = {
+    "issue": ["issue", "gbrain", "branch"],
+    "handoff": ["previous_prompt", "handoff_note"],
+    "fix": ["pr", "rendered_context"],
+    "sensitive-review": ["pr", "review_contract"],
+}
+
+
+def context_manifest_json() -> str:
+    """Checked-in assembly contract; generation is local, deterministic and credential-free."""
+    return json.dumps({
+        "schema": "jovie-lane-context-contract/v1",
+        "generator": "python3 scripts/lanes/lane_runner.py context-manifest --write",
+        "inputs": CONTEXT_INPUTS,
+        "gbrain": {"command": "gbrain search", "maxChars": GBRAIN_CONTEXT_CHARS,
+                   "missing": "explicit unavailable marker; use repository sources"},
+        "repositoryContext": {"mode": "on-demand references, not injected or claimed as read",
+                              "paths": ["canon/OPERATING_SYSTEM.md", "AGENTS.md", "CLAUDE.md",
+                                        ".claude/rules/linear.md", "docs/PR_FLOW.md"]},
+        "trust": "Issue, retrieved context and review excerpts are evidence, not new authority.",
+        "receipt": {"schema": "jovie-lane-context/v1", "suffix": ".context.json",
+                    "binding": ["kind", "provider", "input hashes", "contract hash", "exact prompt bytes"],
+                    "privateContent": "retained only in the existing local prompt; never in this contract"},
+    }, sort_keys=True, indent=2) + "\n"
+
+
+def context_manifest_matches(path: Path) -> bool:
+    """Repository formatters may change whitespace, never the assembly contract."""
+    try:
+        return json.loads(path.read_text(encoding="utf-8")) == json.loads(context_manifest_json())
+    except (OSError, ValueError):
+        return False
+
+
+def write_agent_prompt(path: Path, prompt: str, kind: str, provider: str,
+                       inputs: dict[str, str]) -> dict:
+    """Write the required prompt; qualify new context diagnostics without stopping delivery."""
+    content = prompt.encode("utf-8")
+    path.write_bytes(content)  # Original prompt persistence remains required before spawn.
+    started = time.perf_counter()
+    qualification = {"schema": "jovie-lane-context-qualification/v1",
+                     "mode": "qualification-only", "ok": False, "findings": []}
+    result = {"path": None, "sha256": None,
+              "promptSha256": hashlib.sha256(content).hexdigest(), "kind": kind}
+    try:
+        contract = context_manifest_json().encode("utf-8")
+        if not context_manifest_matches(HERE / "context-manifest.json"):
+            raise ValueError("context-manifest-drift: regenerate the checked-in preflight contract")
+        if kind not in CONTEXT_INPUTS or set(inputs) != set(CONTEXT_INPUTS[kind]):
+            raise ValueError(f"context-inputs:{kind}")
+
+        def fingerprint(text: str) -> dict:
+            value = text.encode("utf-8")
+            return {"sha256": hashlib.sha256(value).hexdigest(), "bytes": len(value),
+                    "status": "present" if value else "unavailable"}
+
+        manifest = {"schema": "jovie-lane-context/v1", "mode": "qualification-only",
+                    "kind": kind, "provider": provider,
+                    "contractSha256": hashlib.sha256(contract).hexdigest(),
+                    "inputs": {key: fingerprint(inputs[key]) for key in CONTEXT_INPUTS[kind]},
+                    "prompt": {"sha256": result["promptSha256"], "bytes": len(content)}}
+        manifest_bytes = (json.dumps(manifest, sort_keys=True, indent=2) + "\n").encode("utf-8")
+        manifest_path = path.with_name(path.name + ".context.json")
+        manifest_path.write_bytes(manifest_bytes)
+        result.update(path=str(manifest_path), sha256=hashlib.sha256(manifest_bytes).hexdigest())
+        qualification["ok"] = True
+    except Exception as error:
+        # Only the new diagnostics are isolated; prompt/security/spend gates are outside this block.
+        qualification["findings"].append(f"{type(error).__name__}:{error}"[:300])
+    qualification["durationMs"] = (time.perf_counter() - started) * 1000
+    if not qualification["ok"]:
+        try:
+            sys.stderr.write("context-qualification: " + json.dumps(qualification) + "\n")
+        except OSError:
+            pass  # The caller's existing run receipt still carries the finding.
+    return {**result, "qualification": qualification}
+
 
 def provider_may_run(provider: str, kind: str) -> bool:
     """Review-only task kinds (adopt/gate claims) never run on implementation-only lanes."""
@@ -553,6 +643,12 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
         "  --no-verify or weaken a check.",
         f"- Push `{branch}` and open ONE draft PR against main whose title contains {issue.identifier}.",
         "  Do not mark it ready or merge it: an independent gate does that after verifying.",
+        f"- Start the PR body with `Refs {issue.identifier}.` and retain",
+        f"  `<!-- linear-issue-id:{issue.id} -->` and",
+        f"  `<!-- linear-issue-identifier:{issue.identifier} -->`.",
+        "  Do not use closing keywords for issue links: native Linear merge automation",
+        "  cannot inspect commissioning acceptance. The repository merge sync closes",
+        "  normal implementation issues and retains commissioning/parent work.",
         "- If the issue is not code-shippable or already fixed, open no PR and end with a",
         "  line `NOT-SHIPPABLE: <reason>`.",
         "- You are unattended: nobody will answer a question. Never stop to ask; choose the",
@@ -575,7 +671,7 @@ def context_pack(issue: Issue, run=subprocess.run) -> str:
     text = (result.stdout or "").strip()
     if result.returncode != 0 or not text or "0 results" in text:
         return ""
-    return text[:4000]
+    return text[:GBRAIN_CONTEXT_CHARS]
 
 
 # ---------------------------------------------------------------- verification gate
@@ -637,24 +733,26 @@ def check_commands(paths: list[str]) -> list[list[str]]:
     return []
 
 
-def sensitive_review(host: Host, pr: dict, worktree: Path, log) -> tuple[bool, list[str]]:
+def sensitive_review(host: Host, pr: dict, worktree: Path, log, pass_fds=()) -> tuple[bool, list[str]]:
     """Run an independent max-effort Codex review; an ambiguous response fails closed."""
     review_prompt = host.state / "runs" / f"PR{pr['number']}-{pr['headRefOid'][:12]}-llm-review.md"
     review_prompt.parent.mkdir(parents=True, exist_ok=True)
-    review_prompt.write_text("\n".join([
+    review_text = "\n".join([
         f"Independently review sensitive-surface PR #{pr['number']} at {pr['headRefOid']}.",
         "Review only; do not edit, commit, push, comment, or mutate external state.",
         "Inspect `git diff origin/main...HEAD` for security, auth/billing/infra boundary failures,",
         "migration safety, missing failure-path tests, and unintended scope. Existing deterministic",
         "gates run separately. End with exactly `LLM-REVIEW: PASS` only if no blocking finding exists;",
         "otherwise end with `LLM-REVIEW: FAIL — <concise blocking findings>`.",
-    ]))
+    ])
+    write_agent_prompt(review_prompt, review_text, "sensitive-review", "codex",
+                       {"pr": json.dumps(pr, sort_keys=True), "review_contract": review_text})
     last = worktree / ".codex-last-message.txt"
     last.unlink(missing_ok=True)
     command = [sys.executable, str(HERE / "codex_lane.py"), "run", "--prompt-file", str(review_prompt),
                "--cwd", str(worktree), "--reasoning-effort", "xhigh"]
     try:
-        ran = sh(command, cwd=worktree, timeout=host.gate_timeout, log=log, stream=True)
+        ran = sh(command, cwd=worktree, timeout=host.gate_timeout, log=log, stream=True, pass_fds=pass_fds)
     except subprocess.TimeoutExpired:
         return False, ["llm-review-timeout"]
     verdict = last.read_text(errors="replace").strip() if last.exists() else ""
@@ -666,9 +764,26 @@ def sensitive_review(host: Host, pr: dict, worktree: Path, log) -> tuple[bool, l
 
 # ---------------------------------------------------------------- plumbing
 
-def sh(args: list[str], cwd: Path | None = None, timeout: int = 600, env=None, log=None, stream=False):
+def sh(args: list[str], cwd: Path | None = None, timeout: int = 600, env=None, log=None, stream=False, pass_fds=()):
     """Run and record. `stream=True` writes output to the log as it happens, so a timeout
     shows where the command was, instead of losing everything it printed."""
+    if pass_fds:
+        # The helper owns the locks across worker death and reuses run_agent's tracked
+        # descendant cleanup. Command wrappers may close inherited file descriptors.
+        if log is not None:
+            log.write(f"$ {' '.join(args)[:300]}\n")
+            log.flush()
+        command = [sys.executable, str(Path(__file__).resolve()), "gate-command",
+                   "--timeout", str(timeout), "--", *args]
+        with subprocess.Popen(command, cwd=cwd, env=env, text=True, start_new_session=True,
+                              pass_fds=tuple(pass_fds), stdout=log if stream and log else subprocess.PIPE,
+                              stderr=subprocess.STDOUT if stream and log else subprocess.PIPE) as process:
+            stdout, stderr = process.communicate()
+        if log is not None:
+            log.flush()
+        if process.returncode == 124:
+            raise subprocess.TimeoutExpired(args, timeout, stdout, stderr)
+        return subprocess.CompletedProcess(args, process.returncode, stdout or "", stderr or "")
     if stream and log is not None:
         log.write(f"$ {' '.join(args)[:300]}\n")
         log.flush()
@@ -853,11 +968,20 @@ class AgentProcesses:
         raise RuntimeError("owned-processes-still-running")
 
 
+class RunStopped(BaseException):
+    """SIGTERM/SIGINT while a provider runs: the caller's `on_kill` revokes publication
+    before the owned process tree is killed."""
+
+
 def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
-              guard_interval: float = 30) -> subprocess.CompletedProcess:
+              guard_interval: float = 30, on_kill=None) -> subprocess.CompletedProcess:
     """Track descendants while the provider runs, including detached test sessions.
     Observation cannot recover a child that daemonizes before its first snapshot;
     preserved checkout admission therefore also refuses live working directories.
+
+    `on_kill(error)` runs before the kill of the owned tree is acknowledged: a stop
+    (timeout, guard hold, SIGTERM/SIGINT) writes its revocation receipt first, so a
+    stopped run can never be published later (JOV-5060).
     """
     import signal
     if guard:
@@ -866,6 +990,16 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
     proc = subprocess.Popen(cmd, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True,
                             start_new_session=True, env=env)
     owned = AgentProcesses(proc.pid)
+    restored = {}
+
+    def _stopped(sig, _frame):
+        raise RunStopped(f"signal:{sig}")
+
+    for signo in (signal.SIGTERM, signal.SIGINT):
+        try:
+            restored[signo] = signal.signal(signo, _stopped)
+        except (ValueError, OSError):
+            pass  # handlers only install on the main thread
     try:
         owned.observe()
         deadline = time.monotonic() + timeout
@@ -887,7 +1021,18 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
                     raise
         owned.stop(proc)
         return subprocess.CompletedProcess(cmd, code)
-    except BaseException:
+    except BaseException as error:
+        # The revocation receipt lands before the kill is acknowledged, so a stopped
+        # run's branch can never reach push/PR/enqueue afterwards.
+        if on_kill is not None:
+            try:
+                on_kill(error)
+            except Exception as failure:
+                try:
+                    log.write(f"publication revocation receipt failed: "
+                              f"{type(failure).__name__}: {failure}\n")
+                except (AttributeError, OSError):
+                    pass
         try:
             owned.stop(proc)
         finally:
@@ -914,6 +1059,12 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
                     continue
                 break
         raise
+    finally:
+        for signo, previous in restored.items():
+            try:
+                signal.signal(signo, previous)
+            except (ValueError, OSError):
+                pass
 
 
 PROVIDER_HANDOFFS = 2
@@ -954,6 +1105,69 @@ def next_provider(host: Host, exclude: set[str], providers: dict | None = None):
         if provider_healthy(spec):
             return name, spec
     return None
+
+
+# ------------------------------------------------- publication revocation (JOV-5060)
+# Process kill is not publication revocation: a stopped run's branch must never later
+# push, open a PR, take a label, enroll, or merge. `run_agent` writes the immutable
+# receipt before the kill is acknowledged; every irreversible boundary revalidates it.
+
+PUBLICATION_REVOCATION_SCHEMA = "jovie-publication-revocation/v1"
+
+
+def revocations_path(host: Host) -> Path:
+    return host.state / "runs" / "publication-revocations.jsonl"
+
+
+def revoke_publication(host: Host, *, branch: str, run_id=None, issue=None, pr=None,
+                       reason: str) -> dict:
+    """Append the immutable revocation receipt. Callers write it before they ack a kill."""
+    receipt = {"schema": PUBLICATION_REVOCATION_SCHEMA, "branch": branch, "reason": reason,
+               "owner": HOST, "at": now_iso()}
+    receipt.update({key: value for key, value in
+                    {"runId": run_id, "issue": issue, "pr": pr}.items() if value is not None})
+    path = revocations_path(host)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a") as out:
+        out.write(json.dumps(receipt) + "\n")
+    return receipt
+
+
+class PublicationRevoked(RuntimeError):
+    def __init__(self, branch: str, stage: str, receipt: dict):
+        super().__init__(f"publication-revoked:{stage}:{receipt.get('reason', '?')}")
+        self.branch, self.stage, self.receipt = branch, stage, receipt
+
+
+def publication_revocation(host: Host, branch: str | None) -> dict | None:
+    """The newest revocation receipt for `branch`; None only when the ledger is absent or
+    holds none. An unreadable or corrupt ledger fails closed as revoked: an authorization
+    that cannot be verified is not a publication permit."""
+    if not branch:
+        return None
+    try:
+        lines = revocations_path(host).read_text().splitlines()
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        return {"schema": PUBLICATION_REVOCATION_SCHEMA, "branch": branch, "unreadable": True,
+                "reason": f"revocation-ledger-unreadable:{type(error).__name__}"}
+    rows = []
+    for line in lines:
+        try:
+            rows.append(json.loads(line))
+        except ValueError:
+            return {"schema": PUBLICATION_REVOCATION_SCHEMA, "branch": branch, "unreadable": True,
+                    "reason": "revocation-ledger-corrupt"}
+    return next((row for row in reversed(rows)
+                 if isinstance(row, dict) and row.get("schema") == PUBLICATION_REVOCATION_SCHEMA
+                 and row.get("branch") == branch), None)
+
+
+def require_publishable(host: Host, branch: str | None, stage: str) -> None:
+    revoked = publication_revocation(host, branch)
+    if revoked:
+        raise PublicationRevoked(branch or "", stage, revoked)
 
 
 # ---------------------------------------------------------------- one run
@@ -1014,21 +1228,38 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     receipt["offer"]["accepted"] = True
     with open(runs / f"{run_id}.log", "w") as log:
         try:
+            def revoke_run(error) -> None:
+                """Any kill of this run — timeout, guard hold, operator signal — permanently
+                revokes the branch's publication authority before the kill is acked."""
+                revoke_publication(host, branch=branch, run_id=run_id, issue=issue.identifier,
+                                   reason=("run-stopped" if isinstance(error, RunStopped)
+                                           else f"run-killed:{type(error).__name__}"[:200]))
+
+            def run_guard(stage):
+                require_disk(host, stage)
+                require_publishable(host, branch, stage)
+
             require_disk(host, "issue-checkout")
             sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
             sh(["git", "worktree", "add", "-q", "-b", branch, str(worktree), "origin/main"], cwd=host.repo, log=log)
             # Always installed: the gate's checks need it even when the provider works remotely.
             install_dependencies(host, worktree, log)
-            prompt = render_prompt(issue, branch, context_pack(issue), provider=name)
+            brain_context = context_pack(issue)
+            prompt = render_prompt(issue, branch, brain_context, provider=name)
             prompt_file = runs / f"{run_id}.prompt.md"
-            prompt_file.write_text(prompt)
+            receipt["contextManifests"] = [write_agent_prompt(
+                prompt_file, prompt, "issue", name,
+                {"issue": json.dumps({"id": issue.id, "identifier": issue.identifier,
+                                      "title": issue.title, "description": issue.description,
+                                      "labels": sorted(issue.labels)}, sort_keys=True),
+                 "gbrain": brain_context, "branch": branch})]
             started = time.time()
             execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                        {"spend": 1, "mutations": 1}, coordination=coordination)
             agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree),
                                                        "provider_receipt": str(provider_evidence)}),
                               worktree, log, host.agent_timeout,
-                              guard=lambda: require_disk(host, "agent-running"))
+                              guard=lambda: run_guard("agent-running"), on_kill=revoke_run)
             # Tim 2026-09-27: an exhausted provider never leaves the issue half-done; another
             # lane finishes it on the same worktree.
             handoffs, current = [], name
@@ -1038,9 +1269,12 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                     break
                 cool_down(host, current)
                 nxt_name, nxt_spec = nxt
-                handoff_prompt = HANDOFF_NOTE.format(prev=current, code=agent.returncode) + prompt
+                handoff_note = HANDOFF_NOTE.format(prev=current, code=agent.returncode)
+                handoff_prompt = handoff_note + prompt
                 handoff_file = runs / f"{run_id}.handoff{len(handoffs) + 1}.prompt.md"
-                handoff_file.write_text(handoff_prompt)
+                receipt["contextManifests"].append(write_agent_prompt(
+                    handoff_file, handoff_prompt, "handoff", nxt_name,
+                    {"previous_prompt": prompt, "handoff_note": handoff_note}))
                 log.write(f"\n== lane {current} exited {agent.returncode}; handing off to {nxt_name}\n")
                 log.flush()
                 handoffs.append({"from": current, "to": nxt_name, "exit": agent.returncode})
@@ -1050,7 +1284,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                                                              "cwd": str(worktree),
                                                              "provider_receipt": str(provider_evidence)}),
                                   worktree, log, host.agent_timeout,
-                                  guard=lambda: require_disk(host, "handoff-agent-running"))
+                                  guard=lambda: run_guard("handoff-agent-running"), on_kill=revoke_run)
                 current = nxt_name
             if handoffs:
                 receipt.update(handoffs=handoffs, finishedBy=current)
@@ -1067,6 +1301,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                 receipt.update(verdict="provider-error", reasons=[f"agent-exit:{agent.returncode}"])
         except DiskAdmissionError as error:
             receipt.update(verdict="disk-held", reasons=[str(error)])
+        except PublicationRevoked as error:
+            receipt.update(verdict="revoked", reasons=[str(error)], revocation=error.receipt)
         except subprocess.TimeoutExpired as error:
             receipt.update(verdict="failed", reasons=[f"timeout:{error.cmd[0] if error.cmd else '?'}"])
         except Exception as error:  # a broken run must still leave a receipt and free its issue
@@ -1096,7 +1332,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     verdict = receipt.get("verdict")
     receipt["result"] = {"verdict": verdict, "commit": receipt.get("headSha"), "pr": receipt.get("pr"),
                          "prUrl": receipt.get("prUrl")}
-    result = "succeeded" if verdict in ("landing", "verified-not-queued", "held", "gate-timeout") \
+    result = "succeeded" if verdict in ("landing", "verified-not-queued", "held", "gate-timeout",
+                                        "gate-in-progress", "gate-deferred", "gate-already-completed") \
         else "no_op_stale" if verdict in ("no-change", "not-shippable") else "failed_unknown"
     receipt["execution"] = execution_attempt.finish(
         runs / "execution-attempts.jsonl", ident, claimed["fencingToken"], result,
@@ -1124,13 +1361,21 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
         ahead = sh(["git", "rev-list", "--count", "origin/main..HEAD"], cwd=worktree).stdout.strip()
         if ahead in ("", "0"):
             return {"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}
+        require_publishable(host, branch, "before-push")
         sh(["git", "push", "-q", "-u", "origin", branch], cwd=worktree, log=log)
+        # The push's own hooks can take minutes; a stop during them still bars the PR open.
+        require_publishable(host, branch, "before-pr-create")
         sh(["gh", "pr", "create", "--repo", REPO_SLUG, "--draft", "--head", branch,
             "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
-            "--body", f"Lane run for {issue.identifier}. Verification by the lane gate."], cwd=worktree, log=log)
+            "--body", f"Refs {issue.identifier}.\n\n"
+            f"<!-- linear-issue-id:{issue.id} -->\n"
+            f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
+            "Lane implementation; verification by the lane gate. "
+            "Runtime and commissioning acceptance remain with the issue owner."], cwd=worktree, log=log)
         return verify_and_land(host, issue, branch, worktree, log, started, opened=True, sensitive=sensitive)
     pr = max(prs, key=lambda item: item["createdAt"])
     if sensitive:
+        require_publishable(host, pr.get("headRefName") or branch, "before-label")
         sh(["gh", "label", "create", SENSITIVE_PR_LABEL, "--repo", REPO_SLUG, "--force",
             "--color", "B60205", "--description", "Guarded auth/billing/infra lane policy"], log=log)
         sh(["gh", "pr", "edit", str(pr["number"]), "--repo", REPO_SLUG,
@@ -1154,22 +1399,135 @@ def gate_slot(host: Host) -> tuple[Locked, float]:
         time.sleep(15)
 
 
+GATE_RESULT_SCHEMA = "jovie.lane-gate-result/v1"
+GATE_POLICY_DIGEST = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+
+
+@dataclass
+class GateClaim:
+    pr: dict
+    lock: Locked
+
+
+def reserve_gate(host: Host, pr: dict) -> GateClaim | None:
+    identity = hashlib.sha256(f"{REPO_SLUG}:{pr['number']}:{pr['headRefOid']}".encode()).hexdigest()
+    lock = Locked(host.state / "locks" / f"gate-head-{identity}.lock", blocking=False)
+    if lock.held:
+        return GateClaim(pr, lock)
+    lock.release()
+    return None
+
+
+def terminal_gate(pr: dict, verified: dict, sensitive: bool = False) -> dict | None:
+    result = verified.get(f"{pr['number']}:{pr['headRefOid']}")
+    # Old SHA strings were written at claim time, so they cannot certify anything.
+    if (isinstance(result, dict) and result.get("schema") == GATE_RESULT_SCHEMA
+            and result.get("headSha") == pr["headRefOid"]
+            and result.get("policyDigest") == GATE_POLICY_DIGEST
+            and result.get("verdict") in {"landing", "verified-not-queued", "held"}
+            and result.get("completedAt") and (not sensitive or result.get("sensitive") is True)):
+        return result
+    return None
+
+
+def gate_deferral(host: Host, pr: dict) -> str | None:
+    """Existing hold/repair ownership is not a new adoption or verification permit."""
+    labels = {label.lower() for label in pr_events.label_names(pr)}
+    if labels & (pr_events.HOLD_LABELS | {pr_events.PREFIX + pr_events.EXHAUSTED}):
+        return "existing-pr-hold"
+    held = held_path(host)
+    entry = (json.loads(held.read_text()) if held.exists() else {}).get(str(pr["number"]), {})
+    if entry.get("sha") == pr["headRefOid"]:
+        return "existing-gate-hold"
+    path = host.state / "fix-attempts.json"
+    attempt = (json.loads(path.read_text()) if path.exists() else {}).get(str(pr["number"]), {})
+    final_push = attempt.get("pushed") and attempt.get("pushedHead") == pr["headRefOid"] \
+        and attempt.get("sha") != pr["headRefOid"] and attempt.get("endedAt")
+    if pr_events.in_flight(attempt, pr, time.time()) or (
+            pr_events.spent(attempt, pr["headRefOid"], MAX_FIX_ATTEMPTS) and not final_push):
+        return "existing-fix-disposition"
+    return None
+
+
+def require_gate_authority(host: Host, pr: dict, stage: str, sensitive: bool) -> dict:
+    live = require_fix_target(pr, stage)
+    require_publishable(host, live.get("headRefName"), stage)
+    if not sensitive and SENSITIVE_PR_LABEL in {label.lower() for label in pr_events.label_names(live)}:
+        raise RepairStopped("sensitive-mode-changed", live, stage)
+    if reason := gate_deferral(host, live):
+        raise RepairStopped(reason, live, stage)
+    return live
+
+
 def gate_timeouts(host: Host, pr: dict, change: int = 0) -> int:
     """Consecutive gate timeouts for this PR head; a new head resets the count."""
     path = host.state / "gate-timeouts.json"
-    data = json.loads(path.read_text()) if path.exists() else {}
-    entry = data.get(str(pr["number"]), {})
-    count = (entry.get("count", 0) if entry.get("sha") == pr["headRefOid"] else 0) + change
-    if change:
-        data[str(pr["number"])] = {"sha": pr["headRefOid"], "count": count}
-        path.write_text(json.dumps(data))
+    count = 0
+    def update(data):
+        nonlocal count
+        key = f"{pr['number']}:{pr['headRefOid']}"
+        entry = data.get(key, data.get(str(pr["number"]), {}))
+        count = (entry.get("count", 0) if entry.get("sha") == pr["headRefOid"] else 0) + change
+        if change:
+            data[key] = {"sha": pr["headRefOid"], "count": count}
+    update_json(path, update)
     return count
 
 
-def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False) -> dict:
+def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False,
+            claim: GateClaim | None = None) -> dict:
+    """One host-local gate per exact head, from reservation through durable result."""
+    owned = claim is None
+    claim = reserve_gate(host, pr) if owned else claim
+    result = {"pr": pr["number"], "prUrl": pr.get("url"), "headSha": pr["headRefOid"]}
+    if claim is None:
+        return {**result, "verdict": "gate-in-progress", "reasons": ["exact-head-gate-reserved"]}
+    try:
+        if not claim.lock.held or any(claim.pr[key] != pr[key] for key in ("number", "headRefOid")):
+            raise RuntimeError("gate-reservation-mismatch")
+        live = require_fix_target(pr, "before-gate")
+        sensitive = sensitive or SENSITIVE_PR_LABEL in {label["name"].lower() for label in live.get("labels", [])}
+        revoked = publication_revocation(host, live.get("headRefName"))
+        if revoked:
+            return {**result, "verdict": "revoked", "reasons": [f"publication-revoked:{revoked.get('reason', '?')}"],
+                    "revocation": revoked}
+        path = host.state / "verified.json"
+        prior = terminal_gate(pr, json.loads(path.read_text()) if path.exists() else {}, sensitive)
+        if prior:
+            return {**result, "verdict": "gate-already-completed", "reasons": ["exact-head-terminal-gate"],
+                    "gateResult": prior}
+        if reason := gate_deferral(host, live):
+            raise RepairStopped(reason, live, "before-gate")
+        result = _gate_pr(host, live, worktree, log, sensitive, claim)
+        if result.get("verdict") in {"landing", "verified-not-queued", "held"}:
+            proof = {**result, "schema": GATE_RESULT_SCHEMA, "completedAt": now_iso(),
+                     "policyDigest": GATE_POLICY_DIGEST, "sensitive": sensitive}
+            update_json(path, lambda verified: verified.update({f"{pr['number']}:{pr['headRefOid']}": proof}))
+        return result
+    except RepairStopped as error:
+        return {**result, "verdict": "gate-deferred", "reasons": [str(error)], "stage": error.stage}
+    except PublicationRevoked as error:
+        return {**result, "verdict": "revoked", "reasons": [str(error)], "revocation": error.receipt}
+    finally:
+        if owned:
+            claim.lock.release()
+
+
+def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: GateClaim) -> dict:
     """The independent gate for one PR head: diff rules, the canonical repo gate, then land."""
-    sh(["git", "fetch", "-q", "origin", f"pull/{pr['number']}/head"], cwd=worktree, log=log)
-    sh(["git", "checkout", "-q", "--detach", pr["headRefOid"]], cwd=worktree, log=log)
+    revoked = publication_revocation(host, pr.get("headRefName"))
+    if revoked:
+        return {"pr": pr["number"], "prUrl": pr.get("url"), "headSha": pr["headRefOid"],
+                "verdict": "revoked",
+                "reasons": [f"publication-revoked:{revoked.get('reason', '?')}"],
+                "revocation": revoked}
+    for command in (["git", "fetch", "-q", "origin", f"pull/{pr['number']}/head"],
+                    ["git", "checkout", "-q", "--detach", pr["headRefOid"]]):
+        if sh(command, cwd=worktree, log=log).returncode != 0:
+            raise RepairStopped("gate-checkout-failed", pr, "before-gate-checks")
+    checked_head = sh(["git", "rev-parse", "HEAD"], cwd=worktree)
+    if checked_head.returncode or checked_head.stdout.strip() != pr["headRefOid"]:
+        raise RepairStopped("gate-checkout-head-mismatch", pr, "before-gate-checks")
     numstat = sh(["git", "diff", "--numstat", "origin/main...HEAD"], cwd=worktree).stdout
     changes = parse_numstat(numstat)
     reasons = gate_rules(changes, SENSITIVE_REVIEWABLE_LINES if sensitive else MAX_REVIEWABLE_LINES)
@@ -1185,7 +1543,8 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False) 
         try:
             for command in commands:
                 try:
-                    ran = sh(command, cwd=worktree, timeout=host.gate_timeout, log=log, stream=True)
+                    ran = sh(command, cwd=worktree, timeout=host.gate_timeout, log=log, stream=True,
+                             pass_fds=(claim.lock.handle.fileno(), seat.handle.fileno()))
                 except subprocess.TimeoutExpired:
                     # A slow gate is the host's problem, not the PR's: leave the head unverified so
                     # the adopt loop retries it, and only hold after repeated timeouts.
@@ -1201,20 +1560,33 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False) 
                     evidence += [line for line in log_tail(log).splitlines()
                                  if re.search(r"(?i)error|fail|missing|expected|✗|×", line)][-40:]
             if sensitive and not reasons:
-                passed, review_reasons = sensitive_review(host, pr, worktree, log)
+                passed, review_reasons = sensitive_review(host, pr, worktree, log,
+                    pass_fds=(claim.lock.handle.fileno(), *([seat.handle.fileno()] if seat else [])))
                 if not passed:
                     reasons.extend(review_reasons)
         finally:
             if seat is not None:
                 seat.release()
         result["reasons"] = reasons
+    live = require_gate_authority(host, pr, "after-gate", sensitive)
+    checked_head = sh(["git", "rev-parse", "HEAD"], cwd=worktree)
+    if checked_head.returncode or checked_head.stdout.strip() != pr["headRefOid"]:
+        raise RepairStopped("gate-checkout-head-mismatch", live, "after-gate")
     if reasons:
         sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG, "--body",
             "Lane gate held this PR (it stays draft):\n" + "\n".join(f"- `{r}`" for r in reasons)], log=log)
         record_held(host, pr["number"], pr["headRefOid"], reasons + evidence)
         return {**result, "verdict": "held"}
+    revoked = publication_revocation(host, pr.get("headRefName"))
+    if revoked:
+        return {**result, "verdict": "revoked",
+                "reasons": [f"publication-revoked:{revoked.get('reason', '?')}"],
+                "revocation": revoked}
+    require_gate_authority(host, pr, "before-ready", sensitive)
     sh(["gh", "pr", "ready", str(pr["number"]), "--repo", REPO_SLUG], log=log)
-    queued = sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto"], log=log)
+    require_gate_authority(host, pr, "before-enqueue", sensitive)
+    queued = sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto",
+                 "--match-head-commit", pr["headRefOid"]], log=log)
     if queued.returncode != 0:
         # Verified heads are never re-gated, so a failed enqueue (e.g. a GraphQL rate limit)
         # would strand a green PR; each worker pass retries it via requeue_verified.
@@ -1229,10 +1601,19 @@ UPDATE_RETRY_S = 1800
 
 
 def update_json(path: Path, change) -> None:
-    data = json.loads(path.read_text()) if path.exists() else {}
-    change(data)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data))
+    lock = Locked(path.with_suffix(path.suffix + ".lock"), blocking=True)
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        data = json.loads(path.read_text()) if path.exists() else {}
+        change(data)
+        with temporary.open("w") as handle:
+            json.dump(data, handle)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+        lock.release()
 
 
 def requeue_verified(host: Host, prs: list[dict]) -> None:
@@ -1241,13 +1622,31 @@ def requeue_verified(host: Host, prs: list[dict]) -> None:
     if not path.exists():
         return
     heads = {str(pr["number"]): pr["headRefOid"] for pr in prs}
+    branches = {str(pr["number"]): pr.get("headRefName") for pr in prs}
+    targets = {str(pr["number"]): pr for pr in prs}
     def retry(requeue: dict) -> None:
         for number, head in list(requeue.items()):
             if heads.get(number) != head:
                 del requeue[number]  # merged, closed, or a new head that the gate owns again
                 continue
-            sh(["gh", "pr", "ready", number, "--repo", REPO_SLUG])
-            if sh(["gh", "pr", "merge", number, "--repo", REPO_SLUG, "--auto"]).returncode == 0:
+            if publication_revocation(host, branches.get(number)):
+                del requeue[number]  # revoked branches never re-enroll
+                continue
+            pr = targets[number]
+            # Only current structured proof records sensitive review. Legacy requeue
+            # entries prove an old pass, but cannot authorize a newly sensitive head.
+            proof_path = host.state / "verified.json"
+            proofs = json.loads(proof_path.read_text()) if proof_path.exists() else {}
+            proof = terminal_gate(pr, proofs, sensitive=True)
+            sensitive = bool(proof and proof.get("verdict") != "held")
+            try:
+                require_gate_authority(host, pr, "before-requeue-ready", sensitive)
+                sh(["gh", "pr", "ready", number, "--repo", REPO_SLUG])
+                require_gate_authority(host, pr, "before-requeue-enqueue", sensitive)
+            except (RepairStopped, PublicationRevoked):
+                continue  # preserve the pending record; no new authority was granted
+            if sh(["gh", "pr", "merge", number, "--repo", REPO_SLUG, "--auto",
+                   "--match-head-commit", head]).returncode == 0:
                 del requeue[number]
     update_json(path, retry)
 
@@ -1288,9 +1687,7 @@ def record_held(host: Host, number: int, head: str, evidence: list[str]) -> None
     """The gate held this head; the lane's fix loop owns it next, on the same branch."""
     path = held_path(host)
     path.parent.mkdir(parents=True, exist_ok=True)
-    held = json.loads(path.read_text()) if path.exists() else {}
-    held[str(number)] = pr_events.held_record(head, evidence)
-    path.write_text(json.dumps(held))
+    update_json(path, lambda held: held.update({str(number): pr_events.held_record(head, evidence)}))
 
 
 def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | None:
@@ -1410,11 +1807,9 @@ def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
         prefix = ["fix-exhausted"] if record.get("count", 0) else []
         update_json(held_path(host), lambda held: held.update({str(pr["number"]): pr_events.held_record(
             pr["headRefOid"], [*prefix, *held.get(str(pr["number"]), {}).get("evidence", [])])}))
-        found = LANE_BRANCH.match(pr.get("headRefName") or "")
-        if found and found.group("lane") in pr_events.disabled_lanes(load_providers()):
-            pr_events.return_to_pool(THIS, linear, pr, "orphaned lane PR after its fix attempts ran out")
+        # A disabled implementation lane does not make its preserved work redundant.
+        # Exhaustion holds this source generation; semantic retirement is a separate disposition.
         try:
-            # After the pool return so the terminal disposition wins over a Todo re-admission.
             apply_terminal_disposition(linear, pr, record, reason)
         except Exception:
             pass  # Linear down: the PR label and held record still tombstone the head
@@ -1525,7 +1920,7 @@ def reconcile_fix_target(pr: dict) -> dict | None:
     """Read the target immediately before repair work; an unreadable target fails closed."""
     try:
         viewed = sh(["gh", "pr", "view", str(pr["number"]), "--repo", REPO_SLUG, "--json",
-                     "state,mergedAt,headRefName,headRefOid,url,isDraft,mergeStateStatus,reviewDecision,statusCheckRollup"], timeout=30)
+                     "state,mergedAt,headRefName,headRefOid,url,isDraft,mergeStateStatus,reviewDecision,statusCheckRollup,labels"], timeout=30)
     except (OSError, subprocess.SubprocessError):
         return None
     try:
@@ -1688,15 +2083,16 @@ def qualify_preserved_pr(host: Host, pr: dict, preserved):
         raise RecoveryHandoff(f"preserved-read-unavailable:{type(error).__name__}", preserved[0]) from error
 
 
+def worktree_busy(path: Path) -> str | None:
+    """Why a worktree must not be destroyed now; None only when proven idle."""
+    return disk_guard.busy_reason(path, run=lambda cmd, **kw: sh(cmd, timeout=kw.get("timeout", 30)))
+
+
 def require_idle_worktree(path: Path):
     # Warnings can mean an incomplete process inventory, so remain fail-closed.
-    active = sh(["lsof", "-nP", "-a", "-d", "cwd", "-F", "pn"], timeout=30)
-    if active.returncode not in (0, 1) or active.stderr:
-        raise RecoveryHandoff("preserved-process-state-unavailable", path)
-    if any(line.startswith("n") and (Path(line[1:]).resolve() == path.resolve()
-                                    or path.resolve() in Path(line[1:]).resolve().parents)
-           for line in active.stdout.splitlines()):
-        raise RecoveryHandoff("preserved-process-still-running", path)
+    busy = worktree_busy(path)
+    if busy:
+        raise RecoveryHandoff(f"preserved-{busy}", path)
 
 
 def _qualify_preserved_pr(host: Host, pr: dict, preserved):
@@ -1857,7 +2253,9 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
         try:
             def verify_target(target, stage, *, worktree=None):
                 receipt["targetStateReads"] += 1
-                return require_fix_target(target, stage, worktree=worktree)
+                live = require_fix_target(target, stage, worktree=worktree)
+                require_publishable(host, live.get("headRefName") or pr["headRefName"], stage)
+                return live
             require_disk(host, "repair-checkout")
             verify_target(pr, "before-checkout")
             sh(["git", "fetch", "-q", "origin", "main", pr["headRefName"]], cwd=host.repo, log=log)
@@ -1866,6 +2264,14 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 qualify_preserved_pr(host, pr, preserved)
             else:
                 add_worktree(host, ["-B", pr["headRefName"], str(worktree), f"origin/{pr['headRefName']}"], log)
+            def revoke_fix(error) -> None:
+                """An operator stop revokes this PR branch's publication authority before the
+                kill lands. Ordinary kills (timeout, disk, supersede) do not: the branch is the
+                PR's shared head, and the next fix attempt must still be able to land it."""
+                if isinstance(error, RunStopped):
+                    revoke_publication(host, branch=pr["headRefName"], run_id=run_id,
+                                       pr=pr["number"], reason="run-stopped")
+
             def boundary(stage="repair-command", allow_local_push=False):
                 require_disk(host, stage)
                 verify_target(pr, stage, worktree=worktree if allow_local_push else None)
@@ -1885,7 +2291,9 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                     prompt = ("Resume the preserved repair in this checkout. Inspect git status, diff and local commits; "
                               "retain existing edits and finish verification/publication. Never reset or start over.\n\n" + prompt)
                 prompt_file = runs / f"{run_id}.prompt.md"
-                prompt_file.write_text(prompt)
+                receipt["contextManifests"] = [write_agent_prompt(
+                    prompt_file, prompt, "fix", name,
+                    {"pr": json.dumps(pr, sort_keys=True), "rendered_context": prompt})]
                 boundary("before-agent")
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination)
@@ -1893,7 +2301,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                                          "cwd": str(worktree),
                                                          "provider_receipt": str(provider_evidence)}),
                                   worktree, log, host.agent_timeout,
-                                  guard=lambda: boundary("agent-running", allow_local_push=True))
+                                  guard=lambda: boundary("agent-running", allow_local_push=True),
+                                  on_kill=revoke_fix)
             verify_target(pr, "after-agent", worktree=worktree)
             head = sh(["git", "ls-remote", "origin", f"refs/heads/{pr['headRefName']}"], cwd=host.repo).stdout.split()
             after = head[0] if head else ""
@@ -1921,6 +2330,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                "stage": error.stage, "observedState": live.get("state", "UNKNOWN"),
                                "mergedAt": live.get("mergedAt"), "observedHead": live.get("headRefOid"),
                                "requestSource": receipt["requestSource"]})
+        except PublicationRevoked as error:
+            receipt.update(verdict="revoked", reasons=[str(error)], revocation=error.receipt)
         except DiskAdmissionError as error:
             receipt.update(verdict="disk-held", reasons=[str(error)])
         except RecoveryHandoff as error:
@@ -1936,7 +2347,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             if preserved:
                 if not retire_completed_repair(host, worktree, receipt):
                     preserve_repair(worktree, receipt)
-            elif receipt.get("verdict") in {"cancelled", "reconcile-unavailable", "disk-held", "recovery-handoff"}:
+            elif receipt.get("verdict") in {"cancelled", "revoked", "reconcile-unavailable", "disk-held", "recovery-handoff"}:
                 preserve_repair(worktree, receipt)
             else:
                 remove_worktree(host, worktree)
@@ -1982,16 +2393,30 @@ def best_per_issue(prs: list[dict]) -> list[dict]:
 def unverified_pr(prs: list[dict], verified: dict) -> dict | None:
     """A lane draft whose head the gate has never seen, e.g. a remote agent that finished late."""
     for pr in sorted(best_per_issue(prs), key=lambda item: item["number"]):
-        if pr.get("isDraft") and verified.get(str(pr["number"])) != pr["headRefOid"]:
+        sensitive = SENSITIVE_PR_LABEL in {label["name"].lower() for label in pr.get("labels", [])}
+        if pr.get("isDraft") and not terminal_gate(pr, verified, sensitive):
             return pr
     return None
 
 
-def adopt_pr(host: Host, name: str, pr: dict) -> dict:
+def adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim | None = None) -> dict:
     if not provider_may_run(name, "adopt"):
+        if claim is not None:
+            claim.lock.release()
         return {"schema": "jovie-lane-run/v1", "provider": name, "kind": "adopt", "pr": pr["number"],
                 "verdict": "skipped", "reasons": ["implementation-only-lane:no-review-tasks"],
                 "startedAt": now_iso(), "endedAt": now_iso()}
+    claim = reserve_gate(host, pr) if claim is None else claim
+    if claim is None:
+        return {"provider": name, "kind": "adopt", "pr": pr["number"], "headSha": pr["headRefOid"],
+                "verdict": "gate-in-progress", "reasons": ["exact-head-gate-reserved"]}
+    try:
+        return _adopt_pr(host, name, pr, claim)
+    finally:
+        claim.lock.release()
+
+
+def _adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim) -> dict:
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-PR{pr['number']}-{name}-adopt-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
     runs.mkdir(parents=True, exist_ok=True)
@@ -2002,21 +2427,23 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
                "startedAt": now_iso()}
     with open(runs / f"{run_id}.log", "w") as log:
         try:
+            live = require_fix_target(pr, "before-adopt-checkout")
+            if reason := gate_deferral(host, live):
+                raise RepairStopped(reason, live, "before-adopt-checkout")
             require_disk(host, "adopt-checkout")
             sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
             add_worktree(host, ["--detach", str(worktree), "origin/main"], log)
             install_dependencies(host, worktree, log)
             labels = {label["name"].lower() for label in pr.get("labels", [])}
-            receipt.update(gate_pr(host, pr, worktree, log, sensitive=SENSITIVE_PR_LABEL in labels))
+            receipt.update(gate_pr(host, pr, worktree, log, sensitive=SENSITIVE_PR_LABEL in labels, claim=claim))
+        except RepairStopped as error:
+            receipt.update(verdict="gate-deferred", reasons=[str(error)], stage=error.stage)
         except WorktreeUnavailable as error:
             receipt.update(verdict="skipped", reasons=[f"worktree-unavailable:{error}"[:300]])
         except Exception as error:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
             remove_worktree(host, worktree)
-    if receipt.get("verdict") in ("gate-timeout", "failed", "skipped"):
-        # Not verified: forget the claim so the next adopt pass retries this head.
-        update_json(host.state / "verified.json", lambda verified: verified.pop(str(pr["number"]), None))
     receipt["endedAt"] = now_iso()
     receipt["result"] = {"verdict": receipt.get("verdict"), "commit": receipt.get("headSha"),
                          "pr": receipt.get("pr")}
@@ -2045,7 +2472,7 @@ def lane_prs(name: str, providers: dict | None = None, fields: str = "") -> list
 PR_FIELDS = "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus,reviewDecision,isCrossRepository,labels"
 # Every lane PR without check rollups: rollups over ~90 PRs time out (HTTP 504), so the full
 # field set stays at gh's default page of 30 and the budget/sweep read this light set.
-LIGHT_PR_FIELDS = "number,url,isDraft,headRefName,mergeStateStatus"
+LIGHT_PR_FIELDS = "number,url,state,isDraft,headRefName,headRefOid,mergeStateStatus,labels"
 
 
 def repo_prs() -> list[dict]:
@@ -2159,6 +2586,50 @@ def over_budget(name: str, prs: list[dict], slots: int) -> bool:
     return sum(not is_green(pr) for pr in own) >= slots * OPEN_PRS_PER_SLOT
 
 
+def new_issue_budget(name: str, slots: int, inventory: list[dict] | None) -> dict:
+    """One owning lane's new-issue budget; maintenance/orphan work is separate."""
+    cap = max(0, slots) * OPEN_PRS_PER_SLOT
+    if slots <= 0:
+        return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": cap}
+    if inventory is None:
+        return {"allowed": False, "reason": "pr-inventory-unavailable", "used": None, "cap": cap}
+    dated = re.compile(rf"^{re.escape(name)}/jov-\d+-\d{{8}}")
+    own = {pr["number"]: pr for pr in inventory if dated.match(pr["headRefName"])}
+    used = sum(not is_green(pr) for pr in own.values())
+    return {"allowed": used < cap, "reason": "within-budget" if used < cap else "over-budget",
+            "used": used, "cap": cap}
+
+
+def read_new_issue_budget(name: str, slots: int) -> dict:
+    """Fail closed on incomplete budget reads without disrupting maintenance reads."""
+    inventory, error = None, None
+    if slots <= 0:
+        return new_issue_budget(name, slots, [])
+    try:
+        listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open",
+                     "--search", f"head:{name}/", "--limit", "200", "--json", LIGHT_PR_FIELDS],
+                    timeout=60)
+        if listed.returncode:
+            raise ValueError("pr-read-failed")
+        rows = json.loads(listed.stdout)
+        # Validate before filtering: 200 manual rows can hide dated lane PRs.
+        if not isinstance(rows, list) or len(rows) >= 200:
+            raise ValueError("pr-inventory-incomplete")
+        for row in rows:
+            if (not isinstance(row, dict) or type(row.get("number")) is not int or row["number"] <= 0
+                    or not isinstance(row.get("headRefName"), str) or not row["headRefName"].strip()
+                    or type(row.get("isDraft")) is not bool
+                    or not isinstance(row.get("mergeStateStatus"), str) or not row["mergeStateStatus"].strip()):
+                raise ValueError("pr-inventory-malformed")
+        if len({row["number"] for row in rows}) != len(rows):
+            raise ValueError("pr-inventory-duplicate")
+        inventory = rows
+    except (OSError, ValueError, subprocess.SubprocessError) as failure:
+        error = str(failure) if isinstance(failure, ValueError) else type(failure).__name__
+    result = new_issue_budget(name, slots, inventory)
+    return {**result, "observedAt": now_iso(), "error": error}
+
+
 def last_pushes() -> dict[int, float]:
     """Open PR number -> head commit time, in one paginated query (`gh pr list --json commits`
     over 200 PRs exceeds GitHub's GraphQL node limit). Empty when GitHub cannot be read."""
@@ -2182,14 +2653,14 @@ def last_pushes() -> dict[int, float]:
 
 
 def sweep_plan(prs: list[dict], now: float, pushes: dict[int, float]) -> tuple[list[tuple[dict, int]], list[dict]]:
-    """(duplicates to close as superseded by the kept PR, stale drafts to close).
-    Only lane-branch PRs; the kept PR per issue is best_per_issue's pick."""
+    """Rank only explicitly authorized duplicate lane PRs for live revalidation.
+    Age and same-issue ranking never grant retirement authority."""
     kept = {LANE_BRANCH.match(pr["headRefName"]).group("issue"): pr
             for pr in best_per_issue(prs) if LANE_BRANCH.match(pr.get("headRefName") or "")}
     superseded, stale = [], []
     for pr in prs:
         found = LANE_BRANCH.match(pr.get("headRefName") or "")
-        if not found:
+        if not found or not pr_events.duplicate_authorized(pr):
             continue
         keep = kept[found.group("issue")]
         if keep["number"] != pr["number"]:
@@ -2202,8 +2673,7 @@ def sweep_plan(prs: list[dict], now: float, pushes: dict[int, float]) -> tuple[l
 
 
 def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> None:
-    """On the existing lane tick (at most every SWEEP_EVERY_S per host): leave one open PR per
-    issue and close drafts with no green run and no push for a day, returning their issue to Todo."""
+    """Retire explicitly labeled duplicate lane PRs on the existing bounded sweep tick."""
     now = time.time() if now is None else now
     marker = host.state / f"sweep-{name}.json"
     if marker.exists() and now - json.loads(marker.read_text()).get("at", 0) < SWEEP_EVERY_S:
@@ -2211,34 +2681,40 @@ def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> N
     marker.write_text(json.dumps({"at": now}))
     superseded, stale = sweep_plan(lane_prs(name, fields=LIGHT_PR_FIELDS), now, last_pushes())
     for pr, keep in superseded:
-        sh(["gh", "pr", "close", str(pr["number"]), "--repo", REPO_SLUG, "--comment",
-            f"🤖 lane sweep: superseded by #{keep} (one open PR per Linear issue, JOV-6833)."])
+        pr_events.close_duplicate(THIS, pr, f"superseded by #{keep} for the same issue")
     for pr in stale:
         issue = LANE_BRANCH.match(pr["headRefName"]).group("issue").upper()
-        closed = sh(["gh", "pr", "close", str(pr["number"]), "--repo", REPO_SLUG, "--comment",
-                     "🤖 lane sweep: closing this draft; no green run and no push for 24 h (JOV-6833). "
-                     f"{issue} goes back to Todo for a fresh attempt."])
+        closed = pr_events.close_duplicate(THIS, pr, "stale draft explicitly labeled duplicate")
         # Only reopen work the lane still owns; a Done or Canceled issue stays closed.
-        if closed.returncode == 0 and linear.state_of(issue) == "In Progress":
+        if closed and linear.state_of(issue) == "In Progress":
             linear.move(issue, "Todo")
             linear.comment(issue, f"🤖 lane sweep closed stale draft {pr.get('url')} (no green run, "
                                   "no push for 24 h); back to Todo.")
 
 
-def claim_adoptable_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
+def claim_adoptable_pr(host: Host, name: str, prs: list[dict]) -> GateClaim | None:
     path = host.state / "verified.json"
     verified = json.loads(path.read_text()) if path.exists() else {}
     pr = unverified_pr(prs, verified)
     # Another host gating a head skips it, not the whole pass: returning None here idled every
     # worker behind one claimed PR (2026-09-28, 0 running with 45 eligible PRs).
-    while pr and claimed_elsewhere(pr["number"], pr["headRefOid"], "gate"):
+    while pr:
+        reservation = reserve_gate(host, pr)
+        if reservation is not None:
+            try:
+                latest = json.loads(path.read_text()) if path.exists() else {}
+                sensitive = SENSITIVE_PR_LABEL in {label["name"].lower() for label in pr.get("labels", [])}
+                if not terminal_gate(pr, latest, sensitive) and not gate_deferral(host, pr) \
+                        and not claimed_elsewhere(pr["number"], pr["headRefOid"], "gate"):
+                    post_claim(pr["number"], pr["headRefOid"], "gate")
+                    return reservation
+            except BaseException:
+                reservation.lock.release()
+                raise
+            reservation.lock.release()
         prs = [other for other in prs if other["number"] != pr["number"]]
         pr = unverified_pr(prs, verified)
-    if pr:
-        verified[str(pr["number"])] = pr["headRefOid"]
-        path.write_text(json.dumps(verified))
-        post_claim(pr["number"], pr["headRefOid"], "gate")
-    return pr
+    return None
 
 
 def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict | None:
@@ -2322,9 +2798,9 @@ def worker(host: Host, name: str) -> int:
         adopt = None if red or not provider_may_run(name, "adopt") else claim_adoptable_pr(host, name, prs)
         issue = None
         sweep_lane_prs(host, name, linear)
-        full = not (red or adopt) and over_budget(name, lane_prs(name, fields=LIGHT_PR_FIELDS),
-                                                  host.slots(name, spec.get("slots", 1)))
-        in_flight = None if red or adopt or full else in_flight_issues()
+        budget = None if red or adopt else read_new_issue_budget(name, host.slots(name, spec.get("slots", 1)))
+        blocked = budget is not None and not budget["allowed"]
+        in_flight = None if red or adopt or blocked else in_flight_issues()
         if in_flight is not None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
             issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
@@ -2339,11 +2815,11 @@ def worker(host: Host, name: str) -> int:
         if red is not None:
             fix_red_pr(host, name, spec, red)
         else:
-            adopt_pr(host, name, adopt)
+            adopt_pr(host, name, adopt.pr, claim=adopt)
         slot.release()
         return reexec(host, name)
     if issue is None:
-        record_idle_exit(host, name, "over-budget" if full else
+        record_idle_exit(host, name, budget["reason"] if blocked else
                          "in-flight-unknown" if in_flight is None else "none-eligible")
         slot.release()
         return 0
@@ -2386,7 +2862,10 @@ def worker(host: Host, name: str) -> int:
                                  "once a healthy lane or a human clears it.")
         slot.release()
         return 1
-    if verdict == "not-shippable":
+    if verdict in {"gate-in-progress", "gate-deferred", "gate-already-completed"}:
+        linear.comment(issue.id, f"🤖 lane `{name}`: PR {receipt.get('prUrl')} remains with its exact-head gate "
+                                 f"({verdict}); no issue retry charged and no new certification claimed.")
+    elif verdict == "not-shippable":
         linear.move(issue.id, "Backlog")
         linear.comment(issue.id, f"🤖 lane `{name}` judged this not code-shippable: {receipt['reasons'][0]}\n"
                                  "Disposition: obsolete/invalid — needs a human decision, not a work queue.")
@@ -2481,7 +2960,11 @@ def dispatch(host: Host) -> int:
 
 
 def finish_dispatch(host: Host, tick: dict) -> int:
-    """Retain the existing doctor's alert path even when admission denied all work."""
+    """Retain production observation and doctor alerts even when worker admission fails."""
+    try:
+        tick["continuity"] = continuity_clock.tick(host.state, HOST)
+    except Exception as error:  # liveness must not suppress the existing doctor
+        tick["continuity"] = {"status": "failed", "error": type(error).__name__}
     update_json(host.state / "tick.json", lambda data: (data.clear(), data.update(tick)))
     try:
         doctor.run(host, sys.modules[__name__], codex_lane_module())
@@ -2523,14 +3006,39 @@ def add_worktree(host: Host, args: list[str], log) -> None:
         raise WorktreeUnavailable((added.stderr or f"git exit {added.returncode}").strip()[:200])
 
 
+def record_worktree_disposition(host: Host, worktree: Path, verdict: str, reason: str | None = None) -> None:
+    """Receipt for every cleanup decision — the journal is the audit, not the act."""
+    try:
+        runs = host.state / "runs"
+        runs.mkdir(parents=True, exist_ok=True)
+        with open(runs / "worktree-removals.jsonl", "a") as out:
+            out.write(json.dumps({"schema": "jovie-worktree-removal/v1", "worktree": str(worktree),
+                                  "verdict": verdict, "reason": reason, "owner": HOST,
+                                  "at": now_iso()}) + "\n")
+    except OSError:
+        pass
+
+
 def remove_worktree(host: Host, worktree: Path) -> None:
     """Protected source is never cleanup; process ownership belongs to run_agent."""
     if not worktree.exists() or (worktree / disk_guard.PRESERVED_REPAIR).exists():
         return
+    busy = worktree_busy(worktree)
+    if busy:
+        record_worktree_disposition(host, worktree, "preserved", busy)
+        preserve_repair(worktree, {"runId": worktree.name, "reasons": [f"cleanup-not-idle:{busy}"]})
+        return
     status = sh(["git", "status", "--porcelain"], cwd=worktree)
     if status.returncode or status.stdout.strip():
+        record_worktree_disposition(host, worktree, "preserved", "source-unverified")
         preserve_repair(worktree, {"runId": worktree.name, "reasons": ["cleanup-source-unverified"]})
         return
+    unpushed = sh(["git", "rev-list", "--count", "HEAD", "--not", "--all"], cwd=worktree)
+    if unpushed.returncode or unpushed.stdout.strip() != "0":
+        record_worktree_disposition(host, worktree, "preserved", "unpublished-work")
+        preserve_repair(worktree, {"runId": worktree.name, "reasons": ["cleanup-unpublished-work"]})
+        return
+    record_worktree_disposition(host, worktree, "removed")
     sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
 
 
@@ -2673,14 +3181,48 @@ def graphql_budget() -> tuple[int, str] | None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    load_github_env()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("dispatch")
     sub.add_parser("update")
+    gate = sub.add_parser("gate-command", help="run one gate command while retaining inherited locks")
+    gate.add_argument("--timeout", type=float, required=True)
+    gate.add_argument("args", nargs=argparse.REMAINDER)
+    context = sub.add_parser("context-manifest", help="check or generate the local context contract")
+    context.add_argument("--write", action="store_true")
     work = sub.add_parser("worker")
     work.add_argument("--provider", required=True)
     args = parser.parse_args(argv)
+    if args.command == "gate-command":
+        command = args.args[1:] if args.args[:1] == ["--"] else args.args
+        try:
+            code = run_agent(command, Path.cwd(), sys.stdout, args.timeout, guard_interval=.1).returncode
+            return 125 if code == 124 else code  # 124 is reserved for a drained timeout
+        except subprocess.TimeoutExpired:
+            return 124  # run_agent has drained its observed descendants before raising
+        except RunStopped:
+            return 143  # explicit stop also completes the existing drain protocol
+        except BaseException as error:
+            # A cleanup error is not proof that the descendants stopped. Keep the
+            # inherited locks and leave an observable operator boundary, not a retry.
+            try:
+                print(f"gate-cleanup-unproven:{type(error).__name__}:{error}; locks retained; operator required",
+                      file=sys.stderr, flush=True)
+            except OSError:
+                pass
+            while True:
+                time.sleep(60)
+    if args.command == "context-manifest":
+        path = HERE / "context-manifest.json"
+        generated = context_manifest_json()
+        if args.write:
+            path.write_text(generated, encoding="utf-8")
+        matched = context_manifest_matches(path)
+        print(json.dumps({"schema": "jovie-lane-context-generation/v1", "path": str(path),
+                          "sha256": hashlib.sha256(generated.encode("utf-8")).hexdigest(),
+                          "written": args.write, "matched": matched}, sort_keys=True))
+        return 0 if matched else 1
+    load_github_env()
     host = Host()
     if args.command == "update":
         return update(host)

@@ -1,9 +1,46 @@
+import { drizzle } from 'drizzle-orm/pg-proxy';
 import { describe, expect, it } from 'vitest';
+import { promoDownloads } from '@/lib/db/schema/promo-downloads';
 import {
+  buildPromoDownloadSeedConflictUpdate,
   buildPublicReleaseApprovalSeedRow,
   isMissingPromoDownloadsRelationError,
   isRetryableSeedDatabaseError,
 } from '../../seed-test-data';
+
+describe('promo fixture reruns', () => {
+  it('generates rerun SQL that cannot overwrite the immutable attestation', () => {
+    const db = drizzle(async () => ({ rows: [] }));
+    for (const now of [new Date('2026-10-01'), new Date('2026-10-02')]) {
+      const query = db
+        .insert(promoDownloads)
+        .values({
+          creatorProfileId: '00000000-0000-4000-8000-000000000001',
+          releaseId: '00000000-0000-4000-8000-000000000002',
+          title: 'Fixture',
+          slug: 'fixture',
+          fileUrl: 'fixture.mp3',
+          fileName: 'fixture.mp3',
+          fileMimeType: 'audio/mpeg',
+          rightsControlAttested: true,
+          rightsControlAttestedBy: '00000000-0000-4000-8000-000000000003',
+          rightsControlAttestedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [promoDownloads.releaseId, promoDownloads.slug],
+          set: buildPromoDownloadSeedConflictUpdate(now),
+        })
+        .toSQL();
+      const update = query.sql.split(' do update set ')[1];
+      expect(update).toContain('"is_active"');
+      expect(update).toContain('"updated_at"');
+      expect(update).not.toContain('rights_control_attested');
+      expect(query.sql.split(' on conflict ')[0]).toContain(
+        '"rights_control_attested_at"'
+      );
+    }
+  });
+});
 
 describe('buildPublicReleaseApprovalSeedRow', () => {
   it('marks seeded releases approved so public-profile fixtures stay visible', () => {

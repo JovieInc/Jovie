@@ -8,6 +8,7 @@ import { revalidatePath } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { attachFirstTouchReceipt } from '@/lib/acquisition/activation-receipt';
 import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
@@ -516,6 +517,11 @@ export async function completeOnboarding({
     } catch (error) {
       throw createOnboardingReceiptPendingError(error);
     }
+
+    // Passive first-touch receipt (JOV-5036): attach the pre-auth envelope
+    // exactly once. Best-effort — the helper swallows and reports failures
+    // so attribution cannot regress activation.
+    await attachFirstTouchReceipt(userId);
 
     if (pendingClaim?.mode === 'token_backed') {
       await clearPendingClaimContext();

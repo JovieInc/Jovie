@@ -7,7 +7,50 @@ struct NativeStoredSession: Equatable, Sendable {
   let expiresAt: Date
 }
 
+/// Authority to apply a response header belongs to the bearer actually sent.
+/// Providers outside the native store can send tokens without gaining this authority.
+struct NativeRequestAuthorization: Equatable, Sendable {
+  let bearerToken: String
+  fileprivate let session: NativeStoredSession?
+  fileprivate let generation: UUID?
+  fileprivate let bearerRevision: UUID?
+
+  init(unmanagedBearerToken: String) {
+    bearerToken = unmanagedBearerToken
+    session = nil
+    generation = nil
+    bearerRevision = nil
+  }
+
+  fileprivate init(session: NativeStoredSession, generation: UUID, bearerRevision: UUID) {
+    bearerToken = session.token
+    self.session = session
+    self.generation = generation
+    self.bearerRevision = bearerRevision
+  }
+}
+
+/// Login ownership outlives bearer rotation, but never an explicit save or clear.
+struct NativeSessionOwnership: Equatable, Sendable {
+  fileprivate let generation: UUID
+}
+
+struct NativeSessionContext: Equatable, Sendable {
+  let ownership: NativeSessionOwnership
+  let authorization: NativeRequestAuthorization?
+}
+
 enum NativeSessionTokenStore {
+  /// Every complete Keychain + metadata operation uses this same lock. Locked
+  /// helpers never call a public operation, so expiry cleanup cannot re-enter it.
+  private final class State: @unchecked Sendable {
+    let lock = NSLock()
+    var generation = UUID()
+    var bearerRevision = UUID()
+    var passivelyExpiredProfileOwner: (originalGeneration: UUID, emptyGeneration: UUID)?
+  }
+
+  private static let state = State()
   private static let service = "ie.jov.Jovie"
   private static let account = "nativeSessionToken"
   private static let fallbackTokenKey = "ie.jov.Jovie.nativeSession.token"
@@ -16,6 +59,15 @@ enum NativeSessionTokenStore {
   private static let expiryLeeway: TimeInterval = 30
 
   static func save(token: String, userID: String, expiresAt: Date) {
+    withLock {
+      state.generation = UUID()
+      state.bearerRevision = UUID()
+      state.passivelyExpiredProfileOwner = nil
+      saveLocked(token: token, userID: userID, expiresAt: expiresAt)
+    }
+  }
+
+  private static func saveLocked(token: String, userID: String, expiresAt: Date) {
     guard let data = token.data(using: .utf8) else { return }
 
     clearToken()
@@ -42,6 +94,64 @@ enum NativeSessionTokenStore {
   }
 
   static func load() -> NativeStoredSession? {
+    withLock { loadLocked() }
+  }
+
+  static func requestAuthorization() -> NativeRequestAuthorization? {
+    captureSessionContext().authorization
+  }
+
+  /// Also captures an empty store's generation so delayed local cleanup cannot
+  /// adopt a login that appears after capture.
+  static func captureSessionContext() -> NativeSessionContext {
+    withLock {
+      let session = loadLocked()
+      return NativeSessionContext(
+        ownership: NativeSessionOwnership(generation: state.generation),
+        authorization: session.map {
+          NativeRequestAuthorization(
+            session: $0, generation: state.generation, bearerRevision: state.bearerRevision
+          )
+        }
+      )
+    }
+  }
+
+  static func isCurrent(_ ownership: NativeSessionOwnership) -> Bool {
+    withLock {
+      guard state.generation == ownership.generation else { return false }
+      _ = loadLocked()
+      return state.generation == ownership.generation
+    }
+  }
+
+  /// Presentation may continue after passive expiry until that exact empty
+  /// generation is replaced or explicitly cleared. This grants no authorization
+  /// and leaves the existing client/terminal path responsible for expiry.
+  static func canContinueProfileLoad(ownedBy ownership: NativeSessionOwnership) -> Bool {
+    withLock {
+      state.generation == ownership.generation || (
+        state.passivelyExpiredProfileOwner?.originalGeneration == ownership.generation &&
+        state.passivelyExpiredProfileOwner?.emptyGeneration == state.generation
+      )
+    }
+  }
+
+  /// A pending operation may use a rotated bearer only within its original login.
+  static func requestAuthorization(
+    ifOwnedBy ownership: NativeSessionOwnership
+  ) -> NativeRequestAuthorization? {
+    withLock {
+      guard state.generation == ownership.generation, let session = loadLocked() else { return nil }
+      return NativeRequestAuthorization(
+        session: session,
+        generation: state.generation,
+        bearerRevision: state.bearerRevision
+      )
+    }
+  }
+
+  private static func loadLocked() -> NativeStoredSession? {
     guard
       let userID = UserDefaults.standard.string(forKey: userIDKey),
       let token = loadToken()
@@ -54,7 +164,9 @@ enum NativeSessionTokenStore {
     )
 
     guard expiresAt.timeIntervalSinceNow > expiryLeeway else {
-      clear()
+      let expiredGeneration = state.generation
+      clearLocked()
+      state.passivelyExpiredProfileOwner = (expiredGeneration, state.generation)
       return nil
     }
 
@@ -62,6 +174,13 @@ enum NativeSessionTokenStore {
   }
 
   static func clear() {
+    withLock { clearLocked() }
+  }
+
+  private static func clearLocked() {
+    state.generation = UUID()
+    state.bearerRevision = UUID()
+    state.passivelyExpiredProfileOwner = nil
     clearToken()
     UserDefaults.standard.removeObject(forKey: fallbackTokenKey)
     UserDefaults.standard.removeObject(forKey: userIDKey)
@@ -69,21 +188,43 @@ enum NativeSessionTokenStore {
   }
 
   /// Persists the Better Auth bearer-plugin roll emitted on successful API calls.
-  /// The response header contains only the token; keep the existing user identity
-  /// and extend the local lease to match the server's seven-day session lifetime.
-  static func refresh(from response: URLResponse) {
+  /// Only the still-current request snapshot may rotate the token. Explicit
+  /// login/clear or another accepted rotation makes a late header a no-op.
+  static func refresh(
+    from response: URLResponse,
+    authorizedBy authorization: NativeRequestAuthorization
+  ) {
     guard
       let httpResponse = response as? HTTPURLResponse,
       let token = httpResponse.value(forHTTPHeaderField: "set-auth-token"),
       !token.isEmpty,
-      let stored = load()
+      let captured = authorization.session
     else { return }
 
-    save(
-      token: token,
-      userID: stored.userID,
-      expiresAt: Date().addingTimeInterval(60 * 60 * 24 * 7)
-    )
+    withLock {
+      guard
+        state.generation == authorization.generation,
+        state.bearerRevision == authorization.bearerRevision,
+        let stored = loadLocked(),
+        stored.userID == captured.userID,
+        stored.token == authorization.bearerToken
+      else { return }
+
+      // Rotation keeps login ownership, including when the server reuses the
+      // token while extending expiry. Fence other responses from this revision.
+      state.bearerRevision = UUID()
+      saveLocked(
+        token: token,
+        userID: captured.userID,
+        expiresAt: Date().addingTimeInterval(60 * 60 * 24 * 7)
+      )
+    }
+  }
+
+  private static func withLock<T>(_ operation: () -> T) -> T {
+    state.lock.lock()
+    defer { state.lock.unlock() }
+    return operation()
   }
 
   private static func loadToken() -> String? {
@@ -130,14 +271,18 @@ enum NativeSessionTokenStore {
  */
 struct NativeSessionTokenProvider: TokenProviding {
   func bearerToken(forceRefresh: Bool) async throws -> String {
-    guard let session = NativeSessionTokenStore.load() else {
+    try await requestAuthorization(forceRefresh: forceRefresh).bearerToken
+  }
+
+  func requestAuthorization(forceRefresh: Bool) async throws -> NativeRequestAuthorization {
+    guard let authorization = NativeSessionTokenStore.requestAuthorization() else {
       throw APIClientError.missingToken
     }
     // No client-side mint; a 401 cannot be recovered by retrying this token.
     if forceRefresh {
       throw APIClientError.missingToken
     }
-    return session.token
+    return authorization
   }
 }
 

@@ -72,6 +72,7 @@ describe('factory stage spine', () => {
   it('orders the stages exactly as the plan', () => {
     expect(FACTORY_STAGES).toEqual([
       'truth',
+      'persuasion',
       'outcomes',
       'narrative',
       'copy',

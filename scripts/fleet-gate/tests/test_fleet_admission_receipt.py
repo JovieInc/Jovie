@@ -669,6 +669,120 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
             {row["signal"] for row in staging["unrelatedDegradations"]},
         )
 
+    def test_failed_screenshot_check_blocks_only_production_web(self):
+        """JOV-4970: a terminal Generate Screenshots failure gates the UI
+        surface that names it, never global fleet promotion."""
+        main = {
+            "status": "green",
+            "sha": SHA,
+            "checks": [
+                {
+                    "name": "Main Release Ready",
+                    "classification": "required",
+                    "verdict": "success",
+                },
+                {
+                    "name": "Generate Screenshots",
+                    "classification": "optional",
+                    "verdict": "failed",
+                    "conclusion": "failure",
+                },
+            ],
+        }
+        receipt = evaluate_receipt(main=main)
+        self.assertEqual(receipt["signals"]["main"]["status"], "green")
+        production = PROJECT.project_fleet_admission_receipt(
+            receipt, scoped_request("production-web")
+        )["scopedAdmission"]
+        self.assertFalse(production["allowed"])
+        self.assertEqual(
+            {row["signal"] for row in production["relevantBlockers"]},
+            {"check:Generate Screenshots"},
+        )
+        fleet = PROJECT.project_fleet_admission_receipt(
+            receipt,
+            scoped_request("fleet-control", mutation="refresh-fleet-admission"),
+        )["scopedAdmission"]
+        self.assertTrue(fleet["allowed"])
+        self.assertEqual(
+            {row["signal"] for row in fleet["unrelatedDegradations"]},
+            {"check:Generate Screenshots"},
+        )
+
+    def test_pending_screenshot_check_never_blocks_promotion(self):
+        """The incident shape: optional pending lane stays observable only."""
+        main = {
+            "status": "green",
+            "sha": SHA,
+            "checks": [
+                {
+                    "name": "Generate Screenshots",
+                    "classification": "optional",
+                    "verdict": "pending",
+                    "status": "in_progress",
+                },
+            ],
+        }
+        receipt = evaluate_receipt(main=main)
+        for surface, mutation in (
+            ("production-web", "promote-staged-web-release"),
+            ("fleet-control", "refresh-fleet-admission"),
+        ):
+            admission = PROJECT.project_fleet_admission_receipt(
+                receipt, scoped_request(surface, mutation=mutation)
+            )["scopedAdmission"]
+            self.assertTrue(admission["allowed"], surface)
+            self.assertEqual(
+                {row["signal"] for row in admission["unrelatedDegradations"]},
+                {"check:Generate Screenshots"},
+            )
+
+    def test_main_health_classification_survives_bounded_projection(self):
+        main = {
+            "status": "green",
+            "sha": SHA,
+            "reason": "required-checks-green-generation-verified",
+            "generationVerified": True,
+            "contract": {"version": "2026-10-01.1"},
+            "marker": {
+                "name": f"production-generation-verified-{SHA}",
+                "verified": True,
+                "stale": False,
+            },
+            "pendingChecks": ["Generate Screenshots"],
+            "checks": [
+                {
+                    "name": "Generate Screenshots",
+                    "classification": "optional",
+                    "verdict": "pending",
+                },
+            ],
+        }
+        projection = PROJECT.project_fleet_admission_receipt(
+            evaluate_receipt(main=main)
+        )
+        projected_main = projection["signals"]["main"]
+        self.assertEqual(
+            projected_main["reason"],
+            "required-checks-green-generation-verified",
+        )
+        self.assertTrue(projected_main["generationVerified"])
+        self.assertEqual(projected_main["contractVersion"], "2026-10-01.1")
+        self.assertTrue(projected_main["marker"]["verified"])
+        self.assertEqual(
+            projected_main["pendingChecks"], ["Generate Screenshots"]
+        )
+        self.assertEqual(
+            projected_main["checks"],
+            [
+                {
+                    "name": "Generate Screenshots",
+                    "classification": "optional",
+                    "verdict": "pending",
+                }
+            ],
+        )
+
 class LargeAdmissionDrainLaunchTests(unittest.TestCase):
     def test_projected_large_receipt_launches_the_drain_path(self):
         receipt = inject_inventories(

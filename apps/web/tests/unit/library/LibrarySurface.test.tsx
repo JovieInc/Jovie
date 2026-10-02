@@ -490,7 +490,7 @@ describe('LibrarySurface', () => {
     renderLibrary([]);
 
     const emptyState = screen.getByTestId('library-workspace-empty-state');
-    expect(screen.getByText('No Library Items')).toBeDefined();
+    expect(screen.getByText('No work yet')).toBeDefined();
     expect(
       screen.getByText(
         'Releases, merch, images, videos, and audio will appear here as they land.'
@@ -504,9 +504,11 @@ describe('LibrarySurface', () => {
       expect(action).toHaveAttribute('href', APP_ROUTES.RELEASES);
     }
     expect(emptyState).toHaveClass('py-16', 'min-h-90');
-    expect(
-      screen.getByRole('heading', { name: 'No Library Items' })
-    ).toHaveClass('text-2xl', 'font-semibold', 'text-primary-token');
+    expect(screen.getByRole('heading', { name: 'No work yet' })).toHaveClass(
+      'text-2xl',
+      'font-semibold',
+      'text-primary-token'
+    );
   });
 
   it('uses the canonical Spotify sync owner for an empty connected library', () => {
@@ -789,7 +791,7 @@ describe('LibrarySurface', () => {
     // Filter rail exposes Approval Status as a first-class chip group (#10384).
     fireEvent.click(screen.getByRole('button', { name: /^Show filters/i }));
     const rail = screen.getByTestId('library-filter-panel');
-    expect(screen.getByRole('group', { name: 'Library Filters' })).toBe(rail);
+    expect(screen.getByRole('group', { name: 'Work Filters' })).toBe(rail);
     expect(within(rail).getByText('Approval Status')).toBeInTheDocument();
     expect(within(rail).getByText('Release Status')).toBeInTheDocument();
     expect(
@@ -995,22 +997,21 @@ describe('LibrarySurface', () => {
         name: 'More actions',
       })
     ).toBeInTheDocument();
-    // Approval status stays a single accessible editor on the Details tab.
+    // Approval status stays a single accessible editor on the Overview tab.
     expect(
       drawer.getByRole('button', { name: 'Approval Status' })
     ).toBeInTheDocument();
-    fireEvent.click(drawer.getByRole('tab', { name: 'Links' }));
     expect(drawer.getByRole('link', { name: /Spotify/u })).toHaveAttribute(
       'href',
       'https://open.spotify.com/album/take-me-over'
     );
-    fireEvent.click(drawer.getByRole('tab', { name: 'Assets' }));
+    fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
     expect(
       drawer.getAllByRole('button', {
         name: /Play Preview for Take Me Over/u,
       }).length
     ).toBeGreaterThan(0);
-    fireEvent.click(drawer.getByRole('tab', { name: 'Details' }));
+    fireEvent.click(drawer.getByRole('tab', { name: 'Overview' }));
     expect(drawer.getByText('Apr 28')).toHaveAttribute('title', 'Apr 28, 2026');
     expect(drawer.getByText('68/100')).toBeDefined();
     expect(drawer.getByText('Progressive House')).toBeDefined();
@@ -1290,10 +1291,14 @@ describe('LibrarySurface', () => {
     expect(within(entityHeader).getByText('Take Me Over')).toBeInTheDocument();
     const workspace = drawer.querySelector('[data-right-rail-workspace]');
     expect(workspace).toHaveAttribute('data-surface-variant', 'flat');
-    expect(tabs.getByRole('tab', { name: 'Details' })).toBeInTheDocument();
-    expect(tabs.getByRole('tab', { name: 'Assets' })).toBeInTheDocument();
-    expect(tabs.getByRole('tab', { name: 'Links' })).toBeInTheDocument();
-    expect(tabs.getByRole('tab', { name: 'Rights' })).toBeInTheDocument();
+    expect(tabs.getByRole('tab', { name: 'Overview' })).toBeInTheDocument();
+    expect(tabs.getByRole('tab', { name: 'Files' })).toBeInTheDocument();
+    expect(
+      tabs.queryByRole('tab', { name: 'Details' })
+    ).not.toBeInTheDocument();
+    expect(tabs.queryByRole('tab', { name: 'Assets' })).not.toBeInTheDocument();
+    expect(tabs.queryByRole('tab', { name: 'Links' })).not.toBeInTheDocument();
+    expect(tabs.queryByRole('tab', { name: 'Rights' })).not.toBeInTheDocument();
     expect(
       tabs.queryByRole('tab', { name: 'Presence' })
     ).not.toBeInTheDocument();
@@ -1321,14 +1326,14 @@ describe('LibrarySurface', () => {
     const overflowButton = drawer.getByRole('button', {
       name: 'More actions',
     });
-    fireEvent.click(drawer.getByRole('tab', { name: 'Assets' }));
+    fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
     const [previewButton] = drawer.getAllByRole('button', {
       name: /Play Preview for Take Me Over/u,
     });
     if (!previewButton) {
       throw new Error('Expected a drawer preview button');
     }
-    fireEvent.click(drawer.getByRole('tab', { name: 'Links' }));
+    fireEvent.click(drawer.getByRole('tab', { name: 'Overview' }));
     const providerLink = drawer.getByRole('link', { name: /Spotify/u });
 
     expect(overflowButton.className).toContain('focus-visible:ring-ring');
@@ -1552,7 +1557,7 @@ describe('LibrarySurface', () => {
     ]);
 
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
-    fireEvent.click(screen.getByRole('tab', { name: 'Assets' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Files' }));
 
     expect(screen.getByTestId('library-audio-dropzone')).toBeInTheDocument();
     expect(
@@ -1585,7 +1590,7 @@ describe('LibrarySurface', () => {
     ]);
 
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
-    fireEvent.click(screen.getByRole('tab', { name: 'Assets' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Files' }));
     fireEvent.change(screen.getByLabelText('Upload audio for Take Me Over'), {
       target: {
         files: [
@@ -1663,7 +1668,7 @@ describe('LibrarySurface', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
 
-    expect(screen.queryByLabelText('Filter library assets')).toBeNull();
+    expect(screen.queryByLabelText('Filter work')).toBeNull();
     expect(
       screen.getByTestId('library-release-row-release-1')
     ).toBeInTheDocument();
@@ -1719,7 +1724,7 @@ describe('LibrarySurface', () => {
     ]);
 
     expect(
-      screen.getByRole('tablist', { name: 'Library Stages' })
+      screen.getByRole('tablist', { name: 'Work Stages' })
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Show filters/i }));
     const kindFilters = screen.getByTestId('library-view-filter-chips');
@@ -1883,7 +1888,7 @@ describe('LibrarySurface', () => {
     expect(contract).not.toHaveAttribute('data-back-href');
     expect(contract).not.toHaveAttribute('data-back-label');
     expect(
-      screen.getByRole('tablist', { name: 'Library Stages' })
+      screen.getByRole('tablist', { name: 'Work Stages' })
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Show filters/i }));
     const kindFilters = screen.getByTestId('library-view-filter-chips');
@@ -1930,7 +1935,7 @@ describe('LibrarySurface', () => {
 
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByTestId('library-filter-popover')).toHaveAccessibleName(
-      'Library Filters'
+      'Work Filters'
     );
     expect(screen.getByTestId('library-filter-panel')).toBeInTheDocument();
 

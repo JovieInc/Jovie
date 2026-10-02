@@ -107,23 +107,74 @@ export function CookieBannerSection({
     const active = document.activeElement;
     if (active !== document.body && active !== initiatingAction) return;
 
-    const canRestore = (element: HTMLElement | null) =>
-      element?.isConnected &&
-      !element.matches('[disabled], [aria-disabled="true"]') &&
-      !element.closest('[hidden], [inert], [aria-hidden="true"]');
+    const canRestore = (
+      element: HTMLElement | null
+    ): element is HTMLElement => {
+      if (
+        !element?.isConnected ||
+        element.matches('[disabled], [aria-disabled="true"]') ||
+        element.closest('[hidden], [inert], [aria-hidden="true"]')
+      )
+        return false;
+      for (
+        let ancestor: HTMLElement | null = element;
+        ancestor;
+        ancestor = ancestor.parentElement
+      ) {
+        const style = globalThis.getComputedStyle(ancestor);
+        if (style.display === 'none' || style.visibility === 'hidden')
+          return false;
+      }
+      return true;
+    };
     const pageAction = lastPageFocus.current;
-    const fallback = () =>
-      Array.from(
-        document.querySelectorAll<HTMLElement>(
-          'main a[href], main button:not([disabled]), main [tabindex="0"]'
-        )
-      ).find(canRestore);
-    const target = visible
-      ? initiatingAction
-      : canRestore(pageAction)
-        ? pageAction
-        : fallback();
-    target?.focus({ preventScroll: true });
+    const observer = new MutationObserver(restoreFocus);
+    function stopWaiting() {
+      observer.disconnect();
+      document.removeEventListener('focusin', stopWaiting);
+    }
+    function restoreFocus() {
+      const current = document.activeElement;
+      if (current !== document.body && current !== initiatingAction) {
+        stopWaiting();
+        return;
+      }
+      const targets = visible
+        ? [initiatingAction]
+        : [
+            pageAction,
+            ...document.querySelectorAll<HTMLElement>(
+              'main a[href], main button:not([disabled]), main [tabindex="0"]'
+            ),
+          ];
+      for (const target of targets) {
+        if (!canRestore(target)) continue;
+        target.focus({ preventScroll: true });
+        if (document.activeElement === target) {
+          stopWaiting();
+          return;
+        }
+      }
+    }
+    // A cookie server action can temporarily hide a refreshed React subtree.
+    // Wait for a real DOM change, not a timer, and cancel on visitor focus.
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: [
+        'style',
+        'class',
+        'hidden',
+        'inert',
+        'disabled',
+        'aria-disabled',
+        'aria-hidden',
+      ],
+    });
+    document.addEventListener('focusin', stopWaiting);
+    restoreFocus();
+    return stopWaiting;
   }, [visible, isSavingConsent]);
 
   // Publish banner height + its rendered bottom offset + a separation gap as a

@@ -1,10 +1,188 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import {
   evaluateSourceAdmission,
   runSourceAdmission,
 } from '../source-admission-policy.mjs';
+
+const { load } = createRequire(import.meta.url)('js-yaml');
+
+test('source and size checks wake when the PR base or contract text is edited', () => {
+  for (const file of ['source-validation.yml', 'pr-size-guard.yml']) {
+    const workflow = load(readFileSync(`.github/workflows/${file}`, 'utf8'));
+    assert.ok(
+      workflow.on.pull_request.types.includes('edited'),
+      `${file} must revalidate a retargeted PR at the unchanged source head`
+    );
+  }
+});
+
+test('source admission loads the actual changelog guard from trusted base when an older head lacks it', () => {
+  const workflow = load(
+    readFileSync('.github/workflows/source-validation.yml', 'utf8')
+  );
+  const trusted = workflow.jobs.deterministic.steps.find(
+    step =>
+      step.name === 'Validate customer changelog decision from trusted base'
+  );
+  const source = workflow.jobs.deterministic.steps.find(
+    step => step.name === 'Run deterministic source contract'
+  );
+  const script = (
+    trusted?.run ??
+    source.run
+      .split('\n')
+      .find(line => line.includes('node scripts/changelog-source-guard.mjs'))
+  ).replace(/\$\{\{\s*github.base_ref\s*\}\}/g, 'main');
+  const root = mkdtempSync(join(tmpdir(), 'source-guard-bootstrap-'));
+  const repo = join(root, 'repo');
+  const bin = join(root, 'bin');
+  const runner = join(root, 'runner');
+  for (const dir of [repo, bin, runner, join(repo, 'scripts/lib')])
+    mkdirSync(dir, { recursive: true });
+  const git = (...args) =>
+    execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
+  try {
+    for (const file of [
+      'scripts/changelog-source-guard.mjs',
+      'scripts/lib/daily-changelog-publication.mjs',
+      'scripts/lib/daily-changelog.mjs',
+      'scripts/lib/changelog-filter-rules.mjs',
+    ]) {
+      writeFileSync(join(repo, file), readFileSync(file));
+    }
+    git('init', '--quiet');
+    git('config', 'user.name', 'Source guard test');
+    git('config', 'user.email', 'source-guard@example.invalid');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'trusted controls');
+    const base = git('rev-parse', 'HEAD');
+    git('update-ref', 'refs/remotes/origin/main', base);
+    rmSync(join(repo, 'scripts'), { recursive: true });
+    mkdirSync(join(repo, 'apps/web/app'), { recursive: true });
+    writeFileSync(
+      join(repo, 'apps/web/app/page.tsx'),
+      'export default function Page() { return null; }\n'
+    );
+    git('add', '--all');
+    git('commit', '--quiet', '-m', 'older implementation head');
+    const head = git('rev-parse', 'HEAD');
+    writeFileSync(
+      join(bin, 'git'),
+      '#!/bin/sh\nif [ "$1" = fetch ]; then exit 0; fi\nexec /usr/bin/git "$@"\n',
+      { mode: 0o755 }
+    );
+    writeFileSync(
+      join(bin, 'gh'),
+      '#!/bin/sh\nprintf "%s" "$CURRENT_PR_JSON"\n',
+      { mode: 0o755 }
+    );
+    const eventPath = join(root, 'event.json');
+    writeFileSync(
+      eventPath,
+      JSON.stringify({
+        pull_request: {
+          number: 7,
+          base: { sha: base },
+          head: { sha: head },
+          created_at: '2026-10-04T00:00:00Z',
+        },
+      })
+    );
+    const run = (body, currentHead = head) =>
+      spawnSync('bash', ['-eo', 'pipefail', '-c', script], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          RUNNER_TEMP: runner,
+          EXPECTED_HEAD: head,
+          GITHUB_EVENT_PATH: eventPath,
+          GITHUB_REPOSITORY: 'JovieInc/Jovie',
+          CURRENT_PR_JSON: JSON.stringify({ head: { sha: currentHead }, body }),
+        },
+      });
+    const internal = run(
+      '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'
+    );
+    assert.equal(internal.status, 0, internal.stderr);
+    const missing = run('');
+    assert.notEqual(missing.status, 0);
+    assert.match(
+      missing.stderr,
+      /Customer outcome decision missing or invalid/
+    );
+    const advanced = run(
+      '<!-- customer-changelog/v1 {"releaseWorthy":false} -->',
+      'b'.repeat(40)
+    );
+    assert.notEqual(advanced.status, 0);
+    assert.match(advanced.stderr, /PR head advanced/);
+    assert.ok(
+      workflow.on.pull_request.types.includes('reopened'),
+      'reopened recovery must wake exact-head validation'
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('source validation rejects script and web-test type errors before queue admission', () => {
+  const workflow = load(
+    readFileSync('.github/workflows/source-validation.yml', 'utf8')
+  );
+  const script = workflow.jobs.deterministic.steps
+    .find(step => step.name === 'Run deterministic source contract')
+    .run.replace(/\$\{\{[^}]+\}\}/g, 'main');
+  const bin = mkdtempSync(join(tmpdir(), 'source-typecheck-contract-'));
+  try {
+    writeFileSync(
+      join(bin, 'git'),
+      '#!/bin/sh\nif [ "$1" = rev-parse ]; then printf "%s" "$EXPECTED_HEAD"; fi\n',
+      { mode: 0o755 }
+    );
+    writeFileSync(join(bin, 'node'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    writeFileSync(
+      join(bin, 'pnpm'),
+      '#!/bin/sh\nif [ "$*" = "$FAIL_TYPECHECK" ]; then exit 17; fi\nexit 0\n',
+      { mode: 0o755 }
+    );
+    for (const command of [
+      'typecheck',
+      'run typecheck:scripts',
+      '--filter @jovie/web run typecheck:tests',
+    ]) {
+      const result = spawnSync('bash', ['-eo', 'pipefail', '-c', script], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          EXPECTED_HEAD: 'a'.repeat(40),
+          FAIL_TYPECHECK: command,
+        },
+      });
+      assert.equal(
+        result.status,
+        17,
+        `${command} must reject source admission: ${result.stderr}`
+      );
+    }
+  } finally {
+    rmSync(bin, { recursive: true, force: true });
+  }
+});
 
 const head = 'a'.repeat(40);
 const other = 'b'.repeat(40);
@@ -16,6 +194,8 @@ function fixture() {
     complete: true,
     pr: {
       number: 7,
+      title: 'fix(automation): preserve commissioning acceptance',
+      body: /** @type {string | null} */ ('Refs JOV-7300.'),
       state: 'open',
       draft: false,
       labels: [],
@@ -62,6 +242,70 @@ test('qualified source remains eligible with unavailable Symphony, unbound produ
     'optional-test',
   ].map(context => ({ context, state: 'failure' }));
   assert.equal(evaluateSourceAdmission(input).allowed, true);
+});
+test('native closing instructions in conditional or negated prose block admission', () => {
+  for (const body of [
+    'Related to JOV-7300.\n\nVerify runtime before closing JOV-7300.',
+    'Related to JOV-7300.\n\nSource merge does not complete JOV-7300.',
+    'Refs JOV-7300.\n\nFixes https://linear.app/jovie/issue/JOV-7300/title',
+    'Refs JOV-7300.\n\nResolves [JOV-7300](https://linear.app/jovie/issue/JOV-7300/title)',
+    'Refs JOV-7300.\n\nCLOSED `jov-7300`',
+  ]) {
+    const input = fixture();
+    input.pr.body = body;
+    assert.deepEqual(
+      evaluateSourceAdmission(input).blockers,
+      ['linear-closing-reference:JOV-7300'],
+      body
+    );
+  }
+  const input = fixture();
+  input.pr.title = 'Fixes JOV-7300';
+  assert.equal(evaluateSourceAdmission(input).allowed, false);
+  for (const keyword of [
+    'close',
+    'closes',
+    'closed',
+    'closing',
+    'fix',
+    'fixes',
+    'fixed',
+    'fixing',
+    'resolve',
+    'resolves',
+    'resolved',
+    'resolving',
+    'complete',
+    'completes',
+    'completed',
+    'completing',
+    'implement',
+    'implements',
+    'implemented',
+    'implementing',
+    'linear issue',
+  ]) {
+    input.pr.title = `${keyword} JOV-7300`;
+    assert.deepEqual(
+      evaluateSourceAdmission(input).blockers,
+      ['linear-closing-reference:JOV-7300'],
+      keyword
+    );
+  }
+});
+test('non-closing references and acceptance prose remain eligible', () => {
+  for (const body of [
+    '',
+    null,
+    'Refs JOV-7300.\nRelated to JOV-7070.\nContributes to JOV-7386.',
+    'Related to JOV-7300. Verify runtime before declaring commissioning complete.',
+    'JOV-7300 remains open. Complete the source repair and verify runtime.',
+    'Fixes CVE-2026-1234. Refs JOV-7300.',
+  ]) {
+    const input = fixture();
+    input.pr.body = body;
+    assert.equal(evaluateSourceAdmission(input).allowed, true);
+  }
 });
 test('every mechanical hold blocks and removing it restores eligibility', () => {
   for (const name of [
@@ -137,6 +381,13 @@ test('missing and incomplete evidence fails closed', () => {
   const input = fixture();
   input.pr.changed_files = 2;
   assert.equal(evaluateSourceAdmission(input).allowed, false);
+  for (const key of ['title', 'body']) {
+    const incomplete = fixture();
+    delete incomplete.pr[key];
+    assert.deepEqual(evaluateSourceAdmission(incomplete).blockers, [
+      'incomplete-evidence',
+    ]);
+  }
 });
 test('latest opinionated reviewer state controls current-head change requests', () => {
   const input = fixture();
@@ -265,6 +516,16 @@ test('late hold blocks and concurrent push cannot inherit earlier evidence', asy
       );
   }
 });
+test('admission checks the final PR text even without a source push', async () => {
+  const mock = requester(fixture(), (_path, response, calls) => {
+    if (calls.length === 5) {
+      /** @type {ReturnType<typeof fixture>['pr']} */ (response.data).body =
+        'Related to JOV-7300. Do not complete JOV-7300.';
+    }
+  });
+  const result = await runSourceAdmission({ ...args, request: mock.request });
+  assert.deepEqual(result.blockers, ['linear-closing-reference:JOV-7300']);
+});
 test('pagination includes later-page review and fails closed on cap or malformed evidence', async () => {
   const mock = requester(fixture(), (path, response) => {
     if (path.includes('/reviews?')) {
@@ -334,4 +595,50 @@ test('CLI missing credentials emits an actionable fail-closed JSON receipt', () 
   const receipt = JSON.parse(child.stdout);
   assert.equal(receipt.allowed, false);
   assert.deepEqual(receipt.blockers, ['evidence-unavailable']);
+});
+
+test('authoring CLI validates a body file and title without credentials or publication', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'jovie-linear-reference-'));
+  const file = join(dir, 'body.md');
+  const invoke = (title, equals = false) =>
+    spawnSync(
+      process.execPath,
+      [
+        'scripts/lib/source-admission-policy.mjs',
+        ...(equals ? [`--body-file=${file}`] : ['--body-file', file]),
+        ...(title ? (equals ? [`--title=${title}`] : ['--title', title]) : []),
+      ],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, GH_TOKEN: '', GITHUB_TOKEN: '' },
+      }
+    );
+  try {
+    writeFileSync(file, 'Related to JOV-7300. Verify before closing JOV-7300.');
+    const rejected = invoke('fix(automation): preserve acceptance');
+    assert.equal(rejected.status, 1);
+    assert.deepEqual(JSON.parse(rejected.stdout).blockers, [
+      'linear-closing-reference:JOV-7300',
+    ]);
+    writeFileSync(
+      file,
+      'Related to JOV-7300. Verify before declaring commissioning complete.'
+    );
+    const accepted = invoke('fix(automation): preserve acceptance');
+    assert.equal(accepted.status, 0);
+    assert.equal(JSON.parse(accepted.stdout).allowed, true);
+    assert.equal(invoke('Fixes JOV-7300').status, 1);
+    assert.equal(invoke(null).status, 1);
+    const equalsAccepted = invoke('fix(automation): preserve acceptance', true);
+    assert.equal(equalsAccepted.status, 0);
+    assert.equal(JSON.parse(equalsAccepted.stdout).allowed, true);
+    const equalsRejected = invoke('Fixes JOV-7300', true);
+    assert.equal(equalsRejected.status, 1);
+    assert.deepEqual(JSON.parse(equalsRejected.stdout).blockers, [
+      'linear-closing-reference:JOV-7300',
+    ]);
+    assert.equal(invoke(null, true).status, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

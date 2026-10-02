@@ -6,6 +6,7 @@ import {
 } from 'next/server';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { captureFirstTouchEnvelope } from '@/lib/acquisition/first-touch-capture';
 import { negotiateAgentMarkdown } from '@/lib/agent/markdown-negotiation';
 import { buildProtectedAuthRedirectUrl } from '@/lib/auth/build-auth-route-url';
 import { handleInvestorRequest } from '@/lib/auth/investor-portal';
@@ -235,7 +236,18 @@ export default async function middleware(
   //     signed-in marker. Public `/` navigation passes through unchanged;
   //     auth-page signed-in redirects are owned by the pages themselves via
   //     auth.api.getSession.
-  return handleProxyRequest(req, sessionCookie, event);
+  const response = await handleProxyRequest(req, sessionCookie, event);
+
+  // Passive first-touch acquisition (JOV-5036): seal the earliest observed
+  // landing into a signed HttpOnly cookie so it survives signup, waitlist,
+  // OTP/OAuth, and returning paths until the activation receipt attach.
+  // First-touch-wins; the helper no-ops on non-navigation methods, /api,
+  // existing valid envelopes, and missing signing secrets.
+  if (hostInfo.isMainHost && response instanceof NextResponse) {
+    await captureFirstTouchEnvelope(req, response);
+  }
+
+  return response;
 }
 
 export const config = {

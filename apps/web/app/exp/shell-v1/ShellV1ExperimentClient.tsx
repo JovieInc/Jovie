@@ -337,7 +337,7 @@ type Workspace = {
 const CORE_ITEMS: NavItem[] = [
   { icon: Search, label: 'Search' },
   { icon: Activity, label: 'Tasks' },
-  { icon: LibraryIcon, label: 'Library' },
+  { icon: LibraryIcon, label: 'Work' },
 ];
 
 // Threads = jobs. Each Jovie action (UI button or chat message) creates
@@ -448,7 +448,7 @@ function canvasViewForNavItem(label: string): CanvasView | null {
       return 'releases';
     case 'Tasks':
       return 'tasks';
-    case 'Library':
+    case 'Work':
       return 'library';
     default:
       return null;
@@ -3038,7 +3038,7 @@ function Sidebar({
   const inLibraryMode = !!libraryProps;
   const inSettingsMode = !!settingsProps;
   const inContextMode = inLibraryMode || inSettingsMode;
-  const contextLabel = inLibraryMode ? 'Library' : 'Settings';
+  const contextLabel = inLibraryMode ? 'Work' : 'Settings';
   const collapsed = false;
   // Header trailing-button affordance morphs through three states:
   //   1. Hover: pin/unpin (transient hint, fades after 3s of inactivity)
@@ -3244,12 +3244,12 @@ function Sidebar({
           <div className='space-y-px'>
             {CORE_ITEMS.filter(item => {
               if (item.label === 'Tasks' && TASKS.length === 0) return false;
-              if (item.label === 'Library' && libraryAssetCount === 0)
+              if (item.label === 'Work' && libraryAssetCount === 0)
                 return false;
               return true;
             }).map(item => {
               const view: CanvasView | null =
-                item.label === 'Library'
+                item.label === 'Work'
                   ? 'library'
                   : item.label === 'Tasks'
                     ? 'tasks'
@@ -3417,7 +3417,7 @@ function breadcrumbForView(
     releases: 'Releases',
     tracks: 'Tracks',
     tasks: 'Tasks',
-    library: 'Library',
+    library: 'Work',
     lyrics: 'Lyrics',
     settings: 'Settings',
     thread: 'Thread',

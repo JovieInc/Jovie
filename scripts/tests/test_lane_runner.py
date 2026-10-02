@@ -6,6 +6,10 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import concurrent.futures
+import signal
+import threading
+import hashlib
 import json
 import os
 import subprocess
@@ -30,7 +34,97 @@ def issue(identifier="JOV-1", priority=2, created="2026-09-01T00:00:00Z", labels
     return lane.Issue("id-" + identifier, identifier, "Tab indicator collapses", "body", priority, created, list(labels))
 
 
+def gate_proof(head, verdict="landing", sensitive=False):
+    return {"schema": lane.GATE_RESULT_SCHEMA, "headSha": head, "verdict": verdict,
+            "completedAt": "2026-10-02T18:00:00Z", "policyDigest": lane.GATE_POLICY_DIGEST,
+            "sensitive": sensitive, "reasons": []}
+
+
+class ContextManifestTest(unittest.TestCase):
+    def test_repository_formatting_is_accepted_but_malformed_or_missing_contract_is_not(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "context-manifest.json"
+            self.assertFalse(lane.context_manifest_matches(path))
+            path.write_text(json.dumps(json.loads(lane.context_manifest_json()), separators=(",", ":")))
+            self.assertTrue(lane.context_manifest_matches(path))
+            path.write_text("not JSON")
+            self.assertFalse(lane.context_manifest_matches(path))
+
+    def test_manifest_binds_exact_prompt_and_inputs_without_copying_private_content(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "issue.prompt.md"
+            inputs = {"issue": "private issue", "gbrain": "prior private decision", "branch": "devin/jov-1"}
+            first = lane.write_agent_prompt(path, "exact prompt\n", "issue", "devin", inputs)
+            body = Path(first["path"]).read_bytes()
+            receipt = json.loads(body)
+            self.assertEqual(path.read_text(), "exact prompt\n")
+            self.assertEqual(receipt["prompt"]["sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
+            self.assertNotIn(b"private", body)
+            self.assertEqual(receipt["inputs"]["gbrain"]["sha256"], hashlib.sha256(inputs["gbrain"].encode()).hexdigest())
+            self.assertEqual(receipt["inputs"]["gbrain"]["status"], "present")
+            repeated = lane.write_agent_prompt(path, "exact prompt\n", "issue", "devin", inputs)
+            self.assertEqual(first["sha256"], repeated["sha256"])
+            self.assertTrue(first["qualification"]["ok"])
+            self.assertEqual(first["qualification"]["mode"], "qualification-only")
+            self.assertGreaterEqual(first["qualification"]["durationMs"], 0)
+            self.assertEqual(body, Path(first["path"]).read_bytes())
+            changed = lane.write_agent_prompt(path, "different prompt", "issue", "devin", inputs)
+            self.assertNotEqual(first["sha256"], changed["sha256"])
+
+    def test_missing_context_and_drift_are_explicit_nonblocking_findings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "issue.prompt.md"
+            inputs = {"issue": "task", "gbrain": "", "branch": "codex/jov-1"}
+            receipt = lane.write_agent_prompt(path, "prompt", "issue", "codex", inputs)
+            self.assertEqual(json.loads(Path(receipt["path"]).read_text())["inputs"]["gbrain"]["status"], "unavailable")
+            with patch.object(lane, "HERE", Path(tmp)):
+                for contract in [None, '{}', 'malformed']:
+                    if contract is not None:
+                        (Path(tmp) / "context-manifest.json").write_text(contract)
+                    drift = lane.write_agent_prompt(path, "still runs", "issue", "codex", inputs)
+                    self.assertEqual(path.read_text(), "still runs")
+                    self.assertFalse(drift["qualification"]["ok"])
+                    self.assertIn("context-manifest-drift", drift["qualification"]["findings"][0])
+                    self.assertIsNone(drift["path"])
+                with patch.object(lane.sys.stderr, "write", side_effect=OSError("closed log")):
+                    self.assertFalse(lane.write_agent_prompt(path, "still runs", "issue", "codex", inputs)["qualification"]["ok"])
+            for kind, data in [("issue", {"gbrain": ""}), ("unknown", inputs),
+                               ("issue", {**inputs, "issue": None})]:
+                failed = lane.write_agent_prompt(path, "still runs", kind, "codex", data)
+                self.assertFalse(failed["qualification"]["ok"])
+                self.assertIsNone(failed["sha256"])
+
+    def test_generator_does_not_load_credentials_or_query_services(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(lane, "HERE", Path(tmp)), \
+                patch.object(lane, "load_github_env", side_effect=AssertionError("credential access")):
+            self.assertEqual(lane.main(["context-manifest", "--write"]), 0)
+            self.assertEqual(lane.main(["context-manifest"]), 0)
+            (Path(tmp) / "context-manifest.json").write_text('{}')
+            self.assertEqual(lane.main(["context-manifest"]), 1)
+
+
 class SelectionTest(unittest.TestCase):
+    def test_rejection_reasons_match_final_worker_admission(self):
+        red = issue("JOV-RED")
+        red.title = "Rotate production credentials"
+        failures = {"JOV-EXHAUSTED": 3, "JOV-BACKOFF": {"count": 1, "at": 9990}}
+        cases = [(issue(labels=["Type:Epic"]), "excluded-label:type:epic"),
+                 (red, "sensitive-text"), (issue(labels=["AUTH"]), "sensitive-provider"),
+                 (issue("JOV-EXHAUSTED"), "retry-exhausted"),
+                 (issue("JOV-BACKOFF"), "retry-backoff"),
+                 (issue("JOV-OWNED"), "in-flight-pr"), (issue("JOV-GOOD"), None)]
+        for task, expected in cases:
+            with self.subTest(expected=expected):
+                self.assertEqual(lane.admission_rejection(task, failures, 10000,
+                                 frozenset({"jov-owned"}), "devin"), expected)
+                self.assertEqual(lane.pick_issue([task], failures, now=10000,
+                                 in_flight=frozenset({"jov-owned"}), provider="devin"),
+                                 task if expected is None else None)
+        self.assertIsNone(lane.admission_rejection(issue(labels=["AUTH"]), {}, 10000, provider="codex"))
+        # Exactly one reason per candidate, preserving the existing gate precedence.
+        self.assertEqual(lane.admission_rejection(issue(labels=["Type:Epic", "auth"]), {}, 10000,
+                         provider="devin"), "excluded-label:type:epic")
+
     def test_orders_like_symphony_priority_then_age_with_none_last(self):
         now = datetime(2026, 9, 4, tzinfo=timezone.utc).timestamp()
         picked = lane.pick_issue([
@@ -139,6 +233,14 @@ class PromptTest(unittest.TestCase):
                        "Do not mark it ready or merge it", "NOT-SHIPPABLE"):
             self.assertIn(needle, prompt)
 
+    def test_native_issue_link_is_nonclosing_before_the_agent_opens_a_pr(self):
+        for labels in ([], ["commissioning"], ["parent"]):
+            with self.subTest(labels=labels):
+                prompt = lane.render_prompt(issue("JOV-42", labels=labels), "devin/jov-42-x", "")
+                self.assertIn("Refs JOV-42.", prompt)
+                self.assertIn("linear-issue-identifier:JOV-42", prompt)
+                self.assertIn("normal implementation", prompt)
+
     def test_contract_forbids_interactive_skill_workflows(self):
         prompt = lane.render_prompt(issue(), "codex/jov-1", "")
         self.assertIn("Never stop to ask", prompt)
@@ -231,6 +333,20 @@ class GateTest(unittest.TestCase):
         self.assertFalse(passed)
         self.assertTrue(reasons[0].startswith("llm-review-failed"))
 
+    def test_context_drift_does_not_replace_the_sensitive_review_verdict(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            host = lane.Host(state=root)
+            for verdict, expected in [("LLM-REVIEW: FAIL", False), ("LLM-REVIEW: PASS", True)]:
+                def review(*args, **kwargs):
+                    (root / ".codex-last-message.txt").write_text(verdict)
+                    return SimpleNamespace(returncode=0)
+                with patch.object(lane, "context_manifest_matches", return_value=False), \
+                        patch.object(lane, "sh", side_effect=review) as reviewer:
+                    passed, _ = lane.sensitive_review(host, {"number": 7, "headRefOid": "abc"}, root, None)
+                self.assertEqual(passed, expected)
+                reviewer.assert_called_once()
+
     def test_numstat_parsing_handles_binary(self):
         changes = lane.parse_numstat("3\t1\ta.ts\n-\t-\timg.png\nnoise\n")
         self.assertEqual([(c.path, c.added, c.deleted) for c in changes], [("a.ts", 3, 1), ("img.png", 0, 0)])
@@ -251,15 +367,19 @@ class FakeShell:
                  failing=()):
         self.prs, self.numstat, self.ahead, self.failing, self.calls = prs, numstat, ahead, failing, []
 
-    def __call__(self, args, cwd=None, timeout=600, env=None, log=None, stream=False):
+    def __call__(self, args, cwd=None, timeout=600, env=None, log=None, stream=False, pass_fds=()):
         self.calls.append(args)
         out, code = "", 0
         if any(token in args for token in getattr(self, "hanging", ())):
             raise subprocess.TimeoutExpired(args, timeout)
         if args[:3] == ["gh", "pr", "list"]:
             out = json.dumps(self.prs)
+        elif args[:3] == ["gh", "pr", "view"]:
+            out = json.dumps({**self.prs[0], "state": "OPEN"})
         elif args[:2] == ["git", "diff"]:
             out = self.numstat
+        elif args == ["git", "rev-parse", "HEAD"]:
+            out = self.prs[0]["headRefOid"]
         elif args[:2] == ["git", "rev-list"]:
             out = self.ahead
         elif any(token in args for token in self.failing):
@@ -287,7 +407,7 @@ class VerifyAndLandTest(unittest.TestCase):
         result = self.run_gate(fake)
         self.assertEqual(result["verdict"], "landing")
         self.assertIn(["gh", "pr", "ready", "7", "--repo", lane.REPO_SLUG], fake.calls)
-        self.assertIn(["gh", "pr", "merge", "7", "--repo", lane.REPO_SLUG, "--auto"], fake.calls)
+        self.assertIn(["gh", "pr", "merge", "7", "--repo", lane.REPO_SLUG, "--auto", "--match-head-commit", "abc"], fake.calls)
 
     def test_failing_check_holds_the_pr_as_draft(self):
         fake = FakeShell([self.pr], failing=("scripts/hooks/pre-push-gate.sh",))
@@ -342,6 +462,17 @@ class VerifyAndLandTest(unittest.TestCase):
     def test_older_prs_for_the_same_issue_are_ignored(self):
         stale = {**self.pr, "createdAt": "2026-09-20T00:00:00Z"}
         self.assertEqual(self.run_gate(FakeShell([stale]))["verdict"], "no-change")
+
+    def test_fallback_pr_is_nonclosing_from_creation_and_retains_merge_sync_identity(self):
+        fake = FakeShell([], ahead="2")
+        self.run_gate(fake)
+        creations = [call for call in fake.calls if call[:3] == ["gh", "pr", "create"]]
+        self.assertEqual(len(creations), 1)
+        body = creations[0][creations[0].index("--body") + 1]
+        self.assertTrue(body.startswith("Refs JOV-1.\n"))
+        self.assertIn("<!-- linear-issue-id:id-JOV-1 -->", body)
+        self.assertIn("<!-- linear-issue-identifier:JOV-1 -->", body)
+        self.assertNotIn("Closes", body)
 
     def test_pr_creation_failure_does_not_loop(self):
         result = self.run_gate(FakeShell([], ahead="2"))
@@ -470,6 +601,9 @@ class LinearClientTest(unittest.TestCase):
 
 class RunIssueTest(unittest.TestCase):
     def setUp(self):
+        disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+        disk.start()
+        self.addCleanup(disk.stop)
         self.real_sh, self.real_verify, self.real_pack = lane.sh, lane.verify_and_land, lane.context_pack
         self.real_next = lane.next_provider
         lane.next_provider = lambda *a, **k: None  # no live provider health checks in unit tests
@@ -506,6 +640,53 @@ class RunIssueTest(unittest.TestCase):
         self.assertTrue(receipt["branch"].startswith("devin/jov-8-"))
         self.assertIn(receipt["runId"], receipt["worktree"])
         self.assertEqual(receipt["result"], {"verdict": "landing", "commit": None, "pr": 9, "prUrl": None})
+        manifest = receipt["contextManifests"][0]
+        body = Path(manifest["path"]).read_bytes()
+        context = json.loads(body)
+        self.assertEqual(manifest["sha256"], hashlib.sha256(body).hexdigest())
+        self.assertEqual(context["provider"], "devin")
+        self.assertEqual(context["prompt"]["sha256"], hashlib.sha256(prompt.encode()).hexdigest())
+        self.assertEqual(self.ledger()[0]["contextManifests"], receipt["contextManifests"])
+
+    def test_deferred_or_reused_gate_does_not_quarantine_completed_implementation(self):
+        for index, verdict in enumerate(("gate-in-progress", "gate-deferred", "gate-already-completed")):
+            with self.subTest(verdict=verdict):
+                lane.verify_and_land = lambda *a, **k: {"verdict": verdict, "pr": 9, "reasons": []}
+                receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]},
+                                         FakeLinear([]), issue(f"JOV-{100 + index}"))
+                self.assertEqual(receipt["execution"]["terminalState"], "succeeded")
+                self.assertEqual(receipt["verdict"], verdict)
+
+    def test_context_contract_drift_does_not_prevent_agent_execution(self):
+        lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 9, "reasons": []}
+        with patch.object(lane, "context_manifest_json", return_value="drift"), \
+                patch.object(lane, "run_agent", wraps=lane.run_agent) as agent:
+            receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]), issue())
+        self.assertEqual(receipt["verdict"], "landing")
+        self.assertIn("context-manifest-drift", receipt["contextManifests"][0]["qualification"]["findings"][0])
+        agent.assert_called_once()
+        self.assertEqual(self.ledger()[0]["contextManifests"], receipt["contextManifests"])
+
+    def test_context_receipt_failure_is_isolated_but_prompt_write_failure_still_blocks(self):
+        original = Path.write_bytes
+        lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 9, "reasons": []}
+        for index, (suffix, verdict) in enumerate([(".context.json", "landing"), (".prompt.md", "failed")]):
+            def write(path, data):
+                if path.name.endswith(suffix):
+                    raise OSError("volume unavailable")
+                return original(path, data)
+            with patch.object(Path, "write_bytes", write), \
+                    patch.object(lane, "run_agent", wraps=lane.run_agent) as agent:
+                receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]), issue(f"JOV-{index + 1}"))
+            self.assertEqual(receipt["verdict"], verdict)
+            if suffix == ".context.json":
+                agent.assert_called_once()
+                context = receipt["contextManifests"][0]
+                self.assertIsNone(context["path"])
+                self.assertIn("volume unavailable", context["qualification"]["findings"][0])
+            else:
+                agent.assert_not_called()
+                self.assertIn("volume unavailable", receipt["reasons"][0])
 
     def test_agent_that_never_worked_is_a_provider_error(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}
@@ -532,6 +713,10 @@ class RunIssueTest(unittest.TestCase):
         handoff = next((self.host.state / "runs").glob("*.handoff1.prompt.md")).read_text()
         self.assertIn("Do not start over", handoff)
         self.assertIn("ctx", handoff)
+        self.assertEqual(len(receipt["contextManifests"]), 2)
+        context = json.loads(Path(receipt["contextManifests"][1]["path"]).read_text())
+        self.assertEqual((context["kind"], context["provider"]), ("handoff", "devin"))
+        self.assertEqual(context["prompt"]["sha256"], hashlib.sha256(handoff.encode()).hexdigest())
 
     def test_next_provider_takes_the_cheapest_enabled_healthy_uncooled_lane(self):
         providers = {
@@ -699,16 +884,20 @@ class AttributionAndThroughputTest(unittest.TestCase):
 
 class WorkerTest(unittest.TestCase):
     def setUp(self):
+        disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+        disk.start()
+        self.addCleanup(disk.stop)
         self.saved = (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
                       lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues,
                       lane.fix_candidates, lane.escalate_exhausted, lane.pr_events.queued_prs,
-                      lane.pr_events.claim_event_pr, lane.sweep_lane_prs)
+                      lane.pr_events.claim_event_pr, lane.sweep_lane_prs, lane.read_new_issue_budget)
         lane.sweep_lane_prs = lambda host, name, linear, now=None: None
         lane.pr_events.queued_prs = lambda module, kinds: []
         lane.pr_events.claim_event_pr = lambda host, module, name, prs: None
         lane.claim_red_pr = lambda host, name, prs=None: None
         lane.claim_adoptable_pr = lambda host, name, prs: None
         lane.lane_prs = lambda name, fields="": []
+        lane.read_new_issue_budget = lambda name, slots: lane.new_issue_budget(name, slots, lane.lane_prs(name, fields=lane.LIGHT_PR_FIELDS))
         lane.in_flight_issues = lambda: frozenset()  # never GitHub from a unit test
         lane.fix_candidates = lambda name: []
         lane.escalate_exhausted = lambda host, prs, linear: None
@@ -724,7 +913,7 @@ class WorkerTest(unittest.TestCase):
         (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
          lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues,
          lane.fix_candidates, lane.escalate_exhausted, lane.pr_events.queued_prs,
-         lane.pr_events.claim_event_pr, lane.sweep_lane_prs) = self.saved
+         lane.pr_events.claim_event_pr, lane.sweep_lane_prs, lane.read_new_issue_budget) = self.saved
         self.tmp.cleanup()
 
     def test_landing_claims_comments_and_pulls_the_next_issue(self):
@@ -817,8 +1006,8 @@ class WorkerTest(unittest.TestCase):
 
     def test_late_remote_drafts_are_adopted_and_gated(self):
         adopted = []
-        lane.claim_adoptable_pr = lambda host, name, prs: {"number": 8}
-        lane.adopt_pr = lambda host, name, pr: adopted.append(pr["number"])
+        lane.claim_adoptable_pr = lambda host, name, prs: SimpleNamespace(pr={"number": 8})
+        lane.adopt_pr = lambda host, name, pr, **kwargs: adopted.append(pr["number"])
         lane.worker(self.host, "devin")
         self.assertEqual((adopted, self.linear.moves), ([8], []))
 
@@ -828,6 +1017,16 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(self.linear.moves, [("id-JOV-3", "In Progress")])
         self.assertIn("will fix it on that branch", self.linear.comments[-1][1])
         self.assertFalse((self.host.state / "failures.json").exists())
+
+    def test_deferred_or_completed_duplicate_gate_does_not_charge_issue_retries(self):
+        for verdict in ("gate-in-progress", "gate-deferred", "gate-already-completed"):
+            with self.subTest(verdict=verdict):
+                self.linear.moves.clear()
+                lane.run_issue = lambda *a: {"verdict": verdict, "pr": 7, "prUrl": "u"}
+                lane.worker(self.host, "devin")
+                self.assertEqual(self.linear.moves, [("id-JOV-3", "In Progress")])
+                self.assertFalse(lane.failures_path(self.host).exists())
+                self.assertIn("no new certification", self.linear.comments[-1][1])
 
     def test_an_issue_taken_by_another_host_meanwhile_is_not_started(self):
         started = []
@@ -866,8 +1065,8 @@ class WorkerTest(unittest.TestCase):
         self.assertTrue(record["at"].endswith("Z"))
 
     def test_over_budget_and_unknown_in_flight_exits_name_their_reason(self):
-        lane.lane_prs = lambda name, fields="": [{"headRefName": "devin/a", "isDraft": True},
-                                                 {"headRefName": "devin/b", "isDraft": True}]
+        lane.lane_prs = lambda name, fields="": [{"number": 1, "headRefName": "devin/jov-1-20261002", "isDraft": True},
+                                                 {"number": 2, "headRefName": "devin/jov-2-20261002", "isDraft": True}]
         self.assertEqual(lane.worker(self.host, "devin"), 0)
         self.assertEqual(json.loads((self.host.state / "worker-idle.json").read_text())
                          ["devin"]["reason"], "over-budget")
@@ -890,6 +1089,24 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(lane.worker(self.host, "devin"), 0)
         self.assertEqual(self.linear.moves, [])
 
+    def test_unknown_budget_defers_without_claim_or_failure_charge(self):
+        lane.read_new_issue_budget = lambda name, slots: lane.new_issue_budget(name, slots, None)
+        lane.run_issue = lambda *a: self.fail("unknown inventory cannot authorize new work")
+        self.assertEqual(lane.worker(self.host, "devin"), 0)
+        self.assertEqual(self.linear.moves, [])
+        self.assertFalse(lane.failures_path(self.host).exists())
+        self.assertEqual(json.loads((self.host.state / "worker-idle.json").read_text())["devin"]["reason"],
+                         "pr-inventory-unavailable")
+
+    def test_existing_repair_never_consults_new_issue_budget(self):
+        lane.claim_red_pr = lambda *a: {"number": 9}
+        fixed = []
+        lane.fix_red_pr = lambda *a: fixed.append(a[-1]["number"])
+        lane.read_new_issue_budget = lambda *a: self.fail("maintenance must not depend on new-issue read")
+        lane.worker(self.host, "devin")
+        self.assertEqual(fixed, [9])
+        self.assertEqual(self.linear.moves, [])
+
     def test_busy_slots_and_empty_queue_exit_quietly(self):
         held = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
         self.assertEqual(lane.worker(self.host, "devin"), 0)
@@ -897,6 +1114,43 @@ class WorkerTest(unittest.TestCase):
         self.linear.issues = []
         self.assertEqual(lane.worker(self.host, "devin"), 0)
         self.assertEqual(self.linear.moves, [])
+
+
+class NewIssueBudgetTest(unittest.TestCase):
+    def row(self, number=1, branch=None, draft=True, state="CLEAN"):
+        return {"number": number, "headRefName": branch or f"codex/jov-{number}-20261002",
+                "isDraft": draft, "mergeStateStatus": state}
+
+    def test_dated_ownership_and_each_head_count_once_without_issue_collapse(self):
+        rows = [self.row(n, branch=f"codex/jov-7-20261002t00000{n}") for n in range(1, 7)]
+        rows += [self.row(8, branch="codex/manual-repair"), self.row(9, branch="devin/jov-9-20261002"),
+                 self.row(10, draft=False), self.row(11, draft=False, state="HAS_HOOKS")]
+        result = lane.new_issue_budget("codex", 3, rows)
+        self.assertEqual((result["used"], result["cap"], result["reason"]), (6, 6, "over-budget"))
+        self.assertFalse(result["allowed"])
+        self.assertTrue(lane.new_issue_budget("codex", 4, rows)["allowed"])
+        self.assertEqual(lane.new_issue_budget("codex", 0, None)["reason"], "provider-disabled")
+
+    def test_failed_malformed_and_truncated_reads_cannot_certify_empty_inventory(self):
+        cases = [(1, "[]"), (1, json.dumps([self.row()])), (0, ""), (0, "{}"), (0, "null"),
+                 (0, json.dumps([self.row(n, branch=f"codex/manual-{n}") for n in range(1, 201)])),
+                 (0, json.dumps([self.row(), self.row()]))]
+        for field, value in [("number", True), ("number", 0), ("headRefName", ""),
+                             ("isDraft", 1), ("mergeStateStatus", None)]:
+            row = self.row(branch="codex/manual")
+            row[field] = value
+            cases.append((0, json.dumps([row])))
+        for code, output in cases:
+            with self.subTest(code=code, output=output[:80]), patch.object(
+                    lane, "sh", return_value=subprocess.CompletedProcess([], code, output, "")):
+                result = lane.read_new_issue_budget("codex", 3)
+                self.assertEqual(result["reason"], "pr-inventory-unavailable")
+                self.assertIsNone(result["used"])
+                self.assertFalse(result["allowed"])
+        with patch.object(lane, "sh", return_value=subprocess.CompletedProcess([], 0, "[]", "")):
+            result = lane.read_new_issue_budget("codex", 3)
+            self.assertTrue(result["allowed"])
+            self.assertEqual(result["used"], 0)
 
 
 class RunAgentTest(unittest.TestCase):
@@ -1047,7 +1301,157 @@ class RunAgentTest(unittest.TestCase):
             self.assertEqual(output.read_text(), "hardlink")
 
 
+class PublicationRevocationTest(unittest.TestCase):
+    """JOV-5060: a stopped run writes an immutable revocation receipt before the kill is
+    acked, and every publication boundary revalidates it."""
+
+    def test_receipt_is_written_before_the_owned_tree_is_killed(self):
+        with tempfile.TemporaryDirectory() as tmp, open(os.devnull, "w") as log:
+            root = Path(tmp)
+            host = lane.Host(state=root)
+            pidfile = root / "pid"
+            command = [sys.executable, "-c",
+                       "import os,time,pathlib; pathlib.Path('pid').write_text(str(os.getpid())); time.sleep(30)"]
+
+            def guard():
+                if pidfile.exists():
+                    raise lane.DiskAdmissionError("disk-critical")
+
+            observed = []
+
+            def on_kill(error):
+                # The agent must still be alive when the revocation lands: receipt first,
+                # then the kill is acknowledged.
+                os.kill(int(pidfile.read_text()), 0)
+                observed.append(type(error).__name__)
+                lane.revoke_publication(host, branch="devin/jov-1-1", run_id="run-1",
+                                        issue="JOV-1", reason="test-stop")
+
+            with self.assertRaises(lane.DiskAdmissionError):
+                lane.run_agent(command, root, log, timeout=10, guard=guard,
+                               guard_interval=0.05, on_kill=on_kill)
+            self.assertEqual(observed, ["DiskAdmissionError"])
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int(pidfile.read_text()), 0)
+            revoked = lane.publication_revocation(host, "devin/jov-1-1")
+            self.assertEqual(revoked["schema"], lane.PUBLICATION_REVOCATION_SCHEMA)
+            self.assertEqual(revoked["reason"], "test-stop")
+            self.assertEqual(revoked["runId"], "run-1")
+
+    def test_sigterm_is_a_stop_that_revokes_before_kill(self):
+        import signal
+        with tempfile.TemporaryDirectory() as tmp, open(os.devnull, "w") as log:
+            root = Path(tmp)
+            host = lane.Host(state=root)
+            pidfile = root / "pid"
+            # Startup may exceed the old 0.5s timer on a loaded installer host.
+            command = [sys.executable, "-c",
+                       "import os,time,pathlib; time.sleep(0.75); pathlib.Path('pid').write_text(str(os.getpid())); time.sleep(30)"]
+
+            def signal_when_ready():
+                if pidfile.exists():
+                    os.kill(os.getpid(), signal.SIGTERM)
+
+            observed = []
+
+            def on_kill(error):
+                # Preserve receipt-before-kill proof for a real SIGTERM too.
+                os.kill(int(pidfile.read_text()), 0)
+                observed.append(type(error).__name__)
+                lane.revoke_publication(host, branch="devin/jov-9-1", reason="run-stopped")
+
+            with self.assertRaises(lane.RunStopped):
+                lane.run_agent(command, root, log, timeout=30,
+                               guard=signal_when_ready, guard_interval=0.05, on_kill=on_kill)
+            self.assertEqual(observed, ["RunStopped"])
+            self.assertIsNotNone(lane.publication_revocation(host, "devin/jov-9-1"))
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int(pidfile.read_text()), 0)
+
+    def test_unreadable_ledger_fails_closed_as_revoked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            self.assertIsNone(lane.publication_revocation(host, "devin/jov-1-1"))
+            lane.revocations_path(host).parent.mkdir(parents=True)
+            lane.revocations_path(host).write_text("not-json\n")
+            self.assertEqual(lane.publication_revocation(host, "devin/jov-1-1")["reason"],
+                             "revocation-ledger-corrupt")
+            with self.assertRaises(lane.PublicationRevoked):
+                lane.require_publishable(host, "devin/jov-1-1", "before-push")
+
+
+class VerifyAndLandRevocationTest(unittest.TestCase):
+    def setUp(self):
+        self.real = lane.sh
+
+    def tearDown(self):
+        lane.sh = self.real
+
+    def test_revoked_branch_never_pushes_or_opens_a_pr(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            lane.revoke_publication(host, branch="devin/jov-1", reason="run-stopped")
+            fake = FakeShell([], ahead="2")
+            lane.sh = fake
+            with self.assertRaises(lane.PublicationRevoked):
+                lane.verify_and_land(host, issue(), "devin/jov-1", Path("/tmp"), None, 0)
+            self.assertFalse(any(call[:2] == ["git", "push"] for call in fake.calls))
+            self.assertFalse(any(call[:3] == ["gh", "pr", "create"] for call in fake.calls))
+
+    def test_a_stop_during_long_pre_push_hooks_still_bars_the_pr_open(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            fake = FakeShell([], ahead="2")
+
+            def push_revokes(args, **kwargs):
+                if args[:2] == ["git", "push"]:  # the stop lands while the hooks run
+                    lane.revoke_publication(host, branch="devin/jov-1", reason="run-stopped")
+                return fake(args, **kwargs)
+
+            lane.sh = push_revokes
+            with self.assertRaises(lane.PublicationRevoked):
+                lane.verify_and_land(host, issue(), "devin/jov-1", Path("/tmp"), None, 0)
+            self.assertTrue(any(call[:2] == ["git", "push"] for call in fake.calls))
+            self.assertFalse(any(call[:3] == ["gh", "pr", "create"] for call in fake.calls))
+
+    def test_gate_never_marks_a_revoked_branch_ready_or_enqueues_it(self):
+        started = datetime(2026, 9, 25, 21, 0, tzinfo=timezone.utc).timestamp()
+        pr = {"number": 7, "headRefName": "devin/jov-1", "headRefOid": "abc", "url": "u",
+              "createdAt": "2026-09-25T21:05:00Z", "isDraft": True}
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            lane.revoke_publication(host, branch="devin/jov-1", reason="run-stopped")
+            fake = FakeShell([pr])
+            lane.sh = fake
+            self.assertEqual(lane.gate_pr(host, pr, Path("/tmp"), None)["verdict"], "revoked")
+            self.assertFalse(any(call[:3] == ["gh", "pr", "ready"] for call in fake.calls))
+            self.assertFalse(any(call[:3] == ["gh", "pr", "merge"] for call in fake.calls))
+        self.assertIsInstance(started, float)
+
+    def test_requeue_verified_drops_revoked_entries_without_enrolling(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            lane.revoke_publication(host, branch="devin/jov-1", reason="run-stopped")
+            lane.update_json(host.state / "requeue.json",
+                             lambda requeue: requeue.update({"7": "abc"}))
+            fake = FakeShell([])
+            lane.sh = fake
+            lane.requeue_verified(host, [{"number": 7, "headRefOid": "abc",
+                                          "headRefName": "devin/jov-1"}])
+            self.assertFalse(any(call[:3] == ["gh", "pr", "ready"] for call in fake.calls))
+            self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {})
+
+
 class DispatchTest(unittest.TestCase):
+    def setUp(self):
+        disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+        disk.start()
+        self.addCleanup(disk.stop)
+        # Host-independent tests must never contact production from Gem's test gate.
+        clock = patch.object(lane.continuity_clock, "tick", return_value={"status": "current"})
+        clock.start()
+        self.addCleanup(clock.stop)
+
     def test_critical_or_unknown_disk_blocks_all_dispatch_and_installs(self):
         for pct in (None, 4.0):
             with self.subTest(pct=pct), tempfile.TemporaryDirectory() as tmp, \
@@ -1109,8 +1513,8 @@ class DispatchTest(unittest.TestCase):
         self.assertEqual([pr["number"] for pr in lane.best_per_issue(drafts)], [3, 4], "newest draft wins")
         # the adopt loop never spends a gate on the losing duplicates
         self.assertEqual(lane.unverified_pr(drafts, {})["number"], 3)
-        self.assertEqual(lane.unverified_pr(drafts, {"3": "c"})["number"], 4)
-        self.assertIsNone(lane.unverified_pr(drafts, {"3": "c", "4": "d"}))
+        self.assertEqual(lane.unverified_pr(drafts, {"3:c": gate_proof("c")})["number"], 4)
+        self.assertIsNone(lane.unverified_pr(drafts, {"3:c": gate_proof("c"), "4:d": gate_proof("d")}))
 
     def test_a_crashing_tick_leaves_its_error_for_the_doctor(self):
         saved = (lane.ensure_full_history, lane.doctor.run)
@@ -1129,8 +1533,84 @@ class DispatchTest(unittest.TestCase):
             fake = FakeShell([])
             with patch.object(lane, "sh", side_effect=fake):
                 lane.remove_worktree(lane.Host(state=Path(tmp), repo=Path(tmp)), Path(tmp))
-            self.assertEqual(fake.calls, [["git", "status", "--porcelain"],
+            self.assertEqual(fake.calls, [["lsof", "-nP", "-a", "-d", "cwd", "-F", "pn"],
+                                          ["git", "status", "--porcelain"],
+                                          ["git", "rev-list", "--count", "HEAD", "--not", "--all"],
                                           ["git", "worktree", "remove", "--force", tmp]])
+
+    def test_removal_is_journaled_before_the_remove_runs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            path = Path(tmp) / "worktrees/done"
+            path.mkdir(parents=True)
+            os.utime(path, (0, 0))
+            journal = host.state / "runs/worktree-removals.jsonl"
+
+            def shell(args, **kwargs):
+                if args[:3] == ["git", "worktree", "remove"]:
+                    self.assertTrue(journal.exists(), "the receipt precedes the destructive call")
+                if args[:2] == ["git", "rev-list"]:
+                    return SimpleNamespace(returncode=0, stdout="0", stderr="")
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            with patch.object(lane, "sh", side_effect=shell):
+                lane.prune_worktrees(host)
+            rows = [json.loads(line) for line in journal.read_text().splitlines()]
+            self.assertEqual(rows[-1]["verdict"], "removed")
+            self.assertEqual(rows[-1]["worktree"], str(path))
+
+    def test_prune_keeps_a_worktree_while_a_process_runs_inside(self):
+        """PID reuse cannot fake this: liveness is a live cwd, not a remembered PID."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "worktrees/live"
+            path.mkdir(parents=True)
+            (path / "wip.py").write_text("unfinished")
+            os.utime(path, (0, 0))
+
+            def shell(args, **kwargs):
+                if args[0] == "lsof":
+                    return SimpleNamespace(returncode=0, stdout=f"p4242\nn{path}\n", stderr="")
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            with patch.object(lane, "sh", side_effect=shell) as mocked:
+                lane.prune_worktrees(host)
+            self.assertEqual((path / "wip.py").read_text(), "unfinished")
+            self.assertTrue((path / lane.disk_guard.PRESERVED_REPAIR).exists())
+            self.assertFalse(any("remove" in call.args[0] for call in mocked.call_args_list))
+            journal = (host.state / "runs/worktree-removals.jsonl").read_text()
+            self.assertIn("process-still-running", journal)
+
+    def test_prune_keeps_a_worktree_while_its_index_is_locked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            gitdir = Path(tmp) / "repo/.git/worktrees/locked"
+            gitdir.mkdir(parents=True)
+            path = Path(tmp) / "worktrees/locked"
+            path.mkdir(parents=True)
+            (path / ".git").write_text(f"gitdir: {gitdir}\n")
+            (gitdir / "index.lock").write_text("")
+            os.utime(path, (0, 0))
+            host = lane.Host(state=Path(tmp), repo=Path(tmp) / "repo")
+            with patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stdout="", stderr="")) as mocked:
+                lane.prune_worktrees(host)
+            self.assertTrue(path.exists())
+            self.assertTrue((path / lane.disk_guard.PRESERVED_REPAIR).exists())
+            self.assertFalse(any("remove" in call.args[0] for call in mocked.call_args_list))
+
+    def test_remove_preserves_unpublished_commits(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            path = Path(tmp) / "worktrees/wip"
+            path.mkdir(parents=True)
+
+            def shell(args, **kwargs):
+                if args[:2] == ["git", "rev-list"]:
+                    return SimpleNamespace(returncode=0, stdout="2", stderr="")
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            with patch.object(lane, "sh", side_effect=shell) as mocked:
+                lane.remove_worktree(host, path)
+            self.assertTrue((path / lane.disk_guard.PRESERVED_REPAIR).exists())
+            self.assertFalse(any("remove" in call.args[0] for call in mocked.call_args_list))
+            self.assertIn("unpublished-work",
+                          (host.state / "runs/worktree-removals.jsonl").read_text())
 
     def test_pruning_dirty_or_unreadable_source_retains_it(self):
         for code, output in ((0, "?? dirty.py"), (1, "")):
@@ -1252,6 +1732,16 @@ class PreservedRecoveryTest(unittest.TestCase):
 
     def test_disk_hold_resumes_dirty_work_in_the_same_budget(self):
         self.assert_resume("disk-held")
+
+    def test_a_revoked_branch_is_never_repaired_or_enrolled(self):
+        lane.revoke_publication(self.host, branch=self.pr["headRefName"], reason="run-stopped")
+        with patch.object(lane, "run_agent", side_effect=AssertionError("agent must not run")):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(receipt["verdict"], "revoked")
+        self.assertTrue(any("before-checkout" in reason or "publication-revoked" in reason
+                            for reason in receipt["reasons"]))
+        self.assertFalse(any(call[:3] == ["gh", "pr", "merge"] for call in self.calls))
+        self.assertFalse(any(call[:2] == ["git", "push"] for call in self.calls))
 
     def test_transient_read_hold_resumes_dirty_work_in_the_same_budget(self):
         self.assert_resume("reconcile-unavailable")
@@ -1487,6 +1977,9 @@ class PreservedRecoveryTest(unittest.TestCase):
 
 class FixRedTest(unittest.TestCase):
     def setUp(self):
+        disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+        disk.start()
+        self.addCleanup(disk.stop)
         self.real_reconcile_fix_target = lane.reconcile_fix_target
         lane.reconcile_fix_target = lambda pr: {**pr, "state": "OPEN", "mergedAt": None}
         self.addCleanup(setattr, lane, "reconcile_fix_target", self.real_reconcile_fix_target)
@@ -1824,7 +2317,9 @@ class FixRedTest(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmp:
                 host = lane.Host(state=Path(tmp))
                 draft = {**self.pr(), "isDraft": True}
-                self.assertEqual(lane.claim_adoptable_pr(host, "devin", [draft])["number"], 5)
+                reservation = lane.claim_adoptable_pr(host, "devin", [draft])
+                self.addCleanup(reservation.lock.release)
+                self.assertEqual(reservation.pr["number"], 5)
                 self.assertTrue(posted and posted[-1].startswith("🤖 lane claim kind=gate sha=h1"))
                 comments[:] = [f"🤖 lane claim kind=gate sha=h1 host=other at={lane.now_iso()}"]
                 host2 = lane.Host(state=Path(tmp) / "b")
@@ -1832,7 +2327,9 @@ class FixRedTest(unittest.TestCase):
                 self.assertIsNone(lane.claim_adoptable_pr(host2, "devin", [draft]))
                 self.assertFalse((host2.state / "verified.json").exists(), "a head another host owns is not marked ours")
                 comments[:] = []
-                self.assertEqual(lane.claim_adoptable_pr(host2, "devin", [draft])["number"], 5, "retried once the claim is gone")
+                reservation = lane.claim_adoptable_pr(host2, "devin", [draft])
+                self.addCleanup(reservation.lock.release)
+                self.assertEqual(reservation.pr["number"], 5, "retried once the claim is gone")
         finally:
             lane.sh = real
 
@@ -1988,8 +2485,11 @@ class FixRedTest(unittest.TestCase):
             host = lane.Host(state=Path(tmp))
             try:
                 self.assertEqual(lane.claim_red_pr(host, "devin", [first, second])["number"], 5)
-                drafts = [{**pr, "isDraft": True} for pr in (first, second)]
-                self.assertEqual(lane.claim_adoptable_pr(host, "devin", drafts)["number"], 5)
+                third = {**self.pr(number=6), "headRefName": "devin/jov-2-20260925204809"}
+                drafts = [{**pr, "isDraft": True} for pr in (first, second, third)]
+                reservation = lane.claim_adoptable_pr(host, "devin", drafts)
+                self.addCleanup(reservation.lock.release)
+                self.assertEqual(reservation.pr["number"], 6, "the already claimed repair stays with its owner")
             finally:
                 lane.claimed_elsewhere, lane.post_claim = saved
             self.assertNotIn("4", json.loads((host.state / "fix-attempts.json").read_text()))
@@ -1998,19 +2498,25 @@ class FixRedTest(unittest.TestCase):
         draft = {**self.pr(), "isDraft": True, "headRefName": "hyperagent/jov-6438-20260925t213221"}
         ready = {**self.pr(number=9), "isDraft": False}
         self.assertEqual(lane.unverified_pr([ready, draft], {})["number"], 5)
-        self.assertIsNone(lane.unverified_pr([draft], {"5": "h1"}))
+        self.assertIsNone(lane.unverified_pr([draft], {"5:h1": gate_proof("h1")}))
         saved = (lane.claimed_elsewhere, lane.post_claim)
         lane.claimed_elsewhere, lane.post_claim = (lambda *a, **k: False), (lambda *a, **k: None)  # no GitHub in CI
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))
             try:
-                self.assertEqual(lane.claim_adoptable_pr(host, "hyperagent", [draft])["number"], 5)
+                claim = lane.claim_adoptable_pr(host, "hyperagent", [draft])
+                self.addCleanup(claim.lock.release)
+                self.assertEqual(claim.pr["number"], 5)
+                self.assertFalse((host.state / "verified.json").exists())
                 self.assertIsNone(lane.claim_adoptable_pr(host, "hyperagent", [draft]))
             finally:
                 lane.claimed_elsewhere, lane.post_claim = saved
 
     def test_adopt_gates_the_pr_head_and_leaves_a_receipt(self):
         real_sh, real_gate = lane.sh, lane.gate_pr
+        target = patch.object(lane, "require_fix_target", side_effect=lambda pr, stage: pr)
+        target.start()
+        self.addCleanup(target.stop)
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout="")
         lane.gate_pr = lambda host, pr, worktree, log, **kwargs: {
             "verdict": "landing", "pr": pr["number"], "reasons": []
@@ -2025,18 +2531,23 @@ class FixRedTest(unittest.TestCase):
 
     def test_a_timed_out_adopt_is_not_counted_as_verified(self):
         real_sh, real_gate = lane.sh, lane.gate_pr
+        target = patch.object(lane, "require_fix_target", side_effect=lambda pr, stage: pr)
+        target.start()
+        self.addCleanup(target.stop)
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout="")  # claim list reads as empty
-        lane.gate_pr = lambda host, pr, worktree, log: {"verdict": "gate-timeout", "pr": pr["number"],
+        lane.gate_pr = lambda host, pr, worktree, log, **kwargs: {"verdict": "gate-timeout", "pr": pr["number"],
                                                         "reasons": ["gate-timeout:2400s:x1"]}
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp), repo=Path(tmp))
             try:
                 draft = {**self.pr(), "isDraft": True}
                 claimed = lane.claim_adoptable_pr(host, "devin", [draft])
-                self.assertEqual(claimed["number"], 5)
-                lane.adopt_pr(host, "devin", claimed)
-                self.assertEqual(json.loads((host.state / "verified.json").read_text()), {})
-                self.assertEqual(lane.claim_adoptable_pr(host, "devin", [draft])["number"], 5)
+                self.assertEqual(claimed.pr["number"], 5)
+                lane.adopt_pr(host, "devin", claimed.pr, claim=claimed)
+                self.assertFalse((host.state / "verified.json").exists())
+                reservation = lane.claim_adoptable_pr(host, "devin", [draft])
+                self.addCleanup(reservation.lock.release)
+                self.assertEqual(reservation.pr["number"], 5)
             finally:
                 lane.sh, lane.gate_pr = real_sh, real_gate
 
@@ -2163,6 +2674,297 @@ class UpdateBackoffTest(unittest.TestCase):
                 lane.sh = real
 
 
+class GateSingleflightTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name))
+        self.pr = {"number": 7, "headRefOid": "abc", "headRefName": "devin/jov-1", "isDraft": True}
+        self.fake = FakeShell([self.pr])
+
+    def test_claim_is_not_proof_and_live_reservation_skips_to_next_pr(self):
+        with patch.object(lane, "claimed_elsewhere", return_value=False), patch.object(lane, "post_claim"):
+            claim = lane.claim_adoptable_pr(self.host, "devin", [self.pr])
+            self.addCleanup(claim.lock.release)
+            self.assertFalse((self.host.state / "verified.json").exists())
+            other = {**self.pr, "number": 8, "headRefName": "devin/jov-2"}
+            next_claim = lane.claim_adoptable_pr(self.host, "devin", [self.pr, other])
+            self.addCleanup(next_claim.lock.release)
+            self.assertEqual(next_claim.pr["number"], 8)
+
+    def test_legacy_claim_and_wrong_head_policy_or_sensitive_mode_are_not_proof(self):
+        self.assertEqual(lane.unverified_pr([self.pr], {"7": "abc"}), self.pr)
+        for proof in [gate_proof("other"), {**gate_proof("abc"), "policyDigest": "old"},
+                      {**gate_proof("abc"), "verdict": "gate-timeout"}]:
+            self.assertEqual(lane.unverified_pr([self.pr], {"7:abc": proof}), self.pr)
+        sensitive = {**self.pr, "labels": [{"name": lane.SENSITIVE_PR_LABEL}]}
+        self.assertEqual(lane.unverified_pr([sensitive], {"7:abc": gate_proof("abc")}), sensitive)
+
+    def test_parallel_original_and_adopter_execute_full_gate_once(self):
+        entered, finish = threading.Event(), threading.Event()
+        calls = []
+        def shell(args, **kwargs):
+            if args == lane.CANONICAL_GATE:
+                calls.append(args)
+                entered.set()
+                self.assertTrue(finish.wait(3))
+            return self.fake(args, **kwargs)
+        with patch.object(lane, "sh", side_effect=shell), concurrent.futures.ThreadPoolExecutor() as pool:
+            original = pool.submit(lane.gate_pr, self.host, self.pr, Path("/tmp"), None)
+            self.assertTrue(entered.wait(3))
+            try:
+                adopted = lane.adopt_pr(self.host, "devin", self.pr)
+                duplicate = lane.gate_pr(self.host, self.pr, Path("/tmp"), None)
+                self.assertEqual(adopted["verdict"], "gate-in-progress")
+                self.assertEqual(duplicate["verdict"], "gate-in-progress")
+                self.assertFalse((self.host.state / "worktrees").exists())
+                self.assertFalse((self.host.state / "verified.json").exists())
+            finally:
+                finish.set()
+            self.assertEqual(original.result()["verdict"], "landing")
+            self.assertEqual(len(calls), 1)
+            again = lane.gate_pr(self.host, self.pr, Path("/tmp"), None)
+            self.assertEqual(again["verdict"], "gate-already-completed")
+            self.assertEqual(len(calls), 1)
+        proof = json.loads((self.host.state / "verified.json").read_text())["7:abc"]
+        self.assertEqual(proof["verdict"], "landing")
+        self.assertTrue(proof["completedAt"])
+        self.assertIn("--match-head-commit", next(c for c in self.fake.calls if c[:3] == ["gh", "pr", "merge"]))
+
+    def test_reserved_adopter_prevents_original_from_taking_heavy_seat(self):
+        claim = lane.reserve_gate(self.host, self.pr)
+        try:
+            with patch.object(lane, "gate_slot") as seat, patch.object(lane, "sh") as shell:
+                result = lane.gate_pr(self.host, self.pr, Path("/tmp"), None)
+            self.assertEqual(result["verdict"], "gate-in-progress")
+            seat.assert_not_called()
+            shell.assert_not_called()
+        finally:
+            claim.lock.release()
+        with patch.object(lane, "sh", self.fake):
+            self.assertEqual(lane.gate_pr(self.host, self.pr, Path("/tmp"), None)["verdict"], "landing")
+
+    def test_head_changed_during_gate_cannot_publish_or_record_terminal_proof(self):
+        live = [{**self.pr, "state": "OPEN"}, {**self.pr, "headRefOid": "new", "state": "OPEN"}]
+        with patch.object(lane, "reconcile_fix_target", side_effect=live), patch.object(lane, "sh", self.fake):
+            result = lane.gate_pr(self.host, self.pr, Path("/tmp"), None)
+        self.assertEqual(result["verdict"], "gate-deferred")
+        self.assertFalse((self.host.state / "verified.json").exists())
+        self.assertFalse(any(c[:3] in (["gh", "pr", "ready"], ["gh", "pr", "merge"]) for c in self.fake.calls))
+
+    def test_wrong_checkout_or_unreadable_target_cannot_be_certified(self):
+        for fault in ("checkout", "unreadable"):
+            with self.subTest(fault=fault):
+                def shell(args, **kwargs):
+                    if fault == "checkout" and args == ["git", "rev-parse", "HEAD"]:
+                        return SimpleNamespace(returncode=0, stdout="wrong", stderr="")
+                    if fault == "unreadable" and args[:3] == ["gh", "pr", "view"]:
+                        return SimpleNamespace(returncode=1, stdout="", stderr="unavailable")
+                    return self.fake(args, **kwargs)
+                with patch.object(lane, "sh", side_effect=shell):
+                    result = lane.gate_pr(self.host, self.pr, Path("/tmp"), None)
+                self.assertEqual(result["verdict"], "gate-deferred")
+                self.assertFalse((self.host.state / "verified.json").exists())
+
+    def test_new_sensitive_mode_and_revocation_are_checked_after_work(self):
+        for change in ("sensitive", "revoked"):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as tmp:
+                host = lane.Host(state=Path(tmp))
+                live = {**self.pr, "state": "OPEN"}
+                def shell(args, **kwargs):
+                    if args == lane.CANONICAL_GATE:
+                        if change == "sensitive":
+                            live["labels"] = [{"name": lane.SENSITIVE_PR_LABEL}]
+                        else:
+                            lane.revoke_publication(host, branch=self.pr["headRefName"], reason="stopped")
+                    return self.fake(args, **kwargs)
+                with patch.object(lane, "reconcile_fix_target", side_effect=lambda _pr: dict(live)), \
+                     patch.object(lane, "sh", side_effect=shell):
+                    result = lane.gate_pr(host, self.pr, Path("/tmp"), None)
+                self.assertEqual(result["verdict"], "gate-deferred" if change == "sensitive" else "revoked")
+                self.assertFalse((host.state / "verified.json").exists())
+
+    def test_terminal_hold_and_timeout_budget_survive_reentry(self):
+        self.fake.hanging = ("scripts/hooks/pre-push-gate.sh",)
+        with patch.object(lane, "sh", self.fake):
+            results = [lane.gate_pr(self.host, self.pr, Path("/tmp"), None)["verdict"] for _ in range(4)]
+        self.assertEqual(results, ["gate-timeout", "gate-timeout", "held", "gate-already-completed"])
+        proofs = json.loads((self.host.state / "verified.json").read_text())
+        self.assertIsNone(lane.unverified_pr([self.pr], proofs))
+        self.assertEqual(proofs["7:abc"]["verdict"], "held")
+        self.assertEqual(lane.gate_timeouts(self.host, self.pr), lane.MAX_GATE_TIMEOUTS)
+
+    def test_legacy_held_spent_or_claimed_fix_generations_cannot_be_adopted_or_regated(self):
+        for disposition in ("held", "spent", "fix-running", "hold-label"):
+            with self.subTest(disposition=disposition), tempfile.TemporaryDirectory() as tmp:
+                host = lane.Host(state=Path(tmp))
+                pr = dict(self.pr)
+                (host.state / "verified.json").write_text(json.dumps({"7": "abc"}))
+                if disposition == "held":
+                    lane.record_held(host, 7, "abc", ["check-failed:old-gate"])
+                elif disposition == "hold-label":
+                    pr["labels"] = [{"name": "tim-hold"}]
+                else:
+                    entry = {"sha": "abc", "count": 2 if disposition == "spent" else 1,
+                             "at": time.time(), "endedAt": None if disposition == "fix-running" else time.time()}
+                    (host.state / "fix-attempts.json").write_text(json.dumps({"7": entry}))
+                with patch.object(lane, "sh", FakeShell([pr])) as shell, \
+                     patch.object(lane, "post_claim") as posted, patch.object(lane, "claimed_elsewhere", return_value=False):
+                    self.assertIsNone(lane.claim_adoptable_pr(host, "devin", [pr]))
+                    result = lane.gate_pr(host, pr, Path("/tmp"), None)
+                    self.assertEqual(result["verdict"], "gate-deferred")
+                    self.assertNotIn(lane.CANONICAL_GATE, shell.calls)
+                    posted.assert_not_called()
+                self.assertEqual(json.loads((host.state / "verified.json").read_text()), {"7": "abc"})
+
+    def test_authority_changed_during_ready_cannot_enqueue_or_record_proof(self):
+        for change in ("sensitive", "revoked", "held"):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as tmp:
+                host = lane.Host(state=Path(tmp))
+                live = {**self.pr, "state": "OPEN"}
+                def shell(args, **kwargs):
+                    if args[:3] == ["gh", "pr", "ready"]:
+                        if change == "revoked":
+                            lane.revoke_publication(host, branch=self.pr["headRefName"], reason="stopped")
+                        else:
+                            live["labels"] = [{"name": lane.SENSITIVE_PR_LABEL if change == "sensitive" else "tim-hold"}]
+                    return self.fake(args, **kwargs)
+                self.fake.calls.clear()
+                with patch.object(lane, "reconcile_fix_target", side_effect=lambda _pr: dict(live)), \
+                     patch.object(lane, "sh", side_effect=shell):
+                    result = lane.gate_pr(host, self.pr, Path("/tmp"), None)
+                self.assertEqual(result["verdict"], "revoked" if change == "revoked" else "gate-deferred")
+                self.assertFalse((host.state / "verified.json").exists())
+                self.assertFalse(any(c[:3] == ["gh", "pr", "merge"] for c in self.fake.calls))
+
+    def test_successful_final_repair_push_may_receive_its_first_gate_without_resetting_budget(self):
+        attempt = {"sha": "old", "pushedHead": "abc", "pushed": True, "count": 2, "endedAt": time.time()}
+        path = self.host.state / "fix-attempts.json"
+        path.write_text(json.dumps({"7": attempt}))
+        with patch.object(lane, "sh", self.fake):
+            self.assertEqual(lane.gate_pr(self.host, self.pr, Path("/tmp"), None)["verdict"], "landing")
+            self.assertEqual(lane.gate_pr(self.host, self.pr, Path("/tmp"), None)["verdict"], "gate-already-completed")
+        self.assertEqual(json.loads(path.read_text()), {"7": attempt})
+        self.assertEqual(self.fake.calls.count(lane.CANONICAL_GATE), 1)
+
+    def test_legacy_timeout_budget_is_carried_into_first_structured_hold(self):
+        path = self.host.state / "gate-timeouts.json"
+        path.write_text(json.dumps({"7": {"sha": "abc", "count": 2}}))
+        self.fake.hanging = ("scripts/hooks/pre-push-gate.sh",)
+        with patch.object(lane, "sh", self.fake):
+            self.assertEqual(lane.gate_pr(self.host, self.pr, Path("/tmp"), None)["verdict"], "held")
+        self.assertEqual(lane.gate_timeouts(self.host, self.pr), 3)
+
+    def test_parallel_state_writers_and_late_head_results_do_not_erase_each_other(self):
+        def write(index):
+            pr = {**self.pr, "headRefOid": str(index)}
+            lane.gate_timeouts(self.host, pr, 1)
+            lane.update_json(self.host.state / "verified.json",
+                             lambda rows: rows.update({f"7:{index}": gate_proof(str(index))}))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+            list(pool.map(write, range(12)))
+        self.assertEqual(len(json.loads((self.host.state / "verified.json").read_text())), 12)
+        for index in range(12):
+            self.assertEqual(lane.gate_timeouts(self.host, {**self.pr, "headRefOid": str(index)}), 1)
+
+    @unittest.skipUnless(sys.platform == "linux", "Linux worker-death lock inheritance")
+    def test_worker_death_does_not_release_a_surviving_gate_childs_locks(self):
+        child_code = "import os,time; print(os.getpid(), flush=True); time.sleep(30)"
+        worker_code = (f"import sys; sys.path.insert(0, {str(ROOT / 'scripts/lanes')!r}); import lane_runner as l; "
+                       f"from pathlib import Path; h=l.Host(state=Path({str(self.host.state)!r})); "
+                       f"c=l.reserve_gate(h, {self.pr!r}); s,_=l.gate_slot(h); "
+                       f"l.sh([sys.executable,'-c',{child_code!r}], log=sys.stdout, stream=True, "
+                       "pass_fds=(c.lock.handle.fileno(),s.handle.fileno()))")
+        worker = subprocess.Popen([sys.executable, "-u", "-c", worker_code], stdout=subprocess.PIPE, text=True)
+        child = None
+        try:
+            worker.stdout.readline()  # command log
+            child = int(worker.stdout.readline())
+            worker.kill()
+            worker.wait(timeout=3)
+            self.assertIsNone(lane.reserve_gate(self.host, self.pr))
+            seat = lane.Locked(self.host.state / "slots/gate.0.lock", blocking=False)
+            self.assertFalse(seat.held)
+            seat.release()
+        finally:
+            if worker.poll() is None:
+                worker.kill()
+                worker.wait(timeout=3)
+            if child:
+                os.killpg(child, signal.SIGKILL)
+            worker.stdout.close()
+        for _ in range(100):
+            claim = lane.reserve_gate(self.host, self.pr)
+            if claim:
+                claim.lock.release()
+                break
+            time.sleep(0.01)
+        else:
+            self.fail("dead worker and child left a non-reclaimable reservation")
+
+    @unittest.skipUnless(sys.platform == "linux", "Linux detached process ownership")
+    def test_gate_timeout_drains_detached_close_fds_descendants_before_return(self):
+        pidfile = self.host.state / "descendant.pid"
+        child = f"import os,time,pathlib; pathlib.Path({str(pidfile)!r}).write_text(str(os.getpid())); time.sleep(30)"
+        wrapper = ("import subprocess,sys,time; "
+                   f"subprocess.Popen([sys.executable,'-c',{child!r}], start_new_session=True, close_fds=True, "
+                   "stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); time.sleep(30)")
+        claim = lane.reserve_gate(self.host, self.pr)
+        seat, _ = lane.gate_slot(self.host)
+        try:
+            with self.assertRaises(subprocess.TimeoutExpired):
+                lane.sh([sys.executable, "-c", wrapper], timeout=2,
+                        pass_fds=(claim.lock.handle.fileno(), seat.handle.fileno()))
+            pid = int(pidfile.read_text())
+            self.assertTrue(pid not in lane.process_snapshot() or lane.process_snapshot()[pid][2].startswith("Z"))
+        finally:
+            claim.lock.release()
+            seat.release()
+
+    @unittest.skipUnless(sys.platform == "linux", "Linux worker-death lock lifetime helper")
+    def test_worker_death_retains_locks_across_close_fds_wrapper_until_helper_drains(self):
+        pidfile = self.host.state / "descendant.pid"
+        child = f"import os,time,pathlib; pathlib.Path({str(pidfile)!r}).write_text(str(os.getpid())); time.sleep(30)"
+        wrapper = ("import subprocess,sys,time; "
+                   f"subprocess.Popen([sys.executable,'-c',{child!r}], start_new_session=True, close_fds=True, "
+                   "stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); time.sleep(30)")
+        worker_code = (f"import sys; sys.path.insert(0, {str(ROOT / 'scripts/lanes')!r}); import lane_runner as l; "
+                       f"from pathlib import Path; h=l.Host(state=Path({str(self.host.state)!r})); "
+                       f"c=l.reserve_gate(h, {self.pr!r}); s,_=l.gate_slot(h); "
+                       f"l.sh([sys.executable,'-c',{wrapper!r}], timeout=3, log=sys.stdout, stream=True, "
+                       "pass_fds=(c.lock.handle.fileno(),s.handle.fileno()))")
+        with open(self.host.state / "worker.log", "w") as log:
+            worker = subprocess.Popen([sys.executable, "-u", "-c", worker_code], stdout=log, stderr=log)
+            try:
+                for _ in range(200):
+                    if pidfile.exists():
+                        break
+                    time.sleep(.01)
+                self.assertTrue(pidfile.exists())
+                time.sleep(.2)  # allow the existing process observer to see the detached child
+                worker.kill()
+                worker.wait(timeout=3)
+                self.assertIsNone(lane.reserve_gate(self.host, self.pr))
+                seat = lane.Locked(self.host.state / "slots/gate.0.lock", blocking=False)
+                self.assertFalse(seat.held)
+                seat.release()
+                for _ in range(600):
+                    claim = lane.reserve_gate(self.host, self.pr)
+                    if claim:
+                        claim.lock.release()
+                        break
+                    time.sleep(.01)
+                else:
+                    self.fail("helper did not complete timeout drainage")
+                pid = int(pidfile.read_text())
+                rows = lane.process_snapshot()
+                self.assertTrue(pid not in rows or rows[pid][2].startswith("Z"))
+            finally:
+                if worker.poll() is None:
+                    worker.kill()
+                    worker.wait(timeout=3)
+
+
 class RequeueTest(unittest.TestCase):
     def test_a_failed_enqueue_is_retried_until_queued_and_dropped_when_the_head_moves(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -2172,6 +2974,9 @@ class RequeueTest(unittest.TestCase):
             calls = []
             def fake_sh(cmd, **kwargs):
                 calls.append(cmd)
+                if cmd[:3] == ["gh", "pr", "view"]:
+                    return SimpleNamespace(returncode=0, stdout=json.dumps(
+                        {"number": int(cmd[3]), "headRefOid": "h1", "headRefName": "devin/jov-1", "state": "OPEN"}))
                 # PR 6 is still rate-limited; everything else enqueues.
                 return SimpleNamespace(returncode=1 if cmd[1:4] == ["pr", "merge", "6"] else 0, stdout="", stderr="")
             real, lane.sh = lane.sh, fake_sh
@@ -2182,7 +2987,33 @@ class RequeueTest(unittest.TestCase):
                 lane.sh = real
             self.assertEqual(json.loads(path.read_text()), {"6": "h1"})
             self.assertNotIn("7", [c[3] for c in calls])
-            self.assertIn(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto"], calls)
+            self.assertIn(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto", "--match-head-commit", "h1"], calls)
+
+    def test_requeue_rechecks_authority_changed_during_ready(self):
+        for change in ("revoked", "sensitive", "head", "unreadable", "held"):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as tmp:
+                host = lane.Host(state=Path(tmp))
+                pr = {"number": 7, "headRefOid": "abc", "headRefName": "devin/jov-1", "state": "OPEN"}
+                path = host.state / "requeue.json"
+                path.write_text(json.dumps({"7": "abc"}))
+                live = dict(pr)
+                fake = FakeShell([pr])
+                def shell(args, **kwargs):
+                    if args[:3] == ["gh", "pr", "ready"]:
+                        if change == "revoked":
+                            lane.revoke_publication(host, branch=pr["headRefName"], reason="stopped")
+                        elif change == "head":
+                            live["headRefOid"] = "new"
+                        elif change == "unreadable":
+                            live.clear()
+                        else:
+                            live["labels"] = [{"name": lane.SENSITIVE_PR_LABEL if change == "sensitive" else "tim-hold"}]
+                    return fake(args, **kwargs)
+                with patch.object(lane, "reconcile_fix_target", side_effect=lambda _pr: dict(live) or None), \
+                     patch.object(lane, "sh", side_effect=shell):
+                    lane.requeue_verified(host, [pr])
+                self.assertFalse(any(c[:3] == ["gh", "pr", "merge"] for c in fake.calls))
+                self.assertEqual(json.loads(path.read_text()), {"7": "abc"})
 
 
 if __name__ == "__main__":
@@ -2217,10 +3048,11 @@ class OnePrPerIssueTest(unittest.TestCase):
 
     def test_sweep_supersedes_duplicates_and_closes_stale_red_drafts(self):
         day = lane.STALE_DRAFT_S
-        prs = [self.pr(1), self.pr(2, draft=False, state="CLEAN"),          # jov-7: keep the green one
-               self.pr(3, issue="jov-8", pushed_ago=day + 1),                # stale red draft
+        prs = [{**self.pr(1), "labels": [{"name": "duplicate"}]}, self.pr(2, draft=False, state="CLEAN"),          # jov-7: keep the green one
+               {**self.pr(3, issue="jov-8", pushed_ago=day + 1), "labels": [{"name": "duplicate"}]},                # stale red draft
                self.pr(4, issue="jov-9", pushed_ago=day - 60),               # recent: keep
                self.pr(5, issue="jov-10", draft=False, pushed_ago=day * 3)]  # ready PRs are not stale
+        prs.append(self.pr(6, issue="jov-11", pushed_ago=day * 3))
         pushes = {pr["number"]: self.NOW - pr.pop("pushedAgo") for pr in prs}
         superseded, stale = lane.sweep_plan(prs, self.NOW, pushes)
         self.assertEqual([(pr["number"], keep) for pr, keep in superseded], [(1, 2)])
@@ -2233,12 +3065,22 @@ class OnePrPerIssueTest(unittest.TestCase):
 
         def fake_sh(args, **k):
             calls.append(args)
-            out = f"3 {stale_at}\n4 {stale_at}\n1 {stale_at}" if args[:3] == ["gh", "api", "graphql"] else ""
+            out = ""
+            if args[:3] == ["gh", "api", "graphql"]:
+                if any("pullRequest(number:" in str(arg) for arg in args):
+                    number = int(next(arg.split("=", 1)[1] for arg in args if str(arg).startswith("number=")))
+                    live = {**self.pr(number, issue={3: "jov-8", 4: "jov-9"}.get(number, "jov-7")),
+                            "headRefOid": "h", "state": "OPEN", "isCrossRepository": False,
+                            "isInMergeQueue": False,
+                            "labels": {"nodes": [{"name": "duplicate"}], "pageInfo": {"hasNextPage": False}}}
+                    out = json.dumps({"data": {"repository": {"pullRequest": live}}})
+                else:
+                    out = f"3 {stale_at}\n4 {stale_at}\n1 {stale_at}"
             return SimpleNamespace(returncode=0, stdout=out, stderr="")
         lane.sh = fake_sh
-        lane.lane_prs = lambda name, fields="": [self.pr(1), self.pr(2),
+        lane.lane_prs = lambda name, fields="": [{**pr, "headRefOid": "h", "labels": [{"name": "duplicate"}]} for pr in [self.pr(1), self.pr(2),
                                                    self.pr(3, issue="jov-8", pushed_ago=lane.STALE_DRAFT_S * 2),
-                                                   self.pr(4, issue="jov-9", pushed_ago=lane.STALE_DRAFT_S * 2)]
+                                                   self.pr(4, issue="jov-9", pushed_ago=lane.STALE_DRAFT_S * 2)]]
         linear = FakeLinear([])
         linear.states = {"JOV-8": "In Progress", "JOV-9": "Done"}
         try:
@@ -2340,3 +3182,70 @@ class LockfileConflictTest(unittest.TestCase):
             self.assertNotIn(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], calls)
             self.assertFalse((work / ".git" / "MERGE_HEAD").exists(), "merge aborted")
             self.assertEqual(self.git("rev-parse", "devin/jov-1-20260927", cwd=origin), before)
+
+
+class TimerInstallerNodePathTests(unittest.TestCase):
+    def test_generated_timers_use_installer_node_and_keep_current_receipts(self):
+        import plistlib
+
+        source = (Path(__file__).resolve().parents[1] / "lanes/install.sh").read_text()
+        for platform in ("Linux", "Darwin"):
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                bin_dir = root / "selected-node-bin"
+                bin_dir.mkdir()
+                units = root / "units"
+                units.mkdir()
+                plist = root / "lanes.plist"
+                # Redirect only service output destinations; keep HOME and the
+                # actual installer logic intact. No host timer is installed.
+                script = source.replace("$HOME/.config/systemd/user", str(units))
+                script = script.replace("$HOME/Library/LaunchAgents/com.jovie.lanes.plist", str(plist))
+                installer = root / "install.sh"
+                installer.write_text(script)
+                commands = root / "commands.log"
+
+                def stub(name, body):
+                    path = bin_dir / name
+                    path.write_text(body)
+                    path.chmod(0o755)
+
+                stub("node", "#!/bin/sh\nprintf 'v24.21.0\\n'\n")
+                stub("uname", f"#!/bin/sh\nprintf '{platform}\\n'\n")
+                stub("git", "#!/bin/sh\nprintf '" + "b" * 40 + "\\n'\n")
+                for name in ("systemctl", "launchctl"):
+                    stub(name, f'#!/bin/sh\nprintf "{name} %s\\n" "$*" >> "$INSTALL_COMMAND_LOG"\n')
+                stub("python3", '''#!/usr/bin/python3
+import os, pathlib, sys
+state = pathlib.Path(os.environ['LANES_STATE'])
+current = state / 'current'
+current.mkdir(parents=True, exist_ok=True)
+(current / '.tree').write_text('a' * 40)
+with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
+    log.write('python3 ' + ' '.join(sys.argv[1:]) + '\\n')
+''')
+                result = subprocess.run(
+                    ["/bin/bash", str(installer)], capture_output=True, text=True,
+                    env={**os.environ, "PATH": f"{bin_dir}:/usr/bin:/bin",
+                         "LANES_STATE": str(root / "state"), "LANES_REPO": str(root / "repo"),
+                         "LANES_HUD": "0", "INSTALL_COMMAND_LOG": str(commands)},
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                if platform == "Darwin":
+                    config = plistlib.loads(plist.read_bytes())
+                    timer_path = config["EnvironmentVariables"]["PATH"]
+                    tick = config["ProgramArguments"][-1]
+                    self.assertEqual(config["EnvironmentVariables"]["CODEX_LEDGER_CADENCE_S"], "3600")
+                else:
+                    service = (units / "jovie-lanes.service").read_text()
+                    timer_path = next(line.removeprefix("Environment=PATH=") for line in service.splitlines() if line.startswith("Environment=PATH="))
+                    tick = service
+                    self.assertIn("KillMode=process", service)
+                    self.assertIn("Environment=CODEX_LEDGER_CADENCE_S=3600", service)
+                self.assertEqual(timer_path.split(":")[0], str(bin_dir))
+                self.assertIn("codex_lane.py reconcile --if-due 3600", tick)
+                self.assertIn("lane_runner.py dispatch", tick)
+                log = commands.read_text()
+                self.assertIn("install-receipt --source-commit " + "b" * 40, log)
+                self.assertIn("--source-tree " + "a" * 40, log)
+                self.assertIn("--cadence 3600", log)
