@@ -1,9 +1,7 @@
 import 'server-only';
 
 import { createHash } from 'node:crypto';
-import { and, eq, isNotNull, isNull } from 'drizzle-orm';
-import { db } from '@/lib/db';
-import { notificationSubscriptions } from '@/lib/db/schema/analytics';
+import { listConsentedSmsRecipientPhones } from '@/lib/db/queries/analytics';
 import {
   isOutboundSmsConfigured,
   isOutboundSmsEnabled,
@@ -49,33 +47,6 @@ function undeliverable(
   };
 }
 
-/**
- * Fans with a confirmed, consented, non-unsubscribed phone subscription for
- * the owning creator profile. `smsConsentAt` is the TCPA consent ledger —
- * without it the recipient is never sendable for a marketing blast.
- */
-async function listConsentedSmsRecipients(
-  creatorProfileId: string
-): Promise<readonly string[]> {
-  const rows = await db
-    .select({ phone: notificationSubscriptions.phone })
-    .from(notificationSubscriptions)
-    .where(
-      and(
-        eq(notificationSubscriptions.creatorProfileId, creatorProfileId),
-        isNotNull(notificationSubscriptions.phone),
-        isNotNull(notificationSubscriptions.confirmedAt),
-        isNotNull(notificationSubscriptions.smsConsentAt),
-        isNull(notificationSubscriptions.unsubscribedAt)
-      )
-    )
-    .limit(MAX_SMS_RECIPIENTS_PER_DISPATCH);
-
-  return rows
-    .map(row => row.phone)
-    .filter((phone): phone is string => Boolean(phone));
-}
-
 async function deliverSmsDraft(input: {
   readonly draft: ReleaseDistributionDraft;
   readonly creatorProfileId: string;
@@ -92,7 +63,10 @@ async function deliverSmsDraft(input: {
     );
   }
 
-  const consented = await listConsentedSmsRecipients(creatorProfileId);
+  const consented = await listConsentedSmsRecipientPhones(
+    creatorProfileId,
+    MAX_SMS_RECIPIENTS_PER_DISPATCH
+  );
   const sendable: string[] = [];
   let suppressedRecipients = 0;
   for (const phone of consented) {
