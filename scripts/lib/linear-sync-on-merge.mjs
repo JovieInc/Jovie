@@ -404,6 +404,14 @@ export function decideLinearCloseOnMerge(input) {
       'The open pull request scan stopped before the last page, so the issue was left open.'
     );
   }
+  const remediationLabeled = (input.issue.labels ?? []).some(label =>
+    String(label).startsWith('remediation:')
+  );
+  if (remediationLabeled && input.checkGreen !== true) {
+    reasons.push(
+      'Fingerprinted remediation issues stay open while the check is red.'
+    );
+  }
   const lead = `Did not mark ${identifier} Done after ${input.mergingPull.url} merged (merge SHA: ${input.mergingPull.sha}).`;
   if (reasons.length > 0) {
     return {
