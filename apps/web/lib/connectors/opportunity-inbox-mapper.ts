@@ -318,6 +318,12 @@ export function buildOpportunityInboxData(
   );
   return {
     cards: [...reportCards, ...brandDealCards, ...otherCards],
+    availability: {
+      suggestedActions: 'available',
+      tourDates: tourDates
+        ? (tourDates.availability ?? 'unknown')
+        : 'not_requested',
+    },
     emptyActionCards: DEFAULT_OPPORTUNITY_INBOX_EMPTY_ACTION_CARDS,
     ...(tourDates ? { tourDates } : {}),
   };

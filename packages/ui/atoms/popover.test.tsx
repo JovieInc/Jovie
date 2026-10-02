@@ -249,6 +249,12 @@ describe('Popover', () => {
       expect(content).toHaveClass('bg-surface-elevated');
     });
 
+    it('supports bare composite content without outer padding', () => {
+      render(<TestPopover open={true} size='bare' />);
+
+      expect(screen.getByTestId('popover-content')).toHaveClass('p-0');
+    });
+
     it('renders arrow when showArrow is true', () => {
       render(<TestPopover open={true} showArrow={true} />);
 
@@ -286,7 +292,11 @@ describe('Popover', () => {
       );
 
       const content = screen.getByTestId('popover-content');
-      expect(content).toHaveClass('max-w-full');
+      expect(content).toHaveClass(
+        'max-w-(--radix-popover-content-available-width)',
+        'max-h-(--radix-popover-content-available-height)',
+        'overflow-y-auto'
+      );
       expect(content).toHaveClass('break-words');
     });
   });

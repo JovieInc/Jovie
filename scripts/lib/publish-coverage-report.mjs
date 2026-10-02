@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { retireCoverageReports } from './retire-coverage-reports.mjs';
 
 const COVERAGE = {
   files: [
@@ -106,10 +107,24 @@ function publishReport(
     if (!url.startsWith(`https://github.com/${repo}/pull/`)) {
       throw new Error('Coverage report PR creation returned no receipt');
     }
+    const retired = retireCoverageReports({
+      gh,
+      repo,
+      url,
+      source,
+      isAncestor: (older, newer) => {
+        try {
+          git('merge-base', '--is-ancestor', older, newer);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+    });
     if (env.GITHUB_STEP_SUMMARY) {
       appendFileSync(
         env.GITHUB_STEP_SUMMARY,
-        `Coverage report: ${url}\nMeasured source: ${source}\n`
+        `Coverage report: ${url}\nMeasured source: ${source}\nRetired reports: ${retired.join(', ') || 'none'}\n`
       );
     }
     return { status: 'published', source, branch, url };

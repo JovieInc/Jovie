@@ -28,6 +28,8 @@ import {
   TableEmptyState,
   TableSearchBar,
 } from '@/components/organisms/table';
+import { TABLE_CELL_MULTILINE_CONTENT_CLASSNAME } from '@/components/organisms/table/atoms/TableCell';
+import { TableIssueSummary } from '@/components/organisms/table/molecules/TableIssueSummary';
 import { APP_ROUTES } from '@/constants/routes';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
@@ -93,25 +95,6 @@ function AssetTypeBadge({ type }: { readonly type: AdminAssetType }) {
   );
 }
 
-function IssuesPills({ issues }: { readonly issues: string[] }) {
-  if (issues.length === 0) {
-    return <span className='text-2xs text-tertiary-token'>—</span>;
-  }
-  return (
-    <div className='flex flex-wrap gap-1'>
-      {issues.map(issue => (
-        <span
-          key={issue}
-          className='inline-flex items-center rounded-full bg-error/10 px-1.5 py-0.5 text-3xs font-medium text-error'
-          title={issue}
-        >
-          {issue}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function formatDate(date: Date | string | null): string {
   if (!date) return '—';
   const d = typeof date === 'string' ? new Date(date) : date;
@@ -127,6 +110,7 @@ function createColumns(): ColumnDef<AdminAssetRow, unknown>[] {
   return [
     columnHelper.display({
       id: 'asset',
+      meta: { cellContentClassName: TABLE_CELL_MULTILINE_CONTENT_CLASSNAME },
       header: 'Asset',
       size: 300,
       cell: ({ row }) => {
@@ -175,12 +159,18 @@ function createColumns(): ColumnDef<AdminAssetRow, unknown>[] {
     }),
     columnHelper.display({
       id: 'issues',
+      meta: { cellContentClassName: TABLE_CELL_MULTILINE_CONTENT_CLASSNAME },
       header: 'Issues',
       size: 180,
-      cell: ({ row }) => <IssuesPills issues={row.original.issues} />,
+      cell: ({ row }) => (
+        <TableIssueSummary
+          issues={row.original.issues.map(label => ({ label }))}
+        />
+      ),
     }),
     columnHelper.display({
       id: 'owner',
+      meta: { cellContentClassName: TABLE_CELL_MULTILINE_CONTENT_CLASSNAME },
       header: 'Owner',
       size: 200,
       cell: ({ row }) => {
@@ -408,13 +398,12 @@ export function AdminAssetsTable({
     >
       {() => (
         <AdminDataTable
+          rowMode='two-line'
           data={allAssets}
           columns={columns}
           getRowId={(row: AdminAssetRow) => `${row.assetType}:${row.id}`}
           emptyState={emptyState}
           getContextMenuItems={(row: AdminAssetRow) => getContextMenuItems(row)}
-          rowHeight={52}
-          getRowClassName={() => 'h-13'}
           hasNextPage={hasNextPage ?? false}
           isFetchingNextPage={isFetchingNextPage}
           onLoadMore={fetchNextPage}

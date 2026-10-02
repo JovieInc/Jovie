@@ -139,13 +139,14 @@ export function AdminCreatorProfilesUnified({
     [signatureProfile]
   );
 
-  // Load all data without server-side search — filter client-side instead
+  // Keep server-filtered rows in their matching query. Seed from current props:
+  // action state may still contain the previous search during navigation.
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useAdminCreatorsInfiniteQuery({
       sort,
-      search: '',
+      search,
       pageSize,
-      initialData: { rows: profilesWithActions, total },
+      initialData: { rows: initialProfiles, total },
     });
 
   // Client-side filter searches across username, display name, and bio

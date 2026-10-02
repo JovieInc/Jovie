@@ -314,6 +314,8 @@ export const ServerEnvSchema = z.object({
 
   // Linear webhook automation
   LINEAR_WEBHOOK_SECRET: z.string().optional(),
+  // Release communications merge-event webhook signing
+  RELEASE_COMMUNICATIONS_WEBHOOK_SECRET: z.string().optional(),
   // Linear API key for HUD queries (tim-action-required issues)
   LINEAR_API_KEY: z.string().optional(),
 
@@ -649,6 +651,7 @@ export const ENV_KEYS = [
   'SENTRY_ORG_SLUG',
   'LINEAR_WEBHOOK_SECRET',
   'LINEAR_API_KEY',
+  'RELEASE_COMMUNICATIONS_WEBHOOK_SECRET',
   'GH_DISPATCH_TOKEN',
   'VERCEL_GIT_REPO_OWNER',
   'VERCEL_GIT_REPO_SLUG',
