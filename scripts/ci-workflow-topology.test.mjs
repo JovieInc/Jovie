@@ -12,6 +12,12 @@ test('repository workflows satisfy the topology and fan-out contract', () => {
   assert.deepEqual(validateTopology({ policy, nodes, edges }).errors, []);
   const observers = new Set(nodes.filter(node => node.active && node.category === 'telemetry-aggregation').map(node => node.name));
   assert.equal(edges.some(edge => edge.type === 'workflow_run' && observers.has(edge.from)), false);
+  for (const producer of ['Source Validation', 'Fork PR Gate', 'PR Size Guard']) {
+    assert.deepEqual(edges.filter(edge => edge.from === producer &&
+      nodes.find(node => node.name === edge.to)?.category === 'remediation-dispatch'),
+    [{ from: producer, to: 'Lane Fix Relay', type: 'workflow_run' }],
+    `${producer} must deliver completion to the single repair owner`);
+  }
 });
 test('rejects cycles, duplicate owners, and budget regressions', () => {
   assert.deepEqual(findCycle(['a', 'b'], [{ from: 'a', to: 'b' }, { from: 'b', to: 'a' }]), ['a', 'b', 'a']);

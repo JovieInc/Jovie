@@ -238,6 +238,7 @@ nodes:
       - Agent Pipeline
       - Auto-Ready Agent Drafts
       - iOS CI
+      - Merge Queue Green Enroll
       - PR Conflict Handler
       - Production Controller
       - Rolling CI Dispatch
@@ -465,6 +466,8 @@ nodes:
     authoritativeFor: []
     allowedConsumers:
       - Auto-Ready Agent Drafts
+      - Lane Fix Relay
+      - Merge Queue Green Enroll
     triggeringStateTransition:
       - merge_group
       - pull_request
@@ -551,6 +554,17 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:worker
     jobCount: 1
+  - name: Internal PR Review (advisory)
+    path: .github/workflows/internal-review.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+    terminalReceipt: job:review
+    jobCount: 1
   - name: iOS CI
     path: .github/workflows/ios-ci.yml
     active: true
@@ -612,6 +626,7 @@ nodes:
       - pull_request_target
       - push
       - workflow_dispatch
+      - workflow_run
     terminalReceipt: job:relay
     jobCount: 1
   - name: Legacy Human Hold Scrub
@@ -700,6 +715,7 @@ nodes:
     triggeringStateTransition:
       - pull_request_target
       - workflow_dispatch
+      - workflow_run
     terminalReceipt: job:enroll
     jobCount: 1
   - name: Merge Queue Ruleset Verify
@@ -876,6 +892,8 @@ nodes:
     authoritativeFor: []
     allowedConsumers:
       - Auto-Ready Agent Drafts
+      - Lane Fix Relay
+      - Merge Queue Green Enroll
     triggeringStateTransition:
       - merge_group
       - pull_request
@@ -943,8 +961,8 @@ nodes:
       - Production Release
     triggeringStateTransition:
       - workflow_run
-    terminalReceipt: job:production-verified
-    jobCount: 8
+    terminalReceipt: job:publish-customer-changelog
+    jobCount: 9
   - name: Production Marker Recovery
     path: .github/workflows/production-marker-recovery.yml
     active: true
@@ -1189,7 +1207,10 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor:
       - source-validation
-    allowedConsumers: []
+    allowedConsumers:
+      - Auto-Ready Agent Drafts
+      - Lane Fix Relay
+      - Merge Queue Green Enroll
     triggeringStateTransition:
       - pull_request
     terminalReceipt: job:ready
@@ -1365,6 +1386,27 @@ edges:
   - from: iOS TestFlight
     to: iOS CI
     type: workflow_call
+  - from: Source Validation
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: Fork PR Gate
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: PR Size Guard
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: Source Validation
+    to: Merge Queue Green Enroll
+    type: workflow_run
+  - from: CI
+    to: Merge Queue Green Enroll
+    type: workflow_run
+  - from: Fork PR Gate
+    to: Merge Queue Green Enroll
+    type: workflow_run
+  - from: PR Size Guard
+    to: Merge Queue Green Enroll
+    type: workflow_run
   - from: CI
     to: Production Controller
     type: workflow_run

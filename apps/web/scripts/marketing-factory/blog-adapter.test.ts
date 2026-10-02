@@ -1,3 +1,7 @@
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   applyStagePassedBit,
@@ -28,9 +32,7 @@ import { digestOf, stageInputDigest } from './receipts';
 const AS_OF = '2026-10-01T18:00:00.000Z';
 const MARKDOWN = 'markdown';
 
-function hash(value: string): string {
-  return digestOf(value);
-}
+const hash = digestOf;
 
 function evidence(
   overrides: Partial<BlogClaimEvidence> = {}
@@ -418,7 +420,6 @@ describe('blog factory adapter', () => {
     const stale = structuredClone(factoryRecord({ published: true }));
     stale.candidate.metadataDigest = hash('changed metadata');
     expect(issueCodes(stale)).toContain('candidate-digest-mismatch');
-
     const forged = structuredClone(factoryRecord({ published: true }));
     forged.receipts[0] = {
       ...forged.receipts[0],
@@ -428,27 +429,43 @@ describe('blog factory adapter', () => {
     expect(issueCodes(forged)).toContain('invalid-stage-receipt');
   });
 
+  it('reports a missing Markdown source through the actual verifier CLI', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'blog-verify-'));
+    try {
+      const path = join(dir, 'record.json');
+      writeFileSync(path, JSON.stringify(factoryRecord({ published: true })));
+      const result = spawnSync(
+        process.execPath,
+        [
+          '--import',
+          'tsx',
+          join(import.meta.dirname, 'verify.ts'),
+          '--blog-record',
+          path,
+        ],
+        { encoding: 'utf8' }
+      );
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('candidate-source-unverified');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('rejects a record that is not bound to the Markdown bytes on disk', () => {
     const record = factoryRecord({ published: true });
-    expect(certifyBlogFactoryRecord(record).issues).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: 'candidate-source-unverified' }),
-      ])
-    );
-    expect(
-      certifyBlogFactoryRecord(record, { sourceContent: 'changed' }).issues
-    ).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: 'candidate-source-mismatch' }),
-      ])
-    );
+    const missing = certifyBlogFactoryRecord(record).issues.map(i => i.code);
+    expect(missing).toContain('candidate-source-unverified');
+    const changed = certifyBlogFactoryRecord(record, {
+      sourceContent: 'changed',
+    }).issues.map(i => i.code);
+    expect(changed).toContain('candidate-source-mismatch');
   });
 
   it('rejects broken links and unsafe Markdown even with old passing receipts', () => {
     const broken = structuredClone(factoryRecord({ published: true }));
     broken.contentChecks.linksValid = false;
     expect(issueCodes(broken)).toContain('content-linksValid');
-
     const unsafe = structuredClone(factoryRecord({ published: true }));
     unsafe.contentChecks.safeMarkdown = false;
     expect(issueCodes(unsafe)).toContain('content-safeMarkdown');
@@ -472,12 +489,9 @@ describe('blog factory adapter', () => {
     record.publication.liveChecks.shareMatches = false;
     record.publication.revert.passed = false;
 
-    expect(issueCodes(record)).toEqual(
-      expect.arrayContaining([
-        'live-verification-failed',
-        'revert-path-untested',
-      ])
-    );
+    const codes = issueCodes(record);
+    expect(codes).toContain('live-verification-failed');
+    expect(codes).toContain('revert-path-untested');
   });
 
   it('reuses an identical publication retry and rejects a stale retry', () => {

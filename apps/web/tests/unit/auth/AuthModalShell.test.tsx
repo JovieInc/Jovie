@@ -92,7 +92,7 @@ describe('AuthModalShell', () => {
     const shell = container.querySelector('[data-auth-modal-shell]');
     // bg-background has no --color-background token and emits no CSS, which
     // left the modal without a page background.
-    expect(shell).toHaveClass('bg-base', 'sm:bg-base/96');
+    expect(shell).toHaveClass('bg-base', 'sm:bg-(--color-bg-base)/96');
     expect(shell).not.toHaveClass('bg-background');
     expect(shell).not.toHaveClass('sm:bg-background/96');
   });

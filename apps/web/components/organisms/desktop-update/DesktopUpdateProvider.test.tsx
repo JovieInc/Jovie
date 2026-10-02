@@ -71,7 +71,7 @@ describe('DesktopUpdateProvider', () => {
 
     act(() => emit(available('26.9.16')));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText('Jovie 26.9.16 is available')).toBeInTheDocument();
+    expect(screen.getByText('Jovie 26.9.16 Is Available')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Later' }));
     await waitFor(() =>
@@ -89,6 +89,12 @@ describe('DesktopUpdateProvider', () => {
     act(() => emit({ state: 'checking' }));
     act(() => emit(available('26.9.17')));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
+
+    // The download phase carries no version; the modal keeps the accepted one.
+    act(() => emit(downloadingUpdate(10)));
+    expect(
+      await screen.findByText('Downloading Jovie 26.9.17')
+    ).toBeInTheDocument();
   });
 
   it('opens from the context trigger and retries after an error', async () => {
@@ -103,7 +109,7 @@ describe('DesktopUpdateProvider', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Open modal' }));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Try Again' }));
     expect(bridge.check).toHaveBeenCalledTimes(1);
 
     act(() => emit(downloadingUpdate(42)));

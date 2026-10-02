@@ -18,6 +18,8 @@ export const OVIE_MCP_TOOLS = [
   'get_gbrain_page',
   'record_operational_memory',
   'coordinate_linear_work',
+  'record_bounded_approval',
+  'get_bounded_approval',
   'get_proof_brief',
   'list_linear_issues',
   'create_linear_issue',
@@ -37,6 +39,7 @@ export const OVIE_WRITE_TOOLS = [
   'record_operational_memory',
   'coordinate_linear_work',
   'create_linear_issue',
+  'record_bounded_approval',
 ] as const;
 
 /** Read-only operating detail that is still founder-private. */

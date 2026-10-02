@@ -24,3 +24,15 @@ export const INSPECTOR_TAB_OPTIONS = [
  * belong on Presence/Tasks/Inbox, not inside an object Inspector.
  */
 export const LIBRARY_INSPECTOR_TABS = INSPECTOR_TAB_OPTIONS;
+
+export const WORK_INSPECTOR_TAB_IDS = ['overview', 'files'] as const;
+
+export type WorkInspectorTabId = (typeof WORK_INSPECTOR_TAB_IDS)[number];
+
+export const WORK_INSPECTOR_TABS = [
+  { value: 'overview', label: 'Overview' },
+  { value: 'files', label: 'Files' },
+] as const satisfies ReadonlyArray<{
+  readonly value: WorkInspectorTabId;
+  readonly label: string;
+}>;

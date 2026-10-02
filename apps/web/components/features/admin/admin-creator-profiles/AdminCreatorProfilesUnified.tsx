@@ -25,10 +25,7 @@ import {
 } from '@/components/organisms/table';
 import { getProfileUrl } from '@/constants/domains';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
-import {
-  AdminTableHeader,
-  AdminTableSubheader,
-} from '@/features/admin/table/AdminTableHeader';
+import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/features/admin/table/useAdminTableKeyboardNavigation';
 import { useCreatorActions } from '@/features/admin/useCreatorActions';
@@ -142,13 +139,14 @@ export function AdminCreatorProfilesUnified({
     [signatureProfile]
   );
 
-  // Load all data without server-side search — filter client-side instead
+  // Keep server-filtered rows in their matching query. Seed from current props:
+  // action state may still contain the previous search during navigation.
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useAdminCreatorsInfiniteQuery({
       sort,
-      search: '',
+      search,
       pageSize,
-      initialData: { rows: profilesWithActions, total },
+      initialData: { rows: initialProfiles, total },
     });
 
   // Client-side filter searches across username, display name, and bio
@@ -482,11 +480,8 @@ export function AdminCreatorProfilesUnified({
                 onClearSelection={handleClearSelection}
                 actions={bulkActions}
               />
-              <AdminTableHeader
-                title='Creators'
-                subtitle='Manage creator profiles, verification, and feature status.'
-              />
               <AdminTableSubheader
+                inert={selectedCount > 0}
                 start={
                   <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
                     Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}

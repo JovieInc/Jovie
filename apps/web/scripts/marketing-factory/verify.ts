@@ -28,17 +28,18 @@ if (pageId === '--blog-record') {
       /^content\/blog\/[a-z0-9-]+\.md$/u.test(sourcePath)
         ? sourcePath
         : null;
-    const result = certifyBlogFactoryRecord(
-      record,
-      safeSourcePath
-        ? {
-            sourceContent: readFileSync(
-              join(import.meta.dirname, '../..', safeSourcePath),
-              'utf8'
-            ),
-          }
-        : {}
-    );
+    let sourceContent: string | undefined;
+    try {
+      if (safeSourcePath) {
+        sourceContent = readFileSync(
+          join(import.meta.dirname, '../..', safeSourcePath),
+          'utf8'
+        );
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    const result = certifyBlogFactoryRecord(record, { sourceContent });
     for (const issue of result.issues) {
       console.error(
         `  ${issue.stage ? `${issue.stage}: ` : ''}${issue.code}: ${issue.message}`
