@@ -204,6 +204,11 @@ git clone https://github.com/JovieInc/Jovie.git ~/devin-sweep/Jovie
 LANES_REPO=~/devin-sweep/Jovie scripts/lanes/install.sh
 ```
 
+Select the repository's pinned Node in the installing shell first. The installer
+puts that Node directory first in the timer PATH on both Linux and macOS.
+After changing the host's Node installation, rerun the installer so the timer
+does not retain a removed runtime directory.
+
 Per-host knobs: `LANES_SLOTS_<PROVIDER>`, `LANES_LINEAR_ENV`, `LANES_AGENT_TIMEOUT_S`,
 `LANES_GATE_TIMEOUT_S`, `LANES_GATE_SLOTS`. A host-specific GitHub token in
 `~/.config/jovie-lanes/github.env` (`GH_TOKEN=...`) gives that host its own API budget.
