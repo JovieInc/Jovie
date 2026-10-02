@@ -41,17 +41,13 @@ export function parseMergeQueueBranch(value) {
 }
 
 function sourceHeadFromItem(item) {
-  if (item?.__typename === 'PullRequestCommit') {
-    return typeof item.commit?.oid === 'string'
-      ? item.commit.oid.toLowerCase()
-      : '';
-  }
-  if (item?.__typename === 'HeadRefForcePushedEvent') {
-    return typeof item.afterCommit?.oid === 'string'
-      ? item.afterCommit.oid.toLowerCase()
-      : '';
-  }
-  return '';
+  const oid =
+    item?.__typename === 'PullRequestCommit'
+      ? item.commit?.oid
+      : item?.__typename === 'HeadRefForcePushedEvent'
+        ? item.afterCommit?.oid
+        : undefined;
+  return typeof oid === 'string' ? oid.toLowerCase() : '';
 }
 
 // Timestamped queue admission binds a synthetic run to its preceding source
@@ -527,35 +523,30 @@ async function main(argv) {
   const result = await applyMergeGroupFailure(
     { repository, run, timeline, failedSteps, statuses },
     {
-      writeStatus: async receipt => {
+      writeStatus: async receipt =>
         gh([
           'api',
           '-X',
           'POST',
           `repos/${repository}/statuses/${receipt.sha}`,
-          '-f',
-          `state=${receipt.state}`,
-          '-f',
-          `context=${receipt.context}`,
-          '-f',
-          `description=${receipt.description}`,
-          '-f',
-          `target_url=${receipt.targetUrl}`,
-        ]);
-      },
+          ...Object.entries({
+            state: receipt.state,
+            context: receipt.context,
+            description: receipt.description,
+            target_url: receipt.targetUrl,
+          }).flatMap(([key, value]) => ['-f', `${key}=${value}`]),
+        ]),
       readPullRequest: async number => readPullRequest(repository, number),
-      dequeuePullRequest: async id => {
+      dequeuePullRequest: async id =>
         graphql(
           'mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}',
           { id }
-        );
-      },
-      disableAutoMerge: async id => {
+        ),
+      disableAutoMerge: async id =>
         graphql(
           'mutation($id:ID!){disablePullRequestAutoMerge(input:{pullRequestId:$id}){clientMutationId}}',
           { id }
-        );
-      },
+        ),
     }
   );
   const serialized = JSON.stringify(result);

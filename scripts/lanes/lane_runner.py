@@ -2472,7 +2472,7 @@ def lane_prs(name: str, providers: dict | None = None, fields: str = "") -> list
 PR_FIELDS = "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus,reviewDecision,isCrossRepository,labels"
 # Every lane PR without check rollups: rollups over ~90 PRs time out (HTTP 504), so the full
 # field set stays at gh's default page of 30 and the budget/sweep read this light set.
-LIGHT_PR_FIELDS = "number,url,isDraft,headRefName,mergeStateStatus"
+LIGHT_PR_FIELDS = "number,url,state,isDraft,headRefName,headRefOid,mergeStateStatus,labels"
 
 
 def repo_prs() -> list[dict]:
@@ -2653,14 +2653,14 @@ def last_pushes() -> dict[int, float]:
 
 
 def sweep_plan(prs: list[dict], now: float, pushes: dict[int, float]) -> tuple[list[tuple[dict, int]], list[dict]]:
-    """(duplicates to close as superseded by the kept PR, stale drafts to close).
-    Only lane-branch PRs; the kept PR per issue is best_per_issue's pick."""
+    """Rank only explicitly authorized duplicate lane PRs for live revalidation.
+    Age and same-issue ranking never grant retirement authority."""
     kept = {LANE_BRANCH.match(pr["headRefName"]).group("issue"): pr
             for pr in best_per_issue(prs) if LANE_BRANCH.match(pr.get("headRefName") or "")}
     superseded, stale = [], []
     for pr in prs:
         found = LANE_BRANCH.match(pr.get("headRefName") or "")
-        if not found:
+        if not found or not pr_events.duplicate_authorized(pr):
             continue
         keep = kept[found.group("issue")]
         if keep["number"] != pr["number"]:
@@ -2673,8 +2673,7 @@ def sweep_plan(prs: list[dict], now: float, pushes: dict[int, float]) -> tuple[l
 
 
 def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> None:
-    """On the existing lane tick (at most every SWEEP_EVERY_S per host): leave one open PR per
-    issue and close drafts with no green run and no push for a day, returning their issue to Todo."""
+    """Retire explicitly labeled duplicate lane PRs on the existing bounded sweep tick."""
     now = time.time() if now is None else now
     marker = host.state / f"sweep-{name}.json"
     if marker.exists() and now - json.loads(marker.read_text()).get("at", 0) < SWEEP_EVERY_S:
@@ -2682,15 +2681,12 @@ def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> N
     marker.write_text(json.dumps({"at": now}))
     superseded, stale = sweep_plan(lane_prs(name, fields=LIGHT_PR_FIELDS), now, last_pushes())
     for pr, keep in superseded:
-        sh(["gh", "pr", "close", str(pr["number"]), "--repo", REPO_SLUG, "--comment",
-            f"🤖 lane sweep: superseded by #{keep} (one open PR per Linear issue, JOV-6833)."])
+        pr_events.close_duplicate(THIS, pr, f"superseded by #{keep} for the same issue")
     for pr in stale:
         issue = LANE_BRANCH.match(pr["headRefName"]).group("issue").upper()
-        closed = sh(["gh", "pr", "close", str(pr["number"]), "--repo", REPO_SLUG, "--comment",
-                     "🤖 lane sweep: closing this draft; no green run and no push for 24 h (JOV-6833). "
-                     f"{issue} goes back to Todo for a fresh attempt."])
+        closed = pr_events.close_duplicate(THIS, pr, "stale draft explicitly labeled duplicate")
         # Only reopen work the lane still owns; a Done or Canceled issue stays closed.
-        if closed.returncode == 0 and linear.state_of(issue) == "In Progress":
+        if closed and linear.state_of(issue) == "In Progress":
             linear.move(issue, "Todo")
             linear.comment(issue, f"🤖 lane sweep closed stale draft {pr.get('url')} (no green run, "
                                   "no push for 24 h); back to Todo.")

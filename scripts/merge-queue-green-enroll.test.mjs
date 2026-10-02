@@ -241,17 +241,6 @@ test('trusted job receipt prevents enrollment while status replication is empty'
       ...receipt,
       classification: 'transient-infrastructure',
     }),
-  });
-  assert.equal(retry.mutations.length, 1);
-  assert.deepEqual(
-    retry.statusWrites.map(item => item.description),
-    ['spent:run=123;try=1']
-  );
-  const synthetic = await fixture({
-    failureReceipt: JSON.stringify({
-      ...receipt,
-      classification: 'transient-infrastructure',
-    }),
     eventName: 'workflow_run',
     payload: {
       workflow_run: {
@@ -262,13 +251,13 @@ test('trusted job receipt prevents enrollment while status replication is empty'
       },
     },
   });
-  assert.deepEqual(synthetic.gets, [1]);
-  assert.equal(synthetic.mutations.length, 1);
+  assert.deepEqual(retry.gets, [1]);
+  assert.equal(retry.mutations.length, 1);
   assert.deepEqual(
-    synthetic.statusWrites.map(item => item.description),
+    retry.statusWrites.map(item => item.description),
     ['spent:run=123;try=1']
   );
-  assert.deepEqual(synthetic.inventories, []);
+  assert.deepEqual(retry.inventories, []);
   const changed = await fixture({
     failureReceipt: JSON.stringify({
       ...receipt,
