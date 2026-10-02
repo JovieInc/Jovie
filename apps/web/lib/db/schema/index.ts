@@ -113,6 +113,17 @@ export {
   type Tip,
   tips,
 } from './analytics';
+// Artist daily public-metric snapshots (append-only)
+export {
+  ARTIST_DAILY_SNAPSHOT_SOURCES,
+  type ArtistDailySnapshot,
+  type ArtistDailySnapshotProvenance,
+  type ArtistDailySnapshotSource,
+  artistDailySnapshots,
+  insertArtistDailySnapshotSchema,
+  type NewArtistDailySnapshot,
+  selectArtistDailySnapshotSchema,
+} from './artist-daily-snapshots';
 // Audit (Ingest Audit Logs)
 export {
   type IngestAuditLog,

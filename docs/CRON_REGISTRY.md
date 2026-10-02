@@ -71,8 +71,9 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 | `/api/cron/process-metadata-submissions` | `0 4 * * *` | Daily at 04:00 UTC |
 | `/api/cron/public-profile-canary` | `13 6 * * *` | Daily at 06:13 UTC |
 | `/api/cron/auth-signup-onboarding-canary` | `23 6 * * *` | Daily at 06:23 UTC (JOV-1871) |
+| `/api/cron/artist-daily-snapshots` | `15 9 * * *` | Daily at 09:15 UTC. No-op unless `ARTIST_DAILY_SNAPSHOTS` is true. Public YouTube, Instagram, and Wikipedia pageview rows only. |
 
-13 paths are currently scheduled in production. `cleanup-sms-intents` was folded into `daily-maintenance` as a sub-job per JOV-1901 (see AUTOMATION_AUDIT.md). Other cron route files exist as standalone endpoints whose logic is called as sub-jobs of `frequent` or `daily-maintenance`.
+`cleanup-sms-intents` was folded into `daily-maintenance` as a sub-job per JOV-1901 (see AUTOMATION_AUDIT.md). Other cron route files exist as standalone endpoints whose logic is called as sub-jobs of `frequent` or `daily-maintenance`. `apps/web/vercel.json` is the schedule source of truth.
 
 **Auth:** All crons use `Authorization: Bearer ${CRON_SECRET}`. The `data-retention` route additionally uses timing-safe comparison + origin verification.
 
@@ -149,6 +150,7 @@ These have their own Vercel schedule OR exist as callable endpoints (also invoke
 | `/api/cron/send-release-notifications` | 120s | Sends notifications; recovers stuck rows >10min; max 100/run | `frequent` |
 | `/api/cron/public-profile-canary` | 30s | Lightweight HTTP health check: GET /tim, /tim/alerts, /tim/pay, POST /api/audience/visit; emits Sentry breadcrumb + writes Redis key for admin ops panel (JOV-1872) | — |
 | `/api/cron/auth-signup-onboarding-canary` | 30s | Lightweight HTTP golden-path check: GET /signup, /signin, /start, POST /api/chat onboarding probe; emits Sentry breadcrumb + writes Redis key for admin ops panel (JOV-1871) | — |
+| `/api/cron/artist-daily-snapshots` | 300s | Append-only public metric snapshot for a capped batch of known artists. Default-off (`ARTIST_DAILY_SNAPSHOTS`). Failures fingerprint as `remediation:artist-snapshots`. | — |
 
 ## LLM Model Usage in Web App Crons
 
