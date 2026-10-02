@@ -1,10 +1,8 @@
 /**
- * Append-only public metric history for known artists.
- *
- * One row per creator profile, source, and UTC collection day. Writers insert
- * and stop. There is no updated_at, and conflict on the unique key is a no-op.
- * raw_values holds parsed public counts only. provenance records how the row
- * was fetched. Neither column may store cookies, tokens, or page HTML.
+ * Append-only public metric history for known artists: one row per creator
+ * profile, source, and UTC collection day; conflicts on the unique key are a
+ * no-op. raw_values holds parsed public counts only; provenance records how
+ * the row was fetched. Neither column may store cookies, tokens, or HTML.
  */
 
 import { sql as drizzleSql } from 'drizzle-orm';

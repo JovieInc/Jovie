@@ -25,7 +25,6 @@ function candidate(
   return {
     creatorProfileId: id,
     youtubeUrl: 'https://www.youtube.com/@artist/about',
-    instagramUrl: null,
     musicbrainzId: null,
     existingSources: [],
     ...overrides,
@@ -66,11 +65,7 @@ describe('runArtistDailySnapshots', () => {
       enabled: false,
       now: new Date('2026-10-02T09:15:00.000Z'),
       store,
-      fetchers: {
-        youtube,
-        instagram: vi.fn(),
-        wikipedia: vi.fn(),
-      },
+      fetchers: { youtube, wikipedia: vi.fn() },
     });
 
     expect(report.enabled).toBe(false);
@@ -82,7 +77,7 @@ describe('runArtistDailySnapshots', () => {
   it('inserts parsed public counts and paces later fetches', async () => {
     const store = memoryStore([
       candidate('artist-1', {
-        instagramUrl: 'https://www.instagram.com/artist/',
+        musicbrainzId: 'f4a7f3d2-1b2c-4d5e-8f9a-0b1c2d3e4f5a',
       }),
     ]);
     const { sleep, clock } = clockedSleep();
@@ -91,10 +86,10 @@ describe('runArtistDailySnapshots', () => {
       rawValues: { subscriberCount: 10, viewCount: 20, videoCount: 1 },
       provenance: provenance('youtube_data_api_v3'),
     }));
-    const instagram = vi.fn(async () => ({
+    const wikipedia = vi.fn(async () => ({
       kind: 'ready' as const,
-      rawValues: { followerCount: 5, postCount: 2 },
-      provenance: provenance('instagram_opengraph'),
+      rawValues: { pageviews: 42 },
+      provenance: provenance('wikimedia_pageviews'),
     }));
 
     const report = await runArtistDailySnapshots({
@@ -102,7 +97,7 @@ describe('runArtistDailySnapshots', () => {
       cap: 5,
       now: new Date('2026-10-02T09:15:00.000Z'),
       store,
-      fetchers: { youtube, instagram, wikipedia: vi.fn() },
+      fetchers: { youtube, wikipedia },
       sleep,
       clock,
     });
@@ -110,7 +105,7 @@ describe('runArtistDailySnapshots', () => {
     expect(report.inserted).toBe(2);
     expect(store.inserted.map(row => row.source)).toEqual([
       'youtube',
-      'instagram',
+      'wikipedia',
     ]);
     expect(store.inserted[0]?.snapshotDay).toBe('2026-10-02');
     expect(JSON.stringify(store.inserted)).not.toMatch(
@@ -127,13 +122,17 @@ describe('runArtistDailySnapshots', () => {
       httpStatus: 429,
       backoff: true,
     }));
-    const captureFailure = vi.fn(async () => undefined);
+    const captureFailure = vi.fn(
+      async (_input: {
+        fingerprint: typeof ARTIST_SNAPSHOT_REMEDIATION_FINGERPRINT;
+      }) => undefined
+    );
 
     const report = await runArtistDailySnapshots({
       enabled: true,
       now: new Date('2026-10-02T09:15:00.000Z'),
       store,
-      fetchers: { youtube, instagram: vi.fn(), wikipedia: vi.fn() },
+      fetchers: { youtube, wikipedia: vi.fn() },
       captureFailure,
       sleep: async () => undefined,
       clock: () => 0,
@@ -155,7 +154,7 @@ describe('runArtistDailySnapshots', () => {
     );
   });
 
-  it('does not store a row when robots disallow the page', async () => {
+  it('does not store a row when a source skips the candidate', async () => {
     const store = memoryStore([candidate('artist-1')]);
     const captureFailure = vi.fn();
     const report = await runArtistDailySnapshots({
@@ -163,8 +162,7 @@ describe('runArtistDailySnapshots', () => {
       now: new Date('2026-10-02T09:15:00.000Z'),
       store,
       fetchers: {
-        youtube: async () => ({ kind: 'skip', reason: 'robots_disallowed' }),
-        instagram: vi.fn(),
+        youtube: async () => ({ kind: 'skip', reason: 'no_youtube_api_key' }),
         wikipedia: vi.fn(),
       },
       captureFailure,
@@ -190,7 +188,6 @@ describe('runArtistDailySnapshots', () => {
           reason: 'logged_in_payload',
           backoff: false,
         }),
-        instagram: vi.fn(),
         wikipedia: vi.fn(),
       },
       captureFailure,
@@ -209,9 +206,8 @@ describe('runArtistDailySnapshots', () => {
           youtube: async () => ({
             kind: 'ready',
             rawValues: { cookie: 'session' },
-            provenance: provenance('youtube_logged_out_page'),
+            provenance: provenance('youtube_data_api_v3'),
           }),
-          instagram: vi.fn(),
           wikipedia: vi.fn(),
         },
         sleep: async () => undefined,
@@ -236,7 +232,6 @@ describe('runArtistDailySnapshots', () => {
           rawValues: { subscriberCount: 1, viewCount: 2, videoCount: 3 },
           provenance: provenance('youtube_data_api_v3'),
         }),
-        instagram: vi.fn(),
         wikipedia: vi.fn(),
       },
       sleep: async () => undefined,

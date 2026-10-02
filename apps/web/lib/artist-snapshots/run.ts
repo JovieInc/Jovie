@@ -9,12 +9,11 @@ import {
   utcSnapshotDay,
 } from './contract';
 
-export type ArtistSnapshotSourceName = 'youtube' | 'instagram' | 'wikipedia';
+export type ArtistSnapshotSourceName = 'youtube' | 'wikipedia';
 
 export interface ArtistSnapshotCandidate {
   readonly creatorProfileId: string;
   readonly youtubeUrl: string | null;
-  readonly instagramUrl: string | null;
   readonly musicbrainzId: string | null;
   readonly existingSources: readonly ArtistSnapshotSourceName[];
 }
@@ -52,7 +51,6 @@ export type SourceFetchResult =
 
 export interface SnapshotFetchers {
   youtube(candidate: ArtistSnapshotCandidate): Promise<SourceFetchResult>;
-  instagram(candidate: ArtistSnapshotCandidate): Promise<SourceFetchResult>;
   wikipedia(candidate: ArtistSnapshotCandidate): Promise<SourceFetchResult>;
 }
 
@@ -73,19 +71,15 @@ export interface ArtistSnapshotRunReport {
   readonly failures: readonly ArtistSnapshotFailure[];
 }
 
-const SOURCES: readonly ArtistSnapshotSourceName[] = [
-  'youtube',
-  'instagram',
-  'wikipedia',
-];
+const SOURCES: readonly ArtistSnapshotSourceName[] = ['youtube', 'wikipedia'];
 
 function hasIdentity(
   candidate: ArtistSnapshotCandidate,
   source: ArtistSnapshotSourceName
 ): boolean {
-  if (source === 'youtube') return Boolean(candidate.youtubeUrl);
-  if (source === 'instagram') return Boolean(candidate.instagramUrl);
-  return Boolean(candidate.musicbrainzId);
+  return Boolean(
+    source === 'youtube' ? candidate.youtubeUrl : candidate.musicbrainzId
+  );
 }
 
 function createPacer(sleep: (ms: number) => Promise<void>, now: () => number) {

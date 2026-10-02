@@ -1,13 +1,8 @@
 /**
- * Daily public-metric snapshots for known artists.
- *
- * Default-off until ARTIST_DAILY_SNAPSHOTS=true. Collects YouTube, Instagram,
- * and Wikipedia pageviews into the append-only artist_daily_snapshots table.
- * Logged-in payloads are refused. Source failures use the
- * remediation:artist-snapshots fingerprint.
- *
- * Schedule: 15 9 * * * UTC, after the previous day's Wikimedia pageviews
- * are usually published.
+ * Daily public-metric snapshots for known artists. Default-off until
+ * ARTIST_DAILY_SNAPSHOTS=true. Collects official-API YouTube statistics and
+ * Wikipedia pageviews (15 9 * * * UTC, after pageviews publish). Source
+ * failures use the remediation:artist-snapshots fingerprint.
  */
 
 import { NextResponse } from 'next/server';

@@ -71,7 +71,7 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 | `/api/cron/process-metadata-submissions` | `0 4 * * *` | Daily at 04:00 UTC |
 | `/api/cron/public-profile-canary` | `13 6 * * *` | Daily at 06:13 UTC |
 | `/api/cron/auth-signup-onboarding-canary` | `23 6 * * *` | Daily at 06:23 UTC (JOV-1871) |
-| `/api/cron/artist-daily-snapshots` | `15 9 * * *` | Daily at 09:15 UTC. No-op unless `ARTIST_DAILY_SNAPSHOTS` is true. Public YouTube, Instagram, and Wikipedia pageview rows only. |
+| `/api/cron/artist-daily-snapshots` | `15 9 * * *` | Daily at 09:15 UTC. No-op unless `ARTIST_DAILY_SNAPSHOTS` is true. Official-API YouTube and Wikipedia pageview rows only. |
 
 `cleanup-sms-intents` was folded into `daily-maintenance` as a sub-job per JOV-1901 (see AUTOMATION_AUDIT.md). Other cron route files exist as standalone endpoints whose logic is called as sub-jobs of `frequent` or `daily-maintenance`. `apps/web/vercel.json` is the schedule source of truth.
 

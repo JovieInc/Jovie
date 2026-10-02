@@ -1,8 +1,6 @@
 /**
- * Artist daily snapshot contract.
- *
- * The cron is default-off. Failures use one Sentry fingerprint so JOV-7540
- * remediation grouping stays a single class instead of a silent log line.
+ * Artist daily snapshot contract. The cron is default-off; failures use one
+ * Sentry fingerprint so JOV-7540 remediation stays a single class.
  */
 
 export const ARTIST_SNAPSHOT_REMEDIATION_FINGERPRINT =

@@ -6,25 +6,16 @@ import {
   ARTIST_SNAPSHOT_ROUTE,
   utcPageviewDay,
 } from './contract';
-import {
-  createSnapshotRobotsCache,
-  fetchInstagramSnapshot,
-  fetchWikipediaSnapshot,
-  fetchYouTubeSnapshot,
-} from './fetchers';
+import { fetchWikipediaSnapshot, fetchYouTubeSnapshot } from './fetchers';
 import { runArtistDailySnapshots } from './run';
 import { drizzleArtistSnapshotStore } from './store';
 
 export async function runLiveArtistDailySnapshots(now = new Date()) {
-  const robots = createSnapshotRobotsCache();
   return runArtistDailySnapshots({
     now,
     store: drizzleArtistSnapshotStore,
     fetchers: {
-      youtube: candidate =>
-        fetchYouTubeSnapshot(candidate.youtubeUrl ?? '', robots),
-      instagram: candidate =>
-        fetchInstagramSnapshot(candidate.instagramUrl ?? '', robots),
+      youtube: candidate => fetchYouTubeSnapshot(candidate.youtubeUrl ?? ''),
       wikipedia: candidate =>
         fetchWikipediaSnapshot({
           musicbrainzId: candidate.musicbrainzId ?? '',
