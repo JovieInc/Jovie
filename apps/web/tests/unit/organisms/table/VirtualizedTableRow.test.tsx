@@ -424,4 +424,56 @@ describe('VirtualizedTableRow', () => {
       'Active'
     );
   });
+
+  it('keeps cells static unless the table asks for a column snap', () => {
+    const row = {
+      id: '1',
+      original: { id: '1', name: 'Avery Chen' },
+      getVisibleCells: () => [
+        {
+          id: '1-fan',
+          column: {
+            id: 'fan',
+            getSize: () => 400,
+            columnDef: { cell: () => 'Avery Chen' },
+          },
+          getContext: () => ({}),
+        },
+      ],
+      getIsSelected: () => false,
+    } as unknown as Row<TestRow>;
+
+    const { rerender } = render(
+      <table>
+        <tbody>
+          <VirtualizedTableRow
+            {...baseProps}
+            row={row}
+            visibleCells={row.getVisibleCells()}
+          />
+        </tbody>
+      </table>
+    );
+    expect(screen.getByRole('cell')).not.toHaveAttribute('data-column-snap');
+
+    rerender(
+      <table>
+        <tbody>
+          <VirtualizedTableRow
+            {...baseProps}
+            row={row}
+            rowIndex={3}
+            visibleCells={row.getVisibleCells()}
+            columnSnap
+            columnSnapOrder={3}
+          />
+        </tbody>
+      </table>
+    );
+    expect(screen.getByRole('cell')).toHaveAttribute('data-column-snap', 'on');
+    expect(screen.getByRole('cell')).toHaveAttribute(
+      'data-column-snap-order',
+      '3'
+    );
+  });
 });

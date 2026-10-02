@@ -1,5 +1,6 @@
 'use client';
 
+import { motion } from 'motion/react';
 import React, { memo, useCallback, useEffect, useRef } from 'react';
 // @coverage-via apps/web/tests/unit/organisms/table/VirtualizedTableRow.test.tsx
 import type { Row, RowData } from '@/lib/tanstack-table';
@@ -8,6 +9,7 @@ import { cn } from '@/lib/utils';
 import '../table.types';
 import { TABLE_CELL_CONTENT_CLASSNAME } from '../atoms/TableCell';
 import { usePrimaryColumnCompacts } from '../column-priority-context';
+import { columnSnapTransition } from '../column-snap';
 import { presets, rowState, tableAlignment } from '../table.styles';
 
 /**
@@ -53,6 +55,14 @@ export interface VirtualizedTableRowProps<TData extends RowData> {
    * @param rowData  - The data of the clicked row
    */
   readonly onRowShiftClick?: (rowIndex: number, rowData: TData) => void;
+  /**
+   * Layout-snap cells when columns appear or disappear.
+   * UnifiedTable turns this on unless the table opts out or motion is reduced.
+   * @default false
+   */
+  readonly columnSnap?: boolean;
+  /** Index among currently rendered rows. Stagger is capped in columnSnapTransition. */
+  readonly columnSnapOrder?: number;
 }
 
 /**
@@ -86,6 +96,8 @@ function VirtualizedTableRowComponent<TData extends RowData>({
   getRowTestId,
   measureElement,
   onRowShiftClick,
+  columnSnap = false,
+  columnSnapOrder = 0,
   ...htmlProps
 }: VirtualizedTableRowProps<TData> &
   Omit<React.ComponentPropsWithoutRef<'tr'>, ManagedTrProps>) {
@@ -189,40 +201,54 @@ function VirtualizedTableRowComponent<TData extends RowData>({
         const align = meta?.align ?? 'left';
         const showCompacts =
           compactNode != null && cell.column.id === primaryId;
-        return (
-          <td
-            key={cell.id}
+        const cellClassName = cn(
+          presets.tableCell,
+          tableAlignment.text[align],
+          meta?.actionVisibility === 'contextual' &&
+            'system-b-table-contextual-action-cell',
+          metaClassName
+        );
+        const cellStyle = {
+          width:
+            cell.column.getSize() === 150 ? undefined : cell.column.getSize(),
+        };
+        const cellContent = (
+          <div
             className={cn(
-              presets.tableCell,
-              tableAlignment.text[align],
-              meta?.actionVisibility === 'contextual' &&
-                'system-b-table-contextual-action-cell',
-              metaClassName
+              TABLE_CELL_CONTENT_CLASSNAME,
+              meta?.cellContentClassName,
+              showCompacts && 'flex items-center gap-2'
             )}
-            style={{
-              width:
-                cell.column.getSize() === 150
-                  ? undefined
-                  : cell.column.getSize(),
-            }}
+            data-table-cell-content='stable'
           >
-            <div
-              className={cn(
-                TABLE_CELL_CONTENT_CLASSNAME,
-                meta?.cellContentClassName,
-                showCompacts && 'flex items-center gap-2'
-              )}
-              data-table-cell-content='stable'
+            {showCompacts ? (
+              <div className='min-w-0 flex-1 overflow-hidden'>
+                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              </div>
+            ) : (
+              flexRender(cell.column.columnDef.cell, cell.getContext())
+            )}
+            {showCompacts ? compactNode : null}
+          </div>
+        );
+        if (columnSnap) {
+          return (
+            <motion.td
+              key={cell.id}
+              layout
+              transition={columnSnapTransition(columnSnapOrder)}
+              data-column-snap='on'
+              data-column-snap-order={columnSnapOrder}
+              className={cellClassName}
+              style={cellStyle}
             >
-              {showCompacts ? (
-                <div className='min-w-0 flex-1 overflow-hidden'>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </div>
-              ) : (
-                flexRender(cell.column.columnDef.cell, cell.getContext())
-              )}
-              {showCompacts ? compactNode : null}
-            </div>
+              {cellContent}
+            </motion.td>
+          );
+        }
+        return (
+          <td key={cell.id} className={cellClassName} style={cellStyle}>
+            {cellContent}
           </td>
         );
       })}

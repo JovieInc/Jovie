@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ColumnDef } from '@/lib/tanstack-table';
 import { UnifiedTable } from './UnifiedTable';
@@ -140,6 +140,68 @@ describe('UnifiedTable column priority', () => {
     expect(screen.getByTestId('table-column-compacts')).toHaveTextContent(
       'SMS'
     );
+    vi.unstubAllGlobals();
+  });
+
+  it('snaps painted cells, and stays still when snap is off or motion is reduced', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    const { unmount } = render(
+      <UnifiedTable
+        data={rows}
+        columns={columns}
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        minWidth='0'
+      />
+    );
+    await waitFor(() => {
+      expect(document.querySelector('[data-column-snap="on"]')).not.toBeNull();
+    });
+    expect(
+      document.querySelector('[data-column-snap-order="0"]')
+    ).not.toBeNull();
+    unmount();
+
+    render(
+      <UnifiedTable
+        data={rows}
+        columns={columns}
+        columnSnap={false}
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        minWidth='0'
+      />
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(document.querySelector('[data-column-snap="on"]')).toBeNull();
+
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('prefers-reduced-motion'),
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    const reduced = render(
+      <UnifiedTable
+        data={rows}
+        columns={columns}
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        minWidth='0'
+      />
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(document.querySelector('[data-column-snap="on"]')).toBeNull();
+    reduced.unmount();
     vi.unstubAllGlobals();
   });
 });

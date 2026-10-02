@@ -56,6 +56,35 @@ function renderCell(
 }
 
 describe('TableHeaderCell (molecule)', () => {
+  it('snaps the header cell only when the table asks for it', () => {
+    const { rerender } = renderCell();
+    expect(screen.getByRole('columnheader')).not.toHaveAttribute(
+      'data-column-snap'
+    );
+
+    rerender(
+      <table>
+        <thead>
+          <tr>
+            <TableHeaderCell
+              header={mockHeader('Title')}
+              canSort
+              sortDirection={false}
+              stickyHeaderClass='sticky'
+              tableHeaderClass='th'
+              onToggleSort={vi.fn()}
+              columnSnap
+            />
+          </tr>
+        </thead>
+      </table>
+    );
+    expect(screen.getByRole('columnheader')).toHaveAttribute(
+      'data-column-snap',
+      'on'
+    );
+  });
+
   it('renders sortable header as a button', () => {
     renderCell({ canSort: true });
     expect(screen.getByRole('button', { name: /Title/i })).toBeInTheDocument();

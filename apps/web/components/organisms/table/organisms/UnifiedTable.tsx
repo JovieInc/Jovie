@@ -12,6 +12,7 @@ import React, {
 } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TABLE_MIN_WIDTHS, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import {
   type ColumnDef,
   type ColumnPinningState,
@@ -279,6 +280,14 @@ export interface UnifiedTableProps<TData extends RowData> {
   readonly onColumnVisibilityChange?: OnChangeFn<VisibilityState>;
 
   /**
+   * Layout-snap columns when they appear or disappear.
+   * Short, interruptible, and skipped when the user prefers reduced motion.
+   * Dense admin tables pass false.
+   * @default true
+   */
+  readonly columnSnap?: boolean;
+
+  /**
    * Whether there are more pages to load (infinite scroll)
    */
   readonly hasNextPage?: boolean;
@@ -453,6 +462,7 @@ export function UnifiedTable<TData extends RowData>({
   enablePinning = false,
   columnVisibility,
   onColumnVisibilityChange,
+  columnSnap = true,
   hasNextPage,
   isFetchingNextPage,
   onLoadMore,
@@ -462,6 +472,8 @@ export function UnifiedTable<TData extends RowData>({
   renderExpandedContent,
   getExpandableRowId,
 }: UnifiedTableProps<TData>) {
+  const prefersReducedMotion = useReducedMotion();
+  const snapColumns = columnSnap && !prefersReducedMotion;
   const resolvedRowHeight = rowMode
     ? TABLE_ROW_MODES[rowMode].rowHeight
     : rowHeight;
@@ -692,6 +704,8 @@ export function UnifiedTable<TData extends RowData>({
           getRowClassName={getRowClassName}
           getRowTestId={getRowTestId}
           onRowShiftClick={onRowShiftClick}
+          columnSnap={snapColumns}
+          columnSnapOrder={index}
         />
       );
 
@@ -758,6 +772,7 @@ export function UnifiedTable<TData extends RowData>({
       contextMenuSearchPlaceholder,
       contextMenuSearchMode,
       rowRefs,
+      snapColumns,
     ]
   );
 
@@ -828,7 +843,10 @@ export function UnifiedTable<TData extends RowData>({
             {caption ?? 'Loading table data'}
           </caption>
           {!hideHeader && (
-            <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+            <UnifiedTableHeader
+              headerGroups={table.getHeaderGroups()}
+              columnSnap={snapColumns}
+            />
           )}
           <LoadingTableBody
             rows={loadingRowCount}
@@ -856,7 +874,10 @@ export function UnifiedTable<TData extends RowData>({
         >
           <caption className='sr-only'>{caption ?? 'Empty table'}</caption>
           {!hideHeader && (
-            <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+            <UnifiedTableHeader
+              headerGroups={table.getHeaderGroups()}
+              columnSnap={snapColumns}
+            />
           )}
           <tbody>
             <tr>
@@ -888,7 +909,10 @@ export function UnifiedTable<TData extends RowData>({
               {caption ?? 'Grouped table data'}
             </caption>
             {!hideHeader && (
-              <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+              <UnifiedTableHeader
+                headerGroups={table.getHeaderGroups()}
+                columnSnap={snapColumns}
+              />
             )}
             <GroupedTableBody
               groupedData={groupedData}
@@ -918,7 +942,10 @@ export function UnifiedTable<TData extends RowData>({
         >
           <caption className='sr-only'>{caption ?? 'Data table'}</caption>
           {!hideHeader && (
-            <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+            <UnifiedTableHeader
+              headerGroups={table.getHeaderGroups()}
+              columnSnap={snapColumns}
+            />
           )}
           <VirtualizedTableBody
             rows={rows}
@@ -949,6 +976,7 @@ export function UnifiedTable<TData extends RowData>({
             renderExpandedContent={renderExpandedContent}
             getExpandableRowId={getExpandableRowId}
             columnCount={columnCount}
+            columnSnap={snapColumns}
           />
           {/* Infinite scroll sentinel + loading indicator */}
           {onLoadMore && (

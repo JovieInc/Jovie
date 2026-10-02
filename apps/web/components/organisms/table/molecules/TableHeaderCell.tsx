@@ -1,10 +1,12 @@
 'use client';
 
+import { motion } from 'motion/react';
 import { Icon } from '@/components/atoms/Icon';
 import type { Header, RowData } from '@/lib/tanstack-table';
 import { flexRender } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import '../table.types';
+import { columnSnapTransition } from '../column-snap';
 import { iconColors, tableAlignment } from '../table.styles';
 
 interface TableHeaderCellProps<TData extends RowData>
@@ -15,6 +17,8 @@ interface TableHeaderCellProps<TData extends RowData>
     readonly stickyHeaderClass: string;
     readonly tableHeaderClass: string;
     readonly onToggleSort?: (event: unknown) => void;
+    /** Layout-snap this header with the body. The header row does not stagger. */
+    readonly columnSnap?: boolean;
   }> {}
 
 /**
@@ -32,6 +36,7 @@ export function TableHeaderCell<TData extends RowData>({
   stickyHeaderClass,
   tableHeaderClass,
   onToggleSort,
+  columnSnap = false,
 }: TableHeaderCellProps<TData>) {
   // Determine aria-sort attribute without nested ternaries
   let ariaSort: 'ascending' | 'descending' | 'none' | undefined;
@@ -78,26 +83,37 @@ export function TableHeaderCell<TData extends RowData>({
     <span className='min-w-0 truncate'>{headerContent}</span>
   );
 
+  const headerClassName = cn(
+    stickyHeaderClass,
+    tableAlignment.text[align],
+    // The sort pill pads 6px; inset the cell 6px so the label lands on
+    // the body cells' 12px text edge.
+    canSort && 'px-1.5',
+    metaClassName,
+    'whitespace-nowrap'
+  );
+  const headerStyle = {
+    width:
+      header.getSize() >= 9999 || header.getSize() === 150
+        ? undefined
+        : header.getSize(),
+  };
+  const HeaderCell = columnSnap ? motion.th : 'th';
+
   return (
-    <th
+    <HeaderCell
       key={header.id}
       scope='col'
       aria-sort={ariaSort}
-      className={cn(
-        stickyHeaderClass,
-        tableAlignment.text[align],
-        // The sort pill pads 6px; inset the cell 6px so the label lands on
-        // the body cells' 12px text edge.
-        canSort && 'px-1.5',
-        metaClassName,
-        'whitespace-nowrap'
-      )}
-      style={{
-        width:
-          header.getSize() >= 9999 || header.getSize() === 150
-            ? undefined
-            : header.getSize(),
-      }}
+      className={headerClassName}
+      style={headerStyle}
+      {...(columnSnap
+        ? {
+            layout: true,
+            transition: columnSnapTransition(0),
+            'data-column-snap': 'on',
+          }
+        : {})}
     >
       {(() => {
         if (header.isPlaceholder) return null;
@@ -139,6 +155,6 @@ export function TableHeaderCell<TData extends RowData>({
           </div>
         );
       })()}
-    </th>
+    </HeaderCell>
   );
 }

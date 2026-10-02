@@ -1,5 +1,6 @@
 import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
 import type { ColumnDef } from '@/lib/tanstack-table';
 import { UnifiedTable } from './UnifiedTable';
 
@@ -85,7 +86,13 @@ const columns: ColumnDef<DemoRow, unknown>[] = [
   },
 ];
 
-function PriorityWidthFrame({ width }: { readonly width: number }) {
+function PriorityWidthFrame({
+  width,
+  columnSnap = true,
+}: {
+  readonly width: number;
+  readonly columnSnap?: boolean;
+}) {
   return (
     <div className='space-y-2' style={{ width }}>
       <p className='text-2xs text-tertiary-token tabular-nums'>
@@ -94,6 +101,7 @@ function PriorityWidthFrame({ width }: { readonly width: number }) {
       <UnifiedTable
         data={rows}
         columns={columns}
+        columnSnap={columnSnap}
         enableVirtualization={false}
         getRowId={row => row.id}
         minWidth='0'
@@ -122,4 +130,28 @@ export const Medium: Story = {
 
 export const Wide: Story = {
   render: () => <PriorityWidthFrame width={1100} />,
+};
+
+export const SnapOff: Story = {
+  render: () => <PriorityWidthFrame width={640} columnSnap={false} />,
+};
+
+function ResizeToggle() {
+  const [width, setWidth] = useState(1100);
+  return (
+    <div className='space-y-3'>
+      <button
+        type='button'
+        className='rounded-full border border-subtle px-3 py-1 text-2xs'
+        onClick={() => setWidth(current => (current === 1100 ? 640 : 1100))}
+      >
+        Toggle {width}px
+      </button>
+      <PriorityWidthFrame width={width} />
+    </div>
+  );
+}
+
+export const Resize: Story = {
+  render: () => <ResizeToggle />,
 };

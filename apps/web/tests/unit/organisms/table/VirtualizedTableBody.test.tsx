@@ -8,8 +8,22 @@ import { getCoreRowModel, type Row, useReactTable } from '@/lib/tanstack-table';
 const tableContextMenuSpy = vi.fn();
 
 vi.mock('@/components/organisms/table/organisms/VirtualizedTableRow', () => ({
-  VirtualizedTableRow: ({ row }: { row: { id: string } }) => (
-    <tr data-testid={`table-row-${row.id}`}>
+  VirtualizedTableRow: ({
+    row,
+    columnSnap,
+    columnSnapOrder,
+  }: {
+    row: { id: string };
+    columnSnap?: boolean;
+    columnSnapOrder?: number;
+  }) => (
+    <tr
+      data-column-snap={columnSnap ? 'on' : 'off'}
+      data-column-snap-order={
+        columnSnapOrder == null ? '' : String(columnSnapOrder)
+      }
+      data-testid={`table-row-${row.id}`}
+    >
       <td>{row.id}</td>
     </tr>
   ),
@@ -144,5 +158,28 @@ describe('VirtualizedTableBody', () => {
     expect(bodyRows[0].querySelector('td')?.style.height).toBe('44px');
     expect(bodyRows[1]).toBe(screen.getByTestId('table-row-2'));
     expect(bodyRows[2].querySelector('td')?.style.height).toBe('792px');
+  });
+
+  it('staggers the column snap by painted order, not the dataset index', () => {
+    const rows = [createRow('1', 'One'), createRow('2', 'Two')];
+    const virtualRows = [
+      { index: 1, start: 44, size: 44, end: 88, key: '1', lane: 0 },
+    ] as VirtualItem[];
+
+    render(
+      <table>
+        <VirtualizedTableBody
+          {...baseProps}
+          rows={rows}
+          shouldVirtualize
+          virtualRows={virtualRows}
+          columnSnap
+        />
+      </table>
+    );
+
+    const row = screen.getByTestId('table-row-2');
+    expect(row).toHaveAttribute('data-column-snap', 'on');
+    expect(row).toHaveAttribute('data-column-snap-order', '0');
   });
 });

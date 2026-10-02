@@ -10,13 +10,16 @@ vi.mock('@/components/organisms/table', () => ({
     className,
     enableVirtualization,
     minWidth,
+    columnSnap,
   }: {
     readonly className?: string;
     readonly enableVirtualization?: boolean;
     readonly minWidth?: string;
+    readonly columnSnap?: boolean;
   }) => (
     <div
       data-class-name={className}
+      data-column-snap={String(columnSnap)}
       data-min-width={minWidth}
       data-testid='unified-table'
       data-virtualized={String(enableVirtualization)}
@@ -36,6 +39,7 @@ describe('AdminDataTable', () => {
     );
     expect(table).toHaveAttribute('data-min-width', '960px');
     expect(table).toHaveAttribute('data-virtualized', 'true');
+    expect(table).toHaveAttribute('data-column-snap', 'false');
   });
 
   it('allows callers to extend class names and override table geometry', () => {

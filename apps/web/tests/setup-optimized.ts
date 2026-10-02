@@ -187,25 +187,76 @@ function createInertMotionValue<T>(initial: T) {
   };
 }
 
-vi.mock('motion/react', () => ({
-  AnimatePresence: ({ children }: { children: unknown }) => children,
-  motion: new Proxy(
-    {},
-    {
-      get:
-        () =>
-        ({ children, ...props }: Record<string, unknown>) =>
-          children ?? null,
-    }
-  ),
-  useReducedMotion: () => false,
-  // Motion-value hooks return inert stand-ins; the proxied `motion.*`
-  // components above never read them.
-  useMotionValue: createInertMotionValue,
-  useSpring: createInertMotionValue,
-  useTransform: () => createInertMotionValue(undefined),
-  useVelocity: () => createInertMotionValue(0),
-}));
+vi.mock('motion/react', async () => {
+  const React = await import('react');
+  // Table tags have to stay real elements. Dropping the wrapper (the default
+  // for every other motion tag) removes the cell and breaks row semantics.
+  const tableTags = new Set([
+    'caption',
+    'col',
+    'colgroup',
+    'table',
+    'tbody',
+    'td',
+    'tfoot',
+    'th',
+    'thead',
+    'tr',
+  ]);
+  const passthrough = ({ children }: { children?: unknown }) =>
+    children ?? null;
+  const tableComponents = new Map<string, typeof passthrough>();
+  return {
+    AnimatePresence: ({ children }: { children: unknown }) => children,
+    motion: new Proxy(
+      {},
+      {
+        get: (_target, tag) => {
+          const element = typeof tag === 'string' ? tag : 'div';
+          if (!tableTags.has(element)) return passthrough;
+          const cached = tableComponents.get(element);
+          if (cached) return cached;
+          const MotionTable = ({
+            children,
+            ...props
+          }: Record<string, unknown>) => {
+            const domProps: Record<string, unknown> = {};
+            for (const [key, value] of Object.entries(props)) {
+              if (
+                key === 'animate' ||
+                key === 'exit' ||
+                key === 'initial' ||
+                key === 'layout' ||
+                key === 'layoutId' ||
+                key === 'transition' ||
+                key === 'variants' ||
+                key.startsWith('onAnimation') ||
+                key.startsWith('while')
+              ) {
+                continue;
+              }
+              domProps[key] = value;
+            }
+            return React.createElement(
+              element,
+              domProps,
+              children as React.ReactNode
+            );
+          };
+          tableComponents.set(element, MotionTable);
+          return MotionTable;
+        },
+      }
+    ),
+    useReducedMotion: () => false,
+    // Motion-value hooks return inert stand-ins; the proxied `motion.*`
+    // components above never read them.
+    useMotionValue: createInertMotionValue,
+    useSpring: createInertMotionValue,
+    useTransform: () => createInertMotionValue(undefined),
+    useVelocity: () => createInertMotionValue(0),
+  };
+});
 
 vi.mock('@headlessui/react', async () => {
   const React = await vi.importActual<typeof import('react')>('react');
