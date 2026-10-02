@@ -5,7 +5,9 @@ import AdminPeoplePage from '@/app/app/(shell)/admin/people/page';
 
 const { mockGetAdminAssets, mockAssetsWrapper } = vi.hoisted(() => ({
   mockGetAdminAssets: vi.fn(),
-  mockAssetsWrapper: vi.fn(() => <div data-testid='admin-assets-wrapper' />),
+  mockAssetsWrapper: vi.fn((_props: unknown) => (
+    <div data-testid='admin-assets-wrapper' />
+  )),
 }));
 
 vi.mock('@/components/features/admin/layout/AdminPage', () => ({
