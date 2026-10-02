@@ -256,6 +256,7 @@ web.admin-feature-registry|web|admin-feature-registry|apps/web/app/app/(shell)/a
 web.admin-platform-connections|web|admin-platform-connections|apps/web/app/app/(shell)/admin/platform-connections/|desktop,mobile
 web.admin-growth|web|admin-growth|apps/web/app/app/(shell)/admin/growth/page.tsx|desktop,mobile
 web.admin-people|web|admin-people|apps/web/app/app/(shell)/admin/people/page.tsx|desktop,mobile
+web.admin-agent-runs|web|admin-agent-runs|apps/web/app/app/(shell)/admin/agent-runs/|desktop,mobile
 web.admin-ops-redirect|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/ops/page.tsx|desktop,mobile
 web.admin-screenshots|web|admin-screenshots|apps/web/app/app/(shell)/admin/screenshots/|desktop,mobile
 web.admin-wiki|web|admin-wiki|apps/web/app/app/(shell)/admin/wiki/|desktop,mobile
