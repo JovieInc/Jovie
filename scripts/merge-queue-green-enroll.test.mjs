@@ -39,13 +39,44 @@ async function fixture({
   dry = false,
   failRead = false,
   failMutation = false,
+  eventName = 'workflow_dispatch',
+  payload = {},
 } = {}) {
   const mutations = [];
   const reads = [];
   const warnings = [];
+  const inventories = [];
+  const gets = [];
   const github = {
-    rest: { pulls: { list: Symbol('pulls.list') } },
+    rest: {
+      pulls: {
+        list: Symbol('pulls.list'),
+        get: async params => {
+          gets.push(params.pull_number);
+          return {
+            data: {
+              ...candidate(params.pull_number),
+              state: 'open',
+              base: { ref: 'main' },
+            },
+          };
+        },
+      },
+      commits: { listPullRequestsAssociatedWithCommit: Symbol('associated') },
+    },
     paginate: async (endpoint, params) => {
+      inventories.push(endpoint);
+      if (
+        endpoint === github.rest.commits.listPullRequestsAssociatedWithCommit
+      ) {
+        assert.deepEqual(params, {
+          owner: 'JovieInc',
+          repo: 'Jovie',
+          commit_sha: sha,
+          per_page: 100,
+        });
+        return roster;
+      }
       assert.equal(endpoint, github.rest.pulls.list);
       assert.deepEqual(params, {
         owner: 'JovieInc',
@@ -79,7 +110,7 @@ async function fixture({
   };
   await run(
     github,
-    { repo: { owner: 'JovieInc', repo: 'Jovie' } },
+    { repo: { owner: 'JovieInc', repo: 'Jovie' }, eventName, payload },
     {
       info() {},
       notice() {},
@@ -87,7 +118,7 @@ async function fixture({
     },
     { env: { DRY_RUN: String(dry) } }
   );
-  return { reads, mutations, warnings };
+  return { reads, mutations, warnings, inventories, gets };
 }
 
 test('scans 113 PRs without a multiplied GraphQL query and pins each enqueue head', async () => {
@@ -158,4 +189,90 @@ test('wakes both existing controllers on completed Source Validation without a p
   );
   assert.ok(ready.on.workflow_run.workflows.includes('Source Validation'));
   assert.match(ready.jobs['green-source'].if, /source-validation\.yml/);
+});
+
+test('a PR wake reads only its current candidate instead of rescanning the whole queue', async () => {
+  const roster = Array.from({ length: 113 }, (_, i) => candidate(i + 1));
+  for (const { eventName, payload } of [
+    {
+      eventName: 'pull_request_target',
+      payload: { pull_request: { number: 7 } },
+    },
+    {
+      eventName: 'workflow_run',
+      payload: { workflow_run: { pull_requests: [{ number: 7 }] } },
+    },
+  ]) {
+    const result = await fixture({ roster, eventName, payload });
+    assert.deepEqual(result.inventories, []);
+    assert.deepEqual(result.gets, [7]);
+    assert.deepEqual(result.reads, [7]);
+    assert.equal(result.mutations.length, 1);
+  }
+});
+
+test('an unattributable automatic wake cannot authorize a global queue scan', async () => {
+  for (const { eventName, payload } of [
+    {
+      eventName: 'workflow_run',
+      payload: { workflow_run: { head_sha: 'bad', pull_requests: [] } },
+    },
+    { eventName: 'pull_request_target', payload: {} },
+    { eventName: 'unknown', payload: {} },
+  ]) {
+    const result = await fixture({ eventName, payload });
+    assert.deepEqual(result.inventories, []);
+    assert.deepEqual(result.reads, []);
+    assert.deepEqual(result.mutations, []);
+  }
+});
+
+test('PR-target workflow receipts resolve only an exact same-repo source association', async () => {
+  const valid = {
+    ...candidate(7),
+    state: 'open',
+    base: { ref: 'main' },
+    head: { ...candidate(7).head, ref: 'codex/source' },
+  };
+  const roster = [
+    valid,
+    { ...valid, number: 8, head: { ...valid.head, sha: 'b'.repeat(40) } },
+    { ...valid, number: 9, head: { ...valid.head, ref: 'other' } },
+    {
+      ...valid,
+      number: 10,
+      head: { ...valid.head, repo: { full_name: 'fork/Jovie' } },
+    },
+    { ...valid, number: 11, state: 'closed' },
+    { ...valid, number: 12, base: { ref: 'feature' } },
+  ];
+  const result = await fixture({
+    roster,
+    eventName: 'workflow_run',
+    payload: {
+      workflow_run: {
+        head_sha: sha,
+        head_branch: 'codex/source',
+        pull_requests: [],
+      },
+    },
+  });
+  assert.equal(result.inventories.length, 1);
+  assert.deepEqual(result.gets, [7]);
+  assert.deepEqual(result.reads, [7]);
+  assert.equal(result.mutations.length, 1);
+});
+
+test('duplicated automatic PR associations do not multiply live reads or enqueue mutations', async () => {
+  const result = await fixture({
+    eventName: 'workflow_run',
+    payload: {
+      workflow_run: {
+        pull_requests: [{ number: 7 }, { number: 7 }, { number: -1 }],
+      },
+    },
+  });
+  assert.deepEqual(result.gets, [7]);
+  assert.deepEqual(result.reads, [7]);
+  assert.equal(result.mutations.length, 1);
 });
