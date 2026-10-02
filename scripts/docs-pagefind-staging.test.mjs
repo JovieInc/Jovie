@@ -21,6 +21,36 @@ describe('docs pagefind staging', () => {
       stagedHtmlRelativePath('app/docs/getting-started.html'),
       'docs/getting-started.html'
     );
+    assert.equal(
+      stagedHtmlRelativePath('.next/server/app/docs/getting-started.html'),
+      'docs/getting-started.html'
+    );
+  });
+
+  it('maps Vercel prerender fallback copies onto the public pathname', () => {
+    assert.equal(
+      stagedHtmlRelativePath(
+        '.next/output/functions/docs/self-serve-guide/edit-smart-link.prerender-fallback.html'
+      ),
+      'docs/self-serve-guide/edit-smart-link.html'
+    );
+    assert.equal(
+      stagedHtmlRelativePath(
+        '.next/output/functions/index.prerender-fallback.html'
+      ),
+      'index.html'
+    );
+  });
+
+  it('maps static adapter HTML outside _next', () => {
+    assert.equal(
+      stagedHtmlRelativePath('.next/output/static/docs/getting-started.html'),
+      'docs/getting-started.html'
+    );
+    assert.equal(
+      stagedHtmlRelativePath('.next/output/static/_next/static/foo.html'),
+      null
+    );
   });
 
   it('drops paths that are not prerendered pages', () => {
@@ -30,5 +60,11 @@ describe('docs pagefind staging', () => {
       null
     );
     assert.equal(stagedHtmlRelativePath('app/docs/page.rsc'), null);
+    assert.equal(
+      stagedHtmlRelativePath(
+        '.next/output/functions/docs/foo.segments/bar.prerender-fallback.html'
+      ),
+      null
+    );
   });
 });
