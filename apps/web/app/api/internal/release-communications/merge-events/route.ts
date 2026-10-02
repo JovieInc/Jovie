@@ -3,9 +3,11 @@
  *
  * Source: the merge automation (Production Verified job / repository merge
  * webhook) pushes a signed event for every merged PR — no polling or
- * inference. The body must carry `verified: true` plus the merge identity;
- * storage-level idempotency (`release_merge_events.event_key` unique) makes
- * replay safe.
+ * inference. A registered source-repository adapter (`lib/release-
+ * communications/sources.ts`) normalizes the payload for the canonical
+ * contract; unknown repositories are rejected. The body must carry
+ * `verified: true` plus the merge identity; storage-level idempotency
+ * (`release_merge_events.event_key` unique) makes replay safe.
  *
  * Security: HMAC-SHA256 over the raw request body, hex digest in the
  * `x-jovie-signature-256` header as `sha256=<digest>`, verified with
@@ -19,7 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { DrizzleReleaseCommunicationsAdapter } from '@/lib/release-communications/drizzle-adapter';
-import { parseVerifiedMergeEvent } from '@/lib/release-communications/prompt';
+import { sourceAdapterForRepository } from '@/lib/release-communications/sources';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -76,7 +78,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const event = parseVerifiedMergeEvent(payload);
+  const repository =
+    payload && typeof payload === 'object'
+      ? (payload as Record<string, unknown>).repository
+      : null;
+  const source = sourceAdapterForRepository(repository);
+  const event = source?.toVerifiedMergeEvent(payload) ?? null;
   if (!event) {
     return NextResponse.json(
       { error: 'invalid merge event' },
