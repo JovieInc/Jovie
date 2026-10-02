@@ -48,5 +48,10 @@ describe('OpportunityInboxEmptyState', () => {
 
     expect(screen.getByText('Start A Brain Dump')).toBeVisible();
     expect(screen.getByTestId('founder-recorder')).toBeVisible();
+    expect(
+      screen.getByText(
+        /Saving a note does not give Jovie permission to publish it/
+      )
+    ).toBeVisible();
   });
 });

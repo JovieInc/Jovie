@@ -37,7 +37,7 @@ export function OpportunityInboxEmptyState({
 
   return (
     <section
-      className='rounded-lg border border-subtle bg-surface-0 p-4 sm:p-5'
+      className='w-full max-w-2xl'
       data-testid='opportunity-inbox-empty-state'
       aria-labelledby='founder-brain-dump-title'
     >
@@ -49,8 +49,8 @@ export function OpportunityInboxEmptyState({
         Start A Brain Dump
       </h2>
       <p className='mt-2 max-w-xl text-sm leading-6 text-secondary-token'>
-        Capture the thought while it is fresh. Jovie will save the transcript
-        and provenance without treating it as permission to publish.
+        Capture a thought while it is fresh. Record or type a note to save it
+        here. Saving a note does not give Jovie permission to publish it.
       </p>
       <FounderReviewRecorder
         className='mt-4'
