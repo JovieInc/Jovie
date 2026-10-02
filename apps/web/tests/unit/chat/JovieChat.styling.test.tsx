@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { act, fireEvent } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, fireEvent, render } from '@testing-library/react';
 import {
   afterAll,
   afterEach,
@@ -33,6 +34,35 @@ const mockInsightsSummary = vi.hoisted(() => ({
     | { insights: { status: string; title: string }[] }
     | undefined,
 }));
+
+const mockRailPanel = vi.hoisted(() => ({
+  enabled: false,
+  value: {
+    target: null,
+    contextTargets: [],
+    open: vi.fn(),
+    close: vi.fn(),
+    clear: vi.fn(),
+    upsertContext: vi.fn(),
+    upsertContexts: vi.fn(),
+    dismissContext: vi.fn(),
+    clearContexts: vi.fn(),
+    clearDismissal: vi.fn(),
+    isDismissed: vi.fn(() => false),
+    isContextDismissed: vi.fn(() => false),
+  },
+}));
+
+vi.mock(
+  '@/app/app/(shell)/chat/ChatEntityPanelContext',
+  async importOriginal => ({
+    ...(await importOriginal<
+      typeof import('@/app/app/(shell)/chat/ChatEntityPanelContext')
+    >()),
+    useOptionalChatEntityPanel: () =>
+      mockRailPanel.enabled ? mockRailPanel.value : null,
+  })
+);
 
 vi.mock('@/lib/queries', async importOriginal => ({
   ...(await importOriginal<typeof import('@/lib/queries')>()),
@@ -221,6 +251,9 @@ beforeAll(() => {
 });
 
 afterEach(() => {
+  mockRailPanel.enabled = false;
+  mockRailPanel.value.upsertContexts.mockClear();
+  mockRailPanel.value.clearContexts.mockClear();
   resizeObserverCallbacks.length = 0;
   virtualizerSpy.options = null;
   virtualizerSpy.measure.mockClear();
@@ -605,5 +638,66 @@ describe('JovieChat styling regressions', () => {
     expect(
       container.querySelector('[data-testid="ovie-editorial-briefing"]')
     ).toBeNull();
+  });
+
+  it('publishes rail context only when its meaning changes during streaming', () => {
+    mockRailPanel.enabled = true;
+    mockChatState.messages = [
+      {
+        id: 'm1',
+        role: 'assistant',
+        parts: [{ type: 'text', text: '@release:one[One]' }],
+      },
+    ];
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <JovieChat profileId='profile-1' conversationId='one' />
+      </QueryClientProvider>
+    );
+    const rerenderChat = (conversationId: string) =>
+      rerender(
+        <QueryClientProvider client={queryClient}>
+          <JovieChat profileId='profile-1' conversationId={conversationId} />
+        </QueryClientProvider>
+      );
+    expect(mockRailPanel.value.upsertContexts).toHaveBeenCalledTimes(1);
+
+    // Opening another panel changes the context value, but the publisher and
+    // derived candidates still mean the same thing.
+    mockRailPanel.value = { ...mockRailPanel.value };
+    rerenderChat('one');
+    expect(mockRailPanel.value.upsertContexts).toHaveBeenCalledTimes(1);
+
+    mockChatState.messages = [
+      {
+        id: 'm1',
+        role: 'assistant',
+        parts: [
+          { type: 'text', text: '@release:one[One] Streaming more text' },
+        ],
+      },
+    ];
+    rerenderChat('one');
+    expect(mockRailPanel.value.upsertContexts).toHaveBeenCalledTimes(1);
+
+    mockChatState.messages = [
+      {
+        id: 'm1',
+        role: 'assistant',
+        parts: [{ type: 'text', text: '@release:one[Renamed]' }],
+      },
+    ];
+    rerenderChat('one');
+    expect(mockRailPanel.value.upsertContexts).toHaveBeenCalledTimes(2);
+    expect(mockRailPanel.value.upsertContexts).toHaveBeenLastCalledWith([
+      expect.objectContaining({ id: 'one', label: 'Renamed' }),
+    ]);
+
+    mockChatState.messages = [];
+    rerenderChat('two');
+    expect(mockRailPanel.value.clearContexts).toHaveBeenCalledTimes(1);
   });
 });
