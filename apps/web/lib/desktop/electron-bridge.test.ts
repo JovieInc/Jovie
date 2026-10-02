@@ -20,6 +20,7 @@ import {
   __testing,
   isDesktopEnvironment,
   reportDesktopWorkState,
+  notifyDesktopComposerReadiness,
   useDesktopBuildIdentity,
 } from './electron-bridge';
 
@@ -783,5 +784,35 @@ describe('narrow current Ovie browser bridge', () => {
       reason: 'ovie-browser-open-failed',
     });
     expect(windowOpenSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('passive composer launch readiness bridge', () => {
+  it('silently tolerates browsers, old binaries, and a failed IPC', async () => {
+    expect(await notifyDesktopComposerReadiness('visible-editable')).toBe(
+      false
+    );
+    setElectronAPI({});
+    expect(await notifyDesktopComposerReadiness('focused')).toBe(false);
+    setElectronAPI({
+      notifyComposerReadiness: vi.fn().mockRejectedValue(new Error('closed')),
+    });
+    expect(await notifyDesktopComposerReadiness('focused')).toBe(false);
+    expect(captureWarningMock).not.toHaveBeenCalled();
+  });
+  it('forwards only the milestone and requires a positive main-process receipt', async () => {
+    const notifyComposerReadiness = vi
+      .fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    setElectronAPI({ notifyComposerReadiness });
+    expect(await notifyDesktopComposerReadiness('visible-editable')).toBe(
+      false
+    );
+    expect(await notifyDesktopComposerReadiness('focused')).toBe(true);
+    expect(notifyComposerReadiness.mock.calls).toEqual([
+      ['visible-editable'],
+      ['focused'],
+    ]);
   });
 });

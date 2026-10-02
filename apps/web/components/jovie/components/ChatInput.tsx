@@ -29,6 +29,7 @@ import {
   type TranscriberErrorCode,
 } from '@/lib/chat/transcriber';
 import { SYSTEM_B_RADIUS_PX } from '@/lib/design/system-b-radius';
+import { useDesktopComposerReadiness } from '@/lib/desktop/use-desktop-composer-readiness';
 import { useEntityRecents } from '@/lib/queries/useEntityRecents';
 import { cn } from '@/lib/utils';
 
@@ -74,6 +75,8 @@ export interface ChatInputProps {
   readonly onInterruptAndSend?: () => void;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
+  /** Opt in only for a loaded conversation in the authenticated chat owner. */
+  readonly desktopConversationReady?: boolean;
   readonly placeholder?: string;
   readonly variant?: 'default' | 'compact' | 'hero';
   readonly onFileAttach?: () => void;
@@ -280,6 +283,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onInterruptAndSend,
       isLoading,
       isSubmitting,
+      desktopConversationReady = false,
       placeholder = '',
       variant = 'default',
       onFileAttach,
@@ -927,6 +931,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       containerRef,
       hiddenDivRef,
       internalTextareaRef,
+      desktopConversationReady,
       value,
       onChange: handleChange,
       handleKeyDown,
@@ -1168,6 +1173,7 @@ interface InputRowProps {
   readonly containerRef: React.RefObject<HTMLDivElement | null>;
   readonly hiddenDivRef: React.RefObject<HTMLDivElement | null>;
   readonly internalTextareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  readonly desktopConversationReady: boolean;
   readonly value: string;
   readonly onChange: (value: string) => void;
   readonly handleKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -1221,6 +1227,7 @@ function InputRow({
   containerRef,
   hiddenDivRef,
   internalTextareaRef,
+  desktopConversationReady,
   value,
   onChange,
   handleKeyDown,
@@ -1262,6 +1269,8 @@ function InputRow({
   pickerActiveRowId,
   isHero,
 }: InputRowProps) {
+  // This component owns the textarea lifetime, including entity-picker swaps.
+  useDesktopComposerReadiness(internalTextareaRef, desktopConversationReady);
   const hasInlineContent = Boolean(value.trim()) || (chips?.length ?? 0) > 0;
   const hasOnlyRootSlashQuery =
     isRootPickerOpen &&

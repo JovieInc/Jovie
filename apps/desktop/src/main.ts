@@ -80,6 +80,13 @@ import {
   shouldRunWakeUpdateCheck,
   shouldScheduleDesktopAutoUpdate,
 } from './desktop-auto-update';
+import {
+  createDesktopLaunchReadiness,
+  createLaunchReadinessWriter,
+  DESKTOP_COMPOSER_READINESS_CHANNEL,
+  DESKTOP_LAUNCH_READINESS_FILE,
+  type ReadinessSender,
+} from './desktop-launch-readiness';
 import { installDesktopCspWatchdog } from './desktop-csp-watchdog';
 import {
   parseDesktopNotificationRequest,
@@ -2389,7 +2396,51 @@ function attachRendererRecovery(
   });
 }
 
+let launchReadiness: ReturnType<typeof createDesktopLaunchReadiness> | null =
+  null;
+
+function readinessSender(
+  event: IpcMainEvent | IpcMainInvokeEvent
+): ReadinessSender {
+  const frame = event.senderFrame;
+  const win = mainWindow;
+  const live = Boolean(win && !win.isDestroyed());
+  return {
+    isMainWindow: live && win?.webContents === event.sender,
+    frame: frame
+      ? {
+          isMainFrame: frame === event.sender.mainFrame,
+          detached: frame.detached,
+          url: frame.url,
+        }
+      : null,
+    appOrigin: APP_ORIGIN,
+    visible: live && Boolean(win?.isVisible()),
+    minimized: !live || Boolean(win?.isMinimized()),
+    focused: live && Boolean(win?.isFocused()),
+  };
+}
+
 function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
+  if (!launchReadiness) {
+    const writeReceipt = createLaunchReadinessWriter(
+      path.join(app.getPath('userData'), DESKTOP_LAUNCH_READINESS_FILE),
+      error =>
+        console.warn(
+          '[desktop-launch-readiness] Could not persist receipt',
+          error
+        )
+    );
+    launchReadiness = createDesktopLaunchReadiness({
+      pid: process.pid,
+      processTimeOrigin: new Date(performance.timeOrigin).toISOString(),
+      nativeBuild: desktopBuildIdentity,
+      now: () => performance.now(),
+      onChange: receipt => {
+        void writeReceipt(receipt);
+      },
+    });
+  }
   const windowState = windowStateStore.peek();
 
   const win = new BrowserWindow({
@@ -2444,6 +2495,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   }, 6000);
 
   win.once('ready-to-show', () => {
+    launchReadiness?.nativeWindowReadyToShow();
     clearTimeout(initialVisibilityFallback);
     if (isAuthHandoffInteractive()) {
       mainWindowHiddenForAuthHandoff = true;
@@ -3146,10 +3198,20 @@ ipcMain.on(CLIENT_NAVIGATION_READY_CHANNEL, (event, ready: unknown) => {
   }
   desktopNavigation.setReady(event.sender.id, ready);
 });
+// Optional composer evidence does not change the renderer recovery watchdog.
+ipcMain.handle(
+  DESKTOP_COMPOSER_READINESS_CHANNEL,
+  (event, ...args: unknown[]) => {
+    return (
+      launchReadiness?.composerReady(readinessSender(event), args) ?? false
+    );
+  }
+);
 
 // Hosted app first-paint heartbeat (JOV-3595). Uses send (not invoke) so a
 // missing main handler on a stale binary cannot reject the renderer promise.
 ipcMain.on(APP_BOOTED_CHANNEL, event => {
+  launchReadiness?.reactMounted(readinessSender(event));
   const parsed = parseUrl(getIpcSenderUrl(event));
   if (parsed?.origin !== APP_ORIGIN) return;
   rendererBootControllers.get(event.sender.id)?.markBooted();
