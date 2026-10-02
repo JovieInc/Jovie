@@ -201,10 +201,15 @@ export function collectRaw({ workflows, days }) {
         const jobs = gh([
           'api',
           `repos/${ghRepo}/actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`,
+          '--paginate',
+          '--slurp',
           '--jq',
-          '[.jobs[] | select(.name == "Blog Content Qualification") | {conclusion, startedAt: .started_at, completedAt: .completed_at}]',
+          '[.[].jobs[] | select(.name == "Blog Content Qualification") | {conclusion, startedAt: .started_at, completedAt: .completed_at}]',
         ]);
         const job = jobs.find(candidate => candidate.conclusion === 'success');
+        pr.blogQualificationConfirmedAbsent =
+          run.conclusion === 'success' &&
+          jobs.every(candidate => candidate.conclusion === 'skipped');
         if (job) {
           pr.blogQualification = {
             ...job,
@@ -215,7 +220,7 @@ export function collectRaw({ workflows, days }) {
           };
         }
       } catch {
-        // The legacy cohort intentionally has no qualification job.
+        // Missing evidence stays unknown, including an unreadable job page.
       }
     }
 
