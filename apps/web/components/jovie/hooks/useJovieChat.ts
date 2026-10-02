@@ -5,7 +5,14 @@ import { useAsyncRateLimiter } from '@tanstack/react-pacer';
 import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport, isToolUIPart, type UIMessage } from 'ai';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { CHAT_STREAM_FAILED_USER_MESSAGE } from '@/lib/ai/gateway-errors';
 import { track } from '@/lib/analytics';
 import { matchCommand } from '@/lib/chat/command-registry';
@@ -347,10 +354,18 @@ export function useJovieChat({
   // Retry may reuse the turn id (message metadata is not readable in onError).
   const pendingSummerFailureRef = useRef<SummerFailure | null>(null);
   const loadedConversationIdsRef = useRef<Set<string>>(new Set());
-  const [input, setInput] = useState(() =>
+  const [input, setInputState] = useState(() =>
     readComposerDraft(conversationId ?? null)
   );
   const inputDraftRef = useRef(input);
+  const inputDraftConversationIdRef = useRef(conversationId ?? null);
+  const setInput = useCallback((value: SetStateAction<string>) => {
+    const nextInput =
+      typeof value === 'function' ? value(inputDraftRef.current) : value;
+    // A route change can unmount chat before React commits this update.
+    inputDraftRef.current = nextInput;
+    setInputState(nextInput);
+  }, []);
   const chipTray = useChipTray();
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -367,6 +382,7 @@ export function useJovieChat({
     if (timelineMode === chatMode) return;
     setTimelineMode(chatMode);
     setTimelineState(createInitialChatTimelineState(conversationId ?? null));
+    inputDraftConversationIdRef.current = conversationId ?? null;
     setActiveConversationId(conversationId ?? null);
     activeClientTurnIdRef.current = null;
   }, [chatMode, conversationId, timelineMode]);
@@ -432,6 +448,7 @@ export function useJovieChat({
       // Switching the hook's chat id before the AI SDK stream finishes
       // recreates the internal chat instance and drops in-flight tokens.
       if (isNewConversation && phase === 'completed') {
+        inputDraftConversationIdRef.current = nextConversationId;
         setActiveConversationId(nextConversationId);
       }
 
@@ -684,7 +701,7 @@ export function useJovieChat({
       activeChatLatencyRef.current = null;
       setIsSubmitting(false);
     },
-    [activeConversationId, dispatchTimelineEvent, profileId]
+    [activeConversationId, dispatchTimelineEvent, profileId, setInput]
   );
 
   /**
@@ -1095,13 +1112,21 @@ export function useJovieChat({
     }
   }, [input, chatError]);
 
-  useEffect(() => {
-    inputDraftRef.current = input;
-  }, [input]);
+  useEffect(
+    () => () => {
+      saveComposerDraft(
+        inputDraftConversationIdRef.current,
+        inputDraftRef.current
+      );
+    },
+    []
+  );
 
   useEffect(() => {
     const handle = globalThis.setTimeout(() => {
-      saveComposerDraft(activeConversationId, input);
+      if (inputDraftConversationIdRef.current === activeConversationId) {
+        saveComposerDraft(activeConversationId, inputDraftRef.current);
+      }
     }, 250);
     return () => globalThis.clearTimeout(handle);
   }, [activeConversationId, input]);
@@ -1135,11 +1160,13 @@ export function useJovieChat({
       nextConversationId &&
       timelineStateRef.current.conversationId === nextConversationId
     ) {
+      inputDraftConversationIdRef.current = nextConversationId;
       setActiveConversationId(nextConversationId);
       return;
     }
 
     saveComposerDraft(activeConversationId, inputDraftRef.current);
+    inputDraftConversationIdRef.current = nextConversationId;
     setInput(readComposerDraft(nextConversationId));
 
     setActiveConversationId(nextConversationId);
@@ -1153,7 +1180,7 @@ export function useJovieChat({
       cachedMessages: takeCachedTimelineMessages(nextConversationId),
       now: Date.now(),
     });
-  }, [activeConversationId, conversationId, dispatchTimelineEvent]);
+  }, [activeConversationId, conversationId, dispatchTimelineEvent, setInput]);
 
   /** Try to handle text as a deterministic command. Returns true if handled. */
   const tryHandleCommand = useCallback(
@@ -1297,6 +1324,7 @@ export function useJovieChat({
       isLoading,
       isSubmitting,
       sendMessage,
+      setInput,
       stop,
       tryHandleCommand,
       chatMode,
