@@ -1,55 +1,46 @@
 'use client';
 // @coverage-via apps/web/tests/unit/dashboard/SettingsUsageStatsSection.test.tsx
 
-import { Button } from '@jovie/ui';
+import { Badge, Button } from '@jovie/ui';
 import { AlertCircle } from 'lucide-react';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { type ReactNode, type Ref, useEffect, useRef, useState } from 'react';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { UsageMeter } from '@/components/molecules/UsageMeter';
 import { APP_ROUTES } from '@/constants/routes';
-import type { ChatUsageState } from '@/lib/chat-usage/copy';
 import { getChatUsageCopy } from '@/lib/chat-usage/copy';
 import { formatResetAt, getWeeklyUsageModel } from '@/lib/chat-usage/metrics';
 import { env } from '@/lib/env-client';
 import { useChatUsageQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
-const USAGE_PANEL_MIN_HEIGHT_CLASS = 'min-h-96';
+const USAGE_PANEL_MIN_HEIGHT_CLASS = 'min-h-64 sm:min-h-56';
 
 interface UsagePanelShellProps {
   readonly children: ReactNode;
   readonly className?: string;
+  readonly resultRef?: Ref<HTMLElement>;
 }
 
-function UsagePanelShell({ children, className }: UsagePanelShellProps) {
+function UsagePanelShell({
+  children,
+  className,
+  resultRef,
+}: UsagePanelShellProps) {
   return (
-    <SettingsPanel cardClassName='border border-subtle bg-surface-1 shadow-none'>
-      <div
+    <SettingsPanel>
+      <section
         className={cn(USAGE_PANEL_MIN_HEIGHT_CLASS, 'flex flex-col', className)}
         data-testid='settings-usage-panel'
+        ref={resultRef}
+        aria-label='Weekly Usage'
+        tabIndex={resultRef ? -1 : undefined}
       >
         {children}
-      </div>
+      </section>
     </SettingsPanel>
   );
-}
-
-function getStatusToneClasses(state: ChatUsageState): string {
-  if (state === 'healthy') {
-    return 'border-success/25 bg-success/10 text-success';
-  }
-
-  if (state === 'near_limit') {
-    return 'border-warning/25 bg-warning/10 text-warning';
-  }
-
-  if (state === 'exhausted') {
-    return 'border-error/25 bg-error/10 text-error';
-  }
-
-  return 'border-subtle bg-surface-0 text-secondary-token';
 }
 
 function UsageLoadingState() {
@@ -78,20 +69,44 @@ function UsageLoadingState() {
 function UsageMessageState({
   title,
   description,
+  onRetry,
+  retryButtonRef,
+  retrying = false,
 }: Readonly<{
   title: string;
   description: string;
+  onRetry?: () => void;
+  retryButtonRef?: Ref<HTMLButtonElement>;
+  retrying?: boolean;
 }>) {
   return (
     <UsagePanelShell className='justify-center'>
-      <div className='mx-auto flex max-w-md flex-col items-center px-4 text-center'>
+      <div className='mx-auto flex max-w-md flex-col items-center px-4 py-5 text-center'>
         <div className='flex h-8 w-8 items-center justify-center rounded-full bg-surface-0 text-secondary-token'>
           <AlertCircle className='h-4 w-4' aria-hidden />
         </div>
-        <p className='mt-3 text-app font-caption text-primary-token'>{title}</p>
+        <p
+          role={onRetry ? 'alert' : undefined}
+          className='mt-3 text-app font-caption text-primary-token'
+        >
+          {title}
+        </p>
         <p className='mt-1 text-xs leading-[17px] text-secondary-token'>
           {description}
         </p>
+        {onRetry ? (
+          <Button
+            ref={retryButtonRef}
+            className='mt-3'
+            variant='secondary'
+            size='sm'
+            aria-disabled={retrying}
+            aria-busy={retrying}
+            onClick={onRetry}
+          >
+            {retrying ? 'Retrying…' : 'Retry'}
+          </Button>
+        ) : null}
       </div>
     </UsagePanelShell>
   );
@@ -101,6 +116,39 @@ export function SettingsUsageStatsSection() {
   const chatUsage = useChatUsageQuery({
     enabled: !env.IS_E2E,
   });
+  const [retrying, setRetrying] = useState(false);
+  const [retryFailed, setRetryFailed] = useState(false);
+  const retryRequested = useRef(false);
+  const retryButtonRef = useRef<HTMLButtonElement>(null);
+  const resultRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!retryRequested.current || retrying) return;
+    if (chatUsage.data && !chatUsage.error && !retryFailed) {
+      resultRef.current?.focus({ preventScroll: true });
+      retryRequested.current = false;
+    }
+  }, [chatUsage.data, chatUsage.error, retryFailed, retrying]);
+
+  async function handleRetry() {
+    if (retrying) return;
+    retryRequested.current = false;
+    setRetryFailed(false);
+    setRetrying(true);
+    try {
+      const result = await chatUsage.refetch();
+      retryRequested.current = Boolean(
+        result.data &&
+          !result.error &&
+          document.activeElement === retryButtonRef.current
+      );
+    } catch {
+      setRetryFailed(true);
+    } finally {
+      setRetrying(false);
+    }
+  }
+
   if (env.IS_E2E) {
     return (
       <UsageMessageState
@@ -110,15 +158,22 @@ export function SettingsUsageStatsSection() {
     );
   }
 
-  if (chatUsage.isLoading) {
+  if (chatUsage.isLoading && !retrying) {
     return <UsageLoadingState />;
   }
 
-  if (chatUsage.error) {
+  if (chatUsage.error || retrying || retryFailed) {
     return (
       <UsageMessageState
         title='Usage unavailable'
-        description="We couldn't load your usage stats right now. Please refresh and try again."
+        description={
+          retrying
+            ? 'Checking your latest usage…'
+            : 'We could not load your usage stats. Try again.'
+        }
+        onRetry={handleRetry}
+        retryButtonRef={retryButtonRef}
+        retrying={retrying}
       />
     );
   }
@@ -142,21 +197,16 @@ export function SettingsUsageStatsSection() {
   const statusLabel = copy?.statusLabel ?? 'Usage unavailable';
 
   return (
-    <UsagePanelShell>
+    <UsagePanelShell resultRef={resultRef}>
       <div className='flex flex-wrap items-start justify-between gap-3 border-b border-subtle px-4 py-4 sm:px-5'>
         <div className='min-w-0 space-y-1'>
           <div className='flex flex-wrap items-center gap-2'>
             <p className='text-app font-caption text-primary-token'>
               {copy?.summaryTitle ?? 'Plan usage'}
             </p>
-            <span
-              className={cn(
-                'inline-flex items-center rounded-md border px-1.5 py-0.5 text-3xs font-medium tracking-wide',
-                getStatusToneClasses(copy?.state ?? 'unavailable')
-              )}
-            >
+            <Badge variant='outline' size='sm'>
               {statusLabel}
-            </span>
+            </Badge>
           </div>
           <p className='max-w-2xl text-xs leading-[17px] text-secondary-token'>
             {copy?.summaryDescription ??
