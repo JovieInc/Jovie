@@ -1,6 +1,7 @@
 import {
   Popover,
   PopoverAnchor,
+  PopoverClose,
   PopoverContent,
   PopoverTrigger,
 } from '@jovie/ui';
@@ -23,6 +24,10 @@ describe('Popover', () => {
 
     it('exports PopoverAnchor component', () => {
       expect(PopoverAnchor).toBeDefined();
+    });
+
+    it('exports PopoverClose component', () => {
+      expect(PopoverClose).toBeDefined();
     });
   });
 
@@ -192,6 +197,7 @@ describe('Popover', () => {
       expect(PopoverTrigger).toBe(jovieUI.PopoverTrigger);
       expect(PopoverContent).toBe(jovieUI.PopoverContent);
       expect(PopoverAnchor).toBe(jovieUI.PopoverAnchor);
+      expect(PopoverClose).toBe(jovieUI.PopoverClose);
     });
   });
 
