@@ -379,7 +379,7 @@ const MARKETING_SURFACES = [
   // SHOW_PRODUCT_DEMO_VIDEO is off, so the surface only exists when the
   // flag ships. demo-video.spec.ts covers the gated-off state.
   ...(FEATURE_FLAGS.SHOW_PRODUCT_DEMO_VIDEO
-    ? [
+    ? ([
         {
           id: 'marketing-demo-video',
           family: 'marketing',
@@ -392,7 +392,7 @@ const MARKETING_SURFACES = [
           perfGroups: ['marketing-public'],
           interactions: GLOBAL_INTERACTIONS,
         },
-      ]
+      ] as const)
     : []),
   {
     id: 'marketing-blog-index',
