@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
 import type { ConnectorStatus } from '@/components/features/connectors/ConnectorCard';
 import { ConnectorCard } from '@/components/features/connectors/ConnectorCard';
-import { SuggestedActionCard } from '@/components/features/connectors/SuggestedActionCard';
 import { SettingsSection } from '@/components/features/dashboard/organisms/SettingsSection';
 import { toast } from '@/components/feedback';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
@@ -26,38 +25,15 @@ interface ConnectorState {
   readonly errorMessage?: string;
 }
 
-interface SuggestedActionPreview {
-  readonly id: string;
-  readonly title: string;
-  readonly startsAt: string;
-  readonly endsAt: string | null;
-  readonly venueName: string | null;
-  readonly city: string | null;
-  readonly region: string | null;
-  readonly country: string | null;
-  readonly confidence: number;
-  readonly rationale: string;
-  readonly sourceRef: { messageId: string; subject: string };
-  readonly status:
-    | 'pending'
-    | 'approved'
-    | 'executed'
-    | 'rejected'
-    | 'failed'
-    | 'expired';
-}
-
 interface ConnectorsClientProps {
   readonly connectors: Readonly<Record<ConnectorProviderId, ConnectorState>>;
   readonly creatorProfileId: string | null;
-  readonly suggestedActions: SuggestedActionPreview[];
   readonly isDev: boolean;
 }
 
 export function ConnectorsClient({
   connectors,
   creatorProfileId,
-  suggestedActions,
   isDev,
 }: ConnectorsClientProps) {
   const router = useRouter();
@@ -164,21 +140,6 @@ export function ConnectorsClient({
           })}
         </div>
       </SettingsPanel>
-
-      {suggestedActions.length > 0 && (
-        <SettingsPanel
-          title='Suggested Actions'
-          bodyClassName='space-y-3 px-4 py-3 sm:px-5'
-        >
-          {suggestedActions.map(action => (
-            <SuggestedActionCard
-              key={action.id}
-              {...action}
-              // Approve/Reject handlers are wired in C-PR-3.
-            />
-          ))}
-        </SettingsPanel>
-      )}
 
       {isDev && isGoogleConnected && (
         <SettingsPanel

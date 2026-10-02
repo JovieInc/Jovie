@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { ConnectorStatus } from '@/components/features/connectors/ConnectorCard';
 import {
   CONNECTOR_PROVIDER_IDS,
@@ -10,10 +10,7 @@ import {
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
-import {
-  connectorAccounts,
-  suggestedActions,
-} from '@/lib/db/schema/connectors';
+import { connectorAccounts } from '@/lib/db/schema/connectors';
 
 interface ConnectorAccountRow {
   readonly provider: ConnectorProviderId;
@@ -32,32 +29,10 @@ export interface SettingsConnectorState {
   readonly errorMessage?: string;
 }
 
-export interface SettingsSuggestedActionPreview {
-  readonly id: string;
-  readonly title: string;
-  readonly startsAt: string;
-  readonly endsAt: string | null;
-  readonly venueName: string | null;
-  readonly city: string | null;
-  readonly region: string | null;
-  readonly country: string | null;
-  readonly confidence: number;
-  readonly rationale: string;
-  readonly sourceRef: { messageId: string; subject: string };
-  readonly status:
-    | 'pending'
-    | 'approved'
-    | 'executed'
-    | 'rejected'
-    | 'failed'
-    | 'expired';
-}
-
 export interface SettingsConnectorsData {
   readonly connectors: Readonly<
     Record<ConnectorProviderId, SettingsConnectorState>
   >;
-  readonly suggestedActions: SettingsSuggestedActionPreview[];
 }
 
 function toConnectorStatus(
@@ -121,7 +96,6 @@ function buildConnectorStates(
 
 const EMPTY_CONNECTORS_DATA: SettingsConnectorsData = {
   connectors: buildConnectorStates([], null),
-  suggestedActions: [],
 };
 
 export async function loadSettingsConnectorsData(
@@ -148,60 +122,20 @@ async function loadSettingsConnectorsDataForUser(
   userId: string,
   creatorProfileId: string | null
 ): Promise<SettingsConnectorsData> {
-  const [connectorRows, actionRows] = await Promise.all([
-    db
-      .select({
-        provider: connectorAccounts.provider,
-        status: connectorAccounts.status,
-        providerAccountId: connectorAccounts.providerAccountId,
-        creatorProfileId: connectorAccounts.creatorProfileId,
-        scopes: connectorAccounts.scopes,
-        capabilities: connectorAccounts.capabilities,
-        lastErrorUserMessage: connectorAccounts.lastErrorUserMessage,
-      })
-      .from(connectorAccounts)
-      .where(eq(connectorAccounts.userId, userId)),
-    db
-      .select({
-        id: suggestedActions.id,
-        payload: suggestedActions.payload,
-        rationale: suggestedActions.rationale,
-        sourceRefs: suggestedActions.sourceRefs,
-        status: suggestedActions.status,
-      })
-      .from(suggestedActions)
-      .where(
-        and(
-          eq(suggestedActions.userId, userId),
-          eq(suggestedActions.status, 'pending')
-        )
-      )
-      .limit(10),
-  ]);
-
-  const pendingActions = actionRows.map(row => {
-    const payload = row.payload as Record<string, unknown>;
-    const sourceRefs =
-      (row.sourceRefs as Array<{ messageId: string; subject: string }>) ?? [];
-
-    return {
-      id: row.id,
-      title: String(payload.title ?? 'Untitled event'),
-      startsAt: String(payload.startsAt ?? ''),
-      endsAt: (payload.endsAt as string | null) ?? null,
-      venueName: (payload.venueName as string | null) ?? null,
-      city: (payload.city as string | null) ?? null,
-      region: (payload.region as string | null) ?? null,
-      country: (payload.country as string | null) ?? null,
-      confidence: Number(payload.confidence ?? 0),
-      rationale: String(row.rationale ?? ''),
-      sourceRef: sourceRefs[0] ?? { messageId: '', subject: '' },
-      status: row.status as 'pending',
-    };
-  });
+  const connectorRows = await db
+    .select({
+      provider: connectorAccounts.provider,
+      status: connectorAccounts.status,
+      providerAccountId: connectorAccounts.providerAccountId,
+      creatorProfileId: connectorAccounts.creatorProfileId,
+      scopes: connectorAccounts.scopes,
+      capabilities: connectorAccounts.capabilities,
+      lastErrorUserMessage: connectorAccounts.lastErrorUserMessage,
+    })
+    .from(connectorAccounts)
+    .where(eq(connectorAccounts.userId, userId));
 
   return {
     connectors: buildConnectorStates(connectorRows, creatorProfileId),
-    suggestedActions: pendingActions,
   };
 }
