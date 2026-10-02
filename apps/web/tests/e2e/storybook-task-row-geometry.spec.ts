@@ -92,7 +92,7 @@ for (const viewport of VIEWPORTS) {
         const violations: string[] = [];
         for (
           let parent = element.parentElement;
-          parent && parent.tagName !== 'TABLE';
+          parent;
           parent = parent.parentElement
         ) {
           const style = getComputedStyle(parent);
@@ -156,6 +156,14 @@ for (const viewport of VIEWPORTS) {
         }
         expect(bounds.hitAtLeft).toBe(true);
         expect(bounds.hitAtRight).toBe(true);
+        const avatarBounds = await avatar.boundingBox();
+        const tableBounds = await table.boundingBox();
+        expect(avatarBounds).not.toBeNull();
+        expect(tableBounds).not.toBeNull();
+        expect(avatarBounds!.x).toBeGreaterThanOrEqual(tableBounds!.x);
+        expect(avatarBounds!.x + avatarBounds!.width).toBeLessThanOrEqual(
+          tableBounds!.x + tableBounds!.width
+        );
       }
     });
   }

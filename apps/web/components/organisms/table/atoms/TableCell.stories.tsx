@@ -106,6 +106,7 @@ export const CreatorIdentity: Story = {
       <UnifiedTable
         data={[creator]}
         columns={creatorColumns}
+        minWidth='320px'
         enableVirtualization={false}
       />
     </div>
