@@ -28,6 +28,7 @@ import {
   TableEmptyState,
   TableSearchBar,
 } from '@/components/organisms/table';
+import { TABLE_CELL_MULTILINE_CONTENT_CLASSNAME } from '@/components/organisms/table/atoms/TableCell';
 import { APP_ROUTES } from '@/constants/routes';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
@@ -127,6 +128,7 @@ function createColumns(): ColumnDef<AdminAssetRow, unknown>[] {
   return [
     columnHelper.display({
       id: 'asset',
+      meta: { cellContentClassName: TABLE_CELL_MULTILINE_CONTENT_CLASSNAME },
       header: 'Asset',
       size: 300,
       cell: ({ row }) => {
@@ -175,12 +177,14 @@ function createColumns(): ColumnDef<AdminAssetRow, unknown>[] {
     }),
     columnHelper.display({
       id: 'issues',
+      meta: { cellContentClassName: TABLE_CELL_MULTILINE_CONTENT_CLASSNAME },
       header: 'Issues',
       size: 180,
       cell: ({ row }) => <IssuesPills issues={row.original.issues} />,
     }),
     columnHelper.display({
       id: 'owner',
+      meta: { cellContentClassName: TABLE_CELL_MULTILINE_CONTENT_CLASSNAME },
       header: 'Owner',
       size: 200,
       cell: ({ row }) => {

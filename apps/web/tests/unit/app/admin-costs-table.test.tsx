@@ -22,6 +22,11 @@ describe('CostsTable', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Last refreshed: Today')).toBeInTheDocument();
     expect(screen.getByText('Application hosting')).toBeInTheDocument();
+    expect(
+      screen
+        .getByText('Application hosting')
+        .closest('[data-table-cell-content]')
+    ).toHaveClass('h-auto', 'max-h-none', 'whitespace-normal');
 
     const action = screen.getByRole('link', {
       name: 'Open Vercel dashboard',

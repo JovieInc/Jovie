@@ -19,6 +19,7 @@ import {
   PAGE_TOOLBAR_META_TEXT_CLASS,
   TableEmptyState,
 } from '@/components/organisms/table';
+import { TABLE_CELL_MULTILINE_CONTENT_CLASSNAME } from '@/components/organisms/table/atoms/TableCell';
 import { APP_ROUTES } from '@/constants/routes';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
@@ -146,6 +147,7 @@ function createColumns(): ColumnDef<AdminReleaseRow, unknown>[] {
   return [
     columnHelper.display({
       id: 'release',
+      meta: { cellContentClassName: TABLE_CELL_MULTILINE_CONTENT_CLASSNAME },
       header: 'Release',
       size: 280,
       cell: ({ row }) => {
@@ -179,12 +181,14 @@ function createColumns(): ColumnDef<AdminReleaseRow, unknown>[] {
     }),
     columnHelper.display({
       id: 'issues',
+      meta: { cellContentClassName: TABLE_CELL_MULTILINE_CONTENT_CLASSNAME },
       header: 'Issues',
       size: 160,
       cell: ({ row }) => <IssuesPills row={row.original} />,
     }),
     columnHelper.display({
       id: 'artist',
+      meta: { cellContentClassName: TABLE_CELL_MULTILINE_CONTENT_CLASSNAME },
       header: 'Artist',
       size: 200,
       cell: ({ row }) => {

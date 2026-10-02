@@ -3,7 +3,11 @@
 import { IconButton } from '@jovie/ui';
 import { ExternalLink } from 'lucide-react';
 import { useMemo } from 'react';
-import { PageToolbar, TableEmptyState } from '@/components/organisms/table';
+import {
+  PageToolbar,
+  TABLE_CELL_MULTILINE_CONTENT_CLASSNAME,
+  TableEmptyState,
+} from '@/components/organisms/table';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
@@ -44,7 +48,10 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
               ) : null}
             </div>
           ),
-          meta: { className: 'min-w-70' },
+          meta: {
+            className: 'min-w-70',
+            cellContentClassName: TABLE_CELL_MULTILINE_CONTENT_CLASSNAME,
+          },
         }),
         columnHelper.accessor('observed30dUsd', {
           header: '30D Spend (USD)',

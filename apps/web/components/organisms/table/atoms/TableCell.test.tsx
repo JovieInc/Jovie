@@ -13,6 +13,25 @@ function renderInTable(child: React.ReactNode) {
 }
 
 describe('TableCell', () => {
+  it('allows stacked labels and controls to determine multiline cell height', () => {
+    renderInTable(
+      <TableCell multiline>
+        <div>Investor</div>
+        <button type='button'>Copy token</button>
+      </TableCell>
+    );
+
+    const content = screen.getByRole('button', {
+      name: 'Copy token',
+    }).parentElement;
+    expect(content).toHaveClass(
+      'h-auto',
+      'min-h-8',
+      'max-h-none',
+      'whitespace-normal'
+    );
+    expect(content).not.toHaveClass('h-8', 'max-h-8', 'whitespace-nowrap');
+  });
   it('uses the canonical table cell density and typography preset', () => {
     renderInTable(<TableCell>Title</TableCell>);
 

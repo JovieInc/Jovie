@@ -5,7 +5,11 @@ import { RotateCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
-import { PageToolbar, TableEmptyState } from '@/components/organisms/table';
+import {
+  PageToolbar,
+  TABLE_CELL_MULTILINE_CONTENT_CLASSNAME,
+  TableEmptyState,
+} from '@/components/organisms/table';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { copyToClipboard } from '@/hooks/useClipboard';
@@ -290,7 +294,10 @@ export function AdminFeaturesTable({
               flagKey={info.row.original.flagKey}
             />
           ),
-          meta: { className: 'min-w-70' },
+          meta: {
+            className: 'min-w-70',
+            cellContentClassName: TABLE_CELL_MULTILINE_CONTENT_CLASSNAME,
+          },
         }),
         ...TIERS.map(tier =>
           columnHelper.accessor(tier.key, {
@@ -330,7 +337,11 @@ export function AdminFeaturesTable({
                 }
               />
             ),
-            meta: { className: 'w-32 min-w-32 text-center' },
+            meta: {
+              className: 'w-32 min-w-32',
+              align: 'center',
+              cellContentClassName: TABLE_CELL_MULTILINE_CONTENT_CLASSNAME,
+            },
           })
         ),
       ] as ColumnDef<FeatureFlagRow, unknown>[],

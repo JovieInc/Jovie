@@ -89,14 +89,17 @@ export function InvestorTableCell({
   children,
   align = 'left',
   className,
+  multiline = false,
 }: Readonly<{
   children: ReactNode;
   align?: 'left' | 'right';
   className?: string;
+  multiline?: boolean;
 }>) {
   return (
     <TableCell
       align={align}
+      multiline={multiline}
       className={cn('px-3 py-1 align-middle', className)}
     >
       {children}

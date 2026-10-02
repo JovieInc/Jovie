@@ -104,6 +104,17 @@ describe('AdminFeaturesTable', () => {
   it('shows raw flag keys and explicit On/Off · Default/Override labels', () => {
     render(<AdminFeaturesTable initialRows={ROWS} currentTier='dev' />);
 
+    expect(
+      screen
+        .getByText('Connect Spotify accounts via OAuth.')
+        .closest('[data-table-cell-content]')
+    ).toHaveClass('h-auto', 'max-h-none', 'whitespace-normal');
+    expect(
+      screen
+        .getAllByTestId('flag-env-status-prod')[0]
+        .closest('[data-table-cell-content]')
+    ).toHaveClass('h-auto', 'max-h-none');
+
     expect(screen.getByTestId('admin-features-table')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Copy flag key spotify_oauth' })
