@@ -3,6 +3,10 @@ import { db } from '@/lib/db';
 import { investorSettings } from '@/lib/db/schema/investors';
 import { getInvestorManifest } from '@/lib/investors/manifest';
 import { getInvestorPortalAccess } from '@/lib/investors/portal-access';
+import {
+  loadInvestorSourcedMetrics,
+  sourcedUsdAmount,
+} from '@/lib/investors/sourced-metrics';
 import { InvestorNav } from '../_components/InvestorNav';
 import { InvestorStickyBar } from '../_components/InvestorStickyBar';
 
@@ -31,6 +35,9 @@ export default async function InvestorLayout({
     getInvestorManifest(),
   ]);
   const settings = settingsResult[0];
+  const metrics = loadInvestorSourcedMetrics();
+  const sourcedRaiseTarget = sourcedUsdAmount(metrics, 'raise_target_usd');
+  const sourcedCommitted = sourcedUsdAmount(metrics, 'raise_committed_usd');
   const navPages = manifest.pages
     .filter(p => p.nav)
     .map(p => ({ slug: p.slug, title: p.title }));
@@ -49,10 +56,12 @@ export default async function InvestorLayout({
       <InvestorStickyBar
         bookCallUrl={settings?.bookCallUrl ?? null}
         investUrl={settings?.investUrl ?? null}
-        showProgress={settings?.showProgressBar ?? false}
-        raiseTarget={settings?.raiseTarget ?? null}
-        committedAmount={settings?.committedAmount ?? null}
-        investorCount={settings?.investorCount ?? null}
+        showProgress={
+          (settings?.showProgressBar ?? false) && sourcedRaiseTarget !== null
+        }
+        raiseTarget={sourcedRaiseTarget}
+        committedAmount={sourcedCommitted}
+        investorCount={null}
       />
     </div>
   );

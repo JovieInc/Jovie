@@ -35,6 +35,10 @@ export const CODE_FLAGS = {
   // stay unchanged. FEATURE_AUTH_OFFER_SUMMARY=true shows the 14-day Pro
   // trial recap. No price, trial-length, Stripe, or entitlement effect.
   AUTH_OFFER_SUMMARY: false,
+  // Fundraising YC section order. Default off until Tim approves the
+  // narrative in Pen. FEATURE_INVESTOR_PORTAL_YC_DECK=true reorders the
+  // existing brief sentences and shows only sourced traction stats.
+  INVESTOR_PORTAL_YC_DECK: false,
 } as const satisfies Record<string, boolean>;
 
 export type CodeFlagName = keyof typeof CODE_FLAGS;
