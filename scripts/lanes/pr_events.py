@@ -837,7 +837,7 @@ def close_duplicate(lane, pr: dict, why: str) -> bool:
                 or live["isCrossRepository"] is not False or live["isInMergeQueue"] is not False
                 or not duplicate_authorized({**live, "labels": labels["nodes"]})):
             return False
-    except (ValueError, KeyError, TypeError, AttributeError, subprocess.SubprocessError):
+    except (ValueError, KeyError, TypeError, AttributeError, OSError, subprocess.SubprocessError):
         return False
     return lane.sh(["gh", "pr", "close", str(pr["number"]), "--repo", lane.REPO_SLUG, "--comment",
                     f"🤖 lanes: closing this explicitly labeled duplicate ({why}); source branch preserved."]).returncode == 0

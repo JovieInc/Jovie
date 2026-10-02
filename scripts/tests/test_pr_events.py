@@ -753,6 +753,17 @@ class GapTest(unittest.TestCase):
         self.assertEqual(landed["close"], [])
         self.assertEqual(next(row for row in landed["dispositions"] if row["pr"] == 22)["state"], "repair")
 
+    def test_explicit_duplicate_plan_still_respects_holds_queue_and_forks(self):
+        old = "2033-05-01T00:00:00Z"
+        candidate = self.node(1, isDraft=True, headRefName="codex/stale", createdAt=old, updatedAt=old,
+                              labels=[{"name": "duplicate"}])
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        self.assertEqual([number for number, _ in events.reconcile_plan([candidate], {}, set(), 2, now)["close"]], [1])
+        for overrides in ({"labels": [{"name": "duplicate"}, {"name": "hold"}]},
+                          {"isInMergeQueue": True}, {"isCrossRepository": True}, {"state": "CLOSED"}):
+            with self.subTest(overrides=overrides):
+                self.assertEqual(events.reconcile_plan([{**candidate, **overrides}], {}, set(), 2, now)["close"], [])
+
     def test_dependency_refs_and_revalidation_reads(self):
         body = ("Waiting on #17290 and https://github.com/JovieInc/Jovie/pull/17291 to land.\n"
                 "Parentbc508 is a sha, not a PR. Not blocked by #17.")
