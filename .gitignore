@@ -232,6 +232,7 @@ apps/desktop/src/*
 !apps/desktop/src/ipc-sender.ts
 !apps/desktop/src/ovie-browser-recovery.ts
 !apps/desktop/src/nightly-update-launch-agent.ts
+!apps/desktop/src/navigation-coordinator.ts
 !apps/desktop/src/window-state-store.ts
 !apps/desktop/src/main-liveness.ts
 !apps/desktop/src/voice-session.ts
