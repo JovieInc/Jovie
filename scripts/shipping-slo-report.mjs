@@ -193,7 +193,7 @@ export function collectRaw({ workflows, days }) {
 
     const run = runs.pull_request
       .filter(candidate => candidate.prNumbers?.includes(pr.number))
-      .toSorted((a, b) => b.id - a.id)[0];
+      .sort((a, b) => b.id - a.id)[0];
     if (run) {
       try {
         const jobs = gh([
@@ -224,7 +224,7 @@ export function collectRaw({ workflows, days }) {
         '--jq',
         '[.check_runs[] | select(.name == "Production Verified" and .conclusion == "success") | .completed_at]',
       ]);
-      pr.productionVerifiedAt = checks.filter(Boolean).toSorted()[0] ?? null;
+      pr.productionVerifiedAt = checks.filter(Boolean).sort()[0] ?? null;
     } catch {
       pr.productionVerifiedAt = null;
     }

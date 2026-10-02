@@ -1047,6 +1047,14 @@ const LINEAR_SYNC_ON_MERGE_LANE = new Set([
   'scripts/run-affected-tests.mjs',
 ]);
 
+/**
+ * @param {string[]} changedFiles
+ * @param {{
+ *   isFileAvailable?: (file: string) => boolean,
+ *   readFile?: (file: string) => string,
+ *   blogContentReceipt?: { contentOnly: boolean, changedPaths: string[] },
+ * }} [options]
+ */
 export function buildAffectedTestPlan(
   changedFiles,
   {
