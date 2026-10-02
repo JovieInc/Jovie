@@ -43,6 +43,7 @@ const STRATEGY_TRIGGERS = [
  * Adjacent-term expansion: words an issue author might use that should still
  * resolve to the doctrine's canonical retrieval anchors.
  */
+/** @type {Array<[RegExp, string]>} */
 const QUERY_EXPANSIONS = [
   [/\bfreemium\b/i, 'free plan'],
   [/\bappsumo\b/i, 'lifetime deal'],
@@ -191,8 +192,12 @@ export function matchStrategyTheses(index, text) {
 /**
  * The theses a strategy-sensitive lease must bind into its context receipt.
  * Non-sensitive issues return an empty list.
+ *
+ * @param {*} issue
+ * @param {{ index?: ReturnType<typeof loadStrategyIndex> }} [options]
  */
-export function requiredStrategyTheses(issue, { index } = {}) {
+export function requiredStrategyTheses(issue, options = {}) {
+  const { index } = options;
   const text = issueText(issue);
   if (!isStrategySensitive(text)) return [];
   const resolved = index || loadStrategyIndex();
