@@ -50,6 +50,8 @@ export interface ElectronAPI {
   readonly goBack: () => Promise<void>;
   /** Navigate forward in the SPA history stack. */
   readonly goForward: () => Promise<void>;
+  /** Validated application route commands. Optional on older binaries. */
+  readonly onNavigate?: (cb: (path: string) => void) => () => void;
   /** Subscribe to nav-state changes; returns unsubscribe. */
   readonly onNavStateChanged: (
     cb: (state: { canGoBack: boolean; canGoForward: boolean }) => void
@@ -269,6 +271,17 @@ export function reportDesktopWorkState(
   } catch {
     return false;
   }
+}
+
+/** Optional routing capability; stale binaries retain native load fallback. */
+export function supportsDesktopNavigation(): boolean {
+  return typeof getRawElectronAPI()?.onNavigate === 'function';
+}
+
+export function onDesktopNavigate(cb: (path: string) => void): () => void {
+  const subscribe = getRawElectronAPI()?.onNavigate;
+  if (typeof subscribe !== 'function') return noopUnsubscribe;
+  return subscribe(cb);
 }
 
 /**

@@ -115,6 +115,7 @@ import {
   summarizeUnhandledRejection,
 } from './main-liveness';
 import { installNightlyUpdateLaunchAgent } from './nightly-update-launch-agent';
+import { DesktopNavigationCoordinator } from './navigation-coordinator';
 import {
   getUrlDisposition as getDesktopUrlDisposition,
   isAllowedExternalUrl as isAllowedDesktopExternalUrl,
@@ -294,6 +295,8 @@ const TRAY_ACTION_CHANNEL = 'tray-action';
 const DESKTOP_NOTIFICATION_CHANNEL = 'desktop-notification-show';
 /** Renderer → main: first successful React paint of the hosted app (JOV-3595). */
 const APP_BOOTED_CHANNEL = 'app-booted';
+const CLIENT_NAVIGATION_CHANNEL = 'desktop-client-navigation';
+const CLIENT_NAVIGATION_READY_CHANNEL = 'desktop-client-navigation-ready';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
 const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity';
 type UpdateChannel =
@@ -353,6 +356,7 @@ let desktopUpdatePhase: DesktopUpdatePhase = DESKTOP_UPDATE_INITIAL_STATE;
 // (up to date / error) shows a dialog; silent background checks stay silent.
 let pendingManualUpdateCheck = false;
 let mainWindow: BrowserWindow | null = null;
+const desktopNavigation = new DesktopNavigationCoordinator();
 let publicProfilePreviewWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
 let aboutWindow: BrowserWindow | null = null;
@@ -2452,6 +2456,13 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   });
 
   mainWindow = win;
+  const navigationContentsId = win.webContents.id;
+  win.webContents.on('render-process-gone', () => {
+    desktopNavigation.setReady(navigationContentsId, false);
+  });
+  win.webContents.on('destroyed', () => {
+    desktopNavigation.setReady(navigationContentsId, false);
+  });
   const authNavigationRecovery = createAuthHandoffNavigationRecovery(APP_ORIGIN);
   const authNavigationContentsId = win.webContents.id;
   authNavigationRecoveries.set(authNavigationContentsId, authNavigationRecovery);
@@ -2462,6 +2473,9 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   win.webContents.on('did-start-navigation', (...args: unknown[]) => {
     const navigation = parseDidStartNavigation(args);
     if (!navigation) return;
+    if (navigation.isMainFrame && !navigation.isInPlace) {
+      desktopNavigation.setReady(navigationContentsId, false);
+    }
     authNavigationRecovery.navigationStarted({
       ...navigation,
       currentUrl: win.webContents.getURL(),
@@ -2569,7 +2583,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     if (disposition === 'profile-preview') {
       showPublicProfilePreview(url);
     } else if (disposition === 'in-app') {
-      void win.loadURL(url);
+      navigateInApp(win, url);
     } else if (disposition === 'external') {
       void openExternalUrl(url);
     }
@@ -2631,6 +2645,21 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   return win;
 }
 
+function navigateInApp(win: BrowserWindow, url: string): void {
+  if (win.isDestroyed()) return;
+  const action = desktopNavigation.resolve(
+    win.webContents.id,
+    win.webContents.getURL(),
+    url,
+    URL_DISPOSITION_OPTIONS
+  );
+  if (action?.kind === 'client') {
+    win.webContents.send(CLIENT_NAVIGATION_CHANNEL, action.path);
+  } else if (action?.kind === 'document') {
+    void win.loadURL(action.url);
+  }
+}
+
 function openPreferences(): void {
   // Mid-handoff the focused window is the small, non-resizable auth window and
   // the main window is intentionally hidden — loading settings into either
@@ -2642,7 +2671,7 @@ function openPreferences(): void {
     return;
   }
 
-  void mainWindow.loadURL(SETTINGS_URL);
+  navigateInApp(mainWindow, SETTINGS_URL);
   showWindow(mainWindow);
 }
 
@@ -3098,6 +3127,24 @@ ipcMain.handle(DESKTOP_UPDATE_INSTALL_CHANNEL, event => {
   }
   autoUpdater.quitAndInstall();
   return { ok: true };
+});
+
+// Only the live main document may announce a mounted client router.
+ipcMain.on(CLIENT_NAVIGATION_READY_CHANNEL, (event, ready: unknown) => {
+  if (
+    typeof ready !== 'boolean' ||
+    !mainWindow ||
+    mainWindow.isDestroyed() ||
+    event.sender !== mainWindow.webContents ||
+    !event.senderFrame ||
+    event.senderFrame.detached ||
+    event.senderFrame !== mainWindow.webContents.mainFrame ||
+    event.senderFrame.parent !== null ||
+    parseUrl(getIpcSenderUrl(event))?.origin !== APP_ORIGIN
+  ) {
+    return;
+  }
+  desktopNavigation.setReady(event.sender.id, ready);
 });
 
 // Hosted app first-paint heartbeat (JOV-3595). Uses send (not invoke) so a
@@ -3655,7 +3702,7 @@ function routeDesktopNotificationClick(urlString: string | undefined): void {
     URL_DISPOSITION_OPTIONS
   );
   if (action.kind === 'load-url') {
-    void win.loadURL(action.url);
+    navigateInApp(win, action.url);
   } else if (action.kind === 'profile-preview') {
     showPublicProfilePreview(action.url);
   } else if (action.kind === 'open-external') {
