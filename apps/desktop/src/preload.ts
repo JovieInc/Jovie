@@ -1,4 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import { createSessionWorkReporter } from './session-work-state';
+
+// Scoped to this document's isolated world; full navigation cannot inherit idle.
+const sessionWorkReporter = createSessionWorkReporter();
+const WORK_STATE_CHANGED_CHANNEL = 'desktop-work-state-changed';
 
 const UPDATE_AVAILABLE_CHANNEL = 'update-available';
 const UPDATE_DOWNLOADED_CHANNEL = 'update-downloaded';
@@ -81,6 +86,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
   electronVersion: process.versions.electron,
   getBuildIdentity: () => ipcRenderer.invoke(GET_BUILD_IDENTITY_CHANNEL),
+  setWorkState: (state: unknown) => {
+    sessionWorkReporter.report(state);
+    // Revoke any in-flight main-process idle decision, never assert safety.
+    ipcRenderer.send(WORK_STATE_CHANGED_CHANNEL);
+  },
+  getWorkState: () => sessionWorkReporter.read(),
 
   /** Fires when electron-updater detects a new version is available for download. */
   onUpdateAvailable: (cb: () => void) => {
