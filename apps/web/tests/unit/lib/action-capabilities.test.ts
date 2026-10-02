@@ -26,7 +26,7 @@ describe('resolveActionCapabilities', () => {
       profileOwned: true,
     });
 
-    expect(result).toHaveLength(10);
+    expect(result).toHaveLength(12);
     const publicActions = result.filter(capability => capability.available);
     expect(publicActions.map(capability => capability.action.id)).toEqual([
       'chat.start',
@@ -54,7 +54,7 @@ describe('resolveActionCapabilities', () => {
           state => state.requirement.type === 'worker_scope'
         )
       );
-      expect(fleetActions).toHaveLength(6);
+      expect(fleetActions).toHaveLength(8);
       for (const capability of fleetActions) {
         expect(capability).toMatchObject({
           available: false,

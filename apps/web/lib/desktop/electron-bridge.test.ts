@@ -20,6 +20,7 @@ import {
   __testing,
   isDesktopEnvironment,
   notifyDesktopComposerReadiness,
+  observeDesktopVisualActivity,
   reportDesktopWorkState,
   useDesktopBuildIdentity,
 } from './electron-bridge';
@@ -80,6 +81,66 @@ describe('electron-bridge — defensive guards', () => {
       throw new Error('disposed');
     });
     expect(reportDesktopWorkState(null)).toBe(false);
+  });
+
+  it('omits visual subscription on old and partial bridges', () => {
+    const callback = vi.fn();
+    const subscribe = vi.fn();
+    for (const api of [
+      {},
+      { onVisualActivity: subscribe },
+      { getVisualActivity: vi.fn() },
+    ]) {
+      setElectronAPI(api);
+      observeDesktopVisualActivity(callback)();
+    }
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it('keeps a newer visibility event over a delayed initial snapshot', async () => {
+    let resolveSnapshot: ((active: boolean) => void) | undefined;
+    let listener: ((active: boolean) => void) | undefined;
+    const unsubscribe = vi.fn();
+    setElectronAPI({
+      getVisualActivity: () =>
+        new Promise<boolean>(resolve => {
+          resolveSnapshot = resolve;
+        }),
+      onVisualActivity: (callback: (active: boolean) => void) => {
+        listener = callback;
+        return unsubscribe;
+      },
+    });
+    const callback = vi.fn();
+    const dispose = observeDesktopVisualActivity(callback);
+    listener?.(false);
+    resolveSnapshot?.(true);
+    await Promise.resolve();
+    expect(callback).toHaveBeenCalledExactlyOnceWith(false);
+    dispose();
+    listener?.(true);
+    expect(callback).toHaveBeenCalledOnce();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('reads the initial native state and tolerates rejected or malformed snapshots', async () => {
+    const callback = vi.fn();
+    for (const snapshot of [
+      Promise.resolve(false),
+      Promise.resolve(null),
+      Promise.reject(new Error('old shell')),
+    ]) {
+      setElectronAPI({
+        getVisualActivity: () => snapshot,
+        onVisualActivity: () => () => undefined,
+      });
+      const dispose = observeDesktopVisualActivity(callback);
+      await Promise.resolve();
+      await Promise.resolve();
+      dispose();
+    }
+    expect(callback).toHaveBeenCalledExactlyOnceWith(false);
   });
   it('isDesktopEnvironment returns false in pure browser context', () => {
     expect(isDesktopEnvironment()).toBe(false);

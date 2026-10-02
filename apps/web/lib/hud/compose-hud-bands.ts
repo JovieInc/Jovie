@@ -11,6 +11,7 @@ export const HUD_NEED_SECTION_IDS = [
   'action-required',
   'shipper',
   'factory-health',
+  'exceptions',
 ] as const;
 
 export const HUD_NOISE_SECTION_IDS = [
@@ -21,6 +22,7 @@ export const HUD_NOISE_SECTION_IDS = [
   'agent-runs',
   'what-shipped',
   'dispatch-details',
+  'drilldowns',
   'env-exceptions',
 ] as const;
 
@@ -44,6 +46,8 @@ export const HUD_SECTION_TEST_IDS = {
   'what-shipped': 'what-shipped-card',
   'dispatch-details': 'hud-dispatch-details',
   'env-exceptions': 'hud-section-env-exceptions',
+  exceptions: 'hud-exceptions-section',
+  drilldowns: 'hud-drilldowns-section',
 } as const satisfies Record<HudSectionId, string>;
 
 export const HUD_SECTION_LABELS = {
@@ -59,6 +63,8 @@ export const HUD_SECTION_LABELS = {
   'what-shipped': 'What shipped',
   'dispatch-details': 'Dispatch and diagnostics',
   'env-exceptions': 'Env exceptions',
+  exceptions: 'Needs attention',
+  drilldowns: 'Search records',
 } as const satisfies Record<HudSectionId, string>;
 
 export interface HudComposedSection {
