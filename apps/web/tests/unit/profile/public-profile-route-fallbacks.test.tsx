@@ -19,6 +19,15 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+// Transform the real boundary modules before starting per-behavior deadlines.
+// Their mocks stay stable; no test changes module-level environment.
+import '@/app/[username]/not-found';
+import '@/app/[username]/[slug]/not-found';
+import '@/app/[username]/[slug]/error';
+import '@/app/[username]/error';
+import '@/app/[username]/[slug]/sounds/error';
+import '@/app/[username]/notifications/loading';
+import '@/app/[username]/_lib/profile-static-params';
 
 const { captureErrorInSentryMock, getTopProfilesForStaticGenerationMock } =
   vi.hoisted(() => ({
@@ -62,37 +71,30 @@ vi.mock('@/components/atoms/Icon', () => ({
 }));
 
 async function importNotFound() {
-  vi.resetModules();
   return import('@/app/[username]/not-found');
 }
 
 async function importSmartLinkNotFound() {
-  vi.resetModules();
   return import('@/app/[username]/[slug]/not-found');
 }
 
 async function importSmartLinkError() {
-  vi.resetModules();
   return import('@/app/[username]/[slug]/error');
 }
 
 async function importProfileError() {
-  vi.resetModules();
   return import('@/app/[username]/error');
 }
 
 async function importSoundsError() {
-  vi.resetModules();
   return import('@/app/[username]/[slug]/sounds/error');
 }
 
 async function importNotificationsLoading() {
-  vi.resetModules();
   return import('@/app/[username]/notifications/loading');
 }
 
 async function importStaticParams() {
-  vi.resetModules();
   return import('@/app/[username]/_lib/profile-static-params');
 }
 

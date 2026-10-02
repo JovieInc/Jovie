@@ -21,8 +21,9 @@
 
 import { createElement, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicProfileLoaderResult } from '@/app/[username]/_lib/public-profile-loader';
+import ArtistPage, { generateMetadata } from '@/app/[username]/page';
 
 const {
   getProfileAndLinksMock,
@@ -278,7 +279,6 @@ const ERROR_RESULT: PublicProfileLoaderResult = {
 
 /** Await the async page (redirect/404 throws propagate) and render nothing. */
 async function executeArtistPage(username: string): Promise<ReactNode> {
-  const { default: ArtistPage } = await import('@/app/[username]/page');
   return ArtistPage({ params: Promise.resolve({ username }) });
 }
 
@@ -300,12 +300,6 @@ async function renderArtistPageContent(username: string): Promise<string> {
   const rendered = await child.type(child.props);
   return renderToStaticMarkup(rendered);
 }
-
-// Load the server import graph during suite setup; test deadlines measure
-// the route behavior rather than a cold transform of unrelated dependencies.
-beforeAll(async () => {
-  await import('@/app/[username]/page');
-});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -442,8 +436,6 @@ describe('public profile page route behavior (JOV-5778)', () => {
 
 describe('public profile generateMetadata behavior (JOV-5778)', () => {
   async function generateMetadataFor(username: string) {
-    vi.resetModules();
-    const { generateMetadata } = await import('@/app/[username]/page');
     return generateMetadata({ params: Promise.resolve({ username }) });
   }
 
