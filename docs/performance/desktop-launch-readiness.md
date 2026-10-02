@@ -14,7 +14,7 @@ identity, and four separately named milestones:
 | --- | --- |
 | `nativeWindowReadyToShowMs` | Electron's first main-window `ready-to-show` event; this can be the local splash. |
 | `reactMountedMs` | The existing React heartbeat from the live top-level chat frame. |
-| `composerVisibleEditableAfterPaintOpportunityMs` | The chat owner reports a loaded conversation, the existing auth context is loaded and signed in, and the actual textarea is connected, enabled, writable, non-inert, CSS-visible (including opacity through Chromium visibility checks), and intersects the viewport after two animation-frame callbacks. Main also verifies the window is visible and not minimized. |
+| `composerVisibleEditableAfterPaintOpportunityMs` | The chat owner reports that initial conversation loading has ended, the existing auth context is loaded and signed in, and the actual textarea is connected, enabled, writable, non-inert, CSS-visible (including opacity through Chromium visibility checks), and intersects the viewport after two animation-frame callbacks. Main also verifies the window is visible and not minimized. |
 | `composerActuallyFocusedMs` | The same textarea is the active element in a focused document, and main verifies the window is focused. |
 
 All elapsed values use the main process's `performance.now()` clock. Renderer
