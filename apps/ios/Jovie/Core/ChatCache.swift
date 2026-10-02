@@ -40,6 +40,10 @@ actor ChatCache {
     remove(for: userID, workspace: .ovie)
   }
 
+  func remove(for userID: String, ifOwnedBy ownership: NativeSessionOwnership) {
+    NativeSessionTokenStore.performIfCurrent(ownership) { remove(for: userID) }
+  }
+
   func remove(for userID: String, workspace: MobileWorkspaceMode) {
     let key = cacheKey(for: userID, workspace: workspace)
     memory[key] = nil

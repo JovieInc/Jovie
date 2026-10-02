@@ -27,7 +27,10 @@ export type {
 // founder-funnel
 export type {
   FounderFunnelData,
+  FounderFunnelDrilldownStage,
   FounderFunnelStage,
+  FounderFunnelStageRow,
+  FounderFunnelStageRows,
   FounderFunnelTimeRange,
 } from './founder-funnel';
 
