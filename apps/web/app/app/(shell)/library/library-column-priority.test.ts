@@ -38,6 +38,16 @@ describe('library column priority', () => {
     expect(layout.hiddenIds).not.toContain('providers');
   });
 
+  it('keeps the full catalog column set before the container is measured', () => {
+    const layout = resolveColumnPriorityLayout(
+      columnPrioritySpecsFromDefs(LIBRARY_CATALOG_TABLE_COLUMNS),
+      1440
+    );
+
+    expect(layout.hiddenIds).not.toContain('waveform');
+    expect(layout.hiddenIds).not.toContain('artist');
+  });
+
   it('hides the catalog waveform before the title when the panel is open', () => {
     const layout = resolveColumnPriorityLayout(
       columnPrioritySpecsFromDefs(LIBRARY_CATALOG_TABLE_COLUMNS),
