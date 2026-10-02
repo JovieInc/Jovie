@@ -22,7 +22,10 @@ const item: OvieInboxCase = {
   evidence: [],
   decisionTarget: { kind: 'summer', id: 'one' },
 };
-function mount() {
+function mount(...responses: Response[]) {
+  const fetcher = vi.fn();
+  for (const response of responses) fetcher.mockResolvedValueOnce(response);
+  vi.stubGlobal('fetch', fetcher);
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -31,6 +34,7 @@ function mount() {
       <OvieInbox />
     </QueryClientProvider>
   );
+  return fetcher;
 }
 const response = (cases: readonly OvieInboxCase[]) =>
   new Response(JSON.stringify({ cases, issues: [] }), { status: 200 });
@@ -44,13 +48,11 @@ describe('Ovie Inbox', () => {
       title: 'Second decision',
       decisionTarget: { kind: 'summer' as const, id: 'two' },
     };
-    const fetcher = vi
-      .fn()
-      .mockResolvedValueOnce(response([item, second]))
-      .mockResolvedValueOnce(new Response('{}'))
-      .mockResolvedValueOnce(response([second]));
-    vi.stubGlobal('fetch', fetcher);
-    mount();
+    const fetcher = mount(
+      response([item, second]),
+      new Response('{}'),
+      response([second])
+    );
     await screen.findByText('First decision');
     expect(screen.queryByText('Second decision')).not.toBeInTheDocument();
     expect(screen.getAllByTestId('ovie-inbox-decision')).toHaveLength(1);
@@ -62,14 +64,7 @@ describe('Ovie Inbox', () => {
     expect(screen.queryByText('First decision')).not.toBeInTheDocument();
   });
   it('preserves notes and current decision when submission fails', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi
-        .fn()
-        .mockResolvedValueOnce(response([item]))
-        .mockResolvedValueOnce(new Response('{}', { status: 503 }))
-    );
-    mount();
+    mount(response([item]), new Response('{}', { status: 503 }));
     await screen.findByText('First decision');
     fireEvent.change(screen.getByLabelText('Decision notes'), {
       target: { value: 'Do not buy this' },
@@ -82,17 +77,11 @@ describe('Ovie Inbox', () => {
     expect(screen.getByText('First decision')).toBeInTheDocument();
   });
   it('does not carry old notes onto a new decision after a conflict', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi
-        .fn()
-        .mockResolvedValueOnce(response([item]))
-        .mockResolvedValueOnce(new Response('{}', { status: 409 }))
-        .mockResolvedValueOnce(
-          response([{ ...item, id: 'new', title: 'New decision' }])
-        )
+    mount(
+      response([item]),
+      new Response('{}', { status: 409 }),
+      response([{ ...item, id: 'new', title: 'New decision' }])
     );
-    mount();
     await screen.findByText('First decision');
     fireEvent.change(screen.getByLabelText('Decision notes'), {
       target: { value: 'Original notes' },
@@ -102,14 +91,7 @@ describe('Ovie Inbox', () => {
     expect(screen.getByLabelText('Decision notes')).toHaveValue('');
   });
   it('distinguishes a failed read from an empty inbox and supports retry', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi
-        .fn()
-        .mockResolvedValueOnce(new Response('{}', { status: 503 }))
-        .mockResolvedValueOnce(response([]))
-    );
-    mount();
+    mount(new Response('{}', { status: 503 }), response([]));
     await screen.findByRole('alert');
     expect(
       screen.queryByText('No pending founder decisions.')
