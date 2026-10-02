@@ -14,6 +14,7 @@ const {
 
 const basePr = {
   number: 42,
+  headRefOid: 'a'.repeat(40),
   title: 'Test PR',
   url: 'https://github.com/o/r/pull/42',
   mergeable: 'MERGEABLE',
@@ -153,12 +154,60 @@ test('the customer-notes handoff requests auto-merge only for its checked head',
     isDraft: false,
     customerNotesReadyHead: 'checked-sha',
   };
-  enableMissingAutoMerge('o/r', [pr], false, args => calls.push(args));
+  const readStatuses = (repo, head) => {
+    assert.equal(repo, 'o/r');
+    assert.equal(head, pr.headRefOid);
+    return [];
+  };
+  enableMissingAutoMerge(
+    'o/r',
+    [pr],
+    false,
+    args => calls.push(args),
+    readStatuses
+  );
   assert.deepEqual(calls[0].slice(-2), ['--match-head-commit', 'checked-sha']);
   const before = calls.length;
-  enableMissingAutoMerge('o/r', [pr], true, args => calls.push(args));
-  enableMissingAutoMerge('o/r', [{ ...pr, isDraft: true }], false, args =>
-    calls.push(args)
+  enableMissingAutoMerge(
+    'o/r',
+    [pr],
+    true,
+    args => calls.push(args),
+    readStatuses
+  );
+  enableMissingAutoMerge(
+    'o/r',
+    [{ ...pr, isDraft: true }],
+    false,
+    args => calls.push(args),
+    readStatuses
   );
   assert.equal(calls.length, before);
+});
+
+test('enable pass skips missing heads and preserves an exact-head revision hold', () => {
+  const pr = { ...basePr, autoMergeRequest: null, headRefOid: 'a'.repeat(40) };
+  const calls = [];
+  const reads = [];
+  const readStatuses = (repo, head) => {
+    reads.push([repo, head]);
+    return [
+      {
+        context: 'jovie-queue-failure-hold/v1',
+        state: 'success',
+        creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+        target_url: 'https://github.com/o/r/actions/runs/123',
+        description: 'class=deterministic-source;n=1;run=123;try=1',
+      },
+    ];
+  };
+  enableMissingAutoMerge(
+    'o/r',
+    [{ ...pr, headRefOid: undefined }, pr],
+    false,
+    args => calls.push(args),
+    readStatuses
+  );
+  assert.deepEqual(reads, [['o/r', pr.headRefOid]]);
+  assert.deepEqual(calls, []);
 });

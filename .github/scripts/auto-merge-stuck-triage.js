@@ -346,10 +346,17 @@ function needsAutoMergeEnable(pr, statuses = [], repo = '') {
   );
 }
 
-function enableMissingAutoMerge(repo, prs, dryRun, command = gh) {
+function enableMissingAutoMerge(
+  repo,
+  prs,
+  dryRun,
+  command = gh,
+  readStatuses = listCommitStatuses
+) {
   for (const pr of prs) {
     if (pr.isDraft || pr.isCrossRepository || pr.autoMergeRequest) continue;
-    const statuses = listCommitStatuses(repo, pr.headRefOid);
+    if (!/^[a-f0-9]{40}$/.test(pr.headRefOid ?? '')) continue;
+    const statuses = readStatuses(repo, pr.headRefOid);
     if (!needsAutoMergeEnable(pr, statuses, repo)) continue;
     if (dryRun) {
       console.log(`[dry-run] would enable auto-merge on PR #${pr.number}`);
