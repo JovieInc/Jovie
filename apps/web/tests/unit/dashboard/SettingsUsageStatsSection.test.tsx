@@ -88,7 +88,7 @@ describe('SettingsUsageStatsSection', () => {
       refetch,
     });
     render(<SettingsUsageStatsSection />);
-    const retry = screen.getByRole('button', { name: 'Retry', exact: true });
+    const retry = screen.getByRole('button', { name: 'Retry' });
     retry.focus();
     await user.keyboard('{Enter}');
     expect(refetch).toHaveBeenCalledOnce();
@@ -102,9 +102,7 @@ describe('SettingsUsageStatsSection', () => {
     expect(screen.getByText('Checking your latest usage…')).toBeVisible();
     expect(screen.queryByText('No usage recorded')).not.toBeInTheDocument();
     await act(async () => rejectRetry(new Error('Still offline')));
-    expect(
-      screen.getByRole('button', { name: 'Retry', exact: true })
-    ).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
     expect(retry).toHaveFocus();
     expect(screen.getByRole('alert')).toHaveTextContent('Usage unavailable');
   });
@@ -125,9 +123,7 @@ describe('SettingsUsageStatsSection', () => {
       refetch,
     });
     const view = render(<SettingsUsageStatsSection />);
-    await user.click(
-      screen.getByRole('button', { name: 'Retry', exact: true })
-    );
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
     mockUseChatUsageQuery.mockReturnValue({
       data: baseUsage,
       isLoading: false,
@@ -167,9 +163,7 @@ describe('SettingsUsageStatsSection', () => {
       </>
     );
     const view = render(content);
-    await user.click(
-      screen.getByRole('button', { name: 'Retry', exact: true })
-    );
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
     await user.tab();
     expect(screen.getByRole('button', { name: 'Next Setting' })).toHaveFocus();
     mockUseChatUsageQuery.mockReturnValue({
@@ -202,13 +196,9 @@ describe('SettingsUsageStatsSection', () => {
       refetch,
     });
     const view = render(<SettingsUsageStatsSection />);
-    await user.click(
-      screen.getByRole('button', { name: 'Retry', exact: true })
-    );
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
     expect(refetch).toHaveBeenCalledOnce();
-    expect(
-      screen.getByRole('button', { name: 'Retry', exact: true })
-    ).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Retry' })).toHaveFocus();
 
     mockUseChatUsageQuery.mockReturnValue({
       data: baseUsage,
