@@ -24,7 +24,7 @@ const entries: BlogFeedEntry[] = Array.from({ length: 5 }, (_, index) => ({
 describe('BlogEditorialRow', () => {
   it('shows at most four real articles with metadata before their complete titles', () => {
     render(<BlogEditorialRow entries={entries} />);
-    const section = screen.getByRole('region', { name: 'Latest news' });
+    const section = screen.getByRole('region', { name: 'Latest News' });
     const articles = within(section).getAllByRole('article');
     expect(articles).toHaveLength(4);
     expect(
