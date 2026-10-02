@@ -123,6 +123,7 @@ import {
 } from './main-liveness';
 import { installNightlyUpdateLaunchAgent } from './nightly-update-launch-agent';
 import { DesktopNavigationCoordinator } from './navigation-coordinator';
+import { createStartupMaintenanceGate } from './startup-maintenance';
 import {
   getUrlDisposition as getDesktopUrlDisposition,
   isAllowedExternalUrl as isAllowedDesktopExternalUrl,
@@ -405,6 +406,8 @@ app.on('web-contents-created', (_event, contents) => {
   });
 });
 let lastDesktopUpdateCheckMs: number | null = null;
+let startupMaintenance: ReturnType<typeof createStartupMaintenanceGate> | null =
+  null;
 let summerRuntimeBridge: SummerRuntimeBridge | null = null;
 let mainLivenessMonitor: MainLivenessMonitor | null = null;
 
@@ -2438,6 +2441,9 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
       now: () => performance.now(),
       onChange: receipt => {
         void writeReceipt(receipt);
+        if (receipt.composerVisibleEditableAfterPaintOpportunityMs !== null) {
+          startupMaintenance?.composerUsable();
+        }
       },
     });
   }
@@ -2789,6 +2795,9 @@ function runDesktopUpdateCheck(mode: 'silent' | 'notify'): void {
     return;
   }
 
+  // An explicit check before startup settles also fulfills queued auto work.
+  startupMaintenance?.cancelPending('update-check');
+
   if (mode === 'notify') {
     pendingManualUpdateCheck = true;
   }
@@ -2806,14 +2815,20 @@ function runDesktopUpdateCheck(mode: 'silent' | 'notify'): void {
   });
 }
 
+function requestAutomaticDesktopUpdateCheck(): void {
+  const check = () => runDesktopUpdateCheck('silent');
+  if (startupMaintenance) startupMaintenance.request('update-check', check);
+  else check();
+}
+
 function scheduleDesktopAutoUpdate(): void {
   configureDesktopAutoUpdater();
-  runDesktopUpdateCheck('silent');
+  requestAutomaticDesktopUpdateCheck();
 
   const UPDATE_INTERVAL_MS = 30 * 60 * 1000;
   const interval = setInterval(() => {
     void installDownloadedUpdateIfIdle();
-    runDesktopUpdateCheck('silent');
+    requestAutomaticDesktopUpdateCheck();
   }, UPDATE_INTERVAL_MS);
   interval.unref?.();
 
@@ -2825,7 +2840,7 @@ function scheduleDesktopAutoUpdate(): void {
         lastCheckMs: lastDesktopUpdateCheckMs,
       })
     ) {
-      runDesktopUpdateCheck('silent');
+      requestAutomaticDesktopUpdateCheck();
     }
   };
   powerMonitor.on('resume', checkAfterWake);
@@ -2882,16 +2897,28 @@ function scheduleNightlyUpdateLaunchAgent(): void {
   });
 }
 
+function requestAutomaticWebBuildCheck(): void {
+  // The initial call normally sees only the local splash. Preserve that no-op
+  // instead of queuing an earlier poll when the composer becomes usable.
+  if (!BrowserWindow.getAllWindows().some(isWebBuildReloadWindow)) {
+    webBuildReloadPending.clear();
+    return;
+  }
+  const check = () => void checkHudBuildAndReload();
+  if (startupMaintenance) startupMaintenance.request('web-build-check', check);
+  else check();
+}
+
 function scheduleHudBuildAutoReload(): void {
-  void checkHudBuildAndReload();
+  requestAutomaticWebBuildCheck();
 
   const interval = setInterval(() => {
-    void checkHudBuildAndReload();
+    requestAutomaticWebBuildCheck();
   }, HUD_BUILD_INFO_POLL_INTERVAL_MS);
 
   interval.unref?.();
   powerMonitor.on('resume', () => {
-    void checkHudBuildAndReload();
+    requestAutomaticWebBuildCheck();
   });
 }
 
@@ -3235,6 +3262,7 @@ ipcMain.on(APP_BOOTED_CHANNEL, event => {
 });
 
 app.on('before-quit', event => {
+  startupMaintenance?.dispose();
   mainLivenessMonitor?.dispose();
   mainLivenessMonitor = null;
   summerRuntimeBridge?.stop();
@@ -3677,6 +3705,7 @@ app.whenReady().then(async () => {
     menuBarTray = new MenuBarTray(handleTrayAction);
   }
 
+  startupMaintenance = createStartupMaintenanceGate();
   createWindow(
     pendingAuthCompletion
       ? buildAuthCompletionUrl(pendingAuthCompletion)

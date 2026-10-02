@@ -93,7 +93,7 @@ test('desktop polls build-info and reloads idle app windows on deploy drift', as
   assert.doesNotMatch(mainSource, /commitSha.*deployedAt/);
 });
 
-test('desktop update checks run on launch, interval, and wake, and restart only when idle', async () => {
+test('automatic update checks defer initial work while manual and nightly checks bypass the gate', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
 
   assert.match(mainSource, /autoUpdater\.autoDownload = true/);
@@ -105,6 +105,29 @@ test('desktop update checks run on launch, interval, and wake, and restart only 
   );
   assert.match(mainSource, /shouldInstallDownloadedUpdateWhileRunning\(/);
   assert.match(mainSource, /autoUpdater\.quitAndInstall\(true, true\)/);
+  const schedule = mainSource.match(
+    /function scheduleDesktopAutoUpdate\(\): void \{[\s\S]*?\n\}/
+  )?.[0];
+  assert.ok(schedule);
+  assert.match(schedule, /configureDesktopAutoUpdater\(\)/);
+  assert.match(schedule, /requestAutomaticDesktopUpdateCheck\(\)/);
+  assert.doesNotMatch(schedule, /runDesktopUpdateCheck\(/);
+  assert.match(
+    mainSource,
+    /function checkForUpdatesFromMenu\(\): void \{[\s\S]*?runDesktopUpdateCheck\('notify'\)/
+  );
+  assert.match(
+    mainSource,
+    /ipcMain\.handle\(DESKTOP_UPDATE_CHECK_CHANNEL,[\s\S]*?runDesktopUpdateCheck\('silent'\)/
+  );
+  assert.match(
+    mainSource,
+    /if \(nightlyUpdateLaunch\) \{[\s\S]*?runDesktopUpdateCheck\('silent'\);[\s\S]*?return;\n  \}[\s\S]*?startupMaintenance = createStartupMaintenanceGate\(\)/
+  );
+  assert.match(
+    mainSource,
+    /receipt\.composerVisibleEditableAfterPaintOpportunityMs !== null\) \{\s*startupMaintenance\?\.composerUsable\(\)/
+  );
 });
 
 test('desktop window fails into a branded Jovie recovery surface', async () => {
