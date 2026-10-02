@@ -1382,7 +1382,7 @@ jobs:
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-      - name: Prepare or finish the one customer-notes release PR
+      - name: Prepare the one customer-notes release PR
         env:
           GH_TOKEN: ${{ steps.changelog-token.outputs.token }}
           JOVIE_AGENT_PROFILE: coder
@@ -1392,17 +1392,10 @@ jobs:
           test "$(jq length <<<"$open_notes")" -le 1 || { echo '::error::Multiple customer-note writers'; exit 1; }
           if [ "$(jq length <<<"$open_notes")" = 1 ]; then
             pr="$(jq -r '.[0].number' <<<"$open_notes")"
-            head="$(jq -r '.[0].headRefOid' <<<"$open_notes")"
-            checks="$(gh pr checks "$pr" --required --json name,bucket || true)"
-            if jq -e 'length >= 4 and all(.[]; .bucket == "pass")' <<<"$checks" >/dev/null; then
-              [ "$(gh pr view "$pr" --json headRefOid --jq .headRefOid)" = "$head" ] || { echo '::notice::Release PR head advanced; fresh checks own the next attempt'; exit 0; }
-              if [ "$(jq -r '.[0].isDraft' <<<"$open_notes")" = true ]; then gh pr ready "$pr"; fi
-              gh pr merge "$pr" --auto --squash --match-head-commit "$head"
-            fi
             echo "Existing release PR owns publication: #$pr"
             exit 0
           fi
-          branch="release/daily-changelog-$(date -u +%F)"
+          branch="release/daily-changelog-$(date -u +%F)-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
             echo '::notice::Existing daily release branch requires reconciliation; no branch is overwritten'
             exit 0

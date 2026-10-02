@@ -163,7 +163,7 @@ describe('source → published changelog', () => {
     expect(release.date).toBe('2026-10-02');
     expect(plan.content).not.toContain('undefined');
   });
-  it('does not rewrite a published date key, and consumes each source once', () => {
+  it('appends within one daily identity, preserves published copy and consumes each source once', () => {
     const first = planDailyPublication(input());
     const replay = planDailyPublication(input({ markdown: first.content }));
     expect(replay.status).toBe('no-change');
@@ -178,8 +178,11 @@ describe('source → published changelog', () => {
     const sameDay = planDailyPublication(
       input({ markdown: first.content, candidates: [second] })
     );
-    expect(sameDay.status).toBe('deferred');
-    expect(sameDay.content).toBe(first.content);
+    expect(sameDay.status).toBe('publish');
+    expect(parseChangelog(sameDay.content).releases).toHaveLength(1);
+    expect(sameDay.content.match(/## \[2026-10-02\]/g)).toHaveLength(1);
+    expect(sameDay.result.stories).toHaveLength(2);
+    expect(sameDay.result.receipt.sourceReceiptIds).toHaveLength(2);
     const nextDay = planDailyPublication(
       input({
         markdown: first.content,
@@ -190,6 +193,65 @@ describe('source → published changelog', () => {
     );
     expect(nextDay.status).toBe('publish');
     expect(parseChangelog(nextDay.content).releases).toHaveLength(2);
+  });
+  it('preserves same-day outcome copy, proof and the three-outcome cap across append attempts', () => {
+    const first = planDailyPublication(
+      input({
+        candidates: [
+          candidate({
+            evidenceReceipts: [{ url: 'https://jov.ie', sha256: 'receipt' }],
+          }),
+        ],
+      })
+    );
+    const make = (number, outcomeKey, text = note.text) =>
+      candidate({
+        pr: {
+          ...candidate().pr,
+          number,
+          body: body({ ...note, outcomeKey, text }),
+        },
+      });
+    const grouped = planDailyPublication(
+      input({ markdown: first.content, candidates: [make(2, note.outcomeKey)] })
+    );
+    expect(grouped.result.stories).toHaveLength(1);
+    expect(grouped.result.stories[0].sourceIds).toHaveLength(2);
+    expect(grouped.result.receipt.runtimeEvidence).toEqual([
+      { url: 'https://jov.ie', sha256: 'receipt' },
+    ]);
+    expect(() =>
+      planDailyPublication(
+        input({
+          markdown: first.content,
+          candidates: [make(2, note.outcomeKey, 'Changed claim')],
+        })
+      )
+    ).toThrow('Conflicting approved copy');
+    const capped = planDailyPublication(
+      input({
+        markdown: first.content,
+        candidates: [make(2, 'second'), make(3, 'third'), make(4, 'fourth')],
+      })
+    );
+    expect(capped.result.stories).toHaveLength(3);
+    expect(capped.deferred).toHaveLength(1);
+    for (const field of ['sourceReceiptIds', 'mergeShas', 'deployments']) {
+      const malformed = first.content.replace(
+        new RegExp(`"${field}":\\[[\\s\\S]*?\\]`),
+        `"${field}":null`
+      );
+      expect(() =>
+        planDailyPublication(input({ markdown: malformed }))
+      ).toThrow('Published daily story provenance missing');
+    }
+    const legacyReceipt = first.content.replace(
+      /,"stories":\[[\s\S]*?\],"publicationHead"/,
+      ',"publicationHead"'
+    );
+    expect(() =>
+      planDailyPublication(input({ markdown: legacyReceipt }))
+    ).toThrow('Published daily story provenance missing');
   });
   it('fails closed on missing or mismatched production evidence and invented dates', () => {
     for (const change of [
@@ -377,10 +439,9 @@ describe('publication transport', () => {
     expect(job.if).toContain("outputs.verified == 'true'");
     expect(
       job.steps.find(
-        step =>
-          step.name === 'Prepare or finish the one customer-notes release PR'
+        step => step.name === 'Prepare the one customer-notes release PR'
       ).run
-    ).toContain('--match-head-commit');
+    ).not.toContain('gh pr merge');
     expect(workflow.jobs['coalesce-production'].steps.at(-1).run).toContain(
       'exact SHA stayed current through the bounded coalescing window'
     );

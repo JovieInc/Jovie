@@ -20,9 +20,20 @@ if (pr) {
   )
     .trim()
     .split('\n');
+  // A failed run may be retried after the writer fixes only PR metadata.
+  // Re-read the current body at the same head rather than the old event body.
+  const current = JSON.parse(
+    execFileSync(
+      'gh',
+      ['api', `repos/${process.env.GITHUB_REPOSITORY}/pulls/${pr.number}`],
+      { encoding: 'utf8' }
+    )
+  );
+  if (current.head?.sha !== pr.head.sha)
+    throw new Error('PR head advanced; validate its current source run');
   const verdict = evaluateCustomerNoteContract({
     files,
-    body: pr.body,
+    body: current.body,
     createdAt: pr.created_at,
   });
   if (!verdict.passed)

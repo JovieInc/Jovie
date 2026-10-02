@@ -22,7 +22,7 @@ import { createHash } from 'node:crypto';
 
 export const DAILY_SOURCE_SCHEMA = 'daily-changelog-source/v1';
 export const DAILY_RECEIPT_SCHEMA = 'daily-changelog-receipt/v1';
-export const DAILY_EVALUATOR_VERSION = 'daily-changelog-eval/1';
+export const DAILY_EVALUATOR_VERSION = 'daily-changelog-eval/2';
 export const DAILY_MAX_BULLETS = 3;
 export const DAILY_FRESHNESS_SLA_MS = 25 * 60 * 60 * 1000;
 

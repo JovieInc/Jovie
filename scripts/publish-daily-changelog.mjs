@@ -100,6 +100,23 @@ const candidates = await collectCustomerCandidates({
       })
     ),
 });
+// Large recovery scans can span a production handoff. Bind again before output.
+const finalResponse = await fetchPage('https://jov.ie/api/health/build-info');
+if (!finalResponse.ok)
+  throw new Error('Final public build identity unavailable');
+const finalBinding = checkPublicationBinding(
+  marker,
+  await finalResponse.json(),
+  controller
+);
+if (finalBinding.status === 'deferred') {
+  writeFileSync(
+    resolve(output, 'plan.json'),
+    `${JSON.stringify({ ...finalBinding, observedAt }, null, 2)}\n`
+  );
+  process.stdout.write(`${JSON.stringify(finalBinding)}\n`);
+  process.exit(0);
+}
 const plan = planDailyPublication({
   markdown,
   marker,

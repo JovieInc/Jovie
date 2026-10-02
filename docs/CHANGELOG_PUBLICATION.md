@@ -34,14 +34,18 @@ the fresh public build SHA and deployment ID. Every source merge must be an
 ancestor of that deployment. Superseded-before-availability generations,
 missing metadata, failed paths and conflicting claims cannot publish.
 
-`--write` requires a clean `release/daily-changelog-YYYY-MM-DD` checkout. The
+`--write` requires a clean `release/daily-changelog-YYYY-MM-DD-<run>-<attempt>` checkout. The
 release PR changes only CHANGELOG.md, follows exact-head source CI and the
 native merge queue, and deploys through the ordinary Production Controller.
 No CalVer, package version, tag, desktop release or alias is mutated by the
-publisher. Implementation branch restrictions stay in force.
+publisher. Implementation branch restrictions stay in force. The existing
+hourly Auto-Merge Default owner promotes only changelog-only release drafts
+with every required check passing at the observed head, then requests native
+auto-merge. Production Controller never becomes a second merge owner.
 
-At most three grouped customer outcomes are published per UTC date. A
-published date is immutable; later sources remain pending for the next date.
+At most three grouped customer outcomes are published per UTC date. Later
+verified changes append to the same daily post identity, preserving published
+copy and whole-post dismissal. Overflow remains pending for the next date.
 Source IDs are persisted in hidden receipts, overflow is carried forward, and
 no-change/deferral/failure plans are retained as workflow artifacts. Older
 recovered work is dated when its customer path is verified, never its merge

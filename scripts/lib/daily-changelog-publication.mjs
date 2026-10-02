@@ -134,7 +134,8 @@ export function checkPublicationBinding(marker, buildInfo, controller) {
 /**
  * Deterministic approved-copy publication, no runtime model or invented facts.
  * Historical recovery uses today's observation date, never the merge date.
- * Published day keys are immutable; subsequent changes wait for the next key.
+ * Later verified changes append to the same day's post/dismissal identity.
+ * Published copy stays intact; overflow waits for the next date.
  */
 export function planDailyPublication({
   markdown,
@@ -154,6 +155,21 @@ export function planDailyPublication({
   const persisted = extractDailyReceipts(markdown);
   if (persisted.some(receipt => receipt.malformed))
     throw new Error('Malformed persisted daily receipt');
+  const currentDay = persisted.find(
+    receipt => receipt.window?.key === windowKey
+  );
+  const publishedStories = currentDay?.stories ?? [];
+  if (
+    currentDay &&
+    (!['stories', 'sourceReceiptIds', 'mergeShas', 'deployments'].every(field =>
+      Array.isArray(currentDay[field])
+    ) ||
+      publishedStories.length > 3)
+  )
+    throw new Error('Published daily story provenance missing');
+  const publishedById = new Map(
+    publishedStories.map(story => [story.id, story])
+  );
   const processed = processedDailySourceIds(markdown);
   const audit = [];
   const sources = [];
@@ -205,10 +221,14 @@ export function planDailyPublication({
       },
       buildInfo: { sha: buildInfo.commitSha, observedAt },
     };
+    const published = publishedById.get(note.outcomeKey);
     const existing = draftsByOutcome.get(note.outcomeKey);
     if (
-      existing &&
-      (existing.summary !== note.text || existing.section !== note.section)
+      [existing, published].some(
+        story =>
+          story &&
+          (story.summary !== note.text || story.section !== note.section)
+      )
     ) {
       throw new Error(
         `Conflicting approved copy for outcome ${note.outcomeKey}`
@@ -234,9 +254,17 @@ export function planDailyPublication({
   const drafts = [...draftsByOutcome.values()].sort((a, b) =>
     a.id.localeCompare(b.id)
   );
-  const selected = drafts.slice(0, 3);
+  let remaining = 3 - publishedStories.length;
+  const selected = drafts.filter(draft => {
+    if (publishedById.has(draft.id)) return true;
+    if (remaining > 0) {
+      remaining--;
+      return true;
+    }
+    deferred.push(...draft.sourceIds);
+    return false;
+  });
   const selectedIds = new Set(selected.flatMap(draft => draft.sourceIds));
-  for (const draft of drafts.slice(3)) deferred.push(...draft.sourceIds);
   const result = evaluateDailyWindow({
     windowKey,
     sources: sources.filter(source => selectedIds.has(source.id)),
@@ -247,24 +275,62 @@ export function planDailyPublication({
     modelReceipt: { mode: 'approved-copy', tokens: 0 },
   });
   if (!result.passed) throw new Error(JSON.stringify(result.findings));
+  const combinedStories = new Map(
+    publishedStories.map(story => [story.id, structuredClone(story)])
+  );
+  for (const story of result.stories) {
+    const previous = combinedStories.get(story.id);
+    combinedStories.set(
+      story.id,
+      previous
+        ? {
+            ...previous,
+            sourceIds: [
+              ...new Set([...previous.sourceIds, ...story.sourceIds]),
+            ].sort(),
+            claimIds: [
+              ...new Set([...previous.claimIds, ...story.claimIds]),
+            ].sort(),
+          }
+        : story
+    );
+  }
+  result.stories = [...combinedStories.values()].sort((a, b) =>
+    a.id.localeCompare(b.id)
+  );
+  if (currentDay) {
+    for (const field of ['sourceReceiptIds', 'mergeShas'])
+      result.receipt[field] = [
+        ...new Set([...currentDay[field], ...result.receipt[field]]),
+      ].sort();
+    result.receipt.deployments = [
+      ...new Map(
+        [...currentDay.deployments, ...result.receipt.deployments].map(
+          deployment => [deployment.id, deployment]
+        )
+      ).values(),
+    ];
+    result.receipt.firstPublicAt = {
+      ...currentDay.firstPublicAt,
+      ...result.receipt.firstPublicAt,
+    };
+  }
+  result.receipt.stories = result.stories;
   result.receipt.publicationHead = marker.sha;
   result.receipt.audit = audit;
   result.receipt.deferred = deferred;
   result.receipt.pending = audit
     .filter(item => item.reason === 'unavailable')
     .map(item => item.id);
-  result.receipt.runtimeEvidence = candidates.flatMap(
-    candidate => candidate.evidenceReceipts ?? []
-  );
-  const publishedDay = persisted.some(
-    receipt => receipt.window?.key === windowKey
-  );
-  const status =
-    publishedDay && !result.noChange
+  result.receipt.runtimeEvidence = [
+    ...(currentDay?.runtimeEvidence ?? []),
+    ...candidates.flatMap(candidate => candidate.evidenceReceipts ?? []),
+  ];
+  const status = result.noChange
+    ? deferred.length
       ? 'deferred'
-      : result.noChange
-        ? 'no-change'
-        : 'publish';
+      : 'no-change'
+    : 'publish';
   const block = status === 'publish' ? renderDailyDigest(result) : '';
   const content = block
     ? insertDailyDigest(markdown, block, windowKey)
