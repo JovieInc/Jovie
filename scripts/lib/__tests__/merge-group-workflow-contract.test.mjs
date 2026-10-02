@@ -3836,7 +3836,7 @@ describe('merge-group Playwright artifact guard', () => {
   });
 });
 
-describe('merge-queue green enroll scan window (JOV-6831)', () => {
+describe('merge-queue green enroll scan window and failure hold', () => {
   const ENROLL = readFileSync(
     resolve(REPO_ROOT, '.github/workflows/merge-queue-green-enroll.yml'),
     'utf8'
@@ -3850,9 +3850,34 @@ describe('merge-queue green enroll scan window (JOV-6831)', () => {
     expect(ENROLL).not.toMatch(/direction:\s*ASC/);
   });
 
-  it('keeps the rejected-head rule: no re-enqueue without a new push', () => {
+  it('persists the exact-head failure before any bounded re-enrollment', () => {
+    expect(ENROLL).toContain('workflow_run:');
     expect(ENROLL).toContain(
-      'if (removedAt && committedAt && removedAt > committedAt) continue;'
+      'github.event.workflow_run.workflow_id == 178737329'
+    );
+    expect(ENROLL).toContain(
+      "github.event.workflow_run.event == 'merge_group'"
+    );
+    expect(ENROLL).toContain(
+      'node scripts/merge-group-failure-hold.mjs --event-path "$GITHUB_EVENT_PATH"'
+    );
+    expect(ENROLL).toContain('failurePolicy.revisionFailureDisposition({');
+    expect(ENROLL).toContain("failure.action === 'block'");
+    expect(ENROLL).toContain("failure.action === 'retry-once'");
+    expect(ENROLL).toContain(
+      "if (removedUnchangedHead && failure.action !== 'retry-once') continue;"
+    );
+    for (const runtimePath of [
+      'scripts/merge-group-failure-hold.mjs',
+      'scripts/lib/merge-queue-guard.mjs',
+      'scripts/lib/pre-land-changelog.mjs',
+      'scripts/version-fanout-guard.mjs',
+    ]) {
+      expect(ENROLL).toContain(runtimePath);
+    }
+    expect(ENROLL).toContain('FAILURE_RETRY_CONTEXT');
+    expect(ENROLL.indexOf('FAILURE_RETRY_CONTEXT')).toBeLessThan(
+      ENROLL.indexOf('enqueuePullRequest(input:')
     );
   });
 });

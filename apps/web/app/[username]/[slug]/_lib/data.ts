@@ -25,8 +25,10 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { promoDownloads } from '@/lib/db/schema/promo-downloads';
 import {
   type CanonicalReleaseCredit,
+  creditProviderMismatchWarningKey,
   materializeReleaseCreditPayload,
   parseProviderAlbumArtists,
+  shouldReportCreditProviderMismatch,
 } from '@/lib/discography/release-credits';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { env } from '@/lib/env-server';
@@ -230,7 +232,16 @@ function attachCanonicalCredits(
     providerArtists: parseProviderAlbumArtists(metadata),
   });
 
-  if (reconciled.mismatch) {
+  if (
+    reconciled.mismatch &&
+    shouldReportCreditProviderMismatch(
+      creditProviderMismatchWarningKey({
+        entityType: context.entityType,
+        entityId: context.entityId,
+        mismatch: reconciled.mismatch,
+      })
+    )
+  ) {
     void captureWarning(
       'Release credit provider mismatch',
       new Error('release_credit_provider_mismatch'),

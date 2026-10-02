@@ -42,6 +42,11 @@ const BASELINE_PATH = join(__dirname, 'destructive-red-drift.baseline.json');
 
 const DESTRUCTIVE_UTILITY = /\b(?:text|bg|border|ring)-destructive\b/g;
 const RAW_RED_UTILITY = /\b(?:text|bg|border|ring)-red-\d+\b/g;
+// `-danger`/`-danger-token` are NOT aliases like `-destructive`: no theme
+// color or component rule defines them, so every use renders an unstyled
+// (inherited-color) error state — an invisible-by-default bug, not drift.
+// Floor is zero; any new use is a regression, not debt.
+const DEAD_DANGER_UTILITY = /\b(?:text|bg|border|ring)-danger(?:-token)?\b/g;
 const SOURCE_EXT = /\.(tsx|ts|css)$/;
 const SKIP_DIRS = new Set(['node_modules', '.next', '.turbo', 'generated']);
 
@@ -89,6 +94,10 @@ export function countDestructiveUtilityUsage() {
 
 export function countRawRedUtilityUsage() {
   return countUsage(RAW_RED_UTILITY);
+}
+
+export function countDeadDangerUtilityUsage() {
+  return countUsage(DEAD_DANGER_UTILITY);
 }
 
 function topFiles(perFile: Map<string, number>): string {
@@ -159,5 +168,27 @@ describe('destructive/red drift ratchet (shrink-only, JOV-6773)', () => {
     }
     expect(verdict.ok).toBe(true);
     expect(count).toBeLessThanOrEqual(baseline.rawRedUtilityCount);
+  });
+
+  it('keeps dead {text,bg,border,ring}-danger/-danger-token usage at zero', {
+    timeout: 60_000,
+  }, () => {
+    const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')) as {
+      deadDangerUtilityCount: number;
+    };
+    const { count, perFile } = countDeadDangerUtilityUsage();
+    const verdict = evaluateShrinkOnlyCount({
+      count,
+      baseline: baseline.deadDangerUtilityCount,
+      metric: '{text,bg,border,ring}-danger/-danger-token usage',
+    });
+
+    if (!verdict.ok) {
+      expect.fail(
+        `${verdict.message} These utilities have no theme definition — ` +
+          `every use renders an unstyled error state. Use -error.\nTop files:\n${topFiles(perFile)}`
+      );
+    }
+    expect(count).toBe(0);
   });
 });
