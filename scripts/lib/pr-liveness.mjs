@@ -427,6 +427,12 @@ export function buildLivenessEvent(classification, options = {}) {
  * Bounded remediation decision. Deterministic mapping from liveness state to
  * the next safe action; attempts beyond `maxAttempts` escalate without
  * destroying or closing valid work.
+ * @param {object} input
+ * @param {string} input.state effective liveness state
+ * @param {string} [input.baseState] pre-overlay state for stale overlays
+ * @param {number} [input.remediationAttempts] attempts already consumed
+ * @param {number} [input.maxAttempts] attempt bound before escalation
+ * @param {boolean} [input.providerAvailable] false routes to provider reroute
  */
 export function nextRemediationAction({
   state,
