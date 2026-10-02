@@ -19,6 +19,7 @@ import {
   getMarketingSection,
   MARKETING_SECTION_IDS,
 } from '@/data/marketing/sections';
+import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import SolutionsAudiencePage, {
   dynamicParams,
   generateMetadata,
@@ -65,6 +66,7 @@ function factoryRecord(copyOverrides: PageRecord['copy'] = {}) {
     id: 'solutions.founders',
     slug: 'founders',
     status: 'shadow',
+    heroVariant: 'f-layout-desktop-screenshot',
     brief: {
       audience: 'founders building an owned audience',
       job: 'show founders how a public profile captures subscribers',
@@ -79,16 +81,19 @@ function factoryRecord(copyOverrides: PageRecord['copy'] = {}) {
           renderer: 'factory-hero',
           instanceId: 'hero-1',
           sectionId: 'hero',
+          variantId: 'split-screenshot-right',
         },
         {
           renderer: 'factory-feature-split',
           instanceId: 'capture-1',
           sectionId: 'feature-split',
+          variantId: 'phone-right',
         },
         {
           renderer: 'factory-cta',
           instanceId: 'cta-1',
           sectionId: 'cta',
+          variantId: 'final-single-claim',
         },
       ],
     },
@@ -100,19 +105,20 @@ function factoryRecord(copyOverrides: PageRecord['copy'] = {}) {
       'capture-1.body': {
         text: 'Visitors subscribe from your page and opt into updates.',
       },
+      'capture-1.headline': { text: 'Build a direct relationship.' },
       'cta-1.headline': { text: 'Start free today' },
       ...copyOverrides,
     },
     media: {
       'hero-1': {
-        kind: 'public-path',
-        id: '/og/default.png',
-        alt: 'Public profile preview',
+        kind: 'screenshot-registry',
+        id: 'public-profile-desktop',
+        alt: getMarketingExportImage('public-profile-desktop').alt,
       },
       'capture-1': {
-        kind: 'public-path',
-        id: '/og/default.png',
-        alt: 'Subscriber capture preview',
+        kind: 'screenshot-registry',
+        id: 'tim-white-profile-subscribe-mobile',
+        alt: getMarketingExportImage('tim-white-profile-subscribe-mobile').alt,
       },
     },
     proof: [],
@@ -156,10 +162,31 @@ describe('/solutions/[audience] family renderer (JOV-7275)', () => {
     expect(container).toHaveTextContent(
       'Visitors subscribe from your page and opt into updates.'
     );
+    expect(container).toHaveTextContent('Build a direct relationship.');
     expect(container).toHaveTextContent('Start free today');
-    expect(
-      container.querySelector('[data-factory-media="/og/default.png"]')
-    ).toBeInTheDocument();
+    const featureSplit = container.querySelector(
+      '[data-testid="marketing-section-feature-split"][data-marketing-occurrence="capture-1"]'
+    );
+    const expectedCapture = getMarketingExportImage(
+      'tim-white-profile-subscribe-mobile'
+    );
+    expect(featureSplit).toHaveAttribute(
+      'data-marketing-variant',
+      'phone-right'
+    );
+    expect(featureSplit).toHaveTextContent('Build a direct relationship.');
+    expect(featureSplit).toHaveTextContent(
+      'Visitors subscribe from your page and opt into updates.'
+    );
+    expect(featureSplit?.querySelector('img')).toHaveAttribute(
+      'src',
+      expectedCapture.publicUrl
+    );
+    expect(featureSplit?.querySelector('img')).toHaveAttribute(
+      'alt',
+      expectedCapture.alt
+    );
+    expect(featureSplit?.querySelector('figcaption')).toBeNull();
   });
 
   it('fails the build gate when a factory section is missing a required copy slot', () => {
