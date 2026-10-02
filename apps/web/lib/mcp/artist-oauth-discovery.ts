@@ -1,3 +1,4 @@
+import { isOvieMcpDynamicClientRegistrationEnabled } from '@/lib/auth/mcp-dynamic-registration';
 import {
   USERNAME_MAX_LENGTH,
   USERNAME_PATTERN,
@@ -86,9 +87,9 @@ export function artistMcpWwwAuthenticate(
 }
 
 /**
- * RFC 8414 requires registration, authorization, and token endpoints.
- * Better Auth omits `registration_endpoint` while dynamic registration is
- * disabled; the mounted `/oauth2/register` route still exists, so advertise it.
+ * Authorization and token endpoints are always advertised. Dynamic client
+ * registration is advertised only when OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION
+ * is on, matching Ovie issuer discovery.
  */
 export function ensureAuthorizationServerEndpoints(
   metadata: Record<string, unknown>,
@@ -99,7 +100,7 @@ export function ensureAuthorizationServerEndpoints(
     typeof metadata.issuer === 'string' && metadata.issuer.length > 0
       ? metadata.issuer.replace(/\/$/, '')
       : fallbackIssuer;
-  return {
+  const document: Record<string, unknown> = {
     ...metadata,
     issuer,
     authorization_endpoint:
@@ -110,9 +111,14 @@ export function ensureAuthorizationServerEndpoints(
       typeof metadata.token_endpoint === 'string'
         ? metadata.token_endpoint
         : `${issuer}/oauth2/token`,
-    registration_endpoint:
-      typeof metadata.registration_endpoint === 'string'
-        ? metadata.registration_endpoint
-        : `${issuer}/oauth2/register`,
   };
+  if (!isOvieMcpDynamicClientRegistrationEnabled()) {
+    delete document.registration_endpoint;
+    return document;
+  }
+  document.registration_endpoint =
+    typeof metadata.registration_endpoint === 'string'
+      ? metadata.registration_endpoint
+      : `${issuer}/oauth2/register`;
+  return document;
 }

@@ -82,6 +82,7 @@
   "lib/auth/auth-shell-intent.test.ts",
   "lib/auth/better-auth-ovie-origin.test.ts",
   "lib/auth/canonical-user-state.test.ts",
+  "lib/auth/mcp-dynamic-registration.test.ts",
   "lib/auth/mcp-redirect-guard.test.ts",
   "lib/auth/ovie-web-origin.test.ts",
   "lib/auth/profile-access.test.ts",
