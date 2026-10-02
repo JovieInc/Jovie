@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { isInternalEntry } from './changelog-filter-rules.mjs';
+import { isCustomerCopy } from './changelog-filter-rules.mjs';
 import {
   DAILY_SOURCE_SCHEMA,
   evaluateDailyWindow,
@@ -27,6 +27,22 @@ export function readCustomerNote(body) {
   }
   if (note?.releaseWorthy === false) return { reason: 'internal' };
   if (
+    note?.availability !== undefined &&
+    (!['ga', 'preview', 'limited'].includes(note.availability?.status) ||
+      !Array.isArray(note.availability?.prerequisites) ||
+      note.availability.prerequisites.length > 5 ||
+      !note.availability.prerequisites.every(
+        value =>
+          typeof value === 'string' &&
+          value.trim() &&
+          value.length <= 200 &&
+          !/[\r\n<>]/.test(value)
+      ) ||
+      (note.availability.status === 'limited' &&
+        note.availability.prerequisites.length === 0))
+  )
+    return { reason: 'failed-validation' };
+  if (
     note?.audience !== 'public' ||
     note?.visibility !== 'public' ||
     note?.releaseWorthy !== true ||
@@ -41,7 +57,7 @@ export function readCustomerNote(body) {
     /\bJOV-\d+\b|\b(?:implementation|refactor|design token|CI)\b/.test(
       note.text
     ) ||
-    isInternalEntry(note.text) ||
+    !isCustomerCopy(note.text) ||
     !Array.isArray(note?.evidence) ||
     note.evidence.length === 0 ||
     note.evidence.length > 3
@@ -83,9 +99,13 @@ export function evaluateCustomerNoteContract({ files, body, createdAt }) {
     return { passed: true, applicable: false };
   const verdict = readCustomerNote(body);
   return {
-    passed: Boolean(verdict.note) || verdict.reason === 'internal',
+    passed:
+      Boolean(verdict.note?.availability) || verdict.reason === 'internal',
     applicable: true,
-    reason: verdict.reason,
+    reason:
+      verdict.note && !verdict.note.availability
+        ? 'missing-availability'
+        : verdict.reason,
   };
 }
 
@@ -227,7 +247,10 @@ export function planDailyPublication({
       [existing, published].some(
         story =>
           story &&
-          (story.summary !== note.text || story.section !== note.section)
+          (story.summary !== note.text ||
+            story.section !== note.section ||
+            JSON.stringify(story.availability) !==
+              JSON.stringify(note.availability))
       )
     ) {
       throw new Error(
@@ -243,6 +266,7 @@ export function planDailyPublication({
         id: note.outcomeKey,
         section: note.section,
         summary: note.text,
+        availability: note.availability,
         bullets: [],
         sourceIds: [id],
         claimIds: [id],
@@ -279,6 +303,10 @@ export function planDailyPublication({
     publishedStories.map(story => [story.id, structuredClone(story)])
   );
   for (const story of result.stories) {
+    const scopedStory = {
+      ...story,
+      availability: draftsByOutcome.get(story.id)?.availability,
+    };
     const previous = combinedStories.get(story.id);
     combinedStories.set(
       story.id,
@@ -292,7 +320,7 @@ export function planDailyPublication({
               ...new Set([...previous.claimIds, ...story.claimIds]),
             ].sort(),
           }
-        : story
+        : scopedStory
     );
   }
   result.stories = [...combinedStories.values()].sort((a, b) =>

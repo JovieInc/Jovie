@@ -21,6 +21,7 @@ const note = {
   visibility: 'public',
   releaseWorthy: true,
   text: 'Choose your profile link: Start with a name on the homepage.',
+  availability: { status: 'ga', prerequisites: [] },
   evidence: [{ url: 'https://jov.ie/', contains: 'Claim' }],
 };
 const body = value => `<!-- customer-changelog/v1 ${JSON.stringify(value)} -->`;
@@ -63,6 +64,45 @@ const input = overrides => ({
   ...overrides,
 });
 describe('customer release metadata', () => {
+  it.each([
+    'Codex shipper: safer dispatch.',
+    'PersistentAudioBar tests: align labels.',
+    'Update apps/web/lib/source.ts: faster imports.',
+  ])('excludes implementation copy at public intake: %s', text => {
+    expect(readCustomerNote(body({ ...note, text })).reason).toBe(
+      'failed-validation'
+    );
+  });
+  it('requires explicit rollout scope for new public notes and retains it in the publication receipt', () => {
+    const scope = {
+      status: 'limited',
+      prerequisites: ['Eligible artist profiles'],
+    };
+    const scoped = { ...note, availability: scope };
+    const result = planDailyPublication(
+      input({
+        candidates: [
+          candidate({ pr: { ...candidate().pr, body: body(scoped) } }),
+        ],
+      })
+    );
+    expect(result.result.receipt.stories[0].availability).toEqual(scope);
+    expect(
+      readCustomerNote(
+        body({
+          ...note,
+          availability: { status: 'limited', prerequisites: [] },
+        })
+      ).reason
+    ).toBe('failed-validation');
+    expect(
+      evaluateCustomerNoteContract({
+        files: ['apps/web/lib/profile.ts'],
+        createdAt: '2026-10-03T00:00:00Z',
+        body: body({ ...note, availability: undefined }),
+      })
+    ).toMatchObject({ passed: false, reason: 'missing-availability' });
+  });
   it('requires a public/internal decision for new customer code without reclassifying existing PRs', () => {
     const event = {
       files: ['apps/web/components/features/profile/Profile.tsx'],
