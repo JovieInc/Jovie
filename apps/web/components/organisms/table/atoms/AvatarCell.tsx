@@ -103,7 +103,7 @@ export const AvatarCell = React.memo(function AvatarCell({
       className={cn(
         'flex items-center gap-3',
         isFeatured && 'pl-1',
-        usernameActions && 'pr-1',
+        Boolean(usernameActions) && 'pr-1',
         className
       )}
     >
