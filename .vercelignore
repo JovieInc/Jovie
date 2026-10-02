@@ -65,6 +65,7 @@ cleanup_old_branches*.sh
 # stay excluded — nothing in the docs build imports that audit helper.
 !apps/docs/scripts/
 !apps/docs/scripts/*.mjs
+apps/docs/scripts/*.test.mjs
 !apps/docs/lib/article-metadata.mjs
 !apps/docs/lib/article-registry.mjs
 !apps/docs/lib/article-structure.mjs
