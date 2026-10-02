@@ -693,6 +693,38 @@ describe('JovieChat styling regressions', () => {
     ).toBeNull();
   });
 
+  it.each([
+    { profileId: 'profile-2', conversationId: 'one' },
+    { profileId: 'profile-1', conversationId: 'two' },
+    { profileId: 'profile-1', conversationId: 'one', chatMode: 'ov' as const },
+  ])('resets navigation hover for a new chat scope: %j', nextScope => {
+    mockChatState.messages = Array.from({ length: 14 }, (_, index) => ({
+      id: `message-${index}`,
+      role: index % 2 === 0 ? 'user' : 'assistant',
+      parts: [{ type: 'text', text: `Message ${index}` }],
+    }));
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const { getByRole, rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <JovieChat profileId='profile-1' conversationId='one' />
+      </QueryClientProvider>
+    );
+    const firstMarker = getByRole('button', { name: /Jump to turn 1:/ });
+    fireEvent.mouseEnter(firstMarker);
+    expect(firstMarker).toHaveClass('is-hovered');
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <JovieChat {...nextScope} />
+      </QueryClientProvider>
+    );
+    expect(getByRole('button', { name: /Jump to turn 1:/ })).not.toHaveClass(
+      'is-hovered'
+    );
+  });
+
   it('publishes rail context only when its meaning changes during streaming', () => {
     mockRailPanel.enabled = true;
     mockChatState.messages = [
