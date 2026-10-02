@@ -127,7 +127,16 @@ test('fails closed on writer takeover, forks, retargeting, extra commits and unr
 
 test('missing publication receipts never authorize cleanup and cleanup failures remain visible', () => {
   assert.throws(
-    () => retireCoverageReports({ url: 'no receipt', repo }),
+    () =>
+      retireCoverageReports({
+        url: 'no receipt',
+        repo,
+        source,
+        gh: () => {
+          throw new Error('invalid receipt must not read GitHub');
+        },
+        isAncestor: () => false,
+      }),
     /Invalid replacement/
   );
   assert.throws(() => fixture({ failClose: true }).run(), /close denied/);

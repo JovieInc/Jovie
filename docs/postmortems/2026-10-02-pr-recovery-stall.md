@@ -5,7 +5,7 @@ severity: sev2
 detected: 2026-10-02T13:30Z
 failure_classes: [non-convergent-control-loop, pre-merge-parity-gap]
 incident_issue: JOV-7455
-actions: [JOV-7460, JOV-7461, JOV-7462]
+actions: [JOV-7460, JOV-7461, JOV-7462, JOV-7468, JOV-7469]
 gbrain: ops/postmortems/2026-10-02-pr-recovery-stall
 ---
 
@@ -19,7 +19,10 @@ A 112-PR inventory contained 38 generated coverage-report drafts. The green
 enrollment sweep repeatedly exceeded GitHub's GraphQL resource limit, and both
 enrollment and draft promotion missed completion of the renamed Source
 Validation workflow. A separate source-validation selection gap let an unwired
-script test enter the queue and fail the combined-head structural gate.
+script test enter the queue and fail the combined-head structural gate. Scripts
+and web-test type checks were also absent from source admission. Advancing the
+changelog archive to October hid an older release link from server-rendered HTML
+and blocked subsequent combined builds with an orphan-page regression.
 
 ## Impact
 
@@ -56,6 +59,13 @@ each run without retiring older generated drafts. In [#19945](https://github.com
 inventory. [Merge-group run 37009989332](https://github.com/JovieInc/Jovie/actions/runs/37009989332)
 rejected the unwired file; Source Validation's control commands lacked that
 inventory check.
+
+Source admission checked production types but omitted `typecheck:scripts` and
+the existing web-test baseline gate. Queue runs rejected #19883's partial
+environment fixtures and #19865's script types after source-green admission.
+In #19951, the first paginated changelog month moved forward to October;
+`/changelog/26.8.1` lost its incoming server-rendered link and SEO certification
+reported one new `geo:geo-orphan` regression.
 
 ## Contributing causes
 
@@ -99,6 +109,15 @@ and an entirely report-only paginated diff. Re-read immediately before closure;
 preserve divergent sources and writer takeovers. Source control commands also
 run the existing script inventory invariant.
 
+Source admission runs production, script and web-test type checks, preserving
+their existing baselines. An executable workflow regression injects failure
+into each actual command and requires the source gate to reject it. The
+changelog hub retains an accessible native disclosure linking every public
+release independently of archive pagination; its regression uses the real
+orphan auditor. Consolidated on the earlier #19962 repair, which restores links
+through the existing archive navigation; closed redundant #19968 while
+preserving its branch and validation receipts.
+
 ## Action items
 
 | Issue | Control | Class | State | Live verification receipt |
@@ -106,6 +125,8 @@ run the existing script inventory invariant.
 | [JOV-7460](https://linear.app/jovie/issue/JOV-7460) | Bounded enrollment and completion wakes | non-convergent-control-loop | Implemented; activation pending | Original workflow fails the new 113-PR regression; repaired workflow passes. |
 | [JOV-7461](https://linear.app/jovie/issue/JOV-7461) | Superseded-report retirement | non-convergent-control-loop | Implemented; activation pending | Real Git publication regression fails against the original publisher; repaired publisher and retirement helper pass at 100% lines, branches and functions. |
 | [JOV-7462](https://linear.app/jovie/issue/JOV-7462) | Source script inventory | pre-merge-parity-gap | Implemented in #19945 source repair; validation pending | Existing inventory catches the original unwired inbound test; repaired inventory passes. |
+| [JOV-7468](https://linear.app/jovie/issue/JOV-7468) | Source script and web-test type checks | pre-merge-parity-gap | Implemented in #19945 source repair; activation pending | Executable workflow regression fails against the original workflow and passes for all three injected typecheck failures. |
+| [JOV-7469](https://linear.app/jovie/issue/JOV-7469) | Public release links | pre-merge-parity-gap | Consolidated on #19962; merge pending | #19962 has a real orphan-auditor red/green regression; redundant #19968 passed combined Build + Layout and exact-head coverage in run 37018692906 before closure. |
 
 ## Open questions and unverified claims
 
