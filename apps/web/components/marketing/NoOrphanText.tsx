@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/marketing/no-orphan-text.test.tsx
 import type { ReactNode } from 'react';
 
 /**
