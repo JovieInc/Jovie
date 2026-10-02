@@ -26,6 +26,10 @@ export const CODE_FLAGS = {
   // FEATURE_OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION=true opens unauthenticated
   // registration limited to the shared MCP redirect allowlist.
   OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: false,
+  // ChatGPT app-directory MCP at /api/chatgpt/mcp. Default off: the route
+  // 404s and is not a live connector. FEATURE_CHATGPT_APP_DIRECTORY_MCP=true
+  // enables the anonymous public-artist tools. Does not enable DCR.
+  CHATGPT_APP_DIRECTORY_MCP: false,
 } as const satisfies Record<string, boolean>;
 
 export type CodeFlagName = keyof typeof CODE_FLAGS;

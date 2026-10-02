@@ -47,6 +47,16 @@ describe('ComparisonPageContent', () => {
     expect(screen.getAllByRole('button')).toHaveLength(data.faq.length);
   });
 
+  it('keeps the feature matrix scroll region keyboard focusable', () => {
+    render(<ComparisonPageContent data={data} />);
+
+    const scrollRegion = screen.getByRole('region', {
+      name: `Jovie vs ${data.competitor} feature comparison`,
+    });
+    expect(scrollRegion).toHaveAttribute('tabindex', '0');
+    expect(within(scrollRegion).getByRole('table')).toBeInTheDocument();
+  });
+
   it('never repeats a hero image across the checked-in comparison slugs', () => {
     const slugs = getComparisonSlugs();
     const images = slugs.map(slug => getComparison(slug)?.heroImage.src);

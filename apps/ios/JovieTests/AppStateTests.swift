@@ -1,5 +1,6 @@
 import AuthenticationServices
 import Foundation
+import JovieKit
 import Testing
 import UserNotifications
 @testable import Jovie
