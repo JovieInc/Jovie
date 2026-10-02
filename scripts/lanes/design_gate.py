@@ -3,11 +3,9 @@
 
 UI and landing work is admitted to a build lane only after a design brief
 completes steps 1–9 of the founder's IA-first pipeline, and only with
-certified product-truth capability ids. Pure stdlib. No I/O at import.
-
-There is no design/brief provider in providers.json. An incomplete brief is
-not claimed by a build lane; the runner reports `needs-design-brief` and, at
-most once, adds the existing Linear label so a design pass can write the
+certified product-truth capability ids. Pure stdlib. No I/O at import. An
+incomplete brief is not claimed; the runner reports `needs-design-brief` and,
+at most once, adds the existing Linear label so a design pass can write the
 brief. Admission clears on its own once steps 1–9 are complete.
 """
 from __future__ import annotations
@@ -28,8 +26,7 @@ GATED_PATH_PREFIXES = (
 )
 
 # Explicit workstream labels. `ws:design-gate` is not in workstreams.RANK yet
-# (JOV-7514 follow-up); the other two are, and `workstreams.explicit` is used
-# when that module is on the path.
+# (JOV-7514 follow-up); `workstreams.explicit` parses the other two.
 GATED_WS_LABELS = frozenset({
     "ws:ui-ia",
     "ws:profiles-marketing",
@@ -59,8 +56,7 @@ SECTION_IDS = frozenset({
     "blog-feed",
 })
 
-# Step 7 imagery, matched case-insensitively. Canonical spelling is lowercase
-# except the template also accepts the founder's "Lottie" / "Mac mockup".
+# Step 7 imagery, case-insensitive; canonical spelling is lowercase.
 IMAGERY_TYPES = frozenset({
     "video",
     "photo",
@@ -143,7 +139,7 @@ def certified_catalog() -> dict:
     """Checked-in projection of the product-truth registry. Loaded on first use."""
     global _CERTIFIED_CACHE
     if _CERTIFIED_CACHE is None:
-        path = Path(__file__).with_name("certified-capabilities.json")
+        path = Path(__file__).with_name("certified-capabilities.gen.json")
         _CERTIFIED_CACHE = json.loads(path.read_text(encoding="utf-8"))
     return _CERTIFIED_CACHE
 

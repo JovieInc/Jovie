@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 """Warn when a PR touches a marketing or landing path without a completed brief.
 
-Warn-only unless DESIGN_GATE_ENFORCE is truthy (1/true/yes/on). Default off.
-A missing brief that we can see is warned, and blocked only when enforcement
-is on. A brief we cannot read (no Linear key, unmapped URL) is always a
-warning, including when enforcement is on.
-
-No new secrets. LINEAR_API_KEY is used only when it is already in the
-environment. The path list lives in design_gate.GATED_PATH_PREFIXES.
+Warn-only unless DESIGN_GATE_ENFORCE is truthy (1/true/yes/on); default off.
+A brief we cannot read (no Linear key, unmapped URL) is always a warning,
+including when enforcement is on. No new secrets; LINEAR_API_KEY is used only
+when already in the environment. Path list: design_gate.GATED_PATH_PREFIXES.
 """
 from __future__ import annotations
 

@@ -26,7 +26,7 @@ on:
       - 'docs/design/**'
       - 'scripts/lanes/design_gate.py'
       - 'scripts/lanes/design_gate_check.py'
-      - 'scripts/lanes/certified-capabilities.json'
+      - 'scripts/lanes/certified-capabilities.gen.json'
       - '.github/workflows/design-gate.yml'
 
 permissions:
