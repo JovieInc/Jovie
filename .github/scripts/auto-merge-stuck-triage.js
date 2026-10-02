@@ -15,9 +15,9 @@
 //     [--enable-missing]
 //
 // `--enable-missing` first enables auto-merge (squash) on every open,
-// non-draft, same-repo PR that lacks it — this covers drafts that went
-// ready (ready_for_review is reserved for merge-queue-autoenroll.yml per
-// trigger-hygiene rule 3) and any missed enable events.
+// non-draft, same-repo PR that lacks it — backstop for a missed opened,
+// reopened, or ready_for_review event. auto-merge-default.yml is the sole
+// ready_for_review subscriber (trigger-hygiene rule 3 / JOV-INV-029).
 
 const { execFileSync } = require('node:child_process');
 

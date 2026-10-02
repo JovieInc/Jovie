@@ -22,6 +22,11 @@ jobs:
           persist-credentials: false
       - &source-setup
         uses: ./.github/actions/setup-node-pnpm
+      # component-ship-gate's live-storybook-cert launches Chromium when the
+      # diff touches in-scope UI components; without browsers the gate fails
+      # closed before any story is measured.
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
       - name: Run deterministic source contract
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}

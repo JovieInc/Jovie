@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.9.16",
+  "version": "26.10.0",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -341,6 +341,7 @@
     "@storybook/addon-docs": "10.5.10",
     "@storybook/addon-vitest": "10.6.1",
     "@storybook/nextjs-vite": "10.6.1",
+    "@storybook/react-vite": "10.6.1",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
     "@tailwindcss/postcss": "^4.3.3",

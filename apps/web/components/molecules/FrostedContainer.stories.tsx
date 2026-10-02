@@ -33,7 +33,7 @@ const SampleContent = () => (
     </p>
     <button
       type='button'
-      className='px-6 py-2 bg-primary-token text-base dark:bg-base dark:text-primary-token rounded-full font-medium'
+      className='px-6 py-2 bg-primary-token text-(--color-bg-base) dark:bg-base dark:text-primary-token rounded-full font-medium'
     >
       Get Started
     </button>

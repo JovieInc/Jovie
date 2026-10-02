@@ -40,6 +40,7 @@ import {
   validateScreenRegistry,
   verifyProofArtifact,
 } from './screen-certification.mjs';
+import { SCREEN_DECISION_SCHEMA } from './screen-decision-routing.mjs';
 import { emitScreenProof } from './screen-proof-emit.mjs';
 import {
   MARKETING_EVIDENCE_SCHEMA,
@@ -628,10 +629,11 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       chmodSync(git, 0o755);
       process.env.PATH = `${root}:${priorPath}`;
       process.env.SCREEN_CERT_DIFF_BASE = 'c'.repeat(40);
-      const certify = () =>
+      const certify = decisionDeclarations =>
         runScreenCertificationFromArtifact({
           artifactId: 42,
           screenId: 'web.homepage',
+          decisionDeclarations,
         });
       const resolveProof = () =>
         resolveTrustedScreenProof({
@@ -647,6 +649,28 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       const result = certify();
       assert.deepEqual([result.ok, result.receipt.certified], [true, true]);
       assert.equal(result.receipt.status, 'certified');
+      const withEvent = certify({
+        schema: SCREEN_DECISION_SCHEMA,
+        headSha: head,
+        changedPaths: ['apps/web/app/(home)/page.tsx'],
+        decisions: [
+          {
+            id: 'permanent-identity',
+            kind: 'event',
+            eventClass: 'identity',
+            paths: ['apps/web/app/(home)/page.tsx'],
+            proposedEffect: 'Change the permanent public identity.',
+            evidence: ['canon/VOICE.md'],
+          },
+        ],
+      });
+      assert.equal(withEvent.receipt.certified, true);
+      assert.equal(
+        withEvent.receipt.decisionRouting.status,
+        'founder-routing-unavailable'
+      );
+      assert.equal(withEvent.receipt.decisionRouting.approvalVerified, false);
+      assert.equal(withEvent.receipt.decisionRouting.deliveryVerified, false);
       assert.equal(
         result.receipt.certificationScope,
         'targeted-screen-plus-change-set'

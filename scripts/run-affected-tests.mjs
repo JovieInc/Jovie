@@ -542,6 +542,15 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
       '--test-coverage-functions=85',
     ],
   ],
+  [
+    'scripts/lib/__tests__/source-admission-policy.test.mjs',
+    'scripts/lib/source-admission-policy.mjs',
+    [
+      '--test-coverage-lines=95',
+      '--test-coverage-branches=90',
+      '--test-coverage-functions=100',
+    ],
+  ],
 ];
 const CI_CONTROL_WEB_TESTS = [
   'apps/web/tests/unit/ci/test-coverage-audit-workflow.test.ts',
