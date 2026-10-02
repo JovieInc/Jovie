@@ -37,6 +37,7 @@ The harness, not the model, owns:
 | Held and failed records carry `reason` + `next_action`; the status feed publishes `held_by_reason` | `pr_events.held_reason()`, `doctor.status_feed()` |
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
 | Disk admission on the tick and before installs: critical (at or below 5%) or unknown free space blocks work. Only a worker holding a slot may sweep under 15%, under one host-wide cleanup lock; cleanup preserves the shared pnpm store, unrelated checkouts and cancelled repair source | `disk_guard.py`, `dispatch()`, `worker()` |
+| Adaptive slots (default on, 30-minute cadence; kill switch `SYMPHONY_AUTOSCALE=0`) | `autoscale.decide()`, `dispatch()` |
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
 | Codex accounts: lease one per run; a burst 429 backs off 2 min and rotates, a spent plan (usage limit / quota) banks until its reset, and only a failed run's closing lines can bank an account | `codex_lane.py` |
 | Provider throughput: matched-work offers, accepts, starts, productive/PR/first-pass rates, remediation, issue→PR→merge time, landed output, idle qualified capacity and failure reasons; landed attribution comes from receipts, never a branch prefix | `provider_throughput()`, `doctor.status_feed()`, `hud.py` |
@@ -51,7 +52,7 @@ running worker. Production deploys are a separate track: only a red main stops s
 New-issue admission reports three separate counts: raw Todo candidates, candidates
 passing the issue predicate, and new issues after the owning lane's PR budget.
 Worker and doctor share the same budget decision: each dated lane branch counts
-once while non-green, with a cap of effective slots × 2. Manual branches and
+once while non-green, with a cap of configured base slots × 2. Manual branches and
 disabled-lane orphan maintenance do not inflate that lane's budget. A failed,
 malformed or truncation-ambiguous inventory stays unknown and cannot admit new
 issues. Maintenance claims still run first and do not depend on that budget read.
@@ -268,6 +269,28 @@ State and receipts live under `~/.local/state/jovie-lanes`. Every gated run reco
 `gateWaitS` (seconds queued for a gate seat) on its receipt; the doctor aggregates
 `gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
 second host is decided on measured queue time, not on timeouts alone.
+
+`SYMPHONY_AUTOSCALE` is on by default (`apply`). Inside the existing minute
+`dispatch()` tick the host raises one lane by one slot after 30 consecutive
+qualifying ticks — work waiting, the provider healthy, budgets and headroom
+holding — and lowers it on rate limits, low GitHub or Linear budget, disk or
+memory pressure, or idle time. The cadence is `SYMPHONY_AUTOSCALE_INTERVAL_S`
+(default 1800 seconds): that is both the per-lane cooldown and, divided by 60,
+the up and idle streaks. Tim set this on 2026-10-02 with no observe-only
+period. `observe` or `shadow` still records the decision and leaves
+`Host.slots()` on the configured base. The kill switch is `SYMPHONY_AUTOSCALE=0`
+(`off` or `false` as well), in the environment or in
+`~/.config/jovie-lanes/autoscale.env` (`KEY=VALUE`; the environment wins).
+Optional ceilings are `SYMPHONY_AUTOSCALE_MAX_<PROVIDER>` (default twice the
+configured base) and `SYMPHONY_AUTOSCALE_HOST_MAX` (default twice the base sum,
+and never low enough that a small CPU count pushes the host below today's base
+sum). New-issue budgets stay on those configured base slots (`slots × 2`
+active, `slots × 4` terminal), not the autoscaled count, so parked PRs cannot
+feed a scale-up. A missing, stale, or corrupt reading fails safe to the base
+count; an unknown GitHub or Linear budget never goes above base; a disabled
+lane stays at 0. `install.sh` does not pass the flag. Scale-down does not
+signal running workers; a slot above the new count finishes and is not taken
+again.
 
 ## Preserved repairs (JOV-7347)
 
