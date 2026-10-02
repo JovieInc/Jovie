@@ -38,6 +38,7 @@ jobs:
           node scripts/verify-workflow-references.mjs
           node scripts/lockfile-specifier-preflight.mjs
           node scripts/ci-release-incident-contract.mjs
+          node scripts/changelog-source-guard.mjs
           pnpm ci:harness:check
           pnpm typecheck
           pnpm biome:check

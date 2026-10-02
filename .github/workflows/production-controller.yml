@@ -1353,3 +1353,87 @@ jobs:
             -d "$payload"; then
             echo "::warning::Production is verified, but the bounded Slack notification failed."
           fi
+
+  publish-customer-changelog:
+    name: Publish verified customer changelog
+    needs: [authorize-production, production-verified]
+    if: ${{ needs.production-verified.outputs.verified == 'true' && needs.authorize-production.outputs.run_web == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ needs.authorize-production.outputs.marker_recovery == 'true' && format('production-generation-verified-recovery-{0}', needs.authorize-production.outputs.expected_sha) || format('production-generation-verified-{0}', needs.authorize-production.outputs.expected_sha) }}
+          path: ${{ runner.temp }}/changelog-marker
+      - name: Generate existing release-writer token
+        id: changelog-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+      - name: Prepare or finish the one customer-notes release PR
+        env:
+          GH_TOKEN: ${{ steps.changelog-token.outputs.token }}
+          JOVIE_AGENT_PROFILE: coder
+        run: |
+          set -euo pipefail
+          open_notes="$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --state open --limit 100 --json number,headRefName,headRefOid,isDraft --jq '[.[] | select(.headRefName | startswith("release/daily-changelog-"))]')"
+          test "$(jq length <<<"$open_notes")" -le 1 || { echo '::error::Multiple customer-note writers'; exit 1; }
+          if [ "$(jq length <<<"$open_notes")" = 1 ]; then
+            pr="$(jq -r '.[0].number' <<<"$open_notes")"
+            head="$(jq -r '.[0].headRefOid' <<<"$open_notes")"
+            checks="$(gh pr checks "$pr" --required --json name,bucket || true)"
+            if jq -e 'length >= 4 and all(.[]; .bucket == "pass")' <<<"$checks" >/dev/null; then
+              [ "$(gh pr view "$pr" --json headRefOid --jq .headRefOid)" = "$head" ] || { echo '::notice::Release PR head advanced; fresh checks own the next attempt'; exit 0; }
+              if [ "$(jq -r '.[0].isDraft' <<<"$open_notes")" = true ]; then gh pr ready "$pr"; fi
+              gh pr merge "$pr" --auto --squash --match-head-commit "$head"
+            fi
+            echo "Existing release PR owns publication: #$pr"
+            exit 0
+          fi
+          branch="release/daily-changelog-$(date -u +%F)"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            echo '::notice::Existing daily release branch requires reconciliation; no branch is overwritten'
+            exit 0
+          fi
+          git checkout -b "$branch"
+          node scripts/publish-daily-changelog.mjs \
+            --marker "$RUNNER_TEMP/changelog-marker/production-generation-verified.json" \
+            --output "$RUNNER_TEMP/customer-changelog" --write
+          [ "$(jq -r .status "$RUNNER_TEMP/customer-changelog/plan.json")" = publish ] || exit 0
+          git config user.name 'jovie-bot[bot]'
+          git config user.email 'jovie-bot[bot]@users.noreply.github.com'
+          gh auth setup-git
+          git add CHANGELOG.md
+          git commit -m "docs(changelog): verified customer updates $(date -u +%F)"
+          git push origin "HEAD:$branch"
+          cat > "$RUNNER_TEMP/customer-changelog/pr.md" <<'EOF'
+          ## Customer updates
+          Publish at most three grouped customer outcomes from exact Production Verified, deployment ancestry and public customer-path readback. Approved source copy and runtime hashes are bound in the hidden daily receipt. No PR titles become release notes.
+
+          CHANGELOG.md only; no executable behavior changed. The existing source CI, native merge queue and Production Controller remain authoritative. Subscriptions and email delivery are unchanged.
+
+          <!-- customer-changelog/v1 {"releaseWorthy":false} -->
+          EOF
+          gh pr create --draft --base main --head "$branch" \
+            --title "docs(changelog): customer updates $(date -u +%F)" \
+            --body-file "$RUNNER_TEMP/customer-changelog/pr.md"
+      - name: Retain publication, exclusion and no-change receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: customer-changelog-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/customer-changelog/plan.json
+          if-no-files-found: ignore
+          retention-days: 30
