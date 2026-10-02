@@ -15,6 +15,9 @@ struct NativeRequestAuthorization: Equatable, Sendable {
   fileprivate let generation: UUID?
   fileprivate let bearerRevision: UUID?
   var isManaged: Bool { generation != nil }
+  var ownership: NativeSessionOwnership? {
+    generation.map { NativeSessionOwnership(generation: $0) }
+  }
 
   init(unmanagedBearerToken: String) {
     bearerToken = unmanagedBearerToken

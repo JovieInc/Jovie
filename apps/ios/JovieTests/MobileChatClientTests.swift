@@ -786,6 +786,228 @@ struct MobileChatClientTests {
   }
 }
 
+extension MobileChatClientTests {
+  private func perform(_ operation: RefreshRequest, on client: MobileChatClient) async throws {
+    switch operation {
+    case .list: #expect(try await client.listConversations().isEmpty)
+    case .detail: #expect(try await client.fetchConversation(id: "conv_1", before: "older").conversation.id == "conv_1")
+    case .stream: #expect(try await client.sendTurn(makeTurnRequest()).count == 1)
+    case .eyesFree, .eyesFreeConflict:
+      #expect(try await client.submitEyesFreeCapture(EyesFreeCaptureAPIRequest(
+        destination: "summer", transcript: "Capture this", clientTurnId: "turn_1234", clientMessageId: "msg_1234"
+      )).readback == "Captured")
+    }
+  }
+
+  @Test(arguments: RefreshRequest.allCases,
+        ["current", "new-user", "same-login", "retry-success", "retry-rejected", "retry-revised", "same-bearer", "cancel"])
+  func ownedChatUsesOnlyTheDispatchedAuthority(operation: RefreshRequest, outcome: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      NativeSessionTokenStore.save(token: "t0", userID: "a", expiresAt: .distantFuture)
+      let owner = NativeSessionTokenStore.captureOwnership()
+      let first = try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: owner)
+      var requests = 0
+      var preserved = NativeSessionTokenStore.captureSessionContext()
+      MockChatURLProtocol.requestHandler = { request in
+        requests += 1
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer \(requests == 1 ? "t0" : "t1")")
+        if operation == .list || operation == .detail {
+          #expect(request.url?.query?.contains("workspace=ov") == true)
+        }
+        let response: (Int, String?) -> HTTPURLResponse = { status, token in
+          HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil,
+                          headerFields: token.map { ["set-auth-token": $0] })!
+        }
+        if outcome == "cancel" { throw URLError(.cancelled) }
+        if requests == 1 {
+          switch outcome {
+          case "new-user", "same-login":
+            NativeSessionTokenStore.save(token: outcome == "same-login" ? "t0" : "b",
+                                        userID: outcome == "same-login" ? "a" : "b", expiresAt: .distantFuture)
+          case "retry-success", "retry-rejected", "retry-revised", "same-bearer":
+            NativeSessionTokenStore.refresh(
+              from: response(200, outcome == "same-bearer" ? "t0" : "t1"), authorizedBy: first
+            )
+          default: break
+          }
+        } else if outcome == "retry-success" {
+          return (response(operation == .eyesFreeConflict ? 409 : 200, "t2"), operation.data)
+        } else if outcome == "retry-revised" {
+          let retry = try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: owner)
+          NativeSessionTokenStore.refresh(from: response(200, "t2"), authorizedBy: retry)
+        }
+        preserved = NativeSessionTokenStore.captureSessionContext()
+        return (response(401, nil), Data())
+      }
+      defer { MockChatURLProtocol.requestHandler = nil }
+      let client = MobileChatClient(
+        baseURL: URL(string: "https://jov.ie")!, session: makeSession(), tokenProvider: NativeSessionTokenProvider(),
+        identity: NativeChatIdentity(userID: "a", ownership: owner, workspace: .ovie)
+      )
+      if outcome == "retry-success" {
+        try await perform(operation, on: client)
+        #expect(NativeSessionTokenStore.load()?.token == "t2")
+        #expect(NativeSessionTokenStore.captureOwnership() == owner)
+      } else if outcome == "current" || outcome == "retry-rejected" {
+        do {
+          try await perform(operation, on: client)
+          Issue.record("A current rejected bearer must produce an expiry receipt")
+        } catch let NativeSessionRequestError.expired(receipt) {
+          #expect(receipt.userID == "a")
+          #expect(receipt.ownership == NativeSessionTokenStore.captureOwnership())
+          #expect(NativeSessionTokenStore.load() == nil)
+        }
+      } else if outcome == "cancel" {
+        await #expect(throws: CancellationError.self) { try await perform(operation, on: client) }
+        #expect(NativeSessionTokenStore.captureSessionContext() == preserved)
+      } else {
+        await #expect(throws: NativeSessionRequestError.superseded) { try await perform(operation, on: client) }
+        #expect(NativeSessionTokenStore.captureSessionContext() == preserved)
+      }
+      #expect(requests == (outcome.hasPrefix("retry-") ? 2 : 1))
+    }
+  }
+
+  @Test(arguments: RefreshRequest.allCases, [false, true])
+  func ownedChatCannotAcquireAReplacement(operation: RefreshRequest, sameLogin: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+      let identity = NativeChatIdentity(userID: "a", ownership: NativeSessionTokenStore.captureOwnership(), workspace: .jovie)
+      NativeSessionTokenStore.save(token: sameLogin ? "a" : "b", userID: sameLogin ? "a" : "b", expiresAt: .distantFuture)
+      let preserved = NativeSessionTokenStore.captureSessionContext()
+      let recorder = RequestRecorder()
+      MockChatURLProtocol.requestHandler = { request in recorder.record(request); throw URLError(.badServerResponse) }
+      defer { MockChatURLProtocol.requestHandler = nil }
+      let client = MobileChatClient(baseURL: URL(string: "https://jov.ie")!, session: makeSession(),
+                                    tokenProvider: NativeSessionTokenProvider(), identity: identity)
+      await #expect(throws: NativeSessionRequestError.superseded) { try await perform(operation, on: client) }
+      #expect(recorder.recordedRequest() == nil)
+      #expect(NativeSessionTokenStore.captureSessionContext() == preserved)
+    }
+  }
+
+  @Test(arguments: RefreshRequest.allCases, [false, true])
+  func ownedChatUnmanagedRetryCannotMutateNativeSession(operation: RefreshRequest, succeed: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      NativeSessionTokenStore.save(token: "t0", userID: "a", expiresAt: .distantFuture)
+      let preserved = NativeSessionTokenStore.captureSessionContext()
+      let provider = MockChatTokenProvider(tokens: ["t0", "t1"])
+      var requests = 0
+      MockChatURLProtocol.requestHandler = { request in
+        requests += 1
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer \(requests == 1 ? "t0" : "t1")")
+        let successStatus = operation == .eyesFreeConflict ? 409 : 200
+        return (HTTPURLResponse(url: request.url!, statusCode: requests == 2 && succeed ? successStatus : 401,
+                                httpVersion: nil, headerFields: ["set-auth-token": "unmanaged"])!, operation.data)
+      }
+      defer { MockChatURLProtocol.requestHandler = nil }
+      let client = MobileChatClient(baseURL: URL(string: "https://jov.ie")!, session: makeSession(), tokenProvider: provider,
+                                    identity: NativeChatIdentity(userID: "a", ownership: preserved.ownership, workspace: .jovie))
+      if succeed { try await perform(operation, on: client) }
+      else {
+        await #expect(throws: MobileChatClientError.requestFailed(statusCode: 401)) { try await perform(operation, on: client) }
+      }
+      #expect(requests == 2)
+      #expect(await provider.recordedForceRefreshValues() == [false, true])
+      #expect(NativeSessionTokenStore.captureSessionContext() == preserved)
+    }
+  }
+
+  @Test func ownedStreamCancellationAfterPublishingDoesNotBecomeInvalidResponse() async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+      let preserved = NativeSessionTokenStore.captureSessionContext()
+      MockChatURLProtocol.requestHandler = { request in
+        (makeResponse(for: request), RefreshRequest.stream.data + Data("\n".utf8))
+      }
+      defer { MockChatURLProtocol.requestHandler = nil }
+      let client = MobileChatClient(baseURL: URL(string: "https://jov.ie")!, session: makeSession(),
+        tokenProvider: NativeSessionTokenProvider(),
+        identity: NativeChatIdentity(userID: "a", ownership: preserved.ownership, workspace: .jovie))
+      let task = Task {
+        try await client.sendTurn(makeTurnRequest(), onEvent: { event in
+          #expect(event == .assistantDelta(clientTurnId: "client_turn_1", text: "Hello"))
+          withUnsafeCurrentTask { $0?.cancel() }
+        })
+      }
+      await #expect(throws: CancellationError.self) { try await task.value }
+      #expect(NativeSessionTokenStore.captureSessionContext() == preserved)
+    }
+  }
+
+  @Test(arguments: [400, 403, 404, 409])
+  func ownedEyesFreeStillDecodesApplicationResponsesWhileStreamRejects(status: Int) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+      let preserved = NativeSessionTokenStore.captureSessionContext()
+      MockChatURLProtocol.requestHandler = { request in
+        (makeResponse(for: request, statusCode: status), RefreshRequest.eyesFree.data)
+      }
+      defer { MockChatURLProtocol.requestHandler = nil }
+      let client = MobileChatClient(baseURL: URL(string: "https://jov.ie")!, session: makeSession(),
+        tokenProvider: NativeSessionTokenProvider(),
+        identity: NativeChatIdentity(userID: "a", ownership: preserved.ownership, workspace: .jovie))
+      try await perform(.eyesFree, on: client)
+      await #expect(throws: MobileChatClientError.requestFailed(statusCode: status)) {
+        try await client.sendTurn(makeTurnRequest())
+      }
+      #expect(NativeSessionTokenStore.captureOwnership() == preserved.ownership)
+    }
+  }
+
+  @Test(arguments: ["retry", "cancel", "replacement", "unmanaged-replacement"])
+  func streamAuthorizationCallbackPrecedesEveryDispatchAndEvent(outcome: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      NativeSessionTokenStore.save(token: "t0", userID: "a", expiresAt: .distantFuture)
+      let owner = NativeSessionTokenStore.captureOwnership()
+      let first = try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: owner)
+      let calls = AuthorizationRecorder()
+      MockChatURLProtocol.requestHandler = { request in
+        let count = calls.dispatched()
+        if count == 1 {
+          NativeSessionTokenStore.refresh(from: HTTPURLResponse(url: request.url!, statusCode: 200,
+                                          httpVersion: nil, headerFields: ["set-auth-token": "t1"])!, authorizedBy: first)
+        }
+        return (makeResponse(for: request, statusCode: count == 1 ? 401 : 200), RefreshRequest.stream.data)
+      }
+      defer { MockChatURLProtocol.requestHandler = nil }
+      let provider: any TokenProviding = outcome == "unmanaged-replacement"
+        ? MockChatTokenProvider(tokens: ["t0"]) : NativeSessionTokenProvider()
+      let client: any MobileChatClientProtocol = MobileChatClient(
+        baseURL: URL(string: "https://jov.ie")!, session: makeSession(), tokenProvider: provider,
+        identity: NativeChatIdentity(userID: "a", ownership: owner, workspace: .jovie)
+      )
+      let send = {
+        try await client.sendTurn(makeTurnRequest(), onAuthorization: { captured in
+          #expect(captured == (outcome == "unmanaged-replacement" ? nil : owner))
+          calls.authorized()
+          if outcome == "cancel" { throw CancellationError() }
+          if outcome.hasSuffix("replacement") { NativeSessionTokenStore.save(token: "b", userID: "b", expiresAt: .distantFuture) }
+        }, onEvent: { _ in #expect(calls.counts() == [2, 2]) })
+      }
+      if outcome == "retry" { #expect(try await send().count == 1) }
+      else if outcome == "cancel" { await #expect(throws: CancellationError.self) { try await send() } }
+      else { await #expect(throws: NativeSessionRequestError.superseded) { try await send() } }
+      #expect(calls.counts() == (outcome == "retry" ? [2, 2] : [1, 0]))
+      if outcome.hasSuffix("replacement") { #expect(NativeSessionTokenStore.load()?.token == "b") }
+    }
+  }
+}
+
+private final class AuthorizationRecorder: @unchecked Sendable {
+  private let lock = NSLock()
+  private var authorizations = 0
+  private var dispatches = 0
+  func authorized() { lock.lock(); defer { lock.unlock() }; authorizations += 1 }
+  func dispatched() -> Int {
+    lock.lock(); defer { lock.unlock() }
+    dispatches += 1
+    #expect(authorizations == dispatches)
+    return dispatches
+  }
+  func counts() -> [Int] { lock.lock(); defer { lock.unlock() }; return [authorizations, dispatches] }
+}
+
 @Suite(.serialized)
 struct NativeSessionRefreshTests {
   private func response(token: String?) -> HTTPURLResponse {

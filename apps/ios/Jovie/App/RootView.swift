@@ -2,6 +2,11 @@ import Observation
 import SwiftUI
 
 
+private struct ChatRepositoryContext: Equatable {
+  let identity: NativeChatIdentity?
+  let showsWorkspaceSwitch: Bool
+}
+
 private struct AppContentView: View {
   @Bindable var appState: AppState
   let isAuthAvailable: Bool
@@ -310,7 +315,7 @@ private struct AppContentView: View {
       }
       await reloadHomeData(for: appState.activeUserID)
     }
-    .task(id: "\(appState.activeUserID ?? "")-\(workspaceMode.rawValue)-\(showsWorkspaceSwitch)") {
+    .task(id: ChatRepositoryContext(identity: chatIdentity, showsWorkspaceSwitch: showsWorkspaceSwitch)) {
       // Ovie never persists across launches: the artist app cold-starts in
       // Jovie mode and admins opt in per session via Settings (JOV-5358).
       let resolved = MobileWorkspaceStore.load(isAdmin: showsWorkspaceSwitch)
@@ -331,10 +336,10 @@ private struct AppContentView: View {
         return
       }
 
-      if appState.launchMode.needsChatRepository,
-         chatRepository == nil || chatRepository?.workspace != workspaceMode
-      {
-        let repository = makeChatRepository(userID: activeUserID)
+      let identity = NativeChatIdentity(userID: activeUserID, ownership: appState.activeSessionOwnership,
+                                        workspace: workspaceMode)
+      if appState.launchMode.needsChatRepository, chatRepository?.identity != identity {
+        let repository = ChatRepository.resolve(chatRepository, for: identity, create: makeChatRepository)
         chatRepository = repository
 
         if let fixtureTimeline = appState.launchMode.chatEntityFixture {
@@ -364,7 +369,7 @@ private struct AppContentView: View {
 #endif
     }
     .task(id: chatRepository?.sessionExpired) {
-      guard chatRepository?.sessionExpired == true else { return }
+      guard chatRepository?.identity.ownership == nil, chatRepository?.sessionExpired == true else { return }
       await appState.handleExpiredSession()
     }
   }
@@ -431,17 +436,26 @@ private struct AppContentView: View {
     homeData.setContext(userID: appState.activeUserID, workspace: mode)
   }
 
-  private func makeChatRepository(userID: String) -> ChatRepository {
+  private var chatIdentity: NativeChatIdentity? {
+    appState.activeUserID.map {
+      NativeChatIdentity(userID: $0, ownership: appState.activeSessionOwnership, workspace: workspaceMode)
+    }
+  }
+
+  private func makeChatRepository(identity: NativeChatIdentity) -> ChatRepository {
     ChatRepository(
       client: MobileChatClient(
         baseURL: appState.configuration.apiBaseURL,
         tokenProvider: NativeSessionTokenProvider(),
-        workspace: workspaceMode
+        workspace: identity.workspace,
+        identity: identity
       ),
       cache: ChatCache(),
-      userID: userID,
+      userID: identity.userID,
       webBaseURL: appState.configuration.webBaseURL,
-      workspace: workspaceMode
+      workspace: identity.workspace,
+      identity: identity,
+      onSessionExpired: { [appState] receipt in await appState.handleExpiredSession(receipt) }
     )
   }
 

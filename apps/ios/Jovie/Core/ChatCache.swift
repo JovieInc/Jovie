@@ -1,6 +1,13 @@
 import Foundation
 
-actor ChatCache {
+protocol ChatCaching: Sendable {
+  func load(for userID: String, workspace: MobileWorkspaceMode) async -> CachedChatSnapshot?
+  func store(_ snapshot: CachedChatSnapshot, for userID: String, workspace: MobileWorkspaceMode) async
+  func store(_ snapshot: CachedChatSnapshot, for userID: String, workspace: MobileWorkspaceMode,
+             ifOwnedBy ownership: NativeSessionOwnership) async -> Bool
+}
+
+actor ChatCache: ChatCaching {
   private var memory: [String: CachedChatSnapshot] = [:]
   private let defaults: UserDefaults
   private let encoder = JSONEncoder()
@@ -32,6 +39,13 @@ actor ChatCache {
     memory[key] = snapshot
     if let data = try? encoder.encode(snapshot) {
       defaults.set(data, forKey: key)
+    }
+  }
+
+  func store(_ snapshot: CachedChatSnapshot, for userID: String, workspace: MobileWorkspaceMode,
+             ifOwnedBy ownership: NativeSessionOwnership) -> Bool {
+    NativeSessionTokenStore.performIfCurrent(ownership) {
+      store(snapshot, for: userID, workspace: workspace)
     }
   }
 

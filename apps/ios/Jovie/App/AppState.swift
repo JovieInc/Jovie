@@ -73,6 +73,7 @@ final class AppState {
   var isOffline = false
   var didInitializeAuth = false
   var activeUserID: String?
+  private(set) var activeSessionOwnership: NativeSessionOwnership?
 
   private let repository: AppStateRepository
   private let sessionRevoker: NativeSessionRevoking
@@ -216,6 +217,7 @@ final class AppState {
 
     let previousUserID = activeUserID
     activeUserID = userID
+    activeSessionOwnership = newAttempt?.context.ownership
 
     guard let userID, let attempt = newAttempt else {
       if previousUserID != nil {
@@ -414,6 +416,7 @@ final class AppState {
     let userID = activeUserID
     Observability.clearUser()
     activeUserID = nil
+    activeSessionOwnership = nil
     profileLoadAttempt = nil
     route = .signedOut
     dashboardState = .idle
