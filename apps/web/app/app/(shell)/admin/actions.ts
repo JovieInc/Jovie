@@ -668,3 +668,81 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
 
   revalidatePath(APP_ROUTES.ADMIN);
 }
+
+export type CustomerIngestionRecoveryState =
+  | 'requested'
+  | 'already-running'
+  | 'missing-source'
+  | 'not-found';
+
+export interface CustomerIngestionRecoveryReceipt {
+  readonly state: CustomerIngestionRecoveryState;
+  readonly queuedCount: number;
+  readonly checkedAt: string;
+}
+
+/**
+ * Customer recovery (JOV-7482): re-run failed artist ingestion for one
+ * creator profile through the same enrichment jobs as the Creators bulk
+ * action. Read-only refusal when the run is already in flight or the profile
+ * has no Spotify source — a duplicate retry could duplicate downstream
+ * enrichment work, so only a 'failed' profile with a source is eligible.
+ */
+export async function rerunCustomerIngestionAction(
+  formData: FormData
+): Promise<CustomerIngestionRecoveryReceipt> {
+  await requireAdmin();
+
+  const profileId = formData.get('profileId');
+  if (typeof profileId !== 'string' || profileId.length === 0) {
+    throw new TypeError('profileId is required');
+  }
+
+  const [profile] = await db
+    .select({
+      id: creatorProfiles.id,
+      spotifyId: creatorProfiles.spotifyId,
+      spotifyUrl: creatorProfiles.spotifyUrl,
+      ingestionStatus: creatorProfiles.ingestionStatus,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, profileId))
+    .limit(1);
+
+  if (!profile) {
+    return {
+      state: 'not-found',
+      queuedCount: 0,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+  if (
+    profile.ingestionStatus === 'pending' ||
+    profile.ingestionStatus === 'processing'
+  ) {
+    return {
+      state: 'already-running',
+      queuedCount: 0,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+  if (!profile.spotifyId?.trim() && !profile.spotifyUrl?.trim()) {
+    return {
+      state: 'missing-source',
+      queuedCount: 0,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
+  const next = new FormData();
+  next.set('profileIds', JSON.stringify([profile.id]));
+  const { queuedCount } = await bulkRerunCreatorIngestionAction(next);
+
+  revalidatePath(APP_ROUTES.ADMIN_PEOPLE);
+
+  return {
+    state: 'requested',
+    queuedCount,
+    checkedAt: new Date().toISOString(),
+  };
+}

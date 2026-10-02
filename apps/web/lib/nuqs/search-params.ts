@@ -368,6 +368,7 @@ export const adminPeopleSearchParams = createSearchParamsCache({
   view: adminPeopleViewParser,
   sort: adminPeopleSortParser,
   q: searchQueryParser,
+  key: searchQueryParser,
   stage: searchQueryParser,
   type: adminAssetTypeParser,
   issues: adminAssetIssuesParser,

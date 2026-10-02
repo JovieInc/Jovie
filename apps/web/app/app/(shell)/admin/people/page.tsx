@@ -6,6 +6,7 @@ import { AdminCreatorsPageWrapper } from '@/components/features/admin/admin-crea
 import { AdminReleasesPageWrapper } from '@/components/features/admin/admin-releases-table';
 import { AdminUsersTableUnified } from '@/components/features/admin/admin-users-table/AdminUsersTableUnified';
 import { AdminContactsTable } from '@/components/features/admin/contacts-table/AdminContactsTable';
+import { CustomerRecoveryPanel } from '@/components/features/admin/customer-recovery/CustomerRecoveryPanel';
 import { AdminFeedbackTable } from '@/components/features/admin/feedback-table/AdminFeedbackTable';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { WaitlistMetrics } from '@/components/features/admin/WaitlistMetrics';
@@ -25,6 +26,7 @@ import {
 } from '@/lib/admin/assets';
 import { getCanonicalContacts } from '@/lib/admin/contacts';
 import { getAdminCreatorProfiles } from '@/lib/admin/creator-profiles';
+import { getCustomerRecovery } from '@/lib/admin/customer-recovery';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { getAdminReleases } from '@/lib/admin/releases';
 import { getAdminUsers } from '@/lib/admin/users';
@@ -265,6 +267,10 @@ async function renderPeopleView(
         />
       );
     }
+    case 'recovery': {
+      const result = await getCustomerRecovery(search, params.key);
+      return <CustomerRecoveryPanel result={result} />;
+    }
     case 'feedback':
     default: {
       const { items, error } = await getAdminFeedbackItemsResult(200);
@@ -305,7 +311,7 @@ export default async function AdminPeoplePage({
         param: 'view',
         value: view,
         options: peopleTabs,
-        clearOnPrimaryChange: ['type', 'issues', 'verified'],
+        clearOnPrimaryChange: ['type', 'issues', 'verified', 'key'],
       }}
       testId='admin-people-page'
       viewTestId={`admin-people-view-${view}`}
