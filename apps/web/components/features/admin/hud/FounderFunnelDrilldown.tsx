@@ -63,9 +63,15 @@ export function FounderFunnelDrilldown({
           <table className='w-full text-left text-xs'>
             <thead>
               <tr className='border-b border-subtle text-tertiary-token'>
-                <th className='py-1.5 pr-4 font-medium'>Name</th>
-                <th className='py-1.5 pr-4 font-medium'>Email</th>
-                <th className='py-1.5 font-medium'>Signed up</th>
+                <th className='whitespace-nowrap py-1.5 pr-4 font-medium'>
+                  Name
+                </th>
+                <th className='whitespace-nowrap py-1.5 pr-4 font-medium'>
+                  Email
+                </th>
+                <th className='whitespace-nowrap py-1.5 font-medium'>
+                  Signed up
+                </th>
               </tr>
             </thead>
             <tbody>
