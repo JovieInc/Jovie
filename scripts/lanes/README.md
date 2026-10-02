@@ -264,27 +264,22 @@ State and receipts live under `~/.local/state/jovie-lanes`. Every gated run reco
 `gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
 second host is decided on measured queue time, not on timeouts alone.
 
-`SYMPHONY_AUTOSCALE` is on by default (`apply`). Inside the existing minute
-`dispatch()` tick the host raises one lane by one slot after 30 consecutive
-qualifying ticks — work waiting, the provider healthy, budgets and headroom
-holding — and lowers it on rate limits, low GitHub or Linear budget, disk or
-memory pressure, or idle time. The cadence is `SYMPHONY_AUTOSCALE_INTERVAL_S`
-(default 1800 seconds): that is both the per-lane cooldown and, divided by 60,
-the up and idle streaks. Tim set this on 2026-10-02 with no observe-only
-period. `observe` or `shadow` still records the decision and leaves
-`Host.slots()` on the configured base. The kill switch is `SYMPHONY_AUTOSCALE=0`
-(`off` or `false` as well), in the environment or in
-`~/.config/jovie-lanes/autoscale.env` (`KEY=VALUE`; the environment wins).
-Optional ceilings are `SYMPHONY_AUTOSCALE_MAX_<PROVIDER>` (default twice the
-configured base) and `SYMPHONY_AUTOSCALE_HOST_MAX` (default twice the base sum,
-and never low enough that a small CPU count pushes the host below today's base
-sum). New-issue budgets stay on those configured base slots (`slots × 2`
-active, `slots × 4` terminal), not the autoscaled count, so parked PRs cannot
-feed a scale-up. A missing, stale, or corrupt reading fails safe to the base
-count; an unknown GitHub or Linear budget never goes above base; a disabled
-lane stays at 0. `install.sh` does not pass the flag. Scale-down does not
-signal running workers; a slot above the new count finishes and is not taken
-again.
+`SYMPHONY_AUTOSCALE` applies by default on the minute `dispatch()` tick. A lane
+gains one slot after 30 qualifying ticks (work waiting, healthy, budgets and
+headroom all holding) and loses one after 30 idle ticks, floor `ceil(base/2)`.
+`SYMPHONY_AUTOSCALE_INTERVAL_S` (default 1800) is the per-lane cooldown and,
+divided by 60, both streaks. Rate limits, a low GitHub or Linear budget, and
+disk or memory emergencies cut immediately and ignore that cooldown. Tim set
+this on 2026-10-02 with no observe-only period. `observe` or `shadow` records
+the decision and leaves `Host.slots()` on the configured base. The kill switch
+is `SYMPHONY_AUTOSCALE=0` (`off` or `false`), in the environment or
+`~/.config/jovie-lanes/autoscale.env` (the environment wins). Ceilings are
+`SYMPHONY_AUTOSCALE_MAX_<PROVIDER>` (default twice the base) and
+`SYMPHONY_AUTOSCALE_HOST_MAX` (default twice the base sum, never below today's
+base sum). New-issue budgets stay on base slots (`×2` active, `×4` terminal).
+Missing, stale, or corrupt input fails safe to base; an unknown API budget
+never exceeds base; a disabled lane stays at 0. `install.sh` does not pass
+the flag. Scale-down does not signal workers.
 
 ## Preserved repairs (JOV-7347)
 
