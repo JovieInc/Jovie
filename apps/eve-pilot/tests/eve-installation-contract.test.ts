@@ -11,6 +11,7 @@ describe('Eve installation contract', () => {
     ) as {
       packageManager?: string;
       dependencies?: { ai?: string; eve?: string };
+      devDependencies?: { '@vitest/coverage-v8'?: string };
     };
     const lockfile = readFileSync(resolve(pilotRoot, 'pnpm-lock.yaml'), 'utf8');
 
@@ -22,6 +23,9 @@ describe('Eve installation contract', () => {
     expect(packageJson.dependencies?.eve).toBe(EVE_PIN);
     expect(lockfile).toContain(
       `      ai:\n        specifier: ${packageJson.dependencies?.ai}\n`
+    );
+    expect(lockfile).toContain(
+      `      '@vitest/coverage-v8':\n        specifier: ${packageJson.devDependencies?.['@vitest/coverage-v8']}\n`
     );
     expect(lockfile).toContain(`  ai@${packageJson.dependencies?.ai}:`);
     expect(
