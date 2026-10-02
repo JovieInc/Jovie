@@ -6,6 +6,7 @@ import {
   chatEntityMentionToEntityCard,
   chatReleaseContextToEntityCard,
   chatTourDateContextToEntityCard,
+  contactToEntityCard,
   merchToEntityCard,
   releaseToEntityCard,
   showToEntityCard,
@@ -40,7 +41,7 @@ describe('merchToEntityCard', () => {
     expect(model.price?.display).toBe('$45.00');
     expect(model.price?.profit).toBe('$11.87');
     expect(model.status).toEqual({ label: 'Live', tone: 'live' });
-    expect(model.cta).toEqual({ label: 'Buy', href: '/tim/merch/m1' });
+    expect(model.cta).toEqual({ label: 'Shop', href: '/tim/merch/m1' });
   });
 
   it('falls back to the first mockup when no primary image', () => {
@@ -57,6 +58,34 @@ describe('merchToEntityCard', () => {
       { handle: 'tim' }
     );
     expect(model.status).toBeNull();
+  });
+});
+
+describe('contactToEntityCard', () => {
+  it('maps public business identity without exposing contact channels', () => {
+    const model = contactToEntityCard(
+      {
+        id: 'contact_1',
+        roleLabel: 'Booking',
+        contactName: 'Morgan Lee',
+        companyLabel: 'Northstar Talent',
+      },
+      { handle: 'luna vale', ctaLabel: 'Continue Inquiry' }
+    );
+
+    expect(model).toMatchObject({
+      id: 'contact_1',
+      kind: 'person',
+      href: '/luna%20vale?mode=contact',
+      title: 'Morgan Lee',
+      meta: 'Booking · Northstar Talent',
+      cta: {
+        label: 'Continue Inquiry',
+        href: '/luna%20vale?mode=contact',
+      },
+    });
+    expect(JSON.stringify(model)).not.toContain('email');
+    expect(JSON.stringify(model)).not.toContain('phone');
   });
 });
 
@@ -368,15 +397,25 @@ describe('showToEntityCard', () => {
     expect(model.datePill).toBeNull();
   });
 
-  it('formats the date pill in UTC so it always matches the events list', () => {
-    // 02:30 UTC is still the previous day in US timezones — the card and the
-    // TourModePanel list (also UTC) must agree on "Jul 29".
+  it('uses deterministic UTC when no venue timezone is available', () => {
+    // No venue timezone was supplied; retain a viewer-independent fallback.
     const model = showToEntityCard({
       id: 's3',
       venueName: 'The Echo',
       startDate: '2026-07-29T02:30:00.000Z',
     });
     expect(model.datePill).toEqual({ month: 'Jul', day: '29' });
+  });
+
+  it('uses the venue calendar day for a show after UTC midnight', () => {
+    expect(
+      showToEntityCard({
+        id: 'radius',
+        venueName: 'Radius',
+        startDate: '2026-09-24T03:00:00Z',
+        timezone: 'America/Chicago',
+      }).datePill
+    ).toEqual({ month: 'Sep', day: '23' });
   });
 
   it('never links a cancelled or sold-out show to tickets', () => {

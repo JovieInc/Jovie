@@ -11,6 +11,7 @@ import {
 import {
   CERTIFICATION_PERSISTENCE_TTL_SECONDS,
   type CertificationRecordBackend,
+  certificationRecordJson,
   mutateCertificationRecord,
 } from '@/lib/agent-os/certification-cas';
 
@@ -212,8 +213,9 @@ function projectCandidate(
   };
 }
 
-function parseRecord(raw: unknown): AcquisitionCertificationRecord {
-  if (typeof raw !== 'string')
+function parseRecord(stored: unknown): AcquisitionCertificationRecord {
+  const raw = certificationRecordJson(stored);
+  if (raw === null)
     throw new Error('Invalid acquisition certification record.');
   const value: AcquisitionCertificationRecord = JSON.parse(raw);
   if (
@@ -330,10 +332,7 @@ export class AcquisitionCertificationStore {
         if (!actor?.trim())
           throw new Error('Acquisition decision authority denied.');
         const effect = this.ports.effect;
-        if (
-          !effect ||
-          effect.idempotency !== 'durable-action-key-and-payload-digest'
-        )
+        if (effect?.idempotency !== 'durable-action-key-and-payload-digest')
           throw new Error('No idempotent acquisition effect.');
         const payloadDigest = digest([
           request.subjectId,
@@ -407,7 +406,7 @@ export class AcquisitionCertificationStore {
           const stored = record.receipts.find(
             item => item.decision.id === request.actionId
           );
-          if (!stored || stored.payloadDigest !== payloadDigest)
+          if (stored?.payloadDigest !== payloadDigest)
             throw new Error('Decision receipt changed during dispatch.');
           if (stored.dispatch.status === 'complete')
             return { ledger: record, result: stored };

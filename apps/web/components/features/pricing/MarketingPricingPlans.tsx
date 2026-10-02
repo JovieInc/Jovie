@@ -1,5 +1,4 @@
 import { Button } from '@jovie/ui';
-import { Check } from 'lucide-react';
 import Link from 'next/link';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import {
@@ -9,6 +8,7 @@ import {
   isMarketingPlanActive,
   type MarketingPricingPlan,
 } from '@/data/marketingPricingPlans';
+import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
 import { cn } from '@/lib/utils';
 
 type MarketingPricingMode = 'compact' | 'expanded';
@@ -82,7 +82,6 @@ function MarketingPricingPlanCard({
         <ul className='marketing-pricing-plan-card__features'>
           {plan.features.map(feature => (
             <li key={feature}>
-              <Check aria-hidden='true' size={15} strokeWidth={1.8} />
               <span>{feature}</span>
             </li>
           ))}
@@ -105,6 +104,7 @@ export function MarketingPricingPlans({
 
   return (
     <div
+      data-offer-contract={ARTIST_VISIBILITY_OFFER_CONTRACT_ID}
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.pricing}
       data-marketing-section='pricing'
       data-marketing-variant={variant}

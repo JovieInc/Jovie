@@ -35,5 +35,9 @@ describe('GET /api/hud/kiosk-session', () => {
 
     expect(response.status).toBe(200);
     expect(body.token).toBe('tv-token');
+    expect(requireAdminHudApiAccessMock).toHaveBeenCalledWith({
+      session: 'fresh',
+      privileged: true,
+    });
   });
 });

@@ -65,10 +65,12 @@ These routes document source behavior, not commissioning proof. Summer remains
 unavailable until the exact deployment and conversation receipts in
 [`docs/operations/SUMMER_RUNTIME_RETIREMENT.md`](../../docs/operations/SUMMER_RUNTIME_RETIREMENT.md)
 pass.
+Hermes is retired and is not a rollback. Missing Eve proof leaves Summer
+unavailable.
 
 ## Local verification
 
-Node 24 or later. Isolated from the monorepo Node 22 CI runner.
+Node 24 or later. The monorepo CI runner is also Node 24.
 
     pnpm --dir apps/eve-pilot install --frozen-lockfile --ignore-workspace
     pnpm --dir apps/eve-pilot --ignore-workspace run typecheck

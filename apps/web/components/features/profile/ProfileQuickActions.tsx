@@ -21,7 +21,7 @@ interface ProfileQuickActionsProps {
 
 const QUICK_ACTIONS: QuickActionItem[] = [
   { id: 'profile', label: 'Profile', icon: House },
-  { id: 'tour', label: 'Tour', icon: CalendarDays },
+  { id: 'tour', label: 'Events', icon: CalendarDays },
   { id: 'contact', label: 'Book', icon: Mail },
   { id: 'pay', label: 'Pay', icon: DollarSign },
   { id: 'about', label: 'About', icon: UserRound },
@@ -37,7 +37,7 @@ export function ProfileQuickActions({
     <div className='px-3 pt-3'>
       <nav
         className='flex items-center justify-center gap-2'
-        aria-label='Profile actions'
+        aria-label='Profile Actions'
       >
         {QUICK_ACTIONS.map(item => {
           const Icon = item.icon;
@@ -51,12 +51,7 @@ export function ProfileQuickActions({
               ariaLabel={item.label}
               size='md'
               variant={isActive ? 'surface' : 'outline'}
-              className={cn(
-                isActive
-                  ? 'text-primary-token'
-                  : 'text-secondary-token hover:text-primary-token',
-                disabled && 'cursor-not-allowed opacity-45 hover:bg-transparent'
-              )}
+              className={cn(disabled && 'cursor-not-allowed')}
               aria-current={isActive ? 'page' : undefined}
               aria-disabled={disabled || undefined}
               onClick={() => {

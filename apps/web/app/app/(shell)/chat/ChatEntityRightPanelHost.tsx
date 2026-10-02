@@ -3,11 +3,12 @@
 import { Button } from '@jovie/ui';
 import { QueryClientContext } from '@tanstack/react-query';
 import {
+  AudioLines,
   Calendar,
   CheckSquare,
   Copy,
-  Disc3,
   ExternalLink,
+  Layers,
   Link as LinkIcon,
   Music2,
   UserRound,
@@ -31,7 +32,7 @@ import { ReleaseTaskChecklist } from '@/components/features/dashboard/release-ta
 import { CompactReleasePlanUpgradeCard } from '@/components/features/dashboard/tasks/TasksUpgradeInterstitial';
 import {
   DrawerSection,
-  EntityHeaderCard,
+  EntityHeader,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -141,7 +142,7 @@ function ChatRailContextIcon({
   kind,
 }: Readonly<{ kind: ChatRailContextKind }>) {
   if (kind === 'profile') return <UserRound className='h-3.5 w-3.5' />;
-  if (kind === 'release') return <Disc3 className='h-3.5 w-3.5' />;
+  if (kind === 'release') return <Layers className='h-3.5 w-3.5' />;
   if (kind === 'event' || kind === 'tour-date') {
     return <Calendar className='h-3.5 w-3.5' />;
   }
@@ -618,8 +619,8 @@ function ChatReleaseEntityPanel({
           if (event.key === 'Escape') onClose();
         }}
         entityHeader={
-          <EntityHeaderCard
-            image={
+          <EntityHeader
+            thumbnail={
               <div
                 className='relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-subtle bg-surface-0 text-tertiary-token'
                 style={releaseArtStyle}
@@ -633,7 +634,7 @@ function ChatReleaseEntityPanel({
                     sizes='40px'
                   />
                 ) : (
-                  <Disc3 className='h-4 w-4' />
+                  <AudioLines className='h-4 w-4' />
                 )}
               </div>
             }
@@ -896,8 +897,8 @@ function ChatContactEntityPanelLoader({
         if (event.key === 'Escape') onClose();
       }}
       entityHeader={
-        <EntityHeaderCard
-          image={
+        <EntityHeader
+          thumbnail={
             <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0 text-tertiary-token'>
               <UserRound className='h-4 w-4' />
             </div>
@@ -1017,8 +1018,8 @@ function ChatTourDateEntityPanelLoader({
         if (keyboardEvent.key === 'Escape') onClose();
       }}
       entityHeader={
-        <EntityHeaderCard
-          image={
+        <EntityHeader
+          thumbnail={
             <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0 text-tertiary-token'>
               <Calendar className='h-4 w-4' />
             </div>

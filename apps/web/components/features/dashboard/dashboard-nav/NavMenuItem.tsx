@@ -17,7 +17,7 @@ import {
 } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
-import { SidebarMenuItem } from '@/components/organisms/Sidebar';
+import { SidebarMenuItem } from '@/components/organisms/sidebar';
 import {
   getSidebarNavIconClassName,
   getSidebarNavRowClassName,
@@ -36,6 +36,8 @@ interface NavMenuItemProps {
   readonly calm?: boolean;
   readonly item: NavItem;
   readonly isActive: boolean;
+  /** Paint-only acknowledgment while the destination route is resolving. */
+  readonly pending?: boolean;
   readonly shortcut?: KeyboardShortcut;
   readonly prefetch?: boolean;
   readonly actions?: ReactNode;
@@ -57,6 +59,7 @@ interface NavMenuItemProps {
 interface NavMenuInteractiveElementProps {
   readonly item: NavItem;
   readonly isActive: boolean;
+  readonly pending: boolean;
   readonly prefetch?: boolean;
   readonly preventNavigation: boolean;
   readonly renderAsButton: boolean;
@@ -71,6 +74,7 @@ interface NavMenuInteractiveElementProps {
 function NavMenuInteractiveElement({
   item,
   isActive,
+  pending,
   prefetch,
   preventNavigation,
   renderAsButton,
@@ -90,6 +94,9 @@ function NavMenuInteractiveElement({
         onMouseEnter={onPrefetch}
         onFocus={onPrefetch}
         aria-pressed={isActive}
+        aria-busy={pending || undefined}
+        data-navigation-item-id={item.id}
+        data-navigation-pending={pending || undefined}
         className={className}
       >
         {children}
@@ -106,7 +113,10 @@ function NavMenuInteractiveElement({
       onMouseEnter={onPrefetch}
       onFocus={onPrefetch}
       aria-current={isActive ? 'page' : undefined}
+      aria-busy={pending || undefined}
       aria-disabled={preventNavigation || undefined}
+      data-navigation-item-id={item.id}
+      data-navigation-pending={pending || undefined}
       className={className}
     >
       {children}
@@ -118,6 +128,7 @@ export function NavMenuItem({
   calm,
   item,
   isActive,
+  pending = false,
   shortcut,
   prefetch,
   actions,
@@ -277,7 +288,7 @@ export function NavMenuItem({
     : undefined;
   const shellNavClassName = getSidebarNavRowClassName({
     calm,
-    active: isActive,
+    active: isActive || pending,
     tone: item.tone,
     className:
       'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0',
@@ -289,7 +300,7 @@ export function NavMenuItem({
           name={item.iconName}
           className={getSidebarNavIconClassName({
             calm,
-            active: isActive,
+            active: isActive || pending,
             tone: item.tone,
           })}
           strokeWidth={2.25}
@@ -299,7 +310,7 @@ export function NavMenuItem({
         <item.icon
           className={getSidebarNavIconClassName({
             calm,
-            active: isActive,
+            active: isActive || pending,
             tone: item.tone,
           })}
           strokeWidth={2.25}
@@ -346,6 +357,7 @@ export function NavMenuItem({
             <NavMenuInteractiveElement
               item={item}
               isActive={isActive}
+              pending={pending}
               prefetch={prefetch}
               preventNavigation={preventNavigation}
               renderAsButton={renderAsButton}

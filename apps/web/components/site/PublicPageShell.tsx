@@ -1,5 +1,6 @@
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { SkipToContent } from '@/components/atoms/SkipToContent';
+import type { MarketingHeaderBrand } from '@/data/marketing/headerBrand';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 import { MarketingFooter } from './MarketingFooter';
@@ -10,7 +11,10 @@ import {
   type MarketingHeaderVariant,
 } from './MarketingHeader';
 import { MarketingPageContractMarkers } from './MarketingPageContractMarkers';
-import { PUBLIC_SHELL_MAIN_OFFSET_CLASS } from './public-shell.constants';
+import {
+  PUBLIC_SHELL_MAIN_DOCKED_CLASS,
+  PUBLIC_SHELL_MAIN_OFFSET_CLASS,
+} from './public-shell.constants';
 
 export interface PublicPageShellProps {
   readonly children: React.ReactNode;
@@ -18,13 +22,16 @@ export interface PublicPageShellProps {
   readonly footerClassName?: string;
   readonly footerVariant?: 'auto' | 'expanded' | 'minimal';
   readonly headerVariant?: MarketingHeaderVariant;
+  /** Overrides the per-page header brand config (icon-only vs lockup). */
+  readonly headerBrand?: MarketingHeaderBrand;
   readonly headerCta?: MarketingHeaderCta;
   readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   readonly logoVariant?: LogoVariant;
   readonly mainClassName?: string;
   /**
    * Apply the fixed-header top offset to <main>. The homepage hero owns its
-   * own spacing, so the (home) layout opts out.
+   * own spacing, so the (home) layout opts out. With the offset on, a
+   * leading `.marketing-hero-dock` hero bleeds under the docked header.
    */
   readonly mainOffset?: boolean;
   readonly navLinks?: readonly MarketingHeaderNavLink[];
@@ -37,6 +44,7 @@ export function PublicPageShell({
   className,
   footerClassName,
   footerVariant,
+  headerBrand,
   headerCta,
   headerVariant = 'landing',
   logoSize = 'xs',
@@ -51,10 +59,12 @@ export function PublicPageShell({
     <div
       // JOV-INV-032: svh avoids iOS Safari 100vh chrome jumps on public web.
       className={cn('flex min-h-svh flex-col', className)}
+      data-public-page-shell
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.shell.publicPage}
     >
       {skipToContent ? <SkipToContent /> : null}
       <MarketingHeader
+        brand={headerBrand}
         logoSize={logoSize}
         logoVariant={logoVariant}
         navLinks={navLinks}
@@ -66,7 +76,9 @@ export function PublicPageShell({
         id='main-content'
         className={cn(
           'flex flex-1 flex-col',
-          mainOffset ? PUBLIC_SHELL_MAIN_OFFSET_CLASS : undefined,
+          mainOffset
+            ? [PUBLIC_SHELL_MAIN_OFFSET_CLASS, PUBLIC_SHELL_MAIN_DOCKED_CLASS]
+            : undefined,
           mainClassName
         )}
       >

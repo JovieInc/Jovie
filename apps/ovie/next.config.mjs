@@ -43,6 +43,11 @@ export const nextConfig = {
   transpilePackages: ['@jovie/ui'],
   serverExternalPackages: ['@statsig/statsig-node-core'],
   poweredByHeader: false,
+  typescript: {
+    // CI sets NEXT_IGNORE_TYPECHECK=1 only after `pnpm typecheck` has already
+    // checked this exact tsconfig, so the build skips its duplicate pass.
+    ignoreBuildErrors: !!process.env.NEXT_IGNORE_TYPECHECK,
+  },
   experimental: { authInterrupts: true },
   images: { unoptimized: true },
   async redirects() {
@@ -51,7 +56,7 @@ export const nextConfig = {
       { source: '/app', destination: 'https://jov.ie/app', permanent: false },
       { source: '/app/ov', destination: '/hud', permanent: false },
       { source: '/app/ov/ops', destination: '/hud', permanent: false },
-      { source: '/hud-tv', destination: '/hud?fs=1', permanent: false },
+      { source: '/hud-tv', destination: '/hud', permanent: false },
       ...['/support', '/legal/terms', '/legal/privacy'].map(source => ({
         source,
         destination: `https://jov.ie${source}`,
@@ -65,7 +70,27 @@ export const nextConfig = {
     ];
   },
   async rewrites() {
-    return [{ source: '/app/ov/:path*', destination: '/app/admin/:path*' }];
+    return {
+      beforeFiles: [
+        { source: '/hud/wiki', destination: '/app/admin/wiki' },
+        {
+          source: '/hud/wiki/:path*',
+          destination: '/app/admin/wiki/:path*',
+        },
+        {
+          source: '/hud',
+          missing: [
+            { type: 'query', key: 'kiosk' },
+            { type: 'query', key: 'mode', value: 'kiosk' },
+          ],
+          destination: '/app/admin/hud',
+        },
+      ],
+      afterFiles: [
+        { source: '/app/ov/:path*', destination: '/app/admin/:path*' },
+      ],
+      fallback: [],
+    };
   },
   async headers() {
     return [

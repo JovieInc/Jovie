@@ -17,7 +17,10 @@ import {
   type FeaturedArtist,
   ReleaseLandingPage,
 } from '@/app/r/[slug]/ReleaseLandingPage';
-import { UnpublishedEntityAlerts } from '@/components/features/alerts/UnpublishedEntityAlerts';
+import {
+  UnpublishedEntityAlerts,
+  UnpublishedEntityAlertsFallback,
+} from '@/components/features/alerts/UnpublishedEntityAlerts';
 import { BASE_URL } from '@/constants/app';
 import {
   MysteryReleasePage,
@@ -30,6 +33,7 @@ import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
+import { applyPlaylistContext } from '@/lib/discography/playlist-context';
 import { resolveSmartLinkArtistByline } from '@/lib/discography/release-credits';
 import { determineReleasePhase } from '@/lib/discography/release-phase';
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
@@ -37,6 +41,7 @@ import type { MusicVideoMetadata, ProviderKey } from '@/lib/discography/types';
 import { isVideoProviderKey } from '@/lib/discography/video-providers';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { getArtistEntitySameAs } from '@/lib/entity/queries';
+import { getListenPlaylistContext } from '@/lib/profile/featured-playlist-fallback-data';
 import {
   canonicalizeReleaseArtistCredits,
   canonicalizeReleaseCreditGroups,
@@ -44,6 +49,7 @@ import {
 } from '@/lib/profile/opaque-internal-profile-handle';
 import { resolveOpaqueInternalProfileUsername } from '@/lib/profile/opaque-internal-profile-handle.server';
 import { getPublicProfileRobots } from '@/lib/profile/public-profile-indexing-policy';
+import { isRenderFixtureEnabled } from '@/lib/render-fixture-policy';
 import { toDateOnlySafe, toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import type { Artist } from '@/types/db';
@@ -55,7 +61,28 @@ import {
   getReleaseTrackList,
   getUnpublishedReleasePresence,
 } from './_lib/data';
+import {
+  SCREEN_CERT_SMARTLINK_FIXTURE_CREATOR,
+  SCREEN_CERT_SMARTLINK_RELEASE_CONTENT,
+  SCREEN_CERT_SMARTLINK_RELEASE_SLUG,
+  SCREEN_CERT_SMARTLINK_USERNAME,
+} from './_lib/screen-cert-fixture';
 import { generateMusicStructuredData } from './_lib/structured-data';
+
+/**
+ * True only for the reserved screen-certification fixture handle, and only
+ * when the shared render-fixture gate admits it (never on a real production
+ * deployment — see `screen-cert-fixture.ts`). Callers still must fetch by the
+ * exact registered fixture slug; this alone never bypasses `notFound()`.
+ */
+function isScreenCertSmartLinkFixtureRequest(
+  normalizedUsername: string
+): boolean {
+  return (
+    normalizedUsername === SCREEN_CERT_SMARTLINK_USERNAME &&
+    isRenderFixtureEnabled()
+  );
+}
 
 // Use ISR with 5-minute revalidation for smart link pages
 export const revalidate = 300;
@@ -126,12 +153,22 @@ export default async function ContentSmartLinkPage({
     permanentRedirect(opaqueInternalProfileRedirectPath(opaqueDecision, slug));
   }
 
-  const creator = await getCreatorByUsername(normalizedUsername);
+  const isFixtureRequest =
+    isScreenCertSmartLinkFixtureRequest(normalizedUsername);
+  if (isFixtureRequest && slug !== SCREEN_CERT_SMARTLINK_RELEASE_SLUG) {
+    notFound();
+  }
+
+  const creator = isFixtureRequest
+    ? SCREEN_CERT_SMARTLINK_FIXTURE_CREATOR
+    : await getCreatorByUsername(normalizedUsername);
   if (!creator) {
     notFound();
   }
 
-  const content = await resolveContentOrRedirect(creator, slug);
+  const content = isFixtureRequest
+    ? SCREEN_CERT_SMARTLINK_RELEASE_CONTENT
+    : await resolveContentOrRedirect(creator, slug);
   if (!content) {
     // Real-but-unpublished entity → alerts opt-in instead of 404 (JOV-3682).
     const unpublished = await getUnpublishedReleasePresence(creator.id, slug);
@@ -139,7 +176,7 @@ export default async function ContentSmartLinkPage({
       notFound();
     }
     return (
-      <Suspense fallback={null}>
+      <Suspense fallback={<UnpublishedEntityAlertsFallback />}>
         <UnpublishedEntityAlerts
           artist={creatorToArtist(creator)}
           entityTitle={unpublished.title}
@@ -160,13 +197,14 @@ export default async function ContentSmartLinkPage({
   }
 
   // Build provider data for the landing page
+  const listenPlaylistContext = getListenPlaylistContext(creator.settings);
   const providers = PRIMARY_PROVIDER_KEYS.map(key => {
     const link = content.providerLinks.find(l => l.providerId === key);
     return {
       key,
       label: PROVIDER_CONFIG[key].label,
       accent: PROVIDER_CONFIG[key].accent,
-      url: link?.url ?? null,
+      url: applyPlaylistContext(key, link?.url, listenPlaylistContext),
       confidence: link ? getProviderConfidence(link) : 'unknown',
     };
   }).filter(p => p.url);
@@ -179,7 +217,7 @@ export default async function ContentSmartLinkPage({
         key,
         label: PROVIDER_CONFIG[key].label,
         accent: PROVIDER_CONFIG[key].accent,
-        url: link?.url ?? null,
+        url: applyPlaylistContext(key, link?.url, listenPlaylistContext),
         confidence: link ? getProviderConfidence(link) : 'unknown',
       };
     })
@@ -276,7 +314,15 @@ export default async function ContentSmartLinkPage({
       {/* Client-side auto-redirect to preferred DSP (preserves ISR caching) */}
       {!isUnreleased && (
         <PreferredDspRedirect
-          providerLinks={content.providerLinks}
+          providerLinks={content.providerLinks.map(link => ({
+            ...link,
+            url:
+              applyPlaylistContext(
+                link.providerId,
+                link.url,
+                listenPlaylistContext
+              ) ?? link.url,
+          }))}
           artistHandle={creator.usernameNormalized}
           tracking={{
             contentType: content.type,

@@ -5,6 +5,31 @@ import {
 } from '@/lib/seo/robots-http-guard';
 
 describe('robots-http-guard (#11043 regression)', () => {
+  it('accepts grouped case-insensitive rules and merges repeated groups', () => {
+    const agents = [
+      'OAI-SearchBot',
+      'ChatGPT-User',
+      'GPTBot',
+      'Claude-SearchBot',
+      'Claude-Web',
+      'ClaudeBot',
+      'Anthropic-AI',
+      'Applebot-Extended',
+      'PerplexityBot',
+      'Google-Extended',
+    ];
+    const body = [
+      'User-agent: *',
+      'Allow: /',
+      ...agents.map(agent => `User-agent: ${agent.toLowerCase()}`),
+      'Disallow: /',
+      ...agents.map(agent => `User-agent: ${agent}`),
+      'Allow: / # declared policy',
+      'Sitemap: https://jov.ie/sitemap.xml',
+    ].join('\n');
+    expect(validateRobotsTxtBody(body)).toEqual({ ok: true, violations: [] });
+  });
+
   it('catches the incident pattern: User-agent * + Disallow / with no Allow /', () => {
     const incidentBody = ['User-agent: *', 'Disallow: /', ''].join('\n');
     const result = validateRobotsTxtBody(incidentBody);
@@ -51,5 +76,24 @@ describe('sitemap-http-guard', () => {
     const result = validateSitemapXmlBody(body);
     expect(result.ok).toBe(true);
     expect(result.urlCount).toBe(1);
+  });
+
+  it('rejects a captured lastmod that is not a date and keeps a real one', () => {
+    const invalid = `<urlset>
+  <url><loc>https://jov.ie/pricing</loc><lastmod>not-a-date</lastmod></url>
+</urlset>`;
+    const invalidResult = validateSitemapXmlBody(invalid);
+    expect(invalidResult.ok).toBe(false);
+    expect(invalidResult.violations).toContain(
+      'sitemap.xml url[0] has an invalid <lastmod>'
+    );
+
+    const valid = `<urlset>
+  <url><loc>https://jov.ie/pricing</loc><lastmod>2026-06-17</lastmod></url>
+</urlset>`;
+    const validResult = validateSitemapXmlBody(valid);
+    expect(validResult.ok).toBe(true);
+    expect(validResult.urlCount).toBe(1);
+    expect(validResult.violations).toEqual([]);
   });
 });

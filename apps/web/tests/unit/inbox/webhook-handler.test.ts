@@ -539,43 +539,41 @@ describe('POST /api/webhooks/resend-inbound', () => {
   // environment through the same fail-closed path.
   // -------------------------------------------------------------------
 
-  it.each([
-    'development',
-    'test',
-    'preview',
-    'production',
-  ] as const)('returns 500 when webhook secret is not configured (NODE_ENV=%s)', async nodeEnv => {
-    const { env: mockEnv } = await import('@/lib/env-server');
-    const original = mockEnv.RESEND_INBOUND_WEBHOOK_SECRET;
-    (mockEnv as Record<string, unknown>).RESEND_INBOUND_WEBHOOK_SECRET =
-      undefined;
-
-    const previousNodeEnv = process.env.NODE_ENV;
-    vi.stubEnv('NODE_ENV', nodeEnv);
-
-    try {
-      // Even with a "valid" looking signature, missing secret must 500.
-      const req = makeRequest(validPayload(), { omitSignature: true });
-      const res = await POST(req as never);
-
-      expect(res.status).toBe(500);
-      const json = await res.json();
-      expect(json.error).toBe('Webhook not configured');
-      expect(mockLoggerError).toHaveBeenCalledWith(
-        'RESEND_INBOUND_WEBHOOK_SECRET not configured'
-      );
-
-      // Must never have touched the DB on the bypass path.
-      expect(mockDbSelect).not.toHaveBeenCalled();
-      expect(mockDbInsert).not.toHaveBeenCalled();
-    } finally {
+  it.each(['development', 'test', 'preview', 'production'] as const)(
+    'returns 500 when webhook secret is not configured (NODE_ENV=%s)',
+    async nodeEnv => {
+      const { env: mockEnv } = await import('@/lib/env-server');
+      const original = mockEnv.RESEND_INBOUND_WEBHOOK_SECRET;
       (mockEnv as Record<string, unknown>).RESEND_INBOUND_WEBHOOK_SECRET =
-        original;
-      if (previousNodeEnv === undefined) {
-        vi.unstubAllEnvs();
-      } else {
-        vi.stubEnv('NODE_ENV', previousNodeEnv);
+        undefined;
+
+      const previousNodeEnv = process.env.NODE_ENV;
+      vi.stubEnv('NODE_ENV', nodeEnv);
+
+      try {
+        // Even with a "valid" looking signature, missing secret must 500.
+        const req = makeRequest(validPayload(), { omitSignature: true });
+        const res = await POST(req as never);
+
+        expect(res.status).toBe(500);
+        const json = await res.json();
+        expect(json.error).toBe('Webhook not configured');
+        expect(mockLoggerError).toHaveBeenCalledWith(
+          'RESEND_INBOUND_WEBHOOK_SECRET not configured'
+        );
+
+        // Must never have touched the DB on the bypass path.
+        expect(mockDbSelect).not.toHaveBeenCalled();
+        expect(mockDbInsert).not.toHaveBeenCalled();
+      } finally {
+        (mockEnv as Record<string, unknown>).RESEND_INBOUND_WEBHOOK_SECRET =
+          original;
+        if (previousNodeEnv === undefined) {
+          vi.unstubAllEnvs();
+        } else {
+          vi.stubEnv('NODE_ENV', previousNodeEnv);
+        }
       }
     }
-  });
+  );
 });

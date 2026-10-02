@@ -62,7 +62,11 @@ describe('buildViewMetadata', () => {
       expect(meta.title, `title shape for ${mode}`).toEqual({
         absolute: expect.any(String),
       });
-      if (typeof meta.title === 'object' && 'absolute' in meta.title) {
+      if (
+        typeof meta.title === 'object' &&
+        meta.title !== null &&
+        'absolute' in meta.title
+      ) {
         expect(meta.title.absolute.endsWith('Jovie')).toBe(true);
         expect(meta.title.absolute.includes('| Jovie')).toBe(false);
       }

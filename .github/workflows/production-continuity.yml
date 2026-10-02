@@ -31,6 +31,7 @@ jobs:
       affected_targets: ${{ steps.probe.outputs.affected_targets }}
       incident_classes: ${{ steps.probe.outputs.incident_classes }}
       incident_key: ${{ steps.probe.outputs.incident_key }}
+      requires_agent_ingress: ${{ steps.probe.outputs.requires_agent_ingress }}
     steps:
       - name: Checkout policy source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -47,6 +48,10 @@ jobs:
 
       - name: Probe Jovie and Summer production
         id: probe
+        # The read-only repo token lets the freshness probe compare the live
+        # production SHA against main; it reaches GitHub only, never jov.ie.
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: >-
           node .github/scripts/production-continuity.mjs
           --output "$RUNNER_TEMP/production-continuity.json"
@@ -149,7 +154,8 @@ jobs:
   agent-ingress:
     name: Admit one Summer provider-recovery task
     needs: observe
-    if: ${{ needs.observe.outputs.status == 'unhealthy' }}
+    # production-stale is a release-pipeline failure, not a provider outage.
+    if: ${{ needs.observe.outputs.status == 'unhealthy' && needs.observe.outputs.requires_agent_ingress == 'true' }}
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 3
     steps:

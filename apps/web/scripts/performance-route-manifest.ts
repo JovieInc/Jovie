@@ -230,6 +230,15 @@ export function assertValidPerfRouteDefinition(route: PerfRouteDefinition) {
     }
   }
 
+  if (
+    route.measureMode === 'warm-navigation' &&
+    !route.navigationItemId?.trim()
+  ) {
+    throw new TypeError(
+      `Warm-navigation route "${route.id}" must define navigationItemId for shell acknowledgment measurement.`
+    );
+  }
+
   if (route.measureMode === 'profile-warm-transition') {
     const timingBudgets = getRouteTimingBudgets(route);
     const interactiveBudget = timingBudgets.find(
@@ -992,7 +1001,7 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
       shell: ['[data-testid="profile-header"]'],
       content: ['[data-testid="profile-primary-tab-tour"]'],
       navTrigger: [
-        '[data-testid="profile-bottom-nav"] button[aria-label="Shows"]',
+        '[data-testid="profile-bottom-nav"] button[aria-label="Events"]',
       ],
     },
     viewport: { width: 390, height: 844 },
@@ -1304,7 +1313,7 @@ const CREATOR_SHELL_ROUTES = [
     group: 'creator-shell',
     surface: 'creator-app',
     path: APP_ROUTES.DASHBOARD,
-    navigationItemId: 'inbox',
+    navigationItemId: 'home',
     warmNavigationStartPath: APP_ROUTES.CHAT,
     requiresAuth: true,
     warmupStrategy: 'authenticated-shell',
@@ -1314,6 +1323,7 @@ const CREATOR_SHELL_ROUTES = [
       content: ['[data-testid="opportunity-inbox-page"]'],
       loading: ['[data-testid="dashboard-segment-skeleton"]'],
       navTrigger: [
+        `a[href="${APP_ROUTES.DASHBOARD}"]:has-text("Home")`,
         `a[href="${APP_ROUTES.DASHBOARD}"]`,
         `a[href^="${APP_ROUTES.DASHBOARD}?"]`,
       ],
@@ -1324,6 +1334,33 @@ const CREATOR_SHELL_ROUTES = [
     ],
     resourceSizes: CHAT_RESOURCE_BUDGETS,
     priority: 2,
+    seedProfile: 'active-user',
+  },
+  {
+    id: 'creator-links',
+    group: 'creator-shell',
+    surface: 'creator-app',
+    path: APP_ROUTES.CHAT_PROFILE_PANEL,
+    navigationItemId: 'links',
+    requiresAuth: true,
+    // Links is a contextual Identity representation after JOV-7305. It uses a
+    // direct route-load contract because it is no longer a root navigation link.
+    warmupStrategy: 'authenticated-route',
+    measureMode: 'page-load',
+    readySelectors: {
+      content: ['[data-testid="profile-contact-sidebar"]'],
+      loading: ['[data-testid="chat-loading"]'],
+    },
+    timings: [
+      { metric: 'first-contentful-paint', budget: 1500 },
+      { metric: 'largest-contentful-paint', budget: 3000 },
+      { metric: 'cumulative-layout-shift', budget: 0.02 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1500 },
+      { metric: 'skeleton-to-content', budget: 1200 },
+    ],
+    resourceSizes: CHAT_RESOURCE_BUDGETS,
+    priority: 4,
     seedProfile: 'active-user',
   },
   {
@@ -1424,17 +1461,17 @@ const CREATOR_SHELL_ROUTES = [
     seedProfile: 'active-user',
   },
   {
-    id: 'creator-presence',
+    id: 'creator-profiles-legacy',
     group: 'creator-shell',
     surface: 'creator-app',
-    path: APP_ROUTES.PRESENCE,
+    path: APP_ROUTES.PROFILES,
     requiresAuth: true,
     warmupStrategy: 'authenticated-route',
     measureMode: 'redirect',
     readySelectors: {
       content: ['[data-testid="profiles-workspace"]', 'section#artist-profile'],
       redirectDestinations: [
-        APP_ROUTES.PROFILES,
+        APP_ROUTES.PRESENCE,
         `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`,
       ],
     },
@@ -1477,7 +1514,7 @@ const CREATOR_SHELL_ROUTES = [
     measureMode: 'page-load',
     readySelectors: {
       content: ['[data-testid="library-surface"]'],
-      loading: ['main[aria-label="Loading Library"]'],
+      loading: ['main[aria-label="Loading Work"]'],
     },
     timings: [
       { metric: 'first-contentful-paint', budget: 1800 },
@@ -1502,9 +1539,9 @@ const CREATOR_SHELL_ROUTES = [
     warmupStrategy: 'authenticated-shell',
     measureMode: 'warm-navigation',
     readySelectors: {
-      shell: ['[data-testid="library-surface"]'],
+      shell: ['[data-app-shell-frame="true"]'],
       content: ['[data-testid="library-surface"]'],
-      loading: ['main[aria-label="Loading Library"]'],
+      loading: ['main[aria-label="Loading Work"]'],
       navTrigger: [
         `a[href="${APP_ROUTES.LIBRARY}"]`,
         `a[href^="${APP_ROUTES.LIBRARY}?"]`,
@@ -1545,19 +1582,19 @@ const CREATOR_SHELL_ROUTES = [
     id: 'creator-contacts',
     group: 'creator-shell',
     surface: 'creator-app',
-    path: APP_ROUTES.CONTACTS,
-    navigationItemId: 'contacts',
+    path: APP_ROUTES.CONTACTS_AUDIENCE,
+    navigationItemId: 'audience',
     warmNavigationStartPath: APP_ROUTES.DASHBOARD,
     requiresAuth: true,
     warmupStrategy: 'authenticated-shell',
     measureMode: 'warm-navigation',
     readySelectors: {
       shell: ['[data-app-shell-frame="true"]'],
-      content: ['[data-testid="contacts-table"]'],
-      navTrigger: [
-        `a[href="${APP_ROUTES.CONTACTS}"]`,
-        `a[href^="${APP_ROUTES.CONTACTS}?"]`,
+      content: [
+        '[data-testid="dashboard-audience-client"]',
+        '[data-testid="dashboard-audience-empty-state"]',
       ],
+      navTrigger: [`a[href="${APP_ROUTES.CONTACTS_AUDIENCE}"]`],
     },
     timings: [
       { metric: 'warm-shell-response', budget: 100 },
@@ -1568,11 +1605,11 @@ const CREATOR_SHELL_ROUTES = [
     seedProfile: 'active-user',
   },
   {
-    id: 'creator-profiles',
+    id: 'creator-presence',
     group: 'creator-shell',
     surface: 'creator-app',
-    path: APP_ROUTES.PROFILES,
-    navigationItemId: 'profiles',
+    path: APP_ROUTES.PRESENCE,
+    navigationItemId: 'presence',
     warmNavigationStartPath: APP_ROUTES.DASHBOARD,
     requiresAuth: true,
     warmupStrategy: 'authenticated-shell',
@@ -1581,8 +1618,8 @@ const CREATOR_SHELL_ROUTES = [
       shell: ['[data-app-shell-frame="true"]'],
       content: ['[data-testid="profiles-workspace"]'],
       navTrigger: [
-        `a[href="${APP_ROUTES.PROFILES}"]`,
-        `a[href^="${APP_ROUTES.PROFILES}?"]`,
+        `a[href="${APP_ROUTES.PRESENCE}"]`,
+        `a[href^="${APP_ROUTES.PRESENCE}?"]`,
       ],
     },
     timings: [
@@ -1624,9 +1661,8 @@ const CREATOR_SHELL_ROUTES = [
     path: APP_ROUTES.CALENDAR,
     navigationItemId: 'calendar',
     requiresAuth: true,
-    // Calendar is mobile More only (OqZTF desktop rail is Library/Contacts/
-    // Presence). The warm-nav guard cannot open More, so this is a documented
-    // route-load contract rather than a desktop `a[href="/app/calendar"]`.
+    // Calendar remains a contextual route after JOV-7159. It uses a direct
+    // route-load contract because it is no longer a root navigation link.
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
     readySelectors: {
@@ -1652,9 +1688,8 @@ const CREATOR_SHELL_ROUTES = [
     path: APP_ROUTES.TASKS,
     navigationItemId: 'tasks',
     requiresAuth: true,
-    // Tasks is mobile More only (OqZTF desktop rail is Library/Contacts/
-    // Presence). Keep the legacy route id, but measure it through the same
-    // documented route-load contract as the canonical Tasks route.
+    // Tasks remains a contextual workflow after JOV-7159. Keep the legacy
+    // route id, but measure it through a direct route-load contract.
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
     readySelectors: {

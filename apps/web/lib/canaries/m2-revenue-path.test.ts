@@ -17,6 +17,7 @@ import {
   M2_ACTIVATION_MARKERS,
   M2_CLAIM_FIRST_COPY,
   M2_CLAIM_PRICE_DISPLAY,
+  M2_CLAIM_PRO_ACCESS_COPY,
   M2_PRO_MONTHLY_AMOUNT_CENTS,
   M2_PRO_MONTHLY_USD,
   M2_REVENUE_PATH_CANARY,
@@ -31,7 +32,7 @@ import {
 const PRICING_HTML = `
   <html><body>
     ${'x'.repeat(500)}
-    <p>${M2_CLAIM_FIRST_COPY}. Choose Pro when you want the release system turned on.</p>
+    <p>${M2_CLAIM_FIRST_COPY}. ${M2_CLAIM_PRO_ACCESS_COPY} when you want the release system turned on.</p>
     <span>${M2_CLAIM_PRICE_DISPLAY}</span>
   </body></html>
 `;
@@ -162,6 +163,7 @@ describe('evaluateClaimSurface', () => {
       ok: true,
       evidence: expect.arrayContaining([
         M2_CLAIM_FIRST_COPY,
+        M2_CLAIM_PRO_ACCESS_COPY,
         M2_CLAIM_PRICE_DISPLAY,
         'signup?plan=pro',
       ]),

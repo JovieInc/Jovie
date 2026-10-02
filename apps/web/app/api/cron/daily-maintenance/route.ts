@@ -17,6 +17,7 @@
  * - AI crawler analytics sync: every day (Cloudflare GraphQL, GH-12748)
  * - Release outcome reconciliation: every day (bounded 30-day snapshots)
  * - Founder-review upload lease cleanup: every day (private Blob orphans)
+ * - AI Gateway spend: every day (admin Costs row + >$5/day alert)
  *
  * Each sub-job runs in an independent try-catch so one failure
  * doesn't block the others.
@@ -25,12 +26,14 @@
  */
 
 import { NextResponse } from 'next/server';
+import { recordDailyGatewaySpend } from '@/lib/ai/gateway-spend';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { sweepUnderEnrichedProfilesForCron } from '@/lib/discography/re-enrich';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { cleanupFounderReviewUploadLeases } from '@/lib/founder-review/server';
+import { runMusicResolverParityCorpus } from '@/lib/music-resolver/shadow';
 import { runOnboardingScriptAggregation } from '@/lib/onboarding/script-aggregation';
 import { getLybDailyMrr } from '@/lib/ovie/lyb-mrr.server';
 import { runProfileSearchMonitoring } from '@/lib/profile-search/runner';
@@ -192,7 +195,27 @@ export async function GET(request: Request) {
     }
   );
 
-  // 12. Data retention — Sundays only (heavy operation)
+  // 12. AI Gateway spend by feature tag and model (summer-config#107 parity).
+  results.aiGatewaySpend = await runSubJob('aiGatewaySpend', async () => {
+    const spend = await recordDailyGatewaySpend();
+    return {
+      day: spend.day,
+      totalUsd: spend.totalUsd,
+      observed30dUsd: spend.observed30dUsd,
+      topTags: spend.byTag.slice(0, 5),
+      alerts: spend.alerts,
+    };
+  });
+
+  // Shadow-only resolver parity: durable cache, no product reads. The parity
+  // reference is built from official DSP APIs (Spotify/Apple Music/Deezer ISRC
+  // lookups); no third-party vendor is used as a benchmark oracle (JOV-7369).
+  results.musicResolverParity = await runSubJob(
+    'musicResolverParity',
+    runMusicResolverParityCorpus
+  );
+
+  // 13. Data retention — Sundays only (heavy operation)
   const isSunday = new Date().getDay() === 0;
   results.dataRetention = isSunday
     ? await runSubJob('dataRetention', runDataRetentionCleanup)

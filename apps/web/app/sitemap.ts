@@ -6,7 +6,13 @@ import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getAlternativeSlugs } from '@/content/alternatives';
 import { getComparisonSlugs } from '@/content/comparisons';
-import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
+import { getIndexedSolutionsPages } from '@/content/pages/solutions';
+import { pageRecordPath } from '@/data/marketing/factory/pageRecord';
+import {
+  getBlogPosts,
+  isBlogPostIndexable,
+  slugifyCategory,
+} from '@/lib/blog/getBlogPosts';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { getChangelogReleases } from '@/lib/changelog-source';
 import { db } from '@/lib/db';
@@ -159,11 +165,17 @@ const getSitemapCatalog = unstable_cache(
           ),
       ]);
 
+      const usernamesWithPublicRelease = new Set(
+        releases.map(release => release.username.trim().toLowerCase())
+      );
       const discoverableProfiles = filterPublicDiscoveryIdentities(
         profiles.map(profile => ({
           ...profile,
           handle: profile.username,
           isPublic: true,
+          hasPublicRelease: usernamesWithPublicRelease.has(
+            profile.username.trim().toLowerCase()
+          ),
         }))
       );
       const eligibleUsernames = new Set(
@@ -191,7 +203,7 @@ const getSitemapCatalog = unstable_cache(
       return EMPTY_CATALOG;
     }
   },
-  ['sitemap-catalog-v6'],
+  ['sitemap-catalog-v7'],
   { revalidate: 3600, tags: [CACHE_TAGS.SITEMAP_CATALOG] }
 );
 
@@ -256,6 +268,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     marketingPages.push(sitemapEntry(`${APP_ROUTES.ALTERNATIVES}/${slug}`));
   }
 
+  // Factory page records: only `indexed` records publish (JOV-7275).
+  for (const record of getIndexedSolutionsPages()) {
+    marketingPages.push(sitemapEntry(pageRecordPath(record)));
+  }
+
   const editorialPages: MetadataRoute.Sitemap = [
     sitemapEntry('/blog', blogLastModified),
     sitemapEntry('/changelog', changelogLastModified),
@@ -263,12 +280,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   editorialPages.push(
-    ...blogPosts.map(post =>
-      sitemapEntry(
-        `/blog/${post.slug}`,
-        toContentRevisionDate(post.updatedDate ?? post.date)
+    ...blogPosts
+      .filter(post => isBlogPostIndexable(post.slug))
+      .map(post =>
+        sitemapEntry(
+          `/blog/${post.slug}`,
+          toContentRevisionDate(post.updatedDate ?? post.date)
+        )
       )
-    )
   );
 
   const blogAuthors = [
@@ -317,10 +336,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           release.date ? `${release.date}T00:00:00Z` : undefined
         )
       )
-    )
-  );
-
-  editorialPages.push(
+    ),
     ...engineeringStories.flatMap(story =>
       story.source
         ? [

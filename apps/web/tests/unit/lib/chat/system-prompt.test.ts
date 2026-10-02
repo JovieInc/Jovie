@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildSystemPrompt } from '@/lib/chat/system-prompt';
+import {
+  buildSystemPrompt,
+  buildSystemPromptParts,
+} from '@/lib/chat/system-prompt';
 
 const baseContext = {
   displayName: 'The Artist',
@@ -175,5 +178,34 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('ONE missing field');
     expect(prompt).toContain('Spotify or private listen link');
     expect(prompt).toContain('Dear Curator');
+  });
+
+  it('keeps per-turn context out of the cacheable stable prefix', () => {
+    const options = (knowledgeContext: string, referencedEntities: string) => ({
+      aiCanUseTools: true,
+      aiWeeklyMessageLimit: 500,
+      knowledgeContext,
+      referencedEntities,
+      pinnedOpportunity: 'PINNED-CARD',
+    });
+    const first = buildSystemPromptParts(
+      baseContext,
+      [],
+      options('KNOWLEDGE-A', 'ENTITY-A')
+    );
+    const second = buildSystemPromptParts(
+      baseContext,
+      [],
+      options('KNOWLEDGE-B', 'ENTITY-B')
+    );
+
+    expect(first.stable).toBe(second.stable);
+    for (const marker of ['KNOWLEDGE-B', 'ENTITY-B', 'PINNED-CARD']) {
+      expect(second.stable).not.toContain(marker);
+      expect(second.dynamic).toContain(marker);
+    }
+    expect(
+      buildSystemPrompt(baseContext, [], options('KNOWLEDGE-B', 'ENTITY-B'))
+    ).toBe(`${second.stable}\n\n${second.dynamic}`);
   });
 });

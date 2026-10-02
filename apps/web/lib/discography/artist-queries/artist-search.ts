@@ -27,12 +27,16 @@ import {
   trackArtists,
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import {
+  isCanonicalPublicProfileHandle,
+  normalizePublicProfileHandle,
+} from '@/lib/profile/opaque-internal-profile-handle';
+import { isPublicProfileIndexable } from '@/lib/profile/public-profile-indexing-policy';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import {
   isPublicArtistCollaboratorRole,
   PUBLIC_ARTIST_COLLABORATOR_ROLES,
 } from '../artist-credit-policy';
-import { artistProfileHref } from '../artist-profile-routing';
 import type {
   CollaboratorInfo,
   CreditedArtistWithProfile,
@@ -46,6 +50,7 @@ export interface StructuredReleaseCollaboratorRow {
   readonly artistProfileId: string | null;
   readonly profileIsPublic: boolean | null;
   readonly profileIsClaimed: boolean | null;
+  readonly profileUsername: string | null;
   readonly creditName: string | null;
   readonly role: ArtistRole;
   readonly position: number;
@@ -106,6 +111,7 @@ export async function getCreditedArtistsWithProfiles(
       .selectDistinct({
         name: drizzleSql<string>`coalesce(${releaseArtists.creditName}, ${artists.name})`,
         handle: creatorProfiles.usernameNormalized,
+        profileDisplayName: creatorProfiles.displayName,
       })
       .from(releaseArtists)
       .innerJoin(
@@ -128,6 +134,7 @@ export async function getCreditedArtistsWithProfiles(
       .selectDistinct({
         name: drizzleSql<string>`coalesce(${trackArtists.creditName}, ${artists.name})`,
         handle: creatorProfiles.usernameNormalized,
+        profileDisplayName: creatorProfiles.displayName,
       })
       .from(trackArtists)
       .innerJoin(discogTracks, eq(trackArtists.trackId, discogTracks.id))
@@ -151,6 +158,10 @@ export async function getCreditedArtistsWithProfiles(
     const name = row.name?.trim();
     const handle = row.handle?.trim();
     if (!name || !handle) continue;
+    // Shared discovery-eligibility predicate (JOV-6260): public-but-ineligible
+    // identities (QA machine handles, reserved fixtures, test display names)
+    // never become linked artist mentions.
+    if (!isPublicProfileIndexable(handle, row.profileDisplayName)) continue;
     const key = name.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -179,6 +190,7 @@ export async function getStructuredReleaseCollaborators(
       artistProfileId: artists.creatorProfileId,
       profileIsPublic: creatorProfiles.isPublic,
       profileIsClaimed: creatorProfiles.isClaimed,
+      profileUsername: creatorProfiles.usernameNormalized,
       creditName: releaseArtists.creditName,
       role: releaseArtists.role,
       position: releaseArtists.position,
@@ -241,28 +253,33 @@ function projectStructuredReleaseCollaborator(
   const name = (row.creditName ?? row.artistName).trim();
   if (!name) return null;
 
+  // Shared discovery-eligibility predicate (JOV-6260): a bound profile that is
+  // public but ineligible (QA machine handle, reserved fixture) is treated as
+  // unavailable so it is never linked or labeled as a public identity.
+  const hasBoundProfile = Boolean(row.artistProfileId);
   const hasPublicProfile =
-    Boolean(row.artistProfileId) && row.profileIsPublic === true;
-  const hasPrivateProfileBinding =
-    Boolean(row.artistProfileId) && row.profileIsPublic !== true;
+    hasBoundProfile &&
+    row.profileIsPublic === true &&
+    isPublicProfileIndexable(row.profileUsername ?? '');
   let profileState: StructuredReleaseCollaborator['profileState'] =
     'unavailable';
   if (hasPublicProfile) {
     profileState = row.profileIsClaimed ? 'claimed' : 'unclaimed';
   }
 
+  // Collaborator mentions only link to readable `/{handle}` destinations
+  // (JOV-6612). Encoded `a_*` unclaimed handles and `/artists/:id` routes are
+  // raw registry IDs; credit-only artists without a canonical handle render
+  // as plain text. The `/artists/:id` route itself stays live for inbound
+  // links and still self-heals an eligible unclaimed profile on first visit.
+  const mentionHandle = isCanonicalPublicProfileHandle(row.profileUsername)
+    ? normalizePublicProfileHandle(row.profileUsername)
+    : null;
+
   return {
     artistId: row.artistId,
     name,
-    // A structured Spotify identity has a canonical entity route even before
-    // its claim-safe profile row is materialized. The route self-heals the
-    // eligible unclaimed profile on first visit; names without an exact
-    // provider identity remain plain text rather than reserving a handle by
-    // display name alone.
-    href:
-      hasPublicProfile || (!hasPrivateProfileBinding && row.artistSpotifyId)
-        ? artistProfileHref(row.artistId)
-        : null,
+    href: hasPublicProfile && mentionHandle ? `/${mentionHandle}` : null,
     profileState,
     reconciliationEligible: Boolean(row.artistSpotifyId),
     role: row.role,

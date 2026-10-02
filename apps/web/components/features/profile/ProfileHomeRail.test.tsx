@@ -12,13 +12,13 @@ vi.mock('@/hooks/useUserLocation', () => ({
 }));
 
 vi.mock('next/image', () => ({
-  default: (props: { readonly alt: string; readonly src?: string | null }) => (
+  default: (props: { readonly alt: string; src?: string | null }) => (
     <img alt='' src={props.src ?? undefined} />
   ),
 }));
 
 describe('ProfileHomeRail', () => {
-  it('renders the single highlights carousel with the PAC card leading', () => {
+  it('renders the featured editorial card as the only card surface', () => {
     render(
       <ProfileHomeRail
         artist={PROFILE_STORY_ARTIST}
@@ -37,12 +37,17 @@ describe('ProfileHomeRail', () => {
       />
     );
 
-    const carousel = screen.getByTestId('profile-home-carousel');
-    expect(carousel).toHaveAttribute('data-layout', 'profile-landscape');
-    expect(carousel.contains(screen.getByTestId('profile-pac'))).toBe(true);
+    const pacCard = screen.getByTestId('profile-pac');
+    expect(pacCard).toHaveAttribute('data-presentation', 'featured');
+    // JOV-7123: the editorial card replaces the highlights carousel — there
+    // is no second card surface stacked underneath it.
+    expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
+    expect(
+      screen.queryByTestId('profile-home-alerts-fallback-card')
+    ).toBeNull();
   });
 
-  it('drops the alerts fallback card when fan capture is unavailable', () => {
+  it('renders nothing when the profile has no card subject', () => {
     render(
       <ProfileHomeRail
         artist={PROFILE_STORY_ARTIST}
@@ -50,12 +55,10 @@ describe('ProfileHomeRail', () => {
         hasPlayableDestinations={false}
         renderMode='preview'
         isSubscribed={false}
-        showAlertsCard={false}
       />
     );
 
-    expect(
-      screen.queryByTestId('profile-home-alerts-fallback-card')
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('profile-pac')).toBeNull();
+    expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
   });
 });

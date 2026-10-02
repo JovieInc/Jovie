@@ -55,7 +55,6 @@ export {
   DrawerFormGridRow,
   type DrawerFormGridRowProps,
 } from './DrawerFormGridRow';
-export { DrawerHeader, type DrawerHeaderProps } from './DrawerHeader';
 export {
   DrawerInlineIconButton,
   type DrawerInlineIconButtonProps,
@@ -125,9 +124,18 @@ export {
 } from './DrawerTabbedCard';
 export { DrawerTabs, type DrawerTabsProps } from './DrawerTabs';
 export {
-  EntityHeaderCard,
-  type EntityHeaderCardProps,
-} from './EntityHeaderCard';
+  ENTITY_HEADER_THUMBNAIL_SIZE_PX,
+  EntityHeader,
+  type EntityHeaderLayout,
+  type EntityHeaderMetaOverflow,
+  type EntityHeaderProps,
+  EntityHeaderStatusGlyph,
+  type EntityHeaderStatusGlyphProps,
+  type EntityHeaderStatusTone,
+  EntityHeaderThumbnail,
+  type EntityHeaderThumbnailProps,
+  type EntityHeaderThumbnailVariant,
+} from './EntityHeader';
 export {
   EntitySidebarShell,
   type EntitySidebarShellProps,

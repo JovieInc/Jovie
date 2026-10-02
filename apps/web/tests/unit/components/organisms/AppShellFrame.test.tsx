@@ -15,10 +15,16 @@ describe('AppShellFrame', () => {
     );
 
     const mainContent = screen.getByRole('main');
+    const appShellFrame = mainContent.closest('[data-app-shell-frame]');
+    const desktopTitlebar = screen.getByTestId('electron-titlebar-row');
 
     expect(mainContent).toHaveAttribute('id', 'main-content');
     expect(mainContent).not.toHaveAttribute('tabindex');
-    expect(mainContent.closest('[data-app-shell-frame]')).toBeInTheDocument();
+    expect(appShellFrame).toBeInTheDocument();
+    expect(appShellFrame).toContainElement(desktopTitlebar);
+    expect(
+      appShellFrame?.querySelectorAll('[data-testid="electron-titlebar-row"]')
+    ).toHaveLength(1);
     const shellBody = mainContent.closest('[data-app-shell-body]');
     expect(shellBody).toHaveAttribute('data-shell-rail-motion', 'coordinated');
     expect(shellBody).toHaveAttribute(
@@ -37,6 +43,19 @@ describe('AppShellFrame', () => {
     // #main-content keeps its full rounded shell radius — no Electron override
     // strips the top corners now that the header lives inside the card.
     expect(mainContent).toHaveClass('lg:rounded-(--app-shell-radius)');
+    // Founder lock 2026-09-25: one rounded, borderless panel — no border.
+    expect(mainContent).not.toHaveClass('lg:border');
+    expect(mainContent).not.toHaveClass('lg:border-(--app-shell-border)');
+    const routeContent = mainContent.querySelector(
+      '[data-app-shell-main-content]'
+    );
+    // The content inset belongs to the scroll wrapper, not the shared
+    // header+route column: the header spans the panel edge-to-edge so the
+    // top row reads as one clipped plane (JOV-7207).
+    expect(routeContent).not.toHaveClass('p-(--app-shell-content-inset)');
+    expect(
+      mainContent.querySelector('[data-app-shell-content-inset]')
+    ).toHaveClass('p-(--app-shell-content-inset)');
     expect(mainContent.closest('[data-app-shell-main-plane]')).not.toHaveClass(
       'lg:gap-(--app-shell-gap)'
     );
@@ -49,7 +68,26 @@ describe('AppShellFrame', () => {
     expect(mainContent).toContainElement(headers[0] as HTMLElement);
   });
 
-  it('allocates the right rail inside main beside route content instead of overlaying it', () => {
+  it('keeps the header and route on the same token-owned paint plane', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main content</div>}
+      />
+    );
+
+    const plane = screen.getByRole('main');
+    // A white blend overlay brightened only the route while the opaque
+    // header masked it, creating an extra elevation despite identical tokens.
+    const decorativePaint = Array.from(
+      plane.querySelectorAll<HTMLElement>('*')
+    ).filter(element => element.style.mixBlendMode === 'overlay');
+    expect(decorativePaint).toHaveLength(0);
+    expect(plane).toHaveClass('bg-(--app-shell-content-surface)');
+  });
+
+  it('allocates the right rail beside the main column instead of overlaying it', () => {
     render(
       <AppShellFrame
         sidebar={<aside>Sidebar</aside>}
@@ -72,9 +110,12 @@ describe('AppShellFrame', () => {
     expect(mainPlane).toHaveAttribute('data-app-shell-main-plane', 'true');
     expect(mainPlane).toContainElement(main);
     expect(mainPlane).toContainElement(rightRail);
-    expect(main).toContainElement(rightRail);
+    // The rail is a sibling of the main column (not clipped inside <main>) so
+    // it spans the full column height and stays above the audio dock — L3
+    // over L1 on the elevation ladder (JOV-6680).
+    expect(main).not.toContainElement(rightRail);
     expect(main).toContainElement(routeContent as HTMLElement);
-    expect(rightRail.parentElement).toBe(main);
+    expect(rightRail.parentElement).toBe(mainPlane);
     expect(routeContent?.parentElement).toBe(main);
     expect(scrollPane).not.toContainElement(rightRail);
     expect(rightRail).toContainElement(
@@ -270,11 +311,46 @@ describe('AppShellFrame', () => {
     expect(audioPlayer).toBeInTheDocument();
     expect(main).not.toContainElement(audioPlayer);
     expect(tray).toContainElement(audioPlayer);
+    // The tray shares the main panel's column so the dock is exactly the
+    // panel's width (JOV-6680).
     expect(tray.parentElement).toHaveAttribute(
-      'data-app-shell-content-column',
+      'data-app-shell-main-column',
+      'true'
+    );
+    expect(main.parentElement).toHaveAttribute(
+      'data-app-shell-main-column',
       'true'
     );
     expect(tray).toHaveClass('shrink-0');
+  });
+
+  it('keeps the right rail above the audio dock (rail spans full column height)', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+        rightPanel={<div data-testid='fixture-rail'>Rail</div>}
+        audioPlayer={<div data-testid='audio-player'>Player</div>}
+      />
+    );
+
+    const main = screen.getByRole('main');
+    const rail = screen.getByTestId('app-shell-right-rail');
+    const tray = screen.getByTestId('app-shell-audio-tray');
+
+    // The rail is a sibling of the main column — not clipped inside <main> —
+    // so it elevates above the dock while the dock matches panel width.
+    expect(main).not.toContainElement(rail);
+    expect(rail).not.toContainElement(tray);
+    expect(tray.parentElement).toHaveAttribute(
+      'data-app-shell-main-column',
+      'true'
+    );
+    expect(rail.parentElement).toHaveAttribute(
+      'data-app-shell-main-plane',
+      'true'
+    );
   });
 
   it('mounts mobile navigation in the shared in-flow bottom surface', () => {

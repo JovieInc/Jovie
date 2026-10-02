@@ -1,15 +1,26 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { readFile, unlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
+import { bundleDesktopPreload } from './bundle-preload.mjs';
 import { deriveStagingReleaseVersion } from './sync-version.mjs';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const execFileAsync = promisify(execFile);
+
+async function readBundledPreload(t) {
+  const directory = await mkdtemp(join(tmpdir(), 'jovie-shell-preload-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const outfile = join(directory, 'preload.js');
+  await bundleDesktopPreload({ outfile });
+  return readFile(outfile, 'utf8');
+}
 
 test('desktop window enters the authenticated chat shell instead of the web root', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
@@ -53,7 +64,7 @@ test('desktop window enters the authenticated chat shell instead of the web root
   );
 });
 
-test('desktop polls build-info and reloads only hud windows on deploy drift', async () => {
+test('desktop polls build-info and reloads idle app windows on deploy drift', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
 
   for (const symbol of [
@@ -61,8 +72,11 @@ test('desktop polls build-info and reloads only hud windows on deploy drift', as
     'fetchHudBuildFingerprint',
     'getHudBuildFingerprint',
     'decideHudBuildReload',
-    'isHudRoutePath',
     'isHudWindow',
+    'isWebBuildReloadWindow',
+    'isWebBuildReloadPath',
+    'shouldReloadWindowForWebBuild',
+    'SESSION_WORK_PROBE',
     'scheduleHudBuildAutoReload',
   ]) {
     assert.match(mainSource, new RegExp(`\\b${symbol}\\b`));
@@ -72,10 +86,25 @@ test('desktop polls build-info and reloads only hud windows on deploy drift', as
   assert.match(mainSource, /60 \* 1000/);
   assert.match(
     mainSource,
-    /BrowserWindow\.getAllWindows\(\)\.some\(isHudWindow\)/
+    /BrowserWindow\.getAllWindows\(\)\.filter\(\s*isWebBuildReloadWindow\s*\)/
   );
+  assert.match(mainSource, /powerMonitor\.getSystemIdleTime\(\)/);
   assert.match(mainSource, /win\.webContents\.reload\(\)/);
   assert.doesNotMatch(mainSource, /commitSha.*deployedAt/);
+});
+
+test('desktop update checks run on launch, interval, and wake, and restart only when idle', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+
+  assert.match(mainSource, /autoUpdater\.autoDownload = true/);
+  assert.match(mainSource, /autoUpdater\.autoInstallOnAppQuit = true/);
+  assert.match(mainSource, /powerMonitor\.on\('resume', checkAfterWake\)/);
+  assert.match(
+    mainSource,
+    /powerMonitor\.on\('unlock-screen', checkAfterWake\)/
+  );
+  assert.match(mainSource, /shouldInstallDownloadedUpdateWhileRunning\(/);
+  assert.match(mainSource, /autoUpdater\.quitAndInstall\(true, true\)/);
 });
 
 test('desktop window fails into a branded Jovie recovery surface', async () => {
@@ -144,7 +173,7 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /NAVIGATION_ABORTED_ERROR_CODE/);
   assert.match(
     mainSource,
-    /maybeShowDesktopAuthHandoff\(resolveNavigationUrl\(validatedURL\)\)/
+    /interceptMainWindowAuthNavigation\(win, resolveNavigationUrl\(validatedURL\)\)/
   );
   assert.match(mainSource, /showDesktopLoadFailure\(win\)/);
   // JOV-3595: blank/crashed-renderer recovery (beyond network did-fail-load).
@@ -166,7 +195,7 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /function buildDesktopBootSplashUrl\(\)/);
   assert.match(mainSource, /function buildDesktopBootSplashHtml\(\)/);
   assert.match(mainSource, /function loadHostedUrlAfterSplash\(/);
-  assert.match(mainSource, /Jovie is loading/);
+  assert.match(mainSource, /Jovie for Mac is loading/);
   assert.match(
     mainSource,
     /renderDesktopBuildIdentitySection\(desktopBuildIdentity\)/
@@ -295,7 +324,7 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(tokenSource, /radiusPill: '999px'/);
 });
 
-test('Mac boot splash is splash-B: 32px cream mark on an empty field', async () => {
+test('Mac boot splash uses the locked cinematic wordmark and quiet corner mark', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
   const tokenSource = await readFile(
     join(desktopRoot, 'src/system-b-tokens.ts'),
@@ -306,20 +335,175 @@ test('Mac boot splash is splash-B: 32px cream mark on an empty field', async () 
   )?.[0];
 
   assert.ok(splashFn, 'buildDesktopBootSplashHtml must exist');
-  assert.match(tokenSource, /splashMarkSizePx: 32/);
+  const localBuilder = await readFile(
+    join(desktopRoot, 'electron-builder.local.yml'),
+    'utf8'
+  );
+  const stagingBuilder = await readFile(
+    join(desktopRoot, 'electron-builder.staging.yml'),
+    'utf8'
+  );
+  const productionBuilder = await readFile(
+    join(desktopRoot, 'electron-builder.yml'),
+    'utf8'
+  );
+  const webWordmark = await readFile(
+    join(desktopRoot, '../web/public/brand/Jovie-Wordmark-Cream.svg'),
+    'utf8'
+  );
+
+  assert.match(webWordmark, /<svg/);
+  for (const config of [localBuilder, stagingBuilder, productionBuilder]) {
+    assert.match(
+      config,
+      /from: \.\.\/web\/public\/brand\/Jovie-Wordmark-Cream\.svg/
+    );
+    assert.match(config, /to: Jovie-Wordmark-Cream\.svg/);
+  }
+  assert.match(tokenSource, /macCornerMarkSizePx: 40/);
+  assert.match(tokenSource, /macCornerMarkOpacity: 0\.35/);
   assert.match(tokenSource, /markCream: '#F5F4F0'/);
-  assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.splashMarkSizePx/);
+  assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.macCornerMarkSizePx/);
+  assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.macCornerMarkOpacity/);
   assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.markCream/);
-  assert.match(splashFn, /data-desktop-splash="splash-b"/);
-  assert.match(splashFn, /aria-label="Jovie is loading"/);
+  assert.match(splashFn, /data-desktop-splash="cinematic"/);
+  assert.match(splashFn, /aria-label="Jovie for Mac is loading"/);
+  const wordmarkPathFn = mainSource.match(
+    /function resolveDesktopBootSplashWordmarkPath\(\): string \{[\s\S]*?\n\}/
+  )?.[0];
+  const preloadFn = mainSource.match(
+    /async function preloadDesktopBootSplashWordmark\(\): Promise<void> \{[\s\S]*?\n\}/
+  )?.[0];
+  const whenReadyBody = mainSource.slice(
+    mainSource.indexOf('app.whenReady().then(async () => {')
+  );
+  assert.ok(wordmarkPathFn, 'resolveDesktopBootSplashWordmarkPath must exist');
+  assert.ok(preloadFn, 'preloadDesktopBootSplashWordmark must exist');
+  // The splash builder reads only the cached data URL; the wordmark load is
+  // async and awaited before the first window paints (JOV-INV-031 ratchet).
+  assert.match(
+    splashFn,
+    /const wordmarkDataUrl = desktopBootSplashWordmarkDataUrl;/
+  );
+  assert.doesNotMatch(splashFn, /readFileSync|fs\.|readFile\(/);
+  assert.match(preloadFn, /await fs\.promises\.readFile\(/);
+  assert.doesNotMatch(preloadFn, /readFileSync/);
+  assert.match(preloadFn, /resolveDesktopBootSplashWordmarkPath\(\)/);
+  assert.match(preloadFn, /data:image\/svg\+xml;base64/);
+  assert.match(wordmarkPathFn, /app\.isPackaged/);
+  assert.match(wordmarkPathFn, /process\.resourcesPath/);
+  assert.match(
+    whenReadyBody,
+    /const bootSplashWordmarkReady = preloadDesktopBootSplashWordmark\(\);/
+  );
+  const preloadAwait = whenReadyBody.indexOf('await bootSplashWordmarkReady;');
+  const firstCreateWindow = whenReadyBody.indexOf('createWindow(');
+  assert.ok(preloadAwait >= 0, 'wordmark preload must be awaited in whenReady');
+  assert.ok(
+    firstCreateWindow > preloadAwait,
+    'wordmark preload must resolve before the first createWindow'
+  );
+  assert.doesNotMatch(splashFn, /@keyframes|animation:|translateX\(/);
   assert.doesNotMatch(splashFn, /180px/);
-  assert.doesNotMatch(splashFn, /opacity:\s*0\.035/);
   assert.doesNotMatch(splashFn, /<h1>/);
   assert.doesNotMatch(splashFn, /Loading Jovie/);
   assert.doesNotMatch(splashFn, /Starting the app/);
   assert.doesNotMatch(splashFn, /renderDesktopBuildIdentitySection/);
   assert.doesNotMatch(mainSource, /width:\s*180px/);
   assert.doesNotMatch(mainSource, /height:\s*180px/);
+});
+
+test('Mac cinematic splash renders the static final lockup', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const splashFn = mainSource.match(
+    /function buildDesktopBootSplashHtml\(\): string \{[\s\S]*?\n\}/
+  )?.[0];
+  const wordmarkPathFn = mainSource.match(
+    /function resolveDesktopBootSplashWordmarkPath\(\): string \{[\s\S]*?\n\}/
+  )?.[0];
+  const preloadFn = mainSource.match(
+    /async function preloadDesktopBootSplashWordmark\(\): Promise<void> \{[\s\S]*?\n\}/
+  )?.[0];
+  const cacheDecl = mainSource.match(
+    /let desktopBootSplashWordmarkDataUrl: string \| null = null;/
+  )?.[0];
+  const markPath = mainSource.match(
+    /const JOVIE_MARK_SVG_PATH =\s*('[^']+');/
+  )?.[1];
+  assert.ok(splashFn && wordmarkPathFn && preloadFn && cacheDecl && markPath);
+
+  const compiled = ts.transpileModule(
+    [
+      cacheDecl,
+      wordmarkPathFn,
+      preloadFn,
+      splashFn,
+      `const JOVIE_MARK_SVG_PATH = ${markPath};`,
+      '(async () => {',
+      '  const before = buildDesktopBootSplashHtml();',
+      '  await preloadDesktopBootSplashWordmark();',
+      '  return { before, html: buildDesktopBootSplashHtml() };',
+      '})();',
+    ].join('\n'),
+    { compilerOptions: { target: ts.ScriptTarget.ES2022 } }
+  ).outputText;
+  const tokens = {
+    macCornerMarkSizePx: 40,
+    macCornerMarkOpacity: 0.35,
+    macCinematicCanvas: '#030407',
+    markCream: '#F5F4F0',
+  };
+  const context = {
+    app: { isPackaged: true },
+    path: { join },
+    __dirname: '/app/dist-electron',
+    process: { resourcesPath: '/app/resources' },
+    SYSTEM_B_DESKTOP_TOKENS: tokens,
+  };
+  const noSyncRead = () => {
+    throw new Error('splash must not read the wordmark synchronously');
+  };
+  const wordmarkSvg = Buffer.from('<svg>canonical wordmark</svg>');
+  let loadedPath;
+  const { before, html } = await runInNewContext(compiled, {
+    ...context,
+    fs: {
+      readFileSync: noSyncRead,
+      promises: {
+        readFile: async path => {
+          loadedPath = path;
+          return wordmarkSvg;
+        },
+      },
+    },
+  });
+  assert.equal(loadedPath, '/app/resources/Jovie-Wordmark-Cream.svg');
+  assert.match(before, /class="fallback-mark"/);
+  assert.match(html, /data-desktop-splash="cinematic"/);
+  assert.match(html, /opacity: 0\.35/);
+  assert.match(html, /width: min\(40px, 1\.786vw\)/);
+  assert.doesNotMatch(html, /@keyframes|animation:|translateX\(/);
+  assert.match(html, /class="suffix">for Mac<\/span>/);
+  assert.match(html, /data:image\/svg\+xml;base64/);
+  assert.ok(
+    html.includes(
+      `src="data:image/svg+xml;base64,${wordmarkSvg.toString('base64')}"`
+    )
+  );
+
+  const { html: fallback } = await runInNewContext(compiled, {
+    ...context,
+    fs: {
+      readFileSync: noSyncRead,
+      promises: {
+        readFile: async () => {
+          throw new Error('wordmark unavailable');
+        },
+      },
+    },
+  });
+  assert.match(fallback, /class="fallback-mark"/);
+  assert.doesNotMatch(fallback, /src="data:image\/svg\+xml;base64/);
 });
 
 const FORBIDDEN_MAC_ENTITLEMENTS = [
@@ -331,6 +515,8 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
   for (const fileName of [
     'entitlements.mac.plist',
     'entitlements.mac.inherit.plist',
+    'entitlements.mac.production.plist',
+    'entitlements.mac.staging.plist',
   ]) {
     const entitlements = await readFile(
       join(desktopRoot, 'build', fileName),
@@ -346,6 +532,91 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
       assert.doesNotMatch(entitlements, new RegExp(`<key>${forbidden}</key>`));
     }
   }
+});
+
+// A keychain-access-groups entitlement the embedded profile does not
+// authorize stops the app from launching, so each channel pairs its own.
+test('signed channels pair Touch ID entitlements with a matching Developer ID profile (JOV-6727)', async () => {
+  for (const [config, bundleId] of [
+    ['electron-builder.yml', 'app.jov.ie'],
+    ['electron-builder.staging.yml', 'app.jov.ie.staging'],
+  ]) {
+    const builder = await readFile(join(desktopRoot, config), 'utf8');
+    assert.match(
+      builder,
+      new RegExp(`^appId: ${bundleId.replaceAll('.', '\\.')}$`, 'm')
+    );
+    const entitlementsPath = builder.match(/^ {2}entitlements: (\S+)$/m)?.[1];
+    const profilePath = builder.match(/^ {2}provisioningProfile: (\S+)$/m)?.[1];
+    assert.ok(entitlementsPath && profilePath, `${config} needs both`);
+
+    const appId = `G24T327LXT.${bundleId}`;
+    const entitlements = await readFile(
+      join(desktopRoot, entitlementsPath),
+      'utf8'
+    );
+    assert.match(entitlements, new RegExp(`<string>${appId}</string>`));
+    assert.match(
+      entitlements,
+      new RegExp(`<string>${appId}\\.webauthn</string>`)
+    );
+    const profile = (await readFile(join(desktopRoot, profilePath))).toString(
+      'latin1'
+    );
+    assert.ok(
+      profile.includes(`<string>${appId}</string>`),
+      `${profilePath} must be for ${bundleId}`
+    );
+    assert.ok(
+      profile.includes('<string>G24T327LXT.*</string>'),
+      `${profilePath} must allow the team keychain groups`
+    );
+  }
+
+  // Local builds have no profile, so they must not claim the entitlement.
+  const local = await readFile(
+    join(desktopRoot, 'electron-builder.local.yml'),
+    'utf8'
+  );
+  assert.doesNotMatch(local, /provisioningProfile/);
+  assert.match(local, /^ {2}entitlements: build\/entitlements\.mac\.plist$/m);
+  const base = await readFile(
+    join(desktopRoot, 'build/entitlements.mac.plist'),
+    'utf8'
+  );
+  assert.doesNotMatch(base, /keychain-access-groups/);
+});
+
+test('macOS disables Skia Graphite and only the main window opts out of throttling (JOV-5289)', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+
+  const workaround = mainSource.match(
+    /function applyMacGraphiteCompositorWorkaround\(\): void \{([\s\S]*?)\n\}/
+  );
+  assert.ok(workaround, 'Graphite workaround function must exist');
+  assert.match(workaround[1], /if \(process\.platform !== 'darwin'\) return;/);
+  assert.match(
+    workaround[1],
+    /app\.commandLine\.appendSwitch\('disable-skia-graphite'\);/
+  );
+  const invocation = mainSource.indexOf(
+    'applyMacGraphiteCompositorWorkaround();'
+  );
+  assert.ok(invocation > 0, 'Graphite workaround must be invoked');
+  assert.ok(
+    invocation < mainSource.indexOf('app.whenReady()'),
+    'Graphite workaround must run before whenReady'
+  );
+  assert.doesNotMatch(mainSource, /disable-background-timer-throttling/);
+  assert.doesNotMatch(mainSource, /disable-backgrounding-occluded-windows/);
+
+  assert.equal(mainSource.match(/backgroundThrottling: false/g)?.length, 1);
+  const mainWindowStart = mainSource.indexOf('function createWindow(');
+  const throttlingIndex = mainSource.indexOf('backgroundThrottling: false');
+  assert.ok(
+    throttlingIndex > mainWindowStart,
+    'only the main window may keep backgroundThrottling: false'
+  );
 });
 
 test('desktop public profile previews are isolated, phone-sized, and closable', async () => {
@@ -558,17 +829,8 @@ test('preload marks the hosted app as Electron after the document root is ready'
   );
 });
 
-test('compiled sandbox preload has no unsupported local module dependency', async () => {
-  const preloadSource = await readFile(
-    join(desktopRoot, 'src/preload.ts'),
-    'utf8'
-  );
-  const compiledPreload = ts.transpileModule(preloadSource, {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2022,
-    },
-  }).outputText;
+test('compiled sandbox preload has no unsupported local module dependency', async t => {
+  const compiledPreload = await readBundledPreload(t);
   const requiredModules = [
     ...compiledPreload.matchAll(/require\(["']([^"']+)["']\)/g),
   ].map(match => match[1]);
@@ -684,7 +946,9 @@ test('desktop dev defaults to the local app shell and packaged builds keep produ
     'src/build-identity.generated.ts'
   );
   const identityJsonPath = join(desktopRoot, 'build/build-identity.json');
-  const originalEnvGenerated = await readFile(envGeneratedPath, 'utf8');
+  const originalEnvGenerated = await readFile(envGeneratedPath, 'utf8').catch(
+    () => null
+  );
   const originalIdentityGenerated = await readFile(
     identityGeneratedPath,
     'utf8'
@@ -805,8 +1069,8 @@ test('desktop dev defaults to the local app shell and packaged builds keep produ
       }
     );
   } finally {
-    await writeFile(envGeneratedPath, originalEnvGenerated);
     for (const [filePath, original] of [
+      [envGeneratedPath, originalEnvGenerated],
       [identityGeneratedPath, originalIdentityGenerated],
       [identityJsonPath, originalIdentityJson],
     ]) {
@@ -883,6 +1147,10 @@ test('native auth smoke keeps browser callbacks on the browser auth origin', asy
 
 test('desktop main-window hub regression contracts (desktop QA)', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const preloadSource = await readFile(
+    join(desktopRoot, 'src/preload.ts'),
+    'utf8'
+  );
   const authRouteSource = await readFile(
     join(desktopRoot, 'src/desktop-auth-browser-route.ts'),
     'utf8'
@@ -993,6 +1261,63 @@ test('desktop main-window hub regression contracts (desktop QA)', async () => {
     /CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL,[\s\S]{0,400}?isTrustedDesktopAuthSender\(event\)[\s\S]{0,300}?clearPendingDesktopAuthFlow\(\);[\s\S]{0,200}?win\.close\(\);/
   );
 
+  // Deep-link-independent return: a typed return code is redeemed in the
+  // main process with the pending PKCE verifier (never a background poll,
+  // which would enable device-code phishing), the jovie:// handler is
+  // reclaimed before each browser handoff, and a late deep link carrying
+  // the same code never reopens sign-in after success.
+  assert.match(
+    mainSource,
+    /REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL,[\s\S]{0,300}?isTrustedDesktopAuthSender\(event\)[\s\S]{0,300}?desktopBrowserAuthRouteState\.pendingPkce[\s\S]{0,600}?redeemDesktopReturnCode\(/
+  );
+  assert.match(
+    mainSource,
+    /desktopBrowserAuthRouteState\.pendingPkce !== pending\)[\s\S]{0,120}?no-pending-flow[\s\S]{0,120}?handleAuthCompletion\(result\.completion\)/
+  );
+  assert.match(
+    mainSource,
+    /net\.fetch\(url, \{ \.\.\.init, credentials: 'omit' \}\)/
+  );
+  assert.doesNotMatch(mainSource, /setInterval\([\s\S]{0,200}?HANDBACK/);
+  assert.match(
+    mainSource,
+    /OPEN_DESKTOP_AUTH_URL_CHANNEL,[\s\S]{0,900}?ensureAuthReturnProtocolRegistered\(\);[\s\S]{0,80}?openExternalUrl\(/
+  );
+  assert.match(
+    mainSource,
+    /function handleAuthCompletion\([\s\S]{0,200}?if \(completion\.code === lastCompletedAuthCode\) return 'duplicate';/
+  );
+  assert.match(
+    preloadSource,
+    /redeemDesktopAuthReturnCode: \(returnCode: string\) =>[\s\S]{0,120}?REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL/
+  );
+
+  // Touch ID (JOV-6727): WebAuthn is configured only from the pure resolver
+  // (signed build + embedded provisioning profile), the account picker
+  // always answers, state writes are allowlisted, and in-app passkey
+  // completion is limited to the trusted auth surfaces.
+  assert.match(
+    mainSource,
+    /resolveDesktopWebAuthnConfig\(\{[\s\S]{0,300}?embedded\.provisionprofile[\s\S]{0,300}?app\.configureWebAuthn\(\{ touchID: config \}\)/
+  );
+  assert.match(
+    mainSource,
+    /'select-webauthn-account'[\s\S]{0,1200}?\.catch\(\(\) => callback\(\)\)/
+  );
+  assert.match(
+    mainSource,
+    /SET_DESKTOP_PASSKEY_STATE_CHANNEL,[\s\S]{0,300}?applyDesktopPasskeyStateUpdate\(update\)[\s\S]{0,120}?isTrustedIpcSender\(event\)/
+  );
+  assert.match(
+    mainSource,
+    /COMPLETE_DESKTOP_PASSKEY_SIGN_IN_CHANNEL,[\s\S]{0,200}?isTrustedDesktopAuthSender\(event\)[\s\S]{0,120}?!desktopPasskeyAvailable/
+  );
+  assert.match(mainSource, /mode: 0o600/);
+  assert.match(
+    preloadSource,
+    /completeDesktopPasskeySignIn: \(\) =>[\s\S]{0,120}?COMPLETE_DESKTOP_PASSKEY_SIGN_IN_CHANNEL/
+  );
+
   // Fix: a no-pending-flow deep link surfaces a visible sign-in retry.
   assert.match(mainSource, /function surfaceNoPendingAuthFlow\(\): void/);
   assert.match(mainSource, /surfaceNoPendingAuthFlow\(\);/);
@@ -1026,7 +1351,7 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   const rootLayout = await readFile(join(webRoot, 'app/layout.tsx'), 'utf8');
   const globalsCss = await readFile(join(webRoot, 'app/globals.css'), 'utf8');
   const titlebarSource = await readFile(
-    join(webRoot, 'components/atoms/DesktopTitlebar.tsx'),
+    join(webRoot, 'components/organisms/DesktopTitlebar.tsx'),
     'utf8'
   );
   const runtimeInit = await readFile(
@@ -1115,4 +1440,301 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
   // native control reserve after resize.
   assert.match(globalsCss, /padding-left: var\(--electron-controls-width\);/);
   assert.match(mainSource, /minWidth: 800,/);
+});
+
+test('Ovie recovery main IPC binds the live main window and root frame without a renderer URL', async () => {
+  const source = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const ast = ts.createSourceFile(
+    'main.ts',
+    source,
+    ts.ScriptTarget.Latest,
+    true
+  );
+  const handler = ast.statements.find(statement =>
+    statement
+      .getText(ast)
+      .startsWith('ipcMain.handle(\n  OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL,')
+  );
+  assert.ok(handler, 'real main process must register the narrow handler');
+  const compiled = ts.transpileModule(handler.getText(ast), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  let registered;
+  let request;
+  const mainContents = {
+    getURL: () => 'https://jov.ie/app/ov?runtime=electron',
+  };
+  runInNewContext(compiled, {
+    OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL: 'open-current-ovie-in-browser',
+    ipcMain: {
+      handle(channel, callback) {
+        assert.equal(channel, 'open-current-ovie-in-browser');
+        registered = callback;
+      },
+    },
+    mainWindow: { webContents: mainContents },
+    getIpcSenderUrl: event => event.senderFrame?.url ?? '',
+    URL_DISPOSITION_OPTIONS: { appUrl: 'https://jov.ie', appEnv: 'production' },
+    openCurrentOvieInBrowser: async input => {
+      request = input;
+      return { ok: true };
+    },
+    shell: {
+      openExternal() {
+        throw Error('OS open must be owned by validated boundary');
+      },
+    },
+  });
+  const frame = { parent: null, detached: false, url: mainContents.getURL() };
+  await registered({ sender: mainContents, senderFrame: frame });
+  assert.equal(request.isMainWindow, true);
+  assert.equal(request.isMainFrame, true);
+  assert.equal(request.currentUrl, mainContents.getURL());
+  assert.equal(request.senderUrl, frame.url);
+  assert.equal(request.args.length, 0);
+  await registered(
+    { sender: {}, senderFrame: { ...frame, parent: {} } },
+    'https://evil.example'
+  );
+  assert.equal(request.isMainWindow, false);
+  assert.equal(request.isMainFrame, false);
+  assert.equal(request.args[0], 'https://evil.example');
+  await registered({ sender: mainContents, senderFrame: null });
+  assert.equal(request.isMainFrame, false);
+  await registered({
+    sender: mainContents,
+    senderFrame: { ...frame, detached: true },
+  });
+  assert.equal(request.isMainFrame, false);
+});
+
+test('Ovie recovery real preload sends zero arguments on its dedicated channel', async t => {
+  const compiled = await readBundledPreload(t);
+  let api;
+  const calls = [];
+  const response = { ok: false, reason: 'blocked-url' };
+  runInNewContext(compiled, {
+    exports: {},
+    process: { platform: 'darwin', versions: { electron: '44' } },
+    document: { documentElement: { dataset: {} } },
+    require(id) {
+      assert.equal(id, 'electron');
+      return {
+        contextBridge: {
+          exposeInMainWorld(name, value) {
+            if (name === 'electronAPI') api = value;
+          },
+        },
+        ipcRenderer: {
+          invoke(...args) {
+            calls.push(args);
+            return Promise.resolve(response);
+          },
+        },
+      };
+    },
+  });
+  assert.equal(await api.openCurrentOvieInBrowser(), response);
+  assert.deepEqual(calls, [['open-current-ovie-in-browser']]);
+});
+
+test('real native cancel wiring retries only an interrupted workspace document', async () => {
+  const source = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const recoverySource = await readFile(
+    join(desktopRoot, 'src/renderer-recovery.ts'),
+    'utf8'
+  );
+  const exports = {};
+  runInNewContext(
+    ts.transpileModule(recoverySource, {
+      compilerOptions: {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.CommonJS,
+      },
+    }).outputText,
+    { exports, URL, setTimeout, clearTimeout }
+  );
+  const ast = ts.createSourceFile(
+    'main.ts',
+    source,
+    ts.ScriptTarget.Latest,
+    true
+  );
+  const declarations = [
+    'restoreMainWindowAfterAuthHandoff',
+    'interceptMainWindowAuthNavigation',
+    'loadReturnedRoute',
+  ];
+  const declarationSource = declarations
+    .map(name => {
+      const declaration = ast.statements.find(
+        node => ts.isFunctionDeclaration(node) && node.name?.text === name
+      );
+      assert.ok(declaration, `real ${name} must exist`);
+      return declaration.getText(ast);
+    })
+    .join('\n');
+  const createWindow = ast.statements.find(
+    node => ts.isFunctionDeclaration(node) && node.name?.text === 'createWindow'
+  );
+  const registrations = [];
+  const visit = node => {
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.getText(ast) === 'win.webContents.on' &&
+      [
+        'did-start-navigation',
+        'did-finish-load',
+        'will-navigate',
+        'will-redirect',
+      ].includes(node.arguments[0]?.text)
+    ) {
+      registrations.push(node.getText(ast));
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(createWindow);
+  assert.equal(registrations.length, 4);
+  const cancelHandler = ast.statements.find(node =>
+    node
+      .getText(ast)
+      .startsWith('ipcMain.handle(\n  CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL,')
+  );
+  assert.ok(cancelHandler);
+  const events = new Map();
+  const loads = [];
+  const handoffs = [];
+  const completions = [];
+  let currentUrl = 'https://jov.ie/app/ov/chat';
+  let cancel;
+  const recovery =
+    exports.createAuthHandoffNavigationRecovery('https://jov.ie');
+  const win = {
+    isDestroyed: () => false,
+    webContents: {
+      id: 7,
+      getURL: () => currentUrl,
+      on: (event, callback) => events.set(event, callback),
+    },
+    loadURL: url => {
+      loads.push(url);
+      return new Promise(resolve => completions.push(resolve));
+    },
+  };
+  const context = {
+    URL,
+    APP_URL: 'https://jov.ie',
+    win,
+    mainWindow: win,
+    mainWindowHiddenForAuthHandoff: true,
+    authNavigationRecovery: recovery,
+    navigationContentsId: 7,
+    desktopNavigation: { setReady: () => {} },
+    authNavigationRecoveries: new Map([[7, recovery]]),
+    parseDidStartNavigation: exports.parseDidStartNavigation,
+    isChromiumErrorDocument: exports.isChromiumErrorDocument,
+    shouldRecoverAuthHandoffToCanonicalShell:
+      exports.shouldRecoverAuthHandoffToCanonicalShell,
+    buildDesktopBrowserAuthUrl: url =>
+      url.endsWith('/signin') ? '/auth/native-start' : null,
+    buildDesktopAuthHandoffUrl: () => 'https://jov.ie/desktop-auth',
+    buildCentralDesktopAuthUrl: () => '/auth/native-start',
+    resolveNavigationUrl: value => value,
+    showDesktopAuthHandoff: url => handoffs.push(url),
+    showWindow: () => {},
+    getUrlDisposition: () => 'in-app',
+    shouldLoadDesktopAuthRouteInApp: () => false,
+    clearPendingDesktopAuthFlow: () => {},
+    isTrustedDesktopAuthSender: event => event.trusted,
+    CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL: 'close-desktop-auth-window',
+    ipcMain: {
+      handle: (_channel, handler) => {
+        cancel = handler;
+      },
+    },
+    BrowserWindow: {
+      fromWebContents: () => ({
+        isDestroyed: () => false,
+        close: () => context.restoreMainWindowAfterAuthHandoff(),
+      }),
+    },
+  };
+  context.authHandoffWindow = {
+    isDestroyed: () => false,
+    close: () => context.restoreMainWindowAfterAuthHandoff(),
+  };
+  const compiled = ts.transpileModule(
+    `${declarationSource}\n${registrations.join(';\n')};\n${cancelHandler.getText(ast)}`,
+    {
+      compilerOptions: { target: ts.ScriptTarget.ES2022 },
+    }
+  ).outputText;
+  runInNewContext(compiled, context);
+  const redirect = () => {
+    let prevented = false;
+    events.get('will-redirect')(
+      {
+        preventDefault: () => {
+          prevented = true;
+        },
+      },
+      'https://jov.ie/signin',
+      false,
+      true
+    );
+    assert.equal(prevented, true);
+  };
+  // The user left locked OV with an actual top-frame document navigation.
+  events.get('did-start-navigation')({}, 'https://jov.ie/app', false, true);
+  currentUrl = 'https://jov.ie/app'; // partially mounted shell before interception
+  redirect();
+  assert.equal(handoffs.length, 1);
+  assert.equal(cancel({ trusted: true }).ok, true);
+  assert.deepEqual(loads, ['https://jov.ie/app']); // no credentials/manual reload
+  // Successful server-authorized navigation finishes and clears the retry.
+  events.get('did-start-navigation')({}, 'https://jov.ie/app', false, true);
+  events.get('did-finish-load')();
+  completions[0]();
+  await Promise.resolve();
+  context.mainWindowHiddenForAuthHandoff = true;
+  redirect();
+  cancel({ trusted: true });
+  assert.equal(
+    loads.length,
+    1,
+    'an intact authenticated draft must not reload'
+  );
+  // A second interrupted navigation which still needs auth recovers inline.
+  context.mainWindowHiddenForAuthHandoff = true;
+  events.get('did-start-navigation')(
+    {},
+    'https://jov.ie/app/chat',
+    false,
+    true
+  );
+  redirect();
+  cancel({ trusted: true });
+  const previousHandoffs = handoffs.length;
+  events.get('did-start-navigation')(
+    {},
+    'https://jov.ie/app/chat',
+    false,
+    true
+  );
+  events.get('did-finish-load')(); // stale finish must not erase retry protection
+  redirect();
+  assert.equal(loads.at(-1), 'https://jov.ie/desktop-auth');
+  events.get('did-finish-load')();
+  redirect(); // duplicate abort/redirect cannot open another handoff
+  assert.equal(handoffs.length, previousHandoffs);
+  assert.equal(cancel({ trusted: false }).ok, false);
+  // A successful auth handback must never replay the interrupted old route.
+  events.get('did-start-navigation')({}, 'https://jov.ie/app/old', false, true);
+  redirect();
+  context.mainWindowHiddenForAuthHandoff = true;
+  const loadsBeforeHandback = loads.length;
+  context.loadReturnedRoute('/app/returned');
+  assert.deepEqual(loads.slice(loadsBeforeHandback), [
+    'https://jov.ie/app/returned',
+  ]);
 });

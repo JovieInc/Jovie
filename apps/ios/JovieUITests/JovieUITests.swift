@@ -87,14 +87,25 @@ final class JovieUITests: XCTestCase {
       $0.buttons["Copy URL"]
     }
 
-    XCTAssertTrue(app.staticTexts["Profile"].exists)
+    XCTAssertTrue(app.staticTexts["My Jovie Card"].exists)
     XCTAssertTrue(app.buttons["Open navigation drawer"].exists)
-    XCTAssertTrue(app.buttons["Open Settings"].exists)
     XCTAssertTrue(app.buttons["dashboard-copy-url-button"].isEnabled)
     XCTAssertTrue(app.buttons["dashboard-share-profile-button"].isEnabled)
     XCTAssertTrue(app.buttons["Open Public Profile"].exists)
     XCTAssertTrue(app.buttons["Open Public Profile"].isEnabled)
+    XCTAssertEqual(
+      app.staticTexts["apple-wallet-profile-pass-status"].label,
+      "Apple Wallet isn't available for this profile yet."
+    )
     attachScreenshot(named: "profile", app: app)
+
+    let actionsMenu = app.buttons["shell-actions-menu"]
+    XCTAssertTrue(actionsMenu.exists)
+    actionsMenu.tap()
+    XCTAssertTrue(
+      app.buttons["Open Settings"].waitForExistence(timeout: 3),
+      "Settings must stay reachable from the shell Actions menu.\n\(app.debugDescription)"
+    )
   }
 
   func testPublicProfileOpensInFullScreenEmbeddedBrowser() {
@@ -151,7 +162,7 @@ final class JovieUITests: XCTestCase {
       $0.buttons["QR unavailable"]
     }
 
-    XCTAssertTrue(app.staticTexts["Profile"].exists)
+    XCTAssertTrue(app.staticTexts["My Jovie Card"].exists)
     let copyButton = app.buttons["dashboard-copy-url-button"]
     let shareButton = app.buttons["dashboard-share-profile-button"]
     XCTAssertTrue(copyButton.exists)
@@ -346,6 +357,7 @@ final class JovieUITests: XCTestCase {
         "Settings row \(linkTitle) did not appear in the accessibility tree.\n\(app.debugDescription)"
       )
     }
+    app.swipeUp()
     for valueTitle in ["Version", "Build"] {
       XCTAssertTrue(
         app.staticTexts[valueTitle].waitForExistence(timeout: 2),
@@ -495,11 +507,11 @@ final class JovieUITests: XCTestCase {
     )
     XCTAssertFalse(
       shellControlExists(app, identifier: "shell-tab-library"),
-      "Library must not be a bottom tab.\n\(app.debugDescription)"
+      "Work must not be a bottom tab.\n\(app.debugDescription)"
     )
     XCTAssertTrue(
-      firstMatchingButton(app, identifiers: ["shell-talk-fab"], labels: ["Talk"]).exists,
-      "Talk must stay reachable off the bottom bar.\n\(app.debugDescription)"
+      app.buttons["shell-actions-menu"].exists,
+      "The Actions overflow must be the shell's single trailing control.\n\(app.debugDescription)"
     )
     XCTAssertFalse(
       app.buttons["chat-voice-button"].exists,
@@ -509,7 +521,7 @@ final class JovieUITests: XCTestCase {
     app.buttons["Open navigation drawer"].tap()
     XCTAssertTrue(
       app.buttons["shell-drawer-surface-shell-tab-library"].waitForExistence(timeout: 3),
-      "Sidebar must expose Library.\n\(app.debugDescription)"
+      "Sidebar must expose Work.\n\(app.debugDescription)"
     )
     XCTAssertTrue(app.buttons["shell-drawer-surface-shell-tab-calendar"].exists)
     XCTAssertTrue(app.buttons["shell-drawer-surface-shell-tab-inbox"].exists)
@@ -518,18 +530,78 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "chat-first-sidebar", app: app)
   }
 
+  func testDrawerUsesCanonicalRootsAndWorkChildren() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "chat composer") {
+      $0.textFields["chat-composer-input"]
+    }
+    app.buttons["Open navigation drawer"].tap()
+    let home = app.buttons["shell-drawer-surface-shell-tab-chat"]
+    XCTAssertTrue(waitForHittable(home, timeout: 3))
+    let identity = app.buttons["shell-drawer-surface-shell-tab-profile"]
+    let work = app.buttons["shell-drawer-surface-shell-tab-library"]
+    let inbox = app.buttons["shell-drawer-surface-shell-tab-inbox"]
+    let calendar = app.buttons["shell-drawer-surface-shell-tab-calendar"]
+    let audience = app.buttons["shell-drawer-surface-shell-tab-audience"]
+    XCTAssertEqual(home.label, "Home")
+    XCTAssertEqual(identity.label, "Identity")
+    let rows = [home, identity, work, inbox, calendar, audience]
+    for (above, below) in zip(rows, rows.dropFirst()) {
+      XCTAssertLessThan(above.frame.maxY, below.frame.maxY)
+      XCTAssertGreaterThanOrEqual(below.frame.height, 44)
+    }
+    XCTAssertGreaterThan(inbox.frame.minX, work.frame.minX)
+    XCTAssertEqual(inbox.frame.minX, calendar.frame.minX, accuracy: 1)
+    attachScreenshot(named: "ios-canonical-information-architecture", app: app)
+
+    inbox.tap()
+    XCTAssertTrue(app.descendants(matching: .any)["inbox-surface"].waitForExistence(timeout: 3))
+    app.buttons["Open navigation drawer"].tap()
+    XCTAssertTrue(waitForHittable(calendar, timeout: 3))
+    calendar.tap()
+    XCTAssertTrue(app.descendants(matching: .any)["calendar-surface"].waitForExistence(timeout: 3))
+    app.buttons["Open navigation drawer"].tap()
+    XCTAssertTrue(waitForHittable(identity, timeout: 3))
+    identity.tap()
+    XCTAssertTrue(app.buttons["Copy URL"].waitForExistence(timeout: 3))
+  }
+
+  func testOfflineStatusReservesToolbarGeometry() {
+    let onlineApp = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "chat composer") {
+      $0.textFields["chat-composer-input"]
+    }
+    let onlineTitle = onlineApp.staticTexts["Home"].firstMatch.frame
+    let onlineActions = onlineApp.buttons["shell-actions-menu"].frame
+    XCTAssertFalse(onlineApp.staticTexts["Offline"].exists)
+    onlineApp.terminate()
+
+    let offlineApp = launchMockApp(launchArgument: "-ui-testing-chat-offline", expectedElementDescription: "chat composer") {
+      $0.textFields["chat-composer-input"]
+    }
+    XCTAssertTrue(offlineApp.staticTexts["Offline"].exists)
+    let offlineTitle = offlineApp.staticTexts["Home"].firstMatch.frame
+    let offlineActions = offlineApp.buttons["shell-actions-menu"].frame
+    XCTAssertEqual(onlineTitle.minY, offlineTitle.minY, accuracy: 1)
+    XCTAssertEqual(onlineActions.minY, offlineActions.minY, accuracy: 1)
+    attachScreenshot(named: "ios-offline-stable-toolbar", app: offlineApp)
+  }
+
   func testShellVlogControlOpensPromptCaptureDirectly() {
     let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
       $0.textFields["chat-composer-input"]
     }
 
+    let actionsMenu = app.buttons["shell-actions-menu"]
+    XCTAssertTrue(
+      waitForHittable(actionsMenu, timeout: 3),
+      "Actions overflow did not become available in the chat shell.\n\(app.debugDescription)"
+    )
+    actionsMenu.tap()
+
     let vlogControl = app.descendants(matching: .any)["shell-vlog-open"]
     XCTAssertTrue(
-      waitForHittable(vlogControl, timeout: 3),
-      "Direct Vlog control did not become available in the chat shell.\n\(app.debugDescription)"
+      vlogControl.waitForExistence(timeout: 3),
+      "Vlog Mode did not appear in the shell Actions menu.\n\(app.debugDescription)"
     )
-    XCTAssertGreaterThanOrEqual(vlogControl.frame.width, 44)
-    XCTAssertGreaterThanOrEqual(vlogControl.frame.height, 44)
 
     vlogControl.tap()
 
@@ -646,24 +718,25 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "no-ghost-footprint-needs-onboarding", app: onboardingApp)
   }
 
-  func testTalkFABAppearsOnPrimaryTabBar() {
+  func testTalkActionLivesInShellActionsMenu() {
     let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
       $0.textFields["chat-composer-input"]
     }
 
-    let talkFAB = firstMatchingButton(
-      app,
-      identifiers: ["shell-talk-fab"],
-      labels: ["Talk"],
-      timeout: 3
-    )
-    XCTAssertTrue(
-      talkFAB.exists,
-      "Talk did not appear in the chat-first toolbar.\n\(app.debugDescription)"
-    )
     XCTAssertFalse(
       shellControlExists(app, identifier: "shell-tab-bar"),
       "Talk must not require a bottom tab bar.\n\(app.debugDescription)"
+    )
+
+    let actionsMenu = app.buttons["shell-actions-menu"]
+    XCTAssertTrue(
+      actionsMenu.waitForExistence(timeout: 3),
+      "Actions overflow did not appear in the chat-first toolbar.\n\(app.debugDescription)"
+    )
+    actionsMenu.tap()
+    XCTAssertTrue(
+      app.descendants(matching: .any)["shell-talk-fab"].waitForExistence(timeout: 3),
+      "Talk did not appear in the shell Actions menu.\n\(app.debugDescription)"
     )
     XCTAssertFalse(
       app.buttons["chat-voice-button"].exists,
@@ -976,7 +1049,7 @@ final class JovieUITests: XCTestCase {
     )
     XCTAssertTrue(
       app.buttons["shell-drawer-surface-shell-tab-library"].isHittable,
-      "Sidebar Library must be reachable after a leading swipe.\n\(app.debugDescription)"
+      "Sidebar Work must be reachable after a leading swipe.\n\(app.debugDescription)"
     )
     XCTAssertFalse(
       app.buttons["Copy URL"].exists,
@@ -1146,7 +1219,7 @@ final class JovieUITests: XCTestCase {
       $0.textFields["chat-composer-input"]
     }
 
-    app.buttons["Open Settings"].tap()
+    openSettingsFromActionsMenu(app)
     XCTAssertTrue(
       app.descendants(matching: .any)["settings-view"].waitForExistence(timeout: 3)
     )
@@ -1165,7 +1238,7 @@ final class JovieUITests: XCTestCase {
       "Ovie workspace did not restore the Summer-owned chat surface.\n\(app.debugDescription)"
     )
 
-    app.buttons["Open Settings"].tap()
+    openSettingsFromActionsMenu(app)
     XCTAssertTrue(waitForLabel(workspaceSwitch, label: "Workspace Ovie", timeout: 3))
     workspaceSwitch.tap()
     XCTAssertTrue(waitForLabel(workspaceSwitch, label: "Workspace Jovie", timeout: 3))
@@ -1819,7 +1892,7 @@ final class JovieUITests: XCTestCase {
 
   // JOV-3672: while the drawer is open, the elevated content card must be
   // non-interactive so the drawer is the sole active switcher — a tap on the
-  // (visually still-present but inert) gear icon must not open Settings.
+  // (visually still-present but inert) Actions menu must not open it.
   func testDrawerOpenMakesContentCardInert() {
     let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
       $0.buttons["Copy URL"]
@@ -1832,8 +1905,8 @@ final class JovieUITests: XCTestCase {
     )
 
     XCTAssertFalse(
-      app.buttons["Open Settings"].isHittable,
-      "Content card's Settings gear stayed hittable while the drawer was open — content must be inert.\n\(app.debugDescription)"
+      app.buttons["shell-actions-menu"].isHittable,
+      "Content card's Actions menu stayed hittable while the drawer was open — content must be inert.\n\(app.debugDescription)"
     )
 
     // Drawer's own surface switcher remains the sole active switcher.
@@ -2179,7 +2252,7 @@ final class JovieUITests: XCTestCase {
         "Chat message",
         "Send",
         "Chat",
-        "Library",
+        "Work",
         "Inbox",
         "Calendar",
         "Done",
@@ -2506,53 +2579,20 @@ final class JovieUITests: XCTestCase {
     return false
   }
 
-  /// Resolve a primary tab bar / Talk FAB control by accessibility identifier.
-  /// SwiftUI groups these as `Other` (not `Button`) when
-  /// `accessibilityElement(children: .ignore)` is applied on tab buttons.
-  private func firstMatchingButton(
-    _ app: XCUIApplication,
-    identifiers: [String],
-    labels: [String],
-    timeout: TimeInterval = 0
-  ) -> XCUIElement {
-    let deadline = Date().addingTimeInterval(max(0, timeout))
-    repeat {
-      for identifier in identifiers {
-        let byID = app.descendants(matching: .any)[identifier]
-        if byID.exists {
-          return byID
-        }
-      }
-      // When the parent HStack ID leaks, every primary tab shares
-      // identifier "shell-tab-bar" and only the accessibility label differs.
-      for label in labels {
-        let leaked = app.buttons
-          .matching(identifier: "shell-tab-bar")
-          .matching(NSPredicate(format: "label == %@", label))
-          .firstMatch
-        if leaked.exists {
-          return leaked
-        }
-        let byLabel = app.descendants(matching: .any)
-          .matching(NSPredicate(format: "label == %@", label))
-          .matching(
-            NSPredicate(
-              format: "identifier BEGINSWITH 'shell-tab-' OR identifier == 'shell-talk-fab'"
-            )
-          )
-          .firstMatch
-        if byLabel.exists {
-          return byLabel
-        }
-      }
-      if Date() >= deadline {
-        break
-      }
-      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
-    } while Date() < deadline
-
-    // Prefer the first identifier so callers can still assert on a stable query.
-    return app.descendants(matching: .any)[identifiers.first ?? labels.first ?? ""]
+  // JOV-5353: Settings lives inside the shell's single trailing Actions menu.
+  private func openSettingsFromActionsMenu(_ app: XCUIApplication) {
+    let actionsMenu = app.buttons["shell-actions-menu"]
+    XCTAssertTrue(
+      actionsMenu.waitForExistence(timeout: 3),
+      "Shell Actions menu did not appear.\n\(app.debugDescription)"
+    )
+    actionsMenu.tap()
+    let settingsItem = app.buttons["Open Settings"]
+    XCTAssertTrue(
+      settingsItem.waitForExistence(timeout: 3),
+      "Settings did not appear in the shell Actions menu.\n\(app.debugDescription)"
+    )
+    settingsItem.tap()
   }
 
   private func shellControlExists(_ app: XCUIApplication, identifier: String) -> Bool {

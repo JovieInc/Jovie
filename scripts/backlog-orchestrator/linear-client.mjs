@@ -1203,6 +1203,21 @@ export async function addComment(issueId, body) {
   );
 }
 
+/** Create a canonical intake issue only after caller-owned reconciliation. */
+export async function createIssue({ teamId, stateId, title, description }) {
+  return graphql(
+    `
+    mutation($input: IssueCreateInput!) {
+      issueCreate(input: $input) {
+        success
+        issue { id identifier url state { id name } }
+      }
+    }
+  `,
+    { input: { teamId, stateId, title, description } }
+  );
+}
+
 export async function updateComment(commentId, body) {
   return graphql(
     `
@@ -1229,6 +1244,19 @@ export async function transitionIssue(issueId, stateId, options = {}) {
     }
   `,
     { id: issueId, stateId },
+    options
+  );
+}
+
+/** Update a source-fenced issue after its owning policy has produced a receipt. */
+export async function updateIssue(issueId, input, options = {}) {
+  return graphql(
+    `
+    mutation($id: String!, $input: IssueUpdateInput!) {
+      issueUpdate(id: $id, input: $input) { success }
+    }
+  `,
+    { id: issueId, input },
     options
   );
 }

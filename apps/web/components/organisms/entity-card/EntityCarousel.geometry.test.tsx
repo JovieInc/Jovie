@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EntityCarousel } from './EntityCarousel';
@@ -250,6 +256,51 @@ describe('EntityCarousel profile geometry', () => {
     expect(carousel.querySelectorAll(':scope > li')).toHaveLength(1);
   });
 
+  it('labels carousel progress as cards so a non-release alerts card cannot read as a release count', () => {
+    // JOV-6438: the public profile carousel mixes a featured leading card and
+    // an alerts trailing card into the release catalog. Slot progress must
+    // self-describe as counting cards, so a "1 of 19" carousel next to "18
+    // listed releases" copy never reads as a contradictory release count.
+    render(
+      <EntityCarousel
+        items={items}
+        layout='profile-landscape'
+        leading={<section data-testid='slot-leading' />}
+        trailing={<section data-testid='slot-trailing' />}
+      />
+    );
+
+    const slides = screen
+      .getAllByRole('listitem')
+      .map(slide => slide.getAttribute('aria-label'));
+    expect(slides).toEqual([
+      'Card 1 of 4',
+      'Card 2 of 4',
+      'Card 3 of 4',
+      'Card 4 of 4',
+    ]);
+    expect(
+      screen.getByRole('navigation', { name: 'Profile Cards' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Previous Card' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Next Card' })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Card 1 of 4/)).toBeInTheDocument();
+
+    // Without leading/trailing slots (a profile with no alerts card and no
+    // featured highlight), the progress still describes cards, not releases.
+    cleanup();
+    render(<EntityCarousel items={items} layout='profile-landscape' />);
+
+    expect(screen.getByText(/Card 1 of 2/)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('navigation', { name: 'Profile Items' })
+    ).not.toBeInTheDocument();
+  });
+
   it('renders one full-width landscape card per mandatory snap', () => {
     const withCta: EntityCardModel[] = [
       {
@@ -339,11 +390,11 @@ describe('EntityCarousel profile geometry', () => {
 
     const controls = screen.getByTestId('profile-carousel-controls');
     const previousArrow = screen.getByRole('button', {
-      name: 'Previous Item',
+      name: 'Previous Card',
     });
-    const nextArrow = screen.getByRole('button', { name: 'Next Item' });
-    const previous = screen.getByRole('button', { name: 'Go to item 1' });
-    const next = screen.getByRole('button', { name: 'Go to item 2' });
+    const nextArrow = screen.getByRole('button', { name: 'Next Card' });
+    const previous = screen.getByRole('button', { name: 'Go to card 1' });
+    const next = screen.getByRole('button', { name: 'Go to card 2' });
     expect(carousel.parentElement).toHaveClass('h-fit');
     expect(controls).not.toContainElement(carousel);
     expect(carousel.nextElementSibling).toBe(controls);
@@ -353,7 +404,7 @@ describe('EntityCarousel profile geometry', () => {
     expect(next).not.toHaveAttribute('aria-current');
     expect(previous).toHaveClass('h-11', 'w-11');
     expect(next).toHaveClass('h-11', 'w-11');
-    expect(screen.getByText('Item 1 of 2')).toBeInTheDocument();
+    expect(screen.getByText(/Card 1 of 2/)).toBeInTheDocument();
 
     fireEvent.click(next);
 
@@ -365,7 +416,7 @@ describe('EntityCarousel profile geometry', () => {
     expect(next).toHaveAttribute('aria-current', 'true');
     expect(previousArrow).toBeEnabled();
     expect(nextArrow).toBeDisabled();
-    expect(screen.getByText('Item 2 of 2')).toBeInTheDocument();
+    expect(screen.getByText(/Card 2 of 2/)).toBeInTheDocument();
   });
 
   it('coalesces scroll tracking without reading every card layout per frame', () => {
@@ -408,7 +459,7 @@ describe('EntityCarousel profile geometry', () => {
       act(() => {
         if (scheduledFrame) scheduledFrame(0);
       });
-      expect(screen.getByText('Item 2 of 2')).toBeInTheDocument();
+      expect(screen.getByText(/Card 2 of 2/)).toBeInTheDocument();
       for (const geometryRead of geometryReads) {
         expect(geometryRead).not.toHaveBeenCalled();
       }
@@ -434,7 +485,7 @@ describe('EntityCarousel profile geometry', () => {
       value: 336,
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next Item' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next Card' }));
 
     expect(scrollTo).toHaveBeenCalledWith({ left: 336, behavior: 'auto' });
   });
@@ -501,14 +552,14 @@ describe('EntityCarousel profile geometry', () => {
 
     const carousel = screen.getByTestId('entity-carousel');
     carousel.scrollTo = vi.fn();
-    fireEvent.click(screen.getByRole('button', { name: 'Next Item' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Next Item' }));
-    expect(screen.getByText('Item 3 of 3')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Next Card' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next Card' }));
+    expect(screen.getByText(/Card 3 of 3/)).toBeInTheDocument();
 
     rerender(<EntityCarousel items={items} layout='profile-landscape' />);
 
-    expect(screen.getByText('Item 2 of 2')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Next Item' })).toBeDisabled();
+    expect(screen.getByText(/Card 2 of 2/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next Card' })).toBeDisabled();
   });
 
   it('keeps missing artwork in the same square, subtly rounded media slot', () => {
@@ -655,7 +706,7 @@ describe('EntityCarousel carousel a11y semantics', () => {
     const track = screen.getByTestId('entity-carousel');
     expect(
       [...track.children].map(card => card.getAttribute('aria-label'))
-    ).toEqual(['1 of 4', '2 of 4', '3 of 4', '4 of 4']);
+    ).toEqual(['Card 1 of 4', 'Card 2 of 4', 'Card 3 of 4', 'Card 4 of 4']);
   });
 
   it('labels slides by slot position even when only entity items render', () => {
@@ -664,7 +715,7 @@ describe('EntityCarousel carousel a11y semantics', () => {
     const track = screen.getByTestId('entity-carousel');
     expect(
       [...track.children].map(card => card.getAttribute('aria-label'))
-    ).toEqual(['1 of 2', '2 of 2']);
+    ).toEqual(['Card 1 of 2', 'Card 2 of 2']);
     expect(track.children[0]).toHaveAttribute('aria-roledescription', 'slide');
   });
 });

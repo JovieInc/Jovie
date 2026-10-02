@@ -69,12 +69,18 @@ export function SettingsPaymentsSection() {
       className={
         tone === 'warning'
           ? 'text-app leading-[18px] text-warning'
-          : 'text-app leading-[18px] text-destructive'
+          : 'text-app leading-[18px] text-error'
       }
     >
       {message}
     </p>
   );
+
+  const paymentErrorNotice = (message: string | null) => {
+    if (!message) return undefined;
+    if (isPlatformProfileUnavailable) return renderNotice(message, 'warning');
+    return renderNotice(message, 'error');
+  };
 
   // Fetch status on mount
   const fetchStatus = useCallback(async () => {
@@ -223,12 +229,7 @@ export function SettingsPaymentsSection() {
         description='Connect stripe to receive fan payments directly through jovie. Stripe handles payment processing, payouts, and tax reporting.'
         action={renderConnectAction('Connect Stripe')}
       />,
-      error
-        ? renderNotice(
-            error,
-            isPlatformProfileUnavailable ? 'warning' : 'error'
-          )
-        : undefined
+      paymentErrorNotice(error)
     );
   }
 
@@ -258,12 +259,7 @@ export function SettingsPaymentsSection() {
           </div>
         }
       />,
-      error
-        ? renderNotice(
-            error,
-            isPlatformProfileUnavailable ? 'warning' : 'error'
-          )
-        : undefined
+      paymentErrorNotice(error)
     );
   }
 
@@ -292,8 +288,6 @@ export function SettingsPaymentsSection() {
         </Button>
       }
     />,
-    error
-      ? renderNotice(error, isPlatformProfileUnavailable ? 'warning' : 'error')
-      : undefined
+    paymentErrorNotice(error)
   );
 }

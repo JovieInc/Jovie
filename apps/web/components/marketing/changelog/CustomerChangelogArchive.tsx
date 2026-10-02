@@ -10,10 +10,13 @@ import {
   Wrench,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { FilterChip } from '@/components/molecules/filters/FilterChip';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  CUSTOMER_CHANGELOG_CATEGORIES,
   CUSTOMER_CHANGELOG_CATEGORY_LABELS,
+  type CustomerChangelogCategory,
   type CustomerChangelogEntry,
   type CustomerChangelogMonthGroup,
   formatCustomerChangelogDate,
@@ -21,6 +24,13 @@ import {
 } from '@/lib/customer-changelog';
 
 const INITIAL_MONTH_COUNT = 1;
+
+type CategoryFilter = 'all' | CustomerChangelogCategory;
+
+const CATEGORY_FILTER_LABELS: Record<CategoryFilter, string> = {
+  all: 'All',
+  ...CUSTOMER_CHANGELOG_CATEGORY_LABELS,
+};
 
 /**
  * Compact source-backed fallback artwork. Customer entries do not currently
@@ -42,6 +52,37 @@ const ENTRY_MEDIA_ICONS: Record<
 
 export interface CustomerChangelogArchiveProps {
   readonly months: readonly CustomerChangelogMonthGroup[];
+  readonly technicalReleases?: readonly { version: string; date: string }[];
+}
+
+function TechnicalReleaseNav({
+  releases,
+}: {
+  readonly releases: readonly { version: string; date: string }[];
+}) {
+  if (!releases.length) return null;
+  return (
+    <nav aria-label='Technical Release Log' className='changelog-archive-nav'>
+      <p className='text-sm text-secondary-token'>Engineering history</p>
+      <ul className='changelog-archive-nav__links'>
+        {releases.map(release => (
+          <li key={release.version}>
+            <Link
+              href={versionHref(release.version)}
+              className='changelog-archive-nav__link'
+            >
+              <span className='changelog-archive-nav__link-date'>
+                {formatCustomerChangelogDate(release.date)}
+              </span>
+              <span className='changelog-archive-nav__link-title'>
+                {release.version}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
 }
 
 function versionHref(version: string): string {
@@ -85,7 +126,10 @@ function EntryRow({
     entry.date,
     entry.technicalVersion
   );
-  const hasLevel2 = Boolean(entry.explanation) || entry.supporting.length > 0;
+  const hasLevel2 =
+    Boolean(entry.explanation) ||
+    entry.supporting.length > 0 ||
+    Boolean(entry.prerequisites?.length);
   const hasLevel3 = entry.technical.length > 0;
 
   return (
@@ -103,12 +147,25 @@ function EntryRow({
             {/* ui-casing-allow: tiny taxonomy caption, not IA heading */}
             {CUSTOMER_CHANGELOG_CATEGORY_LABELS[entry.category]}
           </p>
+          {entry.availability === 'preview' ||
+          entry.availability === 'limited' ? (
+            <p className='text-sm text-secondary-token'>
+              {entry.availability === 'preview'
+                ? 'Preview'
+                : 'Limited availability'}
+            </p>
+          ) : null}
           <h3 className='changelog-entry__title'>{entry.title}</h3>
           <EntryMedia entry={entry} tone={tone} variant='feature' />
           {hasLevel2 ? (
             <div className='space-y-2'>
               {entry.explanation ? (
                 <p className='changelog-entry__excerpt'>{entry.explanation}</p>
+              ) : null}
+              {entry.prerequisites?.length ? (
+                <p className='changelog-entry__excerpt'>
+                  {entry.prerequisites.join(' · ')}
+                </p>
               ) : null}
               {entry.supporting.length > 0 ? (
                 <ul className='space-y-1'>
@@ -185,18 +242,59 @@ function MonthSection({
   );
 }
 
+const CATEGORY_FILTER_OPTIONS: readonly CategoryFilter[] = [
+  'all',
+  ...CUSTOMER_CHANGELOG_CATEGORIES,
+];
+
+/**
+ * Secondary category filter (pen O64tu): quiet chips below the outcome
+ * hero/lead copy, never the primary IA.
+ */
+function CategoryFilterToolbar({
+  active,
+  onChange,
+}: {
+  readonly active: CategoryFilter;
+  readonly onChange: (next: CategoryFilter) => void;
+}) {
+  return (
+    <div
+      role='toolbar'
+      aria-label='Filter Updates By Category'
+      className='changelog-filter-toolbar'
+    >
+      {CATEGORY_FILTER_OPTIONS.map(option => (
+        <FilterChip
+          key={option}
+          pressed={active === option}
+          onClick={() => onChange(option)}
+        >
+          {CATEGORY_FILTER_LABELS[option]}
+        </FilterChip>
+      ))}
+    </div>
+  );
+}
+
 function ArchiveJumpNav({
   months,
+  visibleMonthCount,
 }: {
   readonly months: readonly CustomerChangelogMonthGroup[];
+  readonly visibleMonthCount: number;
 }) {
   return (
     <nav aria-label='Changelog Archive' className='changelog-archive-nav'>
-      {months.map(group => (
+      {months.map((group, index) => (
         <div key={group.monthKey} className='changelog-archive-nav__row'>
           <div className='changelog-archive-nav__rail'>
             <Link
-              href={`#changelog-month-${group.monthKey}`}
+              href={
+                index < visibleMonthCount
+                  ? `#changelog-month-${group.monthKey}`
+                  : versionHref(group.entries[0].technicalVersion)
+              }
               className='changelog-archive-nav__month'
             >
               {group.label}
@@ -207,7 +305,11 @@ function ArchiveJumpNav({
             {group.entries.map(entry => (
               <li key={entry.slug}>
                 <Link
-                  href={`#${entry.slug}`}
+                  href={
+                    index < visibleMonthCount
+                      ? `#${entry.slug}`
+                      : versionHref(entry.technicalVersion)
+                  }
                   className='changelog-archive-nav__link'
                 >
                   <span className='changelog-archive-nav__link-date'>
@@ -238,21 +340,49 @@ function ArchiveJumpNav({
  */
 export function CustomerChangelogArchive({
   months,
+  technicalReleases = [],
 }: CustomerChangelogArchiveProps) {
   const [visibleMonthCount, setVisibleMonthCount] =
     useState(INITIAL_MONTH_COUNT);
+  const [activeCategory, setActiveCategory] = useState<CategoryFilter>('all');
+
+  const filteredMonths = useMemo(
+    () =>
+      activeCategory === 'all'
+        ? months
+        : months
+            .map(group => ({
+              ...group,
+              entries: group.entries.filter(
+                entry => entry.category === activeCategory
+              ),
+            }))
+            .filter(group => group.entries.length > 0),
+    [months, activeCategory]
+  );
+
+  function handleCategoryChange(next: CategoryFilter) {
+    setActiveCategory(next);
+    setVisibleMonthCount(INITIAL_MONTH_COUNT);
+  }
 
   if (months.length === 0) {
     return (
       <div data-reduced-motion='static'>
         <p className='text-secondary-token'>No updates yet. Check back soon!</p>
+        <details className='mb-6'>
+          <summary className='min-h-11 cursor-pointer text-sm text-secondary-token'>
+            Browse engineering history
+          </summary>
+          <TechnicalReleaseNav releases={technicalReleases} />
+        </details>
       </div>
     );
   }
 
-  const visibleCount = Math.min(visibleMonthCount, months.length);
-  const visibleMonths = months.slice(0, visibleCount);
-  const remainingCount = months.length - visibleCount;
+  const visibleCount = Math.min(visibleMonthCount, filteredMonths.length);
+  const visibleMonths = filteredMonths.slice(0, visibleCount);
+  const remainingCount = filteredMonths.length - visibleCount;
 
   const monthToneOffsets = visibleMonths.map((_, index) =>
     visibleMonths
@@ -262,16 +392,38 @@ export function CustomerChangelogArchive({
 
   return (
     <div data-reduced-motion='static'>
-      <ArchiveJumpNav months={visibleMonths} />
-      <div id='changelog-outcome-list'>
-        {visibleMonths.map((group, index) => (
-          <MonthSection
-            key={group.monthKey}
-            group={group}
-            toneOffset={monthToneOffsets[index] ?? 0}
-          />
-        ))}
-      </div>
+      <CategoryFilterToolbar
+        active={activeCategory}
+        onChange={handleCategoryChange}
+      />
+
+      {filteredMonths.length === 0 ? (
+        <p className='text-secondary-token'>
+          {`No ${CATEGORY_FILTER_LABELS[activeCategory].toLowerCase()} updates yet.`}
+        </p>
+      ) : (
+        <>
+          <details className='mb-6'>
+            <summary className='min-h-11 cursor-pointer text-sm text-secondary-token'>
+              Browse all updates
+            </summary>
+            <ArchiveJumpNav
+              months={filteredMonths}
+              visibleMonthCount={visibleCount}
+            />
+            <TechnicalReleaseNav releases={technicalReleases} />
+          </details>
+          <div id='changelog-outcome-list'>
+            {visibleMonths.map((group, index) => (
+              <MonthSection
+                key={group.monthKey}
+                group={group}
+                toneOffset={monthToneOffsets[index] ?? 0}
+              />
+            ))}
+          </div>
+        </>
+      )}
 
       {remainingCount > 0 ? (
         <div className='changelog-load-earlier'>
@@ -282,7 +434,7 @@ export function CustomerChangelogArchive({
             aria-controls='changelog-outcome-list'
             onClick={() =>
               setVisibleMonthCount(current =>
-                Math.min(current + 1, months.length)
+                Math.min(current + 1, filteredMonths.length)
               )
             }
           >

@@ -1,16 +1,23 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
-import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import {
+  DashboardDataContext,
+  type DashboardDataContextValue,
+} from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { useFounderDoor } from '@/contexts/FounderDoorContext';
 
 // Short-circuit heavy import chains that this test doesn't exercise.
 
-const { previewPanelProviderMock, useAuthRouteConfigMock } = vi.hoisted(() => ({
+const {
+  previewPanelProviderMock,
+  useAuthRouteConfigMock,
+  commandPaletteState,
+} = vi.hoisted(() => ({
   previewPanelProviderMock: vi.fn(
     ({ children }: { children: ReactNode }) => children
   ),
+  commandPaletteState: { open: false },
   useAuthRouteConfigMock: vi.fn(() => ({
     section: 'dashboard',
     isArtistProfileSettings: false,
@@ -52,7 +59,7 @@ vi.mock('@/contexts/HeaderActionsContext', () => ({
     headerBadge: null,
     headerSearchAdapter: null,
     isSearchOpen: false,
-    isCommandPaletteOpen: false,
+    isCommandPaletteOpen: commandPaletteState.open,
     commandPaletteHeader: null,
     setHeaderActions: vi.fn(),
     setHeaderBadge: vi.fn(),
@@ -118,12 +125,13 @@ vi.mock('@/components/organisms/AuthShell', () => ({
   ),
 }));
 
-vi.mock('@/features/dashboard/organisms/profile-contact-sidebar', () => ({
-  ProfileContactSidebar: () => null,
+vi.mock('@/components/organisms/CommandPalette', () => ({
+  CommandPalette: () => <div data-testid='command-palette-controller' />,
+  CommandPaletteMainSurface: () => <div data-testid='command-palette-main' />,
 }));
 
-vi.mock('@/features/dashboard/atoms/HeaderProfileProgress', () => ({
-  HeaderProfileProgress: () => null,
+vi.mock('@/features/dashboard/organisms/profile-contact-sidebar', () => ({
+  ProfileContactSidebar: () => null,
 }));
 
 vi.mock('@/features/dashboard/atoms/DrawerToggleButton', () => ({
@@ -171,6 +179,7 @@ function PendingShellControls() {
 
 describe('AuthShellWrapper', () => {
   beforeEach(() => {
+    commandPaletteState.open = false;
     previewPanelProviderMock.mockClear();
     useAuthRouteConfigMock.mockClear();
     useAuthRouteConfigMock.mockReturnValue({
@@ -261,6 +270,23 @@ describe('AuthShellWrapper', () => {
     expect(useAuthRouteConfigMock).toHaveBeenCalledWith('ov');
   });
 
+  it('keeps a locked Ovie screen in the content plane even if Cmd+K was already open', () => {
+    commandPaletteState.open = true;
+    render(
+      <AuthShellWrapper mode='ov' isWorkspaceLocked>
+        <div>Ovie lock screen</div>
+      </AuthShellWrapper>
+    );
+
+    expect(screen.getByText('Ovie lock screen')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('command-palette-main')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('command-palette-controller')
+    ).not.toBeInTheDocument();
+  });
+
   it('passes preview panel default-open state through to provider on dashboard routes', () => {
     render(
       <AuthShellWrapper previewPanelDefaultOpen>
@@ -327,30 +353,33 @@ describe('AuthShellWrapper', () => {
     ['dashboard', {}],
     ['chat', { isChatRoute: true }],
     ['admin', { section: 'admin' }],
-  ])('does not mount stale release-transition copy at rest on %s routes', (_, overrides) => {
-    useAuthRouteConfigMock.mockReturnValue({
-      section: 'dashboard',
-      isArtistProfileSettings: false,
-      breadcrumbs: [],
-      showMobileTabs: false,
-      isTableRoute: false,
-      isDemoRoute: false,
-      isChatRoute: false,
-      isLyricsRoute: false,
-      ...overrides,
-    });
+  ])(
+    'does not mount stale release-transition copy at rest on %s routes',
+    (_, overrides) => {
+      useAuthRouteConfigMock.mockReturnValue({
+        section: 'dashboard',
+        isArtistProfileSettings: false,
+        breadcrumbs: [],
+        showMobileTabs: false,
+        isTableRoute: false,
+        isDemoRoute: false,
+        isChatRoute: false,
+        isLyricsRoute: false,
+        ...overrides,
+      });
 
-    render(
-      <AuthShellWrapper>
-        <div>route content</div>
-      </AuthShellWrapper>
-    );
+      render(
+        <AuthShellWrapper>
+          <div>route content</div>
+        </AuthShellWrapper>
+      );
 
-    expect(screen.queryByText('Opening Releases')).not.toBeInTheDocument();
-    expect(
-      screen.queryByText('Preparing your release workspace.')
-    ).not.toBeInTheDocument();
-  });
+      expect(screen.queryByText('Opening Releases')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('Preparing your release workspace.')
+      ).not.toBeInTheDocument();
+    }
+  );
 
   it('mounts the release-transition overlay only while Releases is pending and clears it on success', () => {
     render(
@@ -421,7 +450,9 @@ describe('AuthShellWrapper', () => {
 
   it('exposes founder-door context so entitled Cmd+O can toggle', () => {
     render(
-      <DashboardDataContext.Provider value={{ isAdmin: true } as DashboardData}>
+      <DashboardDataContext.Provider
+        value={{ isAdmin: true } as unknown as DashboardDataContextValue}
+      >
         <AuthShellWrapper>
           <FounderDoorProbe />
         </AuthShellWrapper>

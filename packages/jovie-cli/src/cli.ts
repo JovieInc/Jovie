@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 import { readFileSync, realpathSync } from 'node:fs';
+import { setGlobalProxyFromEnv } from 'node:http';
+import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -8,14 +10,14 @@ import { parseArgs } from 'node:util';
 import {
   DEFAULT_BASE_URL,
   type FetchImplementation,
-  fetchArtist,
-  fetchArtistLlms,
-  fetchOpenApi,
-  fetchSiteLlms,
   JovieInputError,
   JovieRequestError,
   normalizeBaseUrl,
 } from './client.js';
+import { COMMANDS, findCommand } from './commands.js';
+import { installSkill } from './init.js';
+import { serveMcp } from './mcp.js';
+import { SKILL_MD } from './skill.js';
 
 export const CLI_VERSION_FALLBACK = '0.0.0-private';
 
@@ -61,10 +63,15 @@ export interface CliDependencies {
   readonly fetchImpl?: FetchImplementation;
   readonly stdout?: CliOutput;
   readonly stderr?: CliOutput;
+  readonly stdin?: NodeJS.ReadableStream;
+  readonly homeDir?: string;
+  readonly workerToken?: string;
 }
 
 type CliValues = {
   readonly baseUrl?: string;
+  readonly flags: Readonly<Record<string, string | undefined>>;
+  readonly dir?: string;
   readonly full?: boolean;
   readonly help?: boolean;
   readonly json?: boolean;
@@ -75,30 +82,45 @@ class UsageError extends Error {
   readonly code = 'USAGE_ERROR' as const;
 }
 
-const USAGE = `Usage: jovie <command> [options]
+function usage(): string {
+  const width = 28;
+  const lines = COMMANDS.map(command => {
+    const name = [
+      ...command.path,
+      ...(command.arg ? [`<${command.arg.name}>`] : []),
+      ...(command.flags ?? [])
+        .filter(flag => flag.required)
+        .map(flag => `--${flag.name} <text>`),
+    ].join(' ');
+    return `  ${name.padEnd(width)} ${command.summary}`;
+  });
+  return `Usage: jovie <command> [options]
 
-Read-only public Jovie resources for agents and scripts. No login, API key,
-OAuth flow, file writes, or mutation is performed.
+Jovie for agents: create artist profiles from Spotify and read public artist
+data. No login or API key is needed for public commands.
+Internal fleet commands require a scoped JOVIE_WORKER_TOKEN supplied by the
+operator. Every command supports --json.
 
 Commands:
-  artist get <username>  Fetch an artist profile from GET /api/v1/{username}
-  artist llms <username> Fetch an artist guide from GET /{username}/llms.txt
-  api openapi            Fetch the public OpenAPI contract
-  docs llms               Fetch /llms.txt (use --full for /llms-full.txt)
+${lines.join('\n')}
+  ${'mcp'.padEnd(width)} Run as an MCP server over stdio (same tools as above)
+  ${'init'.padEnd(width)} Install the Jovie skill into Claude, Codex, OpenClaw, Hermes
+  ${'skill'.padEnd(width)} Print the Jovie SKILL.md
 
 Options:
   --base-url <url>       Compatible Jovie deployment origin (default: ${DEFAULT_BASE_URL})
   --json                 Emit compact JSON; text resources use {"content":"..."}
   --full                 Fetch /llms-full.txt (only with docs llms)
+  --dir <path>           Skills directory for init (default: every installed agent)
   -h, --help             Show this help
   -v, --version          Show the installed CLI version
 
 Examples:
-  jovie artist get <artist-username> --json
-  jovie artist llms <artist-username>
-  jovie api openapi --json
-  jovie docs llms --full
+  jovie profile create https://open.spotify.com/artist/<id> --json
+  jovie artist get <username> --json
+  npx -y @jovie/cli mcp
 `;
+}
 
 function writeLine(output: CliOutput, value: string): void {
   output.write(`${value}\n`);
@@ -113,6 +135,8 @@ function errorPayload(error: unknown): Record<string, unknown> {
     return {
       code: error.code,
       message: error.message,
+      ...(error.apiCode ? { apiCode: error.apiCode } : {}),
+      ...(error.retryable === undefined ? {} : { retryable: error.retryable }),
       ...(error.status === undefined ? {} : { status: error.status }),
       ...(error.responseBody ? { responseBody: error.responseBody } : {}),
       ...(error.retryAfterSeconds === undefined
@@ -135,6 +159,27 @@ function errorPayload(error: unknown): Record<string, unknown> {
   };
 }
 
+/** Command flags declared in the table (e.g. --title), parsed as strings. */
+const COMMAND_FLAG_NAMES = [
+  ...new Set(COMMANDS.flatMap(command => command.flags ?? []).map(f => f.name)),
+];
+
+function commandFamily(argv: readonly string[]): string | undefined {
+  const stringOptions = new Set(['base-url', 'dir', ...COMMAND_FLAG_NAMES]);
+  for (let index = 0; index < argv.length; index++) {
+    const token = argv[index];
+    if (token === '--') return argv[index + 1];
+    if (!token.startsWith('-') || token === '-') return token;
+    if (
+      token.startsWith('--') &&
+      !token.includes('=') &&
+      stringOptions.has(token.slice(2))
+    )
+      index++;
+  }
+  return undefined;
+}
+
 function parseCliArgs(argv: readonly string[]): {
   readonly values: CliValues;
   readonly positionals: readonly string[];
@@ -143,17 +188,22 @@ function parseCliArgs(argv: readonly string[]): {
     args: [...argv],
     options: {
       'base-url': { type: 'string' },
+      dir: { type: 'string' },
       full: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
       json: { type: 'boolean' },
       version: { type: 'boolean', short: 'v' },
+      ...Object.fromEntries(
+        COMMAND_FLAG_NAMES.map(name => [name, { type: 'string' as const }])
+      ),
     },
     allowPositionals: true,
     strict: true,
   });
 
-  const values = parsed.values as {
+  const values = parsed.values as Record<string, unknown> & {
     readonly 'base-url'?: string;
+    readonly dir?: string;
     readonly full?: boolean;
     readonly help?: boolean;
     readonly json?: boolean;
@@ -163,6 +213,12 @@ function parseCliArgs(argv: readonly string[]): {
   return {
     values: {
       baseUrl: values['base-url'],
+      flags: Object.fromEntries(
+        COMMAND_FLAG_NAMES.filter(name => values[name] !== undefined).map(
+          name => [name, String(values[name])]
+        )
+      ),
+      dir: values.dir,
       full: values.full,
       help: values.help,
       json: values.json,
@@ -172,65 +228,64 @@ function parseCliArgs(argv: readonly string[]): {
   };
 }
 
-function requireCommand(
-  positionals: readonly string[],
-  expected: readonly string[]
-): void {
-  if (
-    positionals.length !== expected.length ||
-    expected.some((value, index) => positionals[index] !== value)
-  ) {
-    throw new UsageError(`Expected command: ${expected.join(' ')}`);
-  }
-}
-
 async function execute(
   positionals: readonly string[],
   values: CliValues,
-  fetchImpl?: FetchImplementation
+  dependencies: CliDependencies
 ): Promise<string | unknown> {
   const baseUrl = normalizeBaseUrl(values.baseUrl);
-  const options = { baseUrl, fetchImpl };
-  const [domain, action, argument] = positionals;
+  const [first] = positionals;
 
-  if (
-    domain === 'artist' &&
-    action === 'get' &&
-    argument &&
-    positionals.length === 3
-  ) {
-    if (values.full) {
-      throw new UsageError('--full is only supported by docs llms');
+  if (positionals.length === 1 && ['skill', 'init'].includes(first ?? '')) {
+    if (
+      values.full ||
+      Object.keys(values.flags).length ||
+      (first === 'skill' && values.dir)
+    )
+      throw new UsageError('Unsupported option for this command.');
+  }
+  if (positionals.length === 1 && first === 'skill') return SKILL_MD;
+  if (positionals.length === 1 && first === 'init') {
+    return installSkill(dependencies.homeDir ?? homedir(), values.dir);
+  }
+
+  const command = findCommand(positionals);
+  if (!command) {
+    throw new UsageError(`Unknown command: ${positionals.join(' ')}`);
+  }
+  const expectedLength = command.arg ? 3 : 2;
+  if (command.arg && positionals.length < expectedLength) {
+    throw new UsageError(
+      `Missing required argument <${command.arg.name}> for ${command.path.join(' ')}`
+    );
+  }
+  if (positionals.length !== expectedLength) {
+    throw new UsageError(`Unknown command: ${positionals.join(' ')}`);
+  }
+  if (values.full && !command.acceptsFull) {
+    throw new UsageError('--full is only supported by docs llms');
+  }
+  const declared = new Set((command.flags ?? []).map(flag => flag.name));
+  const stray = Object.keys(values.flags).find(name => !declared.has(name));
+  if (stray) {
+    throw new UsageError(
+      `--${stray} is not supported by ${command.path.join(' ')}`
+    );
+  }
+  return command.run(
+    {
+      arg: positionals[2],
+      full: values.full === true,
+      flags: values.flags,
+      meta: { channel: 'cli', version: CLI_VERSION },
+    },
+    {
+      baseUrl,
+      workerToken: dependencies.workerToken ?? process.env.JOVIE_WORKER_TOKEN,
+      fetchImpl: dependencies.fetchImpl,
+      userAgent: `jovie-cli/${CLI_VERSION}`,
     }
-    return fetchArtist(argument, options);
-  }
-
-  if (
-    domain === 'artist' &&
-    action === 'llms' &&
-    argument &&
-    positionals.length === 3
-  ) {
-    if (values.full) {
-      throw new UsageError('--full is only supported by docs llms');
-    }
-    return fetchArtistLlms(argument, options);
-  }
-
-  if (domain === 'api' && action === 'openapi') {
-    requireCommand(positionals, ['api', 'openapi']);
-    if (values.full) {
-      throw new UsageError('--full is only supported by docs llms');
-    }
-    return fetchOpenApi(options);
-  }
-
-  if (domain === 'docs' && action === 'llms') {
-    requireCommand(positionals, ['docs', 'llms']);
-    return fetchSiteLlms(values.full === true, options);
-  }
-
-  throw new UsageError(`Unknown command: ${positionals.join(' ')}`);
+  );
 }
 
 export async function runCli(
@@ -240,6 +295,9 @@ export async function runCli(
   const stdout = dependencies.stdout ?? process.stdout;
   const stderr = dependencies.stderr ?? process.stderr;
   const requestedJson = argv.includes('--json');
+  let internalInvocation = COMMANDS.some(
+    command => command.internal && command.path[0] === commandFamily(argv)
+  );
   let parsed: ReturnType<typeof parseCliArgs>;
 
   try {
@@ -255,22 +313,51 @@ export async function runCli(
       writeLine(stderr, `${payload.message}`);
       writeLine(stderr, 'Run `jovie --help` for usage.');
     }
-    return 2;
+    return internalInvocation ? 3 : 2;
   }
 
   const { values, positionals } = parsed;
+  internalInvocation = COMMANDS.some(
+    command => command.internal && command.path[0] === positionals[0]
+  );
   if (values.version) {
-    writeLine(stdout, CLI_VERSION);
+    writeLine(
+      stdout,
+      values.json ? JSON.stringify({ version: CLI_VERSION }) : CLI_VERSION
+    );
     return 0;
   }
 
   if (values.help || positionals.length === 0) {
-    writeText(stdout, USAGE);
+    if (values.json) writeLine(stdout, JSON.stringify({ content: usage() }));
+    else writeText(stdout, usage());
     return 0;
   }
 
+  if (positionals.length === 1 && positionals[0] === 'mcp') {
+    try {
+      if (
+        values.full ||
+        values.json ||
+        values.dir ||
+        Object.keys(values.flags).length
+      )
+        throw new UsageError('Unsupported option for mcp.');
+      await serveMcp((dependencies.stdin ?? process.stdin) as never, stdout, {
+        version: CLI_VERSION,
+        workerToken: dependencies.workerToken ?? process.env.JOVIE_WORKER_TOKEN,
+        baseUrl: normalizeBaseUrl(values.baseUrl),
+        fetchImpl: dependencies.fetchImpl,
+      });
+      return 0;
+    } catch (error) {
+      writeLine(stderr, errorPayload(error).message as string);
+      return 2;
+    }
+  }
+
   try {
-    const result = await execute(positionals, values, dependencies.fetchImpl);
+    const result = await execute(positionals, values, dependencies);
     if (typeof result === 'string') {
       if (values.json) {
         writeLine(stdout, JSON.stringify({ content: result }));
@@ -280,6 +367,16 @@ export async function runCli(
     } else {
       writeLine(stdout, JSON.stringify(result, null, values.json ? 0 : 2));
     }
+    if (result && typeof result === 'object' && 'status' in result) {
+      const status = (result as { status: string }).status;
+      return status === 'completed' || status === 'handoff'
+        ? 0
+        : status === 'unavailable'
+          ? 2
+          : status === 'in_progress'
+            ? 3
+            : 1;
+    }
     return 0;
   } catch (error) {
     const payload = errorPayload(error);
@@ -288,6 +385,7 @@ export async function runCli(
     } else {
       writeLine(stderr, payload.message as string);
     }
+    if (internalInvocation) return 3;
     return error instanceof UsageError || error instanceof JovieInputError
       ? 2
       : 1;
@@ -300,7 +398,28 @@ const isMain =
     realpathSync(resolve(process.argv[1]));
 
 if (isMain) {
-  runCli(process.argv.slice(2)).then(code => {
-    process.exitCode = code;
-  });
+  const argv = process.argv.slice(2);
+  try {
+    // Only the standalone process owns its global transport configuration.
+    // Node also applies NO_PROXY and keeps the configured TLS trust intact.
+    setGlobalProxyFromEnv();
+    runCli(argv).then(code => {
+      process.exitCode = code;
+    });
+  } catch {
+    // Proxy parser errors can include the URL, including its credentials.
+    const error = new JovieInputError(
+      'Invalid proxy configuration. Check HTTP_PROXY and HTTPS_PROXY.'
+    );
+    if (argv.includes('--json')) {
+      writeLine(process.stdout, JSON.stringify({ error: errorPayload(error) }));
+    } else {
+      writeLine(process.stderr, error.message);
+    }
+    process.exitCode = COMMANDS.some(
+      command => command.internal && command.path[0] === commandFamily(argv)
+    )
+      ? 3
+      : 2;
+  }
 }

@@ -92,6 +92,24 @@
                 "properties": {
                   "type": {
                     "type": "string",
+                    "const": "worker_scope"
+                  },
+                  "key": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "type",
+                  "key"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
                     "const": "entitlement"
                   },
                   "key": {
@@ -221,6 +239,24 @@
                 },
                 "required": [
                   "type"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "worker_scope"
+                  },
+                  "key": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "type",
+                  "key"
                 ],
                 "additionalProperties": false
               },

@@ -2,7 +2,6 @@ import { render, screen } from '@testing-library/react';
 import { createRef } from 'react';
 import { describe, expect, it } from 'vitest';
 import {
-  CONTENT_SURFACE_CARD_CLASSNAME,
   ContentSurfaceCard,
   contentSurfaceCardVariants,
 } from '@/components/molecules/ContentSurfaceCard';
@@ -39,23 +38,19 @@ describe('ContentSurfaceCard', () => {
     expect(card.className).toContain('shadow-none');
   });
 
-  it.each([
-    'default',
-    'details',
-    'marketing',
-    'settings',
-    'table',
-  ] as const)('keeps the %s surface on the established outer-card radius', surface => {
-    expect(contentSurfaceCardVariants({ surface })).toContain('rounded-xl');
-  });
+  it.each(['default', 'details', 'marketing', 'settings', 'table'] as const)(
+    'keeps the %s surface on the established outer-card radius',
+    surface => {
+      expect(contentSurfaceCardVariants({ surface })).toContain('rounded-xl');
+    }
+  );
 
-  it('keeps the deprecated class contract visually equivalent', () => {
-    expect(CONTENT_SURFACE_CARD_CLASSNAME).toContain('rounded-xl');
-    expect(CONTENT_SURFACE_CARD_CLASSNAME).toContain(
-      'border-(--app-shell-border)'
-    );
-    expect(CONTENT_SURFACE_CARD_CLASSNAME).toContain('bg-surface-1');
-    expect(CONTENT_SURFACE_CARD_CLASSNAME).toContain('shadow-none');
+  it('keeps the default variant class contract', () => {
+    const defaultClassName = contentSurfaceCardVariants();
+    expect(defaultClassName).toContain('rounded-xl');
+    expect(defaultClassName).toContain('border-(--app-shell-border)');
+    expect(defaultClassName).toContain('bg-surface-1');
+    expect(defaultClassName).toContain('shadow-none');
   });
 
   it('forwards a root ref while retaining arbitrary HTML attributes', () => {

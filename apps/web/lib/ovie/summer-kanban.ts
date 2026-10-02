@@ -38,7 +38,7 @@ export type SummerKanbanLane = Extract<OvieLane, 'flash' | 'heavy'>;
 /**
  * The durable initiative record is a persisted source, not a heartbeat, so
  * it rides the same ten-minute semantic window as the persisted producers
- * in SHIPPING_SOURCE_SEMANTIC_FRESHNESS_MS (fleet-receipt, lease-guard).
+ * in SHIPPING_SOURCE_SEMANTIC_FRESHNESS_MS (lanes-status).
  */
 export const SUMMER_KANBAN_FRESHNESS_MS = 10 * 60_000;
 
@@ -311,6 +311,17 @@ export async function inspectSummerCard(
   return toSummerKanbanCard(normalized, now) ?? undefined;
 }
 
+function statusForSummerRouting(
+  routingState: OvieRoutingState
+): OvieInitiative['status'] {
+  if (routingState === 'blocked') return 'blocked';
+  if (routingState === 'unavailable') return 'failed';
+  if (routingState === 'done' || routingState === 'landed')
+    return 'implemented';
+  if (routingState === 'in_progress') return 'executing';
+  return 'accepted';
+}
+
 export async function transitionSummerCard(
   store: OperatingStore,
   input: {
@@ -343,16 +354,7 @@ export async function transitionSummerCard(
       input.routingState === 'blocked'
         ? (input.blocker ?? current.blocker)
         : undefined,
-    status:
-      input.routingState === 'blocked'
-        ? 'blocked'
-        : input.routingState === 'unavailable'
-          ? 'failed'
-          : input.routingState === 'done' || input.routingState === 'landed'
-            ? 'implemented'
-            : input.routingState === 'in_progress'
-              ? 'executing'
-              : 'accepted',
+    status: statusForSummerRouting(input.routingState),
   };
   await store.putInitiative(next);
   return next;

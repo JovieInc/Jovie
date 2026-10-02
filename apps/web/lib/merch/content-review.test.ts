@@ -58,6 +58,36 @@ describe('merch content review (JOV-4740)', () => {
     ).toEqual([MERCH_PERSON_CONTENT_PUBLISH_BLOCKER]);
   });
 
+  it('ignores blank copy and still rejects a person description', () => {
+    const review = reviewMerchContent(
+      {
+        prompt: '   ',
+        concept: '',
+        imageDescription: 'A generated photoreal person looking at camera',
+        labels: ['', '   ', 'photoreal person'],
+      },
+      new Date(REVIEWED_AT)
+    );
+
+    expect(review.verdict).toBe('reject');
+    expect(review.failureCodes).toContain('person.human');
+  });
+
+  it('passes whitespace-only copy', () => {
+    const review = reviewMerchContent(
+      {
+        prompt: '   ',
+        concept: '',
+        imageDescription: '   ',
+        labels: ['', '  '],
+      },
+      new Date(REVIEWED_AT)
+    );
+
+    expect(review.verdict).toBe('pass');
+    expect(review.failureCodes).toEqual([]);
+  });
+
   it('passes a normal illustrated mascot/animal graphic', () => {
     const { review } = reviewFixture('fox-mascot-pass');
     const gate = evaluateMerchCandidateReadiness(review);

@@ -93,6 +93,63 @@ export function unwrapCapturedError(error: unknown): unknown {
   return error.error;
 }
 
+const FAILED_QUERY_MESSAGE = /^failed query:/i;
+const WRAPPED_ERROR_KEYS = ['cause', 'sourceError', 'error'] as const;
+const MAX_WRAPPED_ERROR_DEPTH = 8;
+
+function asErrorRecord(value: unknown): Record<string, unknown> | null {
+  if (value instanceof Error) {
+    return value as Error & Record<string, unknown>;
+  }
+  return isPlainObject(value) ? value : null;
+}
+
+/**
+ * Drizzle wraps PostgreSQL failures in `Error("Failed query: ...")`; Sentry
+ * titles then lose the actionable driver error on `.cause`. Capture the deepest
+ * nested Error while preserving the outer SQL wrapper in capture context.
+ */
+export function unwrapFailedQueryError(error: unknown): {
+  readonly error: unknown;
+  readonly wrapperMessage?: string;
+} {
+  const root = asErrorRecord(error);
+  if (!root || typeof root.message !== 'string') {
+    return { error };
+  }
+  if (!FAILED_QUERY_MESSAGE.test(root.message)) {
+    return { error };
+  }
+
+  let current: unknown = error;
+  let depth = 0;
+  while (depth < MAX_WRAPPED_ERROR_DEPTH) {
+    const record = asErrorRecord(current);
+    if (!record) break;
+
+    let next: unknown;
+    for (const key of WRAPPED_ERROR_KEYS) {
+      next ??= record[key];
+    }
+
+    const nextRecord = asErrorRecord(next);
+    if (
+      !nextRecord ||
+      typeof nextRecord.message !== 'string' ||
+      nextRecord.message === record.message
+    ) {
+      break;
+    }
+    current = next;
+    depth++;
+  }
+
+  if (current === error) {
+    return { error };
+  }
+  return { error: current, wrapperMessage: root.message };
+}
+
 /**
  * Promote leftover fields from a `{ error, ...context }` wrapper into
  * capture context (e.g. clerkUserId on ban-check Redis failures).
@@ -102,14 +159,14 @@ export function unwrapCapturedContext(
   context?: Record<string, unknown>
 ): Record<string, unknown> | undefined {
   if (isContextOnlyCaptureBag(error)) {
-    const merged = { ...error, ...(context ?? {}) };
+    const merged = { ...error, ...context };
     return Object.keys(merged).length > 0 ? merged : undefined;
   }
   if (!isPlainObject(error) || !('error' in error)) {
     return context;
   }
   const { error: _nested, ...rest } = error;
-  const merged = { ...rest, ...(context ?? {}) };
+  const merged = { ...rest, ...context };
   return Object.keys(merged).length > 0 ? merged : undefined;
 }
 

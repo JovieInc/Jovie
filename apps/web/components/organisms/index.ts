@@ -26,12 +26,8 @@ export {
 } from './FeaturedArtistsSection';
 export type { HeaderNavProps } from './HeaderNav';
 export { HeaderNav } from './HeaderNav';
-export type { HeroSectionProps } from './HeroSection';
-export { HeroSection } from './HeroSection';
 export type { HowItWorksSectionProps } from './HowItWorksSection';
 export { HowItWorksSection } from './HowItWorksSection';
-export type { ListenSectionProps } from './ListenSection';
-export { ListenSection } from './ListenSection';
 export { PaySection } from './PaySection';
 export { ProfileSection } from './ProfileSection';
 export type {
@@ -58,11 +54,6 @@ export {
   PublicSurfaceShell,
   PublicSurfaceStage,
 } from './public-surface';
-export type {
-  HandleValidationState,
-  SmartHandleInputProps,
-} from './SmartHandleInput';
-export { SmartHandleInput } from './SmartHandleInput';
 export { SocialBar } from './SocialBar';
 export type {
   UserButtonProps,

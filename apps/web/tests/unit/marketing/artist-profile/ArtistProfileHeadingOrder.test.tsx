@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { run as axeRun } from 'axe-core';
+import type { ImgHTMLAttributes } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ArtistProfileHeroAdaptiveIntro } from '@/components/marketing/artist-profile/ArtistProfileHeroAdaptiveIntro';
 import { ArtistProfileOutcomesCarousel } from '@/components/marketing/artist-profile/ArtistProfileOutcomesCarousel';
@@ -25,6 +26,25 @@ vi.mock('next/navigation', () => ({
   useParams: () => ({}),
   redirect: vi.fn(),
   notFound: vi.fn(),
+}));
+
+// next/image with `priority` makes React DOM preload the image by querying
+// `link[imagesrcset="..."]`; the hero's srcset makes that selector longer
+// than the 2048-character limit jsdom 30's selector engine enforces, which
+// throws an unhandled RangeError. Image loading is irrelevant here.
+vi.mock('next/image', () => ({
+  default: ({
+    fill: _fill,
+    priority: _priority,
+    quality: _quality,
+    placeholder: _placeholder,
+    blurDataURL: _blurDataURL,
+    unoptimized: _unoptimized,
+    loader: _loader,
+    ...props
+  }: ImgHTMLAttributes<HTMLImageElement> & Record<string, unknown>) => (
+    <img {...props} alt={typeof props.alt === 'string' ? props.alt : ''} />
+  ),
 }));
 
 // The proof card is irrelevant to heading structure and its jsdom render is

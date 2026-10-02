@@ -13,6 +13,12 @@ const mockSyncAiCrawlerAnalyticsCron = vi.hoisted(() => vi.fn());
 const mockReconcileReleaseWorkflowRunOutcomes = vi.hoisted(() => vi.fn());
 const mockCleanupFounderReviewUploadLeases = vi.hoisted(() => vi.fn());
 const mockGetLybDailyMrr = vi.hoisted(() => vi.fn());
+const mockRecordDailyGatewaySpend = vi.hoisted(() => vi.fn());
+const mockRunMusicResolverParityCorpus = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/ai/gateway-spend', () => ({
+  recordDailyGatewaySpend: mockRecordDailyGatewaySpend,
+}));
 
 vi.mock('@/lib/founder-review/server', () => ({
   cleanupFounderReviewUploadLeases: mockCleanupFounderReviewUploadLeases,
@@ -75,6 +81,9 @@ vi.mock('@/app/api/cron/sync-ai-crawler-analytics/route', () => ({
 
 vi.mock('@/lib/release-to-revenue/outcome-reconciliation', () => ({
   reconcileReleaseWorkflowRunOutcomes: mockReconcileReleaseWorkflowRunOutcomes,
+}));
+vi.mock('@/lib/music-resolver/shadow', () => ({
+  runMusicResolverParityCorpus: mockRunMusicResolverParityCorpus,
 }));
 
 describe('GET /api/cron/daily-maintenance', () => {
@@ -154,6 +163,15 @@ describe('GET /api/cron/daily-maintenance', () => {
       reconciled: 0,
       failed: 0,
     });
+    mockRecordDailyGatewaySpend.mockResolvedValue({
+      day: '2026-03-28',
+      totalUsd: 1.25,
+      observed30dUsd: 30,
+      byTag: [{ key: 'feature:jovie-chat', costUsd: 1, requests: 10 }],
+      byModel: [],
+      alerts: [],
+    });
+    mockRunMusicResolverParityCorpus.mockResolvedValue([{ version: 2 }]);
   });
 
   afterEach(() => {
@@ -234,6 +252,21 @@ describe('GET /api/cron/daily-maintenance', () => {
     expect(mockReconcileReleaseWorkflowRunOutcomes).toHaveBeenCalledTimes(1);
     expect(data.results.founderReviewUploadLeases.success).toBe(true);
     expect(mockCleanupFounderReviewUploadLeases).toHaveBeenCalledTimes(1);
+    expect(data.results.aiGatewaySpend).toEqual({
+      success: true,
+      data: {
+        day: '2026-03-28',
+        totalUsd: 1.25,
+        observed30dUsd: 30,
+        topTags: [{ key: 'feature:jovie-chat', costUsd: 1, requests: 10 }],
+        alerts: [],
+      },
+    });
+    expect(mockRunMusicResolverParityCorpus).toHaveBeenCalledTimes(1);
+    expect(data.results.musicResolverParity).toEqual({
+      success: true,
+      data: [{ version: 2 }],
+    });
     expect(data.results.dataRetention.success).toBe(true);
   });
 

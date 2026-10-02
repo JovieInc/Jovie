@@ -50,6 +50,21 @@ export function TableHeaderCell<TData extends RowData>({
   const align = meta?.align ?? 'left';
   const isSemanticOnlyHeader = meta?.headerVisibility === 'sr-only';
 
+  const rawHeader = header.column.columnDef.header;
+  const columnLabel =
+    typeof rawHeader === 'string' && rawHeader.trim().length > 0
+      ? rawHeader
+      : header.column.id;
+
+  // Accessible name carries label + current sort state so screen readers get
+  // context that the aria-hidden direction glyph cannot provide (eval G4).
+  const sortButtonLabel =
+    sortDirection === 'asc'
+      ? `${columnLabel}: sorted ascending`
+      : sortDirection === 'desc'
+        ? `${columnLabel}: sorted descending`
+        : `${columnLabel}: not sorted, activate to sort`;
+
   const headerContent = isSemanticOnlyHeader ? (
     <span className='sr-only'>
       {flexRender(header.column.columnDef.header, header.getContext())}
@@ -71,6 +86,9 @@ export function TableHeaderCell<TData extends RowData>({
       className={cn(
         stickyHeaderClass,
         tableAlignment.text[align],
+        // The sort pill pads 6px; inset the cell 6px so the label lands on
+        // the body cells' 12px text edge.
+        canSort && 'px-1.5',
         metaClassName,
         'whitespace-nowrap'
       )}
@@ -88,6 +106,7 @@ export function TableHeaderCell<TData extends RowData>({
             <button
               type='button'
               onClick={onToggleSort}
+              aria-label={sortButtonLabel}
               className={cn(
                 tableHeaderClass,
                 'flex w-full items-center gap-2',

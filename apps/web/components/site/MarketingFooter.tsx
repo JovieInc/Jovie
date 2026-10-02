@@ -12,8 +12,10 @@ import {
   MARKETING_FOOTER_COLUMNS,
   MARKETING_LEGAL_LINKS,
   type MarketingFooterLink,
+  PUBLIC_COMMERCIAL_FOOTER_COLUMN,
 } from '@/data/marketingNavigation';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
+import { isEditorialFooterCtaPath } from '@/lib/marketing/editorial-content-routes';
 import { isThemeRoute } from '@/lib/theme/route-policy';
 import { cn } from '@/lib/utils';
 import { MarketingFooterControls } from './MarketingFooterControls';
@@ -24,15 +26,19 @@ import { MarketingFooterCta } from './MarketingFooterCta';
  *
  * Visual contract:
  * - Canvas→shell linear fill + soft floating glow on noir-ion atoms.
- * - Column nav with caps eyebrows (10px / 600 / 0.22em / `$atom-text-muted`).
+ * - Column nav with Title Case labels (12px / 500 / `--mf-text-muted`).
  * - Full: chrome mark + columns, no slogan; copyright left, legal right.
  * - Compact: chrome mark in the legal row; copyright + legal right.
  * - Keep production nav from `marketingNavigation`. Do not invent columns.
  */
 
+// JOV marketing routes 2026-09-26: every marketing page gets the FULL footer
+// (all link columns, never compact) — /artist-profiles opted out of that
+// previously; it now shares the same full-footer treatment as every other
+// route. Its own ArtistProfileFinalCta still owns the page's single footer
+// CTA (see PAGE_OWNS_FINAL_CTA_PATHS below).
 const MINIMAL_FOOTER_PATHS = new Set<string>([
   APP_ROUTES.PRICING,
-  APP_ROUTES.ARTIST_PROFILES,
   APP_ROUTES.ARTIST_PROFILE_LEGACY,
   APP_ROUTES.LEGAL_PRIVACY,
   APP_ROUTES.LEGAL_TERMS,
@@ -48,6 +54,13 @@ const PAGE_OWNS_FINAL_CTA_PATHS = new Set<string>([
   APP_ROUTES.SUPPORT,
   APP_ROUTES.CLI,
   APP_ROUTES.CARD,
+  APP_ROUTES.ABOUT,
+  APP_ROUTES.AI,
+  APP_ROUTES.PRODUCT,
+  // Renders its own MarketingFooterCta with route-specific copy — see
+  // isEditorialFooterCtaPath for the blog/changelog-release/engineering
+  // routes that own a different (email-signup) bottom-of-page CTA.
+  APP_ROUTES.CHANGELOG,
 ]);
 
 interface MarketingFooterProps {
@@ -134,9 +147,13 @@ export function MarketingFooter({
   const resolvedVariant = resolveFooterVariant(variant, pathname);
   const isMinimal = resolvedVariant === 'minimal';
   const pageOwnsFinalCta =
-    typeof pathname === 'string' && PAGE_OWNS_FINAL_CTA_PATHS.has(pathname);
+    typeof pathname === 'string' &&
+    (PAGE_OWNS_FINAL_CTA_PATHS.has(pathname) ||
+      isEditorialFooterCtaPath(pathname));
   const shouldShowCta = showCta && !isMinimal && !pageOwnsFinalCta;
-  const footerColumns = MARKETING_FOOTER_COLUMNS;
+  const footerColumns = FEATURE_FLAGS.SHOW_PUBLIC_ABOUT_FOOTER_REFRESH
+    ? [PUBLIC_COMMERCIAL_FOOTER_COLUMN]
+    : MARKETING_FOOTER_COLUMNS;
 
   return (
     <footer
@@ -172,19 +189,22 @@ export function MarketingFooter({
 
             <nav
               className={cn(
-                'grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 lg:gap-x-12 xl:gap-x-16',
-                footerColumns.length === 4
-                  ? 'lg:grid-cols-4'
-                  : 'lg:grid-cols-5',
+                'grid gap-x-8 gap-y-10 lg:gap-x-12 xl:gap-x-16',
+                footerColumns.length === 1
+                  ? 'grid-cols-1'
+                  : 'grid-cols-2 sm:grid-cols-3',
+                footerColumns.length === 1
+                  ? 'lg:grid-cols-1'
+                  : footerColumns.length === 4
+                    ? 'lg:grid-cols-4'
+                    : 'lg:grid-cols-5',
                 shouldShowCta && 'mt-[clamp(3.25rem,5vw,4.6rem)]'
               )}
               aria-label='Footer'
             >
               {footerColumns.map(column => (
                 <section key={column.title}>
-                  <h2 className='mf-eyebrow mf-eyebrow--caps line-clamp-2'>
-                    {column.title}
-                  </h2>
+                  <h2 className='mf-eyebrow line-clamp-2'>{column.title}</h2>
                   <ul className='flex list-none flex-col gap-3 p-0'>
                     {column.links.map(link => (
                       <li key={`${link.href}-${link.label}`}>

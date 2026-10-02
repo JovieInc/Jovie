@@ -13,11 +13,16 @@ import {
   classifyReviewOutcome,
   inspectReviewBackendConfiguration,
   isBlockingCaptureRuntimeFailure,
+  MAX_CAPTURE_WORKERS,
   normalizeBackendReview,
   readTrustedCapture,
+  resolveCaptureJourneyId,
+  resolveCaptureWorkerCount,
   reviewWithConfiguredBackends,
   routeChangedFiles,
+  runCapturePool,
   sanitizeForPrompt,
+  summarizeScriptedCaptures,
   validateCaptureManifest,
   visualReviewIdentity,
 } from '../../../.github/scripts/pr-visual-review.mjs';
@@ -236,6 +241,53 @@ describe('bounded PR visual review contract', () => {
     expect(incomplete.failures).toContain('missing capture /app/chat::mobile');
   });
 
+  it('bounds parallel capture at four workers while preserving result order', async () => {
+    let active = 0;
+    let peak = 0;
+    const results = await runCapturePool(
+      [1, 2, 3, 4, 5, 6],
+      MAX_CAPTURE_WORKERS,
+      async value => {
+        active += 1;
+        peak = Math.max(peak, active);
+        await Promise.resolve();
+        active -= 1;
+        return value * 2;
+      }
+    );
+
+    expect(results).toEqual([2, 4, 6, 8, 10, 12]);
+    expect(peak).toBe(MAX_CAPTURE_WORKERS);
+    expect(resolveCaptureWorkerCount(undefined)).toBe(2);
+    expect(() => resolveCaptureWorkerCount(5)).toThrow('integer from 1 to 4');
+  });
+
+  it('binds capture routes to canonical P0 journeys', () => {
+    expect(resolveCaptureJourneyId('/')).toBe('marketing-home-render');
+    expect(resolveCaptureJourneyId('/app/chat')).toBe('chat-agent-turn');
+    expect(resolveCaptureJourneyId('/unmapped')).toBeNull();
+  });
+
+  it('keeps scripted failure green-proof when advisory review agrees', () => {
+    const summary = summarizeScriptedCaptures([
+      { status: 'failed', semanticReview: { alignment: 'supported' } },
+      { status: 'captured' },
+      { status: 'blocked' },
+      { status: 'skipped' },
+      { status: 'uncovered' },
+      { status: 'ambiguous' },
+    ]);
+    expect(summary).toEqual({
+      executed: 2,
+      passed: 1,
+      failed: 1,
+      blocked: 1,
+      skipped: 1,
+      uncovered: 1,
+      unknown: 1,
+    });
+  });
+
   it('keys visual review idempotency to the exact PR, head, and run', () => {
     expect(
       visualReviewIdentity({
@@ -391,7 +443,8 @@ describe('bounded PR visual review contract', () => {
       '.github/workflows/pr-visual-review.yml',
       'utf8'
     );
-    expect(workflow).toContain('pull_request_target:');
+    expect(workflow).toMatch(/^  pull_request:$/m);
+    expect(workflow).not.toMatch(/^\s*pull_request_target:/m);
     expect(workflow).toContain('cancel-in-progress: true');
     expect(workflow).toContain('retention-days: 14');
     expect(workflow).not.toContain('VISUAL_REVIEW_AUTOFIX_ENABLED');
@@ -413,7 +466,7 @@ describe('bounded PR visual review contract', () => {
     expect(workflow).toContain("'skipped'");
     expect(workflow).not.toContain('pr-visual-review-capture.mjs || true');
     expect(workflow.match(/^  [a-z][a-z_-]*:$/gm)).toEqual([
-      '  pull_request_target:',
+      '  pull_request:',
       '  capture:',
     ]);
     expect(workflow).toContain('pr-visual-review-capture.mjs');
@@ -535,8 +588,8 @@ describe('bounded PR visual review contract', () => {
     expect(capture).toContain(
       "getByRole('heading', { name: 'New Chat', level: 1 })"
     );
-    expect(capture).toContain("getByRole('heading', { name: 'Just ask' })");
-    expect(capture).toContain("getByTestId('chat-empty-state-greeting')");
+    expect(capture).toContain("getByRole('heading', { level: 2 })");
+    expect(capture).toContain("getByTestId('chat-empty-state-greeting-text')");
     expect(capture).toContain("'domcontentloaded'");
   });
 });
@@ -645,10 +698,16 @@ describe('fail-closed visual evidence gate (JOV-5459)', () => {
           import.meta.url
         )
       );
+      const headSha = 'a'.repeat(40);
       const run = env =>
         spawnSync(process.execPath, [gateScript], {
           cwd: dir,
-          env: { ...process.env, PR_VISUAL_OUT: artifactDir, ...env },
+          env: {
+            ...process.env,
+            PR_VISUAL_OUT: artifactDir,
+            PR_VISUAL_EXPECTED_HEAD_SHA: headSha,
+            ...env,
+          },
         });
 
       const missing = run({ CAPTURE_OUTCOME: 'skipped' });
@@ -663,13 +722,85 @@ describe('fail-closed visual evidence gate (JOV-5459)', () => {
 
       await writeFile(
         join(artifactDir, 'routing.json'),
-        JSON.stringify({ shouldReview: false })
+        JSON.stringify({ shouldReview: false, head_sha: headSha })
       );
       const failedStage = run({ BUILD_OUTCOME: 'failure' });
       expect(failedStage.status).toBe(1);
 
       const skipped = run({});
       expect(skipped.status).toBe(0);
+
+      // Fail closed when the exact-head expectation is absent or malformed.
+      const unbound = spawnSync(process.execPath, [gateScript], {
+        cwd: dir,
+        env: {
+          ...Object.fromEntries(
+            Object.entries(process.env).filter(
+              ([key]) => key !== 'PR_VISUAL_EXPECTED_HEAD_SHA'
+            )
+          ),
+          PR_VISUAL_OUT: artifactDir,
+        },
+      });
+      expect(unbound.status).toBe(1);
+      expect(run({ PR_VISUAL_EXPECTED_HEAD_SHA: 'main' }).status).toBe(1);
+
+      const staleHead = run({ PR_VISUAL_EXPECTED_HEAD_SHA: 'b'.repeat(40) });
+      expect(staleHead.status).toBe(1);
+      expect(
+        JSON.parse(
+          readFileSync(join(artifactDir, 'advisory-outcome.json'), 'utf8')
+        ).missingEvidence
+      ).toContain('routing.json#head_sha');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('binds evidence to the exact PR head SHA and fails closed on drift', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'visual-gate-head-'));
+    const headSha = 'c'.repeat(40);
+    const stages = { build: 'skipped', server: 'skipped', capture: 'skipped' };
+    try {
+      await writeFile(
+        join(dir, 'routing.json'),
+        JSON.stringify({ shouldReview: false, head_sha: headSha })
+      );
+      expect(
+        evaluateVisualEvidence({
+          artifactDir: dir,
+          stages,
+          expectedHeadSha: headSha,
+        }).ok
+      ).toBe(true);
+
+      const drifted = evaluateVisualEvidence({
+        artifactDir: dir,
+        stages,
+        expectedHeadSha: 'd'.repeat(40),
+      });
+      expect(drifted.ok).toBe(false);
+      expect(drifted.missingEvidence).toEqual(['routing.json#head_sha']);
+
+      const malformed = evaluateVisualEvidence({
+        artifactDir: dir,
+        stages,
+        expectedHeadSha: '',
+      });
+      expect(malformed.ok).toBe(false);
+      expect(malformed.missingEvidence).toContain('expected-head-sha');
+
+      await writeFile(
+        join(dir, 'routing.json'),
+        JSON.stringify({ shouldReview: false })
+      );
+      expect(
+        evaluateVisualEvidence({
+          artifactDir: dir,
+          stages,
+          expectedHeadSha: headSha,
+        }).missingEvidence
+      ).toEqual(['routing.json#head_sha']);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -762,5 +893,19 @@ describe('trusted Sonar remediation contracts', () => {
         capacity: { ...sonarReceiptInput.capacity, openAgentPrs: null },
       })
     ).toThrow('valid capacity evidence');
+  });
+});
+
+describe('footer interaction proof follows the theme switching flag', () => {
+  it('runs the footer theme-control proof only for theme-switching builds', () => {
+    const capture = readFileSync(
+      '.github/scripts/pr-visual-review-capture.mjs',
+      'utf8'
+    );
+    expect(capture).toContain(
+      'if (!isThemeSwitchingBuild(process.env)) return;'
+    );
+    expect(capture).toContain("return flag === '1' || flag === 'true';");
+    expect(capture).toContain('NEXT_PUBLIC_FEATURE_THEME_SWITCHING');
   });
 });

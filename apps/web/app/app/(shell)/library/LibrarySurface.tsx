@@ -4,6 +4,7 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
   Popover,
   PopoverContent,
@@ -22,17 +23,18 @@ import {
   ArrowUpDown,
   Check,
   ChevronDown,
-  Disc3,
   FileAudio2,
   FileText,
   Filter,
   Grid3x3,
   ImageIcon,
+  Layers,
   LayoutList,
   type LucideIcon,
   Music2,
   Pause,
   PlayCircle,
+  Plus,
   RefreshCw,
   Shirt,
   Table2,
@@ -44,6 +46,7 @@ import {
   createContext,
   type MouseEvent,
   memo,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   useCallback,
   useContext,
@@ -67,12 +70,13 @@ import {
   LibraryCatalogProvidersCell,
   LibraryCatalogStatusCell,
 } from '@/components/features/library/library-catalog-columns';
+import { WorkInspectorActions } from '@/components/features/library/WorkInspectorActions';
 import { LibraryAssetSharePanel } from '@/components/features/library-asset-share/LibraryAssetSharePanel';
 import { LibraryAssetShareUrlCell } from '@/components/features/library-asset-share/LibraryAssetShareUrlCell';
 import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
 import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
 import { toast } from '@/components/feedback';
-import { EntityHeaderCard } from '@/components/molecules/drawer';
+import { EntityHeader } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import {
@@ -81,15 +85,14 @@ import {
   InspectorRow,
   InspectorSection,
   InspectorShell,
-  type InspectorTabId,
   isDspQuietListScope,
-  LIBRARY_INSPECTOR_TABS,
+  WORK_INSPECTOR_TABS,
+  type WorkInspectorTabId,
 } from '@/components/molecules/inspector';
 import {
   TOOLBAR_MENU_CONTENT_CLASS,
   ToolbarMenuChoiceItem,
 } from '@/components/molecules/menus/ToolbarMenuPrimitives';
-import { PageShell } from '@/components/organisms/PageShell';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
   PAGE_TOOLBAR_END_GROUP_CLASS,
@@ -99,8 +102,11 @@ import {
   PageToolbarActionButton,
   PageToolbarTabButton,
   TableEmptyState,
+  type ToolbarFilterSuggestion,
+  ToolbarFilterSuggestions,
   UnifiedTable,
-  UnifiedTableSkeleton,
+  ViewModeSlider,
+  type ViewModeSliderOption,
 } from '@/components/organisms/table';
 import {
   type ContextMenuItemType,
@@ -109,6 +115,7 @@ import {
   TableContextMenu,
 } from '@/components/organisms/table/molecules/TableContextMenu';
 import { alignment } from '@/components/organisms/table/table.styles';
+import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import type { FilterPill } from '@/components/shell/pill-search.types';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
@@ -127,6 +134,8 @@ import {
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
 import type { LibraryMerchProductOption } from '@/lib/library/graph-types';
 import {
+  LIBRARY_LIFECYCLE_STAGES,
+  LIBRARY_STAGE_LABELS,
   libraryAssetMatchesStage,
   parseLibraryStageParam,
 } from '@/lib/library/lifecycle-stage';
@@ -140,6 +149,7 @@ import {
   releaseStatusDotClasses,
 } from '@/lib/library/release-status';
 import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
+import type { WorkLaunchSummary } from '@/lib/library/work-actions';
 import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries';
 import {
   type ColumnDef,
@@ -153,6 +163,11 @@ import {
   restoreRelease,
 } from '../dashboard/releases/actions';
 import { archiveLibraryMerchCard, restoreLibraryMerchCard } from './actions';
+import {
+  LIBRARY_TABLE_MIN_WIDTH,
+  LIBRARY_TABLE_ROW_HEIGHT,
+  LIBRARY_TABLE_SKELETON_CONFIG,
+} from './LibraryLoadingState';
 import { LibraryMediaThumbnail } from './LibraryMediaThumbnail';
 import {
   attachLibraryProductGraph,
@@ -196,8 +211,6 @@ import {
   YouTubeOptimizationPanel,
 } from './YouTubeAssetDrawerPanels';
 
-const LIBRARY_TABLE_ROW_HEIGHT = 56;
-const LIBRARY_TABLE_MIN_WIDTH = '0';
 const EMPTY_RELATIONSHIPS: readonly LibraryRelationshipView[] = [];
 const LIBRARY_CONTENT_INSET_CLASS =
   'px-(--app-shell-header-padding-x) py-(--app-shell-content-padding-y)';
@@ -211,23 +224,6 @@ const LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS = cn(
   LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS,
   'w-8 min-w-8'
 );
-const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
-  readonly width?: string;
-  readonly variant?:
-    | 'text'
-    | 'avatar'
-    | 'badge'
-    | 'button'
-    | 'release'
-    | 'meta';
-}> = [
-  { variant: 'release', width: '100%' },
-  { variant: 'badge', width: '108px' },
-  { variant: 'badge', width: '92px' },
-  { variant: 'text', width: '88px' },
-  { variant: 'meta', width: '72px' },
-  { variant: 'text', width: '96px' },
-];
 
 type LibrarySortKey = 'releaseDate' | 'title' | 'status' | 'providers';
 type LibraryPresetId = LibraryView;
@@ -284,7 +280,7 @@ const SORT_LABELS: Record<LibrarySortKey, string> = {
   providers: 'Providers',
 };
 
-const PRESETS: readonly {
+export const PRESETS: readonly {
   readonly id: LibraryPresetId;
   readonly label: string;
   readonly description: string;
@@ -354,6 +350,20 @@ function parseLibraryViewParam(value: string | null): LibraryPresetId {
   return PRESETS.some(preset => preset.id === value)
     ? (value as LibraryPresetId)
     : 'all';
+}
+
+let libraryFilterPillFallbackCounter = 0;
+
+/** Mirrors PillSearch's id scheme so quick-suggestion pills stay indistinguishable from search-created ones. */
+function newLibraryFilterPillId(): string {
+  if (
+    typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
+  ) {
+    return crypto.randomUUID();
+  }
+  libraryFilterPillFallbackCounter += 1;
+  return `library-pill-${Date.now()}-${libraryFilterPillFallbackCounter}`;
 }
 
 function toggleSet<T>(set: ReadonlySet<T>, value: T): Set<T> {
@@ -657,7 +667,7 @@ const LIBRARY_CATALOG_COLUMNS = [
   createLibraryActionColumn('w-10 pl-1 pr-2'),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
 
-const LIBRARY_TABLE_COLUMNS = [
+export const LIBRARY_TABLE_COLUMNS = [
   libraryColumnHelper.accessor('title', {
     id: 'release',
     header: 'Item',
@@ -719,75 +729,57 @@ const LIBRARY_TABLE_COLUMNS = [
   createLibraryActionColumn('w-10 pl-1 pr-2'),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
 
-const LIBRARY_VIEW_FILTER_CHIP_KEYS = PRESETS.map(preset => preset.id);
+const STAGE_TABS = ['all', ...LIBRARY_LIFECYCLE_STAGES] as const;
 
-export function LibraryLoadingState() {
-  return (
-    <PageShell
-      aria-busy='true'
-      aria-label='Loading Library'
-      frame='content-container'
-      contentPadding='none'
-      data-testid='library-surface-loading'
-      toolbar={
-        <PageToolbar
-          start={
-            <div
-              className='flex min-w-0 flex-wrap items-center gap-1'
-              data-testid='library-view-filter-chips'
-            >
-              {LIBRARY_VIEW_FILTER_CHIP_KEYS.map(key => (
-                <span
-                  key={key}
-                  className='inline-block h-8 w-16 rounded-full skeleton motion-reduce:animate-none'
-                  aria-hidden='true'
-                />
-              ))}
-            </div>
-          }
-        />
-      }
-    >
-      <UnifiedTableSkeleton<LibraryReleaseAsset>
-        columns={LIBRARY_TABLE_COLUMNS}
-        hideHeader
-        rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
-        minWidth={LIBRARY_TABLE_MIN_WIDTH}
-        skeletonRows={SKELETON_ROW_COUNT.TABLE}
-        skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
-        containerClassName='h-full'
-      />
-    </PageShell>
-  );
-}
-
-function LibraryViewFilterChips({
-  assets,
-  preset,
-  onPreset,
+function LibraryStageTabs({
+  stage,
+  onStage,
 }: {
-  readonly assets: readonly LibraryReleaseAsset[];
-  readonly preset: LibraryPresetId;
-  readonly onPreset: (preset: LibraryPresetId) => void;
+  readonly stage: (typeof STAGE_TABS)[number];
+  readonly onStage: (stage: (typeof STAGE_TABS)[number]) => void;
 }) {
+  const handleTabKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    const tabs = Array.from(
+      event.currentTarget
+        .closest('[role="tablist"]')
+        ?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? []
+    );
+    const currentIndex = tabs.indexOf(event.currentTarget);
+    const nextIndex =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? tabs.length - 1
+          : event.key === 'ArrowRight'
+            ? (currentIndex + 1) % tabs.length
+            : event.key === 'ArrowLeft'
+              ? (currentIndex - 1 + tabs.length) % tabs.length
+              : -1;
+    const nextTab = tabs[nextIndex];
+    if (!nextTab) return;
+    event.preventDefault();
+    nextTab.focus();
+    nextTab.click();
+  };
+
   return (
     <div
+      role='tablist'
+      aria-label='Work Stages'
+      data-testid='library-stage-tabs'
       className='flex shrink-0 flex-nowrap items-center gap-1'
-      data-testid='library-view-filter-chips'
     >
-      {PRESETS.map(view => (
+      {STAGE_TABS.map(tab => (
         <PageToolbarTabButton
-          key={view.id}
-          label={
-            <>
-              {view.label}
-              <span className='system-b-library-rail-count ml-1 tabular-nums text-tertiary-token'>
-                {assets.filter(view.predicate).length}
-              </span>
-            </>
-          }
-          active={preset === view.id}
-          onClick={() => onPreset(view.id)}
+          key={tab}
+          id={`library-stage-${tab}-tab`}
+          label={LIBRARY_STAGE_LABELS[tab]}
+          active={stage === tab}
+          role='tab'
+          tabIndex={stage === tab ? 0 : -1}
+          ariaControls='library-catalog-panel'
+          onKeyDown={handleTabKeyDown}
+          onClick={() => onStage(tab)}
           className={LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS}
         />
       ))}
@@ -833,6 +825,8 @@ function LibrarySavedViewRow({
 
 interface LibraryFilterPanelProps {
   readonly assets: readonly LibraryReleaseAsset[];
+  readonly preset: LibraryPresetId;
+  readonly onPreset: (preset: LibraryPresetId) => void;
   readonly savedView: LibrarySavedViewId;
   readonly onSavedView: (savedView: LibrarySavedViewId) => void;
   readonly filters: LibraryFilters;
@@ -843,6 +837,8 @@ interface LibraryFilterPanelProps {
 
 function LibraryFilterPanel({
   assets,
+  preset,
+  onPreset,
   savedView,
   onSavedView,
   filters,
@@ -893,8 +889,35 @@ function LibraryFilterPanel({
         className
       )}
     >
-      <legend className='sr-only'>Library Filters</legend>
+      <legend className='sr-only'>Work Filters</legend>
       <div className='min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+        <div className='pb-2'>
+          <div className='flex items-center justify-between gap-2 pb-1 pt-2'>
+            <p className='system-b-library-rail-title'>Kind</p>
+            {preset !== 'all' ? (
+              <Button
+                type='button'
+                variant='tertiary'
+                size='sm'
+                onClick={() => onPreset('all')}
+              >
+                Reset
+              </Button>
+            ) : null}
+          </div>
+          <div className='space-y-px' data-testid='library-view-filter-chips'>
+            {PRESETS.map(view => (
+              <LibrarySavedViewRow
+                key={view.id}
+                label={view.label}
+                count={assets.filter(view.predicate).length}
+                active={preset === view.id}
+                onClick={() => onPreset(view.id)}
+              />
+            ))}
+          </div>
+        </div>
+
         <div className='pb-2'>
           <p className='system-b-library-rail-title pb-1 pt-2'>Smart Filters</p>
           <div className='space-y-px' data-testid='library-saved-filter-views'>
@@ -912,7 +935,7 @@ function LibraryFilterPanel({
 
         <div className='flex items-center justify-between gap-2 border-t border-subtle pb-1 pt-2'>
           <p className='system-b-library-rail-title'>Filters</p>
-          {hasActiveFilters(filters) ? (
+          {hasActiveFilters(filters) || preset !== 'all' ? (
             <Button
               type='button'
               variant='tertiary'
@@ -920,7 +943,7 @@ function LibraryFilterPanel({
               onClick={onClearFilters}
               className='h-auto rounded-xs px-1.5 py-0.5 text-tertiary-token hover:bg-surface-1 hover:text-primary-token'
             >
-              Clear Filters ({activeFilterCount})
+              Clear Filters ({activeFilterCount + (preset === 'all' ? 0 : 1)})
             </Button>
           ) : null}
         </div>
@@ -967,7 +990,7 @@ function LibraryFilterPanel({
               key={type}
               active={filters.releaseTypes.has(type)}
               count={counts.releaseTypes.get(type) ?? 0}
-              icon={Disc3}
+              icon={Layers}
               label={formatReleaseType(type)}
               onClick={() =>
                 onFilters({
@@ -1176,7 +1199,7 @@ function LibraryFiltersControl({
             <PopoverTrigger asChild>{trigger}</PopoverTrigger>
           </TooltipTrigger>
           <PopoverContent
-            aria-label='Library Filters'
+            aria-label='Work Filters'
             align='end'
             sideOffset={6}
             className='flex max-h-[min(36rem,var(--radix-popover-content-available-height))] w-80 overflow-hidden p-0'
@@ -1202,7 +1225,7 @@ function LibraryFiltersControl({
           testId='library-filter-sheet'
         >
           <SheetHeader className='shrink-0 border-b border-subtle px-4 py-3 text-left'>
-            <SheetTitle>Library Filters</SheetTitle>
+            <SheetTitle>Work Filters</SheetTitle>
             <SheetDescription className='sr-only'>
               Filter by saved view, approval, release status, type, asset, or
               provider.
@@ -1246,7 +1269,7 @@ function SortDropdown({
           align='end'
           side='bottom'
           sideOffset={6}
-          aria-label='Sort Library'
+          aria-label='Sort Work'
           className={TOOLBAR_MENU_CONTENT_CLASS}
         >
           {(Object.keys(SORT_LABELS) as LibrarySortKey[]).map(key => (
@@ -1266,6 +1289,13 @@ function SortDropdown({
   );
 }
 
+const LIBRARY_VIEW_MODE_OPTIONS: readonly ViewModeSliderOption<LibraryViewMode>[] =
+  [
+    { value: 'grid', label: 'Grid View', icon: Grid3x3 },
+    { value: 'list', label: 'List View', icon: LayoutList },
+    { value: 'table', label: 'Table View', icon: Table2 },
+  ];
+
 function ViewToggle({
   view,
   onView,
@@ -1274,35 +1304,13 @@ function ViewToggle({
   readonly onView: (view: LibraryViewMode) => void;
 }) {
   return (
-    <div className={cn(PAGE_TOOLBAR_END_GROUP_CLASS, 'ml-0 gap-0.5')}>
-      <PageToolbarActionButton
-        label='Grid View'
-        icon={<Grid3x3 className={PAGE_TOOLBAR_ICON_CLASS} />}
-        active={view === 'grid'}
-        onClick={() => onView('grid')}
-        iconOnly
-        tooltipLabel='Grid View'
-        className={LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS}
-      />
-      <PageToolbarActionButton
-        label='List View'
-        icon={<LayoutList className={PAGE_TOOLBAR_ICON_CLASS} />}
-        active={view === 'list'}
-        onClick={() => onView('list')}
-        iconOnly
-        tooltipLabel='List View'
-        className={LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS}
-      />
-      <PageToolbarActionButton
-        label='Table View'
-        icon={<Table2 className={PAGE_TOOLBAR_ICON_CLASS} />}
-        active={view === 'table'}
-        onClick={() => onView('table')}
-        iconOnly
-        tooltipLabel='Table View'
-        className={LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS}
-      />
-    </div>
+    <ViewModeSlider
+      aria-label='Work View'
+      data-testid='library-view-mode-slider'
+      value={view}
+      onChange={onView}
+      options={LIBRARY_VIEW_MODE_OPTIONS}
+    />
   );
 }
 
@@ -1334,10 +1342,67 @@ function GridDensityToggle({
   );
 }
 
+function LibraryImportMenu({
+  canSyncSpotify,
+  isSyncingSpotify,
+  onSyncSpotify,
+  youtubeConnected,
+  isImportingYouTube,
+  youtubeImportDisabled = false,
+  onImportYouTube,
+}: {
+  readonly canSyncSpotify: boolean;
+  readonly isSyncingSpotify: boolean;
+  readonly onSyncSpotify: () => void;
+  readonly youtubeConnected: boolean;
+  readonly isImportingYouTube: boolean;
+  readonly youtubeImportDisabled?: boolean;
+  readonly onImportYouTube?: () => void;
+}) {
+  if (!onImportYouTube && !canSyncSpotify) return null;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type='button'
+          size='sm'
+          disabled={isImportingYouTube || isSyncingSpotify}
+        >
+          <Plus className={PAGE_TOOLBAR_ICON_CLASS} aria-hidden='true' />
+          {isImportingYouTube ? 'Importing…' : 'Add'}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align='end'
+        side='bottom'
+        sideOffset={6}
+        aria-label='Add Or Import'
+        className={TOOLBAR_MENU_CONTENT_CLASS}
+      >
+        {onImportYouTube ? (
+          <DropdownMenuItem
+            disabled={youtubeImportDisabled}
+            onSelect={() => onImportYouTube()}
+          >
+            {youtubeConnected ? 'Import YouTube' : 'Connect YouTube'}
+          </DropdownMenuItem>
+        ) : null}
+        {canSyncSpotify ? (
+          <DropdownMenuItem
+            onSelect={() => onSyncSpotify()}
+            disabled={isSyncingSpotify}
+          >
+            {isSyncingSpotify ? 'Syncing…' : 'Sync from Spotify'}
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function LibraryToolbar({
-  assets,
-  preset,
-  onPreset,
+  stage,
+  onStage,
   sort,
   onSort,
   view,
@@ -1351,10 +1416,17 @@ function LibraryToolbar({
   activeFilterCount,
   filterPanel,
   isDesktop,
+  suggestedFilters,
+  canSyncSpotify,
+  isSyncingSpotify,
+  onSyncSpotify,
+  youtubeConnected = false,
+  isImportingYouTube = false,
+  youtubeImportDisabled = false,
+  onImportYouTube,
 }: {
-  readonly assets: readonly LibraryReleaseAsset[];
-  readonly preset: LibraryPresetId;
-  readonly onPreset: (preset: LibraryPresetId) => void;
+  readonly stage: (typeof STAGE_TABS)[number];
+  readonly onStage: (stage: (typeof STAGE_TABS)[number]) => void;
   readonly sort: LibrarySortKey;
   readonly onSort: (sort: LibrarySortKey) => void;
   readonly view: LibraryViewMode;
@@ -1368,16 +1440,34 @@ function LibraryToolbar({
   readonly activeFilterCount: number;
   readonly filterPanel: ReactNode;
   readonly isDesktop: boolean;
+  readonly suggestedFilters: readonly ToolbarFilterSuggestion[];
+  readonly canSyncSpotify: boolean;
+  readonly isSyncingSpotify: boolean;
+  readonly onSyncSpotify: () => void;
+  readonly youtubeConnected?: boolean;
+  readonly isImportingYouTube?: boolean;
+  readonly youtubeImportDisabled?: boolean;
+  readonly onImportYouTube?: () => void;
 }) {
   return (
     <PageToolbar
       start={
         <div className='flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2'>
-          <LibraryViewFilterChips
-            assets={assets}
-            preset={preset}
-            onPreset={onPreset}
-          />
+          <LibraryStageTabs stage={stage} onStage={onStage} />
+          <div className='group/toolbar-filters flex min-w-0 shrink-0 items-center gap-1'>
+            <LibraryFiltersControl
+              activeFilterCount={activeFilterCount}
+              filterPanel={filterPanel}
+              isDesktop={isDesktop}
+              open={filtersOpen}
+              onOpenChange={onFiltersOpenChange}
+            />
+            <ToolbarFilterSuggestions
+              data-testid='library-filter-suggestions'
+              suggestions={suggestedFilters}
+              hidden={filtersOpen}
+            />
+          </div>
           <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
             {visibleCount}
             {visibleCount === totalCount ? '' : ` of ${totalCount}`} visible
@@ -1386,12 +1476,14 @@ function LibraryToolbar({
       }
       end={
         <>
-          <LibraryFiltersControl
-            activeFilterCount={activeFilterCount}
-            filterPanel={filterPanel}
-            isDesktop={isDesktop}
-            open={filtersOpen}
-            onOpenChange={onFiltersOpenChange}
+          <LibraryImportMenu
+            canSyncSpotify={canSyncSpotify}
+            isSyncingSpotify={isSyncingSpotify}
+            onSyncSpotify={onSyncSpotify}
+            youtubeConnected={youtubeConnected}
+            isImportingYouTube={isImportingYouTube}
+            youtubeImportDisabled={youtubeImportDisabled}
+            onImportYouTube={onImportYouTube}
           />
           <SortDropdown sort={sort} onSort={onSort} />
           {view === 'grid' ? (
@@ -1538,7 +1630,7 @@ const AssetCard = memo(function AssetCard({
               {getLibraryItemKind(asset) === 'merch' ? (
                 <Shirt className='h-3 w-3 shrink-0' />
               ) : (
-                <Disc3 className='h-3 w-3 shrink-0' />
+                <Layers className='h-3 w-3 shrink-0' />
               )}
               <span>{formatLibraryItemType(asset)}</span>
               {getLibraryItemKind(asset) === 'release' ? (
@@ -1735,6 +1827,45 @@ function LibraryReleaseTable({
   );
 }
 
+function LibraryFirstAction({
+  canSyncSpotify,
+  isSyncing,
+  onSyncSpotify,
+  testId,
+}: {
+  readonly canSyncSpotify: boolean;
+  readonly isSyncing: boolean;
+  readonly onSyncSpotify: () => void;
+  readonly testId?: string;
+}) {
+  if (!canSyncSpotify) {
+    return (
+      <Button asChild size='sm'>
+        <Link href={APP_ROUTES.RELEASES}>Open Releases</Link>
+      </Button>
+    );
+  }
+
+  return (
+    <Button
+      type='button'
+      size='sm'
+      disabled={isSyncing}
+      onClick={onSyncSpotify}
+      data-testid={testId}
+    >
+      <RefreshCw
+        className={cn(
+          'h-4 w-4',
+          isSyncing && 'animate-spin motion-reduce:animate-none'
+        )}
+        aria-hidden='true'
+      />
+      {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
+    </Button>
+  );
+}
+
 function EmptyCatalog({
   canSyncSpotify,
   isSyncing,
@@ -1745,61 +1876,52 @@ function EmptyCatalog({
   readonly onSyncSpotify: () => void;
 }) {
   return (
-    <PageShell
-      aria-label='Library'
+    <WorkspacePage
+      aria-label='Work'
       frame='content-container'
       contentPadding='none'
       surfaceMode='table'
       data-testid='library-surface'
+      toolbar={
+        <PageToolbar
+          start={<span className={PAGE_TOOLBAR_META_TEXT_CLASS}>0 items</span>}
+          end={
+            <LibraryFirstAction
+              canSyncSpotify={canSyncSpotify}
+              isSyncing={isSyncing}
+              onSyncSpotify={onSyncSpotify}
+              testId='library-sync-spotify-toolbar'
+            />
+          }
+        />
+      }
     >
       <NavigationDestinationReady destination='library' />
       <EmptyState
         icon={<Music2 className='h-5 w-5' strokeWidth={2.25} />}
-        heading='No Library Items'
+        heading='No work yet'
         description='Releases, merch, images, videos, and audio will appear here as they land.'
         presentation='workspace'
         testId='library-workspace-empty-state'
         className='min-h-90'
         actionSlot={
-          canSyncSpotify ? (
-            <Button
-              type='button'
-              size='sm'
-              disabled={isSyncing}
-              onClick={onSyncSpotify}
-              data-testid='library-sync-spotify-empty-state'
-            >
-              <RefreshCw
-                className={cn(
-                  'h-4 w-4',
-                  isSyncing && 'animate-spin motion-reduce:animate-none'
-                )}
-                aria-hidden='true'
-              />
-              {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
-            </Button>
-          ) : (
-            <Link
-              href={APP_ROUTES.RELEASES}
-              className={cn(
-                'system-b-library-action system-b-library-action--standard system-b-library-action--surface-0 inline-flex items-center border border-subtle',
-                LIBRARY_BUTTON_FOCUS_CLASS
-              )}
-            >
-              Open Releases
-            </Link>
-          )
+          <LibraryFirstAction
+            canSyncSpotify={canSyncSpotify}
+            isSyncing={isSyncing}
+            onSyncSpotify={onSyncSpotify}
+            testId='library-sync-spotify-empty-state'
+          />
         }
       />
-    </PageShell>
+    </WorkspacePage>
   );
 }
 
 function NoResults({ onReset }: { readonly onReset: () => void }) {
   return (
     <TableEmptyState
-      heading='No Assets Match'
-      description='No library items match the selected view or filters.'
+      heading='No work matches'
+      description='No releases, products, or files match the selected view or filters.'
       className='min-h-75'
       action={{
         label: 'Reset View',
@@ -2028,7 +2150,8 @@ function AssetDrawer({
   profileId,
   approvalSavingIds,
   artistHandle,
-  pressKitCandidates,
+  shareCandidates,
+  workLaunches,
   merchProducts,
   relationships,
   postReleaseBundle,
@@ -2047,7 +2170,8 @@ function AssetDrawer({
   readonly profileId: string | null;
   readonly approvalSavingIds: ReadonlySet<string>;
   readonly artistHandle: string | null;
-  readonly pressKitCandidates: readonly LibraryReleaseAsset[];
+  readonly shareCandidates: readonly LibraryReleaseAsset[];
+  readonly workLaunches: readonly WorkLaunchSummary[];
   readonly merchProducts: readonly {
     readonly id: string;
     readonly title: string;
@@ -2074,13 +2198,13 @@ function AssetDrawer({
   const current = asset ?? stickyAsset;
   const isMerch = current ? getLibraryItemKind(current) === 'merch' : false;
   const isYouTubeVideo = current?.source?.provider === 'youtube';
-  const [activeTab, setActiveTab] = useState<InspectorTabId>('details');
+  const [activeTab, setActiveTab] = useState<WorkInspectorTabId>('overview');
   const closedTabIndex = open ? undefined : -1;
   const currentId = current?.id ?? null;
   const inspectorBundle = objectScopedPostReleaseBundle(postReleaseBundle);
 
   useEffect(() => {
-    setActiveTab('details');
+    setActiveTab('overview');
   }, [currentId]);
   const isPreviewPlaying =
     currentId !== null &&
@@ -2109,22 +2233,22 @@ function AssetDrawer({
     <InspectorShell
       isOpen={open}
       width={360}
-      ariaLabel='Library asset details'
+      ariaLabel='Work details'
       onKeyDown={handleDrawerKeyDown}
       contextMenuItems={convertToCommonDropdownItems(
         current ? getContextMenuItems(current) : []
       )}
       testId='library-asset-drawer'
       isEmpty={!current}
-      emptyMessage='Select a library item to view details.'
-      tabs={LIBRARY_INSPECTOR_TABS}
+      emptyMessage='Select a release, product, or file to view details.'
+      tabs={WORK_INSPECTOR_TABS}
       activeTab={activeTab}
       onTabChange={setActiveTab}
       tabsAriaLabel='Inspector tabs'
       objectHeader={
         current ? (
-          <EntityHeaderCard
-            image={
+          <EntityHeader
+            thumbnail={
               <div className='h-12 w-12 shrink-0 overflow-hidden'>
                 <LibraryMediaThumbnail asset={current} size='drawer' />
               </div>
@@ -2144,9 +2268,6 @@ function AssetDrawer({
                 >
                   {formatLibraryStatus(current)}
                 </span>
-                {current.assetKinds.slice(0, 2).map(kind => (
-                  <AssetKindPill key={kind} kind={kind} />
-                ))}
               </div>
             }
             stableLayout
@@ -2170,66 +2291,57 @@ function AssetDrawer({
           searchMode='recursive'
         >
           <div className='space-y-2.5'>
-            {isMerch && activeTab === 'details' ? (
-              <InspectorSection title='Merch'>
-                <p className='system-b-library-drawer-panel-copy leading-5 text-secondary-token'>
-                  {current.description ?? 'Merch card saved from chat.'}
-                </p>
-                <dl className='mt-2'>
-                  <MetadataRow
-                    label='Sale Price'
-                    value={current.salePriceLabel ?? 'No Price'}
-                  />
-                  <MetadataRow
-                    label='Profit'
-                    value={current.profitLabel ?? 'No Estimate'}
-                  />
-                </dl>
-              </InspectorSection>
-            ) : isMerch && activeTab === 'assets' ? (
-              <InspectorEmpty message='No assets for this merch item.' />
-            ) : isMerch && activeTab === 'links' ? (
-              <InspectorEmpty message='No links for this merch item.' />
-            ) : isMerch && activeTab === 'rights' ? (
-              <InspectorEmpty message='No rights findings for this object.' />
-            ) : (
+            {activeTab === 'overview' ? (
               <>
-                {(getLibraryItemKind(current) === 'release' ||
-                  current.linkedReleaseId) &&
-                activeTab === 'rights' ? (
-                  <InspectorSection title='Rights'>
-                    <PostReleasePanel
+                {isMerch ? (
+                  <InspectorSection title='Merch'>
+                    <p className='system-b-library-drawer-panel-copy leading-5 text-secondary-token'>
+                      {current.description ?? 'Merch card saved from chat.'}
+                    </p>
+                    <dl className='mt-2'>
+                      <MetadataRow
+                        label='Sale Price'
+                        value={current.salePriceLabel ?? 'No Price'}
+                      />
+                      <MetadataRow
+                        label='Profit'
+                        value={current.profitLabel ?? 'No Estimate'}
+                      />
+                    </dl>
+                  </InspectorSection>
+                ) : null}
+
+                {!isMerch && hasVerifiedLibraryAudioPreview(current) ? (
+                  <InspectorSection title='Preview'>
+                    <div className='flex items-center justify-between gap-2'>
+                      <span className='system-b-library-drawer-panel-copy min-w-0 flex-1 truncate text-secondary-token'>
+                        {current.title}
+                      </span>
+                      <PreviewActionButton
+                        asset={current}
+                        isPreviewPlaying={isPreviewPlaying}
+                        onTogglePreview={onTogglePreview}
+                        compact
+                        disabledTabIndex={closedTabIndex}
+                      />
+                    </div>
+                  </InspectorSection>
+                ) : null}
+
+                {!isMerch ? (
+                  <InspectorSection title='Actions'>
+                    <WorkInspectorActions
                       asset={current}
-                      creatorProfileId={profileId}
-                      bundle={inspectorBundle}
+                      launches={workLaunches}
+                      canPublish={profileId !== null}
                       disabled={!open}
-                    />
-                  </InspectorSection>
-                ) : activeTab === 'rights' ? (
-                  <InspectorEmpty message='No rights findings for this object.' />
-                ) : null}
-                {isYouTubeVideo && current.source && activeTab === 'links' ? (
-                  <InspectorSection title='Relationships'>
-                    <YouTubeMerchRelationshipEditor
-                      profileId={profileId}
-                      videoId={current.source.canonicalId}
-                      merchProducts={merchProducts}
-                      relationships={relationships}
-                      disabled={!open}
+                      onSharePrivately={() => setActiveTab('files')}
                     />
                   </InspectorSection>
                 ) : null}
-                {isYouTubeVideo && current.source && activeTab === 'assets' ? (
-                  <InspectorSection title='Optimization'>
-                    <YouTubeOptimizationPanel
-                      profileId={profileId}
-                      videoId={current.source.canonicalId}
-                      disabled={!open}
-                    />
-                  </InspectorSection>
-                ) : null}
-                {activeTab === 'links' ? (
-                  <InspectorSection title='Share Link'>
+
+                {!isMerch ? (
+                  <InspectorSection title='Sharing'>
                     <LibraryAssetSharePanel
                       asset={current}
                       profileId={profileId}
@@ -2241,158 +2353,192 @@ function AssetDrawer({
                   </InspectorSection>
                 ) : null}
 
-                {activeTab === 'assets' ? (
-                  <InspectorSection title='Audio'>
-                    {hasVerifiedLibraryAudioPreview(current) ? (
-                      <div className='mb-2 flex justify-end'>
-                        <PreviewActionButton
+                <InspectorSection title='Details'>
+                  <dl>
+                    <MetadataRow
+                      label='Approval Status'
+                      value={
+                        <ApprovalStatusEditor
                           asset={current}
-                          isPreviewPlaying={isPreviewPlaying}
-                          onTogglePreview={onTogglePreview}
-                          compact
-                          disabledTabIndex={closedTabIndex}
+                          profileId={profileId}
+                          disabled={!open}
+                          saving={approvalSavingIds.has(current.id)}
+                          onStatusChange={onApprovalStatusChange}
                         />
-                      </div>
-                    ) : null}
-                    <LibraryAudioPanel
-                      asset={current}
-                      isPreviewPlaying={isPreviewPlaying}
-                      onTogglePreview={onTogglePreview}
-                      onUploaded={onAudioUploaded}
-                      disabledTabIndex={closedTabIndex}
-                      embedded
+                      }
+                    />
+                    <MetadataRow
+                      label={isMerch ? 'Updated' : 'Release Date'}
+                      value={
+                        <span
+                          title={formatLibraryReleaseDateTitle(
+                            current.releaseDate
+                          )}
+                        >
+                          {formatLibraryReleaseDate(current.releaseDate)}
+                        </span>
+                      }
+                    />
+                    <MetadataRow
+                      label='Type'
+                      value={formatLibraryItemType(current)}
+                    />
+                    {isMerch ? (
+                      <MetadataRow
+                        label='Sellability'
+                        value={current.sellabilityLabel ?? 'Not Checked'}
+                      />
+                    ) : (
+                      <>
+                        <MetadataRow
+                          label='Tracks'
+                          value={current.trackCount}
+                        />
+                        <MetadataRow
+                          label='Duration'
+                          value={formatLibraryDuration(current.totalDurationMs)}
+                        />
+                        <MetadataRow
+                          label='Popularity'
+                          value={
+                            current.spotifyPopularity == null
+                              ? 'No Score'
+                              : `${current.spotifyPopularity}/100`
+                          }
+                        />
+                        <MetadataRow
+                          label='Genres'
+                          value={
+                            current.genres.length > 0
+                              ? current.genres.join(', ')
+                              : 'No Genres'
+                          }
+                        />
+                        <MetadataRow
+                          label='Label'
+                          value={
+                            current.label ?? current.distributor ?? 'No Label'
+                          }
+                        />
+                        <MetadataRow
+                          label='UPC'
+                          value={current.upc ?? 'No UPC'}
+                        />
+                        <MetadataRow
+                          label='Pitch Targets'
+                          value={current.targetPlaylistCount}
+                        />
+                      </>
+                    )}
+                  </dl>
+                </InspectorSection>
+
+                {!isMerch &&
+                isDspQuietListScope(getLibraryItemKind(current)) &&
+                current.providers.length > 0 ? (
+                  <InspectorSection title='Providers'>
+                    <div className='space-y-0.5'>
+                      {current.providers.map(provider => (
+                        <DspQuietRow
+                          key={`${current.id}-${provider.key}`}
+                          className='system-b-library-provider-link'
+                          label={provider.label}
+                          href={provider.url}
+                          closedTabIndex={closedTabIndex}
+                          icon={
+                            <ProviderIcon
+                              provider={provider.key as ProviderKey}
+                              className='h-3.5 w-3.5'
+                            />
+                          }
+                        />
+                      ))}
+                    </div>
+                  </InspectorSection>
+                ) : null}
+
+                {isYouTubeVideo && current.source ? (
+                  <InspectorSection title='Relationships'>
+                    <YouTubeMerchRelationshipEditor
+                      profileId={profileId}
+                      videoId={current.source.canonicalId}
+                      merchProducts={merchProducts}
+                      relationships={relationships}
+                      disabled={!open}
                     />
                   </InspectorSection>
                 ) : null}
 
-                {activeTab === 'assets' ? (
-                  <LibraryInspectorAssetSlots
-                    asset={current}
-                    downloads={inspectorBundle.downloads}
-                    disabled={!open}
-                    onArtworkUploaded={onArtworkUploaded}
-                  />
+                {isYouTubeVideo && current.source ? (
+                  <InspectorSection title='Optimization'>
+                    <YouTubeOptimizationPanel
+                      profileId={profileId}
+                      videoId={current.source.canonicalId}
+                      disabled={!open}
+                    />
+                  </InspectorSection>
                 ) : null}
 
-                {activeTab === 'assets' && !isYouTubeVideo ? (
-                  <InspectorSection title='Press Kit Drop'>
+                {!isMerch &&
+                (getLibraryItemKind(current) === 'release' ||
+                  current.linkedReleaseId) ? (
+                  <InspectorSection title='Rights'>
+                    <PostReleasePanel
+                      asset={current}
+                      creatorProfileId={profileId}
+                      bundle={inspectorBundle}
+                      disabled={!open}
+                    />
+                  </InspectorSection>
+                ) : null}
+              </>
+            ) : isMerch ? (
+              <InspectorEmpty message='No files for this merch item.' />
+            ) : (
+              <>
+                <InspectorSection title='Audio'>
+                  {hasVerifiedLibraryAudioPreview(current) ? (
+                    <div className='mb-2 flex justify-end'>
+                      <PreviewActionButton
+                        asset={current}
+                        isPreviewPlaying={isPreviewPlaying}
+                        onTogglePreview={onTogglePreview}
+                        compact
+                        disabledTabIndex={closedTabIndex}
+                      />
+                    </div>
+                  ) : null}
+                  <LibraryAudioPanel
+                    asset={current}
+                    isPreviewPlaying={isPreviewPlaying}
+                    onTogglePreview={onTogglePreview}
+                    onUploaded={onAudioUploaded}
+                    disabledTabIndex={closedTabIndex}
+                    embedded
+                  />
+                </InspectorSection>
+
+                <LibraryInspectorAssetSlots
+                  asset={current}
+                  downloads={inspectorBundle.downloads}
+                  disabled={!open}
+                  onArtworkUploaded={onArtworkUploaded}
+                />
+
+                {!isYouTubeVideo ? (
+                  <InspectorSection title='Share Files Privately'>
                     <LibraryShareDropCreator
                       releaseIds={[current.id]}
-                      candidateAssets={pressKitCandidates.map(item => ({
+                      candidateAssets={shareCandidates.map(item => ({
                         id: item.id,
                         title: item.title,
                       }))}
-                      defaultTitle={`${current.title} press kit`}
+                      defaultTitle={`${current.title} files`}
                     />
                   </InspectorSection>
                 ) : null}
               </>
             )}
-
-            {activeTab === 'details' ? (
-              <InspectorSection title='Details'>
-                <dl>
-                  <MetadataRow
-                    label='Approval Status'
-                    value={
-                      <ApprovalStatusEditor
-                        asset={current}
-                        profileId={profileId}
-                        disabled={!open}
-                        saving={approvalSavingIds.has(current.id)}
-                        onStatusChange={onApprovalStatusChange}
-                      />
-                    }
-                  />
-                  <MetadataRow
-                    label={isMerch ? 'Updated' : 'Release Date'}
-                    value={
-                      <span
-                        title={formatLibraryReleaseDateTitle(
-                          current.releaseDate
-                        )}
-                      >
-                        {formatLibraryReleaseDate(current.releaseDate)}
-                      </span>
-                    }
-                  />
-                  <MetadataRow
-                    label='Type'
-                    value={formatLibraryItemType(current)}
-                  />
-                  {isMerch ? (
-                    <MetadataRow
-                      label='Sellability'
-                      value={current.sellabilityLabel ?? 'Not Checked'}
-                    />
-                  ) : (
-                    <>
-                      <MetadataRow label='Tracks' value={current.trackCount} />
-                      <MetadataRow
-                        label='Duration'
-                        value={formatLibraryDuration(current.totalDurationMs)}
-                      />
-                      <MetadataRow
-                        label='Popularity'
-                        value={
-                          current.spotifyPopularity == null
-                            ? 'No Score'
-                            : `${current.spotifyPopularity}/100`
-                        }
-                      />
-                      <MetadataRow
-                        label='Genres'
-                        value={
-                          current.genres.length > 0
-                            ? current.genres.join(', ')
-                            : 'No Genres'
-                        }
-                      />
-                      <MetadataRow
-                        label='Label'
-                        value={
-                          current.label ?? current.distributor ?? 'No Label'
-                        }
-                      />
-                      <MetadataRow
-                        label='UPC'
-                        value={current.upc ?? 'No UPC'}
-                      />
-                      <MetadataRow
-                        label='Pitch Targets'
-                        value={current.targetPlaylistCount}
-                      />
-                    </>
-                  )}
-                </dl>
-              </InspectorSection>
-            ) : null}
-
-            {!isMerch &&
-            activeTab === 'links' &&
-            isDspQuietListScope(getLibraryItemKind(current)) ? (
-              <InspectorSection title='Providers'>
-                {current.providers.length > 0 ? (
-                  <div className='space-y-0.5'>
-                    {current.providers.map(provider => (
-                      <DspQuietRow
-                        key={`${current.id}-${provider.key}`}
-                        className='system-b-library-provider-link'
-                        label={provider.label}
-                        href={provider.url}
-                        closedTabIndex={closedTabIndex}
-                        icon={
-                          <ProviderIcon
-                            provider={provider.key as ProviderKey}
-                            className='h-3.5 w-3.5'
-                          />
-                        }
-                      />
-                    ))}
-                  </div>
-                ) : null}
-              </InspectorSection>
-            ) : null}
           </div>
         </TableContextMenu>
       ) : null}
@@ -2424,23 +2570,38 @@ function LibraryStatusBar({
 }
 
 const EMPTY_MERCH_PRODUCTS: readonly LibraryMerchProductOption[] = [];
+const EMPTY_WORK_LAUNCHES: readonly WorkLaunchSummary[] = [];
 
 export function LibrarySurface({
   assets,
   profileId = null,
   artistHandle = null,
   canSyncSpotify = false,
+  youtubeConnected = false,
+  isImportingYouTube = false,
+  youtubeImportDisabled = false,
+  onImportYouTube,
   merchProducts = EMPTY_MERCH_PRODUCTS,
   relationships = EMPTY_RELATIONSHIPS,
   postReleaseBundle = EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
+  workLaunches = EMPTY_WORK_LAUNCHES,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly profileId?: string | null;
   readonly artistHandle?: string | null;
   readonly canSyncSpotify?: boolean;
+  readonly youtubeConnected?: boolean;
+  readonly isImportingYouTube?: boolean;
+  readonly youtubeImportDisabled?: boolean;
+  readonly onImportYouTube?: () => void;
   readonly merchProducts?: readonly LibraryMerchProductOption[];
   readonly relationships?: readonly LibraryRelationshipView[];
   readonly postReleaseBundle?: LibraryPostReleaseBundle;
+  /**
+   * Canonical launch summaries (JOV-7472 read contract). Only launches scoped
+   * to the selected work render; absent data means no press-kit slot is shown.
+   */
+  readonly workLaunches?: readonly WorkLaunchSummary[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -2717,6 +2878,22 @@ export function LibrarySurface({
     [router, searchParams]
   );
 
+  const handleStageChange = useCallback(
+    (next: (typeof STAGE_TABS)[number]) => {
+      setStage(next);
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('section');
+      if (next === 'all') params.delete('stage');
+      else params.set('stage', next);
+      const query = params.toString();
+      router.replace(
+        query ? `${APP_ROUTES.LIBRARY}?${query}` : APP_ROUTES.LIBRARY,
+        { scroll: false }
+      );
+    },
+    [router, searchParams]
+  );
+
   const handleSavedViewChange = useCallback((next: LibrarySavedViewId) => {
     setSavedView(next);
     persistLibrarySavedView(next);
@@ -2724,6 +2901,7 @@ export function LibrarySurface({
 
   function resetView() {
     handlePresetChange('all');
+    handleStageChange('all');
     handleSavedViewChange('all');
     setFilters(emptyFilters());
     setPills([]);
@@ -2936,7 +3114,8 @@ export function LibrarySurface({
     filters.approvalStatuses.size +
     filters.releaseTypes.size +
     filters.assetKinds.size +
-    filters.providers.size;
+    filters.providers.size +
+    (preset === 'all' ? 0 : 1);
 
   const headerSearchAdapter = useMemo(
     () =>
@@ -2956,10 +3135,10 @@ export function LibrarySurface({
             visibleCount: visibleAssets.length,
             triggerLabel:
               pills.length > 0
-                ? `Filter Library (${pills.length})`
-                : 'Filter Library',
-            ariaLabel: 'Filter library assets',
-            placeholder: 'Search library',
+                ? `Filter Work (${pills.length})`
+                : 'Filter Work',
+            ariaLabel: 'Filter work',
+            placeholder: 'Search work',
             allowedFields: [
               'artist',
               'title',
@@ -2986,16 +3165,121 @@ export function LibrarySurface({
     () => (
       <LibraryFilterPanel
         assets={effectiveAssets}
+        preset={preset}
+        onPreset={handlePresetChange}
         savedView={savedView}
         onSavedView={handleSavedViewChange}
         filters={filters}
         onFilters={setFilters}
-        onClearFilters={() => setFilters(emptyFilters())}
+        onClearFilters={() => {
+          handlePresetChange('all');
+          setFilters(emptyFilters());
+        }}
         className='max-h-full flex-1'
       />
     ),
-    [effectiveAssets, filters, handleSavedViewChange, savedView]
+    [
+      effectiveAssets,
+      filters,
+      handlePresetChange,
+      handleSavedViewChange,
+      preset,
+      savedView,
+    ]
   );
+
+  // Quick-apply suggestions surfaced next to the filter button (hover/focus
+  // revealed). Each suggestion reuses a real, live filtering mechanism —
+  // the "Type" suggestion switches the view preset, "Status"/"Approval"
+  // add a FilterPill to the same pill-search state the header's Search
+  // Library input writes to — so a click is never a decorative no-op.
+  const suggestedFilters = useMemo<ToolbarFilterSuggestion[]>(() => {
+    const suggestions: ToolbarFilterSuggestion[] = [];
+
+    const typeCandidate = PRESETS.filter(
+      item => item.id !== 'all' && item.id !== preset
+    )
+      .map(item => ({
+        item,
+        count: effectiveAssets.filter(item.predicate).length,
+      }))
+      .filter(entry => entry.count > 0)
+      .toSorted((a, b) => b.count - a.count)[0];
+    if (typeCandidate) {
+      const { item } = typeCandidate;
+      suggestions.push({
+        id: `library-suggestion-type-${item.id}`,
+        // No separate ariaLabel: the visible pill text is the accessible
+        // name (WCAG 2.5.3 Label in Name) so voice-control users can refer
+        // to the control by what it says.
+        label: `Type · ${item.label}`,
+        onSelect: () => handlePresetChange(item.id),
+      });
+    }
+
+    const activeStatusValues = new Set(
+      pills
+        .filter(pill => pill.field === 'status')
+        .flatMap(pill => pill.values.map(normalizePillValue))
+    );
+    const statusCandidate = Array.from(
+      countBy(effectiveAssets, asset => [asset.status]).entries()
+    )
+      .filter(([status]) => !activeStatusValues.has(normalizePillValue(status)))
+      .toSorted((a, b) => b[1] - a[1])[0];
+    if (statusCandidate) {
+      const [status] = statusCandidate;
+      const label = formatReleaseStatus(status);
+      suggestions.push({
+        id: `library-suggestion-status-${status}`,
+        label: `Status · ${label}`,
+        onSelect: () => {
+          setPills(previous => [
+            ...previous,
+            {
+              id: newLibraryFilterPillId(),
+              field: 'status',
+              op: 'is',
+              values: [status],
+            },
+          ]);
+        },
+      });
+    }
+
+    const activeApprovalValues = new Set(
+      pills
+        .filter(pill => pill.field === 'approval')
+        .flatMap(pill => pill.values.map(normalizePillValue))
+    );
+    const approvalCandidate = Array.from(
+      countBy(effectiveAssets, asset => [
+        formatLibraryApprovalStatus(asset.approvalStatus),
+      ]).entries()
+    )
+      .filter(([label]) => !activeApprovalValues.has(normalizePillValue(label)))
+      .toSorted((a, b) => b[1] - a[1])[0];
+    if (approvalCandidate) {
+      const [label] = approvalCandidate;
+      suggestions.push({
+        id: `library-suggestion-approval-${label}`,
+        label: `Approval · ${label}`,
+        onSelect: () => {
+          setPills(previous => [
+            ...previous,
+            {
+              id: newLibraryFilterPillId(),
+              field: 'approval',
+              op: 'is',
+              values: [label],
+            },
+          ]);
+        },
+      });
+    }
+
+    return suggestions.slice(0, 3);
+  }, [effectiveAssets, handlePresetChange, pills, preset]);
 
   const handleAudioUploaded = useCallback(
     (assetId: string, previewUrl: string) => {
@@ -3030,9 +3314,10 @@ export function LibrarySurface({
         profileId={profileId}
         approvalSavingIds={approvalSavingIds}
         artistHandle={artistHandle}
-        pressKitCandidates={effectiveAssets.filter(
+        shareCandidates={effectiveAssets.filter(
           item => getLibraryItemKind(item) === 'release'
         )}
+        workLaunches={workLaunches}
         merchProducts={effectiveAssets.flatMap(asset =>
           getLibraryItemKind(asset) === 'merch' &&
           asset.source?.provider === 'merch'
@@ -3062,6 +3347,7 @@ export function LibrarySurface({
       profileId,
       relationships,
       selectedAsset,
+      workLaunches,
     ]
   );
 
@@ -3078,17 +3364,16 @@ export function LibrarySurface({
   }
 
   return (
-    <PageShell
-      aria-label='Library'
+    <WorkspacePage
+      aria-label='Work'
       frame='content-container'
       contentPadding='none'
       surfaceMode='table'
       data-testid='library-surface'
       toolbar={
         <LibraryToolbar
-          assets={effectiveAssets}
-          preset={preset}
-          onPreset={handlePresetChange}
+          stage={stage}
+          onStage={handleStageChange}
           sort={sort}
           onSort={setSort}
           view={view}
@@ -3102,11 +3387,22 @@ export function LibrarySurface({
           activeFilterCount={activeFilterCount}
           filterPanel={filterPanel}
           isDesktop={isDesktopLayout}
+          suggestedFilters={suggestedFilters}
+          canSyncSpotify={canSyncSpotify}
+          isSyncingSpotify={isSyncingSpotify}
+          onSyncSpotify={handleSyncSpotify}
+          youtubeConnected={youtubeConnected}
+          isImportingYouTube={isImportingYouTube}
+          youtubeImportDisabled={youtubeImportDisabled}
+          onImportYouTube={onImportYouTube}
         />
       }
     >
       <NavigationDestinationReady destination='library' />
       <div
+        id='library-catalog-panel'
+        role='tabpanel'
+        aria-labelledby={`library-stage-${stage}-tab`}
         data-testid='library-content-frame'
         className='flex h-full min-h-0 flex-1 overflow-hidden'
       >
@@ -3155,6 +3451,6 @@ export function LibrarySurface({
           />
         </div>
       </div>
-    </PageShell>
+    </WorkspacePage>
   );
 }

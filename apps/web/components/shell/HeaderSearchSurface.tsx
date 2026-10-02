@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 import {
   CircleHelp,
-  Disc3,
+  Layers,
   MessageCircle,
   Search,
   SlidersHorizontal,
@@ -104,7 +104,7 @@ function HeaderSearchResultIcon({
     return <CircleHelp className='h-3.5 w-3.5' aria-hidden='true' />;
   }
 
-  return <Disc3 className='h-3.5 w-3.5' aria-hidden='true' />;
+  return <Layers className='h-3.5 w-3.5' aria-hidden='true' />;
 }
 
 function getHeaderSearchResultRowClassName(isSelected: boolean) {
@@ -589,7 +589,7 @@ export function HeaderSearchSurface({
         className={cn(
           headerSearchSurfaceChrome,
           headerSearchSurfaceWidth,
-          'inline-flex h-7 min-h-7 min-w-0 items-center justify-start gap-1.5 px-2.5 text-left text-xs text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-subtle ease-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-ring-themed',
+          'inline-flex h-7 min-h-7 min-w-0 items-center justify-start gap-1.5 px-2.5 text-left text-xs text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-subtle ease-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:ring-inset focus-ring-themed',
           className
         )}
         aria-label='Search'

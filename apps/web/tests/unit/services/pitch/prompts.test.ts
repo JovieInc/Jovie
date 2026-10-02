@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildPitchDraftUserPrompt,
   buildSystemPrompt,
   buildUserPrompt,
 } from '@/lib/services/pitch/prompts';
+import { resolvePitchDestination } from '@/lib/services/pitch/targets';
 import type { PitchInput } from '@/lib/services/pitch/types';
 
 const FULL_INPUT: PitchInput = {
@@ -158,6 +160,27 @@ describe('buildUserPrompt', () => {
     expect(prompt).not.toContain('null');
     expect(prompt).toContain('Curator Checklist');
     expect(prompt).toContain('UNKNOWN');
+    const generate =
+      'Generate a playlist pitch for each platform. Stay strictly within character limits.';
+    expect(prompt.indexOf(generate)).toBeGreaterThan(prompt.indexOf('UNKNOWN'));
+  });
+
+  it('keeps the destination pitch instruction after the checklist', () => {
+    const destination = resolvePitchDestination({ target: 'playlist' });
+    if (!destination) {
+      throw new Error('playlist destination missing');
+    }
+    expect(destination.label).toBe('Playlist');
+    expect(destination.characterLimit).toBe(500);
+    const prompt = buildPitchDraftUserPrompt({
+      input: MINIMAL_INPUT,
+      destination,
+    });
+    const generate =
+      'Generate one pitch for the requested destination. Return a concise subject line only when the pitch would naturally be sent as an email or DM.';
+    expect(prompt).toContain('Character limit: 500');
+    expect(prompt).toContain('UNKNOWN');
+    expect(prompt.indexOf(generate)).toBeGreaterThan(prompt.indexOf('UNKNOWN'));
   });
 
   it('does not include career highlights section when empty', () => {

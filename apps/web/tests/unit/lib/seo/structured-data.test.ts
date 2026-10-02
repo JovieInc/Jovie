@@ -521,6 +521,56 @@ describe('generateMusicStructuredData', () => {
       expect(featuredSchema).toHaveProperty('contributor');
     });
 
+    it('projects featured and remixer credits from the same canonical groups', () => {
+      const data = generateMusicStructuredData(
+        {
+          type: 'track',
+          title: 'Take Me Over (Austin Leeds Remix)',
+          slug: 'take-me-over-austin-leeds-remix',
+          artworkUrl: null,
+          releaseDate: null,
+          providerLinks: [],
+          primaryArtists: [{ name: 'Tim White', handle: 'tim' }],
+          credits: [
+            {
+              role: 'featured_artist',
+              label: 'Featured artist',
+              entries: [
+                {
+                  artistId: 'erica',
+                  name: 'Erica Gibson',
+                  handle: null,
+                  role: 'featured_artist',
+                  position: 1,
+                },
+              ],
+            },
+            {
+              role: 'remixer',
+              label: 'Remixer',
+              entries: [
+                {
+                  artistId: 'austin',
+                  name: 'Austin Leeds',
+                  handle: null,
+                  role: 'remixer',
+                  position: 2,
+                },
+              ],
+            },
+          ],
+        },
+        ownerCreator
+      );
+
+      const musicSchema = data['@graph'][0] as Record<string, unknown>;
+      expect(musicSchema.contributor).toEqual([
+        { '@type': 'Person', name: 'Erica Gibson' },
+        { '@type': 'Person', name: 'Austin Leeds' },
+      ]);
+      expect(musicSchema.byArtist).toMatchObject({ name: 'Tim White' });
+    });
+
     it('never links an opaque machine handle from a credited artist', () => {
       const data = generateMusicStructuredData(
         {
@@ -567,6 +617,38 @@ describe('generateMusicStructuredData', () => {
         name: 'hello',
         url: 'https://jov.ie/hello',
         sameAs: ['https://open.spotify.com/artist/2o5jDhtHVPhrJdv3cEQ99Z'],
+      });
+    });
+
+    it('wraps one credited artist into the track-list recording ref', () => {
+      const data = generateMusicStructuredData(
+        {
+          type: 'release',
+          title: 'Wheels Up',
+          slug: 'wheels-up',
+          artworkUrl: null,
+          releaseDate: null,
+          providerLinks: [],
+          primaryArtists: [{ name: 'LYNX', handle: 'lynx' }],
+        },
+        ownerCreator,
+        [
+          {
+            title: 'Wheels Up',
+            slug: 'wheels-up',
+            trackNumber: 1,
+            durationMs: 210000,
+          },
+        ]
+      );
+
+      const musicSchema = data['@graph'][0] as Record<string, unknown>;
+      const track = musicSchema.track as Record<string, unknown>;
+      const firstItem = (track.itemListElement as Record<string, unknown>[])[0]
+        .item as Record<string, unknown>;
+
+      expect(firstItem.byArtist).toEqual({
+        '@id': 'https://jov.ie/lynx#musicgroup',
       });
     });
 

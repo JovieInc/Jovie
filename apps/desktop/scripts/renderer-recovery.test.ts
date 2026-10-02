@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import {
   classifyDesktopLoadFailure,
+  createAuthHandoffNavigationRecovery,
   createLocalHostedLoadRetryController,
   decideAbortedMainFrameRecovery,
   decideDidFinishLoadRecovery,
@@ -233,6 +234,146 @@ test('canceling auth recovers an intercepted blank main window to the canonical 
   expect(
     shouldRecoverAuthHandoffToCanonicalShell('data:text/html,recovery')
   ).toBe(false);
+});
+
+test('cancel retries an explicitly interrupted workspace document once', () => {
+  const recovery = createAuthHandoffNavigationRecovery('https://jov.ie');
+  recovery.navigationStarted({
+    currentUrl: 'https://jov.ie/app/ov/chat',
+    url: 'https://jov.ie/app',
+    isMainFrame: true,
+    isInPlace: false,
+  });
+  expect(recovery.authIntercepted()).toBe('handoff');
+  recovery.documentFinished(); // late finish from the interrupted load
+  expect(recovery.cancel()).toBe('https://jov.ie/app');
+  expect(recovery.cancel()).toBeNull();
+});
+
+test('intact workspace content and drafts do not reload on auth cancellation', () => {
+  const recovery = createAuthHandoffNavigationRecovery('https://jov.ie');
+  expect(recovery.authIntercepted()).toBe('handoff');
+  expect(recovery.cancel()).toBeNull();
+  recovery.navigationStarted({
+    currentUrl: 'https://jov.ie/app/ov/chat',
+    url: 'https://jov.ie/app',
+    isMainFrame: true,
+    isInPlace: false,
+  });
+  recovery.documentFinished();
+  expect(recovery.authIntercepted()).toBe('handoff');
+  expect(recovery.cancel()).toBeNull();
+});
+
+test('retry auth redirects recover inline without opening another handoff loop', () => {
+  const recovery = createAuthHandoffNavigationRecovery('https://jov.ie');
+  const navigation = {
+    currentUrl: 'https://jov.ie/app/ov/chat',
+    url: 'https://jov.ie/app',
+    isMainFrame: true,
+    isInPlace: false,
+  };
+  recovery.navigationStarted(navigation);
+  recovery.authIntercepted();
+  const target = recovery.cancel();
+  recovery.navigationStarted({ ...navigation, url: target! });
+  expect(recovery.authIntercepted()).toBe('canonical-auth-shell');
+  recovery.navigationStarted({
+    ...navigation,
+    url: 'https://jov.ie/desktop-auth',
+  });
+  expect(recovery.authIntercepted()).toBe('ignore');
+  expect(recovery.cancel()).toBeNull();
+});
+
+test('fresh navigation, successful retry and window disposal clear stale tracking', () => {
+  for (const finish of ['navigation', 'document', 'close']) {
+    const recovery = createAuthHandoffNavigationRecovery('https://jov.ie');
+    const navigation = {
+      currentUrl: 'https://jov.ie/app/ov/chat',
+      url: 'https://jov.ie/app',
+      isMainFrame: true,
+      isInPlace: false,
+    };
+    recovery.navigationStarted(navigation);
+    recovery.authIntercepted();
+    if (finish === 'navigation') {
+      recovery.navigationStarted({ ...navigation, url: 'https://jov.ie/help' });
+    } else if (finish === 'document') {
+      recovery.cancel();
+      recovery.navigationCompletion()();
+    } else {
+      recovery.clear();
+    }
+    expect(recovery.authIntercepted()).toBe('handoff');
+    expect(recovery.cancel()).toBeNull();
+  }
+});
+
+test('late finish and stale owned completion cannot clear a newer recovery', () => {
+  const recovery = createAuthHandoffNavigationRecovery('https://jov.ie');
+  const navigation = {
+    currentUrl: 'https://jov.ie/app/ov/chat',
+    url: 'https://jov.ie/app',
+    isMainFrame: true,
+    isInPlace: false,
+  };
+  recovery.navigationStarted(navigation);
+  recovery.authIntercepted();
+  recovery.cancel();
+  const oldCompletion = recovery.navigationCompletion();
+  recovery.navigationStarted(navigation);
+  recovery.documentFinished();
+  expect(recovery.authIntercepted()).toBe('canonical-auth-shell');
+  recovery.documentFinished();
+  expect(recovery.authIntercepted()).toBe('ignore');
+  recovery.navigationStarted({ ...navigation, url: 'https://jov.ie/app/chat' });
+  recovery.authIntercepted();
+  oldCompletion();
+  expect(recovery.cancel()).toBe('https://jov.ie/app/chat');
+});
+
+test('leaving canonical recovery discards its old navigation and loop guard', () => {
+  const recovery = createAuthHandoffNavigationRecovery('https://jov.ie');
+  const navigation = {
+    currentUrl: 'https://jov.ie/app/ov/chat',
+    url: 'https://jov.ie/app',
+    isMainFrame: true,
+    isInPlace: false,
+  };
+  recovery.navigationStarted(navigation);
+  recovery.authIntercepted();
+  recovery.cancel();
+  expect(recovery.authIntercepted()).toBe('canonical-auth-shell');
+  recovery.navigationStarted({
+    ...navigation,
+    url: 'https://example.com/desktop-auth',
+  });
+  expect(recovery.authIntercepted()).toBe('handoff');
+  expect(recovery.cancel()).toBeNull();
+});
+
+test('iframe, same-document, foreign and invalid workspace starts cannot trigger reload', () => {
+  const navigation = {
+    currentUrl: 'https://jov.ie/app/ov/chat',
+    url: 'https://jov.ie/app',
+    isMainFrame: true,
+    isInPlace: false,
+  };
+  for (const overrides of [
+    { isMainFrame: false },
+    { isInPlace: true },
+    { url: 'https://example.com/app' },
+    { currentUrl: 'about:blank' },
+    { url: 'invalid' },
+    { url: 'https://jov.ie/app-other' },
+    { url: 'https://jov.ie/help' },
+  ]) {
+    const recovery = createAuthHandoffNavigationRecovery('https://jov.ie');
+    recovery.navigationStarted({ ...navigation, ...overrides });
+    expect(recovery.authIntercepted()).toBe('handoff');
+    expect(recovery.cancel()).toBeNull();
+  }
 });
 
 test('a crash reloads while within the budget', () => {

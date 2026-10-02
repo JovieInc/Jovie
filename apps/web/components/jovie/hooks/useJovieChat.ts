@@ -3,15 +3,27 @@
 import { useChat } from '@ai-sdk/react';
 import { useAsyncRateLimiter } from '@tanstack/react-pacer';
 import { useQueryClient } from '@tanstack/react-query';
-import { DefaultChatTransport, type UIMessage } from 'ai';
+import { DefaultChatTransport, isToolUIPart, type UIMessage } from 'ai';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { CHAT_STREAM_FAILED_USER_MESSAGE } from '@/lib/ai/gateway-errors';
 import { track } from '@/lib/analytics';
 import { matchCommand } from '@/lib/chat/command-registry';
 import {
+  type ComposerRecoveryContext,
   clearComposerDraft,
+  clearSummerTurnRecovery,
   readComposerDraft,
+  readSummerTurnRecovery,
   saveComposerDraft,
+  saveSummerTurnRecovery,
 } from '@/lib/chat/composer-draft-store';
 import {
   consumeModelRotationNotice,
@@ -24,8 +36,15 @@ import { buildChatThreadRoute } from '@/lib/chat/sync-chat-thread-url';
 import { isRecoverableToolErrorCode } from '@/lib/chat/tool-errors';
 import { CHAT_TRANSCRIPT_WINDOW_VARIANT_IDENTITY } from '@/lib/chat/transcript-window';
 import { recordUxLatency } from '@/lib/monitoring/interaction-latency';
+import {
+  parseSummerFailure,
+  type SummerFailure,
+  summerRetryExplanation,
+} from '@/lib/ovie/summer-failure';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { queryKeys, useChatConversationQuery } from '@/lib/queries';
+import { subscribeCacheFence } from '@/lib/queries/cache-isolation';
+import { FetchError } from '@/lib/queries/fetch';
 import { captureException } from '@/lib/sentry/client-lite';
 import { logger } from '@/lib/utils/logger';
 
@@ -108,6 +127,10 @@ interface SubmitChatMessageOptions {
   readonly toolIntent?: string | null;
   /** Stop the active turn before submitting a user-authored steering message. */
   readonly interrupt?: boolean;
+  /** Resend an unrecorded Summer turn under its original id (idempotent replay). */
+  readonly clientTurnId?: string;
+  /** A retry can submit a failed message while a newer draft stays in the composer. */
+  readonly preserveComposerDraft?: boolean;
 }
 
 interface ChatTurnMetadata {
@@ -130,6 +153,12 @@ function uxLatencyNowMs(): number {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function isRecoverableSummerHistoryFailure(error: unknown): boolean {
+  return (
+    error instanceof FetchError && (error.status === 404 || error.isRetryable())
+  );
 }
 
 function extractChatTurnMetadata(value: unknown): ChatTurnMetadata | null {
@@ -203,8 +232,33 @@ function toError(value: unknown): Error {
   return value instanceof Error ? value : new Error('Chat send failed');
 }
 
+function readRecoveryError(context: ComposerRecoveryContext): ChatError | null {
+  const recovery = readSummerTurnRecovery(context);
+  if (!recovery) return null;
+  return {
+    type: 'server',
+    message: summerRetryExplanation(recovery.retry),
+    errorCode: recovery.errorCode,
+    ...recovery.error,
+    requestId: recovery.requestId,
+    failedMessage: recovery.retry === 'none' ? undefined : recovery.message,
+    ...(recovery.retry === 'same-turn'
+      ? { retryClientTurnId: recovery.clientTurnId }
+      : {}),
+  };
+}
+
 function getMessageParts(message: UIMessage | undefined): UIMessage['parts'] {
   return Array.isArray(message?.parts) ? message.parts : [];
+}
+
+function hasAssistantOutput(parts: UIMessage['parts']): boolean {
+  return parts.some(
+    part =>
+      (part.type === 'text' && part.text.trim().length > 0) ||
+      part.type === 'file' ||
+      isToolUIPart(part)
+  );
 }
 
 function getLastAssistantMessage(messages: readonly UIMessage[]) {
@@ -305,10 +359,19 @@ export function useJovieChat({
 }: UseJovieChatOptions) {
   // The operator session is not a creator conversation or a customer cache key.
   const conversationId = chatMode === 'ov' ? null : requestedConversationId;
+  const recoveryContext = useMemo(
+    () => ({ chatMode, conversationId: conversationId ?? null, profileId }),
+    [chatMode, conversationId, profileId]
+  );
   const router = useRouter();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastAttemptedMessageRef = useRef<string>('');
   const activeClientTurnIdRef = useRef<string | null>(null);
+  const activeRequestIdRef = useRef<string | null>(null);
+  const pendingSendRef = useRef<Promise<void> | null>(null);
+  const replacingTurnRef = useRef(false);
+  const turnContextEpochRef = useRef(0);
+  const mountedRef = useRef(true);
   const activeChatLatencyRef = useRef<ActiveChatLatency | null>(null);
   // Assistant SDK message ids that existed BEFORE the active turn started.
   // Between send and stream start, the SDK's "last assistant message" is still
@@ -319,13 +382,27 @@ export function useJovieChat({
   const streamRevisionRef = useRef(0);
   const lastAssistantPartsSignatureRef = useRef<string | null>(null);
   const sdkMessagesRef = useRef<UIMessage[]>([]);
+  // Failure hop carried on a data part so a stream error still knows whether
+  // Retry may reuse the turn id (message metadata is not readable in onError).
+  const pendingSummerFailureRef = useRef<SummerFailure | null>(null);
   const loadedConversationIdsRef = useRef<Set<string>>(new Set());
-  const [input, setInput] = useState(() =>
+  const [input, setInputState] = useState(() =>
     readComposerDraft(conversationId ?? null)
   );
   const inputDraftRef = useRef(input);
+  const previousErrorInputRef = useRef(input);
+  const inputDraftConversationIdRef = useRef(conversationId ?? null);
+  const setInput = useCallback((value: SetStateAction<string>) => {
+    const nextInput =
+      typeof value === 'function' ? value(inputDraftRef.current) : value;
+    // A route change can unmount chat before React commits this update.
+    inputDraftRef.current = nextInput;
+    setInputState(nextInput);
+  }, []);
   const chipTray = useChipTray();
-  const [chatError, setChatError] = useState<ChatError | null>(null);
+  const [chatError, setChatError] = useState<ChatError | null>(() =>
+    readRecoveryError(recoveryContext)
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showRateLimitHint, setShowRateLimitHint] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<
@@ -336,13 +413,35 @@ export function useJovieChat({
     getCachedTimelineState(activeConversationId)
   );
   const [timelineMode, setTimelineMode] = useState(chatMode);
+  const invalidateTurnContext = useCallback(() => {
+    turnContextEpochRef.current += 1;
+    activeClientTurnIdRef.current = null;
+    activeRequestIdRef.current = null;
+    activeChatLatencyRef.current = null;
+    pendingSendRef.current = null;
+    pendingSummerFailureRef.current = null;
+    replacingTurnRef.current = false;
+  }, []);
+  const resetTurnContext = useCallback(() => {
+    invalidateTurnContext();
+    setIsSubmitting(false);
+    setChatError(readRecoveryError(recoveryContext));
+  }, [invalidateTurnContext, recoveryContext]);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      invalidateTurnContext();
+    };
+  }, [invalidateTurnContext]);
   useEffect(() => {
     if (timelineMode === chatMode) return;
     setTimelineMode(chatMode);
     setTimelineState(createInitialChatTimelineState(conversationId ?? null));
+    inputDraftConversationIdRef.current = conversationId ?? null;
     setActiveConversationId(conversationId ?? null);
-    activeClientTurnIdRef.current = null;
-  }, [chatMode, conversationId, timelineMode]);
+    resetTurnContext();
+  }, [chatMode, conversationId, resetTurnContext, timelineMode]);
   const timelineStateRef = useRef(timelineState);
   useEffect(() => {
     timelineStateRef.current = timelineState;
@@ -405,6 +504,7 @@ export function useJovieChat({
       // Switching the hook's chat id before the AI SDK stream finishes
       // recreates the internal chat instance and drops in-flight tokens.
       if (isNewConversation && phase === 'completed') {
+        inputDraftConversationIdRef.current = nextConversationId;
         setActiveConversationId(nextConversationId);
       }
 
@@ -438,12 +538,30 @@ export function useJovieChat({
     chatMode,
     refetchInterval: titlePollIntervalMs,
   });
+  const blocksOvieConversation =
+    chatMode === 'ov' &&
+    isConversationQueryError &&
+    !isRecoverableSummerHistoryFailure(existingConversationError);
+  // Recorded Summer failures that an answered turn has since superseded. They
+  // collapse behind one control so the thread isn't a wall of failures; the
+  // latest failure stays visible because Retry applies to it.
+  const [showSupersededSummerFailures, setShowSupersededSummerFailures] =
+    useState(false);
+  const supersededSummerFailureIds = useMemo(() => {
+    const rows =
+      chatMode === 'ov' ? (existingConversation?.messages ?? []) : [];
+    const lastAnswered = rows.findLastIndex(
+      row => row.role === 'assistant' && !row.summerFailed
+    );
+    return new Set(
+      rows
+        .slice(0, Math.max(0, lastAnswered))
+        .filter(row => row.summerFailed)
+        .map(row => row.id)
+    );
+  }, [chatMode, existingConversation]);
   const messages = useMemo(() => {
-    if (
-      timelineMode !== chatMode ||
-      (chatMode === 'ov' && isConversationQueryError)
-    )
-      return [];
+    if (timelineMode !== chatMode || blocksOvieConversation) return [];
     const rows = selectRenderableMessages(timelineState);
     if (chatMode !== 'ov') return rows;
     // Canonical turn order wins over tied timestamps; never invent event times.
@@ -451,18 +569,32 @@ export function useJovieChat({
     const order = new Map(
       existingConversation?.messages.map((row, index) => [row.id, index])
     );
-    return [...rows].sort(
-      (a, b) =>
-        (order.get(a.serverMessageId ?? '') ?? Number.MAX_SAFE_INTEGER) -
-        (order.get(b.serverMessageId ?? '') ?? Number.MAX_SAFE_INTEGER)
-    );
+    return [...rows]
+      .filter(
+        row =>
+          showSupersededSummerFailures ||
+          !supersededSummerFailureIds.has(row.serverMessageId ?? '')
+      )
+      .sort(
+        (a, b) =>
+          (order.get(a.serverMessageId ?? '') ?? Number.MAX_SAFE_INTEGER) -
+          (order.get(b.serverMessageId ?? '') ?? Number.MAX_SAFE_INTEGER)
+      );
   }, [
     timelineMode,
     chatMode,
-    isConversationQueryError,
+    blocksOvieConversation,
     timelineState,
     existingConversation,
+    showSupersededSummerFailures,
+    supersededSummerFailureIds,
   ]);
+  const collapsedSummerFailureCount = showSupersededSummerFailures
+    ? 0
+    : (existingConversation?.messages ?? []).filter(
+        row =>
+          row.role === 'assistant' && supersededSummerFailureIds.has(row.id)
+      ).length;
 
   // Create transport: prefer profileId for server-side fetching, fall back to artistContext
   const transport = useMemo(
@@ -492,14 +624,16 @@ export function useJovieChat({
           };
         },
         fetch: async (input, init) => {
+          const clientTurnId = activeClientTurnIdRef.current;
           const response = await globalThis.fetch(input, {
             ...init,
             credentials: 'same-origin',
           });
+          if (clientTurnId !== activeClientTurnIdRef.current) return response;
+          activeRequestIdRef.current = response.headers.get('x-request-id');
           const serverConversationId =
             response.headers.get('x-conversation-id');
           const serverTurnId = response.headers.get('x-chat-turn-id');
-          const clientTurnId = activeClientTurnIdRef.current;
           const latency = activeChatLatencyRef.current;
           if (
             response.ok &&
@@ -576,6 +710,8 @@ export function useJovieChat({
       errorType: 'send' | 'stream',
       clientTurnId = activeClientTurnIdRef.current
     ) => {
+      if (!clientTurnId || clientTurnId !== activeClientTurnIdRef.current)
+        return;
       captureException(error, {
         tags: {
           feature: 'ai-chat',
@@ -595,20 +731,42 @@ export function useJovieChat({
         chatErrorType === 'tool' ||
         isRecoverableToolErrorCode(metadata.errorCode);
 
+      if (!suppressComposerPause || chatErrorType === 'rate_limit') {
+        saveSummerTurnRecovery(recoveryContext, {
+          clientTurnId,
+          message: lastAttemptedMessageRef.current,
+          retry: suppressComposerPause ? 'none' : 'same-turn',
+          requestId:
+            metadata.requestId ?? activeRequestIdRef.current ?? undefined,
+          error: {
+            type: chatErrorType,
+            message: getPreferredErrorMessage(error, chatErrorType, metadata),
+            retryAfter: metadata.retryAfter,
+            errorCode: metadata.errorCode,
+            suppressComposerPause,
+          },
+        });
+      }
+
       setChatError({
         type: chatErrorType,
         message: getPreferredErrorMessage(error, chatErrorType, metadata),
         retryAfter: metadata.retryAfter,
         errorCode: metadata.errorCode,
-        requestId: metadata.requestId,
+        requestId:
+          metadata.requestId ?? activeRequestIdRef.current ?? undefined,
         failedMessage: suppressComposerPause
           ? undefined
           : lastAttemptedMessageRef.current,
         suppressComposerPause,
+        ...(chatMode === 'ov' && !suppressComposerPause
+          ? { retryClientTurnId: clientTurnId }
+          : {}),
       });
 
       if (lastAttemptedMessageRef.current) {
-        setInput(lastAttemptedMessageRef.current);
+        const failedMessage = lastAttemptedMessageRef.current;
+        setInput(current => current || failedMessage);
       }
 
       if (clientTurnId) {
@@ -625,7 +783,14 @@ export function useJovieChat({
       activeChatLatencyRef.current = null;
       setIsSubmitting(false);
     },
-    [activeConversationId, dispatchTimelineEvent, profileId]
+    [
+      activeConversationId,
+      chatMode,
+      dispatchTimelineEvent,
+      profileId,
+      recoveryContext,
+      setInput,
+    ]
   );
 
   /**
@@ -661,13 +826,46 @@ export function useJovieChat({
     // re-render the timeline on every burst; pairs with server-side
     // smoothStream word-level pacing in lib/chat/run.ts.
     experimental_throttle: 50,
-    onFinish: ({ message }) => {
+    onData: dataPart => {
+      if (dataPart.type === 'data-summer-failure') {
+        pendingSummerFailureRef.current = parseSummerFailure(dataPart.data);
+      }
+    },
+    onFinish: ({ message, isError, isAbort, isDisconnect }) => {
+      // stop() settles the cancelled turn. Its eventual SDK callback must not
+      // settle a replacement, even when it arrives after a fresh submission.
+      if (isAbort) return;
       const metadata = extractChatTurnMetadata(message.metadata);
       const finishedConversationId =
         metadata?.conversationId ?? activeConversationId;
       const clientTurnId = activeClientTurnIdRef.current;
+      if (!clientTurnId) return;
       const latency = activeChatLatencyRef.current;
       const messageParts = getMessageParts(message as UIMessage);
+
+      if (isError || isDisconnect) {
+        if (clientTurnId) {
+          handleChatFailure(
+            new Error(CHAT_STREAM_FAILED_USER_MESSAGE),
+            'stream',
+            clientTurnId
+          );
+        }
+        return;
+      }
+
+      if (chatMode !== 'ov' && metadata?.conversationId) {
+        adoptServerConversationId(metadata.conversationId, 'completed');
+      }
+
+      if (clientTurnId && !hasAssistantOutput(messageParts)) {
+        handleChatFailure(
+          new Error(CHAT_STREAM_FAILED_USER_MESSAGE),
+          'stream',
+          clientTurnId
+        );
+        return;
+      }
 
       if (
         clientTurnId &&
@@ -694,8 +892,33 @@ export function useJovieChat({
           now: Date.now(),
         });
       }
-      if (chatMode !== 'ov' && metadata?.conversationId) {
-        adoptServerConversationId(metadata.conversationId, 'completed');
+      const summerFailure =
+        chatMode === 'ov' && isRecord(message.metadata)
+          ? parseSummerFailure(message.metadata.summerFailure)
+          : null;
+      if (summerFailure) {
+        saveSummerTurnRecovery(recoveryContext, {
+          clientTurnId,
+          message: lastAttemptedMessageRef.current,
+          retry: summerFailure.retry,
+          errorCode: summerFailure.hop,
+          requestId: metadata?.requestId,
+        });
+        setChatError({
+          type: 'server',
+          message: summerRetryExplanation(summerFailure.retry),
+          errorCode: summerFailure.hop,
+          requestId: metadata?.requestId,
+          failedMessage:
+            summerFailure.retry === 'none'
+              ? undefined
+              : lastAttemptedMessageRef.current,
+          ...(summerFailure.retry === 'same-turn' && clientTurnId
+            ? { retryClientTurnId: clientTurnId }
+            : {}),
+        });
+      } else {
+        clearSummerTurnRecovery(recoveryContext, clientTurnId);
       }
 
       // 👎 recovery loop (JOV-3362 / #11461): count clean assistant turns so
@@ -721,6 +944,7 @@ export function useJovieChat({
     },
     onError: error => {
       const clientTurnId = activeClientTurnIdRef.current;
+      if (!clientTurnId) return;
       const assistantParts = getActiveTurnAssistantParts(
         sdkMessagesRef.current
       );
@@ -729,6 +953,7 @@ export function useJovieChat({
         clientTurnId &&
         shouldSuppressChatPauseForToolFailure(error, assistantParts)
       ) {
+        clearSummerTurnRecovery(recoveryContext, clientTurnId);
         dispatchTimelineEvent({
           type: 'assistant.stream.completed',
           conversationId: activeConversationId,
@@ -745,11 +970,50 @@ export function useJovieChat({
 
       handleChatFailure(error, 'stream', clientTurnId);
 
+      const summerFailure =
+        chatMode === 'ov' ? pendingSummerFailureRef.current : null;
+      pendingSummerFailureRef.current = null;
+      if (summerFailure) {
+        saveSummerTurnRecovery(recoveryContext, {
+          clientTurnId,
+          message: lastAttemptedMessageRef.current,
+          retry: summerFailure.retry,
+          errorCode: summerFailure.hop,
+          requestId: activeRequestIdRef.current ?? undefined,
+        });
+        setChatError({
+          type: 'server',
+          message: summerRetryExplanation(summerFailure.retry),
+          errorCode: summerFailure.hop,
+          requestId: activeRequestIdRef.current ?? undefined,
+          failedMessage:
+            summerFailure.retry === 'none'
+              ? undefined
+              : lastAttemptedMessageRef.current,
+          ...(summerFailure.retry === 'same-turn' && clientTurnId
+            ? { retryClientTurnId: clientTurnId }
+            : {}),
+        });
+      }
+
       queryClient.invalidateQueries({
         queryKey: queryKeys.chat.usage(),
       });
     },
   });
+
+  const previousProfileIdRef = useRef(profileId);
+  useEffect(() => {
+    if (previousProfileIdRef.current !== profileId) {
+      previousProfileIdRef.current = profileId;
+      rawStop();
+      resetTurnContext();
+    }
+    return subscribeCacheFence(() => {
+      rawStop();
+      resetTurnContext();
+    });
+  }, [profileId, rawStop, resetTurnContext]);
 
   // Query data merges into the canonical timeline. It must never replace the
   // rendered list wholesale because optimistic/streaming rows may be newer.
@@ -964,22 +1228,33 @@ export function useJovieChat({
 
   // Clear error when user starts typing
   useEffect(() => {
+    const previousInput = previousErrorInputRef.current;
+    previousErrorInputRef.current = input;
     if (
       input &&
+      input !== previousInput &&
       chatError &&
-      (!chatError.failedMessage || input !== chatError.failedMessage)
+      input !== (chatError.failedMessage ?? lastAttemptedMessageRef.current)
     ) {
       setChatError(null);
     }
   }, [input, chatError]);
 
-  useEffect(() => {
-    inputDraftRef.current = input;
-  }, [input]);
+  useEffect(
+    () => () => {
+      saveComposerDraft(
+        inputDraftConversationIdRef.current,
+        inputDraftRef.current
+      );
+    },
+    []
+  );
 
   useEffect(() => {
     const handle = globalThis.setTimeout(() => {
-      saveComposerDraft(activeConversationId, input);
+      if (inputDraftConversationIdRef.current === activeConversationId) {
+        saveComposerDraft(activeConversationId, inputDraftRef.current);
+      }
     }, 250);
     return () => globalThis.clearTimeout(handle);
   }, [activeConversationId, input]);
@@ -1013,15 +1288,17 @@ export function useJovieChat({
       nextConversationId &&
       timelineStateRef.current.conversationId === nextConversationId
     ) {
+      inputDraftConversationIdRef.current = nextConversationId;
       setActiveConversationId(nextConversationId);
       return;
     }
 
     saveComposerDraft(activeConversationId, inputDraftRef.current);
+    inputDraftConversationIdRef.current = nextConversationId;
     setInput(readComposerDraft(nextConversationId));
 
     setActiveConversationId(nextConversationId);
-    activeClientTurnIdRef.current = null;
+    resetTurnContext();
     streamRevisionRef.current = 0;
     lastAssistantPartsSignatureRef.current = null;
     dispatchTimelineEvent({
@@ -1031,7 +1308,13 @@ export function useJovieChat({
       cachedMessages: takeCachedTimelineMessages(nextConversationId),
       now: Date.now(),
     });
-  }, [activeConversationId, conversationId, dispatchTimelineEvent]);
+  }, [
+    activeConversationId,
+    conversationId,
+    dispatchTimelineEvent,
+    resetTurnContext,
+    setInput,
+  ]);
 
   /** Try to handle text as a deterministic command. Returns true if handled. */
   const tryHandleCommand = useCallback(
@@ -1065,17 +1348,37 @@ export function useJovieChat({
       files?: FileUIPart[],
       options?: SubmitChatMessageOptions
     ): Promise<boolean> => {
+      if (!mountedRef.current) return false;
       if (
         chatMode === 'ov' &&
-        (isLoadingConversation || isConversationQueryError)
+        (isLoadingConversation || blocksOvieConversation)
       )
         return false;
       const hasFiles = files && files.length > 0;
       if (!text.trim() && !hasFiles) return false;
-      const shouldInterrupt =
-        (isLoading || isSubmitting) && options?.interrupt === true;
-      if ((isLoading || isSubmitting) && !shouldInterrupt) return false;
-      if (shouldInterrupt) stop();
+      if (replacingTurnRef.current) return false;
+      const contextEpoch = turnContextEpochRef.current;
+      const isBusy =
+        isLoading ||
+        isSubmitting ||
+        activeClientTurnIdRef.current !== null ||
+        pendingSendRef.current !== null;
+      const shouldInterrupt = isBusy && options?.interrupt === true;
+      if (isBusy && !shouldInterrupt) return false;
+      if (shouldInterrupt) {
+        replacingTurnRef.current = true;
+        try {
+          const pendingSend = pendingSendRef.current;
+          stop();
+          // Abort starts cancellation; the send promise owns its completion.
+          // Drain it before the shared SDK callbacks can observe a new turn.
+          await pendingSend;
+        } finally {
+          if (contextEpoch === turnContextEpochRef.current)
+            replacingTurnRef.current = false;
+        }
+        if (contextEpoch !== turnContextEpochRef.current) return false;
+      }
 
       // Validate message length
       if (text.length > MAX_MESSAGE_LENGTH) {
@@ -1089,7 +1392,10 @@ export function useJovieChat({
       const trimmedText = text.trim();
 
       // Check for deterministic commands before hitting AI
-      if (!hasFiles && tryHandleCommand(trimmedText)) return true;
+      if (!hasFiles && tryHandleCommand(trimmedText)) {
+        clearSummerTurnRecovery(recoveryContext);
+        return true;
+      }
 
       const payload = {
         text: trimmedText,
@@ -1101,8 +1407,20 @@ export function useJovieChat({
 
       setChatError(null);
       setIsSubmitting(true);
-      const clientTurnId = crypto.randomUUID();
+      const clientTurnId =
+        options?.clientTurnId ??
+        (chatMode === 'ov' && trimmedText === chatError?.failedMessage
+          ? chatError.retryClientTurnId
+          : undefined) ??
+        crypto.randomUUID();
+      if (
+        readSummerTurnRecovery(recoveryContext)?.clientTurnId !== clientTurnId
+      ) {
+        clearSummerTurnRecovery(recoveryContext);
+      }
       activeClientTurnIdRef.current = clientTurnId;
+      activeRequestIdRef.current = null;
+      pendingSummerFailureRef.current = null;
       activeChatLatencyRef.current = {
         clientTurnId,
         startedAt: uxLatencyNowMs(),
@@ -1156,11 +1474,19 @@ export function useJovieChat({
 
       try {
         const result = sendMessage(payload, sendOptions);
-        clearComposerDraft(activeConversationId);
-        setInput('');
-        void Promise.resolve(result).catch(error_ => {
-          handleChatFailure(toError(error_), 'send', clientTurnId);
-        });
+        if (!options?.preserveComposerDraft) {
+          clearComposerDraft(activeConversationId);
+          setInput('');
+        }
+        const pendingSend = Promise.resolve(result)
+          .catch(error_ => {
+            handleChatFailure(toError(error_), 'send', clientTurnId);
+          })
+          .finally(() => {
+            if (pendingSendRef.current === pendingSend)
+              pendingSendRef.current = null;
+          });
+        pendingSendRef.current = pendingSend;
         return true;
       } catch (error) {
         handleChatFailure(toError(error), 'send', clientTurnId);
@@ -1169,26 +1495,33 @@ export function useJovieChat({
     },
     [
       activeConversationId,
+      chatError,
       dispatchTimelineEvent,
       handleChatFailure,
       isLoading,
       isSubmitting,
+      recoveryContext,
       sendMessage,
+      setInput,
       stop,
       tryHandleCommand,
       chatMode,
       isLoadingConversation,
-      isConversationQueryError,
+      blocksOvieConversation,
     ]
   );
 
   // Retry the last failed message
   const handleRetry = useCallback(() => {
     if (chatError?.failedMessage) {
-      setChatError(null);
-      doSubmit(chatError.failedMessage);
+      doSubmit(chatError.failedMessage, undefined, {
+        clientTurnId: chatError.retryClientTurnId,
+        preserveComposerDraft:
+          Boolean(inputDraftRef.current) &&
+          inputDraftRef.current.trim() !== chatError.failedMessage,
+      });
     }
-  }, [chatError, doSubmit, setChatError]);
+  }, [chatError, doSubmit]);
 
   const rateLimitedSubmitter = useAsyncRateLimiter(
     async ({
@@ -1270,10 +1603,17 @@ export function useJovieChat({
   // a repeated user action, so it bypasses the client-side rate limiter to
   // avoid consuming the first-message slot and blocking the user's first send.
   useEffect(() => {
-    const pendingPrompt = consumePendingChatPrompt();
-    if (!pendingPrompt) return;
-
-    doSubmit(pendingPrompt);
+    // Effect replay/unmount must settle before consuming the one-time prompt.
+    // Otherwise StrictMode aborts its only send and the prompt is already gone.
+    let canceled = false;
+    queueMicrotask(() => {
+      if (canceled) return;
+      const pendingPrompt = consumePendingChatPrompt();
+      if (pendingPrompt) void doSubmit(pendingPrompt);
+    });
+    return () => {
+      canceled = true;
+    };
   }, [doSubmit]);
 
   useEffect(() => {
@@ -1333,19 +1673,21 @@ export function useJovieChat({
     setInput,
     chipTray,
     messages,
-    chatError:
-      chatMode === 'ov' && isConversationQueryError
-        ? {
-            type: 'unknown' as const,
-            message:
-              existingConversationError instanceof Error
-                ? existingConversationError.message
-                : 'Summer history is unavailable. Do not resend the original turn.',
-          }
-        : chatError,
+    chatError: blocksOvieConversation
+      ? {
+          type: 'unknown' as const,
+          message:
+            existingConversationError instanceof Error
+              ? existingConversationError.message
+              : 'Summer history couldn’t load. Reload to try again.',
+        }
+      : chatError,
     isLoading,
     isSubmitting,
     hasMessages,
+    /** Earlier unanswered Summer turns hidden behind one control. */
+    collapsedSummerFailureCount,
+    showCollapsedSummerFailures: () => setShowSupersededSummerFailures(true),
     isLoadingConversation:
       chatMode === 'ov'
         ? isLoadingConversation

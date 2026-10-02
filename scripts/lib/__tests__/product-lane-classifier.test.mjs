@@ -21,6 +21,32 @@ const pkg = (before, after) =>
   });
 
 describe('product lane classifier', () => {
+  it('builds and releases canonical changelog content through web while ordinary docs stay operational', () => {
+    expect(classifyProductLanes(['CHANGELOG.md']).selectedLanes).toEqual([
+      'web',
+    ]);
+    expect(
+      classifyProductLanes(['docs/changelog.md', 'README.md']).selectedLanes
+    ).toEqual(['operations']);
+  });
+  it('routes all canary OTP worker artifacts through the web gate and rejects unknown workers', () => {
+    const receipt = classifyProductLanes([
+      'workers/canary-otp/src/index.ts',
+      'workers/canary-otp/src/index.test.mjs',
+      'workers/canary-otp/package.json',
+      'workers/canary-otp/tsconfig.json',
+      'workers/canary-otp/wrangler.example.toml',
+      'workers/canary-otp/README.md',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web']);
+    expect(
+      receipt.classifications.every(item => item.rule === 'web-product')
+    ).toBe(true);
+    expect(() =>
+      classifyProductLanes(['workers/canary-otp-other/src/index.ts'])
+    ).toThrow(ProductLaneClassificationError);
+  });
+
   it('maps shared Jev evaluator-only edits to the consuming web and contract lanes', () => {
     const receipt = classifyProductLanes([
       'packages/jev-evaluation/gateway.mjs',
@@ -53,6 +79,20 @@ describe('product lane classifier', () => {
     ).toThrow(ProductLaneClassificationError);
   });
 
+  it('selects the web contract lane for canonical copy rule changes', () => {
+    const receipt = classifyProductLanes([
+      'packages/copy/rules.ts',
+      'packages/copy/package.json',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web', 'cross-product']);
+    expect(
+      receipt.classifications.every(item => item.rule === 'shared-copy')
+    ).toBe(true);
+    expect(() =>
+      classifyProductLanes(['packages/copywriter/index.ts'])
+    ).toThrow(ProductLaneClassificationError);
+  });
+
   it('selects the web contract lane for release communications extraction', () => {
     const receipt = classifyProductLanes([
       'packages/release-communications/index.ts',
@@ -74,7 +114,7 @@ describe('product lane classifier', () => {
       },
       {
         scripts: {
-          'invariants:check': `${before} && python3 scripts/symphony/tests/codex-account-probe.test.py`,
+          'invariants:check': `${before} && python3 scripts/fleet-gate/tests/codex-account-probe.test.py`,
           'ios:test': 'xcodebuild test',
         },
       }
@@ -99,7 +139,7 @@ describe('product lane classifier', () => {
         {
           scripts: {
             'invariants:check':
-              'node scripts/invariants/validate.mjs && python3 scripts/symphony/tests/queue.test.py',
+              'node scripts/invariants/validate.mjs && python3 scripts/fleet-gate/tests/queue.test.py',
           },
           devDependencies: { turbo: '2' },
         }
@@ -157,9 +197,9 @@ describe('product lane classifier', () => {
     const before = 'node scripts/invariants/validate.mjs';
     const unsafe = [
       'node scripts/untrusted.mjs',
-      'python3 scripts/symphony/tests/../untrusted.test.py',
-      'python3 scripts/symphony/tests/probe.test.py --flag',
-      'python3 scripts/symphony/tests/probe.test.py; node scripts/untrusted.mjs',
+      'python3 scripts/fleet-gate/tests/../untrusted.test.py',
+      'python3 scripts/fleet-gate/tests/probe.test.py --flag',
+      'python3 scripts/fleet-gate/tests/probe.test.py; node scripts/untrusted.mjs',
     ];
     const receipts = [
       classifyProductLanes(['package.json']),
@@ -229,7 +269,7 @@ describe('product lane classifier', () => {
       git(['commit', '-q', '-m', 'before']);
       const base = git(['rev-parse', 'HEAD']);
       writePackage(
-        'node before.mjs && python3 scripts/symphony/tests/probe.test.py'
+        'node before.mjs && python3 scripts/fleet-gate/tests/probe.test.py'
       );
       git(['add', 'package.json']);
       git(['commit', '-q', '-m', 'after']);
@@ -300,9 +340,8 @@ describe('product lane classifier', () => {
         .selectedLanes
     ).toEqual(['operations']);
     expect(
-      classifyProductLanes([
-        'scripts/symphony/signals/gem-publisher-commission.request',
-      ]).selectedLanes
+      classifyProductLanes(['ops/signals/gem-publisher-commission.request'])
+        .selectedLanes
     ).toEqual(['operations']);
     // ops/ is mapped for future fleet signals; Path Changes still trusts main's
     // classifier, so new ops/* files need that mapping already on main.

@@ -313,7 +313,7 @@ Verified 2026-02-09.
 | 10 | Sequential Stripe calls (should be parallel) | High | Performance | **PARTIALLY RESOLVED** — GET parallel, POST sequential by necessity |
 | 11 | HeaderActionsProvider cascading re-renders | High | Performance | Open |
 | 12 | Audience table columns recreated on every click | High | Performance | Open |
-| 13 | `useDedupedFetchAll` infinite re-fetch risk | Medium | Stability | Open |
+| 13 | ~~`useDedupedFetchAll` infinite re-fetch risk~~ | ~~Medium~~ | ~~Stability~~ | **RESOLVED** — `lib/fetch` retired (JOV-6189) |
 | 14 | ~~Spotify token fetch has no timeout~~ | ~~Medium~~ | ~~Stability~~ | **RESOLVED** — has `AbortSignal.timeout()` |
 | 15 | Cron auth bypass in non-production | Medium | Security | Open |
 | 16 | ~~`useKeyboardShortcuts` re-subscribes every render~~ | ~~Medium~~ | ~~Performance~~ | **RESOLVED** — uses ref pattern + empty deps |

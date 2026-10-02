@@ -20,7 +20,7 @@ import {
   evaluateLiveObservation,
   LIVE_INVARIANTS,
   LIVE_VIEWPORTS,
-  qualifyNode22,
+  qualifyNode24,
   runLiveStorybookCertification,
   seededPassingObservations,
   selectLiveStoriesForChanges,
@@ -31,6 +31,7 @@ import {
   findOwnedPlaywrightBrowsers,
   isProcessGone,
   killProcessGroup,
+  mergeOwnedBrowserGroups,
   planOwnedBrowserSignals,
   reapStaleStorybookVitestLeases,
   STORYBOOK_VITEST_OWNER_ARG,
@@ -341,16 +342,18 @@ describe('live Storybook component certification', () => {
     browser = await chromium.launch({ headless: true });
   }, BROWSER_LAUNCH_TIMEOUT_MS);
 
+  // Closing Chromium is process teardown on the same loaded runner, so it
+  // gets the launch budget rather than Vitest's 10s default hook timeout.
   afterAll(async () => {
     await browser?.close();
-  });
+  }, BROWSER_LAUNCH_TIMEOUT_MS);
 
-  it('qualifies exact Node 22 and rejects other majors', () => {
-    expect(qualifyNode22('22.23.2').ok).toBe(true);
-    expect(qualifyNode22('22.13.0').ok).toBe(true);
-    expect(qualifyNode22('20.19.0').ok).toBe(false);
-    expect(qualifyNode22('24.5.0').ok).toBe(false);
-    expect(qualifyNode22('24.5.0').detail).toMatch(/requires Node 22\.x/);
+  it('qualifies exact Node 24 and rejects other majors', () => {
+    expect(qualifyNode24('24.21.0').ok).toBe(true);
+    expect(qualifyNode24('24.5.0').ok).toBe(true);
+    expect(qualifyNode24('20.19.0').ok).toBe(false);
+    expect(qualifyNode24('22.23.2').ok).toBe(false);
+    expect(qualifyNode24('22.23.2').detail).toMatch(/requires Node 24\.x/);
   });
 
   it('computes Storybook CSF ids from title and export name', () => {
@@ -424,7 +427,7 @@ describe('live Storybook component certification', () => {
     }
     const result = runLiveStorybookCertification({
       headSha: HEAD,
-      nodeVersion: '22.23.2',
+      nodeVersion: '24.21.0',
       observations: samples,
     });
     expect(result.ok).toBe(true);
@@ -532,7 +535,7 @@ describe('live Storybook component certification', () => {
     expect(
       runLiveStorybookCertification({
         headSha: HEAD,
-        nodeVersion: '22.23.2',
+        nodeVersion: '24.21.0',
         observations: seededPassingObservations(),
         redFixtures: [leaked],
       }).ok
@@ -613,7 +616,7 @@ describe('live Storybook component certification', () => {
     );
     const result = runLiveStorybookCertification({
       headSha: HEAD,
-      nodeVersion: '22.23.2',
+      nodeVersion: '24.21.0',
       observations: samples,
     });
     expect(result.ok).toBe(false);
@@ -639,7 +642,7 @@ describe('live Storybook component certification', () => {
       skipRatchet: true,
       headSha: HEAD,
       liveObservations: seededPassingObservations(),
-      liveNodeVersion: '22.23.2',
+      liveNodeVersion: '24.21.0',
     });
     expect(live.ok).toBe(true);
     expect(live.sections.liveStorybookCertification.ok).toBe(true);
@@ -667,7 +670,7 @@ describe('live Storybook component certification', () => {
 
     const docsOnly = runLiveStorybookCertification({
       headSha: HEAD,
-      nodeVersion: '22.23.2',
+      nodeVersion: '24.21.0',
       changedComponents: ['docs/README.md'],
       observations: [],
     });
@@ -679,7 +682,7 @@ describe('live Storybook component certification', () => {
     );
     const badgePass = runLiveStorybookCertification({
       headSha: HEAD,
-      nodeVersion: '22.23.2',
+      nodeVersion: '24.21.0',
       changedComponents: ['packages/ui/atoms/badge.tsx'],
       observations: badgeOnly,
     });
@@ -692,7 +695,7 @@ describe('live Storybook component certification', () => {
 
     const badgeMissing = runLiveStorybookCertification({
       headSha: HEAD,
-      nodeVersion: '22.23.2',
+      nodeVersion: '24.21.0',
       changedComponents: ['packages/ui/atoms/button.stories.tsx'],
       observations: badgeOnly,
     });
@@ -882,6 +885,61 @@ describe('live Storybook lifecycle', () => {
     ).toEqual({ ok: true, groupPids: [200], individualPids: [] });
   });
 
+  it('refreshes a helper captured between fork and exec so it is still reaped after its leader dies', () => {
+    const token = randomUUID();
+    const tempRoot = mkdtempSync(
+      join(tmpdir(), 'jovie-storybook-vitest-exec-')
+    );
+    temps.push(tempRoot);
+    const startedAt = 'Sun Aug 30 15:00:00 2026';
+    const leaderCommand = `chromium ${STORYBOOK_VITEST_OWNER_ARG}${token} --user-data-dir=${tempRoot}/playwright_chromiumdev_profile-exec`;
+    const helperCommand =
+      'chromium --type=renderer --field-trial-handle=owned-fixture';
+    const commandHash = command =>
+      createHash('sha256').update(command).digest('hex');
+    const receipt = (pid, command) => ({
+      pid,
+      pgid: 300,
+      startedAt,
+      commandHash: commandHash(command),
+    });
+    // Before exec, `ps` shows the forked helper with its parent's argv.
+    const forkCapture = {
+      leader: receipt(300, leaderCommand),
+      members: [receipt(300, leaderCommand), receipt(301, leaderCommand)],
+    };
+    const execCapture = {
+      leader: receipt(300, leaderCommand),
+      members: [receipt(300, leaderCommand), receipt(301, helperCommand)],
+    };
+
+    const merged = mergeOwnedBrowserGroups([forkCapture], [execCapture]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].members).toEqual(execCapture.members);
+    // The captures passed in are not mutated.
+    expect(forkCapture.members[1].commandHash).toBe(commandHash(leaderCommand));
+
+    // The leader exited on the group SIGTERM; the helper ignored it.
+    const helperRow = {
+      pid: 301,
+      pgid: 300,
+      startedAt,
+      command: helperCommand,
+    };
+    expect(
+      planOwnedBrowserSignals(merged, [helperRow], token, tempRoot)
+    ).toEqual({ ok: true, groupPids: [], individualPids: [301] });
+    // A different process that reused pid 301 is never targeted.
+    expect(
+      planOwnedBrowserSignals(
+        merged,
+        [{ ...helperRow, startedAt: 'Sun Aug 30 15:00:01 2026' }],
+        token,
+        tempRoot
+      )
+    ).toEqual({ ok: true, groupPids: [], individualPids: [] });
+  });
+
   it('treats a defunct zombie process as gone', async () => {
     // A live process (this one) is not gone.
     expect(isProcessGone(process.pid)).toBe(false);
@@ -1025,6 +1083,49 @@ describe('live Storybook lifecycle', () => {
       expect(await waitUntilProcessGone(ready.helperPid, 10_000)).toBe(true);
       expect(existsSync(ready.tempRoot)).toBe(false);
       expect(existsSync(ready.leasePath)).toBe(false);
+    },
+    LIFECYCLE_TEST_TIMEOUT_MS
+  );
+
+  lifecycleIt(
+    'defers watchdog lease writes until its identity handoff',
+    async () => {
+      const { child, ready } = await spawnLifecycleHarness('hang', 30_000);
+      const readLease = () => JSON.parse(readFileSync(ready.leasePath, 'utf8'));
+      await waitFor(() => readLease().browserGroups.length > 0);
+      const { watchdogPid } = readLease();
+      killProcessGroup({ pid: watchdogPid }, 'SIGKILL');
+      expect(await waitUntilProcessGone(watchdogPid, 10_000)).toBe(true);
+      const unclaimed = { ...readLease(), browserGroups: [] };
+      for (const key of ['Pid', 'Pgid', 'StartedAt', 'CommandHash']) {
+        unclaimed[`watchdog${key}`] = null;
+      }
+      writeFileSync(ready.leasePath, JSON.stringify(unclaimed));
+      const watchdog = spawn(
+        process.execPath,
+        [
+          new URL(LIFECYCLE_MODULE_URL).pathname,
+          '--storybook-vitest-watchdog',
+          ready.leasePath,
+        ],
+        { detached: true, stdio: 'ignore' }
+      );
+      ownedPids.push(watchdog.pid);
+      // Past one poll: a stale write would have landed.
+      await new Promise(resolve => setTimeout(resolve, 2_500));
+      expect(readLease().browserGroups).toEqual([]);
+      unclaimed.watchdogPid = unclaimed.watchdogPgid = watchdog.pid;
+      unclaimed.watchdogStartedAt = 'handoff';
+      unclaimed.watchdogCommandHash = '0'.repeat(64);
+      writeFileSync(ready.leasePath, JSON.stringify(unclaimed));
+      await waitFor(() => readLease().browserGroups.length > 0);
+      expect(readLease().watchdogPid).toBe(watchdog.pid);
+      killProcessGroup(watchdog, 'SIGKILL');
+      child.kill('SIGKILL');
+      await waitForExit(child);
+      await reapStaleStorybookVitestLeases({
+        leaseDir: dirname(ready.leasePath),
+      });
     },
     LIFECYCLE_TEST_TIMEOUT_MS
   );

@@ -709,6 +709,9 @@ describe('canonical marketing component registry', () => {
     expect(source.match(/variant='primary'/g)).toHaveLength(2);
     expect(source.match(/variant='tertiary'/g)).toHaveLength(1);
     expect(source).toContain('line-clamp-2');
+    expect(source).toContain("import './MarketingTerminalCta.css';");
+    expect(source).toContain('marketing-terminal-cta--cinematic');
+    expect(source).toContain("data-wrap='editorial-title'");
     expect(source).toContain("variant='primary'");
     expect(source).toContain("variant='tertiary'");
     expect(source).toContain("size='lg'");
@@ -821,6 +824,12 @@ describe('canonical marketing component registry', () => {
     ).toContain('export function FaqSection');
     expect(
       fs.readFileSync(
+        path.join(repoRoot, 'apps/web/components/marketing/FaqSection.tsx'),
+        'utf8'
+      )
+    ).toContain("data-wrap='editorial-title'");
+    expect(
+      fs.readFileSync(
         path.join(
           repoRoot,
           'apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx'
@@ -893,15 +902,40 @@ describe('canonical marketing component registry', () => {
     );
   });
 
-  it('resolves section.cta production ownership without fabricating a Pen identity', () => {
-    expect(
-      MARKETING_COMPONENT_REGISTRY.find(entry => entry.id === 'section.cta')
-    ).toMatchObject({
+  it('binds section.cta to its canonical Pen registry entry, not a borrowed shell id', () => {
+    const cta = MARKETING_COMPONENT_REGISTRY.find(
+      entry => entry.id === 'section.cta'
+    );
+    expect(MARKETING_PEN_CONTRACT_IDS.section.cta).toBe('y8oKXI');
+    expect(cta).toMatchObject({
       sourceBacked: true,
-      penRootId: null,
-      penRootIds: [],
+      penRootIds: [MARKETING_PEN_CONTRACT_IDS.section.cta],
       exportName: 'MarketingCtaSection',
     });
+    expect(cta?.penRootId).toBeUndefined();
+    expect(cta?.penIdentityReason).toBeUndefined();
+    expect(cta?.penRootIds).not.toContain(
+      MARKETING_PEN_CONTRACT_IDS.shell.footerCta
+    );
+    expect(cta?.penRootIds).not.toContain(
+      MARKETING_PEN_CONTRACT_IDS.shell.finalCta
+    );
+  });
+
+  it('Pen-binds every source-backed marketing identity', () => {
+    const sourceBacked = MARKETING_COMPONENT_REGISTRY.filter(
+      entry => entry.sourceBacked
+    );
+    expect(
+      sourceBacked
+        .filter(entry => entry.penRootIds.length !== 1)
+        .map(entry => entry.id)
+    ).toEqual([]);
+    expect(
+      sourceBacked
+        .filter(entry => entry.penRootId === null)
+        .map(entry => entry.id)
+    ).toEqual([]);
   });
 });
 
@@ -1048,7 +1082,7 @@ describe('canonical molecule ownership receipt', () => {
     expect(receipt.schema).toBe('jovie.ui-molecule-ownership/v1');
     expect(receipt.scope).toBe('JOV-5308');
     expect(receipt.families.map(family => family.consumers.length)).toEqual([
-      23, 44,
+      23, 39,
     ]);
     expect(
       validateMoleculeOwnershipReceipt({
@@ -1432,10 +1466,17 @@ describe('production occurrence structural source bindings', () => {
   });
 });
 
-it('binds every nonterminal acquisition occurrence to its declared variant owner', () => {
-  for (const url of ['/', '/youtube-thumbnails']) {
+it('binds priority pages and acquisition occurrences to their declared variant owners', () => {
+  for (const url of [
+    '/',
+    '/pricing',
+    '/artist-profiles',
+    '/youtube-thumbnails',
+  ]) {
     const route = MARKETING_ROUTE_MANIFEST.find(entry => entry.url === url)!;
-    expect(route.bindingEvidence.status).toBe('unverified');
+    expect(route.bindingEvidence.status).toBe(
+      url === '/youtube-thumbnails' ? 'unverified' : 'verified'
+    );
     for (const binding of route.renderedSections) {
       expect(binding.kind).toBe('approved-section');
       if (binding.kind !== 'approved-section')
@@ -1443,6 +1484,12 @@ it('binds every nonterminal acquisition occurrence to its declared variant owner
       const section = MARKETING_SECTION_REGISTRY.find(
         entry => entry.sectionId === binding.sectionId
       )!;
+      expect(
+        MARKETING_SECTIONS.find(
+          section => section.id === binding.sectionId
+        )?.variants.find(variant => variant.id === binding.variantId)?.status
+      ).toBe('active');
+      if (section.resolvedSource === binding.componentPath) continue;
       expect(section.occurrenceProofs).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -1532,16 +1579,23 @@ function hasCtaDelegation(
   return count === 1;
 }
 
-describe('CTA source identity and optional Pen mapping', () => {
+describe('CTA source identity and Pen mapping', () => {
   it('rejects missing and mixed Pen metadata without waiving native source requirements', () => {
     const cta = MARKETING_COMPONENT_REGISTRY.find(
       entry => entry.id === 'section.cta'
     )!;
     expect(validateMarketingPenRegistry([cta])).toEqual([]);
     for (const change of [
-      { penIdentityReason: '' },
-      { penRootIds: [MARKETING_PEN_CONTRACT_IDS.shell.finalCta] },
-      { penVariantRoots: { other: MARKETING_PEN_CONTRACT_IDS.shell.finalCta } },
+      { penRootIds: [] },
+      { penRootId: null },
+      { penIdentityReason: 'stale unknown reason' },
+      {
+        penRootIds: [
+          MARKETING_PEN_CONTRACT_IDS.section.cta,
+          MARKETING_PEN_CONTRACT_IDS.shell.finalCta,
+        ],
+      },
+      { penRootId: MARKETING_PEN_CONTRACT_IDS.shell.finalCta },
     ]) {
       expect(
         validateMarketingPenRegistry([
@@ -1554,6 +1608,18 @@ describe('CTA source identity and optional Pen mapping', () => {
         issue => issue.code
       )
     ).toContain('unresolved-source-root');
+    const footerCta = MARKETING_COMPONENT_REGISTRY.find(
+      entry => entry.id === 'shell.footer-cta'
+    )!;
+    expect(
+      validateMarketingPenRegistry([
+        footerCta,
+        {
+          ...cta,
+          penRootIds: [MARKETING_PEN_CONTRACT_IDS.shell.footerCta],
+        } as MarketingRegistryEntry,
+      ]).map(issue => issue.code)
+    ).toContain('duplicate-pen-root');
   });
   it('proves the inert native section and actual imported delegated bodies, rejecting detached or fake owners', () => {
     const ownerPath = 'apps/web/components/site/MarketingCtaSection.tsx';

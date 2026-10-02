@@ -116,6 +116,11 @@ export const formatTime = createDateFormatter(timeFormatter);
  * Used in: CSV exports, data attributes
  */
 export function formatISODate(value: string | Date | null | undefined): string {
+  // Calendar-date strings pass through untouched: re-interpreting a
+  // date-only value as an instant can shift it across a day boundary.
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
   const date = parseDate(value);
   if (!date) return '';
   return date.toISOString().slice(0, 10);

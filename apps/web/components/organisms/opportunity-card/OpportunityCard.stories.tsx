@@ -17,10 +17,21 @@ const meta = {
 } satisfies Meta<typeof OpportunityCard>;
 export default meta;
 type Story = StoryObj<typeof meta>;
-export const Compact: Story = {};
+export const Compact: Story = {
+  args: {
+    format: 'compact',
+    title: 'Review your release checklist',
+    description: 'Check artwork, credits and links before the release.',
+    icon: <Sparkles className='size-3.5' />,
+    onSelect: fn(),
+  },
+};
 export const Editorial: Story = {
   args: {
     format: 'editorial',
+    title: 'Review your release checklist',
+    description: 'Check artwork, credits and links before the release.',
+    icon: <Sparkles className='size-3.5' />,
     metadata: <span>Release review</span>,
     children: (
       <Button size='sm' onClick={fn()}>
@@ -32,6 +43,9 @@ export const Editorial: Story = {
 
 export const CompactDisabled: Story = {
   args: {
+    format: 'compact',
+    icon: <Sparkles className='size-3.5' />,
+    onSelect: fn(),
     disabled: true,
     title: 'Downloading Jovie Update…',
     description:

@@ -292,6 +292,21 @@ export const waitlistInviteStatusEnum = pgEnum('waitlist_invite_status', [
   'failed',
 ]);
 
+// Canonical customer lifecycle stages (JOV-6888). One ordered funnel shared by
+// leads, waitlist entries, creator profiles, and users.
+export const contactLifecycleStageEnum = pgEnum('contact_lifecycle_stage', [
+  'suggested',
+  'approved',
+  'outreach',
+  'profile_created',
+  'certified',
+  'signed_up',
+  'claimed',
+  'activated',
+  'paying',
+  'churned',
+]);
+
 // User status lifecycle enum - single source of truth for user state
 export const userStatusLifecycleEnum = pgEnum('user_status_lifecycle', [
   'waitlist_pending',
@@ -521,6 +536,20 @@ export const chatMessageRoleEnum = pgEnum('chat_message_role', [
   'assistant',
 ]);
 
+// Conversation Insights Enums (JOV-6784)
+export const conversationFunnelStageEnum = pgEnum('conversation_funnel_stage', [
+  'anonymous',
+  'claimed',
+  'paid',
+]);
+
+export const objectionStatusEnum = pgEnum('objection_status', [
+  'draft',
+  'approved',
+  'published',
+  'rejected',
+]);
+
 export const chatTurnStatusEnum = pgEnum('chat_turn_status', [
   'reserved',
   'running',
@@ -644,6 +673,7 @@ export const tipStatusEnum = pgEnum('tip_status', [
 export const profileClaimRoleEnum = pgEnum('profile_claim_role', [
   'owner',
   'manager',
+  'assistant',
   'viewer',
 ]);
 
@@ -653,6 +683,32 @@ export const profileOwnershipActionEnum = pgEnum('profile_ownership_action', [
   'unlinked',
   'transferred',
   'role_changed',
+]);
+
+// Profile Team Approval Enums (JOV-6601 least-privilege team roles)
+export const profileRiskyActionEnum = pgEnum('profile_risky_action', [
+  'links.mutate',
+  'handle.change',
+  'auth.change',
+  'membership.manage',
+  'broadcast.send',
+]);
+
+export const profileApprovalStatusEnum = pgEnum('profile_approval_status', [
+  'pending',
+  'approved',
+  'rejected',
+  'expired',
+  'revoked',
+]);
+
+export const profileApprovalEventEnum = pgEnum('profile_approval_event', [
+  'requested',
+  'approved',
+  'rejected',
+  'expired',
+  'revoked',
+  'consumed',
 ]);
 
 // Release Task Enums
@@ -744,6 +800,7 @@ export const referralCommissionStatusEnum = pgEnum(
 export const connectorProviderEnum = pgEnum('connector_provider', [
   'google_calendar',
   'gmail',
+  'spotify',
   'youtube',
 ]);
 
@@ -855,4 +912,35 @@ export const libraryProfileVisibilityEnum = pgEnum(
 export const libraryAssetVisibilityEnum = pgEnum('library_asset_visibility', [
   'public',
   'private',
+]);
+
+// ---------------------------------------------------------------------------
+// Coding Agent Run Ingestion Enums (JOV-6508)
+// ---------------------------------------------------------------------------
+
+/** External coding-agent provider that produced the run. */
+export const codingAgentSourceEnum = pgEnum('coding_agent_source', [
+  'hyperagent',
+  'devin',
+  'cursor',
+  'grokbot',
+  'manual',
+]);
+
+/** Whether `cost_usd` is billed truth from the provider or a backfill estimate. */
+export const codingAgentCostSourceEnum = pgEnum('coding_agent_cost_source', [
+  'actual',
+  'estimated',
+]);
+
+/**
+ * Outcome label for the run's linked PR. Rows stay `open` until the 7-day
+ * post-merge window closes — never label landed prematurely.
+ */
+export const codingAgentOutcomeEnum = pgEnum('coding_agent_outcome', [
+  'open',
+  'landed',
+  'reverted',
+  'failed',
+  'abandoned',
 ]);

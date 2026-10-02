@@ -1,0 +1,120 @@
+#!/usr/bin/env node
+/**
+ * Repo paths whose edits can change a `pnpm invariants:check` verdict.
+ *
+ * CI lane selection imports this list (and the PR structural gate shells out
+ * to `--ere`) so a change to any invariant-scanned file always runs the
+ * invariants, whatever product lane the change classifies into. The list is
+ * composed from the invariants' own exported scan scopes, so it cannot drift
+ * from what they actually walk. PR #18182 added a second readFileSync to
+ * apps/desktop/src/main.ts; the change classified as mac,web, the structural
+ * lane ran without its operations-only invariants:check, and main went red.
+ */
+
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+import {
+  CI_FAST_LANES_SOURCE,
+  DESIGN_SURFACE_ROOTS,
+  HOMEPAGE_COPY_SOURCE,
+  LANDING_GRAMMAR_SOURCE,
+  NAVIGATION_SOURCE,
+  RECIPES_SOURCE,
+} from './design-surfaces.mjs';
+import { SEED_DONE_INVARIANTS } from './done-sprint-invariants.mjs';
+import {
+  PUBLIC_SURFACE_ROOTS,
+  ESLINT_CONFIG_PATH as SCROLL_JANK_ESLINT_CONFIG_PATH,
+} from './ios-web-no-scroll-jank.mjs';
+import {
+  ALLOWLIST_PATH,
+  DESKTOP_ENTRY_POINTS,
+  ESLINT_CONFIG_PATH,
+  RUNTIME_ROOTS,
+} from './latency-sensitive-execution-paths.mjs';
+import { CONTRACT_SOURCES as OVERLAY_LAYER_CONTRACT_SOURCES } from './overlay-layer-contract.mjs';
+
+const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+
+/** @returns {string[]} */
+function latencyAllowlistEntries() {
+  const pack = JSON.parse(
+    readFileSync(`${REPO_ROOT}${ALLOWLIST_PATH}`, 'utf8')
+  );
+  return Object.keys(pack.entries ?? {});
+}
+
+// H-06 audits the companion inventory plus the named test/rule anchors.
+// Compose its inputs here so a guard-only edit cannot skip the existing audit.
+/** @param {(path: string, encoding: 'utf8') => string} [read] */
+export function readFeedbackGuardPaths(read = readFileSync) {
+  try {
+    return JSON.parse(read(`${REPO_ROOT}LESSONS.guards.json`, 'utf8'))
+      .lessons.flatMap(lesson => lesson.guards.map(guard => guard.path))
+      .filter(path => typeof path === 'string' && path.length > 0);
+  } catch {
+    // Missing/malformed shadow input must not prevent CI lane selection.
+    // validate.mjs reports the failed qualification; existing scopes remain.
+    return [];
+  }
+}
+const feedbackGuardPaths = readFeedbackGuardPaths();
+
+export const INVARIANT_SCANNED_PATHS = Object.freeze(
+  [
+    ...new Set([
+      // The invariants, their registry, and their ratchet/allowlist data.
+      'scripts/invariants',
+      'canon/invariants.jsonl',
+      'LESSONS.md',
+      'LESSONS.guards.json',
+      ...feedbackGuardPaths,
+      // JOV-INV-031 latency-sensitive-execution (thread-blocking).
+      ...RUNTIME_ROOTS,
+      ...DESKTOP_ENTRY_POINTS,
+      ALLOWLIST_PATH,
+      ...latencyAllowlistEntries(),
+      ESLINT_CONFIG_PATH,
+      // JOV-INV-032 ios-web-no-scroll-jank.
+      ...PUBLIC_SURFACE_ROOTS,
+      SCROLL_JANK_ESLINT_CONFIG_PATH,
+      // JOV-INV-039 overlay layer order and primitive bindings.
+      ...OVERLAY_LAYER_CONTRACT_SOURCES,
+      // JOV-INV-033 Done-sprint source locks.
+      ...SEED_DONE_INVARIANTS.flatMap(entry => entry.files),
+      // JOV-INV-038 founder design invariants (marketing/app surfaces).
+      ...DESIGN_SURFACE_ROOTS,
+      NAVIGATION_SOURCE,
+      RECIPES_SOURCE,
+      LANDING_GRAMMAR_SOURCE,
+      HOMEPAGE_COPY_SOURCE,
+      CI_FAST_LANES_SOURCE,
+    ]),
+  ].sort()
+);
+
+/** True when `relPath` is a scanned file or sits under a scanned directory. */
+export function isInvariantScannedPath(
+  relPath,
+  scanned = INVARIANT_SCANNED_PATHS
+) {
+  const path = String(relPath).replace(/\\/g, '/').replace(/^\.\//, '');
+  return scanned.some(root => path === root || path.startsWith(`${root}/`));
+}
+
+/** POSIX ERE matching exactly the paths `isInvariantScannedPath` accepts. */
+export function invariantScannedPathsEre(scanned = INVARIANT_SCANNED_PATHS) {
+  const escaped = scanned.map(root =>
+    root.replace(/[.[\](){}*+?^$|\\]/g, '\\$&')
+  );
+  return `^(${escaped.join('|')})(/|$)`;
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  if (process.argv.includes('--ere')) {
+    process.stdout.write(`${invariantScannedPathsEre()}\n`);
+  } else {
+    process.stdout.write(`${INVARIANT_SCANNED_PATHS.join('\n')}\n`);
+  }
+}

@@ -76,6 +76,34 @@ export function canAccessAppShellWorkspace(
   return workspace.access === 'authenticated' || context.isAdmin;
 }
 
+/**
+ * Operator chrome (admin env banner, admin passkey step-up) belongs to Ovie.
+ * The customer workspace renders the same chrome for admins and creators, so
+ * an admin reviewing Jovie sees what a customer sees (JOV-6771).
+ */
+export function shouldRenderOperatorChrome(
+  mode: AppShellMode,
+  context: AppShellAccessContext
+): boolean {
+  return mode === OVIE_APP_SHELL_WORKSPACE.id && context.isAdmin;
+}
+
+/** The legacy lock is Ovie-only; an old cookie must not block Jovie. */
+export function shouldLockOperatorWorkspace({
+  mode,
+  isAdmin,
+  needsAdminStepUp,
+  hasLegacyLockCookie,
+}: {
+  readonly mode: AppShellMode;
+  readonly isAdmin: boolean;
+  readonly needsAdminStepUp: boolean;
+  readonly hasLegacyLockCookie: boolean;
+}): boolean {
+  if (!shouldRenderOperatorChrome(mode, { isAdmin })) return false;
+  return needsAdminStepUp || hasLegacyLockCookie;
+}
+
 export function getPermittedAppShellWorkspaces(
   context: AppShellAccessContext
 ): readonly CanonicalAppShellWorkspace<AppShellMode>[] {
@@ -117,5 +145,22 @@ export function getCurrentAppShellWorkspace(pathname: string | null) {
   return (
     APP_SHELL_WORKSPACES.find(workspace => workspace.id === mode) ??
     APP_SHELL_WORKSPACES[0]
+  );
+}
+
+/**
+ * Workspace switch target for the viewer, derived from the server-resolved
+ * admin role. Undefined when the viewer may only use one workspace, so
+ * customer-only viewers never receive an Ovie switch target (JOV-6771).
+ */
+export function getNextPermittedAppShellWorkspace(
+  context: AppShellAccessContext,
+  pathname: string | null
+): CanonicalAppShellWorkspace<AppShellMode> | undefined {
+  const workspaces = getPermittedAppShellWorkspaces(context);
+  if (workspaces.length < 2) return undefined;
+  return getNextAppShellWorkspace(
+    workspaces,
+    getCurrentAppShellWorkspace(pathname).id
   );
 }

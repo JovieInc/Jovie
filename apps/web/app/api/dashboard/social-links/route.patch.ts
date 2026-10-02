@@ -11,6 +11,7 @@ import { parseJsonBody } from '@/lib/http/parse-json';
 import {
   applyRateLimiting,
   computeLinkVersioning,
+  enforceLinksMutationAccess,
   validateLinkStatePayload,
 } from './route.shared';
 
@@ -53,6 +54,15 @@ export async function PATCH(req: Request) {
           { error: 'Profile not found' },
           { status: 404, headers: combinedHeaders }
         );
+      }
+      const accessDenied = await enforceLinksMutationAccess(
+        tx,
+        profileId,
+        clerkUserId,
+        combinedHeaders
+      );
+      if (accessDenied) {
+        return accessDenied;
       }
 
       const [link] = await tx

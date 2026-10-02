@@ -34,6 +34,36 @@ describe('Ovie deployment configuration', () => {
         permanent: false,
       });
     }
+    expect(await config.redirects()).toContainEqual({
+      source: '/hud-tv',
+      destination: '/hud',
+      permanent: false,
+    });
+    expect(await config.rewrites()).toMatchObject({
+      beforeFiles: expect.arrayContaining([
+        { source: '/hud/wiki', destination: '/app/admin/wiki' },
+        {
+          source: '/hud',
+          missing: [
+            { type: 'query', key: 'kiosk' },
+            { type: 'query', key: 'mode', value: 'kiosk' },
+          ],
+          destination: '/app/admin/hud',
+        },
+      ]),
+    });
+  });
+
+  it('keeps the build-time typecheck unless CI already ran it separately', async () => {
+    vi.stubEnv('AGENT_OS_WORKFLOWS_ENABLED', 'false');
+    vi.stubEnv('NEXT_IGNORE_TYPECHECK', '');
+    const { default: strict } = await import('./next.config.mjs');
+    expect(strict.typescript.ignoreBuildErrors).toBe(false);
+
+    vi.resetModules();
+    vi.stubEnv('NEXT_IGNORE_TYPECHECK', '1');
+    const { default: ciBuild } = await import('./next.config.mjs');
+    expect(ciBuild.typescript.ignoreBuildErrors).toBe(true);
   });
 
   it('rejects workflow activation before private-host callback authentication is verified', async () => {

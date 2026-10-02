@@ -22,7 +22,11 @@ import {
 test.use({
   deviceScaleFactor: 3,
   hasTouch: true,
-  isMobile: true,
+  // Firefox supports viewport/touch checks but not Playwright's isMobile
+  // context option. Preserve every layout assertion in that engine.
+  isMobile: async ({ browserName }, provideMobile) => {
+    await provideMobile(browserName !== 'firefox');
+  },
   storageState: { cookies: [], origins: [] },
 });
 test.describe.configure({ mode: 'serial' });
@@ -127,7 +131,8 @@ const PROFILE_MOBILE_SCREENS = [
   },
   {
     id: 'notifications',
-    path: '/testartist?mode=subscribe',
+    // Fan capture requires an owned profile; testartist is deliberately unclaimed.
+    path: `/${TEST_PROFILES.DUALIPA}?mode=subscribe`,
     rootSelector: '[data-testid="profile-compact-surface"]',
     readySelectors: [
       '[data-testid="profile-mobile-notifications-step-email"]',
@@ -575,16 +580,11 @@ type ReleaseCardLayout = {
     readonly width: number;
     readonly height: number;
   };
-  readonly pacIsFirstCard: boolean;
-  readonly peerCard: {
-    readonly width: number;
-    readonly height: number;
-    readonly left: number;
-  } | null;
+  readonly pacIsFeatured: boolean;
+  readonly carouselPresent: boolean;
   readonly rail: {
     readonly left: number;
     readonly right: number;
-    readonly scrollSnapType: string;
   };
   readonly pacCopyFits: boolean;
   readonly tabBar: {
@@ -594,7 +594,8 @@ type ReleaseCardLayout = {
     readonly top: number;
     readonly bottom: number;
   } | null;
-  readonly cover: {
+  readonly portrait: {
+    readonly width: number;
     readonly height: number;
   } | null;
 };
@@ -603,6 +604,9 @@ async function collectMockHomeReleaseCardLayout(
   page: Page
 ): Promise<ReleaseCardLayout> {
   return page.evaluate(() => {
+    const rail = document.querySelector<HTMLElement>(
+      '[data-testid="profile-home-rail"]'
+    );
     const carousel = document.querySelector<HTMLElement>(
       '[data-testid="profile-home-carousel"]'
     );
@@ -610,16 +614,16 @@ async function collectMockHomeReleaseCardLayout(
       '[data-testid="profile-pac"]'
     );
     const hero = document.querySelector<HTMLElement>(
-      '[data-testid="profile-hero-identity-block"]'
+      '[data-testid="profile-identity-header"]'
     );
-    const cover = document.querySelector<HTMLElement>(
-      '[data-testid="profile-cover"]'
+    const portrait = document.querySelector<HTMLElement>(
+      '[data-testid="profile-identity-portrait"]'
     );
     const tabBar = document.querySelector<HTMLElement>(
       '[data-testid="profile-tab-bar"]'
     );
 
-    if (!carousel || !pac) {
+    if (!rail || !pac) {
       throw new Error('Mock-home featured release (PAC) card target missing');
     }
 
@@ -635,43 +639,30 @@ async function collectMockHomeReleaseCardLayout(
       };
     };
 
-    const firstLi = carousel.querySelector(':scope > li');
-    // A peer card in the same track (entity card or alerts card) used to
-    // verify the PAC card shares the fixed 9:4 carousel geometry.
-    const peerLi = [...carousel.querySelectorAll(':scope > li')].find(
-      li => li !== firstLi
-    );
-
-    const railRect = carousel.getBoundingClientRect();
-    const pacContent = pac.children.item(1);
-    const pacCopy = pacContent?.children.item(0);
+    const railRect = rail.getBoundingClientRect();
+    const modeCard = pac.querySelector<HTMLElement>('.profile-mode-card');
 
     return {
       pac: rect(pac),
-      // offsetWidth/offsetHeight are transform-free (edge-dimmed peer cards
-      // are scaled to 0.96 via transform, which would skew getBoundingClientRect).
       pacBox: { width: pac.offsetWidth, height: pac.offsetHeight },
-      pacIsFirstCard: Boolean(firstLi?.contains(pac)),
-      peerCard: peerLi
-        ? {
-            width: peerLi.offsetWidth,
-            height: peerLi.offsetHeight,
-            left: peerLi.getBoundingClientRect().left,
-          }
-        : null,
+      // JOV-7123: the editorial card IS the home surface — featured, inside
+      // the rail, with no carousel stacked underneath it.
+      pacIsFeatured:
+        pac.dataset.presentation === 'featured' && rail.contains(pac),
+      carouselPresent: carousel !== null,
       rail: {
         left: railRect.left,
         right: railRect.right,
-        scrollSnapType: getComputedStyle(carousel).scrollSnapType,
       },
-      pacCopyFits: pacCopy
-        ? pacCopy.scrollHeight <= pacCopy.clientHeight + 1
+      pacCopyFits: modeCard
+        ? modeCard.scrollHeight <= modeCard.clientHeight + 1
         : false,
       tabBar: tabBar ? { top: tabBar.getBoundingClientRect().top } : null,
       hero: hero ? rect(hero) : null,
-      cover: cover
+      portrait: portrait
         ? {
-            height: cover.getBoundingClientRect().height,
+            width: portrait.getBoundingClientRect().width,
+            height: portrait.getBoundingClientRect().height,
           }
         : null,
     };
@@ -721,45 +712,30 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
 
       const layout = await collectMockHomeReleaseCardLayout(page);
 
-      // The featured release card (PAC) is the FIRST card of the single home
-      // carousel — the old stacked bento strip above the carousel is gone.
+      // Pen parity (JOV-7123): the featured editorial card is the only card
+      // surface under the identity header — it replaces the carousel in place.
       expect(
-        layout.pacIsFirstCard,
-        `${viewport.label} featured release card should be the first carousel card`
+        layout.pacIsFeatured,
+        `${viewport.label} featured release card should be the home surface`
       ).toBe(true);
-
-      // Same fixed 9:4 geometry as every other card in the track.
-      if (layout.peerCard) {
-        expect(
-          Math.abs(layout.pacBox.height - layout.peerCard.height),
-          `${viewport.label} featured card should match peer card height`
-        ).toBeLessThanOrEqual(2);
-        expect(
-          Math.abs(layout.pacBox.width - layout.peerCard.width),
-          `${viewport.label} featured card should match peer card width`
-        ).toBeLessThanOrEqual(2);
-      }
       expect(
-        Math.abs(layout.pacBox.width / layout.pacBox.height - 2.25),
-        `${viewport.label} featured card should keep the 9:4 card aspect`
-      ).toBeLessThanOrEqual(0.02);
-      expect(layout.rail.scrollSnapType).toBe('x mandatory');
+        layout.carouselPresent,
+        `${viewport.label} home must not stack a highlights carousel`
+      ).toBe(false);
+      expect(
+        Math.abs(layout.pacBox.width - (layout.rail.right - layout.rail.left)),
+        `${viewport.label} featured card should span the content width`
+      ).toBeLessThanOrEqual(2 * 32 + 2);
       expect(
         layout.pacCopyFits,
         `${viewport.label} featured card copy should not clip behind its action`
       ).toBe(true);
-      if (layout.peerCard) {
-        expect(
-          layout.peerCard.left,
-          `${viewport.label} should show exactly one carousel card at rest`
-        ).toBeGreaterThanOrEqual(layout.rail.right - 1);
-      }
 
       if (layout.hero) {
         expect(
           layout.pac.top,
-          `${viewport.label} featured card should sit below hero identity`
-        ).toBeGreaterThanOrEqual(layout.hero.bottom + 4);
+          `${viewport.label} featured card should sit below the identity header`
+        ).toBeGreaterThanOrEqual(layout.hero.bottom - 1);
       }
 
       // Fully visible above the bottom tab bar inside the profile shell — no
@@ -804,26 +780,27 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
         `${viewport.label} featured card should not change height`
       ).toBeLessThanOrEqual(1);
 
-      if (viewport.height <= 820 && layout.cover) {
-        // Token-driven hero: clamp(220px, 34svh, 400px) — the old ≤190px
-        // shrink-wrap band is gone and the hero never collapses.
-        expect(
-          layout.cover.height,
-          `${viewport.label} home hero should keep its 220px floor on compact viewports`
-        ).toBeGreaterThanOrEqual(220);
-        expect(
-          layout.cover.height,
-          `${viewport.label} home hero should stay within the 400px token cap`
-        ).toBeLessThanOrEqual(400);
-      }
+      // The identity portrait holds its 80px circle on every viewport.
+      expect(
+        layout.portrait,
+        `${viewport.label} portrait is required`
+      ).not.toBeNull();
+      expect(
+        Math.abs((layout.portrait?.width ?? 0) - 80),
+        `${viewport.label} portrait should be 80px`
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs((layout.portrait?.height ?? 0) - 80),
+        `${viewport.label} portrait should be 80px`
+      ).toBeLessThanOrEqual(1);
     });
   }
 });
 
-test.describe('Public Profile Home Carousel @smoke @critical', () => {
-  test('public surface isolates intact first/last cards across the strict viewport matrix', async ({
+test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
+  test('public surface renders one featured card — no carousel — across the strict viewport matrix', async ({
     page,
-  }) => {
+  }, testInfo) => {
     const viewports = [
       { label: 'compact 320', width: 320, height: 568 },
       { label: 'iPhone mini', width: 375, height: 812 },
@@ -849,169 +826,145 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
       );
       await settleLayout(page);
 
-      const carousel = page.getByTestId('profile-home-carousel');
-      const readGeometry = () =>
-        carousel.evaluate(el => {
-          const rail = el.getBoundingClientRect();
-          const cards = [...el.querySelectorAll<HTMLElement>(':scope > li')];
-          const pac = cards[0]?.querySelector<HTMLElement>(
-            '[data-testid="profile-pac"]'
-          );
-          const pacContent = pac?.children.item(1);
-          const pacCopy = pacContent?.children.item(0);
-          const cover = document.querySelector<HTMLElement>(
-            '[data-testid="profile-cover"]'
-          );
-          const mediaStage = cover?.querySelector<HTMLElement>(
-            '.profile-cover-home-media'
-          );
-          const coverImage = mediaStage?.querySelector<HTMLElement>('img');
-          const mediaRect = mediaStage?.getBoundingClientRect();
-          const imageRect = coverImage?.getBoundingClientRect();
-          const dockHost = document.querySelector<HTMLElement>(
-            '[data-testid="profile-tab-bar"]'
-          );
-          const glassDock = dockHost?.querySelector<HTMLElement>('nav');
-          const glassStyle = glassDock ? getComputedStyle(glassDock) : null;
-          return {
-            scrollLeft: el.scrollLeft,
-            rail: { left: rail.left, right: rail.right },
-            snap: getComputedStyle(el).scrollSnapType,
-            cards: cards.map(card => {
-              const rect = card.getBoundingClientRect();
-              return {
-                left: rect.left,
-                right: rect.right,
-                width: card.offsetWidth,
-                height: card.offsetHeight,
-                targets: [
-                  ...card.querySelectorAll<HTMLElement>('a, button'),
-                ].map(target => {
+      await expect(
+        page.locator('[data-visitor-assignment-resolved]').first()
+      ).toHaveAttribute('data-visitor-assignment-resolved', 'true');
+      await expect(page.getByTestId('profile-pac')).toBeVisible();
+
+      // JOV-7123: the editorial card replaces the highlights carousel — the
+      // home surface must not mount a second card track at all.
+      const geometry = await page.evaluate(() => {
+        const pac = document.querySelector<HTMLElement>(
+          '[data-testid="profile-pac"]'
+        );
+        const rail = document.querySelector<HTMLElement>(
+          '[data-testid="profile-home-rail"]'
+        );
+        const modeCard = pac?.querySelector<HTMLElement>('.profile-mode-card');
+        const portrait = document.querySelector<HTMLElement>(
+          '[data-testid="profile-identity-portrait"]'
+        );
+        const portraitImage = portrait?.querySelector<HTMLElement>('img');
+        const portraitRect = portrait?.getBoundingClientRect();
+        const imageRect = portraitImage?.getBoundingClientRect();
+        const dockHost = document.querySelector<HTMLElement>(
+          '[data-testid="profile-tab-bar"]'
+        );
+        const glassDock = dockHost?.querySelector<HTMLElement>('nav');
+        const glassStyle = glassDock ? getComputedStyle(glassDock) : null;
+        const pacRect = pac?.getBoundingClientRect();
+        const railRect = rail?.getBoundingClientRect();
+        const targetsOf = (root: Element | null | undefined) =>
+          root
+            ? [...root.querySelectorAll<HTMLElement>('a, button')].map(
+                target => {
                   const targetRect = target.getBoundingClientRect();
                   return {
                     width: targetRect.width,
                     height: targetRect.height,
                   };
-                }),
-              };
-            }),
-            pacCopyFits: pacCopy
-              ? pacCopy.scrollHeight <= pacCopy.clientHeight + 1
-              : false,
-            heroFilled: Boolean(
-              mediaRect &&
-                imageRect &&
-                imageRect.left <= mediaRect.left + 1 &&
-                imageRect.right >= mediaRect.right - 1 &&
-                imageRect.top <= mediaRect.top + 1 &&
-                imageRect.bottom >= mediaRect.bottom - 1 &&
-                coverImage &&
-                getComputedStyle(coverImage).objectFit === 'cover'
-            ),
-            glassDock: glassStyle
-              ? {
-                  backdropFilter: glassStyle.backdropFilter,
-                  backgroundColor: glassStyle.backgroundColor,
-                  borderColor: glassStyle.borderColor,
                 }
-              : null,
-          };
-        });
+              )
+            : [];
+        return {
+          carouselCount: document.querySelectorAll(
+            '[data-testid="profile-home-carousel"]'
+          ).length,
+          pac: pac
+            ? {
+                featured: pac.dataset.presentation === 'featured',
+                insideRail: Boolean(rail?.contains(pac)),
+                width: pac.offsetWidth,
+                railWidth: railRect ? railRect.right - railRect.left : null,
+                aboveDock: Boolean(
+                  pacRect &&
+                    dockHost &&
+                    (() => {
+                      const dockRect = dockHost.getBoundingClientRect();
+                      // Compact tab chrome is CSS-hidden at >=1180px
+                      // (JOV-5995); only a visible dock constrains the card.
+                      if (dockRect.height === 0) return true;
+                      return pacRect.bottom <= dockRect.top + 1;
+                    })()
+                ),
+                targets: targetsOf(pac),
+              }
+            : null,
+          pacCopyFits: modeCard
+            ? modeCard.scrollHeight <= modeCard.clientHeight + 1
+            : false,
+          portraitFilled: Boolean(
+            portraitRect &&
+              imageRect &&
+              imageRect.left <= portraitRect.left + 1 &&
+              imageRect.right >= portraitRect.right - 1 &&
+              imageRect.top <= portraitRect.top + 1 &&
+              imageRect.bottom >= portraitRect.bottom - 1 &&
+              portraitImage &&
+              getComputedStyle(portraitImage).objectFit === 'cover'
+          ),
+          glassDock: glassStyle
+            ? {
+                backdropFilter: glassStyle.backdropFilter,
+                backgroundColor: glassStyle.backgroundColor,
+                borderColor: glassStyle.borderColor,
+              }
+            : null,
+        };
+      });
 
-      const first = await readGeometry();
-      expect(first.snap, `${viewport.label} uses mandatory x snapping`).toBe(
-        'x mandatory'
-      );
-      expect(first.cards, `${viewport.label} has carousel peers`).toHaveLength(
-        2
-      );
+      await testInfo.attach(`featured-card-${viewport.label}-geometry`, {
+        body: JSON.stringify(geometry, null, 2),
+        contentType: 'application/json',
+      });
+
       expect(
-        first.cards[0]?.left,
-        `${viewport.label} first left`
-      ).toBeGreaterThanOrEqual(first.rail.left);
+        geometry.carouselCount,
+        `${viewport.label} home must not mount a highlights carousel`
+      ).toBe(0);
       expect(
-        first.cards[0]?.right,
-        `${viewport.label} first right`
-      ).toBeLessThanOrEqual(first.rail.right);
-      expect(
-        first.cards[1]?.left,
-        `${viewport.label} next card hidden`
-      ).toBeGreaterThanOrEqual(first.rail.right - 1);
-      expect(
-        Math.abs(
-          (first.cards[0]?.width ?? 0) / (first.cards[0]?.height ?? 1) - 2.25
-        ),
-        `${viewport.label} keeps the 9:4 card geometry`
-      ).toBeLessThanOrEqual(0.02);
-      expect(
-        first.pacCopyFits,
-        `${viewport.label} PAC copy does not clip behind its action`
+        geometry.pac?.featured && geometry.pac.insideRail,
+        `${viewport.label} featured editorial card is the home surface`
       ).toBe(true);
       expect(
-        first.cards[0]?.targets.length,
-        `${viewport.label} first card exposes an action`
+        geometry.pac?.targets.length,
+        `${viewport.label} featured card exposes an action`
       ).toBeGreaterThan(0);
       expect(
-        first.cards[0]?.targets.every(target => target.height >= 44),
-        `${viewport.label} first-card actions meet the 44px floor`
+        geometry.pac?.targets.every(target => target.height >= 44),
+        `${viewport.label} featured-card actions meet the 44px floor`
       ).toBe(true);
       expect(
-        first.heroFilled,
-        `${viewport.label} hero image fills its stage`
+        geometry.pac?.railWidth !== null &&
+          Math.abs(
+            (geometry.pac?.width ?? 0) - (geometry.pac?.railWidth ?? 0)
+          ) <= 2,
+        `${viewport.label} featured card spans the rail width`
       ).toBe(true);
       expect(
-        first.glassDock?.backdropFilter,
+        geometry.pacCopyFits,
+        `${viewport.label} featured card copy does not clip behind its action`
+      ).toBe(true);
+      expect(
+        geometry.pac?.aboveDock,
+        `${viewport.label} featured card clears the bottom dock`
+      ).toBe(true);
+      expect(
+        geometry.portraitFilled,
+        `${viewport.label} portrait image fills its circle`
+      ).toBe(true);
+      expect(
+        geometry.glassDock?.backdropFilter,
         `${viewport.label} dock keeps real backdrop blur`
       ).not.toBe('none');
       expect(
-        first.glassDock?.backgroundColor,
+        geometry.glassDock?.backgroundColor,
         `${viewport.label} dock keeps a translucent surface`
       ).not.toBe('rgba(0, 0, 0, 0)');
       expect(
-        first.glassDock?.borderColor,
+        geometry.glassDock?.borderColor,
         `${viewport.label} dock keeps its hairline`
       ).not.toBe('rgba(0, 0, 0, 0)');
-
-      const targetScrollLeft = await carousel.evaluate(el => {
-        const cards = [...el.querySelectorAll<HTMLElement>(':scope > li')];
-        const requestedTarget =
-          (cards.at(-1)?.offsetLeft ?? 0) - (cards[0]?.offsetLeft ?? 0);
-        const target = Math.min(
-          requestedTarget,
-          el.scrollWidth - el.clientWidth
-        );
-        el.scrollTo({ left: target, behavior: 'auto' });
-        return target;
-      });
-      await expect
-        .poll(async () =>
-          Math.abs(
-            (await carousel.evaluate(el => el.scrollLeft)) - targetScrollLeft
-          )
-        )
-        .toBeLessThanOrEqual(1);
-
-      const last = await readGeometry();
-      expect(
-        last.cards[0]?.right,
-        `${viewport.label} previous card hidden`
-      ).toBeLessThanOrEqual(last.rail.left + 1);
-      expect(
-        last.cards[1]?.left,
-        `${viewport.label} last left`
-      ).toBeGreaterThanOrEqual(last.rail.left);
-      expect(
-        last.cards[1]?.right,
-        `${viewport.label} last right`
-      ).toBeLessThanOrEqual(last.rail.right + 1);
-      expect(
-        last.cards[1]?.targets.length,
-        `${viewport.label} last card exposes an action`
-      ).toBeGreaterThan(0);
-      expect(
-        last.cards[1]?.targets.every(target => target.height >= 44),
-        `${viewport.label} last-card actions meet the 44px floor`
-      ).toBe(true);
     }
   });
 
@@ -1044,6 +997,11 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
         ['[data-testid="profile-pac"]'],
         SMOKE_TIMEOUTS.NAVIGATION
       );
+      await expect(page.getByTestId('profile-compact-shell')).toHaveAttribute(
+        'data-visitor-assignment-resolved',
+        'true'
+      );
+      await expect(page.getByTestId('profile-compact-surface')).toBeVisible();
       await settleLayout(page);
 
       const readGeometry = () =>
@@ -1250,13 +1208,8 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
         after.banner,
         `${viewport.label} consent card must render for overlap verification`
       ).not.toBeNull();
-      expect(
-        after.primaryAction,
-        `${viewport.label} primary profile action must render for overlap verification`
-      ).not.toBeNull();
       const banner = after.banner;
-      const primaryAction = after.primaryAction;
-      if (!banner || !primaryAction) {
+      if (!banner) {
         throw new Error(
           `${viewport.label} overlap prerequisites disappeared after assertion`
         );
@@ -1362,14 +1315,31 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
           `${viewport.label} Customize spans the action row`
         ).toBe(after.actions.right);
       }
-      const overlapsHorizontally =
-        banner.left < primaryAction.right && banner.right > primaryAction.left;
-      const overlapsVertically =
-        banner.top < primaryAction.bottom && banner.bottom > primaryAction.top;
-      expect(
-        overlapsHorizontally && overlapsVertically,
-        `${viewport.label} consent card must not cover the primary profile action`
-      ).toBe(false);
+      // JOV-7114 intentionally lets the phone consent card cover the featured
+      // action until consent is resolved. Tablet and desktop placements still
+      // keep the primary action clear.
+      if (viewport.width >= 768) {
+        expect(
+          after.primaryAction,
+          `${viewport.label} primary profile action must render for overlap verification`
+        ).not.toBeNull();
+        const primaryAction = after.primaryAction;
+        if (!primaryAction) {
+          throw new Error(
+            `${viewport.label} primary profile action disappeared after assertion`
+          );
+        }
+        const overlapsHorizontally =
+          banner.left < primaryAction.right &&
+          banner.right > primaryAction.left;
+        const overlapsVertically =
+          banner.top < primaryAction.bottom &&
+          banner.bottom > primaryAction.top;
+        expect(
+          overlapsHorizontally && overlapsVertically,
+          `${viewport.label} consent card must not cover the primary profile action`
+        ).toBe(false);
+      }
 
       await page.evaluate(() => {
         document.documentElement.style.removeProperty('--cookie-banner-h');
@@ -1378,7 +1348,7 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
     }
   });
 
-  test('mock-home includes horizontally scrollable back-catalog cards', async ({
+  test('mock-home renders one featured card and no back-catalog track', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -1390,229 +1360,29 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
       { timeout: 120_000 }
     );
     await waitForHydration(page);
+    // JOV-7123: the editorial card replaces the carousel — the back catalog
+    // lives on the Music destination, not a second track on Home.
     await waitForAnyVisible(
       page,
-      ['[data-testid="profile-home-carousel"] a'],
+      ['[data-testid="profile-pac"] a'],
       SMOKE_TIMEOUTS.NAVIGATION
     );
 
-    const carousel = page.getByTestId('profile-home-carousel');
-    await expect(carousel).toBeVisible();
-    const metrics = await carousel.evaluate(el => ({
+    const pac = page.getByTestId('profile-pac');
+    await expect(pac).toBeVisible();
+    await expect(page.getByTestId('profile-home-carousel')).toHaveCount(0);
+    const metrics = await pac.evaluate(el => ({
       linkCount: el.querySelectorAll('a').length,
-      scrollWidth: el.scrollWidth,
-      clientWidth: el.clientWidth,
+      featured: el.dataset.presentation === 'featured',
     }));
-    expect(metrics.linkCount).toBeGreaterThanOrEqual(2);
-    expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth);
-
-    await expect(
-      carousel.locator('a').filter({ hasText: /Holding On/i })
-    ).toHaveCount(1);
-    await expect(
-      carousel.locator('a').filter({ hasText: /Clear Skies/i })
-    ).toHaveCount(1);
-
-    const scrolledLeft = await carousel.evaluate(el => {
-      el.scrollLeft = el.scrollWidth;
-      return el.scrollLeft;
-    });
-    expect(scrolledLeft).toBeGreaterThan(0);
+    expect(metrics.featured).toBe(true);
+    expect(metrics.linkCount).toBeGreaterThanOrEqual(1);
   });
 
-  test('every settled landscape snap isolates one complete card', async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await installProfileMocks(page);
-    await smokeNavigate(
-      page,
-      '/demo/showcase/tim-white-profile?state=mock-home',
-      { timeout: 120_000 }
-    );
-    await waitForHydration(page);
-    await waitForAnyVisible(
-      page,
-      ['[data-testid="profile-home-carousel"]'],
-      SMOKE_TIMEOUTS.NAVIGATION
-    );
-
-    const carousel = page.getByTestId('profile-home-carousel');
-    const targetScrollLeft = await carousel.evaluate(el => {
-      const cards = [...el.querySelectorAll<HTMLElement>(':scope > li')];
-      if (cards.length < 3) throw new Error('Expected at least three cards');
-      const target = cards[1].offsetLeft - cards[0].offsetLeft;
-      el.scrollTo({ left: target, behavior: 'auto' });
-      return target;
-    });
-    await expect
-      .poll(() => carousel.evaluate(el => el.scrollLeft))
-      .toBeCloseTo(targetScrollLeft, 0);
-
-    const isolation = await carousel.evaluate(el => {
-      const cards = [...el.querySelectorAll<HTMLElement>(':scope > li')];
-      const rail = el.getBoundingClientRect();
-      const previous = cards[0].getBoundingClientRect();
-      const active = cards[1].getBoundingClientRect();
-      const next = cards[2].getBoundingClientRect();
-      return {
-        previousRight: previous.right,
-        activeLeft: active.left,
-        activeRight: active.right,
-        nextLeft: next.left,
-        railLeft: rail.left,
-        railRight: rail.right,
-      };
-    });
-
-    expect(isolation.previousRight).toBeLessThanOrEqual(isolation.railLeft + 1);
-    expect(isolation.activeLeft).toBeGreaterThanOrEqual(isolation.railLeft);
-    expect(isolation.activeRight).toBeLessThanOrEqual(isolation.railRight);
-    expect(isolation.nextLeft).toBeGreaterThanOrEqual(isolation.railRight - 1);
-  });
-
-  test('reduced motion keeps card geometry fixed and uses immediate navigation', async ({
-    page,
-  }) => {
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.setViewportSize({ width: 768, height: 1024 });
-    await installProfileMocks(page);
-    await smokeNavigate(
-      page,
-      '/demo/showcase/tim-white-profile?state=mock-home',
-      { timeout: 120_000 }
-    );
-    await waitForHydration(page);
-    await waitForAnyVisible(
-      page,
-      ['[data-testid="profile-home-carousel"]'],
-      SMOKE_TIMEOUTS.NAVIGATION
-    );
-
-    const carousel = page.getByTestId('profile-home-carousel');
-    const before = await carousel.evaluate(el => {
-      const cards = [...el.querySelectorAll<HTMLElement>(':scope > li')];
-      const scrollBehaviors: ScrollBehavior[] = [];
-      const nativeScrollTo = el.scrollTo.bind(el);
-      el.scrollTo = options => {
-        if (typeof options === 'object' && options.behavior) {
-          scrollBehaviors.push(options.behavior);
-        }
-        nativeScrollTo(options);
-      };
-      (
-        window as Window & {
-          __profileScrollBehaviors?: ScrollBehavior[];
-        }
-      ).__profileScrollBehaviors = scrollBehaviors;
-      return {
-        sizes: cards.map(card => [card.offsetWidth, card.offsetHeight]),
-        hasDimmedEdgeState: cards.some(card => card.dataset.edge === 'true'),
-        opacities: cards.map(card => getComputedStyle(card).opacity),
-      };
-    });
-
-    const clickedNext = await page.evaluate(() => {
-      const button = document.querySelector<HTMLButtonElement>(
-        'button[aria-label="Next Item"]'
-      );
-      button?.click();
-      return Boolean(button);
-    });
-    expect(clickedNext).toBe(true);
-    await expect
-      .poll(() => carousel.evaluate(el => el.scrollLeft))
-      .toBeGreaterThan(0);
-
-    const after = await carousel.evaluate(el => {
-      const cards = [...el.querySelectorAll<HTMLElement>(':scope > li')];
-      return {
-        sizes: cards.map(card => [card.offsetWidth, card.offsetHeight]),
-        hasDimmedEdgeState: cards.some(card => card.dataset.edge === 'true'),
-        opacities: cards.map(card => getComputedStyle(card).opacity),
-        behaviors:
-          (
-            window as Window & {
-              __profileScrollBehaviors?: ScrollBehavior[];
-            }
-          ).__profileScrollBehaviors ?? [],
-      };
-    });
-
-    expect(before.hasDimmedEdgeState).toBe(false);
-    expect(after.hasDimmedEdgeState).toBe(false);
-    expect(before.opacities.every(opacity => opacity === '1')).toBe(true);
-    expect(after.opacities.every(opacity => opacity === '1')).toBe(true);
-    expect(after.behaviors).toContain('auto');
-    expect(after.sizes).toEqual(before.sizes);
-  });
-
-  test('a Chromium touch drag advances exactly one complete card', async ({
-    browserName,
-    context,
-    page,
-  }) => {
-    test.skip(browserName !== 'chromium', 'CDP touch input is Chromium-only');
-    await page.setViewportSize({ width: 390, height: 844 });
-    await smokeNavigate(page, '/demo/showcase/public-profile', {
-      timeout: 120_000,
-    });
-    await waitForHydration(page);
-    await waitForAnyVisible(
-      page,
-      ['[data-testid="profile-home-carousel"]'],
-      SMOKE_TIMEOUTS.NAVIGATION
-    );
-
-    const carousel = page.getByTestId('profile-home-carousel');
-    const box = await carousel.boundingBox();
-    if (!box) throw new Error('Carousel touch target is not visible');
-    const targetScrollLeft = await carousel.evaluate(el => {
-      const cards = [...el.querySelectorAll<HTMLElement>(':scope > li')];
-      return (cards[1]?.offsetLeft ?? 0) - (cards[0]?.offsetLeft ?? 0);
-    });
-    const cdp = await context.newCDPSession(page);
-    const y = box.y + box.height / 2;
-    const startX = box.x + box.width - 28;
-    const endX = box.x + 28;
-    await cdp.send('Input.dispatchTouchEvent', {
-      type: 'touchStart',
-      touchPoints: [{ x: startX, y, id: 1 }],
-    });
-    for (let step = 1; step <= 6; step += 1) {
-      const x = startX + ((endX - startX) * step) / 6;
-      await cdp.send('Input.dispatchTouchEvent', {
-        type: 'touchMove',
-        touchPoints: [{ x, y, id: 1 }],
-      });
-    }
-    await cdp.send('Input.dispatchTouchEvent', {
-      type: 'touchEnd',
-      touchPoints: [],
-    });
-
-    await expect
-      .poll(() => carousel.evaluate(el => el.scrollLeft))
-      .toBeCloseTo(targetScrollLeft, 0);
-    const settled = await carousel.evaluate(el => {
-      const rail = el.getBoundingClientRect();
-      const cards = [...el.querySelectorAll<HTMLElement>(':scope > li')];
-      const previous = cards[0]?.getBoundingClientRect();
-      const active = cards[1]?.getBoundingClientRect();
-      return {
-        railLeft: rail.left,
-        railRight: rail.right,
-        previousRight: previous?.right ?? Number.POSITIVE_INFINITY,
-        activeLeft: active?.left ?? Number.NEGATIVE_INFINITY,
-        activeRight: active?.right ?? Number.POSITIVE_INFINITY,
-      };
-    });
-    expect(settled.previousRight).toBeLessThanOrEqual(settled.railLeft + 1);
-    expect(settled.activeLeft).toBeGreaterThanOrEqual(settled.railLeft);
-    expect(settled.activeRight).toBeLessThanOrEqual(settled.railRight);
-  });
-
-  test('keyboard focus traverses complete cards and activates profile navigation', async ({
+  // JOV-5845 / JOV-7123: the keyboard smoke point now lives on the featured
+  // editorial card (the carousel it traversed is gone). Tab must land inside
+  // the card with a visible, hittable focus ring, then reach profile nav.
+  test('keyboard focus reaches the editorial card and activates profile navigation', async ({
     browserName,
     page,
   }) => {
@@ -1623,29 +1393,29 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
     await waitForHydration(page);
     await waitForAnyVisible(
       page,
-      ['[data-testid="profile-home-carousel"]'],
+      ['[data-testid="profile-pac"]'],
       SMOKE_TIMEOUTS.NAVIGATION
     );
 
-    const carousel = page.getByTestId('profile-home-carousel');
+    await expect(page.getByTestId('profile-home-carousel')).toHaveCount(0);
+
     // WebKit models Safari's default macOS keyboard policy: Option+Tab moves
     // through every control, while plain Tab may leave focus on the document.
+    await expect(
+      page.locator('[data-visitor-assignment-resolved]').first()
+    ).toHaveAttribute('data-visitor-assignment-resolved', 'true');
     const focusNextKey = browserName === 'webkit' ? 'Alt+Tab' : 'Tab';
-    let focusedFirstCard = false;
+    let focusedCard = false;
     for (let attempt = 0; attempt < 12; attempt += 1) {
       await page.keyboard.press(focusNextKey);
-      focusedFirstCard = await page.evaluate(() =>
-        Boolean(
-          document.activeElement?.closest(
-            '[data-testid="profile-home-carousel"] > li:first-child'
-          )
-        )
+      focusedCard = await page.evaluate(() =>
+        Boolean(document.activeElement?.closest('[data-testid="profile-pac"]'))
       );
-      if (focusedFirstCard) break;
+      if (focusedCard) break;
     }
-    expect(focusedFirstCard).toBe(true);
+    expect(focusedCard).toBe(true);
 
-    const firstFocus = await page.evaluate(() => {
+    const cardFocus = await page.evaluate(() => {
       const active = document.activeElement as HTMLElement | null;
       const rect = active?.getBoundingClientRect();
       return {
@@ -1655,38 +1425,15 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
         focusVisible: active?.matches(':focus-visible') ?? false,
       };
     });
-    expect(firstFocus.label).toBe('Listen');
-    expect(firstFocus.height).toBeGreaterThanOrEqual(44);
-    expect(firstFocus.focusVisible).toBe(true);
-
-    await page.keyboard.press(focusNextKey);
-    const targetScrollLeft = await carousel.evaluate(el => {
-      const cards = [...el.querySelectorAll<HTMLElement>(':scope > li')];
-      return (cards[1]?.offsetLeft ?? 0) - (cards[0]?.offsetLeft ?? 0);
-    });
-    await expect
-      .poll(() => carousel.evaluate(el => el.scrollLeft))
-      .toBeCloseTo(targetScrollLeft, 0);
-    const secondFocus = await page.evaluate(() => {
-      const active = document.activeElement as HTMLElement | null;
-      const rect = active?.getBoundingClientRect();
-      return {
-        inSecondCard: Boolean(
-          active?.closest(
-            '[data-testid="profile-home-carousel"] > li:nth-child(2)'
-          )
-        ),
-        height: rect?.height ?? 0,
-      };
-    });
-    expect(secondFocus.inSecondCard).toBe(true);
-    expect(secondFocus.height).toBeGreaterThanOrEqual(44);
+    expect(cardFocus.label).toBe('Listen now');
+    expect(cardFocus.height).toBeGreaterThanOrEqual(44);
+    expect(cardFocus.focusVisible).toBe(true);
 
     let focusedEvents = false;
-    for (let attempt = 0; attempt < 6; attempt += 1) {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
       await page.keyboard.press(focusNextKey);
       focusedEvents = await page.evaluate(
-        () => document.activeElement?.getAttribute('aria-label') === 'Shows'
+        () => document.activeElement?.getAttribute('aria-label') === 'Events'
       );
       if (focusedEvents) break;
     }
@@ -1694,7 +1441,10 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/\/calvin-demo\?mode=tour$/);
     await expect(
-      page.getByRole('heading', { name: 'Shows', exact: true })
+      page.getByRole('region', { name: 'Events', exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'No upcoming events', exact: true })
     ).toBeVisible();
   });
 });
@@ -1724,6 +1474,10 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
           expect(response?.status() ?? 0).toBeLessThan(500);
 
           await waitForHydration(screenPage);
+          await expect(
+            screenPage.getByTestId('profile-compact-shell')
+          ).toHaveAttribute('data-visitor-assignment-resolved', 'true');
+          await expect(screenPage.locator(screen.rootSelector)).toBeVisible();
           await waitForAnyVisible(
             screenPage,
             screen.readySelectors,
@@ -1735,6 +1489,10 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
             screenPage,
             screen.rootSelector
           );
+          await testInfo.attach('profile-viewport-geometry', {
+            body: JSON.stringify({ viewport, screen: screen.id, snapshot }),
+            contentType: 'application/json',
+          });
           expectMobileShellStable(
             snapshot,
             viewport,
@@ -1772,7 +1530,7 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
 
         const response = await smokeNavigate(
           flowPage,
-          '/testartist?mode=subscribe',
+          `/${TEST_PROFILES.DUALIPA}?mode=subscribe`,
           {
             timeout: 120_000,
           }

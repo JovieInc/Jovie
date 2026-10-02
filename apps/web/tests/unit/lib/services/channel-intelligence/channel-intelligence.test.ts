@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   answerChannelIntelligenceQuery,
+  buildChannelChangePlan,
   buildChannelIntelligenceReport,
   CHANNEL_PLAYLIST_TARGET_RULES,
   type ChannelVideoMetrics,
@@ -9,6 +10,7 @@ import {
   ctrTimesAvgViewDurationMinutes,
   evaluateAllChannelPlaylistRuleCases,
   evaluateChannelPlaylistRuleCase,
+  type RankedVideo,
   rankVideosByWatchMinutesPerImpression,
   watchMinutesPerImpression,
 } from '@/lib/services/channel-intelligence';
@@ -297,5 +299,46 @@ describe('channel playlist freshness + no-invent gate', () => {
     );
     expect(CHANNEL_PLAYLIST_TARGET_RULES).toContain('No invented placements');
     expect(CHANNEL_PLAYLIST_TARGET_RULES).toContain('never claim "active"');
+  });
+});
+
+function rankedVideo(overrides: Partial<RankedVideo> = {}): RankedVideo {
+  return {
+    videoId: 'weak',
+    title: 'Weak Video',
+    publishedAt: '2026-01-01T00:00:00.000Z',
+    watchMinutesPerImpression: 0.01,
+    ctrTimesAvgViewDurationMinutes: 0.01,
+    ctr: 0.01,
+    avgViewDurationSeconds: 10,
+    impressions: 1000,
+    views: 10,
+    watchMinutes: 1,
+    reachTrend: -0.2,
+    rank: 1,
+    ...overrides,
+  };
+}
+
+describe('buildChannelChangePlan distribution gate', () => {
+  function planFor(video: Partial<RankedVideo>) {
+    return buildChannelChangePlan({
+      worstVideos: [rankedVideo(video)],
+      decliningVideos: [],
+      winSignals: [],
+      sources: [],
+    });
+  }
+
+  it('names both misses, a CTR miss, and a retention miss', () => {
+    expect(
+      planFor({ ctr: 0.01, avgViewDurationSeconds: 10 })[0]?.observation
+    ).toContain('CTR and retention both miss the continued-distribution gate');
+    expect(
+      planFor({ ctr: 0.01, avgViewDurationSeconds: 90 })[0]?.observation
+    ).toContain('CTR misses the continued-distribution gate');
+    expect(
+      planFor({ ctr: 0.2, avgViewDurationSeconds: 10 })[0]?.observation
+    ).toContain('Retention misses the continued-distribution gate');
   });
 });

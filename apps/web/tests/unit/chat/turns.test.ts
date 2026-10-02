@@ -28,7 +28,7 @@ const hoisted = vi.hoisted(() => {
   const selectMock = vi.fn(() => ({ from: selectFromMock }));
 
   const insertReturningMock = vi.fn();
-  const insertOnConflictDoNothingMock = vi.fn(() => ({
+  const insertOnConflictDoNothingMock = vi.fn((_config?: unknown) => ({
     returning: insertReturningMock,
   }));
   const insertValuesMock = vi.fn(() => ({
@@ -58,6 +58,7 @@ const hoisted = vi.hoisted(() => {
     updateSetMock,
     updateReturningMock,
     deleteMock,
+    ensureChatWorkRecordMock: vi.fn().mockResolvedValue(null),
   };
 });
 
@@ -77,6 +78,10 @@ vi.mock('@/lib/utils/logger', () => ({
     info: vi.fn(),
     debug: vi.fn(),
   },
+}));
+
+vi.mock('@/lib/tasks/chat-work-record', () => ({
+  ensureChatWorkRecord: hoisted.ensureChatWorkRecordMock,
 }));
 
 vi.mock('@/lib/db/schema/chat', () => ({
@@ -215,6 +220,11 @@ describe('chat turn service', () => {
     });
 
     expect(result.outcome).toBe('reserved');
+    // JOV-4514: a durable work record is ensured for the conversation.
+    expect(hoisted.ensureChatWorkRecordMock).toHaveBeenCalledWith({
+      conversationId: 'conv-1',
+      creatorProfileId: 'profile-1',
+    });
     expect(hoisted.insertValuesMock).toHaveBeenCalledWith(
       expect.objectContaining({
         conversationId: 'conv-1',
@@ -234,6 +244,68 @@ describe('chat turn service', () => {
         where: expect.anything(),
       })
     );
+  });
+
+  it('creates the work record for a conversation minted by the turn', async () => {
+    const insertedTurn = {
+      id: 'turn-9',
+      conversationId: 'conv-new',
+      clientTurnId: 'client-turn-9',
+      status: 'reserved',
+    };
+    // No existing client turn, then the conversation insert + turn insert.
+    hoisted.selectLimitMock.mockResolvedValueOnce([]);
+    hoisted.insertReturningMock
+      .mockResolvedValueOnce([{ id: 'conv-new' }])
+      .mockResolvedValueOnce([insertedTurn]);
+
+    const { reserveChatTurn } = await import('@/lib/chat/turns');
+    const result = await reserveChatTurn({
+      conversationId: null,
+      clientTurnId: 'client-turn-9',
+      clientMessageId: 'client-message-9',
+      source: 'typed',
+      toolIntent: null,
+      userMessage: 'Start planning my release',
+      userId: 'user-9',
+      creatorProfileId: 'profile-9',
+    });
+
+    expect(result.outcome).toBe('reserved');
+    expect(result.conversationId).toBe('conv-new');
+    expect(hoisted.ensureChatWorkRecordMock).toHaveBeenCalledWith({
+      conversationId: 'conv-new',
+      creatorProfileId: 'profile-9',
+    });
+  });
+
+  it('still reserves the turn when work record creation fails', async () => {
+    const insertedTurn = {
+      id: 'turn-8',
+      conversationId: 'conv-8',
+      clientTurnId: 'client-turn-8',
+      status: 'reserved',
+    };
+    hoisted.selectLimitMock.mockResolvedValueOnce([{ id: 'conv-8' }]);
+    hoisted.insertReturningMock.mockResolvedValueOnce([insertedTurn]);
+    hoisted.ensureChatWorkRecordMock.mockRejectedValueOnce(
+      new Error('tasks table unavailable')
+    );
+
+    const { reserveChatTurn } = await import('@/lib/chat/turns');
+    const result = await reserveChatTurn({
+      conversationId: 'conv-8',
+      clientTurnId: 'client-turn-8',
+      clientMessageId: 'client-message-8',
+      source: 'typed',
+      toolIntent: null,
+      userMessage: 'Hi',
+      userId: 'user-8',
+      creatorProfileId: 'profile-8',
+    });
+
+    expect(result.outcome).toBe('reserved');
+    expect(result.conversationId).toBe('conv-8');
   });
 
   it('falls back to clientTurnId when no clientMessageId is provided', async () => {
@@ -291,7 +363,7 @@ describe('chat turn service', () => {
     // Force the SELECT chain to resolve to the existing assistant row.
     hoisted.selectOrderByMock.mockReturnValueOnce({
       limit: vi.fn().mockResolvedValueOnce([existingAssistant]),
-      then: (onFulfilled: (value: unknown) => unknown) =>
+      then: (onFulfilled?: (value: unknown) => unknown) =>
         Promise.resolve([existingAssistant]).then(onFulfilled),
     });
 
@@ -325,7 +397,7 @@ describe('chat turn service', () => {
     // No existing assistant row.
     hoisted.selectOrderByMock.mockReturnValueOnce({
       limit: vi.fn().mockResolvedValueOnce([]),
-      then: (onFulfilled: (value: unknown) => unknown) =>
+      then: (onFulfilled?: (value: unknown) => unknown) =>
         Promise.resolve([]).then(onFulfilled),
     });
     hoisted.insertReturningMock.mockResolvedValueOnce([
@@ -361,7 +433,10 @@ describe('chat turn service', () => {
   it('persistTerminalAssistantMessage fails soft when the DB write throws', async () => {
     hoisted.selectOrderByMock.mockReturnValueOnce({
       limit: vi.fn().mockRejectedValueOnce(new Error('column does not exist')),
-      then: (onFulfilled: (value: unknown) => unknown, onRejected) =>
+      then: (
+        onFulfilled?: (value: unknown) => unknown,
+        onRejected?: (reason: unknown) => unknown
+      ) =>
         Promise.reject(new Error('column does not exist')).then(
           onFulfilled,
           onRejected
@@ -554,7 +629,10 @@ describe('chat turn service', () => {
   it('marks an ephemeral terminal assistant result as not durable', async () => {
     hoisted.selectOrderByMock.mockReturnValueOnce({
       limit: vi.fn().mockRejectedValueOnce(new Error('db unavailable')),
-      then: (onFulfilled: (value: unknown) => unknown, onRejected) =>
+      then: (
+        onFulfilled?: (value: unknown) => unknown,
+        onRejected?: (reason: unknown) => unknown
+      ) =>
         Promise.reject(new Error('db unavailable')).then(
           onFulfilled,
           onRejected

@@ -1,10 +1,22 @@
 ---
-paths: ["scripts/hermes/**", "docs/hermes/**"]
+paths: ["docs/HERMES_AIR.md"]
 ---
 
 # Hermes on the MacBook Air (Always-On Orchestration Node)
 
+> Symphony is the shipping lanes harness (`scripts/lanes/README.md`). The Symphony Elixir control plane is retired from Jovie; paths written `symphony-control/...` live in the private repo JovieInc/symphony-control (full history).
+
 Operating contract for the always-on Hermes gateway running on the dedicated 16 GB MacBook Air. This file is the canonical reference; the operator runbook lives at `docs/HERMES_AIR.md`.
+
+## Current Role (2026-09-29): Mac Lane
+
+Hermes was retired as Summer's runtime on 2026-09-05 and its gateway is unloaded on the Air. The Air (`tims-macbook-air`) is now the fleet's **Mac lane**, doing Mac-only work that Gem (Linux) cannot:
+
+- **Self-hosted Actions runner** `tims-macbook-air` (labels `self-hosted, macOS, ARM64, jovie-mac`). It runs only jobs whose `runs-on` selects `jovie-mac` after a fresh `Mac Runner Heartbeat`. Today that is the iOS fast gate in `ios-ci.yml`. Any stale, busy or uncertain heartbeat falls back to hosted macOS, and the repo variable `JOVIE_MAC_RUNNER=off` forces hosted. Release regressions never run here.
+- **Nightly Mac dogfood verifier:** a local launchd job running a headless Claude Code session on a clean `origin/main` worktree. It exercises the iOS simulator build, the macOS apps, and read-only production web. It files at most three `mac-dogfood` Linear issues per night and never edits, commits, pushes or merges.
+- **gbrain client only.** The Air uses the ops Mac server over Tailscale with its own bearer token. It runs no gbrain server against the shared database.
+
+The Hermes sections below describe the retired gateway and are kept for reactivation. The private Voice Memo invariants still apply to anything on the Air.
 
 ## What Hermes-Air IS
 
@@ -14,13 +26,13 @@ A dedicated orchestration node that:
 - Retains a selected, private macOS Voice Memos shadow architecture for later activation. The watcher is disabled and must not process real memos until the activation gate below passes.
 - Persists shared company context to gbrain (Air-as-server, PGLite backend, exposed over Tailscale as a remote-MCP HTTP server). Raw Voice Memo audio and transcripts are excluded from that shared store.
 - Segments dumps into `memory` (gbrain only), `issue` (Linear), and `task` (sub-agent dispatch).
-- Files exactly one Linear issue for engineering/product/ops work using the canonical follow-up shape from `.claude/rules/linear.md` via `scripts/symphony/lib/tracker-client.ts`. Linear failures queue a Linear retry and fail closed; there is no GitHub fallback or dual-write.
+- Files exactly one Linear issue for engineering/product/ops work using the canonical follow-up shape from `.claude/rules/linear.md` via `symphony-control/lib/tracker-client.ts`. Linear failures queue a Linear retry and fail closed; there is no GitHub fallback or dual-write.
 - Routes non-engineering tasks (calendar moves, Airtable updates, emails) to the right sub-agent which calls the appropriate MCP.
 - Runs deterministic cron jobs: PR-stuck monitor, CI failure triage, HUD refresh, daily briefing, cost monitor, deterministic-tracker (self-improvement), free-model health.
 
 ## What Hermes-Air IS NOT
 
-- **NOT a code editor.** No Claude Code sessions, no `pnpm` builds, no Conductor worktrees, no `git` commits, no PR merges from this node.
+- **NOT a code author.** No commits, pushes, PR authoring or PR merges from unattended jobs on this node. The Mac-lane runner and dogfood verifier above may build and test in isolated worktrees but do not change code. Interactive operator sessions follow the normal repo rules.
 - **NOT a GitHub Issue dispatcher.** Engineering intake is Linear-only and selection belongs to Linear-backed Symphony. The GitHub AI dispatcher/orchestrator and Pro codex issue shipper are retired.
 - **NOT a hot path for product traffic.** Vercel still runs all product crons. Hermes-Air owns ops crons only.
 - **NOT a backlog source of truth.** Linear is the sole canonical backlog. GitHub remains authoritative for PRs, Actions, and merge-queue evidence; Airtable, Calendar, and gbrain keep their scoped records.
@@ -29,10 +41,10 @@ A dedicated orchestration node that:
 
 | Invariant | Enforced by |
 |---|---|
-| Hermes-Air never edits code or merges PRs | Profile gate (`JOVIE_AGENT_PROFILE!=coder`); `orchestrator-boundary-check.sh` hook on any Claude Code session that ever runs on Air (should be zero) |
+| Unattended Air jobs never author code or merge PRs | Profile gate (`JOVIE_AGENT_PROFILE!=coder`) on the dogfood verifier; Actions jobs run only reviewed merge-group/main code; `orchestrator-boundary-check.sh` for any coder session |
 | All admitted engineering follow-ups go through Linear | Telegram intake handlers file via the Linear-only `tracker-client.ts`; no GitHub Issue fallback or `repository_dispatch` from Air. Private voice proposals require Summer admission and sanitization first. |
 | Inference cost is $0 unless user explicitly opts in | `free-model-router.ts` only selects `:free` OpenRouter variants; `cost-monitor.ts` kills non-watchdog jobs if any paid spend exceeds $0 in 24h |
-| gbrain stays local (Air-hosted, Tailscale-bound) | `gbrain serve --http --bind <tailscale-ip>` binds to the Tailscale interface only; no public exposure |
+| Air never serves the shared gbrain | Company gbrain is served from the ops Mac (`tims-macbook-pro:7801`, see JovieInc/gbrain `MAINTENANCE.md`); the Air is a Tailscale MCP client with its own revocable token. The private voice store stays local PGLite. |
 | Voice memo source material stays private on the Air | Audio, raw transcripts, classifications, and proposals live only under non-symlinked `~/.hermes/private/` roots with `0700` directories and `0600` files. No raw shared gbrain, GitHub, Telegram, dispatch log, or repository write. |
 | Voice storage is isolated from company gbrain | A dedicated no-embedding PGLite store lives at `~/.hermes/private/voice-brain/`. The adapter scrubs ambient database, Supabase, repository, sync, provider, and source variables, runs from a neutral private working directory, and requires gbrain repo write-through to report `no_repo_configured`. |
 | Voice analysis is local by default | Apple transcripts are accepted only after exact database binding. Missing transcripts fall back to local Whisper. Classification uses literal-loopback Ollama. Groq transcription is disabled unless the operator explicitly sets `HERMES_VOICE_ENABLE_GROQ=1` and provides its key. |
@@ -42,7 +54,7 @@ A dedicated orchestration node that:
 
 ## Sub-Agent Profiles
 
-Profiles are defined in `~/.hermes/config.yaml` (template at `scripts/symphony/config.air.template.yaml`). Each profile is a Hermes sub-agent with a scoped skill loadout and MCP allowlist. Profiles never escalate; the chief profile routes incoming intent to the right one.
+Profiles are defined in `~/.hermes/config.yaml` (template at `symphony-control/config.air.template.yaml`). Each profile is a Hermes sub-agent with a scoped skill loadout and MCP allowlist. Profiles never escalate; the chief profile routes incoming intent to the right one.
 
 | Profile | Scope | MCPs allowed | Cannot do |
 |---|---|---|---|
@@ -62,7 +74,7 @@ This is the selected architecture, not an active service contract:
 5. Write raw artifacts and private proposals only to the dedicated no-embedding PGLite store and private object root. Run the adapter with ambient database and sync variables scrubbed, from a neutral private working directory, while holding `~/.hermes/state/heavy-job.lock`.
 6. Summer may later admit a constraint-relevant, sanitized company work packet. The raw audio, transcript, private classification, and unadmitted proposal never enter shared gbrain, GitHub, Telegram, or an executor prompt.
 
-The legacy `scripts/symphony/jobs/voice-memo-ingest.ts` watcher is not the activation source for this architecture and must remain unloaded.
+The legacy `symphony-control/jobs/voice-memo-ingest.ts` watcher is not the activation source for this architecture and must remain unloaded.
 
 ## Engineering Work Handoff (the only contract with the Pro)
 
@@ -91,7 +103,7 @@ This is how Hermes-Air keeps trending toward $0 model calls over time.
 - **Hermes embeddings**: $0/mo for shared company context. The private voice store disables embeddings entirely.
 - **Telegram bot**: $0/mo.
 - **Tailscale**: $0/mo (free tier, 2 devices under 100-device limit).
-- **gbrain**: $0/mo (local PGLite).
+- **gbrain**: $0/mo on the Air (client of the ops Mac server; private voice store is local PGLite).
 - **Hard cap**: any paid spend >$0 in 24h triggers `cost-monitor.ts` to kill non-watchdog launchd jobs and notify Telegram. Resuming requires user confirmation.
 
 ## Workspace Topology Reminder
@@ -100,10 +112,10 @@ Per `CLAUDE.md` → Workspace Topology: this Air is the **third workspace** alon
 
 ## Related Files
 
-- `scripts/symphony/bootstrap-air.sh` — installer
-- `scripts/symphony/config.air.template.yaml` — Hermes config template
-- `scripts/symphony/launchd/*.plist.template` — launchd unit templates (the legacy voice-memo watcher must remain unloaded)
-- `scripts/symphony/jobs/*.ts` — cron handlers
-- `scripts/symphony/lib/free-model-router.ts` — cost-safe model selection
+- `symphony-control/bootstrap-air.sh` — installer
+- `symphony-control/config.air.template.yaml` — Hermes config template
+- `symphony-control/launchd/*.plist.template` — launchd unit templates (the legacy voice-memo watcher must remain unloaded)
+- `symphony-control/jobs/*.ts` — cron handlers
+- `symphony-control/lib/free-model-router.ts` — cost-safe model selection
 - `docs/HERMES_AIR.md` — operator runbook
 - `.claude/plans/system-instruction-you-are-working-polished-gadget.md` — architecture decision record

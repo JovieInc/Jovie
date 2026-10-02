@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useState } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { HudObservationStatus } from '@/components/features/admin/hud/HudObservationStatus';
@@ -109,13 +110,15 @@ function FunnelStageTile({
   readonly isBiggestLeak: boolean;
 }>) {
   return (
-    <div
+    <Link
+      href={stage.drillDownHref}
       className={cn(
         'min-w-32 shrink-0 rounded-(--radius-md) border p-2.5',
         isBiggestLeak ? 'border-error' : 'border-transparent'
       )}
       data-testid={`founder-funnel-stage-${stage.key}`}
       title={stage.description}
+      aria-label={`${stage.count.toLocaleString('en-US')} ${stage.label}; inspect underlying entities`}
     >
       <p className='text-2xs font-semibold text-tertiary-token'>
         {stage.label}
@@ -135,7 +138,7 @@ function FunnelStageTile({
             ? 'Top of funnel'
             : `−${stage.dropOff.toLocaleString('en-US')} lost`}
       </p>
-    </div>
+    </Link>
   );
 }
 
@@ -245,7 +248,7 @@ export function FounderFunnelBand({
   };
 
   return (
-    <ContentSurfaceCard className='overflow-hidden p-0'>
+    <ContentSurfaceCard className='overflow-hidden'>
       <ContentSectionHeader
         title='Bottleneck'
         subtitle='Death-step in onboarding chat to paid.'

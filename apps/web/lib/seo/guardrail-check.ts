@@ -5,12 +5,37 @@
  * Unit-tested so robots/sitemap regressions cannot slip past deploy gates.
  */
 
-export const REQUIRED_AI_CRAWLERS = [
-  'GPTBot',
-  'ChatGPT-User',
-  'Claude-Web',
+/**
+ * Crawler tokens by purpose (JOV-7259). AI *search* crawlers index pages for
+ * answer-engine citation; training/control tokens govern model training or
+ * feature use. Granting a training token access is not search citability —
+ * the two classes are checked separately so a policy that allows GPTBot but
+ * omits OAI-SearchBot still fails the search requirement.
+ */
+export const AI_SEARCH_CRAWLERS = [
+  'OAI-SearchBot',
+  'Claude-SearchBot',
   'PerplexityBot',
+] as const;
+
+/** Training and feature-control tokens Jovie chooses to keep allowed. */
+export const AI_TRAINING_TOKENS = [
+  'GPTBot',
+  'ClaudeBot',
   'Google-Extended',
+  'Applebot-Extended',
+] as const;
+
+/** User-triggered retrieval does not establish search-index eligibility. */
+export const AI_USER_FETCHERS = ['ChatGPT-User'] as const;
+/** Preserve existing grants without assigning undocumented current purposes. */
+export const AI_LEGACY_TOKENS = ['Claude-Web', 'Anthropic-AI'] as const;
+
+export const REQUIRED_AI_CRAWLERS = [
+  ...AI_SEARCH_CRAWLERS,
+  ...AI_TRAINING_TOKENS,
+  ...AI_USER_FETCHERS,
+  ...AI_LEGACY_TOKENS,
 ] as const;
 
 export interface SeoGuardrailFinding {
@@ -48,7 +73,7 @@ function result(errors: SeoGuardrailFinding[]): SeoGuardrailResult {
   return { ok: errors.length === 0, errors };
 }
 
-interface ParsedRobotsRule {
+export interface ParsedRobotsRule {
   readonly userAgents: readonly string[];
   readonly allow: readonly string[];
   readonly disallow: readonly string[];
@@ -82,7 +107,7 @@ function referencesSitemap(content: string): boolean {
   return false;
 }
 
-function parseRobotsRules(content: string): ParsedRobotsRule[] {
+export function parseRobotsRules(content: string): ParsedRobotsRule[] {
   const rules: ParsedRobotsRule[] = [];
   let currentAgents: string[] = [];
   let currentAllow: string[] = [];
@@ -101,8 +126,8 @@ function parseRobotsRules(content: string): ParsedRobotsRule[] {
   };
 
   for (const rawLine of content.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith('#')) continue;
+    const line = rawLine.split('#', 1)[0]!.trim();
+    if (!line) continue;
 
     const separatorIndex = line.indexOf(':');
     if (separatorIndex === -1) continue;
@@ -111,8 +136,8 @@ function parseRobotsRules(content: string): ParsedRobotsRule[] {
     const value = line.slice(separatorIndex + 1).trim();
 
     if (directive === 'user-agent') {
-      flush();
-      currentAgents = [value];
+      if (currentAllow.length > 0 || currentDisallow.length > 0) flush();
+      currentAgents.push(value.toLowerCase());
       continue;
     }
 
@@ -127,7 +152,19 @@ function parseRobotsRules(content: string): ParsedRobotsRule[] {
   }
 
   flush();
-  return rules;
+  // RFC 9309: matching groups combine; user-agent tokens are case-insensitive.
+  const merged = new Map<string, ParsedRobotsRule>();
+  for (const rule of rules) {
+    for (const agent of rule.userAgents) {
+      const previous = merged.get(agent);
+      merged.set(agent, {
+        userAgents: [agent],
+        allow: [...(previous?.allow ?? []), ...rule.allow],
+        disallow: [...(previous?.disallow ?? []), ...rule.disallow],
+      });
+    }
+  }
+  return [...merged.values()];
 }
 
 /**
@@ -172,13 +209,48 @@ export function validateRobotsTxt(content: string): SeoGuardrailResult {
     );
   }
 
-  for (const crawler of REQUIRED_AI_CRAWLERS) {
-    const crawlerRule = rules.find(rule => rule.userAgents.includes(crawler));
+  for (const crawler of AI_SEARCH_CRAWLERS) {
+    const crawlerRule = rules.find(rule =>
+      rule.userAgents.includes(crawler.toLowerCase())
+    );
+    if (!crawlerRule) {
+      errors.push(
+        failure(
+          'robots.missing-search-crawler',
+          `robots.txt is missing an explicit rule for ${crawler}; AI search citability requires it (a training token does not count).`,
+          AI_CRAWLER_REMEDIATION
+        )
+      );
+      continue;
+    }
+
+    if (
+      crawlerRule.disallow.includes('/') &&
+      !crawlerRule.allow.includes('/')
+    ) {
+      errors.push(
+        failure(
+          'robots.search-crawler-blocked',
+          `robots.txt globally blocks AI search crawler ${crawler} with Disallow: /.`,
+          AI_CRAWLER_REMEDIATION
+        )
+      );
+    }
+  }
+
+  for (const crawler of [
+    ...AI_TRAINING_TOKENS,
+    ...AI_USER_FETCHERS,
+    ...AI_LEGACY_TOKENS,
+  ]) {
+    const crawlerRule = rules.find(rule =>
+      rule.userAgents.includes(crawler.toLowerCase())
+    );
     if (!crawlerRule) {
       errors.push(
         failure(
           'robots.missing-ai-crawler',
-          `robots.txt is missing an explicit rule for ${crawler}.`,
+          `robots.txt is missing an explicit rule for ${crawler} (keep the declared non-search policy explicit).`,
           AI_CRAWLER_REMEDIATION
         )
       );
@@ -255,7 +327,7 @@ export function validateSitemapXml(content: string): SeoGuardrailResult {
         )
       );
     }
-    const lastmod = block.match(/<lastmod>([^<]*)<\/lastmod>/i)?.[1];
+    const lastmod = /<lastmod>([^<]*)<\/lastmod>/i.exec(block)?.[1];
     if (lastmod !== undefined && Number.isNaN(new Date(lastmod).getTime())) {
       errors.push(
         failure(

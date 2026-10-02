@@ -229,11 +229,15 @@ The main content area (`<main>`) uses `bg-(--app-shell-content-surface)`, the sh
 
 ### Color & Accent Discipline
 
-`DESIGN.md` is canonical. Accent color is semantic only: status, focus,
-selection, active navigation, links, or a named data category. Do not rotate
-accent colors between sections, ornament title text, or place decorative icons
-on colored squares. CTAs remain neutral high-contrast pills. Color never
-carries status alone.
+`DESIGN.md` is canonical for tokens. Color is neutral by default; accents
+appear only on card and section backgrounds, rotating in visual order
+blue → purple → pink (then orange, then red/green last) with no two
+consecutive sections sharing one. Image cards pick the accent that
+complements the art by color theory and anchor the rotation. Each gradient
+uses one accent centered on its exact token value. Lower OKLCH chroma for
+contrast, and more strongly behind art. The focus/link accent never rotates.
+CTAs stay neutral pills. Color never carries status alone. Full rule:
+`docs/design-system/DETAILS.md` (accent rotation rule).
 
 For Jovie-owned intentionally art-directed/generated brand imagery, use
 Scene Palette v1 from `apps/web/data/marketing/imageColorPolicy.ts`. The
@@ -457,7 +461,7 @@ Marketing pages reference product screenshots through `apps/web/lib/screenshots/
 
 - **NEVER** invent, substitute, or mix placeholder creator identities on the homepage or marketing demos when Tim White or a real featured creator from canonical data should be used.
 - For Tim White specifically, agents must use the canonical homepage identity source instead of hardcoded fallback assets or guessed values.
-- If Tim White appears in homepage mocks, use the correct founder photo and the correct Spotify artist ID: `4u`.
+- If Tim White appears in homepage mocks, use `TIM_WHITE_PROFILE` from `apps/web/lib/tim-white.ts` and `TIM_WHITE_SPOTIFY_ID` from `apps/web/lib/spotify/blacklist.ts`; do not duplicate or truncate the identifier.
 - Calvin Harris demo fixtures must not include `Blessings`, Clementine Douglas, or any Tim White credit. Those names create an obvious founder-identity collision and must be treated as forbidden in Calvin demo content.
 - When fixing one wrong Tim White reference, search for sibling homepage/demo references and fix all of them in the same pass.
 
@@ -476,3 +480,13 @@ When building or iterating on the Artist Profiles landing page:
 - Keep copy in data files, not inline JSX.
 - Iterate section by section in browser instead of trying to style the whole page in one pass.
 - Marketing fake-proof/founder-first rules are now owned normatively by the marketing registry (`apps/web/data/marketing/`) — see `docs/marketing/AGENT_GUIDE.md` (zero-proof path: proof/trust sections illegal without verified data).
+
+## Lesson Guard References
+
+- Register new Tailwind v4 utility tokens in `@theme` or `@theme inline` in
+  `globals.css`; a CSS variable declared only in `:root` does not emit utilities.
+- Marketing signup CTAs use `/signup`. Do not send them to `/claim`, `/register`
+  or `/waitlist`; the artist profile claim flow has a different intent.
+- Honor the marketing registry's above-the-fold hero contract: do not use a
+  full-height hero shell that pushes the first proof element below the fold.
+  Keep the opening proof in the composition without decorative inset cards.

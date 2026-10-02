@@ -298,6 +298,36 @@ describe('onboarding tool artifacts', () => {
     expect(onHandleCandidateChange).toHaveBeenLastCalledWith('');
   });
 
+  it('renders an unavailable handle with the error token, not raw red-* (JOV-6773)', () => {
+    mocks.handleAvailability.data = { available: false };
+
+    fastRender(
+      <OnboardingHandleCheckCard
+        state='output-available'
+        output={{ action: 'check_handle', handle: 'takenartist' }}
+      />
+    );
+
+    expect(screen.getByText('is not available')).toBeDefined();
+    const card = screen.getByTestId('onboarding-handle-check');
+    expect(card.className).toContain('text-error');
+    expect(card.className).not.toMatch(/\bred-\d/);
+    const icon = card.querySelector('[aria-hidden="true"]');
+    expect(icon?.className).toContain('text-error');
+    expect(icon?.className).not.toMatch(/\bred-\d/);
+  });
+
+  it('renders a failed artist lookup with the error token, not raw red-* (JOV-6773)', () => {
+    fastRender(<OnboardingArtistConfirmedCard state='output-error' />);
+
+    expect(
+      screen.getByText('Artist profile could not be loaded')
+    ).toBeDefined();
+    const alert = screen.getByRole('alert');
+    expect(alert.className).toContain('text-error');
+    expect(alert.className).not.toMatch(/\bred-\d/);
+  });
+
   it('emits Confirm Handle widget event when the CTA is pressed', () => {
     mocks.handleAvailability.data = { available: true };
     const onConfirmHandle = vi.fn();
@@ -315,6 +345,40 @@ describe('onboarding tool artifacts', () => {
     expect(
       screen.getByRole('button', { name: 'Handle Confirmed' })
     ).toBeDefined();
+  });
+
+  it('collapses a handle_confirmed output to a non-interactive status', () => {
+    fastRender(
+      <OnboardingHandleCheckCard
+        state='output-available'
+        output={{ action: 'handle_confirmed', handle: 'validartist' }}
+        onConfirmHandle={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Handle confirmed')).toBeDefined();
+    expect(screen.getByText('@validartist')).toBeDefined();
+    expect(screen.queryByLabelText('Edit Proposed Handle')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Confirm Handle' })).toBeNull();
+    expect(screen.queryByTestId('onboarding-confirm-handle')).toBeNull();
+  });
+
+  it('collapses a social_attached output to a non-interactive status', () => {
+    fastRender(
+      <OnboardingSocialLinkCard
+        state='output-available'
+        output={{
+          action: 'social_attached',
+          url: 'https://instagram.com/testartist',
+        }}
+        onAttachAccount={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Social account attached')).toBeDefined();
+    expect(screen.queryByLabelText('Social Profile URL')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Attach Account' })).toBeNull();
+    expect(screen.queryByTestId('onboarding-attach-account')).toBeNull();
   });
 
   it('renders proposed social links with Attach Account CTA', () => {

@@ -130,8 +130,7 @@ export function getConnectionStatus(
       tone: 'error',
       needsAttention: true,
       sortPriority: 0,
-      nextAction:
-        'Inspect the source to check this identity conflict. Identity confirmation is not yet available here.',
+      nextAction: 'Resolve this identity using the retained source evidence.',
     };
   }
   if (row.qualificationStatus === 'suggested') {
@@ -140,8 +139,17 @@ export function getConnectionStatus(
       tone: 'warning',
       needsAttention: true,
       sortPriority: 0,
+      nextAction: 'Confirm whether this public identity belongs to the artist.',
+    };
+  }
+  if (row.qualificationStatus === 'rejected') {
+    return {
+      label: 'Not You',
+      tone: 'neutral',
+      needsAttention: false,
+      sortPriority: 4,
       nextAction:
-        'Inspect the source to check whether it belongs to the artist. Identity confirmation is not yet available here.',
+        'This identity was rejected and is retained as negative evidence.',
     };
   }
   if (row.monitoringState === 'locked') {
@@ -262,6 +270,19 @@ export function sortProfileWorkspaceRows(
   });
 }
 
+function monitoringLabelForCounts(input: {
+  readonly providerAvailable: boolean;
+  readonly activeCount: number;
+  readonly pausedCount: number;
+  readonly limitedCount: number;
+}): ConnectionsWorkspaceSummary['monitoringLabel'] {
+  if (!input.providerAvailable) return 'Unavailable';
+  if (input.activeCount > 0) return 'Active';
+  if (input.pausedCount > 0) return 'Paused';
+  if (input.limitedCount > 0) return 'Limited';
+  return 'Unavailable';
+}
+
 export function summarizeProfileWorkspaceRows(
   rows: readonly ProfileWorkspaceRow[],
   providerAvailable = true
@@ -286,15 +307,12 @@ export function summarizeProfileWorkspaceRows(
       row => getConnectionStatus(row).needsAttention
     ).length,
     bestRank: measuredRanks.length > 0 ? Math.min(...measuredRanks) : null,
-    monitoringLabel: !providerAvailable
-      ? 'Unavailable'
-      : activeCount > 0
-        ? 'Active'
-        : pausedCount > 0
-          ? 'Paused'
-          : limitedCount > 0
-            ? 'Limited'
-            : 'Unavailable',
+    monitoringLabel: monitoringLabelForCounts({
+      providerAvailable,
+      activeCount,
+      pausedCount,
+      limitedCount,
+    }),
   };
 }
 

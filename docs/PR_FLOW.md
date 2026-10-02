@@ -25,9 +25,19 @@ the implementation slot only after its exact-head receipt is acknowledged.
 | Activation | Production controller | Exact deployed runtime proof |
 | Closure | Summer | Closure receipt referencing activation proof |
 
+Leaving draft (`ready_for_review`) is owned by `auto-merge-default.yml`, which
+enables native auto-merge and skips drafts. That event does not start another
+source CI flight.
+
 Missing ownership, stale/changed heads, failed checks, lost or duplicate events,
 and expired holds remain bounded repair/evidence outcomes. The policy digest is
 included in delivery receipts so a runtime can reject a mismatched contract.
+
+When a phase fails badly enough to hit a trigger in
+[post-mortems](postmortems/README.md#when-a-post-mortem-is-required) (for
+example a production freeze, red `main`, or a stalled lane), the agent that
+resolves it writes a post-mortem and files `postmortem-action` issues for the
+systemic controls.
 
 ## North star
 
@@ -75,16 +85,20 @@ in the merge queue, while network/deploy/exhaustive depth runs later.
 | **Merge queue** | combined-head `ci-fast`, exact-combined-head web coverage, path-selected Web unit/build, Mac test/package artifact, iOS unit + coverage fast gate, shared-contract integration, path-selected model-free Promptfoo/golden evals, diff secret scan, Golden Path Lock, migration policy | GitHub `merge_group` synthetic head |
 | **Release (`main`)** | exact queue proof or fail-closed direct-main fallback, then successful exact CI-attempt authorization into one `production-mutation` FIFO spanning staging, promotion, one centralized rollback owner, and final verification | completed successful `CI` workflow run for `main`; one bounded controller retry |
 | **Post-deploy** | hosted public, homepage, and live Lighthouse probes against the immutable deployment URL while the controller retains its lease; authenticated smoke is explicit optional evidence until credentials exist; final current-main/canonical check; JOV-INV-033 Done-sprint production HTML rescan (`DONE_INVARIANT_RESCAN=release`) against that same URL; `Production Verified` marker; event-driven Golden Path Prod Autofix (Cursor-direct, fail-closed) | successful current production release |
-| **Deep / nightly** | CodeQL, Trivy, full-history secret scans, Scorecard, SonarCloud, full E2E matrix, exhaustive suites, weekly Slop Gate (advisory copy smell on main) | schedule, event, or explicit manual dispatch |
+| **Deep / nightly** | CodeQL, Trivy, full-history secret scans, Scorecard, SonarCloud, full E2E matrix, exhaustive suites | schedule, event, or explicit manual dispatch |
 
 Rules:
 - **Heavy scans never gate a source PR or a merge-queue batch.** Running CodeQL
   ×5 + the full security suite per-PR saturated the runner pool and made the
   native queue retry-storm itself into a 6-hour stall. CodeQL / Trivy / Scorecard scan the
-  *merged* code on `main` + nightly. **Slop Gate** is the same class: a weekly
-  post-merge copy-smell report on `main`. Taste/copy judgment is post-ship
-  (`taste-classifier` + production walkthroughs). Do not add slopcheck to
-  `PR Ready` or `ci-harness/manifest.json`.
+  *merged* code on `main` + nightly.
+- **Exception: the deterministic copy gate runs on PRs.** The `copy-gate`
+  ci-fast lane lints only lines a PR adds in customer-facing copy paths
+  (`@jovie/copy`, policy in `canon/VOICE.md`). It is pure regex, runs in about a
+  second, and blocks new harm, legal, platform-ToS, leak, and slop violations
+  (founder decision 2026-09-25). Legacy lines stay advisory. LLM judge panels
+  never run in PR CI; they run in the authoring loop (`copywriting` skill) and
+  taste stays post-ship. Slop Gate and `slopcheck.py` are retired.
 - **Exception — secret scanning gates PRs.** A diff-scoped gitleaks + trufflehog
   runs on every PR (~10s, 1 slot): a leaked key on this **public** repo is scraped
   within seconds of hitting `main`, so it is EVENT-class and must be caught
@@ -188,8 +202,16 @@ selecting both iOS and Mac needs two macOS jobs, leaving one reserve at two
 groups. The five self-hosted Linux runners do not provide capacity for these
 hosted product lanes.
 
+On 2026-09-25 a ruleset admin raised live `max_entries_to_build` to GitHub's
+10-group ceiling (`updated_at` 2026-09-25T22:20Z, during the production-freeze
+incident window). Source-of-record synced to the applied live value under
+JOV-6815; the live-parity check keeps accepting any lower build count so a
+rollback to the JOV-6107 bound stays green. Re-evaluate against measured
+runner saturation — ten full groups (~190 hosted jobs) exceeds both capacity
+figures above — and return live to `2` if deep queues starve required CI.
+
 Source preflight accepts integer build counts from one through the reviewed
-ceiling of two and records the actual count and any difference from the target.
+ceiling of ten and records the actual count and any difference from the target.
 This permits source-first rollout and a one-field rollback without blocking
 normal admission.
 
@@ -394,6 +416,32 @@ Use `JOVIE_PUSH_PHASE=qualification git push` before ready/landing.
 ## Agent checklist
 
 Before you open a PR:
+
+Use an explicit non-closing Linear reference from creation: `Refs JOV-1234.`
+on a separate line for each linked issue, with the existing
+`linear-issue-id` / `linear-issue-identifier` markers retained. Avoid closing
+keywords even for normal implementation work: native Linear automation cannot
+inspect commissioning labels or runtime acceptance. The existing repository
+merge sync still closes normal completed implementation issues and leaves
+commissioning/parent issues open. A commissioning note alone does not change
+native linking semantics. For an already-linked issue, inspect its other PR
+relationships before editing; an older merged closing link can still affect
+status. Do not add a reconciliation loop or disable team-wide automation.
+
+Check the entire title and description, including negated or conditional prose.
+Native Linear still interprets a closing word immediately before an issue ID
+as an instruction even when the sentence says the work is incomplete. Put the
+ID in the explicit reference line and describe remaining acceptance without
+that syntax. Before `gh pr create` or a description edit, check the prepared
+body file and title without credentials or publication:
+
+```bash
+node scripts/lib/source-admission-policy.mjs --body-file /tmp/pr-body.md --title 'fix(scope): describe the repair'
+```
+
+The existing native-admission path checks current PR text again before landing.
+That later check cannot undo status changes caused by an earlier publication;
+inspect Linear's actual Related/Resolves relationship when repairing old links.
 
 1. **Small + focused**, targeting `main`. Dependent? Use the native GitHub
    retarget/rebase sequence in [`pr-stacking.md`](../.claude/rules/pr-stacking.md).

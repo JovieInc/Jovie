@@ -4,6 +4,7 @@ import { TooltipProvider } from '@jovie/ui';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { TASK_DATA_TABLE_MULTILINE_CELL_CONTENT_CLASSNAME } from '@/components/features/dashboard/tasks/TaskDataTable';
 import { APP_ROUTES } from '@/constants/routes';
 import type { TaskBoardResult, TaskStatus, TaskView } from '@/lib/tasks/types';
 
@@ -15,6 +16,7 @@ const {
   mockUseTaskBoardQuery,
   mockUseTasksQuery,
   mockEntitySidebarShell,
+  editorTestState,
 } = vi.hoisted(() => ({
   mockRouterPush: vi.fn(),
   mockRegisterRightPanel: vi.fn(),
@@ -23,6 +25,7 @@ const {
   mockUseTaskBoardQuery: vi.fn(),
   mockUseTasksQuery: vi.fn(),
   mockEntitySidebarShell: vi.fn(),
+  editorTestState: { real: false },
 }));
 
 vi.mock('next/navigation', () => ({
@@ -31,8 +34,11 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('@/components/organisms/RichTextEditor', () => ({
-  RichTextEditor: React.forwardRef(function MockRichTextEditor(
+vi.mock('@/components/organisms/RichTextEditor', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/components/organisms/RichTextEditor')
+  >('@/components/organisms/RichTextEditor');
+  const MockEditor = React.forwardRef(function MockRichTextEditor(
     {
       ariaLabel,
       content,
@@ -104,6 +110,17 @@ vi.mock('@/components/organisms/RichTextEditor', () => ({
           className='focus-visible:bg-surface-1'
           style={{ boxShadow: 'none' }}
         />
+        <button
+          type='button'
+          onClick={() =>
+            onChange({
+              content: { ...content, content: content.content ?? [] },
+              plainText,
+            })
+          }
+        >
+          Emit unchanged editor update
+        </button>
         <span>{statusLabel}</span>
         {statusAction ? (
           <button type='button' onClick={statusAction.onClick}>
@@ -112,8 +129,20 @@ vi.mock('@/components/organisms/RichTextEditor', () => ({
         ) : null}
       </div>
     );
-  }),
-}));
+  });
+  return {
+    RichTextEditor: React.forwardRef<
+      import('@/components/organisms/RichTextEditor').RichTextEditorHandle,
+      React.ComponentProps<typeof actual.RichTextEditor>
+    >(function TestRichTextEditor(props, ref) {
+      return editorTestState.real ? (
+        <actual.RichTextEditor {...props} ref={ref} />
+      ) : (
+        <MockEditor {...props} ref={ref} />
+      );
+    }),
+  };
+});
 
 vi.mock('@jovie/ui', async () => {
   const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
@@ -229,9 +258,9 @@ const mockTaskTwo = {
   title: 'Confirm final DSP delivery checklist',
   description: 'Follow up on delivery status and confirm provider approval.',
   status: 'in_progress',
-  agentStatus: 'processing',
+  agentStatus: 'drafting',
   priority: 'medium',
-} as const;
+} as const satisfies TaskView;
 
 const mockJovieTask = {
   ...mockTask,
@@ -705,6 +734,7 @@ import {
   HeaderActionsProvider,
   useOptionalHeaderActions,
 } from '@/contexts/HeaderActionsContext';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 
 const { TasksPageClient } = await import(
   '@/components/features/dashboard/tasks/TasksPageClient'
@@ -738,10 +768,38 @@ function renderPage() {
   );
 }
 
+function TasksSearchActivityFixture() {
+  const [searchOpen, setSearchOpen] = React.useState(false);
+  return (
+    <>
+      <button type='button' onClick={() => setSearchOpen(current => !current)}>
+        {searchOpen ? 'Return to tasks' : 'Open main Search'}
+      </button>
+      <React.Activity mode={searchOpen ? 'hidden' : 'visible'}>
+        <TasksPageClient />
+      </React.Activity>
+    </>
+  );
+}
+function renderPageInActivity() {
+  return render(
+    <TooltipProvider>
+      <HeaderActionsProvider>
+        <HeaderActionsHost />
+        <TasksSearchActivityFixture />
+      </HeaderActionsProvider>
+    </TooltipProvider>
+  );
+}
+
 function getLatestTableProps() {
   return mockUnifiedTable.mock.calls.at(-1)?.[0] as
     | {
         readonly data?: ReadonlyArray<TaskView>;
+        readonly columns?: ReadonlyArray<{
+          readonly id?: string;
+          readonly meta?: { readonly cellContentClassName?: string };
+        }>;
         readonly onRowClick?: (task: TaskView) => void;
         readonly isRowSelected?: (task: TaskView, index: number) => boolean;
         readonly getRowClassName?: (task: TaskView, index: number) => string;
@@ -758,6 +816,7 @@ function getLatestTableProps() {
 describe('TasksPageClient', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    editorTestState.real = false;
     latestHeaderSearchAdapter = null;
     mockCreateTask.mockReset();
     mockDeleteTask.mockReset();
@@ -816,6 +875,20 @@ describe('TasksPageClient', () => {
     expect(source).toContain(
       "<TaskMetaTrigger ariaLabel='Change Task Priority'>"
     );
+  });
+
+  it('drops the retired Disc3 release glyph (banned icon guard, Tim, 2026-09-25)', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../components/features/dashboard/tasks/TasksPageClient.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toContain('Disc3');
+    expect(source).toContain('Layers,');
+    expect(source).toContain('<Layers className=');
   });
 
   it('routes table API imports through the v9 compat adapter', () => {
@@ -891,14 +964,24 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(
-      screen.getByRole('tab', { name: 'Assigned To Me 2' })
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Me', '2'),
+      })
     ).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: 'All 3' })).toBeInTheDocument();
     expect(
-      screen.getByRole('tab', { name: 'Assigned To Jovie 1' })
+      screen.getByRole('tab', { name: segmentedAccessibleName('All', '3') })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Jovie', '1'),
+      })
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
+    fireEvent.click(
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Jovie', '1'),
+      })
+    );
 
     expect(
       screen.getByTestId('mock-board-card-task-jovie')
@@ -944,14 +1027,20 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(
-      screen.getByRole('tab', { name: 'Assigned To Me 2' })
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Me', '2'),
+      })
     ).toHaveAttribute('aria-selected', 'true');
     expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
       'task-2',
       'task-1',
     ]);
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
+    fireEvent.click(
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Jovie', '1'),
+      })
+    );
 
     const tableProps = mockUnifiedTable.mock.calls.at(-1)?.[0] as
       | {
@@ -960,7 +1049,9 @@ describe('TasksPageClient', () => {
       | undefined;
 
     expect(
-      screen.getByRole('tab', { name: 'Assigned To Jovie 1' })
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Jovie', '1'),
+      })
     ).toHaveAttribute('aria-selected', 'true');
     expect(tableProps?.data?.map(task => task.id)).toEqual(['task-jovie']);
   });
@@ -1007,7 +1098,11 @@ describe('TasksPageClient', () => {
     });
     expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
+    fireEvent.click(
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Jovie', '1'),
+      })
+    );
 
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
     expect(screen.getByText('Select a task')).toBeInTheDocument();
@@ -1026,18 +1121,28 @@ describe('TasksPageClient', () => {
       'task-1',
     ]);
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Me 2' }));
+    fireEvent.click(
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Me', '2'),
+      })
+    );
     expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
       'task-2',
       'task-1',
     ]);
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
+    fireEvent.click(
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Jovie', '1'),
+      })
+    );
     expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
       'task-jovie',
     ]);
 
-    fireEvent.click(screen.getByRole('tab', { name: 'All 3' }));
+    fireEvent.click(
+      screen.getByRole('tab', { name: segmentedAccessibleName('All', '3') })
+    );
     expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
       'task-jovie',
       'task-2',
@@ -1342,6 +1447,115 @@ describe('TasksPageClient', () => {
     expect(mockUpdateTaskAsync).toHaveBeenCalledTimes(2);
   });
 
+  it('resumes a debounced task draft after Search without a hidden write or discarded content', async () => {
+    renderPageInActivity();
+    openTask();
+    const description = screen.getByLabelText('Task Description');
+    fireEvent.change(description, {
+      target: { value: 'Synthetic paused draft' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open main Search' }));
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(mockUpdateTaskAsync).not.toHaveBeenCalled();
+    expect(description).not.toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Return to tasks' }));
+    expect(screen.getByLabelText('Task Description')).toBe(description);
+    expect(description).toHaveValue('Synthetic paused draft');
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(mockUpdateTaskAsync).toHaveBeenCalledOnce();
+    expect(mockUpdateTaskAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          description: 'Synthetic paused draft',
+        }),
+      })
+    );
+    expect(screen.getByText('Saved')).toBeInTheDocument();
+  });
+
+  it('keeps a newer task draft when an in-flight save completes while Search hides the route', async () => {
+    let completeSave: ((task: TaskView) => void) | undefined;
+    mockUpdateTaskAsync.mockImplementationOnce(
+      () =>
+        new Promise<TaskView>(resolve => {
+          completeSave = resolve;
+        })
+    );
+    renderPageInActivity();
+    openTask();
+    fireEvent.change(screen.getByLabelText('Task Description'), {
+      target: { value: 'First synthetic draft' },
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    fireEvent.change(screen.getByLabelText('Task Description'), {
+      target: { value: 'Newer synthetic draft' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open main Search' }));
+    await act(async () => {
+      completeSave?.({
+        ...mockTaskTwo,
+        description: 'First synthetic draft',
+        mutationVersion: 8,
+      });
+    });
+    expect(mockUpdateTaskAsync).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', { name: 'Return to tasks' }));
+    expect(screen.getByLabelText('Task Description')).toHaveValue(
+      'Newer synthetic draft'
+    );
+    expect(screen.getByText('Edited')).toBeInTheDocument();
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(mockUpdateTaskAsync).toHaveBeenCalledTimes(2);
+    expect(mockUpdateTaskAsync).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          description: 'Newer synthetic draft',
+          expectedMutationVersion: 8,
+        }),
+      })
+    );
+  });
+
+  it('preserves a save failure that settles while Search hides the task route', async () => {
+    let rejectSave: ((error: Error) => void) | undefined;
+    mockUpdateTaskAsync.mockImplementationOnce(
+      () =>
+        new Promise<TaskView>((_resolve, reject) => {
+          rejectSave = reject;
+        })
+    );
+    renderPageInActivity();
+    openTask();
+    fireEvent.change(screen.getByLabelText('Task Description'), {
+      target: { value: 'Synthetic failed draft' },
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open main Search' }));
+    await act(async () => {
+      rejectSave?.(new Error('save failed'));
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Return to tasks' }));
+    expect(screen.getByLabelText('Task Description')).toHaveValue(
+      'Synthetic failed draft'
+    );
+    expect(screen.getByText('Not saved')).toBeInTheDocument();
+    expect(mockUpdateTaskAsync).toHaveBeenCalledOnce();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByLabelText('Task Description')).toHaveValue(
+      'Synthetic failed draft'
+    );
+  });
+
   it('blocks task switching until the active autosave finishes', async () => {
     let finishFirstSave: (() => void) | undefined;
     mockUpdateTaskAsync.mockImplementationOnce(
@@ -1409,6 +1623,16 @@ describe('TasksPageClient', () => {
     expect(
       screen.getByText('Conflict · reload task changes')
     ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Emit unchanged editor update' })
+    );
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(
+      screen.getByText('Conflict · reload task changes')
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Task Title')).toHaveValue(
+      'Unsaved metadata-safe title'
+    );
     act(() => vi.advanceTimersByTime(500));
     expect(mockUpdateTaskAsync).not.toHaveBeenCalled();
 
@@ -1648,9 +1872,12 @@ describe('TasksPageClient', () => {
     ).getByRole('button', { name: 'Search Jovie' });
     expect(searchTrigger).toHaveAttribute('data-app-search-trigger', 'true');
     expect(
-      within(screen.getByTestId('header-actions-host')).getByRole('button', {
+      within(screen.getByTestId('header-actions-host')).queryByRole('button', {
         name: 'Create Task',
       })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'New Task' })
     ).toBeInTheDocument();
   }, 10000);
 
@@ -1695,6 +1922,18 @@ describe('TasksPageClient', () => {
     );
   });
 
+  it('opts the task title cell into multiline row content', () => {
+    renderPage();
+
+    const titleColumn = getLatestTableProps()?.columns?.find(
+      column => column.id === 'title'
+    );
+
+    expect(titleColumn?.meta?.cellContentClassName).toBe(
+      TASK_DATA_TABLE_MULTILINE_CELL_CONTENT_CLASSNAME
+    );
+  });
+
   it('keeps task title search wired into board filters', () => {
     mockViewMode = 'board';
 
@@ -1720,14 +1959,10 @@ describe('TasksPageClient', () => {
     );
   });
 
-  it('promotes the header into create mode when new task is triggered', () => {
+  it('promotes the toolbar into create mode when new task is triggered', () => {
     renderPage();
 
-    fireEvent.click(
-      within(screen.getByTestId('header-actions-host')).getByRole('button', {
-        name: 'Create Task',
-      })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'New Task' }));
 
     expect(screen.getByLabelText('New Task Name')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
@@ -1859,6 +2094,175 @@ describe('TasksPageClient', () => {
     expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
   });
 
+  it('mounts the real rich text editor with saved content without marking it edited', async () => {
+    vi.useRealTimers();
+    editorTestState.real = true;
+    const rangeDescriptors = ['getClientRects', 'getBoundingClientRect'].map(
+      name => ({
+        name,
+        descriptor: Object.getOwnPropertyDescriptor(Range.prototype, name),
+      })
+    );
+    try {
+      Object.defineProperty(Range.prototype, 'getClientRects', {
+        configurable: true,
+        value: () => [],
+      });
+      Object.defineProperty(Range.prototype, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => new DOMRect(0, 0, 0, 0),
+      });
+      renderPage();
+      openTask();
+      await act(async () => {});
+      expect(screen.getByLabelText('Task Description')).toHaveTextContent(
+        mockTaskTwo.description!
+      );
+      expect(screen.queryByText('Edited')).not.toBeInTheDocument();
+      expect(mockUpdateTaskAsync).not.toHaveBeenCalled();
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
+    } finally {
+      for (const { name, descriptor } of rangeDescriptors) {
+        if (descriptor) {
+          Object.defineProperty(Range.prototype, name, descriptor);
+        } else {
+          Reflect.deleteProperty(Range.prototype, name);
+        }
+      }
+    }
+  });
+
+  it('closes after an unchanged editor callback without attempting a save', () => {
+    renderPage();
+    openTask();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Emit unchanged editor update' })
+    );
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(mockUpdateTaskAsync).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
+  });
+
+  it('closes after reverting a title before autosave without writing the task', () => {
+    renderPage();
+    openTask();
+    fireEvent.change(screen.getByLabelText('Task Title'), {
+      target: { value: 'Temporary draft' },
+    });
+    fireEvent.change(screen.getByLabelText('Task Title'), {
+      target: { value: mockTaskTwo.title },
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(mockUpdateTaskAsync).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
+  });
+
+  it('blocks Escape for a genuinely changed draft before autosave starts', () => {
+    renderPage();
+    openTask();
+    fireEvent.change(screen.getByLabelText('Task Title'), {
+      target: { value: 'Unsaved title' },
+    });
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByLabelText('Task Title')).toHaveValue('Unsaved title');
+    expect(screen.getByText('Edited')).toBeInTheDocument();
+    expect(mockUpdateTaskAsync).not.toHaveBeenCalled();
+  });
+
+  it('does not clear an active save when optimistic cache values match the local editor', () => {
+    mockUpdateTaskAsync.mockImplementationOnce(
+      () => new Promise<TaskView>(() => {})
+    );
+    const view = renderPage();
+    openTask();
+    fireEvent.change(screen.getByLabelText('Task Title'), {
+      target: { value: 'Optimistic title' },
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    mockTasksData = [{ ...mockTaskTwo, title: 'Optimistic title' }, mockTask];
+    view.rerender(
+      <TooltipProvider>
+        <HeaderActionsProvider>
+          <HeaderActionsHost />
+          <TasksPageClient />
+        </HeaderActionsProvider>
+      </TooltipProvider>
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Emit unchanged editor update' })
+    );
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByLabelText('Task Title')).toHaveValue('Optimistic title');
+    expect(screen.getByText('Saving…')).toBeInTheDocument();
+    expect(mockUpdateTaskAsync).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a reverted draft open while its earlier save is active or not yet reflected in the task cache', async () => {
+    let finishSave: ((task: TaskView) => void) | undefined;
+    mockUpdateTaskAsync.mockImplementationOnce(
+      () =>
+        new Promise<TaskView>(resolve => {
+          finishSave = resolve;
+        })
+    );
+    renderPage();
+    openTask();
+    const title = screen.getByLabelText('Task Title');
+    fireEvent.change(title, { target: { value: 'In-flight title' } });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    fireEvent.change(title, { target: { value: mockTaskTwo.title } });
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
+    expect(mockUpdateTaskAsync).toHaveBeenCalledOnce();
+    await act(async () => {
+      finishSave?.({
+        ...mockTaskTwo,
+        title: 'In-flight title',
+        mutationVersion: 8,
+      });
+    });
+    expect(screen.getByText('Edited')).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
+    expect(mockUpdateTaskAsync).toHaveBeenCalledOnce();
+  });
+
+  it('preserves a failed save and draft when the editor emits an unchanged callback', async () => {
+    mockUpdateTaskAsync.mockRejectedValueOnce(new Error('save failed'));
+    renderPage();
+    openTask();
+    fireEvent.change(screen.getByLabelText('Task Description'), {
+      target: { value: 'Unsaved draft' },
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.getByText('Not saved')).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Emit unchanged editor update' })
+    );
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.getByText('Not saved')).toBeInTheDocument();
+    expect(mockUpdateTaskAsync).toHaveBeenCalledOnce();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByLabelText('Task Description')).toHaveValue(
+      'Unsaved draft'
+    );
+  });
+
   it('closes the canonical task detail with Escape from the ambient task surface', () => {
     renderPage();
 
@@ -1899,9 +2303,7 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(
-      within(screen.getByTestId('header-actions-host')).getByRole('button', {
-        name: 'Create Task',
-      })
+      screen.getByRole('button', { name: 'New Task' })
     ).toBeInTheDocument();
   });
 
@@ -1929,18 +2331,26 @@ describe('TasksPageClient', () => {
 
     renderPage();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'All 3' }));
+    fireEvent.click(
+      screen.getByRole('tab', { name: segmentedAccessibleName('All', '3') })
+    );
 
     expect(screen.getAllByTestId('mobile-task-row')).toHaveLength(3);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open 2' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: segmentedAccessibleName('Open', '2') })
+    );
     expect(screen.getAllByTestId('mobile-task-row')).toHaveLength(2);
     expect(screen.getByText(mockTaskTwo.title)).toBeInTheDocument();
     expect(screen.getByText(mockJovieTask.title)).toBeInTheDocument();
     expect(screen.queryByText(mockTask.title)).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Closed 1' }));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: segmentedAccessibleName('Closed', '1'),
+      })
+    );
     expect(screen.getAllByTestId('mobile-task-row')).toHaveLength(1);
     expect(screen.getByText(mockTask.title)).toBeInTheDocument();
   });
@@ -1951,7 +2361,11 @@ describe('TasksPageClient', () => {
 
     renderPage();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
+    fireEvent.click(
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Jovie', '1'),
+      })
+    );
 
     expect(screen.getAllByTestId('mobile-task-row')).toHaveLength(1);
     expect(screen.getByText(mockJovieTask.title)).toBeInTheDocument();

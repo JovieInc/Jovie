@@ -6,6 +6,7 @@ import type { Row, RowData } from '@/lib/tanstack-table';
 import { flexRender } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import '../table.types';
+import { TABLE_CELL_CONTENT_CLASSNAME } from '../atoms/TableCell';
 import { presets, rowState, tableAlignment } from '../table.styles';
 
 /**
@@ -24,11 +25,12 @@ type ManagedTrProps =
 
 export interface VirtualizedTableRowProps<TData extends RowData> {
   readonly row: Row<TData>;
+  /** TanStack rows retain identity when visibility changes; cells must invalidate memoization. */
+  readonly visibleCells?: ReturnType<Row<TData>['getVisibleCells']>;
   readonly rowIndex: number;
   readonly rowRefsMap: Map<number, HTMLTableRowElement>;
   readonly shouldEnableKeyboardNav: boolean;
   readonly shouldVirtualize: boolean;
-  readonly virtualStart?: number;
   readonly focusedIndex: number;
   /** Consumer-owned selected state, composed with TanStack selection. */
   readonly isSelected?: boolean;
@@ -57,7 +59,7 @@ export interface VirtualizedTableRowProps<TData extends RowData> {
  *
  * Features:
  * - Memoization to prevent unnecessary re-renders
- * - Virtualization support with absolute positioning
+ * - Virtualization support (in-flow rows between spacer rows)
  * - Keyboard navigation support
  * - Context menu support
  * - Dynamic row measurement for variable heights
@@ -68,11 +70,11 @@ export interface VirtualizedTableRowProps<TData extends RowData> {
  */
 function VirtualizedTableRowComponent<TData extends RowData>({
   row,
+  visibleCells = row.getVisibleCells(),
   rowIndex,
   rowRefsMap,
   shouldEnableKeyboardNav,
   shouldVirtualize,
-  virtualStart,
   focusedIndex,
   isSelected = false,
   onRowClick,
@@ -178,19 +180,8 @@ function VirtualizedTableRowComponent<TData extends RowData>({
       onKeyDown={handleKeyDown}
       onFocus={handleFocusChange}
       onContextMenu={handleContextMenu}
-      style={
-        shouldVirtualize && virtualStart !== undefined
-          ? {
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              transform: `translateY(${virtualStart}px)`,
-            }
-          : undefined
-      }
     >
-      {row.getVisibleCells().map(cell => {
+      {visibleCells.map(cell => {
         const meta = cell.column.columnDef.meta;
         const metaClassName = meta?.className;
         const align = meta?.align ?? 'left';
@@ -211,7 +202,15 @@ function VirtualizedTableRowComponent<TData extends RowData>({
                   : cell.column.getSize(),
             }}
           >
-            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+            <div
+              className={cn(
+                TABLE_CELL_CONTENT_CLASSNAME,
+                meta?.cellContentClassName
+              )}
+              data-table-cell-content='stable'
+            >
+              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+            </div>
           </td>
         );
       })}

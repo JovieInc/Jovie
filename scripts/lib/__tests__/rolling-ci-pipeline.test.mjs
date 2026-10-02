@@ -274,11 +274,19 @@ describe('bootstrap-safe policy gates', () => {
 
 describe('draft-first rolling CI policy wiring', () => {
   it('records the contract without adding source-PR coverage jobs', () => {
-    expect(read('AGENTS.md')).toContain(
-      'publish the first coherent commit as a draft'
+    // 74ecdd7397 (#17270) made CLAUDE.md/AGENTS.md a terse router; the
+    // draft-first rule now lives canonically in docs/PR_FLOW.md, and the
+    // router must keep pointing publication at it.
+    expect(read('AGENTS.md')).toMatch(
+      /Before publication follow `docs\/PR_FLOW\.md`: coherent draft/
+    );
+    expect(read('.claude/rules/release.md')).toContain(
+      '(../../docs/PR_FLOW.md#draft-first-rolling-ci-contract)'
     );
     const flow = read('docs/PR_FLOW.md');
+    expect(flow).toContain('## Draft-first rolling CI contract');
     for (const text of [
+      'Publish the first coherent commit as a draft.',
       'JOVIE_PUSH_PHASE=publication git push',
       'Per-PR concurrency cancels superseded runs',
       'stale or duplicate deliveries are rejected',

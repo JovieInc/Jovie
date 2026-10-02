@@ -380,6 +380,17 @@ export interface PresenceOutcomeSummary {
   readonly status: PresenceObservationStatus | 'inventory';
 }
 
+function presenceSearchDetail(
+  searchStatus: 'unavailable' | 'stale' | 'measured' | 'pending'
+): string {
+  if (searchStatus === 'unavailable') return 'Search provider is unavailable';
+  if (searchStatus === 'pending') return 'No search run has completed yet';
+  if (searchStatus === 'stale') {
+    return 'Last search check is older than two weeks';
+  }
+  return 'Best measured Jovie rank';
+}
+
 export function summarizePresenceOutcomes(input: {
   readonly artistName: string;
   readonly artistIsPublic: boolean;
@@ -403,13 +414,15 @@ export function summarizePresenceOutcomes(input: {
     ),
   } as const;
 
-  const searchStatus = !input.providerAvailable
-    ? 'unavailable'
-    : isPresenceObservationStale(input.lastObservedAt, now)
-      ? 'stale'
-      : input.lastObservedAt || input.bestJovieRank !== null
-        ? 'measured'
-        : 'pending';
+  let searchStatus: 'unavailable' | 'stale' | 'measured' | 'pending' =
+    'pending';
+  if (!input.providerAvailable) {
+    searchStatus = 'unavailable';
+  } else if (isPresenceObservationStale(input.lastObservedAt, now)) {
+    searchStatus = 'stale';
+  } else if (input.lastObservedAt || input.bestJovieRank !== null) {
+    searchStatus = 'measured';
+  }
 
   return [
     ...(['identity', 'profiles', 'catalog'] as const).map(group => ({
@@ -430,14 +443,7 @@ export function summarizePresenceOutcomes(input: {
       group: 'search',
       label: 'Search',
       value: formatPresenceRank(input.bestJovieRank, searchStatus),
-      detail:
-        searchStatus === 'unavailable'
-          ? 'Search provider is unavailable'
-          : searchStatus === 'pending'
-            ? 'No search run has completed yet'
-            : searchStatus === 'stale'
-              ? 'Last search check is older than two weeks'
-              : 'Best measured Jovie rank',
+      detail: presenceSearchDetail(searchStatus),
       attentionCount: searchStatus === 'measured' ? 0 : 1,
       status: searchStatus,
     },

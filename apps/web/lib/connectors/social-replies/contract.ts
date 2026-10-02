@@ -1,3 +1,4 @@
+import { lintCopy } from '@jovie/copy';
 import { z } from 'zod';
 
 /** Metadata is intentionally opaque to the provider-agnostic engine. */
@@ -70,6 +71,18 @@ export const socialReplyBatchRequestSchema = z
         });
       } else {
         normalizedTexts.set(normalizedText, index);
+      }
+
+      // Replies go out in the customer's voice: their style, our floor
+      // (harm, legal, platform ToS, leaks). canon/VOICE.md.
+      for (const finding of lintCopy(target.draftedText, {
+        register: 'customer-voice',
+      }).blocking) {
+        context.addIssue({
+          code: 'custom',
+          path: ['targets', index, 'draftedText'],
+          message: `draftedText fails copy floor (${finding.rule}): ${finding.message}`,
+        });
       }
     }
 
@@ -265,6 +278,15 @@ export interface SocialReplyBatchOptions {
   readonly minDelayMs?: number;
   readonly sleep?: (milliseconds: number) => Promise<void>;
   readonly now?: () => Date;
+  /**
+   * Called with each item receipt the moment it settles (posted, skipped,
+   * failed, ambiguous, or batch-halted), so callers can stream incremental
+   * progress instead of waiting for the whole batch. Observer errors are
+   * swallowed: progress reporting must never change execution.
+   */
+  readonly onItemSettled?: (
+    item: SocialReplyItemReceipt
+  ) => void | Promise<void>;
 }
 
 /**

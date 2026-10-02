@@ -9,6 +9,7 @@ vi.mock('next/cache', () => ({
 }));
 
 vi.mock('@/constants/app', () => ({
+  APP_NAME: 'Jovie',
   BASE_URL: 'https://jov.ie',
 }));
 
@@ -23,8 +24,9 @@ vi.mock('@/lib/blog/getBlogPosts', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@/lib/blog/getBlogPosts')>();
   return {
+    ...actual,
     getBlogPosts,
-    slugifyCategory: actual.slugifyCategory,
+    isBlogPostIndexable: vi.fn().mockReturnValue(true),
   };
 });
 
@@ -226,6 +228,7 @@ describe('sitemap', () => {
         'https://jov.ie/legal/cookies',
         'https://jov.ie/legal/dmca',
         'https://jov.ie/artist-profiles',
+        'https://jov.ie/solutions/artists',
         'https://jov.ie/product',
         'https://jov.ie/youtube-thumbnails',
         'https://jov.ie/tim',
@@ -300,7 +303,14 @@ describe('sitemap', () => {
           updatedAt: new Date('2026-01-01'),
         },
       ])
-      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          username: 'artist',
+          slug: 'first-single',
+          updatedAt: new Date('2026-01-01'),
+          artworkUrl: 'https://cdn.jov.ie/art/artist.jpg',
+        },
+      ])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 
@@ -344,7 +354,14 @@ describe('sitemap', () => {
           },
         },
       ])
-      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          username: 'claimed-artist',
+          slug: 'first-single',
+          updatedAt: new Date('2026-01-01'),
+          artworkUrl: 'https://cdn.jov.ie/art/claimed-artist.jpg',
+        },
+      ])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 
@@ -535,7 +552,14 @@ describe('sitemap', () => {
           settings: {},
         },
       ])
-      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          username: 'tmoc-artist',
+          slug: 'first-single',
+          updatedAt: new Date('2026-01-01'),
+          artworkUrl: 'https://cdn.jov.ie/art/tmoc-artist.jpg',
+        },
+      ])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 
@@ -588,6 +612,61 @@ describe('sitemap', () => {
 
     expect(urls).not.toContain('https://jov.ie/jordanmiles');
     expect(urls).not.toContain('https://jov.ie/jordanmiles/realistic-release');
+    expect(urls).toContain('https://jov.ie/tim');
+    expect(urls).toContain('https://jov.ie/tim/never-say-a-word');
+  });
+
+  it('excludes empty profiles and unresolved platform-ID handles (JOV-6126 reopen)', async () => {
+    getBlogPosts.mockResolvedValue([]);
+    whereMock
+      .mockResolvedValueOnce([
+        {
+          username: 'timwhite1',
+          displayName: 'timwhite',
+          updatedAt: new Date('2026-09-24'),
+          isClaimed: true,
+          settings: {},
+        },
+        {
+          username: 'artist_5k9ywwwkldouuicvijstpl',
+          displayName: 'Dave Edwards',
+          updatedAt: new Date('2026-09-24'),
+          isClaimed: true,
+          settings: {},
+        },
+        {
+          username: 'tim',
+          displayName: 'Tim White',
+          updatedAt: new Date('2026-09-24'),
+          isClaimed: true,
+          settings: {},
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          username: 'artist_5k9ywwwkldouuicvijstpl',
+          slug: 'spotify-copy',
+          updatedAt: new Date('2026-09-24'),
+          artworkUrl: 'https://cdn.jov.ie/art/copy.jpg',
+        },
+        {
+          username: 'tim',
+          slug: 'never-say-a-word',
+          updatedAt: new Date('2026-09-24'),
+          artworkUrl: 'https://cdn.jov.ie/art/nsaw.jpg',
+        },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const { default: sitemap } = await import('../../app/sitemap');
+    const urls = (await sitemap()).map(entry => entry.url);
+
+    expect(urls).not.toContain('https://jov.ie/timwhite1');
+    expect(urls).not.toContain('https://jov.ie/artist_5k9ywwwkldouuicvijstpl');
+    expect(urls).not.toContain(
+      'https://jov.ie/artist_5k9ywwwkldouuicvijstpl/spotify-copy'
+    );
     expect(urls).toContain('https://jov.ie/tim');
     expect(urls).toContain('https://jov.ie/tim/never-say-a-word');
   });

@@ -26,6 +26,7 @@ import {
   HeaderActionsProvider,
   useHeaderActions,
 } from '@/contexts/HeaderActionsContext';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 
 const pushMock = vi.fn();
 const assignMock = vi.fn();
@@ -183,8 +184,16 @@ function CommandPaletteHeaderHarness() {
 }
 
 function withDashboard(node: ReactNode, isAdmin = false) {
+  const dashboard = makeDashboard(isAdmin);
+
   return (
-    <DashboardDataContext.Provider value={makeDashboard(isAdmin)}>
+    <DashboardDataContext.Provider
+      value={{
+        ...dashboard,
+        identities: dashboard.creatorProfiles,
+        activeIdentity: dashboard.selectedProfile,
+      }}
+    >
       <HeaderActionsProvider>
         {node}
         <CommandPaletteMainSurface />
@@ -294,7 +303,11 @@ describe('CommandPalette', () => {
     expect(input).toHaveValue('Calendar');
     expect(
       screen.getByRole('option', {
-        name: 'Calendar Plan release dates and campaign moments. ⌘1',
+        name: segmentedAccessibleName(
+          'Calendar',
+          'Plan release dates and campaign moments.',
+          '⌘1'
+        ),
       })
     ).toHaveAttribute('aria-selected', 'true');
     fireEvent.keyDown(input, { key: 'Enter' });

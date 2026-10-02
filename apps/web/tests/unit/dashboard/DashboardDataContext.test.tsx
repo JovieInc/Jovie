@@ -44,6 +44,16 @@ function ProfileCompletionProbe() {
   return <span>{profileCompletion.percentage}%</span>;
 }
 
+function IdentityContextProbe() {
+  const { activeIdentity, identities } = useDashboardData();
+
+  return (
+    <span>
+      {activeIdentity?.id ?? 'none'}:{identities.length}
+    </span>
+  );
+}
+
 describe('DashboardDataContext', () => {
   beforeEach(() => {
     resetCacheIsolationForTests();
@@ -67,6 +77,25 @@ describe('DashboardDataContext', () => {
     );
 
     expect(getByText('0%')).toBeDefined();
+  });
+
+  it('projects persistence profiles into the active identity context', () => {
+    const identity = {
+      id: 'identity-1',
+    } as DashboardData['creatorProfiles'][number];
+    const { getByText } = fastRender(
+      <DashboardDataProvider
+        value={{
+          ...baseDashboardData,
+          creatorProfiles: [identity],
+          selectedProfile: identity,
+        }}
+      >
+        <IdentityContextProbe />
+      </DashboardDataProvider>
+    );
+
+    expect(getByText('identity-1:1')).toBeDefined();
   });
 
   it('fences cache identity when the selected profile changes', () => {

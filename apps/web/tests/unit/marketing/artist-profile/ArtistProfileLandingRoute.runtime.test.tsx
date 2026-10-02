@@ -1,9 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import type { ImgHTMLAttributes } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import MarketingLayout from '@/app/(marketing)/layout';
 import { ArtistProfileLandingRoute } from '@/components/marketing/artist-profile/ArtistProfileLandingRoute';
+import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/artist-profiles',
@@ -12,6 +14,26 @@ vi.mock('next/navigation', () => ({
   useParams: () => ({}),
   redirect: vi.fn(),
   notFound: vi.fn(),
+}));
+
+// next/image with `priority` makes React DOM preload the image by querying
+// `link[imagesrcset="..."]`; the hero's srcset makes that selector longer
+// than the 2048-character limit jsdom 30's selector engine enforces, which
+// throws an unhandled RangeError. Image preloading is not what this
+// composition test covers (Radix Slot boundaries are), so render a plain img.
+vi.mock('next/image', () => ({
+  default: ({
+    fill: _fill,
+    priority: _priority,
+    quality: _quality,
+    placeholder: _placeholder,
+    blurDataURL: _blurDataURL,
+    unoptimized: _unoptimized,
+    loader: _loader,
+    ...props
+  }: ImgHTMLAttributes<HTMLImageElement> & Record<string, unknown>) => (
+    <img {...props} alt={typeof props.alt === 'string' ? props.alt : ''} />
+  ),
 }));
 
 /**
@@ -35,6 +57,34 @@ describe('ArtistProfileLandingRoute runtime composition', () => {
       { timeout: 1_000 }
     );
     expect(screen.getByRole('main')).toBeInTheDocument();
+    const route = MARKETING_ROUTE_MANIFEST.find(
+      entry => entry.url === '/artist-profiles'
+    );
+    const roots = Array.from(
+      document.querySelectorAll('section[data-testid^="marketing-section-"]')
+    );
+    const expected =
+      route?.renderedSections.filter(
+        entry => entry.kind === 'approved-section'
+      ) ?? [];
+    expect(
+      roots.map(root => ({
+        sectionId: root
+          .getAttribute('data-testid')
+          ?.replace('marketing-section-', ''),
+        variantId: root.getAttribute('data-marketing-variant'),
+        componentPath: root.getAttribute('data-marketing-owner'),
+        occurrenceId:
+          root.getAttribute('data-marketing-occurrence') ?? undefined,
+      }))
+    ).toEqual(
+      expected.map(({ sectionId, variantId, componentPath, occurrenceId }) => ({
+        sectionId,
+        variantId,
+        componentPath,
+        occurrenceId,
+      }))
+    );
     expect(
       screen.getByTestId('artist-profile-adaptive-sequence')
     ).toBeInTheDocument();

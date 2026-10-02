@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+/** The cache subset of the Redis client the route touches. */
+interface ShippingVelocityRedisStub {
+  get: (key: string) => unknown;
+  set: (...args: unknown[]) => unknown;
+}
+
 const hoisted = vi.hoisted(() => ({
-  getCurrentUserEntitlements: vi.fn(),
+  getOvieOperatorEntitlements: vi.fn(),
   checkAdminRole: vi.fn(),
   env: {
     HUD_GITHUB_TOKEN: undefined as string | undefined,
@@ -10,13 +16,13 @@ const hoisted = vi.hoisted(() => ({
     VERCEL_ENV: 'development' as string | undefined,
     NODE_ENV: 'test' as string | undefined,
   },
-  getRedis: vi.fn(() => null),
+  getRedis: vi.fn((): ShippingVelocityRedisStub | null => null),
   captureError: vi.fn(),
   logger: { error: vi.fn(), warn: vi.fn() },
 }));
 
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: hoisted.getCurrentUserEntitlements,
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  getOvieOperatorEntitlements: hoisted.getOvieOperatorEntitlements,
 }));
 
 vi.mock('@/lib/admin/roles', () => ({
@@ -46,7 +52,7 @@ describe('GET /api/admin/hud/shipping-velocity', () => {
     hoisted.env.HUD_GITHUB_OWNER = undefined;
     hoisted.env.HUD_GITHUB_REPO = undefined;
     hoisted.getRedis.mockReturnValue(null);
-    hoisted.getCurrentUserEntitlements.mockResolvedValue({
+    hoisted.getOvieOperatorEntitlements.mockResolvedValue({
       isAuthenticated: true,
       userId: 'admin-test',
       isAdmin: false,
@@ -358,46 +364,51 @@ describe('GET /api/admin/hud/shipping-velocity', () => {
   it.each([
     ['future', '2026-08-30T12:00:00.001Z'],
     ['invalid', 'not-a-timestamp'],
-  ])('refetches instead of serving a %s cache timestamp', async (_label, cachedAt) => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-08-30T12:00:00.000Z'));
-    hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
-    hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
-    hoisted.env.HUD_GITHUB_REPO = 'jovie';
-    hoisted.getRedis.mockReturnValue({
-      get: vi.fn().mockResolvedValue({
-        data: [],
-        range: '7d',
-        cachedAt,
-        observation: 'empty',
-      }),
-      set: vi.fn(),
-    });
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          data: {
-            repository: {
-              pullRequests: {
-                nodes: [],
-                pageInfo: { hasNextPage: false, endCursor: null },
+  ])(
+    'refetches instead of serving a %s cache timestamp',
+    async (_label, cachedAt) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-08-30T12:00:00.000Z'));
+      hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
+      hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
+      hoisted.env.HUD_GITHUB_REPO = 'jovie';
+      hoisted.getRedis.mockReturnValue({
+        get: vi.fn().mockResolvedValue({
+          data: [],
+          range: '7d',
+          cachedAt,
+          observation: 'empty',
+        }),
+        set: vi.fn(),
+      });
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            data: {
+              repository: {
+                pullRequests: {
+                  nodes: [],
+                  pageInfo: { hasNextPage: false, endCursor: null },
+                },
               },
             },
-          },
-        }),
-        { status: 200 }
-      )
-    );
-    vi.stubGlobal('fetch', fetchMock);
+          }),
+          { status: 200 }
+        )
+      );
+      vi.stubGlobal('fetch', fetchMock);
 
-    const { GET } = await import('@/app/api/admin/hud/shipping-velocity/route');
-    const response = await GET(
-      new Request('http://localhost/api/admin/hud/shipping-velocity?range=7d')
-    );
+      const { GET } = await import(
+        '@/app/api/admin/hud/shipping-velocity/route'
+      );
+      const response = await GET(
+        new Request('http://localhost/api/admin/hud/shipping-velocity?range=7d')
+      );
 
-    expect(response.status).toBe(200);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
+      expect(response.status).toBe(200);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('fails unavailable instead of projecting malformed GitHub data as zero', async () => {
     hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
@@ -718,7 +729,7 @@ describe('GET /api/admin/hud/shipping-velocity', () => {
   });
 
   it('returns 401 for signed-out users', async () => {
-    hoisted.getCurrentUserEntitlements.mockResolvedValue({
+    hoisted.getOvieOperatorEntitlements.mockResolvedValue({
       isAuthenticated: false,
       userId: null,
       isAdmin: false,
@@ -733,7 +744,7 @@ describe('GET /api/admin/hud/shipping-velocity', () => {
   });
 
   it('returns 401 when authentication has no stable user id', async () => {
-    hoisted.getCurrentUserEntitlements.mockResolvedValue({
+    hoisted.getOvieOperatorEntitlements.mockResolvedValue({
       isAuthenticated: true,
       userId: null,
       isAdmin: true,
@@ -751,7 +762,7 @@ describe('GET /api/admin/hud/shipping-velocity', () => {
   });
 
   it('returns 403 for authenticated non-admin users', async () => {
-    hoisted.getCurrentUserEntitlements.mockResolvedValue({
+    hoisted.getOvieOperatorEntitlements.mockResolvedValue({
       isAuthenticated: true,
       userId: 'creator-test',
       isAdmin: false,

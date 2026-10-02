@@ -461,23 +461,26 @@ describe('authenticated persistent Summer conversation', () => {
     'sessionId',
     'nextStartIndex',
     'status',
-  ])('rejects malformed or misbound predecessor %s before dispatch', async field => {
-    const f = fixture();
-    await f.send(input());
-    await readConversationResult({
-      store: f.store,
-      eventId: id(1),
-      principalHash: input().principalHash,
-      deploymentId: input().deploymentId,
-      stream: async () => stream(events(input())),
-    });
-    const path = conversationPath('results', id(1));
-    f.records.set(path, { ...f.records.get(path), [field]: 'invalid' });
-    expect((await f.send({ ...input(2), previousEventId: id(1) })).status).toBe(
-      409
-    );
-    expect(f.dispatch).toHaveBeenCalledOnce();
-  });
+  ])(
+    'rejects malformed or misbound predecessor %s before dispatch',
+    async field => {
+      const f = fixture();
+      await f.send(input());
+      await readConversationResult({
+        store: f.store,
+        eventId: id(1),
+        principalHash: input().principalHash,
+        deploymentId: input().deploymentId,
+        stream: async () => stream(events(input())),
+      });
+      const path = conversationPath('results', id(1));
+      f.records.set(path, { ...f.records.get(path), [field]: 'invalid' });
+      expect(
+        (await f.send({ ...input(2), previousEventId: id(1) })).status
+      ).toBe(409);
+      expect(f.dispatch).toHaveBeenCalledOnce();
+    }
+  );
   it('shares the commercial UTC budget and exposes its reset without dispatch', async () => {
     const f = fixture();
     for (let n = 1; n <= 25; n++)
@@ -810,40 +813,40 @@ describe('Eve terminal stream receipts', () => {
     expect(await response.json()).toMatchObject({ code: 'turn_pending' });
     expect(f.records.has(conversationPath('accepted', id(1)))).toBe(false);
   });
-  it.each([
-    'principalHash',
-    'deploymentId',
-  ] as const)('rejects %s drift before returning, streaming or recovering private results', async field => {
-    const f = fixture();
-    await f.send(input());
-    const source = vi.fn(async () => stream(events(input())));
-    const recoverSession = vi.fn(async () => 'ses_summer');
-    const request = {
-      store: f.store,
-      eventId: id(1),
-      principalHash: input().principalHash,
-      deploymentId: input().deploymentId,
-      stream: source,
-      recoverSession,
-    };
-    const wrong = {
-      ...request,
-      [field]: field === 'principalHash' ? 'b'.repeat(43) : 'dpl_other',
-    };
-    expect((await readConversationResult(wrong)).status).toBe(503);
-    expect(source).not.toHaveBeenCalled();
-    expect(recoverSession).not.toHaveBeenCalled();
-    f.records.delete(conversationPath('accepted', id(1)));
-    expect((await readConversationResult(wrong)).status).toBe(503);
-    expect(recoverSession).not.toHaveBeenCalled();
-    expect((await readConversationResult(request)).status).toBe(200);
-    source.mockClear();
-    expect((await readConversationResult(wrong)).status).toBe(503);
-    expect(source).not.toHaveBeenCalled();
-    const terminal = f.records.get(conversationPath('results', id(1)))!;
-    delete terminal.deploymentId;
-    expect((await readConversationResult(request)).status).toBe(503);
-  });
+  it.each(['principalHash', 'deploymentId'] as const)(
+    'rejects %s drift before returning, streaming or recovering private results',
+    async field => {
+      const f = fixture();
+      await f.send(input());
+      const source = vi.fn(async () => stream(events(input())));
+      const recoverSession = vi.fn(async () => 'ses_summer');
+      const request = {
+        store: f.store,
+        eventId: id(1),
+        principalHash: input().principalHash,
+        deploymentId: input().deploymentId,
+        stream: source,
+        recoverSession,
+      };
+      const wrong = {
+        ...request,
+        [field]: field === 'principalHash' ? 'b'.repeat(43) : 'dpl_other',
+      };
+      expect((await readConversationResult(wrong)).status).toBe(503);
+      expect(source).not.toHaveBeenCalled();
+      expect(recoverSession).not.toHaveBeenCalled();
+      f.records.delete(conversationPath('accepted', id(1)));
+      expect((await readConversationResult(wrong)).status).toBe(503);
+      expect(recoverSession).not.toHaveBeenCalled();
+      expect((await readConversationResult(request)).status).toBe(200);
+      source.mockClear();
+      expect((await readConversationResult(wrong)).status).toBe(503);
+      expect(source).not.toHaveBeenCalled();
+      const terminal = f.records.get(conversationPath('results', id(1)))!;
+      delete terminal.deploymentId;
+      expect((await readConversationResult(request)).status).toBe(503);
+    }
+  );
   it('cannot return success before durable terminal storage', async () => {
     const f = fixture();
     await f.send(input());

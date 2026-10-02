@@ -118,6 +118,7 @@ import { createManageTasksTool } from '@/lib/chat/tools/tasks';
 import {
   type ChatTurnSource,
   markChatTurnStreaming,
+  markChatTurnTerminal,
   persistTerminalAssistantMessage,
   recordChatTurnModel,
   reserveChatTurn,
@@ -129,6 +130,7 @@ import {
   type ChatTelemetry,
   type ReleaseContext,
 } from '@/lib/chat/types';
+import { gateAssistantReply } from '@/lib/chat/voice-lint';
 import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
 import { loadCustomerChatPinnedOpportunity } from '@/lib/connectors/customer-pinned-opportunity';
 import { db } from '@/lib/db';
@@ -181,10 +183,10 @@ import {
   createRateLimitHeaders,
 } from '@/lib/rate-limit';
 import {
+  AlbumArtGatewayUnconfiguredError,
   buildAlbumArtBackgroundPrompt,
   generateAlbumArtBackgrounds,
-  isXaiConfigured,
-  XaiApiKeyMissingError,
+  isAlbumArtGatewayConfigured,
 } from '@/lib/services/album-art/provider-xai';
 import { renderAlbumArtCandidate } from '@/lib/services/album-art/render';
 import {
@@ -1043,7 +1045,7 @@ function createGenerateAlbumArtTool(params: {
         };
       }
 
-      if (!isXaiConfigured()) {
+      if (!isAlbumArtGatewayConfigured()) {
         return {
           success: false as const,
           retryable: false,
@@ -1193,8 +1195,8 @@ function createGenerateAlbumArtTool(params: {
           })),
         };
       } catch (error) {
-        if (error instanceof XaiApiKeyMissingError) {
-          // Provider key may go missing between the early check and the call
+        if (error instanceof AlbumArtGatewayUnconfiguredError) {
+          // Gateway auth may be missing between the early check and the call
           // (e.g. env reload). Treat as feature_disabled, do not capture.
           return {
             success: false as const,
@@ -2525,7 +2527,7 @@ export async function POST(req: Request) {
   );
   const albumArtCapability = resolveAlbumArtCapability({
     featureEnabled: albumArtFeatureEnabled,
-    providerConfigured: isXaiConfigured(),
+    providerConfigured: isAlbumArtGatewayConfigured(),
     entitlements: currentUserEntitlements,
   });
   const retouchCapability = resolveRetouchCapability({
@@ -3054,11 +3056,9 @@ export async function POST(req: Request) {
 
       streamFailurePersisted = true;
       const failure = classifyChatStreamFailure(error);
-      await persistTerminalAssistantMessage({
-        conversationId: reservedTurn.conversationId,
+      await markChatTurnTerminal({
         turnId: reservedTurn.turnId,
         status: 'failed_model_error',
-        content: failure.userMessage,
         errorCode: failure.errorCode,
         errorMessage: failure.errorMessage,
       });
@@ -3142,28 +3142,55 @@ export async function POST(req: Request) {
               toolStepCapExhausted: turn.turnSignals.toolStepCapExhausted,
             })
           : undefined,
-      onFinish: async ({ responseMessage, isAborted }) => {
+      onFinish: async ({ responseMessage, isAborted, outcome }) => {
         if (!reservedTurn || streamFailurePersisted) return;
+        if (outcome.status === 'failed') {
+          await persistStreamFailure(
+            outcome.error ?? new Error('Assistant stream failed')
+          );
+          return;
+        }
 
         const assistantText = sanitizeAssistantResponse(
           extractUIMessageText(
             responseMessage.parts as Array<{ type: string; text?: string }>
           )
         ).text;
+        // Copy floor (canon/VOICE.md): a streamed reply can't be blocked
+        // mid-flight, so gate the completed text before it persists. A floor
+        // violation swaps in a safe fallback and logs the rules that fired.
+        const gatedReply = gateAssistantReply(assistantText);
+        if (gatedReply.violations.length > 0) {
+          logger.warn(
+            'Assistant reply failed copy floor; persisting fallback',
+            {
+              requestId,
+              turnId: reservedTurn.turnId,
+              rules: gatedReply.violations.map(violation => violation.rule),
+            }
+          );
+        }
         const toolCalls = preparePersistedToolEventsForTurnFinish({
           parts: responseMessage.parts,
           isAborted,
         });
+        if (
+          !isAborted &&
+          !assistantText.trim() &&
+          (!toolCalls || toolCalls.length === 0)
+        ) {
+          await persistStreamFailure(
+            new Error('Model turn produced no text or tool calls')
+          );
+          return;
+        }
         await persistTerminalAssistantMessage({
           conversationId: reservedTurn.conversationId,
           turnId: reservedTurn.turnId,
           status: isAborted ? 'canceled' : 'completed',
           content: isAborted
             ? 'This response was canceled before Jovie could finish. Retry when you are ready.'
-            : assistantText ||
-              (toolCalls && toolCalls.length > 0
-                ? ''
-                : 'Done. What would you like to do next?'),
+            : gatedReply.text,
           toolCalls,
           ...(isAborted
             ? {
@@ -3209,11 +3236,9 @@ export async function POST(req: Request) {
 
     if (reservedTurn) {
       const failure = classifyChatStreamFailure(error);
-      await persistTerminalAssistantMessage({
-        conversationId: reservedTurn.conversationId,
+      await markChatTurnTerminal({
         turnId: reservedTurn.turnId,
         status: 'failed_model_error',
-        content: failure.userMessage,
         errorCode: failure.errorCode,
         errorMessage: failure.errorMessage,
       }).catch(() => null);

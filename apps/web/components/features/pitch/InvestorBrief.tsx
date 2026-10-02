@@ -6,7 +6,8 @@ import { fundraisingRegistry } from '@/lib/investors/fundraising-registry';
 import { PitchEngagement } from './PitchEngagement';
 
 const CONTACT_EMAIL = 't@meetjovie.com';
-const PITCH_DECK_PDF_URL = '/Jovie-Pitch-Deck.pdf';
+// Gated with the portal: served only to investor-link or admin sessions.
+const PITCH_DECK_PDF_URL = '/investor-portal/deck/Jovie-Pitch-Deck.pdf';
 
 const statusTone = {
   LIVE: 'text-accent-blue',
@@ -16,22 +17,18 @@ const statusTone = {
 } as const;
 
 interface InvestorBriefProps {
-  readonly embedded?: boolean;
   readonly investorName?: string | null;
 }
 
-export function InvestorBrief({
-  embedded = false,
-  investorName = null,
-}: InvestorBriefProps) {
+/** The investor brief. Rendered only inside the gated portal's <main>. */
+export function InvestorBrief({ investorName = null }: InvestorBriefProps) {
   const registry = fundraisingRegistry;
-  const Root = embedded ? 'div' : 'main';
 
   return (
-    <Root className='min-h-svh bg-base text-primary-token'>
+    <div className='min-h-svh bg-base text-primary-token'>
       <PitchEngagement />
 
-      <nav className='sticky top-0 z-40 border-b border-subtle bg-base/90 backdrop-blur-md'>
+      <nav className='sticky top-0 z-40 border-b border-subtle bg-(--color-bg-base)/90 backdrop-blur-md'>
         <div className='mx-auto flex h-14 max-w-6xl items-center justify-between px-5 sm:px-8'>
           <Link
             aria-label='Jovie Home'
@@ -305,6 +302,6 @@ export function InvestorBrief({
           </div>
         </div>
       </footer>
-    </Root>
+    </div>
   );
 }

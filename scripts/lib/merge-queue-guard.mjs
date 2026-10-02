@@ -61,13 +61,17 @@ export function isPendingNativeCohortCutoverField(field) {
 }
 
 export const NATIVE_QUEUE_POLICY = Object.freeze({
-  // JOV-6107: measured peak 19 hosted jobs/group plus >=7 background jobs on
-  // Team's 60-job budget permits two groups (45), not three (64). Preserve
-  // ALLGREEN. The prior 20-minute response deadline is shorter than the
-  // 30/40-minute required CI paths; source targets 60 minutes.
+  // JOV-6107 measured peak 19 hosted jobs/group plus >=7 background jobs on
+  // Team's 60-job budget permits two groups (45), not three (64). JOV-6815:
+  // a ruleset admin raised live build concurrency to GitHub's 10-group
+  // ceiling on 2026-09-25 (production-freeze incident window); source syncs
+  // to the applied live value and every lower live count stays supported
+  // for rollback. Re-evaluate against measured runner saturation if deep
+  // queues starve required CI. Preserve ALLGREEN. The 60-minute response
+  // budget covers the 30/40-minute required CI paths.
   check_response_timeout_minutes: 60,
   grouping_strategy: 'ALLGREEN',
-  max_entries_to_build: 2,
+  max_entries_to_build: 10,
   max_entries_to_merge: 5,
   merge_method: 'SQUASH',
   min_entries_to_merge: NATIVE_QUEUE_COHORT_POLICY.minEntriesToMerge,
@@ -537,6 +541,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Build + Layout (combined)',
   'CI / Ovie Build (combined)',
   'Ovie Build (combined)',
+  'CI / Ovie Typecheck (combined)',
+  'Ovie Typecheck (combined)',
   'CI / Storybook Surface Matrix (combined)',
   'Storybook Surface Matrix (combined)',
   'CI / iOS Fast Unit + Coverage (combined)',
@@ -553,6 +559,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Promptfoo Evals (deterministic)',
   'CI / Golden Eval Set (deterministic)',
   'Golden Eval Set (deterministic)',
+  'CI / Database Certification (isolated Neon)',
+  'Database Certification (isolated Neon)',
   // Harness evidence jobs (must stay aggregated under PR Ready / never pin solo)
   'CI / Lighthouse (public routes manual)',
   'Lighthouse (public routes manual)',
@@ -560,6 +568,11 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Lighthouse (dashboard manual)',
   'CI / Lighthouse (onboarding manual)',
   'Lighthouse (onboarding manual)',
+  // Merge-group launch gates (JOV-6002) — same rule: aggregated under PR Ready.
+  'CI / Lighthouse (dashboard gate)',
+  'Lighthouse (dashboard gate)',
+  'CI / Lighthouse (onboarding gate)',
+  'Lighthouse (onboarding gate)',
   'CI / Lighthouse (admin manual)',
   'Lighthouse (admin manual)',
   'CI / E2E Smoke (manual)',
@@ -1009,12 +1022,6 @@ export function serializationKeysForFile(file) {
     keys.push({
       key: `subsystem:${firstDirectory(normalized, 4)}`,
       reason: 'web library subsystem',
-      file: normalized,
-    });
-  } else if (normalized.startsWith('scripts/symphony/')) {
-    keys.push({
-      key: `subsystem:${firstDirectory(normalized, 3)}`,
-      reason: 'Symphony automation subsystem',
       file: normalized,
     });
   } else if (normalized.startsWith('scripts/')) {

@@ -5,6 +5,7 @@ import {
   NEVER_SAY_A_WORD_OPAQUE_PROFILE_FIXTURE as FIXTURE,
   isEncodedUnclaimedArtistHandle,
   isOpaqueInternalProfileHandle,
+  isPublicArtistMentionHref,
   opaqueInternalProfileRedirectPath,
   publicProfilePathForHandle,
 } from './opaque-internal-profile-handle';
@@ -70,6 +71,30 @@ describe('opaque internal profile handles (JOV-6201)', () => {
     ).toBe(FIXTURE.ownerHandle);
   });
 
+  it('does not link a credit-only collaborator with an encoded a_* handle', () => {
+    expect(
+      canonicalizeReleaseArtistHandle({
+        handle: 'a_eiqd46x3irj64dlgo8a3glau4',
+        name: 'LYNX',
+        ownerHandle: FIXTURE.ownerHandle,
+        ownerName: FIXTURE.ownerName,
+      })
+    ).toBeNull();
+  });
+
+  it('accepts only readable single-segment profile paths as mention hrefs', () => {
+    expect(isPublicArtistMentionHref('/tim')).toBe(true);
+    expect(isPublicArtistMentionHref('/a_eiqd46x3irj64dlgo8a3glau4')).toBe(
+      false
+    );
+    expect(isPublicArtistMentionHref('/tmoc9mm7xfvx02c')).toBe(false);
+    expect(
+      isPublicArtistMentionHref('/artists/f5441adb-6789-449a-9553-ab7460c9c61c')
+    ).toBe(false);
+    expect(isPublicArtistMentionHref('/tim/about')).toBe(false);
+    expect(isPublicArtistMentionHref(null)).toBe(false);
+  });
+
   it('redirects the opaque profile URL to the canonical handle when one exists', () => {
     const decision = decideOpaqueInternalProfileUsername({
       username: FIXTURE.opaqueHandle,
@@ -85,6 +110,22 @@ describe('opaque internal profile handles (JOV-6201)', () => {
         decision as Extract<typeof decision, { action: 'redirect' }>
       )
     ).toBe(publicProfilePathForHandle(FIXTURE.ownerHandle));
+  });
+
+  it('keeps a leading slash on the redirect suffix and adds one when it is missing', () => {
+    const decision = {
+      action: 'redirect' as const,
+      handle: FIXTURE.ownerHandle,
+    };
+    const base = publicProfilePathForHandle(FIXTURE.ownerHandle);
+
+    expect(opaqueInternalProfileRedirectPath(decision, '')).toBe(base);
+    expect(opaqueInternalProfileRedirectPath(decision, 'bio')).toBe(
+      `${base}/bio`
+    );
+    expect(opaqueInternalProfileRedirectPath(decision, '/bio')).toBe(
+      `${base}/bio`
+    );
   });
 
   it('404s an opaque profile URL with no canonical twin', () => {

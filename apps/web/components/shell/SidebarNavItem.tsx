@@ -11,6 +11,7 @@ export interface ShellNavItem {
   readonly icon: React.ComponentType<{
     readonly className?: string;
     readonly strokeWidth?: number;
+    readonly 'aria-hidden'?: boolean | 'true' | 'false';
   }>;
   readonly label: string;
   readonly active?: boolean;
@@ -101,10 +102,12 @@ export function getSidebarNavRowClassName({
           'group-data-[collapsible=icon]:grid-cols-1 group-data-[collapsible=icon]:place-items-center'
         ),
     getToneClassName({ active, nested, tone }),
+    // Founder lock 2026-09-25 (Linear-scale density): 28px calm rows. Active
+    // state is the shared neutral tint from getToneClassName above — no
+    // border, so resting and active rows share the same row geometry.
     calm &&
       !collapsed &&
-      'h-9 rounded-lg grid-cols-(--app-shell-sidebar-nav-grid) gap-x-(--space-2-5) text-(length:--text-app) border border-transparent after:absolute after:inset-x-0 after:-inset-y-1 after:lg:hidden',
-    calm && active && 'border-subtle font-semibold',
+      'h-7 rounded-lg grid-cols-(--app-shell-sidebar-nav-grid) gap-x-(--space-2-5) text-(length:--text-app) after:absolute after:inset-x-0 after:-inset-y-1 after:lg:hidden',
     className
   );
 }
@@ -146,6 +149,7 @@ export function SidebarNavItem({
     <button
       type='button'
       onClick={item.onActivate}
+      aria-pressed={item.active || undefined}
       className={getSidebarNavRowClassName({
         active: item.active,
         collapsed,
@@ -160,6 +164,7 @@ export function SidebarNavItem({
           tight,
         })}
         strokeWidth={2}
+        aria-hidden='true'
       />
       {!collapsed && (
         // These rows never render a trailing action over the label, so the

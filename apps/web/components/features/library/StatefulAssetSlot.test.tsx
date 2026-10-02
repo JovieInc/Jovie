@@ -79,11 +79,53 @@ describe('LibraryInspectorAssetSlots', () => {
       ...overrides,
     }) as LibraryReleaseAsset;
 
-  it('uses object UI for populated artwork and acquisition for empty kinds', () => {
+  it('uses object UI for populated artwork and acquisition links for empty kinds', () => {
     render(<LibraryInspectorAssetSlots asset={asset()} downloads={[]} />);
     expect(screen.getByTestId('library-artwork-object')).toBeInTheDocument();
     expect(screen.queryByTestId('library-artwork-dropzone')).toBeNull();
     expect(screen.getByTestId('library-video-acquisition')).toBeInTheDocument();
+  });
+
+  it('collapses empty media sections into Add File links', () => {
+    render(<LibraryInspectorAssetSlots asset={asset()} downloads={[]} />);
+    expect(screen.queryByText('Video')).toBeNull();
+    expect(screen.queryByText('Documents')).toBeNull();
+    expect(screen.queryByText('Stems')).toBeNull();
+    expect(screen.getByText('Add File')).toBeInTheDocument();
+    expect(screen.getByTestId('library-video-acquisition')).toHaveAttribute(
+      'href',
+      '/app/library?view=videos'
+    );
+    expect(screen.getByTestId('library-docs-acquisition')).toHaveAttribute(
+      'href',
+      '/app/library?view=documents'
+    );
+    expect(screen.getByTestId('library-stems-acquisition')).toHaveAttribute(
+      'href',
+      '/app/releases/release-1/downloads'
+    );
+  });
+
+  it('keeps a populated stems section with its add link', () => {
+    render(
+      <LibraryInspectorAssetSlots
+        asset={asset()}
+        downloads={[
+          {
+            id: 'download-1',
+            releaseId: 'release-1',
+            title: 'Stem pack',
+            fileName: 'stems.zip',
+          },
+        ]}
+      />
+    );
+    expect(screen.getByText('Stems')).toBeInTheDocument();
+    expect(screen.getByTestId('library-stems-add')).toHaveAttribute(
+      'href',
+      '/app/releases/release-1/downloads'
+    );
+    expect(screen.queryByTestId('library-stems-acquisition')).toBeNull();
   });
 
   it('shows an artwork drop zone only when empty', () => {

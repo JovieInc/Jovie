@@ -48,6 +48,7 @@ vi.mock('@/lib/db/schema/better-auth', () => ({
   baOauthConsents: {},
   baOauthRefreshTokens: {},
   baOauthResources: {},
+  baPasskeys: {},
   baSessions: {},
   baUsers: {},
   baVerifications: {},
@@ -75,6 +76,11 @@ vi.mock('@/lib/auth/rate-limit-storage', () => ({
     consume: async () => ({ allowed: true, retryAfter: null }),
   },
 }));
+
+// VERCEL=1 marks a real Vercel runtime; the hoisted env mock defaults to
+// VERCEL_ENV='preview', so mark this process as Vercel for the eager import.
+// Tests that simulate local runs clear it and restore it in a finally block.
+process.env.VERCEL = '1';
 
 await import('@/lib/auth/better-auth');
 
@@ -175,33 +181,38 @@ describe('Better Auth base URL', () => {
     mocks.env.VERCEL_URL = undefined;
     mocks.env.VERCEL_BRANCH_URL = undefined;
     mocks.env.BETTER_AUTH_URL = 'http://127.0.0.1:3260';
+    delete process.env.VERCEL;
     mocks.betterAuth.mockClear();
     vi.resetModules();
 
-    await import('@/lib/auth/better-auth');
+    try {
+      await import('@/lib/auth/better-auth');
 
-    expect(getOptions().baseURL).toEqual({
-      allowedHosts: [
-        'jov.ie',
-        'www.jov.ie',
-        'staging.jov.ie',
-        'localhost:3100',
-        '127.0.0.1:3260',
-        'localhost:*',
-        '127.0.0.1:*',
-        '[::1]:*',
-      ],
-      protocol: 'http',
-    });
+      expect(getOptions().baseURL).toEqual({
+        allowedHosts: [
+          'jov.ie',
+          'www.jov.ie',
+          'staging.jov.ie',
+          'localhost:3100',
+          '127.0.0.1:3260',
+          'localhost:*',
+          '127.0.0.1:*',
+          '[::1]:*',
+        ],
+        protocol: 'http',
+      });
 
-    expect(
-      resolveBaseURL(
-        getOptions().baseURL,
-        '/api/auth',
-        new Request('http://127.0.0.1:3260/identity'),
-        false
-      )
-    ).toBe('http://127.0.0.1:3260/api/auth');
+      expect(
+        resolveBaseURL(
+          getOptions().baseURL,
+          '/api/auth',
+          new Request('http://127.0.0.1:3260/identity'),
+          false
+        )
+      ).toBe('http://127.0.0.1:3260/api/auth');
+    } finally {
+      process.env.VERCEL = '1';
+    }
   });
 
   it('allows both loopback host spellings for the active local dev port', async () => {
@@ -212,6 +223,7 @@ describe('Better Auth base URL', () => {
     mocks.env.VERCEL_BRANCH_URL = undefined;
     mocks.env.BETTER_AUTH_URL = 'http://localhost:3100';
     process.env.PORT = '3257';
+    delete process.env.VERCEL;
     mocks.betterAuth.mockClear();
     vi.resetModules();
 
@@ -244,6 +256,7 @@ describe('Better Auth base URL', () => {
     } finally {
       if (originalPort === undefined) delete process.env.PORT;
       else process.env.PORT = originalPort;
+      process.env.VERCEL = '1';
     }
   });
 
@@ -255,6 +268,7 @@ describe('Better Auth base URL', () => {
     mocks.env.VERCEL_BRANCH_URL = undefined;
     mocks.env.BETTER_AUTH_URL = 'http://localhost:3100';
     process.env.PORT = '3194';
+    delete process.env.VERCEL;
     mocks.betterAuth.mockClear();
     vi.resetModules();
 
@@ -284,6 +298,44 @@ describe('Better Auth base URL', () => {
     } finally {
       if (originalPort === undefined) delete process.env.PORT;
       else process.env.PORT = originalPort;
+      process.env.VERCEL = '1';
+    }
+  });
+
+  it('adds loopback wildcards when VERCEL_ENV leaks into a local run (JOV-4382)', async () => {
+    mocks.env.VERCEL_ENV = 'production';
+    mocks.env.NODE_ENV = 'production';
+    mocks.env.VERCEL_URL = undefined;
+    mocks.env.VERCEL_BRANCH_URL = undefined;
+    mocks.env.BETTER_AUTH_URL = 'http://localhost:3100';
+    delete process.env.VERCEL;
+    mocks.betterAuth.mockClear();
+    vi.resetModules();
+
+    try {
+      await import('@/lib/auth/better-auth');
+
+      const baseURL = getOptions().baseURL;
+      expect(baseURL).toEqual(
+        expect.objectContaining({
+          allowedHosts: expect.arrayContaining([
+            'localhost:*',
+            '127.0.0.1:*',
+            '[::1]:*',
+          ]),
+        })
+      );
+
+      expect(
+        resolveBaseURL(
+          baseURL,
+          '/api/auth',
+          new Request('http://127.0.0.1:32117/api/auth/ok'),
+          false
+        )
+      ).toBe('https://127.0.0.1:32117/api/auth');
+    } finally {
+      process.env.VERCEL = '1';
     }
   });
 

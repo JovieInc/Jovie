@@ -126,6 +126,7 @@ describe('loadAppShellRouteContext', () => {
           ok: true,
           userId: 'clerk_user_1',
           dashboardData,
+          activeIdentityId: 'profile_1',
           profileId: 'profile_1',
         },
         '/app/audience'
@@ -142,6 +143,7 @@ describe('loadAppShellRouteContext', () => {
           ok: true,
           userId: 'clerk_user_1',
           dashboardData,
+          activeIdentityId: 'profile_1',
           profileId: 'profile_1',
         },
         '/app/audience'
@@ -233,7 +235,7 @@ describe('loadAppShellRouteContext', () => {
     ).rejects.toThrow('NEXT_REDIRECT:/start');
   });
 
-  it('returns the shell context and selected profile id for route prefetches', async () => {
+  it('returns the active identity context for route prefetches', async () => {
     const data = shellData({ selectedProfile: { id: 'profile_2' } });
     getDashboardShellDataMock.mockResolvedValue(data);
 
@@ -246,6 +248,7 @@ describe('loadAppShellRouteContext', () => {
       ok: true,
       userId: 'user_1',
       dashboardData: data,
+      activeIdentityId: 'profile_2',
       profileId: 'profile_2',
     });
   });
@@ -266,6 +269,7 @@ describe('loadAppShellRouteContext', () => {
       ok: true,
       userId: 'user_from_page',
       dashboardData: data,
+      activeIdentityId: 'profile_3',
       profileId: 'profile_3',
     });
   });

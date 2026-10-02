@@ -175,6 +175,14 @@ function parseStoredAuthState(value: unknown): AuthStateRecord | null {
     codeChallenge: record.codeChallenge ?? null,
     desktopFlow:
       typeof record.desktopFlow === 'string' ? record.desktopFlow : null,
+    desktopReturnCode: record.desktopReturnCode === true,
+    desktopLoopbackPort:
+      typeof record.desktopLoopbackPort === 'number' &&
+      Number.isInteger(record.desktopLoopbackPort) &&
+      record.desktopLoopbackPort >= 1 &&
+      record.desktopLoopbackPort <= 65535
+        ? record.desktopLoopbackPort
+        : undefined,
     createdAt: record.createdAt,
     expiresAt: record.expiresAt,
     consumedAt:
@@ -239,6 +247,8 @@ export async function createStoredAuthState(input: {
   readonly state: string;
   readonly codeChallenge?: string | null;
   readonly desktopFlow?: string | null;
+  readonly desktopReturnCode?: boolean;
+  readonly desktopLoopbackPort?: number | null;
   readonly now?: number;
 }): Promise<AuthStateRecord> {
   const record = createAuthStateRecord({
@@ -248,6 +258,8 @@ export async function createStoredAuthState(input: {
     state: input.state,
     codeChallenge: input.codeChallenge,
     desktopFlow: input.desktopFlow,
+    desktopReturnCode: input.desktopReturnCode,
+    desktopLoopbackPort: input.desktopLoopbackPort,
     now: input.now ?? Date.now(),
   });
 
@@ -371,4 +383,174 @@ export async function consumeStoredNativeExchangeCode(input: {
     now,
     createCodeChallenge: input.createCodeChallenge,
   });
+}
+
+// Desktop handback that does not depend on the jovie:// deep link. When the
+// browser cannot hand control back (no URL scheme handler, another copy of
+// the app owns it, a blocked prompt, or sign-in finished on another device),
+// the return page shows a short return code. The user types it into the Mac
+// app, which redeems it with its PKCE verifier for the same code/state pair
+// the deep link carries.
+//
+// The code is shown to a human on purpose. An automatic poll would let
+// anyone who crafts a sign-in link with their own verifier collect a
+// victim's session once the victim signs in (device-code phishing). Here
+// the attacker needs both the verifier and the code the victim reads.
+const DESKTOP_HANDBACK_PREFIX = 'jovie-auth-desktop-handback';
+// RFC 8628 section 6.1: consonants only, no vowels, no look-alikes.
+export const DESKTOP_RETURN_CODE_ALPHABET = 'BCDFGHJKLMNPQRSTVWXZ';
+export const DESKTOP_RETURN_CODE_LENGTH = 8;
+
+interface DesktopHandbackRecord {
+  readonly code: string;
+  readonly state: string;
+  readonly desktopFlow: string;
+  readonly codeChallenge: string;
+  readonly returnCodeHash: string;
+  readonly expiresAt: number;
+}
+
+function buildDesktopHandbackKey(desktopFlow: string): string {
+  const flowHash = createHash('sha256').update(desktopFlow).digest('base64url');
+  return `${DESKTOP_HANDBACK_PREFIX}:${flowHash}`;
+}
+
+export function normalizeDesktopReturnCode(value: string): string | null {
+  const normalized = value.toUpperCase().replaceAll(/[\s-]/g, '');
+  if (normalized.length !== DESKTOP_RETURN_CODE_LENGTH) return null;
+  for (const char of normalized) {
+    if (!DESKTOP_RETURN_CODE_ALPHABET.includes(char)) return null;
+  }
+  return normalized;
+}
+
+export function createDesktopReturnCode(): string {
+  // 240 is the largest multiple of 20 below 256; rejecting the rest keeps
+  // every letter equally likely.
+  let code = '';
+  while (code.length < DESKTOP_RETURN_CODE_LENGTH) {
+    for (const byte of randomBytes(DESKTOP_RETURN_CODE_LENGTH * 2)) {
+      if (byte >= 240) continue;
+      code += DESKTOP_RETURN_CODE_ALPHABET[byte % 20];
+      if (code.length === DESKTOP_RETURN_CODE_LENGTH) break;
+    }
+  }
+  return code;
+}
+
+function hashDesktopReturnCode(
+  desktopFlow: string,
+  returnCode: string
+): string {
+  return createHash('sha256')
+    .update('jovie-desktop-return-code:v1\0')
+    .update(desktopFlow)
+    .update('\0')
+    .update(returnCode)
+    .digest('base64url');
+}
+
+function parseDesktopHandbackRecord(
+  value: unknown
+): DesktopHandbackRecord | null {
+  const parsed = parseJsonRecord(value);
+  if (parsed === null || typeof parsed !== 'object') return null;
+
+  const record = parsed as Record<string, unknown>;
+  if (
+    typeof record.code !== 'string' ||
+    typeof record.state !== 'string' ||
+    typeof record.desktopFlow !== 'string' ||
+    typeof record.codeChallenge !== 'string' ||
+    typeof record.returnCodeHash !== 'string' ||
+    typeof record.expiresAt !== 'number'
+  ) {
+    return null;
+  }
+
+  return {
+    code: record.code,
+    state: record.state,
+    desktopFlow: record.desktopFlow,
+    codeChallenge: record.codeChallenge,
+    returnCodeHash: record.returnCodeHash,
+    expiresAt: record.expiresAt,
+  };
+}
+
+/** Stores the handback and returns the human-readable return code. */
+export async function createStoredDesktopHandback(input: {
+  readonly code: string;
+  readonly state: string;
+  readonly desktopFlow: string;
+  readonly codeChallenge: string;
+  readonly expiresAt: number;
+  readonly returnCode?: string;
+}): Promise<string> {
+  const returnCode = input.returnCode ?? createDesktopReturnCode();
+  await createVerificationRecord(
+    buildDesktopHandbackKey(input.desktopFlow),
+    {
+      code: input.code,
+      state: input.state,
+      desktopFlow: input.desktopFlow,
+      codeChallenge: input.codeChallenge,
+      returnCodeHash: hashDesktopReturnCode(input.desktopFlow, returnCode),
+      expiresAt: input.expiresAt,
+    } satisfies DesktopHandbackRecord,
+    input.expiresAt
+  );
+  return returnCode;
+}
+
+export type DesktopHandbackRedeemResult =
+  | { readonly status: 'invalid' }
+  | {
+      readonly status: 'complete';
+      readonly code: string;
+      readonly state: string;
+    };
+
+/**
+ * Read-verify-consume, mirroring `consumeStoredNativeExchangeCode`: a wrong
+ * verifier or return code never consumes the record, so a typo does not
+ * burn the handback. Only the PKCE verifier holder can redeem, and the
+ * redeemed code still needs that verifier at `/api/auth/native/exchange`.
+ * Unknown, expired, already-redeemed and mismatched requests all answer
+ * `invalid` so the endpoint is not an oracle.
+ */
+export async function redeemStoredDesktopHandback(input: {
+  readonly desktopFlow: string;
+  readonly codeVerifier: string;
+  readonly returnCode: string;
+  readonly createCodeChallenge: (verifier: string) => string;
+  readonly now?: number;
+}): Promise<DesktopHandbackRedeemResult> {
+  const now = input.now ?? Date.now();
+  const returnCode = normalizeDesktopReturnCode(input.returnCode);
+  if (!returnCode) return { status: 'invalid' };
+
+  const identifier = buildDesktopHandbackKey(input.desktopFlow);
+  const candidate = parseDesktopHandbackRecord(
+    await readVerificationRecord(identifier)
+  );
+  if (
+    !candidate ||
+    candidate.desktopFlow !== input.desktopFlow ||
+    now > candidate.expiresAt ||
+    input.createCodeChallenge(input.codeVerifier) !== candidate.codeChallenge ||
+    hashDesktopReturnCode(input.desktopFlow, returnCode) !==
+      candidate.returnCodeHash
+  ) {
+    return { status: 'invalid' };
+  }
+
+  const consumed = parseDesktopHandbackRecord(
+    await consumeVerificationRecord(identifier)
+  );
+  if (!consumed || consumed.code !== candidate.code) {
+    return { status: 'invalid' };
+  }
+
+  return { status: 'complete', code: consumed.code, state: consumed.state };
 }

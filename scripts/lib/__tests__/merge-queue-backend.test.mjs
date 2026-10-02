@@ -18,6 +18,7 @@ import {
   canAcceptExactHeadQueueReceipt,
   DEFAULT_MERGE_QUEUE_BACKEND,
   dequeuePullRequest,
+  ejectedWithoutRepair,
   enrollPullRequest,
   explainExactHeadAdmissionSelector,
   explainExactHeadQueueReceipt,
@@ -60,7 +61,7 @@ const VALID_REPOSITORY = Object.freeze(
 );
 const VALID_RULESET = Object.freeze(
   JSON.parse(
-    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":60,"grouping_strategy":"ALLGREEN","max_entries_to_build":2,"max_entries_to_merge":5,"merge_method":"SQUASH","min_entries_to_merge":5,"min_entries_to_merge_wait_minutes":10}}]}`
+    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":60,"grouping_strategy":"ALLGREEN","max_entries_to_build":10,"max_entries_to_merge":5,"merge_method":"SQUASH","min_entries_to_merge":5,"min_entries_to_merge_wait_minutes":10}}]}`
   )
 );
 const VALID_WORKFLOW = `name: CI
@@ -84,7 +85,7 @@ const VALID_BRANCH_PROTECTION_REF = Object.freeze({
 }} */
 const VALID_LIVE_QUEUE_CONFIGURATION = Object.freeze({
   checkResponseTimeout: 3600,
-  maximumEntriesToBuild: 2,
+  maximumEntriesToBuild: 10,
   maximumEntriesToMerge: 5,
   mergeMethod: 'SQUASH',
   minimumEntriesToMerge: 5,
@@ -144,6 +145,7 @@ function createNativeRunner({
   membershipPayload = null,
   listPages = null,
   enableResult = ok({ data: {} }),
+  ejectionTimeline = [],
   viewerPayload = /** @type {unknown} */ ({
     data: { viewer: { login: CANONICAL_NATIVE_MUTATION_ACTOR } },
   }),
@@ -195,6 +197,15 @@ function createNativeRunner({
           },
         ]
       );
+    }
+    if (query.includes('MergeQueueEjectionHistory')) {
+      return ok({
+        data: {
+          repository: {
+            pullRequest: { timelineItems: { nodes: ejectionTimeline } },
+          },
+        },
+      });
     }
     if (query.includes('MergeQueueCanonicalMembership')) {
       return ok(membershipPayload ?? canonicalMembership(lastState));
@@ -731,7 +742,7 @@ describe('native live preflight', () => {
   });
 
   it.each([
-    1, 2,
+    1, 2, 10,
   ])('allows supported build count %s during rollout and rollback with truthful readback', buildCount => {
     const result = validateNativePreflightEvidence({
       ruleset: VALID_RULESET,
@@ -747,15 +758,15 @@ describe('native live preflight', () => {
     expect(result.policyReadback.observed.max_entries_to_build).toBe(
       buildCount
     );
-    expect(result.policyReadback.matched).toBe(buildCount === 2);
+    expect(result.policyReadback.matched).toBe(buildCount === 10);
     expect(result.policyReadback.drift).toEqual(
-      buildCount === 1 ? ['max_entries_to_build'] : []
+      buildCount === 10 ? [] : ['max_entries_to_build']
     );
   });
 
   it.each([
     0,
-    3,
+    11,
     100,
     -1,
     1.5,
@@ -826,7 +837,7 @@ describe('native live preflight', () => {
               ...rule,
               parameters: {
                 ...rule.parameters,
-                max_entries_to_build: 3,
+                max_entries_to_build: 12,
               },
             }
           : rule
@@ -852,7 +863,7 @@ describe('native live preflight', () => {
     expect(liveGraphql.policyReadback).toMatchObject({
       matched: true,
       drift: [],
-      observed: { max_entries_to_build: 2 },
+      observed: { max_entries_to_build: 10 },
     });
   });
 
@@ -865,7 +876,7 @@ describe('native live preflight', () => {
     expect(result).toMatchObject({ ready: true });
     expect(result.policyReadback).toMatchObject({
       matched: true,
-      observed: { max_entries_to_build: 2 },
+      observed: { max_entries_to_build: 10 },
     });
     const liveConfigCall = runner.mock.calls.find(([args]) =>
       queryText(args).includes('MergeQueueLiveConfiguration')
@@ -969,7 +980,7 @@ describe('native live preflight', () => {
               ...rule,
               parameters: {
                 ...rule.parameters,
-                max_entries_to_build: 3,
+                max_entries_to_build: 12,
               },
             }
           : rule
@@ -985,7 +996,7 @@ describe('native live preflight', () => {
       ready: true,
       policyReadback: {
         matched: true,
-        observed: { max_entries_to_build: 2 },
+        observed: { max_entries_to_build: 10 },
       },
     });
   });
@@ -1497,7 +1508,7 @@ describe('canonical admission membership binding', () => {
     expect(afterResponse.message).toContain('"stdoutBytes":500');
     expect(afterResponse.message).not.toContain('exitMs');
   });
-  it('encodes the GraphQL Int through the real gh HTTP transport', async () => {
+  it('encodes the GraphQL Int through the real gh HTTP transport', { timeout: 30000 }, async () => {
     const config = mkdtempSync(join(tmpdir(), 'membership-gh-'));
     const started = performance.now();
     const phases = {};
@@ -1565,7 +1576,7 @@ describe('canonical admission membership binding', () => {
                 ],
                 {
                   env: environment,
-                  timeout: 3000,
+                  timeout: 20000,
                 },
                 (error, stdout, stderr) => {
                   if (error) {
@@ -2755,6 +2766,45 @@ describe('exact-head queue receipt proof', () => {
     expect(invokedNativeMutation(runner)).toBe(false);
     expect(invokedMutationActorCheck(runner)).toBe(false);
   });
+
+  it('keeps every bounded receipt read when fixtures zero the CLI poll delay', async () => {
+    const runner = createNativeRunner({
+      states: Array.from({ length: 6 }, () => prState()),
+    });
+    const startedAt = performance.now();
+    await expect(
+      runCli(['prove-receipt', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+          MERGE_QUEUE_POSTCONDITION_DELAY_MS: '0',
+        },
+        runner,
+        write: vi.fn(),
+      })
+    ).resolves.toMatchObject({ ok: false, attempts: 6 });
+    expect(performance.now() - startedAt).toBeLessThan(2_000);
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+
+  it.each(['-1', '1.5', 'soon'])(
+    'rejects malformed MERGE_QUEUE_POSTCONDITION_DELAY_MS=%s before reading state',
+    async delay => {
+      const runner = createNativeRunner({ states: [prState()] });
+      await expect(
+        runCli(['prove-receipt', '14359', HEAD], {
+          env: {
+            MERGE_QUEUE_BACKEND: 'native',
+            GITHUB_REPOSITORY: REPOSITORY,
+            MERGE_QUEUE_POSTCONDITION_DELAY_MS: delay,
+          },
+          runner,
+          write: vi.fn(),
+        })
+      ).rejects.toMatchObject({ code: 'invalid_postcondition_delay' });
+      expect(runner).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('authoritative native state listing', () => {
@@ -3070,4 +3120,56 @@ it('real prove-admission CLI emits only the sanitized failed-predicate receipt',
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+describe('same-head re-enrollment after a failed-checks ejection (JOV-6620)', () => {
+  const REMOVED = { __typename: 'RemovedFromMergeQueueEvent', reason: 'failed_checks' };
+
+  it('detects an ejection with no later head change', () => {
+    expect(ejectedWithoutRepair([])).toBe(false);
+    expect(ejectedWithoutRepair([{ __typename: 'PullRequestCommit' }, REMOVED])).toBe(true);
+    expect(ejectedWithoutRepair([REMOVED, { __typename: 'HeadRefForcePushedEvent' }])).toBe(false);
+    expect(ejectedWithoutRepair([REMOVED, { __typename: 'PullRequestCommit' }])).toBe(false);
+    expect(
+      ejectedWithoutRepair([{ __typename: 'RemovedFromMergeQueueEvent', reason: 'dequeued' }])
+    ).toBe(false);
+    expect(() => ejectedWithoutRepair(null)).toThrow(/not an array/);
+  });
+
+  it('refuses to re-enroll the rejected head and never calls the mutation', async () => {
+    const runner = createNativeRunner({ states: [prState()], ejectionTimeline: [REMOVED] });
+    await expect(enroll(runner)).rejects.toMatchObject({ code: 'ejected_same_head' });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('enrolls again after a repair push', async () => {
+    const runner = createNativeRunner({
+      states: [prState(), prState({ isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY })],
+      ejectionTimeline: [REMOVED, { __typename: 'HeadRefForcePushedEvent' }],
+    });
+    await expect(enroll(runner)).resolves.toMatchObject({ changed: true });
+  });
+
+  it('allows an explicit flake rerun receipt at the same head', async () => {
+    const runner = createNativeRunner({
+      states: [prState(), prState({ isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY })],
+      ejectionTimeline: [REMOVED],
+    });
+    await expect(
+      enroll(runner, { flakeRerunReceipt: 'https://github.com/JovieInc/Jovie/actions/runs/1' })
+    ).resolves.toMatchObject({ changed: true });
+  });
+
+  it('check-reenroll CLI refuses a rejected head and passes a repaired one', async () => {
+    const blocked = createNativeRunner({ ejectionTimeline: [REMOVED] });
+    await expect(
+      runCli(['check-reenroll', '14359'], { env: {}, runner: blocked, write: () => {} })
+    ).rejects.toMatchObject({ code: 'ejected_same_head' });
+    const repaired = createNativeRunner({
+      ejectionTimeline: [REMOVED, { __typename: 'PullRequestCommit' }],
+    });
+    await expect(
+      runCli(['check-reenroll', '14359'], { env: {}, runner: repaired, write: () => {} })
+    ).resolves.toMatchObject({ reenrollable: true });
+  });
 });

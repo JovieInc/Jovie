@@ -18,8 +18,12 @@
  *   excluded from the parsed output — they're for developer reference only.
  * - **Auto-filter**: Entries matching vendor names, dev tooling, or infrastructure
  *   patterns are automatically excluded even without the `[internal]` prefix.
+ * - **`### Dogfood`**: optional bullets telling internal users what to try in
+ *   this release. They feed the in-app What's New surfaces only; they are
+ *   never customer changelog entries and never make a release public.
  */
 
+import { z } from 'zod';
 import { isInternalEntry } from './changelog-filter-rules';
 
 export interface ChangelogSection {
@@ -30,11 +34,48 @@ export interface ChangelogSection {
   removed: string[];
 }
 
+type ParsedSection = keyof ChangelogSection | 'dogfood';
+
+export type ChangelogReleaseKind = 'release' | 'daily';
+
 export interface ChangelogRelease {
   version: string;
   date: string;
+  /**
+   * `daily` marks a JOV-5762 date-keyed digest (`## [YYYY-MM-DD]`). These are
+   * curated public digests, not CalVer releases: they get stable date
+   * permalinks and never render a fake `v` prefix.
+   */
+  kind: ChangelogReleaseKind;
   summary: string;
   sections: ChangelogSection;
+  /** Optional `### Dogfood` bullets; absent when the release has none. */
+  dogfood?: string[];
+  /** Reviewed customer copy from a verified daily publication receipt. */
+  customerOutcomes?: Record<
+    string,
+    {
+      availability: 'ga' | 'preview' | 'limited' | 'unverified';
+      prerequisites: string[];
+    }
+  >;
+}
+
+const DAILY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** True when a version slot is a date-keyed daily digest, not a CalVer. */
+export function isDailyChangelogKey(version: string): boolean {
+  return DAILY_KEY_RE.test(version);
+}
+
+/** Display label: `v26.9.0` for releases, `2026-09-27` for daily digests. */
+export function changelogVersionLabel(version: string): string {
+  return isDailyChangelogKey(version) ? version : `v${version}`;
+}
+
+/** Anchor id shared by the index timeline and the Atom entry ids. */
+export function changelogAnchorId(version: string): string {
+  return changelogVersionLabel(version);
 }
 
 export interface ChangelogParseResult {
@@ -55,7 +96,8 @@ export type ChangelogInlineNode =
     };
 
 const VERSION_HEADING_RE = /^## \[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?$/;
-const SECTION_HEADING_RE = /^### (Featured|Added|Changed|Fixed|Removed)$/;
+const SECTION_HEADING_RE =
+  /^### (Featured|Added|Changed|Fixed|Removed|Dogfood)$/;
 const INTERNAL_MARKER_RE = /\[\s*internal\s*\]/i;
 
 function isValidDate(value: string): boolean {
@@ -187,9 +229,12 @@ function parseVersionHeading(
   if (!match) return null;
   const [, version, date] = match;
   if (version.toLowerCase() === 'unreleased') return 'unreleased';
+  const daily = isDailyChangelogKey(version);
   return {
     version,
-    date: date && isValidDate(date) ? date : '',
+    // A daily heading carries its date in the key; a CalVer heading in `- date`.
+    date: daily ? version : date && isValidDate(date) ? date : '',
+    kind: daily ? 'daily' : 'release',
     summary: '',
     sections: {
       featured: [],
@@ -230,7 +275,7 @@ export function parseChangelogDocument(markdown: string): ChangelogParseResult {
   const lines = markdown.split('\n');
   const releases: ChangelogRelease[] = [];
   let current: ChangelogRelease | null = null;
-  let currentSection: keyof ChangelogSection | null = null;
+  let currentSection: ParsedSection | null = null;
   let summaryConsumed = false;
 
   for (const line of lines) {
@@ -262,7 +307,7 @@ export function parseChangelogDocument(markdown: string): ChangelogParseResult {
 
 type LineState = {
   current: ChangelogRelease | null;
-  currentSection: keyof ChangelogSection | null;
+  currentSection: ParsedSection | null;
   summaryConsumed: boolean;
 };
 
@@ -288,7 +333,7 @@ function tryParseVersion(
 function tryParseSummary(
   line: string,
   current: ChangelogRelease,
-  currentSection: keyof ChangelogSection | null,
+  currentSection: ParsedSection | null,
   summaryConsumed: boolean
 ): LineState | null {
   if (!currentSection && line.startsWith('> ') && !summaryConsumed) {
@@ -309,7 +354,7 @@ function tryParseSection(
   if (!sMatch) return null;
   return {
     current,
-    currentSection: sMatch[1].toLowerCase() as keyof ChangelogSection,
+    currentSection: sMatch[1].toLowerCase() as ParsedSection,
     summaryConsumed: true,
   };
 }
@@ -317,20 +362,23 @@ function tryParseSection(
 function tryParseBullet(
   line: string,
   current: ChangelogRelease,
-  currentSection: keyof ChangelogSection | null
+  currentSection: ParsedSection | null
 ): void {
   const trimmed = line.trim();
   if (!trimmed.startsWith('- ') || !currentSection) return;
   const entry = trimmed.slice(2);
-  if (isPublicEntry(entry)) {
-    current.sections[currentSection].push(entry);
+  if (!isPublicEntry(entry)) return;
+  if (currentSection === 'dogfood') {
+    current.dogfood = [...(current.dogfood ?? []), entry];
+    return;
   }
+  current.sections[currentSection].push(entry);
 }
 
 function processChangelogLine(
   line: string,
   current: ChangelogRelease | null,
-  currentSection: keyof ChangelogSection | null,
+  currentSection: ParsedSection | null,
   summaryConsumed: boolean,
   releases: ChangelogRelease[]
 ): LineState {
@@ -338,6 +386,8 @@ function processChangelogLine(
   if (versionState) return versionState;
 
   if (!current) return { current, currentSection, summaryConsumed };
+
+  readCustomerPublication(line, current);
 
   const summaryState = tryParseSummary(
     line,
@@ -352,4 +402,87 @@ function processChangelogLine(
 
   tryParseBullet(line, current, currentSection);
   return { current, currentSection, summaryConsumed };
+}
+
+const PublicationReceiptSchema = z.object({
+  schema: z.literal('daily-changelog-receipt/v1'),
+  window: z.object({ key: z.string() }),
+  publicationHead: z.string().regex(/^[a-f0-9]{40}$/),
+  sourceReceiptIds: z.array(z.string()).min(1),
+  deployments: z.array(z.object({ sha: z.string(), id: z.string() })).min(1),
+  runtimeEvidence: z
+    .array(
+      z.object({
+        passed: z.boolean(),
+        status: z.number(),
+        sha256: z.string(),
+      })
+    )
+    .min(1),
+  stories: z
+    .array(
+      z.object({
+        summary: z.string().min(1),
+        section: z.enum(['Added', 'Changed', 'Fixed', 'Removed']),
+        sourceIds: z.array(z.string()).min(1),
+        availability: z
+          .object({
+            status: z.enum(['ga', 'preview', 'limited']),
+            prerequisites: z.array(z.string().trim().min(1)).max(5),
+          })
+          .refine(
+            value =>
+              value.status !== 'limited' || value.prerequisites.length > 0
+          )
+          .optional()
+          .catch(undefined),
+      })
+    )
+    .max(3),
+});
+
+/** Engineering history remains readable; only receipted copy becomes a card. */
+function readCustomerPublication(
+  line: string,
+  release: ChangelogRelease
+): void {
+  const match = /^<!-- daily-changelog-receipt\/v1 (.+) -->$/.exec(line);
+  if (!match) return;
+  try {
+    const parsed = PublicationReceiptSchema.safeParse(JSON.parse(match[1]));
+    if (!parsed.success) return;
+    const receipt = parsed.data;
+    if (
+      receipt.window.key !== release.version ||
+      !receipt.deployments.some(
+        deployment =>
+          deployment.sha === receipt.publicationHead &&
+          /^dpl_[A-Za-z0-9]+$/.test(deployment.id)
+      ) ||
+      !receipt.runtimeEvidence.some(
+        evidence =>
+          evidence.passed &&
+          evidence.status === 200 &&
+          /^[a-f0-9]{64}$/.test(evidence.sha256)
+      )
+    )
+      return;
+    const outcomes: NonNullable<ChangelogRelease['customerOutcomes']> = {};
+    for (const story of receipt.stories) {
+      if (
+        !story.sourceIds.every(id => receipt.sourceReceiptIds.includes(id)) ||
+        !release.sections[
+          story.section.toLowerCase() as keyof ChangelogSection
+        ].includes(story.summary)
+      )
+        continue;
+      outcomes[story.summary] = {
+        availability: story.availability?.status ?? 'unverified',
+        prerequisites: story.availability?.prerequisites ?? [],
+      };
+    }
+    release.customerOutcomes = outcomes;
+  } catch {
+    // Corrupt/legacy receipts cannot silently approve engineering bullets.
+  }
 }

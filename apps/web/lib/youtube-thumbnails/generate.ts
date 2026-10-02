@@ -43,12 +43,9 @@ function cacheKey(videoId: string): string {
 }
 
 function blobPath(videoId: string, mediaType: string): string {
-  const ext =
-    mediaType === 'image/png'
-      ? 'png'
-      : mediaType === 'image/webp'
-        ? 'webp'
-        : 'jpg';
+  let ext = 'jpg';
+  if (mediaType === 'image/png') ext = 'png';
+  else if (mediaType === 'image/webp') ext = 'webp';
   return `youtube-thumbnails/redo/${videoId}/${styleScope()}.${ext}`;
 }
 

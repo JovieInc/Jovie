@@ -28,6 +28,25 @@ describe('FilterChip', () => {
     expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('uses the defined base background token for pressed text', () => {
+    const { rerender } = render(
+      <FilterChip pressed={true} onClick={vi.fn()}>
+        Label
+      </FilterChip>
+    );
+    const btn = screen.getByRole('button');
+    expect(btn).toHaveClass('bg-foreground', 'text-(--color-bg-base)');
+    expect(btn).not.toHaveClass('text-background');
+
+    rerender(
+      <FilterChip pressed={false} onClick={vi.fn()}>
+        Label
+      </FilterChip>
+    );
+    expect(btn).not.toHaveClass('text-(--color-bg-base)');
+    expect(btn).toHaveClass('text-muted-foreground');
+  });
+
   it('fires onClick when clicked', () => {
     const onClick = vi.fn();
     render(

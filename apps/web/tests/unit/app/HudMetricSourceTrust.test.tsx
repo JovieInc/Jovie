@@ -83,23 +83,23 @@ describe('HudMetricSourceTrust', () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
-  it.each([
-    'invalid',
-    new Date(Date.now() + 60_000).toISOString(),
-  ])('renders invalid or future timestamps as unknown with retry: %s', fetchedAtIso => {
-    const onRetry = vi.fn();
-    render(
-      <HudMetricSourceTrust
-        source={{ ...freshSource, fetchedAtIso }}
-        onRetry={onRetry}
-      />
-    );
+  it.each(['invalid', new Date(Date.now() + 60_000).toISOString()])(
+    'renders invalid or future timestamps as unknown with retry: %s',
+    fetchedAtIso => {
+      const onRetry = vi.fn();
+      render(
+        <HudMetricSourceTrust
+          source={{ ...freshSource, fetchedAtIso }}
+          onRetry={onRetry}
+        />
+      );
 
-    expect(screen.getByText('Timestamp unknown')).toBeInTheDocument();
-    expect(screen.queryByText(/Updated just now/i)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Retry/i }));
-    expect(onRetry).toHaveBeenCalledTimes(1);
-  });
+      expect(screen.getByText('Timestamp unknown')).toBeInTheDocument();
+      expect(screen.queryByText(/Updated just now/i)).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /Retry/i }));
+      expect(onRetry).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('reserves footer height to avoid layout shift', () => {
     const { container } = render(<HudMetricSourceTrust source={freshSource} />);

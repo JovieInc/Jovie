@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { LibraryAssetShareSurface } from '@/components/features/library-asset-share/LibraryAssetShareSurface';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
-import { buildLibraryAssetSharePublicViewByToken } from '@/lib/library/asset-share-public.server';
+import { getPrivateAssetSharePageData } from './private-asset-share-page-data';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,19 +11,22 @@ interface PrivateAssetPageProps {
   readonly params: Promise<{ token: string }>;
 }
 
+const UNAVAILABLE_METADATA = {
+  title: 'Asset not found · Jovie',
+  robots: { index: false, follow: false },
+} satisfies Metadata;
+
 export async function generateMetadata({
   params,
 }: PrivateAssetPageProps): Promise<Metadata> {
   const { token } = await params;
-  const view = await buildLibraryAssetSharePublicViewByToken(token);
+  const data = await getPrivateAssetSharePageData(token);
 
-  if (!view) {
-    return {
-      title: 'Asset not found · Jovie',
-      robots: { index: false, follow: false },
-    };
+  if (data.status !== 'ready') {
+    return UNAVAILABLE_METADATA;
   }
 
+  const { view } = data;
   const title = `${view.title} · ${view.artistName} · Jovie`;
 
   return {
@@ -50,12 +53,13 @@ export default async function LibraryAssetPrivateSharePage({
   params,
 }: PrivateAssetPageProps) {
   const { token } = await params;
-  const view = await buildLibraryAssetSharePublicViewByToken(token);
+  const data = await getPrivateAssetSharePageData(token);
 
-  if (!view) {
+  if (data.status !== 'ready') {
     notFound();
   }
 
+  const { view } = data;
   return (
     <PublicPageShell
       headerVariant='landing'

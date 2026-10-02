@@ -13,6 +13,10 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const TierCardsRecommended: Story = {
+  args: {
+    mode: 'expanded',
+    variant: 'tier-cards-recommended',
+  },
   render: () => (
     <div className='min-h-dvh bg-page px-4 py-10 md:px-8'>
       <div className='mx-auto max-w-6xl'>
@@ -26,6 +30,10 @@ export const TierCardsRecommended: Story = {
 };
 
 export const TierCardsNeutral: Story = {
+  args: {
+    mode: 'compact',
+    variant: 'tier-cards-neutral',
+  },
   render: () => (
     <div className='min-h-dvh bg-page px-4 py-10 md:px-8'>
       <div className='mx-auto max-w-6xl'>

@@ -201,6 +201,11 @@ describe('navigation telemetry client', () => {
     );
   });
 
+  it('ignores destination ready when nothing is in flight', () => {
+    expect(markNavigationDestinationReady('library', 50)).toBeNull();
+    expect(mockPostJsonBeacon).not.toHaveBeenCalled();
+  });
+
   it('does not start telemetry for an already-active destination', () => {
     expect(
       startNavigationTelemetry({
@@ -213,6 +218,37 @@ describe('navigation telemetry client', () => {
       })
     ).toBeNull();
     expect(mockPostJsonBeacon).not.toHaveBeenCalled();
+  });
+
+  it('tracks query-backed navigation identities on the same pathname', () => {
+    const linksActivation = startNavigationTelemetry({
+      itemId: 'links',
+      sourcePathname: '/app/chat',
+      destinationHref: '/app/chat?panel=profile',
+      inputMethod: 'pointer',
+      context: CONTEXT,
+      startedAt: 100,
+    });
+    expect(linksActivation).toMatchObject({
+      event: 'activation',
+      item_id: 'links',
+      destination_route: 'chat',
+    });
+    markNavigationDestinationReady('chat', 150);
+
+    const audienceActivation = startNavigationTelemetry({
+      itemId: 'audience',
+      sourcePathname: '/app/contacts',
+      destinationHref: '/app/contacts?tab=audience',
+      inputMethod: 'keyboard',
+      context: CONTEXT,
+      startedAt: 200,
+    });
+    expect(audienceActivation).toMatchObject({
+      event: 'activation',
+      item_id: 'audience',
+      destination_route: 'contacts',
+    });
   });
 
   it('records one bounded drop-off when destination ready never arrives', () => {

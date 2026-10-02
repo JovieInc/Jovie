@@ -57,6 +57,8 @@ export interface GatedFanEmailCopy {
   readonly ctaUrl: string | null;
   readonly ctaCount: number;
   readonly omittedClaims: readonly FanEmailClaimKey[];
+  /** Copy-floor rule ids that forced a safe fallback line (empty when clean). */
+  readonly copyFloorViolations: readonly string[];
 }
 
 export interface FanEmailGateResult {

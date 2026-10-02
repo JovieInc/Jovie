@@ -163,9 +163,21 @@ export function navigationInputMethodFromClick(detail: number) {
   return detail === 0 ? 'keyboard' : 'pointer';
 }
 
-function canonicalNavigationPath(value: string): string {
-  const path = value.split(/[?#]/, 1)[0] || '/';
-  return path === '/' ? path : path.replace(/\/+$/, '');
+const NAVIGATION_IDENTITY_SEARCH_PARAMS = ['panel', 'tab'] as const;
+
+function canonicalNavigationLocation(value: string): string {
+  const url = new URL(value, 'https://jovie.local');
+  const pathname =
+    url.pathname === '/' ? url.pathname : url.pathname.replace(/\/+$/, '');
+  const identityParams = new URLSearchParams();
+  for (const key of NAVIGATION_IDENTITY_SEARCH_PARAMS) {
+    for (const entry of url.searchParams.getAll(key)) {
+      identityParams.append(key, entry);
+    }
+  }
+  identityParams.sort();
+  const query = identityParams.toString();
+  return query ? `${pathname}?${query}` : pathname;
 }
 
 function startUxNavigationMeasurement(
@@ -186,7 +198,7 @@ function completeUxNavigationMeasurement(
   readyAt: number
 ): void {
   const navigation = pendingUxNavigation;
-  if (!navigation || destinationRoute !== navigation.destinationRoute) return;
+  if (destinationRoute !== navigation?.destinationRoute) return;
   pendingUxNavigation = null;
   clearTimeout(navigation.timeoutId);
   recordUxLatency(
@@ -274,8 +286,8 @@ export function startNavigationTelemetry(input: {
   readonly startedAt?: number;
 }): NavigationTelemetryPayload | null {
   if (
-    canonicalNavigationPath(input.sourcePathname) ===
-    canonicalNavigationPath(input.destinationHref)
+    canonicalNavigationLocation(input.sourcePathname) ===
+    canonicalNavigationLocation(input.destinationHref)
   ) {
     return null;
   }
@@ -297,9 +309,9 @@ export function startNavigationTelemetry(input: {
   }
 
   if (
-    lastReadyNavigation &&
-    destinationRoute === lastReadyNavigation.sourceRoute &&
-    startedAt - lastReadyNavigation.readyAt <= NAVIGATION_SHORT_RETURN_MS
+    destinationRoute === lastReadyNavigation?.sourceRoute &&
+    startedAt - (lastReadyNavigation?.readyAt ?? Number.POSITIVE_INFINITY) <=
+      NAVIGATION_SHORT_RETURN_MS
   ) {
     pendingInputs.push({
       eventId: `${navigationId}:short_return`,
@@ -309,7 +321,7 @@ export function startNavigationTelemetry(input: {
       destinationRoute,
       inputMethod: input.inputMethod,
       context: input.context,
-      latencyMs: startedAt - lastReadyNavigation.readyAt,
+      latencyMs: startedAt - (lastReadyNavigation?.readyAt ?? 0),
       success: false,
     });
   }
@@ -360,7 +372,7 @@ export function markNavigationDestinationReady(
 ): NavigationTelemetryPayload | null {
   completeUxNavigationMeasurement(destinationRoute, readyAt);
   const navigation = pendingNavigation;
-  if (!navigation || destinationRoute !== navigation.destinationRoute) {
+  if (destinationRoute !== navigation?.destinationRoute) {
     return null;
   }
 

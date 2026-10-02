@@ -18,6 +18,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
+import { CallerCancellationError } from '@/lib/resilience/caller-cancellation';
 
 // ============================================================================
 // Types
@@ -184,7 +185,10 @@ export class CircuitBreaker {
     } catch (error) {
       // Only count errors that the config considers real failures.
       // Rate-limit (429) responses are excluded so they don't trip the breaker.
-      if (!this.config.shouldCount || this.config.shouldCount(error)) {
+      if (
+        !(error instanceof CallerCancellationError) &&
+        (!this.config.shouldCount || this.config.shouldCount(error))
+      ) {
         this.onFailure();
       }
       throw error;

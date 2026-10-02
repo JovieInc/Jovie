@@ -2,7 +2,7 @@
 
 Status: Canon
 Inherits: [`OPERATING_SYSTEM.md`](./OPERATING_SYSTEM.md)
-Last updated: 2026-08-28
+Last updated: 2026-09-26
 
 Product exists to increase customer value delivered per week.
 
@@ -101,6 +101,68 @@ Machine enforcement: [`JOV-INV-012`](./invariants.jsonl).
 
 ---
 
+## Opinions: outcomes over knobs
+
+Founder intent (Tim White, 2026-09-26): get the ask, deliver the outcome.
+
+These rules are enforceable. A proposal, issue, or PR that breaks one is rejected or reclassified, not debated.
+
+1. **Deliver the outcome; abstract the process.** The user states what they want; Jovie does it. Intermediate steps, pipelines, and internal state are not product surface.
+2. **No fiddle surfaces.** Do not ship tooling or UI whose main use is tuning, inspecting, or re-running Jovie's work. It spends the user's attention and our tokens without moving an outcome.
+3. **Users do not pick the AI model.** Model, provider, temperature, and prompt choice are Jovie's job. This kind of configurability ships only as a deep feature after paying Pro-level customers ask for it.
+4. **Opinionated defaults over settings.** Pick the right default and ship it. A setting is allowed only when the platform requires it (OS permissions, legal consent, unsubscribe) or when users genuinely differ and no default can be right for most of them.
+5. **One control, not a matrix.** When a control is unavoidable, ship the single system-standard one (on/off, revoke, delete), never a per-item grid.
+
+### Capability classification
+
+Any agent proposing, filing, or building a capability classifies it first:
+
+| Class | Test | Action |
+|---|---|---|
+| **table-stakes** | Any user of this surface type expects it; its absence reads as broken or untrustworthy. | Ship. File as `capability-gap`. |
+| **outcome-deepening** | Makes the core outcome better, faster, or more automatic without asking the user to do more. | Ship. File as `capability-gap`. |
+| **configurability/tooling** | Knobs, pickers, dashboards, or controls for tuning how Jovie works. | **Hold.** No issue. Record the ask in customer asks / waitlist wants; revisit at 3 distinct paying Pro asks. |
+| **taste** | Identity, brand, voice, default direction, or anything where the right answer is judgment, not evidence. | Founder decision card. |
+
+Examples:
+
+- Password reset or account recovery: table-stakes. Jovie is passwordless, so recovery means email OTP plus self-serve change email.
+- Touch ID on the Mac app, Face ID on iOS: table-stakes for native apps holding a business session.
+- In-app account deletion on iOS: table-stakes (App Store requirement).
+- Auto-importing a Linktree during onboarding: outcome-deepening.
+- An AI model picker: configurability. Held.
+- Custom analytics dashboards, per-event notification matrices, custom CSS: configurability. Held.
+- Whether biometric lock defaults on or off: taste; the Ovie decision below settles its current default.
+
+The per-surface table-stakes checklist lives in [`docs/product/CAPABILITY_BASELINE.md`](../docs/product/CAPABILITY_BASELINE.md). "Competitor parity without customer evidence" (Anti-Goals) still applies to everything except table-stakes: table-stakes is the one place peer evidence is sufficient.
+
+### Ovie privacy lock (founder decision, 2026-09-29)
+
+**EVENT:** The additional passkey privacy lock is Ovie-only and opt-in. Ordinary
+Jovie use must not be blocked by it, including a legacy workspace-lock cookie.
+A successful unlock remains effective until an explicit re-lock or 24 hours
+after verification. Navigation, reloads, and app relaunch must not restart the
+prompt or extend that deadline. Once unlocked, the protection gets out of the way.
+
+When enabled and locked, protect private data and agent actions at the server
+boundary as well as the composed screen. Search, cached suggestions, inspectors,
+and other app-owned overlays cannot reveal protected content or replace the lock.
+Client cookies and hidden content alone are not proof of authorization. Sign-in,
+ownership, roles, and privileged-action permissions remain mandatory; privacy
+unlock never grants a role or expands an agent's authority.
+
+Keep one clear enable/disable control and one explicit lock action within Ovie.
+Store the opt-in independently from the expiring unlock receipt; expiration must
+lock an enabled workspace, not silently disable its protection. Failed verification
+or a persistence failure must not report a successful unlock.
+
+This supersedes JOV-6829's earlier extension of workspace locking to regular
+creator users. JOV-7205 owns implementation and regression evidence; JOV-6506
+owns the native sweep and exact delivered-runtime retest. These are requirements,
+not a claim that the current distributed app satisfies them.
+
+---
+
 ## Anti-Goals
 
 Do not optimize for:
@@ -126,5 +188,6 @@ Do not optimize for:
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-09-26 | "Opinions: outcomes over knobs" rules and capability classification (table-stakes / outcome-deepening / configurability held / taste). | Tim White |
 | 2026-08-28 | Continuous-optimization doctrine, learning hierarchy, safe transfer, and objective hierarchy. | Tim White / JOV-4045 |
 | 2026-07-17 | Created as domain canon under `/canon`. | Tim White |

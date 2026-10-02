@@ -15,6 +15,10 @@ vi.mock('@/lib/notifications/preferences', () => ({
   markNotificationDismissed: vi.fn(),
 }));
 
+vi.mock('@/lib/notifications/push', () => ({
+  sendPushNotification: vi.fn(),
+}));
+
 vi.mock('@/lib/notifications/providers/resend', () => ({
   ResendEmailProvider: vi.fn().mockImplementation(function (this: any) {
     this.provider = 'resend';
@@ -73,6 +77,7 @@ import {
   markNotificationDismissed,
 } from '@/lib/notifications/preferences';
 import { sendOutboundSms } from '@/lib/notifications/providers/sms/outbound-sms';
+import { sendPushNotification } from '@/lib/notifications/push';
 import { checkQuota, reserveTrialFanEmail } from '@/lib/notifications/quota';
 import { checkReputation } from '@/lib/notifications/reputation';
 import { formatSystemSender } from '@/lib/notifications/sender-policy';
@@ -97,6 +102,11 @@ import type {
 describe('Notification Service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(sendPushNotification).mockResolvedValue({
+      channel: 'push',
+      status: 'sent',
+      provider: 'apns',
+    });
     vi.mocked(reserveTrialFanEmail).mockResolvedValue(true);
     vi.mocked(getCreatorEntitlements).mockResolvedValue({
       plan: 'trial',
@@ -316,7 +326,7 @@ describe('Notification Service', () => {
       expect(result.results).toHaveLength(1);
     });
 
-    it('should skip unimplemented channels', async () => {
+    it('should deliver push through APNs', async () => {
       vi.mocked(getNotificationPreferences).mockResolvedValue({
         channels: { email: true, sms: true, push: true, in_app: true },
         marketingEmails: true,
@@ -331,8 +341,11 @@ describe('Notification Service', () => {
 
       const result = await sendNotification(messageWithPush, baseTarget);
 
-      expect(result.skipped).toHaveLength(1);
-      expect(result.skipped[0].detail).toContain('not implemented');
+      expect(result.delivered).toEqual(['push']);
+      expect(sendPushNotification).toHaveBeenCalledWith(
+        messageWithPush,
+        baseTarget
+      );
     });
 
     it('should respect respectUserPreferences flag', async () => {

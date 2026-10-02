@@ -79,6 +79,66 @@ describe('presence identity', () => {
     expect(formatPresenceRank(0, 'measured')).toBe('#0');
   });
 
+  it('summarizes search as unavailable, pending, stale, or measured', () => {
+    const search = (
+      overrides: Partial<Parameters<typeof summarizePresenceOutcomes>[0]>
+    ) =>
+      summarizePresenceOutcomes({
+        artistName: 'Tim White',
+        artistIsPublic: true,
+        providerAvailable: true,
+        bestJovieRank: null,
+        lastObservedAt: null,
+        rows: [],
+        now,
+        ...overrides,
+      }).find(item => item.group === 'search');
+
+    expect(
+      search({
+        providerAvailable: false,
+        lastObservedAt: '2026-09-15T12:00:00.000Z',
+        bestJovieRank: 4,
+      })
+    ).toMatchObject({
+      status: 'unavailable',
+      value: 'Unavailable',
+      detail: 'Search provider is unavailable',
+      attentionCount: 1,
+    });
+    expect(search({})).toMatchObject({
+      status: 'pending',
+      value: 'Not Measured',
+      detail: 'No search run has completed yet',
+      attentionCount: 1,
+    });
+    expect(
+      search({
+        lastObservedAt: '2026-08-01T00:00:00.000Z',
+        bestJovieRank: 4,
+      })
+    ).toMatchObject({
+      status: 'stale',
+      value: '#4',
+      detail: 'Last search check is older than two weeks',
+      attentionCount: 1,
+    });
+    expect(
+      search({ lastObservedAt: '2026-09-15T12:00:00.000Z' })
+    ).toMatchObject({
+      status: 'measured',
+      value: 'Not Ranked',
+      detail: 'Best measured Jovie rank',
+      attentionCount: 0,
+    });
+    expect(search({ bestJovieRank: 0 })).toMatchObject({
+      status: 'measured',
+      value: '#0',
+      detail: 'Best measured Jovie rank',
+      attentionCount: 0,
+    });
+  });
+
   it('prefers a clean entity name and handle over repeated domain/path', () => {
     const sevenDigital = {
       kind: 'dsp',

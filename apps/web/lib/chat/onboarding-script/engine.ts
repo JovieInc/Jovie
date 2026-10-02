@@ -1,11 +1,11 @@
 import 'server-only';
-import type { UIMessage } from 'ai';
+import { randomUUID } from 'node:crypto';
+import type { UIMessage, UIMessageChunk } from 'ai';
 import {
   type AccessDecision,
-  evaluateAccessSignal,
+  decideOnboardingAccess,
 } from '@/lib/chat/tools/onboarding-access-eval';
 import type { AudienceBand } from '@/lib/chat/tools/onboarding-signals';
-import { collapseInterviewSignals } from '@/lib/chat/tools/onboarding-signals';
 import {
   buildConfirmSpotifyArtistOutput,
   type OnboardingTurnState,
@@ -296,36 +296,21 @@ function decideAccess(
   extraBand: AudienceBand | null,
   options?: { readonly forceTurnCap?: boolean }
 ): AccessDecision {
-  if (state.accessControlled) {
-    if (!state.spotifyArtistId) {
-      return {
-        kind: 'needs_more_info',
-        rationale: 'confirmed_artist_required_for_waitlist',
-        score: 0,
-      };
-    }
-    return {
-      kind: 'waitlist',
-      rationale: 'controlled_access_gate_enabled',
-      score: 100,
-    };
-  }
-
-  const recordedAt = new Date().toISOString();
-  const signals = state.signals.map(signal => ({ ...signal, recordedAt }));
-  if (extraBand) {
-    signals.push({ audienceBand: extraBand, recordedAt });
-  }
   // Incomplete acks must not force waitlist via turn cap — freeze turnCount
   // under the force threshold unless we have real signal this turn.
   const turnCount =
     options?.forceTurnCap === false
       ? Math.min(state.turnCount, 2)
       : state.turnCount;
-  return evaluateAccessSignal({
-    signal: collapseInterviewSignals(signals),
+  return decideOnboardingAccess({
+    accessControlled: state.accessControlled,
+    spotifyArtistId: state.spotifyArtistId,
+    publicProfileUrl: state.publicProfileUrl,
     spotifyFollowers: state.spotifyFollowers,
+    metrics: state.artistMetrics,
+    signals: state.signals,
     turnCount,
+    extraBand,
   });
 }
 
@@ -429,8 +414,7 @@ function decisionTurn(
     forceTurnCap: Boolean(parsedBand) || latestText.trim().length >= 8,
   });
   if (decision.kind === 'instant_access') {
-    events.push(proposeNextStepEvent(decision));
-    events.push({
+    events.push(proposeNextStepEvent(decision), {
       toolName: 'proposeCheckout',
       input: {},
       output: {
@@ -739,4 +723,60 @@ export async function decideFallbackTurn(
       : null
     : null;
   return decisionTurn(input, existingDecisionKind, pick);
+}
+
+const SPOTIFY_ARTIST_ID = /^[0-9A-Za-z]{22}$/;
+
+interface ServerArtistConfirmation {
+  readonly historyMessage: UIMessage;
+  readonly chunks: readonly UIMessageChunk[];
+}
+
+/**
+ * JOV-7134: when the latest user message is a picker selection, confirm it
+ * server-side from the real id (never a model-supplied one). Returns the
+ * completed tool call as a history message for the model and as stream
+ * chunks for the client, or null when there is no new valid selection.
+ */
+export async function confirmSelectedArtist(
+  messages: readonly UIMessage[],
+  state: OnboardingTurnState
+): Promise<ServerArtistConfirmation | null> {
+  const latestUser =
+    [...messages].reverse().find(message => message.role === 'user') ?? null;
+  const spotifyArtistId = parseArtistSelection(latestUser);
+  if (
+    !spotifyArtistId ||
+    !SPOTIFY_ARTIST_ID.test(spotifyArtistId) ||
+    state.spotifyArtistId === spotifyArtistId
+  ) {
+    return null;
+  }
+  const output = await buildConfirmSpotifyArtistOutput(spotifyArtistId, state);
+  const toolCallId = randomUUID();
+  const input = { spotifyArtistId };
+  return {
+    historyMessage: {
+      id: `server-artist-confirmation-${toolCallId}`,
+      role: 'assistant',
+      parts: [
+        {
+          type: 'tool-confirmSpotifyArtist',
+          toolCallId,
+          state: 'output-available',
+          input,
+          output,
+        } as UIMessage['parts'][number],
+      ],
+    },
+    chunks: [
+      {
+        type: 'tool-input-available',
+        toolCallId,
+        toolName: 'confirmSpotifyArtist',
+        input,
+      } as UIMessageChunk,
+      { type: 'tool-output-available', toolCallId, output } as UIMessageChunk,
+    ],
+  };
 }

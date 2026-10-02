@@ -100,6 +100,17 @@ export const queryKeys = {
       ] as const,
   },
 
+  // Admin asset library
+  adminAssets: {
+    all: ['admin-assets'] as const,
+    list: (filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.adminAssets.all,
+        'list',
+        ...(filters === undefined ? [] : [filters]),
+      ] as const,
+  },
+
   // Admin users
   adminUsers: {
     all: ['admin-users'] as const,
@@ -286,6 +297,7 @@ export const queryKeys = {
   admin: {
     all: ['admin'] as const,
     impersonation: () => [...queryKeys.admin.all, 'impersonation'] as const,
+    certifications: () => [...queryKeys.admin.all, 'certifications'] as const,
     waitlistSettings: () =>
       [...queryKeys.admin.all, 'waitlist-settings'] as const,
     leads: {
@@ -299,6 +311,14 @@ export const queryKeys = {
       settings: () => [...queryKeys.admin.leads.all(), 'settings'] as const,
       keywords: () => [...queryKeys.admin.leads.all(), 'keywords'] as const,
     },
+  },
+
+  // HUD ops surfaces (admin shell + kiosk). Keys carry only the access
+  // scope — never raw kiosk tokens.
+  hud: {
+    all: ['hud'] as const,
+    metrics: (scope: 'admin' | 'kiosk') =>
+      [...queryKeys.hud.all, 'metrics', scope] as const,
   },
 
   // Campaign invite queries (admin)

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { seedFeatureFmKeywords } from '@/lib/leads/seed-keywords';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -11,7 +11,7 @@ export const runtime = 'nodejs';
  * POST /api/admin/leads/seed — Seed Feature.fm discovery keywords.
  */
 export async function POST() {
-  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
+  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },

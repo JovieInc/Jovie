@@ -19,7 +19,7 @@ TypeScript, React/Next.js, server/client boundaries, canonical imports, ESLint r
 | Linting | Biome |
 | Package Manager | pnpm 9.15.9 |
 | Monorepo | Turborepo |
-| Runtime | Node.js 22 LTS |
+| Runtime | Node.js 24 LTS |
 
 ## TypeScript
 
@@ -222,7 +222,7 @@ useQuery({
 
 ## Custom ESLint Rules
 
-19 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`; enforced in CI.
+20 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`; enforced in CI.
 
 | Rule | What It Blocks | Fix |
 |------|---------------|-----|
@@ -245,6 +245,7 @@ useQuery({
 | `chat-tool-schema-strict` | Bare `z.object()` chat tool input schemas | Wrap with `chatToolSchema()` |
 | `canonical-ui-label-casing` | Title Case / sentence-case violations on UI labels | Follow `DESIGN.md` casing; allowlist with `ui-casing-allow` |
 | `no-hardcoded-theme-colors` | Bare `text-black`/`bg-white` or `text-[#hex]` that bypass semantic tokens | Use token utilities (`text-primary-token`) or pair light/dark classes |
+| `no-direct-stripe-client` | Runtime `stripe` imports, `require('stripe')`, or `new Stripe(...)` outside `lib/stripe/` | Import the canonical client from `@/lib/stripe/client` (type-only imports are allowed) |
 
 **Run:** `pnpm --filter web lint:eslint` (all rules) or `pnpm --filter web lint:server-boundaries` (boundary rules only).
 
@@ -376,7 +377,7 @@ Hooks in `.claude/hooks/` run automatically on every tool use. You cannot bypass
 | Hook | Trigger | Purpose |
 |------|---------|---------|
 | `session-start.sh` | Session start | Verifies Node/pnpm versions, installs deps, builds gstack |
-| `post-task-validate.sh` | Task completion (Stop) | Blocks completion if typecheck, Biome lint, server boundaries, or affected tests fail |
+| `post-task-validate.sh` | Task completion (Stop) | Blocks completion if Biome (changed files), web typecheck, server boundaries, or changed web test files fail; checks the session cwd |
 
 ## Agent Autonomy: When to Ask vs. Just Do It
 

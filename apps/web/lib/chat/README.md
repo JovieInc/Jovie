@@ -7,7 +7,7 @@ Provider-neutral chat-turn pipeline. Wraps the Vercel AI SDK with Jovie-specific
 `run.ts:executeChatTurn()` is the entry point. The pipeline:
 
 1. **Knowledge selection** — `knowledge/router.ts` extracts relevant industry context from the last few user turns (topics in `knowledge/topics.ts`).
-2. **System prompt** — `system-prompt.ts:buildSystemPrompt()` composes artist context, discography summary, plan capabilities, and tool docs.
+2. **System prompt** — `system-prompt.ts:buildSystemPrompt()` composes artist context, discography summary, plan capabilities, and tool docs. `buildSystemPromptParts()` splits it into a stable prefix (sent first with an Anthropic cache breakpoint) and per-turn context (knowledge, usage counters, referenced entities, pinned card). Tool calls older than the last two user turns are pruned before the model call, and every call is tagged `feature:<functionId>` + `app:web` for AI Gateway spend reporting.
 3. **Message conversion** — UIMessage history → AI SDK ModelMessage format.
 4. **Model selection** — frontier model by default; `forceLightModel` (Statsig kill-switch) routes to the cheaper/faster model. Free-tier short-intent traffic also routes light.
 5. **`streamText()`** — AI SDK call with system prompt, messages, tools, and a plan-aware `stopWhen: stepCountIs(N)` cap (8 paid / 3 free) to guard in-turn tool loops.
@@ -33,7 +33,7 @@ Tools are NOT defined here. They are built in the route (`buildFreeChatTools`, `
 
 ## AI SDK Entry Point
 
-`streamText`, `generateText`, `generateObject`, and `streamObject` are re-exported from `@/lib/ai/sdk` (leak-guard wrapped). Any new AI SDK caller must import from `@/lib/ai/sdk`, not directly from `'ai'`, so leak-guard output filtering applies uniformly. Direct Anthropic SDK callers use `getAnthropicClient()` from `@/lib/ai/anthropic`.
+`streamText`, `generateText`, `generateObject`, and `streamObject` are re-exported from `@/lib/ai/sdk` (leak-guard wrapped). Any new AI SDK caller must import from `@/lib/ai/sdk`, not directly from `'ai'`, so leak-guard output filtering applies uniformly. OpenAI/Anthropic models are banned on the AI Gateway (JOV-7119) — the selector throws on `openai/*` and `anthropic/*` ids.
 
 ## Telemetry contract
 

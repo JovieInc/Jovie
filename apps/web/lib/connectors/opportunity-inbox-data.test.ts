@@ -14,7 +14,10 @@ vi.mock('@/lib/utils/logger', () => ({ logger: { error: vi.fn() } }));
 
 import { GET } from '@/app/api/connectors/suggested-actions/route';
 import { buildMobileInbox } from '@/lib/mobile/action-loop-inbox';
-import { loadOpportunityInboxData } from './opportunity-inbox-data';
+import {
+  loadOpportunityInboxData,
+  loadOpportunityInboxTourDateSections,
+} from './opportunity-inbox-data';
 
 vi.mock('@/lib/auth/require-auth', () => ({
   requireAuth: async () => ({ userId: 'signed-in', error: null }),
@@ -84,5 +87,51 @@ describe('consumer opportunity storage boundary', () => {
     await expect(loadOpportunityInboxData('signed-in')).rejects.toThrow(
       'offline'
     );
+  });
+  it('reports missing storage as unknown rather than a verified empty inbox', async () => {
+    mocks.limit.mockRejectedValueOnce(
+      new Error('relation "suggested_actions" does not exist')
+    );
+    const result = await loadOpportunityInboxData('signed-in');
+    expect(result?.cards).toEqual([]);
+    expect(result?.availability).toEqual({
+      suggestedActions: 'unknown',
+      tourDates: 'not_requested',
+    });
+  });
+  it('distinguishes healthy empty reads from an unrequested tour-date source', async () => {
+    mocks.limit.mockResolvedValueOnce([]);
+    expect((await loadOpportunityInboxData('signed-in'))?.availability).toEqual(
+      { suggestedActions: 'available', tourDates: 'not_requested' }
+    );
+    expect(mocks.limit).toHaveBeenCalledTimes(1);
+  });
+  it('keeps successful date sections when another attempted section fails', async () => {
+    mocks.limit.mockResolvedValueOnce([
+      {
+        id: 'date-1',
+        title: 'Detroit show',
+        startDate: new Date('2026-11-01'),
+        startTime: null,
+        venueName: 'Venue',
+        city: 'Detroit',
+        region: 'MI',
+        country: 'US',
+        provider: 'bandsintown',
+        confirmationStatus: 'pending',
+      },
+    ]);
+    mocks.limit.mockRejectedValueOnce(new Error('dates unavailable'));
+    mocks.limit.mockResolvedValueOnce([]);
+    const result = await loadOpportunityInboxTourDateSections('profile-1');
+    expect(result.availability).toBe('unknown');
+    expect(result.pending.map(item => item.id)).toEqual(['date-1']);
+    expect(result.confirmed).toEqual([]);
+  });
+  it('marks successfully checked empty date sections as available', async () => {
+    mocks.limit.mockResolvedValue([]);
+    expect(
+      (await loadOpportunityInboxTourDateSections('profile-1')).availability
+    ).toBe('available');
   });
 });

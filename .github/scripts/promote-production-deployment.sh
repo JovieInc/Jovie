@@ -53,12 +53,21 @@ valid_current_json() {
   ' >/dev/null 2>&1
 }
 
+valid_alias_json() {
+  jq -e '
+    type == "object" and
+    (.id | type == "string") and
+    (.readyState | type == "string")
+  ' >/dev/null 2>&1
+}
+
 valid_rollout_json() {
   jq -e 'type == "object" or . == null' >/dev/null 2>&1
 }
 
 validate_vercel_json() {
   case "$1" in
+    alias) valid_alias_json ;;
     current) valid_current_json ;;
     rollout) valid_rollout_json ;;
     *) return 1 ;;
@@ -153,6 +162,11 @@ inspect_current() {
     inspect jov.ie --format=json
 }
 
+inspect_staging_alias() {
+  read_vercel_json "inspect staging alias" alias \
+    inspect staging.jov.ie --format=json
+}
+
 inspect_deployment() {
   read_vercel_json "inspect deployment" current \
     inspect "$1" --format=json
@@ -185,6 +199,120 @@ rollout_target_id() {
     end
   ' <<<"$1"
 }
+
+staging_preview_id=""
+staging_preview_url=""
+
+capture_staging_preview() {
+  local alias_json=""
+  local deployment_json=""
+  local candidate_id=""
+  local candidate_ready=""
+  local candidate_target=""
+  local candidate_url=""
+
+  if ! alias_json="$(inspect_staging_alias)"; then
+    echo "Canonical staging alias was unavailable before production promotion; continuing without a restore candidate." >&2
+    return 0
+  fi
+  candidate_id="$(jq -r '.id' <<<"$alias_json")"
+  candidate_ready="$(jq -r '.readyState | ascii_upcase' <<<"$alias_json")"
+  if [[ "$candidate_id" != dpl_* ]] || [ "$candidate_ready" != "READY" ]; then
+    echo "Canonical staging alias was not a READY deployment before production promotion; continuing without a restore candidate." >&2
+    return 0
+  fi
+  if ! deployment_json="$(inspect_deployment "$candidate_id")"; then
+    echo "Canonical staging deployment could not be resolved before production promotion; continuing without a restore candidate." >&2
+    return 0
+  fi
+  candidate_target="$(jq -r '.target | ascii_downcase' <<<"$deployment_json")"
+  candidate_url="$(jq -r '.url // ""' <<<"$deployment_json")"
+  if [[ "$candidate_url" != *://* && "$candidate_url" == *.vercel.app ]]; then
+    candidate_url="https://${candidate_url}"
+  fi
+  candidate_url="${candidate_url%/}"
+  if [ "$candidate_target" != "preview" ] ||
+    [[ "$candidate_url" != https://*.vercel.app ]]; then
+    echo "Canonical staging alias was not bound to a preview before production promotion; continuing without a restore candidate." >&2
+    return 0
+  fi
+
+  staging_preview_id="$candidate_id"
+  staging_preview_url="$candidate_url"
+  echo "Captured staging preview $staging_preview_id before production promotion."
+}
+
+restore_staging_preview() {
+  local alias_json=""
+  local current_alias_id=""
+  local current_alias_ready=""
+  local current_deployment_json=""
+  local current_alias_target=""
+
+  [ -n "$staging_preview_id" ] && [ -n "$staging_preview_url" ] || return 0
+
+  if alias_json="$(inspect_staging_alias)"; then
+    current_alias_id="$(jq -r '.id' <<<"$alias_json")"
+    current_alias_ready="$(jq -r '.readyState | ascii_upcase' <<<"$alias_json")"
+    if [ "$current_alias_id" = "$staging_preview_id" ] &&
+      [ "$current_alias_ready" = "READY" ]; then
+      echo "Canonical staging preview remained bound during production promotion."
+      return 0
+    fi
+
+    # Preserve a different READY preview if a staging controller repaired the
+    # alias before this cleanup ran. Repeated staging-side reassertion covers
+    # the inverse race where production finishes after a newer preview bind.
+    if [[ "$current_alias_id" == dpl_* ]] &&
+      current_deployment_json="$(inspect_deployment "$current_alias_id")"; then
+      current_alias_target="$(jq -r '.target | ascii_downcase' <<<"$current_deployment_json")"
+      if [ "$current_alias_ready" = "READY" ] &&
+        [ "$current_alias_target" = "preview" ]; then
+        echo "Canonical staging already owns a newer READY preview; preserving $current_alias_id."
+        return 0
+      fi
+    fi
+  fi
+
+  echo "Restoring staging.jov.ie to preview $staging_preview_id after production promotion."
+  if ! vercel alias set "$staging_preview_url" staging.jov.ie; then
+    echo "Unable to restore the canonical staging preview alias." >&2
+    return 1
+  fi
+  for restore_attempt in $(seq 1 15); do
+    if alias_json="$(inspect_staging_alias)"; then
+      current_alias_id="$(jq -r '.id' <<<"$alias_json")"
+      current_alias_ready="$(jq -r '.readyState | ascii_upcase' <<<"$alias_json")"
+      if [ "$current_alias_id" = "$staging_preview_id" ] &&
+        [ "$current_alias_ready" = "READY" ]; then
+        echo "Canonical staging preview restored to $staging_preview_id."
+        return 0
+      fi
+    fi
+    [ "$restore_attempt" -lt 15 ] && sleep "$poll_seconds"
+  done
+  echo "Canonical staging preview did not converge after production promotion." >&2
+  return 1
+}
+
+finalize_promotion() {
+  local promotion_status=$?
+  local restore_status=0
+  trap - EXIT
+
+  restore_staging_preview || restore_status=$?
+  if [ "$promotion_status" -eq 0 ] && [ "$restore_status" -ne 0 ]; then
+    write_failure staging_alias_restore_failed
+    exit "$restore_status"
+  fi
+  if [ "$promotion_status" -ne 0 ] && [ "$restore_status" -ne 0 ]; then
+    echo "Staging alias restoration also failed while production promotion was already failing." >&2
+  fi
+  exit "$promotion_status"
+}
+
+capture_staging_preview
+trap finalize_promotion EXIT
 
 current_json=""
 rollout_json=""
@@ -246,17 +374,20 @@ if [[ ! "$current_main_sha" =~ ^[0-9a-f]{40}$ ]]; then
   write_failure production_promotion_state_invalid
   exit 1
 fi
-if [ "$current_main_sha" != "$expected_main_sha" ]; then
+# Forward-only lineage: an authorized SHA that is still an ancestor of main is
+# promoted even though main advanced; only a rewind or force-push yields.
+if [ "$current_main_sha" != "$expected_main_sha" ] &&
+  [ "$($gh_cli api "repos/$repository/compare/${expected_main_sha}...${current_main_sha}" --jq '.status // empty')" != "ahead" ]; then
   if [ -n "${GITHUB_OUTPUT:-}" ]; then
     printf 'promotion_sha=%s\n' "$current_main_sha" >> "$GITHUB_OUTPUT"
   fi
-  echo "Release $expected_main_sha was superseded by $current_main_sha before production mutation."
+  echo "Release $expected_main_sha left main's lineage (main is $current_main_sha) before production mutation."
   exit 0
 fi
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
-  # The observed SHA is public, high-entropy release identity. Unlike a boolean
+  # The promoted SHA is public, high-entropy release identity. Unlike a boolean
   # true, it cannot collide with a Doppler-added secret mask at the job boundary.
-  printf 'promotion_sha=%s\n' "$current_main_sha" >> "$GITHUB_OUTPUT"
+  printf 'promotion_sha=%s\n' "$expected_main_sha" >> "$GITHUB_OUTPUT"
 fi
 
 promotion_requested=false
@@ -344,6 +475,10 @@ last_rollout_active=false
 last_rollout_target=""
 for attempt in $(seq 1 "$settle_attempts"); do
   if current_json="$(inspect_current)" && rollout_json="$(fetch_rollout)"; then
+    # A newer staging controller may publish a preview while Vercel's rolling
+    # production release is still settling. Keep the newest observed preview
+    # as the restore target before production rewrites the project aliases.
+    capture_staging_preview >/dev/null 2>&1 || true
     last_state_valid=true
     current_id="$(jq -r '.id' <<<"$current_json")"
     current_ready="$(jq -r '.readyState | ascii_upcase' <<<"$current_json")"

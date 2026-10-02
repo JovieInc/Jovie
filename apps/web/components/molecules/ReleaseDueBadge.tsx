@@ -43,8 +43,8 @@ const VARIANT_STYLES = {
     dotClassName: 'bg-amber-500',
   },
   overdue: {
-    className: 'border-red-500/20 bg-red-500/5',
-    dotClassName: 'bg-red-500',
+    className: 'border-error/20 bg-error/5',
+    dotClassName: 'bg-error',
   },
   stale: {
     className: 'border-zinc-400/20 bg-zinc-400/5',

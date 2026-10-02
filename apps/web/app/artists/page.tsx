@@ -1,37 +1,71 @@
+import { redirect } from 'next/navigation';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ArtistsDirectory } from '@/components/organisms/ArtistsDirectory';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
-import { loadArtistsDirectoryProfiles } from '@/lib/profile/public-discovery-catalog';
+import {
+  loadArtistsDirectoryCount,
+  loadArtistsDirectoryProfiles,
+} from '@/lib/profile/public-discovery-catalog';
 
 export const revalidate = 3600;
 
-export default async function ArtistsPage() {
-  const catalog = await loadArtistsDirectoryProfiles();
+interface ArtistsPageProps {
+  readonly searchParams?: Promise<
+    Record<string, string | string[] | undefined>
+  >;
+}
+
+export default async function ArtistsPage({
+  searchParams = Promise.resolve({}),
+}: ArtistsPageProps) {
+  const resolvedSearchParams = await searchParams;
+  const cursorParam = resolvedSearchParams.cursor;
+  const cursor = typeof cursorParam === 'string' ? cursorParam : undefined;
+
+  const [catalog, total] = await Promise.all([
+    loadArtistsDirectoryProfiles(cursor),
+    loadArtistsDirectoryCount(),
+  ]);
 
   if (catalog.status === 'unavailable') {
     return renderFallback();
   }
 
-  return <ArtistsDirectory profiles={catalog.profiles} />;
+  // A stale or exhausted cursor must never render a "0 PUBLIC PROFILES"
+  // dead end (JOV-6939). Empty results are only a valid state on page 1.
+  if (cursor && catalog.profiles.length === 0) {
+    redirect('/artists');
+  }
+
+  return (
+    <ArtistsDirectory
+      profiles={catalog.profiles}
+      total={total}
+      nextCursor={catalog.nextCursor}
+      isFirstPage={!cursor}
+    />
+  );
 }
 
 function renderFallback() {
   return (
     <StandaloneProductPage width='lg' centered>
-      <ContentSurfaceCard surface='details' className='overflow-hidden'>
-        <ContentSectionHeader
-          density='compact'
-          headingLevel='h1'
-          title='Profiles are loading'
-          subtitle='Please check back shortly once the connection is available.'
-        />
-        <div className='px-5 py-8 text-center sm:px-6'>
-          <p className='text-app leading-5 text-secondary-token'>
-            Public creator data is temporarily unavailable.
-          </p>
-        </div>
-      </ContentSurfaceCard>
+      <div data-testid='artists-directory'>
+        <ContentSurfaceCard surface='details' className='overflow-hidden'>
+          <ContentSectionHeader
+            density='compact'
+            headingLevel='h1'
+            title='Profiles are loading'
+            subtitle='Please check back shortly once the connection is available.'
+          />
+          <div className='px-5 py-8 text-center sm:px-6'>
+            <p className='text-app leading-5 text-secondary-token'>
+              Public creator data is temporarily unavailable.
+            </p>
+          </div>
+        </ContentSurfaceCard>
+      </div>
     </StandaloneProductPage>
   );
 }

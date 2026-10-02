@@ -1,0 +1,49 @@
+import { revalidateTag } from 'next/cache';
+import {
+  CACHE_TAGS,
+  createPublicReleasesTag,
+  createReleasesTag,
+  createSmartLinkContentTag,
+} from './tags';
+
+/**
+ * Mutation-to-invalidation map for release caches (JOV-6272).
+ *
+ * One canonical entry point for every release mutation that persists a write
+ * (create, rename/edit, archive, restore, delete, provider overrides,
+ * artwork, lyrics, canvas, audio snippet/confirm, Spotify sync). It
+ * invalidates exactly the dependent server caches after successful
+ * persistence:
+ *
+ * - `releases:<userId>:<profileId>` — the unified release matrix/entity
+ *   server cache (one key family keyed by userId+profileId only; the handle
+ *   never participates, so a rename does not fork the family).
+ * - `smartlink-content:<profileId>` — smart-link content derived from
+ *   release rows.
+ * - `public-releases:<profileId>` — the public profile/feed release
+ *   projection, keyed by immutable profile ID.
+ * - `profiles-all` — the public profile snapshot also embeds latest-release
+ *   data but is keyed by mutable handle, so it is invalidated as one family.
+ * - `sitemap-catalog` — public release and track URLs derived from release
+ *   rows.
+ *
+ * Authorization is checked by each caller BEFORE persistence; this map only
+ * runs after a successful write. Old-handle/new-handle public profile paths
+ * are owned by `invalidateUsernameChange` in `./profile` — do not duplicate
+ * them here.
+ */
+export function invalidateReleaseCaches(
+  userId: string,
+  profileId: string
+): void {
+  revalidateTag(createReleasesTag(userId, profileId), 'max');
+  invalidateSmartLinkContentCache(profileId);
+  revalidateTag(createPublicReleasesTag(profileId), 'max');
+  revalidateTag(CACHE_TAGS.PUBLIC_PROFILE, 'max');
+  revalidateTag(CACHE_TAGS.SITEMAP_CATALOG, 'max');
+}
+
+/** Invalidate a public SmartLink after a recording-credit-only mutation. */
+export function invalidateSmartLinkContentCache(profileId: string): void {
+  revalidateTag(createSmartLinkContentTag(profileId), 'max');
+}

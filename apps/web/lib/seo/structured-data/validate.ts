@@ -148,10 +148,11 @@ export function validateMerchRichResults(
   }
 
   errors.push(
+    // Availability is recommended for product snippets, not required. Unknown
+    // stock must remain absent rather than be invented to satisfy validation.
     ...assertRequired(offers as SchemaNode, 'Offer', [
       'price',
       'priceCurrency',
-      'availability',
       'url',
     ])
   );

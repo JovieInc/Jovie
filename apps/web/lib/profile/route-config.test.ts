@@ -193,11 +193,11 @@ describe('getRouteConfigForMode', () => {
     expect(config.label).toBe('Get updates');
   });
 
-  it('"tour" → mode-tour with Shows destination active', () => {
+  it('"tour" → mode-tour with Events destination active', () => {
     const config = getRouteConfigForMode('tour');
     expect(config.key).toBe('mode-tour');
     expect(config.activeTab).toBe('tour');
-    expect(config.label).toBe('Shows');
+    expect(config.label).toBe('Events');
   });
 
   it('"releases" → mode-releases with Music tab active (drawer overlay)', () => {
@@ -400,7 +400,7 @@ describe('REDIRECT_SINK_ROUTE_KEYS', () => {
 });
 
 describe('BOTTOM_TAB_KEYS', () => {
-  it('contains exactly four destination keys in Home · Music · Shows · About order', () => {
+  it('contains exactly four destination keys in Home · Music · Events · About order', () => {
     expect(BOTTOM_TAB_KEYS).toEqual(['profile', 'listen', 'tour', 'about']);
   });
 });
@@ -412,7 +412,7 @@ describe('PUBLIC_PROFILE_NAVIGATION', () => {
     ).toEqual(['profile', 'listen', 'tour', 'about']);
     expect(
       PUBLIC_PROFILE_NAVIGATION.map(destination => destination.label)
-    ).toEqual(['Home', 'Music', 'Shows', 'About']);
+    ).toEqual(['Home', 'Music', 'Events', 'About']);
     expect(
       PUBLIC_PROFILE_NAVIGATION.every(
         destination =>
@@ -548,7 +548,7 @@ describe('PUBLIC_PROFILE_NAVIGATION', () => {
     const legacyLabel = clone();
     legacyLabel[2] = {
       ...legacyLabel[2],
-      label: 'Events',
+      label: 'Shows',
     } as unknown as PublicProfileNavigationDestination;
     expect(validatePublicProfileNavigation(legacyLabel)).toContain(
       'legacy-nav-label'

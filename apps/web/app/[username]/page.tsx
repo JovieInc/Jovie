@@ -1,16 +1,19 @@
 import { type Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { Suspense } from 'react';
+import { loadPublicReleaseCredits } from '@/app/[username]/[slug]/_lib/data';
 
 // No `export const dynamic` here — the parent layout sets `revalidate: 3600`
 // (ISR). The public profile route must stay ISR-cacheable; avoid any Dynamic
 // API (cookies(), headers()) in this RSC tree.
 
+import { AskJovieWidget } from '@/components/features/ask-jovie/AskJovieWidget';
 import type { ProfileMode } from '@/components/features/profile/contracts';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import { UnfazedProfileClient } from '@/components/features/profile/UnfazedProfileClient';
 import { BASE_URL } from '@/constants/app';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
+import { assertLiveProfileRoute } from '@/features/profile/live-profile-lock';
 import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
 import { ProfileAeoProofClaimCard } from '@/features/profile/ProfileAeoProofClaimCard';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
@@ -18,6 +21,7 @@ import { getProfileModeDefinition } from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking/JoviePixel';
 import { MetaPixel } from '@/features/tracking/MetaPixel';
+import { SignupFunnelBeacon } from '@/features/tracking/SignupFunnelBeacon';
 import {
   isProofProfileHandle,
   resolveProofClaimCta,
@@ -32,7 +36,6 @@ import {
   getCreditedArtistsWithProfiles,
   getStructuredReleaseCollaborators,
 } from '@/lib/discography/artist-queries';
-import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { getEntityIdentityLinks } from '@/lib/entity/queries';
 import { env } from '@/lib/env-server';
 import { DEFAULT_PROFILE_PAC_ASSIGNMENT } from '@/lib/flags/profile-pac';
@@ -46,6 +49,7 @@ import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
 import {
   buildProfileAeoContent,
   buildProfileAeoFaqStructuredData,
+  buildStructuredCollaboratorParagraph,
 } from '@/lib/profile/aeo-content';
 import {
   collectEntityMentions,
@@ -61,6 +65,7 @@ import { resolveOpaqueInternalProfileUsername } from '@/lib/profile/opaque-inter
 import { schedulePublicCollaboratorProfileReconciliation } from '@/lib/profile/public-collaborator-reconciliation';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { isUnclaimedStructuredCreditProfile } from '@/lib/profile/unclaimed-artist-profile';
+import { getCachedPublicReleasesForProfile } from '@/lib/releases/public-release-loader';
 import { generateProfileStructuredData } from '@/lib/seo/structured-data';
 import { resolveSpotifyArtistIdentity } from '@/lib/spotify/artist-id';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
@@ -152,12 +157,14 @@ async function getPublicTourDates(
 }
 
 async function getPublicReleases(profileId: string): Promise<{
-  readonly releases: Awaited<ReturnType<typeof getReleasesForProfileLite>>;
+  readonly releases: Awaited<
+    ReturnType<typeof getCachedPublicReleasesForProfile>
+  >;
   readonly failed: boolean;
 }> {
   try {
     return {
-      releases: await getReleasesForProfileLite(profileId),
+      releases: await getCachedPublicReleasesForProfile(profileId),
       failed: false,
     };
   } catch (error) {
@@ -247,7 +254,6 @@ async function ArtistPageContent({
   profileResult,
 }: Readonly<ArtistPageContentProps>) {
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
-  const viewerCountryCode = null;
 
   // IMPORTANT: Do NOT read cookies() here — it would opt this ISR route into
   // dynamic rendering, defeating the revalidate: 3600 set in layout.tsx.
@@ -255,6 +261,9 @@ async function ArtistPageContent({
   // work). The alertOptInVariant defaults to 'button' for ISR; ProfileCompactTemplate
   // renders AnonCookieBootstrap which resolves the per-user variant client-side
   // via /api/profile/audience-anon-cookie and updates its own state.
+  // Viewer geo reaches the client through the readable jv_country cookie the
+  // proxy stamps on the response; ProfileCompactTemplate reads it post-mount
+  // for DSP geo-sorting, so no server-side country input is passed here.
 
   const {
     profile,
@@ -338,6 +347,9 @@ async function ArtistPageContent({
     getClientTrackingToken(profile.id).token ?? undefined;
 
   const latestRelease = fetchedLatestRelease;
+  const releaseCredits = latestRelease?.id
+    ? await loadPublicReleaseCredits(latestRelease.id).catch(() => [])
+    : [];
 
   const publicContacts: PublicContact[] = toPublicContacts(
     contacts,
@@ -462,6 +474,9 @@ async function ArtistPageContent({
       {isPublicNoAuthSmoke ? null : (
         <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
       )}
+      {isPublicNoAuthSmoke || isClaimed ? null : (
+        <SignupFunnelBeacon surface='profile_claim' trackLanding={false} />
+      )}
       {/* Server-side pixel tracking */}
       {isPublicNoAuthSmoke ? null : <JoviePixel profileId={profile.id} />}
       {/* Browser Meta pixel (fbq) — builds the retargeting website custom
@@ -479,7 +494,6 @@ async function ArtistPageContent({
         mode={initialMode}
         artist={artist}
         socialLinks={links}
-        viewerCountryCode={viewerCountryCode}
         contacts={publicContacts}
         subtitle={subtitle}
         showBackButton={showBackButton}
@@ -498,6 +512,7 @@ async function ArtistPageContent({
         allowFanCapture={isClaimed}
         enableDynamicEngagement={creatorIsPro}
         latestRelease={latestRelease}
+        releaseCredits={releaseCredits}
         photoDownloadSizes={photoDownloadSizes}
         allowPhotoDownloads={allowPhotoDownloads}
         pressPhotos={pressPhotos}
@@ -521,6 +536,13 @@ async function ArtistPageContent({
           showOldReleases: profileSettings.showOldReleases === true,
         }}
         featuredPlaylistFallback={featuredPlaylistFallback}
+        creditSegments={
+          buildStructuredCollaboratorParagraph(
+            artist.name,
+            artist.handle,
+            releaseCollaborators
+          )?.segments
+        }
         releases={releases}
         catalogLoadFailed={catalogLoadFailed}
         merchCards={merchCards}
@@ -542,13 +564,17 @@ async function ArtistPageContent({
         />
       ) : null}
       {isPublicNoAuthSmoke ? null : (
-        <DesktopQrOverlayClient handle={artist.handle} />
+        <>
+          <DesktopQrOverlayClient handle={artist.handle} />
+          <AskJovieWidget username={artist.handle} artistName={artist.name} />
+        </>
       )}
     </>
   );
 }
 
 export default async function ArtistPage({ params }: Readonly<Props>) {
+  assertLiveProfileRoute();
   const { username, __profileMode: initialMode = 'profile' } = await params;
   assertValidProfileUsername(username);
 
@@ -598,7 +624,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   await enforceCanonicalPublicProfileUsername(username);
 
   const profileResult = await getProfileAndLinks(username);
-  const { profile, genres, status, creatorClerkId } = profileResult;
+  const { profile, genres, status, creatorClerkId, latestRelease } =
+    profileResult;
 
   if (status === 'error') {
     return PROFILE_ERROR_METADATA;
@@ -612,5 +639,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     profile,
     genres,
     isClaimed: creatorClerkId !== null,
+    // latestRelease uses the public release-eligibility predicate, so null
+    // means the profile has no publicly eligible release.
+    hasPublicRelease: latestRelease !== null,
   });
 }

@@ -27,6 +27,8 @@ const CODE = '00000000000040008000000000000001';
 const STATE = 'abcdef0123456789abcdef0123456789';
 const FLOW = 'htmjTw7x7kSYKEPuInDfGOJ0U9q56p4Y';
 
+const fetchMock = vi.fn().mockResolvedValue(new Response('ok'));
+
 function setSearchParams(query: string) {
   searchParamsMock.mockReturnValue(new URLSearchParams(query));
 }
@@ -59,6 +61,8 @@ function setLocationOrigin(origin: string) {
 describe('NativeReturnPage (native auth bounce)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    fetchMock.mockResolvedValue(new Response('ok'));
+    vi.stubGlobal('fetch', fetchMock);
     setPathname('/auth/native-return');
     // jsdom cannot navigate to a custom scheme; swallow the auto-fire assign.
     setLocationOrigin('https://jov.ie');
@@ -72,15 +76,74 @@ describe('NativeReturnPage (native auth bounce)', () => {
     const expectedDeepLink = `jovie://auth/complete?code=${CODE}&state=${STATE}&desktop_flow=${FLOW}`;
     const link = screen.getByRole('link', { name: 'Return to Jovie' });
     expect(link).toHaveAttribute('href', expectedDeepLink);
-    expect(hrefWrites).toEqual([expectedDeepLink]);
+    expect(screen.getByTestId('native-protocol-launcher')).toHaveAttribute(
+      'src',
+      expectedDeepLink
+    );
+    expect(hrefWrites).toEqual([]);
     expect(
       screen.getByRole('heading', { name: 'Return to Jovie' })
     ).toBeVisible();
     expect(
       screen.getByText('Authentication is complete. Return to Jovie.')
     ).toBeVisible();
+    expect(document.body).not.toHaveTextContent(expectedDeepLink);
+    expect(document.body).not.toHaveTextContent(CODE);
     expect(screen.queryByText('Jovie Desktop')).toBeNull();
   });
+
+  it('shows the desktop return code for when the deep link cannot reach the app', () => {
+    setSearchParams(
+      `code=${CODE}&state=${STATE}&desktop_flow=${FLOW}&return_code=BCDFGHJK`
+    );
+    render(<NativeReturnPage />);
+
+    expect(
+      screen.getByText('Jovie did not open? Enter this code in the app.')
+    ).toBeVisible();
+    expect(screen.getByText('BCDF-GHJK')).toBeVisible();
+  });
+
+  it.each([
+    [`code=${CODE}&state=${STATE}&return_code=BCDFGHJK`],
+    [`code=${CODE}&state=${STATE}&desktop_flow=${FLOW}&return_code=AEIOU123`],
+    [
+      `client=ios&code=${CODE}&state=${STATE}&desktop_flow=${FLOW}&return_code=BCDFGHJK`,
+    ],
+  ])('hides the return code when it cannot be redeemed (%s)', query => {
+    setSearchParams(query);
+    render(<NativeReturnPage />);
+    expect(screen.queryByTestId('desktop-return-code')).toBeNull();
+  });
+
+  it('hands the completion to the app loopback listener when advertised', () => {
+    setSearchParams(
+      `code=${CODE}&state=${STATE}&desktop_flow=${FLOW}&return_code=BCDFGHJK&loopback_port=51234`
+    );
+    render(<NativeReturnPage />);
+
+    // The typed return code stays visible: the loopback fetch runs in the
+    // background so a sign-in finished on another device still works.
+    expect(screen.getByTestId('desktop-return-code')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      `http://127.0.0.1:51234/auth/complete?code=${CODE}&state=${STATE}&desktop_flow=${FLOW}`,
+      expect.objectContaining({ credentials: 'omit' })
+    );
+  });
+
+  it.each([
+    `code=${CODE}&state=${STATE}&desktop_flow=${FLOW}`,
+    `code=${CODE}&state=${STATE}&desktop_flow=${FLOW}&loopback_port=abc`,
+    `code=${CODE}&state=${STATE}&desktop_flow=${FLOW}&loopback_port=99999`,
+    `client=ios&code=${CODE}&state=${STATE}&desktop_flow=${FLOW}&loopback_port=51234`,
+  ])(
+    'never hits the loopback listener without a valid electron port (%s)',
+    query => {
+      setSearchParams(query);
+      render(<NativeReturnPage />);
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  );
 
   it('preserves the deep link without desktop_flow when absent', () => {
     setSearchParams(`code=${CODE}&state=${STATE}`);
@@ -103,7 +166,11 @@ describe('NativeReturnPage (native auth bounce)', () => {
     expect(
       screen.getByRole('link', { name: 'Return to Jovie' })
     ).toHaveAttribute('href', expectedDeepLink);
-    expect(hrefWrites).toEqual([expectedDeepLink]);
+    expect(screen.getByTestId('native-protocol-launcher')).toHaveAttribute(
+      'src',
+      expectedDeepLink
+    );
+    expect(hrefWrites).toEqual([]);
   });
 
   it('uses the local app scheme on localhost origin', () => {
@@ -115,7 +182,11 @@ describe('NativeReturnPage (native auth bounce)', () => {
     expect(
       screen.getByRole('link', { name: 'Return to Jovie' })
     ).toHaveAttribute('href', expectedDeepLink);
-    expect(hrefWrites).toEqual([expectedDeepLink]);
+    expect(screen.getByTestId('native-protocol-launcher')).toHaveAttribute(
+      'src',
+      expectedDeepLink
+    );
+    expect(hrefWrites).toEqual([]);
   });
 
   it('renders safely before browser location is available', () => {
@@ -153,7 +224,11 @@ describe('NativeReturnPage (native auth bounce)', () => {
     expect(
       screen.getByRole('link', { name: 'Return to Jovie' })
     ).toHaveAttribute('href', expectedDeepLink);
-    expect(hrefWrites).toEqual([expectedDeepLink]);
+    expect(screen.getByTestId('native-protocol-launcher')).toHaveAttribute(
+      'src',
+      expectedDeepLink
+    );
+    expect(hrefWrites).toEqual([]);
     expect(screen.queryByRole('link', { name: /continue/i })).toBeNull();
     expect(screen.queryByRole('link', { name: /dashboard/i })).toBeNull();
     expect(screen.queryByRole('link', { name: /library/i })).toBeNull();

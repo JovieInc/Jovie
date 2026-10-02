@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 import { ArtistNotificationsHero } from './ArtistNotificationsHero';
 import storyMeta, { Hero } from './ArtistNotificationsHero.stories';
 
@@ -11,18 +12,35 @@ describe('ArtistNotificationsHero', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'Reach Every Fan. Automatically.',
+        name: segmentedAccessibleName('Reach Every Fan.', 'Automatically.'),
       })
-    ).toHaveClass('line-clamp-2');
+    ).not.toHaveClass('line-clamp-2');
     expect(
       screen.getByRole('link', {
         name: ARTIST_NOTIFICATIONS_COPY.hero.primaryCtaLabel,
       })
     ).toHaveAttribute('href', ARTIST_NOTIFICATIONS_COPY.hero.primaryCtaHref);
 
+    const cardStage = screen.getByTestId('artist-notifications-card-stage');
     for (const card of ARTIST_NOTIFICATIONS_COPY.hero.floatingCards) {
-      expect(screen.getByText(card.title)).toBeInTheDocument();
+      expect(cardStage).toHaveTextContent(card.title);
     }
+  });
+
+  it('docks under the header and renders the low-opacity dark-underlay hero image', () => {
+    const { container } = render(
+      <ArtistNotificationsHero hero={ARTIST_NOTIFICATIONS_COPY.hero} />
+    );
+
+    expect(container.querySelector('section')).toHaveClass(
+      'marketing-hero-dock'
+    );
+
+    const heroImage = container.querySelector('img[alt=""]');
+    expect(heroImage?.getAttribute('src')).toContain(
+      encodeURIComponent('/images/hero/artist-notifications.webp')
+    );
+    expect(heroImage).toHaveClass('opacity-30');
   });
 
   it('keeps the adjacent Storybook receipt bound to the production fixture', () => {

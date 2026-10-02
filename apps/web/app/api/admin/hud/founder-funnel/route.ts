@@ -6,8 +6,8 @@ import {
   type FounderFunnelTimeRange,
   getFounderFunnelData,
 } from '@/lib/admin/founder-funnel';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 export const runtime = 'nodejs';
 
@@ -23,7 +23,7 @@ function parseRange(request: Request): FounderFunnelTimeRange {
 }
 
 async function authorizeAdmin(): Promise<Response | null> {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },

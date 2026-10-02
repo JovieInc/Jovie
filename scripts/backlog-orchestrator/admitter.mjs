@@ -17,7 +17,11 @@ import {
 } from './ownership-inventory.mjs';
 import { planGateReceipt } from './plan-gate.mjs';
 import { researchGateReceipt } from './research-gate.mjs';
-import { scoreIssue } from './scorer.mjs';
+import {
+  assessPreventionLeverage,
+  rankQueueCandidates,
+  scoreIssue,
+} from './scorer.mjs';
 import { verifyRoutingReceipt } from './symphony-routing.mjs';
 
 export const SYMPHONY_LABEL = 'symphony';
@@ -674,26 +678,51 @@ export function evaluateFleetGate(
   const queueRepositoryCapacity = queueRepository
     ? scopedLaneCapacity?.repositories?.[queueRepository]
     : null;
-  const queueRepositoryCapacityAvailable = Boolean(
-    queueRepositoryCapacity &&
-      queueRepositoryCapacity.ready < queueRepositoryCapacity.budget
+  const laneCapacity = evidence?.queue?.laneCapacity;
+  const laneCapacityReceiptValid = Boolean(
+    queueRepository &&
+      laneCapacity &&
+      typeof laneCapacity === 'object' &&
+      !Array.isArray(laneCapacity) &&
+      laneCapacity.schema === 'jovie-lane-capacity/v2' &&
+      laneCapacity.repositories &&
+      typeof laneCapacity.repositories === 'object' &&
+      !Array.isArray(laneCapacity.repositories)
   );
+  const queueRepositoryCapacityConsistent = Boolean(
+    laneCapacityReceiptValid &&
+      queueRepositoryCapacity &&
+      queueRepositoryCapacity.ready === greenReadyPrs &&
+      queueRepositoryCapacity.budget === queueTarget
+  );
+  // Mirror gem-priority-gate (JOV-5340): a lane-capacity receipt vetoes new
+  // leases only when present and contradictory; an absent or unscoped
+  // receipt must not freeze a lane below queue backpressure.
+  const queueRepositoryCapacityAvailable =
+    queueBelowBackpressure &&
+    (!laneCapacityReceiptValid || queueRepositoryCapacityConsistent);
   const newMutationAllowed =
-    concurrency.newMutationAllowed &&
-    queueShapeValid &&
-    queueRepositoryCapacityAvailable;
+    queueShapeValid && queueRepositoryCapacityAvailable;
+  // merge-speed-fast-ui-lanes-v1: a bound-GREEN fleet also admits isolated
+  // UI/docs promotion on source-bound gates.
   const isolatedPromotionAllowed =
-    state === FLEET_GATE_STATE.AMBER &&
     reviewAdmission.allowed &&
     controllerFresh &&
     controllerStatus === 'green' &&
     mainStatus === 'green' &&
-    productionStatus === 'red' &&
     ['clear', 'resolved'].includes(integrityStatus) &&
     queueBelowBackpressure &&
-    reasons.every(
-      reason => reason.code === FLEET_GATE_REASON.PRODUCTION_NOT_GREEN
-    );
+    ((state === FLEET_GATE_STATE.GREEN &&
+      productionStatus === 'green' &&
+      deploymentBound(
+        evidence?.main?.sha,
+        evidence?.production?.deployedSha
+      )) ||
+      (state === FLEET_GATE_STATE.AMBER &&
+        productionStatus === 'red' &&
+        reasons.every(
+          reason => reason.code === FLEET_GATE_REASON.PRODUCTION_NOT_GREEN
+        )));
   const workActivities =
     state === FLEET_GATE_STATE.RED
       ? [...FLEET_AUTHORITY.RED]
@@ -745,19 +774,20 @@ export function evaluateFleetGate(
         FLEET_GATE_REASON.PRODUCTION_DEPLOYMENT_UNBOUND,
       ].includes(reason)
     );
-  const promotionMode = isolatedPromotionAllowed
-    ? FLEET_PROMOTION_MODE.ISOLATED_ONLY
-    : state === FLEET_GATE_STATE.GREEN
+  const promotionMode =
+    state === FLEET_GATE_STATE.GREEN
       ? FLEET_PROMOTION_MODE.NORMAL
-      : state === FLEET_GATE_STATE.AMBER &&
-          mainStatus === 'red' &&
-          ['clear', 'resolved'].includes(integrityStatus)
-        ? FLEET_PROMOTION_MODE.DRAFT_ONLY
-        : holdIntakeAllowed
-          ? FLEET_PROMOTION_MODE.HOLD_INTAKE
-          : controllerRepairAllowed
-            ? FLEET_PROMOTION_MODE.CONTROLLER_REPAIR_ONLY
-            : FLEET_PROMOTION_MODE.BLOCKED;
+      : isolatedPromotionAllowed
+        ? FLEET_PROMOTION_MODE.ISOLATED_ONLY
+        : state === FLEET_GATE_STATE.AMBER &&
+            mainStatus === 'red' &&
+            ['clear', 'resolved'].includes(integrityStatus)
+          ? FLEET_PROMOTION_MODE.DRAFT_ONLY
+          : holdIntakeAllowed
+            ? FLEET_PROMOTION_MODE.HOLD_INTAKE
+            : controllerRepairAllowed
+              ? FLEET_PROMOTION_MODE.CONTROLLER_REPAIR_ONLY
+              : FLEET_PROMOTION_MODE.BLOCKED;
   const cohort = alreadyAdmittedCohortSemantics(promotionMode);
   const closureAwareCohort = closureAdmission.newIssueIntakeAllowed
     ? cohort
@@ -867,7 +897,11 @@ export function hasAdmissionEvidence(issue, classification = issue) {
 
 export function buildAdmissionReceipt(
   issue,
-  { now = new Date().toISOString(), fingerprint = '' } = {}
+  {
+    now = new Date().toISOString(),
+    fingerprint = '',
+    queueRankingReceipt = null,
+  } = {}
 ) {
   const targeting = resolveAdmissionTarget(issue);
   const target =
@@ -883,6 +917,7 @@ export function buildAdmissionReceipt(
       researchGateReceipt(issue, { now })?.payload?.fingerprint || '',
     action: 'lease',
     at: now,
+    ...(queueRankingReceipt ? { queueRanking: queueRankingReceipt } : {}),
     ...(target || {}),
   })} -->`;
 }
@@ -983,17 +1018,24 @@ export async function selectNextToAdmit(
       preAdmission: decision.preAdmission,
     })
   );
-  const candidates = evaluations
+  const eligible = evaluations
     .filter(({ decision }) => decision.eligible)
-    .map(({ classification }) => ({
-      ...classification,
-      type: 'issue',
-      issue: issueForClassification(classification),
-      score: scoreIssue(classification).score,
-    }))
-    .sort(
-      (a, b) => b.score - a.score || a.identifier.localeCompare(b.identifier)
+    .map(({ classification }) => classification);
+  // JOV-7091: evaluate upstream prevention leverage against the rest of the
+  // eligible queue before scoring. Weak evidence leaves `prevention` null, so
+  // a mislabeled invariant earns no automatic priority.
+  for (const classification of eligible) {
+    classification.prevention = assessPreventionLeverage(
+      classification,
+      eligible
     );
+  }
+  const candidates = eligible.map(classification => ({
+    ...classification,
+    type: 'issue',
+    issue: issueForClassification(classification),
+    score: scoreIssue(classification).score,
+  }));
 
   if (candidates.length === 0) {
     return {
@@ -1004,12 +1046,21 @@ export async function selectNextToAdmit(
       admissionDecisions,
     };
   }
-  const selected = candidates[0];
+  const queueRanking = rankQueueCandidates(candidates, {
+    selectedAt: state.now,
+  });
+  const selected = {
+    ...queueRanking.ranked[0],
+    queueRankingReceipt: queueRanking.receipt,
+  };
   return {
     admit: [selected],
-    reason: `selected: ${selected.identifier} (score ${selected.score})`,
+    reason:
+      `selected: ${selected.identifier} (score ${selected.score}; ` +
+      `${queueRanking.receipt.mode})`,
     fleetGate,
     admissionDecisions,
+    queueRankingReceipt: queueRanking.receipt,
   };
 }
 
@@ -1071,6 +1122,7 @@ export async function admitIssue({
   const receipt = buildAdmissionReceipt(issue, {
     now,
     fingerprint: classification.fingerprint || '',
+    queueRankingReceipt: classification.queueRankingReceipt || null,
   });
   if (
     hasReceipt(issue, receipt) ||

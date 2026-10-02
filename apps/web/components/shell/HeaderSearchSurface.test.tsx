@@ -7,6 +7,7 @@ import {
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { HeaderSearchAdapter } from '@/contexts/HeaderActionsContext';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 import { HeaderSearchSurface } from './HeaderSearchSurface';
 import type { SearchableRelease } from './header-search-results';
 
@@ -50,6 +51,33 @@ describe('HeaderSearchSurface', () => {
     expect(trigger.className).toContain('duration-subtle');
     expect(trigger.className).toContain('ease-subtle');
     expect(trigger.className).not.toContain('duration-cinematic');
+  });
+
+  it('keeps hover chrome and keyboard focus rings inset so the compact trigger does not clip', () => {
+    render(
+      <HeaderSearchSurface
+        adapter={createAdapter()}
+        isOpen={false}
+        onOpen={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Search' });
+    expect(trigger).toHaveClass(
+      'hover:border-default',
+      'hover:bg-surface-1',
+      'hover:text-primary-token',
+      'focus-visible:ring-inset',
+      'focus-ring-themed',
+      'rounded-xl'
+    );
+    expect(trigger.className).not.toContain('overflow-hidden');
+
+    const shortcut = trigger.querySelector('kbd');
+    expect(shortcut).not.toBeNull();
+    expect(shortcut).toHaveTextContent('/');
+    expect(shortcut).toHaveClass('hidden', 'sm:inline', 'text-tertiary-token');
   });
 
   it('keeps the open search surface on the same compact header height', () => {
@@ -186,16 +214,16 @@ describe('HeaderSearchSurface', () => {
 
     expect(screen.getByText('Threads')).toBeVisible();
     expect(screen.getByText('Entities')).toBeVisible();
-    expect(screen.getByText('Library Assets')).toBeVisible();
+    expect(screen.getByText('Work')).toBeVisible();
     expect(screen.getByText('Current view')).toBeVisible();
     expect(screen.getByRole('group', { name: 'Threads' })).toBeVisible();
     expect(screen.getByRole('group', { name: 'Entities' })).toBeVisible();
-    expect(screen.getByRole('group', { name: 'Library Assets' })).toBeVisible();
+    expect(screen.getByRole('group', { name: 'Work' })).toBeVisible();
     expect(screen.getByRole('group', { name: 'Current View' })).toBeVisible();
     for (const heading of [
       screen.getByText('Threads'),
       screen.getByText('Entities'),
-      screen.getByText('Library Assets'),
+      screen.getByText('Work'),
       screen.getByText('Current view'),
     ]) {
       expect(heading.className).not.toContain('uppercase');
@@ -225,7 +253,7 @@ describe('HeaderSearchSurface', () => {
     expect(options[0]).toHaveAttribute('aria-selected', 'true');
     expect(options[2]).toHaveClass('system-b-table-row-shell', 'min-h-10');
     const filterSuggestion = screen.getByRole('option', {
-      name: 'Midnight Artist Filter by artist',
+      name: segmentedAccessibleName('Midnight Artist', 'Filter by artist'),
     });
     expect(filterSuggestion).toHaveClass(
       'system-b-table-row-shell',
@@ -253,6 +281,39 @@ describe('HeaderSearchSurface', () => {
     ]);
   });
 
+  it('uses the banned-icon-safe Layers glyph for a release with no known provider', () => {
+    render(
+      <HeaderSearchSurface
+        adapter={createAdapter()}
+        catalog={{
+          conversations: [],
+          profiles: [],
+          releases: [
+            {
+              id: 'release-unknown-provider',
+              title: 'Unmastered Draft',
+              artistNames: ['Midnight Artist'],
+              smartLinkPath: '/midnight-artist/unmastered-draft',
+            },
+          ],
+        }}
+        isOpen
+        onOpen={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search Jovie' }), {
+      target: { value: 'unmastered' },
+    });
+
+    const icon = screen
+      .getByRole('option', { name: /Unmastered Draft/ })
+      .querySelector('[data-header-search-result-icon] svg');
+    expect(icon).toHaveClass('lucide-layers');
+    expect(icon).not.toHaveClass('lucide-disc-3');
+  });
+
   it('keeps the active result identity stable as slower groups arrive and falls back only when it disappears', () => {
     const onClose = vi.fn();
     const props = {
@@ -276,7 +337,7 @@ describe('HeaderSearchSurface', () => {
     const input = screen.getByRole('combobox', { name: 'Search Jovie' });
     fireEvent.change(input, { target: { value: 'sober' } });
     const releaseOption = screen.getByRole('option', {
-      name: 'Sober Frank Ocean',
+      name: segmentedAccessibleName('Sober', 'Frank Ocean'),
     });
     expect(releaseOption).toHaveAttribute('aria-selected', 'true');
 
@@ -299,7 +360,7 @@ describe('HeaderSearchSurface', () => {
     );
 
     const stableReleaseOption = screen.getByRole('option', {
-      name: 'Sober Frank Ocean',
+      name: segmentedAccessibleName('Sober', 'Frank Ocean'),
     });
     expect(stableReleaseOption).toHaveAttribute('aria-selected', 'true');
     const activateRelease = vi

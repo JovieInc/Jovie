@@ -1,5 +1,5 @@
 ---
-paths: [".github/**", "scripts/hermes/**", "apps/web/app/api/cron/**", "vercel.json"]
+paths: [".github/**", "scripts/fleet-gate/**", "apps/web/app/api/cron/**", "vercel.json"]
 ---
 
 # Infrastructure & Scheduling Guardrails

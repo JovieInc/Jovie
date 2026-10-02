@@ -16,8 +16,8 @@ import {
   ChevronRight,
   ChevronUp,
   Copy,
-  Disc3,
   ExternalLink,
+  Layers,
   Link as LinkIcon,
   Music,
   Pencil,
@@ -70,7 +70,7 @@ const DSP_GLYPH: Record<DspKey, string> = {
 const DSP_COLOR: Record<DspKey, string> = {
   spotify: 'bg-emerald-500/85',
   apple: 'bg-rose-400/85',
-  youtube: 'bg-red-500/85',
+  youtube: 'bg-brand-youtube/85',
   tidal: 'bg-sky-400/85',
   amazon: 'bg-amber-400/85',
 };
@@ -563,7 +563,7 @@ function ActivityBlock() {
   return (
     <div className='flex flex-col gap-1.5'>
       <ActivityRow
-        icon={Disc3}
+        icon={Layers}
         label={`${release.tasksOpen} open tasks`}
         meta='Last touched 2h ago'
       />
@@ -588,7 +588,7 @@ function ActivityRow({
   meta,
   accent,
 }: {
-  icon: typeof Disc3;
+  icon: typeof Layers;
   label: string;
   meta: string;
   accent?: boolean;
@@ -969,7 +969,7 @@ const COMMAND_GROUPS: CommandGroup[] = [
     label: 'Navigate',
     items: [
       { label: 'Open release page', icon: ExternalLink, shortcut: '↵' },
-      { label: 'View tasks (2)', icon: Disc3 },
+      { label: 'View tasks (2)', icon: Layers },
       { label: 'View related tracks', icon: Music },
       { label: 'View audience', icon: Users },
     ],

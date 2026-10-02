@@ -213,16 +213,18 @@ struct MobileMeResponseTests {
     #expect(ChatComposerCopy.emptyPlaceholder.isEmpty)
   }
 
-  @Test func workspaceStoreForcesJovieForNonAdminAndPersistsOvieForAdmin() {
-    let suiteName = "MobileWorkspaceStoreTests"
-    let defaults = UserDefaults(suiteName: suiteName)!
-    defaults.removePersistentDomain(forName: suiteName)
-    defaults.set(MobileWorkspaceMode.ovie.rawValue, forKey: MobileWorkspaceStore.defaultsKey)
-    #expect(MobileWorkspaceStore.load(isAdmin: false, defaults: defaults) == .jovie)
-    MobileWorkspaceStore.save(.ovie, isAdmin: false, defaults: defaults)
-    #expect(defaults.string(forKey: MobileWorkspaceStore.defaultsKey) == MobileWorkspaceMode.jovie.rawValue)
-    MobileWorkspaceStore.save(.ovie, isAdmin: true, defaults: defaults)
-    #expect(MobileWorkspaceStore.load(isAdmin: true, defaults: defaults) == .ovie)
+  @Test func workspaceStoreForcesJovieForNonAdminAndScopesOvieToSession() {
+    MobileWorkspaceStore.resetSessionForTesting()
+    MobileWorkspaceStore.save(.ovie, isAdmin: false)
+    #expect(MobileWorkspaceStore.load(isAdmin: false) == .jovie)
+    #expect(MobileWorkspaceStore.load(isAdmin: true) == .jovie)
+    MobileWorkspaceStore.save(.ovie, isAdmin: true)
+    #expect(MobileWorkspaceStore.load(isAdmin: true) == .ovie)
+    // Ovie never survives a cold start: the artist app relaunches in Jovie
+    // mode so the Inbox cannot inherit Taste/ops copy (JOV-5358).
+    MobileWorkspaceStore.resetSessionForTesting()
+    #expect(MobileWorkspaceStore.load(isAdmin: true) == .jovie)
+    MobileWorkspaceStore.save(.jovie, isAdmin: true)
   }
 
   @Test func inboxStillImageURLOnlyForStillType() {
@@ -243,5 +245,72 @@ struct MobileMeResponseTests {
         == "https://cdn.jov.ie/stills/16197.jpg"
     )
     #expect(item("Card", url: "https://cdn.jov.ie/cards/local.png").stillImageURL == nil)
+  }
+
+  @Test func appleWalletFlowCoversLoadingFailureRetryAndDuplicateRequests() {
+    var state = AppleWalletFlowState.available
+
+    let firstRequest = state.beginRequest()
+    #expect(firstRequest)
+    #expect(state == .loading)
+    let duplicateRequest = state.beginRequest()
+    #expect(!duplicateRequest)
+
+    state.requestFailed()
+    #expect(state == .failed)
+    let retryRequest = state.beginRequest()
+    #expect(retryRequest)
+  }
+
+  @Test func appleWalletAvailabilityKeepsServerAndDeviceFailuresTruthful() {
+    #expect(
+      AppleWalletControlAvailability(
+        serverAvailable: false,
+        deviceCanAddPasses: true
+      ) == .serverUnavailable
+    )
+    #expect(
+      AppleWalletControlAvailability(
+        serverAvailable: true,
+        deviceCanAddPasses: false
+      ) == .deviceUnsupported
+    )
+    #expect(
+      AppleWalletControlAvailability(
+        serverAvailable: true,
+        deviceCanAddPasses: true
+      ) == .available
+    )
+  }
+
+  @Test func appleWalletFlowNeverTreatsCancellationAsInstallation() {
+    var state = AppleWalletFlowState.loading
+    state.preparedPass(isInstalled: false)
+    #expect(state == .presenting)
+    let presentingRequest = state.beginRequest()
+    #expect(!presentingRequest)
+
+    state.presentationFinished(isInstalled: false)
+    #expect(state == .available)
+    let retryAfterCancel = state.beginRequest()
+    #expect(retryAfterCancel)
+  }
+
+  @Test func appleWalletFlowCoversInstalledAndUnavailableControllerPaths() {
+    var state = AppleWalletFlowState.loading
+    state.preparedPass(isInstalled: true)
+    #expect(state == .installed)
+    let installedRequest = state.beginRequest()
+    #expect(!installedRequest)
+
+    state = .loading
+    state.preparedPass(isInstalled: false, controllerAvailable: false)
+    #expect(state == .controllerUnavailable)
+    let unavailableRequest = state.beginRequest()
+    #expect(unavailableRequest)
+
+    state.preparedPass(isInstalled: false)
+    state.presentationFinished(isInstalled: true)
+    #expect(state == .installed)
   }
 }

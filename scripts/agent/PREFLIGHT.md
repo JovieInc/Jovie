@@ -1,5 +1,7 @@
 # Agent preflight receipt (`scripts/agent/preflight.sh`)
 
+> Symphony is the shipping lanes harness (`scripts/lanes/README.md`). The Symphony Elixir control plane is retired from Jovie; paths written `symphony-control/...` live in the private repo JovieInc/symphony-control (full history).
+
 JOV-4183 — deterministic bootstrap for `/autoplan` (and other agent jobs).
 
 ## Why
@@ -57,7 +59,7 @@ in-run (it fetches the network and performs one-time migrations).
 `receipt.gstack.latest` is a read-only parse of the cached
 `~/.gstack/last-update-check` state file. `receipt.gstack.policy` defaults to
 `pinned` when no explicit config override exists. Upgrades run out-of-band in
-the nightly Hermes cron (`scripts/symphony/jobs/gstack-nightly-upgrade.ts`,
+the nightly Hermes cron (`symphony-control/jobs/gstack-nightly-upgrade.ts`,
 backup/restore + ops alert on failure).
 
 ## Implementation

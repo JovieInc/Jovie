@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EmailCodeAuthForm } from './EmailCodeAuthForm';
 
@@ -28,6 +29,9 @@ vi.mock('@/hooks/useClerkSafe', () => ({
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
+
+const trackFunnelStep = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/analytics/signup-funnel-client', () => ({ trackFunnelStep }));
 
 vi.mock('@/lib/utils/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
@@ -75,6 +79,41 @@ beforeEach(() => {
 });
 
 describe('EmailCodeAuthForm', () => {
+  it('records a signup auth_start, then an error step when the send fails', async () => {
+    sendVerificationOtp.mockResolvedValueOnce({
+      data: null,
+      error: { status: 500, statusText: 'Server Error' },
+    });
+    renderForm();
+    await submitEmail();
+
+    await waitFor(() => expect(trackFunnelStep).toHaveBeenCalledTimes(2));
+    expect(trackFunnelStep).toHaveBeenNthCalledWith(1, {
+      funnel: 'artist_signup',
+      step: 'auth_start',
+      surface: 'signup',
+    });
+    expect(trackFunnelStep).toHaveBeenNthCalledWith(2, {
+      funnel: 'artist_signup',
+      step: 'auth_start',
+      outcome: 'error',
+      surface: 'signup',
+      reason: 'otp_send_failed',
+    });
+  });
+
+  it('does not count sign-in as a signup funnel step', async () => {
+    sendVerificationOtp.mockResolvedValueOnce({
+      data: { success: true },
+      error: null,
+    });
+    render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/start' />);
+    await submitEmail();
+
+    await waitFor(() => expect(sendVerificationOtp).toHaveBeenCalledTimes(1));
+    expect(trackFunnelStep).not.toHaveBeenCalled();
+  });
+
   it('stays on the email step and shows an error when send returns an error result', async () => {
     sendVerificationOtp.mockResolvedValueOnce({
       data: null,
@@ -131,6 +170,42 @@ describe('EmailCodeAuthForm', () => {
     expect(locationAssign).not.toHaveBeenCalled();
   });
 
+  it('reads a send error code from the message prefix when code is absent', async () => {
+    sendVerificationOtp.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'rate_limit_exceeded: slow down' },
+    });
+    renderForm();
+    await submitEmail();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/too many requests\. please wait a moment/i)
+      ).toBeTruthy()
+    );
+    expect(
+      document.querySelector('[data-auth-email-code-step="code"]')
+    ).toBeNull();
+  });
+
+  it('locks verify when the message prefix is too many attempts and code is absent', async () => {
+    renderForm();
+    await reachCodeStep();
+
+    signInEmailOtp.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'TOO_MANY_ATTEMPTS: locked out' },
+    });
+    await submitCode('111111');
+
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-auth-email-code-step="locked"]')
+      ).toBeTruthy()
+    );
+    expect(locationAssign).not.toHaveBeenCalled();
+  });
+
   it('navigates to the redirect URL when verify succeeds', async () => {
     renderForm();
     await reachCodeStep();
@@ -139,5 +214,30 @@ describe('EmailCodeAuthForm', () => {
     await submitCode('424242');
 
     await waitFor(() => expect(locationAssign).toHaveBeenCalledWith('/start'));
+  });
+});
+
+describe('EmailCodeAuthForm pre-hydration guard', () => {
+  it('server-renders the send button disabled so an early click cannot native-submit the email into the URL', () => {
+    const html = renderToString(
+      <EmailCodeAuthForm mode='sign-up' redirectUrl='/start' />
+    );
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    const sendButton = container.querySelector<HTMLButtonElement>(
+      'button[type="submit"]'
+    );
+
+    expect(sendButton?.disabled).toBe(true);
+  });
+
+  it('enables the send button once the client submit handler is attached', async () => {
+    renderForm();
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Send sign-in code' })
+      ).toBeEnabled()
+    );
   });
 });

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { NextResponse } from 'next/server';
 import { env } from '@/lib/env';
+import { getWorktreeIdentity } from '@/lib/observability/worktree-runtime';
 // Compile-time release version from monorepo root. Bundled into the route so
 // the response cannot collapse to 0.0.0 when NEXT_PUBLIC_APP_VERSION is not
 // present at runtime (JOV-3459).
@@ -52,6 +53,7 @@ function resolveCommitSha(): string | undefined {
 }
 
 export function GET() {
+  const worktree = getWorktreeIdentity();
   const version = resolveAppVersion();
   const environment = env.VERCEL_ENV;
   const isDevelopment = env.NODE_ENV !== 'production';
@@ -78,7 +80,9 @@ export function GET() {
       version,
       deployedAt: env.VERCEL_DEPLOYMENT_TIME || Date.now(),
       commitSha: resolveCommitSha(),
+      deploymentId: env.VERCEL_DEPLOYMENT_ID,
       environment,
+      ...(worktree ? { worktree } : {}),
     },
     {
       headers: { ...BUILD_INFO_CACHE_HEADERS },

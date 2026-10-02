@@ -14,11 +14,14 @@ files:
 extraResources:
   - from: build/build-identity.json
     to: build-identity.json
+  - from: ../web/public/brand/Jovie-Wordmark-Cream.svg
+    to: Jovie-Wordmark-Cream.svg
 mac:
   category: public.app-category.music
   darkModeSupport: true
   hardenedRuntime: true
-  entitlements: build/entitlements.mac.plist
+  entitlements: build/entitlements.mac.production.plist
+  provisioningProfile: build/jovie-mac.provisionprofile
   entitlementsInherit: build/entitlements.mac.inherit.plist
   extendInfo:
     NSMicrophoneUsageDescription: Jovie records your voice on morning product walks.

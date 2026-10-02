@@ -32,7 +32,7 @@ export async function verifyProfileHasAvatar(): Promise<{
     .select({ avatarUrl: creatorProfiles.avatarUrl })
     .from(creatorProfiles)
     .innerJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(and(eq(users.clerkId, userId), eq(creatorProfiles.isClaimed, true)))
+    .where(and(eq(users.id, userId), eq(creatorProfiles.isClaimed, true)))
     .limit(1);
 
   const avatarUrl = profile?.avatarUrl?.trim();
@@ -60,7 +60,7 @@ export async function getProfileAvatarUrl(): Promise<{
     .select({ avatarUrl: creatorProfiles.avatarUrl })
     .from(creatorProfiles)
     .innerJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(and(eq(users.clerkId, userId), eq(creatorProfiles.isClaimed, true)))
+    .where(and(eq(users.id, userId), eq(creatorProfiles.isClaimed, true)))
     .limit(1);
 
   return { avatarUrl: profile?.avatarUrl?.trim() || null };
@@ -84,7 +84,7 @@ export async function updateOnboardingProfile(updates: {
     })
     .from(creatorProfiles)
     .innerJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(and(eq(users.clerkId, userId), eq(creatorProfiles.isClaimed, true)))
+    .where(and(eq(users.id, userId), eq(creatorProfiles.isClaimed, true)))
     .limit(1);
 
   if (!profile) {

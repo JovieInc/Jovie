@@ -256,7 +256,7 @@ function main() {
       errors.push(
         `${key} regression: ${count} > baseline ${base}\n` +
           `  New raw-color violations introduced. Use a semantic token instead\n` +
-          `  (text-foreground, bg-background, bg-surface-1, border-border, etc.).\n` +
+          `  (text-foreground, bg-base, bg-surface-1, border-subtle, etc.).\n` +
           `  See DESIGN.md → "Use tokens, not raw colors".\n` +
           `  Once violations are fixed, lower the baseline: node scripts/lint-contrast-ratchet.mjs --update`
       );

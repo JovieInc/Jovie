@@ -178,7 +178,7 @@ async function writeAndReadback(
   }
   try {
     const readback = await writer.getVideo(live.id);
-    if (!readback || readback.snippet.description !== description) {
+    if (readback?.snippet.description !== description) {
       return { ok: false, error: 'readback-mismatch' };
     }
     return { ok: true, live: readback };

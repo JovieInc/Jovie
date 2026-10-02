@@ -123,8 +123,8 @@ Raw Tailwind color utilities (`text-black`, `bg-white`, `text-[#fff]`) are the r
 |--------|-----|-------------|
 | `text-black` without `dark:text-*` | Black text invisible in dark mode | `text-foreground` |
 | `text-white` without `dark:text-*` | White text invisible in light mode | `text-foreground` or `text-primary-token` |
-| `bg-white` without `dark:bg-*` | White bg may trap dark text in dark mode | `bg-background` or `bg-surface-1` |
-| `bg-black` without `dark:bg-*` | Black bg may trap light text | `bg-background` |
+| `bg-white` without `dark:bg-*` | White bg may trap dark text in dark mode | `bg-base` or `bg-surface-1` |
+| `bg-black` without `dark:bg-*` | Black bg may trap light text | `bg-base` |
 | `text-[#hex]` / `bg-[#hex]` / `border-[#hex]` | Arbitrary hex bypasses token system entirely | Pick a named token from the Color System tables below |
 
 **Opacity-modified overlay patterns** (`text-black/20`, `bg-white/5`) are intentional and allowed — they represent translucent overlays on known-dark surfaces, not absolute colors.
@@ -148,7 +148,7 @@ Mint = success. Orange = warning. Red = danger. Use semantic tokens, not these n
 
 | Surface | Dark value |
 |---|---|
-| Shell | `#06080D` | `--color-bg-surface-0`, sidebar rgb `6 8 13` | Sidebar / chrome |
+| Shell | `#07080A` | `--color-bg-surface-0`, sidebar rgb `7 8 10` | Sidebar / chrome |
 
 ## Spacing
 
@@ -210,23 +210,19 @@ Read [the component patterns reference](docs/design-system/DETAILS.md#component-
 
 ### Sidebar (App Shell)
 
-Founder lock 2026-09-12, Pen `OqZTF`: 280px customer rail; combined search/inbox/
-new-chat bar; Library, Contacts, Presence (`canonicalSidebarNavigation`); 36px
-nav/history rows; Today/Earlier history; bottom-anchored account footer. Mobile
-keeps its composition. Homepage `t1x8T` remains locked.
+Founder lock 2026-09-12, Pen `OqZTF`: combined search/inbox/new-chat bar;
+Today/Earlier history; footer. JOV-7305 defines the shared Home, Identity,
+Work, Audience root (`canonicalSidebarNavigation`). Links are contextual
+representations, not a top-level area. Mobile derives from the same ordered set.
+Homepage `t1x8T` locked. Founder lock 2026-09-25 brought it to Linear-scale
+density (28px rows, neutral non-ion selected state). Read
+[the sidebar reference](docs/design-system/DETAILS.md#sidebar-app-shell)
+for full tokens and sizing when changing this area.
 
 | Token | Light | Dark |
 |-------|-------|------|
-| Width | 280px | 280px |
-| Background RGB | `247 248 248` | `6 8 13` |
-| Foreground RGB | `18 18 20` | `227 228 229` |
-| Border RGB | `0 0 0 / 0.06` | `255 255 255 / 0.06` |
-| Accent RGB | `242 243 245` | `255 255 255 / 0.03` |
-| Item foreground RGB | `88 90 96` | `214 218 226` |
-| Item icon RGB | `122 125 132` | `116 120 128` |
-| Muted RGB | `112 116 124` | `107 111 118` |
-| Nav font | 12px / weight 500 | — |
-| Item font | 13px / weight 450 | — |
+| Width | 244px | 244px |
+| Background RGB | `247 248 248` | `7 8 10` |
 
 
 ## Full-Screen Status Screens

@@ -7,6 +7,7 @@ import { getSocialLinksVerificationColumnSupport } from '@/lib/db/queries/social
 import { socialLinks } from '@/lib/db/schema/links';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { enforceLinksMutationAccess } from './route.shared';
 
 interface VerifyWebsiteBody {
   profileId?: string;
@@ -48,6 +49,16 @@ export async function POST(req: Request) {
         { error: 'Profile not found', code: 'profile_not_found' },
         { status: 404, headers: NO_STORE_HEADERS }
       );
+    }
+
+    const accessDenied = await enforceLinksMutationAccess(
+      tx,
+      profileId,
+      clerkUserId,
+      NO_STORE_HEADERS
+    );
+    if (accessDenied) {
+      return accessDenied;
     }
 
     const hasVerificationColumns =

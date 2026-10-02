@@ -24,7 +24,7 @@ function readWebSource(path: string): string {
 }
 
 describe('CLI landing page', () => {
-  it('documents only the verified read-only CLI surface', () => {
+  it('documents only the verified CLI surface', () => {
     render(<CliLandingPage />);
 
     expect(
@@ -34,10 +34,10 @@ describe('CLI landing page', () => {
       screen.getByRole('heading', { level: 2, name: 'Install' })
     ).toHaveClass('line-clamp-2');
     expect(
-      screen.getByRole('heading', { level: 2, name: 'What you can do' })
+      screen.getByRole('heading', { level: 2, name: 'What You Can Do' })
     ).toHaveClass('line-clamp-2');
     expect(
-      screen.getByRole('heading', { level: 2, name: 'CLI reference' })
+      screen.getByRole('heading', { level: 2, name: 'CLI Reference' })
     ).toHaveClass('line-clamp-2');
     expect(screen.getByText(CLI_SUBTITLE)).toBeVisible();
     expect(screen.getByTestId('cli-hero-install')).toHaveAttribute(
@@ -54,8 +54,10 @@ describe('CLI landing page', () => {
     expect(pageText).toContain('jovie --version');
     expect(pageText).toContain('No account');
     expect(pageText).toContain('No API key');
-    expect(pageText).toContain('Read-only');
+    expect(pageText).toContain('MCP server');
     expect(pageText).toContain('JSON output');
+    expect(pageText).toContain('Give an artist a profile');
+    expect(pageText).toContain('Plug Jovie into an agent');
     expect(pageText).toContain('Get an artist');
     expect(pageText).toContain('Give an artist to an agent');
     expect(pageText).toContain('Build against Jovie');
@@ -66,6 +68,11 @@ describe('CLI landing page', () => {
       expect(screen.getByText(item.request)).toBeVisible();
     }
 
+    expect(
+      CLI_DOCUMENTED_COMMANDS.find(item => item.command === 'jovie skill')
+        ?.request
+    ).toBe('Prints the Jovie SKILL.md for agents');
+
     expect(screen.queryByText(/login/i, { selector: 'h2' })).toBeNull();
     expect(screen.queryByText(/oauth/i, { selector: 'h2' })).toBeNull();
     expect(screen.queryByText('npm publish')).toBeNull();
@@ -73,6 +80,13 @@ describe('CLI landing page', () => {
     for (const item of CLI_FAQ_ITEMS) {
       expect(screen.getByText(item.question)).toBeVisible();
     }
+  });
+
+  it('docks the hero over its own abstract photo', () => {
+    const { container } = render(<CliLandingPage />);
+    const photo = container.querySelector('.marketing-hero-photo img');
+    expect(photo?.getAttribute('src')).toContain('marketing-hero%2Fcli.webp');
+    expect(photo).toHaveAttribute('alt', '');
   });
 
   it('composes shared hero, prose, FAQ, and footer CTA primitives', () => {
@@ -129,21 +143,59 @@ describe('CLI landing page', () => {
 
   it('stays inside the verified CLI command surface', () => {
     const packageRoot = resolve(process.cwd(), '../../packages/jovie-cli');
-    const cliSource = readFileSync(resolve(packageRoot, 'src/cli.ts'), 'utf8');
-    const clientSource = readFileSync(
-      resolve(packageRoot, 'src/client.ts'),
-      'utf8'
-    );
-    const documented = `${cliSource}\n${clientSource}`;
+    const read = (file: string) =>
+      readFileSync(resolve(packageRoot, 'src', file), 'utf8');
+    const cliSource = `${read('cli.ts')}\n${read('commands.ts')}`;
+    const clientSource = read('client.ts');
     for (const item of CLI_DOCUMENTED_COMMANDS) {
-      expect(cliSource).toContain(item.command.replace(/^jovie /, ''));
-      expect(documented).toContain(item.request.replace(/^GET /, ''));
+      const words = item.command
+        .replace(/^jovie /, '')
+        .split(' ')
+        .filter(word => !word.startsWith('<') && !word.startsWith('--'));
+      expect(cliSource).toContain(
+        words.length === 1
+          ? `'${words[0]}'`
+          : `path: [${words.map(word => `'${word}'`).join(', ')}]`
+      );
+      const route = item.request.match(/^(?:GET|POST) (\S+)/)?.[1];
+      for (const part of route?.split(/\{\w+\}/) ?? []) {
+        expect(clientSource).toContain(part);
+      }
     }
     expect(cliSource).toContain('--base-url');
     expect(cliSource).toContain('--json');
     expect(cliSource).toContain('-h, --help');
     expect(cliSource).toContain('-v, --version');
-    expect(cliSource).toContain('No login, API key');
+    expect(cliSource).toContain('No login or API key');
     expect(isReservedUsername('cli')).toBe(true);
+  });
+
+  it('documents the published CLI Node engines range', () => {
+    const packageJson = JSON.parse(
+      readFileSync(
+        resolve(process.cwd(), '../../packages/jovie-cli/package.json'),
+        'utf8'
+      )
+    ) as { engines?: { node?: string } };
+    const nodeFaq = CLI_FAQ_ITEMS.find(
+      item => item.question === 'Which Node.js version does it need?'
+    );
+
+    expect(packageJson.engines?.node).toBe('>=24.21.0 <25');
+    expect(nodeFaq?.answer).toContain('Node.js 24.21.0');
+    expect(nodeFaq?.answer).toContain('below Node 25');
+    expect(nodeFaq?.answer).toContain('published package engines field');
+  });
+
+  it('keeps every scrollable command block reachable by keyboard', () => {
+    render(<CliLandingPage />);
+    const blocks = document.querySelectorAll('article pre');
+    expect(blocks.length).toBeGreaterThan(0);
+    for (const block of blocks) {
+      const scroller = block.closest('section');
+      expect(scroller).toHaveAttribute('tabindex', '0');
+      expect(scroller?.getAttribute('aria-label')).toMatch(/ command$/);
+      expect(scroller?.className).toContain('overflow-x-auto');
+    }
   });
 });

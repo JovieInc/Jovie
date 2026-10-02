@@ -45,8 +45,10 @@ import { StaticListenInterface } from '@/features/profile/StaticListenInterface'
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
+import { formatEventDateParts } from '@/lib/events/date';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
+import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
 import {
   type BottomTabKey,
   getPermittedPublicProfileActions,
@@ -108,10 +110,18 @@ interface ProfileDesktopSurfaceProps {
     readonly showOldReleases?: boolean;
   } | null;
   readonly alertOptInVariant?: ProfileAlertOptInVariant;
+  /**
+   * False while the per-user experiment assignment is still resolving.
+   * Variant-dependent fan-capture CTAs stay inert until this is true so the
+   * assigned control never morphs post-paint.
+   */
+  readonly visitorAssignmentResolved?: boolean;
   readonly allowFanCapture?: boolean;
   readonly genres?: string[] | null;
   readonly pressPhotos?: PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
+  /** Selected-credits segments for the About destination (JOV-6199). */
+  readonly creditSegments?: readonly EntityMentionSegment[];
   readonly photoDownloadSizes?: AvatarSize[];
   readonly tourDates?: TourDateViewModel[];
   readonly viewerCountryCode?: string | null;
@@ -136,6 +146,11 @@ interface ProfileDesktopSurfaceProps {
   /** Fired once the desktop surface has mounted so the layout shell can
    *  retire the compact a11y tree (JOV-6434). */
   readonly onReady?: () => void;
+  readonly onOpenReleaseCredits?: () => void;
+  /** The surface is server-rendered inside the display:none desktop shell on
+   *  mobile so cold desktop loads paint the real composition (JOV-6452). While
+   *  hidden, portaled overlays (modal drawer, auto-open alerts) stay closed. */
+  readonly overlaysEnabled?: boolean;
 }
 
 function toDateValue(value: Date | string | null | undefined) {
@@ -158,20 +173,28 @@ function toDateValue(value: Date | string | null | undefined) {
   return Number.isNaN(next.getTime()) ? null : next;
 }
 
-function formatMonth(date: string | Date | null | undefined) {
-  const resolved = toDateValue(date);
-  if (!resolved) return 'Soon';
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-  }).format(resolved);
+function formatMonth(
+  date: string | Date | null | undefined,
+  timezone: string | null
+) {
+  return formatEventDateParts({ startDate: date, timezone })?.month ?? 'Soon';
 }
 
-function formatDay(date: string | Date | null | undefined) {
-  const resolved = toDateValue(date);
-  if (!resolved) return '—';
-  return new Intl.DateTimeFormat('en-US', {
-    day: '2-digit',
-  }).format(resolved);
+function formatDay(
+  date: string | Date | null | undefined,
+  timezone: string | null
+) {
+  return (
+    formatEventDateParts({ startDate: date, timezone })?.day.padStart(2, '0') ??
+    '—'
+  );
+}
+
+// JOV-4429: each Tickets link needs a unique accessible name — tour lists
+// often reuse one ticketing URL for every date, which otherwise renders as
+// a duplicate CTA cluster to assistive tech and the copy-regression guard.
+function ticketLinkLabel(tourDate: TourDateViewModel) {
+  return `Tickets for ${tourDate.venueName} on ${formatMonth(tourDate.startDate, tourDate.timezone)} ${formatDay(tourDate.startDate, tourDate.timezone)}`;
 }
 
 function formatReleaseMeta(
@@ -251,10 +274,12 @@ export function ProfileDesktopSurface({
   latestRelease,
   profileSettings,
   alertOptInVariant = 'button',
+  visitorAssignmentResolved = true,
   allowFanCapture = true,
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
+  creditSegments,
   photoDownloadSizes = [],
   tourDates = [],
   viewerCountryCode,
@@ -282,6 +307,8 @@ export function ProfileDesktopSurface({
   onUnsubscribe = () => {},
   isUnsubscribing = false,
   onReady,
+  onOpenReleaseCredits,
+  overlaysEnabled = true,
 }: ProfileDesktopSurfaceProps) {
   const [isHydrated, setIsHydrated] = useState(false);
   useEffect(() => {
@@ -393,14 +420,27 @@ export function ProfileDesktopSurface({
   let primaryActionElement: React.ReactNode;
   if (primaryAction.kind === 'subscribe') {
     primaryActionElement = canGetUpdates ? (
-      <ProfileInlineNotificationsCTA
-        artist={artist}
-        portalContainer={notificationsPortalContainer}
-        variant='hero'
-        presentation='modal'
-        experimentVariant={alertOptInVariant}
-        onManageNotifications={() => onModeSelect('subscribe')}
-      />
+      visitorAssignmentResolved ? (
+        <ProfileInlineNotificationsCTA
+          artist={artist}
+          portalContainer={notificationsPortalContainer}
+          variant='hero'
+          presentation='modal'
+          experimentVariant={alertOptInVariant}
+          onManageNotifications={() => onModeSelect('subscribe')}
+        />
+      ) : (
+        <Button
+          type='button'
+          variant='primary'
+          size='marketing'
+          disabled
+          aria-busy='true'
+          data-testid='profile-desktop-subscribe-resolving'
+        >
+          {primaryAction.label}
+        </Button>
+      )
     ) : null;
   } else {
     const primaryActionContent = (
@@ -554,8 +594,8 @@ export function ProfileDesktopSurface({
           data-testid='profile-desktop-secondary-grid'
         >
           <DesktopSurfaceCard
-            title='Shows'
-            actionLabel={hasEventsDestination ? 'View Shows' : undefined}
+            title='Events'
+            actionLabel={hasEventsDestination ? 'View Events' : undefined}
             onAction={
               hasEventsDestination ? () => onModeSelect('tour') : undefined
             }
@@ -569,10 +609,10 @@ export function ProfileDesktopSurface({
                   >
                     <div className='rounded-xl border border-white/10 bg-white/[0.07] px-2 py-2 text-center'>
                       <div className='text-3xs font-semibold tracking-wide text-white/58'>
-                        {formatMonth(tourDate.startDate)}
+                        {formatMonth(tourDate.startDate, tourDate.timezone)}
                       </div>
                       <div className='mt-1 text-xl font-semibold leading-none tracking-[-0.05em] text-white dark:text-white'>
-                        {formatDay(tourDate.startDate)}
+                        {formatDay(tourDate.startDate, tourDate.timezone)}
                       </div>
                     </div>
                     <div className='min-w-0'>
@@ -588,6 +628,7 @@ export function ProfileDesktopSurface({
                     {tourDate.ticketUrl ? (
                       <a
                         href={tourDate.ticketUrl}
+                        aria-label={ticketLinkLabel(tourDate)}
                         className='inline-flex h-11 items-center rounded-full border border-white/12 px-3 text-xs font-medium text-white/82 transition-colors duration-subtle hover:bg-white/[0.04]'
                       >
                         Tickets
@@ -696,6 +737,7 @@ export function ProfileDesktopSurface({
                 {isSubscribed ? 'Manage' : 'Get updates'}
               </span>
             </button>
+
             {showArtistEmailRow ? (
               <>
                 <div className='h-px bg-white/8' />
@@ -868,7 +910,7 @@ export function ProfileDesktopSurface({
       </DesktopSurfaceCard>
     ) : activePrimaryTab === 'tour' ? (
       <DesktopSurfaceCard
-        title='Shows'
+        title='Events'
         className='flex-1'
         testId='profile-primary-tab-tour'
       >
@@ -881,10 +923,10 @@ export function ProfileDesktopSurface({
               >
                 <div className='rounded-xl border border-white/10 bg-white/[0.07] px-2 py-2.5 text-center'>
                   <div className='text-3xs font-semibold tracking-wide text-white/58'>
-                    {formatMonth(tourDate.startDate)}
+                    {formatMonth(tourDate.startDate, tourDate.timezone)}
                   </div>
                   <div className='mt-1 text-2xl font-semibold leading-none tracking-[-0.05em] text-white dark:text-white'>
-                    {formatDay(tourDate.startDate)}
+                    {formatDay(tourDate.startDate, tourDate.timezone)}
                   </div>
                 </div>
                 <div className='min-w-0'>
@@ -903,6 +945,7 @@ export function ProfileDesktopSurface({
                 {tourDate.ticketUrl ? (
                   <a
                     href={tourDate.ticketUrl}
+                    aria-label={ticketLinkLabel(tourDate)}
                     className='inline-flex h-11 items-center rounded-full border border-white/12 px-4 text-sm font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
                   >
                     Tickets
@@ -926,6 +969,8 @@ export function ProfileDesktopSurface({
           genres={genres}
           pressPhotos={pressPhotos}
           allowPhotoDownloads={allowPhotoDownloads}
+          creditSegments={creditSegments}
+          contacts={contacts}
         />
       </DesktopSurfaceCard>
     ) : (
@@ -945,6 +990,16 @@ export function ProfileDesktopSurface({
           data-testid='profile-desktop-top-chrome'
         >
           <div className='flex min-w-0 items-center gap-2'>
+            {onOpenReleaseCredits ? (
+              <button
+                type='button'
+                data-testid='profile-release-credits'
+                onClick={onOpenReleaseCredits}
+                className='inline-flex min-h-11 items-center rounded-full border border-white/16 bg-white px-4 text-sm font-semibold text-black dark:bg-white dark:text-black'
+              >
+                Release credits
+              </button>
+            ) : null}
             {showBackChevron && onBack ? (
               <CircleIconButton
                 onClick={onBack}
@@ -1005,12 +1060,22 @@ export function ProfileDesktopSurface({
 
         <div className='relative flex min-h-0 flex-1 flex-col overflow-hidden'>
           <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_34%)]' />
-          <div className='relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain [touch-action:pan-y] [will-change:scroll-position] p-5 pt-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+          <div
+            // The document scrolls at desktop widths (globals.css md+ unlock),
+            // so this pane must chain overscroll to the page — `overscroll-contain`
+            // trapped the wheel at the pane's edges (JOV-7412).
+            className='relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-auto [touch-action:pan-y] [will-change:scroll-position] p-5 pt-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+            data-testid='profile-desktop-content-scroll'
+          >
             {nonHomeContent}
           </div>
         </div>
 
-        {canGetUpdates && activeMode === 'subscribe' && !isSubscribed ? (
+        {canGetUpdates &&
+        visitorAssignmentResolved &&
+        activeMode === 'subscribe' &&
+        !isSubscribed &&
+        overlaysEnabled ? (
           <ProfileInlineNotificationsCTA
             artist={artist}
             presentation='modal'
@@ -1023,7 +1088,7 @@ export function ProfileDesktopSurface({
         ) : null}
 
         <ProfileUnifiedDrawer
-          open={drawerOpen}
+          open={drawerOpen && overlaysEnabled}
           onOpenChange={onDrawerOpenChange}
           view={drawerView}
           onViewChange={onDrawerViewChange}
@@ -1044,6 +1109,7 @@ export function ProfileDesktopSurface({
           genres={genres}
           pressPhotos={pressPhotos}
           allowPhotoDownloads={allowPhotoDownloads}
+          creditSegments={creditSegments}
           tourDates={tourDates}
           hasReleases={hasReleases}
           releases={visibleReleases}

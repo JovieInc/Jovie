@@ -65,50 +65,51 @@ const STATUS_CASES = [
 }>;
 
 describe('ConnectorCard', () => {
-  it.each(
-    STATUS_CASES
-  )('maps $status to its semantic status and $actionLabel action', ({
-    status,
-    statusLabel,
-    statusVariant,
-    actionLabel,
-    actionVariant,
-    actionOwner,
-  }) => {
-    const onConnect = vi.fn();
-    const onDisconnect = vi.fn();
+  it.each(STATUS_CASES)(
+    'maps $status to its semantic status and $actionLabel action',
+    ({
+      status,
+      statusLabel,
+      statusVariant,
+      actionLabel,
+      actionVariant,
+      actionOwner,
+    }) => {
+      const onConnect = vi.fn();
+      const onDisconnect = vi.fn();
 
-    render(
-      <ConnectorCard
-        provider='gmail'
-        status={status}
-        onConnect={onConnect}
-        onDisconnect={onDisconnect}
-      />
-    );
+      render(
+        <ConnectorCard
+          provider='gmail'
+          status={status}
+          onConnect={onConnect}
+          onDisconnect={onDisconnect}
+        />
+      );
 
-    expect(
-      screen.getByRole('status', {
-        name: `Gmail status: ${statusLabel}`,
-      })
-    ).toHaveAttribute('data-variant', statusVariant);
+      expect(
+        screen.getByRole('status', {
+          name: `Gmail status: ${statusLabel}`,
+        })
+      ).toHaveAttribute('data-variant', statusVariant);
 
-    const action = screen.getByRole('button', { name: actionLabel });
-    expect(action).toHaveAttribute('data-variant', actionVariant);
-    if (actionOwner === 'disconnect') {
-      expect(action).toHaveAttribute('data-destructive', 'true');
-    } else {
-      expect(action).not.toHaveAttribute('data-destructive');
+      const action = screen.getByRole('button', { name: actionLabel });
+      expect(action).toHaveAttribute('data-variant', actionVariant);
+      if (actionOwner === 'disconnect') {
+        expect(action).toHaveAttribute('data-destructive', 'true');
+      } else {
+        expect(action).not.toHaveAttribute('data-destructive');
+      }
+
+      fireEvent.click(action);
+      expect(
+        actionOwner === 'connect' ? onConnect : onDisconnect
+      ).toHaveBeenCalledOnce();
+      expect(
+        actionOwner === 'connect' ? onDisconnect : onConnect
+      ).not.toHaveBeenCalled();
     }
-
-    fireEvent.click(action);
-    expect(
-      actionOwner === 'connect' ? onConnect : onDisconnect
-    ).toHaveBeenCalledOnce();
-    expect(
-      actionOwner === 'connect' ? onDisconnect : onConnect
-    ).not.toHaveBeenCalled();
-  });
+  );
 
   it('keeps the action visible but disabled when its callback is unavailable', () => {
     const { rerender } = render(
@@ -124,12 +125,12 @@ describe('ConnectorCard', () => {
     expect(screen.getByRole('button', { name: 'Disconnect' })).toBeDisabled();
   });
 
-  it('shows connected email or recovery detail in one stable status slot', () => {
+  it('shows connected account or recovery detail in one stable status slot', () => {
     const { rerender } = render(
       <ConnectorCard
         provider='gmail'
         status='connected'
-        email='artist@example.com'
+        accountLabel='artist@example.com'
         errorMessage='This should stay hidden.'
       />
     );
@@ -142,7 +143,7 @@ describe('ConnectorCard', () => {
       <ConnectorCard
         provider='gmail'
         status='error'
-        email='artist@example.com'
+        accountLabel='artist@example.com'
         errorMessage='Google rejected the connection.'
       />
     );
@@ -158,6 +159,19 @@ describe('ConnectorCard', () => {
       <ConnectorCard provider='gmail' status='error' errorMessage='  ' />
     );
     expect(detail).toHaveTextContent('Connection failed. Try again.');
+  });
+
+  it('renders the Spotify social icon for the spotify provider', () => {
+    const { container } = render(
+      <ConnectorCard provider='spotify' status='connected' />
+    );
+
+    expect(
+      screen.getByRole('status', { name: 'Spotify status: Connected' })
+    ).toBeInTheDocument();
+    const iconSlot = container.querySelector('div.mt-0\\.5');
+    expect(iconSlot?.querySelector('svg[fill="currentColor"]')).not.toBeNull();
+    expect(iconSlot?.querySelector('.lucide')).toBeNull();
   });
 
   it('marks syncing as busy without changing the disconnect contract', () => {

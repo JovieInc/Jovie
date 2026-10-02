@@ -21,9 +21,13 @@ import {
   selectMerchDesign,
 } from '@/lib/merch/service';
 import type {
-  MerchGenerationOptionView,
   MerchGenerationResult,
   MerchSelectionResult,
+} from '@/lib/merch/types';
+
+export type {
+  MerchGenerationOptionView,
+  MerchGenerationResult,
 } from '@/lib/merch/types';
 
 /**
@@ -190,5 +194,3 @@ export async function createAlternativeMerchFromCard(params: {
 export function canFulfillMerch(): boolean {
   return true;
 }
-
-export type { MerchGenerationOptionView, MerchGenerationResult };

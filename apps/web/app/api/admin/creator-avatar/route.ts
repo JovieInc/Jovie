@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { updateCreatorAvatarAsAdmin } from '@/app/app/(shell)/admin/actions';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 export const runtime = 'nodejs';
 
@@ -15,7 +15,9 @@ interface AdminAvatarPayload {
 
 export async function POST(request: NextRequest) {
   try {
-    const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
+    const entitlements = await getOvieOperatorEntitlements({
+      session: 'fresh',
+    });
 
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
@@ -49,7 +51,9 @@ export async function POST(request: NextRequest) {
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
+    const entitlements = await getOvieOperatorEntitlements({
+      session: 'fresh',
+    });
     await captureCriticalError(
       'Admin action failed: update creator avatar',
       error instanceof Error ? error : new Error(String(error)),

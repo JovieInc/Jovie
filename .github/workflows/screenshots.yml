@@ -15,6 +15,22 @@ on:
       - '.github/actions/upload-safe-playwright-artifact/**'
       - '.github/scripts/guard-playwright-artifacts.mjs'
       - '.github/workflows/screenshots.yml'
+      - 'apps/web/app/artists/**'
+      - 'apps/web/app/hud/**'
+      - 'apps/web/lib/admin/roles.ts'
+      - 'apps/web/lib/auth/gate.ts'
+      - 'apps/web/app/app/(shell)/tasks/**'
+      - 'apps/web/app/app/(shell)/dashboard/tasks/**'
+      - 'apps/web/app/app/(shell)/contacts/**'
+      - 'apps/web/app/api/dashboard/contacts/**'
+      - 'apps/web/lib/screen-cert/**'
+      - 'apps/web/lib/tasks/**'
+      - 'apps/web/lib/contacts/**'
+      - 'apps/web/lib/render-fixture-policy.ts'
+      - 'apps/web/lib/e2e/**'
+      - 'apps/web/app/app/(shell)/dashboard/actions/**'
+      - 'apps/web/components/features/dashboard/tasks/**'
+      - 'apps/web/components/features/dashboard/organisms/contacts-table/**'
       - 'apps/web/app/(marketing)/**'
       - 'apps/web/app/(home)/**'
       - 'apps/web/app/(dynamic)/**'
@@ -48,7 +64,10 @@ permissions: {}
 
 concurrency:
   group: screenshots
-  cancel-in-progress: true
+  # GitHub already keeps only the newest pending run in a concurrency group.
+  # Let the active ~20-minute capture finish instead of discarding its proof on
+  # every qualifying main push; the newest pending head runs next.
+  cancel-in-progress: false
 
 jobs:
   generate:
@@ -64,6 +83,12 @@ jobs:
     outputs:
       marketing-artifact-id: ${{ steps.marketing-captures.outputs.artifact-id }}
       profile-artifact-id: ${{ steps.profile-proof.outputs.artifact-id }}
+      artists-artifact-id: ${{ steps.artists-proof.outputs.artifact-id }}
+      smartlink-release-artifact-id: ${{ steps.smartlink-release-proof.outputs.artifact-id }}
+      smartlink-track-artifact-id: ${{ steps.smartlink-track-proof.outputs.artifact-id }}
+      hud-isolated-artifact-id: ${{ steps.hud-isolated-proof.outputs.artifact-id }}
+      tasks-artifact-id: ${{ steps.tasks-proof.outputs.artifact-id }}
+      contacts-artifact-id: ${{ steps.contacts-proof.outputs.artifact-id }}
       catalog-changed: ${{ steps.diff.outputs.changed }}
     defaults:
       run:
@@ -77,6 +102,22 @@ jobs:
       E2E_USE_TEST_AUTH_BYPASS: '1'
       E2E_CLERK_USER_ID: user_test
       PUBLIC_NOAUTH_SMOKE: '1'
+      # JOV-7126: server-only — never inlined client-side, so it cannot
+      # change the marketing catalog's rendered bytes. Read by
+      # lib/admin/roles.ts and lib/auth/gate.ts; see the hud-isolated
+      # capture step below for why this must be job-level env.
+      E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'
+      # web.tasks / web.contacts producers: server-only, read by
+      # isE2EFastOnboardingEnabled() (lib/e2e/runtime.ts). This is what lets
+      # createE2EDashboardCoreData's synthetic profile fallback
+      # (dashboard-data.ts) activate for any bypass session, which the tasks
+      # and contacts fixtures gate on — see
+      # apps/web/lib/screen-cert/app-shell-fixture-gate.ts. Its only other
+      # readers (releases/actions.ts, onboarding/actions/connect-spotify.ts)
+      # are not on any existing producer's render path, so this cannot
+      # change bytes for the marketing catalog or the five screen-proof
+      # producers above.
+      E2E_FAST_ONBOARDING: '1'
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -86,6 +127,14 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
+      - name: Cache Playwright Browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 
@@ -93,6 +142,20 @@ jobs:
         run: pnpm run build
 
       - name: Start production server
+        env:
+          # JOV-7126 follow-up: unset (or 0.0.0.0), the standalone server.js
+          # bind address leaks into request.nextUrl.hostname for every
+          # request it serves — Next.js derives that URL from the server's
+          # own configured hostname, not the incoming Host header. The
+          # dev-test-auth bypass's loopback trust check
+          # (isLocalDevelopmentAutomationHostname in
+          # lib/security/development-only.ts) only recognizes real loopback
+          # names (localhost, 127.0.0.1, ::1, *.localhost) and correctly
+          # rejects "0.0.0.0" as untrustworthy, so every producer that goes
+          # through that bypass — currently only hud-isolated — got a 403
+          # rather than a synthetic admin session. `next start` reads the
+          # same env var, so this covers both server commands below.
+          HOSTNAME: localhost
         run: |
           if [ -f .next/standalone/apps/web/server.js ]; then
             SERVER_COMMAND=(node .next/standalone/apps/web/server.js)
@@ -161,6 +224,29 @@ jobs:
           public-images: true
           diagnostic-paths: true
 
+      - name: Certify route DOM invariants
+        timeout-minutes: 30
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/route-dom-certification.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1
+        env:
+          BASE_URL: http://localhost:3000
+          EXPECTED_COMMIT_SHA: ${{ github.sha }}
+          ROUTE_DOM_CERTIFICATION_OUTPUT_DIR: test-results/route-dom-certification
+
+      - name: Upload route DOM certification
+        if: ${{ always() && hashFiles('apps/web/test-results/route-dom-certification/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: route-dom-certification-${{ github.sha }}
+          path: apps/web/test-results/route-dom-certification/
+          if-no-files-found: error
+          retention-days: 14
+          diagnostic-paths: true
+
       - name: Capture public-profile screen proof
         timeout-minutes: 10
         run: |
@@ -208,6 +294,349 @@ jobs:
             apps/web/test-results/screen-browser-proof/screen-proof.json
             apps/web/test-results/screen-browser-proof/screenshots/desktop.png
             apps/web/test-results/screen-browser-proof/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      - name: Capture /artists screen proof
+        timeout-minutes: 10
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/artists-screen-proof.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1
+        env:
+          BASE_URL: http://localhost:3000
+          SCREEN_PROOF_OUTPUT_DIR: test-results/screen-browser-proof-artists
+          SCREEN_PROOF_MEASUREMENTS: test-results/screen-browser-proof-artists-measurements.json
+
+      - name: Bind /artists proof to producer provenance
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRODUCER_JOB_ID="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Could not resolve the current producer job ID."
+            exit 1
+          fi
+          node scripts/invariants/screen-proof-emit.mjs \
+            --screen=web.artists \
+            --head-sha="$GITHUB_SHA" \
+            --run-url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
+            --bundle=apps/web/test-results/screen-browser-proof-artists \
+            --measurements=apps/web/test-results/screen-browser-proof-artists-measurements.json \
+            --out=apps/web/test-results/screen-browser-proof-artists/screen-proof.json \
+            --artifact-root="$GITHUB_WORKSPACE" \
+            --producer-run-id="$GITHUB_RUN_ID" \
+            --producer-run-attempt="$GITHUB_RUN_ATTEMPT" \
+            --producer-job-id="$PRODUCER_JOB_ID" \
+            --environment=local-production-build
+
+      - name: Upload /artists screen proof
+        id: artists-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-artists
+          path: |
+            apps/web/test-results/screen-browser-proof-artists/screen-proof.json
+            apps/web/test-results/screen-browser-proof-artists/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-artists/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      # JOV-7126: first exact-head producer for an authenticated app-shell
+      # screen. E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH (job env, so the
+      # already-running production server above has it too — a later
+      # step's env cannot reach a server that's already started) lets the
+      # dev-test-auth bypass mint a synthetic admin persona against this
+      # job's noop DATABASE_URL. lib/admin/roles.ts and lib/auth/gate.ts
+      # trust it only for this exact bypass session, so the spec renders
+      # the real apps/web/app/hud/page.tsx source (isolated ?fs=1 chrome;
+      # plain /hud rewrites onto the app-shell-wrapped web.ov-hud-shell
+      # screen instead). This isolated layout never mounts
+      # DashboardShellContent, so it is the one authenticated app-shell
+      # screen that also does not hit the passkey/Touch ID admin step-up
+      # lock (lib/admin/mfa.ts) — every other admin screen under
+      # apps/web/app/app/(shell)/admin/ stays unregistered as a producer
+      # until a human decides how to handle that lock for a producer job.
+
+      # web.smartlink-release and web.smartlink-track (JOV-7127) are
+      # revenue-sensitive dynamic routes with no no-DB fallback on the real
+      # production path, so they capture a reserved, env-gated fixture route
+      # that renders the exact registered page component — see
+      # apps/web/app/[username]/[slug]/_lib/screen-cert-fixture.ts.
+      - name: Capture smartlink-release screen proof
+        timeout-minutes: 10
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/smartlink-release-screen-proof.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1
+        env:
+          BASE_URL: http://localhost:3000
+          SCREEN_PROOF_OUTPUT_DIR: test-results/screen-browser-proof-smartlink-release
+          SCREEN_PROOF_MEASUREMENTS: test-results/screen-browser-proof-smartlink-release-measurements.json
+
+      - name: Bind smartlink-release proof to producer provenance
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRODUCER_JOB_ID="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Could not resolve the current producer job ID."
+            exit 1
+          fi
+          node scripts/invariants/screen-proof-emit.mjs \
+            --screen=web.smartlink-release \
+            --head-sha="$GITHUB_SHA" \
+            --run-url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
+            --bundle=apps/web/test-results/screen-browser-proof-smartlink-release \
+            --measurements=apps/web/test-results/screen-browser-proof-smartlink-release-measurements.json \
+            --out=apps/web/test-results/screen-browser-proof-smartlink-release/screen-proof.json \
+            --artifact-root="$GITHUB_WORKSPACE" \
+            --producer-run-id="$GITHUB_RUN_ID" \
+            --producer-run-attempt="$GITHUB_RUN_ATTEMPT" \
+            --producer-job-id="$PRODUCER_JOB_ID" \
+            --environment=local-production-build
+
+      - name: Upload smartlink-release screen proof
+        id: smartlink-release-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-smartlink-release
+          path: |
+            apps/web/test-results/screen-browser-proof-smartlink-release/screen-proof.json
+            apps/web/test-results/screen-browser-proof-smartlink-release/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-smartlink-release/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      - name: Capture smartlink-track screen proof
+        timeout-minutes: 10
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/smartlink-track-screen-proof.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1
+        env:
+          BASE_URL: http://localhost:3000
+          SCREEN_PROOF_OUTPUT_DIR: test-results/screen-browser-proof-smartlink-track
+          SCREEN_PROOF_MEASUREMENTS: test-results/screen-browser-proof-smartlink-track-measurements.json
+
+      - name: Bind smartlink-track proof to producer provenance
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRODUCER_JOB_ID="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Could not resolve the current producer job ID."
+            exit 1
+          fi
+          node scripts/invariants/screen-proof-emit.mjs \
+            --screen=web.smartlink-track \
+            --head-sha="$GITHUB_SHA" \
+            --run-url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
+            --bundle=apps/web/test-results/screen-browser-proof-smartlink-track \
+            --measurements=apps/web/test-results/screen-browser-proof-smartlink-track-measurements.json \
+            --out=apps/web/test-results/screen-browser-proof-smartlink-track/screen-proof.json \
+            --artifact-root="$GITHUB_WORKSPACE" \
+            --producer-run-id="$GITHUB_RUN_ID" \
+            --producer-run-attempt="$GITHUB_RUN_ATTEMPT" \
+            --producer-job-id="$PRODUCER_JOB_ID" \
+            --environment=local-production-build
+
+      - name: Upload smartlink-track screen proof
+        id: smartlink-track-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-smartlink-track
+          path: |
+            apps/web/test-results/screen-browser-proof-smartlink-track/screen-proof.json
+            apps/web/test-results/screen-browser-proof-smartlink-track/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-smartlink-track/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+      - name: Capture hud-isolated screen proof
+        timeout-minutes: 10
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/hud-isolated-screen-proof.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1
+        env:
+          BASE_URL: http://localhost:3000
+          SCREEN_PROOF_OUTPUT_DIR: test-results/screen-browser-proof-hud-isolated
+          SCREEN_PROOF_MEASUREMENTS: test-results/screen-browser-proof-hud-isolated-measurements.json
+
+      - name: Bind hud-isolated proof to producer provenance
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRODUCER_JOB_ID="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Could not resolve the current producer job ID."
+            exit 1
+          fi
+          node scripts/invariants/screen-proof-emit.mjs \
+            --screen=web.hud-isolated \
+            --head-sha="$GITHUB_SHA" \
+            --run-url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
+            --bundle=apps/web/test-results/screen-browser-proof-hud-isolated \
+            --measurements=apps/web/test-results/screen-browser-proof-hud-isolated-measurements.json \
+            --out=apps/web/test-results/screen-browser-proof-hud-isolated/screen-proof.json \
+            --artifact-root="$GITHUB_WORKSPACE" \
+            --producer-run-id="$GITHUB_RUN_ID" \
+            --producer-run-attempt="$GITHUB_RUN_ATTEMPT" \
+            --producer-job-id="$PRODUCER_JOB_ID" \
+            --environment=local-production-build
+
+      - name: Upload hud-isolated screen proof
+        id: hud-isolated-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-hud-isolated
+          path: |
+            apps/web/test-results/screen-browser-proof-hud-isolated/screen-proof.json
+            apps/web/test-results/screen-browser-proof-hud-isolated/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-hud-isolated/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      # web.tasks and web.contacts are authenticated app-shell screens with
+      # no no-DB fallback on the real production path, so they capture the
+      # real routes under a reserved, env-gated synthetic profile instead of
+      # a separate fixture URL — see
+      # apps/web/lib/screen-cert/app-shell-fixture-gate.ts.
+      - name: Capture tasks screen proof
+        timeout-minutes: 10
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/tasks-screen-proof.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1
+        env:
+          BASE_URL: http://localhost:3000
+          SCREEN_PROOF_OUTPUT_DIR: test-results/screen-browser-proof-tasks
+          SCREEN_PROOF_MEASUREMENTS: test-results/screen-browser-proof-tasks-measurements.json
+
+      - name: Bind tasks proof to producer provenance
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRODUCER_JOB_ID="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Could not resolve the current producer job ID."
+            exit 1
+          fi
+          node scripts/invariants/screen-proof-emit.mjs \
+            --screen=web.tasks \
+            --head-sha="$GITHUB_SHA" \
+            --run-url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
+            --bundle=apps/web/test-results/screen-browser-proof-tasks \
+            --measurements=apps/web/test-results/screen-browser-proof-tasks-measurements.json \
+            --out=apps/web/test-results/screen-browser-proof-tasks/screen-proof.json \
+            --artifact-root="$GITHUB_WORKSPACE" \
+            --producer-run-id="$GITHUB_RUN_ID" \
+            --producer-run-attempt="$GITHUB_RUN_ATTEMPT" \
+            --producer-job-id="$PRODUCER_JOB_ID" \
+            --environment=local-production-build
+
+      - name: Upload tasks screen proof
+        id: tasks-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-tasks
+          path: |
+            apps/web/test-results/screen-browser-proof-tasks/screen-proof.json
+            apps/web/test-results/screen-browser-proof-tasks/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-tasks/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      - name: Capture contacts screen proof
+        timeout-minutes: 10
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/contacts-screen-proof.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1
+        env:
+          BASE_URL: http://localhost:3000
+          SCREEN_PROOF_OUTPUT_DIR: test-results/screen-browser-proof-contacts
+          SCREEN_PROOF_MEASUREMENTS: test-results/screen-browser-proof-contacts-measurements.json
+
+      - name: Bind contacts proof to producer provenance
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRODUCER_JOB_ID="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Could not resolve the current producer job ID."
+            exit 1
+          fi
+          node scripts/invariants/screen-proof-emit.mjs \
+            --screen=web.contacts \
+            --head-sha="$GITHUB_SHA" \
+            --run-url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
+            --bundle=apps/web/test-results/screen-browser-proof-contacts \
+            --measurements=apps/web/test-results/screen-browser-proof-contacts-measurements.json \
+            --out=apps/web/test-results/screen-browser-proof-contacts/screen-proof.json \
+            --artifact-root="$GITHUB_WORKSPACE" \
+            --producer-run-id="$GITHUB_RUN_ID" \
+            --producer-run-attempt="$GITHUB_RUN_ATTEMPT" \
+            --producer-job-id="$PRODUCER_JOB_ID" \
+            --environment=local-production-build
+
+      - name: Upload contacts screen proof
+        id: contacts-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-contacts
+          path: |
+            apps/web/test-results/screen-browser-proof-contacts/screen-proof.json
+            apps/web/test-results/screen-browser-proof-contacts/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-contacts/screenshots/mobile.png
           if-no-files-found: error
           retention-days: 14
           allow-images: true
@@ -467,10 +896,40 @@ jobs:
             DIFF_BASE="$(git rev-parse HEAD^)"
           fi
           export SCREEN_CERT_DIFF_BASE="$DIFF_BASE"
+
+          # Each screen below has its own dedicated producer artifact, so
+          # certify them as independent invocations: one screen's failure
+          # must not suppress the other's receipt or verdict.
+          STATUS=0
           node scripts/invariants/screen-certification.mjs \
             --artifact-id=${{ needs.generate.outputs.profile-artifact-id }} \
             --screen-id=web.public-profile \
-            --receipt-out=.artifacts/screen-certification/combined.json
+            --receipt-out=.artifacts/screen-certification/combined.json || STATUS=$?
+          node scripts/invariants/screen-certification.mjs \
+            --artifact-id=${{ needs.generate.outputs.artists-artifact-id }} \
+            --screen-id=web.artists \
+            --receipt-out=.artifacts/screen-certification/artists.json || STATUS=$?
+          node scripts/invariants/screen-certification.mjs \
+            --artifact-id=${{ needs.generate.outputs.smartlink-release-artifact-id }} \
+            --screen-id=web.smartlink-release \
+            --receipt-out=.artifacts/screen-certification/smartlink-release.json || STATUS=$?
+          node scripts/invariants/screen-certification.mjs \
+            --artifact-id=${{ needs.generate.outputs.smartlink-track-artifact-id }} \
+            --screen-id=web.smartlink-track \
+            --receipt-out=.artifacts/screen-certification/smartlink-track.json || STATUS=$?
+          node scripts/invariants/screen-certification.mjs \
+            --artifact-id=${{ needs.generate.outputs.hud-isolated-artifact-id }} \
+            --screen-id=web.hud-isolated \
+            --receipt-out=.artifacts/screen-certification/hud-isolated.json || STATUS=$?
+          node scripts/invariants/screen-certification.mjs \
+            --artifact-id=${{ needs.generate.outputs.tasks-artifact-id }} \
+            --screen-id=web.tasks \
+            --receipt-out=.artifacts/screen-certification/tasks.json || STATUS=$?
+          node scripts/invariants/screen-certification.mjs \
+            --artifact-id=${{ needs.generate.outputs.contacts-artifact-id }} \
+            --screen-id=web.contacts \
+            --receipt-out=.artifacts/screen-certification/contacts.json || STATUS=$?
+          exit "$STATUS"
 
       - name: Upload screen certification receipts
         if: always() && hashFiles('.artifacts/screen-certification/*.json') != ''

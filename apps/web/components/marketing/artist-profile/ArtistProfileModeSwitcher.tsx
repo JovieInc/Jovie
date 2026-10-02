@@ -3,7 +3,7 @@
 import { Tabs } from '@jovie/ui';
 import { AnimatePresence, motion } from 'motion/react';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
@@ -25,7 +25,13 @@ export function ArtistProfileModeSwitcher({
   showIntroHeading = true,
 }: Readonly<ArtistProfileModeSwitcherProps>) {
   const reducedMotion = useReducedMotion();
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [interactiveReady, setInteractiveReady] = useState(false);
+  useEffect(() => {
+    setInteractiveReady(true);
+  }, []);
+  const [[activeIndex, slideDirection], setActiveMode] = useState<
+    readonly [number, number]
+  >([0, 1]);
   const activeMode = adaptive.modes[activeIndex] ?? adaptive.modes[0];
   const headlineLines = adaptive.headline.split('\n');
   const compactAccessibleContext = [phoneCaption, phoneSubcaption]
@@ -34,14 +40,39 @@ export function ArtistProfileModeSwitcher({
 
   const selectMode = (modeId: string) => {
     const nextIndex = adaptive.modes.findIndex(mode => mode.id === modeId);
-    if (nextIndex >= 0) {
-      setActiveIndex(nextIndex);
+    if (nextIndex >= 0 && nextIndex !== activeIndex) {
+      setActiveMode([nextIndex, nextIndex > activeIndex ? 1 : -1]);
     }
   };
 
   if (!activeMode) {
     return null;
   }
+
+  const renderModePanelCopy = (
+    mode: ArtistProfileLandingCopy['adaptive']['modes'][number]
+  ) => (
+    <>
+      {showIntroHeading ? (
+        <p className='text-xs font-semibold text-secondary-token'>
+          {mode.label}
+        </p>
+      ) : null}
+      <p
+        className={cn(
+          'max-w-lg font-semibold leading-snug tracking-tight text-primary-token',
+          showIntroHeading ? 'mt-2 text-xl' : 'text-sm sm:text-mid'
+        )}
+      >
+        {mode.headline}
+      </p>
+      {showIntroHeading ? (
+        <p className='mt-2 font-mono text-xs tracking-tight text-tertiary-token'>
+          {mode.pathLabel}
+        </p>
+      ) : null}
+    </>
+  );
 
   return (
     <div
@@ -88,6 +119,8 @@ export function ArtistProfileModeSwitcher({
         ) : null}
 
         <Tabs.Root
+          data-interactive-ready={interactiveReady ? 'true' : 'false'}
+          aria-busy={!interactiveReady}
           value={activeMode.id}
           onValueChange={value => selectMode(value)}
           className={cn(showIntroHeading ? 'mt-9 w-full' : 'w-full')}
@@ -108,8 +141,10 @@ export function ArtistProfileModeSwitcher({
                 <Tabs.Trigger
                   key={mode.id}
                   value={mode.id}
+                  disabled={!interactiveReady}
                   className={cn(
                     'relative flex min-w-0 items-center justify-center whitespace-nowrap px-2 text-center text-2xs font-semibold leading-none text-tertiary-token transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus data-[state=active]:text-primary-token sm:text-xs',
+                    'disabled:cursor-wait',
                     showIntroHeading
                       ? 'min-h-12 rounded-lg'
                       : 'min-h-11 rounded-full'
@@ -140,38 +175,34 @@ export function ArtistProfileModeSwitcher({
           </Tabs.List>
           <div
             className={cn(
+              'grid',
               showIntroHeading ? 'mt-6 min-h-20' : 'mt-2.5 min-h-10 px-2'
             )}
           >
+            {/* Sizer stack: every mode's copy occupies the same grid cell so
+                the slot is deterministically sized to the tallest mode.
+                State changes must never move the module or the page. */}
+            {adaptive.modes.map(mode => (
+              <div
+                key={`${mode.id}-sizer`}
+                aria-hidden='true'
+                className='invisible col-start-1 row-start-1'
+              >
+                {renderModePanelCopy(mode)}
+              </div>
+            ))}
             {adaptive.modes.map(mode => (
               <Tabs.Content
                 key={`${mode.id}-panel`}
                 value={mode.id}
-                className='focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+                className='col-start-1 row-start-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
               >
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: reducedMotion ? 0 : 0.22 }}
                 >
-                  {showIntroHeading ? (
-                    <p className='text-xs font-semibold text-secondary-token'>
-                      {mode.label}
-                    </p>
-                  ) : null}
-                  <p
-                    className={cn(
-                      'max-w-lg font-semibold leading-snug tracking-tight text-primary-token',
-                      showIntroHeading ? 'mt-2 text-xl' : 'text-sm sm:text-mid'
-                    )}
-                  >
-                    {mode.headline}
-                  </p>
-                  {showIntroHeading ? (
-                    <p className='mt-2 font-mono text-xs tracking-tight text-tertiary-token'>
-                      {mode.pathLabel}
-                    </p>
-                  ) : null}
+                  {renderModePanelCopy(mode)}
                 </motion.div>
               </Tabs.Content>
             ))}
@@ -208,9 +239,19 @@ export function ArtistProfileModeSwitcher({
                     'absolute inset-0',
                     showIntroHeading ? 'top-10' : null
                   )}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
+                  initial={{
+                    opacity: 0,
+                    transform: reducedMotion
+                      ? 'translateX(0px)'
+                      : `translateX(${24 * slideDirection}px)`,
+                  }}
+                  animate={{ opacity: 1, transform: 'translateX(0px)' }}
+                  exit={{
+                    opacity: 0,
+                    transform: reducedMotion
+                      ? 'translateX(0px)'
+                      : `translateX(${-24 * slideDirection}px)`,
+                  }}
                   transition={{ duration: reducedMotion ? 0 : 0.32 }}
                 >
                   <Image

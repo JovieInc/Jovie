@@ -6,11 +6,13 @@ import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MarketingPageContractMarkers } from './MarketingPageContractMarkers';
 import { PublicPageShell } from './PublicPageShell';
 
+const pathnameRef = vi.hoisted(() => ({ current: '/' }));
+
 vi.mock('next/navigation', async importOriginal => {
   const actual = await importOriginal<typeof import('next/navigation')>();
   return {
     ...actual,
-    usePathname: () => '/',
+    usePathname: () => pathnameRef.current,
   };
 });
 
@@ -43,10 +45,14 @@ describe('PublicPageShell', () => {
       'data-pen-contract',
       MARKETING_PEN_CONTRACT_IDS.shell.publicPage
     );
+    expect(container.firstElementChild).toHaveAttribute(
+      'data-public-page-shell'
+    );
     const main = document.getElementById('main-content');
     expect(main).toBeInTheDocument();
     expect(main).toHaveTextContent('route content');
     expect(main?.className).toContain('pt-(--public-shell-header-offset)');
+    expect(main).toHaveClass('public-shell-main--docked');
 
     const homepageContract = MARKETING_PAGE_CONTRACTS['(home)/page.tsx'];
     const marker = main?.querySelector('[data-page-job]');
@@ -67,7 +73,8 @@ describe('PublicPageShell', () => {
     const { container } = render(<MarketingPageContractMarkers />);
     const homepageContract = MARKETING_PAGE_CONTRACTS['(home)/page.tsx'];
 
-    const marker = container.querySelector('[data-page-job]');
+    const marker = container.querySelector('[data-copy-scope]');
+    expect(marker).toHaveAttribute('data-copy-scope', 'shared');
     expect(marker).toHaveAttribute('hidden');
     expect(marker).toHaveAttribute('data-page-job', homepageContract.job);
     expect(marker).toHaveAttribute('data-proof', homepageContract.proof);
@@ -81,11 +88,35 @@ describe('PublicPageShell', () => {
     );
   });
 
+  it('leaves a record family route to its record contract markers', () => {
+    pathnameRef.current = '/solutions/artists';
+    try {
+      const { container, rerender } = render(<MarketingPageContractMarkers />);
+      expect(container.querySelector('[data-copy-scope]')).toBeNull();
+
+      const recordContract = {
+        ...MARKETING_PAGE_CONTRACTS[
+          '(marketing)/solutions/[audience]/page.tsx'
+        ],
+        url: '/solutions/artists',
+        copyScope: 'music' as const,
+        job: 'record job',
+      };
+      rerender(<MarketingPageContractMarkers contract={recordContract} />);
+      const marker = container.querySelector('[data-copy-scope]');
+      expect(marker).toHaveAttribute('data-copy-scope', 'music');
+      expect(marker).toHaveAttribute('data-page-job', 'record job');
+    } finally {
+      pathnameRef.current = '/';
+    }
+  });
+
   it('omits the fixed-header offset when mainOffset is false', () => {
     render(<PublicPageShell mainOffset={false}>hero</PublicPageShell>);
 
     const main = document.getElementById('main-content');
     expect(main?.className).not.toContain('pt-(--public-shell-header-offset)');
+    expect(main).not.toHaveClass('public-shell-main--docked');
   });
 
   it('passes footer variant and className through to MarketingFooter', () => {

@@ -6,6 +6,7 @@ import {
   isRemix,
   normalizeArtistName,
   parseArtistCredits,
+  parseArtistCreditsFromArtistLine,
   parseMainArtists,
   splitByConjunction,
 } from '@/lib/discography/artist-parser';
@@ -117,7 +118,7 @@ describe('artist-parser', () => {
   });
 
   describe('parseArtistCredits', () => {
-    it('dedupes featured artists already present in main artist array', () => {
+    it('uses explicit title roles instead of promoting provider artists', () => {
       const credits = parseArtistCredits(
         'Song (feat. Artist B) [Skrillex Remix]',
         [
@@ -128,10 +129,61 @@ describe('artist-parser', () => {
 
       expect(credits.map(c => `${c.role}:${c.name}`)).toEqual([
         'main_artist:Artist A',
-        'main_artist:Artist B',
+        'featured_artist:Artist B',
         'remixer:Skrillex',
       ]);
       expect(credits.map(c => c.position)).toEqual([0, 1, 2]);
+      expect(credits[1]).toMatchObject({
+        spotifyId: '2',
+        observedRole: 'main_artist',
+        roleSource: 'title',
+        isPrimary: false,
+      });
+    });
+
+    it('preserves primary, featured, and remixer roles for Take Me Over', () => {
+      const credits = parseArtistCredits(
+        'Take Me Over (feat. Erica Gibson) [Austin Leeds Remix]',
+        [
+          { id: 'spotify-tim', name: 'Tim White' },
+          { id: 'spotify-austin', name: 'Austin Leeds' },
+        ]
+      );
+
+      expect(credits).toMatchObject([
+        {
+          name: 'Tim White',
+          role: 'main_artist',
+          isPrimary: true,
+          spotifyId: 'spotify-tim',
+        },
+        {
+          name: 'Erica Gibson',
+          role: 'featured_artist',
+          isPrimary: false,
+        },
+        {
+          name: 'Austin Leeds',
+          role: 'remixer',
+          isPrimary: false,
+          spotifyId: 'spotify-austin',
+          observedRole: 'main_artist',
+        },
+      ]);
+    });
+
+    it('normalizes Apple display metadata without inventing artist IDs', () => {
+      const credits = parseArtistCreditsFromArtistLine(
+        'Take Me Over (feat. Erica Gibson) [Austin Leeds Remix]',
+        'Tim White & Austin Leeds'
+      );
+
+      expect(credits.map(({ name, role }) => ({ name, role }))).toEqual([
+        { name: 'Tim White', role: 'main_artist' },
+        { name: 'Erica Gibson', role: 'featured_artist' },
+        { name: 'Austin Leeds', role: 'remixer' },
+      ]);
+      expect(credits.every(credit => !credit.spotifyId)).toBe(true);
     });
   });
 

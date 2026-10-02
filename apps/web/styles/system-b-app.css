@@ -673,6 +673,16 @@
   --color-skeleton-shimmer: rgba(255, 255, 255, 0.11);
 }
 
+/* A selected row mode owns the same geometry during loading and after data arrives. */
+[data-table-row-mode] tbody > .system-b-table-row-height {
+  height: var(--table-row-height);
+}
+
+[data-table-row-mode] [data-table-cell-content="stable"] {
+  height: var(--table-cell-content-height);
+  max-height: var(--table-cell-content-height);
+}
+
 :where(.system-b-table-row-height) {
   height: 40px;
 }
@@ -4885,13 +4895,14 @@
 }
 
 :root.dark {
-  /* Sidebar tokens — Noir Ion shell; active uses Ion selection tint */
+  /* Sidebar tokens — Noir Ion shell. Founder lock 2026-09-25: active/selected
+     rows use a neutral hover-level tint, not the ion accent (no blue bg). */
   --sidebar-background: var(--app-shell-sidebar-background-rgb);
   --sidebar-foreground: 245 247 251;
   --sidebar-primary: 245 247 251;
   --sidebar-primary-foreground: 2 3 7;
   --sidebar-accent: 168 176 195 / 0.06;
-  --sidebar-accent-active: 17 175 255 / 0.1;
+  --sidebar-accent-active: 168 176 195 / 0.1;
   --sidebar-accent-foreground: 245 247 251;
   --sidebar-border: 168 176 195 / 0.1;
   --sidebar-ring: 17 175 255 / 0.72;
@@ -4899,7 +4910,7 @@
   --sidebar-muted-foreground: 125 135 157;
   --sidebar-surface: var(--app-shell-sidebar-background-rgb);
   --sidebar-surface-hover: 168 176 195 / 0.06;
-  --sidebar-input-background: 15 20 32 / 1;
+  --sidebar-input-background: 19 20 23 / 1;
   --sidebar-input-border: 168 176 195 / 0.16;
   --sidebar-item-foreground: 215 220 232;
   --sidebar-item-icon: 125 135 157;
@@ -5936,15 +5947,20 @@
   --system-b-release-provider-accent-hover: var(--color-accent-hover);
 }
 
-:where(.system-b-spotify-connect-card) {
+:where(.system-b-spotify-connect-card),
+:where([data-spotify-connect-surface="card"]) {
   overflow: visible;
   background: var(--system-b-app-content-surface);
+  padding: calc(var(--space-3) + var(--space-0-5));
 }
 
-:where(.system-b-spotify-connect-status-card) {
+:where(.system-b-spotify-connect-status-card),
+:where([data-spotify-connect-surface="status"]) {
   display: flex;
   min-height: calc(var(--space-10) + var(--space-4));
   align-items: center;
+  gap: var(--space-2-5);
+  padding-inline: var(--space-2-5);
   background: color-mix(
     in oklab,
     var(--system-b-app-content-surface) 88%,
@@ -6424,4 +6440,16 @@
 [data-empty-chat-region="true"]:has([data-chat-composer-overlay="true"])
 [data-empty-chat-suggestions="true"] {
   visibility: hidden;
+}
+
+/* Founder-review registries keep table geometry reserved while the canonical
+   app-shell right rail opens in flow beside them. */
+:where(.system-b-founder-review-table-shell) {
+  height: min(35rem, calc(100vh - 19rem));
+  min-height: 28rem;
+}
+
+:where(.system-b-founder-review-table) {
+  width: 100%;
+  table-layout: fixed;
 }

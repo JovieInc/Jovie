@@ -4,7 +4,9 @@
  * Database operations for release-artist junction table.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { admitArtistCredit } from '@/lib/canonical/artist-credit';
+import { SemanticContractError } from '@/lib/canonical/semantic-contract';
 import { type DbOrTransaction, db } from '@/lib/db';
 import {
   type ArtistRole,
@@ -40,14 +42,35 @@ export async function upsertReleaseArtist(
   const database = tx ?? db;
   const now = new Date();
 
+  // JOV-6543: canonical admission for the credit edge. An implausible credit
+  // (non-registry artist reference, unsupported role, or an unsupported
+  // featured/remixer/production→primary promotion) is quarantined by
+  // throwing SemanticContractError — never written to canon.
+  const admission = admitArtistCredit(
+    {
+      artistId: input.artistId,
+      role: input.role,
+      isPrimary: input.isPrimary,
+      position: input.position,
+    },
+    {
+      producer: 'discography/upsert-release-artist@1',
+      source: input.sourceType ?? 'ingested',
+      confidence: input.sourceType === 'ingested' ? 'imported' : 'observed',
+    }
+  );
+  if (admission.status !== 'accepted' || !admission.canonical) {
+    throw new SemanticContractError(admission);
+  }
+
   const insertData: NewReleaseArtist = {
     releaseId: input.releaseId,
-    artistId: input.artistId,
-    role: input.role,
+    artistId: admission.canonical.artistId,
+    role: admission.canonical.role,
     creditName: input.creditName ?? null,
     joinPhrase: input.joinPhrase ?? null,
-    position: input.position ?? 0,
-    isPrimary: input.isPrimary ?? false,
+    position: admission.canonical.position,
+    isPrimary: admission.canonical.isPrimary,
     sourceType: input.sourceType ?? 'ingested',
     metadata: input.metadata ?? {},
     createdAt: now,
@@ -60,7 +83,10 @@ export async function upsertReleaseArtist(
   if (input.position !== undefined) updateSet.position = input.position;
   if (input.isPrimary !== undefined) updateSet.isPrimary = input.isPrimary;
   if (input.sourceType !== undefined) updateSet.sourceType = input.sourceType;
-  if (input.metadata !== undefined) updateSet.metadata = input.metadata;
+  const metadataUpdate =
+    input.metadata === undefined
+      ? undefined
+      : drizzleSql`COALESCE(${releaseArtists.metadata}, '{}'::jsonb) || ${JSON.stringify(input.metadata)}::jsonb`;
 
   const [result] = await database
     .insert(releaseArtists)
@@ -72,8 +98,11 @@ export async function upsertReleaseArtist(
         releaseArtists.role,
       ],
       set:
-        Object.keys(updateSet).length > 0
-          ? updateSet
+        Object.keys(updateSet).length > 0 || metadataUpdate
+          ? {
+              ...updateSet,
+              ...(metadataUpdate && { metadata: metadataUpdate }),
+            }
           : { creditName: insertData.creditName },
     })
     .returning();

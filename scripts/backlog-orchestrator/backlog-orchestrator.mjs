@@ -30,10 +30,12 @@ import { preAdmissionDecision } from './admission-policy.mjs';
 // Keep the complete control-plane dependency closure visible to source sync and
 // module tooling. These are canonical sibling modules, not host-only copies.
 import * as admitter from './admitter.mjs';
+import * as backlogHygiene from './backlog-hygiene.mjs';
 import * as backlogReduction from './backlog-reduction.mjs';
 import * as backlogRemediation from './backlog-remediation.mjs';
 import * as classifier from './classifier.mjs';
 import * as contextGate from './context-gate.mjs';
+import { reconcileConversationRequest } from './conversation-intake.mjs';
 import * as deterministicGates from './deterministic-gates.mjs';
 import * as gateNextHold from './gate-next-hold.mjs';
 import { cliGbrainClient } from './gbrain-client.mjs';
@@ -47,8 +49,12 @@ import * as reporter from './reporter.mjs';
 import * as researchGate from './research-gate.mjs';
 import * as runtimeState from './runtime-state.mjs';
 import * as scorer from './scorer.mjs';
-import { gateShippingLeadRequest } from './shipping-lead-gate.mjs';
+import {
+  gateShippingLeadRequest,
+  materializeReviewedPlanAdmission,
+} from './shipping-lead-gate.mjs';
 import * as staleLeaseGuard from './stale-lease-guard.mjs';
+import { shippingTaskProfile } from './summer-shipping-lead-contract.mjs';
 import {
   buildRoutingReceipt,
   readCodexRotateCapacity,
@@ -149,6 +155,8 @@ Usage:
   node backlog-orchestrator.mjs remediate --dry-run   Inventory and report without mutations
   node backlog-orchestrator.mjs intake-readiness      Classify changed intake work (always dry-run)
   node backlog-orchestrator.mjs backlog-reduction     Audit high-confidence duplicate reduction (dry-run)
+  node backlog-orchestrator.mjs backlog-hygiene       Aged dedup + stale Sentry-only hygiene pass (dry-run)
+  node backlog-orchestrator.mjs reconcile-conversation --evidence-file=/path/request.json
   node backlog-orchestrator.mjs approve-research --issue=JOV-123 --evidence-file=/path/research.json
   node backlog-orchestrator.mjs report                Generate shadow report
 `);
@@ -178,6 +186,10 @@ Usage:
     await runIntakeReadiness(cache, issueArg);
   } else if (command === 'backlog-reduction') {
     await runBacklogReduction(cache);
+  } else if (command === 'backlog-hygiene') {
+    await runBacklogHygiene(cache);
+  } else if (command === 'reconcile-conversation') {
+    await runConversationReconciliation(evidenceFile, evidenceJson, isDryRun);
   } else if (command === 'approve-plan') {
     await runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun);
   } else if (command === 'approve-research') {
@@ -186,6 +198,28 @@ Usage:
     console.error(`Unknown command: ${command}`);
     process.exit(1);
   }
+}
+
+async function runConversationReconciliation(
+  evidenceFile,
+  evidenceJson,
+  isDryRun
+) {
+  if (!evidenceFile && !evidenceJson)
+    throw new Error(
+      'reconcile-conversation requires --evidence-file or --evidence'
+    );
+  const request = evidenceFile
+    ? JSON.parse(readFileSync(evidenceFile, 'utf8'))
+    : JSON.parse(evidenceJson);
+  const receipt = await reconcileConversationRequest({
+    request,
+    teamId: TEAM_CONFIGS[0].id,
+    stateId: TEAM_FILE_CONFIG.states.triage,
+    client: linear,
+    dryRun: isDryRun,
+  });
+  console.log(JSON.stringify(receipt, null, 2));
 }
 
 async function runIntakeReadiness(cache, issueArg) {
@@ -246,6 +280,26 @@ async function runBacklogReduction(cache) {
     mutations: 0,
   };
   saveCache({ ...cache, backlogReduction: { lastReceipt: result } });
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function runBacklogHygiene(cache) {
+  const teams = [];
+  for (const team of TEAM_CONFIGS) {
+    const issues = await linear.fetchTeamIntakeIssues(team.id);
+    teams.push({
+      team: team.key,
+      ...backlogHygiene.buildBacklogHygieneReceipt(issues),
+    });
+  }
+  const result = {
+    schema: 'backlog-hygiene/multiteam/v1',
+    mode: 'dry-run',
+    observedAt: new Date().toISOString(),
+    teams,
+    mutations: 0,
+  };
+  saveCache({ ...cache, backlogHygiene: { lastReceipt: result } });
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -858,11 +912,23 @@ async function evaluateGateCandidate(
 
 /** Existing single-issue pipeline; no pool sweep, stale-lease recovery, or new controller. */
 export async function admitShippingLeadRequest(task, options = {}) {
+  const profile = shippingTaskProfile(task);
+  const team = TEAM_CONFIGS.find(
+    candidate => candidate.key === profile?.teamKey
+  );
   return gateShippingLeadRequest(task, {
     client: linear,
     preflight: admissionPreflight,
-    evaluate: evaluateGateCandidate,
-    team: TEAM_CONFIGS.find(team => team.key === 'JOV'),
+    evaluate: profile?.approvalOnly
+      ? (_team, issue, _dryRun, _preflight, _staleLeaseRecovery, gate) =>
+          materializeReviewedPlanAdmission({
+            task,
+            issue,
+            client: gate.client,
+            teamId: team?.id || null,
+          })
+      : evaluateGateCandidate,
+    team,
     ...options,
   });
 }

@@ -40,6 +40,7 @@ import {
   isRedisQuotaFailure,
   unwrapCapturedContext,
   unwrapCapturedError,
+  unwrapFailedQueryError,
 } from '@/lib/utils/errors';
 
 // NOTE: This module is used in both server and client contexts, so we read
@@ -144,8 +145,11 @@ function sendToSentry(params: {
   }
 
   try {
+    const unwrappedQueryError = unwrapFailedQueryError(error);
     const errorInstance =
-      error instanceof Error ? error : new Error(errorMessage);
+      unwrappedQueryError.error instanceof Error
+        ? unwrappedQueryError.error
+        : new Error(errorMessage);
 
     const tags: Record<string, string> = {
       severity,
@@ -179,17 +183,20 @@ function sendToSentry(params: {
     // Stable fingerprint overrides default grouping so distinct failure classes
     // (e.g. RLS set_config) never merge into generic "Failed query" issues.
     // Quota exhaustion is one incident (JOV-5199), not one Linear issue per route.
-    const fingerprint =
-      typeof context?.fingerprint === 'string' && context.fingerprint
-        ? [context.fingerprint]
-        : quotaFailure
-          ? ['redis-quota-exceeded']
-          : undefined;
+    let fingerprint: string[] | undefined;
+    if (typeof context?.fingerprint === 'string' && context.fingerprint) {
+      fingerprint = [context.fingerprint];
+    } else if (quotaFailure) {
+      fingerprint = ['redis-quota-exceeded'];
+    }
 
     Sentry.captureException(errorInstance, {
       extra: {
         message,
         sentryMode,
+        ...(unwrappedQueryError.wrapperMessage
+          ? { query_wrapper: unwrappedQueryError.wrapperMessage }
+          : {}),
         ...context,
       },
       level: severity === 'critical' ? 'fatal' : severity,

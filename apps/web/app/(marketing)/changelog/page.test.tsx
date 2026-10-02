@@ -1,11 +1,12 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChangelogParseResult } from '@/lib/changelog-parser';
 
 const SNAPSHOT: ChangelogParseResult = {
   releases: [
     {
       version: '26.8.2',
+      kind: 'release',
       date: '2026-08-31',
       summary: '',
       sections: {
@@ -20,6 +21,7 @@ const SNAPSHOT: ChangelogParseResult = {
   sourceReleases: [
     {
       version: '26.9.0',
+      kind: 'release',
       date: '2026-09-19',
       summary: '',
       sections: {
@@ -34,6 +36,7 @@ const SNAPSHOT: ChangelogParseResult = {
   unpublishedReleases: [
     {
       version: '26.9.0',
+      kind: 'release',
       date: '2026-09-19',
       summary: '',
       sections: {
@@ -46,6 +49,26 @@ const SNAPSHOT: ChangelogParseResult = {
     },
   ],
 };
+
+function reviewedSnapshot(
+  snapshot: ChangelogParseResult
+): ChangelogParseResult {
+  return {
+    ...snapshot,
+    releases: snapshot.releases.map(release => ({
+      ...release,
+      customerOutcomes: Object.fromEntries(
+        Object.values(release.sections)
+          .flat()
+          .map(text => [
+            text,
+            { availability: 'unverified' as const, prerequisites: [] },
+          ])
+      ),
+    })),
+  };
+}
+let currentSnapshot = reviewedSnapshot(SNAPSHOT);
 
 vi.mock('next/link', () => ({
   default: ({
@@ -63,20 +86,55 @@ vi.mock('next/link', () => ({
 }));
 
 vi.mock('@/lib/changelog-source', () => ({
-  getChangelogSnapshot: async () => SNAPSHOT,
+  getChangelogSnapshot: async () => reviewedSnapshot(currentSnapshot),
 }));
 
 vi.mock('@/components/marketing/changelog/ChangelogSubscribeColumn', () => ({
   ChangelogSubscribeColumn: () => <div data-testid='changelog-subscribe' />,
 }));
 
-vi.mock('@/components/site/MarketingFinalCTA', () => ({
-  MarketingFinalCTA: () => <div data-testid='marketing-final-cta' />,
+vi.mock('@/components/site/MarketingFooterCta', () => ({
+  MarketingFooterCta: () => <div data-testid='marketing-footer-cta' />,
 }));
 
 import ChangelogPage, { metadata } from './page';
 
 describe('public changelog page', () => {
+  beforeEach(() => {
+    currentSnapshot = reviewedSnapshot(SNAPSHOT);
+  });
+  it('does not describe older empty slots as newer than a published daily update', async () => {
+    currentSnapshot = {
+      ...SNAPSHOT,
+      releases: [
+        {
+          ...SNAPSHOT.releases[0],
+          version: '2026-10-02',
+          kind: 'daily',
+          date: '2026-10-02',
+        },
+      ],
+    };
+    render(await ChangelogPage());
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'October 2026' })).toBeVisible();
+  });
+  it.each(['empty', 'undated'] as const)(
+    'reports %s publication without inventing a date or update',
+    async kind => {
+      currentSnapshot = {
+        ...SNAPSHOT,
+        releases:
+          kind === 'empty' ? [] : [{ ...SNAPSHOT.releases[0], date: '' }],
+      };
+      render(await ChangelogPage());
+      expect(screen.getByRole('status')).toHaveTextContent(
+        kind === 'empty'
+          ? 'No customer updates have been published yet.'
+          : 'The latest published update is listed below.'
+      );
+    }
+  );
   it('keeps one customer-facing heading and discloses unpublished source slots', async () => {
     render(await ChangelogPage());
 
@@ -97,5 +155,18 @@ describe('public changelog page', () => {
     expect(metadata.title).toBe(
       'Jovie Changelog: Product Updates & New Features'
     );
+  });
+
+  it('renders the unique docked hero photo and exactly one footer CTA', async () => {
+    render(await ChangelogPage());
+
+    const heroPhoto = screen.getByTestId('changelog-hero-photo');
+    expect(heroPhoto).toBeInTheDocument();
+    expect(heroPhoto.querySelector('img')?.getAttribute('src')).toContain(
+      'changelog-index.webp'
+    );
+    // Route owns its final CTA (MarketingFooterCta) instead of stacking
+    // the generic footer request-access banner on top of it (spec rule 2).
+    expect(screen.getAllByTestId('marketing-footer-cta')).toHaveLength(1);
   });
 });

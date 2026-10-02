@@ -2,6 +2,8 @@ import {
   convertToModelMessages,
   type LanguageModel,
   type ModelMessage,
+  pruneMessages,
+  type SystemModelMessage,
   smoothStream,
   stepCountIs,
   type ToolSet,
@@ -40,7 +42,11 @@ import {
 } from '@/lib/chat/prompt-disclosure-guard';
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
 import { resolveChatPromptRegistryEntry } from '@/lib/chat/prompts/registry';
-import { buildSystemPrompt } from '@/lib/chat/system-prompt';
+import {
+  buildSystemPromptParts,
+  joinSystemPromptParts,
+  type SystemPromptParts,
+} from '@/lib/chat/system-prompt';
 import {
   isChatToolStepCapExhausted,
   resolveChatToolStepLimit,
@@ -140,6 +146,56 @@ export function recentUserTexts(uiMessages: UIMessage[], limit = 3): string[] {
  */
 export function selectKnowledgeContextForTurn(uiMessages: UIMessage[]): string {
   return selectKnowledgeContext(recentUserTexts(uiMessages).join(' '));
+}
+
+/**
+ * User turns whose tool calls and results are replayed verbatim. Older turns
+ * keep their text only, so large tool outputs are not re-sent on every turn.
+ */
+export const CHAT_TOOL_HISTORY_USER_TURNS = 2;
+
+/**
+ * Drops tool calls/results older than the last
+ * `CHAT_TOOL_HISTORY_USER_TURNS` user turns (AI SDK `pruneMessages`).
+ */
+export function pruneStaleToolHistory(
+  messages: ModelMessage[]
+): ModelMessage[] {
+  let userTurns = 0;
+  for (let index = messages.length - 1; index > 0; index -= 1) {
+    if (messages[index]?.role !== 'user') continue;
+    userTurns += 1;
+    if (userTurns === CHAT_TOOL_HISTORY_USER_TURNS) {
+      return pruneMessages({
+        messages,
+        toolCalls: `before-last-${messages.length - index}-messages`,
+      });
+    }
+  }
+  return messages;
+}
+
+/**
+ * The stable prompt goes first with an Anthropic cache breakpoint, so tools
+ * plus the stable prompt are read from cache on later turns. Per-turn context
+ * follows as a separate, uncached system block.
+ */
+export function buildCachedSystemMessages(
+  parts: SystemPromptParts
+): SystemModelMessage[] {
+  const messages: SystemModelMessage[] = [
+    {
+      role: 'system',
+      content: parts.stable,
+      providerOptions: {
+        anthropic: { cacheControl: { type: 'ephemeral' } },
+      },
+    },
+  ];
+  if (parts.dynamic) {
+    messages.push({ role: 'system', content: parts.dynamic });
+  }
+  return messages;
 }
 
 export interface ExecuteChatTurnInput {
@@ -295,9 +351,9 @@ export async function executeChatTurn(
   // music-industry knowledge context (which is keyed on the artist's profile,
   // not relevant pre-account). Authenticated `mode='app'` keeps the existing
   // buildSystemPrompt path so this refactor is behaviour-stable for in-app chat.
-  let systemPrompt: string;
+  let systemPromptParts: SystemPromptParts;
   if (mode === 'onboarding') {
-    systemPrompt = ONBOARDING_SYSTEM_PROMPT;
+    systemPromptParts = { stable: ONBOARDING_SYSTEM_PROMPT, dynamic: '' };
   } else {
     // Runtime guard rather than a `as ArtistContext` cast — the type system
     // can't express "non-null when mode='app'" without a discriminated union,
@@ -319,7 +375,7 @@ export async function executeChatTurn(
     });
     const pinnedOpportunityBlock =
       buildPinnedOpportunityBlock(pinnedOpportunity);
-    systemPrompt = buildSystemPrompt(artistContext, releases, {
+    const parts = buildSystemPromptParts(artistContext, releases, {
       aiCanUseTools: planLimits.booleans.aiCanUseTools,
       aiWeeklyMessageLimit: planLimits.limits.aiWeeklyMessageLimit,
       insightsEnabled,
@@ -329,12 +385,18 @@ export async function executeChatTurn(
       pinnedOpportunity: pinnedOpportunityBlock,
       lockedTools,
     });
-    if (identity) {
-      systemPrompt = applyEveIdentityToSystemPrompt(systemPrompt, identity);
-    }
+    systemPromptParts = identity
+      ? {
+          stable: applyEveIdentityToSystemPrompt(parts.stable, identity),
+          dynamic: parts.dynamic,
+        }
+      : parts;
   }
+  const systemPrompt = joinSystemPromptParts(systemPromptParts);
 
-  const modelMessages = await convertToModelMessages(uiMessages);
+  const modelMessages = pruneStaleToolHistory(
+    await convertToModelMessages(uiMessages)
+  );
 
   // `forceLightModel` is the runtime lever (Statsig `ai_chat_force_light`)
   // that degrades the entire chat surface to the light model during a
@@ -491,7 +553,7 @@ export async function executeChatTurn(
           PROMPT_DISCLOSURE_REFUSAL
         ) as unknown as LanguageModel)
       : (rotatingModel as unknown as LanguageModel),
-    system: systemPrompt,
+    system: buildCachedSystemMessages(systemPromptParts),
     messages: modelMessages,
     tools: blockedForDisclosure ? undefined : tools,
     stopWhen: blockedForDisclosure ? undefined : stepCountIs(toolStepLimit),
@@ -508,6 +570,9 @@ export async function executeChatTurn(
           return {};
         },
     abortSignal: signal,
+    providerOptions: {
+      gateway: { tags: ['feature:jovie-chat', `surface:${mode}`] },
+    },
     // JOV-3525: pace raw model deltas into a steady word-level reveal so the
     // client render cadence is smooth; pairs with useChat
     // experimental_throttle in useJovieChat.
@@ -524,7 +589,39 @@ export async function executeChatTurn(
         chatToolStepLimit: toolStepLimit,
       },
     }),
-    onFinish: async ({ steps, text }) => {
+    onFinish: async ({ steps, text, finishReason }) => {
+      if (
+        !(typeof text === 'string' && text.trim()) &&
+        steps.every(step => step.toolCalls.length === 0)
+      ) {
+        const emptyOutputError = Object.assign(
+          new Error('Model turn produced no text or tool calls'),
+          { name: 'EmptyChatTurnError' }
+        );
+        // An empty turn is a failure the caller would otherwise persist as a
+        // placeholder reply (JOV-6533); console.error so prod logs show it.
+        console.error('[chat] model turn produced no output', {
+          requestId,
+          mode,
+          selectedModel,
+          finishReason,
+          steps: steps.length,
+          aborted: signal?.aborted ?? false,
+        });
+        langfuseTrace.endError(emptyOutputError);
+        await telemetry?.captureException?.(emptyOutputError, {
+          tags: { feature: 'ai-chat', errorType: 'empty_output' },
+          extra: {
+            userId,
+            messageCount: uiMessages.length,
+            requestId,
+            profileId: resolvedProfileId,
+            conversationId: resolvedConversationId,
+          },
+        });
+        await onStreamError?.(emptyOutputError);
+        return;
+      }
       let promptLeakBlocked = false;
       if (!blockedForDisclosure && typeof text === 'string') {
         const sanitized = sanitizeAssistantResponse(text);
@@ -599,9 +696,37 @@ export async function executeChatTurn(
         },
       });
     },
+    onAbort: ({ steps }) => {
+      console.error('[chat] model stream aborted', {
+        requestId,
+        mode,
+        selectedModel,
+        steps: steps.length,
+        reason:
+          signal?.reason instanceof Error
+            ? `${signal.reason.name}: ${signal.reason.message}`
+            : String(signal?.reason ?? 'unknown'),
+      });
+    },
     onError: async ({ error }) => {
       if (isClientDisconnect(error, signal)) return;
 
+      // Always leave the real provider error in runtime logs: callers map it to
+      // recovery copy and telemetry is optional, so it was otherwise invisible
+      // (JOV-6533: 200 + "Message paused" with no trace anywhere).
+      // console.error, not logger: the app logger is a no-op in production builds,
+      // and this line exists to be visible in Vercel runtime logs.
+      console.error('[chat] model stream error', {
+        message: error instanceof Error ? error.message : String(error),
+        name: error instanceof Error ? error.name : undefined,
+        cause:
+          error instanceof Error && error.cause instanceof Error
+            ? error.cause.message
+            : undefined,
+        requestId,
+        mode,
+        selectedModel,
+      });
       langfuseTrace.endError(error);
 
       if (isGatewayBudgetExceededError(error)) {
@@ -672,13 +797,15 @@ async function resolveCoreChatTrace(input: {
 function wrapStreamResultWithLeakGuard<T extends ReturnType<typeof streamText>>(
   streamResult: T
 ): T {
-  if (!streamResult?.text) {
+  const textPromise = streamResult?.text;
+  if (!textPromise) {
     return streamResult;
   }
 
-  const sanitizedTextPromise = streamResult.text.then(
+  const sanitizedTextPromise = Promise.resolve(textPromise).then(
     text => sanitizeAssistantResponse(text).text
   );
+  void sanitizedTextPromise.catch(() => undefined);
 
   return Object.create(streamResult, {
     text: {

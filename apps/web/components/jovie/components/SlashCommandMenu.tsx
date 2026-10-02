@@ -19,7 +19,7 @@
 
 import {
   Calendar,
-  Disc3,
+  Layers,
   type LucideIcon,
   Music2,
   UserCircle,
@@ -60,7 +60,7 @@ export type { EntityRefMeta } from '@/lib/commands/entities';
 export type SlashMenuMode = 'all' | EntityKind;
 
 const KIND_ICON_MAP: Record<EntityKind, LucideIcon> = {
-  release: Disc3,
+  release: Layers,
   artist: UserCircle,
   track: Music2,
   event: Calendar,

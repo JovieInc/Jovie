@@ -119,12 +119,9 @@ function restoreStuckFocus(restored: string[]): void {
     '[aria-label="Chat Message Input"]'
   );
   const main = document.getElementById('main-content');
-  const target =
-    composer && !composer.closest('[inert]')
-      ? composer
-      : main && !main.closest('[inert]')
-        ? main
-        : null;
+  let target: HTMLElement | null = null;
+  if (composer && !composer.closest('[inert]')) target = composer;
+  else if (main && !main.closest('[inert]')) target = main;
   if (!target || typeof target.focus !== 'function') return;
   target.focus({ preventScroll: true });
   restored.push('focus');

@@ -1,6 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { SmartLinkArtworkCard } from './SmartLinkPagePrimitives';
+import {
+  SmartLinkArtworkCard,
+  SmartLinkPoweredByFooter,
+} from './SmartLinkPagePrimitives';
 
 vi.mock('next/image', () => ({
   default: (props: { readonly alt: string; readonly className?: string }) => (
@@ -16,5 +19,32 @@ describe('SmartLinkArtworkCard', () => {
     const image = screen.getByRole('img', { name: 'Never Say A Word artwork' });
     expect(image).toHaveClass('object-contain');
     expect(image).not.toHaveClass('object-cover');
+  });
+
+  it('uses the banned-icon-safe AudioLines glyph without artwork', () => {
+    const { container } = render(
+      <SmartLinkArtworkCard title='Never Say A Word' artworkUrl={null} />
+    );
+
+    const icon = container.querySelector('svg.lucide-audio-lines');
+    expect(icon).toBeTruthy();
+    expect(container.querySelector('svg.lucide-disc-3')).toBeNull();
+  });
+});
+
+describe('SmartLinkPoweredByFooter', () => {
+  it('links to the abuse report flow for smart links', () => {
+    const { rerender } = render(<SmartLinkPoweredByFooter />);
+    const link = screen.getByRole('link', { name: 'Report' });
+    expect(link).toHaveAttribute('href', '/report?type=smart_link');
+    expect(screen.getByRole('link', { name: /Powered by/i })).toHaveAttribute(
+      'href',
+      '/'
+    );
+
+    rerender(
+      <SmartLinkPoweredByFooter reportHref='/report?type=smart_link&target=abc' />
+    );
+    expect(link).toHaveAttribute('href', '/report?type=smart_link&target=abc');
   });
 });

@@ -5,6 +5,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 
+// These cases cover the theme-switching policy itself; production ships with
+// theme switching off (dark forced), covered in lib/theme/route-policy.test.ts.
+vi.hoisted(() => {
+  process.env.NEXT_PUBLIC_FEATURE_THEME_SWITCHING = '1';
+});
+
 const mockUsePathname = vi.fn<() => string | null>(() => '/about');
 const themeState = vi.hoisted(() => ({
   theme: 'dark',
@@ -46,7 +52,23 @@ describe('MarketingFooter', () => {
     themeState.setTheme.mockReset();
   });
 
+  it('keeps the current footer columns while the about refresh flag is off', () => {
+    mockUsePathname.mockReturnValue('/about');
+    render(<MarketingFooter />);
+
+    expect(screen.getByRole('link', { name: 'Blog' })).toHaveAttribute(
+      'href',
+      '/blog'
+    );
+    expect(screen.getByRole('heading', { name: 'Connect' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
+      'href',
+      '/product'
+    );
+  });
+
   it('renders the full marketing footer when the full-footer flag is enabled', () => {
+    mockUsePathname.mockReturnValue('/solutions');
     render(<MarketingFooter />);
 
     const footer = screen.getByTestId('marketing-footer');
@@ -71,17 +93,19 @@ describe('MarketingFooter', () => {
       'href',
       '/legal/terms'
     );
-    expect(screen.getByRole('link', { name: 'Investors' })).toHaveAttribute(
-      'href',
-      '/investors'
-    );
+    // Investor pages are private: the public footer never links them.
+    expect(screen.queryByRole('link', { name: 'Investors' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Pitch' })).toBeNull();
     expect(screen.getByRole('heading', { name: 'Product' })).toHaveClass(
       'line-clamp-2'
     );
-    expect(screen.getByRole('link', { name: 'Status' })).toHaveAttribute(
-      'href',
-      'https://status.jov.ie'
+    // DETAILS.md text casing: never ALL CAPS for column headings.
+    expect(screen.getByRole('heading', { name: 'Product' })).not.toHaveClass(
+      'mf-eyebrow--caps'
     );
+    // status.jov.ie currently serves Vercel DEPLOYMENT_NOT_FOUND; the public
+    // footer omits the link until the status deployment is restored (JOV-7135).
+    expect(screen.queryByRole('link', { name: 'Status' })).toBeNull();
   });
 
   it('renders the full homepage footer without the duplicate final CTA', () => {
@@ -125,16 +149,50 @@ describe('MarketingFooter', () => {
     );
   });
 
-  it.each(['/artist-profiles', '/artist-profile'])(
-    'keeps %s on the minimal homepage footer treatment',
+  it('keeps the legacy /artist-profile route on the minimal homepage footer treatment', () => {
+    mockUsePathname.mockReturnValue('/artist-profile');
+
+    render(<MarketingFooter />);
+
+    expect(screen.getByTestId('marketing-footer')).toHaveClass(
+      'system-b-mounted-home-footer'
+    );
+    expect(
+      screen.queryByTestId('marketing-footer-cta')
+    ).not.toBeInTheDocument();
+  });
+
+  // JOV marketing routes 2026-09-26: every marketing page gets the FULL
+  // footer (all link columns, never compact) — /artist-profiles no longer
+  // opts into the minimal homepage treatment. It still omits the shared
+  // footer CTA because ArtistProfileFinalCta already owns the page's single
+  // final CTA.
+  it('gives /artist-profiles the full footer without a duplicate final CTA', () => {
+    mockUsePathname.mockReturnValue('/artist-profiles');
+
+    render(<MarketingFooter />);
+
+    expect(screen.getByTestId('marketing-footer')).not.toHaveClass(
+      'system-b-mounted-home-footer'
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Product' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Connect' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('marketing-footer-cta')
+    ).not.toBeInTheDocument();
+  });
+
+  it.each(['/about', '/ai', '/product'])(
+    'renders one final CTA on %s, owned by the page',
     pathname => {
       mockUsePathname.mockReturnValue(pathname);
 
       render(<MarketingFooter />);
 
-      expect(screen.getByTestId('marketing-footer')).toHaveClass(
-        'system-b-mounted-home-footer'
-      );
       expect(
         screen.queryByTestId('marketing-footer-cta')
       ).not.toBeInTheDocument();
@@ -149,6 +207,32 @@ describe('MarketingFooter', () => {
     expect(
       screen.queryByTestId('marketing-footer-cta')
     ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    '/blog',
+    '/blog/the-contact-problem',
+    '/blog/category/artist-management',
+    '/changelog',
+    '/changelog/26.9.0',
+    '/engineering',
+    '/engineering/some-story',
+  ])('omits the duplicate footer CTA on the editorial route %s', pathname => {
+    mockUsePathname.mockReturnValue(pathname);
+
+    render(<MarketingFooter />);
+
+    expect(
+      screen.queryByTestId('marketing-footer-cta')
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the terminal CTA on the founder-only engineering preview gallery', () => {
+    mockUsePathname.mockReturnValue('/engineering/preview');
+
+    render(<MarketingFooter />);
+
+    expect(screen.getByTestId('marketing-footer-cta')).toBeInTheDocument();
   });
 
   it('links to the canonical Card route without duplicating its terminal CTA', () => {
@@ -166,6 +250,7 @@ describe('MarketingFooter', () => {
   });
 
   it('honors the expanded footer variant when the full-footer flag is enabled', () => {
+    mockUsePathname.mockReturnValue('/solutions');
     render(<MarketingFooter variant='expanded' />);
 
     expect(screen.getByTestId('marketing-footer-cta')).toBeInTheDocument();

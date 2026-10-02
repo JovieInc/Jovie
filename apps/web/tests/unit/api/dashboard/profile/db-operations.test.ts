@@ -92,26 +92,26 @@ describe('updateProfileRecords exact-profile CAS', () => {
   it.each([
     { reason: 'forbidden' as const, status: 403 },
     { reason: 'not_found' as const, status: 404 },
-  ])('stops the profile update preflight at exact access $reason', async ({
-    reason,
-    status,
-  }) => {
-    getExactProfileAccess.mockResolvedValue({ ok: false, reason });
-    const { tx } = createTx();
-    const { getProfileUpdatePreflight } = await import(
-      '@/app/api/dashboard/profile/lib/db-operations'
-    );
+  ])(
+    'stops the profile update preflight at exact access $reason',
+    async ({ reason, status }) => {
+      getExactProfileAccess.mockResolvedValue({ ok: false, reason });
+      const { tx } = createTx();
+      const { getProfileUpdatePreflight } = await import(
+        '@/app/api/dashboard/profile/lib/db-operations'
+      );
 
-    const result = await getProfileUpdatePreflight(
-      tx as never,
-      'user-a',
-      'profile-a'
-    );
+      const result = await getProfileUpdatePreflight(
+        tx as never,
+        'user-a',
+        'profile-a'
+      );
 
-    expect(result).toBeInstanceOf(NextResponse);
-    expect((result as NextResponse).status).toBe(status);
-    expect(tx.select).not.toHaveBeenCalled();
-  });
+      expect(result).toBeInstanceOf(NextResponse);
+      expect((result as NextResponse).status).toBe(status);
+      expect(tx.select).not.toHaveBeenCalled();
+    }
+  );
 
   it('reads the current avatar and CAS version after exact access succeeds', async () => {
     const avatarUrl = 'https://example.com/avatar.png';

@@ -24,6 +24,7 @@ export default async function DesktopAuthPage({
   return (
     <DesktopAuthClient
       authUrlParam={firstSearchParam(resolvedSearchParams.auth_url)}
+      touchIdHint={firstSearchParam(resolvedSearchParams.touch_id) === '1'}
     />
   );
 }

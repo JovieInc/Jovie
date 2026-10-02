@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ProfileSwitcher } from '@/components/organisms/ProfileSwitcher';
+import { IdentitySwitcher } from '@/components/organisms/ProfileSwitcher';
 
 const { mockRefresh, mockToastError, mockUseDashboardData } = vi.hoisted(
   () => ({
@@ -47,7 +47,7 @@ vi.mock('@/components/molecules/Avatar', () => ({
 }));
 
 vi.mock('@/components/organisms/CreateProfileDialog', () => ({
-  CreateProfileDialog: () => null,
+  CreateIdentityDialog: () => null,
 }));
 
 vi.mock('@jovie/ui', () => ({
@@ -76,7 +76,7 @@ vi.mock('@jovie/ui', () => ({
   ),
 }));
 
-describe('ProfileSwitcher sidebar workspace selection', () => {
+describe('IdentitySwitcher identity context selection', () => {
   const originalLocation = globalThis.location;
   const mockReload = vi.fn();
   const fetchMock = vi.fn();
@@ -96,7 +96,7 @@ describe('ProfileSwitcher sidebar workspace selection', () => {
       json: async () => ({ success: true }),
     });
     mockUseDashboardData.mockReturnValue({
-      creatorProfiles: [
+      identities: [
         {
           id: '11111111-1111-4111-8111-111111111111',
           avatarUrl: null,
@@ -110,7 +110,7 @@ describe('ProfileSwitcher sidebar workspace selection', () => {
           username: 'beta',
         },
       ],
-      selectedProfile: {
+      activeIdentity: {
         id: '11111111-1111-4111-8111-111111111111',
         avatarUrl: null,
         displayName: 'Alpha Artist',
@@ -129,7 +129,7 @@ describe('ProfileSwitcher sidebar workspace selection', () => {
   });
 
   it('uses canonical avatar sizes and fallback names for identity rows', () => {
-    render(<ProfileSwitcher />);
+    render(<IdentitySwitcher />);
 
     const avatars = screen.getAllByTestId('profile-switcher-avatar');
     expect(avatars).toHaveLength(3);
@@ -148,10 +148,47 @@ describe('ProfileSwitcher sidebar workspace selection', () => {
     }
   });
 
+  it('names the control as identity context instead of Presence', () => {
+    render(<IdentitySwitcher />);
+
+    expect(
+      screen.getByRole('button', { name: 'Switch Identity' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Add Artist Identity' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Presence' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not burden a single-identity account with a switcher', () => {
+    mockUseDashboardData.mockReturnValue({
+      identities: [
+        {
+          id: '11111111-1111-4111-8111-111111111111',
+          avatarUrl: null,
+          displayName: 'Alpha Artist',
+          username: 'alpha',
+        },
+      ],
+      activeIdentity: {
+        id: '11111111-1111-4111-8111-111111111111',
+        avatarUrl: null,
+        displayName: 'Alpha Artist',
+        username: 'alpha',
+      },
+    });
+
+    const { container } = render(<IdentitySwitcher />);
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('refreshes App Router data instead of forcing a document reload', async () => {
     const user = userEvent.setup();
 
-    render(<ProfileSwitcher />);
+    render(<IdentitySwitcher />);
 
     await user.click(screen.getByRole('button', { name: /Beta Artist/ }));
 
@@ -176,12 +213,12 @@ describe('ProfileSwitcher sidebar workspace selection', () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValue({
       json: async () => ({
-        error: "Couldn't switch profile. Try again.",
+        error: "Couldn't switch identity. Try again.",
         success: false,
       }),
     });
 
-    render(<ProfileSwitcher />);
+    render(<IdentitySwitcher />);
 
     await user.click(screen.getByRole('button', { name: /Beta Artist/ }));
 
@@ -196,7 +233,7 @@ describe('ProfileSwitcher sidebar workspace selection', () => {
         })
       );
       expect(mockToastError).toHaveBeenCalledWith(
-        "Couldn't switch profile. Try again."
+        "Couldn't switch identity. Try again."
       );
     });
     expect(mockRefresh).not.toHaveBeenCalled();
@@ -207,13 +244,13 @@ describe('ProfileSwitcher sidebar workspace selection', () => {
     const user = userEvent.setup();
     fetchMock.mockRejectedValue(new Error('network down'));
 
-    render(<ProfileSwitcher />);
+    render(<IdentitySwitcher />);
 
     await user.click(screen.getByRole('button', { name: /Beta Artist/ }));
 
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith(
-        "Couldn't switch profile. Try again."
+        "Couldn't switch identity. Try again."
       );
     });
     expect(mockRefresh).not.toHaveBeenCalled();

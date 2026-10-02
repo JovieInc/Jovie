@@ -2,18 +2,33 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { getMarketingPageContractForPathname } from '@/data/marketing/pageContracts';
+import {
+  getMarketingPageContractForPathname,
+  type MarketingPageContract,
+} from '@/data/marketing/pageContracts';
 
-export function MarketingPageContractMarkers() {
+interface MarketingPageContractMarkersProps {
+  /**
+   * A page record's own contract, passed by its family route. Without it, a
+   * family glob contract renders nothing: the record route owns its markers.
+   */
+  readonly contract?: MarketingPageContract;
+}
+
+export function MarketingPageContractMarkers({
+  contract: recordContract,
+}: MarketingPageContractMarkersProps = {}) {
   const pathname = usePathname();
-  const contract = getMarketingPageContractForPathname(pathname);
+  const contract =
+    recordContract ?? getMarketingPageContractForPathname(pathname);
 
-  if (!contract) return null;
+  if (!contract || (!recordContract && contract.recordFamily)) return null;
 
   return (
     <div
       hidden
       aria-hidden='true'
+      data-copy-scope={contract.copyScope}
       data-page-job={contract.job}
       data-proof={contract.proof}
       data-success-event={contract.successEvent}

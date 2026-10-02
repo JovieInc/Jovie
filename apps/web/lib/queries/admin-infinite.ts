@@ -2,6 +2,7 @@
 
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { PAGINATED_CACHE } from './cache-strategies';
+import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 import type { AdminLead } from './useAdminLeadsPrimitives';
 
@@ -118,6 +119,14 @@ interface InfinitePage<T> {
 
 const DEFAULT_PAGE_SIZE = 20;
 
+function nextAdminPageParam<TRow>(
+  lastPage: InfinitePage<TRow>,
+  allPages: InfinitePage<TRow>[]
+) {
+  const loaded = allPages.reduce((acc, page) => acc + page.rows.length, 0);
+  return loaded < lastPage.total ? allPages.length + 1 : undefined;
+}
+
 const parseDate = (value: Date | string | null | undefined) => {
   if (!value) {
     return null;
@@ -131,9 +140,7 @@ const parseDate = (value: Date | string | null | undefined) => {
 };
 
 async function fetchPage<T>(url: string, signal: AbortSignal) {
-  const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`Failed to fetch page: ${res.status}`);
-  return (await res.json()) as InfinitePage<T>;
+  return fetchWithTimeout<InfinitePage<T>>(url, { signal });
 }
 
 export function useAdminUsersInfiniteQuery({
@@ -273,6 +280,74 @@ export function useAdminReleasesInfiniteQuery({
       const loaded = allPages.reduce((acc, page) => acc + page.rows.length, 0);
       return loaded < lastPage.total ? allPages.length + 1 : undefined;
     },
+    initialPageParam: 1,
+    initialData: initialData
+      ? { pages: [initialData], pageParams: [1] }
+      : undefined,
+    placeholderData: keepPreviousData,
+    ...PAGINATED_CACHE,
+  });
+}
+
+export type {
+  AdminAssetIssuesFilter,
+  AdminAssetRow,
+  AdminAssetSort,
+  AdminAssetType,
+  AdminAssetVerifiedFilter,
+} from '@/lib/admin/assets';
+
+export function useAdminAssetsInfiniteQuery({
+  sort,
+  search,
+  type = 'all',
+  issues = 'all',
+  verified = 'all',
+  pageSize = DEFAULT_PAGE_SIZE,
+  initialData,
+}: {
+  sort: import('@/lib/admin/assets').AdminAssetSort;
+  search: string;
+  type?: import('@/lib/admin/assets').AdminAssetType | 'all';
+  issues?: import('@/lib/admin/assets').AdminAssetIssuesFilter;
+  verified?: import('@/lib/admin/assets').AdminAssetVerifiedFilter;
+  pageSize?: number;
+  initialData?: InfinitePage<import('@/lib/admin/assets').AdminAssetRow>;
+}) {
+  return useInfiniteQuery<
+    InfinitePage<import('@/lib/admin/assets').AdminAssetRow>
+  >({
+    queryKey: queryKeys.adminAssets.list({
+      sort,
+      search,
+      type,
+      issues,
+      verified,
+      pageSize,
+    }),
+    queryFn: async ({ pageParam, signal }) => {
+      const params = new URLSearchParams({
+        page: String(pageParam),
+        pageSize: String(pageSize),
+        sort,
+        q: search,
+        type,
+        issues,
+        verified,
+      });
+      const page = await fetchPage<import('@/lib/admin/assets').AdminAssetRow>(
+        `/api/admin/assets?${params.toString()}`,
+        signal
+      );
+      return {
+        ...page,
+        rows: page.rows.map(row => ({
+          ...row,
+          createdAt: parseDate(row.createdAt),
+        })),
+      };
+    },
+    getNextPageParam: nextAdminPageParam,
     initialPageParam: 1,
     initialData: initialData
       ? { pages: [initialData], pageParams: [1] }

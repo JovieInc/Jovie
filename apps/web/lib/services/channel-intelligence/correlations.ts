@@ -28,6 +28,20 @@ export const MIN_GROUP_SAMPLE = 3;
 /** Absolute lift vs channel mean required to call a “win” signal. */
 export const MIN_LIFT_ABS = 0.08;
 
+function liftAgainstBaseline(value: number, baseline: number): number {
+  if (baseline > 0) return (value - baseline) / baseline;
+  if (value > 0) return 1;
+  return 0;
+}
+
+function learningLayerConfidence(
+  confidence: number
+): ChannelWinSignal['confidence'] {
+  if (confidence >= 0.95) return 'high';
+  if (confidence >= 0.85) return 'medium';
+  return 'low';
+}
+
 function groupMean(videos: readonly ChannelVideoMetrics[]): number {
   if (videos.length === 0) return 0;
   const sum = videos.reduce((acc, v) => acc + watchMinutesPerImpression(v), 0);
@@ -51,8 +65,7 @@ function buildGroup(
 ): CorrelationGroup | null {
   if (videos.length < MIN_GROUP_SAMPLE) return null;
   const mean = groupMean(videos);
-  const lift =
-    channelMean > 0 ? (mean - channelMean) / channelMean : mean > 0 ? 1 : 0;
+  const lift = liftAgainstBaseline(mean, channelMean);
   return {
     key,
     dimension,
@@ -145,14 +158,10 @@ function signalFromGroups(
   const worst = sorted[sorted.length - 1];
   if (!best || !worst || best.key === worst.key) return null;
 
-  const relativeLift =
-    worst.meanWatchMinutesPerImpression > 0
-      ? (best.meanWatchMinutesPerImpression -
-          worst.meanWatchMinutesPerImpression) /
-        worst.meanWatchMinutesPerImpression
-      : best.meanWatchMinutesPerImpression > 0
-        ? 1
-        : 0;
+  const relativeLift = liftAgainstBaseline(
+    best.meanWatchMinutesPerImpression,
+    worst.meanWatchMinutesPerImpression
+  );
 
   if (
     relativeLift < MIN_LIFT_ABS &&
@@ -313,12 +322,7 @@ export function mergeLearningLayerAnnotations(
         losingLabel: null,
         liftPercent: annotation.liftPercent,
         sampleSize: annotation.sampleSize,
-        confidence:
-          annotation.confidence >= 0.95
-            ? 'high'
-            : annotation.confidence >= 0.85
-              ? 'medium'
-              : 'low',
+        confidence: learningLayerConfidence(annotation.confidence),
         groups: [],
         source: learningSource,
       });

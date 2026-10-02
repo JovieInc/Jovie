@@ -9,14 +9,19 @@ vi.mock('@/components/organisms/AppShellFrame', () => ({
   AppShellFrame: ({ main }: { readonly main: ReactNode }) => <>{main}</>,
 }));
 
-vi.mock('@/components/organisms/Sidebar', () => ({
+vi.mock('@/components/organisms/sidebar', () => ({
   SidebarProvider: ({ children }: { readonly children: ReactNode }) => (
     <>{children}</>
   ),
 }));
 
 vi.mock('@/components/features/onboarding/OnboardingChat', () => ({
-  OnboardingChat: () => <div data-testid='onboarding-chat' />,
+  OnboardingChat: ({ headerOverlay }: { readonly headerOverlay?: boolean }) => (
+    <div
+      data-testid='onboarding-chat'
+      data-header-overlay={headerOverlay ? 'true' : 'false'}
+    />
+  ),
 }));
 
 vi.mock('@/components/features/onboarding/OnboardingTurnstile', () => ({
@@ -31,11 +36,16 @@ vi.mock('@/components/features/onboarding/useOnboardingClaim', () => ({
 }));
 
 describe('onboarding sign-in placement', () => {
-  it('anchors the quiet sign-in link in an absolute top-right header slot', () => {
+  it('keeps the quiet sign-in link in flow above chat messages', () => {
     render(<OnboardingShell sessionLabel='pending' />);
 
     const header = screen.getByTestId('onboarding-sign-in-header');
-    expect(header).toHaveClass('absolute', 'right-3', 'top-3');
+    const chat = screen.getByTestId('onboarding-chat');
+    expect(header).toHaveClass('flex', 'shrink-0', 'justify-end');
+    expect(header).not.toHaveClass('absolute');
+    expect(
+      header.compareDocumentPosition(chat) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
       'href',
       APP_ROUTES.SIGNIN
@@ -48,6 +58,23 @@ describe('onboarding sign-in placement', () => {
     expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
   });
 
+  it.each([
+    ['anonymous', undefined, 'true'],
+    ['signed-in', true, 'false'],
+  ] as const)(
+    'reserves chat top clearance under the floating sign-in only while %s (JOV-7192)',
+    (_label, isSignedIn, expected) => {
+      render(
+        <OnboardingShell sessionLabel='pending' isSignedIn={isSignedIn} />
+      );
+
+      expect(screen.getByTestId('onboarding-chat')).toHaveAttribute(
+        'data-header-overlay',
+        expected
+      );
+    }
+  );
+
   it('removes the centered duplicate and starter rail from the blank entry', () => {
     render(<OnboardingChatEmptyIntro mode='blank' />);
 
@@ -55,4 +82,16 @@ describe('onboarding sign-in placement', () => {
     expect(screen.queryByTestId('onboarding-sign-in-skip')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
   });
+
+  it.each(['prompt_handoff', 'spotify_handoff'] as const)(
+    'keeps the %s intro free of verification theater (JOV-3379)',
+    mode => {
+      const { container } = render(<OnboardingChatEmptyIntro mode={mode} />);
+
+      expect(container.textContent ?? '').not.toMatch(
+        /verif|browser check|human/i
+      );
+      expect(screen.getByText('Your message is on its way.')).toBeTruthy();
+    }
+  );
 });

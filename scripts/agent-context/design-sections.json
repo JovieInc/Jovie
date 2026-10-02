@@ -21,11 +21,11 @@
   },
   {
     "heading": "## Use Tokens, Not Raw Colors",
-    "sha256": "d3695f07b5100c41650d6391ef1d0c3c056dc6a1f4e9436b07c4ab50ad7b1875"
+    "sha256": "2d25233bd649db3a4e95de07622e4b7b3a9144f96f9e3f74f5e279eed38431e7"
   },
   {
     "heading": "## Color System",
-    "sha256": "aed69b189b29a8501cbb05c40d77f3c676b3f4798dba905d088c6620abf45721"
+    "sha256": "ad853fee1b414099a2f806a1446188530018c913227d35ce08250d85567dc700"
   },
   {
     "heading": "## Spacing",
@@ -49,15 +49,15 @@
   },
   {
     "heading": "## App IA & Page Scaffold",
-    "sha256": "19d50dbe5f3e51fe1c2cf3db9b1afc48b656b9bdacedad5d18f518cf691611d9"
+    "sha256": "3f4917fa28e4c03a78ce89c171ae16ddf4004970b856b1aab9afff00eeaa69f7"
   },
   {
     "heading": "## Component Patterns",
-    "sha256": "b940d3d28f77a1010ef2415c34d6b61b73cc0b0868ab9ee2d130a7b272f6ee32"
+    "sha256": "c6155cea6f2712ccd80cc66f51fb19d3bfa95a194af79f832314d180c34cd569"
   },
   {
     "heading": "## Full-Screen Status Screens",
-    "sha256": "1274db9e0de0a6ed8c51f980016b98cd02587aaff86f74663d8162c3b1baf9c6"
+    "sha256": "9f7d836b1d0463d53ae5a8c7036aeb2b7f1a4dec5f3ed6e38cf6417648c5d452"
   },
   {
     "heading": "## Layout Shift Prevention (Visual Stability)",
@@ -65,7 +65,7 @@
   },
   {
     "heading": "## Text Casing",
-    "sha256": "10db10e0e41b2b585ba45b3ed8daa43e5976274706aecc1718d3a3a4cb309aa8"
+    "sha256": "1f4602a991c9b34afbe54f9a2f4475c9b5d3febd330d8971284b9f5f8e7fb0d4"
   },
   {
     "heading": "## Canonical Surface Split",
@@ -77,6 +77,6 @@
   },
   {
     "heading": "## Decisions Log",
-    "sha256": "a4e225adaf13ffe4a690bc8f19ebe7ef0e3ce2f3e56daae43a633c052c6fbff3"
+    "sha256": "f526047a5f751e257fdda67ddddcaea25f777f1b9e5f232d6a2ef2feebc8be90"
   }
 ]

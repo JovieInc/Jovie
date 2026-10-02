@@ -5,7 +5,9 @@
  * Mirrors track-artists.ts but references discog_recordings instead of discog_tracks.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { admitArtistCredit } from '@/lib/canonical/artist-credit';
+import { SemanticContractError } from '@/lib/canonical/semantic-contract';
 import { type DbOrTransaction, db } from '@/lib/db';
 import {
   type ArtistRole,
@@ -38,14 +40,35 @@ export async function upsertRecordingArtist(
   const database = tx ?? db;
   const now = new Date();
 
+  // JOV-6543: canonical admission for the credit edge. An implausible credit
+  // (non-registry artist reference, unsupported role, or an unsupported
+  // featured/remixer/production→primary promotion) is quarantined by
+  // throwing SemanticContractError — never written to canon.
+  const admission = admitArtistCredit(
+    {
+      artistId: input.artistId,
+      role: input.role,
+      isPrimary: input.isPrimary,
+      position: input.position,
+    },
+    {
+      producer: 'discography/upsert-recording-artist@1',
+      source: input.sourceType ?? 'ingested',
+      confidence: input.sourceType === 'ingested' ? 'imported' : 'observed',
+    }
+  );
+  if (admission.status !== 'accepted' || !admission.canonical) {
+    throw new SemanticContractError(admission);
+  }
+
   const insertData: NewRecordingArtist = {
     recordingId: input.recordingId,
-    artistId: input.artistId,
-    role: input.role,
+    artistId: admission.canonical.artistId,
+    role: admission.canonical.role,
     creditName: input.creditName ?? null,
     joinPhrase: input.joinPhrase ?? null,
-    position: input.position ?? 0,
-    isPrimary: input.isPrimary ?? false,
+    position: admission.canonical.position,
+    isPrimary: admission.canonical.isPrimary,
     sourceType: input.sourceType ?? 'ingested',
     metadata: input.metadata ?? {},
     createdAt: now,
@@ -58,7 +81,10 @@ export async function upsertRecordingArtist(
   if (input.position !== undefined) updateSet.position = input.position;
   if (input.isPrimary !== undefined) updateSet.isPrimary = input.isPrimary;
   if (input.sourceType !== undefined) updateSet.sourceType = input.sourceType;
-  if (input.metadata !== undefined) updateSet.metadata = input.metadata;
+  const metadataUpdate =
+    input.metadata === undefined
+      ? undefined
+      : drizzleSql`COALESCE(${recordingArtists.metadata}, '{}'::jsonb) || ${JSON.stringify(input.metadata)}::jsonb`;
 
   const [result] = await database
     .insert(recordingArtists)
@@ -70,13 +96,59 @@ export async function upsertRecordingArtist(
         recordingArtists.role,
       ],
       set:
-        Object.keys(updateSet).length > 0
-          ? updateSet
+        Object.keys(updateSet).length > 0 || metadataUpdate
+          ? {
+              ...updateSet,
+              ...(metadataUpdate && { metadata: metadataUpdate }),
+            }
           : { creditName: insertData.creditName },
     })
     .returning();
 
   return result;
+}
+
+export async function getRecordingArtistCreditEdges(
+  recordingId: string,
+  artistId: string,
+  tx?: DbOrTransaction
+): Promise<
+  Array<{
+    role: ArtistRole;
+    metadata: Record<string, unknown> | null;
+  }>
+> {
+  const database = tx ?? db;
+  return database
+    .select({
+      role: recordingArtists.role,
+      metadata: recordingArtists.metadata,
+    })
+    .from(recordingArtists)
+    .where(
+      and(
+        eq(recordingArtists.recordingId, recordingId),
+        eq(recordingArtists.artistId, artistId)
+      )
+    );
+}
+
+export async function deleteRecordingArtistRole(
+  recordingId: string,
+  artistId: string,
+  role: ArtistRole,
+  tx?: DbOrTransaction
+): Promise<void> {
+  const database = tx ?? db;
+  await database
+    .delete(recordingArtists)
+    .where(
+      and(
+        eq(recordingArtists.recordingId, recordingId),
+        eq(recordingArtists.artistId, artistId),
+        eq(recordingArtists.role, role)
+      )
+    );
 }
 
 /**

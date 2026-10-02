@@ -28,6 +28,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { glob } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { listSurfaceFiles } from './lib/coverage-surface-files.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), '..', '..');
 const REGISTER_PATH = resolve(REPO_ROOT, 'docs/TEST_RISK_REGISTER.md');
@@ -317,20 +318,6 @@ function globToRegex(pattern: string): RegExp {
   return new RegExp(re);
 }
 
-async function listFilesMatching(pattern: string): Promise<string[]> {
-  const pathOnly = pattern.split(':')[0];
-  if (!pathOnly.includes('*')) {
-    // Single file
-    return existsSync(resolve(REPO_ROOT, pathOnly)) ? [pathOnly] : [];
-  }
-  const matched: string[] = [];
-  // Use Node 22's built-in async glob with cwd=REPO_ROOT
-  for await (const f of glob(pathOnly, { cwd: REPO_ROOT })) {
-    matched.push(f);
-  }
-  return matched;
-}
-
 // ---------------------------------------------------------------------------
 // Compute metrics per surface
 // ---------------------------------------------------------------------------
@@ -342,7 +329,7 @@ async function computeMetrics(
   testInventory: TestInventory,
   previousSnapshot: Snapshot | null
 ): Promise<SurfaceMetrics> {
-  const files = await listFilesMatching(surface.glob);
+  const files = await listSurfaceFiles(surface.glob, REPO_ROOT);
   const filesInGlob = files.length;
 
   let totalStatements = 0;
@@ -586,7 +573,7 @@ function priorityQueue(
 async function detectStaleRows(surfaces: Surface[]): Promise<Surface[]> {
   const stale: Surface[] = [];
   for (const s of surfaces) {
-    const files = await listFilesMatching(s.glob);
+    const files = await listSurfaceFiles(s.glob, REPO_ROOT);
     if (files.length === 0) stale.push(s);
   }
   return stale;

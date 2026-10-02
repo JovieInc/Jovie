@@ -5,12 +5,11 @@
  * robots.txt that silently blocks all crawlers (incident #11043).
  */
 
-const REQUIRED_AI_CRAWLERS = [
-  'GPTBot',
-  'Claude-Web',
-  'PerplexityBot',
-  'Google-Extended',
-] as const;
+import {
+  type ParsedRobotsRule,
+  parseRobotsRules,
+  REQUIRED_AI_CRAWLERS,
+} from '@/lib/seo/guardrail-check';
 
 export interface RobotsHttpGuardResult {
   readonly ok: boolean;
@@ -23,50 +22,10 @@ export interface SitemapHttpGuardResult {
   readonly urlCount: number;
 }
 
-interface ParsedRobotsGroup {
-  readonly userAgents: readonly string[];
-  readonly allow: readonly string[];
-  readonly disallow: readonly string[];
-}
-
-function parseRobotsGroups(body: string): ParsedRobotsGroup[] {
-  const groups: ParsedRobotsGroup[] = [];
-  let current: {
-    userAgents: string[];
-    allow: string[];
-    disallow: string[];
-  } | null = null;
-
-  for (const rawLine of body.split('\n')) {
-    const line = rawLine.split('#')[0]?.trim() ?? '';
-    if (!line) continue;
-
-    const colonIndex = line.indexOf(':');
-    if (colonIndex === -1) continue;
-
-    const directive = line.slice(0, colonIndex).trim().toLowerCase();
-    const value = line.slice(colonIndex + 1).trim();
-
-    if (directive === 'user-agent') {
-      if (current) groups.push(current);
-      current = { userAgents: [value], allow: [], disallow: [] };
-      continue;
-    }
-
-    if (!current) continue;
-
-    if (directive === 'allow') current.allow.push(value);
-    if (directive === 'disallow') current.disallow.push(value);
-  }
-
-  if (current) groups.push(current);
-  return groups;
-}
-
 /**
  * Detect a `Sitemap:` directive without a backtracking regex.
  *
- * Scans line-by-line (same idiom as parseRobotsGroups) so the check stays
+ * Scans line-by-line (same idiom as parseRobotsRules) so the check stays
  * linear in the body length and cannot be abused for ReDoS.
  */
 function hasSitemapDirective(body: string): boolean {
@@ -87,17 +46,17 @@ function hasSitemapDirective(body: string): boolean {
   return false;
 }
 
-function isGlobalBlock(group: ParsedRobotsGroup): boolean {
+function isGlobalBlock(group: ParsedRobotsRule): boolean {
   if (!group.userAgents.includes('*')) return false;
   if (!group.disallow.includes('/')) return false;
   return !group.allow.includes('/');
 }
 
 function groupAllowsRootForAgent(
-  groups: readonly ParsedRobotsGroup[],
+  groups: readonly ParsedRobotsRule[],
   agent: string
 ): boolean {
-  const group = groups.find(g => g.userAgents.includes(agent));
+  const group = groups.find(g => g.userAgents.includes(agent.toLowerCase()));
   if (!group) return false;
   return group.allow.includes('/');
 }
@@ -107,7 +66,7 @@ function groupAllowsRootForAgent(
  */
 export function validateRobotsTxtBody(body: string): RobotsHttpGuardResult {
   const violations: string[] = [];
-  const groups = parseRobotsGroups(body);
+  const groups = parseRobotsRules(body);
 
   if (groups.some(isGlobalBlock)) {
     violations.push(
@@ -161,7 +120,7 @@ export function validateSitemapXmlBody(body: string): SitemapHttpGuardResult {
     if (!/<loc>[^<]+<\/loc>/.test(block)) {
       violations.push(`sitemap.xml url[${index}] is missing <loc>`);
     }
-    const lastmod = block.match(/<lastmod>([^<]*)<\/lastmod>/)?.[1];
+    const lastmod = /<lastmod>([^<]*)<\/lastmod>/.exec(block)?.[1];
     if (lastmod !== undefined && Number.isNaN(new Date(lastmod).getTime())) {
       violations.push(`sitemap.xml url[${index}] has an invalid <lastmod>`);
     }

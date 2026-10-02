@@ -200,60 +200,58 @@ describe('exact production Lighthouse evidence guard', () => {
     );
   });
 
-  it.each([
-    '1',
-    'sentinel-bypass-secret',
-    'sentinel-cookie-value',
-  ])('rejects artifacts containing protected probe state without echoing it', sensitiveValue => {
-    const sensitiveValues =
-      sensitiveValue === '1'
-        ? ['1']
-        : ['sentinel-bypass-secret', 'sentinel-cookie-value'];
-    expect(() =>
-      validateNoSensitiveArtifactValues(
-        [
-          {
-            name: 'lhr-1.json',
-            contents: JSON.stringify({ diagnostic: sensitiveValue }),
-          },
-        ],
-        sensitiveValues
-      )
-    ).toThrow('protected probe state');
-    try {
-      validateNoSensitiveArtifactValues(
-        [{ name: 'lhr-1.json', contents: sensitiveValue }],
-        sensitiveValues
-      );
-    } catch (error) {
-      expect(String(error)).not.toContain(sensitiveValue);
-    }
-  });
-
-  it.each([
-    'symlink',
-    'directory',
-    'fifo',
-  ])('rejects a %s anywhere in the Lighthouse upload tree', entryType => {
-    const directory = mkdtempSync(join(tmpdir(), 'jovie-lhci-tree-'));
-    try {
-      const artifact = join(directory, 'lhr-1.json');
-      writeFileSync(artifact, JSON.stringify(reportFixture(HOME_URL)));
-      const unsafe = join(directory, 'unsafe-entry');
-      if (entryType === 'symlink') symlinkSync(artifact, unsafe);
-      else if (entryType === 'directory') mkdirSync(unsafe);
-      else {
-        const result = spawnSync('mkfifo', [unsafe]);
-        expect(result.status).toBe(0);
+  it.each(['1', 'sentinel-bypass-secret', 'sentinel-cookie-value'])(
+    'rejects artifacts containing protected probe state without echoing it',
+    sensitiveValue => {
+      const sensitiveValues =
+        sensitiveValue === '1'
+          ? ['1']
+          : ['sentinel-bypass-secret', 'sentinel-cookie-value'];
+      expect(() =>
+        validateNoSensitiveArtifactValues(
+          [
+            {
+              name: 'lhr-1.json',
+              contents: JSON.stringify({ diagnostic: sensitiveValue }),
+            },
+          ],
+          sensitiveValues
+        )
+      ).toThrow('protected probe state');
+      try {
+        validateNoSensitiveArtifactValues(
+          [{ name: 'lhr-1.json', contents: sensitiveValue }],
+          sensitiveValues
+        );
+      } catch (error) {
+        expect(String(error)).not.toContain(sensitiveValue);
       }
-
-      expect(() => readRegularArtifactRecords(directory)).toThrow(
-        'symlink or non-regular entry'
-      );
-    } finally {
-      rmSync(directory, { force: true, recursive: true });
     }
-  });
+  );
+
+  it.each(['symlink', 'directory', 'fifo'])(
+    'rejects a %s anywhere in the Lighthouse upload tree',
+    entryType => {
+      const directory = mkdtempSync(join(tmpdir(), 'jovie-lhci-tree-'));
+      try {
+        const artifact = join(directory, 'lhr-1.json');
+        writeFileSync(artifact, JSON.stringify(reportFixture(HOME_URL)));
+        const unsafe = join(directory, 'unsafe-entry');
+        if (entryType === 'symlink') symlinkSync(artifact, unsafe);
+        else if (entryType === 'directory') mkdirSync(unsafe);
+        else {
+          const result = spawnSync('mkfifo', [unsafe]);
+          expect(result.status).toBe(0);
+        }
+
+        expect(() => readRegularArtifactRecords(directory)).toThrow(
+          'symlink or non-regular entry'
+        );
+      } finally {
+        rmSync(directory, { force: true, recursive: true });
+      }
+    }
+  );
 
   it('rejects an unsafe or upload-visible sensitive-values receipt', () => {
     const root = mkdtempSync(join(tmpdir(), 'jovie-lhci-receipt-'));
@@ -264,6 +262,9 @@ describe('exact production Lighthouse evidence guard', () => {
     try {
       mkdirSync(reports);
       writeFileSync(outsideReceipt, 'opaque-cookie\n', { mode: 0o644 });
+      // Creation mode is masked by the host umask; make the unsafe fixture
+      // explicit so the negative control also runs under a restrictive 0077.
+      chmodSync(outsideReceipt, 0o644);
       expect(() => readSensitiveValues(outsideReceipt, reports)).toThrow(
         'mode-0600 regular file'
       );

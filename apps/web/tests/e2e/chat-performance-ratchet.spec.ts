@@ -8,7 +8,13 @@
  * @smoke
  */
 
-import { expect, type Page, test } from '@playwright/test';
+import {
+  expect,
+  type Locator,
+  type Page,
+  type Request,
+  test,
+} from '@playwright/test';
 import {
   buildInteractionLatencyReport,
   type InteractionLatencySample,
@@ -366,6 +372,77 @@ async function measureDroppedScrollFrames(page: Page) {
   });
 }
 
+function isChatApiRequest(request: Request): boolean {
+  const { pathname } = new URL(request.url());
+  return pathname === '/api/chat' || pathname.startsWith('/api/chat/');
+}
+
+/**
+ * Counts in-flight chat-owned API requests (all served by `mockChatBackend`).
+ *
+ * `networkidle` is not a usable readiness signal on the chat route: the shell
+ * sidebar full-prefetches every nav destination (`prefetch={true}`) and warms
+ * the Library route plus its release-matrix data ~300ms after mount. Those are
+ * real, DB-backed renders of other routes whose duration is not bounded by the
+ * chat surface, so on a loaded CI server they can keep the network busy past
+ * any timeout (and get aborted mid-stream by the next navigation).
+ */
+function trackChatApiRequests(page: Page) {
+  const inFlight = new Set<Request>();
+  page.on('request', request => {
+    if (isChatApiRequest(request)) inFlight.add(request);
+  });
+  page.on('requestfinished', request => inFlight.delete(request));
+  page.on('requestfailed', request => inFlight.delete(request));
+  return { pendingCount: () => inFlight.size };
+}
+
+/** Resolves after two painted frames and an idle main-thread slot. */
+async function waitForMainThreadIdle(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>(resolve => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (typeof window.requestIdleCallback === 'function') {
+              window.requestIdleCallback(() => resolve());
+            } else {
+              setTimeout(resolve, 0);
+            }
+          });
+        });
+      })
+  );
+}
+
+/**
+ * Deterministic chat-route readiness: hydrated, chat surface and composer
+ * usable, every chat API request settled, and the main thread idle. Each
+ * sample starts from a quiescent chat surface without waiting on unrelated
+ * background prefetches of other routes.
+ */
+async function waitForChatRouteReady(
+  page: Page,
+  chatContent: Locator,
+  composer: Locator,
+  chatApi: ReturnType<typeof trackChatApiRequests>
+): Promise<void> {
+  await waitForHydration(page);
+  await expect(chatContent).toBeVisible({ timeout: 30_000 });
+  await expect(composer).toBeEnabled({ timeout: 30_000 });
+  // Idle first so mount effects have issued their chat fetches, then require
+  // none outstanding; both must hold in the same pass.
+  await expect
+    .poll(
+      async () => {
+        await waitForMainThreadIdle(page);
+        return chatApi.pendingCount();
+      },
+      { timeout: 30_000 }
+    )
+    .toBe(0);
+}
+
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test('chat route stays within the deploy-gating responsiveness budget', async ({
@@ -379,19 +456,18 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
   await page.setViewportSize({ width: 1280, height: 480 });
 
   await mockChatBackend(page);
+  const chatApi = trackChatApiRequests(page);
   await setTestAuthBypassSession(page, 'creator-ready', 'e2e-chat-performance');
   await page.goto('/app/chat', { waitUntil: 'domcontentloaded' });
-  await waitForHydration(page);
-  await page.waitForLoadState('networkidle');
 
   const chatContent = page.getByTestId('chat-content').last();
-  await expect(chatContent).toBeVisible({ timeout: 30_000 });
   const composer = chatContent.locator(
     'textarea[aria-label="Chat Message Input"]'
   );
   const sendButton = chatContent.getByRole('button', {
     name: /send message/i,
   });
+  await waitForChatRouteReady(page, chatContent, composer, chatApi);
   const samples: InteractionLatencySample[] = [];
 
   for (let runIndex = 0; runIndex < SAMPLE_COUNT; runIndex += 1) {
@@ -399,9 +475,7 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
       // A full route mount makes each sample independent and resets the
       // intentional one-message-per-second composer pacer without sleeping.
       await page.goto('/app/chat', { waitUntil: 'domcontentloaded' });
-      await waitForHydration(page);
-      await page.waitForLoadState('networkidle');
-      await expect(chatContent).toBeVisible({ timeout: 30_000 });
+      await waitForChatRouteReady(page, chatContent, composer, chatApi);
     }
 
     const userText = `Performance message ${runIndex + 1}`;

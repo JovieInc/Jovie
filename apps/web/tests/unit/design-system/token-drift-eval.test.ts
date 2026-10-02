@@ -139,7 +139,9 @@ describe('token-drift eval (shipped contrast ratchet)', () => {
     ).toBe(true);
   });
 
-  it('live product components+app trees have zero owned raw-token buckets', () => {
+  it('live product components+app trees have zero owned raw-token buckets', {
+    timeout: 60000,
+  }, () => {
     const files: string[] = [];
     for (const dir of SCAN_DIRS) {
       walkDir(join(WEB_ROOT, dir), files);

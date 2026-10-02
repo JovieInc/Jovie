@@ -90,7 +90,7 @@ test('public profile renders core elements within budget', async ({ page }) => {
     .locator(
       [
         'a[aria-label^="View "]',
-        '[data-testid="profile-home-carousel"] a',
+        '[data-testid="profile-pac"] a',
         'a[href*="spotify"]',
         'a[href*="apple"]',
         'a[href*="music"]',
@@ -184,7 +184,7 @@ test.describe('public profile document semantics @regression', () => {
       await expect(page.locator('footer')).toHaveCount(1);
 
       const homeAction = page.getByRole('link', { name: 'Go home' });
-      const searchAction = page.getByRole('link', { name: 'Search artists' });
+      const searchAction = page.getByRole('link', { name: 'Explore profiles' });
 
       await expect(homeAction).toHaveAttribute('href', '/');
       await expect(searchAction).toHaveAttribute('href', '/artist-profiles');

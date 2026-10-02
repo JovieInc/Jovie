@@ -13,7 +13,11 @@ const {
   mockEq,
   mockInArray,
   mockLte,
+  mockIsNotNull,
+  mockCountOpenCohortLearnings,
 } = vi.hoisted(() => ({
+  mockIsNotNull: vi.fn((column: unknown) => ({ op: 'isNotNull', column })),
+  mockCountOpenCohortLearnings: vi.fn(),
   mockDbSelect: vi.fn(),
   mockGetWaitlistSettings: vi.fn(),
   mockTryReserveAutoAcceptSlot: vi.fn(),
@@ -75,6 +79,7 @@ vi.mock('@/lib/db/schema/waitlist', () => ({
     canonical: 'waitlist_entries.canonical',
     waitlistedAt: 'waitlist_entries.waitlisted_at',
     createdAt: 'waitlist_entries.created_at',
+    spotifyUrl: 'waitlist_entries.spotify_url',
   },
 }));
 
@@ -84,6 +89,7 @@ vi.mock('drizzle-orm', () => ({
   eq: mockEq,
   gt: vi.fn((_column: unknown, value: unknown) => ({ op: 'gt', value })),
   inArray: mockInArray,
+  isNotNull: mockIsNotNull,
   isNull: vi.fn((column: unknown) => ({ op: 'isNull', column })),
   lte: mockLte,
   or: vi.fn((...args: unknown[]) => ({ op: 'or', args })),
@@ -108,6 +114,11 @@ vi.mock('@/lib/waitlist/settings', () => ({
 vi.mock('@/lib/waitlist/approval', () => ({
   approveWaitlistEntryInTx: mockApproveWaitlistEntryInTx,
   finalizeWaitlistApproval: mockFinalizeWaitlistApproval,
+}));
+
+vi.mock('@/lib/waitlist/cohort-learnings', () => ({
+  MAX_OPEN_COHORT_LEARNINGS: 10,
+  countOpenCohortLearnings: mockCountOpenCohortLearnings,
 }));
 
 vi.mock('@/lib/waitlist/email-jobs', () => ({
@@ -197,6 +208,7 @@ describe('runWaitlistAutoAccept', () => {
       autoAcceptDailyLimit: 5,
       autoAcceptedToday: 0,
     });
+    mockCountOpenCohortLearnings.mockResolvedValue(0);
     mockTryReserveAutoAcceptSlot.mockResolvedValue({
       shouldAutoAccept: true,
       reason: 'reserved',
@@ -231,31 +243,31 @@ describe('runWaitlistAutoAccept', () => {
     });
   });
 
-  it.each([
-    undefined,
-    'invalid+base@e2e.example.com',
-  ])('never approves the retained canary when base config is %s', async baseEmail => {
-    if (baseEmail) vi.stubEnv('E2E_PROD_SIGNUP_EMAIL_BASE', baseEmail);
-    candidateRows = [
-      {
-        id: 'canary-entry',
-        email: 'synthetic+jovie-prod-waitlist-canary@e2e.example.com',
-        status: 'waitlisted',
-      },
-    ];
+  it.each([undefined, 'invalid+base@e2e.example.com'])(
+    'never approves the retained canary when base config is %s',
+    async baseEmail => {
+      if (baseEmail) vi.stubEnv('E2E_PROD_SIGNUP_EMAIL_BASE', baseEmail);
+      candidateRows = [
+        {
+          id: 'canary-entry',
+          email: 'synthetic+jovie-prod-waitlist-canary@e2e.example.com',
+          status: 'waitlisted',
+        },
+      ];
 
-    const { runWaitlistAutoAccept } = await import(
-      '@/lib/waitlist/auto-accept'
-    );
-    const result = await runWaitlistAutoAccept({
-      now: new Date('2026-08-10T00:00:00Z'),
-    });
+      const { runWaitlistAutoAccept } = await import(
+        '@/lib/waitlist/auto-accept'
+      );
+      const result = await runWaitlistAutoAccept({
+        now: new Date('2026-08-10T00:00:00Z'),
+      });
 
-    expect(result).toMatchObject({ scanned: 1, approved: 0, skipped: 1 });
-    expect(mockTryReserveAutoAcceptSlot).not.toHaveBeenCalled();
-    expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
-    expect(mockEnqueueWaitlistApprovalInviteEmail).not.toHaveBeenCalled();
-  });
+      expect(result).toMatchObject({ scanned: 1, approved: 0, skipped: 1 });
+      expect(mockTryReserveAutoAcceptSlot).not.toHaveBeenCalled();
+      expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
+      expect(mockEnqueueWaitlistApprovalInviteEmail).not.toHaveBeenCalled();
+    }
+  );
 
   it('includes migrated legacy waitlist rows still stored with new status', async () => {
     candidateRows = [
@@ -357,5 +369,38 @@ describe('runWaitlistAutoAccept', () => {
     expect(mockTryReserveAutoAcceptSlot).not.toHaveBeenCalled();
     expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
     expect(mockEnqueueWaitlistApprovalInviteEmail).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [10, 'open_learnings'],
+    [null, 'learnings_unavailable'],
+  ] as const)(
+    'admits nobody while open cohort learnings are %s',
+    async (openLearnings, pausedReason) => {
+      mockCountOpenCohortLearnings.mockResolvedValue(openLearnings);
+      candidateRows = [
+        { id: 'artist', email: 'artist@example.com', status: 'waitlisted' },
+      ];
+
+      const { runWaitlistAutoAccept } = await import(
+        '@/lib/waitlist/auto-accept'
+      );
+      const result = await runWaitlistAutoAccept({
+        now: new Date('2026-09-29T00:00:00Z'),
+      });
+
+      expect(result).toMatchObject({ scanned: 0, approved: 0, pausedReason });
+      expect(mockDbSelect).not.toHaveBeenCalled();
+      expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
+    }
+  );
+
+  it('only auto-admits entries with a Spotify artist profile', async () => {
+    const { runWaitlistAutoAccept } = await import(
+      '@/lib/waitlist/auto-accept'
+    );
+    await runWaitlistAutoAccept({ now: new Date('2026-09-29T00:00:00Z') });
+
+    expect(mockIsNotNull).toHaveBeenCalledWith('waitlist_entries.spotify_url');
   });
 });

@@ -300,6 +300,14 @@ export function EntityCard({
       : model.meta;
   const preserveLandscapeMedia =
     isProfileLandscape && (model.kind === 'video' || model.kind === 'merch');
+  let shellLayoutClass = 'gap-3 p-3';
+  if (isProfileLandscape && isLandscapeNonMedia) {
+    shellLayoutClass = 'gap-0 overflow-hidden p-0';
+  } else if (isProfileLandscape) {
+    shellLayoutClass = 'gap-0 overflow-hidden p-1.5';
+  } else if (treatment === 'big' || isUnified) {
+    shellLayoutClass = 'gap-0 overflow-hidden p-0';
+  }
 
   return (
     <CardShell
@@ -310,11 +318,7 @@ export function EntityCard({
       className={cn(
         'group flex min-w-0 text-left transition-[background-color,border-color] duration-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-focus-ring)',
         isProfileLandscape ? 'flex-row' : 'flex-col',
-        isProfileLandscape
-          ? cn('gap-0 overflow-hidden', isLandscapeNonMedia ? 'p-0' : 'p-1.5')
-          : treatment === 'big' || isUnified
-            ? 'gap-0 overflow-hidden p-0'
-            : 'gap-3 p-3',
+        shellLayoutClass,
         isPearl
           ? 'rounded-(--profile-inner-radius) border border-(--profile-pearl-border) bg-(--profile-pearl-bg) shadow-(--profile-pearl-shadow) backdrop-blur-2xl hover:bg-(--profile-pearl-bg-hover)'
           : 'rounded-2xl border border-subtle bg-surface-1 shadow-card hover:border-default',
@@ -361,8 +365,13 @@ export function EntityCard({
               fallbackClassName='bg-transparent'
             />
           ) : model.datePill ? (
-            <div className='flex flex-col items-center justify-center text-primary-token'>
-              <span className='text-2xs font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
+            // Solid surface, not a translucent one: this pill sits on the
+            // card's own gradient artStyle background, whose brightness
+            // varies with the assigned accent, so the date text needs a
+            // guaranteed-opaque well underneath rather than a token bump
+            // (JOV-INV-019 image-contrast).
+            <div className='flex flex-col items-center justify-center rounded-lg bg-surface-0 px-4 py-3 text-primary-token'>
+              <span className='text-2xs font-semibold uppercase tracking-[0.12em] text-primary-token'>
                 {model.datePill.month}
               </span>
               <span className='text-[34px] font-bold leading-none tracking-tighter tabular-nums'>
@@ -451,7 +460,7 @@ export function EntityCard({
           {size.showMeta && metaText ? (
             <span
               className={cn(
-                'block min-w-0 truncate text-[11.5px] text-tertiary-token',
+                'block min-w-0 truncate text-xs text-tertiary-token',
                 isUnified && 'entity-card-meta',
                 isProfileLandscape && 'text-secondary-token'
               )}
@@ -463,7 +472,7 @@ export function EntityCard({
           {size.showMeta && model.secondaryMeta ? (
             <span
               className={cn(
-                'block min-w-0 truncate text-[11.5px] text-tertiary-token',
+                'block min-w-0 truncate text-xs text-tertiary-token',
                 isUnified && 'entity-card-meta'
               )}
             >

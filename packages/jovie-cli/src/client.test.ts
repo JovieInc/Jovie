@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createProfile,
   DEFAULT_BASE_URL,
   type FetchImplementation,
   fetchArtist,
@@ -9,6 +10,8 @@ import {
   fetchSiteLlms,
   JovieInputError,
   normalizeBaseUrl,
+  readResponseBody,
+  reportIssue,
   validateUsername,
 } from './client.js';
 
@@ -89,7 +92,10 @@ describe('Jovie public resource client', () => {
       openapi: '3.1.0',
     });
     expect(calls[0].input).toBe('https://jov.ie/api/v1/openapi.json');
-    expect(calls[0].init?.headers).toEqual({ Accept: 'application/json' });
+    expect(calls[0].init?.headers).toEqual({
+      Accept: 'application/json',
+      'User-Agent': 'jovie-cli',
+    });
   });
 
   it('fetches site and per-artist llms resources as text', async () => {
@@ -98,7 +104,10 @@ describe('Jovie public resource client', () => {
       fetchSiteLlms(false, { fetchImpl: site.fetchImpl })
     ).resolves.toBe('# site guide');
     expect(site.calls[0].input).toBe('https://jov.ie/llms.txt');
-    expect(site.calls[0].init?.headers).toEqual({ Accept: 'text/plain' });
+    expect(site.calls[0].init?.headers).toEqual({
+      Accept: 'text/plain',
+      'User-Agent': 'jovie-cli',
+    });
 
     const full = createFetch('# full guide');
     await expect(
@@ -157,7 +166,9 @@ describe('Jovie public resource client', () => {
   });
 
   it('wraps transport errors without exposing request internals', async () => {
+    let attempts = 0;
     const fetchImpl: FetchImplementation = async () => {
+      attempts += 1;
       throw new Error('socket unavailable');
     };
 
@@ -165,6 +176,7 @@ describe('Jovie public resource client', () => {
       code: 'REQUEST_FAILED',
       message: 'GET https://jov.ie/llms.txt failed: socket unavailable',
     });
+    expect(attempts).toBe(2);
 
     const nonErrorFetch: FetchImplementation = async () => {
       throw 'connection closed';
@@ -176,6 +188,40 @@ describe('Jovie public resource client', () => {
     });
   });
 
+  it('retries a transient transport failure once', async () => {
+    let attempts = 0;
+    const fetchImpl: FetchImplementation = async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw new Error('The operation was aborted due to timeout');
+      }
+      return new Response('{"artist":{"username":"demo"}}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    };
+
+    await expect(fetchArtist('demo', { fetchImpl })).resolves.toEqual({
+      artist: { username: 'demo' },
+    });
+    expect(attempts).toBe(2);
+  });
+
+  it('never retries after the caller aborts', async () => {
+    let attempts = 0;
+    const controller = new AbortController();
+    const fetchImpl: FetchImplementation = async () => {
+      attempts += 1;
+      controller.abort();
+      throw new Error('aborted');
+    };
+
+    await expect(
+      fetchArtist('demo', { fetchImpl, signal: controller.signal })
+    ).rejects.toMatchObject({ code: 'REQUEST_FAILED' });
+    expect(attempts).toBe(1);
+  });
+
   it('combines a caller cancellation signal with the request timeout', async () => {
     const { calls, fetchImpl } = createFetch('# guide');
     const controller = new AbortController();
@@ -185,5 +231,244 @@ describe('Jovie public resource client', () => {
     ).resolves.toBe('# guide');
     expect(calls[0].init?.signal).toBeInstanceOf(AbortSignal);
     expect(calls[0].init?.signal).not.toBe(controller.signal);
+  });
+
+  it('posts a Spotify artist URL to create a profile', async () => {
+    const { calls, fetchImpl } = createFetch(
+      '{"username":"demo","claimUrl":"https://jov.ie/demo/claim"}',
+      201
+    );
+    await expect(
+      createProfile('https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb', {
+        fetchImpl,
+        userAgent: 'jovie-cli/1.0.0',
+      })
+    ).resolves.toEqual({
+      username: 'demo',
+      claimUrl: 'https://jov.ie/demo/claim',
+    });
+    expect(calls[0]).toMatchObject({
+      input: 'https://jov.ie/api/agents/profiles',
+      init: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'jovie-cli/1.0.0',
+        },
+        body: '{"url":"https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb"}',
+      },
+    });
+  });
+
+  it('rejects non-Spotify-artist URLs before any request', () => {
+    const { calls, fetchImpl } = createFetch('{}');
+    for (const value of [
+      'not a url',
+      'http://open.spotify.com/artist/abc',
+      'https://open.spotify.com/track/abc',
+      'https://evilspotify.com/artist/abc',
+      'https://instagram.com/artist',
+    ]) {
+      expect(() => createProfile(value, { fetchImpl })).toThrow(
+        JovieInputError
+      );
+    }
+    expect(calls).toHaveLength(0);
+  });
+
+  it('reports POST failures with the method and status', async () => {
+    const { fetchImpl } = createFetch(
+      '{"error":{"code":"RATE_LIMITED"}}',
+      429,
+      { 'Retry-After': '120' }
+    );
+    await expect(
+      createProfile('https://open.spotify.com/artist/abc', { fetchImpl })
+    ).rejects.toMatchObject({
+      message: 'POST https://jov.ie/api/agents/profiles returned HTTP 429',
+      apiCode: 'RATE_LIMITED',
+      status: 429,
+      retryAfterSeconds: 120,
+    });
+  });
+
+  it('parses HTTP-date and invalid Retry-After values', async () => {
+    const future = new Date(Date.now() + 60_000).toUTCString();
+    for (const [header, expected] of [
+      [future, expect.any(Number)],
+      ['not a date', undefined],
+    ] as const) {
+      const { fetchImpl } = createFetch('nope', 503, { 'Retry-After': header });
+      const error = (await fetchOpenApi({ fetchImpl }).catch(
+        (e: unknown) => e
+      )) as { retryAfterSeconds?: number; apiCode?: string };
+      expect(error.retryAfterSeconds).toEqual(expected);
+      expect(error.apiCode).toBeUndefined();
+    }
+  });
+
+  it('posts a report with only the provided safe context', async () => {
+    const { calls, fetchImpl } = createFetch('{"reportId":"r-1"}', 201);
+    await expect(
+      reportIssue(
+        { kind: 'bug', title: ' broke ', details: ' details ' },
+        { cliVersion: '1.0.0', command: undefined, channel: 'cli' },
+        { fetchImpl }
+      )
+    ).resolves.toEqual({ reportId: 'r-1' });
+    expect(calls[0].input).toBe('https://jov.ie/api/agents/feedback');
+    expect(JSON.parse(String(calls[0].init?.body))).toEqual({
+      kind: 'bug',
+      title: 'broke',
+      details: 'details',
+      context: { cliVersion: '1.0.0', channel: 'cli' },
+    });
+  });
+
+  it('requires a title and details before any request', () => {
+    const { calls, fetchImpl } = createFetch('{}');
+    expect(() =>
+      reportIssue(
+        { kind: 'feedback', title: ' ', details: 'x' },
+        {},
+        { fetchImpl }
+      )
+    ).toThrow(JovieInputError);
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe('mutation and stable error contract', () => {
+  it('never retries an ambiguously committed POST', async () => {
+    let calls = 0;
+    const fetchImpl: FetchImplementation = async () => {
+      calls++;
+      throw new Error('connection lost after commit');
+    };
+    await expect(
+      reportIssue(
+        { kind: 'bug', title: 'issue', details: 'details' },
+        {},
+        { fetchImpl }
+      )
+    ).rejects.toMatchObject({ code: 'REQUEST_FAILED' });
+    expect(calls).toBe(1);
+  });
+  it.each([
+    [429, 'RATE_LIMITED'],
+    [503, 'RATE_LIMIT_UNAVAILABLE'],
+  ])('preserves top-level API code on %s', async (status, code) => {
+    const { fetchImpl } = createFetch(
+      JSON.stringify({ code, error: 'unavailable' }),
+      status
+    );
+    await expect(fetchArtist('demo', { fetchImpl })).rejects.toMatchObject({
+      status,
+      apiCode: code,
+    });
+  });
+});
+
+describe('bounded body consumption', () => {
+  it('cancels an oversized body', async () => {
+    let canceled = false;
+    const fetchImpl: FetchImplementation = async () =>
+      new Response(
+        new ReadableStream({
+          start(c) {
+            c.enqueue(new Uint8Array(1_048_577));
+          },
+          cancel() {
+            canceled = true;
+          },
+        })
+      );
+    await expect(fetchSiteLlms(false, { fetchImpl })).rejects.toMatchObject({
+      code: 'REQUEST_FAILED',
+      message: 'Response body exceeds 1 MiB.',
+    });
+    expect(canceled).toBe(true);
+  });
+  it('retains deadline after headers and cancels a hanging body', async () => {
+    let canceled = false;
+    const fetchImpl: FetchImplementation = async () =>
+      new Response(
+        new ReadableStream({
+          cancel() {
+            canceled = true;
+          },
+        })
+      );
+    await expect(
+      fetchSiteLlms(false, { fetchImpl, timeoutMs: 10 })
+    ).rejects.toMatchObject({ code: 'REQUEST_FAILED' });
+    expect(canceled).toBe(true);
+  });
+  it('cancels body consumption when the caller aborts', async () => {
+    const controller = new AbortController();
+    let canceled = false;
+    const fetchImpl: FetchImplementation = async () => {
+      setTimeout(() => controller.abort(), 5);
+      return new Response(
+        new ReadableStream({
+          cancel() {
+            canceled = true;
+          },
+        })
+      );
+    };
+    await expect(
+      fetchSiteLlms(false, { fetchImpl, signal: controller.signal })
+    ).rejects.toMatchObject({ code: 'REQUEST_FAILED' });
+    expect(canceled).toBe(true);
+  });
+});
+
+describe('response decoding and preexisting cancellation', () => {
+  it('rejects an already-aborted response instead of returning an empty success', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      readResponseBody(new Response('abc'), controller.signal)
+    ).rejects.toThrow('canceled');
+    await expect(
+      readResponseBody(new Response(null, { status: 204 }), controller.signal)
+    ).rejects.toThrow('canceled');
+    await expect(
+      fetchSiteLlms(false, {
+        fetchImpl: async (_url, init) => {
+          init?.signal?.dispatchEvent(new Event('abort'));
+          controller.abort();
+          return new Response('abc');
+        },
+        signal: controller.signal,
+      })
+    ).rejects.toMatchObject({ code: 'REQUEST_FAILED' });
+  });
+  it('rejects cancellation after headers before reading the body', async () => {
+    const controller = new AbortController();
+    await expect(
+      fetchSiteLlms(false, {
+        signal: controller.signal,
+        fetchImpl: async () => {
+          controller.abort();
+          return new Response('abc');
+        },
+      })
+    ).rejects.toMatchObject({ code: 'REQUEST_FAILED' });
+  });
+  it('decodes UTF8 JSON with a leading BOM like Response.text', async () => {
+    const fetchImpl: FetchImplementation = async () =>
+      new Response(
+        new Uint8Array([
+          239,
+          187,
+          191,
+          ...new TextEncoder().encode('{"artist":{"username":"demo"}}'),
+        ])
+      );
+    await expect(fetchArtist('demo', { fetchImpl })).resolves.toEqual({
+      artist: { username: 'demo' },
+    });
   });
 });

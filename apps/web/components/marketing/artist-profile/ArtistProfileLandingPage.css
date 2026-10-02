@@ -356,11 +356,20 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-launch-hero) {
   display: flex;
-  min-height: calc(92svh - var(--system-b-header-height));
+  /* .marketing-hero-dock (plain, no --inset) bleeds this section's
+     background to y=0 via negative margin-top (marketing-routes-code-spec,
+     2026-09-26). min-height drops the old "- header height" term and
+     padding-block gains it back, so the box bottom and the hero's own
+     copy both land exactly where they sat pre-dock. */
+  min-height: 92svh;
   align-items: center;
   border-bottom: 1px solid
     color-mix(in oklab, var(--system-b-text-primary) 8%, transparent);
-  padding-block: calc(var(--system-b-header-height) + var(--space-8))
+  padding-block: calc(
+      var(--system-b-header-height) +
+      var(--space-8) +
+      var(--marketing-dock-offset, 0px)
+    )
     var(--space-12);
 }
 
@@ -1221,7 +1230,11 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
 @media (max-width: 767px) {
   :where(.system-b-launch-hero) {
     min-height: auto;
-    padding-block: calc(var(--system-b-header-height) + var(--space-8))
+    padding-block: calc(
+        var(--system-b-header-height) +
+        var(--space-8) +
+        var(--marketing-dock-offset, 0px)
+      )
       var(--space-12);
   }
 
@@ -1473,7 +1486,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-pricing-hero) {
   display: flex;
-  min-height: calc(92svh - var(--system-b-header-height));
+  min-height: auto;
   align-items: center;
   border-bottom: 1px solid
     color-mix(in oklab, var(--system-b-text-primary) 8%, transparent);
@@ -1737,7 +1750,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 }
 
 :where(.system-b-pricing-page .marketing-pricing-plan-card__features li) {
-  grid-template-columns: var(--space-4) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
   color: color-mix(in oklab, var(--system-b-text-primary) 58%, transparent);
   font-size: var(--text-sm);
@@ -1974,6 +1987,30 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
   border-bottom: 1px solid
     color-mix(in oklab, var(--system-b-text-primary) 7%, transparent);
   padding: var(--space-3) var(--space-5);
+}
+
+:where(
+  .system-b-pricing-table-shell[data-variant="mobile"]
+    .system-b-pricing-chart-cell
+) {
+  padding: var(--space-3);
+}
+
+:where(
+  .system-b-pricing-table-shell[data-variant="mobile"]
+    .system-b-pricing-chart-cell--feature
+) {
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+:where(
+  .system-b-pricing-table-shell[data-variant="mobile"]
+    .system-b-pricing-plan-price
+) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 }
 
 :where(.system-b-pricing-chart-cell--feature),
@@ -2622,6 +2659,23 @@ body:has(.system-b-brand-page) .marketing-glass-header__cta:focus-visible {
       color-mix(in oklab, var(--color-text-primary-token) 2%, transparent),
       transparent 48%
     );
+}
+
+/* Dark underlay for the generated-34 hero photo: keeps the docked header
+   and the hero copy legible everywhere in the section, while leaving the
+   image visible at low opacity (JOV marketing routes 2026-09-26). Darkest
+   at the very top edge (under the transparent-at-rest header) and never
+   drops below a mostly-opaque floor, so no band of the hero reads lighter
+   than the rest. */
+:where(.system-b-artist-notifications-hero-underlay) {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    var(--system-b-cinematic-black) 0%,
+    color-mix(in oklab, var(--system-b-cinematic-black) 86%, transparent) 18%,
+    color-mix(in oklab, var(--system-b-cinematic-black) 86%, transparent) 100%
+  );
 }
 
 :where(.system-b-artist-notifications-hero-grid) {

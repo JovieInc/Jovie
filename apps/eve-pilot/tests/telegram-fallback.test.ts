@@ -114,8 +114,8 @@ describe('Ovie Telegram fallback identity', () => {
         fallback: 'true',
       },
     });
-    expect(admitted?.context?.[0]).toContain('You are Summer');
-    expect(admitted?.context?.[0]).toContain('Do not speak as Ovie or Jovie');
+    // The Summer pack binds once per session (instructions/channel-identity.ts).
+    expect(admitted?.context).toBeUndefined();
 
     expect(
       onSummerTelegramMessage(

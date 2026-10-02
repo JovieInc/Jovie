@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { Music, SquarePen } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
@@ -7,6 +9,13 @@ import { NavMenuItem } from './NavMenuItem';
 vi.mock('@/lib/desktop/electron-bridge', () => ({
   useIsElectronRuntime: () => false,
 }));
+
+function readWebSource(sourcePath: string): string {
+  const webRoot = process.cwd().endsWith('/apps/web')
+    ? process.cwd()
+    : resolve(process.cwd(), 'apps/web');
+  return readFileSync(resolve(webRoot, sourcePath), 'utf8');
+}
 
 describe('NavMenuItem', () => {
   it('keeps a long primary label in its assigned grid track with a right-edge fade', () => {
@@ -86,8 +95,42 @@ describe('NavMenuItem', () => {
     );
 
     const row = screen.getByRole('link', { name: 'Library' });
-    expect(row.className).toContain('h-9');
+    // Founder lock 2026-09-25 (Linear-scale density): calm rows are 28px
+    // (h-7), down from the prior 36px (h-9).
+    expect(row.className).toContain('h-7');
     expect(row.className).toContain('rounded-lg');
     expect(row.className).toContain('grid-cols-(--app-shell-sidebar-nav-grid)');
+  });
+
+  it('acknowledges a pending destination without changing row geometry', () => {
+    render(
+      <NavMenuItem
+        calm
+        item={{
+          id: 'library',
+          name: 'Library',
+          href: '/app/library',
+          icon: Music,
+        }}
+        isActive={false}
+        pending
+      />
+    );
+
+    const row = screen.getByRole('link', { name: 'Library' });
+    expect(row).toHaveAttribute('aria-busy', 'true');
+    expect(row).toHaveAttribute('data-navigation-item-id', 'library');
+    expect(row).toHaveAttribute('data-navigation-pending', 'true');
+    expect(row.className).toContain('bg-sidebar-accent-active');
+    expect(row.className).toContain('h-7');
+    expect(row.className).toContain('grid-cols-(--app-shell-sidebar-nav-grid)');
+  });
+
+  it('imports sidebar chrome from the modular sidebar specifier', () => {
+    const source = readWebSource(
+      'components/features/dashboard/dashboard-nav/NavMenuItem.tsx'
+    );
+    expect(source).toContain("@/components/organisms/sidebar'");
+    expect(source).not.toContain(`@/components/organisms/${'Sidebar'}'`);
   });
 });

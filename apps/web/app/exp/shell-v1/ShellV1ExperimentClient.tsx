@@ -45,11 +45,11 @@ import {
   ChevronLeft,
   ChevronUp,
   Copy,
-  Disc3,
   ExternalLink,
   Flag,
   Heart,
   Inbox,
+  Layers,
   LayoutDashboard,
   Library as LibraryIcon,
   Link as LinkIcon,
@@ -211,6 +211,7 @@ import { relativeDate as formatRelativeDate } from '@/lib/format-relative-date';
 //      "keyboard shortcuts" sheet can ship later without hunting them down.
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
+import { releasePopoverStatus, releaseTrackCount } from './release-popover';
 import type { CanvasView } from './shell-v1-types';
 import { useShellHotkeys } from './useShellHotkeys';
 
@@ -336,7 +337,7 @@ type Workspace = {
 const CORE_ITEMS: NavItem[] = [
   { icon: Search, label: 'Search' },
   { icon: Activity, label: 'Tasks' },
-  { icon: LibraryIcon, label: 'Library' },
+  { icon: LibraryIcon, label: 'Work' },
 ];
 
 // Threads = jobs. Each Jovie action (UI button or chat message) creates
@@ -410,7 +411,7 @@ const THREADS: Thread[] = [
 
 const ARTIST_ITEMS: NavItem[] = [
   { icon: LayoutDashboard, label: 'Dashboard', active: true },
-  { icon: Disc3, label: 'Releases' },
+  { icon: Layers, label: 'Releases' },
   { icon: BarChart3, label: 'Insights' },
   { icon: Users, label: 'Audience' },
   { icon: Heart, label: 'Tipping' },
@@ -447,7 +448,7 @@ function canvasViewForNavItem(label: string): CanvasView | null {
       return 'releases';
     case 'Tasks':
       return 'tasks';
-    case 'Library':
+    case 'Work':
       return 'library';
     default:
       return null;
@@ -892,10 +893,9 @@ function releaseToEntityPopover(r: Release): EntityPopoverData {
     artist: r.artist,
     releaseType: r.type,
     releaseDate: r.releaseDate,
-    totalTracks: r.type === 'Single' ? 1 : r.type === 'EP' ? 5 : 11,
+    totalTracks: releaseTrackCount(r.type),
     durationSec: r.durationSec,
-    status:
-      r.dsps.spotify === 'live' ? 'Live' : r.pitchReady ? 'Ready' : 'Draft',
+    status: releasePopoverStatus(r.dsps.spotify, r.pitchReady),
   };
 }
 
@@ -2769,7 +2769,6 @@ function ShellV1ExperimentContent() {
           <AudioBar
             isPlaying={isPlaying}
             onPlay={() => setIsPlaying(p => !p)}
-            onCollapse={() => setBarCollapsed(true)}
             currentTime={currentTimeSec}
             duration={playingDurationSec}
             loopMode={loopMode}
@@ -3039,7 +3038,7 @@ function Sidebar({
   const inLibraryMode = !!libraryProps;
   const inSettingsMode = !!settingsProps;
   const inContextMode = inLibraryMode || inSettingsMode;
-  const contextLabel = inLibraryMode ? 'Library' : 'Settings';
+  const contextLabel = inLibraryMode ? 'Work' : 'Settings';
   const collapsed = false;
   // Header trailing-button affordance morphs through three states:
   //   1. Hover: pin/unpin (transient hint, fades after 3s of inactivity)
@@ -3245,12 +3244,12 @@ function Sidebar({
           <div className='space-y-px'>
             {CORE_ITEMS.filter(item => {
               if (item.label === 'Tasks' && TASKS.length === 0) return false;
-              if (item.label === 'Library' && libraryAssetCount === 0)
+              if (item.label === 'Work' && libraryAssetCount === 0)
                 return false;
               return true;
             }).map(item => {
               const view: CanvasView | null =
-                item.label === 'Library'
+                item.label === 'Work'
                   ? 'library'
                   : item.label === 'Tasks'
                     ? 'tasks'
@@ -3418,7 +3417,7 @@ function breadcrumbForView(
     releases: 'Releases',
     tracks: 'Tracks',
     tasks: 'Tasks',
-    library: 'Library',
+    library: 'Work',
     lyrics: 'Lyrics',
     settings: 'Settings',
     thread: 'Thread',
@@ -5127,7 +5126,7 @@ function ReleaseRowMoreMenu({ release }: { release: Release }) {
         <ShellDropdown.Item icon={ExternalLink} label='Open Release' />
         <ShellDropdown.Separator />
         <ShellDropdown.Sub>
-          <ShellDropdown.SubTrigger icon={Disc3} label='Move To Release…' />
+          <ShellDropdown.SubTrigger icon={Layers} label='Move To Release…' />
           <ShellDropdown.SubContent
             searchable
             searchPlaceholder='Filter releases…'

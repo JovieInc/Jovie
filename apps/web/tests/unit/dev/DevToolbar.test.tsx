@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -39,6 +40,7 @@ vi.mock('@/lib/flags/contracts', () => ({
 import { DevToolbar } from '@/components/features/dev/DevToolbar';
 import { isDevToolbarSuppressedPath } from '@/components/features/dev/DevToolbarGate';
 import { FlagRow } from '@/components/features/dev/DevToolbarRows';
+import { serializedDeclaration } from '@/tests/utils/css-declaration';
 
 const TOOLBAR_HIDDEN_KEY = '__dev_toolbar_hidden';
 const TOOLBAR_OPEN_KEY = '__dev_toolbar_open';
@@ -214,9 +216,9 @@ describe('DevToolbar', () => {
       const bottomBar = screen.getByTestId('dev-toolbar-bottom-bar');
 
       expect(drawer).toHaveClass('overflow-y-auto');
-      expect(drawer).toHaveStyle({
-        maxHeight: 'min(400px, calc(100dvh - 7rem))',
-      });
+      expect(drawer.style.maxHeight).toBe(
+        serializedDeclaration('max-height', 'min(400px, calc(100dvh - 7rem))')
+      );
       expect(bottomBar).toHaveClass('overflow-x-auto');
       expect(
         screen.getByRole('textbox', { name: 'Search Flags' })
@@ -549,6 +551,67 @@ describe('DevToolbar', () => {
   // ─── Copy Actions ───────────────────────────────────────────
 
   describe('copy actions', () => {
+    describe('clipboard lifecycle', () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+        localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      });
+
+      afterEach(() => {
+        cleanup();
+        vi.clearAllTimers();
+        vi.useRealTimers();
+      });
+
+      it('cancels copy feedback when the toolbar unmounts', async () => {
+        const { unmount } = renderToolbar();
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: 'Copy SHA' }));
+        });
+        expect(vi.getTimerCount()).toBeGreaterThan(0);
+        unmount();
+        expect(vi.getTimerCount()).toBe(0);
+      });
+
+      it('does not schedule feedback when clipboard completes after unmount', async () => {
+        let completeCopy!: () => void;
+        vi.mocked(navigator.clipboard.writeText).mockReturnValue(
+          new Promise<void>(resolve => {
+            completeCopy = resolve;
+          })
+        );
+        const { unmount } = renderToolbar();
+        fireEvent.click(screen.getByRole('button', { name: 'Copy SHA' }));
+        unmount();
+        await act(async () => {
+          completeCopy();
+        });
+        expect(vi.getTimerCount()).toBe(0);
+      });
+
+      it('keeps feedback for 1500ms after the latest copy', async () => {
+        renderToolbar();
+        const button = screen.getByRole('button', { name: 'Copy SHA' });
+        await act(async () => {
+          fireEvent.click(button);
+        });
+        act(() => {
+          vi.advanceTimersByTime(1000);
+        });
+        await act(async () => {
+          fireEvent.click(button);
+        });
+        act(() => {
+          vi.advanceTimersByTime(500);
+        });
+        expect(button.querySelector('.lucide-check')).toBeInTheDocument();
+        act(() => {
+          vi.advanceTimersByTime(1000);
+        });
+        expect(button.querySelector('.lucide-check')).not.toBeInTheDocument();
+      });
+    });
+
     it('copies SHA to clipboard when SHA button is clicked', async () => {
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
@@ -743,10 +806,11 @@ describe('DevToolbar', () => {
       expect(screen.getByText('v1.0.0')).toBeInTheDocument();
     });
 
-    it('applies red styling for production env', () => {
+    it('applies the error token for production env (JOV-6773)', () => {
       renderToolbar({ env: 'production' });
       const badge = screen.getByText('production');
-      expect(badge.className).toContain('text-red-400');
+      expect(badge.className).toContain('text-error');
+      expect(badge.className).not.toMatch(/\bred-\d/);
     });
 
     it('applies yellow styling for preview env', () => {
@@ -851,22 +915,26 @@ describe('DevToolbar', () => {
     });
 
     it('loads and displays the active persona when opened', async () => {
-      fetchSpy.mockResolvedValueOnce(
-        mockSessionResponse({
-          active: true,
-          persona: 'creator-ready',
-          userId: 'user_ready',
-          email: 'browse-ready+clerk_test@jov.ie',
-          profilePath: '/browse-ready-user',
-        })
-      );
+      const session =
+        Promise.withResolvers<ReturnType<typeof mockSessionResponse>>();
+      fetchSpy.mockReturnValueOnce(session.promise);
+      const response = mockSessionResponse({
+        active: true,
+        persona: 'creator-ready',
+        userId: 'user_ready',
+        email: 'browse-ready+clerk_test@jov.ie',
+        profilePath: '/browse-ready-user',
+      });
 
       renderToolbar();
       fireEvent.click(screen.getByRole('button', { name: 'Test Persona' }));
 
       expect(await screen.findByText('Pro Creator')).toBeInTheDocument();
+      expect(screen.getByText('No test persona active')).toBeInTheDocument();
+      // The menu exists before the session response; its label is not a ready signal.
+      session.resolve(response);
       expect(
-        screen.getByText('Active: browse-ready+clerk_test@jov.ie')
+        await screen.findByText('Active: browse-ready+clerk_test@jov.ie')
       ).toBeInTheDocument();
       expect(screen.getByText('/browse-ready-user')).toBeInTheDocument();
       expect(

@@ -2,10 +2,22 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ComponentProps, type ReactNode, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const desktopAuth = vi.hoisted(() => ({ isLoaded: true, isSignedIn: false }));
+vi.mock('@/hooks/useJovieAuth', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/hooks/useJovieAuth')>()),
+  useJovieAuth: () => desktopAuth,
+}));
 
 function readSource(path: string): string {
   return readFileSync(resolve(process.cwd(), path), 'utf8');
@@ -17,6 +29,7 @@ import {
 } from '@/components/features/chat/Composer';
 import { ChatInput } from '@/components/jovie/components/ChatInput';
 import * as largeTextPaste from '@/lib/chat/large-text-paste';
+import { serializedDeclaration } from '@/tests/utils/css-declaration';
 import { fastRender } from '@/tests/utils/fast-render';
 
 function withProviders(ui: ReactNode) {
@@ -165,6 +178,7 @@ function ControlledChatInputHarness() {
 afterEach(() => {
   removeMockSpeechRecognition();
   removeElectronAPI();
+  desktopAuth.isSignedIn = false;
 });
 
 describe('ChatInput', () => {
@@ -175,6 +189,125 @@ describe('ChatInput', () => {
     isLoading: false,
     isSubmitting: false,
   };
+
+  it('certifies only the opted-in loaded authenticated composer and observes focus passively', async () => {
+    const frames = new Map<number, FrameRequestCallback>();
+    let next = 0;
+    const raf = vi
+      .spyOn(globalThis, 'requestAnimationFrame')
+      .mockImplementation(callback => {
+        frames.set(++next, callback);
+        return next;
+      });
+    const cancel = vi
+      .spyOn(globalThis, 'cancelAnimationFrame')
+      .mockImplementation(id => {
+        frames.delete(id);
+      });
+    const rect = vi
+      .spyOn(HTMLTextAreaElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue(new DOMRect(0, 0, 300, 40));
+    const visible = vi
+      .spyOn(document, 'visibilityState', 'get')
+      .mockReturnValue('visible');
+    const focus = vi.spyOn(document, 'hasFocus').mockReturnValue(true);
+    const notifyComposerReadiness = vi.fn().mockResolvedValue(true);
+    setElectronAPI({ notifyComposerReadiness });
+    desktopAuth.isSignedIn = true;
+    const flush = async () => {
+      await act(async () => {
+        for (let i = 0; i < 2; i += 1) {
+          const callbacks = [...frames.values()];
+          frames.clear();
+          for (const callback of callbacks) callback(performance.now());
+          await Promise.resolve();
+        }
+      });
+    };
+    const view = fastRender(
+      withProviders(
+        <ChatInput {...baseProps} desktopConversationReady={false} />
+      )
+    );
+    try {
+      await flush();
+      expect(notifyComposerReadiness).not.toHaveBeenCalled();
+      view.rerender(
+        withProviders(<ChatInput {...baseProps} desktopConversationReady />)
+      );
+      await flush();
+      expect(notifyComposerReadiness.mock.calls).toEqual([
+        ['visible-editable'],
+      ]);
+      const input = screen.getByRole('textbox', {
+        name: /chat message input/i,
+      });
+      expect(document.activeElement).not.toBe(input);
+      // Direct entity entry changes the composer layout and replaces its input.
+      fireEvent.change(input, {
+        target: { value: '/release ', selectionStart: 9 },
+      });
+      const replacement = screen.getByRole('combobox', {
+        name: /chat message input/i,
+      });
+      expect(replacement).not.toBe(input);
+      expect(input.isConnected).toBe(false);
+      act(() => replacement.focus());
+      await flush();
+      expect(notifyComposerReadiness.mock.calls).toEqual([
+        ['visible-editable'],
+        ['visible-editable'],
+        ['focused'],
+      ]);
+    } finally {
+      view.unmount();
+      raf.mockRestore();
+      cancel.mockRestore();
+      rect.mockRestore();
+      visible.mockRestore();
+      focus.mockRestore();
+    }
+  });
+
+  it('emits exactly one onChange per keystroke (JOV-5325)', async () => {
+    const user = userEvent.setup();
+    const calls: string[] = [];
+
+    function Harness() {
+      const [value, setValue] = useState('');
+      return (
+        <ChatInput
+          value={value}
+          onChange={next => {
+            calls.push(next);
+            setValue(next);
+          }}
+          onSubmit={vi.fn()}
+          isLoading={false}
+          isSubmitting={false}
+        />
+      );
+    }
+
+    fastRender(withProviders(<Harness />));
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    });
+
+    await user.type(textarea, 'Hey');
+
+    expect(calls).toEqual(['H', 'He', 'Hey']);
+  });
+
+  it('sets the textarea height inline so line growth snaps with the keystroke (JOV-5325)', () => {
+    fastRender(withProviders(<ChatInput {...baseProps} />));
+
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    }) as HTMLTextAreaElement;
+
+    expect(textarea.style.height).toBe('24px');
+  });
 
   it('keeps the textarea focused when clicking send', async () => {
     const user = userEvent.setup();
@@ -410,7 +543,9 @@ describe('ChatInput', () => {
 
     const surface = screen.getByTestId('chat-composer-surface');
     expect(surface.getAttribute('data-variant')).toBe('hero');
-    expect(surface.style.maxWidth).toBe('min(calc(100vw - 32px), 45rem)');
+    expect(surface.style.maxWidth).toBe(
+      serializedDeclaration('max-width', 'min(calc(100vw - 32px), 45rem)')
+    );
     expect(surface.style.borderRadius).toBe('9999px');
 
     expect(screen.getByTestId('chat-composer-input-row').className).toContain(

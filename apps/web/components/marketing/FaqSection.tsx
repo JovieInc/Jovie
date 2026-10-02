@@ -9,6 +9,7 @@ interface FaqItem {
 }
 
 interface FaqSectionProps {
+  readonly sectionVariant?: string;
   readonly items: readonly FaqItem[];
   readonly className?: string;
   readonly headingClassName?: string;
@@ -19,6 +20,7 @@ interface FaqSectionProps {
 
 export function FaqSection({
   items,
+  sectionVariant,
   className,
   headingClassName,
   heading = 'Frequently Asked Questions',
@@ -28,6 +30,13 @@ export function FaqSection({
   return (
     <section
       data-marketing-section='faq'
+      data-testid={sectionVariant ? 'marketing-section-faq' : undefined}
+      data-marketing-owner={
+        sectionVariant
+          ? 'apps/web/components/marketing/FaqSection.tsx'
+          : undefined
+      }
+      data-marketing-variant={sectionVariant}
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.faq}
       data-layout-contract='bounded-local-disclosure'
       className={cn(
@@ -36,8 +45,9 @@ export function FaqSection({
       )}
     >
       <h2
+        data-wrap='editorial-title'
         className={cn(
-          'faq-section__heading line-clamp-2',
+          'faq-section__heading',
           headingClassName ??
             'system-b-marketing-section-heading text-primary-token'
         )}

@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   auditCoverageViaReceipts,
   checkChangedComponents,
+  hasRealLegacyTestEvidence,
+  isStoryRequirementExempt,
   resolveRenderedEvaluationSection,
   runComponentShipGate,
 } from '../../component-ship-gate.mjs';
@@ -14,6 +16,7 @@ import {
   isUnderShipScope,
   listComponentsInRoot,
   measureRootCoverage,
+  sourceHasJsx,
 } from '../../component-ship-policy.mjs';
 import {
   compareCoverage,
@@ -149,19 +152,90 @@ describe('component-ship-policy scope', () => {
   it('lists components with adjacent story/test pairing', () => {
     const root = fixtureRepo({
       'packages/ui/atoms/button.tsx':
-        'export function Button(props: { readonly label: string }) { return null }\n',
+        'export function Button(props: { readonly label: string }) { return <button>{props.label}</button> }\n',
       'packages/ui/atoms/button.stories.tsx':
         "import { Button } from './button';\nexport default { component: Button };\n",
       'packages/ui/atoms/button.test.tsx':
         "import { Button } from './button';\n",
       'packages/ui/atoms/orphan.tsx':
-        'export function Orphan() { return null }\n',
+        'export function Orphan() { return <div>orphan</div> }\n',
     });
     const list = listComponentsInRoot('packages/ui/atoms', root);
     expect(list.map(c => c.component).sort()).toEqual(['button', 'orphan']);
     expect(list.find(c => c.component === 'button')?.covered).toBe(true);
     expect(list.find(c => c.component === 'button')?.tested).toBe(true);
     expect(list.find(c => c.component === 'orphan')?.covered).toBe(false);
+  });
+
+  it('excludes .tsx files with no JSX, no hook usage, and no re-export from the component inventory', () => {
+    const root = fixtureRepo({
+      // Server-only query module — real shape of LeadPipelineKpis.tsx.
+      'apps/web/components/atoms/getLeadFunnelCounts.tsx':
+        'export async function getLeadFunnelCounts() { return { discovered: 0 } }\n',
+      // Pure menu-item builder with JSX icon *values*, never returned from
+      // a function — real shape of admin-user-actions.tsx.
+      'apps/web/components/atoms/buildUserActions.tsx':
+        "import { Copy } from 'lucide-react';\nconst ICON = <Copy />;\nexport function buildUserActions(user) { return [{ id: 'copy', icon: ICON }] }\n",
+      'apps/web/components/atoms/buildUserActions.stories.tsx':
+        "import { buildUserActions } from './buildUserActions';\nexport default { component: buildUserActions };\n",
+    });
+    const list = listComponentsInRoot('apps/web/components/atoms', root);
+    expect(list.map(c => c.component)).toEqual([]);
+  });
+
+  it('keeps a renderless side-effect component, a headless-hook module, and a re-export barrel', () => {
+    const root = fixtureRepo({
+      // Renderless side-effect component — real shape of DocPrintScope.tsx.
+      'apps/web/components/atoms/PrintScope.tsx':
+        "import { useEffect } from 'react';\nexport function PrintScope() { useEffect(() => {}); return null }\n",
+      // Headless hook module with no JSX of its own — real shape of
+      // PendingShellContext.tsx / ProfileSidebarHeader.tsx. Named after the
+      // context, not the hook, so the pre-existing `/^use[A-Z]/` filename
+      // exclusion doesn't apply — matches the real files' naming.
+      'apps/web/components/atoms/PendingShellContext.tsx':
+        "import { useContext, createContext } from 'react';\nconst Ctx = createContext(null);\nexport function usePendingShellState() { return useContext(Ctx) }\n",
+      // "Backwards compatibility" re-export barrel, directive prologue and
+      // all — real shape of the features/home/AuthTextInput.tsx barrel.
+      'apps/web/components/atoms/ReexportedButton.tsx':
+        "'use client';\n\nexport { Button as ReexportedButton } from './button';\n",
+      'apps/web/components/atoms/button.tsx':
+        'export function Button() { return <button /> }\n',
+    });
+    const list = listComponentsInRoot('apps/web/components/atoms', root);
+    expect(list.map(c => c.component).sort()).toEqual([
+      'PendingShellContext',
+      'PrintScope',
+      'ReexportedButton',
+      'button',
+    ]);
+  });
+
+  it('sourceHasJsx: returns JSX (incl. ternary/&&), hook calls, and pure re-export barrels count; plain data/query files do not', () => {
+    expect(sourceHasJsx('export function A() { return <div/> }')).toBe(true);
+    expect(
+      sourceHasJsx('export function A(ok) { return ok ? <A/> : <B/> }')
+    ).toBe(true);
+    expect(sourceHasJsx('export function A(ok) { return ok && <A/> }')).toBe(
+      true
+    );
+    expect(sourceHasJsx('export const A = () => <div/>;')).toBe(true);
+    expect(
+      sourceHasJsx(
+        "import { useEffect } from 'react';\nexport function A() { useEffect(() => {}); return null }"
+      )
+    ).toBe(true);
+    expect(sourceHasJsx("export { Thing } from './thing';")).toBe(true);
+    expect(
+      sourceHasJsx("'use client';\n\nexport { Thing } from './thing';")
+    ).toBe(true);
+    expect(
+      sourceHasJsx('export async function getCounts() { return { n: 0 } }')
+    ).toBe(false);
+    expect(
+      sourceHasJsx(
+        'const ICON = <svg/>;\nexport function buildItems() { return [{ icon: ICON }] }'
+      )
+    ).toBe(false);
   });
 
   it('keeps the complete web component inventory inside the hard diff gate', () => {
@@ -242,6 +316,67 @@ describe('story match checks', () => {
     });
     expect(result.ok).toBe(true);
   });
+
+  it('does not flag an unrelated internal helper Props interface as required (JOV-6773)', () => {
+    // Widget itself only requires `title`. RowProps belongs to a
+    // non-exported helper in the same file (e.g. MatchConfidenceBreakdown's
+    // ScoreRowProps, SettingsAdPixelsSection's PlatformSectionProps) and
+    // must not leak into Widget's required-prop surface.
+    const source = `
+      interface RowProps {
+        readonly label: string;
+        readonly value: number;
+      }
+      function Row(_p: RowProps) { return null }
+      export interface WidgetProps {
+        readonly title: string;
+      }
+      export function Widget(_p: WidgetProps) { return null }
+    `;
+    expect(extractRequiredPropNames(source, ['Widget'])).toEqual(['title']);
+
+    const story = `
+      import { Widget } from './Widget';
+      export default { component: Widget };
+      export const Default = { args: { title: 'Hi' } };
+    `;
+    const result = checkStoryMatchesComponent({
+      componentSource: source,
+      storySource: story,
+      componentRel: 'x/Widget.tsx',
+      storyRel: 'x/Widget.stories.tsx',
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('does not mistake a Tailwind disabled: variant for a disabled prop (JOV-6773)', () => {
+    // WidgetProps has no `disabled` field at all -- only a `disabled:
+    // opacity-50` Tailwind variant inside a className string, which a bare
+    // substring/whole-file search for `disabled\s*:` would match.
+    const source = `
+      export interface WidgetProps {
+        readonly title: string;
+      }
+      export function Widget({ title }: WidgetProps) {
+        return <button className="disabled:opacity-50">{title}</button>;
+      }
+    `;
+    const story = `
+      import { Widget } from './Widget';
+      export default { component: Widget };
+      export const Default = { args: { title: 'Hi' } };
+    `;
+    const result = checkStoryMatchesComponent({
+      componentSource: source,
+      storySource: story,
+      componentRel: 'x/Widget.tsx',
+      storyRel: 'x/Widget.stories.tsx',
+    });
+    expect(result.ok).toBe(true);
+    expect(result.findings.some(f => f.rule === 'story-state-matrix')).toBe(
+      false
+    );
+  });
 });
 
 describe('diff gate', () => {
@@ -310,7 +445,7 @@ describe('diff gate', () => {
   it('fails closed without test and story', () => {
     const root = fixtureRepo({
       'apps/web/components/atoms/NewThing.tsx':
-        'export function NewThing() { return null }\n',
+        'export function NewThing() { return <div>new</div> }\n',
     });
     // Monkey-patch by calling policy against fixture via checkChangedComponents
     // with absolute paths is hard; unit-test the pure helpers and a temp-root
@@ -341,6 +476,69 @@ describe('diff gate', () => {
     expect(result.issues.map(issue => issue.rule)).toEqual(
       expect.arrayContaining(['missing-test', 'missing-story'])
     );
+  });
+
+  describe('design-studio story exemption (JOV-6773)', () => {
+    it('exempts only the components/design-studio/ prefix, not lookalikes', () => {
+      expect(
+        isStoryRequirementExempt(
+          'apps/web/components/design-studio/SectionVariantPreview.tsx'
+        )
+      ).toBe(true);
+      expect(
+        isStoryRequirementExempt(
+          'apps/web/components/design-studio/nested/Foo.tsx'
+        )
+      ).toBe(true);
+
+      // Not a real match for the exempt prefix -- must not be over-exempted.
+      expect(
+        isStoryRequirementExempt(
+          'apps/web/components/design-studio-marketing/Foo.tsx'
+        )
+      ).toBe(false);
+      expect(
+        isStoryRequirementExempt(
+          'apps/web/components/features/design-studio/Foo.tsx'
+        )
+      ).toBe(false);
+      expect(
+        isStoryRequirementExempt('apps/web/components/atoms/Badge.tsx')
+      ).toBe(false);
+    });
+
+    it('does not require a story for a tested design-studio component', () => {
+      const sourceRel = 'apps/web/components/design-studio/StudioWidget.tsx';
+      const testRel = 'apps/web/components/design-studio/StudioWidget.test.tsx';
+      const root = fixtureRepo({
+        [sourceRel]: 'export function StudioWidget() { return null }\n',
+        [testRel]:
+          "import { render } from '@testing-library/react';\n" +
+          "import { StudioWidget } from './StudioWidget';\n" +
+          'render(<StudioWidget />);\n',
+      });
+
+      const result = checkChangedComponents([sourceRel, testRel], {
+        repoRoot: root,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.issues.some(issue => issue.rule === 'missing-story')).toBe(
+        false
+      );
+    });
+
+    it('still requires a test for a design-studio component (only the story is exempt)', () => {
+      const sourceRel = 'apps/web/components/design-studio/StudioWidget.tsx';
+      const root = fixtureRepo({
+        [sourceRel]: 'export function StudioWidget() { return null }\n',
+      });
+
+      const result = checkChangedComponents([sourceRel], { repoRoot: root });
+
+      expect(result.ok).toBe(false);
+      expect(result.issues.map(issue => issue.rule)).toEqual(['missing-test']);
+    });
   });
 
   it('accepts a changed feature component only with touched real test and story evidence', () => {
@@ -384,7 +582,8 @@ describe('diff gate', () => {
 
   it('reports missing test/story for changed components in a fixture root', () => {
     const root = fixtureRepo({
-      'packages/ui/atoms/Bare.tsx': 'export function Bare() { return null }\n',
+      'packages/ui/atoms/Bare.tsx':
+        'export function Bare() { return <span>bare</span> }\n',
       'packages/ui/atoms/Bare.stories.tsx':
         "import { Bare } from './Bare';\nexport default { component: Bare };\nexport const Default = {};\n",
     });
@@ -670,6 +869,54 @@ function coverageViaResult({
   });
 }
 
+describe('legacy test evidence resolution (JOV-6773)', () => {
+  const sourceRel = 'apps/web/components/features/dashboard/organisms/Foo.tsx';
+  const testRel = 'apps/web/tests/unit/dashboard/Foo.test.tsx';
+  const componentSource = 'export function Foo() { return null; }\n';
+
+  it('resolves a @/features/* import shortcut to its components/features source', () => {
+    // tsconfig.json maps `@/features/*` to `./components/features/*`, one
+    // segment shorter than the generic `@/*` -> `apps/web/*` mapping this
+    // resolver otherwise applies, and several apps/web tests use the
+    // shortcut instead of the fully-qualified `@/components/features/*`.
+    const testSource = [
+      "import { render } from '@testing-library/react';",
+      "import { Foo } from '@/features/dashboard/organisms/Foo';",
+      'render(<Foo />);',
+    ].join('\n');
+
+    expect(
+      hasRealLegacyTestEvidence({
+        testSource,
+        testRel,
+        sourceRel,
+        componentSource,
+      })
+    ).toBe(true);
+  });
+
+  it('recognizes tests/utils/fast-render wrappers as real render calls', () => {
+    // fastRender/renderWithClerk/renderWithNextJs/renderWithHeadlessUi each
+    // just call @testing-library/react's real `render` with a fixed
+    // `wrapper` (apps/web/tests/utils/fast-render.ts) — a JSX argument
+    // reaching one is exactly as real as reaching `render` directly.
+    const testSource = [
+      "import { fastRender } from '@/tests/utils/fast-render';",
+      "import { Foo } from '@/components/features/dashboard/organisms/Foo';",
+      'fastRender(<Foo />);',
+    ].join('\n');
+
+    expect(
+      hasRealLegacyTestEvidence({
+        testSource,
+        testRel,
+        sourceRel,
+        componentSource,
+      })
+    ).toBe(true);
+  });
+});
+
 describe('coverage-via executable evidence', () => {
   const viaImport = "import { ViaPanel } from '@/components/atoms/ViaPanel';";
   const renderImport = "import { render } from '@testing-library/react';";
@@ -886,9 +1133,12 @@ describe('coverage-via executable evidence', () => {
         "test.todo('renders', () => render(<ViaPanel />));",
       ],
     ],
-  ])('rejects a render inside %s as inert @coverage-via evidence', (_case, testSource) => {
-    expectInvalidCoverageVia(testSource.join('\n'));
-  });
+  ])(
+    'rejects a render inside %s as inert @coverage-via evidence',
+    (_case, testSource) => {
+      expectInvalidCoverageVia(testSource.join('\n'));
+    }
+  );
 
   it('rejects a helper call from an unrelated shadowed scope', () => {
     expectInvalidCoverageVia(
@@ -962,11 +1212,13 @@ describe('coverage-via executable evidence', () => {
     ).toBe(true);
   });
 
+  // Full-repo audit: reads and TypeScript-parses every coverage-via receipt
+  // (161 today) — measured 1.6s in-suite, 3.7s under ci-fast CPU contention.
   it('has zero invalid existing coverage-via receipts', () => {
     const audit = auditCoverageViaReceipts();
     expect(audit.invalid).toEqual([]);
     expect(audit.ok).toBe(true);
-  });
+  }, 15_000);
 });
 
 describe('multi-root ratchet', () => {

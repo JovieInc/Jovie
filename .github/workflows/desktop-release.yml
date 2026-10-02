@@ -1,4 +1,5 @@
 name: desktop-release
+# clock-class: skip-if-unchanged
 run-name: Desktop release ${{ github.event.workflow_run.head_sha || github.sha }}
 
 # controller-hop-exception: jovie-controller-hop/v1
@@ -7,7 +8,9 @@ run-name: Desktop release ${{ github.event.workflow_run.head_sha || github.sha }
 # removal-trigger: Remove this observer hop when Production Controller can request the same signed desktop publication directly.
 
 # Triggers:
-# - Auto after Production Controller verifies exact current main. A checked-in
+# - Auto after Production Controller verifies a generation that is current
+#   main or a trusted ancestor of it (forward-only; exact-SHA supersession
+#   starved desktop while the merge queue outran the controller). A checked-in
 #   VERSION change publishes immediately; production-impacting desktop source
 #   opens one deterministic post-land stamp PR before publication.
 # - Manual dispatch publishes a signed staging prerelease from exact green
@@ -227,7 +230,11 @@ jobs:
           if [ "$EVENT_NAME" = "schedule" ] && [ "$current_main_sha" != "$release_sha" ]; then
             echo "::notice::Scheduled staging generation $release_sha was superseded by $current_main_sha."
             exit 0
-          elif [ "$environment" = "staging" ] && [ "$current_main_sha" != "$release_sha" ]; then
+          elif [ "$current_main_sha" != "$release_sha" ]; then
+            # Forward-only lineage: a verified generation that main has since
+            # advanced past still publishes. Exact-SHA supersession starved
+            # production desktop from 26.9.14 onward (2026-09-21..26) because
+            # the merge queue lands faster than the controller verifies.
             mainline_compare="$(gh api \
               "repos/$REPOSITORY/compare/$release_sha...$current_main_sha")"
             jq -e --arg release "$release_sha" --arg current "$current_main_sha" '
@@ -242,9 +249,7 @@ jobs:
               echo "::error::Desktop generation $release_sha is not a trusted ancestor of current main $current_main_sha."
               exit 1
             }
-          elif [ "$current_main_sha" != "$release_sha" ]; then
-            echo "::notice::Desktop generation $release_sha was superseded by $current_main_sha."
-            exit 0
+            echo "::notice::Desktop generation $release_sha is a trusted ancestor of current main $current_main_sha; continuing forward-only."
           fi
 
           # Staging publishes an immutable mainline generation whose exact push
@@ -506,6 +511,16 @@ jobs:
                   )
               ] | length
             ' <<<"$jobs_json")"
+            verified_skipped="$(jq --arg sha "$release_sha" '
+              [
+                .[].jobs[]?
+                | select(
+                    .name == "Production Verified" and
+                    .head_sha == $sha and
+                    .conclusion == "skipped"
+                  )
+              ] | length
+            ' <<<"$jobs_json")"
             if [ "$verified_count" = "1" ]; then
               production_proven=true
             fi
@@ -515,6 +530,14 @@ jobs:
             if prove_existing_production_marker "$release_sha"; then
               production_proven=true
               echo "Existing exact Production Verified marker authorized $release_sha."
+            elif [ "${verified_skipped:-0}" = "1" ]; then
+              # The controller concluded success with Production Verified
+              # skipped only when it deliberately yielded the release lease
+              # to a newer main generation. That generation will trigger its
+              # own desktop reconciliation, so this observer has nothing to
+              # publish and must not fail main.
+              echo "::notice::Production Verified was skipped for $release_sha because the controller yielded the release lease; no desktop release is due."
+              exit 0
             else
               echo "::error::Current main lacks exact successful Production Verified evidence."
               exit 1
@@ -593,11 +616,14 @@ jobs:
               .path == ".github/workflows/desktop-release.yml" and
               (.event == "workflow_run" or .event == "workflow_dispatch") and
               (.head_sha | test("^[0-9a-f]{40}$")) and
-              (. as $run | $run.display_title == ("Desktop release " + $run.head_sha))
+              (.display_title | test("^Desktop release [0-9a-f]{40}$"))
             ' >/dev/null <<<"$run_json"; then
               continue
             fi
-            run_sha="$(jq -r '.head_sha' <<<"$run_json")"
+            # workflow_run events stamp the run with main's tip at trigger
+            # time; the published generation is the one in the run name.
+            run_sha="$(jq -r '.display_title | ltrimstr("Desktop release ")' <<<"$run_json")"
+            run_head_sha="$(jq -r '.head_sha' <<<"$run_json")"
             workflow_id="$(jq -r '.workflow_id' <<<"$run_json")"
             if ! workflow_json="$(gh api \
               "repos/$REPOSITORY/actions/workflows/$workflow_id")"; then
@@ -650,7 +676,7 @@ jobs:
               exit 1
             fi
             publisher_count="$(jq \
-              --arg sha "$run_sha" \
+              --arg sha "$run_head_sha" \
               --arg job "$publisher_job_id" '
               [
                 .[].jobs[]?
@@ -694,7 +720,7 @@ jobs:
             }
             desktop_workflow_id="$(jq -r '.id' <<<"$desktop_workflow")"
             recovery_runs="$(gh api \
-              "repos/$REPOSITORY/actions/workflows/$desktop_workflow_id/runs?branch=main&status=completed&per_page=25")"
+              "repos/$REPOSITORY/actions/workflows/$desktop_workflow_id/runs?branch=main&status=completed&per_page=100")"
             jq -e \
               --arg repo "$REPOSITORY" \
               --arg workflow_id "$desktop_workflow_id" '
@@ -719,21 +745,21 @@ jobs:
             recovery_candidates="$(
               if [ "$DESKTOP_RUN_ATTEMPT" -gt 1 ]; then
                 for ((attempt = DESKTOP_RUN_ATTEMPT - 1; attempt >= 1; attempt--)); do
-                  printf '%s\t%s\t%s\n' "$DESKTOP_RUN_ID" "$attempt" "$release_sha"
+                  printf '%s\t%s\t%s\t%s\n' "$DESKTOP_RUN_ID" "$attempt" "$release_sha" "$GITHUB_SHA"
                 done
               fi
               jq -r '
                 map(. as $run | select(
                   ($run.event == "workflow_run" or $run.event == "workflow_dispatch") and
-                  $run.display_title == ("Desktop release " + $run.head_sha)
+                  ($run.display_title | test("^Desktop release [0-9a-f]{40}$"))
                 )) |
                 sort_by(.created_at, .id) | reverse | .[] |
                 . as $run |
                 range(.run_attempt; 0; -1) |
-                [$run.id, ., $run.head_sha] | @tsv
+                [$run.id, ., ($run.display_title | ltrimstr("Desktop release ")), $run.head_sha] | @tsv
               ' <<<"$(jq -c '.workflow_runs' <<<"$recovery_runs")"
             )"
-            while IFS=$'\t' read -r recovery_run_id recovery_attempt recovery_sha; do
+            while IFS=$'\t' read -r recovery_run_id recovery_attempt recovery_sha recovery_head_sha; do
               [ -n "$recovery_run_id" ] || continue
               if ! recovery_jobs="$(gh api --paginate --slurp \
                 "repos/$REPOSITORY/actions/runs/$recovery_run_id/attempts/$recovery_attempt/jobs?per_page=100")"; then
@@ -747,7 +773,7 @@ jobs:
                 echo "::error::GitHub returned malformed desktop recovery jobs."
                 exit 1
               }
-              recovery_publisher_count="$(jq --arg sha "$recovery_sha" '[
+              recovery_publisher_count="$(jq --arg sha "$recovery_head_sha" '[
                 .[].jobs[]?
                 | select(
                     .name == "Publish production desktop release" and
@@ -761,20 +787,17 @@ jobs:
                     )] | length) == 1
                   )
               ] | length' <<<"$recovery_jobs")"
-              recovery_asset_proof_count="$(jq --arg sha "$recovery_sha" '[
+              # Asset proof is the verify step. The publisher cross-prove is
+              # already established above from this attempt's own jobs, and a
+              # cross-prove failure after verified assets must stay recoverable.
+              recovery_asset_proof_count="$(jq --arg sha "$recovery_head_sha" '[
                 .[].jobs[]?
                 | select(
                     .name == "Record production desktop publish" and
                     .head_sha == $sha and
                     .status == "completed" and
-                    .conclusion == "success" and
                     ([.steps[]? | select(
                       .name == "Verify exact published release assets" and
-                      .status == "completed" and
-                      .conclusion == "success"
-                    )] | length) == 1 and
-                    ([.steps[]? | select(
-                      .name == "Cross-prove exact production publisher" and
                       .status == "completed" and
                       .conclusion == "success"
                     )] | length) == 1
@@ -982,6 +1005,13 @@ jobs:
             exit 1
           }
           git cat-file -e "${BASELINE_SHA}^{commit}"
+          # Forward-only authorization lets a verified generation arrive after
+          # a newer one already published; it is covered, never re-published.
+          if [ "$BASELINE_SHA" != "$RELEASE_SHA" ] &&
+            git merge-base --is-ancestor "$RELEASE_SHA" "$BASELINE_SHA"; then
+            echo "Verified generation $RELEASE_SHA is already covered by the newer desktop publish $BASELINE_SHA."
+            exit 0
+          fi
           git merge-base --is-ancestor "$BASELINE_SHA" "$RELEASE_SHA" || {
             echo "::error::The last successful desktop release is not an ancestor of current main."
             exit 1
@@ -1057,11 +1087,39 @@ jobs:
             echo "::error::Desktop release stamp SHA is malformed."
             exit 1
           }
-          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
-          if [ "$current_main_sha" != "$RELEASE_SHA" ]; then
-            echo "::notice::Desktop release stamp generation $RELEASE_SHA was superseded by $current_main_sha."
-            exit 0
-          fi
+          # Forward-only: stamp from a verified generation that main has moved
+          # past, unless main already carries newer release state, in which
+          # case the next verified generation publishes it.
+          stamp_lineage_is_current() {
+            local current_main_sha mainline_compare main_version
+            current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+            [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
+              echo "::error::Could not resolve exact current main for the desktop release stamp."
+              exit 1
+            }
+            [ "$current_main_sha" = "$RELEASE_SHA" ] && return 0
+            mainline_compare="$(gh api \
+              "repos/$REPOSITORY/compare/$RELEASE_SHA...$current_main_sha")"
+            jq -e --arg release "$RELEASE_SHA" --arg current "$current_main_sha" '
+              type == "object" and
+              .status == "ahead" and
+              .base_commit.sha == $release and
+              .merge_base_commit.sha == $release and
+              (.ahead_by | type == "number" and . > 0 and floor == .) and
+              (.commits | type == "array" and length > 0 and .[-1].sha == $current) and
+              .behind_by == 0
+            ' >/dev/null <<<"$mainline_compare" || {
+              echo "::notice::Desktop release stamp generation $RELEASE_SHA left main's lineage (main is $current_main_sha)."
+              return 1
+            }
+            main_version="$(gh api -H 'Accept: application/vnd.github.raw' \
+              "repos/$REPOSITORY/contents/VERSION?ref=$current_main_sha" | tr -d '[:space:]')"
+            if [ "$main_version" != "$(git show "$RELEASE_SHA:VERSION" | tr -d '[:space:]')" ]; then
+              echo "::notice::Main $current_main_sha already carries desktop release state $main_version; the next verified generation publishes it."
+              return 1
+            fi
+          }
+          stamp_lineage_is_current || exit 0
 
           short_sha="${RELEASE_SHA:0:12}"
           branch="cursor/stable-desktop-publish-$short_sha"
@@ -1101,11 +1159,7 @@ jobs:
             --base "$RELEASE_SHA" \
             --branch "$branch"
 
-          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
-          if [ "$current_main_sha" != "$RELEASE_SHA" ]; then
-            echo "::notice::Main advanced to $current_main_sha while stamping; a newer controller generation will own the release."
-            exit 0
-          fi
+          stamp_lineage_is_current || exit 0
 
           release_version="$(tr -d '[:space:]' < VERSION)"
           git config user.name "jovie-bot[bot]"
@@ -1168,7 +1222,7 @@ jobs:
         run: |
           set -euo pipefail
           current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
-          if [ "$ENVIRONMENT" = "staging" ] && [ "$current_main_sha" != "$RELEASE_SHA" ]; then
+          if [ "$current_main_sha" != "$RELEASE_SHA" ]; then
             mainline_compare="$(gh api \
               "repos/${{ github.repository }}/compare/$RELEASE_SHA...$current_main_sha")"
             jq -e --arg release "$RELEASE_SHA" --arg current "$current_main_sha" '
@@ -1183,20 +1237,33 @@ jobs:
               echo "::error::Desktop generation $RELEASE_SHA is not a trusted ancestor of current main $current_main_sha before packaging."
               exit 1
             }
-          elif [ "$current_main_sha" != "$RELEASE_SHA" ]; then
-            echo "::error::Desktop generation $RELEASE_SHA was superseded by $current_main_sha before packaging."
-            exit 1
           fi
+
+      # pnpm must exist before setup-node so `cache: pnpm` can resolve the
+      # store; action-setup reads the root packageManager pin (pnpm@9.15.9).
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "22"
-
-      - name: Enable corepack and prepare pnpm
-        run: corepack enable && corepack prepare pnpm@9.15.9 --activate
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # Electron and electron-builder re-download their universal runtimes on
+      # every cold macOS VM; restore only those immutable download caches,
+      # never build output (#16891's cache, lost in its merge).
+      - name: Cache Electron downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: ${{ runner.os }}-electron-downloads-${{ hashFiles('pnpm-lock.yaml', 'apps/desktop/electron-builder*.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-downloads-
 
       - name: Prepare private production draft
         if: env.ENVIRONMENT == 'production'
@@ -1413,6 +1480,7 @@ jobs:
           grep -Eq '^provider:[[:space:]]*generic[[:space:]]*$' "$update_config"
           grep -Eq '^url:[[:space:]]*https://github.com/JovieInc/Jovie/releases/download/desktop-staging[[:space:]]*$' "$update_config"
           grep -Eq '^channel:[[:space:]]*staging[[:space:]]*$' "$update_config"
+          grep -Eq "^updaterCacheDirName:[[:space:]]*'?jovie-desktop-staging-updater'?[[:space:]]*$" "$update_config"
 
           staging_dmg="apps/desktop/dist/Jovie-Staging-${release_version}-universal.dmg"
           xcrun stapler validate "$staging_dmg"
@@ -1462,7 +1530,7 @@ jobs:
           node scripts/desktop-release-assets.mjs upload-and-publish \
             --environment staging \
             --sha "$RELEASE_SHA" \
-            --version "${{ steps.staging-version.outputs.version }}" \
+            --version="${{ steps.staging-version.outputs.version }}" \
             --dist "apps/desktop/dist"
 
       - name: Package production desktop app
@@ -1535,10 +1603,22 @@ jobs:
             }
           done
           current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
-          [ "$current_main_sha" = "$RELEASE_SHA" ] || {
-            echo "::error::Desktop generation $RELEASE_SHA was superseded by $current_main_sha before publication."
-            exit 1
-          }
+          if [ "$current_main_sha" != "$RELEASE_SHA" ]; then
+            mainline_compare="$(gh api \
+              "repos/${{ github.repository }}/compare/$RELEASE_SHA...$current_main_sha")"
+            jq -e --arg release "$RELEASE_SHA" --arg current "$current_main_sha" '
+              type == "object" and
+              .status == "ahead" and
+              .base_commit.sha == $release and
+              .merge_base_commit.sha == $release and
+              (.ahead_by | type == "number" and . > 0 and floor == .) and
+              (.commits | type == "array" and length > 0 and .[-1].sha == $current) and
+              .behind_by == 0
+            ' >/dev/null <<<"$mainline_compare" || {
+              echo "::error::Desktop generation $RELEASE_SHA is not a trusted ancestor of current main $current_main_sha before publication."
+              exit 1
+            }
+          fi
           node scripts/desktop-release-assets.mjs upload-and-publish \
             --sha "$RELEASE_SHA" \
             --dist "apps/desktop/dist"
@@ -1588,7 +1668,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "22"
+          node-version: "24"
 
       - name: Verify exact published release assets
         id: release-proof
@@ -1608,12 +1688,14 @@ jobs:
           PUBLISHER_ATTEMPT: ${{ needs.build.outputs.publisher_attempt }}
           REPOSITORY: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
+          WORKFLOW_SHA: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
           [[ "$PUBLISHED_SHA" =~ ^[0-9a-f]{40}$ ]] &&
             [[ "$PUBLISHER_ATTEMPT" =~ ^[1-9][0-9]*$ ]] &&
-            [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]] || {
+            [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
+            [[ "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Desktop publisher identity is malformed."
             exit 1
           }
@@ -1623,21 +1705,25 @@ jobs:
             --arg repo "$REPOSITORY" \
             --arg run "$RUN_ID" \
             --arg attempt "$PUBLISHER_ATTEMPT" \
-            --arg sha "$PUBLISHED_SHA" '
+            --arg published_sha "$PUBLISHED_SHA" \
+            --arg workflow_sha "$WORKFLOW_SHA" '
               type == "object" and
               (.id | tostring) == $run and
               (.run_attempt | tostring) == $attempt and
               (.workflow_id | type == "number") and
-              .head_sha == $sha and
+              .head_sha == $workflow_sha and
               .head_branch == "main" and
               .head_repository.full_name == $repo and
               .path == ".github/workflows/desktop-release.yml" and
               (.event == "workflow_run" or .event == "workflow_dispatch") and
-              .display_title == ("Desktop release " + $sha)
+              .display_title == ("Desktop release " + $published_sha)
             ' >/dev/null <<<"$run_record" || {
             echo "::error::Exact desktop publisher run was not proven."
             exit 1
           }
+          # The run name carries the published generation; the run and its
+          # jobs carry main's tip at trigger time, which is often newer.
+          run_head_sha="$(jq -r '.head_sha' <<<"$run_record")"
           workflow_id="$(jq -r '.workflow_id' <<<"$run_record")"
           workflow_record="$(gh api \
             "repos/$REPOSITORY/actions/workflows/$workflow_id")"
@@ -1659,11 +1745,14 @@ jobs:
             echo "::error::GitHub returned malformed desktop publisher jobs."
             exit 1
           }
-          publisher="$(jq -c --arg sha "$PUBLISHED_SHA" '[
+          publisher="$(jq -c \
+            --arg sha "$run_head_sha" \
+            --arg workflow_sha "$WORKFLOW_SHA" '[
             .[].jobs[]?
             | select(
                 .name == "Publish production desktop release" and
                 .head_sha == $sha and
+                .head_sha == $workflow_sha and
                 .status == "completed" and
                 .conclusion == "success" and
                 ([.steps[]? | select(

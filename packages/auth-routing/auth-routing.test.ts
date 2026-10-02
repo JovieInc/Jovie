@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildAuthStartUrl,
+  buildDesktopAuthLoopbackUrl,
   buildElectronAuthCompleteUrl,
   buildIosAuthCompleteUrl,
   buildNativeExchangeCodeRecord,
@@ -11,6 +12,7 @@ import {
   getElectronAuthCompleteProtocolForOrigin,
   isAllowlistedNativeHandbackUrl,
   NATIVE_HANDBACK_BOUNCE_PATHS,
+  parseDesktopLoopbackPortParam,
   resolveAuthCallback,
   sanitizeReturnTo,
   validateNativeExchange,
@@ -294,6 +296,179 @@ describe('auth routing boundary', () => {
     ).toBe(
       `${NATIVE_HANDBACK_BOUNCE_PATHS.electron}?code=electron_code&state=electron_state&desktop_flow=flow_nonce`
     );
+    expect(
+      buildNativeHandbackBouncePath({
+        client: 'electron',
+        code: 'electron_code',
+        state: 'electron_state',
+        desktopFlow: 'flow_nonce',
+        returnCode: 'BCDFGHJK',
+      })
+    ).toBe(
+      `${NATIVE_HANDBACK_BOUNCE_PATHS.electron}?code=electron_code&state=electron_state&desktop_flow=flow_nonce&return_code=BCDFGHJK`
+    );
+    // A return code is only meaningful with a desktop flow to redeem against,
+    // and never leaks onto the iOS bounce.
+    expect(
+      buildNativeHandbackBouncePath({
+        client: 'electron',
+        code: 'electron_code',
+        state: 'electron_state',
+        returnCode: 'BCDFGHJK',
+      })
+    ).not.toContain('return_code');
+    expect(
+      buildNativeHandbackBouncePath({
+        client: 'ios',
+        code: 'ios_code',
+        state: 'ios_state',
+        desktopFlow: 'flow_nonce',
+        returnCode: 'BCDFGHJK',
+      })
+    ).toBe(`${NATIVE_HANDBACK_BOUNCE_PATHS.ios}?code=ios_code&state=ios_state`);
+  });
+
+  it('threads the loopback listener port onto the electron bounce only', () => {
+    expect(
+      buildNativeHandbackBouncePath({
+        client: 'electron',
+        code: 'electron_code',
+        state: 'electron_state',
+        desktopFlow: 'flow_nonce',
+        desktopLoopbackPort: 51234,
+      })
+    ).toBe(
+      `${NATIVE_HANDBACK_BOUNCE_PATHS.electron}?code=electron_code&state=electron_state&desktop_flow=flow_nonce&loopback_port=51234`
+    );
+    // No flow to bind to, and never on the iOS bounce.
+    expect(
+      buildNativeHandbackBouncePath({
+        client: 'electron',
+        code: 'electron_code',
+        state: 'electron_state',
+        desktopLoopbackPort: 51234,
+      })
+    ).not.toContain('loopback_port');
+    expect(
+      buildNativeHandbackBouncePath({
+        client: 'ios',
+        code: 'ios_code',
+        state: 'ios_state',
+        desktopFlow: 'flow_nonce',
+        desktopLoopbackPort: 51234,
+      })
+    ).toBe(`${NATIVE_HANDBACK_BOUNCE_PATHS.ios}?code=ios_code&state=ios_state`);
+  });
+
+  it('accepts only real TCP ports for the loopback listener', () => {
+    expect(parseDesktopLoopbackPortParam('51234')).toBe(51234);
+    expect(parseDesktopLoopbackPortParam('1')).toBe(1);
+    expect(parseDesktopLoopbackPortParam('65535')).toBe(65535);
+    for (const bad of [
+      null,
+      '',
+      '0',
+      '65536',
+      '80.5',
+      '-1',
+      'abc',
+      '51234;rm',
+      ' 51234',
+      '000000',
+    ]) {
+      expect(parseDesktopLoopbackPortParam(bad)).toBeNull();
+    }
+  });
+
+  it('builds a 127.0.0.1 handback URL bound to code, state, and flow', () => {
+    expect(
+      buildDesktopAuthLoopbackUrl({
+        port: 51234,
+        code: 'electron_code',
+        state: 'electron_state',
+        desktopFlow: 'flow_nonce',
+      })
+    ).toBe(
+      'http://127.0.0.1:51234/auth/complete?code=electron_code&state=electron_state&desktop_flow=flow_nonce'
+    );
+  });
+
+  it('only lets Electron flows with a flow nonce record a loopback port', () => {
+    const base = {
+      intent: 'sign_in' as const,
+      state: 'state_123',
+      codeChallenge: 'challenge',
+      desktopFlow: 'flow_nonce_abcdef123456',
+      now: 1_000,
+    };
+    expect(
+      createAuthStateRecord({
+        ...base,
+        client: 'electron',
+        returnTo: '/app',
+        desktopLoopbackPort: 51234,
+      }).desktopLoopbackPort
+    ).toBe(51234);
+    expect(
+      createAuthStateRecord({
+        ...base,
+        client: 'electron',
+        returnTo: '/app',
+        desktopFlow: null,
+        desktopLoopbackPort: 51234,
+      }).desktopLoopbackPort
+    ).toBeUndefined();
+    expect(
+      createAuthStateRecord({
+        ...base,
+        client: 'ios',
+        returnTo: '/app',
+        desktopLoopbackPort: 51234,
+      }).desktopLoopbackPort
+    ).toBeUndefined();
+    expect(
+      createAuthStateRecord({
+        ...base,
+        client: 'electron',
+        returnTo: '/app',
+        desktopLoopbackPort: 70000,
+      }).desktopLoopbackPort
+    ).toBeUndefined();
+  });
+
+  it('only lets Electron flows with a flow nonce opt into return codes', () => {
+    const base = {
+      intent: 'sign_in' as const,
+      state: 'state_123',
+      codeChallenge: 'challenge',
+      now: 1_000,
+    };
+    expect(
+      createAuthStateRecord({
+        ...base,
+        client: 'electron',
+        returnTo: '/app',
+        desktopFlow: 'flow_nonce_abcdef123456',
+        desktopReturnCode: true,
+      }).desktopReturnCode
+    ).toBe(true);
+    expect(
+      createAuthStateRecord({
+        ...base,
+        client: 'electron',
+        returnTo: '/app',
+        desktopReturnCode: true,
+      }).desktopReturnCode
+    ).toBe(false);
+    expect(
+      createAuthStateRecord({
+        ...base,
+        client: 'ios',
+        returnTo: '/app',
+        desktopFlow: 'flow_nonce_abcdef123456',
+        desktopReturnCode: true,
+      }).desktopReturnCode
+    ).toBe(false);
   });
 
   it.each([

@@ -11,8 +11,9 @@ import {
 import { ArrowLeft, Copy, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useCallback, useMemo } from 'react';
+import { type PropsWithChildren, useCallback, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { toast } from '@/components/feedback';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
@@ -27,7 +28,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from '@/components/organisms/Sidebar';
+  useSidebar,
+} from '@/components/organisms/sidebar';
 import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
 import { BASE_URL } from '@/constants/domains';
@@ -54,7 +56,7 @@ import {
   isOperatorNavigationHrefActive,
   OPERATOR_NAV_SECTIONS,
 } from './operator-navigation';
-import { ProfileSwitcher } from './ProfileSwitcher';
+import { IdentitySwitcher } from './ProfileSwitcher';
 import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
 
 export interface UnifiedSidebarProps {
@@ -226,7 +228,7 @@ function SidebarHeaderNav({
   isRouteSidebar,
   isOperatorSection,
   canSwitchWorkspaces,
-  hasMultipleProfiles,
+  hasMultipleIdentities,
   isDemoRoute,
   variant = 'jovie',
   routeBackHref = APP_ROUTES.DASHBOARD,
@@ -235,7 +237,7 @@ function SidebarHeaderNav({
   isRouteSidebar: boolean;
   isOperatorSection: boolean;
   canSwitchWorkspaces: boolean;
-  hasMultipleProfiles: boolean;
+  hasMultipleIdentities: boolean;
   isDemoRoute: boolean;
   variant?: BrandVariant;
   routeBackHref?: string;
@@ -296,12 +298,12 @@ function SidebarHeaderNav({
             />
           );
         }
-        if (hasMultipleProfiles && !isOperatorSection) {
-          return <ProfileSwitcher />;
+        if (hasMultipleIdentities && !isOperatorSection) {
+          return <IdentitySwitcher />;
         }
-        // Clean header: brand logo + wordmark for identity (matches Linear's
-        // workspace pill pattern). User menu lives in the bottom Settings button.
-        // Wordmark and logo variant are driven by the active brand skin.
+        // Clean header: the Jovie mark is the global "Ask Jovie" entry point
+        // (JOV-6569). OV skin keeps its static identity wordmark; user menu
+        // lives in the bottom Settings button.
         return (
           <div
             className={cn(
@@ -309,14 +311,20 @@ function SidebarHeaderNav({
               'group-data-[collapsible=icon]:justify-center'
             )}
           >
-            <BrandLogo
-              size={24}
-              tone='auto'
-              variant={variant}
-              rounded={false}
-              className='rounded-sm shrink-0'
-            />
-            {variant === 'ov' ? <span>{BRAND_WORDMARKS[variant]}</span> : null}
+            {variant === 'ov' ? (
+              <>
+                <BrandLogo
+                  size={24}
+                  tone='auto'
+                  variant={variant}
+                  rounded={false}
+                  className='rounded-sm shrink-0'
+                />
+                <span>{BRAND_WORDMARKS[variant]}</span>
+              </>
+            ) : (
+              <AskJovieMark variant={variant} />
+            )}
           </div>
         );
       })()}
@@ -350,6 +358,18 @@ function OperatorSessionControls() {
   );
 }
 
+/** Bottom-owned shell slot for transient entity cards and status banners. */
+export function SidebarDock({ children }: PropsWithChildren) {
+  return (
+    <div
+      data-sidebar-dock='true'
+      className='flex shrink-0 flex-col gap-1 overflow-visible'
+    >
+      {children}
+    </div>
+  );
+}
+
 /**
  * UnifiedSidebar - Single sidebar component for all post-auth sections
  *
@@ -360,14 +380,15 @@ export function UnifiedSidebar({
   section,
   variant = 'jovie',
 }: UnifiedSidebarProps) {
-  const { creatorProfiles, isAdmin: canSwitchWorkspaces } = useDashboardData();
+  const { identities, isAdmin: canSwitchWorkspaces } = useDashboardData();
   const sidebarOverride = useShellSidebarOverride();
+  const { state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const isDemoRoute = isDemoRoutePath(pathname);
   const isInSettings = section === 'settings';
   const isOperatorSection = section === 'admin' || section === 'ov';
   const isRouteSidebar = isInSettings || sidebarOverride !== null;
-  const hasMultipleProfiles = creatorProfiles.length >= 2;
+  const hasMultipleIdentities = identities.length >= 2;
   // Read the bridge synchronously so the desktop update listener mounts on
   // the first committed sidebar render. Electron emits update events once;
   // waiting for the effect-backed runtime hook would miss a boot-time event.
@@ -378,7 +399,7 @@ export function UnifiedSidebar({
     <Sidebar
       variant='sidebar'
       data-shell-rail-motion='left'
-      collapsible='offcanvas'
+      collapsible='icon'
       className={cn(
         'bg-base',
         '[--sidebar-width:var(--app-shell-sidebar-width)]',
@@ -395,7 +416,7 @@ export function UnifiedSidebar({
         className={cn(
           'relative justify-center gap-0 px-(--space-2-5)',
           isRouteSidebar || isOperatorSection
-            ? 'h-(--app-shell-header-height-compact) py-0.5'
+            ? 'h-(--app-shell-header-height) py-0.5'
             : 'h-16 pl-4 pr-3 pt-5 pb-4'
         )}
       >
@@ -403,7 +424,7 @@ export function UnifiedSidebar({
           isRouteSidebar={isRouteSidebar}
           isOperatorSection={isOperatorSection}
           canSwitchWorkspaces={canSwitchWorkspaces}
-          hasMultipleProfiles={hasMultipleProfiles}
+          hasMultipleIdentities={hasMultipleIdentities}
           isDemoRoute={isDemoRoute}
           variant={variant}
           routeBackHref={sidebarOverride?.backHref}
@@ -438,7 +459,11 @@ export function UnifiedSidebar({
         // (sidebar peer + shell mount both h-full), SidebarContent's flex-1
         // absorbs free space so media and the protected account panel pin bottom.
         <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-(--space-2-5) pb-(--space-3-5)'>
-          <SidebarBottomNowPlayingBridge />
+          <SidebarDock>
+            <SidebarBottomNowPlayingBridge
+              collapsed={sidebarState === 'closed'}
+            />
+          </SidebarDock>
           <SidebarIdentityGroup
             calm={!isRouteSidebar}
             profileHref={profileHref}

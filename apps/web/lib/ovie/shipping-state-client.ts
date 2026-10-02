@@ -1,12 +1,18 @@
 import type { OperationalTruthState } from '@/lib/ovie/program';
 import {
+  type DeliverySummary,
+  emptyDeliverySummary,
   SHIPPING_STATE_FRESHNESS_MS,
   SHIPPING_STATE_SCHEMA,
 } from '@/lib/ovie/shipping-state';
+import { parseDeliverySummary } from '@/lib/ovie/shipping-state/client';
 
 export { SHIPPING_STATE_SCHEMA };
 export const SHIPPING_STATE_FRESHNESS_BUDGET_MS = SHIPPING_STATE_FRESHNESS_MS;
-export const SHIPPING_STATE_POLL_INTERVAL_MS = 4_000;
+/** One interval for the delivery card and operational tasks. Under the 10s freshness budget. */
+export const SHIPPING_STATE_POLL_INTERVAL_MS = 6_000;
+/** Leaves one poll plus one failed read inside the measured 10s M1 budget. */
+export const SHIPPING_STATE_REQUEST_TIMEOUT_MS = 3_000;
 export const SHIPPING_STATE_CLOCK_UNCERTAINTY_MS = 1_000;
 export const SHIPPING_STATE_CACHE_GC_MS = 30_000;
 
@@ -24,6 +30,7 @@ export type ShippingMeaningView = {
 export type ShippingFlag =
   | 'replay'
   | 'duplicate'
+  | 'contradictory'
   | 'sequenceGap'
   | 'partial'
   | 'unsupportedSchema'
@@ -50,6 +57,8 @@ export type ShippingStateView = {
   readonly ciGreen: ShippingMeaningView;
   readonly productionVerified: ShippingMeaningView;
   readonly exactLiveBuild: ShippingMeaningView;
+  /** Per-metric delivery truth; a failed source leaves only its metrics n/a. */
+  readonly delivery: DeliverySummary;
   readonly flags: ReadonlySet<ShippingFlag>;
 };
 export type ShippingStateRead =
@@ -200,6 +209,7 @@ export function createEmptyShippingStateView(): ShippingStateView {
     ciGreen: NONE_MEANING,
     productionVerified: NONE_MEANING,
     exactLiveBuild: NONE_MEANING,
+    delivery: emptyDeliverySummary(),
     flags: new Set(),
   };
 }
@@ -223,6 +233,9 @@ export function parseShippingStateProjection(
   | { readonly ok: true; readonly projection: ShippingStateView }
   | { readonly ok: false; readonly reason: 'unsupported-schema' | 'invalid' } {
   if (!isRecord(payload)) return { ok: false, reason: 'invalid' };
+  if (typeof payload.schema !== 'string') {
+    return { ok: false, reason: 'invalid' };
+  }
   if (payload.schema !== SHIPPING_STATE_SCHEMA) {
     return { ok: false, reason: 'unsupported-schema' };
   }
@@ -271,11 +284,12 @@ export function parseShippingStateProjection(
     lastSuccess: null,
     lastError: lastErrorMessage(payload.lastError),
     queued: nestedCount(payload.sources, 'github-native-merge-queue', 'queued'),
-    inFlight: nestedCount(payload.sources, 'symphony-runtime', 'running'),
+    inFlight: nestedCount(payload.sources, 'lane-pull-requests', 'running'),
     merged: parseMeaning(meanings.merged),
     ciGreen: parseMeaning(meanings.ciGreen),
     productionVerified: parseMeaning(meanings.productionVerified),
     exactLiveBuild: parseMeaning(meanings.exactLiveBuild),
+    delivery: parseDeliverySummary(payload.delivery),
     flags,
   };
   return { ok: true, projection: view };
@@ -308,10 +322,11 @@ export function shippingStateReadFromHttp(
   if (!isRecord(payload)) {
     return { kind: 'unavailable', reason: 'invalid-response' };
   }
-  if (payload.schema === SHIPPING_STATE_SCHEMA) {
-    return { kind: 'projection', payload };
-  }
-  return { kind: 'unavailable', reason: 'invalid-response' };
+  return { kind: 'projection', payload };
+}
+
+function successfulSnapshot(view: ShippingStateView): ShippingStateView {
+  return { ...view, lastSuccess: null };
 }
 
 function retain(
@@ -323,7 +338,11 @@ function retain(
   lastError: string | null = prev.view.lastError
 ): ShippingMachineState {
   const last =
-    prev.view.lastSuccess ?? (prev.view.sourceTime ? prev.view : null);
+    prev.view.lastSuccess ??
+    (prev.view.sourceTime &&
+    (prev.view.truth === 'fresh' || prev.view.truth === 'recovery')
+      ? successfulSnapshot(prev.view)
+      : null);
   const base = last ?? prev.view;
   return {
     ...prev,
@@ -371,6 +390,20 @@ function applyProjection(
   if (
     lastSeq !== null &&
     parsed.sequence === lastSeq &&
+    parsed.projectionId !== prev.lastAppliedProjectionId
+  ) {
+    return retain(
+      prev,
+      'degraded',
+      prev.view.connection,
+      now,
+      ['contradictory'],
+      `Contradictory projection at sequence ${parsed.sequence}`
+    );
+  }
+  if (
+    lastSeq !== null &&
+    parsed.sequence === lastSeq &&
     parsed.projectionId === prev.lastAppliedProjectionId
   ) {
     return retain(prev, prev.view.truth, prev.view.connection, now, [
@@ -402,14 +435,13 @@ function applyProjection(
   const parsedAgeMs = age(parsed.sourceTime, now);
   const lastSuccess =
     resolved === 'fresh'
-      ? {
+      ? successfulSnapshot({
           ...parsed,
           flags,
           truth: resolved,
           connection: 'connected' as const,
           ageMs: parsedAgeMs,
-          lastSuccess: prev.view.lastSuccess,
-        }
+        })
       : prev.view.lastSuccess;
   return {
     lastAppliedSequence: parsed.sequence,
@@ -437,6 +469,16 @@ export function applyShippingStateRead(
 ): ShippingMachineState {
   switch (read.kind) {
     case 'timeout':
+      return retain(
+        prev,
+        'unavailable',
+        prev.view.connection === 'unauthorized'
+          ? 'unauthorized'
+          : 'disconnected',
+        now,
+        [],
+        'Shipping-state request timed out'
+      );
     case 'missing':
       return retain(
         prev,
@@ -444,7 +486,9 @@ export function applyShippingStateRead(
         prev.view.connection === 'unauthorized'
           ? 'unauthorized'
           : 'disconnected',
-        now
+        now,
+        [],
+        'Shipping-state source missing'
       );
     case 'disconnected':
       return retain(prev, 'disconnected', 'disconnected', now);
@@ -464,9 +508,23 @@ export function applyShippingStateRead(
     case 'projection': {
       const parsed = parseShippingStateProjection(read.payload);
       if (!parsed.ok) {
-        return retain(prev, 'unknown', prev.view.connection, now, [
-          'unsupportedSchema',
-        ]);
+        return parsed.reason === 'unsupported-schema'
+          ? retain(
+              prev,
+              'unknown',
+              prev.view.connection,
+              now,
+              ['unsupportedSchema'],
+              'Unsupported shipping-state schema'
+            )
+          : retain(
+              prev,
+              'unknown',
+              prev.view.connection,
+              now,
+              [],
+              'Invalid shipping-state projection'
+            );
       }
       return applyProjection(prev, parsed.projection, now);
     }

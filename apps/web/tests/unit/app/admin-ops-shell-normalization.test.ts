@@ -59,9 +59,9 @@ describe('admin ops shell normalization', () => {
     expect(hud).toContain('<AdminPage');
     expect(hud).not.toContain('StandaloneProductPage');
     expect(hud).toContain("tokenOk ? 'token' : 'shell'");
-    expect(hud).toContain(
-      "density={tokenOk || fullscreen ? 'kiosk' : 'shell'}"
-    );
+    expect(hud).toContain("density={tokenOk ? 'kiosk' : 'shell'}");
+    expect(hud).not.toContain('OvieMacHud');
+    expect(hud).not.toContain("action='exit'");
     expect(ops).toContain('redirect(APP_ROUTES.HUD)');
     expect(ops).not.toContain('<AdminPage');
     const hudShell = readSource(HUD_SHELL_PAGE);

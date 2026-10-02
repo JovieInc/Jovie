@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { OvieMacHud } from '@/components/features/admin/hud/OvieMacHud';
 import type { OvieMacHudSnapshot } from '@/lib/hud/ovie-mac-hud';
 
-vi.mock('@/components/atoms/DesktopTitlebar', () => ({
+vi.mock('@/components/organisms/DesktopTitlebar', () => ({
   DesktopTitlebar: () => <div data-testid='electron-titlebar-row' />,
 }));
 
@@ -13,12 +13,6 @@ vi.mock('@/components/features/admin/hud/OvieLauncherRail', () => ({
 
 vi.mock('@/components/features/admin/hud/OperationalTasksPanel', () => ({
   OperationalTasksPanel: () => <div data-testid='operational-tasks-panel' />,
-}));
-
-vi.mock('@/components/features/admin/hud/SymphonyCodexAccountControl', () => ({
-  SymphonyCodexAccountControl: () => (
-    <div data-testid='ovie-codex-account-control'>Codex Accounts</div>
-  ),
 }));
 
 vi.mock('@/components/features/admin/design-lab', () => ({
@@ -114,9 +108,6 @@ describe('OvieMacHud', () => {
       within(panel).getByRole('link', { name: /#16886/i })
     ).toHaveAttribute('href', 'https://github.com/JovieInc/Jovie/pull/16886');
     expect(screen.getByTestId('ovie-launcher-rail')).toBeInTheDocument();
-    expect(screen.getByTestId('ovie-codex-account-control')).toHaveTextContent(
-      'Codex Accounts'
-    );
     expect(screen.getByTestId('ovie-taste-inbox')).toHaveTextContent(
       'Taste Inbox'
     );

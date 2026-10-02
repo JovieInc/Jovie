@@ -13,7 +13,31 @@
       "--model",
       "swe-2-medium",
       "--permission-mode",
-      "dangerous"
+      "dangerous",
+      "--respect-workspace-trust",
+      "false"
+    ]
+  },
+  "codex": {
+    "label": "codex",
+    "model": "codex-default",
+    "accountClass": "chatgpt-oauth",
+    "reasoningEffort": "xhigh",
+    "slots": 3,
+    "health": ["python3", "{here}/codex_lane.py", "health"],
+    "healthy": "available: [1-9]",
+    "cmd": [
+      "python3",
+      "{here}/codex_lane.py",
+      "run",
+      "--reasoning-effort",
+      "xhigh",
+      "--prompt-file",
+      "{prompt_file}",
+      "--receipt-file",
+      "{provider_receipt}",
+      "--cwd",
+      "{cwd}"
     ]
   },
   "claude": {
@@ -29,7 +53,8 @@
       "sonnet",
       "--dangerously-skip-permissions",
       "{prompt}"
-    ]
+    ],
+    "enabled": false
   },
   "hyperagent": {
     "label": "hyperagent",
@@ -37,6 +62,7 @@
     "slots": 2,
     "health": ["hyperagent", "models", "--json"],
     "healthy": "glm-5\\.3",
-    "cmd": ["hyperagent", "--model", "z-ai/glm-5.3", "-p", "{prompt}"]
+    "cmd": ["hyperagent", "--model", "z-ai/glm-5.3", "-p", "{prompt}"],
+    "enabled": false
   }
 }

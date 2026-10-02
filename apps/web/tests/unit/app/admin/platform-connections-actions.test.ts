@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   getCachedAuthMock: vi.fn(),
+  privacyGuardMock: vi.fn(),
   checkAdminRoleMock: vi.fn(),
   selectLimitMock: vi.fn(),
   selectWhereMock: vi.fn(),
@@ -27,6 +28,10 @@ const hoisted = vi.hoisted(() => ({
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: hoisted.getCachedAuthMock,
+}));
+
+vi.mock('@/lib/ovie/privacy-lock/server', () => ({
+  assertOviePrivacyUnlocked: hoisted.privacyGuardMock,
 }));
 
 vi.mock('@/lib/admin/roles', () => ({
@@ -86,7 +91,11 @@ describe('admin platform-connections actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Session userId is the app users.id UUID post-cutover (JOV-4228).
-    hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'db-admin-1' });
+    hoisted.getCachedAuthMock.mockResolvedValue({
+      userId: 'db-admin-1',
+      sessionId: 'session-admin-1',
+    });
+    hoisted.privacyGuardMock.mockResolvedValue(undefined);
     hoisted.checkAdminRoleMock.mockResolvedValue(true);
     mockSelectChain([{ id: 'db-admin-1' }]);
     mockInsertChain();
@@ -111,6 +120,13 @@ describe('admin platform-connections actions', () => {
     });
 
     expect(result.success).toBe(true);
+    expect(hoisted.getCachedAuthMock).toHaveBeenCalledWith({
+      session: 'fresh',
+    });
+    expect(hoisted.privacyGuardMock).toHaveBeenCalled();
+    expect(hoisted.privacyGuardMock.mock.invocationCallOrder[0]).toBeLessThan(
+      hoisted.setPlaylistEngineSettingsMock.mock.invocationCallOrder[0]
+    );
     // The audit-log user lookup must target users.id with the session UUID.
     expect(hoisted.eqMock).toHaveBeenCalledWith('users.id', 'db-admin-1');
     expect(hoisted.eqMock).not.toHaveBeenCalledWith(
@@ -192,7 +208,50 @@ describe('admin platform-connections actions', () => {
 
     const result = await generateTestPlaylist();
 
-    expect(result.success).toBe(false);
+    expect(result).toEqual({
+      success: false,
+      message: 'Spotify publisher is not healthy.',
+    });
+    expect(hoisted.getPlaylistSpotifyStatusMock).toHaveBeenCalled();
     expect(hoisted.generatePlaylistMock).not.toHaveBeenCalled();
   });
+});
+
+// Real actions must stop at the privacy boundary before third-party settings,
+// pipeline dispatch, audit reads/writes, or route revalidation.
+describe('platform-connections private action failures', () => {
+  it.each(['locked', 'privacy storage unavailable'])(
+    '%s blocks every action',
+    async message => {
+      vi.clearAllMocks();
+      hoisted.getCachedAuthMock.mockResolvedValue({
+        userId: 'db-admin-1',
+        sessionId: 'session-admin-1',
+      });
+      hoisted.checkAdminRoleMock.mockResolvedValue(true);
+      hoisted.privacyGuardMock.mockRejectedValue(Error(message));
+      const actions = await import(
+        '@/app/app/(shell)/admin/platform-connections/actions'
+      );
+      const results = await Promise.all([
+        actions.updatePlaylistEngineSettings({
+          enabled: true,
+          intervalValue: 3,
+          intervalUnit: 'days',
+        }),
+        actions.setCurrentAdminAsPlaylistSpotifyPublisher(),
+        actions.generateTestPlaylist(),
+      ]);
+      expect(results).toEqual(
+        Array.from({ length: 3 }, () => ({ success: false, message }))
+      );
+      expect(hoisted.setPlaylistEngineSettingsMock).not.toHaveBeenCalled();
+      expect(hoisted.setPlaylistSpotifyClerkUserIdMock).not.toHaveBeenCalled();
+      expect(hoisted.getPlaylistSpotifyStatusMock).not.toHaveBeenCalled();
+      expect(hoisted.generatePlaylistMock).not.toHaveBeenCalled();
+      expect(hoisted.dbSelectMock).not.toHaveBeenCalled();
+      expect(hoisted.dbInsertMock).not.toHaveBeenCalled();
+      expect(hoisted.revalidatePathMock).not.toHaveBeenCalled();
+    }
+  );
 });

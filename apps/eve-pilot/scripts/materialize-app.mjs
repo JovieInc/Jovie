@@ -13,6 +13,7 @@ const common = [
   '.gitignore',
   'agent/channels/photon.ts',
   'agent/lib/imessage-allowlist.ts',
+  'agent/lib/context-budget.ts',
   'agent/lib/runtime-commissioning-health.ts',
   'tests/runtime-commissioning-health.test.ts',
 ];
@@ -76,13 +77,13 @@ const jovie = [
   'tests/eve-channel-auth-contract.test.ts',
   'tests/jovie_capability_manifest.test.ts',
 ];
+// Eve 0.66 retired the default `ask_question` and `todo` tools; an orphan
+// disableTool stub for either fails discovery, so they are not listed here.
 export const disabledTools = [
   'agent',
-  'ask_question',
   'bash',
   'read_file',
   'write_file',
-  'todo',
   'web_fetch',
   'web_search',
   'load_skill',
@@ -124,8 +125,12 @@ export function materializeApp(identity, destination, source = pilot) {
     'agent/agent.ts',
     `import { defineAgent } from 'eve';
 import { assertRuntimeEnvironment } from './lib/application-boundary';
+import { EVE_PILOT_COMPACTION_THRESHOLD_PERCENT } from './lib/context-budget';
 assertRuntimeEnvironment();
-export default defineAgent({ model: 'zai/glm-5.3-flash' });\n`
+export default defineAgent({
+  model: 'zai/glm-5.3-flash',
+  compaction: { thresholdPercent: EVE_PILOT_COMPACTION_THRESHOLD_PERCENT },
+});\n`
   );
   // Health status comes from a verified signed receipt, never a hardcoded
   // commissioned literal. Isolated built proof stays uncommissioned.
@@ -171,6 +176,15 @@ export default defineChannel({ routes: [GET('/runtime/v1/health', async () => {
     "import { disableRoute } from 'eve/channels';\nexport default disableRoute();\n"
   );
   if (identity === 'summer') {
+    put(
+      'agent/lib/summer-bottleneck-loop.ts',
+      files
+        .get('agent/lib/summer-bottleneck-loop.ts')
+        .replace(
+          '../../../../packages/agent-transport-contracts/prediction-receipt',
+          '../../vendor/agent-transport-contracts/prediction-receipt.js'
+        )
+    );
     put(
       'agent/channels/eve.ts',
       "import { disableRoute } from 'eve/channels';\nexport default disableRoute();\n"
@@ -276,10 +290,20 @@ The source export is preparatory; deployment and commissioning require separate 
           '../vendor/agent-transport-contracts/index'
         )
     );
-    for (const path of ['index.ts', 'symphony-outage.ts', 'package.json']) {
+    for (const path of [
+      'index.ts',
+      'prediction-outcome.ts',
+      'prediction-receipt.ts',
+      'symphony-outage.ts',
+      'package.json',
+    ]) {
       let contents = readFileSync(
         resolve(pilot, '../../packages/agent-transport-contracts', path),
         'utf8'
+      );
+      contents = contents.replaceAll(
+        "from './prediction-receipt';",
+        "from './prediction-receipt.js';"
       );
       if (
         path === 'index.ts' &&
@@ -306,6 +330,8 @@ The source export is preparatory; deployment and commissioning require separate 
     'scripts/templates/application-boundary.ts',
     'scripts/templates/application-boundary.test.ts',
     '../../packages/agent-transport-contracts/index.ts',
+    '../../packages/agent-transport-contracts/prediction-outcome.ts',
+    '../../packages/agent-transport-contracts/prediction-receipt.ts',
     '../../packages/agent-transport-contracts/symphony-outage.ts',
     '../../packages/agent-transport-contracts/package.json',
   ];
@@ -339,7 +365,7 @@ The source export is preparatory; deployment and commissioning require separate 
     ),
     contracts: {
       shadow: 'jovie.ovie-summer-shadow.event/v1',
-      commercial: 'jovie.summer-commercial.snapshot/v1',
+      commercial: 'jovie.summer-commercial.snapshot/v2',
     },
     status: 'prepared-not-commissioned',
   };

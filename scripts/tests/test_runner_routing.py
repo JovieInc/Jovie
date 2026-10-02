@@ -145,6 +145,7 @@ def _run_query(
     expected_sha: str = "",
     github_actions_context: bool = False,
     invocation_marker: Optional[Path] = None,
+    workflow: str = "runner-heartbeat.yml",
 ) -> tuple[subprocess.CompletedProcess[str], dict[str, str]]:
     tmp_path.mkdir(parents=True, exist_ok=True)
     fake_gh = _fake_gh(tmp_path)
@@ -164,6 +165,7 @@ def _run_query(
             "GITHUB_OUTPUT": str(output),
             "HEARTBEAT_GH_TEST_HELPER": str(fake_gh),
             "HEARTBEAT_GH_TEST_MODE": "1",
+            "HEARTBEAT_WORKFLOW": workflow,
             "HEARTBEAT_MAX_AGE_SECONDS": "900",
             "HEARTBEAT_API_TIMEOUT_SECONDS": timeout_seconds,
             "HEARTBEAT_EXPECTED_EVENT": expected_event,
@@ -728,14 +730,16 @@ def test_ci_route_is_trusted_secretless_bounded_and_nonblocking() -> None:
     assert 'head_repository.full_name == $repo' in query
     assert '.[0].run_id == $run_id' in query
     assert '.[0].head_sha == $head_sha' in query
-    assert 'index("jovie-runner") != null' in query
+    assert 'index($runner_label) != null' in query
+    assert 'HEARTBEAT_RUNNER_LABEL="jovie-runner"' in query
+    assert 'HEARTBEAT_RUNNER_LABEL="jovie-mac"' in query
     assert 'jobs_endpoint="repos/$GH_REPO/actions/runs/$run_id/attempts/$run_attempt/jobs?per_page=100"' in query
     assert '.[0].run_attempt == $run_attempt' in query
     assert "HEARTBEAT_JOB_POLL_ATTEMPTS" in query
     assert 'degrade pending "current exact heartbeat' in query
     assert "for ((attempt = 1; attempt <= POLL_ATTEMPTS; attempt++))" in awaiter
     assert 'if [[ "$probe_state" != "pending" ]]' in awaiter
-    assert "needs: [ci-path-changes, ci-merge-group-admission]" in units
+    assert "needs: [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]" in units
     assert "ci-unit-runner-route" not in units
     assert "runs-on: ubuntu-latest" in units
     assert "runs-on: jovie-runner" not in units
@@ -797,3 +801,50 @@ def test_legacy_variable_mutators_are_removed_and_query_is_executable() -> None:
     assert not (_REPO_ROOT / ".github/scripts/update-runner-routing.sh").exists()
     assert not (_REPO_ROOT / ".github/scripts/reconcile-runner-routing.sh").exists()
     assert os.access(_QUERY_SCRIPT, os.X_OK)
+
+
+_MAC_RUN = {
+    "name": "Mac Runner Heartbeat",
+    "path": ".github/workflows/mac-runner-heartbeat.yml",
+}
+_MAC_JOB = {
+    "name": "Self-hosted Mac runner heartbeat",
+    "runner_name": "tims-macbook-air",
+    "labels": ["self-hosted", "macOS", "ARM64", "jovie-mac"],
+}
+
+
+def test_mac_heartbeat_identity_is_healthy(tmp_path: Path) -> None:
+    runs_json, jobs_json = _exact_evidence(run_updates=_MAC_RUN, job_updates=_MAC_JOB)
+    result, outputs = _run_query(
+        tmp_path,
+        runs_json=runs_json,
+        jobs_json=jobs_json,
+        workflow="mac-runner-heartbeat.yml",
+    )
+    assert result.returncode == 0, result.stderr
+    assert outputs["health"] == "up"
+    assert outputs["probe_state"] == "healthy"
+
+
+def test_pool_heartbeats_cannot_attest_for_each_other(tmp_path: Path) -> None:
+    # Linux heartbeat evidence must never route work to the Mac pool.
+    result, outputs = _run_query(tmp_path / "linux-as-mac", workflow="mac-runner-heartbeat.yml")
+    assert result.returncode == 0, result.stderr
+    assert outputs["health"] == "down"
+
+    # A Mac runner reusing the Linux job identity still lacks the Linux label.
+    runs_json, jobs_json = _exact_evidence(
+        job_updates={**_MAC_JOB, "name": "Self-hosted runner heartbeat"}
+    )
+    result, outputs = _run_query(tmp_path / "mac-as-linux", runs_json=runs_json, jobs_json=jobs_json)
+    assert result.returncode == 0, result.stderr
+    assert outputs["health"] == "down"
+    assert outputs["probe_state"] == "uncertain"
+
+
+def test_unknown_heartbeat_workflow_is_not_authorized(tmp_path: Path) -> None:
+    result, outputs = _run_query(tmp_path, workflow="other-heartbeat.yml")
+    assert result.returncode == 0, result.stderr
+    assert outputs["health"] == "down"
+    assert outputs["evidence"] == "heartbeat workflow identity is not authorized"

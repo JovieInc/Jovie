@@ -38,6 +38,14 @@ vi.mock('@/lib/rate-limit', () => ({
   },
 }));
 
+vi.mock('@/lib/db', () => ({
+  db: {
+    select: () => ({
+      from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
+    }),
+  },
+}));
+
 vi.mock('@/lib/services/profile', () => ({
   getProfileByUsername: hoisted.getProfileByUsername,
 }));
@@ -125,7 +133,9 @@ describe('GET /api/v1/[username]', () => {
     expect(res.headers.get('X-RateLimit-Limit')).toBe('100');
     expect(res.headers.get('X-RateLimit-Remaining')).toBe('99');
     expect(res.headers.get('Retry-After')).toBeNull();
-    expect((await res.json()).artist.username).toBe('realartist');
+    const body = await res.json();
+    expect(body.artist.username).toBe('realartist');
+    expect(body._links.rider).toBeUndefined();
   });
 
   it('hides a private profile the same way as a missing one', async () => {

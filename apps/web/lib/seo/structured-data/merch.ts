@@ -13,12 +13,15 @@ export interface MerchStructuredDataInput {
   readonly handle: string;
   readonly cardId: string;
   readonly retailPriceCents: number;
+  /** Current stock observation; publication or price alone is not evidence. */
+  readonly availability?: 'InStock' | 'OutOfStock' | null;
   readonly aggregateRating?: MerchAggregateRatingInput | null;
 }
 
 /**
  * Generate Product JSON-LD for merch pages.
- * AggregateRating is included only when verified review data is supplied.
+ * Availability and AggregateRating are included only when supplied by their
+ * evidence-owning callers. Unknown stock is omitted rather than invented.
  */
 export function generateMerchStructuredData(
   input: MerchStructuredDataInput
@@ -28,6 +31,8 @@ export function generateMerchStructuredData(
   const product: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'Product',
+    sku: input.cardId,
+    url: productUrl,
     name: input.title,
     description: input.description,
     ...(input.imageUrl ? { image: [input.imageUrl] } : {}),
@@ -39,7 +44,9 @@ export function generateMerchStructuredData(
       '@type': 'Offer',
       priceCurrency: 'USD',
       price: (input.retailPriceCents / 100).toFixed(2),
-      availability: 'https://schema.org/InStock',
+      ...(input.availability
+        ? { availability: `https://schema.org/${input.availability}` }
+        : {}),
       url: productUrl,
     },
   };
