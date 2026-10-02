@@ -102,6 +102,30 @@ describe('NavMenuItem', () => {
     expect(row.className).toContain('grid-cols-(--app-shell-sidebar-nav-grid)');
   });
 
+  it('acknowledges a pending destination without changing row geometry', () => {
+    render(
+      <NavMenuItem
+        calm
+        item={{
+          id: 'library',
+          name: 'Library',
+          href: '/app/library',
+          icon: Music,
+        }}
+        isActive={false}
+        pending
+      />
+    );
+
+    const row = screen.getByRole('link', { name: 'Library' });
+    expect(row).toHaveAttribute('aria-busy', 'true');
+    expect(row).toHaveAttribute('data-navigation-item-id', 'library');
+    expect(row).toHaveAttribute('data-navigation-pending', 'true');
+    expect(row.className).toContain('bg-sidebar-accent-active');
+    expect(row.className).toContain('h-7');
+    expect(row.className).toContain('grid-cols-(--app-shell-sidebar-nav-grid)');
+  });
+
   it('imports sidebar chrome from the modular sidebar specifier', () => {
     const source = readWebSource(
       'components/features/dashboard/dashboard-nav/NavMenuItem.tsx'

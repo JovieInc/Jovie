@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  mockUsePathname,
   renderDashboardNav,
   resetDashboardNavTestMocks,
 } from '@/tests/utils/dashboard-nav-test-support';
@@ -70,6 +71,66 @@ describe('DashboardNav route warming', () => {
       expect(
         screen.queryByRole('link', { name: label })
       ).not.toBeInTheDocument();
+    }
+  });
+
+  it('acknowledges New Chat immediately while retaining authenticated content', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
+    renderDashboardNav({
+      renderFn: render,
+      children: (
+        <main data-testid='authenticated-route-content'>Current route</main>
+      ),
+    });
+
+    const newChat = screen.getByRole('link', { name: 'New Chat' });
+    newChat.addEventListener('click', event => event.preventDefault());
+    fireEvent.click(newChat);
+
+    expect(newChat).toHaveAttribute('aria-busy', 'true');
+    expect(newChat).toHaveAttribute('data-navigation-item-id', 'chat');
+    expect(newChat).toHaveAttribute('data-navigation-pending', 'true');
+    expect(newChat).toHaveClass('size-6', 'rounded-full', 'opacity-70');
+    expect(screen.getByTestId('authenticated-route-content')).toHaveTextContent(
+      'Current route'
+    );
+  });
+
+  it('acknowledges a sidebar destination on click without changing row geometry', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
+    renderDashboardNav({ renderFn: render });
+
+    const work = screen.getByRole('link', { name: 'Work' });
+    work.addEventListener('click', event => event.preventDefault());
+    fireEvent.click(work);
+
+    expect(work).toHaveAttribute('aria-busy', 'true');
+    expect(work).toHaveAttribute('data-navigation-item-id', 'library');
+    expect(work).toHaveAttribute('data-navigation-pending', 'true');
+    expect(work.className).toContain('bg-sidebar-accent-active');
+  });
+
+  it('recovers the pending acknowledgment after a failed no-URL transition', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
+    renderDashboardNav({ renderFn: render });
+
+    const work = screen.getByRole('link', { name: 'Work' });
+    work.addEventListener('click', event => event.preventDefault());
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(work);
+      expect(work).toHaveAttribute('data-navigation-pending', 'true');
+
+      // The URL never commits (the transition failed or was aborted), so the
+      // acknowledgment must recover on the navigation drop-off window.
+      act(() => {
+        vi.advanceTimersByTime(10_000);
+      });
+      expect(work).not.toHaveAttribute('data-navigation-pending');
+      expect(work).not.toHaveAttribute('aria-busy');
+    } finally {
+      vi.useRealTimers();
     }
   });
 
