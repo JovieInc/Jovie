@@ -1,6 +1,14 @@
 'use client';
 
-import { Badge, Button } from '@jovie/ui';
+import {
+  Badge,
+  Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAdminPeopleRightPanel } from '@/components/features/admin/AdminPeopleRightPanelProvider';
@@ -10,7 +18,7 @@ import {
   EntityHeader,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
-import { AdminTableHeader } from '@/features/admin/table/AdminTableHeader';
+import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/features/admin/table/useAdminTableKeyboardNavigation';
 import type {
@@ -497,6 +505,7 @@ export function AdminContactsTable({
   search,
   metrics,
 }: Readonly<AdminContactsTableProps>) {
+  const router = useRouter();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = useMemo(
     () => rows.find(row => row.dedupeKey === selectedId) ?? null,
@@ -547,7 +556,7 @@ export function AdminContactsTable({
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const from = rows.length === 0 ? 0 : (page - 1) * pageSize + 1;
-  const to = (page - 1) * pageSize + rows.length;
+  const to = rows.length === 0 ? 0 : (page - 1) * pageSize + rows.length;
 
   return (
     <AdminTableShell
@@ -555,38 +564,32 @@ export function AdminContactsTable({
       className='rounded-none border-0'
       scrollContainerProps={{ tabIndex: 0, onKeyDown: handleKeyDown }}
       toolbar={
-        <>
-          <AdminTableHeader
-            title='Customers'
-            subtitle='One canonical record per person across waitlist, leads, profiles, and users.'
-          />
-          <div className='flex flex-wrap items-center gap-2 border-b border-(--app-shell-frame-seam) bg-surface-1 px-app-header py-2'>
-            <a
-              href={stageHref(null)}
-              className={cn(
-                'rounded-full px-2 py-1 text-xs',
-                stage == null
-                  ? 'bg-surface-3 font-medium text-primary-token'
-                  : 'text-secondary-token hover:text-primary-token'
-              )}
-            >
-              All ({metrics.total})
-            </a>
-            {CONTACT_LIFECYCLE_STAGES.map(value => (
-              <a
-                key={value}
-                href={stageHref(value)}
-                className={cn(
-                  'rounded-full px-2 py-1 text-xs',
-                  stage === value
-                    ? 'bg-surface-3 font-medium text-primary-token'
-                    : 'text-secondary-token hover:text-primary-token'
-                )}
-                data-testid={`contacts-stage-filter-${value}`}
+        <AdminTableSubheader
+          start={
+            <div className='w-56 shrink-0'>
+              <Select
+                value={stage ?? 'all'}
+                onValueChange={value =>
+                  router.push(stageHref(value === 'all' ? null : value))
+                }
               >
-                {getContactLifecycleStageLabel(value)} ({metrics[value]})
-              </a>
-            ))}
+                <SelectTrigger aria-label='Filter By Lifecycle Stage'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='all'>
+                    All stages ({metrics.total})
+                  </SelectItem>
+                  {CONTACT_LIFECYCLE_STAGES.map(value => (
+                    <SelectItem key={value} value={value}>
+                      {getContactLifecycleStageLabel(value)} ({metrics[value]})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          }
+          end={
             <form
               method='GET'
               action=''
@@ -605,8 +608,8 @@ export function AdminContactsTable({
                 className='h-7 w-48 rounded-md border border-strong bg-surface-0 px-2 text-xs text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
               />
             </form>
-          </div>
-        </>
+          }
+        />
       }
       footer={
         <div className='flex items-center justify-between px-app-header py-2 text-xs text-secondary-token'>

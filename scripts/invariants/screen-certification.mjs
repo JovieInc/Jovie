@@ -266,6 +266,7 @@ web.youtube-channel-pilot|web|screen.youtube.channel-pilot|apps/web/app/app/(she
 web.shipping-statistics|web|shipping-statistics|apps/web/app/app/(shell)/admin/shipping/page.tsx|desktop,mobile
 web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx,apps/web/app/(dynamic)/start/layout.tsx|desktop,mobile
 web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
+web.chat|web|screen.chat|apps/web/app/app/(shell)/chat/page.tsx|desktop,mobile
 web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
 web.settings-billing|web|screen.settings.billing|apps/web/app/app/(shell)/settings/billing/page.tsx|desktop,mobile
 web.settings-connectors|web|settings-connectors|apps/web/app/app/(shell)/settings/connectors/|desktop,mobile

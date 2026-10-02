@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildDogfoodReceipt,
   DOGFOOD_RECEIPT_NO_RETENTION,
+  type DogfoodCommandRun,
   type DogfoodDriver,
   type DogfoodMissionContext,
   type DogfoodReceipt,
@@ -107,31 +108,53 @@ describe('dogfoodReceiptFromPlaywrightReport', () => {
 });
 
 describe('dogfoodReceiptFromCommandRun', () => {
-  const run = {
-    command: 'jovie artist get tim',
+  const run = (exitCode: number | null = 0): DogfoodCommandRun => ({
     completedAt: COMPLETED,
-    exitCode: 0,
+    invocation: {
+      caller: { id: 'codex', model: 'gpt-5', runtime: 'cli', host: 'linux' },
+      capability: {
+        id: '@jovie/cli',
+        version: '26.10.0',
+        revision: COMMIT_SHA,
+      },
+      command: {
+        surface: 'artist.get',
+        redactedArgv: ['jovie', 'artist', 'get', 'tim'],
+      },
+      intendedTask: 'read Tim’s profile',
+      expectedResult: 'canonical Tim profile',
+      actualResult: exitCode === 0 ? 'canonical Tim profile' : 'request failed',
+      executionStatus: exitCode === 0 ? 'completed' : 'failed',
+      exitCode,
+      attempt: 1,
+      workaroundUsed: false,
+      bypassUsed: false,
+      canonicalComparison: {
+        status: 'matched',
+        sourceRef: 'jov.ie/tim',
+        discrepancy: null,
+      },
+      defectFingerprint: exitCode === 0 ? null : 'f'.repeat(64),
+      repair: null,
+    },
     startedAt: STARTED,
-  };
+  });
 
   it('maps a successful read-only CLI call to agent_on_behalf', () => {
-    const result = dogfoodReceiptFromCommandRun(CONTEXT, 'cli', run);
+    const result = dogfoodReceiptFromCommandRun(CONTEXT, 'cli', run());
     expect(result.kind).toBe('agent_on_behalf');
     expect(result.driver).toBe('cli');
     expect(result.outcome).toBe('passed');
+    expect(result.invocation?.latencyMs).toBe(60_000);
   });
 
   it('maps a nonzero exit to failed and a missing exit to blocked', () => {
-    expect(
-      dogfoodReceiptFromCommandRun(CONTEXT, 'mcp', { ...run, exitCode: 2 })
-        .outcome
-    ).toBe('failed');
-    const blocked = dogfoodReceiptFromCommandRun(CONTEXT, 'mcp', {
-      ...run,
-      exitCode: null,
-    });
+    expect(dogfoodReceiptFromCommandRun(CONTEXT, 'mcp', run(2)).outcome).toBe(
+      'failed'
+    );
+    const blocked = dogfoodReceiptFromCommandRun(CONTEXT, 'mcp', run(null));
     expect(blocked.outcome).toBe('blocked');
-    expect(blocked.blocker).toContain(run.command);
+    expect(blocked.blocker).toContain('jovie artist get tim');
   });
 });
 

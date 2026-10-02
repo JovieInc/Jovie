@@ -25,10 +25,7 @@ import {
 } from '@/components/organisms/table';
 import { getProfileUrl } from '@/constants/domains';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
-import {
-  AdminTableHeader,
-  AdminTableSubheader,
-} from '@/features/admin/table/AdminTableHeader';
+import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/features/admin/table/useAdminTableKeyboardNavigation';
 import { useCreatorActions } from '@/features/admin/useCreatorActions';
@@ -482,11 +479,8 @@ export function AdminCreatorProfilesUnified({
                 onClearSelection={handleClearSelection}
                 actions={bulkActions}
               />
-              <AdminTableHeader
-                title='Creators'
-                subtitle='Manage creator profiles, verification, and feature status.'
-              />
               <AdminTableSubheader
+                inert={selectedCount > 0}
                 start={
                   <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
                     Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
