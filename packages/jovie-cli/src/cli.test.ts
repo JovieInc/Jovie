@@ -44,6 +44,7 @@ describe('jovie CLI', () => {
     expect(result).toBe(0);
     expect(stdout.read()).toContain('artist get <username>');
     expect(stdout.read()).toContain('profile create <url>');
+    expect(stdout.read()).toContain('link create <query>');
     expect(stdout.read()).toContain(
       'No login or API key is needed for public commands.'
     );
@@ -373,6 +374,7 @@ describe('jovie CLI', () => {
       (tool: { name: string }) => tool.name
     );
     expect(tools).toContain('create_profile');
+    expect(tools).toContain('create_link');
   });
 
   it('installs the skill with init and rejects a bad MCP base URL', async () => {

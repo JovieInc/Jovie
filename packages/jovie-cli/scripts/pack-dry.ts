@@ -363,6 +363,7 @@ async function main(): Promise<void> {
       'api openapi',
       'docs llms',
       'profile create <url>',
+      'link create <query>',
       'mcp',
       'init',
     ]) {

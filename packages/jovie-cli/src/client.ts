@@ -342,6 +342,32 @@ export function createProfile(
   return requestJson('/api/agents/profiles', options, { url: url.toString() });
 }
 
+/**
+ * Make one public Jovie link. The same query returns the existing link.
+ * Writes are not retried. The link stays unclaimed.
+ */
+export function createLink(
+  query: string,
+  options: ResourceOptions & { readonly kind?: string } = {}
+): Promise<unknown> {
+  const trimmed = query.trim();
+  if (!trimmed || trimmed.length > 300) {
+    throw new JovieInputError('Query must be 1 to 300 characters.');
+  }
+  const kind = options.kind?.trim();
+  if (kind && kind !== 'track' && kind !== 'artist') {
+    throw new JovieInputError('kind must be track or artist.');
+  }
+  const { kind: _ignoredKind, ...rest } = options;
+  return requestJson(
+    '/api/links',
+    rest,
+    kind === 'track' || kind === 'artist'
+      ? { query: trimmed, kind }
+      : { query: trimmed }
+  );
+}
+
 export type ReportKind = 'bug' | 'feedback';
 
 /** Safe execution context only; never env, credentials, or file contents. */

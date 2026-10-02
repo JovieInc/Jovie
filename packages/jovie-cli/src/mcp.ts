@@ -66,7 +66,8 @@ function toolDefinition(command: CommandSpec) {
       idempotentHint:
         command.readOnly ||
         command.internal === true ||
-        command.tool === 'create_profile',
+        command.tool === 'create_profile' ||
+        command.tool === 'create_link',
       openWorldHint: true,
     },
   };

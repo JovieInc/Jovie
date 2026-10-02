@@ -29,6 +29,19 @@ Returns:
 - \`claimUrl: null\` means the artist already owns the profile.
 - Only Spotify artist URLs work. Find one by searching Spotify for the artist.
 
+## Make a Jovie link
+
+\`\`\`sh
+npx -y @jovie/cli link create "<streaming URL, ISRC, or name>" --json
+\`\`\`
+
+Returns \`shortUrl\` when the link is created or already exists. A name can
+return \`needs_choice\`: ask the person to pick a candidate, then call again
+with that URL. The link stays unclaimed. Give \`claimUrl\` only to the artist.
+\`RATE_LIMITED\`, \`LIMIT_REACHED\`, and \`FEATURE_DISABLED\` are honest stops.
+Do not quote a price. If this installed CLI does not have \`link create\`,
+POST \`{"query":"..."}\` to \`https://jov.ie/api/links\`.
+
 ## Look up an artist
 
 \`\`\`sh
@@ -60,6 +73,6 @@ in a report. The CLI only attaches its version, platform, and runtime.
 ## MCP
 
 The same tools are available as an MCP server: \`npx -y @jovie/cli mcp\`
-(stdio). Tools: create_profile, get_artist, get_artist_guide, get_openapi,
-get_docs, report_issue, report_feedback.
+(stdio). Tools: create_profile, create_link, get_artist, get_artist_guide,
+get_openapi, get_docs, report_issue, report_feedback.
 `;
