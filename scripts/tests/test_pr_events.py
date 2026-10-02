@@ -842,31 +842,35 @@ class RunnerHookTest(unittest.TestCase):
             record = json.loads((host.state / "held.json").read_text())["9"]
             self.assertEqual((record["reason"], record["next_action"]), ("diff-too-large", "bug-intake"))
 
-    def test_an_exhausted_orphan_is_escalated_then_returned_to_the_pool(self):
-        stuck = pr(number=7, branch="claude/jov-9-20260926t0100", merge="DIRTY", title="orphan")
-        calls = []
-        saved = (runner.sh, runner.load_providers, events.return_to_pool)
+    def test_exhausted_disabled_lane_preserves_pr_and_terminal_backlog_disposition(self):
+        stuck = pr(number=7, branch="claude/jov-9-20260926t0100", sha="h1", merge="DIRTY")
+        calls, moves, comments = [], [], []
+        saved = (runner.sh, runner.load_providers)
         runner.sh = lambda args, **k: calls.append(args) or SimpleNamespace(returncode=0, stderr="", stdout="")
         runner.load_providers = lambda: PROVIDERS
-        returned = []
-        events.return_to_pool = lambda lane, linear, pr, why: returned.append(pr["number"])
-        triaged = []
-        linear = SimpleNamespace(create_triage=lambda title, body, dedupe=None: triaged.append(body))
+        linear = SimpleNamespace(
+            gql=lambda *a: {"issues": {"nodes": [{"id": "iss", "state": {"type": "started"},
+                                                  "comments": {"nodes": []}}]}},
+            move=lambda issue, state: moves.append((issue, state)),
+            comment=lambda issue, body: comments.append(body))
         try:
             with tempfile.TemporaryDirectory() as tmp:
                 host = runner.Host(state=Path(tmp))
-                # `pushed` marks a head the fix loop may have produced itself: still terminal.
                 (host.state / "fix-attempts.json").write_text(json.dumps(
                     {"7": {"sha": "h0", "count": 2, "pushed": True}}))
                 runner.escalate_exhausted(host, [stuck], linear)
                 held = json.loads((host.state / "held.json").read_text())["7"]
+                runner.escalate_exhausted(host, [stuck], linear)
         finally:
-            runner.sh, runner.load_providers, events.return_to_pool = saved
-        self.assertEqual(returned, [7])
-        self.assertIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/issues/7/labels", "-f",
-                       "labels[]=lane-fix-exhausted"], calls, "held with a reason, visible on the PR")
-        self.assertEqual(triaged, [], "a terminal generation is a disposition, not queue inventory")
+            runner.sh, runner.load_providers = saved
+        self.assertFalse(any(call[:3] == ["gh", "pr", "close"] for call in calls),
+                         "retry exhaustion is evidence of a held generation, not redundant work")
+        self.assertEqual(moves, [("iss", "Backlog")])
+        self.assertEqual(len(comments), 1, "terminal disposition remains deduplicated")
+        self.assertIn("needs-human-decision", comments[0])
         self.assertEqual((held["reason"], held["sha"]), ("fix-exhausted", "h1"))
+        self.assertIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/issues/7/labels", "-f",
+                       "labels[]=lane-fix-exhausted"], calls)
 
     def test_an_unfixable_hold_escalates_once_without_burning_attempts(self):
         stuck = pr(number=7, title="big diff")
