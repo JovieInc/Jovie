@@ -89,6 +89,10 @@ const SHARE_CHECKS = [
   'share-preview',
 ] as const;
 
+const DISCOVERY_CHECKS = ARTICLE_CHECKS.filter(
+  check => check !== 'reading-hierarchy' && check !== 'external-links'
+);
+
 function renderCaptures() {
   const dimensions = {
     phone: { width: 390, height: 844 },
@@ -130,7 +134,7 @@ function renderCaptures() {
     cls: 0,
     lcpMs: 1200,
     domFindings: [],
-    checksPassed: [...ARTICLE_CHECKS],
+    checksPassed: [...DISCOVERY_CHECKS],
     checksFailed: [],
   }));
   const share = (['light', 'dark'] as const).map(theme => ({
@@ -294,7 +298,7 @@ function factoryRecord(
       unsupportedClaims: [],
     },
     publication,
-  };
+  } satisfies Omit<BlogFactoryRecord, 'stageArtifacts' | 'receipts'>;
   const stages = publication ? FACTORY_STAGES : FACTORY_STAGES.slice(0, -1);
   const stageArtifacts = stages.map(stage =>
     defineBlogStageArtifact(core, stage)
@@ -362,6 +366,37 @@ describe('blog factory adapter', () => {
     );
 
     expect(result).toMatchObject({ verdict: 'pass', issues: [] });
+  });
+
+  it('keeps candidate identity and receipts stable when evidence defaults are omitted', () => {
+    const record = factoryRecord({ published: true });
+    const raw = record.evidence.map(
+      ({ sensitivity: _s, authorizationRef: _a, ...item }) => item
+    );
+    expect(blogCandidateDigest(record.candidate, raw)).toBe(
+      record.candidateDigest
+    );
+    expect(
+      certifyBlogFactoryRecord(
+        { ...record, evidence: raw },
+        {
+          sourceContent: MARKDOWN,
+        }
+      )
+    ).toMatchObject({ verdict: 'pass', issues: [] });
+  });
+
+  it('requires shared discovery checks without requiring article-only checks', () => {
+    const record = factoryRecord({ published: true });
+    expect(issueCodes(record)).not.toContain('incomplete-render-checks');
+    const discovery = record.renderEvidence.captures.find(
+      capture => capture.kind === 'discovery'
+    );
+    if (!discovery) throw new Error('Missing discovery fixture');
+    discovery.checksPassed = discovery.checksPassed.filter(
+      check => check !== 'accessibility'
+    );
+    expect(issueCodes(record)).toContain('incomplete-render-checks');
   });
 
   it('rejects unsupported product claims instead of treating them as facts', () => {

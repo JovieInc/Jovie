@@ -280,9 +280,14 @@ function sortedEvidence(evidence: readonly BlogClaimEvidence[]) {
 /** Exact source/metadata/assets/policy/evidence identity for one candidate. */
 export function blogCandidateDigest(
   candidate: BlogCandidate,
-  evidence: readonly BlogClaimEvidence[]
+  evidence: readonly z.input<typeof BlogClaimEvidenceSchema>[]
 ): string {
-  return digestOf({ candidate, evidence: sortedEvidence(evidence) });
+  return digestOf({
+    candidate: BlogCandidateSchema.parse(candidate),
+    evidence: sortedEvidence(
+      evidence.map(item => BlogClaimEvidenceSchema.parse(item))
+    ),
+  });
 }
 
 export function blogPublicationIdempotencyKey(input: {
@@ -312,7 +317,9 @@ export function blogStageEvidenceDigest(
 ): string {
   switch (stage) {
     case 'truth':
-      return digestOf(record.evidence);
+      return digestOf(
+        record.evidence.map(item => BlogClaimEvidenceSchema.parse(item))
+      );
     case 'copy':
       return digestOf(record.contentChecks);
     case 'render':
@@ -428,6 +435,12 @@ const REQUIRED_CONTENT_CHECKS: ReadonlyArray<
 
 const REQUIRED_ARTICLE_RENDER_CHECKS = BLOG_RENDER_CHECK_IDS.filter(
   check => check !== 'share-preview'
+);
+
+// Discovery lists need the shared surface checks; article prose hierarchy
+// and article-specific external citations are measured on article captures.
+const REQUIRED_DISCOVERY_RENDER_CHECKS = REQUIRED_ARTICLE_RENDER_CHECKS.filter(
+  check => check !== 'reading-hierarchy' && check !== 'external-links'
 );
 
 function validateQualificationEvidence(
@@ -571,7 +584,9 @@ function validateQualificationEvidence(
     const required =
       capture.kind === 'share'
         ? ['accessibility', 'overflow', 'artwork-fallback', 'share-preview']
-        : REQUIRED_ARTICLE_RENDER_CHECKS;
+        : capture.kind === 'discovery'
+          ? REQUIRED_DISCOVERY_RENDER_CHECKS
+          : REQUIRED_ARTICLE_RENDER_CHECKS;
     const missing = required.filter(
       check =>
         !capture.checksPassed.includes(
