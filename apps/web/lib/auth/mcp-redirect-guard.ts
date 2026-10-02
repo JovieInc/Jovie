@@ -1,5 +1,6 @@
 import type { BetterAuthPlugin } from 'better-auth';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
+import { BETTER_AUTH_OAUTH_PROVIDER_PATHS } from '@/constants/routes';
 import {
   acceptedMcpRedirectUris,
   isAllowedMcpRedirectUri,
@@ -10,9 +11,9 @@ import { isOAuthProviderTrustedClient } from './oauth-trusted-clients';
 const REGISTRATION_PATHS = new Set([
   '/oauth2/register',
   '/oauth2/create-client',
-  '/admin/oauth2/create-client',
+  BETTER_AUTH_OAUTH_PROVIDER_PATHS.ADMIN_CREATE_CLIENT,
   '/oauth2/update-client',
-  '/admin/oauth2/update-client',
+  BETTER_AUTH_OAUTH_PROVIDER_PATHS.ADMIN_UPDATE_CLIENT,
 ]);
 
 type GuardContext = {
