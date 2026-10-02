@@ -52,6 +52,21 @@ describe('MarketingFooter', () => {
     themeState.setTheme.mockReset();
   });
 
+  it('keeps the current footer columns while the about refresh flag is off', () => {
+    mockUsePathname.mockReturnValue('/about');
+    render(<MarketingFooter />);
+
+    expect(screen.getByRole('link', { name: 'Blog' })).toHaveAttribute(
+      'href',
+      '/blog'
+    );
+    expect(screen.getByRole('heading', { name: 'Connect' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
+      'href',
+      '/product'
+    );
+  });
+
   it('renders the full marketing footer when the full-footer flag is enabled', () => {
     mockUsePathname.mockReturnValue('/solutions');
     render(<MarketingFooter />);
