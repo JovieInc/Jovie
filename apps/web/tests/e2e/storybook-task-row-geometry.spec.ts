@@ -75,6 +75,17 @@ for (const viewport of VIEWPORTS) {
       await expect(table).toBeVisible();
       const avatar = table.locator('[data-slot="app-avatar"]');
       await expect(avatar).toBeVisible();
+      await expect
+        .poll(() =>
+          avatar
+            .locator('img')
+            .evaluate(
+              image =>
+                (image as HTMLImageElement).complete &&
+                (image as HTMLImageElement).naturalWidth > 0
+            )
+        )
+        .toBe(true);
       // Measure the whole circular frame, not pixels intentionally masked by its radius.
       const clipping = await avatar.evaluate(element => {
         const bounds = element.getBoundingClientRect();

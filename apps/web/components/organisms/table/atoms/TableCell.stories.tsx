@@ -77,7 +77,7 @@ const creator: AdminCreatorProfileRow = {
   username: 'long_creator_username',
   usernameNormalized: 'long_creator_username',
   displayName: 'A long creator display name',
-  avatarUrl: null,
+  avatarUrl: '/images/avatars/tim-white.jpg',
   isVerified: true,
   isFeatured: true,
   marketingOptOut: false,
