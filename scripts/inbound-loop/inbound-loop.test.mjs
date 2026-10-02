@@ -67,6 +67,57 @@ const corpus = [
   },
 ];
 
+test('escaped private references cannot bypass public-artifact leakage checks', () => {
+  for (const reference of [
+    'C:\\private\\thread-9917',
+    'private "quote"',
+    'private\nthread',
+  ]) {
+    assert.throws(
+      () =>
+        assertNoPrivateLeakage(
+          { nested: [{ summary: `source ${reference}` }] },
+          [reference]
+        ),
+      /private source record leaked/
+    );
+  }
+});
+
+test('incomplete corpus entries do not crash matching against later complete records', () => {
+  const candidate = normalizeDemandSignal(demandInput, registry);
+  const result = decideCandidate(candidate, {
+    registry,
+    now: Date.parse('2026-10-01T00:00:00Z'),
+    existingContent: [{ url: '/blog/other', dedupeKey: 'other' }, ...corpus],
+  });
+  assert.equal(result.decision, 'update-or-merge');
+  assert.ok('existingUrl' in result);
+  assert.equal(result.existingUrl, corpus[0].url);
+});
+
+test('punctuation-only inputs never produce colliding empty dedupe keys', () => {
+  assert.throws(
+    () =>
+      normalizeDemandSignal(
+        { ...demandInput, canonicalEntity: '---' },
+        registry
+      ),
+    /normalized key part/
+  );
+});
+
+test('invalid queue timestamps and contradictory run outcomes are rejected explicitly', () => {
+  assert.throws(
+    () => reconcileRun({ oldestActiveCandidateAt: 'invalid-date' }),
+    /oldestActiveCandidateAt/
+  );
+  assert.throws(
+    () => recordRun({}, { ok: true, disable: true }),
+    /successful run.*disable/
+  );
+});
+
 test('registry encodes the operating contract', () => {
   assert.equal(validateRegistry(registry), true);
   assert.equal(registry.queue.maxActiveCandidates, 3);

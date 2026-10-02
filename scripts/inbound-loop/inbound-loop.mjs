@@ -47,10 +47,11 @@ function isoTimestamp(value, field) {
 }
 
 function normalizeKeyPart(value) {
-  return requireText(value, 'key part')
+  const normalized = requireText(value, 'key part')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+  return requireText(normalized, 'normalized key part');
 }
 
 export function candidateKey(candidate) {
@@ -204,9 +205,13 @@ export function isSourceStale(candidate, freshness, now = Date.now()) {
 function matchesExisting(candidate, corpus) {
   return corpus.find(
     entry =>
-      entry.dedupeKey === candidate.dedupeKey ||
-      (normalizeKeyPart(entry.canonicalEntity) ===
-        normalizeKeyPart(candidate.canonicalEntity) &&
+      entry?.dedupeKey === candidate.dedupeKey ||
+      (typeof entry?.canonicalEntity === 'string' &&
+        typeof entry?.readerJob === 'string' &&
+        /[a-z0-9]/i.test(entry.canonicalEntity) &&
+        /[a-z0-9]/i.test(entry.readerJob) &&
+        normalizeKeyPart(entry.canonicalEntity) ===
+          normalizeKeyPart(candidate.canonicalEntity) &&
         normalizeKeyPart(entry.readerJob) ===
           normalizeKeyPart(candidate.readerJob))
   );
@@ -336,6 +341,13 @@ export function classifyIntakeEvent(event, registry = loadRegistry()) {
 
 export function reconcileRun(runState, options = {}) {
   const now = options.now ?? Date.now();
+  if (!Number.isFinite(now)) throw new Error('now must be a finite timestamp');
+  if (
+    runState.oldestActiveCandidateAt != null &&
+    !Number.isFinite(Date.parse(runState.oldestActiveCandidateAt))
+  ) {
+    throw new Error('oldestActiveCandidateAt must be a valid timestamp');
+  }
   const queueAgeDays =
     runState.oldestActiveCandidateAt != null
       ? Math.max(
@@ -355,6 +367,9 @@ export function reconcileRun(runState, options = {}) {
 }
 
 export function recordRun(state, result) {
+  if (result.ok === true && result.disable === true) {
+    throw new Error('A successful run cannot also disable the loop');
+  }
   const next = { ...state };
   next.lastAttemptAt = result.attemptedAt;
   if (result.ok === true) {
@@ -384,7 +399,10 @@ export function recordRun(state, result) {
 export function assertNoPrivateLeakage(publicArtifact, privateFields = []) {
   const serialized = JSON.stringify(publicArtifact);
   for (const value of privateFields) {
-    if (value && serialized.includes(value)) {
+    if (
+      value &&
+      serialized.includes(JSON.stringify(String(value)).slice(1, -1))
+    ) {
       throw new Error('private source record leaked into public artifact');
     }
   }
