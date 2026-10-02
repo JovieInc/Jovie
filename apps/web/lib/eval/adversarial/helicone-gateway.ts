@@ -59,7 +59,7 @@ export interface RealEvalRunEligibility {
 }
 
 export function resolveRealEvalEligibility(
-  env: NodeJS.ProcessEnv = process.env
+  env: Readonly<Record<string, string | undefined>> = process.env
 ): RealEvalRunEligibility | null {
   const declared = parseRealEvalEligibility(env.REAL_EVAL_ELIGIBILITY);
   if (!declared) return null;
@@ -75,7 +75,7 @@ export function resolveRealEvalEligibility(
 }
 
 export function isRealModelEvalEnabled(
-  env: NodeJS.ProcessEnv = process.env
+  env: Readonly<Record<string, string | undefined>> = process.env
 ): boolean {
   return resolveRealEvalEligibility(env) !== null;
 }
