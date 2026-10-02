@@ -14,8 +14,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       { status: 201 }
     );
   } catch (error) {
+    const errorDescription =
+      error instanceof Error ? error.message : 'invalid client metadata';
     return NextResponse.json(
-      { error: 'invalid_client_metadata', error_description: String(error) },
+      {
+        error: 'invalid_client_metadata',
+        error_description: errorDescription,
+      },
       { status: 400 }
     );
   }
