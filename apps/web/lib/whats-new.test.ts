@@ -14,7 +14,7 @@ function release(
   version: string,
   overrides: Partial<ChangelogRelease> = {}
 ): ChangelogRelease {
-  return {
+  const value: ChangelogRelease = {
     version,
     kind: 'release',
     date: '2026-09-01',
@@ -28,6 +28,12 @@ function release(
     },
     ...overrides,
   };
+  value.customerOutcomes = Object.fromEntries(
+    Object.values(value.sections)
+      .flat()
+      .map(text => [text, { availability: 'unverified', prerequisites: [] }])
+  );
+  return value;
 }
 
 function entry(id: string): WhatsNewEntry {
@@ -60,7 +66,7 @@ describe('projectWhatsNew', () => {
             featured: ['**Chat is home:** Ask first.'],
             added: ['**Library filters:** One catalog.'],
             changed: ['Buttons use a lighter label'],
-            fixed: ['Sign-in recovers (JOV-123)'],
+            fixed: ['Sign-in recovers'],
             removed: ['Old tab bar'],
           },
           dogfood: ['Open **Chat** and ask about a `release`'],
