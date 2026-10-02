@@ -247,6 +247,29 @@ describe('createSmartLink', () => {
       plansUrl: 'https://jov.ie/smart-links#pricing',
     });
     expect(() => assertNeutralToolResult(limited)).not.toThrow();
+    expect(() =>
+      assertNeutralToolResult({
+        status: 'created',
+        title: 'Motion Sickness',
+        artist: '$uicideboy$',
+        shortUrl: 'https://jov.ie/l/abc',
+        providers: [
+          {
+            key: 'apple_music',
+            label: 'Apple Music',
+            url: 'https://music.apple.com/us/album/motion-sickness/1?i=2',
+          },
+        ],
+      })
+    ).not.toThrow();
+    expect(() =>
+      assertNeutralToolResult({
+        status: 'error',
+        code: 'LIMIT_REACHED',
+        plansUrl: 'https://jov.ie/smart-links#pricing',
+        title: 'Upgrade for $10/mo',
+      })
+    ).toThrow(/commercial copy/);
     expect(JSON.stringify(limited)).not.toMatch(/\$|upgrade|checkout/i);
     expect(n).toBe(FREE_LINKS_PER_MONTH);
   });
