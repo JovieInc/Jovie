@@ -410,17 +410,15 @@ describe('package prepare hook lifecycle', () => {
     const output = `${result.stdout}\n${result.stderr}`;
     expect(result.status, output).toBe(0);
     expect(output).not.toContain('No such file or directory');
-    expect(run('git', ['config', '--get', 'core.hooksPath']).stdout.trim()).toBe(
-      ''
-    );
+    expect(
+      run('git', ['config', '--get', 'core.hooksPath']).stdout.trim()
+    ).toBe('');
   });
 
   it('skips hook setup on Vercel and CI even when the helper is present', () => {
     const { root, env, run } = fixture();
     expect(run('git', ['init', '--initial-branch=main']).status).toBe(0);
-    expect(
-      run('git', ['config', 'core.hooksPath', '.husky/_']).status
-    ).toBe(0);
+    expect(run('git', ['config', 'core.hooksPath', '.husky/_']).status).toBe(0);
     for (const [key, value] of [
       ['VERCEL', '1'],
       ['CI', 'true'],
