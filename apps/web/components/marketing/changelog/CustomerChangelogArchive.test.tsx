@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { parseChangelog } from '@/lib/changelog-parser';
 import {
   type CustomerChangelogMonthGroup,
@@ -60,6 +60,12 @@ const MONTHS: readonly CustomerChangelogMonthGroup[] = [
 ];
 
 describe('CustomerChangelogArchive', () => {
+  beforeEach(() => {
+    window.history.replaceState(null, '', window.location.pathname);
+    document.activeElement instanceof HTMLElement &&
+      document.activeElement.blur();
+  });
+
   it('shows source-declared limited rollout prerequisites without a GA badge', () => {
     render(
       <CustomerChangelogArchive
@@ -145,7 +151,7 @@ describe('CustomerChangelogArchive', () => {
     expect(container.querySelector('img')).not.toBeInTheDocument();
   });
 
-  it('links unloaded months to version pages and mounted months to existing anchors', () => {
+  it('keeps archive links on stable fragments before and after a month loads', () => {
     const { container } = render(<CustomerChangelogArchive months={MONTHS} />);
     fireEvent.click(screen.getByText('Browse all updates'));
     const archive = within(
@@ -163,8 +169,10 @@ describe('CustomerChangelogArchive', () => {
       'href',
       `#${MONTHS[0].entries[0].slug}`
     );
-    expect(olderEntry).toHaveAttribute('href', '/changelog/26.7.0');
-    expect(olderMonth).toHaveAttribute('href', '/changelog/26.7.0');
+    // The href is the same whether or not its month has mounted, so the
+    // resolver can reveal the target instead of landing on the release page.
+    expect(olderEntry).toHaveAttribute('href', `#${MONTHS[1].entries[0].slug}`);
+    expect(olderMonth).toHaveAttribute('href', '#changelog-month-2026-07');
     expect(container.querySelector(`#${MONTHS[1].entries[0].slug}`)).toBeNull();
 
     fireEvent.click(
@@ -187,7 +195,87 @@ describe('CustomerChangelogArchive', () => {
     fireEvent.click(screen.getByRole('button', { name: 'All' }));
     expect(
       archive.getByRole('link', { name: /Sign-out stays available/ })
-    ).toHaveAttribute('href', '/changelog/26.7.0');
+    ).toHaveAttribute('href', `#${MONTHS[1].entries[0].slug}`);
+  });
+
+  it('reveals, scrolls to, and focuses a deep-linked entry in an unloaded month', () => {
+    window.location.hash = `#${MONTHS[1].entries[0].slug}`;
+    const { container } = render(<CustomerChangelogArchive months={MONTHS} />);
+
+    const target = container.querySelector(
+      `#${MONTHS[1].entries[0].slug}`
+    ) as HTMLElement;
+    expect(target).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'July 2026' })
+    ).toBeInTheDocument();
+    expect(target).toHaveFocus();
+    expect(
+      screen.queryByRole('button', { name: 'Load Earlier Updates' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('reveals an unloaded month section for a month fragment', () => {
+    window.location.hash = '#changelog-month-2026-07';
+    const { container } = render(<CustomerChangelogArchive months={MONTHS} />);
+
+    const section = container.querySelector(
+      '#changelog-month-2026-07'
+    ) as HTMLElement;
+    expect(section).toBeInTheDocument();
+    expect(section).toHaveFocus();
+  });
+
+  it('reveals the target when a hashchange arrives after mount', () => {
+    const { container } = render(<CustomerChangelogArchive months={MONTHS} />);
+    expect(container.querySelector(`#${MONTHS[1].entries[0].slug}`)).toBeNull();
+
+    window.location.hash = `#${MONTHS[1].entries[0].slug}`;
+    fireEvent(window, new HashChangeEvent('hashchange'));
+
+    const target = container.querySelector(
+      `#${MONTHS[1].entries[0].slug}`
+    ) as HTMLElement;
+    expect(target).toBeInTheDocument();
+    expect(target).toHaveFocus();
+  });
+
+  it('resets an excluding category filter so the deep-linked entry is visible', () => {
+    render(<CustomerChangelogArchive months={MONTHS} />);
+    fireEvent.click(screen.getByRole('button', { name: 'New' }));
+    expect(
+      screen.queryByRole('heading', { name: /Sign-out stays available/ })
+    ).not.toBeInTheDocument();
+
+    window.location.hash = `#${MONTHS[1].entries[0].slug}`;
+    fireEvent(window, new HashChangeEvent('hashchange'));
+
+    const target = screen.getByRole('heading', {
+      name: /Sign-out stays available/,
+    });
+    expect(target).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(document.getElementById(MONTHS[1].entries[0].slug)).toHaveFocus();
+  });
+
+  it('ignores unknown fragments without landing on a different entry', () => {
+    window.location.hash = '#no-such-update';
+    const { container } = render(<CustomerChangelogArchive months={MONTHS} />);
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'Review qualified brand deals in your Inbox',
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'July 2026' })
+    ).not.toBeInTheDocument();
+    expect(document.activeElement).not.toBe(
+      container.querySelector(`#${MONTHS[0].entries[0].slug}`)
+    );
   });
 
   it('keeps published older releases crawlable in initial server-rendered HTML', () => {
