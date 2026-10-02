@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { desc, eq, or } from 'drizzle-orm';
+import { and, count, desc, eq, or } from 'drizzle-orm';
 import {
   type CanonicalContactListRow,
   getCanonicalContacts,
@@ -112,6 +112,7 @@ export interface CustomerRecoveryResult {
   readonly search: string;
   readonly matches: readonly CustomerRecoveryMatch[];
   readonly dossier: CustomerRecoveryDossier | null;
+  readonly error: 'unavailable' | null;
   readonly generatedAt: string;
 }
 
@@ -165,7 +166,7 @@ export function deriveCustomerBlocker(input: {
   };
 }
 
-/** Prefer an exact identifier match, then fall back to the first row. */
+/** Prefer an explicit or exact identifier match; require selection if fuzzy. */
 export function selectRecoveryMatch(
   contacts: readonly Pick<
     CanonicalContactListRow,
@@ -199,7 +200,7 @@ export function selectRecoveryMatch(
     // exact dedupe key (e.g. pasted from another admin surface).
     if (contacts.some(c => c.dedupeKey === needle)) return needle;
   }
-  return contacts[0]?.dedupeKey ?? null;
+  return contacts.length === 1 ? (contacts[0]?.dedupeKey ?? null) : null;
 }
 
 const iso = (value: Date | null | undefined): string | null =>
@@ -212,102 +213,162 @@ export async function getCustomerRecovery(
   const trimmed = search.trim();
   const generatedAt = new Date().toISOString();
   if (!trimmed && !key) {
-    return { search: trimmed, matches: [], dossier: null, generatedAt };
+    return {
+      search: trimmed,
+      matches: [],
+      dossier: null,
+      error: null,
+      generatedAt,
+    };
   }
 
+  let contacts: CanonicalContactListRow[];
   try {
-    const { contacts } = await getCanonicalContacts({
+    ({ contacts } = await getCanonicalContacts({
       page: 1,
       pageSize: 8,
-      search: trimmed,
-    });
-    const matches: CustomerRecoveryMatch[] = contacts.map(c => ({
-      dedupeKey: c.dedupeKey,
-      displayName: c.displayName,
-      email: c.email,
-      handle: c.handle,
-      stage: c.stage,
+      search: trimmed || key || '',
+      throwOnError: true,
     }));
-
-    const selectedKey = selectRecoveryMatch(contacts, trimmed, key);
-    const selected = contacts.find(c => c.dedupeKey === selectedKey);
-    const dossier = selected ? await buildDossier(selected) : null;
-    return { search: trimmed, matches, dossier, generatedAt };
   } catch (error) {
-    captureError('Error building customer recovery dossier', error, {
+    await captureError('Error loading customer recovery matches', error, {
       search: trimmed,
       key,
     });
-    return { search: trimmed, matches: [], dossier: null, generatedAt };
+    return {
+      search: trimmed,
+      matches: [],
+      dossier: null,
+      error: 'unavailable',
+      generatedAt,
+    };
+  }
+
+  const matches: CustomerRecoveryMatch[] = contacts.map(c => ({
+    dedupeKey: c.dedupeKey,
+    displayName: c.displayName,
+    email: c.email,
+    handle: c.handle,
+    stage: c.stage,
+  }));
+  const selectedKey = selectRecoveryMatch(contacts, trimmed, key);
+  const selected = contacts.find(c => c.dedupeKey === selectedKey);
+  if (!selected) {
+    return {
+      search: trimmed,
+      matches,
+      dossier: null,
+      error: null,
+      generatedAt,
+    };
+  }
+
+  try {
+    const dossier = await buildDossier(selected);
+    return {
+      search: trimmed,
+      matches,
+      dossier,
+      error: null,
+      generatedAt,
+    };
+  } catch (error) {
+    await captureError('Error building customer recovery dossier', error, {
+      search: trimmed,
+      key,
+      dedupeKey: selected.dedupeKey,
+    });
+    return {
+      search: trimmed,
+      matches,
+      dossier: null,
+      error: 'unavailable',
+      generatedAt,
+    };
   }
 }
 
 async function buildDossier(
   contact: CanonicalContactListRow
 ): Promise<CustomerRecoveryDossier> {
-  const [userRow, waitlistRow, profileRow, linkCountRow, releaseRows] =
-    await Promise.all([
-      contact.userId
-        ? db
-            .select({
-              userStatus: users.userStatus,
-              plan: users.plan,
-              isPro: users.isPro,
-              stripeSubscriptionId: users.stripeSubscriptionId,
-              email: users.email,
-              deletedAt: users.deletedAt,
-            })
-            .from(users)
-            .where(eq(users.id, contact.userId))
-            .limit(1)
-        : Promise.resolve([]),
-      contact.waitlistEntryId
-        ? db
-            .select({
-              status: waitlistEntries.status,
-              approvedAt: waitlistEntries.approvedAt,
-              invitedAt: waitlistEntries.invitedAt,
-              signedUpAt: waitlistEntries.signedUpAt,
-            })
-            .from(waitlistEntries)
-            .where(eq(waitlistEntries.id, contact.waitlistEntryId))
-            .limit(1)
-        : Promise.resolve([]),
-      contact.creatorProfileId
-        ? db
-            .select({
-              claimedAt: creatorProfiles.claimedAt,
-              isVerified: creatorProfiles.isVerified,
-              ingestionStatus: creatorProfiles.ingestionStatus,
-              lastIngestionError: creatorProfiles.lastIngestionError,
-              spotifyId: creatorProfiles.spotifyId,
-              spotifyUrl: creatorProfiles.spotifyUrl,
-              usernameNormalized: creatorProfiles.usernameNormalized,
-            })
-            .from(creatorProfiles)
-            .where(eq(creatorProfiles.id, contact.creatorProfileId))
-            .limit(1)
-        : Promise.resolve([]),
-      contact.creatorProfileId
-        ? db
-            .select({ id: socialLinks.id })
-            .from(socialLinks)
-            .where(eq(socialLinks.creatorProfileId, contact.creatorProfileId))
-        : Promise.resolve([]),
-      contact.creatorProfileId
-        ? db
-            .select({
-              title: discogReleases.title,
-              releaseDate: discogReleases.releaseDate,
-            })
-            .from(discogReleases)
-            .where(
-              eq(discogReleases.creatorProfileId, contact.creatorProfileId)
+  const [
+    userRow,
+    waitlistRow,
+    profileRow,
+    linkCountRow,
+    releaseCountRow,
+    latestReleaseRows,
+  ] = await Promise.all([
+    contact.userId
+      ? db
+          .select({
+            userStatus: users.userStatus,
+            plan: users.plan,
+            isPro: users.isPro,
+            stripeSubscriptionId: users.stripeSubscriptionId,
+            email: users.email,
+            deletedAt: users.deletedAt,
+          })
+          .from(users)
+          .where(eq(users.id, contact.userId))
+          .limit(1)
+      : Promise.resolve([]),
+    contact.waitlistEntryId
+      ? db
+          .select({
+            status: waitlistEntries.status,
+            approvedAt: waitlistEntries.approvedAt,
+            invitedAt: waitlistEntries.invitedAt,
+            signedUpAt: waitlistEntries.signedUpAt,
+          })
+          .from(waitlistEntries)
+          .where(eq(waitlistEntries.id, contact.waitlistEntryId))
+          .limit(1)
+      : Promise.resolve([]),
+    contact.creatorProfileId
+      ? db
+          .select({
+            claimedAt: creatorProfiles.claimedAt,
+            isVerified: creatorProfiles.isVerified,
+            ingestionStatus: creatorProfiles.ingestionStatus,
+            lastIngestionError: creatorProfiles.lastIngestionError,
+            spotifyId: creatorProfiles.spotifyId,
+            spotifyUrl: creatorProfiles.spotifyUrl,
+            usernameNormalized: creatorProfiles.usernameNormalized,
+          })
+          .from(creatorProfiles)
+          .where(eq(creatorProfiles.id, contact.creatorProfileId))
+          .limit(1)
+      : Promise.resolve([]),
+    contact.creatorProfileId
+      ? db
+          .select({ value: count() })
+          .from(socialLinks)
+          .where(
+            and(
+              eq(socialLinks.creatorProfileId, contact.creatorProfileId),
+              eq(socialLinks.isActive, true),
+              eq(socialLinks.state, 'active')
             )
-            .orderBy(desc(discogReleases.releaseDate))
-            .limit(5)
-        : Promise.resolve([]),
-    ]);
+          )
+      : Promise.resolve([]),
+    contact.creatorProfileId
+      ? db
+          .select({ value: count() })
+          .from(discogReleases)
+          .where(eq(discogReleases.creatorProfileId, contact.creatorProfileId))
+      : Promise.resolve([]),
+    contact.creatorProfileId
+      ? db
+          .select({
+            title: discogReleases.title,
+          })
+          .from(discogReleases)
+          .where(eq(discogReleases.creatorProfileId, contact.creatorProfileId))
+          .orderBy(desc(discogReleases.releaseDate))
+          .limit(1)
+      : Promise.resolve([]),
+  ]);
 
   const profile = profileRow[0] ?? null;
   const recentOperations = profile
@@ -384,11 +445,11 @@ async function buildDossier(
           signedUpAt: iso(waitlist.signedUpAt),
         }
       : null,
-    connections: { activeSocialLinks: linkCountRow.length },
+    connections: { activeSocialLinks: Number(linkCountRow[0]?.value ?? 0) },
     launch: contact.creatorProfileId
       ? {
-          releaseCount: releaseRows.length,
-          latestReleaseTitle: releaseRows[0]?.title ?? null,
+          releaseCount: Number(releaseCountRow[0]?.value ?? 0),
+          latestReleaseTitle: latestReleaseRows[0]?.title ?? null,
         }
       : null,
     recentOperations: recentOperations.map(op => ({

@@ -85,6 +85,7 @@ function buildResult(
     search: 'phoebe',
     matches: [],
     dossier: null,
+    error: null,
     generatedAt: '2026-10-02T12:00:00.000Z',
     ...overrides,
   };
@@ -141,6 +142,22 @@ describe('CustomerRecoveryPanel', () => {
       'href',
       expect.stringContaining('key=lead%3Al2')
     );
+    expect(
+      screen.queryByTestId('customer-recovery-dossier')
+    ).not.toBeInTheDocument();
+  });
+
+  it('distinguishes unavailable evidence from an empty search result', () => {
+    render(
+      <CustomerRecoveryPanel result={buildResult({ error: 'unavailable' })} />
+    );
+
+    expect(screen.getByTestId('customer-recovery-error')).toHaveTextContent(
+      'temporarily unavailable'
+    );
+    expect(
+      screen.queryByText('No canonical customer matches “phoebe”.')
+    ).not.toBeInTheDocument();
   });
 
   it('renders the dossier facts and the supported recovery action', () => {

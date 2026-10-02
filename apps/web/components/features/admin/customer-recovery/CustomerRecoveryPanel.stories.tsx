@@ -64,6 +64,7 @@ const baseResult: CustomerRecoveryResult = {
   search: 'phoebe',
   matches: [],
   dossier,
+  error: null,
   generatedAt: '2026-10-02T12:00:00.000Z',
 };
 
@@ -114,6 +115,17 @@ export const AmbiguousMatches: Story = {
 export const NoMatches: Story = {
   args: {
     result: { ...baseResult, dossier: null, matches: [] },
+  },
+};
+
+export const Unavailable: Story = {
+  args: {
+    result: {
+      ...baseResult,
+      dossier: null,
+      matches: [],
+      error: 'unavailable',
+    },
   },
 };
 

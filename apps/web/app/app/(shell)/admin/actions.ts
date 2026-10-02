@@ -10,6 +10,7 @@ import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { checkUserStatus } from '@/lib/auth/status-checker';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
+import { claimAndEnqueueCustomerRecovery } from '@/lib/db/customer-recovery';
 import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { adminAuditLog } from '@/lib/db/schema/admin';
 import { users } from '@/lib/db/schema/auth';
@@ -192,6 +193,23 @@ export async function bulkRerunCreatorIngestionAction(
     .from(creatorProfiles)
     .where(inArray(creatorProfiles.id, profileIds));
 
+  const queuedCount = await enqueueCreatorIngestionProfiles(profiles);
+
+  revalidatePath(APP_ROUTES.ADMIN);
+  revalidatePath(APP_ROUTES.ADMIN_CREATORS);
+
+  return { queuedCount };
+}
+
+interface CreatorIngestionCandidate {
+  readonly id: string;
+  readonly spotifyId: string | null;
+  readonly spotifyUrl: string | null;
+}
+
+async function enqueueCreatorIngestionProfiles(
+  profiles: readonly CreatorIngestionCandidate[]
+): Promise<number> {
   const BATCH_SIZE = 25;
   let queuedCount = 0;
 
@@ -210,7 +228,15 @@ export async function bulkRerunCreatorIngestionAction(
           return null;
         }
 
-        // Enqueue DSP artist discovery alongside MusicFetch enrichment
+        const musicFetchJobId = await enqueueMusicFetchEnrichmentJob({
+          creatorProfileId: profile.id,
+          spotifyUrl,
+        });
+        if (!musicFetchJobId) {
+          return null;
+        }
+
+        // Enqueue supplemental DSP discovery only after the primary job exists.
         const spotifyArtistId =
           (profile.spotifyId?.trim() || null) ??
           (profile.spotifyUrl
@@ -232,20 +258,14 @@ export async function bulkRerunCreatorIngestionAction(
           });
         }
 
-        return enqueueMusicFetchEnrichmentJob({
-          creatorProfileId: profile.id,
-          spotifyUrl,
-        });
+        return musicFetchJobId;
       })
     );
 
     queuedCount += jobIds.filter(Boolean).length;
   }
 
-  revalidatePath(APP_ROUTES.ADMIN);
-  revalidatePath(APP_ROUTES.ADMIN_CREATORS);
-
-  return { queuedCount };
+  return queuedCount;
 }
 
 export async function bulkSetCreatorsVerifiedAction(
@@ -673,6 +693,7 @@ export type CustomerIngestionRecoveryState =
   | 'requested'
   | 'already-running'
   | 'missing-source'
+  | 'not-failed'
   | 'not-found';
 
 export interface CustomerIngestionRecoveryReceipt {
@@ -726,6 +747,13 @@ export async function rerunCustomerIngestionAction(
       checkedAt: new Date().toISOString(),
     };
   }
+  if (profile.ingestionStatus !== 'failed') {
+    return {
+      state: 'not-failed',
+      queuedCount: 0,
+      checkedAt: new Date().toISOString(),
+    };
+  }
   if (!profile.spotifyId?.trim() && !profile.spotifyUrl?.trim()) {
     return {
       state: 'missing-source',
@@ -734,15 +762,50 @@ export async function rerunCustomerIngestionAction(
     };
   }
 
-  const next = new FormData();
-  next.set('profileIds', JSON.stringify([profile.id]));
-  const { queuedCount } = await bulkRerunCreatorIngestionAction(next);
+  const spotifyUrl =
+    profile.spotifyUrl?.trim() ||
+    `https://open.spotify.com/artist/${encodeURIComponent(profile.spotifyId?.trim() ?? '')}`;
+
+  let jobId: string | null;
+  try {
+    jobId = await claimAndEnqueueCustomerRecovery({
+      creatorProfileId: profile.id,
+      spotifyUrl,
+    });
+  } catch (error) {
+    await captureError('Customer ingestion recovery enqueue failed', error, {
+      creatorProfileId: profile.id,
+    });
+    throw error;
+  }
+
+  if (!jobId) {
+    return {
+      state: 'already-running',
+      queuedCount: 0,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
+  const spotifyArtistId =
+    (profile.spotifyId?.trim() || null) ??
+    extractSpotifyArtistId(profile.spotifyUrl ?? '');
+  if (spotifyArtistId) {
+    fireDspDiscovery({
+      creatorProfileId: profile.id,
+      spotifyArtistId,
+      onError: error =>
+        void captureError('DSP discovery enqueue failed', error, {
+          creatorProfileId: profile.id,
+        }),
+    });
+  }
 
   revalidatePath(APP_ROUTES.ADMIN_PEOPLE);
 
   return {
     state: 'requested',
-    queuedCount,
+    queuedCount: 1,
     checkedAt: new Date().toISOString(),
   };
 }

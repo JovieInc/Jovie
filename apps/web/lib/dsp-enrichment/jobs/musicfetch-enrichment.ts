@@ -53,6 +53,7 @@ export const musicFetchEnrichmentPayloadSchema = z.object({
   creatorProfileId: z.string().uuid(),
   spotifyUrl: z.string().url(),
   dedupKey: z.string(),
+  recoveryClaimed: z.boolean().optional(),
 });
 
 export type MusicFetchEnrichmentPayload = z.infer<
@@ -65,6 +66,7 @@ export type MusicFetchEnrichmentPayload = z.infer<
 
 export interface MusicFetchEnrichmentResult {
   creatorProfileId: string;
+  status: 'complete' | 'failed';
   dspFieldsUpdated: string[];
   socialLinksInserted: number;
   socialLinksUpdated: number;
@@ -459,6 +461,7 @@ export async function processMusicFetchEnrichmentJob(
 
   const result: MusicFetchEnrichmentResult = {
     creatorProfileId,
+    status: 'failed',
     dspFieldsUpdated: [],
     socialLinksInserted: 0,
     socialLinksUpdated: 0,
@@ -638,6 +641,7 @@ export async function processMusicFetchEnrichmentJob(
 
   // Mark enrichment as complete
   await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'complete');
+  result.status = 'complete';
 
   return result;
 }

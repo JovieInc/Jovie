@@ -52,6 +52,8 @@ export interface GetCanonicalContactsParams {
   pageSize?: number;
   search?: string;
   stage?: string | null;
+  /** Preserve source failures for callers that distinguish outage from empty. */
+  throwOnError?: boolean;
 }
 
 export type CanonicalContactMetrics = Record<ContactLifecycleStage, number> & {
@@ -493,12 +495,34 @@ async function buildCanonicalContacts(): Promise<CanonicalContactListRow[]> {
   return applyOverrides(mergeCanonicalContacts(sourceRows), overrides);
 }
 
-function matchesSearch(row: CanonicalContactListRow, search: string): boolean {
+export function canonicalContactMatchesSearch(
+  row: Pick<
+    CanonicalContactListRow,
+    | 'displayName'
+    | 'email'
+    | 'handle'
+    | 'dedupeKey'
+    | 'userId'
+    | 'creatorProfileId'
+    | 'leadId'
+    | 'waitlistEntryId'
+  >,
+  search: string
+): boolean {
   const needle = search.trim().toLowerCase();
   if (!needle) return true;
-  return [row.displayName, row.email, row.handle].some(
+  const textMatch = [row.displayName, row.email, row.handle].some(
     field => field?.toLowerCase().includes(needle) === true
   );
+  if (textMatch) return true;
+
+  return [
+    row.dedupeKey,
+    row.userId,
+    row.creatorProfileId,
+    row.leadId,
+    row.waitlistEntryId,
+  ].some(field => field?.toLowerCase() === needle);
 }
 
 export async function getCanonicalContacts(
@@ -523,7 +547,7 @@ export async function getCanonicalContacts(
 
     const filtered = all
       .filter(row => (stageFilter ? row.stage === stageFilter : true))
-      .filter(row => matchesSearch(row, params.search ?? ''))
+      .filter(row => canonicalContactMatchesSearch(row, params.search ?? ''))
       .sort((a, b) => {
         const aTime = a.activityAt?.getTime() ?? 0;
         const bTime = b.activityAt?.getTime() ?? 0;
@@ -539,6 +563,9 @@ export async function getCanonicalContacts(
       total: filtered.length,
     };
   } catch (error) {
+    if (params.throwOnError) {
+      throw error;
+    }
     captureError('Error loading canonical contacts', error, {
       page,
       pageSize,

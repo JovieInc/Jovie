@@ -14,6 +14,7 @@ const RECEIPT_LABELS: Record<string, string> = {
   'already-running': 'No change: an ingestion run is already in flight.',
   'missing-source':
     'No change: profile has no linked Spotify source to ingest.',
+  'not-failed': 'No change: this profile has no failed ingestion to recover.',
   'not-found': 'No change: creator profile no longer exists.',
 };
 
@@ -33,16 +34,25 @@ export function RerunIngestionButton({
   const [pending, startTransition] = useTransition();
   const [receipt, setReceipt] =
     useState<CustomerIngestionRecoveryReceipt | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const run = () => {
     startTransition(async () => {
+      setError(null);
+      setReceipt(null);
       const fd = new FormData();
       fd.set('profileId', creatorProfileId);
-      const result = await rerunCustomerIngestionAction(fd);
-      setReceipt(result);
-      // Read back the same dossier so the operator sees fresh evidence
-      // (ingestion status, recent operations), not just a toast.
-      router.refresh();
+      try {
+        const result = await rerunCustomerIngestionAction(fd);
+        setReceipt(result);
+        // Read back the same dossier so the operator sees fresh evidence
+        // (ingestion status, recent operations), not just a toast.
+        router.refresh();
+      } catch {
+        setError(
+          'Recovery could not be requested. The profile was left unchanged; try again.'
+        );
+      }
     });
   };
 
@@ -62,15 +72,25 @@ export function RerunIngestionButton({
         )}
         Re-run Artist Ingestion
       </Button>
-      {receipt && (
-        <p
-          className='text-app text-secondary-token'
-          data-testid='rerun-ingestion-receipt'
-        >
-          {RECEIPT_LABELS[receipt.state] ?? receipt.state} Queued:{' '}
-          {receipt.queuedCount}. Checked {receipt.checkedAt}
-        </p>
-      )}
+      <div className='min-h-5' aria-live='polite'>
+        {receipt && (
+          <p
+            className='text-app text-secondary-token'
+            data-testid='rerun-ingestion-receipt'
+          >
+            {RECEIPT_LABELS[receipt.state] ?? receipt.state} Queued:{' '}
+            {receipt.queuedCount}. Checked {receipt.checkedAt}
+          </p>
+        )}
+        {error && (
+          <p
+            className='text-app text-secondary-token'
+            data-testid='rerun-ingestion-error'
+          >
+            {error}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

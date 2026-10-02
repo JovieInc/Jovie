@@ -186,6 +186,8 @@ export function CustomerRecoveryPanel({
           name='q'
           defaultValue={result.search}
           placeholder='Search email, handle, or linked ID…'
+          aria-label='Customer Identifier'
+          autoComplete='off'
           className='max-w-sm'
         />
         <button
@@ -229,7 +231,18 @@ export function CustomerRecoveryPanel({
         </div>
       )}
 
-      {result.search && result.matches.length === 0 && (
+      {result.error === 'unavailable' && (
+        <p
+          className='text-app text-secondary-token'
+          role='status'
+          data-testid='customer-recovery-error'
+        >
+          Customer recovery evidence is temporarily unavailable. Try the search
+          again.
+        </p>
+      )}
+
+      {!result.error && result.search && result.matches.length === 0 && (
         <p className='text-app text-secondary-token'>
           No canonical customer matches “{result.search}”.
         </p>

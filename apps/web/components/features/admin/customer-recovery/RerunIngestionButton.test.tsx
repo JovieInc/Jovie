@@ -61,4 +61,18 @@ describe('RerunIngestionButton', () => {
       )
     ).toBeInTheDocument();
   });
+
+  it('shows a stable retryable error when the server action fails', async () => {
+    rerunActionMock.mockRejectedValue(new Error('queue unavailable'));
+    render(<RerunIngestionButton creatorProfileId='cp-1' />);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Re-run Artist Ingestion' })
+    );
+
+    expect(
+      await screen.findByTestId('rerun-ingestion-error')
+    ).toHaveTextContent('profile was left unchanged; try again');
+    expect(refreshMock).not.toHaveBeenCalled();
+  });
 });
