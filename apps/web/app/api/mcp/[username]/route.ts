@@ -31,6 +31,11 @@ import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
+  artistMcpOwnerToolAuthMessage,
+  artistMcpWwwAuthenticate,
+  isArtistMcpOwnerTool,
+} from '@/lib/mcp/artist-oauth-discovery';
+import {
   createMerchGeneration,
   getLiveMerchCardsForProfile,
   publishMerchCard,
@@ -238,6 +243,24 @@ export async function POST(
   // tools/call
   // -------------------------------------------------------------------------
   if (msg.method === 'tools/call') {
+    if (isArtistMcpOwnerTool(msg.params.name)) {
+      const { userId } = await getCachedAuth();
+      if (!userId) {
+        return mcpError(
+          -32602,
+          artistMcpOwnerToolAuthMessage(msg.params.name),
+          401,
+          requestId,
+          {
+            'WWW-Authenticate': artistMcpWwwAuthenticate(
+              new URL(req.url).origin,
+              username
+            ),
+            'Cache-Control': 'no-store',
+          }
+        );
+      }
+    }
     const result = await callTool(
       msg.params.name,
       msg.params.arguments ?? {},

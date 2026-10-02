@@ -14,7 +14,11 @@ if (!data) {
 
 describe('ComparisonPageContent', () => {
   it('renders the complete checked-in comparison body', () => {
-    render(<ComparisonPageContent data={data} />);
+    const { container } = render(<ComparisonPageContent data={data} />);
+
+    expect(
+      container.querySelector('[class~="via-(--color-bg-base)/70"]')
+    ).toBeInTheDocument();
 
     expect(
       screen.getByRole('heading', { level: 1, name: data.heroHeadline })
