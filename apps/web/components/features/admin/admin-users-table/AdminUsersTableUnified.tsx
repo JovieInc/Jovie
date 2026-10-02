@@ -37,10 +37,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useTableMeta } from '@/contexts/TableMetaContext';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
-import {
-  AdminTableHeader,
-  AdminTableSubheader,
-} from '@/features/admin/table/AdminTableHeader';
+import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
@@ -582,11 +579,8 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
               onClearSelection={clearSelection}
               actions={bulkActions}
             />
-            <AdminTableHeader
-              title='Users'
-              subtitle='Review lifecycle state, profile completion, and suppression health.'
-            />
             <AdminTableSubheader
+              inert={selectedCount > 0}
               start={
                 <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
                   Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}

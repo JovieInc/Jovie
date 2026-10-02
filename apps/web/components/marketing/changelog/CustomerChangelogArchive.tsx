@@ -349,10 +349,15 @@ export function CustomerChangelogArchive({
         </p>
       ) : (
         <>
-          <ArchiveJumpNav
-            months={filteredMonths}
-            visibleMonthCount={visibleCount}
-          />
+          <details className='mb-6'>
+            <summary className='min-h-11 cursor-pointer text-sm text-secondary-token'>
+              Browse all updates
+            </summary>
+            <ArchiveJumpNav
+              months={filteredMonths}
+              visibleMonthCount={visibleCount}
+            />
+          </details>
           <div id='changelog-outcome-list'>
             {visibleMonths.map((group, index) => (
               <MonthSection

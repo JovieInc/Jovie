@@ -1,3 +1,4 @@
+import '@/styles/system-b-app.css';
 import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
