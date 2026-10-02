@@ -392,6 +392,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/backlog-orchestrator/__tests__/plan-gate.test.mjs',
   'scripts/backlog-orchestrator/__tests__/runtime-state.test.mjs',
   'scripts/backlog-orchestrator/__tests__/shipping-observability.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/strategy-index.test.mjs',
   'scripts/backlog-orchestrator/__tests__/summer-live-state.test.mjs',
   'scripts/capability-benchmark/capability-benchmark.test.mjs',
   'scripts/capability-benchmark/computer-use-decision.test.mjs',
