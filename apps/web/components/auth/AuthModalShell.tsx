@@ -2,8 +2,19 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import { useModalFocusBoundary } from '@/lib/a11y/modal-focus-boundary';
 import { AUTH_SHELL_KIND } from '@/lib/auth/auth-shell-layout-contract';
+import { sanitizeRedirectUrl } from '@/lib/auth/constants';
+
+/**
+ * Labels whose destination is fixed and validated. The visible back promise
+ * and the actual navigation target must never diverge based on browser
+ * history (JOV-6225) — a known label resolves to a known destination.
+ */
+const KNOWN_BACK_DESTINATIONS = {
+  'Back to homepage': APP_ROUTES.HOME,
+} as const;
 
 interface AuthModalShellProps {
   readonly children: React.ReactNode;
@@ -12,9 +23,39 @@ interface AuthModalShellProps {
   /**
    * Visible label for the quiet unboxed back control. Defaults to
    * "Back to homepage" so the destination is explicit. Callers that know
-   * their origin — e.g. chat intake — pass "Back to chat".
+   * their origin — e.g. chat intake — pass "Back to chat" together with a
+   * matching backDestination.
    */
   readonly backButtonLabel?: string;
+  /**
+   * Explicit validated destination the visible back control navigates to.
+   * When omitted, it is derived from the known back labels. A label without
+   * a known or valid destination falls back to safe modal dismissal instead
+   * of guessing a route — the control never navigates somewhere its label
+   * did not promise.
+   */
+  readonly backDestination?: string;
+}
+
+/**
+ * Same-app relative paths only. Matches sanitizeRedirectUrl's threat model:
+ * rejects protocol-relative URLs and backslash-normalization bypasses.
+ * Unlike sanitizeRedirectUrl this accepts the bare root path "/", which is
+ * the "Back to homepage" destination.
+ */
+function resolveBackDestination(
+  label: string,
+  destination: string | undefined
+): string | null {
+  const knownDestination = Object.hasOwn(KNOWN_BACK_DESTINATIONS, label)
+    ? KNOWN_BACK_DESTINATIONS[label as keyof typeof KNOWN_BACK_DESTINATIONS]
+    : null;
+  const candidate = destination ?? knownDestination;
+  if (!candidate) return null;
+  const trimmed = candidate.trim();
+  return trimmed === APP_ROUTES.HOME
+    ? APP_ROUTES.HOME
+    : sanitizeRedirectUrl(trimmed);
 }
 
 export function AuthModalShell({
@@ -22,17 +63,35 @@ export function AuthModalShell({
   statusRow,
   ariaLabel = 'Authentication',
   backButtonLabel = 'Back to homepage',
+  backDestination,
 }: AuthModalShellProps) {
   // Guard against callers passing an empty or whitespace-only string — a
   // literal '' on an aria-label makes the button invisible to assistive tech
   // even though the default prop would otherwise have fallen through.
   const resolvedBackButtonLabel =
     backButtonLabel.trim().length > 0 ? backButtonLabel : 'Back to homepage';
+  const resolvedBackDestination = resolveBackDestination(
+    resolvedBackButtonLabel,
+    backDestination
+  );
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
+  // Escape and backdrop are modal-DISMISSAL: pop the intercepted route via
+  // history. They must never navigate somewhere unrelated, so they do not
+  // use the destination path.
   const dismiss = useCallback(() => {
     router.back();
   }, [router]);
+  // The visible back control is destination navigation: it goes exactly
+  // where its label promises, independent of the history stack. Without a
+  // validated destination it degrades to dismissal instead of guessing.
+  const handleBackControl = useCallback(() => {
+    if (resolvedBackDestination) {
+      router.push(resolvedBackDestination);
+      return;
+    }
+    dismiss();
+  }, [dismiss, resolvedBackDestination, router]);
 
   useModalFocusBoundary(dialogRef, true, {
     lockScroll: true,
@@ -80,7 +139,7 @@ export function AuthModalShell({
         <div className='mb-5 flex min-w-0 flex-col items-start gap-3 sm:mb-6'>
           <button
             type='button'
-            onClick={dismiss}
+            onClick={handleBackControl}
             aria-label={resolvedBackButtonLabel}
             className='rounded-sm text-sm text-secondary-token underline-offset-2 transition-colors hover:text-primary-token hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
           >

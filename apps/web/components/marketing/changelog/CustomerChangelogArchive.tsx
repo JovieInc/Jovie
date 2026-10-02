@@ -531,20 +531,11 @@ export function CustomerChangelogArchive({
           {`No ${CATEGORY_FILTER_LABELS[activeCategory].toLowerCase()} updates yet.`}
         </p>
       ) : (
-        <>
-          <details className='mb-6'>
-            <summary className='min-h-11 cursor-pointer text-sm text-secondary-token'>
-              Browse all updates
-            </summary>
-            <ArchiveJumpNav months={filteredMonths} />
-            <TechnicalReleaseNav releases={technicalReleases} />
-          </details>
-          <div id='changelog-outcome-list'>
-            {visibleMonths.map(group => (
-              <MonthSection key={group.monthKey} group={group} />
-            ))}
-          </div>
-        </>
+        <div id='changelog-outcome-list'>
+          {visibleMonths.map(group => (
+            <MonthSection key={group.monthKey} group={group} />
+          ))}
+        </div>
       )}
 
       {remainingCount > 0 ? (
@@ -563,6 +554,16 @@ export function CustomerChangelogArchive({
             Load Earlier Updates
           </Button>
         </div>
+      ) : null}
+
+      {filteredMonths.length > 0 ? (
+        <details className='mt-6'>
+          <summary className='min-h-11 cursor-pointer text-sm text-secondary-token'>
+            Browse all updates
+          </summary>
+          <ArchiveJumpNav months={filteredMonths} />
+          <TechnicalReleaseNav releases={technicalReleases} />
+        </details>
       ) : null}
     </div>
   );

@@ -137,6 +137,20 @@ enum NativeSessionTokenStore {
     }
   }
 
+  /// Keeps a synchronous local mutation atomic with login replacement/clear.
+  /// The operation must not await or re-enter any token-store API.
+  @discardableResult
+  static func performIfCurrent(
+    _ ownership: NativeSessionOwnership,
+    _ operation: () -> Void
+  ) -> Bool {
+    withLock {
+      guard state.generation == ownership.generation else { return false }
+      operation()
+      return true
+    }
+  }
+
   /// A pending operation may use a rotated bearer only within its original login.
   static func requestAuthorization(
     ifOwnedBy ownership: NativeSessionOwnership
