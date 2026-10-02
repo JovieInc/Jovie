@@ -23,6 +23,7 @@ import {
 } from '@/lib/audio/constants';
 import type { AudioSnippet } from '@/lib/audio/snippet';
 import { resolveStatefulAssetSlot } from '@/lib/library/stateful-asset-slot';
+import { fileNameFromMediaUrl } from '@/lib/library/work-files';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/utils/logger';
 import { AudioWaveformEditor } from './AudioWaveformEditor';
@@ -380,10 +381,10 @@ export function ReleaseAudioAssetPanel({
         </span>
         <div className='min-w-0 flex-1'>
           <p className='truncate text-xs font-medium text-primary-token'>
-            Audio attached
+            {fileNameFromMediaUrl(localPreviewUrl) ?? 'Audio'}
           </p>
           <p className='mt-0.5 text-2xs leading-4 text-tertiary-token'>
-            Preview, scrub, and trim a promo snippet for drops.
+            Private recording · preview, scrub, and trim a promo snippet.
           </p>
         </div>
         {isEditable && presentation.replaceAction === 'secondary' ? (
