@@ -22,7 +22,6 @@ import {
   measureChatTranscriptRow,
 } from '@/lib/chat/transcript-window';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
-import { useDesktopChatWorkState } from '@/lib/desktop/chat-work-state';
 import { useAppFlag } from '@/lib/flags/client';
 import {
   useInsightsSummaryQuery,
@@ -45,17 +44,19 @@ import { OvieEditorialBriefing } from './components/OvieEditorialBriefing';
 import {
   useChatFileAttachments,
   useChatJankMonitor,
-  useJovieChat,
+  useJovieChatController,
   useStickToBottom,
 } from './hooks';
 import { useChatRailContextTargets } from './hooks/useChatRailContextTargets';
+import { useComposerDraftIntent } from './hooks/useComposerDraft';
 import {
   CHAT_COMPOSER_DOCK_CLASSNAME,
   CHAT_COMPOSER_SCROLL_FADE_CLASSNAME,
   CHAT_COMPOSER_THREAD_SCROLL_PADDING_CLASSNAME,
   CHAT_EMPTY_TOP_SPACING_OWNER,
   CHAT_EMPTY_VIEWPORT_CLASSNAME,
-  ChatComposerSurface,
+  ChatDraftComposerSurface,
+  ChatDraftWorkState,
   ChatEmptyStateComposerRegion,
   ChatInlineError,
   ChatLoadingConversationSkeleton,
@@ -116,7 +117,7 @@ export function JovieChat({
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
   const initialConversationScrollRef = useRef<string | null>(null);
   const {
-    input,
+    draft,
     setInput,
     messages,
     chatError,
@@ -139,7 +140,7 @@ export function JovieChat({
     isRateLimited,
     stop,
     chipTray,
-  } = useJovieChat({
+  } = useJovieChatController({
     profileId,
     artistContext,
     conversationId,
@@ -222,17 +223,6 @@ export function JovieChat({
     onError: error => setChatError({ type: 'unknown', message: error }),
     onAudioUploaded: handleAudioUploaded,
     resetKey: activeConversationId ?? conversationId ?? null,
-  });
-
-  useDesktopChatWorkState({
-    input,
-    hasAttachments: pendingFiles.length > 0,
-    isUploading,
-    isLoading,
-    isSubmitting,
-    isLoadingConversation,
-    status,
-    messages,
   });
 
   // Manifest collapse state: when uploading and user scrolls/types, show collapsed bar
@@ -517,8 +507,12 @@ export function JovieChat({
   const showBottomComposer = showThreadView;
   const showOvieBriefing =
     chatMode === 'ov' && ovieHomeBriefing != null && !showThreadView;
+  const hasDraftIntent = useComposerDraftIntent(
+    draft,
+    !showThreadView && !showOvieBriefing
+  );
   const composerHasIntent =
-    composerPickerOpen || Boolean(input.trim()) || chipTray.chips.length > 0;
+    composerPickerOpen || hasDraftIntent || chipTray.chips.length > 0;
   // JOV-7150: the empty state is one sentence — a real insight when one
   // exists, otherwise a plain greeting — above the composer. No cards, no
   // chips, no demo exchange, no competing CTA surface. While the composer
@@ -645,14 +639,30 @@ export function JovieChat({
 
   // A reserved/first-token conversation fetch must not unmount a live turn.
   // Electron hits this when the thread URL is reserved as the answer starts.
+  const workStateReporter = (
+    <ChatDraftWorkState
+      draft={draft}
+      hasAttachments={pendingFiles.length > 0}
+      isUploading={isUploading}
+      isLoading={isLoading}
+      isSubmitting={isSubmitting}
+      isLoadingConversation={isLoadingConversation}
+      status={status}
+      messages={messages}
+    />
+  );
   if (isLoadingConversation && !hasMessages && !conversationInProgress) {
-    return <ChatLoadingConversationSkeleton />;
+    return (
+      <>
+        {workStateReporter}
+        <ChatLoadingConversationSkeleton />
+      </>
+    );
   }
 
   const chatInputProps = {
     desktopConversationReady: !isLoadingConversation,
     ref: inputRef,
-    value: input,
     onChange: setInput,
     onSubmit: handleSubmitWithFiles,
     onInterruptAndSend: handleInterruptAndSubmit,
@@ -676,7 +686,8 @@ export function JovieChat({
   } as const;
 
   const composerSurface = (
-    <ChatComposerSurface
+    <ChatDraftComposerSurface
+      draft={draft}
       chatInputProps={chatInputProps}
       chatMode={chatMode}
       showThreadView={showThreadView}
@@ -708,7 +719,7 @@ export function JovieChat({
       />
     ) : null;
 
-  return (
+  const content = (
     <EntityResolutionProvider profileId={profileId}>
       <div
         className={cn(
@@ -912,5 +923,11 @@ export function JovieChat({
         </div>
       </div>
     </EntityResolutionProvider>
+  );
+  return (
+    <>
+      {workStateReporter}
+      {content}
+    </>
   );
 }

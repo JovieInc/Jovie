@@ -73,6 +73,7 @@ import {
   shouldSuppressChatPauseForToolFailure,
 } from '../utils';
 import { composeMessage, useChipTray } from './useChipTray';
+import { createComposerDraft, useComposerDraft } from './useComposerDraft';
 
 interface UseJovieChatOptions {
   /** Profile ID for server-side context fetching (preferred) */
@@ -348,7 +349,7 @@ function isTimelineDebugEnabled(): boolean {
   }
 }
 
-export function useJovieChat({
+export function useJovieChatController({
   profileId,
   artistContext, // NOSONAR - kept for backward compatibility
   conversationId: requestedConversationId,
@@ -386,22 +387,42 @@ export function useJovieChat({
   // Retry may reuse the turn id (message metadata is not readable in onError).
   const pendingSummerFailureRef = useRef<SummerFailure | null>(null);
   const loadedConversationIdsRef = useRef<Set<string>>(new Set());
-  const [input, setInputState] = useState(() =>
-    readComposerDraft(conversationId ?? null)
+  const [draft] = useState(() =>
+    createComposerDraft(readComposerDraft(conversationId ?? null))
   );
-  const inputDraftRef = useRef(input);
-  const previousErrorInputRef = useRef(input);
   const inputDraftConversationIdRef = useRef(conversationId ?? null);
-  const setInput = useCallback((value: SetStateAction<string>) => {
-    const nextInput =
-      typeof value === 'function' ? value(inputDraftRef.current) : value;
-    // A route change can unmount chat before React commits this update.
-    inputDraftRef.current = nextInput;
-    setInputState(nextInput);
-  }, []);
   const chipTray = useChipTray();
-  const [chatError, setChatError] = useState<ChatError | null>(() =>
+  const [chatError, setChatErrorState] = useState<ChatError | null>(() =>
     readRecoveryError(recoveryContext)
+  );
+  // Error + draft writes may share one event before React commits (including a
+  // failed send restoring its text). Keep the imperative comparison current.
+  const chatErrorRef = useRef(chatError);
+  const setChatError = useCallback(
+    (update: SetStateAction<ChatError | null>) => {
+      const next =
+        typeof update === 'function' ? update(chatErrorRef.current) : update;
+      chatErrorRef.current = next;
+      setChatErrorState(next);
+    },
+    []
+  );
+  const setInput = useCallback(
+    (update: SetStateAction<string>) => {
+      const previous = draft.getSnapshot();
+      draft.set(update);
+      const next = draft.getSnapshot();
+      const error = chatErrorRef.current;
+      if (
+        next &&
+        next !== previous &&
+        error &&
+        next !== (error.failedMessage ?? lastAttemptedMessageRef.current)
+      ) {
+        setChatError(null);
+      }
+    },
+    [draft, setChatError]
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showRateLimitHint, setShowRateLimitHint] = useState(false);
@@ -426,7 +447,7 @@ export function useJovieChat({
     invalidateTurnContext();
     setIsSubmitting(false);
     setChatError(readRecoveryError(recoveryContext));
-  }, [invalidateTurnContext, recoveryContext]);
+  }, [invalidateTurnContext, recoveryContext, setChatError]);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -789,6 +810,7 @@ export function useJovieChat({
       dispatchTimelineEvent,
       profileId,
       recoveryContext,
+      setChatError,
       setInput,
     ]
   );
@@ -1226,38 +1248,33 @@ export function useJovieChat({
     return () => clearTimeout(timer);
   }, [titlePollingSince]);
 
-  // Clear error when user starts typing
-  useEffect(() => {
-    const previousInput = previousErrorInputRef.current;
-    previousErrorInputRef.current = input;
-    if (
-      input &&
-      input !== previousInput &&
-      chatError &&
-      input !== (chatError.failedMessage ?? lastAttemptedMessageRef.current)
-    ) {
-      setChatError(null);
-    }
-  }, [input, chatError]);
-
   useEffect(
     () => () => {
       saveComposerDraft(
         inputDraftConversationIdRef.current,
-        inputDraftRef.current
+        draft.getSnapshot()
       );
     },
-    []
+    [draft]
   );
 
   useEffect(() => {
-    const handle = globalThis.setTimeout(() => {
-      if (inputDraftConversationIdRef.current === activeConversationId) {
-        saveComposerDraft(activeConversationId, inputDraftRef.current);
-      }
-    }, 250);
-    return () => globalThis.clearTimeout(handle);
-  }, [activeConversationId, input]);
+    let handle: ReturnType<typeof globalThis.setTimeout>;
+    const scheduleSave = () => {
+      globalThis.clearTimeout(handle);
+      handle = globalThis.setTimeout(() => {
+        if (inputDraftConversationIdRef.current === activeConversationId) {
+          saveComposerDraft(activeConversationId, draft.getSnapshot());
+        }
+      }, 250);
+    };
+    scheduleSave();
+    const unsubscribe = draft.subscribe(scheduleSave);
+    return () => {
+      unsubscribe();
+      globalThis.clearTimeout(handle);
+    };
+  }, [activeConversationId, draft]);
 
   // Sync activeConversationId when parent prop changes
   useEffect(() => {
@@ -1293,7 +1310,7 @@ export function useJovieChat({
       return;
     }
 
-    saveComposerDraft(activeConversationId, inputDraftRef.current);
+    saveComposerDraft(activeConversationId, draft.getSnapshot());
     inputDraftConversationIdRef.current = nextConversationId;
     setInput(readComposerDraft(nextConversationId));
 
@@ -1312,6 +1329,7 @@ export function useJovieChat({
     activeConversationId,
     conversationId,
     dispatchTimelineEvent,
+    draft,
     resetTurnContext,
     setInput,
   ]);
@@ -1502,6 +1520,7 @@ export function useJovieChat({
       isSubmitting,
       recoveryContext,
       sendMessage,
+      setChatError,
       setInput,
       stop,
       tryHandleCommand,
@@ -1517,11 +1536,11 @@ export function useJovieChat({
       doSubmit(chatError.failedMessage, undefined, {
         clientTurnId: chatError.retryClientTurnId,
         preserveComposerDraft:
-          Boolean(inputDraftRef.current) &&
-          inputDraftRef.current.trim() !== chatError.failedMessage,
+          Boolean(draft.getSnapshot()) &&
+          draft.getSnapshot().trim() !== chatError.failedMessage,
       });
     }
-  }, [chatError, doSubmit]);
+  }, [chatError, doSubmit, draft]);
 
   const rateLimitedSubmitter = useAsyncRateLimiter(
     async ({
@@ -1544,7 +1563,7 @@ export function useJovieChat({
           type: 'rate_limit',
           message:
             'You’re sending messages too quickly. Please wait a moment and try again.',
-          failedMessage: input,
+          failedMessage: draft.getSnapshot(),
         });
       },
     }
@@ -1565,7 +1584,7 @@ export function useJovieChat({
   const handleSubmit = useCallback(
     (e?: React.FormEvent, files?: FileUIPart[]) => {
       e?.preventDefault();
-      const composed = composeMessage(chipTray.chips, input);
+      const composed = composeMessage(chipTray.chips, draft.getSnapshot());
       const skillChip = chipTray.chips.find(chip => chip.type === 'skill');
       rateLimitedSubmitter.maybeExecute({
         text: composed,
@@ -1574,7 +1593,7 @@ export function useJovieChat({
         toolIntent: skillChip ? inferToolIntentFromSkill(skillChip.id) : null,
       });
     },
-    [chipTray, input, rateLimitedSubmitter]
+    [chipTray, draft, rateLimitedSubmitter]
   );
 
   const handleSuggestedPrompt = useCallback(
@@ -1589,14 +1608,14 @@ export function useJovieChat({
   );
 
   const handleInterruptAndSubmit = useCallback(() => {
-    const composed = composeMessage(chipTray.chips, input);
+    const composed = composeMessage(chipTray.chips, draft.getSnapshot());
     const skillChip = chipTray.chips.find(chip => chip.type === 'skill');
     void doSubmit(composed, undefined, {
       source: skillChip ? 'slash_command' : 'typed',
       toolIntent: skillChip ? inferToolIntentFromSkill(skillChip.id) : null,
       interrupt: true,
     });
-  }, [chipTray, doSubmit, input]);
+  }, [chipTray, doSubmit, draft]);
 
   // Consume a pending prompt set before the chat component mounted
   // (e.g. via "open-chat-with-prompt"). This is programmatic/automated, not
@@ -1669,7 +1688,7 @@ export function useJovieChat({
 
   return {
     // State
-    input,
+    draft,
     setInput,
     chipTray,
     messages,
@@ -1712,4 +1731,11 @@ export function useJovieChat({
     /** Stop the current AI generation */
     stop,
   };
+}
+
+/** Existing hook consumers keep the subscribed input API; the transcript does not. */
+export function useJovieChat(options: UseJovieChatOptions) {
+  const controller = useJovieChatController(options);
+  const input = useComposerDraft(controller.draft);
+  return { ...controller, input };
 }
