@@ -10,6 +10,7 @@ import {
 import {
   getFirstSliceInteractionHotPaths,
   getInteractionHotPathById,
+  type InteractionLatencyBudget,
 } from './performance-interaction-manifest';
 import {
   buildInteractionLatencyReport,
@@ -172,14 +173,10 @@ describe('performance interaction report', () => {
     expect(chat(cold)?.p95UsableStateMs).toBe(580.4);
     expect(warm.status).toBe('pass');
     expect(chat(warm)?.passed).toBe(true);
-    expect(
-      getInteractionHotPathById('chat-message-round-trip')?.budget
-        .usableStateP95Ms
-    ).toBe(300);
-    expect(
-      getInteractionHotPathById('chat-message-round-trip')?.budget
-        .firstFeedbackP50Ms
-    ).toBe(100);
+    const chatBudget: InteractionLatencyBudget | undefined =
+      getInteractionHotPathById('chat-message-round-trip')?.budget;
+    expect(chatBudget?.usableStateP95Ms).toBe(300);
+    expect(chatBudget?.firstFeedbackP50Ms).toBe(100);
   });
 
   it('ranks failing manager-loop interactions ahead of passing lower risk ones', () => {
