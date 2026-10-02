@@ -299,9 +299,7 @@ describe('OperationalTasksPanelView', () => {
 
       await user.click(inspect);
       await user.click(screen.getByRole('button', { name: 'More actions' }));
-      await user.click(
-        screen.getByRole('menuitem', { name: 'Close', exact: true })
-      );
+      await user.click(screen.getByRole('menuitem', { name: 'Close' }));
 
       expect(inspect).toHaveAttribute('aria-expanded', 'false');
       expect(screen.getByTestId('shipping-row-rail')).toHaveAttribute('inert');
