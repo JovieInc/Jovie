@@ -33,10 +33,25 @@ vi.mock('next/cache', () => ({
 }));
 
 const mockCaptureWarning = vi.hoisted(() => vi.fn());
+const mockRequireAdmin = vi.hoisted(() => vi.fn());
+const mockVerifyCronRequest = vi.hoisted(() => vi.fn());
+const mockReadLastRunAt = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/error-tracking', () => ({
   captureWarning: mockCaptureWarning,
 }));
+
+vi.mock('@/lib/admin', () => ({ requireAdmin: mockRequireAdmin }));
+vi.mock('@/lib/cron/auth', () => ({
+  verifyCronRequest: mockVerifyCronRequest,
+}));
+vi.mock('@/lib/billing/reconciliation/run-receipt', () => ({
+  readBillingReconciliationLastRunAt: mockReadLastRunAt,
+}));
+
+function healthRequest() {
+  return new Request('https://jov.ie/api/billing/health');
+}
 
 function mockHealthQueries(queryResults: unknown[]) {
   let queryIndex = 0;
@@ -68,6 +83,74 @@ describe('GET /api/billing/health', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mockVerifyCronRequest.mockReturnValue(null);
+    mockRequireAdmin.mockResolvedValue(null);
+    mockReadLastRunAt.mockResolvedValue(null);
+  });
+
+  it('returns 401 for anonymous callers and does not query billing data', async () => {
+    const denied = new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+    });
+    mockVerifyCronRequest.mockReturnValue(denied);
+    mockRequireAdmin.mockResolvedValue(denied);
+
+    const { GET } = await import('@/app/api/billing/health/route');
+    const response = await GET(healthRequest());
+
+    expect(response.status).toBe(401);
+    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(mockStripeSubscriptionsList).not.toHaveBeenCalled();
+    expect(mockReadLastRunAt).not.toHaveBeenCalled();
+    const body = await response.json();
+    expect(body.metrics).toBeUndefined();
+  });
+
+  it('allows an admin session when cron auth fails', async () => {
+    mockVerifyCronRequest.mockReturnValue(new Response(null, { status: 401 }));
+    mockRequireAdmin.mockResolvedValue(null);
+    mockHealthQueries([
+      [{ count: 1 }],
+      [{ count: 0 }],
+      [{ createdAt: new Date() }],
+      [{ count: 1 }],
+      [{ lastBillingEventAt: new Date() }],
+    ]);
+    mockStripeSubscriptionsList.mockResolvedValue({
+      data: [{ id: 'sub_1' }],
+      has_more: false,
+    });
+
+    const { GET } = await import('@/app/api/billing/health/route');
+    const response = await GET(healthRequest());
+
+    expect(response.status).toBe(200);
+    expect(mockRequireAdmin).toHaveBeenCalled();
+  });
+
+  it('treats a recent run receipt as reconciliation even when the last fix is old', async () => {
+    const lastFix = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString();
+    const lastRun = new Date();
+    mockReadLastRunAt.mockResolvedValue(lastRun);
+    mockHealthQueries([
+      [{ count: 1 }],
+      [{ count: 0 }],
+      [{ createdAt: lastFix }],
+      [{ count: 1 }],
+      [{ lastBillingEventAt: lastFix }],
+    ]);
+    mockStripeSubscriptionsList.mockResolvedValue({
+      data: [{ id: 'sub_1' }],
+      has_more: false,
+    });
+
+    const { GET } = await import('@/app/api/billing/health/route');
+    const response = await GET(healthRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.checks.recentReconciliation.status).toBe('healthy');
+    expect(data.metrics.lastReconciliationAt).toBe(lastRun.toISOString());
   });
 
   it('returns healthy status when all checks pass', async () => {
@@ -87,7 +170,7 @@ describe('GET /api/billing/health', () => {
     });
 
     const { GET } = await import('@/app/api/billing/health/route');
-    const response = await GET();
+    const response = await GET(healthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -120,7 +203,7 @@ describe('GET /api/billing/health', () => {
     });
 
     const { GET } = await import('@/app/api/billing/health/route');
-    const response = await GET();
+    const response = await GET(healthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -150,7 +233,7 @@ describe('GET /api/billing/health', () => {
     });
 
     const { GET } = await import('@/app/api/billing/health/route');
-    const response = await GET();
+    const response = await GET(healthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -176,7 +259,7 @@ describe('GET /api/billing/health', () => {
     });
 
     const { GET } = await import('@/app/api/billing/health/route');
-    const response = await GET();
+    const response = await GET(healthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -201,7 +284,7 @@ describe('GET /api/billing/health', () => {
     });
 
     const { GET } = await import('@/app/api/billing/health/route');
-    const response = await GET();
+    const response = await GET(healthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(503);
@@ -223,7 +306,7 @@ describe('GET /api/billing/health', () => {
     });
 
     const { GET } = await import('@/app/api/billing/health/route');
-    const response = await GET();
+    const response = await GET(healthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(503);

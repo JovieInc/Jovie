@@ -8,6 +8,8 @@ const mockUpdateUserBillingStatus = vi.hoisted(() => vi.fn());
 const mockCaptureWarning = vi.hoisted(() => vi.fn());
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 const mockStripeList = vi.hoisted(() => vi.fn());
+const mockRecordRun = vi.hoisted(() => vi.fn());
+const mockReprocess = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -57,6 +59,14 @@ vi.mock('@/lib/error-tracking', () => ({
   captureWarning: mockCaptureWarning,
 }));
 
+vi.mock('@/lib/billing/reconciliation/run-receipt', () => ({
+  recordBillingReconciliationRun: mockRecordRun,
+}));
+
+vi.mock('@/lib/stripe/webhooks/reprocess-unprocessed', () => ({
+  reprocessUnprocessedStripeWebhookEvents: mockReprocess,
+}));
+
 describe('GET /api/cron/billing-reconciliation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -64,6 +74,14 @@ describe('GET /api/cron/billing-reconciliation', () => {
     vi.stubEnv('CRON_SECRET', 'test-secret');
 
     mockUpdateUserBillingStatus.mockResolvedValue({ success: true });
+    mockRecordRun.mockResolvedValue(undefined);
+    mockReprocess.mockResolvedValue({
+      examined: 0,
+      processed: 0,
+      failed: 0,
+      released: 0,
+      subscriptionStateEventIds: [],
+    });
     mockDbUpdateWhere.mockResolvedValue(undefined);
     mockDbUpdateSet.mockReturnValue({ where: mockDbUpdateWhere });
     mockDbInsertValues.mockResolvedValue(undefined);
@@ -134,6 +152,10 @@ describe('GET /api/cron/billing-reconciliation', () => {
     expect(response.status).toBe(200);
     expect(data.success).toBeDefined();
     expect(data.stats).toBeDefined();
+    expect(mockRecordRun).toHaveBeenCalledWith(
+      expect.objectContaining({ success: true })
+    );
+    expect(mockReprocess).toHaveBeenCalledOnce();
   });
 
   it('links trialing subscriptions for pro users missing stripeSubscriptionId', async () => {

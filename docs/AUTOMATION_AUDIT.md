@@ -56,7 +56,7 @@ These routes exist in the codebase but have **no entry in `vercel.json`**. They 
 
 | Path | `maxDuration` | Called By | Status | Purpose | Recommendation |
 |------|---------------|-----------|--------|---------|----------------|
-| `billing-reconciliation` | 60s | `daily-maintenance` sub-job | Orphaned (no vercel.json schedule) | Standalone entry for billing reconciliation | **Keep as sub-job only** — no dedicated schedule needed; `daily-maintenance` covers it. |
+| `billing-reconciliation` | 60s | `30 * * * *` and `daily-maintenance` sub-job | Scheduled | Reconcile DB subscription status with Stripe (read/list only) and replay unprocessed stored webhooks | **Keep the hourly schedule.** PR #3496 (2026-02-15) removed the hourly cron to free slots and left only the daily sub-job. A no-mismatch day wrote no audit row, so health reported the last fix (2026-07-27) as the last run. |
 | `cleanup-idempotency-keys` | 60s | `daily-maintenance` sub-job | Orphaned | Standalone entry for key cleanup | **Keep as sub-job only** |
 | `cleanup-photos` | 60s | `daily-maintenance` sub-job + `helpers.ts` | Orphaned | Standalone entry for photo cleanup | **Keep as sub-job only** |
 | `cleanup-sms-intents` | 60s | None detected | Orphaned | Marks expired SMS subscribe intents as `expired`; hard-deletes rows older than 24h | **Consolidate into `daily-maintenance`** — pure daily janitor work, no reason to be standalone. |

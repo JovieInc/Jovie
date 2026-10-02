@@ -60,6 +60,7 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 |-----------|----------|-----------|
 | `/api/cron/frequent` | `*/15 * * * *` | Every 15 minutes |
 | `/api/cron/daily-maintenance` | `0 0 * * *` | Daily at midnight UTC |
+| `/api/cron/billing-reconciliation` | `30 * * * *` | Hourly at minute 30. Also runs inside `daily-maintenance`. Restored after PR #3496 dropped the hourly entry. |
 | `/api/cron/generate-insights` | `0 5 * * *` | Daily at 05:00 UTC |
 | `/api/cron/process-ingestion-jobs` | `*/6 * * * *` | Every 6 minutes (JOV-2500: lets Neon 5min autosuspend reclaim compute) |
 | `/api/cron/process-merch-fulfillment` | `*/10 * * * *` | Every 10 minutes |
@@ -138,7 +139,7 @@ These have their own Vercel schedule OR exist as callable endpoints (also invoke
 | `/api/cron/cleanup-sms-intents` | 60s | Marks expired SMS subscribe intents and hard-deletes rows >24h old (no longer scheduled directly — called via `daily-maintenance` sub-job; file kept as admin escape hatch) | `daily-maintenance` |
 | `/api/cron/monitor-metadata-submissions` | 60s | Polls third-party metadata pages for drift detection; read-only snapshot workflow | — |
 | `/api/cron/process-metadata-submissions` | 60s | Sends queued metadata submissions; processes the outbound send queue | — |
-| `/api/cron/billing-reconciliation` | 60s | Standalone entry for billing reconciliation | `daily-maintenance` |
+| `/api/cron/billing-reconciliation` | 60s | Hourly at minute 30. Read-only Stripe retrieve/list, DB status repair, stored-webhook replay | `daily-maintenance` |
 | `/api/cron/cleanup-idempotency-keys` | 60s | Standalone entry for key cleanup | `daily-maintenance` |
 | `/api/cron/cleanup-photos` | 60s | Standalone entry for photo cleanup | `daily-maintenance` |
 | `/api/cron/data-retention` | 300s | Standalone entry with enhanced auth | `daily-maintenance` |

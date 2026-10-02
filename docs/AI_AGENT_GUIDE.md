@@ -91,7 +91,7 @@ The optional per-user Ovie privacy gate protects operator data and actions serve
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/billing/health` | GET | Better Auth | Billing system health |
+| `/api/billing/health` | GET | Admin session or CRON_SECRET | Billing system health |
 | `/api/billing/history` | GET | Better Auth | Invoice history |
 | `/api/billing/status` | GET | Better Auth | Current billing status |
 | `/api/stripe/cancel` | POST/GET | Better Auth | Cancel subscription |

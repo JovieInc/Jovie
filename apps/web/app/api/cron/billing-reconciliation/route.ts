@@ -9,7 +9,10 @@
  * 2. Compares DB isPro status with Stripe subscription status
  * 3. Fixes any mismatches and logs to audit table
  *
- * Schedule: Every hour (configured in vercel.json)
+ * Schedule: hourly at minute 30 (vercel.json) so it does not start with
+ * daily-maintenance at 00:00. daily-maintenance still calls runReconciliation.
+ * Stripe access here is retrieve/list plus DB status updates. This job does
+ * not charge, refund, or cancel.
  */
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
@@ -21,6 +24,7 @@ import {
   type ReconciliationStats,
   updateStatsFromResult,
 } from '@/lib/billing/reconciliation/batch-processor';
+import { recordBillingReconciliationRun } from '@/lib/billing/reconciliation/run-receipt';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -28,6 +32,7 @@ import { billingAuditLog } from '@/lib/db/schema/billing';
 import { env } from '@/lib/env-server';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
+import { reprocessUnprocessedStripeWebhookEvents } from '@/lib/stripe/webhooks/reprocess-unprocessed';
 import { isActiveSubscription } from '@/lib/stripe/webhooks/utils';
 import { logger } from '@/lib/utils/logger';
 
@@ -68,11 +73,25 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
   };
   const errors: string[] = [];
 
-  await reconcileUsersWithSubscriptions(stats, errors);
-  await reconcileProUsersWithoutSubscription(stats, errors);
-  await checkStaleCustomers(stats);
+  try {
+    await reconcileUsersWithSubscriptions(stats, errors);
+    await reconcileProUsersWithoutSubscription(stats, errors);
+    await checkStaleCustomers(stats);
+  } catch (error) {
+    await recordBillingReconciliationRun({
+      success: false,
+      stats,
+      duration: Date.now() - startTime,
+    });
+    throw error;
+  }
 
   const duration = Date.now() - startTime;
+  await recordBillingReconciliationRun({
+    success: stats.errors === 0,
+    stats,
+    duration,
+  });
 
   const result: ReconciliationResult = {
     success: stats.errors === 0,
@@ -108,7 +127,8 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
 /**
  * GET /api/cron/billing-reconciliation
  *
- * Daily cron job to reconcile billing status between DB and Stripe
+ * Hourly cron to reconcile billing status between DB and Stripe, then replay
+ * stored webhook rows that never reached processed_at.
  */
 export async function GET(request: Request) {
   const authError = verifyCronRequest(request, {
@@ -119,7 +139,11 @@ export async function GET(request: Request) {
 
   try {
     const result = await runReconciliation();
-    return NextResponse.json(result, { headers: NO_STORE_HEADERS });
+    const webhookReplay = await reprocessUnprocessedStripeWebhookEvents();
+    return NextResponse.json(
+      { ...result, webhookReplay },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     await captureCriticalError('Billing reconciliation failed', error, {});
 

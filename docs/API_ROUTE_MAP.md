@@ -121,7 +121,7 @@
 
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
-| `/api/billing/health` | GET | `auth` | Billing system health check |
+| `/api/billing/health` | GET | `admin` or `CRON_SECRET` | Billing system health check |
 | `/api/billing/history` | GET | `auth` | Payment history |
 | `/api/billing/status` | GET | `auth` | Current subscription status |
 

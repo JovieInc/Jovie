@@ -14,6 +14,9 @@
 import { and, sql as drizzleSql, eq, gte, isNull } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/admin';
+import { readBillingReconciliationLastRunAt } from '@/lib/billing/reconciliation/run-receipt';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { billingAuditLog, stripeWebhookEvents } from '@/lib/db/schema/billing';
@@ -73,10 +76,18 @@ interface HealthCheck {
 /**
  * GET /api/billing/health
  *
- * Health check endpoint for billing sync status
- * Returns detailed health information for monitoring
+ * Admin session or CRON_SECRET. Anonymous callers get 401/403 and no metrics.
+ * Nothing external (Sentry uptime, GitHub workflows) reads this body.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const machineAuthError = verifyCronRequest(request, {
+    route: '/api/billing/health',
+  });
+  if (machineAuthError) {
+    const adminAuthError = await requireAdmin();
+    if (adminAuthError) return adminAuthError;
+  }
+
   try {
     const now = new Date();
     const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
@@ -91,6 +102,7 @@ export async function GET() {
       proUserCount,
       stripeSubscriptionCount,
       lastBillingEvent,
+      lastReconciliationRunAt,
     ] = await Promise.all([
       // Count webhooks in last 24 hours
       db
@@ -136,13 +148,18 @@ export async function GET() {
           >`MAX(${users.lastBillingEventAt})`,
         })
         .from(users),
+
+      readBillingReconciliationLastRunAt(),
     ]);
 
     // Parse results
     const recentWebhookCount = Number(recentWebhooks[0]?.count ?? 0);
     const unprocessedWebhookCount = Number(stuckWebhooks[0]?.count ?? 0);
     const proUsersInDb = Number(proUserCount[0]?.count ?? 0);
-    const lastReconciliationAt = lastReconciliation[0]?.createdAt ?? null;
+    const lastReconciliationAt = laterTimestamp(
+      lastReconciliation[0]?.createdAt ?? null,
+      lastReconciliationRunAt
+    );
     const lastBillingEventAt = lastBillingEvent[0]?.lastBillingEventAt ?? null;
 
     // Perform health checks
@@ -229,6 +246,16 @@ export async function GET() {
       }
     );
   }
+}
+
+function laterTimestamp(
+  auditAt: Date | string | null,
+  runAt: Date | null
+): Date | string | null {
+  const auditDate = parseDate(auditAt);
+  if (!auditDate) return runAt ?? auditAt;
+  if (!runAt) return auditAt;
+  return runAt >= auditDate ? runAt : auditAt;
 }
 
 /**

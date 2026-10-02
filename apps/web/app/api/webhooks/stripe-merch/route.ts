@@ -132,9 +132,14 @@ export async function POST(request: NextRequest) {
       webhookRecordId,
     });
     if (!claimAcquired) {
+      // A 2xx here tells Stripe to stop retrying while the lease owner may
+      // still die before processed_at is set. Match the billing webhook route.
       return NextResponse.json(
-        { received: true },
-        { headers: NO_STORE_HEADERS }
+        { error: 'Webhook processing in progress' },
+        {
+          status: 503,
+          headers: { ...NO_STORE_HEADERS, 'Retry-After': '5' },
+        }
       );
     }
 
