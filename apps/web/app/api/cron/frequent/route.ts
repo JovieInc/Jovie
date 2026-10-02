@@ -19,6 +19,7 @@
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { runBillingSyncRemediation } from '@/lib/billing/sync-remediation';
 import { reconcileOrphanedAcceptedActions } from '@/lib/connectors/workflows/reconcile-orphaned-approved-actions';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
@@ -115,6 +116,17 @@ export async function GET(request: Request) {
     await db.execute(drizzleSql`SELECT 1`);
     return { latencyMs: Date.now() - pingStart };
   });
+
+  // Billing sync detector. Lives on the 15-minute cron so a dead daily
+  // reconciliation cannot take the alert with it. Reads the database; it
+  // does not call /api/billing/health.
+  results.billingSyncRemediation = await runSubJob(
+    'billingSyncRemediation',
+    async () => {
+      const remediation = await runBillingSyncRemediation();
+      return { ...remediation };
+    }
+  );
 
   // 1.5 Redis write/read canary — hourly. PING can remain green after a hard
   // command quota is exhausted, so only a real ephemeral write/read proves the

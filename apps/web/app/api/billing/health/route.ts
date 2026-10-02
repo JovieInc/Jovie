@@ -14,6 +14,7 @@
 import { and, sql as drizzleSql, eq, gte, isNull } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { NextResponse } from 'next/server';
+import { RECONCILIATION_STALE_AFTER_MS } from '@/lib/billing/sync-remediation-policy';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { billingAuditLog, stripeWebhookEvents } from '@/lib/db/schema/billing';
@@ -80,7 +81,9 @@ export async function GET() {
   try {
     const now = new Date();
     const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
-    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+    const reconciliationStaleBefore = new Date(
+      now.getTime() - RECONCILIATION_STALE_AFTER_MS
+    );
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     // Run all checks in parallel for efficiency
@@ -151,7 +154,7 @@ export async function GET() {
     const noStuckWebhooks = checkNoStuckWebhooks(unprocessedWebhookCount);
     const recentReconciliation = checkRecentReconciliation(
       lastReconciliationAt,
-      twoHoursAgo
+      reconciliationStaleBefore
     );
     const proCountSync = checkProCountSync(
       proUsersInDb,

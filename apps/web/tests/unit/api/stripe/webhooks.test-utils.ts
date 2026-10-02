@@ -223,3 +223,7 @@ vi.mock('@/lib/stripe/webhooks', () => ({
   getStripeObjectId: mockGetStripeObjectId,
   stripeTimestampToDate: mockStripeTimestampToDate,
 }));
+
+vi.mock('@/lib/stripe/webhooks/registry', () => ({
+  getHandler: mockGetHandler,
+}));

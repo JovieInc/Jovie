@@ -21,6 +21,7 @@ const {
   mockReconcileOrphanedAcceptedActions,
   mockProbeRedisOperability,
   mockCaptureError,
+  mockRunBillingSyncRemediation,
 } = vi.hoisted(() => ({
   mockDbExecute: vi.fn(),
   mockDbSelect: vi.fn(),
@@ -42,6 +43,7 @@ const {
   mockReconcileOrphanedAcceptedActions: vi.fn(),
   mockProbeRedisOperability: vi.fn(),
   mockCaptureError: vi.fn(),
+  mockRunBillingSyncRemediation: vi.fn(),
 }));
 
 vi.mock(
@@ -50,6 +52,10 @@ vi.mock(
     reconcileOrphanedAcceptedActions: mockReconcileOrphanedAcceptedActions,
   })
 );
+
+vi.mock('@/lib/billing/sync-remediation', () => ({
+  runBillingSyncRemediation: mockRunBillingSyncRemediation,
+}));
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -214,6 +220,11 @@ describe('GET /api/cron/frequent', () => {
       status: 'healthy',
       latencyMs: 5,
     });
+    mockRunBillingSyncRemediation.mockResolvedValue({
+      findings: 0,
+      filed: [],
+      skipped: false,
+    });
   });
 
   afterEach(() => {
@@ -252,6 +263,11 @@ describe('GET /api/cron/frequent', () => {
     });
     expect(data.results.scheduleNotifications.success).toBe(true);
     expect(data.results.sendNotifications.success).toBe(true);
+    expect(data.results.billingSyncRemediation).toEqual({
+      success: true,
+      data: { findings: 0, filed: [], skipped: false },
+    });
+    expect(mockRunBillingSyncRemediation).toHaveBeenCalledOnce();
     expect(data.results.redisOperability).toEqual({
       success: true,
       skipped: true,
@@ -348,5 +364,28 @@ describe('GET /api/cron/frequent', () => {
     expect(data.success).toBe(false);
     expect(data.results.sendNotifications.success).toBe(false);
     expect(data.results.sendNotifications.error).toBe('send service down');
+  });
+
+  it('returns 207 when billing sync remediation cannot file', async () => {
+    mockRunBillingSyncRemediation.mockRejectedValue(
+      new Error(
+        'LINEAR_API_KEY is not configured; billing sync remediation cannot file'
+      )
+    );
+
+    const { GET } = await import('@/app/api/cron/frequent/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/frequent', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(207);
+    expect(data.results.billingSyncRemediation.success).toBe(false);
+    expect(data.results.billingSyncRemediation.error).toContain(
+      'LINEAR_API_KEY'
+    );
+    expect(mockCaptureError).toHaveBeenCalled();
   });
 });

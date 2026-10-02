@@ -1,15 +1,13 @@
 /**
- * Billing Reconciliation Cron Job
+ * Billing Reconciliation
  *
- * Runs hourly to reconcile database subscription status with Stripe
- * Ensures no user is stuck in wrong subscription state for >1 hour
+ * Runs once a day inside `/api/cron/daily-maintenance` (midnight UTC).
+ * The standalone route stays callable with the cron secret for a manual pass.
  *
  * What it does:
- * 1. Fetches all users with stripeSubscriptionId from DB
+ * 1. Replays stored Stripe events that never reached processed_at
  * 2. Compares DB isPro status with Stripe subscription status
- * 3. Fixes any mismatches and logs to audit table
- *
- * Schedule: Every hour (configured in vercel.json)
+ * 3. Fixes mismatches and writes a reconciliation heartbeat even when nothing changed
  */
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
@@ -21,6 +19,8 @@ import {
   type ReconciliationStats,
   updateStatsFromResult,
 } from '@/lib/billing/reconciliation/batch-processor';
+import { recordReconciliationHeartbeat } from '@/lib/billing/reconciliation-heartbeat';
+import { replayUnprocessedStripeWebhooks } from '@/lib/billing/webhook-replay';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -68,11 +68,38 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
   };
   const errors: string[] = [];
 
+  // Stored-event replay is idempotent and does not call Stripe write APIs.
+  // A thrown replay (database down) fails the job so we do not write a
+  // heartbeat for a pass that never looked at the stuck rows. A single
+  // event that fails or needs a Dashboard cancel stays in the summary.
+  const replay = await replayUnprocessedStripeWebhooks();
+  if (replay.blocked.length > 0 || replay.failed.length > 0) {
+    logger.info('[billing-reconciliation] stored webhook replay left rows', {
+      processed: replay.processed,
+      blocked: replay.blocked.length,
+      failed: replay.failed.length,
+    });
+  }
+
   await reconcileUsersWithSubscriptions(stats, errors);
   await reconcileProUsersWithoutSubscription(stats, errors);
   await checkStaleCustomers(stats);
 
   const duration = Date.now() - startTime;
+
+  // A failed user pass must not look fresh. Quiet successful days still
+  // write this row; billing health reads the newest reconciliation source.
+  if (stats.errors === 0) {
+    await recordReconciliationHeartbeat({
+      stats,
+      durationMs: duration,
+      replay: {
+        processed: replay.processed,
+        blocked: replay.blocked.length,
+        failed: replay.failed.length,
+      },
+    });
+  }
 
   const result: ReconciliationResult = {
     success: stats.errors === 0,
