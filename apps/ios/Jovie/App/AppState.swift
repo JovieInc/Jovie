@@ -11,6 +11,7 @@ enum DashboardLoadState: Equatable {
 protocol AppStateRepository: Sendable {
   func loadMe(for userID: String) async throws -> MeRepositoryResult
   func clearCachedUser(_ userID: String) async
+  func clearCachedUser(_ userID: String, ifOwnedBy ownership: NativeSessionOwnership) async
   func cachedSnapshot(for userID: String) async -> MobileMeResponse?
 }
 
@@ -354,7 +355,7 @@ final class AppState {
   }
 
   private func resetToSignedOut() async {
-
+    let cleanupOwnership = NativeSessionTokenStore.captureSessionContext().ownership
     let userID = activeUserID
     Observability.clearUser()
     activeUserID = nil
@@ -365,10 +366,10 @@ final class AppState {
     MobileAuthDiagnostics.record("route_signed_out")
 
     if let userID {
-      await repository.clearCachedUser(userID)
-      await chatCache.remove(for: userID)
-      await audienceHighlightsCache.remove(for: userID)
-      await actionLoopCache.remove(for: userID)
+      await repository.clearCachedUser(userID, ifOwnedBy: cleanupOwnership)
+      await chatCache.remove(for: userID, ifOwnedBy: cleanupOwnership)
+      await audienceHighlightsCache.remove(for: userID, ifOwnedBy: cleanupOwnership)
+      await actionLoopCache.remove(for: userID, ifOwnedBy: cleanupOwnership)
     }
   }
 
