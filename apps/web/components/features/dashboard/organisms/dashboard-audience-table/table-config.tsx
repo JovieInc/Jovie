@@ -1,5 +1,11 @@
 'use client';
 
+import {
+  type ColumnPriorityLayout,
+  type ColumnPrioritySpec,
+  columnPrioritySpecsFromDefs,
+  resolveColumnPriorityLayout,
+} from '@/components/organisms/table/column-priority';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import {
   type ColumnDef,
@@ -34,7 +40,25 @@ export const AUDIENCE_TABLE_SKELETON_COLUMN_CONFIG: Array<{
   { width: '5.5rem', variant: 'button' as const },
 ];
 
+/**
+ * Fit budgets, not rendered sizes. Essential columns reserve 380px
+ * (40 + 220 + 120). Priority 2 (state + last, 340px) appears at 720.
+ * Priority 1 (alerts + engagement, 240px) appears at 960.
+ */
+const AUDIENCE_FIT = {
+  select: 40,
+  fan: 220,
+  action: 120,
+  state: 200,
+  last: 140,
+  alerts: 120,
+  engagement: 120,
+} as const;
+
 export type AudienceTableLayout = 'narrow' | 'medium' | 'wide';
+
+export const AUDIENCE_COLUMN_SPECS: readonly ColumnPrioritySpec[] =
+  columnPrioritySpecsFromDefs(buildAudienceMemberColumns('members'));
 
 export function buildAudienceMemberColumns(mode: 'members' | 'subscribers') {
   return [
@@ -44,6 +68,7 @@ export function buildAudienceMemberColumns(mode: 'members' | 'subscribers') {
       cell: SelectCell,
       size: 40,
       enableSorting: false,
+      meta: { minWidth: AUDIENCE_FIT.select },
     }),
     memberColumnHelper.accessor('displayName', {
       id: 'fan',
@@ -52,6 +77,7 @@ export function buildAudienceMemberColumns(mode: 'members' | 'subscribers') {
       size: 9999,
       minSize: 220,
       enableSorting: false,
+      meta: { primary: true, minWidth: AUDIENCE_FIT.fan },
     }),
     memberColumnHelper.display({
       id: 'state',
@@ -61,6 +87,11 @@ export function buildAudienceMemberColumns(mode: 'members' | 'subscribers') {
       ),
       size: 96,
       enableSorting: false,
+      meta: {
+        priority: 2,
+        minWidth: AUDIENCE_FIT.state,
+        compact: member => <AudienceStateCell member={member} mode={mode} />,
+      },
     }),
     memberColumnHelper.display({
       id: 'alerts',
@@ -68,6 +99,15 @@ export function buildAudienceMemberColumns(mode: 'members' | 'subscribers') {
       cell: ({ row }) => <AudienceAlertsCell member={row.original} />,
       size: 96,
       enableSorting: false,
+      meta: {
+        priority: 1,
+        minWidth: AUDIENCE_FIT.alerts,
+        compact: member =>
+          member.hasActiveAlerts &&
+          (member.activeAlertChannels?.length ?? 0) > 0 ? (
+            <AudienceAlertsCell member={member} />
+          ) : null,
+      },
     }),
     memberColumnHelper.accessor('engagementScore', {
       id: 'engagement',
@@ -77,6 +117,13 @@ export function buildAudienceMemberColumns(mode: 'members' | 'subscribers') {
       ),
       size: 80,
       enableSorting: true,
+      meta: {
+        priority: 1,
+        minWidth: AUDIENCE_FIT.engagement,
+        compact: member => (
+          <AudienceEngagementBars score={member.engagementScore} />
+        ),
+      },
     }),
     memberColumnHelper.accessor('lastSeenAt', {
       id: 'last',
@@ -86,6 +133,16 @@ export function buildAudienceMemberColumns(mode: 'members' | 'subscribers') {
       ),
       size: 56,
       enableSorting: true,
+      meta: {
+        priority: 2,
+        minWidth: AUDIENCE_FIT.last,
+        compact: member => (
+          <span className='inline-flex items-center'>
+            <span className='sr-only'>Last seen </span>
+            <AudienceLastCell lastSeenAt={member.lastSeenAt} />
+          </span>
+        ),
+      },
     }),
     memberColumnHelper.display({
       id: 'action',
@@ -93,46 +150,32 @@ export function buildAudienceMemberColumns(mode: 'members' | 'subscribers') {
       cell: ({ row }) => <AudienceActionCell member={row.original} />,
       size: 120,
       enableSorting: false,
-      meta: { className: 'text-right' },
+      meta: { className: 'text-right', minWidth: AUDIENCE_FIT.action },
     }),
   ] as Array<ColumnDef<AudienceMember, unknown>>;
 }
 
+export function audienceTableMinWidthForLayout(
+  layout: ColumnPriorityLayout
+): number {
+  if (layout.hiddenIds.includes('state')) return 480;
+  if (layout.hiddenIds.includes('alerts')) return 640;
+  return TABLE_MIN_WIDTHS.SMALL;
+}
+
 export function getAudienceTableLayout(width: number): AudienceTableLayout {
-  if (width < 720) {
-    return 'narrow';
-  }
-  if (width < 960) {
-    return 'medium';
-  }
+  const layout = resolveColumnPriorityLayout(AUDIENCE_COLUMN_SPECS, width);
+  if (layout.hiddenIds.includes('state')) return 'narrow';
+  if (layout.hiddenIds.includes('alerts')) return 'medium';
   return 'wide';
 }
 
 export function getAudienceColumnVisibility(width: number): VisibilityState {
-  switch (getAudienceTableLayout(width)) {
-    case 'narrow':
-      return {
-        alerts: false,
-        engagement: false,
-        state: false,
-        last: false,
-      };
-    case 'medium':
-      return { alerts: false, engagement: false };
-    case 'wide':
-    default:
-      return {};
-  }
+  return resolveColumnPriorityLayout(AUDIENCE_COLUMN_SPECS, width).visibility;
 }
 
 export function getAudienceTableMinWidth(width: number): number {
-  switch (getAudienceTableLayout(width)) {
-    case 'narrow':
-      return 480;
-    case 'medium':
-      return 640;
-    case 'wide':
-    default:
-      return TABLE_MIN_WIDTHS.SMALL;
-  }
+  return audienceTableMinWidthForLayout(
+    resolveColumnPriorityLayout(AUDIENCE_COLUMN_SPECS, width)
+  );
 }
