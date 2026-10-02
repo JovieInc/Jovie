@@ -1,3 +1,4 @@
+import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import type { AdminCreatorProfileRow } from '@/lib/admin/types';

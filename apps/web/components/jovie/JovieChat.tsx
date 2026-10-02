@@ -10,7 +10,6 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -30,7 +29,6 @@ import {
   usePlanGate,
 } from '@/lib/queries';
 import { cn } from '@/lib/utils';
-import { deriveChatRailContextTargets } from './chat-context-rail';
 import {
   getChatEmptyStateFirstName,
   resolveChatEmptyStateInsight,
@@ -49,6 +47,7 @@ import {
   useJovieChat,
   useStickToBottom,
 } from './hooks';
+import { useChatRailContextTargets } from './hooks/useChatRailContextTargets';
 import {
   CHAT_COMPOSER_DOCK_CLASSNAME,
   CHAT_COMPOSER_SCROLL_FADE_CLASSNAME,
@@ -323,34 +322,24 @@ export function JovieChat({
   }, [initialSkillId, conversationId, isLoadingConversation, chipTray]);
 
   const profileRailLabel = displayName ?? username ?? null;
-  const railContextTargets = useMemo(
-    () =>
-      deriveChatRailContextTargets({
-        messages,
-        profile: profileId
-          ? {
-              id: profileId,
-              label: profileRailLabel,
-            }
-          : null,
-      }),
-    [messages, profileId, profileRailLabel]
-  );
+  const knownConversationKey = activeConversationId ?? conversationId ?? null;
+  const railContextTargets = useChatRailContextTargets({
+    conversationKey: knownConversationKey,
+    messages,
+    profile: profileId ? { id: profileId, label: profileRailLabel } : null,
+  });
+  const clearRailContexts = chatEntityPanel?.clearContexts;
+  const upsertRailContexts = chatEntityPanel?.upsertContexts;
 
   useEffect(() => {
-    if (!chatEntityPanel) {
-      return;
-    }
-
     if (railContextTargets.length === 0) {
-      chatEntityPanel.clearContexts();
+      clearRailContexts?.();
       return;
     }
 
-    chatEntityPanel.upsertContexts(railContextTargets);
-  }, [chatEntityPanel, railContextTargets]);
+    upsertRailContexts?.(railContextTargets);
+  }, [clearRailContexts, upsertRailContexts, railContextTargets]);
 
-  const knownConversationKey = activeConversationId ?? conversationId ?? null;
   const knownConversationSeedRef = useRef<string | null>(null);
   if (knownConversationSeedRef.current !== knownConversationKey) {
     knownConversationSeedRef.current = knownConversationKey;
