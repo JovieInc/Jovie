@@ -254,6 +254,200 @@ class DoctorAndIntakeTest(unittest.TestCase):
         self.assertEqual(hits, [])
 
 
+def linear_issue(identifier, fingerprint, *, state="unstarted", title="", description="",
+                 created="2026-10-01T00:00:00Z", team="JOV", updated="2026-10-02T00:00:00Z"):
+    name = "Todo" if state == "unstarted" else ("Done" if state == "completed" else state)
+    return {
+        "id": "id-" + identifier, "identifier": identifier, "title": title or fingerprint,
+        "description": description, "createdAt": created, "updatedAt": updated,
+        "url": f"https://linear.app/jov/{identifier}",
+        "state": {"name": name, "type": state},
+        "team": {"key": team, "states": {"nodes": [
+            {"id": f"todo-{team}", "name": "Todo", "type": "unstarted"},
+            {"id": f"ip-{team}", "name": "In Progress", "type": "started"},
+        ]}},
+        "labels": {"nodes": [{"id": "lab-" + fingerprint, "name": f"remediation:{fingerprint}"}]},
+    }
+
+
+class LabeledEventTest(unittest.TestCase):
+    def setUp(self):
+        os.environ.pop("LANES_ESCALATION_NOTIFY_TIM", None)
+
+    def test_example_fingerprints_and_musicfetch_cutover(self):
+        cases = {
+            "asc-agreements": "human-only",
+            "billing-health-public": "fixable-by-agent",
+            "stripe-reconcile": "fixable-by-agent",
+            "e2e-nightly": "fixable-by-agent",
+            "synthetic-monitor": "fixable-by-agent",
+        }
+        for fingerprint, cls in cases.items():
+            classified = remediation.classify_labeled_event(fingerprint, fingerprint, "")
+            self.assertEqual(classified["cls"], cls, fingerprint)
+        self.assertEqual(remediation.classify_labeled_event("asc-agreements")["subtype"], "store submission")
+        for phrase, category in (
+                ("approve spend for the vendor", "spend"),
+                ("billing action on the live customer", "billing action"),
+                ("env/DNS/secrets rotated by hand", "env/DNS/secrets"),
+                ("store submission is waiting", "store submission"),
+                ("needs an outside human", "outside human"),
+                ("manual deploy of the worker", "manual deploy"),
+        ):
+            classified = remediation.classify_labeled_event("gap", "gap", phrase)
+            self.assertEqual((classified["cls"], classified["subtype"]), ("human-only", category), phrase)
+        renew = remediation.classify_labeled_event(
+            "musicfetch-quota", "Renew MusicFetch", "please renew MusicFetch before Friday")
+        self.assertEqual(renew["cls"], "fixable-by-agent")
+        self.assertEqual(renew["subtype"], "musicfetch-cutover")
+        self.assertEqual(renew["next_action"], "JOV-7323")
+        dossier = remediation.event_dossier(renew, "Renew MusicFetch", "JOV-9")
+        self.assertIn("JOV-7323", dossier)
+        self.assertIn("Do not renew MusicFetch", dossier)
+        self.assertNotIn("please renew", dossier.lower())
+
+    def test_one_open_event_per_fingerprint_and_recurrence_reopens(self):
+        older = linear_issue("JOV-1", "stripe-reconcile", created="2026-10-01T00:00:00Z")
+        newer = linear_issue("JOV-2", "stripe-reconcile", created="2026-10-02T00:00:00Z", team="LYB")
+        plan = remediation.plan_labeled_events([newer, older], {}, providers(), NOW, healthy=lambda *_: True)
+        self.assertEqual(list(plan["events"]), ["stripe-reconcile"])
+        self.assertEqual(plan["events"]["stripe-reconcile"]["identifier"], "JOV-1")
+        self.assertEqual(plan["events"]["stripe-reconcile"]["status"], "claimed")
+        self.assertEqual(plan["events"]["stripe-reconcile"]["lane"], "codex")
+        self.assertEqual([row["id"] for row in plan["comments"]], ["id-JOV-2"])
+        self.assertEqual(plan["reopens"], [])
+        again = remediation.plan_labeled_events([older, newer], plan["events"], providers(), NOW, healthy=lambda *_: True)
+        self.assertEqual(again["comments"], [])
+        self.assertEqual(again["events"]["stripe-reconcile"]["attempts"], plan["events"]["stripe-reconcile"]["attempts"])
+
+        closed = linear_issue("JOV-1", "e2e-nightly", state="completed", created="2026-09-01T00:00:00Z")
+        opened = linear_issue("JOV-8", "e2e-nightly", created="2026-10-02T00:00:00Z")
+        recur = remediation.plan_labeled_events(
+            [opened, closed], {"e2e-nightly": {"issueId": "id-JOV-1", "status": "done"}},
+            providers(), NOW, healthy=lambda *_: True)
+        self.assertEqual(recur["events"]["e2e-nightly"]["identifier"], "JOV-1")
+        self.assertEqual(recur["reopens"], [{"id": "id-JOV-1", "stateId": "todo-JOV"}])
+        self.assertTrue(any("Reopened" in row["body"] for row in recur["comments"]))
+        self.assertNotIn("id-JOV-8", recur["events"]["e2e-nightly"]["issueId"])
+
+    def test_human_and_exhausted_ping_is_behind_the_flag(self):
+        human = linear_issue("JOV-3", "asc-agreements", title="ASC agreements blocked")
+        quiet = remediation.plan_labeled_events([human], {}, providers(), NOW, healthy=lambda *_: True)
+        self.assertEqual(quiet["events"]["asc-agreements"]["status"], "human")
+        self.assertIn("store submission", quiet["events"]["asc-agreements"]["ask"])
+        self.assertEqual(quiet["comments"], [])
+        self.assertEqual(quiet["labels"], [])
+        os.environ["LANES_ESCALATION_NOTIFY_TIM"] = "1"
+        try:
+            loud = remediation.plan_labeled_events([human], {}, providers(), NOW, healthy=lambda *_: True)
+        finally:
+            os.environ.pop("LANES_ESCALATION_NOTIFY_TIM", None)
+        self.assertEqual(len(loud["comments"]), 1)
+        self.assertIn("needs-human `ccf5eaaa-8705-49f0-b264-ec3558d678b7`", loud["comments"][0]["body"])
+        self.assertEqual(loud["labels"], [{"id": "id-JOV-3", "labelId": remediation.NEEDS_HUMAN_LABEL_ID}])
+        held = remediation.plan_labeled_events([human], loud["events"], providers(), NOW, healthy=lambda *_: True)
+        self.assertEqual(held["comments"], [])
+
+        spent = {"stripe-reconcile": {
+            "issueId": "id-JOV-4", "status": "claimed", "release": True, "lane": None,
+            "attempts": [
+                {"kind": "model", "lane": "codex", "head": "stripe-reconcile", "at": NOW - 10000},
+                {"kind": "model", "lane": "devin", "head": "stripe-reconcile", "at": NOW - 9000, "topRung": True},
+            ],
+        }}
+        exhausted = remediation.plan_labeled_events(
+            [linear_issue("JOV-4", "stripe-reconcile")], spent, providers(), NOW, healthy=lambda *_: True)
+        self.assertEqual(exhausted["events"]["stripe-reconcile"]["status"], "exhausted")
+        self.assertEqual(exhausted["labels"], [])
+        self.assertTrue(exhausted["events"]["stripe-reconcile"]["ask"])
+
+    def test_failover_picks_a_stronger_live_lane(self):
+        recorded = {"synthetic-monitor": {
+            "issueId": "id-JOV-5", "status": "claimed", "release": True, "lane": None,
+            "attempts": [{"kind": "model", "lane": "codex", "head": "synthetic-monitor", "at": NOW - 10000}],
+        }}
+        plan = remediation.plan_labeled_events(
+            [linear_issue("JOV-5", "synthetic-monitor")], recorded, providers(), NOW,
+            healthy=lambda *_: True, cooled={"codex"})
+        self.assertEqual(plan["events"]["synthetic-monitor"]["status"], "claimed")
+        self.assertEqual(plan["events"]["synthetic-monitor"]["lane"], "host-local")
+        self.assertNotEqual(plan["events"]["synthetic-monitor"]["lane"], "hyperagent")
+
+    def test_doctor_counts_by_fingerprint(self):
+        snapshot = {"events": {
+            "stripe-reconcile": {"status": "claimed", "identifier": "JOV-4", "cls": "fixable-by-agent", "lane": "codex"},
+            "asc-agreements": {"status": "human", "identifier": "JOV-3", "cls": "human-only", "ask": "Tim"},
+            "e2e-nightly": {"status": "exhausted", "identifier": "JOV-8", "cls": "fixable-by-agent"},
+            "old": {"status": "done", "identifier": "JOV-1", "cls": "fixable-by-agent"},
+        }}
+        report = remediation.events_summary(snapshot)
+        self.assertEqual(report["eventsOpen"], 3)
+        self.assertEqual(report["eventsClaimed"], 1)
+        self.assertEqual(report["eventsHuman"], 1)
+        self.assertEqual(report["eventsExhausted"], 1)
+        self.assertEqual(report["byFingerprint"]["asc-agreements"]["state"], "human")
+        self.assertEqual(report["byFingerprint"]["old"]["state"], "done")
+        wrapped = remediation.remediation_summary(snapshot, [], NOW)
+        self.assertEqual(wrapped["eventsClaimed"], 1)
+        self.assertEqual(wrapped["byFingerprint"]["stripe-reconcile"]["issue"], "JOV-4")
+
+    def test_scan_is_one_label_filtered_read(self):
+        os.environ["LANES_EXECUTION_BACKEND"] = "local-test"
+        if "lane_runner" in sys.modules and hasattr(sys.modules["lane_runner"], "claim_remediation_events"):
+            runner = sys.modules["lane_runner"]
+        else:
+            runner = load("lane_runner")
+        nodes = [
+            linear_issue("JOV-1", "billing-health-public"),
+            linear_issue("JOV-2", "billing-health-public", created="2026-10-03T00:00:00Z"),
+            linear_issue("LYB-9", "synthetic-monitor", team="LYB"),
+            linear_issue("JOV-7", "musicfetch-quota", title="Renew MusicFetch", description="renew MusicFetch"),
+        ]
+        calls = []
+
+        class Linear:
+            def gql(self, query, variables):
+                calls.append(query)
+                if "issues(" in query:
+                    return {"issues": {"nodes": nodes}}
+                return {"issueUpdate": {"success": True}, "issueAddLabel": {"success": True}}
+
+            def comment(self, issue_id, body):
+                calls.append(("comment", issue_id))
+
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp, patch.object(runner, "provider_healthy", return_value=True):
+            host = type("Host", (), {"state": Path(tmp)})()
+            runner.claim_remediation_events(host, Linear())
+            runner.claim_remediation_events(host, Linear())
+            stored = __import__("json").loads((Path(tmp) / "escalation.json").read_text())
+            self.assertEqual(stored["events"]["billing-health-public"]["identifier"], "JOV-1")
+            self.assertEqual(stored["events"]["synthetic-monitor"]["team"], "LYB")
+            self.assertEqual(stored["events"]["musicfetch-quota"]["route"], "JOV-7323")
+            self.assertIn("Do not renew MusicFetch", stored["events"]["musicfetch-quota"]["dossier"])
+            self.assertNotEqual(stored["events"]["billing-health-public"]["lane"], "devin")
+            lane_name = stored["events"]["musicfetch-quota"]["lane"]
+            for fingerprint, row in stored["events"].items():
+                if fingerprint != "musicfetch-quota" and row.get("lane") == lane_name:
+                    row["running"] = True
+            (Path(tmp) / "escalation.json").write_text(__import__("json").dumps(stored))
+            issue = runner.claim_labeled_event(host, lane_name, Linear())
+            self.assertIn("JOV-7323", issue.description)
+            self.assertIn("Do not renew MusicFetch", issue.description)
+            self.assertIsNone(runner.claim_labeled_event(host, lane_name, Linear()))
+            runner.note_event_outcome(host, issue, "provider-error")
+            released = __import__("json").loads((Path(tmp) / "escalation.json").read_text())
+            self.assertTrue(released["events"]["musicfetch-quota"]["release"])
+            self.assertIsNone(released["events"]["musicfetch-quota"]["lane"])
+        reads = [query for query in calls if isinstance(query, str) and "startsWith" in query]
+        self.assertEqual(len(reads), 2)
+        self.assertIn('"JOV"', reads[0])
+        self.assertIn('"LYB"', reads[0])
+        self.assertFalse(any(isinstance(query, str) and "issue(id:" in query for query in calls))
+
+
 def json_providers():
     import json
     return json.loads((ROOT / "scripts/lanes/providers.json").read_text())

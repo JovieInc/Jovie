@@ -797,6 +797,9 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     result["providerIdleSince"] = previous["providerIdleSince"]
     result["escalation"] = obs.get("escalation") or remediation.empty_escalation()
     result["remediation"] = obs.get("remediation") or remediation.empty_remediation()
+    for key in ("eventsOpen", "eventsClaimed", "eventsHuman", "eventsExhausted"):
+        result[key] = result["remediation"].get(key, 0)
+    result["byFingerprint"] = result["remediation"].get("byFingerprint") or {}
     result["observed"] = {k: v for k, v in obs.items() if k not in ("tick", "codex", "_receipts24h", "_allReceipts")}
     if not os.environ.get("LANES_SELFTEST"):
         try:

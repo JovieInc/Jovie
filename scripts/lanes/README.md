@@ -333,15 +333,53 @@ Needs-human, obsolete and ladder-exhausted share one PR comment marked
 Escalating, ladder-exhausted and surfaced PRs count toward the terminal cap (`slots × 4`)
 via `lane-fix-escalating` / `lane-fix-exhausted`.
 
-Non-PR intake is a GitHub issue labeled `symphony-remediation` with a fingerprint marker
-(no new Actions secret). After a 30-minute claim window the tick converts it to one Linear
-issue labeled `remediation`, `agent-ready` and `ws:ci` / `ws:release-deploy` / `ws:reliability`.
-`ws:ci` is the first workstream rank, so those issues drain first.
+Non-PR intake from the relay is still a GitHub issue labeled `symphony-remediation` with a
+fingerprint marker (no new Actions secret). After a 30-minute claim window the tick converts
+it to one Linear issue labeled `remediation`, `agent-ready` and `ws:ci` /
+`ws:release-deploy` / `ws:reliability`. `ws:ci` is the first workstream rank, so those
+issues drain first.
+
+### Label contract (`remediation:<fingerprint>`)
+
+Any detector — CI, Sentry, a synthetic monitor, a cron — files or reopens **one Linear
+issue** on team **JOV** or **LYB** and adds a label whose name is `remediation:<fingerprint>`.
+That label is the event. No new controller, workflow, or service is required, and nobody
+has to file the event by hand beyond creating or reopening that issue.
+
+Examples: `remediation:asc-agreements`, `remediation:billing-health-public`,
+`remediation:stripe-reconcile`, `remediation:e2e-nightly`, `remediation:synthetic-monitor`.
+
+The bare label `remediation` (no colon) is the relay intake label, not an event.
+
+On the next dispatch tick the router:
+
+1. Reads events with **one** label-filtered Linear query (`labels.name startsWith "remediation:"`,
+   teams JOV and LYB, first 100, no per-issue follow-up read). The read goes through the
+   cached claim scan (`shared`, key `remediation-events`) so workers do not repeat it.
+2. Dedupes by fingerprint. One open event per fingerprint. A second open issue is a
+   comment, not a second claim. A recurrence reopens the canonical issue and comments
+   instead of keeping a duplicate.
+3. Classifies the event as `fixable-by-agent` or `human-only`. Human-only means Tim has
+   to act: spend, billing actions, env/DNS/secrets, store submissions (including
+   `asc-agreements`), outside humans, manual deploys.
+4. Dispatches fixable events up the existing lane ladder: the first model is a stronger
+   enabled lane than the weakest, then failover across lanes and accounts, then one
+   top-rung retry. The assigned lane claims the issue on its existing worker pass.
+5. For human-only or ladder-exhausted events, records the state always. The `needs-human`
+   label and one comment with the exact ask are posted only when
+   `LANES_ESCALATION_NOTIFY_TIM` is on (default off).
+
+`remediation:musicfetch-*` is not a renewal. It routes to the in-house resolver cutover
+(**JOV-7323**). The dossier tells the lane not to renew, purchase, extend, or restore
+MusicFetch.
 
 `doctor.json` always carries `escalation` (`by_class`, `escalating`, `ladder_exhausted`,
 `surfaced`, `attempts24h`, `landed_after_escalation24h`) and `remediation` (`by_source`,
 `by_class`, `routed_by_lane`, `failovers24h`, `escalations24h`, `ladder_exhausted`,
-`surfaced`). A non-empty `surfaced` list raises alert `escalation-needs-human`.
+`surfaced`, plus the event counters). The same event counters are top-level:
+`eventsOpen`, `eventsClaimed`, `eventsHuman`, `eventsExhausted`, and `byFingerprint`
+(state, issue, class, lane, and the exact ask). A non-empty `surfaced` list raises
+alert `escalation-needs-human`.
 
 ## Tests
 
