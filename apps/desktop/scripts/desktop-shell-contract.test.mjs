@@ -93,7 +93,7 @@ test('desktop polls build-info and reloads idle app windows on deploy drift', as
   assert.doesNotMatch(mainSource, /commitSha.*deployedAt/);
 });
 
-test('desktop update checks run on launch, interval, and wake, and restart only when idle', async () => {
+test('automatic update checks defer initial work while manual and nightly checks bypass the gate', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
 
   assert.match(mainSource, /autoUpdater\.autoDownload = true/);
@@ -105,6 +105,129 @@ test('desktop update checks run on launch, interval, and wake, and restart only 
   );
   assert.match(mainSource, /shouldInstallDownloadedUpdateWhileRunning\(/);
   assert.match(mainSource, /autoUpdater\.quitAndInstall\(true, true\)/);
+  const schedule = mainSource.match(
+    /function scheduleDesktopAutoUpdate\(\): void \{[\s\S]*?\n\}/
+  )?.[0];
+  assert.ok(schedule);
+  assert.match(schedule, /configureDesktopAutoUpdater\(\)/);
+  assert.match(schedule, /requestAutomaticDesktopUpdateCheck\(\)/);
+  assert.doesNotMatch(schedule, /runDesktopUpdateCheck\(/);
+  assert.match(
+    mainSource,
+    /function checkForUpdatesFromMenu\(\): void \{[\s\S]*?runDesktopUpdateCheck\('notify'\)/
+  );
+  assert.match(
+    mainSource,
+    /ipcMain\.handle\(DESKTOP_UPDATE_CHECK_CHANNEL,[\s\S]*?runDesktopUpdateCheck\('silent'\)/
+  );
+  assert.match(
+    mainSource,
+    /if \(nightlyUpdateLaunch\) \{[\s\S]*?runDesktopUpdateCheck\('silent'\);[\s\S]*?return;\n  \}[\s\S]*?startupMaintenance = createStartupMaintenanceGate\(\)/
+  );
+  assert.match(
+    mainSource,
+    /receipt\.composerVisibleEditableAfterPaintOpportunityMs !== null\) \{\s*startupMaintenance\?\.composerUsable\(\)/
+  );
+});
+
+test('real startup scheduling preserves an explicit update check made before gate initialization', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const source = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const ast = ts.createSourceFile(
+    'main.ts',
+    source,
+    ts.ScriptTarget.Latest,
+    true
+  );
+  const declarations = [
+    'checkForUpdatesFromMenu',
+    'runDesktopUpdateCheck',
+    'requestAutomaticDesktopUpdateCheck',
+    'scheduleDesktopAutoUpdate',
+    'requestAutomaticWebBuildCheck',
+    'scheduleHudBuildAutoReload',
+  ].map(name => {
+    const node = ast.statements.find(
+      statement =>
+        ts.isFunctionDeclaration(statement) && statement.name?.text === name
+    );
+    assert.ok(node, `real ${name} must exist`);
+    return node.getText(ast);
+  });
+  const gateSource = await readFile(
+    join(desktopRoot, 'src/startup-maintenance.ts'),
+    'utf8'
+  );
+  const compiled = ts.transpileModule(
+    `${gateSource}\n${declarations.join('\n')}`,
+    {
+      compilerOptions: {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.CommonJS,
+      },
+    }
+  ).outputText;
+
+  for (const beforeInitialization of [true, false]) {
+    let updates = 0;
+    let webChecks = 0;
+    const intervals = [];
+    const checkUpdate = () => {
+      updates += 1;
+      return Promise.resolve();
+    };
+    const context = {
+      exports: {},
+      setTimeout,
+      clearTimeout,
+      startupMaintenance: null,
+      lastDesktopUpdateCheckMs: null,
+      pendingManualUpdateCheck: false,
+      updateReadyToInstall: false,
+      nightlyUpdateLaunch: false,
+      desktopUpdatesSupported: () => true,
+      configureDesktopAutoUpdater() {},
+      autoUpdater: {
+        checkForUpdates: checkUpdate,
+        checkForUpdatesAndNotify: checkUpdate,
+      },
+      showManualUpdateCheckFeedback() {},
+      installDownloadedUpdateIfIdle() {},
+      shouldRunWakeUpdateCheck: () => false,
+      powerMonitor: { on() {} },
+      setInterval: (callback, delay) => {
+        intervals.push({ callback, delay });
+        return { unref() {} };
+      },
+      HUD_BUILD_INFO_POLL_INTERVAL_MS: 60_000,
+      BrowserWindow: { getAllWindows: () => [{}] },
+      isWebBuildReloadWindow: () => true,
+      webBuildReloadPending: new Set(),
+      checkHudBuildAndReload: () => {
+        webChecks += 1;
+      },
+    };
+    runInNewContext(compiled, context);
+    // The menu exists while app.whenReady awaits window state and splash assets.
+    if (beforeInitialization) context.checkForUpdatesFromMenu();
+    context.startupMaintenance = context.exports.createStartupMaintenanceGate();
+    context.scheduleDesktopAutoUpdate();
+    context.scheduleHudBuildAutoReload();
+    if (!beforeInitialization) context.checkForUpdatesFromMenu();
+    assert.equal(updates, 1);
+    assert.equal(webChecks, 0);
+    context.startupMaintenance.composerUsable();
+    t.mock.timers.tick(context.exports.STARTUP_MAINTENANCE_SETTLE_MS);
+    assert.equal(
+      updates,
+      1,
+      'the explicit check fulfills initial automatic work'
+    );
+    assert.equal(webChecks, 1, 'independent pending web work still runs');
+    intervals.find(interval => interval.delay === 30 * 60 * 1000).callback();
+    assert.equal(updates, 2, 'only the initial duplicate is skipped');
+    context.startupMaintenance.dispose();
+  }
 });
 
 test('desktop window fails into a branded Jovie recovery surface', async () => {

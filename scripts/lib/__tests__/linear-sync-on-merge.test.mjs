@@ -317,6 +317,32 @@ describe('linear sync on merge', () => {
     );
   });
 
+  it('keeps an escaped defect open for exact-build product and detector proof', () => {
+    const decision = decideLinearCloseOnMerge({
+      issue: {
+        id: 'issue-7200',
+        identifier: 'JOV-7200',
+        labels: ['escaped-defect'],
+        description: 'The product fix merged, but no deployment proof exists.',
+        comments: [],
+        children: [],
+        hasChildren: false,
+      },
+      pullRequests: [],
+      mergingPull: {
+        number: 19000,
+        url: 'https://github.com/JovieInc/Jovie/pull/19000',
+        sha: 'merged-is-not-deployed',
+      },
+    });
+
+    expect(decision.action).toBe('skip');
+    expect(decision.blockingNumbers).toEqual([]);
+    expect(decision.comment).toContain('Escaped defects stay open at merge');
+    expect(decision.comment).toContain('Closure evidence is incomplete');
+    expect(decision.comment).toContain('escaped-defect-closure:v1');
+  });
+
   it('does not close commissioning parent JOV-5853 when a child pull request merges', () => {
     expect(COMMISSIONING_PARENT_ALLOWLIST.has('JOV-5853')).toBe(true);
     const decision = decideLinearCloseOnMerge({

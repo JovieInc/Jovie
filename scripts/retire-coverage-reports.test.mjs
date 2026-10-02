@@ -34,6 +34,7 @@ function fixture({
   files = reports,
   ancestor = true,
   failClose = false,
+  profile = 'coverage-audit',
 } = {}) {
   const calls = [];
   let reads = 0;
@@ -52,6 +53,7 @@ function fixture({
   const run = () =>
     retireCoverageReports({
       gh,
+      profile,
       repo,
       url,
       source,
@@ -140,4 +142,67 @@ test('missing publication receipts never authorize cleanup and cleanup failures 
     /Invalid replacement/
   );
   assert.throws(() => fixture({ failClose: true }).run(), /close denied/);
+});
+
+const nightlyFiles =
+  'docs/NIGHTLY_TESTING_AGENT_REPORT.md\napps/web/reports/nightly-agent/last-run.json';
+const nightlyCandidate = () => ({
+  ...candidate(),
+  headRefName: 'bot/nightly-evidence-123-1',
+});
+const nightlyPR = () => ({
+  ...pr(),
+  title: 'chore(testing): refresh nightly testing evidence',
+  head: { ...pr().head, ref: nightlyCandidate().headRefName },
+});
+
+test('nightly retirement closes only an older nightly report and preserves coverage', () => {
+  const f = fixture({
+    profile: 'nightly-evidence',
+    candidates: [candidate(), nightlyCandidate()],
+    first: nightlyPR(),
+    files: nightlyFiles,
+  });
+  assert.deepEqual(f.run(), [1]);
+  assert.equal(f.closed().length, 1);
+  assert.equal(f.calls.filter(args => args.includes('--paginate')).length, 1);
+});
+
+test('coverage and nightly ownership cannot cross report namespaces, titles or files', () => {
+  assert.deepEqual(
+    fixture({
+      candidates: [nightlyCandidate()],
+      first: nightlyPR(),
+      files: nightlyFiles,
+    }).run(),
+    []
+  );
+  assert.deepEqual(fixture({ profile: 'nightly-evidence' }).run(), []);
+  for (const override of [
+    { title: pr().title },
+    { labels: [{ name: 'hold' }] },
+    { draft: false },
+    { head: { ...nightlyPR().head, sha: source } },
+  ]) {
+    const f = fixture({
+      profile: 'nightly-evidence',
+      candidates: [nightlyCandidate()],
+      first: nightlyPR(),
+      second: { ...nightlyPR(), ...override },
+      files: nightlyFiles,
+    });
+    assert.deepEqual(f.run(), []);
+  }
+  for (const files of [reports, `${nightlyFiles}\nsource.ts`, '']) {
+    assert.deepEqual(
+      fixture({
+        profile: 'nightly-evidence',
+        candidates: [nightlyCandidate()],
+        first: nightlyPR(),
+        files,
+      }).run(),
+      []
+    );
+  }
+  assert.throws(() => fixture({ profile: 'unknown' }).run(), /report profile/);
 });
