@@ -84,6 +84,34 @@ describe('affected-test selector inventory', () => {
     ).toBe('full');
   });
 
+  it('maps the Decisions benchmark fixture to the complete capability lane', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/capability-benchmark/decision-routing-benchmark.json',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+    expect(plan.nodeTests).toEqual([
+      'scripts/capability-benchmark/capability-benchmark.test.mjs',
+      'scripts/capability-benchmark/computer-use-decision.test.mjs',
+      'scripts/capability-benchmark/capability-reconciliation.test.mjs',
+    ]);
+  });
+
+  it('fails closed when a capability benchmark change has an unknown peer', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/capability-benchmark/decision-routing-benchmark.json',
+      'scripts/lib/unknown-capability-peer.mjs',
+    ]);
+
+    expect(plan.mode).toBe('full');
+    expect(plan.fallbackReason).toBe(
+      'Capability benchmark change exceeds its focused lane'
+    );
+  });
+
   it('enforces real merge-sync writer coverage in its existing focused CI selector', () => {
     const plan = buildAffectedTestPlan([
       'scripts/lib/linear-sync-on-merge.mjs',
