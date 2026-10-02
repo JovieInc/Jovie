@@ -294,7 +294,7 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     cell: ({ row }) => <LibraryCatalogStatusCell asset={row.original} />,
     size: 112,
     minSize: 96,
-    meta: { className: alignment.workspaceSeamX },
+    meta: { className: alignment.workspaceSeamX, minWidth: 112 },
   }),
   libraryCatalogColumnHelper.display({
     id: 'artwork',
@@ -303,7 +303,7 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     size: 56,
     minSize: 56,
     enableSorting: false,
-    meta: { className: 'px-2' },
+    meta: { className: 'px-2', minWidth: 56 },
   }),
   libraryCatalogColumnHelper.accessor('title', {
     id: 'title',
@@ -316,7 +316,7 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     minSize: 180,
     size: 9999,
     enableSorting: false,
-    meta: { className: 'px-2' },
+    meta: { className: 'px-2', primary: true, minWidth: 180 },
   }),
   libraryCatalogColumnHelper.accessor('artist', {
     id: 'artist',
@@ -329,7 +329,12 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     size: 160,
     minSize: 120,
     enableSorting: false,
-    meta: { className: 'hidden md:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 5,
+      minWidth: 160,
+      compact: asset => asset.artist,
+    },
   }),
   libraryCatalogColumnHelper.display({
     id: 'type',
@@ -341,7 +346,12 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     ),
     size: 120,
     minSize: 96,
-    meta: { className: 'hidden sm:table-cell pl-2 pr-3' },
+    meta: {
+      className: 'pl-2 pr-3',
+      priority: 6,
+      minWidth: 120,
+      compact: asset => formatLibraryItemType(asset),
+    },
   }),
   libraryCatalogColumnHelper.display({
     id: 'bpm',
@@ -351,7 +361,12 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     ),
     size: 72,
     minSize: 64,
-    meta: { className: 'hidden lg:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 4,
+      minWidth: 72,
+      compact: asset => <LibraryCatalogMetricCell asset={asset} metric='bpm' />,
+    },
   }),
   libraryCatalogColumnHelper.display({
     id: 'key',
@@ -361,7 +376,12 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     ),
     size: 72,
     minSize: 64,
-    meta: { className: 'hidden lg:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 4,
+      minWidth: 72,
+      compact: asset => <LibraryCatalogMetricCell asset={asset} metric='key' />,
+    },
   }),
   libraryCatalogColumnHelper.display({
     id: 'energy',
@@ -371,7 +391,14 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     ),
     size: 80,
     minSize: 72,
-    meta: { className: 'hidden xl:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 3,
+      minWidth: 80,
+      compact: asset => (
+        <LibraryCatalogMetricCell asset={asset} metric='energy' />
+      ),
+    },
   }),
   libraryCatalogColumnHelper.display({
     id: 'rating',
@@ -381,7 +408,14 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     ),
     size: 88,
     minSize: 80,
-    meta: { className: 'hidden xl:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 3,
+      minWidth: 88,
+      compact: asset => (
+        <LibraryCatalogMetricCell asset={asset} metric='rating' />
+      ),
+    },
   }),
   libraryCatalogColumnHelper.display({
     id: 'length',
@@ -389,7 +423,12 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     cell: ({ row }) => <LibraryCatalogLengthCell asset={row.original} />,
     size: 80,
     minSize: 72,
-    meta: { className: 'hidden md:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 5,
+      minWidth: 80,
+      compact: asset => <LibraryCatalogLengthCell asset={asset} />,
+    },
   }),
   libraryCatalogColumnHelper.display({
     id: 'waveform',
@@ -398,7 +437,7 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     size: 176,
     minSize: 176,
     enableSorting: false,
-    meta: { className: 'hidden xl:table-cell px-2' },
+    meta: { className: 'px-2', priority: 1, minWidth: 176 },
   }),
   libraryCatalogColumnHelper.display({
     id: 'providers',
@@ -406,6 +445,11 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     cell: ({ row }) => <LibraryCatalogProvidersCell asset={row.original} />,
     size: 120,
     minSize: 96,
-    meta: { className: 'hidden md:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 5,
+      minWidth: 120,
+      compact: asset => <LibraryCatalogProvidersCell asset={asset} />,
+    },
   }),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
