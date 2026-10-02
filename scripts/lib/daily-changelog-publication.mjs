@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto';
 import { isCustomerCopy } from './changelog-filter-rules.mjs';
 import {
+  DAILY_MAX_BULLETS,
   DAILY_SOURCE_SCHEMA,
   evaluateDailyWindow,
   extractDailyReceipts,
   insertDailyDigest,
+  isSafeActionHref,
   processedDailySourceIds,
   renderDailyDigest,
 } from './daily-changelog.mjs';
@@ -61,6 +63,34 @@ export function readCustomerNote(body) {
     !Array.isArray(note?.evidence) ||
     note.evidence.length === 0 ||
     note.evidence.length > 3
+  )
+    return { reason: 'failed-validation' };
+  // Optional richer explanation and a receipt-bound next step (JOV-7493).
+  // Details become claim-mapped bullets; the action destination must stay
+  // first-party and reachable for signed-out visitors.
+  if (
+    note?.details !== undefined &&
+    (!Array.isArray(note.details) ||
+      note.details.length > DAILY_MAX_BULLETS ||
+      !note.details.every(
+        value =>
+          typeof value === 'string' &&
+          value.trim() &&
+          value.length <= 240 &&
+          !/[\r\n<>]/.test(value) &&
+          isCustomerCopy(value)
+      ))
+  )
+    return { reason: 'failed-validation' };
+  if (
+    note?.action !== undefined &&
+    (typeof note.action !== 'object' ||
+      note.action === null ||
+      typeof note.action.label !== 'string' ||
+      !note.action.label.trim() ||
+      note.action.label.length > 80 ||
+      /[\r\n<>]/.test(note.action.label) ||
+      !isSafeActionHref(note.action.href))
   )
     return { reason: 'failed-validation' };
   for (const evidence of note.evidence) {
@@ -225,7 +255,7 @@ export function planDailyPublication({
         visibility: note.visibility,
         releaseWorthy: true,
         approvedClaimIds: [id],
-        approvedFacts: [note.text],
+        approvedFacts: [note.text, ...(note.details ?? [])],
         sourceLinks: [pr.url, ...note.evidence.map(item => item.url)],
       },
       controller: {
@@ -250,7 +280,8 @@ export function planDailyPublication({
           (story.summary !== note.text ||
             story.section !== note.section ||
             JSON.stringify(story.availability) !==
-              JSON.stringify(note.availability))
+              JSON.stringify(note.availability) ||
+            JSON.stringify(story.action) !== JSON.stringify(note.action))
       )
     ) {
       throw new Error(
@@ -267,7 +298,11 @@ export function planDailyPublication({
         section: note.section,
         summary: note.text,
         availability: note.availability,
-        bullets: [],
+        bullets: (note.details ?? []).map(text => ({
+          text,
+          claimIds: [id],
+        })),
+        ...(note.action !== undefined ? { action: note.action } : {}),
         sourceIds: [id],
         claimIds: [id],
       });
@@ -306,6 +341,9 @@ export function planDailyPublication({
     const scopedStory = {
       ...story,
       availability: draftsByOutcome.get(story.id)?.availability,
+      ...(draftsByOutcome.get(story.id)?.action !== undefined
+        ? { action: draftsByOutcome.get(story.id).action }
+        : {}),
     };
     const previous = combinedStories.get(story.id);
     combinedStories.set(

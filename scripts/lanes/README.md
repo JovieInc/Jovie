@@ -47,6 +47,25 @@ Event-driven: a worker that finishes re-execs the current release and pulls the 
 issue. The minute timer only restarts idle lanes and applies updates; it never signals a
 running worker. Production deploys are a separate track: only a red main stops shipping.
 
+New-issue admission reports three separate counts: raw Todo candidates, candidates
+passing the issue predicate, and new issues after the owning lane's PR budget.
+Worker and doctor share the same budget decision: each dated lane branch counts
+once while non-green, with a cap of effective slots × 2. Manual branches and
+disabled-lane orphan maintenance do not inflate that lane's budget. A failed,
+malformed or truncation-ambiguous inventory stays unknown and cannot admit new
+issues. Maintenance claims still run first and do not depend on that budget read.
+HUD labels this count as new issues; it is not total company demand or a claim of
+available worker capacity. Slot occupancy, account leases and PR work remain
+separate facts. Empty-demand alerts require known zero eligibility and no open
+PR maintenance; unknown evidence and backpressure reset the empty timer.
+
+Account attribution uses the existing status rows without changing account
+admission. Lease occupancy and cooldown are independent; an account can be both
+leased and in a recorded hold. The existing available flag means eligible under
+cooldown policy, not a fresh positive quota reading. An empty unleased-available
+list does not mean all quotas are exhausted. Usage-limit, auth, rate and unknown
+holds remain distinct, and stale or incomplete rows report unknown.
+
 Gate reservations use kernel locks for the PR number and head SHA. An adopter carries
 its reservation through checkout, install, checks and terminal receipt publication;
 another contender skips that head without taking a heavy seat or charging an issue
@@ -203,6 +222,11 @@ Gem (systemd user timer) or a Mac (launchd), with a dedicated clone:
 git clone https://github.com/JovieInc/Jovie.git ~/devin-sweep/Jovie
 LANES_REPO=~/devin-sweep/Jovie scripts/lanes/install.sh
 ```
+
+Select the repository's pinned Node in the installing shell first. The installer
+puts that Node directory first in the timer PATH on both Linux and macOS.
+After changing the host's Node installation, rerun the installer so the timer
+does not retain a removed runtime directory.
 
 Per-host knobs: `LANES_SLOTS_<PROVIDER>`, `LANES_LINEAR_ENV`, `LANES_AGENT_TIMEOUT_S`,
 `LANES_GATE_TIMEOUT_S`, `LANES_GATE_SLOTS`. A host-specific GitHub token in
