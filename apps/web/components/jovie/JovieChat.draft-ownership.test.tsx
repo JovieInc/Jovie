@@ -1,15 +1,27 @@
 import { act, fireEvent, screen } from '@testing-library/react';
 import type { UIMessage } from 'ai';
-import { useLayoutEffect, useState } from 'react';
+import {
+  type ComponentProps,
+  type ReactNode,
+  useLayoutEffect,
+  useState,
+} from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetComposerDraftStoreForTests } from '@/lib/chat/composer-draft-store';
 import { getDesktopWorkState } from '@/lib/desktop/session-work-state';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
+import type { ChatInputProps } from './components/ChatInput';
+import type { PendingFile } from './hooks/useChatFileAttachments';
+import { createComposerDraft } from './hooks/useComposerDraft';
 import { resetChatTimelineStateCacheForTests } from './hooks/useJovieChat';
 import { JovieChat } from './JovieChat';
+import * as sections from './JovieChatSections';
 
 const h = vi.hoisted(() => ({
+  router: { push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() },
   sdkRenders: vi.fn(),
+  inputRenders: vi.fn(),
+  inputProps: null as ChatInputProps | null,
   virtualizerRenders: vi.fn(),
   send: vi.fn(),
   stop: vi.fn(),
@@ -71,7 +83,7 @@ vi.mock('@tanstack/react-virtual', async importOriginal => {
   };
 });
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+  useRouter: () => h.router,
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/app/chat/draft-owner-thread',
 }));
@@ -104,24 +116,22 @@ vi.mock('@/components/jovie/components', async importOriginal => {
     ...(await importOriginal<typeof import('@/components/jovie/components')>()),
     // The controlled DOM input preserves the real ownership path: no runtime
     // hook, controller, composer surface, or transcript owner is substituted.
-    ChatInput: forwardRef<
-      HTMLTextAreaElement,
-      {
-        value: string;
-        onChange: (value: string) => void;
-        onSubmit: () => void;
-      }
-    >(({ value, onChange, onSubmit }, ref) => (
-      <textarea
-        ref={ref}
-        aria-label='Draft'
-        value={value}
-        onChange={event => onChange(event.target.value)}
-        onKeyDown={event => {
-          if (event.key === 'Enter') onSubmit();
-        }}
-      />
-    )),
+    ChatInput: forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) => {
+      const { value, onChange, onSubmit } = props;
+      h.inputProps = props;
+      h.inputRenders();
+      return (
+        <textarea
+          ref={ref}
+          aria-label='Draft'
+          value={value}
+          onChange={event => onChange(event.target.value)}
+          onKeyDown={event => {
+            if (event.key === 'Enter') onSubmit();
+          }}
+        />
+      );
+    }),
     ChatMessage: ({ parts }: { parts: UIMessage['parts'] }) => (
       <p>
         {parts
@@ -134,6 +144,31 @@ vi.mock('@/components/jovie/components', async importOriginal => {
   };
 });
 
+// Observe the real render body before mounting. The baseline exports a function;
+// the optimized version keeps React's real memo object/comparison and spies its type.
+function observeComposerRender() {
+  const component: unknown = sections.ChatDraftComposerSurface;
+  if (typeof component === 'function') {
+    return vi.spyOn(sections, 'ChatDraftComposerSurface');
+  }
+  if (
+    component !== null &&
+    typeof component === 'object' &&
+    'type' in component &&
+    typeof component.type === 'function'
+  ) {
+    return vi.spyOn(
+      component as {
+        type: (
+          props: ComponentProps<typeof sections.ChatDraftComposerSurface>
+        ) => ReactNode;
+      },
+      'type'
+    );
+  }
+  throw new Error('Expected the actual composer render function or memo type');
+}
+
 describe('composer draft ownership', () => {
   beforeEach(() => {
     resetChatTimelineStateCacheForTests();
@@ -141,8 +176,12 @@ describe('composer draft ownership', () => {
     h.loading = false;
     h.sdkSnapshot = { messages: [], status: 'ready' };
     h.sdkRenders.mockClear();
+    h.inputRenders.mockClear();
+    h.inputProps = null;
+    h.router = { push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() };
     h.virtualizerRenders.mockClear();
     h.send.mockReset().mockResolvedValue(undefined);
+    h.stop.mockReset();
     vi.stubGlobal(
       'ResizeObserver',
       class {
@@ -243,6 +282,8 @@ describe('composer draft ownership', () => {
       });
       expect(screen.getByText(text)).toBeInTheDocument();
       expect(getDesktopWorkState()?.isStreaming).toBe(true);
+      expect(h.inputProps?.isStreaming).toBe(true);
+      expect(h.inputProps?.isLoading).toBe(true);
       fireEvent.change(input, { target: { value: `Draft during ${text}` } });
       expect(input).toHaveValue(`Draft during ${text}`);
       expect(getDesktopWorkState()?.hasDraft).toBe(true);
@@ -259,10 +300,210 @@ describe('composer draft ownership', () => {
       for (const notify of h.sdkListeners) notify();
     });
     expect(getDesktopWorkState()?.isStreaming).toBe(false);
+    expect(h.inputProps?.isStreaming).toBe(false);
+    expect(h.inputProps?.isLoading).toBe(false);
+    act(() => h.inputProps?.onStop?.());
+    expect(h.stop).toHaveBeenCalledTimes(1);
     expect(getDesktopWorkState()?.hasDraft).toBe(true);
     expect(input).toHaveValue('Draft during Growing answer complete');
     view.unmount();
     expect(getDesktopWorkState()).toBeNull();
+  });
+
+  it('streams twenty assistant revisions without invoking an unchanged composer', async () => {
+    const composerRenders = observeComposerRender();
+    const view = renderWithQueryClient(
+      <JovieChat conversationId='draft-owner-thread' />
+    );
+    try {
+      await act(async () => {});
+      const input = screen.getByRole('textbox', { name: 'Draft' });
+      await act(async () => {
+        fireEvent.change(input, { target: { value: 'Start streaming' } });
+        fireEvent.keyDown(input, { key: 'Enter' });
+      });
+      const publish = (text: string) => {
+        h.sdkSnapshot = {
+          status: 'streaming',
+          messages: [
+            {
+              id: 'live-response',
+              role: 'assistant',
+              parts: [{ type: 'text', text }],
+            },
+          ],
+        };
+        for (const notify of h.sdkListeners) notify();
+      };
+      act(() => publish('First token'));
+      expect(screen.getByText('First token')).toBeInTheDocument();
+      const before = {
+        composer: composerRenders.mock.calls.length,
+        input: h.inputRenders.mock.calls.length,
+      };
+      const transcriptRenders = h.virtualizerRenders.mock.calls.length;
+      for (let index = 1; index <= 20; index++) {
+        const text = `Assistant ${'word '.repeat(index).trim()}`;
+        act(() => publish(text));
+        expect(screen.getByText(text)).toBeInTheDocument();
+      }
+      expect({
+        composer: composerRenders.mock.calls.length,
+        input: h.inputRenders.mock.calls.length,
+      }).toEqual(before);
+      expect(h.virtualizerRenders.mock.calls.length).toBeGreaterThan(
+        transcriptRenders
+      );
+      fireEvent.change(input, { target: { value: 'A live new draft' } });
+      expect(input).toHaveValue('A live new draft');
+      expect(composerRenders.mock.calls.length).toBeGreaterThan(
+        before.composer
+      );
+      expect(h.inputRenders.mock.calls.length).toBeGreaterThan(before.input);
+    } finally {
+      view.unmount();
+      composerRenders.mockRestore();
+    }
+  });
+
+  it('keeps current router, chip, profile, mode, picker and readiness behavior live', async () => {
+    const firstRouter = h.router;
+    const view = renderWithQueryClient(
+      <JovieChat conversationId='draft-owner-thread' profileId='profile-a' />
+    );
+    await act(async () => {});
+    act(() => h.inputProps?.onAddSkill?.('generateAlbumArt'));
+    expect(h.inputProps?.chips?.[0]).toMatchObject({
+      type: 'skill',
+      id: 'generateAlbumArt',
+    });
+    act(() => h.inputProps?.onRemoveChipAt?.(0));
+    expect(h.inputProps?.chips).toHaveLength(0);
+    act(() => h.inputProps?.onPickerOpenChange?.(true));
+    expect(screen.getByTestId('chat-content')).toHaveAttribute(
+      'data-picker-open',
+      'true'
+    );
+    act(() => h.inputProps?.onPickerOpenChange?.(false));
+    expect(screen.getByTestId('chat-content')).not.toHaveAttribute(
+      'data-picker-open'
+    );
+
+    const firstInterrupt = h.inputProps?.onInterruptAndSend;
+    h.router = { push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() };
+    view.rerender(
+      <JovieChat conversationId='draft-owner-thread' profileId='profile-a' />
+    );
+    expect(h.inputProps?.onInterruptAndSend).not.toBe(firstInterrupt);
+    await act(async () => {
+      fireEvent.change(screen.getByRole('textbox', { name: 'Draft' }), {
+        target: { value: 'open settings' },
+      });
+      h.inputProps?.onInterruptAndSend?.();
+    });
+    expect(h.router.push).toHaveBeenCalledWith('/app/settings');
+    expect(firstRouter.push).not.toHaveBeenCalled();
+    expect(h.send).not.toHaveBeenCalled();
+    view.rerender(<JovieChat chatMode='ov' profileId='profile-b' />);
+    await act(async () => {});
+    expect(h.inputProps?.profileId).toBe('profile-b');
+    expect(h.inputProps?.placeholder).toBe('Ask Ovie...');
+    expect(h.inputProps?.desktopConversationReady).toBe(true);
+    h.loading = true;
+    view.rerender(<JovieChat chatMode='ov' profileId='profile-b' />);
+    expect(getDesktopWorkState()?.hasPendingAction).toBe(true);
+    expect(
+      screen.queryByRole('textbox', { name: 'Draft' })
+    ).not.toBeInTheDocument();
+    h.loading = false;
+    view.rerender(<JovieChat chatMode='ov' profileId='profile-b' />);
+    expect(h.inputProps?.desktopConversationReady).toBe(true);
+    view.unmount();
+  });
+
+  it('updates file progress, upload status and rate guidance through the memo boundary', () => {
+    const draft = createComposerDraft('Review upload');
+    const file: PendingFile = {
+      id: 'upload-1',
+      name: 'notes.pdf',
+      size: 1024,
+      mediaType: 'application/pdf',
+      kind: 'document',
+      status: 'uploading',
+      progress: 25,
+      speed: 10,
+      kindLabel: 'PDF',
+    };
+    const props: ComponentProps<typeof sections.ChatDraftComposerSurface> = {
+      draft,
+      chatInputProps: {
+        onChange: draft.set,
+        onSubmit: vi.fn(),
+        isLoading: false,
+        isSubmitting: false,
+        isFileProcessing: true,
+        pendingFiles: [file],
+      },
+      showThreadView: true,
+      isRateLimited: false,
+      showManifest: true,
+      manifestCollapsed: false,
+      showChips: false,
+      pendingFiles: [file],
+      aggregate: {
+        total: 1,
+        done: 0,
+        overallPct: 25,
+        speed: '10 B/s',
+        eta: '1m',
+        locked: 0,
+      },
+      isUploading: true,
+      isPro: false,
+      onRemoveFile: vi.fn(),
+      onCollapseManifest: vi.fn(),
+      onExpandManifest: vi.fn(),
+    };
+    const view = renderWithQueryClient(
+      <sections.ChatDraftComposerSurface {...props} />
+    );
+    expect(
+      screen.getByRole('progressbar', { name: 'Upload progress for notes.pdf' })
+    ).toHaveAttribute('aria-valuenow', '25');
+    const updated = { ...file, progress: 75 };
+    view.rerender(
+      <sections.ChatDraftComposerSurface
+        {...props}
+        pendingFiles={[updated]}
+        aggregate={{ ...props.aggregate, overallPct: 75 }}
+        isRateLimited
+      />
+    );
+    expect(
+      screen.getByRole('progressbar', { name: 'Upload progress for notes.pdf' })
+    ).toHaveAttribute('aria-valuenow', '75');
+    expect(screen.getByText(/Sending too fast/)).toBeInTheDocument();
+    view.rerender(
+      <sections.ChatDraftComposerSurface
+        {...props}
+        isUploading={false}
+        pendingFiles={[]}
+        showManifest={false}
+        chatInputProps={{
+          ...props.chatInputProps,
+          isFileProcessing: false,
+          pendingFiles: [],
+        }}
+      />
+    );
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Sending too fast/)).not.toBeInTheDocument();
+    expect(h.inputProps?.isFileProcessing).toBe(false);
+    expect(h.inputProps?.pendingFiles).toHaveLength(0);
+    expect(screen.getByRole('textbox', { name: 'Draft' })).toHaveValue(
+      'Review upload'
+    );
+    view.unmount();
   });
 
   it('edits the visible draft without invoking the real runtime or virtualizer owner', async () => {
