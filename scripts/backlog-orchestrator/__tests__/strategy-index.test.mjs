@@ -1,5 +1,6 @@
 // biome-ignore-all format: Preserve legacy fixture formatting.
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { describe, it } from 'node:test';
 import {
   CONTEXT_BLOCKER,
@@ -173,6 +174,47 @@ describe('strategy index', () => {
     );
     assert.deepEqual(superseded.map(t => t.id), ['STRAT-OLD']);
     assert.deepEqual(required.map(t => t.id), ['STRAT-NEW']);
+  });
+
+  for (const [name, links] of [
+    ['self-loop', [['A', 'A']]],
+    ['two-node cycle', [['A', 'B'], ['B', 'A']]],
+  ]) {
+    it(`fails closed on a supersession ${name} without hanging`, () => {
+      const moduleUrl = new URL('../strategy-index.mjs', import.meta.url).href;
+      // A test-runner timeout cannot interrupt an infinite synchronous walk.
+      const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+        import assert from 'node:assert/strict';
+        import { matchStrategyTheses, requiredStrategyTheses } from ${JSON.stringify(moduleUrl)};
+        const theses = ${JSON.stringify(links)}.map(([id, supersededBy], i) => ({
+          id, supersededBy, status: 'superseded', keywords: i === 0 ? ['free plan'] : [],
+        }));
+        const index = { theses, byId: new Map(theses.map(t => [t.id, t])) };
+        const expected = { name: 'Error', message: 'strategy-thesis-supersession-cycle' };
+        assert.throws(() => matchStrategyTheses(index, 'free plan'), expected);
+        assert.throws(() => requiredStrategyTheses({ title: 'free plan' }, { index }), expected);
+      `], { encoding: 'utf8', timeout: 2_000, killSignal: 'SIGKILL' });
+      assert.ifError(result.error);
+      assert.equal(result.signal, null);
+      assert.equal(result.status, 0, result.stderr);
+    });
+  }
+
+  it('preserves shared multi-hop replacements, provenance and score order', () => {
+    const theses = [
+      { id: 'OLD-A', status: 'superseded', keywords: ['retired alpha'], supersededBy: 'MIDDLE' },
+      { id: 'OLD-B', status: 'superseded', keywords: ['retired beta'], supersededBy: 'MIDDLE' },
+      { id: 'MIDDLE', status: 'superseded', keywords: [], supersededBy: 'STRAT-00' },
+      { id: 'STRAT-00', status: 'active', keywords: [], supersededBy: null },
+      { id: 'STRAT-A', status: 'active', keywords: ['direct match'], supersededBy: null },
+      { id: 'STRAT-Z', status: 'active', keywords: ['direct match', 'strong match'], supersededBy: null },
+    ];
+    const index = { theses, byId: new Map(theses.map(t => [t.id, t])) };
+    const { required, superseded } = matchStrategyTheses(
+      index, 'retired alpha retired beta direct match strong match'
+    );
+    assert.deepEqual(required, [theses[5], theses[4], theses[3]]);
+    assert.deepEqual(superseded, [theses[0], theses[1]]);
   });
 
   it('requires no strategy binding for non-sensitive issues', () => {

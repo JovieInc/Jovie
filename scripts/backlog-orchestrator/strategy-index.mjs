@@ -168,8 +168,12 @@ export function matchStrategyTheses(index, text) {
   const active = scored.filter(e => e.thesis.status !== 'superseded');
   // Superseded doctrine must surface its current replacement, not the loser.
   for (const { thesis } of superseded) {
+    const visited = new Set();
     let cursor = thesis;
     while (cursor?.supersededBy) {
+      if (visited.has(cursor.id))
+        throw new Error('strategy-thesis-supersession-cycle');
+      visited.add(cursor.id);
       const winner = index.byId.get(cursor.supersededBy);
       if (!winner || winner.status === 'superseded') {
         cursor = winner;

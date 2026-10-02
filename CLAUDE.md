@@ -88,9 +88,9 @@ Docs use [parity](docs/DOCUMENTATION.md), policy, link and context evals; they
 must not be presented as live model or UI proof. UI changes require state coverage
 and layout stability checks; see DESIGN.md for bounded disclosure exceptions.
 
-Run the narrow relevant checks first; broaden for changed boundaries, failures,
-or required CI coverage. Once relevant checks pass, avoid redundant reruns.
-Report changes, exact checks, failures, and limitations. Distinguish local source,
-hosted CI, native merge queue, deployed build, and observed runtime. Never infer
-one from another. Preserve the original objective and user corrections across
-compaction; resume from the next unfinished step, not from the beginning.
+Run narrow relevant checks first; broaden for changed boundaries, failures, or
+required CI coverage. Avoid redundant reruns. Report changes, exact checks,
+failures, and limitations. Keep local source, hosted CI, native merge queue,
+deployed build and observed runtime distinct; never infer one from another.
+Preserve the original goal and user corrections across compaction; resume at
+the next unfinished step.
