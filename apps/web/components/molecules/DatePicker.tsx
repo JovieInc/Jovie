@@ -67,7 +67,7 @@ export function DatePicker({
           type='button'
           disabled={disabled}
           className={cn(
-            'flex h-8 w-full items-center justify-start gap-2 rounded-lg border border-subtle bg-surface-0 px-3 text-xs font-normal text-primary-token transition-[border-color,background-color,color] duration-subtle hover:border-default hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60',
+            'flex h-8 w-full items-center justify-start gap-2 rounded-lg border border-subtle bg-surface-0 px-3 text-xs font-normal text-primary-token transition-colors duration-subtle hover:border-default hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60',
             !selected && 'text-tertiary-token',
             className
           )}
