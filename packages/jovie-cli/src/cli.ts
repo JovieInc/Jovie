@@ -97,8 +97,9 @@ function usage(): string {
   return `Usage: jovie <command> [options]
 
 Jovie for agents: create artist profiles from Spotify and read public artist
-data. Public commands need no login. Internal fleet commands require a scoped
-JOVIE_WORKER_TOKEN supplied by the operator. Every command supports --json.
+data. No login or API key is needed for public commands.
+Internal fleet commands require a scoped JOVIE_WORKER_TOKEN supplied by the
+operator. Every command supports --json.
 
 Commands:
 ${lines.join('\n')}
