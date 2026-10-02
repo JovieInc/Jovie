@@ -59,6 +59,7 @@ interface HealthCheckResult {
     activeSubscriptionsInStripe: number;
     recentWebhookCount: number;
     unprocessedWebhookCount: number;
+    oldestUnprocessedWebhookAt: string | null;
     lastReconciliationAt: string | null;
     lastBillingEventAt: string | null;
   };
@@ -100,7 +101,12 @@ export async function GET() {
 
       // Count stuck (unprocessed) webhooks older than 30 minutes
       db
-        .select({ count: drizzleSql<number>`count(*)` })
+        .select({
+          count: drizzleSql<number>`count(*)`,
+          oldestCreatedAt: drizzleSql<
+            Date | string | null
+          >`min(${stripeWebhookEvents.createdAt})`,
+        })
         .from(stripeWebhookEvents)
         .where(
           and(
@@ -141,6 +147,8 @@ export async function GET() {
     // Parse results
     const recentWebhookCount = Number(recentWebhooks[0]?.count ?? 0);
     const unprocessedWebhookCount = Number(stuckWebhooks[0]?.count ?? 0);
+    const oldestUnprocessedWebhookAt =
+      stuckWebhooks[0]?.oldestCreatedAt ?? null;
     const proUsersInDb = Number(proUserCount[0]?.count ?? 0);
     const lastReconciliationAt = lastReconciliation[0]?.createdAt ?? null;
     const lastBillingEventAt = lastBillingEvent[0]?.lastBillingEventAt ?? null;
@@ -183,6 +191,9 @@ export async function GET() {
         activeSubscriptionsInStripe: stripeSubscriptionCount,
         recentWebhookCount,
         unprocessedWebhookCount,
+        oldestUnprocessedWebhookAt: toISOStringOrNull(
+          oldestUnprocessedWebhookAt
+        ),
         lastReconciliationAt: toISOStringOrNull(lastReconciliationAt),
         lastBillingEventAt: toISOStringOrNull(lastBillingEventAt),
       },
@@ -198,6 +209,14 @@ export async function GET() {
         route: '/api/billing/health',
         checks: result.checks,
         metrics: result.metrics,
+      });
+    } else if (recentReconciliation.status === 'warning') {
+      await captureWarning('Billing sync stale', undefined, {
+        service: 'billing',
+        route: '/api/billing/health',
+        remediation: 'billing-sync-stale',
+        fingerprint: 'billing-sync-stale',
+        lastReconciliationAt: result.metrics.lastReconciliationAt,
       });
     }
 
