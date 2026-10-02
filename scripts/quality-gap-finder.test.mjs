@@ -553,18 +553,37 @@ describe('quality-gap-finder', () => {
     });
 
     it('rejects another issue closure receipt fetched through the real Linear adapter', async () => {
-      const issues = await fetchRecentDefects('lin_test', 30, async (_url, init) => {
-        const { query } = JSON.parse(String(init?.body ?? '{}'));
-        return { ok: true, json: async () => ({ data:
-          query.includes('EscapedDefectClosureComments')
-            ? { i0: { identifier: 'JOV-10', comments: { nodes: [
-                { body: escapedDefectEvidence() },
-              ] } } }
-            : { issues: { nodes: [{ identifier: 'JOV-10', title: 'different defect',
-                state: { name: 'Done', type: 'completed' },
-                labels: { nodes: [{ name: 'escaped-defect' }] } }] } },
-        }) };
-      });
+      const issues = await fetchRecentDefects(
+        'lin_test',
+        30,
+        async (_url, init) => {
+          const { query } = JSON.parse(String(init?.body ?? '{}'));
+          return {
+            ok: true,
+            json: async () => ({
+              data: query.includes('EscapedDefectClosureComments')
+                ? {
+                    i0: {
+                      identifier: 'JOV-10',
+                      comments: { nodes: [{ body: escapedDefectEvidence() }] },
+                    },
+                  }
+                : {
+                    issues: {
+                      nodes: [
+                        {
+                          identifier: 'JOV-10',
+                          title: 'different defect',
+                          state: { name: 'Done', type: 'completed' },
+                          labels: { nodes: [{ name: 'escaped-defect' }] },
+                        },
+                      ],
+                    },
+                  },
+            }),
+          };
+        }
+      );
       const [gap] = collectEscapedDefectClosureGaps(issues);
       assert.ok(gap, 'receipt for JOV-9 must not close JOV-10');
       assert.equal(gap.originatingIssue, 'JOV-10');

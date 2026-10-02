@@ -57,13 +57,11 @@ import {
 } from 'node:fs';
 import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ownedHere } from './invariants/registry.mjs';
 import {
   ESCAPED_DEFECT_LABEL,
   evaluateEscapedDefectClosure,
 } from './lib/escaped-defect-closure.mjs';
-
-
-import { ownedHere } from './invariants/registry.mjs';
 import {
   JOVIE_TEAM_ID,
   upsertLinearIssueByTitleFingerprint,
