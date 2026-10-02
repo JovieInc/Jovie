@@ -58,12 +58,32 @@ export function isStrictBlogContentPr(pr) {
 
 export function findBlogQualificationRun(runs, pr) {
   return runs
-    .filter(
-      run =>
+    .filter(run => {
+      if (
+        run.workflow &&
+        run.workflow !== 'ci.yml' &&
+        run.path !== '.github/workflows/ci.yml'
+      )
+        return false;
+      const source =
+        run.event !== 'merge_group' &&
         run.head_sha === pr.headRefOid &&
         (run.prNumbers?.includes(pr.number) ||
-          run.head_branch === pr.headRefName)
-    )
+          run.head_branch === pr.headRefName);
+      // The queue suffix is a predecessor SHA, not the PR source SHA. Only a
+      // run on the actual landed commit can prove this native qualification.
+      const queue =
+        /^gh-readonly-queue\/main\/pr-([1-9]\d*)-[a-f0-9]{40}$/.exec(
+          run.head_branch || ''
+        );
+      const native =
+        run.event === 'merge_group' &&
+        /^[a-f0-9]{40}$/.test(pr.mergeCommitSha || '') &&
+        run.head_sha === pr.mergeCommitSha &&
+        (run.prNumbers?.includes(pr.number) ||
+          Number(queue?.[1]) === pr.number);
+      return source || native;
+    })
     .toSorted((a, b) => b.id - a.id)[0];
 }
 

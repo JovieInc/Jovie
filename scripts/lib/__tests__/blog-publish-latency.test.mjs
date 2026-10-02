@@ -38,6 +38,46 @@ describe('blog publish latency', () => {
     ).toBeUndefined();
   });
 
+  it('attributes native qualification only to a proven merged head and the same PR', () => {
+    const pr = {
+      number: 42,
+      headRefName: 'candidate',
+      headRefOid: 'a'.repeat(40),
+      mergeCommitSha: 'c'.repeat(40),
+    };
+    const native = {
+      id: 7,
+      event: 'merge_group',
+      head_sha: pr.mergeCommitSha,
+      head_branch: `gh-readonly-queue/main/pr-42-${'b'.repeat(40)}`,
+      prNumbers: [],
+    };
+    expect(findBlogQualificationRun([native], pr)).toEqual(native);
+    expect(
+      findBlogQualificationRun([{ ...native, head_sha: 'd'.repeat(40) }], pr)
+    ).toBeUndefined();
+    expect(
+      findBlogQualificationRun(
+        [
+          {
+            ...native,
+            head_branch: `gh-readonly-queue/main/pr-43-${'b'.repeat(40)}`,
+          },
+        ],
+        pr
+      )
+    ).toBeUndefined();
+    expect(
+      findBlogQualificationRun([{ ...native, event: 'pull_request' }], pr)
+    ).toBeUndefined();
+    expect(
+      findBlogQualificationRun(
+        [{ ...native, workflow: 'fork-pr-gate.yml' }],
+        pr
+      )
+    ).toBeUndefined();
+  });
+
   it('discloses unclassified PRs instead of silently reporting a complete cohort', () => {
     const report = buildBlogPublishLatency({
       mergedPrs: [
