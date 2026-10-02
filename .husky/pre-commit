@@ -9,7 +9,7 @@ bash scripts/security/scan-secrets.sh pre-commit
 node scripts/repo-hygiene-guard.mjs --staged
 pnpm run skill-governance:check -- --staged
 pnpm run next:proxy-guard
-pnpm exec lint-staged
+pnpm exec lint-staged --no-stash
 
 # iOS adapter: when Swift sources are staged, run the portable best-practices lint.
 if git diff --cached --name-only --diff-filter=ACM | grep -qE '^apps/ios/.*\.swift$'; then

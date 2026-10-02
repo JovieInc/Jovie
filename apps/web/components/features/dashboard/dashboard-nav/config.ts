@@ -7,21 +7,22 @@ import {
   Home,
   IdCard,
   Inbox,
+  Layers,
   Link,
   Lock,
   MailCheck,
-  Music,
   PieChart,
   Plug,
   Settings,
   ShieldCheck,
   SquarePen,
+  User,
   UserCircle,
   Users,
-  Waypoints,
 } from 'lucide-react';
 
 import { APP_ROUTES } from '@/constants/routes';
+import { PRODUCT_ONTOLOGY } from '@/data/productOntology';
 
 import { CUSTOMER_NAV_CAPACITY, partitionCustomerNavigation } from './capacity';
 import type { NavItem } from './types';
@@ -63,13 +64,13 @@ export const homeNavItem: NavItem = {
 };
 
 export const libraryNavItem: NavItem = {
-  name: 'Library',
+  name: PRODUCT_ONTOLOGY.work.label,
   href: APP_ROUTES.LIBRARY,
   id: 'library',
-  icon: Music,
-  iconName: 'Music',
+  icon: Layers,
+  iconName: 'Layers',
   tier: 'core',
-  description: 'Browse releases, audio, video, images, and files',
+  description: PRODUCT_ONTOLOGY.work.definition,
 };
 
 export const contactsNavItem: NavItem = {
@@ -83,13 +84,13 @@ export const contactsNavItem: NavItem = {
 };
 
 export const presenceNavItem: NavItem = {
-  name: 'Presence',
+  name: PRODUCT_ONTOLOGY.identity.label,
   href: APP_ROUTES.PRESENCE,
   id: 'presence',
-  icon: Waypoints,
-  iconName: 'Waypoints',
+  icon: User,
+  iconName: 'User',
   tier: 'core',
-  description: 'Monitor DSP profiles, social networks, and artist presence',
+  description: PRODUCT_ONTOLOGY.identity.definition,
 };
 
 export const linksNavItem: NavItem = {
@@ -99,7 +100,7 @@ export const linksNavItem: NavItem = {
   icon: Link,
   iconName: 'Link',
   tier: 'core',
-  description: 'Manage your public identity and links',
+  description: 'Manage links that represent your identity and work',
 };
 
 export const audienceNavItem: NavItem = {
@@ -136,10 +137,10 @@ export const tasksNavItem: NavItem = {
 export const artistNavigation = [] as const satisfies readonly NavItem[];
 
 /**
- * Founder-approved job-level customer shell IA (JOV-7159): one ordered tuple
+ * Founder-approved top-level product ontology (JOV-7305): one ordered tuple
  * shared by desktop, mobile, and route coverage. Entity collections such as
- * releases, products, events, and videos remain contextual views instead of
- * permanent root destinations.
+ * links, releases, products, events, and videos remain contextual views or
+ * representations instead of permanent root destinations.
  *
  * Capacity (JOV-4515): every entry here is `core` and must fit the desktop
  * primary rail. Mark new trial destinations `experimental` so they overflow
@@ -149,7 +150,7 @@ export const artistNavigation = [] as const satisfies readonly NavItem[];
 export const primaryNavigation = [
   homeNavItem,
   presenceNavItem,
-  linksNavItem,
+  libraryNavItem,
   audienceNavItem,
 ] as const satisfies readonly NavItem[];
 

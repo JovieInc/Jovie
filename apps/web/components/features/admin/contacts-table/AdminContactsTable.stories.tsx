@@ -1,5 +1,7 @@
+import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { AdminPeopleRightPanelProvider } from '@/components/features/admin/AdminPeopleRightPanelProvider';
+import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import type {
   AdminContactRow,
   AdminContactStageMetrics,
@@ -67,9 +69,11 @@ const meta: Meta<typeof AdminContactsTable> = {
   },
   decorators: [
     Story => (
-      <AdminPeopleRightPanelProvider>
-        <Story />
-      </AdminPeopleRightPanelProvider>
+      <RightPanelProvider>
+        <AdminPeopleRightPanelProvider>
+          <Story />
+        </AdminPeopleRightPanelProvider>
+      </RightPanelProvider>
     ),
   ],
 };

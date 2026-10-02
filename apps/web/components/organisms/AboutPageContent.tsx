@@ -1,12 +1,15 @@
 import Image from 'next/image';
+import Link from 'next/link';
 import {
   FaqSection,
   MarketingContainer,
   MarketingHero,
   MarketingHeroPhoto,
 } from '@/components/marketing';
+import { AboutPageRefresh } from '@/components/organisms/AboutPageRefresh';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { ABOUT_COPY, ABOUT_FAQ_ITEMS } from '@/data/aboutCopy';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 export { ABOUT_FAQ_ITEMS };
 
@@ -17,6 +20,10 @@ const ABOUT_HERO_PHOTO = {
 } as const;
 
 export function AboutPageContent() {
+  if (FEATURE_FLAGS.SHOW_PUBLIC_ABOUT_FOOTER_REFRESH) {
+    return <AboutPageRefresh />;
+  }
+
   return (
     <>
       <div className='marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'>
@@ -60,7 +67,13 @@ export function AboutPageContent() {
               width={640}
             />
             <figcaption className='px-5 py-4 text-sm text-secondary-token'>
-              {ABOUT_COPY.origin.signoff}
+              <Link
+                href={ABOUT_COPY.origin.href}
+                prefetch={false}
+                className='underline underline-offset-4'
+              >
+                {ABOUT_COPY.origin.signoff}
+              </Link>
             </figcaption>
           </figure>
         </section>
@@ -75,7 +88,13 @@ export function AboutPageContent() {
             {ABOUT_COPY.features.map(feature => (
               <div key={feature.title}>
                 <h3 className='font-medium text-primary-token'>
-                  {feature.title}
+                  <Link
+                    href={feature.href}
+                    prefetch={false}
+                    className='underline underline-offset-4'
+                  >
+                    {feature.title}
+                  </Link>
                 </h3>
                 <p className='mt-2 text-sm leading-relaxed text-secondary-token'>
                   {feature.description}

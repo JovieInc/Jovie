@@ -19,6 +19,7 @@ import {
   screen,
   session,
   shell,
+  type WebContents,
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { openCurrentOvieInBrowser } from './ovie-browser-recovery';
@@ -98,10 +99,15 @@ import {
   getHudBuildFingerprint,
   isHudRoutePath,
   isWebBuildReloadPath,
+  SESSION_WORK_PROBE,
   shouldReloadWindowForWebBuild,
-  UNSENT_INPUT_PROBE,
 } from './hud-build-reload';
 import { resolveIpcSenderUrl } from './ipc-sender';
+import {
+  probeAllWindowWorkSafety,
+  probeSessionWorkSafety,
+  singleFlight,
+} from './session-work-state';
 import {
   type MainLivenessMonitor,
   createMainLivenessMonitor,
@@ -368,6 +374,25 @@ let mainWindowHiddenForAuthHandoff = false;
 let currentHudBuildFingerprint: string | null = null;
 // webContents ids still showing the web build that preceded the current one.
 const webBuildReloadPending = new Set<number>();
+const workDocumentGenerations = new WeakMap<WebContents, number>();
+ipcMain.on('desktop-work-state-changed', event => {
+  if (event.senderFrame !== event.sender.mainFrame) return;
+  workDocumentGenerations.set(
+    event.sender,
+    (workDocumentGenerations.get(event.sender) ?? 0) + 1
+  );
+});
+app.on('web-contents-created', (_event, contents) => {
+  contents.on('did-start-navigation', (...args: unknown[]) => {
+    const navigation = parseDidStartNavigation(args);
+    if (navigation?.isMainFrame && !navigation.isInPlace) {
+      workDocumentGenerations.set(
+        contents,
+        (workDocumentGenerations.get(contents) ?? 0) + 1
+      );
+    }
+  });
+});
 let lastDesktopUpdateCheckMs: number | null = null;
 let summerRuntimeBridge: SummerRuntimeBridge | null = null;
 let mainLivenessMonitor: MainLivenessMonitor | null = null;
@@ -1612,6 +1637,11 @@ async function persistDesktopBuildIdentityEvidence(): Promise<void> {
 }
 
 function showDesktopAboutWindow(): void {
+  if (process.platform === 'darwin') {
+    app.showAboutPanel();
+    return;
+  }
+
   if (aboutWindow && !aboutWindow.isDestroyed()) {
     showWindow(aboutWindow);
     return;
@@ -1773,24 +1803,43 @@ function isWebBuildReloadWindow(win: BrowserWindow): boolean {
   );
 }
 
-/** Unreadable renderers count as holding input: never drop text on a guess. */
-async function windowHasUnsentInput(win: BrowserWindow): Promise<boolean> {
-  try {
-    return (
-      (await win.webContents.executeJavaScript(UNSENT_INPUT_PROBE)) === true
-    );
-  } catch {
-    return true;
-  }
+/** Auth remains main-owned even when the chat renderer is hidden or idle. */
+function hasPendingDesktopAuthentication(): boolean {
+  return Boolean(
+    isAuthHandoffOpen() ||
+    desktopBrowserAuthRouteState.pendingPkce ||
+    desktopBrowserAuthRouteState.recoveryNavigationPending ||
+    pendingAuthCompletion ||
+    pendingLegacyAuthReturnRoute
+  );
 }
 
-async function anyWindowHasUnsentInput(): Promise<boolean> {
-  const results = await Promise.all(
-    BrowserWindow.getAllWindows()
-      .filter(isWebBuildReloadWindow)
-      .map(windowHasUnsentInput)
-  );
-  return results.some(Boolean);
+/** Unknown state, draft probe failures and navigation during a probe block reload. */
+async function windowWorkStateSafe(win: BrowserWindow): Promise<boolean> {
+  if (win.isDestroyed() || win.webContents.isLoadingMainFrame()) return false;
+  const contents = win.webContents;
+  const generation = workDocumentGenerations.get(contents);
+  return probeSessionWorkSafety({
+    read: () => contents.executeJavaScript(SESSION_WORK_PROBE),
+    isCurrentDocument: () =>
+      !win.isDestroyed() &&
+      !contents.isLoadingMainFrame() &&
+      generation === workDocumentGenerations.get(contents),
+    isAuthenticating: hasPendingDesktopAuthentication,
+    now: Date.now,
+  });
+}
+
+function allWindowWorkStateSafe(): Promise<boolean> {
+  return probeAllWindowWorkSafety({
+    getWindows: () => BrowserWindow.getAllWindows().filter(
+      win => win === mainWindow || isWebBuildReloadWindow(win)
+    ),
+    getGeneration: win => workDocumentGenerations.get(win.webContents),
+    isLoading: win => win.isDestroyed() || win.webContents.isLoadingMainFrame(),
+    probe: windowWorkStateSafe,
+    isAuthenticating: hasPendingDesktopAuthentication,
+  });
 }
 
 function anyWindowAudible(): boolean {
@@ -1800,7 +1849,6 @@ function anyWindowAudible(): boolean {
 }
 
 async function reloadIdleWindowsForWebBuildChange(): Promise<void> {
-  const systemIdleSeconds = powerMonitor.getSystemIdleTime();
   const liveIds = new Set<number>();
   for (const win of BrowserWindow.getAllWindows()) {
     if (!isWebBuildReloadWindow(win)) continue;
@@ -1808,14 +1856,17 @@ async function reloadIdleWindowsForWebBuildChange(): Promise<void> {
     liveIds.add(id);
     if (!webBuildReloadPending.has(id)) continue;
 
+    const workStateSafe = await windowWorkStateSafe(win);
+    if (win.isDestroyed()) continue;
     const isHud = isHudWindow(win);
     const reload = shouldReloadWindowForWebBuild({
       isHud,
       visible: win.isVisible() && !win.isMinimized(),
       focused: win.isFocused(),
       audible: win.webContents.isCurrentlyAudible(),
-      hasUnsentInput: isHud ? false : await windowHasUnsentInput(win),
-      systemIdleSeconds,
+      hasUnsentInput: false, // Included in the request-time work probe.
+      workStateSafe,
+      systemIdleSeconds: powerMonitor.getSystemIdleTime(),
     });
     if (reload && !win.isDestroyed()) {
       webBuildReloadPending.delete(id);
@@ -1827,7 +1878,7 @@ async function reloadIdleWindowsForWebBuildChange(): Promise<void> {
   }
 }
 
-async function checkHudBuildAndReload(): Promise<void> {
+const checkHudBuildAndReload = singleFlight(async () => {
   const reloadable = BrowserWindow.getAllWindows().filter(
     isWebBuildReloadWindow
   );
@@ -1851,7 +1902,7 @@ async function checkHudBuildAndReload(): Promise<void> {
   if (webBuildReloadPending.size > 0) {
     await reloadIdleWindowsForWebBuildChange();
   }
-}
+});
 
 function showPublicProfilePreview(urlString: string): boolean {
   const canonicalUrl = canonicalPublicProfileUrl(urlString);
@@ -2701,29 +2752,35 @@ function scheduleDesktopAutoUpdate(): void {
 }
 
 /** Restart into a downloaded update only overnight, idle, and with no work at risk. */
-async function installDownloadedUpdateIfIdle(): Promise<void> {
+const installDownloadedUpdateIfIdle = singleFlight(async () => {
   if (!updateReadyToInstall || nightlyUpdateLaunch) return;
-  const baseline = {
-    updateReadyToInstall,
-    localHour: new Date().getHours(),
-    systemIdleSeconds: powerMonitor.getSystemIdleTime(),
-    audible: anyWindowAudible(),
-  };
-  if (
-    !shouldInstallDownloadedUpdateWhileRunning({
-      ...baseline,
-      hasUnsentInput: false,
-    })
-  ) {
-    return;
-  }
+  const workStateSafe = await allWindowWorkStateSafe();
   if (
     shouldInstallDownloadedUpdateWhileRunning({
-      ...baseline,
-      hasUnsentInput: await anyWindowHasUnsentInput(),
+      updateReadyToInstall,
+      localHour: new Date().getHours(),
+      systemIdleSeconds: powerMonitor.getSystemIdleTime(),
+      audible: anyWindowAudible(),
+      hasUnsentInput: false, // Included in the request-time work probe.
+      workStateSafe,
     })
   ) {
     autoUpdater.quitAndInstall(true, true);
+  }
+});
+
+async function installNightlyDownloadedUpdate(): Promise<void> {
+  const workStateSafe = await allWindowWorkStateSafe();
+  if (
+    shouldInstallDownloadedUpdateNow({
+      nightlyLaunch: nightlyUpdateLaunch,
+      hasVisibleWindow: BrowserWindow.getAllWindows().some(
+        win => !win.isDestroyed() && win.isVisible() && !win.isMinimized()
+      ),
+      workStateSafe,
+    })
+  ) {
+    autoUpdater.quitAndInstall(true, false);
   }
 }
 
@@ -2948,16 +3005,8 @@ autoUpdater.on('update-downloaded', info => {
   sendToAppWindows(UPDATE_DOWNLOADED_CHANNEL);
   pushUpdateEvent({ type: 'update-downloaded', version: info.version });
 
-  const hasVisibleWindow = BrowserWindow.getAllWindows().some(
-    win => !win.isDestroyed() && win.isVisible() && !win.isMinimized()
-  );
-  if (
-    shouldInstallDownloadedUpdateNow({
-      nightlyLaunch: nightlyUpdateLaunch,
-      hasVisibleWindow,
-    })
-  ) {
-    autoUpdater.quitAndInstall(true, false);
+  if (nightlyUpdateLaunch) {
+    void installNightlyDownloadedUpdate();
     return;
   }
   void installDownloadedUpdateIfIdle();

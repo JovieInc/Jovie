@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+
 /**
  * Unified Admin Table Design Tokens & Styles
  * Inspired by Linear.app for clean visual hierarchy and polish
@@ -177,3 +179,21 @@ export const presets = {
     'align-middle'
   ),
 } as const;
+
+/** Fixed content budgets shared by real rows, loading rows, and virtualization. */
+export const TABLE_ROW_MODES = {
+  compact: { rowHeight: 40, contentHeight: 32 },
+  'two-line': { rowHeight: 56, contentHeight: 48 },
+  description: { rowHeight: 72, contentHeight: 64 },
+  controls: { rowHeight: 96, contentHeight: 88 },
+} as const;
+
+export type TableRowMode = keyof typeof TABLE_ROW_MODES;
+
+export function tableRowModeStyle(mode?: TableRowMode): CSSProperties {
+  if (!mode) return {};
+  return {
+    '--table-row-height': `${TABLE_ROW_MODES[mode].rowHeight}px`,
+    '--table-cell-content-height': `${TABLE_ROW_MODES[mode].contentHeight}px`,
+  } as CSSProperties;
+}

@@ -121,7 +121,7 @@ function isExcludedAccount(account: FinanceAccount): boolean {
 function isCashAccount(account: FinanceAccount): boolean {
   if (isExcludedAccount(account)) return false;
   const t = (account.accountType ?? '').toLowerCase();
-  return ['', 'checking', 'savings', 'depository', 'cash'].includes(t);
+  return ['checking', 'savings', 'depository', 'cash'].includes(t);
 }
 
 function toNumber(value: string | null | undefined): number | null {
@@ -184,7 +184,7 @@ function makeMetric(
       ? computeRatePercent(deltaAbs, Math.abs(previous!))
       : null;
   const favorable =
-    deltaAbs === null
+    deltaAbs === null || deltaAbs === 0
       ? null
       : opts.desiredDirection === 'up'
         ? deltaAbs > 0
@@ -204,23 +204,39 @@ function makeMetric(
   };
 }
 
-function netMetric(
-  id: MoneyMetricId,
-  label: string,
+function scopeMetrics(
+  scope: MoneyScope,
   income: number,
   expenses: number,
-  prevIncome: number,
-  prevExpenses: number,
-  comparisonDays: number,
+  prevIncome: number | null,
+  prevExpenses: number | null,
   confidence: MoneyMetric['confidence']
-): MoneyMetric {
-  return makeMetric(id, label, income - expenses, {
-    previous: prevIncome - prevExpenses,
-    comparisonDays,
-    desiredDirection: 'up',
-    target: income - expenses >= 0 ? 'on-track' : 'at-risk',
-    confidence,
-  });
+) {
+  const label = scope === 'personal' ? 'Personal' : 'Creator';
+  const common = { comparisonDays: MONEY_WINDOW_DAYS, confidence };
+  return {
+    income: makeMetric(`${scope}Income`, `${label} income`, income, {
+      ...common,
+      previous: prevIncome,
+      desiredDirection: 'up',
+      target: 'no-target',
+    }),
+    expenses: makeMetric(`${scope}Spend`, `${label} spend`, expenses, {
+      ...common,
+      previous: prevExpenses,
+      desiredDirection: 'down',
+      target: 'no-target',
+    }),
+    net: makeMetric(`${scope}Net`, `${label} net`, income - expenses, {
+      ...common,
+      previous:
+        prevIncome === null || prevExpenses === null
+          ? null
+          : prevIncome - prevExpenses,
+      desiredDirection: 'up',
+      target: income - expenses >= 0 ? 'on-track' : 'at-risk',
+    }),
+  };
 }
 
 export function buildMoneyOverview(input: {
@@ -406,56 +422,21 @@ export function buildMoneyOverview(input: {
     }),
   ];
 
-  const personal = {
-    income: makeMetric('personalIncome', 'Personal income', personalIncome, {
-      previous: prevPersonalIncome,
-      comparisonDays: MONEY_WINDOW_DAYS,
-      desiredDirection: 'up',
-      target: 'no-target',
-      confidence,
-    }),
-    expenses: makeMetric('personalSpend', 'Personal spend', personalSpend, {
-      previous: prevPersonalSpend,
-      comparisonDays: MONEY_WINDOW_DAYS,
-      desiredDirection: 'down',
-      target: 'no-target',
-      confidence,
-    }),
-    net: netMetric(
-      'personalNet',
-      'Personal net',
-      personalIncome,
-      personalSpend,
-      prevPersonalIncome ?? 0,
-      prevPersonalSpend ?? 0,
-      MONEY_WINDOW_DAYS,
-      confidence
-    ),
-  };
-
+  const personal = scopeMetrics(
+    'personal',
+    personalIncome,
+    personalSpend,
+    prevPersonalIncome,
+    prevPersonalSpend,
+    confidence
+  );
   const creator = {
-    income: makeMetric('creatorIncome', 'Creator income', creatorIncome, {
-      previous: prevCreatorIncome,
-      comparisonDays: MONEY_WINDOW_DAYS,
-      desiredDirection: 'up',
-      target: 'no-target',
-      confidence,
-    }),
-    expenses: makeMetric('creatorSpend', 'Creator spend', creatorSpend, {
-      previous: prevCreatorSpend,
-      comparisonDays: MONEY_WINDOW_DAYS,
-      desiredDirection: 'down',
-      target: 'no-target',
-      confidence,
-    }),
-    net: netMetric(
-      'creatorNet',
-      'Creator net',
+    ...scopeMetrics(
+      'creator',
       creatorIncome,
       creatorSpend,
-      prevCreatorIncome ?? 0,
-      prevCreatorSpend ?? 0,
-      MONEY_WINDOW_DAYS,
+      prevCreatorIncome,
+      prevCreatorSpend,
       confidence
     ),
     hasIncome: creatorIncome > 0,

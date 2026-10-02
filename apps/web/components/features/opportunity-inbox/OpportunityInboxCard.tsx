@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Handshake,
   MessageSquare,
+  MessagesSquare,
   Music2,
   Sparkles,
   ThumbsDown,
@@ -33,6 +34,7 @@ const SIGNAL_TYPE_VISUALS: Readonly<
   new_event: { icon: CalendarDays, accentClassName: 'text-accent-purple' },
   new_profile_match: { icon: UserRound, accentClassName: 'text-accent-pink' },
   brand_deal: { icon: Handshake, accentClassName: 'text-accent-orange' },
+  fan_reply: { icon: MessagesSquare, accentClassName: 'text-accent-teal' },
   other: { icon: Sparkles, accentClassName: '' },
 };
 

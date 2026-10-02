@@ -7,6 +7,7 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { OpportunityInboxData } from '@/lib/connectors/opportunity-inbox-types';
 import { OpportunityInboxPageClient } from './OpportunityInboxPageClient';
 
 const runtimeState = vi.hoisted(() => ({
@@ -22,6 +23,7 @@ vi.mock('@/components/shell/RuntimeUpdateProvider', () => ({
   useRuntimeUpdate: () => runtimeState.update,
 }));
 const mutateMock = vi.fn();
+const refreshMock = vi.fn();
 const mutateAsyncMock = vi.fn().mockResolvedValue({ ok: true });
 let inboxHomeEnabled = false;
 
@@ -31,6 +33,7 @@ vi.mock('next/navigation', () => ({
     push: vi.fn(),
     replace: vi.fn(),
     prefetch: vi.fn(),
+    refresh: refreshMock,
   }),
 }));
 
@@ -117,6 +120,12 @@ vi.mock('@/lib/queries/useOpportunityInboxMutations', () => ({
       mutate: mutateMock,
       mutateAsync: mutateAsyncMock,
     },
+    reviseMutation: {
+      isPending: false,
+      variables: undefined,
+      mutate: mutateMock,
+      mutateAsync: mutateAsyncMock,
+    },
     nextStepMutation: {
       isPending: false,
       variables: undefined,
@@ -148,6 +157,11 @@ vi.mock('@/lib/queries/useTourDateReviewMutations', () => ({
   }),
 }));
 
+const HEALTHY_AVAILABILITY = {
+  suggestedActions: 'available',
+  tourDates: 'not_requested',
+} as const;
+
 const pendingTourDate = {
   id: 'td-1',
   title: 'Saint Andrews Hall',
@@ -167,6 +181,126 @@ describe('OpportunityInboxPageClient', () => {
     mutateAsyncMock.mockReset();
     mutateAsyncMock.mockResolvedValue({ ok: true });
     tourDateMutateMock.mockReset();
+    refreshMock.mockReset();
+  });
+
+  it('does not claim a clear inbox when availability metadata is missing', () => {
+    render(
+      <OpportunityInboxPageClient inbox={{ cards: [], emptyActionCards: [] }} />
+    );
+    expect(screen.queryByText('Your Inbox Is Clear')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try Again' })).toBeVisible();
+  });
+
+  it('preserves known dates while suggestions are unavailable and retries the existing route', async () => {
+    render(
+      <OpportunityInboxPageClient
+        inbox={{
+          cards: [],
+          emptyActionCards: [],
+          availability: { suggestedActions: 'unknown', tourDates: 'available' },
+          tourDates: {
+            pending: [pendingTourDate],
+            confirmed: [],
+            rejected: [],
+            availability: 'available',
+          },
+        }}
+      />
+    );
+    expect(screen.getByText('Saint Andrews Hall')).toBeVisible();
+    expect(screen.queryByText('Your Inbox Is Clear')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Try Again' }));
+    expect(refreshMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Saint Andrews Hall')).toBeVisible();
+  });
+
+  it('retains loaded cards and filter context when a tour-date retry recovers new data', async () => {
+    const partialInbox: OpportunityInboxData = {
+      cards: [
+        {
+          id: 'release-1',
+          signalType: 'new_song',
+          typeLabel: 'New Song',
+          createdAt: '2026-10-02T12:00:00Z',
+          title: 'Review Your Release',
+          why: 'A new song is ready to review.',
+          primaryActionLabel: 'Review',
+          status: 'pending',
+          category: 'suggestion',
+        },
+      ],
+      emptyActionCards: [],
+      availability: { suggestedActions: 'available', tourDates: 'unknown' },
+      tourDates: {
+        pending: [],
+        confirmed: [],
+        rejected: [],
+        availability: 'unknown',
+      },
+    };
+    const { rerender } = render(
+      <OpportunityInboxPageClient inbox={partialInbox} />
+    );
+    const songFilter = screen.getByTestId('opportunity-inbox-filter-new_song');
+    await userEvent.click(songFilter);
+    expect(screen.getByText('Review Your Release')).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Try Again' }));
+    expect(refreshMock).toHaveBeenCalledTimes(1);
+    rerender(
+      <OpportunityInboxPageClient
+        inbox={{
+          ...partialInbox,
+          cards: [
+            ...partialInbox.cards,
+            {
+              ...partialInbox.cards[0]!,
+              id: 'release-2',
+              title: 'New Opportunity',
+            },
+          ],
+          availability: {
+            suggestedActions: 'available',
+            tourDates: 'available',
+          },
+          tourDates: {
+            pending: [pendingTourDate],
+            confirmed: [],
+            rejected: [],
+            availability: 'available',
+          },
+        }}
+      />
+    );
+    await waitFor(() =>
+      expect(screen.getByText('New Opportunity')).toBeVisible()
+    );
+    expect(screen.getByText('Review Your Release')).toBeVisible();
+    expect(screen.getByText('Saint Andrews Hall')).toBeVisible();
+    expect(
+      screen.queryByTestId('opportunity-inbox-availability')
+    ).not.toBeInTheDocument();
+    expect(songFilter).toHaveAttribute('aria-pressed', 'true');
+    expect(songFilter).toHaveFocus();
+  });
+
+  it('keeps unknown founder inboxes distinct from healthy clear and brain-dump states', () => {
+    inboxHomeEnabled = true;
+    render(
+      <OpportunityInboxPageClient
+        inbox={{
+          cards: [],
+          emptyActionCards: [],
+          availability: {
+            suggestedActions: 'unknown',
+            tourDates: 'not_requested',
+          },
+        }}
+      />
+    );
+    expect(screen.queryByText('Inbox Clear')).not.toBeInTheDocument();
+    expect(screen.queryByText('Start A Brain Dump')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try Again' })).toBeVisible();
   });
 
   it('shows runtime notifications in Inbox instead of a caught-up state', () => {
@@ -178,7 +312,13 @@ describe('OpportunityInboxPageClient', () => {
       apply: vi.fn(),
     };
     render(
-      <OpportunityInboxPageClient inbox={{ cards: [], emptyActionCards: [] }} />
+      <OpportunityInboxPageClient
+        inbox={{
+          cards: [],
+          availability: HEALTHY_AVAILABILITY,
+          emptyActionCards: [],
+        }}
+      />
     );
     expect(screen.getByTestId('inbox-runtime-notification')).toBeVisible();
     expect(
@@ -189,7 +329,11 @@ describe('OpportunityInboxPageClient', () => {
   it('hydrates the artist-profile rail with the inbox profile data', async () => {
     render(
       <OpportunityInboxPageClient
-        inbox={{ cards: [], emptyActionCards: [] }}
+        inbox={{
+          cards: [],
+          availability: HEALTHY_AVAILABILITY,
+          emptyActionCards: [],
+        }}
         initialLinks={[
           {
             id: 'spotify-link',
@@ -242,6 +386,7 @@ describe('OpportunityInboxPageClient', () => {
               category: 'suggestion',
             },
           ],
+          availability: HEALTHY_AVAILABILITY,
           emptyActionCards: [],
         }}
       />
@@ -284,6 +429,7 @@ describe('OpportunityInboxPageClient', () => {
               category: 'suggestion',
             },
           ],
+          availability: HEALTHY_AVAILABILITY,
           emptyActionCards: [],
         }}
       />
@@ -309,6 +455,7 @@ describe('OpportunityInboxPageClient', () => {
       <OpportunityInboxPageClient
         inbox={{
           cards: [],
+          availability: HEALTHY_AVAILABILITY,
           emptyActionCards: [
             {
               id: 'connect-spotify',
@@ -362,6 +509,7 @@ describe('OpportunityInboxPageClient', () => {
               category: 'suggestion' as const,
             },
           ],
+          availability: HEALTHY_AVAILABILITY,
           emptyActionCards: [],
         }}
       />
@@ -423,6 +571,7 @@ describe('OpportunityInboxPageClient', () => {
               category: 'suggestion' as const,
             },
           ],
+          availability: HEALTHY_AVAILABILITY,
           emptyActionCards: [],
         }}
       />
@@ -431,6 +580,7 @@ describe('OpportunityInboxPageClient', () => {
     const all = screen.getByRole('button', { name: 'All' });
     const newSong = screen.getByRole('button', { name: 'Songs' });
     const brandDeals = screen.getByRole('button', { name: 'Brand Deals' });
+    const fanReplies = screen.getByRole('button', { name: 'Fan Replies' });
 
     all.focus();
     await user.keyboard('{ArrowRight}');
@@ -448,7 +598,7 @@ describe('OpportunityInboxPageClient', () => {
     ).not.toBeInTheDocument();
 
     await user.keyboard('{End}');
-    expect(brandDeals).toHaveFocus();
+    expect(fanReplies).toHaveFocus();
     expect(newSong).toHaveAttribute('aria-pressed', 'true');
 
     await user.keyboard('{Home}');
@@ -484,6 +634,7 @@ describe('OpportunityInboxPageClient', () => {
               category: 'suggestion' as const,
             },
           ],
+          availability: HEALTHY_AVAILABILITY,
           emptyActionCards: [],
         }}
       />
@@ -518,6 +669,10 @@ describe('OpportunityInboxPageClient', () => {
                 category: 'suggestion' as const,
               },
             ],
+            availability: {
+              suggestedActions: 'available',
+              tourDates: 'not_requested',
+            },
             emptyActionCards: [],
           }}
         />
@@ -556,6 +711,7 @@ describe('OpportunityInboxPageClient', () => {
               category: 'suggestion',
             },
           ],
+          availability: HEALTHY_AVAILABILITY,
           emptyActionCards: [],
         }}
       />
@@ -600,6 +756,7 @@ describe('OpportunityInboxPageClient', () => {
               category: 'suggestion' as const,
             },
           ],
+          availability: HEALTHY_AVAILABILITY,
           emptyActionCards: [],
         }}
       />
@@ -646,6 +803,10 @@ describe('OpportunityInboxPageClient', () => {
                 category: 'suggestion' as const,
               },
             ],
+            availability: {
+              suggestedActions: 'available',
+              tourDates: 'not_requested',
+            },
             emptyActionCards: [],
           }}
         />
@@ -701,6 +862,7 @@ describe('OpportunityInboxPageClient', () => {
               },
             },
           ],
+          availability: HEALTHY_AVAILABILITY,
           emptyActionCards: [],
         }}
       />
@@ -752,6 +914,7 @@ describe('OpportunityInboxPageClient', () => {
               },
             },
           ],
+          availability: HEALTHY_AVAILABILITY,
           emptyActionCards: [],
         }}
       />
@@ -792,6 +955,10 @@ describe('OpportunityInboxPageClient', () => {
                 category: 'suggestion' as const,
               },
             ],
+            availability: {
+              suggestedActions: 'available',
+              tourDates: 'not_requested',
+            },
             emptyActionCards: [],
           }}
         />
@@ -839,6 +1006,7 @@ describe('OpportunityInboxPageClient', () => {
               category: 'suggestion' as const,
             },
           ],
+          availability: HEALTHY_AVAILABILITY,
           emptyActionCards: [],
         }}
       />
@@ -868,6 +1036,10 @@ describe('OpportunityInboxPageClient', () => {
       <OpportunityInboxPageClient
         inbox={{
           cards: [],
+          availability: {
+            suggestedActions: 'available',
+            tourDates: 'available',
+          },
           emptyActionCards: [],
           tourDates: {
             pending: [pendingTourDate],
@@ -904,6 +1076,10 @@ describe('OpportunityInboxPageClient', () => {
       <OpportunityInboxPageClient
         inbox={{
           cards: [],
+          availability: {
+            suggestedActions: 'available',
+            tourDates: 'available',
+          },
           emptyActionCards: [],
           tourDates: {
             pending: [pendingTourDate],
@@ -934,6 +1110,10 @@ describe('OpportunityInboxPageClient', () => {
       <OpportunityInboxPageClient
         inbox={{
           cards: [],
+          availability: {
+            suggestedActions: 'available',
+            tourDates: 'available',
+          },
           emptyActionCards: [],
           tourDates: {
             pending: [],

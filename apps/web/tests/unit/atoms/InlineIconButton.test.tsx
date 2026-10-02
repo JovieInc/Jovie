@@ -9,6 +9,26 @@ import {
 import { expectNoA11yViolations } from '../../utils/a11y';
 
 describe('InlineIconButton', () => {
+  it.each(['button', 'link'] as const)(
+    'supports compact %s actions without losing activation',
+    kind => {
+      const onClick = vi.fn();
+      render(
+        <InlineIconButton
+          size='sm'
+          aria-label='Compact action'
+          onClick={onClick}
+          {...(kind === 'link' ? { href: '#profile' } : {})}
+        >
+          <svg aria-hidden='true' />
+        </InlineIconButton>
+      );
+      const action = screen.getByRole(kind, { name: 'Compact action' });
+      expect(action).toHaveAttribute('data-size', 'icon-sm');
+      fireEvent.click(action);
+      expect(onClick).toHaveBeenCalledOnce();
+    }
+  );
   it('renders a button by default', () => {
     render(
       <InlineIconButton aria-label='Edit item'>

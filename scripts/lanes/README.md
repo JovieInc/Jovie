@@ -40,6 +40,7 @@ The harness, not the model, owns:
 | Provider throughput: matched-work offers, accepts, starts, productive/PR/first-pass rates, remediation, issue→PR→merge time, landed output, idle qualified capacity and failure reasons; landed attribution comes from receipts, never a branch prefix | `provider_throughput()`, `doctor.status_feed()`, `hud.py` |
 | Provider failover: a lane that exits non-zero mid-issue (every account spent, auth, crash) hands the same worktree to the next enabled, healthy, uncooled lane, up to 2 handoffs; the receipt records `handoffs` and `finishedBy` | `run_issue()`, `next_provider()` |
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
+| Stop revokes publication: a kill writes `runs/publication-revocations.jsonl` before the kill is acked, and every irreversible boundary (push, PR open, label, enqueue) revalidates it — revoked branches never ship (JOV-5060) | `run_agent(on_kill=)`, `revoke_publication()`, `require_publishable()` |
 
 Event-driven: a worker that finishes re-execs the current release and pulls the next
 issue. The minute timer only restarts idle lanes and applies updates; it never signals a
@@ -185,6 +186,49 @@ State and receipts live under `~/.local/state/jovie-lanes`. Every gated run reco
 `gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
 second host is decided on measured queue time, not on timeouts alone.
 
+## Preserved repairs (JOV-7347)
+
+Repair retries reuse a registered preserved checkout only after its ended run,
+execution identity, current target head, ancestry and idle process state agree.
+The existing coordinator still enforces the live lease and original retry budget;
+changing check failures does not grant a fresh budget. A host-local PR lock spans
+failure identities. Unverifiable or superseded work emits a recovery handoff.
+Damaged markers matched to the requested target still require a handoff;
+unidentified markers are logged for host reconciliation without blocking unrelated
+targets. Completed recovery clears its marker and checkout only when the source
+is clean, matches the verified remote head, and has no live working directory.
+Unpublished edits, unreadable evidence, and failed cleanup retain protection.
+Preserved issue implementations require execution reconciliation and remain on
+Backlog with their source and accountable issue reference intact.
+
+The runner tracks observed descendants by PID and start time across detached
+sessions, cleans them up on completion/cancellation, and never kills by pathname.
+A child that fully daemonizes before its first snapshot cannot be attributed this
+way; preserved-work admission therefore also checks live working directories.
+Cleanup retains protected, dirty or unreadable source. Installed-runtime evidence
+is required before calling this commissioned.
+
+## Context receipts
+
+The existing spawn preflight checks `context-manifest.json` before issue,
+handoff, repair, and sensitive-review agent execution. Regenerate the checked-in
+contract with `python3 scripts/lanes/lane_runner.py context-manifest --write`;
+omit `--write` to check it without credentials or network calls.
+
+Each local prompt has a `.context.json` sidecar binding its exact UTF-8 bytes,
+provider, contract, and source inputs by SHA-256. Missing GBrain context is
+explicitly marked unavailable. The contract hash uses canonical JSON; repository
+formatting changes do not count as drift. New contract drift, input mismatch and
+sidecar-write failures emit `jovie-lane-context-qualification/v1` findings without
+stopping the agent. Existing prompt-write, spend, security and authorization
+failures remain blocking. Failed sidecars have no asserted path or digest in the
+run receipt; findings also go to stderr for review-only calls.
+H-EX-02 remains partial until the ship cohort and staged promotion required by
+`canon/ENGINEERING.md` are verified; no promotion threshold is implied.
+Repository documents remain on-demand references; the receipt does not claim they were injected or read. Private issue
+and retrieved text remain in the existing local prompt, not the checked-in
+contract or hash-only sidecar.
+
 ## Tests
 
 ```sh
@@ -194,3 +238,46 @@ python3 -m unittest scripts/tests/test_lane_runner.py scripts/tests/test_codex_l
 ```
 
 The same files run inside `update()` before a release is installed anywhere.
+
+### Production continuity clock (JOV-6909)
+
+Gem's existing minute tick checks the fixed `production-continuity.yml` workflow
+at most once every five minutes. When its latest invocation is overdue and no
+active run is observed, it requests that existing workflow on `main`. A separate
+in-progress lookup catches runs outside the recent 30-run window; the workflow's
+existing concurrency group serializes a race with GitHub's native schedule.
+Only the hosted workflow performs probes, check-ins, alerts and recovery ingress.
+A `dispatch-requested` receipt is not a successful probe or restored service.
+
+The adapter runs even when disk admission prevents worker launches. Mac hosts
+return `not-owner`. A host-local file lock prevents overlapping ticks, atomic
+state records the budget before network calls, and an uncertain POST backs off
+15 minutes. Unreadable state and API errors never reset that budget or invent a
+successful observation. Inspect `continuity-clock.json` and `tick.json` in the
+existing lane state directory; the Sentry deadman remains authoritative when
+there are no accepted observations. There are no new credentials or timers.
+
+Adopt-first decision: **compose** the existing Gem/systemd clock, GitHub Actions
+workflow and Sentry monitor. Native schedule alone repeatedly omitted hours of
+invocations while delivered probes succeeded (run 36829224204; Sentry issue
+7750181397). GitHub documents that scheduled runs can be delayed or dropped:
+https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule
+That is a possible mechanism, not a proved cause for this incident. Webhooks,
+inline work and lazy evaluation cannot themselves observe absence of invocation.
+A new scheduler adds an owner and credential boundary without filling a gap that
+Gem's existing tick cannot cover. All components remain in the current operating
+and credential boundary; no new dependency or license is introduced. Removal is
+one adapter call after an alternative clock proves the same external liveness.
+
+Budget: at most 288 recent-run reads plus 288 active-run reads and 288 dispatches
+per day under continuous native-schedule absence (at most 25,920 API calls per
+30 days). Healthy native cadence normally skips the second read and POST. Each
+child has a 10-second timeout; an overdue attempt is bounded to 30 seconds of
+network subprocess time. Hosted run costs retain the existing five-minute probe
+cadence; a schedule race may enqueue one additional serialized invocation.
+
+Ship now: bounded missing-invocation recovery through the existing clock.
+Re-evaluate when observed dispatches and real workflow/check-in receipts prove
+recurrence, or native scheduling reliably supplies the cadence again. Then:
+remove unnecessary recovery calls while retaining the independent deadman.
+JOV-6909 remains commissioning until recurrence is observed after deployment.

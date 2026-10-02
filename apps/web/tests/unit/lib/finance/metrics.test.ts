@@ -1,4 +1,7 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { MoneyOverviewClient } from '@/app/app/money/MoneyOverviewClient';
 import type {
   FinanceAccount,
   FinanceTransaction,
@@ -14,7 +17,10 @@ const DAY = 86_400_000;
 const ACTIVE = { status: 'active' };
 
 function tx(
-  over: Partial<FinanceTransaction> & { daysAgo: number; amount: number }
+  over: Omit<Partial<FinanceTransaction>, 'amount'> & {
+    daysAgo: number;
+    amount: number;
+  }
 ): FinanceTransaction {
   const { daysAgo, amount, ...rest } = over;
   return {
@@ -51,6 +57,14 @@ function account(over: Partial<FinanceAccount> = {}): FinanceAccount {
     ...over,
   } as FinanceAccount;
 }
+
+const overview = (transactions: FinanceTransaction[]) =>
+  buildMoneyOverview({
+    institutions: [ACTIVE],
+    accounts: [account()],
+    transactions,
+    now: NOW,
+  });
 
 const card = (o: ReturnType<typeof buildMoneyOverview>, id: string) =>
   o.cards.find(c => c.id === id)!;
@@ -98,12 +112,7 @@ describe('buildMoneyOverview states', () => {
         now: NOW,
       }).state
     ).toBe('provider-error');
-    const short = buildMoneyOverview({
-      institutions: [ACTIVE],
-      accounts: [account()],
-      transactions: [tx({ daysAgo: 2, amount: -100 })],
-      now: NOW,
-    });
+    const short = overview([tx({ daysAgo: 2, amount: -100 })]);
     expect(short.state).toBe('insufficient-history');
     expect(card(short, 'runway').confidence).toBe('insufficient');
   });
@@ -114,6 +123,7 @@ describe('buildMoneyOverview states', () => {
       accounts: [
         account({ id: 'c', accountType: 'credit', currentBalance: '-400' }),
         account({ id: 'h', accountType: 'hidden', currentBalance: '999' }),
+        account({ id: 'u', accountType: null, currentBalance: '99999' }),
       ],
       transactions: [tx({ daysAgo: 20, amount: 100 })],
       now: NOW,
@@ -141,6 +151,15 @@ describe('buildMoneyOverview metrics', () => {
     expect(o.state).toBe('ready');
     expect(card(o, 'income').value).toBe(3000); // 40d-ago payroll is prior window
     expect(card(o, 'income').deltaAbs).toBe(0);
+    expect(card(o, 'income').favorable).toBeNull();
+    const root = document.createElement('div');
+    root.innerHTML = renderToStaticMarkup(
+      createElement(MoneyOverviewClient, { overview: o })
+    );
+    const metric = root.querySelector('[data-testid="money-metric-income"]');
+    expect(metric?.textContent).toContain('No change:');
+    expect(metric?.textContent).not.toMatch(/[▲▼]|Unfavorable/);
+    expect(metric?.querySelector('.text-error')).toBeNull();
     expect(card(o, 'burn').value).toBe(900);
     expect(card(o, 'netCashFlow').value).toBe(2100);
     expect(card(o, 'netCashFlow').target).toBe('on-track');
@@ -150,37 +169,31 @@ describe('buildMoneyOverview metrics', () => {
   });
 
   it('splits personal and creator economics', () => {
-    const o = buildMoneyOverview({
-      institutions: [ACTIVE],
-      accounts: [account()],
-      transactions: [
-        tx({ daysAgo: 20, amount: 100, category: 'groceries' }),
-        tx({ daysAgo: 20, amount: 50, category: 'creator:domain' }),
-        tx({ daysAgo: 20, amount: -80, category: 'creator:royalties' }),
-        tx({ daysAgo: 20, amount: -200, category: 'payroll' }),
-      ],
-      now: NOW,
-    });
+    const o = overview([
+      tx({ daysAgo: 20, amount: 100, category: 'groceries' }),
+      tx({ daysAgo: 20, amount: 50, category: 'creator:domain' }),
+      tx({ daysAgo: 20, amount: -80, category: 'creator:royalties' }),
+      tx({ daysAgo: 20, amount: -200, category: 'payroll' }),
+    ]);
     expect(o.personal.expenses.value).toBe(100);
     expect(o.creator.expenses.value).toBe(50);
     expect(o.creator.income.value).toBe(80);
     expect(o.personal.income.value).toBe(200);
     expect(o.creator.net.value).toBe(30);
     expect(o.creator.hasIncome).toBe(true);
+    for (const net of [o.personal.net, o.creator.net]) {
+      expect(net.deltaAbs).toBeNull();
+      expect(net.deltaPct).toBeNull();
+    }
   });
 
   it('marks spend decreases favorable and income decreases unfavorable', () => {
-    const o = buildMoneyOverview({
-      institutions: [ACTIVE],
-      accounts: [account()],
-      transactions: [
-        tx({ daysAgo: 45, amount: 600, category: 'rent' }),
-        tx({ daysAgo: 10, amount: 300, category: 'rent' }),
-        tx({ daysAgo: 45, amount: -1000, category: 'payroll' }),
-        tx({ daysAgo: 10, amount: -500, category: 'payroll' }),
-      ],
-      now: NOW,
-    });
+    const o = overview([
+      tx({ daysAgo: 45, amount: 600, category: 'rent' }),
+      tx({ daysAgo: 10, amount: 300, category: 'rent' }),
+      tx({ daysAgo: 45, amount: -1000, category: 'payroll' }),
+      tx({ daysAgo: 10, amount: -500, category: 'payroll' }),
+    ]);
     expect(o.personal.expenses.deltaAbs).toBe(-300);
     expect(o.personal.expenses.favorable).toBe(true);
     expect(o.personal.income.deltaAbs).toBe(-500);
@@ -203,15 +216,10 @@ describe('buildMoneyOverview metrics', () => {
   });
 
   it('counts review queue and flags stale data', () => {
-    const o = buildMoneyOverview({
-      institutions: [ACTIVE],
-      accounts: [account()],
-      transactions: [
-        tx({ daysAgo: 10, amount: 5 }), // uncategorized → review
-        tx({ daysAgo: 10, amount: 5, category: 'rent' }),
-      ],
-      now: NOW,
-    });
+    const o = overview([
+      tx({ daysAgo: 10, amount: 5 }), // uncategorized → review
+      tx({ daysAgo: 10, amount: 5, category: 'rent' }),
+    ]);
     expect(o.reviewCount).toBe(1);
     expect(o.anomalies).toContain('stale-data');
   });

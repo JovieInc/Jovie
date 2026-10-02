@@ -791,8 +791,8 @@ jobs:
             exit 0
           fi
 
-          # Check if only docs changed (exclude .github/ — workflow changes must run CI)
-          if ! echo "$CHANGED_FILES" | grep -q -E '^\.github/' &&
+          # CHANGELOG.md is customer-facing web content, not documentation.
+          if ! echo "$CHANGED_FILES" | grep -q -E '^(\.github/|CHANGELOG\.md$)' &&
             ! echo "$CHANGED_FILES" | grep -q -v -E '\.(md|txt)$'; then
             echo "Only documentation files changed"
             for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
@@ -805,7 +805,7 @@ jobs:
           echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
 
           # Build paths
-          BUILD_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/constants/|apps/web/package.*\.json|apps/web/next\.config\.js|apps/web/tailwind\.config\.|apps/web/postcss\.config\.|apps/web/instrumentation.*\.ts|apps/web/sentry\..*\.config\.ts|apps/web/middleware\.ts|package.*\.json|turbo\.json)'
+          BUILD_PATTERN='^(CHANGELOG\.md$|apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/constants/|apps/web/package.*\.json|apps/web/next\.config\.js|apps/web/tailwind\.config\.|apps/web/postcss\.config\.|apps/web/instrumentation.*\.ts|apps/web/sentry\..*\.config\.ts|apps/web/middleware\.ts|package.*\.json|turbo\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$BUILD_PATTERN"; then
             RUN_BUILD=true
             echo "run_build=true" >> "$GITHUB_OUTPUT"
@@ -1838,6 +1838,7 @@ jobs:
             echo "overlay=false"
             echo "privacy=false"
             echo "tasks=false"
+            echo "desktop_update=false"
             echo "run=false"
           } >> "$GITHUB_OUTPUT"
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
@@ -1847,6 +1848,7 @@ jobs:
           KBD_STORYBOOK_PATTERN='^(packages/ui/atoms/kbd(\.stories)?\.tsx|apps/web/\.storybook/(motion-fixtures\.ts|preview\.tsx|preview-head\.html|main\.ts)|apps/web/tests/e2e/storybook-kbd-motion\.spec\.ts)$'
           CRAWLER_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/organisms/ai-crawler/AiCrawler(DetailPanel|IntelligenceCard)(\.stories)?\.tsx|tests/e2e/storybook-ai-crawler\.spec\.ts)$'
           TASKS_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/tasks/(Task(DataTable|ListRow)(\.stories)?\.tsx|TasksPageClient\.tsx)|components/organisms/table/(atoms/TableCell\.tsx|table\.types\.ts|organisms/VirtualizedTableRow\.tsx|molecules/TaskProjectionListRow\.tsx)|tests/e2e/storybook-task-row-geometry\.spec\.ts)$'
+          DESKTOP_UPDATE_STORYBOOK_PATTERN='^apps/web/(components/organisms/desktop-update/DesktopUpdateModal(\.stories)?\.tsx|tests/e2e/storybook-desktop-update-modal\.spec\.ts)$'
           # Overlay primitives, their layer tokens, and the
           # collision harness re-prove stacking, focus, and viewport fit.
           OVERLAY_STORYBOOK_PATTERN='^(packages/ui/atoms/(dialog|alert-dialog|sheet|popover|dropdown-menu|context-menu|select|tooltip)\.tsx|packages/ui/lib/(overlay-styles|overlay-focus|dropdown-styles|utils)\.ts|apps/web/styles/tailwind-foundation\.css|apps/web/\.storybook/stories/overlay-collisions\.stories\.tsx|apps/web/tests/e2e/storybook-overlay-collisions\.spec\.ts)$'
@@ -1874,6 +1876,12 @@ jobs:
           if grep -qE "$TASKS_STORYBOOK_PATTERN" "$changed_files"; then
             {
               echo "tasks=true"
+              echo "run=true"
+            } >> "$GITHUB_OUTPUT"
+          fi
+          if grep -qE "$DESKTOP_UPDATE_STORYBOOK_PATTERN" "$changed_files"; then
+            {
+              echo "desktop_update=true"
               echo "run=true"
             } >> "$GITHUB_OUTPUT"
           fi
@@ -1967,6 +1975,7 @@ jobs:
           RUN_OVERLAY: ${{ steps.storybook-browser.outputs.overlay }}
           RUN_PRIVACY: ${{ steps.storybook-browser.outputs.privacy }}
           RUN_TASKS: ${{ steps.storybook-browser.outputs.tasks }}
+          RUN_DESKTOP_UPDATE: ${{ steps.storybook-browser.outputs.desktop_update }}
           STORYBOOK_BASE_URL: http://localhost:6006
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
@@ -1992,6 +2001,9 @@ jobs:
           fi
           if [[ "$RUN_TASKS" == 'true' ]]; then
             specs+=(tests/e2e/storybook-task-row-geometry.spec.ts)
+          fi
+          if [[ "$RUN_DESKTOP_UPDATE" == 'true' ]]; then
+            specs+=(tests/e2e/storybook-desktop-update-modal.spec.ts)
           fi
           test "${#specs[@]}" -gt 0
           pnpm exec storybook dev -p 6006 --no-open &
@@ -3199,6 +3211,7 @@ jobs:
                   tests/e2e/storybook-spotify-connect.spec.ts \
                   tests/e2e/storybook-ovie-privacy-boundary.spec.ts \
                   tests/e2e/storybook-task-row-geometry.spec.ts \
+                  tests/e2e/storybook-desktop-update-modal.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \
                   --workers=2
               exit 0

@@ -18,7 +18,15 @@ export const OVIE_MCP_TOOLS = [
   'get_gbrain_page',
   'record_operational_memory',
   'coordinate_linear_work',
+  'record_bounded_approval',
+  'get_bounded_approval',
   'get_proof_brief',
+  'list_linear_issues',
+  'create_linear_issue',
+  'list_github_pull_requests',
+  'get_github_pull_request',
+  'list_github_issues',
+  'get_github_issue',
 ] as const;
 
 export type OvieMcpToolName = (typeof OVIE_MCP_TOOLS)[number];
@@ -30,6 +38,8 @@ export const OVIE_WRITE_TOOLS = [
   'request_workflow_capture',
   'record_operational_memory',
   'coordinate_linear_work',
+  'create_linear_issue',
+  'record_bounded_approval',
 ] as const;
 
 /** Read-only operating detail that is still founder-private. */
@@ -37,6 +47,11 @@ export const OVIE_FOUNDER_TOOLS = [
   'get_invariant_stewardship',
   'get_workflow_capture',
   'get_proof_brief',
+  'list_linear_issues',
+  'list_github_pull_requests',
+  'get_github_pull_request',
+  'list_github_issues',
+  'get_github_issue',
 ] as const;
 
 export type CertLevel =

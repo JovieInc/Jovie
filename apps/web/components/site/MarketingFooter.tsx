@@ -12,6 +12,7 @@ import {
   MARKETING_FOOTER_COLUMNS,
   MARKETING_LEGAL_LINKS,
   type MarketingFooterLink,
+  PUBLIC_COMMERCIAL_FOOTER_COLUMN,
 } from '@/data/marketingNavigation';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { isEditorialFooterCtaPath } from '@/lib/marketing/editorial-content-routes';
@@ -150,7 +151,9 @@ export function MarketingFooter({
     (PAGE_OWNS_FINAL_CTA_PATHS.has(pathname) ||
       isEditorialFooterCtaPath(pathname));
   const shouldShowCta = showCta && !isMinimal && !pageOwnsFinalCta;
-  const footerColumns = MARKETING_FOOTER_COLUMNS;
+  const footerColumns = FEATURE_FLAGS.SHOW_PUBLIC_ABOUT_FOOTER_REFRESH
+    ? [PUBLIC_COMMERCIAL_FOOTER_COLUMN]
+    : MARKETING_FOOTER_COLUMNS;
 
   return (
     <footer
@@ -186,10 +189,15 @@ export function MarketingFooter({
 
             <nav
               className={cn(
-                'grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 lg:gap-x-12 xl:gap-x-16',
-                footerColumns.length === 4
-                  ? 'lg:grid-cols-4'
-                  : 'lg:grid-cols-5',
+                'grid gap-x-8 gap-y-10 lg:gap-x-12 xl:gap-x-16',
+                footerColumns.length === 1
+                  ? 'grid-cols-1'
+                  : 'grid-cols-2 sm:grid-cols-3',
+                footerColumns.length === 1
+                  ? 'lg:grid-cols-1'
+                  : footerColumns.length === 4
+                    ? 'lg:grid-cols-4'
+                    : 'lg:grid-cols-5',
                 shouldShowCta && 'mt-[clamp(3.25rem,5vw,4.6rem)]'
               )}
               aria-label='Footer'

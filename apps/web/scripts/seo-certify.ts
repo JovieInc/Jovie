@@ -4,11 +4,11 @@
  * Sweeps every public route in MARKETING_ROUTE_MANIFEST against rendered HTML
  * and ratchets failures against lib/seo/seo-certify-baseline.json.
  *
- * HTML source, cheapest first and never live production:
+ * HTML source (read-only unless --post is explicitly requested):
  * - default: the prerendered build output (`.next/server/app/<path>.html`),
  *   the same `.next` CI's "Build (public routes)" job already produces;
  * - `--base-url http://localhost:3000`: fetch a locally running `next start`
- *   for routes that are not prerendered.
+ *   for routes that are not prerendered, or a deployed URL for runtime evidence.
  *
  *   tsx scripts/seo-certify.ts [--build-dir .next] [--base-url URL]
  *     [--sha SHA] [--run-ref REF] [--out report.json]
@@ -78,13 +78,16 @@ export function readBuildPage(
   return { target, html: readFileSync(htmlPath, 'utf8'), status, source };
 }
 
-async function fetchPage(
+export async function fetchPage(
   baseUrl: string,
   target: SeoSweepTarget
 ): Promise<SeoSweepPage> {
   const url = new URL(target.pathname, baseUrl).toString();
   try {
-    const response = await fetch(url, { redirect: 'manual' });
+    const response = await fetch(url, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(10_000),
+    });
     return {
       target,
       html: await response.text(),
@@ -94,6 +97,26 @@ async function fetchPage(
   } catch {
     return { target, html: null, status: 0, source: url };
   }
+}
+
+export async function readSiteFile(
+  pathname: string,
+  appDir: string,
+  baseUrl?: string
+): Promise<string | null> {
+  if (baseUrl) {
+    try {
+      const response = await fetch(new URL(pathname, baseUrl), {
+        redirect: 'manual',
+        signal: AbortSignal.timeout(10_000),
+      });
+      return response.ok ? await response.text() : null;
+    } catch {
+      return null;
+    }
+  }
+  const bodyPath = join(appDir, `${pathname.replace('/', '')}.body`);
+  return existsSync(bodyPath) ? readFileSync(bodyPath, 'utf8') : null;
 }
 
 async function main() {
@@ -132,13 +155,13 @@ async function main() {
       baseUrl ? fetchPage(baseUrl, target) : readBuildPage(appDir, target)
     )
   );
-  const llmsPath = join(appDir, 'llms.txt.body');
   const results = certifySweep({
     pages,
     sourceSha: sha,
     runRef: values['run-ref'] ?? 'local',
     now: new Date(),
-    llmsTxt: existsSync(llmsPath) ? readFileSync(llmsPath, 'utf8') : null,
+    llmsTxt: await readSiteFile('/llms.txt', appDir, baseUrl),
+    robotsTxt: await readSiteFile('/robots.txt', appDir, baseUrl),
   });
 
   for (const result of results) {

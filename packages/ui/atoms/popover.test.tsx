@@ -3,7 +3,12 @@ import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { Popover, PopoverContent, PopoverTrigger } from './popover';
+import {
+  Popover,
+  PopoverClose,
+  PopoverContent,
+  PopoverTrigger,
+} from './popover';
 
 // Simple click utility
 const fastClick = (element: Element) => {
@@ -100,6 +105,25 @@ describe('Popover', () => {
       // Popover should close
       expect(
         screen.queryByText('Test popover content')
+      ).not.toBeInTheDocument();
+    });
+
+    it('closes through the canonical close control', () => {
+      render(
+        <Popover defaultOpen>
+          <PopoverTrigger>Open popover</PopoverTrigger>
+          <PopoverContent>
+            <PopoverClose asChild>
+              <button type='button'>Done</button>
+            </PopoverClose>
+          </PopoverContent>
+        </Popover>
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+      expect(
+        screen.queryByRole('button', { name: 'Done' })
       ).not.toBeInTheDocument();
     });
   });
@@ -225,6 +249,12 @@ describe('Popover', () => {
       expect(content).toHaveClass('bg-surface-elevated');
     });
 
+    it('supports bare composite content without outer padding', () => {
+      render(<TestPopover open={true} size='bare' />);
+
+      expect(screen.getByTestId('popover-content')).toHaveClass('p-0');
+    });
+
     it('renders arrow when showArrow is true', () => {
       render(<TestPopover open={true} showArrow={true} />);
 
@@ -262,7 +292,11 @@ describe('Popover', () => {
       );
 
       const content = screen.getByTestId('popover-content');
-      expect(content).toHaveClass('max-w-full');
+      expect(content).toHaveClass(
+        'max-w-(--radix-popover-content-available-width)',
+        'max-h-(--radix-popover-content-available-height)',
+        'overflow-y-auto'
+      );
       expect(content).toHaveClass('break-words');
     });
   });

@@ -49,7 +49,11 @@ function MetricCard({
         ? 'text-success'
         : 'text-error';
   const arrow =
-    metric.deltaAbs === null ? null : metric.deltaAbs > 0 ? '▲' : '▼';
+    metric.deltaAbs === null || metric.deltaAbs === 0
+      ? null
+      : metric.deltaAbs > 0
+        ? '▲'
+        : '▼';
   const targetLabel = TARGET_LABEL[metric.target];
 
   return (
@@ -82,9 +86,11 @@ function MetricCard({
             <>
               <span aria-hidden>{arrow} </span>
               <span className='sr-only'>
-                {metric.favorable
-                  ? 'Favorable change: '
-                  : 'Unfavorable change: '}
+                {metric.favorable === null
+                  ? 'No change: '
+                  : metric.favorable
+                    ? 'Favorable change: '
+                    : 'Unfavorable change: '}
               </span>
               {formatSigned(metric, metric.deltaAbs)}
               {metric.deltaPct !== null &&

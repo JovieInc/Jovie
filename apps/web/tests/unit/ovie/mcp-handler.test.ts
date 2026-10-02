@@ -5,6 +5,59 @@ const workflowCaptureMocks = vi.hoisted(() => ({
   get: vi.fn(),
 }));
 
+const founderWorkMocks = vi.hoisted(() => ({
+  listLinearIssues: vi.fn(async () => [
+    {
+      id: 'linear-1',
+      identifier: 'JOV-5223',
+      title: 'Ovie provider work',
+      url: 'https://linear.app/jovie/issue/JOV-5223',
+    },
+  ]),
+  listGithubPullRequests: vi.fn(async () => [
+    {
+      number: 16209,
+      title: 'Source PR',
+      url: 'https://github.com/JovieInc/Jovie/pull/16209',
+    },
+  ]),
+  getGithubPullRequest: vi.fn(async () => ({
+    number: 16209,
+    title: 'Source PR',
+    url: 'https://github.com/JovieInc/Jovie/pull/16209',
+    body: 'source',
+  })),
+  listGithubIssues: vi.fn(async () => [
+    {
+      number: 5223,
+      title: 'Ovie MCP providers',
+      url: 'https://github.com/JovieInc/Jovie/issues/5223',
+    },
+  ]),
+  getGithubIssue: vi.fn(async () => ({
+    number: 5223,
+    title: 'Ovie MCP providers',
+    url: 'https://github.com/JovieInc/Jovie/issues/5223',
+    body: 'issue',
+  })),
+}));
+
+const linearCoordinationMocks = vi.hoisted(() => ({
+  createIssue: vi.fn(async (input: { title: string }) => ({
+    id: 'linear-created',
+    identifier: 'JOV-9000',
+    title: input.title,
+    url: 'https://linear.app/jovie/issue/JOV-9000',
+  })),
+  updateIssue: vi.fn(),
+  readIssue: vi.fn(async () => ({
+    id: 'linear-created',
+    identifier: 'JOV-9000',
+    title: 'Created through Ovie',
+    url: 'https://linear.app/jovie/issue/JOV-9000',
+  })),
+}));
+
 vi.mock('@/lib/wiki/gbrain-client', () => ({
   searchPages: vi.fn(async (query: string) => [
     { slug: 'ovie-mcp', title: `hit:${query}`, score: 0.9 },
@@ -19,6 +72,19 @@ vi.mock('@/lib/wiki/gbrain-client', () => ({
 vi.mock('@/lib/workflow-capture/server', () => ({
   createWorkflowCaptureRequest: workflowCaptureMocks.create,
   getWorkflowCaptureReceipt: workflowCaptureMocks.get,
+}));
+
+vi.mock('@/lib/ovie/mcp/founder-work', async importOriginal => {
+  const original =
+    await importOriginal<typeof import('@/lib/ovie/mcp/founder-work')>();
+  return {
+    ...original,
+    createLiveFounderWorkReader: () => founderWorkMocks,
+  };
+});
+
+vi.mock('@/lib/ovie/linear-coordination-live', () => ({
+  createLiveLinearCoordinationDeps: () => linearCoordinationMocks,
 }));
 
 import {
@@ -176,6 +242,197 @@ describe('Ovie MCP handler', () => {
       principal: user,
     });
     expect(result.status).toBe(403);
+  });
+
+  it('records and verifies a bounded approval without conferring authority', async () => {
+    const store = new MemoryOperatingStore();
+    const digest = `sha256:${'1'.padStart(64, '0')}`;
+    const recorded = await handleOvieMcpRequest({
+      store,
+      principal: founder,
+      body: rpc('tools/call', {
+        name: 'record_bounded_approval',
+        arguments: {
+          actor: 'founder_1',
+          action: 'merge',
+          repository: 'JovieInc/Jovie',
+          revision: 'a'.repeat(40),
+          diff_digest: digest,
+        },
+      }),
+    });
+    expect(recorded.status).toBe(200);
+    const approval = toolResult<{
+      id: string;
+      actor: string;
+      action: string;
+      executed: boolean;
+      authority_conferred: boolean;
+      identities: Record<string, boolean>;
+    }>(recorded.body);
+    expect(approval.executed).toBe(false);
+    expect(approval.authority_conferred).toBe(false);
+    expect(approval.identities.executionCompleted).toBe(false);
+
+    const verified = await handleOvieMcpRequest({
+      store,
+      principal: founder,
+      body: rpc('tools/call', {
+        name: 'get_bounded_approval',
+        arguments: {
+          id: approval.id,
+          actor: 'founder_1',
+          action: 'merge',
+          repository: 'JovieInc/Jovie',
+          revision: 'a'.repeat(40),
+          diff_digest: digest,
+        },
+      }),
+    });
+    expect(verified.status).toBe(200);
+    expect(
+      toolResult<{
+        verified: { valid: boolean; reason: string | null };
+      }>(verified.body).verified
+    ).toMatchObject({ valid: true, reason: null });
+
+    const stale = await handleOvieMcpRequest({
+      store,
+      principal: founder,
+      body: rpc('tools/call', {
+        name: 'get_bounded_approval',
+        arguments: {
+          id: approval.id,
+          actor: 'founder_1',
+          action: 'merge',
+          repository: 'JovieInc/Jovie',
+          revision: 'b'.repeat(40),
+        },
+      }),
+    });
+    expect(
+      toolResult<{
+        verified: { valid: boolean; reason: string };
+      }>(stale.body).verified
+    ).toMatchObject({ valid: false, reason: 'revision-mismatch' });
+  });
+
+  it('rejects non-founder bounded-approval writes', async () => {
+    const result = await handleOvieMcpRequest({
+      body: rpc('tools/call', {
+        name: 'record_bounded_approval',
+        arguments: {
+          actor: 'founder_1',
+          action: 'merge',
+          repository: 'JovieInc/Jovie',
+          revision: 'a'.repeat(40),
+          diff_digest: `sha256:${'1'.padStart(64, '0')}`,
+        },
+      }),
+      principal: user,
+    });
+    expect(result.status).toBe(403);
+  });
+
+  it('founder-gates Linear and GitHub provider work', async () => {
+    for (const name of ['list_linear_issues', 'list_github_issues']) {
+      const result = await handleOvieMcpRequest({
+        body: rpc('tools/call', { name, arguments: {} }),
+        principal: user,
+      });
+      expect(result.status).toBe(403);
+    }
+
+    const create = await handleOvieMcpRequest({
+      body: rpc('tools/call', {
+        name: 'create_linear_issue',
+        arguments: {
+          title: 'Created through Ovie',
+          description: 'Founder-authorized work',
+          founder_intent_ref: 'chatgpt:founder-request',
+          source_refs: ['JOV-5223'],
+          author: 'tim',
+        },
+      }),
+      principal: user,
+    });
+    expect(create.status).toBe(403);
+    expect(linearCoordinationMocks.createIssue).not.toHaveBeenCalled();
+  });
+
+  it('lets an OAuth founder list/create Linear work and list/read Jovie GitHub work', async () => {
+    const calls = [
+      { name: 'list_linear_issues', arguments: { limit: 5 } },
+      {
+        name: 'create_linear_issue',
+        arguments: {
+          title: 'Created through Ovie',
+          description: 'Founder-authorized work',
+          founder_intent_ref: 'chatgpt:founder-request',
+          source_refs: ['JOV-5223'],
+          author: 'tim',
+        },
+      },
+      {
+        name: 'list_github_pull_requests',
+        arguments: { state: 'open', limit: 5 },
+      },
+      { name: 'get_github_pull_request', arguments: { number: 16209 } },
+      {
+        name: 'list_github_issues',
+        arguments: { state: 'all', limit: 5 },
+      },
+      { name: 'get_github_issue', arguments: { number: 5223 } },
+    ] as const;
+
+    const results = [];
+    for (const params of calls) {
+      const response = await handleOvieMcpRequest({
+        body: rpc('tools/call', params),
+        principal: founder,
+      });
+      expect(response.status).toBe(200);
+      results.push(toolResult<Record<string, unknown>>(response.body));
+    }
+
+    expect(results[0]).toMatchObject({
+      provider: 'linear',
+      team: 'JOV',
+      trust: 'untrusted_external_data',
+      issues: [{ identifier: 'JOV-5223' }],
+    });
+    expect(results[1]).toMatchObject({
+      status: 'ok',
+      provider: 'linear',
+      team: 'JOV',
+      identities: {
+        linearAccepted: true,
+        executionCompleted: false,
+        deliveryAccepted: false,
+      },
+    });
+    expect(results[2]).toMatchObject({
+      repository: 'JovieInc/Jovie',
+      pull_requests: [{ number: 16209 }],
+    });
+    expect(results[3]).toMatchObject({
+      repository: 'JovieInc/Jovie',
+      pull_request: { number: 16209, body: 'source' },
+    });
+    expect(results[4]).toMatchObject({
+      repository: 'JovieInc/Jovie',
+      issues: [{ number: 5223 }],
+    });
+    expect(results[5]).toMatchObject({
+      repository: 'JovieInc/Jovie',
+      issue: { number: 5223, body: 'issue' },
+    });
+    expect(founderWorkMocks.listLinearIssues).toHaveBeenCalledWith(5);
+    expect(linearCoordinationMocks.createIssue).toHaveBeenCalledWith({
+      title: 'Created through Ovie',
+      description: 'Founder-authorized work',
+      teamId: 'bdc09edc-f91c-4a06-b308-74b4fcf093f8',
+    });
   });
 
   it('round-trips create_initiative then get_initiative without spawning', async () => {

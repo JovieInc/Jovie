@@ -59,6 +59,10 @@ export function absolutePublicUrl(
  * for one-release compatibility with existing Playwright/CI setters.
  */
 export const publicEnv = {
+  // Opaque local identity; validated before use and disabled on deployed builds.
+  get NEXT_PUBLIC_JOVIE_WORKTREE_IDENTITY() {
+    return process.env.NEXT_PUBLIC_JOVIE_WORKTREE_IDENTITY || undefined;
+  },
   // Better Auth: Google One Tap client id (also gates One Tap rendering)
   get NEXT_PUBLIC_GOOGLE_CLIENT_ID() {
     return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || undefined;

@@ -1,3 +1,5 @@
+import { getWorktreeIdentity } from '@/lib/observability/worktree-runtime';
+
 // Lightweight environment-gated logger for dev and preview only
 // Usage: import { logger } from '@/lib/utils/logger'
 //
@@ -32,7 +34,11 @@ function safeConsole() {
 }
 
 function formatMsg(scope: string | undefined, msg: unknown) {
-  return scope ? `[${scope}] ${String(msg)}` : String(msg);
+  const identity = getWorktreeIdentity();
+  const prefix = identity
+    ? `[worktree ${identity.id} boot=${identity.boot}] `
+    : '';
+  return prefix + (scope ? `[${scope}] ${String(msg)}` : String(msg));
 }
 
 export const logger = {
