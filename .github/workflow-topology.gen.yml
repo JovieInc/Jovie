@@ -1000,6 +1000,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:find
     jobCount: 1
+  - name: Remediation Sweep
+    path: .github/workflows/remediation-sweep.yml
+    active: true
+    category: remediation-dispatch
+    authoritativeProducer: Lane Fix Relay
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:sweep
+    jobCount: 1
   - name: Repository documentation shadow
     path: .github/workflows/repository-docs-shadow.yml
     active: true
