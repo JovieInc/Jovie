@@ -4,7 +4,9 @@
 An alert is a stable key plus a one-line cause. New keys open a Linear issue in Triage
 (label `symphony`, title "Symphony doctor: <key>") so Summer routes it; a key that clears
 moves its issue to Done with a comment; a key that fires again within the cool-off reopens
-the same issue instead of spamming a new one. `doctor.json` is what the HUD renders.
+the same issue instead of spamming a new one. While `LANES_ESCALATION` is on, open, reopen,
+and close also apply `remediation:<alert-key-slug>` (created on the JOV team when missing,
+color `#E5484D`). `doctor.json` is what the HUD renders.
 """
 from __future__ import annotations
 
@@ -496,9 +498,51 @@ class Tracker:
     """Linear Triage issues, one per alert key, reused within the cool-off."""
     def __init__(self, linear, host_name: str):
         self.linear, self.host = linear, host_name
+        self._team_node = None
 
     def title(self, key: str) -> str:
         return f"Symphony doctor: {key} ({self.host})"
+
+    def _team(self) -> dict:
+        if self._team_node is None:
+            self._team_node = self.linear.gql(
+                'query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}',
+                {})["teams"]["nodes"][0]
+        return self._team_node
+
+    def _remediation_label_id(self, key: str) -> str | None:
+        """`remediation:<slug>` on the JOV team. Created when missing, color #E5484D."""
+        if not remediation.escalation_enabled():
+            return None
+        name = remediation.remediation_label_for_alert(key)
+        if not name:
+            return None
+        team = self._team()
+        for label in team["labels"]["nodes"]:
+            if label.get("name") == name and label.get("id"):
+                return label["id"]
+        created = self.linear.gql(
+            'mutation($i:IssueLabelCreateInput!){issueLabelCreate(input:$i){issueLabel{id name}}}',
+            {"i": {"teamId": team["id"], "name": name, "color": remediation.REMEDIATION_LABEL_COLOR}})
+        label = ((created or {}).get("issueLabelCreate") or {}).get("issueLabel") or {}
+        if not label.get("id"):
+            return None
+        team["labels"]["nodes"].append({"id": label["id"], "name": label.get("name") or name})
+        return label["id"]
+
+    def apply_alert_label(self, issue_id: str | None, key: str) -> None:
+        """Attach the alert's remediation label. No-op when the router flag is off."""
+        if not issue_id:
+            return
+        try:
+            label_id = self._remediation_label_id(key)
+            if not label_id:
+                return
+            self.linear.gql(
+                'mutation($id:String!,$l:String!){issueAddLabel(id:$id,labelId:$l){success}}',
+                {"id": issue_id, "l": label_id})
+        except Exception:
+            return
 
     def existing(self, key: str) -> str | None:
         """An open issue for this key and host, if a previous tick (or a lost doctor.json)
@@ -515,13 +559,17 @@ class Tracker:
     def open(self, key: str, text: str) -> str | None:
         found = self.existing(key)
         if found:
+            self.apply_alert_label(found, key)
             return found
         try:
             priority = 1 if key.startswith(("provider-idle:", "provider-down:", "pr-inventory-unavailable:")) or key in (
                 "linear-down", "spawn-exit", "tick-error") else 2
-            team = self.linear.gql('query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}', {})["teams"]["nodes"][0]
+            team = self._team()
             triage = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Triage")
             labels = [l["id"] for l in team["labels"]["nodes"] if l["name"] == "symphony"]
+            remediation_label = self._remediation_label_id(key)
+            if remediation_label:
+                labels.append(remediation_label)
             data = self.linear.gql(
                 'mutation($i:IssueCreateInput!){issueCreate(input:$i){issue{id identifier}}}',
                 {"i": {"teamId": team["id"], "stateId": triage, "labelIds": labels, "priority": priority,
@@ -552,17 +600,21 @@ class Tracker:
         except Exception:
             pass
 
-    def reopen(self, issue_id: str, text: str) -> None:
+    def reopen(self, issue_id: str, text: str, key: str | None = None) -> None:
         try:
             self.linear.move(issue_id, "Triage")
             self.linear.comment(issue_id, f"🤖 doctor: fired again on `{self.host}` at {now_iso()}: {text}")
+            if key:
+                self.apply_alert_label(issue_id, key)
         except Exception:
             pass
 
-    def close(self, issue_id: str) -> None:
+    def close(self, issue_id: str, key: str | None = None) -> None:
         try:
             self.linear.comment(issue_id, f"🤖 doctor: cleared on `{self.host}` at {now_iso()}.")
             self.linear.move(issue_id, "Done")
+            if key:
+                self.apply_alert_label(issue_id, key)
         except Exception:
             pass
 
@@ -584,7 +636,7 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
             continue
         if entry and now - float(entry.get("closedAt") or 0) < COOL_OFF_S and entry.get("id"):
             if tracker:
-                tracker.reopen(entry["id"], text)
+                tracker.reopen(entry["id"], text, key)
                 contradict = getattr(tracker, "contradict_invariant", None)
                 if contradict and conditions and key in conditions:
                     contradict(conditions[key])
@@ -599,7 +651,7 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
     for key, entry in issues.items():
         if key not in alerts and entry.get("closedAt") is None:
             if tracker and entry.get("id"):
-                tracker.close(entry["id"])
+                tracker.close(entry["id"], key)
             entry["closedAt"] = now
     receipts = {}
     for key, event in (conditions or {}).items():
