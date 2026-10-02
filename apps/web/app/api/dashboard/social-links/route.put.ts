@@ -15,6 +15,7 @@ import {
   buildSocialLinksInsertPayload,
   checkIdempotencyKey,
   computeLinkVersioning,
+  enforceLinksMutationAccess,
   enqueueProfileEnrichment,
   processLinkValidation,
   storeIdempotencyKey,
@@ -119,6 +120,15 @@ export async function PUT(req: Request) {
           idempotencyKey,
           clerkUserId
         );
+      }
+      const accessDenied = await enforceLinksMutationAccess(
+        tx,
+        profileId,
+        clerkUserId,
+        { ...NO_STORE_HEADERS, ...rateLimitHeaders }
+      );
+      if (accessDenied) {
+        return accessDenied;
       }
       const validation = processLinkValidation(links);
       if (!validation.ok) {

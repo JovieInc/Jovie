@@ -266,7 +266,7 @@ export const COMMANDS: readonly Command[] = [
     'Presence',
     'Monitor artist profiles, public pages, and search visibility.',
     'Waypoints',
-    APP_ROUTES.PROFILES
+    APP_ROUTES.PRESENCE
   ),
   nav(
     'go-connections',

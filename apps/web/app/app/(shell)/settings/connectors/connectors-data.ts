@@ -2,7 +2,11 @@ import 'server-only';
 
 import { and, eq } from 'drizzle-orm';
 import type { ConnectorStatus } from '@/components/features/connectors/ConnectorCard';
-import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
+import {
+  CONNECTOR_PROVIDER_IDS,
+  CONNECTOR_PROVIDERS,
+  type ConnectorProviderId,
+} from '@/lib/connectors/registry';
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
@@ -12,14 +16,19 @@ import {
 } from '@/lib/db/schema/connectors';
 
 interface ConnectorAccountRow {
+  readonly provider: ConnectorProviderId;
   readonly status: string;
   readonly providerAccountId: string | null;
+  readonly creatorProfileId: string | null;
+  readonly scopes: readonly string[];
+  readonly capabilities: unknown;
   readonly lastErrorUserMessage: string | null;
 }
 
 export interface SettingsConnectorState {
   readonly status: ConnectorStatus;
-  readonly email?: string;
+  readonly accountLabel?: string;
+  readonly scopes?: readonly string[];
   readonly errorMessage?: string;
 }
 
@@ -45,8 +54,9 @@ export interface SettingsSuggestedActionPreview {
 }
 
 export interface SettingsConnectorsData {
-  readonly gmail: SettingsConnectorState;
-  readonly calendar: SettingsConnectorState;
+  readonly connectors: Readonly<
+    Record<ConnectorProviderId, SettingsConnectorState>
+  >;
   readonly suggestedActions: SettingsSuggestedActionPreview[];
 }
 
@@ -61,23 +71,62 @@ function toConnectorStatus(
   };
 }
 
-function toConnectorState(row: ConnectorAccountRow | null) {
+function getAccountLabel(
+  row: ConnectorAccountRow,
+  provider: ConnectorProviderId
+): string | undefined {
+  if (
+    provider === CONNECTOR_PROVIDERS.youtube &&
+    row.capabilities &&
+    typeof row.capabilities === 'object' &&
+    'channelTitle' in row.capabilities &&
+    typeof row.capabilities.channelTitle === 'string'
+  ) {
+    return row.capabilities.channelTitle;
+  }
+
+  return row.providerAccountId ?? undefined;
+}
+
+function toConnectorState(
+  row: ConnectorAccountRow | null,
+  provider: ConnectorProviderId
+): SettingsConnectorState {
   const state = toConnectorStatus(row);
   return {
     status: state.status,
-    email: row?.providerAccountId ?? undefined,
+    accountLabel: row ? getAccountLabel(row, provider) : undefined,
+    scopes: row?.scopes,
     errorMessage: state.errorMessage,
   };
 }
 
+function buildConnectorStates(
+  rows: readonly ConnectorAccountRow[],
+  creatorProfileId: string | null
+): Readonly<Record<ConnectorProviderId, SettingsConnectorState>> {
+  return Object.fromEntries(
+    CONNECTOR_PROVIDER_IDS.map(provider => {
+      const row =
+        rows.find(candidate => {
+          if (candidate.provider !== provider) return false;
+          return provider !== CONNECTOR_PROVIDERS.youtube
+            ? true
+            : candidate.creatorProfileId === creatorProfileId;
+        }) ?? null;
+      return [provider, toConnectorState(row, provider)];
+    })
+  ) as Record<ConnectorProviderId, SettingsConnectorState>;
+}
+
 const EMPTY_CONNECTORS_DATA: SettingsConnectorsData = {
-  gmail: { status: 'not_connected' },
-  calendar: { status: 'not_connected' },
+  connectors: buildConnectorStates([], null),
   suggestedActions: [],
 };
 
 export async function loadSettingsConnectorsData(
-  clerkUserId: string
+  clerkUserId: string,
+  creatorProfileId: string | null
 ): Promise<SettingsConnectorsData | null> {
   const dbUser = await getUserByClerkId(db, clerkUserId);
 
@@ -86,7 +135,7 @@ export async function loadSettingsConnectorsData(
   }
 
   try {
-    return await loadSettingsConnectorsDataForUser(dbUser.id);
+    return await loadSettingsConnectorsDataForUser(dbUser.id, creatorProfileId);
   } catch (error) {
     if (isMissingConnectorSchemaError(error)) {
       return EMPTY_CONNECTORS_DATA;
@@ -96,57 +145,39 @@ export async function loadSettingsConnectorsData(
 }
 
 async function loadSettingsConnectorsDataForUser(
-  userId: string
+  userId: string,
+  creatorProfileId: string | null
 ): Promise<SettingsConnectorsData> {
-  const [gmailRow, calendarRow] = await Promise.all([
+  const [connectorRows, actionRows] = await Promise.all([
     db
       .select({
+        provider: connectorAccounts.provider,
         status: connectorAccounts.status,
         providerAccountId: connectorAccounts.providerAccountId,
+        creatorProfileId: connectorAccounts.creatorProfileId,
+        scopes: connectorAccounts.scopes,
+        capabilities: connectorAccounts.capabilities,
         lastErrorUserMessage: connectorAccounts.lastErrorUserMessage,
       })
       .from(connectorAccounts)
-      .where(
-        and(
-          eq(connectorAccounts.userId, userId),
-          eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.gmail)
-        )
-      )
-      .limit(1)
-      .then(rows => rows[0] ?? null),
+      .where(eq(connectorAccounts.userId, userId)),
     db
       .select({
-        status: connectorAccounts.status,
-        providerAccountId: connectorAccounts.providerAccountId,
-        lastErrorUserMessage: connectorAccounts.lastErrorUserMessage,
+        id: suggestedActions.id,
+        payload: suggestedActions.payload,
+        rationale: suggestedActions.rationale,
+        sourceRefs: suggestedActions.sourceRefs,
+        status: suggestedActions.status,
       })
-      .from(connectorAccounts)
+      .from(suggestedActions)
       .where(
         and(
-          eq(connectorAccounts.userId, userId),
-          eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.google_calendar)
+          eq(suggestedActions.userId, userId),
+          eq(suggestedActions.status, 'pending')
         )
       )
-      .limit(1)
-      .then(rows => rows[0] ?? null),
+      .limit(10),
   ]);
-
-  const actionRows = await db
-    .select({
-      id: suggestedActions.id,
-      payload: suggestedActions.payload,
-      rationale: suggestedActions.rationale,
-      sourceRefs: suggestedActions.sourceRefs,
-      status: suggestedActions.status,
-    })
-    .from(suggestedActions)
-    .where(
-      and(
-        eq(suggestedActions.userId, userId),
-        eq(suggestedActions.status, 'pending')
-      )
-    )
-    .limit(10);
 
   const pendingActions = actionRows.map(row => {
     const payload = row.payload as Record<string, unknown>;
@@ -170,8 +201,7 @@ async function loadSettingsConnectorsDataForUser(
   });
 
   return {
-    gmail: toConnectorState(gmailRow),
-    calendar: toConnectorState(calendarRow),
+    connectors: buildConnectorStates(connectorRows, creatorProfileId),
     suggestedActions: pendingActions,
   };
 }

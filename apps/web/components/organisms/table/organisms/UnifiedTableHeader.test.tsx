@@ -1,4 +1,9 @@
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import path from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { JsxEmit, ModuleKind, transpileModule } from 'typescript';
 import { describe, expect, it, vi } from 'vitest';
 import {
   type ColumnDef,
@@ -7,6 +12,9 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@/lib/tanstack-table';
+import { TableHeaderCell } from '../molecules/TableHeaderCell';
+import { presets } from '../table.styles';
+import type { UnifiedTableHeader as HeaderComponent } from './UnifiedTableHeader';
 import { UnifiedTableHeader } from './UnifiedTableHeader';
 
 type Row = { id: string; title: string; count: number };
@@ -124,12 +132,11 @@ describe('UnifiedTableHeader', () => {
     expect(titleHeader).toHaveAttribute('aria-sort', 'descending');
   });
 
-  it('does not bake sort state into the header button accessible name', () => {
+  it('bakes sort state into the header button accessible name', () => {
     render(<Harness initialSort={[{ id: 'title', desc: true }]} />);
-    expect(screen.getByRole('button', { name: 'Title' })).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /sorted descending/i })
-    ).toBeNull();
+      screen.getByRole('button', { name: 'Title: sorted descending' })
+    ).toBeInTheDocument();
   });
 
   it('exposes aria-sort=none on sortable but unsorted columns', () => {
@@ -162,5 +169,146 @@ describe('UnifiedTableHeader', () => {
       </table>
     );
     expect(container.querySelector('thead')).toBeNull();
+  });
+});
+
+const require = createRequire(import.meta.url);
+const babel = require('next/dist/compiled/babel/core') as {
+  transformSync(
+    code: string,
+    options: Record<string, unknown>
+  ): {
+    code: string;
+  };
+};
+const filename = path.join(__dirname, 'UnifiedTableHeader.tsx');
+function compileHeader(removeOptOut = false) {
+  const source = readFileSync(filename, 'utf8');
+  const compiled = babel.transformSync(
+    removeOptOut ? source.replace("  'use no memo';\n", '') : source,
+    {
+      filename,
+      babelrc: false,
+      configFile: false,
+      plugins: [
+        [require.resolve('babel-plugin-react-compiler'), {}],
+        require.resolve('next/dist/compiled/babel/plugin-syntax-jsx'),
+        [
+          require.resolve('next/dist/compiled/babel/plugin-syntax-typescript'),
+          { isTSX: true },
+        ],
+      ],
+    }
+  );
+  const executable = transpileModule(compiled.code, {
+    compilerOptions: { jsx: JsxEmit.ReactJSX, module: ModuleKind.CommonJS },
+  }).outputText;
+  const compiledModule = {
+    exports: {} as { UnifiedTableHeader: typeof HeaderComponent },
+  };
+  // Execute the production compiler output with the real cell and table styles.
+  const loadDependency = (id: string) => {
+    if (id === '../molecules/TableHeaderCell') return { TableHeaderCell };
+    if (id === '../table.styles') return { presets };
+    return require(id);
+  };
+  new Function('require', 'module', 'exports', executable)(
+    loadDependency,
+    compiledModule,
+    compiledModule.exports
+  );
+  return compiledModule.exports.UnifiedTableHeader;
+}
+const CompiledHeader = compileHeader();
+const CachedHeader = compileHeader(true);
+
+type Contact = { role: string };
+const contacts: Contact[] = [
+  { role: 'press' },
+  { role: 'bookings' },
+  { role: 'management' },
+];
+const columns: ColumnDef<Contact>[] = [{ accessorKey: 'role', header: 'Role' }];
+function CompiledContacts({
+  headerComponent: Header = CompiledHeader,
+}: {
+  headerComponent?: typeof HeaderComponent;
+}) {
+  const table = useReactTable({
+    data: contacts,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+  return (
+    <table>
+      <Header headerGroups={table.getHeaderGroups()} />
+      <tbody>
+        {table.getRowModel().rows.map(row => (
+          <tr key={row.id}>
+            <td>{row.original.role}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+describe('compiled table header sorting', () => {
+  it('executes compiler caching in the negative control', async () => {
+    const user = userEvent.setup();
+    render(<CompiledContacts headerComponent={CachedHeader} />);
+    const header = screen.getByRole('button', {
+      name: 'Role: not sorted, activate to sort',
+    });
+    await user.click(header);
+    expect(screen.getAllByRole('cell').map(cell => cell.textContent)).toEqual([
+      'bookings',
+      'management',
+      'press',
+    ]);
+    expect(header).toHaveAccessibleName('Role: not sorted, activate to sort');
+  });
+  it('keeps accessible state and focus aligned with pointer and keyboard row sorting', async () => {
+    const user = userEvent.setup();
+    render(<CompiledContacts />);
+    const header = screen.getByRole('button', {
+      name: 'Role: not sorted, activate to sort',
+    });
+    await user.click(header);
+    expect(screen.getAllByRole('cell').map(cell => cell.textContent)).toEqual([
+      'bookings',
+      'management',
+      'press',
+    ]);
+    expect(header).toHaveAccessibleName('Role: sorted ascending');
+    expect(screen.getByRole('columnheader')).toHaveAttribute(
+      'aria-sort',
+      'ascending'
+    );
+    expect(header).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(screen.getAllByRole('cell').map(cell => cell.textContent)).toEqual([
+      'press',
+      'management',
+      'bookings',
+    ]);
+    expect(header).toHaveAccessibleName('Role: sorted descending');
+    expect(screen.getByRole('columnheader')).toHaveAttribute(
+      'aria-sort',
+      'descending'
+    );
+    await user.keyboard(' ');
+    expect(screen.getAllByRole('cell').map(cell => cell.textContent)).toEqual([
+      'press',
+      'bookings',
+      'management',
+    ]);
+    expect(header).toHaveAccessibleName('Role: not sorted, activate to sort');
+    expect(screen.getByRole('columnheader')).toHaveAttribute(
+      'aria-sort',
+      'none'
+    );
+    expect(header).toHaveFocus();
   });
 });

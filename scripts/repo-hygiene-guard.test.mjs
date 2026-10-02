@@ -7,6 +7,7 @@ import {
   mkdirSync,
   mkdtempSync,
   openSync,
+  readdirSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -20,6 +21,7 @@ import test from 'node:test';
 import {
   classifyRolloutFindings,
   evaluateRepoHygiene,
+  filterMergeParentIdenticalPaths,
   HYGIENE_EXCEPTION_MAX_DAYS,
   HYGIENE_LIMITS,
   REPO_HEALTH_BASELINE,
@@ -61,6 +63,28 @@ function promotedRollout(mode) {
 const rolloutErrors = rollout => validateRepoHealthRollout(rollout).join('\n');
 const baselineChangeErrors = current =>
   validateRepoHealthBaselineChange(REPO_HEALTH_BASELINE, current).join('\n');
+
+test('staged merge hygiene keeps resolutions and ignores unchanged incoming paths', () => {
+  const incomingOid = 'a'.repeat(40);
+  const resolvedOid = 'b'.repeat(40);
+  const mergeHeadOids = new Map([
+    ['incoming.ts', incomingOid],
+    ['resolved.ts', incomingOid],
+  ]);
+  const stagedOids = new Map([
+    ['incoming.ts', incomingOid],
+    ['resolved.ts', resolvedOid],
+  ]);
+
+  assert.deepEqual(
+    filterMergeParentIdenticalPaths(
+      ['incoming.ts', 'resolved.ts'],
+      stagedOids,
+      mergeHeadOids
+    ),
+    ['resolved.ts']
+  );
+});
 
 function fixtureFile(root, path, bytes = 1) {
   const absolute = join(root, path);
@@ -620,6 +644,18 @@ test('reports all regular files while preserving the legacy compatibility count'
   }
 });
 
+test('tracked-bytes budget raise stays within the documented +10% cap', () => {
+  // JOV-6635: origin/main measured 178.14 MiB against the 180 MiB budget
+  // (99.0%, over the >=90% raise threshold). The policy caps a single payload
+  // raise at +10%, so the budget is pinned at 198 MiB.
+  const previousBudget = 180 * 1024 * 1024;
+  assert.equal(HYGIENE_LIMITS.maxTrackedBytes, 198 * 1024 * 1024);
+  assert.ok(
+    HYGIENE_LIMITS.maxTrackedBytes <= previousBudget * 1.1,
+    'payload budget raises are capped at +10% per docs/ci/repository-health.md'
+  );
+});
+
 test('tracked payload skips missing paths and symlinks without following them', () => {
   const root = mkdtempSync(join(tmpdir(), 'jovie-hygiene-repo-links-'));
   try {
@@ -910,4 +946,28 @@ test('cleanup preserves aged Git temp packs when lsof is unavailable', () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// JOV-6671: drizzle-kit only reads the newest `*_snapshot.json` in
+// apps/web/drizzle/migrations/meta (the diff base for `generate`), while the
+// migrator only reads `_journal.json` + `*.sql`. Each full snapshot costs
+// ~1 MiB, so committing one per migration pushed tracked bytes to ~99% of the
+// combined-tree budget. Keep a bounded trailing window; prune older snapshots
+// in the same PR that would exceed the cap.
+test('drizzle meta retains only a bounded window of schema snapshots', () => {
+  const metaDir = resolve('apps/web/drizzle/migrations/meta');
+  const snapshots = readdirSync(metaDir)
+    .filter(name => /^\d+_snapshot\.json$/.test(name))
+    .sort();
+  assert.ok(
+    snapshots.length > 0,
+    'drizzle-kit generate needs the newest snapshot as its diff base'
+  );
+  const MAX_RETAINED_SNAPSHOTS = 8;
+  assert.ok(
+    snapshots.length <= MAX_RETAINED_SNAPSHOTS,
+    `${snapshots.length} drizzle meta snapshots retained (cap ${MAX_RETAINED_SNAPSHOTS}); ` +
+      'each is a ~1 MiB copy of the full schema and only the newest is read by ' +
+      'drizzle-kit generate — git rm the oldest *_snapshot.json files in this PR'
+  );
 });

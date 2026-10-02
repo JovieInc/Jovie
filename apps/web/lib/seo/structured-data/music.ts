@@ -26,6 +26,12 @@ const CREDIT_ROLE_SCHEMA_MAP: Record<string, string> = {
   composer: 'composer',
   lyricist: 'lyricist',
   featured_artist: 'contributor',
+  remixer: 'contributor',
+  arranger: 'contributor',
+  conductor: 'contributor',
+  mix_engineer: 'contributor',
+  mastering_engineer: 'contributor',
+  other: 'contributor',
 };
 
 type TrackListItem = {

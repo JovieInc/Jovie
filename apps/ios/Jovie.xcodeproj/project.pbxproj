@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C5343C2723024E59D50EDAFF /* JovieKit in Frameworks */ = {isa = PBXBuildFile; productRef = B830FF153D4F8A274C482A3F /* JovieKit */; };
+		4A7DFF3478291D060F028FE6 /* JovieKit in Frameworks */ = {isa = PBXBuildFile; productRef = A1ADF8E0F54BC659AC0718BB /* JovieKit */; };
 		A0F17E100000000000000004 /* VlogTeleprompterCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F17E100000000000000003 /* VlogTeleprompterCore.swift */; };
 		A0F507500000000000000002 /* TeleprompterProposal.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000001 /* TeleprompterProposal.swift */; };
 		A0F507500000000000000004 /* TeleprompterCaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000003 /* TeleprompterCaptureController.swift */; };
@@ -27,6 +29,8 @@
 		296968C7C074659FBA3D85E9 /* Inter-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A108B03BA602F4C24B54E590 /* Inter-Variable.ttf */; };
 		2C6C36E98540C94E3F1EF74A /* Configuration.local.plist in Resources */ = {isa = PBXBuildFile; fileRef = D24EEA621BFC0D5C4F57065C /* Configuration.local.plist */; };
 		3397C6D45B48BBDAF736A405 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71290AE6A5F14D6941193B70 /* AppRouter.swift */; };
+		A0J0V6095000000000000002 /* AppRouteManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V6095000000000000001 /* AppRouteManifest.swift */; };
+		A0J0V6095000000000000004 /* AppRouteManifestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V6095000000000000003 /* AppRouteManifestTests.swift */; };
 		33F1DF8D4B8D292316335711 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6FDEFEB6D7C1D0251FDA1E61 /* Foundation.framework */; };
 		4CA1C477ECC6B7B40EA17787 /* LaunchMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD30F57584F71E958D8C0514 /* LaunchMode.swift */; };
 		52C5CBF9C24E4C502FA64955 /* MobileMeResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EC2367922F1F00AB0AF1164 /* MobileMeResponse.swift */; };
@@ -61,6 +65,8 @@
 		A0B10F00000000000000000F /* ObservabilityRedactionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F00000000000000000D /* ObservabilityRedactionTests.swift */; };
 		A0B10F000000000000000012 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = A0B10F000000000000000011 /* Sentry */; };
 		A0B10F000000000000000020 /* AuthScreenStyleGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F000000000000000021 /* AuthScreenStyleGuardTests.swift */; };
+		A0671400A0671400A0671402 /* BiometricLockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0671400A0671400A0671401 /* BiometricLockView.swift */; };
+		A0671400A0671400A0671404 /* BiometricLockPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0671400A0671400A0671403 /* BiometricLockPolicyTests.swift */; };
 		A0A344000000000000000002 /* AppShellIntentNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A344000000000000000001 /* AppShellIntentNavigation.swift */; };
 		A0A344000000000000000004 /* AppShellIntentNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A344000000000000000003 /* AppShellIntentNavigationTests.swift */; };
 		A0J0V36330000000000000002 /* AppShellLeftDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36330000000000000001 /* AppShellLeftDrawer.swift */; };
@@ -127,6 +133,7 @@
 		CCA8CB157DC140048C2D28B9 /* MobileAuthCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA18C2D747C4D929F25DF70 /* MobileAuthCoordinator.swift */; };
 		FA8D45F4123178BDD33F82C5 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D156B3220339CAB0DBE1DD /* SplashView.swift */; };
 		FDD930D67ACF374B16E87FDE /* MeRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 191669F70597A1039C74C0B1 /* MeRepositoryTests.swift */; };
+		10CDA6A50000000000000001 /* MobileHomeDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10CDA6A50000000000000002 /* MobileHomeDataStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -188,6 +195,8 @@
 		A0C053710000000000000001 /* LibraryAccessibilityUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryAccessibilityUITests.swift; sourceTree = "<group>"; };
 		A0C045720000000000000001 /* DogfoodExplorationUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DogfoodExplorationUITests.swift; sourceTree = "<group>"; };
 		6FDEFEB6D7C1D0251FDA1E61 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		A0J0V6095000000000000001 /* AppRouteManifest.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppRouteManifest.swift; sourceTree = "<group>"; };
+		A0J0V6095000000000000003 /* AppRouteManifestTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppRouteManifestTests.swift; sourceTree = "<group>"; };
 		71290AE6A5F14D6941193B70 /* AppRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
 		71445144CE0970267C0508C6 /* AppState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		7DEB4AD6A6B0BBDE4A347E2D /* VenueModeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VenueModeView.swift; sourceTree = "<group>"; };
@@ -214,6 +223,8 @@
 		A0B10F00000000000000000C /* ObservabilityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservabilityTests.swift; sourceTree = "<group>"; };
 		A0B10F00000000000000000D /* ObservabilityRedactionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservabilityRedactionTests.swift; sourceTree = "<group>"; };
 		A0B10F000000000000000021 /* AuthScreenStyleGuardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthScreenStyleGuardTests.swift; sourceTree = "<group>"; };
+		A0671400A0671400A0671401 /* BiometricLockView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BiometricLockView.swift; sourceTree = "<group>"; };
+		A0671400A0671400A0671403 /* BiometricLockPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BiometricLockPolicyTests.swift; sourceTree = "<group>"; };
 		A0A344000000000000000001 /* AppShellIntentNavigation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellIntentNavigation.swift; sourceTree = "<group>"; };
 		A0A344000000000000000003 /* AppShellIntentNavigationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellIntentNavigationTests.swift; sourceTree = "<group>"; };
 		A0J0V36330000000000000001 /* AppShellLeftDrawer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellLeftDrawer.swift; sourceTree = "<group>"; };
@@ -270,6 +281,7 @@
 		EDFB0D6D1DA6A287207AC1A6 /* AuthScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthScreen.swift; sourceTree = "<group>"; };
 		BCA18C2D747C4D929F25DF70 /* MobileAuthCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileAuthCoordinator.swift; sourceTree = "<group>"; };
 		F4562819B40056163650929C /* JovieAppIntentsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieAppIntentsTests.swift; sourceTree = "<group>"; };
+		10CDA6A50000000000000002 /* MobileHomeDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHomeDataStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -278,6 +290,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D179CCF9F0BD00565174ACF6 /* Foundation.framework in Frameworks */,
+				4A7DFF3478291D060F028FE6 /* JovieKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -294,6 +307,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				33F1DF8D4B8D292316335711 /* Foundation.framework in Frameworks */,
+				C5343C2723024E59D50EDAFF /* JovieKit in Frameworks */,
 				A0B10F000000000000000012 /* Sentry in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -397,6 +411,7 @@
 			children = (
 				4C8753F36E077F69D925EE26 /* APIClientTests.swift */,
 				A93DB506915B418D06E897A4 /* AppStateTests.swift */,
+				A0671400A0671400A0671403 /* BiometricLockPolicyTests.swift */,
 				A0B10F000000000000000021 /* AuthScreenStyleGuardTests.swift */,
 				F1E2D3C4B5A697886756453E /* SettingsEscapeTrapGuardTests.swift */,
 				A0J0V2549000000000000000B /* ChatRepositoryTests.swift */,
@@ -423,6 +438,7 @@
 				5615484B29C6B6E26EE5E92B /* IntentNavigationStoreTests.swift */,
 				F4562819B40056163650929C /* JovieAppIntentsTests.swift */,
 				A0J0V11070000000000000003 /* ConversationUserActivityTests.swift */,
+				A0J0V6095000000000000003 /* AppRouteManifestTests.swift */,
 			);
 			name = JovieTests;
 			path = JovieTests;
@@ -535,6 +551,7 @@
 				A0J0V36380000000000000003 /* MobileAudienceHighlightsResponse.swift */,
 				A0GH12706000000000000001 /* MobileActionLoopInboxResponse.swift */,
 				A0GH12706000000000000003 /* MobileActionLoopCalendarResponse.swift */,
+				10CDA6A50000000000000002 /* MobileHomeDataStore.swift */,
 				A0B10F00000000000000000B /* Observability */,
 				44B3D151E21A49C2876932A8 /* NativeSessionTokenStore.swift */,
 				A0J0V26350000000000000001 /* MobileAuthFinalization.swift */,
@@ -620,6 +637,7 @@
 			isa = PBXGroup;
 			children = (
 				71290AE6A5F14D6941193B70 /* AppRouter.swift */,
+				A0J0V6095000000000000001 /* AppRouteManifest.swift */,
 				71445144CE0970267C0508C6 /* AppState.swift */,
 				E4EAFC467F76300BCFC2659F /* Configuration.swift */,
 				00BCF42EFB99B5DAB4E0F400 /* JovieApp.swift */,
@@ -637,6 +655,7 @@
 			isa = PBXGroup;
 			children = (
 				EDFB0D6D1DA6A287207AC1A6 /* AuthScreen.swift */,
+				A0671400A0671400A0671401 /* BiometricLockView.swift */,
 				BCA18C2D747C4D929F25DF70 /* MobileAuthCoordinator.swift */,
 			);
 			name = Auth;
@@ -678,6 +697,7 @@
 			name = Jovie;
 			packageProductDependencies = (
 				A0B10F000000000000000011 /* Sentry */,
+				B830FF153D4F8A274C482A3F /* JovieKit */,
 			);
 			productName = Jovie;
 			productReference = 95CA509F09ADCA8A54FCC85A /* Jovie.app */;
@@ -697,6 +717,9 @@
 				87AD3BF953180708922D0183 /* PBXTargetDependency */,
 			);
 			name = JovieTests;
+			packageProductDependencies = (
+				A1ADF8E0F54BC659AC0718BB /* JovieKit */,
+			);
 			productName = JovieTests;
 			productReference = 549B9163EF50F377CA1A4C5B /* JovieTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -741,6 +764,7 @@
 			mainGroup = 05015460AF84AD8DF5276AD4;
 			minimizedProjectReferenceProxies = 0;
 			packageReferences = (
+				B9D51D5F8DAD5A0D21CC5283 /* XCLocalSwiftPackageReference "JovieKit" */,
 				A0B10F000000000000000010 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -791,6 +815,7 @@
 			files = (
 				C2C8C16A08954501FB61E562 /* APIClientTests.swift in Sources */,
 				EE4CBA88057592FAFCD7F926 /* AppStateTests.swift in Sources */,
+				A0671400A0671400A0671404 /* BiometricLockPolicyTests.swift in Sources */,
 				A0J0V2549000000000000000C /* ChatRepositoryTests.swift in Sources */,
 				A0J0V2549000000000000000E /* MobileChatClientTests.swift in Sources */,
 				A0J0V36390000000000000004 /* ComposerWorkflowSheetTests.swift in Sources */,
@@ -817,6 +842,7 @@
 				71B98E46403E1759256C61A5 /* IntentNavigationStoreTests.swift in Sources */,
 				F232904F618A4671B805D0BC /* JovieAppIntentsTests.swift in Sources */,
 				A0J0V11070000000000000004 /* ConversationUserActivityTests.swift in Sources */,
+				A0J0V6095000000000000004 /* AppRouteManifestTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -825,6 +851,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3397C6D45B48BBDAF736A405 /* AppRouter.swift in Sources */,
+				A0J0V6095000000000000002 /* AppRouteManifest.swift in Sources */,
 				045FC6E446AFF7FFD3ED0FE2 /* AppState.swift in Sources */,
 				EBDA8137B767F16402C41C24 /* Configuration.swift in Sources */,
 				89B2D98342D65781B5E80A72 /* JovieApp.swift in Sources */,
@@ -860,6 +887,7 @@
 				A0J0V36380000000000000004 /* MobileAudienceHighlightsResponse.swift in Sources */,
 				A0GH12706000000000000002 /* MobileActionLoopInboxResponse.swift in Sources */,
 				A0GH12706000000000000004 /* MobileActionLoopCalendarResponse.swift in Sources */,
+				10CDA6A50000000000000001 /* MobileHomeDataStore.swift in Sources */,
 				DA0F3A9E1C4B4B149B7D4C21 /* NativeSessionTokenStore.swift in Sources */,
 				A0J0V26350000000000000002 /* MobileAuthFinalization.swift in Sources */,
 				ADC14533827EFD888D1ED50F /* QRCodeRenderer.swift in Sources */,
@@ -882,6 +910,7 @@
 				A0J0V3632A0000000000000E /* InboxSurfaceView.swift in Sources */,
 				5F4F3551CC9F4C09A2520AEB /* AppShellView.swift in Sources */,
 				F95545618F95E792DCBCA7DF /* AuthScreen.swift in Sources */,
+				A0671400A0671400A0671402 /* BiometricLockView.swift in Sources */,
 				CCA8CB157DC140048C2D28B9 /* MobileAuthCoordinator.swift in Sources */,
 				74E75D0A3C816805F65FA48A /* DashboardView.swift in Sources */,
 				A0J0V51480000000000000002 /* PublicProfileBrowserView.swift in Sources */,
@@ -1246,6 +1275,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		B9D51D5F8DAD5A0D21CC5283 /* XCLocalSwiftPackageReference "JovieKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/JovieKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		A0B10F000000000000000010 /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -1258,6 +1294,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		B830FF153D4F8A274C482A3F /* JovieKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B9D51D5F8DAD5A0D21CC5283 /* XCLocalSwiftPackageReference "JovieKit" */;
+			productName = JovieKit;
+		};
+		A1ADF8E0F54BC659AC0718BB /* JovieKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B9D51D5F8DAD5A0D21CC5283 /* XCLocalSwiftPackageReference "JovieKit" */;
+			productName = JovieKit;
+		};
 		A0B10F000000000000000011 /* Sentry */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A0B10F000000000000000010 /* XCRemoteSwiftPackageReference "sentry-cocoa" */;

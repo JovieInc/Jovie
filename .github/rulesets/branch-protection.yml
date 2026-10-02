@@ -149,11 +149,12 @@ rules:
       # production deploy latency. Live ruleset 10512119 stays 1/0 until the
       # post-merge apply + canary.
       min_entries_to_merge: 5
-      # JOV-6107 measured capacity: 2 groups * 19 jobs + 7 background < 60.
-      # Source-first rollout permits live 1; apply only the build count after
-      # landing. Preserve the separately pending cohort fields above/below.
+      # JOV-6815: a ruleset admin raised live build concurrency to GitHub's
+      # 10-group ceiling on 2026-09-25; source syncs to the applied live
+      # value. JOV-6107's measured bound was 2 groups under the conservative
+      # 60-job readback; any lower live count remains supported for rollback.
       max_entries_to_merge: 5
-      max_entries_to_build: 2
+      max_entries_to_build: 10
       min_entries_to_merge_wait_minutes: 10
       # Source-first cutover: live stays at 20 until this guard lands, then
       # apply 60 without changing required checks or ALLGREEN.

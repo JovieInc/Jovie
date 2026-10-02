@@ -83,14 +83,19 @@ vi.mock('@/features/profile/ProfileUnifiedDrawer', () => ({
   ProfileUnifiedDrawer: ({
     open,
     presentation,
+    creditSegments,
   }: {
     readonly open: boolean;
     readonly presentation?: string;
+    readonly creditSegments?: readonly { readonly type: string }[];
   }) => (
     <div
       data-testid='mock-desktop-drawer'
       data-open={String(open)}
       data-presentation={presentation ?? 'standalone'}
+      data-credit-segments={(creditSegments ?? [])
+        .map(segment => segment.type)
+        .join('|')}
     />
   ),
 }));
@@ -111,15 +116,19 @@ vi.mock('@/features/profile/StaticListenInterface', () => ({
   ),
 }));
 
-vi.mock('@/lib/profile-dsps', () => ({
-  getCanonicalProfileDSPs: () => [
+const mockGetCanonicalProfileDSPs = vi.hoisted(() =>
+  vi.fn(() => [
     {
       key: 'spotify',
       name: 'Spotify',
       url: 'https://open.spotify.com/artist/4u',
       config: {},
     },
-  ],
+  ])
+);
+
+vi.mock('@/lib/profile-dsps', () => ({
+  getCanonicalProfileDSPs: () => mockGetCanonicalProfileDSPs(),
 }));
 
 vi.mock('@/lib/dsp', () => ({
@@ -166,6 +175,14 @@ const contentPrefs: Record<NotificationContentType, boolean> = {
 describe('ProfileDesktopSurface', () => {
   beforeEach(() => {
     mockUseIsAuthenticated.mockReturnValue(false);
+    mockGetCanonicalProfileDSPs.mockReturnValue([
+      {
+        key: 'spotify',
+        name: 'Spotify',
+        url: 'https://open.spotify.com/artist/4u',
+        config: {},
+      },
+    ]);
   });
 
   it('hides the desktop back control on the public profile root for logged-out visitors', () => {
@@ -265,6 +282,7 @@ describe('ProfileDesktopSurface', () => {
     expect(onReady).toHaveBeenCalledTimes(1);
   });
   it('renders the desktop shell and primary navigation', () => {
+    const onModeSelect = vi.fn();
     render(
       <ProfileDesktopSurface
         artist={artist}
@@ -274,7 +292,7 @@ describe('ProfileDesktopSurface', () => {
         drawerOpen={false}
         drawerView='menu'
         activeMode='profile'
-        onModeSelect={vi.fn()}
+        onModeSelect={onModeSelect}
         onDrawerOpenChange={vi.fn()}
         onDrawerViewChange={vi.fn()}
         onOpenMenu={vi.fn()}
@@ -316,6 +334,10 @@ describe('ProfileDesktopSurface', () => {
     expect(
       within(navigation).queryByRole('button', { name: 'Get updates' })
     ).not.toBeInTheDocument();
+
+    fireEvent.click(within(navigation).getByRole('button', { name: 'Events' }));
+    expect(onModeSelect).toHaveBeenCalledWith('tour');
+
     const listenCta = screen.getByRole('button', { name: 'Listen' });
     expect(listenCta).toHaveClass('h-auto', 'min-h-7');
     expect(listenCta).toHaveClass(
@@ -428,6 +450,100 @@ describe('ProfileDesktopSurface', () => {
       '[@media(min-width:1180px)]:contents'
     );
     expect(screen.getByTestId('profile-desktop-surface')).toBeInTheDocument();
+  });
+
+  // JOV-7412: the document scrolls at desktop widths, so the card's inner
+  // scroll pane must chain overscroll to the page instead of trapping the
+  // wheel at its own edges.
+  it('chains overscroll to the document instead of trapping the wheel', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+      />
+    );
+
+    const scrollPane = screen.getByTestId('profile-desktop-content-scroll');
+    expect(scrollPane).toHaveClass('overflow-y-auto', 'overscroll-auto');
+    expect(scrollPane.className).not.toMatch(/\boverscroll-contain\b/);
+  });
+
+  // JOV-6453: while the AnonCookieBootstrap fetch is still in flight the
+  // variant-dependent hero CTA stays inert so it cannot morph post-paint.
+  it('holds the hero subscribe CTA inert while the visitor assignment resolves', () => {
+    // No playable destinations -> hero primary action resolves to subscribe.
+    mockGetCanonicalProfileDSPs.mockReturnValue([]);
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        allowFanCapture
+        visitorAssignmentResolved={false}
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+      />
+    );
+
+    const resolving = screen.getByTestId('profile-desktop-subscribe-resolving');
+    expect(resolving).toBeDisabled();
+    expect(resolving).toHaveAttribute('aria-busy', 'true');
+    expect(
+      screen.queryByTestId('mock-desktop-alerts-cta')
+    ).not.toBeInTheDocument();
+  });
+
+  it('mounts the hero subscribe CTA once the visitor assignment is resolved', () => {
+    mockGetCanonicalProfileDSPs.mockReturnValue([]);
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        allowFanCapture
+        visitorAssignmentResolved
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('mock-desktop-alerts-cta')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('profile-desktop-subscribe-resolving')
+    ).not.toBeInTheDocument();
   });
 
   // Regression: JOV-4103 — desktop hero must render social media icons.
@@ -661,6 +777,71 @@ describe('ProfileDesktopSurface', () => {
     }
   );
 
+  // JOV-4429: tour lists often reuse one ticketing URL for every date, so
+  // each Tickets link needs a unique accessible name (WCAG 2.4.4).
+  it.each(['profile', 'tour'] as const)(
+    'gives per-event Tickets links unique accessible names in %s mode',
+    activeMode => {
+      const makeShow = (
+        id: string,
+        venueName: string,
+        startDate: string
+      ): TourDateViewModel => ({
+        id,
+        profileId: artist.id,
+        externalId: null,
+        provider: 'manual',
+        eventType: 'tour',
+        confirmationStatus: 'confirmed',
+        reviewedAt: '2026-01-01T00:00:00.000Z',
+        title: null,
+        venueName,
+        city: 'Los Angeles',
+        region: 'CA',
+        country: 'US',
+        startDate,
+        startTime: null,
+        timezone: 'America/Chicago',
+        latitude: null,
+        longitude: null,
+        ticketUrl: 'https://tickets.example.com/tour',
+        ticketStatus: 'available',
+        lastSyncedAt: null,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      });
+
+      render(
+        <ProfileDesktopSurface
+          artist={artist}
+          socialLinks={[]}
+          contacts={contacts}
+          photoDownloadSizes={[]}
+          tourDates={[
+            makeShow('show-1', 'The Echo', '2030-09-24T03:00:00Z'),
+            makeShow('show-2', 'The Wiltern', '2030-09-26T03:00:00Z'),
+          ]}
+          drawerOpen={false}
+          drawerView='menu'
+          activeMode={activeMode}
+          onModeSelect={vi.fn()}
+          onDrawerOpenChange={vi.fn()}
+          onDrawerViewChange={vi.fn()}
+          onOpenMenu={vi.fn()}
+          onPlayClick={vi.fn()}
+          profileHref='/timwhite'
+        />
+      );
+
+      expect(
+        screen.getByRole('link', { name: 'Tickets for The Echo on Sep 23' })
+      ).toHaveAttribute('href', 'https://tickets.example.com/tour');
+      expect(
+        screen.getByRole('link', { name: 'Tickets for The Wiltern on Sep 25' })
+      ).toHaveAttribute('href', 'https://tickets.example.com/tour');
+    }
+  );
+
   it('offers View Events only when upcoming dates exist', () => {
     const onModeSelect = vi.fn();
     const upcomingShow = {
@@ -850,5 +1031,37 @@ describe('ProfileDesktopSurface', () => {
     expect(
       screen.queryByTestId('mock-static-listen-interface')
     ).not.toBeInTheDocument();
+  });
+
+  it('routes selected credits into the drawer About destination (JOV-6199)', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        drawerOpen={true}
+        drawerView='about'
+        activeMode='profile'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        creditSegments={[
+          { type: 'text', text: 'Credited on "' },
+          {
+            type: 'release',
+            text: 'Neon Circuit',
+            href: '/timwhite/neon-circuit',
+          },
+          { type: 'text', text: '".' },
+        ]}
+      />
+    );
+
+    expect(screen.getByTestId('mock-desktop-drawer')).toHaveAttribute(
+      'data-credit-segments',
+      'text|release|text'
+    );
   });
 });

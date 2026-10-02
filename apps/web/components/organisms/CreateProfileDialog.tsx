@@ -15,21 +15,21 @@ import { useRouter } from 'next/navigation';
 import { type FormEvent, useState, useTransition } from 'react';
 import { toast } from '@/components/feedback';
 
-interface CreateProfileResult {
+interface CreateIdentityResult {
   success: boolean;
   error?: string;
   profileId?: string;
 }
 
-interface CreateProfileDialogProps {
+interface CreateIdentityDialogProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
 }
 
-export function CreateProfileDialog({
+export function CreateIdentityDialog({
   open,
   onOpenChange,
-}: CreateProfileDialogProps) {
+}: CreateIdentityDialogProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [displayName, setDisplayName] = useState('');
@@ -57,7 +57,7 @@ export function CreateProfileDialog({
     }
 
     startTransition(async () => {
-      let result: CreateProfileResult;
+      let result: CreateIdentityResult;
       try {
         const response = await fetch('/api/dashboard/profile/create', {
           method: 'POST',
@@ -67,18 +67,18 @@ export function CreateProfileDialog({
             username: username.trim(),
           }),
         });
-        result = (await response.json()) as CreateProfileResult;
+        result = (await response.json()) as CreateIdentityResult;
       } catch {
-        setError("Couldn't create profile. Try again.");
+        setError("Couldn't create identity. Try again.");
         return;
       }
 
       if (!result.success) {
-        setError(result.error ?? "Couldn't create profile. Try again.");
+        setError(result.error ?? "Couldn't create identity. Try again.");
         return;
       }
 
-      toast.success('Profile created');
+      toast.success('Identity created');
       handleClose();
       router.refresh();
     });
@@ -88,9 +88,9 @@ export function CreateProfileDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className='sm:max-w-100'>
         <DialogHeader>
-          <DialogTitle>Add Artist Profile</DialogTitle>
+          <DialogTitle>Add Artist Identity</DialogTitle>
           <DialogDescription>
-            Create a new artist profile you can switch between from the sidebar.
+            Create an artist identity you can switch to from the sidebar.
           </DialogDescription>
         </DialogHeader>
 
@@ -148,7 +148,7 @@ export function CreateProfileDialog({
               loading={isPending}
               disabled={isPending || !displayName.trim() || !username.trim()}
             >
-              Create Profile
+              Create Identity
             </Button>
           </DialogFooter>
         </form>

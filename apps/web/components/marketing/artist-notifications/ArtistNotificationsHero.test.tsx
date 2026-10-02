@@ -14,16 +14,33 @@ describe('ArtistNotificationsHero', () => {
         level: 1,
         name: segmentedAccessibleName('Reach Every Fan.', 'Automatically.'),
       })
-    ).toHaveClass('line-clamp-2');
+    ).not.toHaveClass('line-clamp-2');
     expect(
       screen.getByRole('link', {
         name: ARTIST_NOTIFICATIONS_COPY.hero.primaryCtaLabel,
       })
     ).toHaveAttribute('href', ARTIST_NOTIFICATIONS_COPY.hero.primaryCtaHref);
 
+    const cardStage = screen.getByTestId('artist-notifications-card-stage');
     for (const card of ARTIST_NOTIFICATIONS_COPY.hero.floatingCards) {
-      expect(screen.getByText(card.title)).toBeInTheDocument();
+      expect(cardStage).toHaveTextContent(card.title);
     }
+  });
+
+  it('docks under the header and renders the low-opacity dark-underlay hero image', () => {
+    const { container } = render(
+      <ArtistNotificationsHero hero={ARTIST_NOTIFICATIONS_COPY.hero} />
+    );
+
+    expect(container.querySelector('section')).toHaveClass(
+      'marketing-hero-dock'
+    );
+
+    const heroImage = container.querySelector('img[alt=""]');
+    expect(heroImage?.getAttribute('src')).toContain(
+      encodeURIComponent('/images/hero/artist-notifications.webp')
+    );
+    expect(heroImage).toHaveClass('opacity-30');
   });
 
   it('keeps the adjacent Storybook receipt bound to the production fixture', () => {

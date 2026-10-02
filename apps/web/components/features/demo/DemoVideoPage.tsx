@@ -7,9 +7,14 @@ import {
   getDemoVideoPosterUrl,
   getDemoVideoUrl,
 } from '@/lib/demo-video';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { DemoVideoPlayer } from './DemoVideoPlayer';
 
 export function DemoVideoPage() {
+  if (!FEATURE_FLAGS.SHOW_PRODUCT_DEMO_VIDEO) {
+    return null;
+  }
+
   const videoUrl = getDemoVideoUrl();
   const posterUrl = getDemoVideoPosterUrl();
   const downloadHref = getDemoVideoDownloadHref(videoUrl);

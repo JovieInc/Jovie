@@ -1,0 +1,64 @@
+name: Lane Fix Relay
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# capability-gap: The shipping lanes on Gem have no inbound webhook, so this hop records a PR's failed CI, merge-queue removal, conflict, review feedback or green lane draft as a lane-fix-<kind> label that the lane runner reads each pass; it never pushes, readies, merges or enqueues.
+# removal-trigger: Remove when the lanes receive GitHub webhooks directly (an org webhook to the lane host) or the shipping lanes are retired.
+
+# JOV-6672: no PR needs Tim. Every signal that a PR needs repair is pushed to
+# the lanes as a label on that exact PR (scripts/lanes/pr_events.py), instead of
+# the lanes scanning every PR. The lane runner owns every mutation after that:
+# the fix, marking a green lane draft ready with its merge intent, and closing
+# or adopting drafts left by disabled lanes.
+
+on:
+  workflow_run:
+    workflows: [Source Validation, Fork PR Gate, PR Size Guard]
+    types: [completed]
+  pull_request_target:
+    types: [dequeued]
+  pull_request_review:
+    types: [submitted]
+  pull_request_review_comment:
+    types: [created]
+  push:
+    branches: [main]
+  # Manual backfill: label open PRs already conflicting, green lane drafts and
+  # drafts orphaned by disabled lanes, which predate the relay.
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  # Pushes to main supersede each other (only the newest conflict read matters);
+  # every other event is its own PR signal and must not be dropped.
+  group: lane-fix-relay-${{ github.event_name == 'push' && 'main' || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
+jobs:
+  relay:
+    name: Queue lane repair
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.event == 'pull_request' &&
+       contains(fromJSON('["failure","timed_out","startup_failure","success"]'), github.event.workflow_run.conclusion))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout trusted lane policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/lanes
+          sparse-checkout-cone-mode: false
+
+      - name: Label the PR for the lanes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODE: ${{ github.event_name == 'workflow_dispatch' && 'backfill' || 'relay' }}
+        run: python3 scripts/lanes/pr_events.py "$MODE"

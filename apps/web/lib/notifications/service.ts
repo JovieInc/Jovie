@@ -9,6 +9,7 @@ import {
 import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
 import { sendOutboundSms } from '@/lib/notifications/providers/sms/outbound-sms';
 import type { SendSmsResult } from '@/lib/notifications/providers/sms/twilio-sender';
+import { sendPushNotification } from '@/lib/notifications/push';
 import {
   checkQuota,
   incrementQuota,
@@ -462,6 +463,13 @@ export const sendNotification = async (
   const results: NotificationChannelResult[] = [];
 
   for (const channel of channels) {
+    // Push uses canonical Better Auth recipient preferences. The older creator
+    // profile preferences below remain the email/SMS compatibility layer.
+    if (channel === 'push') {
+      results.push(await sendPushNotification(message, target));
+      continue;
+    }
+
     const isChannelEnabled = preferences.channels[channel] ?? false;
 
     if (!isChannelEnabled) {
@@ -487,7 +495,7 @@ export const sendNotification = async (
       continue;
     }
 
-    // Placeholder for push or in-app transports
+    // Placeholder for in-app transport
     results.push(buildSkippedResult(channel, 'Channel not implemented yet'));
   }
 

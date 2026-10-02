@@ -21,6 +21,11 @@ export const CODE_FLAGS = {
   // flag flips on only when Tim certifies the redo output. Env override:
   // FEATURE_YOUTUBE_THUMBNAILS_PASTE_GENERATE=true
   YOUTUBE_THUMBNAILS_PASTE_GENERATE: false,
+  // Ovie MCP Better Auth dynamic client registration. Default off: discovery
+  // does not advertise registration_endpoint and /oauth2/register stays closed.
+  // FEATURE_OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION=true opens unauthenticated
+  // registration limited to the shared MCP redirect allowlist.
+  OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: false,
 } as const satisfies Record<string, boolean>;
 
 export type CodeFlagName = keyof typeof CODE_FLAGS;

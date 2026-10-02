@@ -1,3 +1,7 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Readable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 import {
   CLI_VERSION_FALLBACK,
@@ -39,7 +43,10 @@ describe('jovie CLI', () => {
 
     expect(result).toBe(0);
     expect(stdout.read()).toContain('artist get <username>');
-    expect(stdout.read()).toContain('No login, API key');
+    expect(stdout.read()).toContain('profile create <url>');
+    expect(stdout.read()).toContain(
+      'No login or API key is needed for public commands.'
+    );
   });
 
   it('prints the source fallback version before command validation', async () => {
@@ -209,6 +216,33 @@ describe('jovie CLI', () => {
     expect(invalid.read()).toContain('--full is only supported by docs llms');
   });
 
+  it('reports a missing command argument instead of an unknown command', async () => {
+    const stdout = createOutput();
+    const stderr = createOutput();
+
+    await expect(
+      runCli(['artist', 'get', '--json'], {
+        stdout: stdout.output,
+        stderr: stderr.output,
+      })
+    ).resolves.toBe(2);
+    expect(JSON.parse(stdout.read())).toEqual({
+      error: {
+        code: 'USAGE_ERROR',
+        message: 'Missing required argument <username> for artist get',
+      },
+    });
+
+    const text = createOutput();
+    await expect(
+      runCli(['profile', 'create'], { stderr: text.output })
+    ).resolves.toBe(2);
+    expect(text.read()).toContain(
+      'Missing required argument <url> for profile create'
+    );
+    expect(text.read()).not.toContain('Unknown command');
+  });
+
   it('rejects malformed parser options and unsafe base URLs', async () => {
     const parserError = createOutput();
     await expect(
@@ -263,15 +297,16 @@ describe('jovie CLI', () => {
     expect(stderr.read()).toContain('--full is only supported by docs llms');
   });
 
-  it('keeps an unexpected response-body failure distinct from request failures', async () => {
+  it('reports response stream failure with a stable request code', async () => {
     const stdout = createOutput();
     const fetchImpl: FetchImplementation = async () =>
-      ({
-        ok: true,
-        text: async () => {
-          throw new Error('body stream unavailable');
-        },
-      }) as unknown as Response;
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.error(new Error('body stream unavailable'));
+          },
+        })
+      );
 
     await expect(
       runCli(['docs', 'llms', '--json'], {
@@ -281,9 +316,150 @@ describe('jovie CLI', () => {
     ).resolves.toBe(1);
     expect(JSON.parse(stdout.read())).toEqual({
       error: {
-        code: 'CLI_ERROR',
+        code: 'REQUEST_FAILED',
         message: 'body stream unavailable',
+        status: 200,
       },
     });
+  });
+
+  it('creates a profile and prints the claim URL as JSON', async () => {
+    const stdout = createOutput();
+    const fetch = createFetch(
+      '{"username":"demo","claimUrl":"https://jov.ie/demo/claim"}',
+      201
+    );
+    await expect(
+      runCli(
+        ['profile', 'create', 'https://open.spotify.com/artist/abc', '--json'],
+        { fetchImpl: fetch.fetchImpl, stdout: stdout.output }
+      )
+    ).resolves.toBe(0);
+    expect(fetch.urls).toEqual(['https://jov.ie/api/agents/profiles']);
+    expect(JSON.parse(stdout.read())).toEqual({
+      username: 'demo',
+      claimUrl: 'https://jov.ie/demo/claim',
+    });
+  });
+
+  it('exits 2 for a non-Spotify profile URL without a request', async () => {
+    const stdout = createOutput();
+    const fetch = createFetch('{}');
+    await expect(
+      runCli(['profile', 'create', 'https://instagram.com/x', '--json'], {
+        fetchImpl: fetch.fetchImpl,
+        stdout: stdout.output,
+      })
+    ).resolves.toBe(2);
+    expect(fetch.urls).toEqual([]);
+    expect(JSON.parse(stdout.read()).error.code).toBe('INVALID_INPUT');
+  });
+
+  it('prints the skill and serves MCP over stdin', async () => {
+    const skill = createOutput();
+    await expect(runCli(['skill'], { stdout: skill.output })).resolves.toBe(0);
+    expect(skill.read()).toContain('name: jovie');
+
+    const stdout = createOutput();
+    await expect(
+      runCli(['mcp'], {
+        stdin: Readable.from([
+          '{"jsonrpc":"2.0","id":1,"method":"tools/list"}\n',
+        ]),
+        stdout: stdout.output,
+      })
+    ).resolves.toBe(0);
+    const tools = JSON.parse(stdout.read()).result.tools.map(
+      (tool: { name: string }) => tool.name
+    );
+    expect(tools).toContain('create_profile');
+  });
+
+  it('installs the skill with init and rejects a bad MCP base URL', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jovie-cli-init-'));
+    const stdout = createOutput();
+    await expect(
+      runCli(['init', '--dir', dir, '--json'], { stdout: stdout.output })
+    ).resolves.toBe(0);
+    expect(JSON.parse(stdout.read()).installed).toEqual([
+      join(dir, 'jovie/SKILL.md'),
+    ]);
+
+    const stderr = createOutput();
+    await expect(
+      runCli(['mcp', '--base-url', 'ftp://x'], {
+        stdin: Readable.from([]),
+        stderr: stderr.output,
+      })
+    ).resolves.toBe(2);
+    expect(stderr.read()).toContain('Base URL must be');
+  });
+
+  it('files a report with flags and attaches safe context', async () => {
+    const stdout = createOutput();
+    const bodies: unknown[] = [];
+    const fetchImpl: FetchImplementation = async (_input, init) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response('{"reportId":"r-9"}', { status: 201 });
+    };
+    await expect(
+      runCli(
+        [
+          'report',
+          'bug',
+          '--title',
+          'claim link 404',
+          '--details',
+          'Opened it, got 404.',
+          '--code',
+          'CREATE_FAILED',
+          '--json',
+        ],
+        { fetchImpl, stdout: stdout.output }
+      )
+    ).resolves.toBe(0);
+    expect(JSON.parse(stdout.read())).toEqual({ reportId: 'r-9' });
+    expect(bodies[0]).toMatchObject({
+      kind: 'bug',
+      title: 'claim link 404',
+      context: { apiCode: 'CREATE_FAILED', channel: 'cli' },
+    });
+    const context = (bodies[0] as { context: Record<string, unknown> }).context;
+    expect(Object.keys(context).sort()).toEqual(
+      ['apiCode', 'channel', 'cliVersion', 'platform', 'runtime'].sort()
+    );
+  });
+
+  it('rejects report flags on commands that do not take them', async () => {
+    const stderr = createOutput();
+    await expect(
+      runCli(['api', 'openapi', '--title', 'x'], { stderr: stderr.output })
+    ).resolves.toBe(2);
+    expect(stderr.read()).toContain('--title is not supported by api openapi');
+    const help = createOutput();
+    await runCli(['--help'], { stdout: help.output });
+    expect(help.read()).toContain('report bug --title <text> --details <text>');
+  });
+});
+
+describe('machine-readable special commands', () => {
+  it('prints JSON help and version', async () => {
+    for (const flag of ['--help', '--version']) {
+      const stdout = createOutput();
+      expect(await runCli([flag, '--json'], { stdout: stdout.output })).toBe(0);
+      expect(JSON.parse(stdout.read())).toHaveProperty(
+        flag === '--help' ? 'content' : 'version'
+      );
+    }
+  });
+  it('rejects unsupported special command flags', async () => {
+    for (const args of [
+      ['skill', '--full', '--json'],
+      ['skill', '--title', 'bad', '--json'],
+    ]) {
+      const stdout = createOutput();
+      expect(await runCli(args, { stdout: stdout.output })).toBe(2);
+      expect(JSON.parse(stdout.read()).error.code).toBe('USAGE_ERROR');
+    }
   });
 });

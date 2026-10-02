@@ -83,11 +83,17 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   deployPromote: mandatoryDeny,
   accountDelete: mandatoryDeny,
   publicArtistApi: mandatoryDenyFixed,
+  agentProfileCreate: mandatoryDenyFixed,
   general: mandatoryDenyFixed,
   changelogSubscribe: mandatoryDenyFixed,
   musicBrainzLookup: mandatoryDeny,
 
   claimTokenAccess: advisoryAllow,
+  libraryAssetShareAccess: advisoryAllow,
+  // Password-gated surfaces: deny on outage rather than leak or hand brute
+  // force a fresh per-instance memory budget.
+  riderPublicAccess: mandatoryDenyFixed,
+  riderUnlock: mandatoryDenyFixed,
   publicClick: advisoryAllow,
   aiChat: advisoryAllow,
   avatarUpload: advisoryDeny,

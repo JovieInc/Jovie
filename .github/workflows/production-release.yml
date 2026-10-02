@@ -15,7 +15,28 @@ on:
         description: Exact current main SHA authorized for release.
         required: true
         type: string
+      release_mode:
+        description: Run exactly one mutation phase (staging or production).
+        required: true
+        type: string
+      staging_verified:
+        description: Exact staging receipt was verified by the production caller.
+        required: false
+        default: false
+        type: boolean
     outputs:
+      staging_eligible:
+        description: Whether this generation remained exact-main through staging mutation.
+        value: ${{ jobs.alias-staging.outputs.is_current }}
+      staging_deployed:
+        description: Whether the staging phase persisted an exact deployment receipt.
+        value: ${{ jobs.staging-deployment-receipt.outputs.deployed }}
+      staging_state:
+        description: Terminal state of the staging generation.
+        value: ${{ jobs.staging-deployment-receipt.outputs.staging_refresh_outcome }}
+      staging_deployment_id:
+        description: Exact immutable staging deployment ID.
+        value: ${{ jobs.staging-deployment-receipt.outputs.deployment_id }}
       released:
         description: Whether this SHA reached and passed production rollback gates.
         value: ${{ jobs.release-result.outputs.released }}
@@ -89,7 +110,7 @@ jobs:
   deploy-staging:
     needs: [release-head]
     # The caller owns the single release lease. A superseded SHA is neutral.
-    if: ${{ always() && needs.release-head.result == 'success' && needs.release-head.outputs.is_current == 'true' }}
+    if: ${{ always() && inputs.release_mode == 'staging' && needs.release-head.result == 'success' && needs.release-head.outputs.is_current == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
@@ -146,6 +167,15 @@ jobs:
           --only-secrets=DATABASE_URL --no-fallback --
           env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:ci
         continue-on-error: false
+      - name: DB migrate (staging - online indexes)
+        timeout-minutes: 12
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
+          ALLOW_ONLINE_INDEX_MIGRATIONS: 'true'
+        run: >-
+          doppler run --project jovie-web --config stg
+          --only-secrets=DATABASE_URL --no-fallback --
+          env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:online-indexes:ci
       - name: DB verify (post-migration schema check)
         id: verify
         env:
@@ -436,7 +466,7 @@ jobs:
   attest-staging-build:
     name: Attest staging build provenance
     needs: [deploy-staging]
-    if: ${{ always() && needs.deploy-staging.result == 'success' }}
+    if: ${{ always() && inputs.release_mode == 'staging' && needs.deploy-staging.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -474,7 +504,7 @@ jobs:
   canary-health-gate:
     name: Canary Health Gate (staging)
     needs: [deploy-staging]
-    if: ${{ always() && needs.deploy-staging.result == 'success' }}
+    if: ${{ always() && inputs.release_mode == 'staging' && needs.deploy-staging.result == 'success' }}
     uses: ./.github/workflows/canary-health-gate.yml
     with:
       # Verify the exact deployment produced by deploy-staging instead of the
@@ -493,7 +523,7 @@ jobs:
   staging-head:
     name: Recheck main before staging alias
     needs: [deploy-staging, attest-staging-build, canary-health-gate]
-    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.attest-staging-build.result == 'success' && needs.canary-health-gate.result == 'success' }}
+    if: ${{ always() && inputs.release_mode == 'staging' && needs.deploy-staging.result == 'success' && needs.attest-staging-build.result == 'success' && needs.canary-health-gate.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     outputs:
@@ -522,7 +552,7 @@ jobs:
   alias-staging:
     name: Alias verified preview to staging.jov.ie
     needs: [deploy-staging, canary-health-gate, staging-head]
-    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' && needs.staging-head.result == 'success' && needs.staging-head.outputs.is_current == 'true' }}
+    if: ${{ always() && inputs.release_mode == 'staging' && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' && needs.staging-head.result == 'success' && needs.staging-head.outputs.is_current == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -625,16 +655,22 @@ jobs:
         if: ${{ steps.head.outputs.is_current == 'true' }}
         env:
           BASE_URL: https://staging.jov.ie
+          DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
           EXPECTED_VERCEL_ALIAS_ORIGIN: https://staging.jov.ie
           EXPECTED_VERCEL_ENVIRONMENT: preview
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_DYNAMIC_SECRETS_FILE: ${{ runner.temp }}/playwright-dynamic-cookie-values
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           # Provider-console callback allowlists intentionally name the shared
           # staging alias. This proof must run only after this exact deployment
           # owns staging.jov.ie; pre-alias probes can test a stale generation.
+          set -euo pipefail
+          deployment_url="$(printf '%s' "$DEPLOYMENT_URL_B64" | base64 --decode)"
+          test -n "$deployment_url"
           cd apps/web
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
@@ -656,7 +692,12 @@ jobs:
           attempt=1
           max_attempts=3
           while [ "$attempt" -le "$max_attempts" ]; do
-            if PLAYWRIGHT_WORKERS=1 CI=true SMOKE_ONLY=1 \
+            # Production promotion rewrites every project domain. Reassert the
+            # exact preview on every retry so an overlapping rollout cannot
+            # turn a safe retry into a permanent wrong-environment failure.
+            if "$GITHUB_WORKSPACE/node_modules/.bin/vercel" alias set \
+              "$deployment_url" staging.jov.ie --scope "$VERCEL_ORG_ID" && \
+              PLAYWRIGHT_WORKERS=1 CI=true SMOKE_ONLY=1 \
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
                 pnpm exec playwright test tests/e2e/oauth-providers.spec.ts \
                   --project=chromium --reporter=line; then
@@ -684,8 +725,8 @@ jobs:
 
   production-head:
     name: Recheck main before production mutation
-    needs: [alias-staging]
-    if: ${{ always() && needs.alias-staging.result == 'success' && needs.alias-staging.outputs.is_current == 'true' }}
+    needs: [release-head]
+    if: ${{ always() && inputs.release_mode == 'production' && inputs.staging_verified && needs.release-head.result == 'success' && needs.release-head.outputs.is_current == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     outputs:
@@ -713,17 +754,10 @@ jobs:
 
   migrate-production:
     name: Migrate production database
-    needs:
-      [
-        deploy-staging,
-        attest-staging-build,
-        canary-health-gate,
-        alias-staging,
-        production-head,
-      ]
-    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.attest-staging-build.result == 'success' && needs.canary-health-gate.result == 'success' && needs.alias-staging.result == 'success' && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' }}
+    needs: [production-head]
+    if: ${{ always() && inputs.release_mode == 'production' && inputs.staging_verified && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     permissions:
       contents: read
     outputs:
@@ -768,6 +802,15 @@ jobs:
           doppler run --project jovie-web --config prd
           --only-secrets=DATABASE_URL --no-fallback --
           env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:ci
+      - name: DB migrate (production - online indexes)
+        timeout-minutes: 12
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          ALLOW_ONLINE_INDEX_MIGRATIONS: 'true'
+        run: >-
+          doppler run --project jovie-web --config prd
+          --only-secrets=DATABASE_URL --no-fallback --
+          env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:online-indexes:ci
       - name: DB verify (production schema check)
         id: verify-production-schema
         env:
@@ -779,8 +822,8 @@ jobs:
 
   promote-production:
     name: Promote to Production
-    needs: [deploy-staging, attest-staging-build, canary-health-gate, alias-staging, production-head, migrate-production]
-    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.attest-staging-build.result == 'success' && needs.canary-health-gate.result == 'success' && needs.alias-staging.result == 'success' && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' && needs.migrate-production.result == 'success' }}
+    needs: [production-head, migrate-production]
+    if: ${{ always() && inputs.release_mode == 'production' && inputs.staging_verified && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' && needs.migrate-production.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -807,7 +850,13 @@ jobs:
         with:
           ref: ${{ inputs.expected_sha }}
           persist-credentials: false
+      # The production SBOM (`pnpm licenses list`) reads package index files
+      # from the pnpm store. An exact node_modules cache hit restores the tree
+      # without any store, which froze production (JOV-6726). Install from the
+      # lockfile into a warm store here instead of restoring a cached tree.
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          package_cache: 'false'
       # Production runtime config comes from the isolated Doppler `prd`
       # service token. Vercel remains the deployment control plane only.
       - uses: ./.github/actions/setup-doppler
@@ -950,8 +999,10 @@ jobs:
 
           provenance_dir="$RUNNER_TEMP/production-input-provenance"
           mkdir "$provenance_dir"
-          node .github/scripts/production-input-provenance.mjs sbom \
-            "$provenance_dir/sbom.cdx.json"
+          if ! node .github/scripts/production-input-provenance.mjs sbom \
+            "$provenance_dir/sbom.cdx.json"; then
+            fail_stage "Unable to generate the production SBOM from the installed dependency tree." production_artifact_failed
+          fi
           node .github/scripts/production-input-provenance.mjs inputs \
             "$provenance_dir/inputs.json" "$provenance_dir/sbom.cdx.json"
 
@@ -1300,11 +1351,8 @@ jobs:
 
   staging-deployment-receipt:
     name: Preserve exact staging deployment receipt
-    needs: [deploy-staging, alias-staging, promote-production, rollback-production]
-    # The initial alias is exact and current. Wait for every production routing
-    # mutation, including a possible rollback, to settle before reasserting the
-    # preview because Vercel may retarget project domains such as staging.jov.ie.
-    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.alias-staging.result == 'success' && needs.alias-staging.outputs.is_current == 'true' }}
+    needs: [deploy-staging, alias-staging]
+    if: ${{ always() && inputs.release_mode == 'staging' && needs.deploy-staging.result == 'success' && needs.alias-staging.result == 'success' && needs.alias-staging.outputs.is_current == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -1312,59 +1360,35 @@ jobs:
     outputs:
       deployed: ${{ steps.receipt.outputs.deployed }}
       deployment_id: ${{ steps.receipt.outputs.deployment_id }}
-      staging_refresh_outcome: ${{ steps.receipt.outputs.staging_refresh_outcome || steps.reassert.outputs.staging_refresh_outcome }}
+      staging_refresh_outcome: ${{ steps.receipt.outputs.staging_refresh_outcome }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.expected_sha }}
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
-      - name: Reassert the exact preview after production settles
+      - name: Classify staging generation after mutation
         id: reassert
         env:
-          DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
-          PROMOTION_RESULT: ${{ needs.promote-production.result }}
-          PROMOTION_SHA: ${{ needs.promote-production.outputs.promotion_sha }}
-          ROLLBACK_RESULT: ${{ needs.rollback-production.result }}
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         shell: bash
         run: |
           set -euo pipefail
-          echo "staging_refresh_outcome=current" >> "$GITHUB_OUTPUT"
           current_main="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
-          if [[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]; then
-            if [ "$PROMOTION_RESULT" = "success" ] &&
-              [[ "$PROMOTION_SHA" =~ ^[0-9a-f]{40}$ ]] &&
-              [ "$PROMOTION_SHA" != "$EXPECTED_COMMIT_SHA" ] &&
-              [ "$ROLLBACK_RESULT" = "skipped" ]; then
-              echo "::notice::Main advanced before production promotion to $PROMOTION_SHA; refusing stale staging alias mutation and omitting a current staging receipt for $EXPECTED_COMMIT_SHA."
-              echo "staging_refresh_outcome=superseded_before_promotion" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            if [ "$PROMOTION_RESULT" = "success" ] &&
-              [ "$PROMOTION_SHA" = "$EXPECTED_COMMIT_SHA" ] &&
-              [ "$ROLLBACK_RESULT" = "skipped" ]; then
-              echo "::notice::Main advanced to $current_main after exact production promotion; refusing stale staging alias mutation and omitting a current staging receipt for $EXPECTED_COMMIT_SHA."
-              echo "staging_refresh_outcome=superseded_after_promotion" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            echo "::error::Refusing to reassert stale staging preview $EXPECTED_COMMIT_SHA; current main is $current_main."
-            exit 1
-          fi
-          deployment_url="$(printf '%s' "$DEPLOYMENT_URL_B64" | base64 --decode)"
-          [[ "$deployment_url" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]] || {
-            echo "::error::Exact staging deployment URL is missing or malformed."
+          [[ "$current_main" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Could not resolve exact main after staging mutation."
             exit 1
           }
-          ./node_modules/.bin/vercel alias set "$deployment_url" staging.jov.ie \
-            --scope "$VERCEL_ORG_ID"
+          if [ "$current_main" = "$EXPECTED_COMMIT_SHA" ]; then
+            echo "staging_refresh_outcome=current" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Staging generation $EXPECTED_COMMIT_SHA finished deterministically and was superseded by $current_main."
+            echo "staging_refresh_outcome=superseded_after_mutation" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Prove exact staging identity, privacy, and representative routes
-        if: ${{ steps.reassert.outputs.staging_refresh_outcome == 'current' }}
         env:
           DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
@@ -1404,21 +1428,27 @@ jobs:
           }
 
           for attempt in $(seq 1 15); do
+            # Production promotion may rewrite project domains while this
+            # staging generation is becoming durable. Reassert before each
+            # control-plane observation, then prove the exact deployment.
+            ./node_modules/.bin/vercel alias set "$deployment_url" staging.jov.ie \
+              --scope "$VERCEL_ORG_ID"
             alias_json="$(./node_modules/.bin/vercel inspect staging.jov.ie \
               --format=json --scope "$VERCEL_ORG_ID" 2>/dev/null || true)"
             if jq -e '
               type == "object" and
               (.id | type == "string") and
-              (.readyState | type == "string") and
-              (.target | type == "string")
+              (.readyState | type == "string")
             ' >/dev/null 2>&1 <<<"$alias_json"; then
               alias_id="$(jq -r '.id' <<<"$alias_json")"
               alias_state="$(jq -r '.readyState | ascii_upcase' <<<"$alias_json")"
-              alias_target="$(jq -r '.target | ascii_downcase' <<<"$alias_json")"
               if [ "$alias_id" = "$EXPECTED_DEPLOYMENT_ID" ] &&
-                [ "$alias_state" = "READY" ] &&
-                [ "$alias_target" = "preview" ]; then
-                echo "staging.jov.ie owns exact READY preview $alias_id."
+                [ "$alias_state" = "READY" ]; then
+                # Vercel inspect does not consistently expose target metadata.
+                # The live build-info proof below binds the exact deployment to
+                # the preview environment without making alias convergence race
+                # an optional inspect field.
+                echo "staging.jov.ie owns exact READY deployment $alias_id."
                 break
               fi
             fi
@@ -1466,6 +1496,8 @@ jobs:
           # stale content retries; transport/auth/schema failures stay terminal.
           build_info_path="$RUNNER_TEMP/staging-build-info.json"
           for identity_attempt in $(seq 1 5); do
+            ./node_modules/.bin/vercel alias set "$deployment_url" staging.jov.ie \
+              --scope "$VERCEL_ORG_ID"
             curl_status=0
             response_meta="$(curl "${curl_args[@]}" \
               --output "$build_info_path" \
@@ -1484,22 +1516,27 @@ jobs:
             observed_sha="$(jq -er '
               .commitSha | select(type == "string") | select(length == 40) | select(test("^[0-9a-f]{40}$"))
             ' "$build_info_path" 2>/dev/null)" || observed_sha=invalid
+            observed_deployment_id="$(jq -er '
+              .deploymentId | select(type == "string") | select(test("^dpl_[A-Za-z0-9]+$"))
+            ' "$build_info_path" 2>/dev/null)" || observed_deployment_id=invalid
             observed_environment="$(jq -er '
               .environment | select(. == "preview" or . == "production" or . == "development")
             ' "$build_info_path" 2>/dev/null)" || observed_environment=invalid
             rm -f "$build_info_path"
-            echo "Staging identity attempt $identity_attempt/5: status=$http_status content_type=$content_type commitSha=$observed_sha environment=$observed_environment"
+            echo "Staging identity attempt $identity_attempt/5: status=$http_status content_type=$content_type commitSha=$observed_sha deploymentId=$observed_deployment_id environment=$observed_environment"
             if [ "$curl_status" -ne 0 ]; then
               echo "::error::Staging build-info transport or HTTP request failed."
               exit "$curl_status"
             fi
             if [ "$http_status" != "200" ] || [ "$content_type" != "application/json" ] ||
-              [ "$observed_sha" = "invalid" ] || [ "$observed_environment" = "invalid" ]; then
+              [ "$observed_sha" = "invalid" ] || [ "$observed_deployment_id" = "invalid" ] || [ "$observed_environment" = "invalid" ]; then
               echo "::error::Staging build-info response is not a valid build identity."
               exit 1
             fi
             privacy_valid=false
-            if [ "$observed_sha" = "$EXPECTED_COMMIT_SHA" ] && [ "$observed_environment" = "preview" ]; then
+            if [ "$observed_sha" = "$EXPECTED_COMMIT_SHA" ] &&
+              [ "$observed_deployment_id" = "$EXPECTED_DEPLOYMENT_ID" ] &&
+              [ "$observed_environment" = "preview" ]; then
               privacy_valid=true
               homepage_headers="$RUNNER_TEMP/staging-homepage-headers.txt"
               curl "${curl_args[@]}" --dump-header "$homepage_headers" \
@@ -1528,41 +1565,25 @@ jobs:
 
       - name: Write typed staging deployment receipt
         id: receipt
-        if: ${{ steps.reassert.outputs.staging_refresh_outcome == 'current' }}
         env:
           DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
           EXPECTED_DEPLOYMENT_ID: ${{ needs.deploy-staging.outputs.deploy_id }}
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          PROMOTION_RESULT: ${{ needs.promote-production.result }}
-          PROMOTION_SHA: ${{ needs.promote-production.outputs.promotion_sha }}
-          ROLLBACK_RESULT: ${{ needs.rollback-production.result }}
+          STAGING_REFRESH_OUTCOME: ${{ steps.reassert.outputs.staging_refresh_outcome }}
+          SOURCE_CI_COMPLETED_AT: ${{ github.event.workflow_run.updated_at }}
           SOURCE_CI_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
           SOURCE_CI_RUN_ID: ${{ github.event.workflow_run.id }}
         shell: bash
         run: |
           set -euo pipefail
           current_main="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
-          if [[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]; then
-            if [ "$PROMOTION_RESULT" = "success" ] &&
-              [[ "$PROMOTION_SHA" =~ ^[0-9a-f]{40}$ ]] &&
-              [ "$PROMOTION_SHA" != "$EXPECTED_COMMIT_SHA" ] &&
-              [ "$ROLLBACK_RESULT" = "skipped" ]; then
-              echo "::notice::Main advanced before production promotion to $PROMOTION_SHA; omitting a falsely current staging receipt for $EXPECTED_COMMIT_SHA."
-              echo "staging_refresh_outcome=superseded_before_promotion" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            if [ "$PROMOTION_RESULT" = "success" ] &&
-              [ "$PROMOTION_SHA" = "$EXPECTED_COMMIT_SHA" ] &&
-              [ "$ROLLBACK_RESULT" = "skipped" ]; then
-              echo "::notice::Main advanced to $current_main before the staging receipt boundary; omitting a falsely current receipt for $EXPECTED_COMMIT_SHA."
-              echo "staging_refresh_outcome=superseded_after_promotion" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            echo "::error::Refusing a stale staging receipt for $EXPECTED_COMMIT_SHA; current main is $current_main."
-            exit 1
-          fi
+          [[ "$current_main" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          latency_seconds=$(( $(date -u +%s) - $(date -u -d "$SOURCE_CI_COMPLETED_AT" +%s) ))
+          slo_state=within_target
+          [ "$latency_seconds" -le 180 ] || slo_state=over_target
+          [ "$latency_seconds" -le 600 ] || slo_state=breach
           deployment_url="$(printf '%s' "$DEPLOYMENT_URL_B64" | base64 --decode)"
           jq -n \
             --arg schema 'jovie-staging-deployment/v1' \
@@ -1575,12 +1596,13 @@ jobs:
             --arg sourceCiRunAttempt "$SOURCE_CI_RUN_ATTEMPT" \
             --arg controllerRunId '${{ github.run_id }}' \
             --arg controllerRunAttempt '${{ github.run_attempt }}' \
-            --arg promotionResult "$PROMOTION_RESULT" \
-            --arg rollbackResult "$ROLLBACK_RESULT" \
+            --arg state "$STAGING_REFRESH_OUTCOME" \
+            --arg sloState "$slo_state" \
+            --argjson latencySeconds "$latency_seconds" \
             --arg observedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '{
               schema: $schema,
-              state: "deployed",
+              state: $state,
               terminal: true,
               repository: $repository,
               sha: $sha,
@@ -1593,17 +1615,18 @@ jobs:
               sourceCiRunAttempt: $sourceCiRunAttempt,
               controllerRunId: $controllerRunId,
               controllerRunAttempt: $controllerRunAttempt,
-              promotionResult: $promotionResult,
-              rollbackResult: $rollbackResult,
+              latencySeconds: $latencySeconds,
+              sloState: $sloState,
               exactIdentity: "passed",
               routeSmoke: "passed",
               privacy: "robots-block-all-and-http-noindex",
               observedAt: $observedAt
             }' > "$RUNNER_TEMP/staging-deployment-receipt.json"
           {
-            echo "staging_refresh_outcome=current_receipt"
+            echo "staging_refresh_outcome=$STAGING_REFRESH_OUTCOME"
             echo "deployed=true"
             echo "deployment_id=$EXPECTED_DEPLOYMENT_ID"
+            echo "slo_state=$slo_state"
           } >> "$GITHUB_OUTPUT"
 
       - name: Upload exact staging deployment receipt
@@ -1614,6 +1637,16 @@ jobs:
           path: ${{ runner.temp }}/staging-deployment-receipt.json
           if-no-files-found: error
           retention-days: 30
+
+      # JOV-7149: latency is an SLO alarm, not a correctness gate. Measured from CI
+      # completion, it counts time spent waiting behind the serialized staging queue,
+      # so with a ~15 min staging pipeline every run "breached" and nothing reached
+      # production (2026-09-29 08:35Z onward). The receipt keeps sloState=breach for
+      # alerting; exact-SHA identity, canary, and alias proofs above stay blocking.
+      - name: Flag staging freshness breach
+        if: ${{ steps.receipt.outputs.slo_state == 'breach' }}
+        run: |
+          echo "::warning::Staging freshness exceeded 10 minutes (SLO alarm, not a gate). Next: inspect this controller's staging build/canary timings. Proof: staging-deployment-${{ inputs.expected_sha }}."
 
   production-public-profile-alias-gate:
     name: Production public-profile alias usable-result gate
@@ -1664,8 +1697,8 @@ jobs:
 
   sentry-error-gate:
     name: Sentry Error Gate (production)
-    needs: [promote-production, canary-health-gate]
-    if: ${{ always() && needs.promote-production.result == 'success' && needs.promote-production.outputs.promotion_sha == inputs.expected_sha && needs.canary-health-gate.result == 'success' }}
+    needs: [promote-production]
+    if: ${{ always() && needs.promote-production.result == 'success' && needs.promote-production.outputs.promotion_sha == inputs.expected_sha }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -2067,7 +2100,7 @@ jobs:
         production-oauth-gate,
         rollback-production,
       ]
-    if: ${{ always() }}
+    if: ${{ always() && inputs.release_mode == 'production' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     outputs:
@@ -2099,7 +2132,7 @@ jobs:
             echo "production_deployment_id=$PRODUCTION_DEPLOYMENT_ID"
             echo "production_deployment_url_b64=$PRODUCTION_DEPLOYMENT_URL_B64"
             echo "previous_production_deployment_id=$PREVIOUS_PRODUCTION_DEPLOYMENT_ID"
-            echo "schema_drift=${{ needs.migrate-production.outputs.schema_drift == 'true' || needs.deploy-staging.outputs.schema_drift == 'true' }}"
+            echo "schema_drift=${{ needs.migrate-production.outputs.schema_drift == 'true' }}"
             echo "failure_subtype=${{ needs.promote-production.outputs.failure_subtype }}"
             echo "sentry_gate_status=${{ needs.sentry-error-gate.outputs.gate_status }}"
             echo "oauth_gate_status=${{ needs.production-oauth-gate.outputs.gate_status }}"
@@ -2142,14 +2175,8 @@ jobs:
           fi
           if [ "${{ needs.production-head.result }}" = "success" ] &&
             [ "${{ needs.production-head.outputs.is_current }}" != "true" ]; then
-            if [ "${{ needs.deploy-staging.result }}" != "success" ] ||
-              [ "${{ needs.attest-staging-build.result }}" != "success" ] ||
-              [ "${{ needs.canary-health-gate.result }}" != "success" ] ||
-              [ "${{ needs.staging-head.result }}" != "success" ] ||
-              [ "${{ needs.staging-head.outputs.is_current }}" != "true" ] ||
-              [ "${{ needs.alias-staging.result }}" != "success" ] ||
-              [ "${{ needs.alias-staging.outputs.is_current }}" != "true" ]; then
-              echo "::error::Pre-production supersession cannot mask failed exact staging work."
+            if [ "${{ inputs.staging_verified }}" != "true" ]; then
+              echo "::error::Pre-production supersession lacks an exact staging receipt."
               exit 1
             fi
             echo "superseded_before_promotion=true" >> "$GITHUB_OUTPUT"
@@ -2162,13 +2189,7 @@ jobs:
               exit 1
             }
             if [ "$PROMOTION_SHA" != "$EXPECTED_SHA" ]; then
-              if [ "${{ needs.deploy-staging.result }}" != "success" ] ||
-                [ "${{ needs.attest-staging-build.result }}" != "success" ] ||
-                [ "${{ needs.canary-health-gate.result }}" != "success" ] ||
-                [ "${{ needs.staging-head.result }}" != "success" ] ||
-                [ "${{ needs.staging-head.outputs.is_current }}" != "true" ] ||
-                [ "${{ needs.alias-staging.result }}" != "success" ] ||
-                [ "${{ needs.alias-staging.outputs.is_current }}" != "true" ] ||
+              if [ "${{ inputs.staging_verified }}" != "true" ] ||
                 [ "${{ needs.production-head.result }}" != "success" ] ||
                 [ "${{ needs.production-head.outputs.is_current }}" != "true" ] ||
                 [ "${{ needs.migrate-production.result }}" != "success" ]; then
@@ -2208,43 +2229,13 @@ jobs:
             exit 1
           fi
 
-          staging_refresh_outcome="${{ needs.staging-deployment-receipt.outputs.staging_refresh_outcome }}"
-          if [ "$staging_refresh_outcome" = "superseded_after_promotion" ]; then
-            if [ "${{ needs.staging-deployment-receipt.result }}" != "success" ] ||
-              [ "${{ needs.staging-deployment-receipt.outputs.deployed }}" = "true" ] ||
-              [ "${{ needs.deploy-staging.result }}" != "success" ] ||
-              [ "${{ needs.attest-staging-build.result }}" != "success" ] ||
-              [ "${{ needs.canary-health-gate.result }}" != "success" ] ||
-              [ "${{ needs.staging-head.result }}" != "success" ] ||
-              [ "${{ needs.staging-head.outputs.is_current }}" != "true" ] ||
-              [ "${{ needs.alias-staging.result }}" != "success" ] ||
-              [ "${{ needs.alias-staging.outputs.is_current }}" != "true" ] ||
-              [ "${{ needs.production-head.result }}" != "success" ] ||
-              [ "${{ needs.production-head.outputs.is_current }}" != "true" ] ||
-              [ "${{ needs.promote-production.result }}" != "success" ] ||
-              [ "$PROMOTION_SHA" != "$EXPECTED_SHA" ]; then
-              echo "::error::Superseded staging refresh lacked exact pre-promotion staging gates or exact production promotion evidence."
-              exit 1
-            fi
-            echo "Main advanced after exact production promotion; no current staging receipt was emitted."
-          elif [ "$staging_refresh_outcome" = "current_receipt" ]; then
-            if [ "${{ needs.staging-deployment-receipt.result }}" != "success" ] ||
-              [ "${{ needs.staging-deployment-receipt.outputs.deployed }}" != "true" ]; then
-              echo "::error::Current staging refresh lacked an exact deployed receipt."
-              exit 1
-            fi
-          else
-            echo "::error::Staging refresh omitted a recognized terminal outcome."
+          if [ "${{ inputs.staging_verified }}" != "true" ]; then
+            echo "::error::Production release lacks the exact staging controller receipt."
             exit 1
           fi
 
           for gate in \
             "migrate-production:${{ needs.migrate-production.result }}" \
-            "deploy-staging:${{ needs.deploy-staging.result }}" \
-            "attest-staging-build:${{ needs.attest-staging-build.result }}" \
-            "canary-health-gate:${{ needs.canary-health-gate.result }}" \
-            "staging-head:${{ needs.staging-head.result }}" \
-            "alias-staging:${{ needs.alias-staging.result }}" \
             "production-head:${{ needs.production-head.result }}" \
             "promote-production:${{ needs.promote-production.result }}" \
             "production-public-profile-alias-gate:${{ needs.production-public-profile-alias-gate.result }}" \

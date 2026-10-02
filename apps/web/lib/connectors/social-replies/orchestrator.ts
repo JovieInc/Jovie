@@ -160,16 +160,32 @@ function buildReceipt(
   });
 }
 
-function appendUnattemptedItems(
+type ItemObserver = (item: SocialReplyItemReceipt) => void | Promise<void>;
+
+async function emitItem(
+  observer: ItemObserver | undefined,
+  item: SocialReplyItemReceipt
+): Promise<void> {
+  if (!observer) return;
+  try {
+    await observer(item);
+  } catch {
+    // Progress observers are instrumentation; they must never halt execution.
+  }
+}
+
+async function appendUnattemptedItems(
   targets: ReadonlyArray<SocialReplyTarget>,
   fromIndex: number,
   items: MutableItemReceipt[],
-  draftedAt: string
-): void {
+  draftedAt: string,
+  observer?: ItemObserver
+): Promise<void> {
   for (const target of targets.slice(fromIndex)) {
     const item = baseItemReceipt(target, draftedAt);
     withFailure(item, 'batch-halted', 'failed');
     items.push(item);
+    await emitItem(observer, item);
   }
 }
 
@@ -249,6 +265,9 @@ export async function runSocialReplyBatch(
     const items = request.targets.map(target =>
       baseItemReceipt(target, draftedAt)
     );
+    for (const item of items) {
+      await emitItem(options.onItemSettled, item);
+    }
     return buildReceipt(request, items, startedAt, asIsoTimestamp(now), null);
   }
 
@@ -258,6 +277,9 @@ export async function runSocialReplyBatch(
       const item = baseItemReceipt(target, draftedAt);
       return withFailure(item, 'approval-mismatch', 'failed');
     });
+    for (const item of items) {
+      await emitItem(options.onItemSettled, item);
+    }
     return buildReceipt(
       request,
       items,
@@ -268,6 +290,11 @@ export async function runSocialReplyBatch(
   }
 
   const items: MutableItemReceipt[] = [];
+  const observer = options.onItemSettled;
+  const settleItem = async (item: MutableItemReceipt) => {
+    items.push(item);
+    await emitItem(observer, item);
+  };
   let haltReason: SocialReplyBatchReceipt['haltReason'] = null;
   let writesAttempted = 0;
 
@@ -277,17 +304,29 @@ export async function runSocialReplyBatch(
 
     if (!adapter) {
       withFailure(item, 'missing-adapter', 'failed');
-      items.push(item);
+      await settleItem(item);
       haltReason = 'missing-adapter';
-      appendUnattemptedItems(request.targets, index + 1, items, draftedAt);
+      await appendUnattemptedItems(
+        request.targets,
+        index + 1,
+        items,
+        draftedAt,
+        observer
+      );
       break;
     }
 
     if (adapter.platform !== target.platform) {
       withFailure(item, 'adapter-platform-mismatch', 'failed');
-      items.push(item);
+      await settleItem(item);
       haltReason = 'adapter-platform-mismatch';
-      appendUnattemptedItems(request.targets, index + 1, items, draftedAt);
+      await appendUnattemptedItems(
+        request.targets,
+        index + 1,
+        items,
+        draftedAt,
+        observer
+      );
       break;
     }
 
@@ -300,18 +339,30 @@ export async function runSocialReplyBatch(
       preflightRaw = await adapter.preflight(target);
     } catch {
       withFailure(item, 'preflight-error', 'ambiguous');
-      items.push(item);
+      await settleItem(item);
       haltReason = 'preflight-error';
-      appendUnattemptedItems(request.targets, index + 1, items, draftedAt);
+      await appendUnattemptedItems(
+        request.targets,
+        index + 1,
+        items,
+        draftedAt,
+        observer
+      );
       break;
     }
 
     const preflightResult = socialReplyPreflightSchema.safeParse(preflightRaw);
     if (!preflightResult.success) {
       withFailure(item, 'invalid-preflight-result', 'ambiguous');
-      items.push(item);
+      await settleItem(item);
       haltReason = 'invalid-preflight-result';
-      appendUnattemptedItems(request.targets, index + 1, items, draftedAt);
+      await appendUnattemptedItems(
+        request.targets,
+        index + 1,
+        items,
+        draftedAt,
+        observer
+      );
       break;
     }
 
@@ -321,19 +372,19 @@ export async function runSocialReplyBatch(
 
     if (!preflight.isPublic) {
       withSkipped(item, 'not-public');
-      items.push(item);
+      await settleItem(item);
       continue;
     }
 
     if (!preflight.canReply) {
       withSkipped(item, 'not-replyable');
-      items.push(item);
+      await settleItem(item);
       continue;
     }
 
     if (preflight.alreadyReplied || preflight.existingReplyCount > 0) {
       withSkipped(item, 'already-replied');
-      items.push(item);
+      await settleItem(item);
       continue;
     }
 
@@ -344,18 +395,30 @@ export async function runSocialReplyBatch(
       writeRaw = await adapter.writeReply(target);
     } catch {
       withFailure(item, 'write-error-ambiguous', 'ambiguous');
-      items.push(item);
+      await settleItem(item);
       haltReason = 'write-error-ambiguous';
-      appendUnattemptedItems(request.targets, index + 1, items, draftedAt);
+      await appendUnattemptedItems(
+        request.targets,
+        index + 1,
+        items,
+        draftedAt,
+        observer
+      );
       break;
     }
 
     const writeResult = socialReplyWriteResultSchema.safeParse(writeRaw);
     if (!writeResult.success) {
       withFailure(item, 'invalid-write-result', 'ambiguous');
-      items.push(item);
+      await settleItem(item);
       haltReason = 'invalid-write-result';
-      appendUnattemptedItems(request.targets, index + 1, items, draftedAt);
+      await appendUnattemptedItems(
+        request.targets,
+        index + 1,
+        items,
+        draftedAt,
+        observer
+      );
       break;
     }
 
@@ -367,9 +430,15 @@ export async function runSocialReplyBatch(
         'ambiguous',
         writeResult.data.reason
       );
-      items.push(item);
+      await settleItem(item);
       haltReason = 'write-ambiguous';
-      appendUnattemptedItems(request.targets, index + 1, items, draftedAt);
+      await appendUnattemptedItems(
+        request.targets,
+        index + 1,
+        items,
+        draftedAt,
+        observer
+      );
       break;
     }
 
@@ -382,9 +451,15 @@ export async function runSocialReplyBatch(
       verificationRaw = await adapter.verifyReply(target, writeResult.data);
     } catch {
       withFailure(item, 'verification-error-ambiguous', 'ambiguous');
-      items.push(item);
+      await settleItem(item);
       haltReason = 'verification-error-ambiguous';
-      appendUnattemptedItems(request.targets, index + 1, items, draftedAt);
+      await appendUnattemptedItems(
+        request.targets,
+        index + 1,
+        items,
+        draftedAt,
+        observer
+      );
       break;
     }
 
@@ -392,9 +467,15 @@ export async function runSocialReplyBatch(
       socialReplyVerificationResultSchema.safeParse(verificationRaw);
     if (!verificationResult.success) {
       withFailure(item, 'invalid-verification-result', 'ambiguous');
-      items.push(item);
+      await settleItem(item);
       haltReason = 'invalid-verification-result';
-      appendUnattemptedItems(request.targets, index + 1, items, draftedAt);
+      await appendUnattemptedItems(
+        request.targets,
+        index + 1,
+        items,
+        draftedAt,
+        observer
+      );
       break;
     }
 
@@ -412,9 +493,15 @@ export async function runSocialReplyBatch(
             ? 'verification-mismatch'
             : 'verification-ambiguous';
       withFailure(item, reason, 'ambiguous', verification.reason);
-      items.push(item);
+      await settleItem(item);
       haltReason = reason;
-      appendUnattemptedItems(request.targets, index + 1, items, draftedAt);
+      await appendUnattemptedItems(
+        request.targets,
+        index + 1,
+        items,
+        draftedAt,
+        observer
+      );
       break;
     }
 
@@ -423,15 +510,21 @@ export async function runSocialReplyBatch(
       verification.verifiedText !== target.draftedText
     ) {
       withFailure(item, 'verification-mismatch', 'ambiguous');
-      items.push(item);
+      await settleItem(item);
       haltReason = 'verification-mismatch';
-      appendUnattemptedItems(request.targets, index + 1, items, draftedAt);
+      await appendUnattemptedItems(
+        request.targets,
+        index + 1,
+        items,
+        draftedAt,
+        observer
+      );
       break;
     }
 
     item.status = 'posted';
     item.verifiedAt = verification.verifiedAt;
-    items.push(item);
+    await settleItem(item);
   }
 
   return buildReceipt(

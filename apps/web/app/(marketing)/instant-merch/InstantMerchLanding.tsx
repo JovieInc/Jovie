@@ -1,6 +1,7 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { ChatGenerationArtifactSurface } from '@/components/jovie/components/ChatGenerationArtifactSurface';
+import { ChatMerchDesignCarousel } from '@/components/jovie/components/ChatMerchDesignCarousel';
 import {
   MarketingContainer,
   MarketingFeatureGrid,
@@ -9,8 +10,65 @@ import {
 } from '@/components/marketing';
 import { APP_ROUTES } from '@/constants/routes';
 import { INSTANT_MERCH_COPY as copy } from '@/data/instantMerchCopy';
+import type { MerchDesignCarouselResult } from '@/lib/merch/types';
 
 const CREATE_MERCH_HREF = `${APP_ROUTES.CHAT}?q=${encodeURIComponent('Make me merch')}`;
+
+/**
+ * Tim White dogfood concepts rendered by the real merch review carousel —
+ * the same component the chat mounts after generation. The preview images
+ * are garment mockups produced by the canonical merch pipeline
+ * (`buildPrintSvg` + `renderMockup` in lib/merch/artwork, see
+ * scripts/generate-instant-merch-proof.ts), not album art. Selecting a
+ * concept without a signed-in profile submits the choice into the
+ * authenticated merch conversation via the chat prompt bridge.
+ */
+const MERCH_LANDING_RESULT: MerchDesignCarouselResult = {
+  success: true,
+  generationId: 'instant-merch-landing',
+  prompt: 'Make me merch',
+  designs: [
+    {
+      id: 'landing-concept-1',
+      option_number: 1,
+      design_name: 'Never Say A Word — lyric tee',
+      concept: 'Single lyric line over the release artwork palette.',
+      status: 'ready',
+      preview_url: '/images/merch/never-say-a-word-tee-mockup.webp',
+      slots: {
+        artist_name: 'Tim White',
+        lyric: 'Never say a word',
+        source_type: 'song_title',
+      },
+    },
+    {
+      id: 'landing-concept-2',
+      option_number: 2,
+      design_name: 'The Deep End — cover hoodie',
+      concept: 'Cover art centered on a heavyweight hoodie.',
+      status: 'ready',
+      preview_url: '/images/merch/the-deep-end-hoodie-mockup.webp',
+      slots: {
+        artist_name: 'Tim White',
+        short_text: 'The Deep End',
+        source_type: 'album_title',
+      },
+    },
+    {
+      id: 'landing-concept-3',
+      option_number: 3,
+      design_name: 'Take Me Over — wordmark cap',
+      concept: 'Minimal wordmark treatment on a limited cap.',
+      status: 'ready',
+      preview_url: '/images/merch/take-me-over-cap-mockup.webp',
+      slots: {
+        artist_name: 'Tim White',
+        short_text: 'Take Me Over',
+        source_type: 'song_title',
+      },
+    },
+  ],
+};
 
 function MerchFlowPreview() {
   return (
@@ -19,27 +77,8 @@ function MerchFlowPreview() {
       subtitle='Review before you publish'
       className='w-full'
     >
-      <div className='grid gap-3 sm:grid-cols-3'>
-        {['Heavyweight tee', 'Tour hoodie', 'Limited cap'].map(
-          (product, index) => (
-            <div
-              key={product}
-              className='rounded-xl border border-subtle bg-surface-0 p-4'
-            >
-              <div
-                aria-hidden='true'
-                className='aspect-square rounded-lg bg-panel'
-              />
-              <p className='mt-3 text-sm font-medium text-primary-token'>
-                {product}
-              </p>
-              <p className='mt-1 text-xs text-tertiary-token'>
-                Concept {index + 1}
-              </p>
-            </div>
-          )
-        )}
-      </div>
+      <h2 className='sr-only'>Merch Concepts</h2>
+      <ChatMerchDesignCarousel result={MERCH_LANDING_RESULT} />
     </ChatGenerationArtifactSurface>
   );
 }
@@ -53,7 +92,13 @@ export function InstantMerchLanding() {
           title={copy.hero.title}
           body={copy.hero.body}
           media={<MerchFlowPreview />}
+          photo={{
+            src: '/images/marketing-hero/instant-merch.webp',
+            width: 1600,
+            height: 901,
+          }}
           headingId='instant-merch-hero-heading'
+          headlineMaxLines='none'
           sectionTestId='marketing-section-hero'
           primaryCtaLabel={copy.hero.primaryCta}
           primaryCtaHref={CREATE_MERCH_HREF}

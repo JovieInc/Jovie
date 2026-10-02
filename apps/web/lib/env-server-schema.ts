@@ -46,6 +46,7 @@ export const ServerEnvSchema = z.object({
   NEXT_PUBLIC_BUILD_SHA: z.string().optional(),
   NEXT_PUBLIC_SENTRY_RELEASE: z.string().optional(),
   VERCEL_GIT_COMMIT_SHA: z.string().optional(),
+  VERCEL_DEPLOYMENT_ID: z.string().optional(),
   VERCEL_DEPLOYMENT_TIME: z.string().optional(),
   VERCEL_URL: z
     .string()
@@ -61,6 +62,14 @@ export const ServerEnvSchema = z.object({
     .refine(isHostWithOptionalPort, {
       message:
         'VERCEL_BRANCH_URL must be a hostname or hostname:port without a scheme or path',
+    })
+    .optional(),
+  VERCEL_PROJECT_PRODUCTION_URL: z
+    .string()
+    .trim()
+    .refine(isHostWithOptionalPort, {
+      message:
+        'VERCEL_PROJECT_PRODUCTION_URL must be a hostname or hostname:port without a scheme or path',
     })
     .optional(),
   VERCEL_AUTOMATION_BYPASS_SECRET: z.string().optional(),
@@ -124,6 +133,12 @@ export const ServerEnvSchema = z.object({
   APPLE_WALLET_WWDR_CERT_PEM: z.string().optional(),
   APPLE_WALLET_AUTH_TOKEN_SECRET: z.string().min(32).optional(),
   APPLE_WALLET_APNS_PRODUCTION: z.enum(['true', 'false']).optional(),
+
+  // Jovie iOS remote notifications (APNs token authentication)
+  JOVIE_IOS_APNS_KEY_ID: z.string().optional(),
+  JOVIE_IOS_APNS_TEAM_ID: z.string().optional(),
+  JOVIE_IOS_APNS_PRIVATE_KEY: z.string().optional(),
+  JOVIE_IOS_APNS_TOPIC: z.string().optional(),
 
   // Bandsintown configuration
   BANDSINTOWN_APP_ID: z.string().optional(),
@@ -206,6 +221,9 @@ export const ServerEnvSchema = z.object({
   // URL encryption (required in production/preview)
   LEAD_ATTRIBUTION_SECRET: z.string().optional(),
   URL_ENCRYPTION_KEY: z.string().optional(),
+  // Passive first-touch acquisition envelope signing (JOV-5036). Falls back
+  // to LEAD_ATTRIBUTION_SECRET, then URL_ENCRYPTION_KEY, when unset.
+  ACQUISITION_FIRST_TOUCH_SECRET: z.string().min(32).optional(),
 
   // Cron job authentication
   CRON_SECRET: z.string().optional(),
@@ -230,11 +248,17 @@ export const ServerEnvSchema = z.object({
   HUD_STARTUP_NAME: z.string().optional(),
   HUD_STARTUP_LOGO_URL: z.string().url().optional(),
   HUD_GITHUB_TOKEN: z.string().optional(),
+  JOVIE_BOT_APP_ID: z.string().optional(),
+  JOVIE_BOT_INSTALLATION_ID: z.string().optional(),
+  JOVIE_BOT_PRIVATE_KEY: z.string().optional(),
   HUD_GITHUB_OWNER: z.string().optional(),
   HUD_GITHUB_REPO: z.string().optional(),
   HUD_GITHUB_WORKFLOW: z.string().optional(),
+  HUD_GEM_BRIDGE_URL: z.string().url().optional(),
+  HUD_GEM_BRIDGE_TOKEN: z.string().optional(),
   GBRAIN_API_URL: z.string().optional(),
   GBRAIN_API_KEY: z.string().optional(),
+  GBRAIN_HEALTH_URL: z.string().trim().url().optional(),
 
   // Revalidation
   REVALIDATE_SECRET: z.string().optional(),
@@ -290,8 +314,13 @@ export const ServerEnvSchema = z.object({
 
   // Linear webhook automation
   LINEAR_WEBHOOK_SECRET: z.string().optional(),
+  // Release communications merge-event webhook signing
+  RELEASE_COMMUNICATIONS_WEBHOOK_SECRET: z.string().optional(),
   // Linear API key for HUD queries (tim-action-required issues)
   LINEAR_API_KEY: z.string().optional(),
+  // JOV-7331: internal fleet canary, disabled until deployment approval.
+  JOVIE_FLEET_ENABLED: z.enum(['0', '1']).optional(),
+  JOVIE_FLEET_LINEAR_TEAM_ID: z.string().uuid().optional(),
 
   // GitHub dispatch (Sentry autofix pipeline)
   GH_DISPATCH_TOKEN: z.string().optional(),
@@ -349,6 +378,13 @@ export const ServerEnvSchema = z.object({
   // AgentOS workflows are compile-ready but runtime-disabled by default.
   AGENT_OS_WORKFLOWS_ENABLED: z.enum(['true', 'false']).optional(),
 
+  /**
+   * Creator Financial Health hard kill switch (JOV-4621). 'true'/'1' forces
+   * every finance surface off immediately, independent of the
+   * CREATOR_FINANCE flag-resolution latency.
+   */
+  FINANCE_DISABLE: z.enum(['0', '1', 'true', 'false']).optional(),
+
   // Eve core-chat shadow bridge. Off unless explicitly enabled and configured.
   EVE_CORE_CHAT_MODE: z.enum(['off', 'shadow']).optional(),
   EVE_CORE_CHAT_URL: z.string().url().optional(),
@@ -370,6 +406,7 @@ export const ServerEnvSchema = z.object({
   GOOGLE_OAUTH_REDIRECT_URI_BASE: z.string().url().optional(),
   /** Base URL for the YouTube OAuth redirect URI, e.g. https://jov.ie/api/connectors/youtube */
   YOUTUBE_OAUTH_REDIRECT_URI_BASE: z.string().url().optional(),
+  SPOTIFY_OAUTH_REDIRECT_URI_BASE: z.string().url().optional(),
   /** Days before/after today to fetch Calendar events (default: 90 past, 365 future) */
   GOOGLE_CALENDAR_DEFAULT_WINDOW_DAYS: z.string().optional(),
   /** Days of Gmail history to scan for booking signals (default: 30) */
@@ -477,9 +514,11 @@ export const ENV_KEYS = [
   'NEXT_PUBLIC_BUILD_SHA',
   'NEXT_PUBLIC_SENTRY_RELEASE',
   'VERCEL_GIT_COMMIT_SHA',
+  'VERCEL_DEPLOYMENT_ID',
   'VERCEL_DEPLOYMENT_TIME',
   'VERCEL_URL',
   'VERCEL_BRANCH_URL',
+  'VERCEL_PROJECT_PRODUCTION_URL',
   'VERCEL_AUTOMATION_BYPASS_SECRET',
   'PUBLIC_NOAUTH_SMOKE',
   'CHAT_LLM_FAILURE_INJECTION',
@@ -515,6 +554,10 @@ export const ENV_KEYS = [
   'APPLE_WALLET_WWDR_CERT_PEM',
   'APPLE_WALLET_AUTH_TOKEN_SECRET',
   'APPLE_WALLET_APNS_PRODUCTION',
+  'JOVIE_IOS_APNS_KEY_ID',
+  'JOVIE_IOS_APNS_TEAM_ID',
+  'JOVIE_IOS_APNS_PRIVATE_KEY',
+  'JOVIE_IOS_APNS_TOPIC',
   'BANDSINTOWN_APP_ID',
   'BLOB_READ_WRITE_TOKEN',
   'BLOB_STORE_ID',
@@ -559,11 +602,17 @@ export const ENV_KEYS = [
   'HUD_STARTUP_NAME',
   'HUD_STARTUP_LOGO_URL',
   'HUD_GITHUB_TOKEN',
+  'JOVIE_BOT_APP_ID',
+  'JOVIE_BOT_INSTALLATION_ID',
+  'JOVIE_BOT_PRIVATE_KEY',
   'HUD_GITHUB_OWNER',
   'HUD_GITHUB_REPO',
   'HUD_GITHUB_WORKFLOW',
+  'HUD_GEM_BRIDGE_URL',
+  'HUD_GEM_BRIDGE_TOKEN',
   'GBRAIN_API_URL',
   'GBRAIN_API_KEY',
+  'GBRAIN_HEALTH_URL',
   'REVALIDATE_SECRET',
   'APPLE_MUSIC_KEY_ID',
   'APPLE_MUSIC_TEAM_ID',
@@ -605,6 +654,9 @@ export const ENV_KEYS = [
   'SENTRY_ORG_SLUG',
   'LINEAR_WEBHOOK_SECRET',
   'LINEAR_API_KEY',
+  'RELEASE_COMMUNICATIONS_WEBHOOK_SECRET',
+  'JOVIE_FLEET_ENABLED',
+  'JOVIE_FLEET_LINEAR_TEAM_ID',
   'GH_DISPATCH_TOKEN',
   'VERCEL_GIT_REPO_OWNER',
   'VERCEL_GIT_REPO_SLUG',
@@ -629,6 +681,7 @@ export const ENV_KEYS = [
   'LANGFUSE_BASE_URL',
   'JOVIE_ENABLE_LANGFUSE',
   'AGENT_OS_WORKFLOWS_ENABLED',
+  'FINANCE_DISABLE',
   'EVE_CORE_CHAT_MODE',
   'EVE_CORE_CHAT_URL',
   'EVE_CORE_CHAT_AUTH_TOKEN',
@@ -673,6 +726,7 @@ export const ENV_KEYS = [
   'GOOGLE_OAUTH_CLIENT_SECRET',
   'GOOGLE_OAUTH_REDIRECT_URI_BASE',
   'YOUTUBE_OAUTH_REDIRECT_URI_BASE',
+  'SPOTIFY_OAUTH_REDIRECT_URI_BASE',
   'GOOGLE_CALENDAR_DEFAULT_WINDOW_DAYS',
   'GMAIL_HISTORY_WINDOW_DAYS',
   'AI_CONNECTORS_DAILY_TOKEN_BUDGET',

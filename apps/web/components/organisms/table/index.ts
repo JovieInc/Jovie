@@ -101,7 +101,10 @@ export { SkeletonCell } from './atoms/SkeletonCell';
 export { SkeletonRow } from './atoms/SkeletonRow';
 export { TableBadge } from './atoms/TableBadge';
 export type { TableCellProps } from './atoms/TableCell';
-export { TableCell } from './atoms/TableCell';
+export {
+  TABLE_CELL_MULTILINE_CONTENT_CLASSNAME,
+  TableCell,
+} from './atoms/TableCell';
 export type {
   TableCheckboxCellLegacyProps,
   TableCheckboxCellProps,
@@ -195,6 +198,16 @@ export type { TableHeaderRowProps } from './molecules/TableHeaderRow';
 export { TableHeaderRow } from './molecules/TableHeaderRow';
 export type { TableSearchBarProps } from './molecules/TableSearchBar';
 export { TableSearchBar } from './molecules/TableSearchBar';
+export type {
+  ToolbarFilterSuggestion,
+  ToolbarFilterSuggestionsProps,
+} from './molecules/ToolbarFilterSuggestions';
+export { ToolbarFilterSuggestions } from './molecules/ToolbarFilterSuggestions';
+export type {
+  ViewModeSliderOption,
+  ViewModeSliderProps,
+} from './molecules/ViewModeSlider';
+export { ViewModeSlider } from './molecules/ViewModeSlider';
 
 // =============================================================================
 // Organisms

@@ -3,14 +3,16 @@ import { Button } from '@jovie/ui';
 import { MessageCircle } from 'lucide-react';
 import Link from 'next/link';
 import { HudStatusPill } from '@/app/app/(shell)/admin/ops/HudStatusPill';
-import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
 import { DesignProposalReviewPanel } from '@/components/features/admin/design-lab';
 import { OperationalTasksPanel } from '@/components/features/admin/hud/OperationalTasksPanel';
 import { OvieLauncherRail } from '@/components/features/admin/hud/OvieLauncherRail';
+import { SummerCardReviewPanel } from '@/components/features/admin/summer-cards';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { DesktopTitlebar } from '@/components/organisms/DesktopTitlebar';
 import { APP_ROUTES } from '@/constants/routes';
+import type { DecisionHudView } from '@/lib/hud/decision-signals';
 import {
   type OvieMacHudInFlightPrStatus,
   type OvieMacHudSnapshot,
@@ -128,6 +130,92 @@ function InFlightPullRequestsPanel({
   );
 }
 
+function DecisionQueuePanel({
+  decisionHud,
+}: Readonly<{ readonly decisionHud: DecisionHudView }>) {
+  // Truthful empty/healthy state: no vanity filler.
+  if (decisionHud.items.length === 0) return null;
+
+  return (
+    <ContentSurfaceCard
+      className='flex flex-col'
+      data-testid='ovie-mac-hud-decision-queue'
+    >
+      <div className='flex flex-col gap-2 p-3'>
+        <div className='flex min-h-6 items-center justify-between gap-3'>
+          <p className='truncate text-2xs font-semibold tracking-normal text-tertiary-token'>
+            Decision queue
+          </p>
+          <span className='shrink-0 text-2xs font-medium text-secondary-token'>
+            {decisionHud.explanation}
+            {decisionHud.drillDown.length > 0
+              ? ` · ${decisionHud.drillDown.length} in drill-down`
+              : ''}
+          </span>
+        </div>
+        <ol className='grid gap-1.5'>
+          {decisionHud.items.map(item => {
+            const { candidate } = item;
+            return (
+              <li
+                key={candidate.id}
+                className='rounded-lg px-2 py-2 outline-none'
+                data-testid={`decision-item-${candidate.id}`}
+              >
+                <div className='flex min-h-6 items-start justify-between gap-2'>
+                  <p className='min-w-0 flex-1 truncate text-app font-medium text-primary-token'>
+                    <span className='font-normal text-tertiary-token'>
+                      #{item.rank}
+                    </span>{' '}
+                    {candidate.title}
+                  </p>
+                  <HudStatusPill
+                    label={
+                      item.priorityOverride
+                        ? 'P0'
+                        : item.degraded
+                          ? 'Stale'
+                          : candidate.summerCanAct
+                            ? 'Summer'
+                            : 'Founder'
+                    }
+                    tone={
+                      item.priorityOverride
+                        ? 'bad'
+                        : item.degraded
+                          ? 'warning'
+                          : 'neutral'
+                    }
+                  />
+                </div>
+                <p className='mt-1 text-2xs text-secondary-token'>
+                  {candidate.whyNow}
+                </p>
+                <div className='mt-1 grid gap-0.5 text-2xs text-tertiary-token'>
+                  <span>
+                    Now: {candidate.currentValue}
+                    {candidate.delta ? ` · Δ ${candidate.delta}` : ''}
+                    {candidate.target ? ` · Target: ${candidate.target}` : ''}
+                  </span>
+                  <span>
+                    Next: {candidate.nextAction} · Removes when:{' '}
+                    {candidate.removalEvent}
+                  </span>
+                  <span>
+                    Source: {candidate.source} · Confidence{' '}
+                    {Math.round(candidate.confidence * 100)}% ·{' '}
+                    {candidate.freshness}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+    </ContentSurfaceCard>
+  );
+}
+
 export function OvieMacHud({
   snapshot,
 }: Readonly<{ readonly snapshot: OvieMacHudSnapshot }>) {
@@ -168,6 +256,9 @@ export function OvieMacHud({
         </header>
         <OvieLauncherRail />
         <OperationalTasksPanel />
+        {snapshot.decisionHud ? (
+          <DecisionQueuePanel decisionHud={snapshot.decisionHud} />
+        ) : null}
         <section className='grid min-h-40 gap-3 xl:grid-cols-4'>
           <div className='grid gap-3 md:grid-cols-3 xl:col-span-3'>
             <ContentMetricCard
@@ -234,6 +325,7 @@ export function OvieMacHud({
           <InFlightPullRequestsPanel pullRequests={inFlightPullRequests} />
         </section>
         <DesignProposalReviewPanel />
+        <SummerCardReviewPanel />
       </main>
     </div>
   );

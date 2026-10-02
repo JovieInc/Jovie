@@ -43,7 +43,6 @@
   --profile-drawer-radius-desktop: 20px;
   --profile-action-radius: 14px;
   --profile-notification-icon-size: 17px;
-  --profile-hero-identity-min-height: calc(var(--space-24) + var(--space-2));
   --app-dialog-radius: var(--profile-inner-radius);
   --app-shell-sidebar-floating-radius: 14px;
   --page-pad: clamp(16px, 4vw, 32px);
@@ -114,6 +113,12 @@
   --app-shell-radius: 12px;
   --app-shell-radius-item: 8px;
   --app-shell-radius-menu: 8px;
+  /* Nested surfaces sit inside the shell inset: outer radius − gap. */
+  --app-shell-radius-nested: calc(
+    var(--app-shell-radius) -
+    var(--app-shell-gap)
+  );
+  --app-shell-content-inset: var(--app-shell-gap);
   --app-shell-border: rgba(0, 0, 0, 0.05);
   --app-shell-sidebar-seam: rgba(0, 0, 0, 0.05);
   --app-shell-frame-seam: rgba(0, 0, 0, 0.045);
@@ -318,7 +323,14 @@
   --profile-rail-dot-active: rgba(255, 255, 255, 0.92);
   --profile-rail-dot-inactive: rgba(255, 255, 255, 0.18);
   --profile-composer-border: rgba(255, 255, 255, 0.1);
-  --profile-dock-bg: rgba(30, 32, 40, 0.52);
+  /* JOV-INV-019 image-contrast: the dock sits over the page's own photo
+     content (mode-card artwork, ambient backdrop), so its glass scrim must
+     stay opaque enough to guarantee 4.5:1 for its white glyphs against any
+     underlying image, not just a typical dark one. Darkened + raised opacity
+     2026-09-29 (was rgba(30, 32, 40, 0.52)); lens now shares the same dark
+     material instead of a white tint that diluted the scrim under the
+     active tab. */
+  --profile-dock-bg: rgba(18, 19, 24, 0.86);
   --profile-dock-border: rgba(255, 255, 255, 0.18);
   --profile-dock-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 14px 34px rgba(0, 0, 0, 0.3);
@@ -333,7 +345,7 @@
   --profile-dock-glow: rgba(255, 255, 255, 0.05);
   --profile-dock-rim-top: rgba(255, 255, 255, 0.38);
   --profile-dock-rim-bottom: rgba(0, 0, 0, 0.24);
-  --profile-dock-lens-bg: rgba(255, 255, 255, 0.13);
+  --profile-dock-lens-bg: rgba(18, 19, 24, 0.86);
   --profile-dock-lens-sheen: rgba(255, 255, 255, 0.14);
   --profile-dock-lens-rim: rgba(255, 255, 255, 0.34);
   --profile-dock-lens-rim-bottom: rgba(255, 255, 255, 0.06);
@@ -448,13 +460,19 @@
   }
 }
 
-:where(.profile-aeo-content) {
-  --profile-aeo-text: var(--color-text-tooltip);
+:where(
+  .profile-aeo-content,
+  [data-testid="profile-mobile-notifications-flow"]
+) {
   --profile-aeo-muted: color-mix(
     in oklab,
     var(--color-text-tooltip) 70%,
     transparent
   );
+}
+
+:where(.profile-aeo-content) {
+  --profile-aeo-text: var(--color-text-tooltip);
   --profile-aeo-border: color-mix(
     in oklab,
     var(--color-text-tooltip) 14%,
@@ -491,43 +509,6 @@
   }
 }
 
-:where(.profile-hero-identity-scrim) {
-  min-height: var(--profile-hero-identity-min-height);
-  background: var(--profile-stage-bg);
-}
-
-/* Single hero legibility gradient, limited to the bottom ~55% of the cover so
-   the artist photo stays clearly visible in the upper zone. Replaces the old
-   stacked full-height scrims (profile-cover-home-gradient +
-   profile-cover-home-fade) that darkened the whole photo. */
-:where(.profile-cover-home-gradient) {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  height: 55%;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(3, 4, 6, 0.42) 52%,
-    rgba(5, 6, 8, 0.9) 86%,
-    var(--profile-stage-bg) 100%
-  );
-}
-
-/* The public compact hero reserves identity outside the image, so it needs
-   only a shallow media-edge transition. This modifier preserves the shared
-   legacy class contract while ensuring the live surface never lays a tall
-   scrim across the subject. */
-:where(.profile-cover-home-gradient--face-safe) {
-  height: var(--space-8);
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    color-mix(in oklab, var(--profile-stage-bg) 44%, transparent) 54%,
-    var(--profile-stage-bg) 100%
-  );
-}
-
 /* Profile home carousel card geometry: one 3:4 shape that fills the remaining
    viewport height. Width derives from height via aspect-ratio; the max-height
    cap keeps width at or under ~78vw (width = 0.75 × height). Cards center
@@ -555,6 +536,17 @@
   max-height: none;
   align-self: flex-start;
   container-type: inline-size;
+}
+
+/* A short viewport or enlarged identity must scroll the card, never compress
+   the horizontal track and clip its action below an overflow-hidden edge.
+   The landscape card height is content-driven (aspect-ratio is only a
+   preferred ratio), so the floor is the card's own content height, not a
+   fixed pixel value. */
+.profile-horizontal-rail[data-layout="profile-landscape"] {
+  height: auto;
+  min-height: max-content;
+  flex-shrink: 0;
 }
 
 /* Unified card anatomy: the art zone is a full-width square, so the text
@@ -782,17 +774,38 @@
    static DOM, but out of mobile layout so it cannot add page scroll below the
    compact profile. Desktop keeps the readable AEO section. */
 @media (max-width: 767px) {
-  /* The consent card mounts lazily after geo/cookie checks. Keep it in the
-     safe-area top overlay on phones: the bottom region contains both the
-     profile's primary conversion action and the canonical glass dock. */
+  /* The consent card mounts lazily after geo/cookie checks. On phones it
+     sits at the bottom, directly above the dock stack (and the proof claim
+     bar, which grows --profile-bottom-nav-height), so it never covers the
+     profile identity or the dock (Tim 2026-09-29, JOV-7114). */
   .cookie-banner-card--above-public-profile-dock {
-    top: max(env(safe-area-inset-top), 8px);
-    bottom: auto;
+    top: auto;
+    bottom: var(--profile-bottom-nav-height);
     left: min(50vw, calc(var(--profile-shell-max-width) / 2));
     right: auto !important;
-    width: min(254px, calc(100vw - 136px)) !important;
+    /* Same edges as the claim bar and dock below it. */
+    width: min(358px, calc(100vw - 32px)) !important;
     max-width: none;
     transform: translateX(-50%);
+  }
+
+  /* The canonical launcher occupies the clear upper-right rail. Keep its
+     placement here with the profile dock and proof claim-bar geometry so it
+     cannot intercept either the navigation or the featured action. */
+  [data-ask-jovie-launcher] {
+    top: calc(env(safe-area-inset-top) + var(--space-16));
+    bottom: auto;
+  }
+
+  /* The proof claim bar rides inside the dock; content clears both. */
+  :root:has([data-testid="profile-proof-claim-bar"]) {
+    --profile-bottom-nav-height: calc(
+      var(--space-8) +
+      max(10px, env(safe-area-inset-bottom)) +
+      var(--space-2) +
+      var(--space-6) +
+      52px
+    );
   }
 
   .profile-viewport ~ .profile-aeo-content {
@@ -844,49 +857,6 @@
   }
 }
 
-/* Compact mobile home hero: one definite token-driven height on every
-   viewport (--cover-height, clamp(220px, 34svh, 400px)). The hero never
-   shrink-wraps; media crops via object-cover and the carousel below owns the
-   remaining viewport height. */
-/* The fixed token remains the minimum crop-safe media height. On the home
-   surface, the shell gives every additional vertical pixel to the real hero
-   instead of leaving an ownerless flex region below the primary card. The
-   content column stays intrinsic, so the card and dock never stretch and no
-   fake spacer participates in the layout. */
-:where(
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-    > .profile-home-fluid-hero
-) {
-  flex: 1 1 auto;
-  min-height: var(--cover-height);
-  height: auto;
-  /* The base declaration preserves the established media floor; this
-     supported calc also reserves the non-overlay identity band. */
-  min-height: calc(
-    var(--cover-height) +
-    var(--profile-hero-identity-min-height)
-  );
-}
-
-/* Profiles without real hero media keep the identity chrome compact instead
-   of stretching a decorative gradient through most of the first viewport. */
-:where(
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-    > .profile-home-fluid-hero--no-media
-) {
-  flex: 0 0 auto;
-  height: calc(
-    max(env(safe-area-inset-top), 16px) +
-    5rem +
-    var(--profile-hero-identity-min-height)
-  );
-  min-height: calc(
-    max(env(safe-area-inset-top), 16px) +
-    5rem +
-    var(--profile-hero-identity-min-height)
-  );
-}
-
 :where(
   [data-testid="profile-compact-surface"][data-mode="profile"]
     > .profile-home-content-column,
@@ -898,31 +868,50 @@
   flex: 0 0 auto;
 }
 
-/* The public mobile contract gives the media slot the tokenized 34svh height;
-   the in-flow identity band is additive and remains directly attached to the
-   media. Keep the rail at the top of its remaining region so the primary card
-   follows the identity without introducing an ownerless spacer. */
+/* Reserve the floating dock outside the home scroll box at every compact
+   breakpoint. End padding makes the last row reachable after scrolling, but
+   it cannot stop an absolute dock from covering the current viewport. The
+   desktop shell is a fixed-height phone card, so without this the last card
+   renders half-covered by the dock at rest even though it can technically
+   scroll into view (JOV-7192). Embedded previews render no dock, so they keep
+   the in-box padding instead. */
+:where(
+  [data-testid="profile-compact-surface"][data-mode="profile"]:not(
+      [data-presentation="embedded"]
+    )
+    > .profile-home-content-column
+) {
+  margin-bottom: var(--profile-bottom-nav-height);
+}
+
+[data-testid="profile-compact-surface"][data-mode="profile"]:not(
+    [data-presentation="embedded"]
+  )
+  .profile-home-content-scroll {
+  padding-bottom: 0;
+}
+
+/* From md up the compact surface is a fixed-height phone card with overflow
+   hidden. Natural-height content ran past the card, under the tab bar, and
+   could never be scrolled into view (jov.ie/tim dogfood 2026-09-27). Bound the
+   column so the content region scrolls inside the card; its bottom padding
+   keeps the last row reachable above the dock. */
+@media (min-width: 768px) {
+  :where(
+    [data-testid="profile-compact-surface"][data-mode="profile"]
+      > .profile-home-content-column,
+    [data-testid="profile-compact-surface"][data-mode="profile"]
+      .profile-home-content-scroll
+  ) {
+    flex: 1 1 0%;
+    min-height: 0;
+  }
+}
+
+/* Mobile home: the identity header and the rail share one scroll region.
+   Keep the rail at the top of its remaining region so the featured card
+   follows the identity header without an ownerless spacer. */
 @media (max-width: 767px) {
-  :where(
-    [data-testid="profile-compact-surface"][data-mode="profile"]
-      > .profile-home-fluid-hero:not(.profile-home-fluid-hero--no-media)
-  ) {
-    flex: 0 0 auto;
-    height: auto;
-    min-height: calc(
-      var(--cover-height) +
-      var(--profile-hero-identity-min-height)
-    );
-  }
-
-  :where(
-    [data-testid="profile-compact-surface"][data-mode="profile"]
-      .profile-cover-home-media
-  ) {
-    flex: 0 0 var(--cover-height);
-    height: var(--cover-height);
-  }
-
   :where(
     [data-testid="profile-compact-surface"][data-mode="profile"]
       > .profile-home-content-column,
@@ -940,22 +929,6 @@
     flex: 1 1 0%;
     justify-content: flex-start;
     min-height: 0;
-  }
-
-  /* Reserve the floating dock outside the scroll box. The existing padding
-     utility reserves the same space inside the box, which would make the
-     layout metrics report content underneath the dock after the hero is
-     pinned to its token. */
-  :where(
-    [data-testid="profile-compact-surface"][data-mode="profile"]
-      > .profile-home-content-column
-  ) {
-    margin-bottom: var(--profile-bottom-nav-height);
-  }
-
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-    .profile-home-content-scroll {
-    padding-bottom: 0;
   }
 
   /* Large text can make the in-flow identity taller than the phone viewport.
@@ -1080,45 +1053,6 @@
     .profile-floating-tab-bar {
     position: fixed;
   }
-}
-
-/* Query-mode profile URLs are served from the ISR home shell, then hydrate into
-   the requested mode from window.location. Match the mode header on first paint
-   so hydration does not move the compact profile frame. */
-html[data-profile-initial-mode]
-[data-testid="profile-compact-surface"][data-mode="profile"] {
-  --cover-height: calc(3.5rem + max(env(safe-area-inset-top), 0px));
-}
-
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  [data-testid="profile-cover"] {
-  height: calc(3.5rem + max(env(safe-area-inset-top), 0px)) !important;
-  max-height: calc(3.5rem + max(env(safe-area-inset-top), 0px)) !important;
-}
-
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  .profile-cover-chrome {
-  padding-top: max(env(safe-area-inset-top), 10px) !important;
-}
-
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  .profile-cover-home-media,
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  .profile-cover-home-gradient,
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  [data-testid="profile-hero-identity-block"] {
-  display: none !important;
-}
-
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  .profile-cover-mode-title {
-  display: block !important;
 }
 
 @media (min-width: 768px) {
@@ -1739,7 +1673,9 @@ html[data-profile-initial-mode]
   --profile-rail-dot-active: rgba(255, 255, 255, 0.92);
   --profile-rail-dot-inactive: rgba(255, 255, 255, 0.18);
   --profile-composer-border: rgba(255, 255, 255, 0.1);
-  --profile-dock-bg: rgba(30, 32, 40, 0.52);
+  /* JOV-INV-019 image-contrast: keep this in sync with the .profile-viewport
+     block above — see its comment for why the scrim must be this opaque. */
+  --profile-dock-bg: rgba(18, 19, 24, 0.86);
   --profile-dock-border: rgba(255, 255, 255, 0.18);
   --profile-dock-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 14px 34px rgba(0, 0, 0, 0.3);
@@ -1754,7 +1690,7 @@ html[data-profile-initial-mode]
   --profile-dock-glow: rgba(255, 255, 255, 0.05);
   --profile-dock-rim-top: rgba(255, 255, 255, 0.38);
   --profile-dock-rim-bottom: rgba(0, 0, 0, 0.24);
-  --profile-dock-lens-bg: rgba(255, 255, 255, 0.13);
+  --profile-dock-lens-bg: rgba(18, 19, 24, 0.86);
   --profile-dock-lens-sheen: rgba(255, 255, 255, 0.14);
   --profile-dock-lens-rim: rgba(255, 255, 255, 0.34);
   --profile-dock-lens-rim-bottom: rgba(255, 255, 255, 0.06);
@@ -1956,6 +1892,160 @@ html[data-profile-initial-mode]
   color: var(--profile-dock-active-fg);
 }
 
+:where(.profile-glass-pill--flat) {
+  /* Flat frosted variant (profile identity Listen action): the same dock
+     lens fill and hairline rim, minus the sheen and top-rim bevel, with its
+     own 16px blur because it sits directly on the page, not on a card. */
+  border-radius: 10px;
+  background: var(--profile-dock-lens-bg);
+  box-shadow: inset 0 0 0 var(--space-px) var(--profile-dock-border);
+  backdrop-filter: blur(var(--space-4));
+  -webkit-backdrop-filter: blur(var(--space-4));
+}
+
+/* Public-profile mode cards (Pen D14lo6 / NdEbB / GTSIc / QZvG7). One accent
+   per card, set by lib/profile/mode-card-accent.ts through data-accent. The
+   gradient centers on the exact accent token; the only contrast lever is
+   OKLCH chroma (lightness and hue stay), lowered strongly for art cards.
+   Text, glyphs, and CTAs inside stay neutral. */
+:where(.profile-mode-card) {
+  --profile-mode-card-bg: rgb(5, 6, 8);
+  --profile-mode-card-fg: rgba(255, 255, 255, 0.98);
+  --profile-mode-card-muted: rgba(255, 255, 255, 0.58);
+  --profile-mode-card-hairline: rgba(255, 255, 255, 0.1);
+  --profile-mode-card-well: rgba(255, 255, 255, 0.04);
+  --profile-mode-card-well-active: rgba(255, 255, 255, 0.1);
+  --profile-mode-card-cta-bg: rgba(246, 247, 251, 0.98);
+  --profile-mode-card-cta-fg: rgba(8, 9, 10, 0.96);
+  --profile-mode-card-min-height: 17rem;
+  --profile-mode-card-accent: var(--noir-ion-ion);
+  --profile-mode-card-chroma: 0.72;
+  --profile-mode-card-accent-center: oklch(
+    from var(--profile-mode-card-accent) l
+      calc(c * var(--profile-mode-card-chroma)) h
+  );
+  --profile-mode-card-accent-shade: oklch(
+    from var(--profile-mode-card-accent) calc(l * 0.5)
+      calc(c * var(--profile-mode-card-chroma) * 0.6) h /
+    0.4
+  );
+
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: var(--profile-mode-card-min-height);
+  border-radius: var(--profile-card-radius);
+  background: var(--profile-mode-card-bg);
+  color: var(--profile-mode-card-fg);
+}
+
+/* Pen D14lo6 / tkdyb: retain the reserved card height, then compact the art
+   and spacing when the home region is shorter so the action clears the dock. */
+[data-testid="profile-compact-surface"]:not(
+    [data-profile-overflow-mode="scroll"]
+  )
+  [data-testid="profile-home-rail"]
+  > [data-presentation="featured"] {
+  height: calc(var(--spacing) * 80);
+  min-height: calc(var(--spacing) * 52);
+  container: profile-featured-card / size;
+}
+
+[data-testid="profile-compact-surface"]:not(
+    [data-profile-overflow-mode="scroll"]
+  )
+  [data-testid="profile-home-rail"]
+  > [data-presentation="featured"]
+  > .profile-mode-card {
+  height: 100%;
+  min-height: 0;
+}
+
+@media (max-width: 767px) {
+  [data-testid="profile-compact-surface"]:not(
+      [data-profile-overflow-mode="scroll"]
+    )
+    [data-testid="profile-home-rail"]
+    > [data-presentation="featured"] {
+    height: min(calc(var(--spacing) * 80), 100%);
+  }
+}
+
+@container profile-featured-card (height < 20rem) {
+  .profile-mode-card {
+    padding: var(--space-3);
+  }
+  .profile-mode-card > div:first-child {
+    min-height: var(--space-4);
+  }
+  .profile-mode-card > div:has(> [data-testid="profile-pac-featured-art"]) {
+    margin-top: var(--space-1);
+  }
+  [data-testid="profile-pac-featured-art"] {
+    width: var(--space-12);
+    height: var(--space-12);
+  }
+  .profile-mode-card > div:last-child {
+    padding-top: var(--space-1);
+  }
+  .profile-mode-card h2 {
+    line-height: var(--space-7);
+  }
+  .profile-mode-card p {
+    margin-top: 0;
+    line-height: var(--space-5);
+  }
+  .profile-mode-card [aria-live="polite"] {
+    min-height: 0;
+  }
+}
+
+:where(.profile-mode-card)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      80% 42% at 100% 0%,
+      var(--profile-mode-card-accent-center) 0%,
+      var(--profile-mode-card-accent-shade) 42%,
+      transparent 100%
+    ),
+    radial-gradient(
+      42% 16% at 0% 100%,
+      var(--profile-mode-card-accent-shade) 0%,
+      transparent 100%
+    );
+}
+
+.profile-mode-card[data-accent="ultra"] {
+  --profile-mode-card-accent: var(--noir-ion-ultra);
+}
+
+.profile-mode-card[data-accent="pulse"] {
+  --profile-mode-card-accent: var(--noir-ion-pulse);
+}
+
+.profile-mode-card[data-accent="orange"] {
+  --profile-mode-card-accent: var(--noir-ion-orange);
+}
+
+.profile-mode-card[data-accent-strength="art"] {
+  --profile-mode-card-chroma: 0.38;
+}
+
+@media (forced-colors: active) {
+  :where(.profile-mode-card) {
+    border: var(--space-px) solid CanvasText;
+  }
+
+  :where(.profile-mode-card)::before {
+    display: none;
+  }
+}
+
 /* Safari/Media Queries 5 plus a deterministic manual hook for testability and
    clients that expose the OS preference outside CSS. */
 @media (prefers-reduced-transparency: reduce) {
@@ -1980,6 +2070,11 @@ html[data-profile-initial-mode]
 
   :where(.profile-glass-pill) {
     background: var(--profile-dock-solid-bg);
+  }
+
+  :where(.profile-glass-pill--flat) {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 }
 
@@ -2013,6 +2108,12 @@ html[data-profile-initial-mode]
   box-shadow: inset 0 0 0 var(--space-px) var(--profile-dock-solid-border);
 }
 
+:root[data-reduced-transparency="true"] .profile-glass-pill--flat,
+:root.high-contrast .profile-glass-pill--flat {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 @media (prefers-contrast: more) {
   :where(.profile-liquid-glass-nav) {
     border-color: var(--profile-dock-solid-border);
@@ -2035,6 +2136,11 @@ html[data-profile-initial-mode]
 
   :where(.profile-glass-pill) {
     background: var(--profile-dock-solid-bg);
+  }
+
+  :where(.profile-glass-pill--flat) {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 }
 
@@ -2530,28 +2636,28 @@ html[data-profile-initial-mode]
      KEY: Linear uses 13px (0.8125rem) as the primary app UI size */
   --text-3xs: 0.625rem;
   /* 10px — micro labels, legal */
-  --text-2xs: 0.6875rem;
-  /* 11px — tiny labels, badges */
+  --text-2xs: 0.75rem;
+  /* 12px — small step (was 11px; consolidated 2026-09-27) */
   --text-xs: 0.75rem;
   /* 12px */
-  --text-app: 0.8125rem;
-  /* 13px — LINEAR'S DEFAULT APP UI SIZE (sidebar, issues, tabs) */
+  --text-app: 0.75rem;
+  /* 12px — app default UI size (was 13px; consolidated 2026-09-27) */
   --text-sm: 0.875rem;
   /* 14px */
-  --text-mid: 0.9375rem;
-  /* 15px — between sm and base; intentional tight fit */
+  --text-mid: 0.875rem;
+  /* 14px — body step (was 15px; consolidated 2026-09-27) */
   --text-base: 1rem;
   /* 16px */
-  --text-lg: 1.125rem;
-  /* 18px */
+  --text-lg: 1rem;
+  /* 16px (display ladder, was 18px) */
   --text-xl: 1.25rem;
   /* 20px */
   --text-2xl: 1.5rem;
   /* 24px */
-  --text-3xl: 1.875rem;
-  /* 30px */
-  --text-4xl: 2.25rem;
-  /* 36px */
+  --text-3xl: 2rem;
+  /* 32px (was 30px) */
+  --text-4xl: 2.5rem;
+  /* 40px (was 36px) */
   --text-5xl: 3rem;
   /* 48px */
 
@@ -3037,14 +3143,16 @@ html:not(.dark) .smart-link-powered-by {
   outline: none;
 }
 
-:where(
-  input,
-  textarea,
-  select,
-  [contenteditable="true"],
-  [role="textbox"]
-):focus-visible {
-  box-shadow: none;
+@layer base {
+  :where(
+    input,
+    textarea,
+    select,
+    [contenteditable="true"],
+    [role="textbox"]
+  ):focus-visible {
+    box-shadow: none;
+  }
 }
 
 /* ============================================

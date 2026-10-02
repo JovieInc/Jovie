@@ -1,10 +1,13 @@
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  copyFileSync,
   existsSync,
   globSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -70,7 +73,7 @@ function loadNextConfigForTracingTest(vercelEnv = ''): NextConfigForTest {
         return { withWorkflow: identityConfig };
       case '@vercel/toolbar/plugins/next':
         return () => identityConfig;
-      case '@sentry/nextjs':
+      case '@sentry/nextjs/config':
         return { withSentryConfig: identityConfig };
       default:
         throw new Error(`Unexpected next.config.js dependency: ${specifier}`);
@@ -146,6 +149,26 @@ function turbopackGlobSource(exclude: string): string {
 }
 
 describe('Vercel function config', () => {
+  it('loads the real production config with Sentry source maps enabled', () => {
+    const result = spawnSync(
+      process.execPath,
+      ['-e', "require('./next.config.js')"],
+      {
+        cwd: appWebRoot,
+        env: {
+          ...process.env,
+          NODE_ENV: 'production',
+          NEXT_ENABLE_TOOLBAR: '0',
+          SENTRY_AUTH_TOKEN: 'test-token',
+          VERCEL_ENV: 'production',
+        },
+        encoding: 'utf8',
+      }
+    );
+
+    expect(result.status, result.stderr).toBe(0);
+  });
+
   it.each(['', 'preview', 'production'])(
     'never traces files outside apps/web (VERCEL_ENV=%s)',
     vercelEnv => {
@@ -297,6 +320,30 @@ describe('Vercel function config', () => {
     }
   });
 
+  it('packages public blog assets needed by request-time catalog validation', async () => {
+    const { loadBlogCatalog } = await import('@/lib/blog/getBlogPosts');
+    const runtimeRoot = mkdtempSync(resolve(tmpdir(), 'jovie-blog-trace-'));
+    try {
+      const includes =
+        loadNextConfigForTracingTest().outputFileTracingIncludes?.['/*'] ?? [];
+      const tracedPublicFiles = includes
+        .flatMap(pattern => globSync(pattern, { cwd: appWebRoot }))
+        .filter(file => file.startsWith('public/') && !file.endsWith('/'));
+      for (const file of tracedPublicFiles) {
+        const destination = resolve(runtimeRoot, file);
+        mkdirSync(dirname(destination), { recursive: true });
+        copyFileSync(resolve(appWebRoot, file), destination);
+      }
+      const catalog = await loadBlogCatalog({
+        directory: resolve(appWebRoot, 'content/blog'),
+        publicDirectory: resolve(runtimeRoot, 'public'),
+      });
+      expect(catalog.publicPosts.length).toBeGreaterThan(0);
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
+  });
+
   it('keeps dynamic runtime readers covered by bounded Next trace includes', () => {
     const nextConfig = loadNextConfigForTracingTest();
     const includesByRoute = nextConfig.outputFileTracingIncludes ?? {};
@@ -331,6 +378,17 @@ describe('Vercel function config', () => {
       expect.arrayContaining(screenshotIncludes)
     );
     expect(includes).not.toEqual(expect.arrayContaining(screenshotIncludes));
+
+    // Certification packet files are staged into runtime-data and traced only
+    // into the certification API routes that read them.
+    const certificationIncludes = ['runtime-data/docs/certification/**/*'];
+    expect(includesByRoute['/api/ovie/certifications']).toEqual(
+      certificationIncludes
+    );
+    expect(includesByRoute['/api/ovie/certifications/**']).toEqual(
+      certificationIncludes
+    );
+    expect(includes).not.toEqual(expect.arrayContaining(certificationIncludes));
   });
 
   it('excludes non-runtime repo files from traces without dropping runtime reads', async () => {

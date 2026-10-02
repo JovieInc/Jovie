@@ -14,7 +14,8 @@
   ],
   "workspaces": {
     ".": {
-      "entry": ["scripts/**/*.{ts,mjs}"]
+      "entry": ["scripts/**/*.{ts,mjs}"],
+      "ignoreDependencies": ["@commitlint/cli", "lint-staged"]
     },
     "apps/web": {
       "entry": [
@@ -36,7 +37,9 @@
         "@radix-ui/react-toggle",
         "@radix-ui/react-toggle-group",
         "@opentelemetry/sdk-trace-base",
-        "@sentry/node"
+        "@sentry/node",
+        "import-in-the-middle",
+        "require-in-the-middle"
       ],
       "playwright": {
         "config": [
@@ -70,6 +73,9 @@
         "config": ["eslint.config.js", "eslint-server-boundaries.config.js"]
       },
       "drizzle": false
+    },
+    "apps/macos": {
+      "ignoreDependencies": ["tsx"]
     },
     "apps/desktop": {
       "entry": ["src/**/*.ts", "scripts/**/*.{js,mjs,cjs}"],

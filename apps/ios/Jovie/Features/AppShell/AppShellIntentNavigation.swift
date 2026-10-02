@@ -90,7 +90,7 @@ enum MobileSignedInLinkRoute: String, Equatable, Sendable {
 
   /// Signed-in product URLs. Auth callbacks stay on the existing parser.
   static func resolve(_ url: URL) -> Self? {
-    let path = normalizedPath(url.path)
+    let path = normalizedRoutePath(url)
     if path == "/settings" || path.hasPrefix("/settings/")
       || path == "/app/settings" || path.hasPrefix("/app/settings/")
     {
@@ -101,6 +101,13 @@ enum MobileSignedInLinkRoute: String, Equatable, Sendable {
       return .chatHome
     }
     return nil
+  }
+
+  private static func normalizedRoutePath(_ url: URL) -> String {
+    if url.scheme?.lowercased() == "ie.jov.jovie", let host = url.host {
+      return normalizedPath("/\(host)\(url.path)")
+    }
+    return normalizedPath(url.path)
   }
 
   private static func normalizedPath(_ path: String) -> String {

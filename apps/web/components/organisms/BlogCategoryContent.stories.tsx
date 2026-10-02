@@ -16,7 +16,7 @@ export const BLOG_CATEGORY_STORY_CATEGORY: BlogCategory = {
   name: 'Artist Management',
   slug: 'artist-management',
   description:
-    'Insights on navigating the business side of music — managers, agents, and the systems that connect artists to opportunities.',
+    'Insights on navigating the business side of music: managers, agents, and the systems that connect artists to opportunities.',
 };
 
 /** Exact public fields parsed from the checked-in blog post. */
@@ -28,8 +28,8 @@ export const BLOG_CATEGORY_STORY_POST: BlogPostSummary = {
   category: 'Artist Management',
   excerpt:
     "When I fired my manager, the first thing I realized wasn't emotional. It was logistical.",
-  readingTime: 5,
-  wordCount: 978,
+  readingTime: 4,
+  wordCount: 921,
   tags: ['contact info', 'manager changes', 'booking agents', 'music industry'],
 };
 

@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -20,6 +22,7 @@ import {
   captureArtifact,
   captureInputs,
   compareSources,
+  generateSbom,
   sourceSnapshot,
 } from './production-input-provenance.mjs';
 
@@ -106,7 +109,9 @@ printf '%s' "$production_deploy_json"
 });
 
 function fixture(t) {
-  const base = mkdtempSync(resolve(tmpdir(), 'jovie-input-proof-'));
+  const base = realpathSync(
+    mkdtempSync(resolve(tmpdir(), 'jovie-input-proof-'))
+  );
   const root = resolve(base, 'repo');
   mkdirSync(root);
   t.after(() => rmSync(base, { recursive: true, force: true }));
@@ -187,6 +192,25 @@ function fixture(t) {
     captureInputs: capture,
   };
 }
+
+test('captures dependency evidence through a symlinked checkout without accepting escapes', t => {
+  const f = fixture(t);
+  const alias = resolve(f.base, 'repo-alias');
+  symlinkSync(f.root, alias, 'dir');
+  const receipt = captureInputs(alias, f.sha, f.input, f.sbom);
+  assert.equal(receipt.source.head, f.sha);
+  assert.equal(receipt.supplyChain.lockfile.path, 'pnpm-lock.yaml');
+  const outside = resolve(f.base, 'outside-lock.yaml');
+  writeFileSync(outside, 'outside');
+  rmSync(resolve(f.root, 'pnpm-lock.yaml'));
+  symlinkSync(outside, resolve(f.root, 'pnpm-lock.yaml'));
+  const escapedReceipt = resolve(f.base, 'escaped.json');
+  assert.throws(
+    () => captureInputs(alias, f.sha, escapedReceipt, f.sbom),
+    /Missing build input file/
+  );
+  assert.equal(existsSync(escapedReceipt), false);
+});
 
 test('records clean baseline, dirty paths and artifact/deployment binding without leaking file bodies', t => {
   const f = fixture(t);
@@ -323,6 +347,115 @@ test('builds a deterministic CycloneDX production dependency inventory', () => {
         property.name === 'jovie:certification-contract' &&
         property.value === 'jovie.certification/v1'
     )
+  );
+});
+
+const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
+
+function fakePnpm(t, script) {
+  const dir = mkdtempSync(resolve(tmpdir(), 'jovie-fake-pnpm-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const pnpm = resolve(dir, 'pnpm');
+  writeFileSync(pnpm, `#!${process.execPath}\n${script}\n`);
+  chmodSync(pnpm, 0o755);
+  return { dir, pnpm };
+}
+
+test('promote-production installs into a warm pnpm store before generating the SBOM', () => {
+  const workflow = readFileSync(
+    new URL('../workflows/production-release.yml', import.meta.url),
+    'utf8'
+  );
+  const start = workflow.indexOf('\n  promote-production:\n');
+  const end = workflow.indexOf('\n  ', workflow.indexOf('\n    steps:', start));
+  assert.ok(start >= 0);
+  const job = workflow.slice(start);
+  const setup = job.indexOf('- uses: ./.github/actions/setup-node-pnpm');
+  const sbom = job.indexOf('production-input-provenance.mjs sbom');
+  assert.ok(end > start && setup > 0 && sbom > setup);
+  // The exact node_modules cache restores a tree without its store; the SBOM
+  // needs the store the lockfile install populated (JOV-6726).
+  assert.match(
+    job.slice(setup, job.indexOf('\n      - ', setup + 1)),
+    /with:\n\s+package_cache: 'false'/
+  );
+  const action = readFileSync(
+    new URL('../actions/setup-node-pnpm/action.yml', import.meta.url),
+    'utf8'
+  );
+  const step = name => {
+    const at = action.indexOf(`- name: ${name}`);
+    assert.ok(at >= 0, name);
+    return action.slice(at, action.indexOf('\n    - ', at + 1));
+  };
+  assert.match(
+    step('Restore installed node_modules (GitHub-hosted)'),
+    /inputs\.package_cache == 'true'/
+  );
+  assert.match(
+    step('Warm pnpm store'),
+    /steps\.node-modules-cache\.outputs\.cache-hit != 'true'[\s\S]*pnpm fetch --frozen-lockfile/
+  );
+});
+
+test('generates the SBOM from the pnpm license report of the installed tree', t => {
+  const report = {
+    MIT: [{ name: '@fixture/runtime', versions: ['1.2.3'], license: 'MIT' }],
+  };
+  const { dir, pnpm } = fakePnpm(
+    t,
+    `if (process.argv.slice(2).join(' ') !== 'licenses list --prod --json') process.exit(2);
+process.stdout.write(${JSON.stringify(JSON.stringify(report))});`
+  );
+  const output = resolve(dir, 'sbom.cdx.json');
+  const sha = 'b'.repeat(40);
+  generateSbom(repoRoot, sha, output, { pnpm });
+  const sbom = JSON.parse(readFileSync(output, 'utf8'));
+  assert.deepEqual(
+    sbom.components.map(component => component.purl),
+    ['pkg:npm/%40fixture/runtime@1.2.3']
+  );
+  assert.equal(sbom.metadata.component.version, sha);
+});
+
+test('explains a pnpm store without package index files instead of a bare exit 1', t => {
+  // Real pnpm against the real installed tree with an empty store: the exact
+  // release shape of an exact node_modules cache hit (JOV-6726).
+  if (!existsSync(resolve(repoRoot, 'node_modules/.modules.yaml'))) {
+    t.skip('workspace dependencies are not installed');
+    return;
+  }
+  const store = mkdtempSync(resolve(tmpdir(), 'jovie-empty-store-'));
+  t.after(() => rmSync(store, { recursive: true, force: true }));
+  const output = resolve(store, 'sbom.cdx.json');
+  assert.throws(
+    () =>
+      generateSbom(repoRoot, 'c'.repeat(40), output, {
+        env: { ...process.env, npm_config_store_dir: store },
+      }),
+    error =>
+      /pnpm store populated by the same install as node_modules/.test(
+        error.message
+      ) &&
+      /package_cache: 'false'/.test(error.message) &&
+      /ERR_PNPM_MISSING_PACKAGE_INDEX_FILE: Failed to find package index file/.test(
+        error.message
+      )
+  );
+  assert.equal(existsSync(output), false);
+});
+
+test('reports other pnpm license failures with their diagnostic', t => {
+  const { dir, pnpm } = fakePnpm(
+    t,
+    "process.stderr.write('registry unreachable\\n'); process.exit(1);"
+  );
+  assert.throws(
+    () =>
+      generateSbom(repoRoot, 'd'.repeat(40), resolve(dir, 'sbom.json'), {
+        pnpm,
+      }),
+    /pnpm licenses list failed: registry unreachable/
   );
 });
 
@@ -467,4 +600,28 @@ test('workflow records inputs before build and binds inspected deployment before
   );
   assert.match(job, /if-no-files-found: error/);
   assert.ok(!job.includes('production-input-provenance/**'));
+});
+
+test('production controller waits longer for the staging receipt than staging takes and fits its job timeout', () => {
+  const workflow = readFileSync(
+    resolve(
+      fileURLToPath(import.meta.url),
+      '../../workflows/production-controller.yml'
+    ),
+    'utf8'
+  );
+  const attempts = Number(
+    workflow.match(
+      /for attempt in \$\(seq 1 (\d+)\); do\n\s+staging_artifact_id/
+    )?.[1]
+  );
+  const job = workflow.slice(workflow.indexOf('  authorize-production:'));
+  const timeout = Number(job.match(/timeout-minutes: (\d+)/)?.[1]);
+  const waitMinutes = (attempts * 10) / 60;
+  // Staging took ~20 min end to end on 2026-09-29; a 10 min wait failed valid releases.
+  assert.ok(waitMinutes >= 20, `wait ${waitMinutes}m`);
+  assert.ok(
+    timeout >= waitMinutes + 5,
+    `timeout ${timeout}m vs wait ${waitMinutes}m`
+  );
 });

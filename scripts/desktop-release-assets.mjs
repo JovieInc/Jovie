@@ -25,13 +25,19 @@ function invariant(condition, message) {
   }
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const [command, ...rest] = argv;
   const args = {};
-  for (let index = 0; index < rest.length; index += 2) {
+  for (let index = 0; index < rest.length; index += 1) {
     const name = rest[index];
-    const value = rest[index + 1];
-    invariant(name?.startsWith('--') && value, `Malformed argument: ${name}`);
+    invariant(name?.startsWith('--'), `Malformed argument: ${name}`);
+    const equals = name.indexOf('=');
+    if (equals !== -1) {
+      args[name.slice(2, equals)] = name.slice(equals + 1);
+      continue;
+    }
+    const value = rest[++index];
+    invariant(value, `Malformed argument: ${name}`);
     args[name.slice(2)] = value;
   }
   return { args, command };
@@ -1258,14 +1264,9 @@ export async function uploadAndPublish({
     version,
     draft: true,
   });
-  if (environment === 'staging') {
-    await client.assertMainlineAncestor(releaseSha);
-  } else {
-    invariant(
-      (await client.currentMainSha()) === releaseSha,
-      'Desktop generation was superseded before release publication.'
-    );
-  }
+  // Forward-only for both channels: a verified generation main has since
+  // advanced past still publishes; a rewound or diverged one never does.
+  await client.assertMainlineAncestor(releaseSha);
 
   release = await client.publishRelease(release.id, environment, version);
   validateReleaseAssets({

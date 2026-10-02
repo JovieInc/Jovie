@@ -41,6 +41,12 @@ export interface ParsedArtistCredit {
   isPrimary: boolean;
   /** Spotify ID if available */
   spotifyId?: string;
+  /** Apple Music ID if available */
+  appleMusicId?: string;
+  /** Provider role before an explicit title role resolved the canonical role. */
+  observedRole?: ArtistRole;
+  /** Evidence used to resolve the canonical role. */
+  roleSource?: 'provider_artist' | 'title';
   /** Image URL if available */
   imageUrl?: string;
 }
@@ -273,26 +279,42 @@ function extractValidRemixerName(segment: string): string | null {
   return cleanedPart;
 }
 
-function appendUniqueCredits(
-  existingCredits: ParsedArtistCredit[],
-  nextCredits: ParsedArtistCredit[],
-  startPosition: number
-): number {
-  const existingNormalized = new Set(
-    existingCredits.map(a => normalizeArtistName(a.name))
+function applyExplicitRoles(
+  mainCredits: ParsedArtistCredit[],
+  explicitCredits: ParsedArtistCredit[]
+): ParsedArtistCredit[] {
+  const explicitNames = new Set(
+    explicitCredits.map(credit => normalizeArtistName(credit.name))
   );
+  const mainIdentityByName = new Map(
+    mainCredits.map(credit => [normalizeArtistName(credit.name), credit])
+  );
+  const keptMainCredits = mainCredits.filter(
+    credit => !explicitNames.has(normalizeArtistName(credit.name))
+  );
+  const seenExplicitRoles = new Set<string>();
+  const keptExplicitCredits: ParsedArtistCredit[] = [];
 
-  let nextPosition = startPosition;
-  for (const credit of nextCredits) {
-    const normalized = normalizeArtistName(credit.name);
-    if (existingNormalized.has(normalized)) continue;
+  for (const credit of explicitCredits) {
+    const normalizedName = normalizeArtistName(credit.name);
+    const mainCredit = mainIdentityByName.get(normalizedName);
+    const identity =
+      mainCredit?.spotifyId ?? mainCredit?.appleMusicId ?? normalizedName;
+    const roleKey = `${credit.role}:${identity}`;
+    if (seenExplicitRoles.has(roleKey)) continue;
+    seenExplicitRoles.add(roleKey);
 
-    existingNormalized.add(normalized);
-    credit.position = nextPosition++;
-    existingCredits.push(credit);
+    keptExplicitCredits.push({
+      ...credit,
+      spotifyId: mainCredit?.spotifyId ?? credit.spotifyId,
+      appleMusicId: mainCredit?.appleMusicId ?? credit.appleMusicId,
+      observedRole: mainCredit ? 'main_artist' : credit.observedRole,
+    });
   }
 
-  return nextPosition;
+  return [...keptMainCredits, ...keptExplicitCredits].map(
+    (credit, position) => ({ ...credit, position })
+  );
 }
 
 // ============================================================================
@@ -596,22 +618,34 @@ export function parseArtistCredits(
   trackTitle: string,
   spotifyArtists: SpotifyArtistInput[]
 ): ParsedArtistCredit[] {
-  const allCredits = parseMainArtists(spotifyArtists);
+  const mainCredits = parseMainArtists(spotifyArtists).map(credit => ({
+    ...credit,
+    roleSource: 'provider_artist' as const,
+  }));
+  const explicitCredits = [
+    ...extractFeatured(trackTitle),
+    ...extractWith(trackTitle),
+    ...extractRemixers(trackTitle),
+  ].map(credit => ({ ...credit, roleSource: 'title' as const }));
 
-  let nextPosition = allCredits.length;
-  nextPosition = appendUniqueCredits(
-    allCredits,
-    extractFeatured(trackTitle),
-    nextPosition
-  );
-  nextPosition = appendUniqueCredits(
-    allCredits,
-    extractWith(trackTitle),
-    nextPosition
-  );
-  appendUniqueCredits(allCredits, extractRemixers(trackTitle), nextPosition);
+  return applyExplicitRoles(mainCredits, explicitCredits);
+}
 
-  return allCredits;
+/**
+ * Normalize a provider display artist line together with its title roles.
+ * The provider line has no stable per-artist IDs, so exact title-role evidence
+ * determines role without inventing an identity or using fuzzy name matching.
+ */
+export function parseArtistCreditsFromArtistLine(
+  trackTitle: string,
+  artistLine: string
+): ParsedArtistCredit[] {
+  return parseArtistCredits(
+    trackTitle,
+    splitByConjunction(artistLine).map(name => ({ id: '', name }))
+  ).map(({ spotifyId, ...credit }) =>
+    spotifyId ? { ...credit, spotifyId } : credit
+  );
 }
 
 /**

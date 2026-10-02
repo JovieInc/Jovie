@@ -1,5 +1,6 @@
 import { Button } from '@jovie/ui';
 import { Check, Minus } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   FaqSection,
@@ -7,8 +8,8 @@ import {
   MarketingHero,
 } from '@/components/marketing';
 import { APP_NAME } from '@/constants/app';
-import { APP_ROUTES } from '@/constants/routes';
 import type { ComparisonData } from '@/content/comparisons';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 
 interface ComparisonPageContentProps {
   readonly data: ComparisonData;
@@ -17,9 +18,25 @@ interface ComparisonPageContentProps {
 export function ComparisonPageContent({
   data,
 }: Readonly<ComparisonPageContentProps>) {
+  const freeOffer = getPublicPriceClaim('free');
+
   return (
     <>
-      <MarketingHero variant='left'>
+      <MarketingHero
+        variant='left'
+        className='marketing-hero-dock relative overflow-hidden'
+      >
+        <div className='absolute inset-0 -z-10' aria-hidden='true'>
+          <Image
+            fill
+            priority
+            sizes='100vw'
+            src={data.heroImage.src}
+            alt={data.heroImage.alt}
+            className='object-cover opacity-25'
+          />
+          <div className='absolute inset-0 bg-gradient-to-b from-base via-(--color-bg-base)/70 to-base' />
+        </div>
         <p className='text-sm font-medium text-tertiary-token'>Compare</p>
         <h1 className='mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
           {data.heroHeadline}
@@ -34,7 +51,12 @@ export function ComparisonPageContent({
           <h2 className='text-2xl font-semibold text-primary-token'>
             Feature Comparison
           </h2>
-          <div className='mt-8 overflow-x-auto'>
+          <section
+            className='mt-8 overflow-x-auto'
+            aria-label={`${APP_NAME} vs ${data.competitor} feature comparison`}
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region needs a keyboard entry point for native scrolling (axe scrollable-region-focusable)
+            tabIndex={0}
+          >
             <table className='w-full text-sm'>
               <thead>
                 <tr className='border-b border-border-primary'>
@@ -102,7 +124,7 @@ export function ComparisonPageContent({
                 ))}
               </tbody>
             </table>
-          </div>
+          </section>
         </section>
       </MarketingContainer>
 
@@ -116,7 +138,9 @@ export function ComparisonPageContent({
           </p>
           <div className='mt-8'>
             <Button asChild variant='primary' size='lg'>
-              <Link href={APP_ROUTES.SIGNUP}>Try {APP_NAME} Free</Link>
+              <Link href={freeOffer.ctaHref} data-claim-id='jovie.free-profile'>
+                {freeOffer.ctaLabel}
+              </Link>
             </Button>
           </div>
         </section>

@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { APP_ROUTES } from '@/constants/routes';
-import { HeaderNav } from './HeaderNav';
+import { HeaderNav, type HeaderNavProps } from './HeaderNav';
 
-const meta: Meta<typeof HeaderNav> = {
+const meta: Meta<HeaderNavProps> = {
   title: 'Organisms/HeaderNav',
   component: HeaderNav,
   parameters: {

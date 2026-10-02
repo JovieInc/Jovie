@@ -73,7 +73,7 @@ describe('homepage-optical-polish-v1', () => {
 
     const close = read('components/homepage/HomepageClose.tsx');
     expect(close).not.toContain('HeroSpotifySearch');
-    expect(close).toContain("getElementById('homepage-name-search')");
+    expect(close).toContain("getElementById('homepage-claim-handle')");
     expect(close).toContain('?.focus()');
     expect(
       findChromeOverrideViolations(
@@ -122,14 +122,14 @@ describe('homepage-optical-polish-v1', () => {
     expect(search).toContain("size='marketing'");
   });
 
-  it('names proof, text, product, and close spacing treatments', () => {
+  it('keeps landed visual chapters on product rhythm and preserves close spacing', () => {
     const sections = read('components/homepage/HomepageCertifiedSections.tsx');
     const close = read('components/homepage/HomepageClose.tsx');
     const certifiedCss = readCertifiedCss();
 
     expect(sections).not.toContain("data-rhythm='proof'");
     expect(sections).toContain("rhythm='product'");
-    expect(sections).toContain("rhythm='text'");
+    expect(sections).not.toContain("rhythm='text'");
     expect(close).toContain("data-rhythm='close'");
     expect(certifiedCss).toContain('--homepage-rhythm-proof:');
     expect(certifiedCss).toContain('--homepage-rhythm-text:');
@@ -141,8 +141,8 @@ describe('homepage-optical-polish-v1', () => {
     expect(certifiedCss).toMatch(
       /\.homepage-certified-proof__logos\s*\{[\s\S]*?margin-top:\s*0;/
     );
-    expect(certifiedCss).toContain('.homepage-connected-artwork');
-    expect(certifiedCss).toContain('.homepage-relationship-outcomes');
+    // Pen My0zu (JOV-6946): the relationships beat shows real next steps.
+    expect(certifiedCss).toContain('.homepage-next-steps');
   });
 
   it('kills the elliptical wireframe and the 55% horizon line', () => {

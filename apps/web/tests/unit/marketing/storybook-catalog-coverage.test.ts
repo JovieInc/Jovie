@@ -214,9 +214,9 @@ describe('marketing Storybook catalog coverage (JOV-4420)', () => {
     expect(stubs.length).toBeGreaterThan(0);
   });
 
-  it('section id list floor remains 17 (registry contract)', () => {
-    expect(MARKETING_SECTION_IDS).toHaveLength(17);
+  it('section id list includes the 18 registered sections', () => {
+    expect(MARKETING_SECTION_IDS).toHaveLength(18);
     const unique = new Set<MarketingSectionId>(MARKETING_SECTION_IDS);
-    expect(unique.size).toBe(17);
+    expect(unique.size).toBe(18);
   });
 });

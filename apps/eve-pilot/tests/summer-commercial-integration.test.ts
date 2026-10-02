@@ -99,9 +99,9 @@ describe('persisted Summer commercial observation', () => {
         `summer-shadow/receipts/${summerShadowKey('event-0001')}.json`
       );
       expect(stored?.commercialProjection).toMatchObject({
-        selectedCandidateId: 'thumbnails',
+        selectedCandidateId: 'lyb-sales',
       });
-      expect(input.message).toContain('"selectedCandidateId":"thumbnails"');
+      expect(input.message).toContain('"selectedCandidateId":"lyb-sales"');
       expect(input.message).toContain('not independently verified facts');
       expect(input.message).toContain('Never dispatch work');
       return { sessionId: 'ses_commercial' };
@@ -114,7 +114,7 @@ describe('persisted Summer commercial observation', () => {
     expect(persisted.consumption).toBe(
       'eve_session_accepted; model_decision_unverified'
     );
-    expect(persisted.currentProjection.selectedCandidateId).toBe('thumbnails');
+    expect(persisted.currentProjection.selectedCandidateId).toBe('lyb-sales');
     expect((await handler()(event())).status).toBe(409);
     const input = snapshot();
     input.candidates.push({
@@ -143,7 +143,7 @@ describe('persisted Summer commercial observation', () => {
     const stale = await (await staleReadback(request(), 'event-0001')).json();
     expect(stale.currentProjection.verdict).toBe('hold');
     expect(stale.receipt.commercialProjection.selectedCandidateId).toBe(
-      'thumbnails'
+      'lyb-sales'
     );
   });
   it('does not claim a consumed decision after failed dispatch or tampered projection', async () => {

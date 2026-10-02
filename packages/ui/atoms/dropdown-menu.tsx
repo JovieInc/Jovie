@@ -16,6 +16,7 @@ import {
   OVERLAY_COLLISION_PADDING,
   OVERLAY_SIDE_OFFSET,
   subMenuContentClasses,
+  submenuViewportFitStyle,
 } from '../lib/dropdown-styles';
 import { cn } from '../lib/utils';
 
@@ -65,6 +66,7 @@ const DropdownMenuSubContent = React.forwardRef<
       disablePortal = false,
       sideOffset = OVERLAY_SIDE_OFFSET,
       collisionPadding = OVERLAY_COLLISION_PADDING,
+      style,
       ...props
     },
     ref
@@ -74,6 +76,7 @@ const DropdownMenuSubContent = React.forwardRef<
         ref={ref}
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}
+        style={{ ...submenuViewportFitStyle('dropdown-menu'), ...style }}
         className={cn(
           subMenuContentClasses,
           DROPDOWN_TRANSFORM_ORIGIN,

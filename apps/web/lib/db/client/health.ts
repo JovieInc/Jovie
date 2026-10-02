@@ -47,6 +47,12 @@ const TABLE_EXISTENCE_CACHE_TTL_MS = 60_000;
 // Neon cold starts can take 10-15s, so use a 15s timeout to avoid false negatives.
 const TABLE_EXISTS_TIMEOUT_MS = 15_000;
 
+// Timeout for each validateDbConnection attempt. Health probes (deploy gate,
+// Vercel checks) run inside a 30s serverless budget, so a stalled socket must
+// fail fast and retry instead of hanging until the platform kills the function.
+const CONNECTION_VALIDATION_TIMEOUT_MS = 10_000;
+const CONNECTION_VALIDATION_MAX_ATTEMPTS = 2;
+
 function clearExistenceCachesIfDatabaseChanged() {
   if (env.DATABASE_URL && env.DATABASE_URL !== lastTableExistenceDatabaseUrl) {
     tableExistenceCache.clear();
@@ -307,8 +313,23 @@ export async function validateDbConnection(): Promise<ConnectionValidationResult
   try {
     const db = getDb();
     await withRetry(
-      () => db.execute(drizzleSql`SELECT 1`),
-      'startupConnection'
+      () =>
+        Promise.race([
+          db.execute(drizzleSql`SELECT 1`),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error(
+                    `validateDbConnection timeout after ${CONNECTION_VALIDATION_TIMEOUT_MS}ms`
+                  )
+                ),
+              CONNECTION_VALIDATION_TIMEOUT_MS
+            )
+          ),
+        ]),
+      'startupConnection',
+      CONNECTION_VALIDATION_MAX_ATTEMPTS
     );
 
     const latency = Date.now() - startTime;

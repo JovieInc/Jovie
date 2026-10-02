@@ -178,11 +178,17 @@ describe('supply chain provenance guardrails', () => {
     expect(aliasJob).toContain(
       'needs: [deploy-staging, canary-health-gate, staging-head]'
     );
+    // Production admission is decoupled from staging freshness (JOV-5935):
+    // the production controller validates the exact attested staging receipt
+    // and passes staging_verified into this workflow, so promote-production is
+    // gated on the controller's admission plus the current main head and the
+    // production migration, not on in-run staging jobs.
     expect(promoteJob).toContain(
-      'needs: [deploy-staging, attest-staging-build, canary-health-gate, alias-staging, production-head, migrate-production]'
+      'needs: [production-head, migrate-production]'
     );
+    expect(promoteJob).toContain('inputs.staging_verified');
     expect(promoteJob).toContain(
-      "needs.attest-staging-build.result == 'success'"
+      "needs.production-head.outputs.is_current == 'true'"
     );
     expect(promoteJob).toContain(
       "needs.migrate-production.result == 'success'"

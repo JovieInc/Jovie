@@ -24,7 +24,7 @@ export const PRESENCE_BUILD_TOOL_NAMES = {
 
 export const PRESENCE_BUILD_STEP_LABELS = {
   research_artist: 'Research Artist',
-  surface_library_opportunities: 'Surface Library Opportunities',
+  surface_library_opportunities: 'Surface Work Opportunities',
   assemble_profile: 'Assemble Profile',
   generate_smart_link: 'Generate Smart Link',
   draft_welcome_post: 'Draft Welcome Post',

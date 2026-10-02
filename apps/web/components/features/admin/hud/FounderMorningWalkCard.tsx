@@ -5,6 +5,7 @@ import { Circle, Square } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { useAuthSafe } from '@/hooks/useJovieAuth';
 import {
   canRecordScreen,
   type ScreenRecordingSession,
@@ -17,37 +18,46 @@ type WalkPhase = 'idle' | 'recording' | 'uploading';
 
 export function FounderMorningWalkCard(props: {
   readonly defaultStatus: string;
+  /** Render as a single action row for the cockpit utility strip. */
+  readonly compact?: boolean;
 }) {
+  const { userId } = useAuthSafe();
   const [phase, setPhase] = useState<WalkPhase>('idle');
   const [lastUrl, setLastUrl] = useState<string | null>(null);
   const sessionRef = useRef<ScreenRecordingSession | null>(null);
 
-  const finishUpload = useCallback(async (session: ScreenRecordingSession) => {
-    setPhase('uploading');
-    try {
-      const recording = await session.stop();
-      const uploaded = await uploadAccountVideo(recording.file);
-      const confirm = await fetch(FOUNDER_WALK_CONFIRM_PATH, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          blobUrl: uploaded.url,
-          durationMs: recording.durationMs,
-          byteSize: recording.byteSize,
-        }),
-      });
-      if (!confirm.ok) {
-        throw new Error('Walk confirm failed');
+  const finishUpload = useCallback(
+    async (session: ScreenRecordingSession) => {
+      setPhase('uploading');
+      try {
+        const recording = await session.stop();
+        const uploaded = await uploadAccountVideo(
+          recording.file,
+          userId ?? 'unknown'
+        );
+        const confirm = await fetch(FOUNDER_WALK_CONFIRM_PATH, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            blobUrl: uploaded.url,
+            durationMs: recording.durationMs,
+            byteSize: recording.byteSize,
+          }),
+        });
+        if (!confirm.ok) {
+          throw new Error('Walk confirm failed');
+        }
+        setLastUrl(uploaded.url);
+        toast.success('Walk stored. Nothing admitted until it is classified.');
+      } catch {
+        toast.error('Could not store the walk. Try again.');
+      } finally {
+        sessionRef.current = null;
+        setPhase('idle');
       }
-      setLastUrl(uploaded.url);
-      toast.success('Walk stored. Nothing admitted until it is classified.');
-    } catch {
-      toast.error('Could not store the walk. Try again.');
-    } finally {
-      sessionRef.current = null;
-      setPhase('idle');
-    }
-  }, []);
+    },
+    [userId]
+  );
 
   const startRecording = useCallback(async () => {
     if (!canRecordScreen()) {
@@ -68,6 +78,49 @@ export function FounderMorningWalkCard(props: {
     if (!session) return;
     void finishUpload(session);
   }, [finishUpload]);
+
+  if (props.compact) {
+    return (
+      <div
+        className='flex items-center gap-2'
+        data-testid='founder-morning-walk'
+      >
+        {phase === 'recording' ? (
+          <Button
+            type='button'
+            size='sm'
+            variant='secondary'
+            onClick={stopRecording}
+          >
+            <Square className='h-3.5 w-3.5' aria-hidden='true' />
+            Stop Walk
+          </Button>
+        ) : (
+          <Button
+            type='button'
+            size='sm'
+            variant='secondary'
+            onClick={() => void startRecording()}
+            disabled={phase === 'uploading'}
+            title={props.defaultStatus}
+          >
+            <Circle className='h-3.5 w-3.5 fill-current' aria-hidden='true' />
+            {phase === 'uploading' ? 'Storing…' : 'Record walk'}
+          </Button>
+        )}
+        {lastUrl ? (
+          <a
+            href={lastUrl}
+            className='truncate text-2xs text-secondary-token underline'
+            target='_blank'
+            rel='noreferrer'
+          >
+            Last walk
+          </a>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <ContentSurfaceCard className='p-3' data-testid='founder-morning-walk'>

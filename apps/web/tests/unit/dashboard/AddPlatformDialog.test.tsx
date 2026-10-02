@@ -110,8 +110,14 @@ describe('AddPlatformDialog', () => {
       url: 'https://open.spotify.com/artist/123',
       artistName: 'Midnight Echo',
     });
-    expect(screen.getByRole('alert')).toHaveTextContent('URL must use HTTPS');
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('URL must use HTTPS');
     expect(toastSuccessMock).not.toHaveBeenCalled();
+
+    // JOV-6773: the inline validation error renders on the error token,
+    // not raw red-*.
+    expect(alert.className).toContain('text-error');
+    expect(alert.className).not.toMatch(/\bred-\d/);
   });
 
   it('updates the inline error when the form is resubmitted with new input', async () => {

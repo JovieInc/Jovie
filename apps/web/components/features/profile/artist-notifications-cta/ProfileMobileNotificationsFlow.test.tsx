@@ -1,7 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { COUNTRY_OPTIONS } from '@/features/profile/notifications';
 import { ProfileMobileNotificationsFlow } from './ProfileMobileNotificationsFlow';
+
+// Exercise the actual initial frame; the global Motion stub drops its wrapper.
+vi.unmock('motion/react');
 
 function renderFlow(
   overrides: Partial<Parameters<typeof ProfileMobileNotificationsFlow>[0]> = {}
@@ -60,10 +65,50 @@ function renderFlow(
 }
 
 describe('ProfileMobileNotificationsFlow', () => {
+  it.each(['overlay', 'modal'] as const)(
+    'names the %s dialog for the artist whose updates are being requested',
+    presentation => {
+      renderFlow({ presentation, step: 'email' });
+
+      expect(
+        screen.getByRole('dialog', { name: 'Get Updates from Tim White' })
+      ).toHaveAttribute('aria-modal', 'true');
+    }
+  );
+
+  it('keeps the inline flow outside modal dialog semantics', () => {
+    renderFlow({ presentation: 'inline', step: 'email' });
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('makes the capture screen immediately visible without a sliding transition', () => {
+    renderFlow({ step: 'email' });
+
+    const captureStep = screen.getByTestId(
+      'profile-mobile-notifications-step-email'
+    );
+    expect(captureStep).toBeVisible();
+    expect(getComputedStyle(captureStep).transform).not.toContain('translate');
+  });
+
   it('labels the event preference with the generalized Events copy', () => {
     renderFlow();
 
     expect(screen.getAllByText('Events').length).toBeGreaterThan(0);
     expect(screen.queryByText('Shows')).toBeNull();
+  });
+
+  it('renders alert text with the error token, not raw red-* (JOV-6773)', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/profile/artist-notifications-cta/ProfileMobileNotificationsFlow.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/\bred-\d/);
+    expect(source).toContain('text-error');
   });
 });

@@ -1,0 +1,232 @@
+'use client';
+
+// @coverage-via apps/web/tests/unit/components/organisms/DesktopTitlebar.test.tsx
+
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import type { CSSProperties } from 'react';
+import { useContext } from 'react';
+import { RailToggleButton } from '@/components/atoms/RailToggleButton';
+import { SidebarContext } from '@/components/organisms/sidebar/context';
+import { SIDEBAR_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useSidebarKeyboardShortcut';
+import {
+  type DesktopBuildIdentity,
+  useDesktopBuildIdentity,
+  useDesktopNavigation,
+  useIsElectronRuntime,
+} from '@/lib/desktop/electron-bridge';
+import { cn } from '@/lib/utils';
+
+const DESKTOP_CHANNEL_LABELS = {
+  production: 'Stable',
+  staging: 'Canary',
+  local: 'Local',
+} as const;
+
+const DESKTOP_VERSION =
+  /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+const STAGING_DESKTOP_VERSION = /^\d+\.\d+\.\d+-staging\.[1-9]\d*\.[1-9]\d*$/;
+const FULL_SOURCE_REVISION = /^[0-9a-f]{40}$/;
+
+type DesktopChannel = keyof typeof DESKTOP_CHANNEL_LABELS;
+
+interface DesktopReleaseIdentityLabel {
+  readonly ariaLabel: string;
+  readonly provenance: 'identified' | 'unverified';
+  readonly visibleLabel: string;
+}
+
+function isDesktopChannel(value: string | undefined): value is DesktopChannel {
+  return value !== undefined && value in DESKTOP_CHANNEL_LABELS;
+}
+
+function isTrustedDesktopIdentity(
+  identity: DesktopBuildIdentity | undefined
+): identity is DesktopBuildIdentity {
+  if (
+    identity?.provenance !== 'verified' &&
+    identity?.provenance !== 'development'
+  ) {
+    return false;
+  }
+  if (!isDesktopChannel(identity.channel)) return false;
+  const validVersion =
+    identity.channel === 'staging'
+      ? STAGING_DESKTOP_VERSION.test(identity.version)
+      : /^\d+\.\d+\.\d+$/.test(identity.version);
+  if (!validVersion) return false;
+  if (
+    identity.sourceRevision !== null &&
+    !FULL_SOURCE_REVISION.test(identity.sourceRevision)
+  ) {
+    return false;
+  }
+  if (identity.provenance === 'verified') {
+    if (
+      identity.channel === 'local' ||
+      identity.sourceRevision === null ||
+      identity.builtAt === null
+    ) {
+      return false;
+    }
+    const parsedBuiltAt = Date.parse(identity.builtAt);
+    return (
+      Number.isFinite(parsedBuiltAt) &&
+      new Date(parsedBuiltAt).toISOString() === identity.builtAt
+    );
+  }
+  return identity.builtAt === null;
+}
+
+function readDesktopReleaseIdentity(
+  bridgeIdentity: DesktopBuildIdentity | undefined
+): DesktopReleaseIdentityLabel {
+  const trustedBridgeIdentity = isTrustedDesktopIdentity(bridgeIdentity)
+    ? bridgeIdentity
+    : undefined;
+  const channel = trustedBridgeIdentity?.channel;
+  const channelLabel = isDesktopChannel(channel)
+    ? DESKTOP_CHANNEL_LABELS[channel]
+    : 'Desktop';
+  const version = trustedBridgeIdentity?.version;
+  const hasVersion =
+    typeof version === 'string' && DESKTOP_VERSION.test(version);
+  const versionLabel = hasVersion ? version : 'Version Unknown';
+  const sourceRevision = trustedBridgeIdentity?.sourceRevision ?? undefined;
+  const hasSourceRevision =
+    typeof sourceRevision === 'string' &&
+    FULL_SOURCE_REVISION.test(sourceRevision);
+  const sourceLabel = hasSourceRevision
+    ? sourceRevision.slice(0, 7)
+    : 'Unverified';
+  const provenance =
+    isDesktopChannel(channel) && hasVersion && hasSourceRevision
+      ? 'identified'
+      : 'unverified';
+
+  return {
+    ariaLabel: `${channelLabel} environment, version ${hasVersion ? version : 'unknown'}, source revision ${hasSourceRevision ? sourceRevision : 'unverified'}`,
+    provenance,
+    visibleLabel: `${channelLabel} · ${versionLabel} · ${sourceLabel}`,
+  };
+}
+
+interface DesktopReleaseIdentityProps {
+  readonly className?: string;
+}
+
+/** Secondary diagnostics label. Native and web revisions stay distinct. */
+export function DesktopReleaseIdentity({
+  className,
+}: DesktopReleaseIdentityProps) {
+  const isDesktop = useIsElectronRuntime();
+  const identity = useDesktopBuildIdentity();
+  const releaseIdentity = readDesktopReleaseIdentity(identity);
+  if (!isDesktop) return null;
+  return (
+    <span
+      aria-label={releaseIdentity.ariaLabel}
+      className={cn(
+        'pointer-events-none max-w-64 shrink truncate text-2xs font-medium tabular-nums text-tertiary-token',
+        className
+      )}
+      data-provenance={releaseIdentity.provenance}
+      data-testid='electron-release-identity'
+      role='status'
+      title={releaseIdentity.ariaLabel}
+    >
+      {releaseIdentity.visibleLabel}
+    </span>
+  );
+}
+
+/** Desktop-only controls share the page header's top row. */
+export function DesktopTitlebar() {
+  const isDesktop = useIsElectronRuntime();
+  const { canGoBack, canGoForward, goBack, goForward } = useDesktopNavigation();
+  // useContext (not useSidebar) so this is safe outside SidebarProvider (e.g. demo shell)
+  const sidebarCtx = useContext(SidebarContext);
+  const sidebarOpen = sidebarCtx?.state === 'open';
+  const toggleSidebar = sidebarCtx?.toggleSidebar;
+  const isMobile = sidebarCtx?.isMobile === true;
+  const sidebarToggleOpen = isMobile
+    ? sidebarCtx?.openMobile === true
+    : sidebarOpen;
+
+  return (
+    <div
+      data-electron-titlebar='true'
+      data-main-header-inset={!sidebarOpen || isMobile ? 'true' : undefined}
+      data-electron-collapsed-rail={
+        !sidebarOpen && !isMobile ? 'icon' : undefined
+      }
+      data-testid='electron-titlebar-row'
+      data-electron-drag-region='true'
+      style={{ WebkitAppRegion: 'drag' } as CSSProperties}
+    >
+      {isDesktop ? (
+        <div
+          data-testid='electron-titlebar-sidebar-cell'
+          className='flex w-full min-w-0 items-center gap-1.5 px-2.5'
+        >
+          <div
+            data-testid='electron-traffic-light-safe-area'
+            className='w-(--electron-traffic-light-safe-width) shrink-0'
+            aria-hidden='true'
+          />
+          {/* Single canonical sidebar toggle for Electron: the same rail
+              control primitive the header uses in the browser. Buttons are
+              no-drag via the Electron drag-region CSS. */}
+          <RailToggleButton
+            side='left'
+            open={sidebarToggleOpen}
+            openLabel='Collapse sidebar'
+            closedLabel='Expand sidebar'
+            onToggle={() => toggleSidebar?.()}
+            disabled={!toggleSidebar}
+            shortcut={SIDEBAR_KEYBOARD_SHORTCUT_BARE}
+            dataTestId='electron-sidebar-toggle'
+            iconTestId='electron-sidebar-toggle-icon'
+          />
+          <div
+            data-testid='electron-nav-pill'
+            className='flex shrink-0 items-center gap-0.5'
+            style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
+          >
+            <button
+              type='button'
+              onClick={goBack}
+              disabled={!canGoBack}
+              aria-label='Go Back'
+              data-testid='electron-nav-back'
+              className={cn(
+                'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-secondary-token',
+                'transition-colors duration-subtle',
+                'hover:bg-white/[0.06] hover:text-primary-token',
+                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
+                'disabled:pointer-events-none disabled:opacity-30'
+              )}
+            >
+              <ChevronLeft className='h-3.5 w-3.5' strokeWidth={2} />
+            </button>
+            <button
+              type='button'
+              onClick={goForward}
+              disabled={!canGoForward}
+              aria-label='Go Forward'
+              data-testid='electron-nav-forward'
+              className={cn(
+                'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-secondary-token',
+                'transition-colors duration-subtle',
+                'hover:bg-white/[0.06] hover:text-primary-token',
+                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
+                'disabled:pointer-events-none disabled:opacity-30'
+              )}
+            >
+              <ChevronRight className='h-3.5 w-3.5' strokeWidth={2} />
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}

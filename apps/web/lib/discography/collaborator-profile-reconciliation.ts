@@ -11,6 +11,7 @@ import {
   or,
 } from 'drizzle-orm';
 import { invalidateProfileCache } from '@/lib/cache/profile';
+import { admitCreatorUsername } from '@/lib/canonical/creator-username';
 import type { DbOrTransaction } from '@/lib/db';
 import { db } from '@/lib/db';
 import {
@@ -146,11 +147,16 @@ async function getCreditedArtistCandidates(
   };
 }
 
+interface OwnerBindingOutcome {
+  readonly status: 'bound' | 'requires_verified_merge';
+  readonly collision?: 'profile' | 'registry';
+}
+
 async function bindOwnerRegistryArtist(
   tx: DbOrTransaction,
   creatorProfileId: string,
   spotifyId: string
-): Promise<void> {
+): Promise<OwnerBindingOutcome> {
   await lockSpotifyProfileIdentity(tx, spotifyId);
 
   const [otherExactProfile] = await tx
@@ -164,9 +170,7 @@ async function bindOwnerRegistryArtist(
     )
     .limit(1);
   if (otherExactProfile) {
-    throw new Error(
-      'Owner Spotify identity requires an explicit verified profile merge'
-    );
+    return { status: 'requires_verified_merge', collision: 'profile' };
   }
 
   const [otherRegistryBinding] = await tx
@@ -181,9 +185,7 @@ async function bindOwnerRegistryArtist(
     )
     .limit(1);
   if (otherRegistryBinding) {
-    throw new Error(
-      'Owner registry identity requires an explicit verified profile merge'
-    );
+    return { status: 'requires_verified_merge', collision: 'registry' };
   }
 
   await tx
@@ -192,12 +194,18 @@ async function bindOwnerRegistryArtist(
     .where(
       and(eq(artists.spotifyId, spotifyId), isNull(artists.creatorProfileId))
     );
+
+  return { status: 'bound' };
 }
 
 async function markArtistProfileConflict(
   tx: DbOrTransaction,
   artist: LockedRegistryArtist,
-  reason: 'duplicate_profiles' | 'handle_collision' | 'profile_insert'
+  reason:
+    | 'duplicate_profiles'
+    | 'handle_collision'
+    | 'profile_insert'
+    | 'implausible_username'
 ): Promise<void> {
   await tx
     .update(artists)
@@ -370,6 +378,26 @@ async function reconcileCandidate(
         handle = buildUnclaimedArtistHandle(candidate.artistId);
       }
 
+      // JOV-5922: the chosen handle must satisfy the versioned semantic
+      // contract before it becomes `creator_profiles.username`. An
+      // implausible value (serialized list, URL, delimiter-joined
+      // candidates, whitespace fragment) is quarantined as a conflict —
+      // never coerced or written to canon.
+      const admission = admitCreatorUsername(handle, {
+        producer: 'collaborator-profile-reconciliation',
+        source: 'spotify_release_credit',
+        confidence: 'inferred',
+      });
+      if (admission.status !== 'accepted' || !admission.canonical) {
+        await markArtistProfileConflict(
+          tx,
+          lockedArtist,
+          'implausible_username'
+        );
+        return { status: 'conflicted' };
+      }
+      const canonicalHandle = admission.canonical;
+
       const [handleOwner] = await tx
         .select({ id: creatorProfiles.id })
         .from(creatorProfiles)
@@ -395,8 +423,8 @@ async function reconcileCandidate(
         .insert(creatorProfiles)
         .values({
           creatorType: 'creator',
-          username: handle,
-          usernameNormalized: handle,
+          username: canonicalHandle,
+          usernameNormalized: canonicalHandle,
           displayName,
           avatarUrl,
           spotifyId: candidate.spotifyId,
@@ -695,9 +723,34 @@ export async function reconcileCreditedArtistProfiles(
     .from(creatorProfiles)
     .where(eq(creatorProfiles.id, creatorProfileId))
     .limit(1);
-  await withSystemIngestionSession(tx =>
+  const ownerBinding = await withSystemIngestionSession(tx =>
     bindOwnerRegistryArtist(tx, creatorProfileId, ownerSpotifyId)
   );
+
+  // JOV-4838: an owner identity collision is a fail-closed guard, not an
+  // error. Skip candidate work and file a named warning so operators can
+  // route the owner through an explicit verified merge — callers must never
+  // see this as an unhandled throw.
+  if (ownerBinding.status === 'requires_verified_merge') {
+    await captureWarning(
+      'Owner identity requires an explicit verified profile merge',
+      undefined,
+      {
+        source: 'spotify_release_credit',
+        creatorProfileId,
+        ownerSpotifyId,
+        collision: ownerBinding.collision,
+      }
+    );
+    return {
+      candidates: 0,
+      created: 0,
+      deferred: false,
+      reused: 0,
+      conflicted: 1,
+      metadataUnavailable: 0,
+    };
+  }
 
   const candidateSelection = await getCreditedArtistCandidates(
     creatorProfileId,

@@ -3,7 +3,7 @@
  *
  * Per the amended charter (E4, DX1), this vitest test rides the existing
  * Unit Tests lane and asserts:
- *   1. route-glob ⇔ manifest bidirectional (every (marketing) + (home) + waitlist route is mapped/exempted)
+ *   1. route-glob ⇔ manifest bidirectional (every (marketing), (home), waitlist, and guarded profile-admission route is mapped/exempted)
  *   2. glob-count floor (catches route-group rename — silent-failure guard)
  *   3. recipeId ∈ registry
  *   4. proven recipes reference a real route (CI refuses proven without reference)
@@ -687,9 +687,9 @@ describe('marketing route manifest integrity', () => {
     expect(pricingReport.actualSectionIds).toEqual([
       'hero',
       'pricing',
-      'social-proof',
       'comparison',
       'cta',
+      'capture',
     ]);
     expect(pricingReport.expectedSectionIds).toEqual([
       'hero',
@@ -708,12 +708,15 @@ describe('marketing route manifest integrity', () => {
       'feature-split',
       'feature-grid',
       'capture',
-      'comparison',
+      'feature-split',
+      'feature-split',
+      'product-gallery',
       'spec-wall',
       'how-it-works',
-      'feature-grid',
+      'product-gallery',
       'faq',
       'cta',
+      'capture',
     ]);
     expect(artistReport.evidenceStatus).toBe('verified');
     expect(artistReport.matches).toBe(false);
@@ -722,7 +725,7 @@ describe('marketing route manifest integrity', () => {
   it('keeps source-verified route bodies explicit even when recipe parity is incomplete', () => {
     for (const [url, expectedParity] of [
       ['/pay', false],
-      ['/support', true],
+      ['/support', false],
       ['/waitlist', false],
     ] as const) {
       const entry = MARKETING_ROUTE_MANIFEST.find(item => item.url === url);
@@ -1535,34 +1538,37 @@ describe('marketing adversarial-review invariants', () => {
 
 // Source inventory checks only. Mounted identity remains the route-health gate.
 describe('current acquisition source inventory (JOV-4065)', () => {
-  it('retains the locked homepage beats and their actual outer-section owners', async () => {
-    const { HOMEPAGE_LAUNCH_COPY } = await import('@/data/homepageLaunchCopy');
+  it('retains the current identity homepage beats and their actual outer-section owners', async () => {
+    const { HOMEPAGE_IDENTITY_COPY } = await import(
+      '@/data/homepageIdentityCopy'
+    );
     const entry = MARKETING_ROUTE_MANIFEST.find(route => route.url === '/')!;
     const bindings = entry.renderedSections.filter(
       binding => binding.kind === 'approved-section'
     );
     expect(entry.specVersion).toBe(MARKETING_SPEC_VERSION);
-    const rows = HOMEPAGE_LAUNCH_COPY.certified.sections;
+    const rows = HOMEPAGE_IDENTITY_COPY.sections;
     expect(bindings.slice(1, -1).map(binding => binding.occurrenceId)).toEqual(
       rows.map(row => row.id)
     );
-    expect(rows.map(row => row.id)).toEqual(['connected', 'relationships']);
+    // Latest founder direction replaces the legacy relationships/changelog page.
+    expect(rows.map(row => row.id)).toEqual(['presence', 'structure']);
     expect(bindings.map(binding => binding.sectionId)).toEqual([
       'hero',
       ...rows.map(() => 'feature-split'),
       'cta',
     ]);
     expect(bindings.map(binding => binding.componentPath)).toEqual([
-      'apps/web/components/homepage/HomepageEditorialHero.tsx',
+      'apps/web/components/homepage/HomepageIdentityHero.tsx',
       ...Array(rows.length).fill(
-        'apps/web/components/homepage/HomepageCertifiedSections.tsx'
+        'apps/web/components/homepage/HomepageIdentitySections.tsx'
       ),
-      'apps/web/components/homepage/HomepageClose.tsx',
+      'apps/web/components/homepage/HomepageIdentityClose.tsx',
     ]);
-    // Source inventory must not clear incomplete root/variant registration.
-    expect(entry.bindingEvidence.status).toBe('unverified');
+    // Source inventory is separate from deployed mounted and visual certification.
+    expect(entry.bindingEvidence.status).toBe('verified');
     expect(bindings.map(binding => binding.variantId)).toEqual([
-      'centered-none',
+      'split-claim-card',
       ...rows.map(() => 'editorial'),
       'editorial-search',
     ]);

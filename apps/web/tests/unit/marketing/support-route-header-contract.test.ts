@@ -35,8 +35,29 @@ describe('support route header contract', () => {
     expect(headerSource).toContain(
       'getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary'
     );
+    // JOV-6860: every marketing-header route shares the waitlist-mode
+    // front-door CTA via the single resolver; no per-route CTA overrides
+    // other than the locked homepage entry.
+    expect(headerSource).toContain('resolveMarketingHeaderPrimaryCta');
+    expect(headerSource).toContain(
+      'getHomepageFrontDoorCtaContract(waitlistEnabled).primary'
+    );
+    expect(headerSource).not.toContain('MARKETING_CTA_INTENTS');
+    expect(headerSource).not.toContain('APP_ROUTES.ARTIST_PROFILES]:');
+    // Homepage conversion lock (JOV-5085): / shows Find yourself -> /start
+    // even while waitlisting; other routes keep the front-door CTA.
+    expect(headerSource).toContain(
+      "[APP_ROUTES.HOME]: { label: 'Find yourself', href: APP_ROUTES.START }"
+    );
     expect(headerSource).toContain("treatment: 'wordmark'");
     expect(headerSource).toContain('MARKETING_NAV_LINKS.map');
+    // Canonical Pen header: the Customers flyout is the only glass flyout.
+    expect(headerSource).toContain(
+      'const MARKETING_GLASS_FLYOUT_MENUS: readonly HeaderFlyoutMenu[] = [\n  MARKETING_CUSTOMERS_FLYOUT,\n];'
+    );
+    expect(headerSource).toContain(
+      'flyoutMenus: MARKETING_GLASS_FLYOUT_MENUS,'
+    );
     expect(headerSource).not.toContain('MARKETING_GLASS_FLYOUTS');
     expect(headerSource).not.toContain('MARKETING_NAV_UTILITIES');
     expect(headerSource).toContain('showContactLink={false}');

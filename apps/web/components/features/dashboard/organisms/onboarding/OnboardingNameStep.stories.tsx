@@ -25,4 +25,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  args: {
+    title: "What's your name?",
+    fullName: 'Mock Artist',
+    namePlaceholder: 'Your name',
+    isValid: true,
+    isTransitioning: false,
+    isSubmitting: false,
+    inputRef: { current: null },
+    onNameChange: () => {},
+    onSubmit: () => {},
+  },
+};

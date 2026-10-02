@@ -61,18 +61,20 @@ function baseline(
   overrides: Partial<Record<ShippingSourceId, AuthorityRead>> = {}
 ): Partial<Record<ShippingSourceId, AuthorityRead>> {
   return {
-    'symphony-runtime': ok('symphony-runtime', {
-      running: [],
-      retrying: [],
-      blocked: [],
+    'lanes-status': ok('lanes-status', {
+      schema: 'symphony-lanes-status/v1',
+      running: 7,
+      idle: 2,
     }),
-    'symphony-task': ok('symphony-task', {
-      running: [],
-      retrying: [],
-      blocked: [],
-    }),
-    'lease-guard-capacity': ok('lease-guard-capacity', {
-      capacity: { available: 2, accounts: 4, locked: 1, cooldown: 1 },
+    'lane-pull-requests': ok('lane-pull-requests', { pullRequests: [] }),
+    'github-merges': ok(
+      'github-merges',
+      { today: 0 },
+      { measuredMeanings: { merged: false } }
+    ),
+    'summer-runtime': ok('summer-runtime', {
+      identity: 'summer',
+      availability: 'up',
     }),
     'github-native-merge-queue': ok('github-native-merge-queue', {
       entries: [],
@@ -101,11 +103,8 @@ function baseline(
         measuredMeanings: { exactLiveBuild: true },
       }
     ),
-    'fleet-receipt': ok(
-      'fleet-receipt',
-      { state: 'GREEN', signals: { main: { sha: SHA } } },
-      { measuredMeanings: { merged: false } }
-    ),
+    'staging-controller': ok('staging-controller', { conclusion: 'success' }),
+    'staging-build-info': ok('staging-build-info', { commitSha: SHA }),
     ...overrides,
   };
 }
@@ -124,7 +123,7 @@ describe('shipping operational task sync', () => {
     resetShippingStatePublisher();
   });
 
-  it('marks a fresh runtime read as fresh and keeps a stopped projection stale', async () => {
+  it('marks a fresh lane PR read as fresh and keeps a stopped projection stale', async () => {
     const fresh = await publish(baseline());
     expect(fresh.operationalTasks.syncState).toBe('fresh');
     expect(fresh.state).toBe('fresh');
@@ -156,22 +155,22 @@ describe('shipping operational task sync', () => {
     expect(cold.operationalTasks.syncState).toBe('failed');
   });
 
-  it('syncs an unknown runtime as syncing and an error runtime as failed', async () => {
+  it('syncs an unknown lane PR read as syncing and an error read as failed', async () => {
     const syncing = await publish(
       baseline({
-        'symphony-runtime': failed('symphony-runtime', 'unknown'),
+        'lane-pull-requests': failed('lane-pull-requests', 'unknown'),
       })
     );
-    expect(syncing.sources['symphony-runtime'].state).toBe('unknown');
+    expect(syncing.sources['lane-pull-requests'].state).toBe('unknown');
     expect(syncing.operationalTasks.syncState).toBe('syncing');
 
     resetShippingStatePublisher();
     const errored = await publish(
       baseline({
-        'symphony-runtime': failed('symphony-runtime', 'error'),
+        'lane-pull-requests': failed('lane-pull-requests', 'error'),
       })
     );
-    expect(errored.sources['symphony-runtime'].state).toBe('error');
+    expect(errored.sources['lane-pull-requests'].state).toBe('error');
     expect(errored.operationalTasks.syncState).toBe('failed');
   });
 });

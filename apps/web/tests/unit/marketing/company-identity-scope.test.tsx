@@ -10,7 +10,7 @@ import {
   AboutPageContent,
 } from '@/components/organisms/AboutPageContent';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
-import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { buildOrganizationSchema } from '@/lib/constants/schemas';
 import {
   ARTIST_LABELED_IDENTITY_SURFACES,
@@ -68,7 +68,7 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
     ).toBe(false);
     expect(
       isArtistOnlyCompanyDefinition(
-        'Jovie was founded by Tim White, a music marketing veteran who ran campaigns for artists like Tory Lanez.'
+        'Jovie was founded by Tim White, a music marketing veteran who ran campaigns for artists like some named artist.'
       )
     ).toBe(false);
   });
@@ -83,12 +83,12 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
   });
 
   it('keeps canonical identity aligned with the approved homepage SEO copy', () => {
-    expect(COMPANY_IDENTITY.seoTitle).toBe(HOMEPAGE_LAUNCH_COPY.seo.title);
+    expect(COMPANY_IDENTITY.seoTitle).toBe(HOMEPAGE_IDENTITY_COPY.seo.title);
     expect(COMPANY_IDENTITY.seoDescription).toBe(
-      HOMEPAGE_LAUNCH_COPY.seo.description
+      HOMEPAGE_IDENTITY_COPY.seo.description
     );
     expect(COMPANY_IDENTITY.homepageHeadline).toBe(
-      HOMEPAGE_LAUNCH_COPY.hero.headline
+      HOMEPAGE_IDENTITY_COPY.hero.headline
     );
   });
 
@@ -102,8 +102,11 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
       })
     ).toBeVisible();
     expect(
-      screen.getByText(COMPANY_IDENTITY.support, { exact: false })
-    ).toBeVisible();
+      screen.getByRole('heading', {
+        level: 1,
+        name: COMPANY_IDENTITY.headline,
+      }).nextElementSibling
+    ).toHaveTextContent(COMPANY_IDENTITY.definition);
     expect(
       screen.getByRole('heading', { level: 3, name: 'For Artists' })
     ).toBeVisible();
@@ -116,7 +119,7 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
 
   it('uses general metadata, Open Graph, and Organization schema on /about', async () => {
     const { metadata } = await import('../../../app/(marketing)/about/page');
-    const expectedTitle = `About — ${COMPANY_IDENTITY.headline.replace(/\.$/, '')}`;
+    const expectedTitle = `About Jovie: ${COMPANY_IDENTITY.headline.replace(/\.$/, '')}`;
 
     expect(metadata.title).toBe(expectedTitle);
     expect(String(metadata.description)).toContain(COMPANY_IDENTITY.definition);

@@ -1,11 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetPlaylistSpotifyClerkUserId } = vi.hoisted(() => ({
+const {
+  mockGetPlaylistSpotifyClerkUserId,
+  mockGetSpotifyConnectorAccount,
+  mockLoadFreshSpotifyAccessToken,
+} = vi.hoisted(() => ({
   mockGetPlaylistSpotifyClerkUserId: vi.fn(),
+  mockGetSpotifyConnectorAccount: vi.fn(),
+  mockLoadFreshSpotifyAccessToken: vi.fn(),
 }));
 
 vi.mock('@/lib/admin/platform-connections', () => ({
   getPlaylistSpotifyClerkUserId: mockGetPlaylistSpotifyClerkUserId,
+  getSpotifyConnectorAccount: mockGetSpotifyConnectorAccount,
+}));
+
+vi.mock('@/lib/connectors/spotify/access-token', () => ({
+  loadFreshSpotifyAccessToken: mockLoadFreshSpotifyAccessToken,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -22,6 +33,8 @@ describe('jovie Spotify account', () => {
     vi.resetModules();
     vi.clearAllMocks();
     vi.unstubAllEnvs();
+    mockGetSpotifyConnectorAccount.mockResolvedValue(null);
+    mockLoadFreshSpotifyAccessToken.mockResolvedValue(null);
   });
 
   it('returns JOVIE_SPOTIFY_ACCESS_TOKEN when set', async () => {
@@ -36,7 +49,7 @@ describe('jovie Spotify account', () => {
     );
   });
 
-  it('throws when no Spotify access token is configured after Better Auth cutover', async () => {
+  it('throws when no Spotify access token is configured and no connector account exists', async () => {
     const { getSpotifyTokenForClerkUser, SpotifyAuthError } = await import(
       '@/lib/spotify/jovie-account'
     );
@@ -44,6 +57,40 @@ describe('jovie Spotify account', () => {
     await expect(getSpotifyTokenForClerkUser('user_1')).rejects.toBeInstanceOf(
       SpotifyAuthError
     );
+  });
+
+  it('returns a token from the canonical connector account vault', async () => {
+    mockGetSpotifyConnectorAccount.mockResolvedValue({
+      id: 'conn_1',
+      status: 'connected',
+    });
+    mockLoadFreshSpotifyAccessToken.mockResolvedValue('connector-token');
+
+    const { getSpotifyTokenForClerkUser } = await import(
+      '@/lib/spotify/jovie-account'
+    );
+
+    await expect(getSpotifyTokenForClerkUser('user_1')).resolves.toBe(
+      'connector-token'
+    );
+    expect(mockGetSpotifyConnectorAccount).toHaveBeenCalledWith('user_1');
+    expect(mockLoadFreshSpotifyAccessToken).toHaveBeenCalledWith('conn_1');
+  });
+
+  it('throws when the connector account is disabled', async () => {
+    mockGetSpotifyConnectorAccount.mockResolvedValue({
+      id: 'conn_1',
+      status: 'disabled',
+    });
+
+    const { getSpotifyTokenForClerkUser, SpotifyAuthError } = await import(
+      '@/lib/spotify/jovie-account'
+    );
+
+    await expect(getSpotifyTokenForClerkUser('user_1')).rejects.toBeInstanceOf(
+      SpotifyAuthError
+    );
+    expect(mockLoadFreshSpotifyAccessToken).not.toHaveBeenCalled();
   });
 
   it('uses the DB configured publisher before the env fallback when token is set', async () => {

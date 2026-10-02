@@ -82,12 +82,12 @@ export function YoutubeThumbnailCheckoutClient({
         </p>
       ) : null}
       {errorMessage ? (
-        <p className='mt-5 text-sm text-destructive' role='alert'>
+        <p className='mt-5 text-sm text-error' role='alert'>
           {errorMessage}
         </p>
       ) : null}
       {!priceId ? (
-        <p className='mt-5 text-sm text-destructive' role='alert'>
+        <p className='mt-5 text-sm text-error' role='alert'>
           Founder checkout is temporarily unavailable.
         </p>
       ) : null}

@@ -2,9 +2,8 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
-import { headers } from 'next/headers';
 import { cache } from 'react';
-import { auth } from '@/lib/auth/better-auth';
+import { getRequestSession } from '@/lib/auth/request-session';
 import { db } from '@/lib/db';
 import {
   getDeepErrorMessage,
@@ -13,6 +12,7 @@ import {
 } from '@/lib/db/errors';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { isVisualCaptureSyntheticAuthEnabled } from '@/lib/e2e/runtime';
 import { captureCriticalError, captureError } from '@/lib/error-tracking';
 import { normalizeEmail } from '@/lib/utils/email';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
@@ -64,11 +64,27 @@ export interface AuthGateResult {
   };
 }
 
+/**
+ * PR visual review (JOV-5387) signals this lane via the build-time
+ * NEXT_PUBLIC_E2E_MODE flag. The screen-certification producer job
+ * (JOV-7126) is a second secretless-capture caller that authenticates a
+ * server-only synthetic persona instead — it must not need to flip a
+ * client-inlined flag (which would also change the marketing screenshot
+ * catalog's rendered bytes) just to unblock its own admin-gated routes.
+ * `isVisualCaptureSyntheticAuthEnabled()` is server-only and already scopes
+ * exactly this "no reachable DB" contract for admin/roles.ts and
+ * auth/ban-check.ts, so it is accepted here as an equivalent signal.
+ */
 function canUseE2ETestAuthFallback(): boolean {
+  if (
+    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1' ||
+    process.env.VERCEL_ENV === 'preview'
+  ) {
+    return false;
+  }
   return (
-    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' &&
-    process.env.NEXT_PUBLIC_E2E_MODE === '1' &&
-    process.env.VERCEL_ENV !== 'preview'
+    process.env.NEXT_PUBLIC_E2E_MODE === '1' ||
+    isVisualCaptureSyntheticAuthEnabled()
   );
 }
 
@@ -497,8 +513,8 @@ async function handleMissingDbUser(
 }
 
 /**
- * Resolve the current Better Auth identity. Reads `auth.api.getSession`
- * directly (NOT through cached.ts) so gate.ts sees the BA user id — the
+ * Resolve the current Better Auth identity. Reads the request-scoped
+ * Better Auth session (NOT through cached.ts) so gate.ts sees the BA user id — the
  * app `users` lookup then goes through `users.better_auth_user_id`.
  *
  * The `clerkUserId` field name is preserved in the return shape for
@@ -554,8 +570,7 @@ async function resolveAuthIdentity(knownAppUserId?: string): Promise<{
   }
 
   try {
-    const headerStore = await headers();
-    const session = await auth.api.getSession({ headers: headerStore });
+    const session = await getRequestSession();
     if (!session) {
       return { clerkUserId: null, email: null };
     }
@@ -844,7 +859,10 @@ export async function resolveUserState(
 // =============================================================================
 
 export type { WaitlistAccessResult, WaitlistStatus } from './waitlist-access';
-export { getWaitlistAccess } from './waitlist-access';
+export {
+  getWaitlistAccess,
+  getWaitlistReservedHandle,
+} from './waitlist-access';
 
 // State utilities (getRedirectForState, canAccessApp, canAccessOnboarding,
 // requiresRedirect) are re-exported from canonical-user-state.ts at the top

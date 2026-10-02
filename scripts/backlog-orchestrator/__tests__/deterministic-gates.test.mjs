@@ -1,12 +1,14 @@
 // biome-ignore-all format: Preserve legacy fixture formatting.
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { beforeEach, describe, it } from 'node:test';
 import { validateOptimizationContract } from '../../invariants/optimization-contract.mjs';
 import * as admissionGate from '../admission-gate.mjs';
 import * as admitter from '../admitter.mjs';
 import * as deterministicGates from '../deterministic-gates.mjs';
 import * as planGate from '../plan-gate.mjs';
 import { withPreLeaseReceipts } from './pre-lease.mjs';
+
+const NOW = new Date().toISOString();
 
 function issue(overrides = {}) {
   return {
@@ -40,7 +42,7 @@ Normalize the unstable token before sending the event.
 ## Acceptance criteria
 * Repeated events group into one issue.
 * Focused normalizer tests pass.`,
-    createdAt: '2026-08-01T00:00:00.000Z',
+    createdAt: new Date(Date.now() - 4 * 86_400_000).toISOString(),
     priority: 2,
     estimate: 2,
     state: { name: 'Backlog' },
@@ -81,6 +83,12 @@ function plannedIssue(overrides = {}) {
 }
 
 describe('deterministic no-model gates', () => {
+  beforeEach(context => {
+    // Use the existing pre-lease receipt date, independently of wall-clock time.
+    assert.ok('mock' in context, 'fixture clock needs a test context');
+    context.mock.timers.enable({ apis: ['Date'], now: new Date('2026-08-22T12:00:00.000Z') });
+  });
+
   it('builds complete bounded plan evidence only from an allowlisted issue', () => {
     const result = deterministicGates.buildDeterministicPlanEvidence(issue());
     assert.equal(result.reason, null);
@@ -261,11 +269,52 @@ Normalize the unstable token before sending the event.
     ]);
   });
 
+  it('deliberate red: distinguishes safe fixture context from forbidden action requests', () => {
+    const safe = issue({
+      description: issue().description.replace(
+        'Normalize the unstable token before sending the event.',
+        `Exercise a synthetic staging fixture from the checkout context and inspect its artifact bundle at checkout SHA.
+Review chat/payment/import risk cases from the iOS checkout/runner.
+Do not access credentials, API keys, billing, or production data. Do not purchase anything.`
+      ),
+    });
+    assert.equal(
+      deterministicGates.validateDeterministicPlanCandidate(safe),
+      null
+    );
+
+    for (const request of [
+      'Rotate the production credential after the safe fixture passes.',
+      'The plan says not to buy test data elsewhere. Charge the customer card.',
+      'Keep the bundle local, then delete production user data.',
+      'No production data is present, publish the result externally.',
+      'Do not access credentials, and publish the result externally.',
+      'Never read secrets, or deploy to production.',
+      'Implement checkout flow.',
+      'Billing integration.',
+      'Database migration.',
+    ]) {
+      const unsafe = issue({
+        description: issue().description.replace(
+          'Normalize the unstable token before sending the event.',
+          request
+        ),
+      });
+      assert.equal(
+        deterministicGates.validateDeterministicPlanCandidate(unsafe),
+        'sensitive-or-external-work',
+        request
+      );
+    }
+  });
+
   it('fails closed on team routing, ownership, epic, sensitive, stale, and incomplete work', () => {
     const cases = [
       issue({ identifier: 'OPS-1' }),
       issue({ assignee: { id: 'other', name: 'Other Owner' } }),
       issue({ labels: { nodes: [{ name: 'type:epic' }] } }),
+      issue({ labels: { nodes: [{ name: 'synthetic' }] } }),
+      issue({ labels: { nodes: [{ name: 'workstream' }] } }),
       issue({ title: 'Rotate a production credential' }),
       issue({ createdAt: '2025-01-01T00:00:00.000Z' }),
       issue({ description: 'No structured acceptance section' }),
@@ -273,7 +322,7 @@ Normalize the unstable token before sending the event.
     for (const candidate of cases) {
       assert.notEqual(
         deterministicGates.validateDeterministicPlanCandidate(candidate, {
-          now: '2026-08-05T00:00:00.000Z',
+          now: NOW,
         }),
         null
       );
@@ -322,7 +371,7 @@ Normalize the unstable token before sending the event.
         issue({ identifier: 'JOV-4304', priority: 3 }),
         issue({ identifier: 'JOV-4305', priority: 2 }),
       ],
-      { now: '2026-08-05T00:00:00.000Z' }
+      { now: NOW }
     );
     assert.equal(result.selected.identifier, 'JOV-4305');
   });
@@ -334,7 +383,7 @@ Normalize the unstable token before sending the event.
         issue({ identifier: 'JOV-4305', priority: 2 }),
       ],
       {
-        now: '2026-08-05T00:00:00.000Z',
+        now: NOW,
         excludeIdentifiers: ['JOV-4305'],
       }
     );

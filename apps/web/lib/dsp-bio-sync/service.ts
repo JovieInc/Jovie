@@ -9,7 +9,7 @@
  */
 
 import { and, desc, eq } from 'drizzle-orm';
-
+import { assertCustomerVoiceFloor } from '@/lib/copy/outbound-floor';
 import { db } from '@/lib/db';
 import {
   type DspBioSyncMetadata,
@@ -187,6 +187,10 @@ export async function syncBioToDsps(
   if (!bioText?.trim()) {
     throw new Error('No bio text provided and profile has no existing bio');
   }
+
+  // Copy floor (canon/VOICE.md, JOV-6616): the bio ships in the customer's
+  // voice to DSPs; refuse to send text that breaks a blocking floor rule.
+  assertCustomerVoiceFloor(bioText, 'dsp-bio-sync');
 
   // Determine which DSPs to target
   const targetProviders = providerIds

@@ -8,6 +8,7 @@ import {
 } from '@ai-sdk/gateway';
 import { eq } from 'drizzle-orm';
 import { formatUsd } from '@/lib/admin/format';
+import { isGatewayBannedModel } from '@/lib/constants/ai-models';
 import { db } from '@/lib/db';
 import { adminCosts } from '@/lib/db/schema/admin';
 import { env } from '@/lib/env-server';
@@ -71,7 +72,9 @@ function toLine(key: string, row: GatewaySpendReportRow): GatewaySpendLine {
     costUsd: row.totalCost,
     requests,
     promptTokensPerRequest:
-      requests > 0 && prompt > 0 ? Math.round(prompt / requests) : null,
+      requests > 0 && (row.inputTokens != null || row.cachedInputTokens != null)
+        ? Math.round(prompt / requests)
+        : null,
     cacheShare: cacheShareOf([row]),
   };
 }
@@ -124,6 +127,13 @@ export async function getDailyGatewaySpend(
     );
   }
   for (const line of byModel) {
+    // JOV-7119: OpenAI/Anthropic are banned on the gateway — any spend line is
+    // a policy violation and must alert regardless of amount.
+    if (isGatewayBannedModel(line.key)) {
+      alerts.push(
+        `banned gateway model ${line.key} billed ${formatUsd(line.costUsd)} across ${line.requests} requests on ${day}`
+      );
+    }
     if (
       line.promptTokensPerRequest != null &&
       line.promptTokensPerRequest > AI_GATEWAY_INPUT_TOKENS_PER_REQUEST_ALERT

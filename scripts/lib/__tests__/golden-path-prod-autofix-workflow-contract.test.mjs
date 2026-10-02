@@ -24,9 +24,9 @@ const CI_WORKFLOW = readFileSync(
 );
 
 describe('Golden Path prod autofix workflow contract', () => {
-  it('is event-driven off Production Controller, not a cron', () => {
-    expect(WORKFLOW).toContain('workflows: [Production Controller]');
-    expect(WORKFLOW).toContain('types: [completed]');
+  it('is a bounded manual fallback, not a recursive observer', () => {
+    expect(WORKFLOW).toContain('workflow_dispatch:');
+    expect(WORKFLOW).not.toContain('workflow_run:');
     expect(WORKFLOW).not.toMatch(/^\s*schedule:/m);
     expect(WORKFLOW).not.toContain('cron:');
   });
@@ -119,6 +119,15 @@ describe('Golden Path prod autofix workflow contract', () => {
     expect(CI_WORKFLOW).toContain(
       '${{ runner.temp }}/golden-path-lock-coverage/coverage-final.json'
     );
+  });
+
+  it('passes a GitHub token so autofix can dedupe on fingerprint-marked PRs (JOV-6827)', () => {
+    expect(WORKFLOW).toContain('GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}');
+    expect(WORKFLOW).toContain('pull-requests: read');
+    expect(WORKFLOW).toContain('issues: write');
+    expect(LOCK_HELPER).toContain('AUTOFIX_PR_MARKER');
+    expect(LOCK_HELPER).toContain('AUTOFIX_LAUNCH_MARKER');
+    expect(LOCK_HELPER).toContain("'escalate'");
   });
 
   it('does not live inside the read-only post-deploy probe workflow', () => {
@@ -283,5 +292,28 @@ describe('Golden Path Lock merge-gate contract', () => {
     const lockJob = CI_WORKFLOW.slice(lockStart, lockEnd);
     expect(lockJob).toContain('node scripts/golden-path-lock.mjs merge-gate');
     expect(lockJob).not.toMatch(/secrets\.[A-Z0-9_]+/);
+  });
+});
+
+describe('Golden Path prod autofix dedupe contract (JOV-6832)', () => {
+  it('lets the job read open fix PRs and dedupes before any launch', () => {
+    expect(WORKFLOW).toContain('pull-requests: read');
+    expect(WORKFLOW).not.toMatch(/pull-requests:\s*write/);
+    expect(WORKFLOW).toContain('GH_TOKEN: ${{ github.token }}');
+    const dedupe = SCRIPT.indexOf('findOpenAutofixPr(listOpenPrs()');
+    const delegate = SCRIPT.indexOf('await executeAutofix(');
+    const launch = SCRIPT.indexOf('Launched Cursor-direct autofix');
+    // JOV-6827: intake + deeper dedupe + launch live in lib executeAutofix;
+    // the CLI still dedupes open fix PRs before delegating.
+    const intake = LOCK_HELPER.indexOf('await createGoldenPathLinearIssue(');
+    const cursorLaunch = LOCK_HELPER.indexOf(
+      'body: JSON.stringify(plan.request)'
+    );
+    expect(dedupe).toBeGreaterThan(-1);
+    expect(delegate).toBeGreaterThan(dedupe);
+    expect(launch).toBeGreaterThan(dedupe);
+    expect(intake).toBeGreaterThan(-1);
+    expect(cursorLaunch).toBeGreaterThan(intake);
+    expect(SCRIPT).toContain('refusing to launch a possible duplicate');
   });
 });

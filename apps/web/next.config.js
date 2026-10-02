@@ -71,12 +71,18 @@ const nextConfig = {
       'runtime-data/apps/eve-pilot/identities/summer/instructions.md',
       'tests/quarantine.json',
       'content/**/*',
+      // Blog catalog validation checks these assets with fs.access at request time.
+      'public/images/blog/**/*',
       'lib/chat/knowledge/topics/**/*',
       'public/fonts/Satoshi-Bold.ttf',
       'public/fonts/DMSans-Regular.ttf',
     ],
+    '/api/ovie/certifications': ['runtime-data/docs/certification/**/*'],
+    '/api/ovie/certifications/**': ['runtime-data/docs/certification/**/*'],
     '/app/admin/screenshots': screenshotCatalogTraceIncludes,
     '/api/admin/screenshots/**': screenshotCatalogTraceIncludes,
+    // Gated investor deck PDF: kept out of public/ so no CDN URL serves it.
+    '/investor-portal/deck/[...path]': ['assets/investor-deck/**/*'],
   },
   // Dynamic fs paths make NFT over-approximate and copy repo files no route
   // reads into server functions (e2e PNG snapshots, 45 MB of drizzle migration
@@ -290,7 +296,7 @@ const nextConfig = {
         ],
       },
       {
-        source: '/(pricing|support|investors|engagement-engine|blog|changelog)',
+        source: '/(pricing|support|engagement-engine|blog|changelog)',
         headers: [...securityHeaders, cacheHeaders.immutable],
       },
       {
@@ -355,18 +361,28 @@ const nextConfig = {
           },
         ],
       },
-      // Canonical pitch-deck static HTML (apps/web/public/pitch/**) is
-      // embedded as a same-origin iframe from the /pitch wrapper page.
-      // Override X-Frame-Options DENY → SAMEORIGIN for these assets only,
-      // AFTER the catch-all (Next.js merges headers; later rules win).
-      // The wrapper page itself (/pitch) stays DENY via the catch-all.
-      {
-        source: '/pitch/:path+',
+      // Investor surfaces are never indexable or shared-cacheable, including
+      // their 404s and static-extension URLs that proxy.ts does not run for.
+      // Later rules win, so this overrides the public catch-all above. The
+      // retired public /pitch and /investors paths keep the headers too.
+      ...[
+        '/investor-portal',
+        '/investor-portal/:path*',
+        '/pitch',
+        '/pitch/:path*',
+        '/investors',
+        '/investors/:path*',
+        '/Jovie-Pitch-Deck.pdf',
+      ].map(source => ({
+        source,
         headers: [
-          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
-          { key: 'Cache-Control', value: cacheHeaders.immutable.value },
+          cacheHeaders.noStore,
+          {
+            key: 'X-Robots-Tag',
+            value: 'noindex, nofollow, noarchive, nosnippet',
+          },
         ],
-      },
+      })),
     ];
   },
   async redirects() {
@@ -525,6 +541,14 @@ const nextConfig = {
         destination: '/artists',
         permanent: true,
       },
+      // No /solutions index page exists; send it to the shipped solutions
+      // route instead of falling through to profile resolution ("Profile
+      // not found").
+      {
+        source: '/solutions',
+        destination: '/solutions/artists',
+        permanent: true,
+      },
       {
         source: '/engagement-engine',
         destination: '/artist-notifications',
@@ -604,11 +628,25 @@ const nextConfig = {
 
     return {
       beforeFiles: [
+        {
+          source: '/hud/wiki',
+          destination: '/app/ov/wiki',
+        },
+        {
+          source: '/hud/wiki/:path*',
+          destination: '/app/ov/wiki/:path*',
+        },
         // Default /hud is a filesystem route outside /app/(shell). Intercept
-        // it before that page so Ops inherits sidebar + app chrome. Isolated
-        // query modes stay on /hud: fullscreen and kiosk token. The packaged
-        // Mac door (?ovie=mac) also gets the shell so the founder can reach
-        // Chat, Growth and revenue from Ops (JOV-6164).
+        // it before that page so Ops inherits sidebar + app chrome. A signed
+        // kiosk token is the only presentation boundary; browser fullscreen
+        // expands the existing main-content surface. `fs=1` is the third
+        // exemption (JOV-7126): it is the only way to reach the isolated
+        // apps/web/app/hud/page.tsx source directly (screen-cert producer
+        // web.hud-isolated, per scripts/invariants/screen-certification.mjs),
+        // which documented this exemption before it actually existed here —
+        // that source page stays admin-gated on its own
+        // (getCurrentAdminPageAccess), so this exemption does not widen who
+        // can reach it, only which of the two equivalent pages renders.
         {
           source: '/hud',
           missing: [
@@ -784,7 +822,7 @@ module.exports = exposeBaseStaticConfigForTooling(
 // Sentry upload credentials; applying the plugin there has caused generated
 // interception helpers to be externalized without being copied into standalone.
 // The Sentry runtime SDK (sentry.server.config.ts) works independently.
-const { withSentryConfig } = require('@sentry/nextjs');
+const { withSentryConfig } = require('@sentry/nextjs/config');
 
 const hasSentryAuthToken = Boolean(process.env.SENTRY_AUTH_TOKEN);
 const shouldUseSentryPlugin =

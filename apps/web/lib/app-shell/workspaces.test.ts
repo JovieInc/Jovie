@@ -6,7 +6,10 @@ import {
   getAppShellContract,
   getCurrentAppShellWorkspace,
   getNextAppShellWorkspace,
+  getNextPermittedAppShellWorkspace,
   getPermittedAppShellWorkspaces,
+  shouldLockOperatorWorkspace,
+  shouldRenderOperatorChrome,
 } from './workspaces';
 
 describe('app shell workspaces', () => {
@@ -109,5 +112,69 @@ describe('app shell workspaces', () => {
     expect(
       new Set(contract.workspaces.map(workspace => workspace.chatOwner))
     ).toEqual(new Set([contract.chatOwner]));
+  });
+});
+
+describe('operator surfaces stay in Ovie (JOV-6771)', () => {
+  it('keeps Jovie usable despite legacy lock cookies or stale step-up', () => {
+    for (const isAdmin of [false, true]) {
+      expect(
+        shouldLockOperatorWorkspace({
+          mode: 'customer',
+          isAdmin,
+          needsAdminStepUp: true,
+          hasLegacyLockCookie: true,
+        })
+      ).toBe(false);
+    }
+  });
+
+  it('preserves existing Ovie cookie and step-up gates', () => {
+    expect(
+      shouldLockOperatorWorkspace({
+        mode: 'ov',
+        isAdmin: true,
+        needsAdminStepUp: false,
+        hasLegacyLockCookie: true,
+      })
+    ).toBe(true);
+    expect(
+      shouldLockOperatorWorkspace({
+        mode: 'ov',
+        isAdmin: true,
+        needsAdminStepUp: true,
+        hasLegacyLockCookie: false,
+      })
+    ).toBe(true);
+  });
+  it('gives non-admins no workspace switch target anywhere', () => {
+    for (const pathname of ['/app', '/app/chat', APP_ROUTES.OV, null]) {
+      expect(
+        getNextPermittedAppShellWorkspace({ isAdmin: false }, pathname)
+      ).toBeUndefined();
+    }
+  });
+
+  it('lets admins switch between Jovie and Ovie', () => {
+    expect(
+      getNextPermittedAppShellWorkspace({ isAdmin: true }, '/app/chat')?.id
+    ).toBe('ov');
+    expect(
+      getNextPermittedAppShellWorkspace({ isAdmin: true }, APP_ROUTES.OV)?.id
+    ).toBe('customer');
+  });
+
+  it('never renders operator chrome for non-admins', () => {
+    expect(shouldRenderOperatorChrome('customer', { isAdmin: false })).toBe(
+      false
+    );
+    expect(shouldRenderOperatorChrome('ov', { isAdmin: false })).toBe(false);
+  });
+
+  it('renders operator chrome for admins only inside Ovie', () => {
+    expect(shouldRenderOperatorChrome('customer', { isAdmin: true })).toBe(
+      false
+    );
+    expect(shouldRenderOperatorChrome('ov', { isAdmin: true })).toBe(true);
   });
 });

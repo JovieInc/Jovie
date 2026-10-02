@@ -129,14 +129,45 @@ export function buildSbom(licenses, sourceSha) {
   };
 }
 
-export function generateSbom(root, expectedSha, output) {
-  const report = JSON.parse(
-    execFileSync('pnpm', ['licenses', 'list', '--prod', '--json'], {
+// pnpm licenses reads each package's index file from the pnpm store, not from
+// node_modules. A node_modules tree restored without its store (the
+// setup-node-pnpm exact-cache hit) fails every package with
+// ERR_PNPM_MISSING_PACKAGE_INDEX_FILE, reported as JSON on stdout (JOV-6726).
+function pnpmLicenseReport(root, { pnpm = 'pnpm', env = process.env } = {}) {
+  let stdout;
+  try {
+    stdout = execFileSync(pnpm, ['licenses', 'list', '--prod', '--json'], {
       cwd: root,
+      env,
       encoding: 'utf8',
       maxBuffer: 32 * 1024 * 1024,
-    })
-  );
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (error) {
+    let reported;
+    try {
+      reported = JSON.parse(String(error.stdout ?? '')).error;
+    } catch {}
+    const detail = reported?.code
+      ? `${reported.code}: ${reported.message}`
+      : String(error.stderr || error.message).trim();
+    if (reported?.code === 'ERR_PNPM_MISSING_PACKAGE_INDEX_FILE') {
+      throw new Error(
+        'SBOM generation needs a pnpm store populated by the same install as ' +
+          'node_modules, but the store has no package index for an installed ' +
+          'package. The installed tree was likely restored from a cache ' +
+          'without its store. Install with `pnpm install --frozen-lockfile` ' +
+          "against a warm store (setup-node-pnpm package_cache: 'false'). " +
+          detail
+      );
+    }
+    throw new Error('pnpm licenses list failed: ' + detail);
+  }
+  return JSON.parse(stdout);
+}
+
+export function generateSbom(root, expectedSha, output, options) {
+  const report = pnpmLicenseReport(root, options);
   const sbom = buildSbom(report, expectedSha);
   writeFileSync(output, JSON.stringify(sbom, null, 2) + '\n', {
     flag: 'wx',
@@ -146,6 +177,7 @@ export function generateSbom(root, expectedSha, output) {
 }
 
 export function supplyChainSnapshot(root, sbomPath, runner = {}) {
+  root = realpathSync(root);
   const files = requiredSupplyChainFiles.map(path => entry(root, path));
   check(
     files.every(file => file.kind === 'file'),

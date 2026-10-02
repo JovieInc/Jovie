@@ -50,6 +50,20 @@ const APP_SHELL_GLOBS = [
 ];
 
 describe('surface elevation guardrails', () => {
+  it('lets the People shell own its page title instead of repeating it in each table', () => {
+    for (const file of [
+      'admin-creator-profiles/AdminCreatorProfilesUnified.tsx',
+      'admin-users-table/AdminUsersTableUnified.tsx',
+      'waitlist-table/AdminWaitlistTableWithViews.tsx',
+      'contacts-table/AdminContactsTable.tsx',
+      'feedback-table/AdminFeedbackTable.tsx',
+    ]) {
+      expect(readComponent(`components/features/admin/${file}`)).not.toContain(
+        '<AdminTableHeader'
+      );
+    }
+  });
+
   it('keeps the dark shell canvas separate from the shared card surface', () => {
     const designSystem = [
       readFileSync(join(ROOT, 'styles/design-system.css'), 'utf-8'),
@@ -223,13 +237,9 @@ describe('surface elevation guardrails', () => {
     expect(waitlistSuccess).toContain('<AuthLayout');
   });
 
-  it('keeps the tasks workspace inside a framed content panel', () => {
+  it('keeps the tasks workspace inside the canonical flat content panel', () => {
     const tasksPage = readFileSync(
       join(ROOT, 'components/features/dashboard/tasks/TasksPageClient.tsx'),
-      'utf-8'
-    );
-    const dashboardPanel = readFileSync(
-      join(ROOT, 'components/organisms/AppShellContentPanel.tsx'),
       'utf-8'
     );
     const shellRouteMatches = readFileSync(
@@ -241,8 +251,9 @@ describe('surface elevation guardrails', () => {
       'utf-8'
     );
 
-    expect(tasksPage).toContain('PageShell');
-    expect(dashboardPanel).toContain("frame = 'content-container'");
+    expect(tasksPage).toContain('WorkspacePage');
+    expect(tasksPage).toContain("frame='none'");
+    expect(tasksPage).toContain("contentPadding='none'");
     expect(tasksPage).toContain("data-testid='tasks-content-panel'");
     expect(tasksPage).toContain('TaskDataTable');
     expect(tasksPage).not.toMatch(/<UnifiedTable\b/);
@@ -345,6 +356,16 @@ describe('surface elevation guardrails', () => {
     }
   });
 
+  it('routes admin lead-table 403s through the step-up unlock state', () => {
+    const leadTable = readComponent(
+      'components/features/admin/leads/LeadTable.tsx'
+    );
+
+    expect(leadTable).toContain('isForbiddenError');
+    expect(leadTable).toContain('AdminStepUp');
+    expect(leadTable).toContain('Admin verification required');
+  });
+
   it('routes library filters through the shared header search contract', () => {
     const librarySurface = readFileSync(
       join(ROOT, 'app/app/(shell)/library/LibrarySurface.tsx'),
@@ -357,7 +378,7 @@ describe('surface elevation guardrails', () => {
 
     expect(librarySurface).toContain('useRegisterHeaderSearch');
     expect(librarySurface).toContain("key: 'library'");
-    expect(librarySurface).toContain('Filter Library');
+    expect(librarySurface).toContain('Filter Work');
     expect(librarySurface).not.toContain('OPEN_COMMAND_PALETTE_EVENT');
     expect(appShellLayout).toContain('isLibraryShellRoute');
     expect(appShellLayout).toContain('LibraryLoadingState');
@@ -386,8 +407,6 @@ describe('surface elevation guardrails', () => {
   it('keeps task and preview cards off the shell canvas token', () => {
     const files = [
       'components/features/dashboard/layout/PreviewPanel.tsx',
-      'components/features/dashboard/molecules/phone-mockup-preview/PhoneMockupPreview.tsx',
-      'components/features/dashboard/organisms/DashboardPreview.tsx',
       'components/features/dashboard/organisms/ProfileEditPreviewCard.tsx',
       'components/features/dashboard/release-tasks/ReleaseTaskEmptyState.tsx',
       'components/features/dashboard/release-tasks/ReleaseTaskExplainerPopover.tsx',
@@ -549,6 +568,24 @@ describe('surface elevation guardrails', () => {
       'components/features/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx'
     );
     expect(creatorProfiles).not.toContain("'@tanstack/react-table'");
+  });
+
+  it('renders the admin feedback detail header through the canonical EntityHeader', () => {
+    const adminFeedbackTable = readComponent(
+      'components/features/admin/feedback-table/AdminFeedbackTable.tsx'
+    );
+
+    expect(adminFeedbackTable).toContain('EntityHeader');
+    expect(adminFeedbackTable).not.toContain('EntityHeaderCard');
+  });
+
+  it('names the hidden-header release table for screen readers', () => {
+    const releaseTable = readComponent(
+      'components/features/dashboard/organisms/release-provider-matrix/ReleaseTable.tsx'
+    );
+
+    expect(releaseTable).toContain('hideHeader');
+    expect(releaseTable).toContain("caption='Releases'");
   });
 
   it('drops the banned Disc3 empty-state glyph from ReleaseTable', () => {

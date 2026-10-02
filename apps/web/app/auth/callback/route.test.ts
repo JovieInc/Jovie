@@ -6,6 +6,7 @@ const hoisted = vi.hoisted(() => ({
   consumeStoredAuthState: vi.fn(),
   captureError: vi.fn().mockResolvedValue(undefined),
   createStoredNativeExchangeCode: vi.fn(),
+  createStoredDesktopHandback: vi.fn().mockResolvedValue('BCDFGHJK'),
   trackServerEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -21,6 +22,7 @@ vi.mock('@/lib/auth/better-auth', () => ({
 vi.mock('@/lib/auth/routing-state.server', () => ({
   consumeStoredAuthState: hoisted.consumeStoredAuthState,
   createStoredNativeExchangeCode: hoisted.createStoredNativeExchangeCode,
+  createStoredDesktopHandback: hoisted.createStoredDesktopHandback,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -118,9 +120,118 @@ describe('GET /auth/callback', () => {
       new Request('https://jov.ie/auth/callback?state=state_123')
     );
 
-    expect(response.headers.get('location')).toBe(
-      'https://jov.ie/auth/native-return?code=00000000000040008000000000000001&state=state_123&desktop_flow=flow_nonce_abcdef123456'
+    expect(response.headers.get('location')).toMatch(
+      /^https:\/\/jov\.ie\/auth\/native-return\?code=00000000000040008000000000000001&state=state_123&desktop_flow=flow_nonce_abcdef123456(&|$)/
     );
+  });
+
+  it('records a PKCE-bound desktop handback and shows its return code on the bounce', async () => {
+    hoisted.consumeStoredAuthState.mockResolvedValueOnce({
+      client: 'electron',
+      intent: 'sign_in',
+      returnTo: '/app/chat?runtime=electron',
+      state: 'state_123',
+      codeChallenge: 'challenge_123',
+      desktopFlow: 'flow_nonce_abcdef123456',
+      desktopReturnCode: true,
+      createdAt: 1_000,
+      expiresAt: 601_000,
+      consumedAt: null,
+    });
+
+    const response = await GET(
+      new Request('https://jov.ie/auth/callback?state=state_123')
+    );
+
+    expect(response.headers.get('location')).toBe(
+      'https://jov.ie/auth/native-return?code=00000000000040008000000000000001&state=state_123&desktop_flow=flow_nonce_abcdef123456&return_code=BCDFGHJK'
+    );
+    expect(hoisted.createStoredDesktopHandback).toHaveBeenCalledWith({
+      code: '00000000000040008000000000000001',
+      state: 'state_123',
+      desktopFlow: 'flow_nonce_abcdef123456',
+      codeChallenge: 'challenge_123',
+      expiresAt: 62_000,
+    });
+  });
+
+  it('still bounces through the deep link when the handback record fails', async () => {
+    hoisted.consumeStoredAuthState.mockResolvedValueOnce({
+      client: 'electron',
+      intent: 'sign_in',
+      returnTo: '/app/chat?runtime=electron',
+      state: 'state_123',
+      codeChallenge: 'challenge_123',
+      desktopFlow: 'flow_nonce_abcdef123456',
+      desktopReturnCode: true,
+      createdAt: 1_000,
+      expiresAt: 601_000,
+      consumedAt: null,
+    });
+    hoisted.createStoredDesktopHandback.mockRejectedValueOnce(
+      new Error('db down')
+    );
+
+    const response = await GET(
+      new Request('https://jov.ie/auth/callback?state=state_123')
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toContain('/auth/native-return');
+    expect(response.headers.get('location')).not.toContain('return_code');
+    expect(hoisted.captureError).toHaveBeenCalledWith(
+      'Desktop handback record failed',
+      expect.any(Error),
+      { route: '/auth/callback' }
+    );
+  });
+
+  it('threads the loopback listener port onto the electron bounce', async () => {
+    hoisted.consumeStoredAuthState.mockResolvedValueOnce({
+      client: 'electron',
+      intent: 'sign_in',
+      returnTo: '/app/chat?runtime=electron',
+      state: 'state_123',
+      codeChallenge: 'challenge_123',
+      desktopFlow: 'flow_nonce_abcdef123456',
+      desktopLoopbackPort: 51234,
+      createdAt: 1_000,
+      expiresAt: 601_000,
+      consumedAt: null,
+    });
+
+    const response = await GET(
+      new Request('https://jov.ie/auth/callback?state=state_123')
+    );
+
+    expect(response.headers.get('location')).toContain('loopback_port=51234');
+  });
+
+  it('does not record a desktop handback without a desktop flow nonce', async () => {
+    await GET(new Request('https://jov.ie/auth/callback?state=state_123'));
+    expect(hoisted.createStoredDesktopHandback).not.toHaveBeenCalled();
+  });
+
+  it('shows no return code to Mac app builds that cannot redeem one', async () => {
+    hoisted.consumeStoredAuthState.mockResolvedValueOnce({
+      client: 'electron',
+      intent: 'sign_in',
+      returnTo: '/app/chat?runtime=electron',
+      state: 'state_123',
+      codeChallenge: 'challenge_123',
+      desktopFlow: 'flow_nonce_abcdef123456',
+      desktopReturnCode: false,
+      createdAt: 1_000,
+      expiresAt: 601_000,
+      consumedAt: null,
+    });
+
+    const response = await GET(
+      new Request('https://jov.ie/auth/callback?state=state_123')
+    );
+
+    expect(hoisted.createStoredDesktopHandback).not.toHaveBeenCalled();
+    expect(response.headers.get('location')).not.toContain('return_code');
   });
 
   it('bounces iOS through the same-origin ios-complete page, never a web app page', async () => {

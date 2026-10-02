@@ -3,55 +3,107 @@ import type { AlternativeData } from './types';
 export const linkInBioAlternative: AlternativeData = {
   slug: 'link-in-bio',
   category: 'Link in Bio',
-  title: 'Best Link in Bio for Artists (2026)',
+  title: 'A Link in Bio for Artists (2026)',
   metaDescription:
-    'The best link in bio tool for musicians and artists. Jovie goes beyond link-in-bio with smart links, fan notifications, audience intelligence, and AI tools.',
-  heroHeadline: 'The best link in bio for artists',
+    'Use Jovie as an artist link in bio with a public profile, release smart links, audience capture, and enrolled artist workflows.',
+  heroHeadline: 'A link in bio for artists',
   heroSubheadline:
-    'Most link-in-bio tools are designed for influencers and businesses. Jovie is designed for musicians — with smart links, fan data, and release automation built in.',
+    'Jovie combines a public artist profile, release smart links, and audience capture, with additional artist workflows available by access level.',
+  heroImage: {
+    src: '/images/hero/alternatives-link-in-bio.webp',
+    alt: 'A vertical column of purple light through dark smoke.',
+  },
   whySwitch: [
-    'Generic link-in-bio tools don\u2019t understand music releases. You need a tool that knows the difference between a single, an EP, and an album.',
-    'Link pages are passive — fans visit once and forget. Jovie captures fan contacts and notifies them when you release new music.',
-    'Manual link management wastes time. Jovie auto-generates smart links for every release with streaming platform routing.',
-    'No analytics that matter. Page views don\u2019t tell you which platform your fans prefer or where they came from.',
+    {
+      text: 'Choose Jovie when your link in bio should also be your public artist profile.',
+      claimIds: ['jovie.public-profile'],
+    },
+    {
+      text: 'Publish release smart links alongside the profile instead of managing a separate release-link product.',
+      claimIds: ['jovie.public-profile', 'jovie.smart-links'],
+    },
+    {
+      text: 'Capture audience contacts from the profile; export and advanced CRM capabilities depend on plan access.',
+      claimIds: ['jovie.contact-collection', 'jovie.capability-access'],
+    },
+    {
+      text: 'Eligible artists can add fan notifications, advanced analytics, and a release-planning workspace.',
+      claimIds: [
+        'jovie.fan-notifications',
+        'jovie.analytics',
+        'jovie.release-workspace',
+      ],
+    },
   ],
   highlights: [
     {
-      title: 'More than a link page',
+      title: 'Public artist profile',
       description:
-        'Your Jovie profile is a full artist page — music catalog, social links, tour dates, bio, and tipping. Not just a list of links.',
+        'Put your work, public links, and artist identity on one claimable profile.',
+      claimIds: ['jovie.public-profile', 'jovie.free-profile'],
     },
     {
-      title: 'Smart links for every release',
+      title: 'Release smart links',
       description:
-        'Each release gets a smart link that detects which streaming platform a fan prefers and routes them there. Spotify, Apple Music, YouTube, and more.',
+        'Publish release links that remember a fan’s streaming-platform choice.',
+      claimIds: ['jovie.smart-links'],
     },
     {
-      title: 'Build your audience',
+      title: 'Audience capture',
       description:
-        'Collect fan emails and phone numbers directly from your profile. When you release music, notify them automatically.',
+        'Collect audience contacts from the public profile, with plan-specific limits and export access.',
+      claimIds: ['jovie.contact-collection', 'jovie.capability-access'],
     },
     {
-      title: 'Release automation',
+      title: 'Access-aware workspace',
       description:
-        'Plan your rollout, manage release tasks, and let Jovie handle the notifications. Focus on the music, not the marketing.',
+        'Fan notifications, advanced analytics, and release planning are available to enrolled artists rather than promised to every account.',
+      claimIds: [
+        'jovie.fan-notifications',
+        'jovie.analytics',
+        'jovie.release-workspace',
+      ],
     },
   ],
   faq: [
     {
-      question: 'What is the best link in bio for musicians?',
+      question: 'What should artists look for in a link-in-bio tool?',
       answer:
-        'Jovie is the best link-in-bio tool for musicians because it\u2019s purpose-built for music artists. It auto-generates smart links, routes fans to streaming platforms, collects fan contacts, and sends automatic release notifications. General-purpose link tools like Linktree, Beacons, and Stan Store work for anyone but aren\u2019t optimized for music.',
+        'Start with the job you need to complete: a public profile, release links, audience capture, or an artist workspace. Jovie combines those jobs, with notifications, advanced analytics, and release planning gated by account access.',
+      claimIds: [
+        'jovie.public-profile',
+        'jovie.smart-links',
+        'jovie.contact-collection',
+        'jovie.capability-access',
+      ],
     },
     {
       question: 'Do I need a separate link-in-bio tool if I use Jovie?',
       answer:
-        'No. Your Jovie profile at jov.ie/username is your link-in-bio. It includes everything — music, social links, tour dates, bio, and tipping — plus smart links and fan collection.',
+        'Not if the Jovie public profile and release-link workflow cover your needs. Claim a profile, add your public links, and verify access to any enrolled artist capabilities you plan to use.',
+      claimIds: [
+        'jovie.public-profile',
+        'jovie.smart-links',
+        'jovie.capability-access',
+      ],
     },
     {
-      question: 'How is Jovie different from Beacons or Stan Store?',
+      question: 'What is included with a Jovie profile?',
       answer:
-        'Beacons and Stan Store are designed for creators selling products and courses. Jovie is designed for musicians releasing music. Different use cases, different tools. If your primary content is music releases, Jovie is the better fit.',
+        'The free offer includes a public profile and audience capture. Release smart links are generally available; notifications, advanced analytics, and release-planning tools require enrollment.',
+      claimIds: [
+        'jovie.free-profile',
+        'jovie.smart-links',
+        'jovie.fan-notifications',
+        'jovie.analytics',
+        'jovie.release-workspace',
+      ],
     },
+  ],
+  claimIds: [
+    'jovie.public-profile',
+    'jovie.smart-links',
+    'jovie.contact-collection',
+    'jovie.capability-access',
   ],
 };

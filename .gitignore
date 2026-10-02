@@ -150,6 +150,10 @@ ideation/screenshots/
 
 # npm lockfiles (pnpm monorepo uses pnpm-lock.yaml)
 package-lock.json
+# The trusted DeepSec scanner workspace pins its full npm dependency tree.
+!scripts/security/deepsec/package-lock.json
+scripts/security/deepsec/data/
+scripts/security/deepsec/node_modules/
 
 # Xcode
 DerivedData/
@@ -188,6 +192,9 @@ ruvector.db
 
 # AgentOS run artifacts (binary outputs not source-controlled)
 agentos/runs/**/artifacts/
+
+# Marketing factory run receipts (pnpm factory:run; JOV-7276)
+/runs/factory/
 .hermes/
 agentos/
 docs/leads/
@@ -202,13 +209,19 @@ apps/desktop/
 apps/desktop/*
 !apps/desktop/src/
 apps/desktop/src/*
+!apps/desktop/src/session-work-state.ts
 !apps/desktop/src/system-b-tokens.ts
 !apps/desktop/src/desktop-auth-security.ts
+!apps/desktop/src/desktop-auth-handback.ts
+!apps/desktop/src/desktop-auth-loopback.ts
+!apps/desktop/src/desktop-passkey.ts
 !apps/desktop/src/desktop-auto-update.ts
 !apps/desktop/src/desktop-csp-watchdog.ts
+!apps/desktop/src/desktop-notifications.ts
 !apps/desktop/src/desktop-permissions.ts
 !apps/desktop/src/desktop-security-reporting.ts
 !apps/desktop/src/window-state.ts
+!apps/desktop/src/visual-activity.ts
 !apps/desktop/src/renderer-recovery.ts
 !apps/desktop/src/tray.ts
 !apps/desktop/src/ovie-door.ts
@@ -218,8 +231,11 @@ apps/desktop/src/*
 !apps/desktop/src/build-identity.ts
 !apps/desktop/src/bounded-process.ts
 !apps/desktop/src/ipc-sender.ts
+!apps/desktop/src/ovie-browser-recovery.ts
 !apps/desktop/src/nightly-update-launch-agent.ts
+!apps/desktop/src/navigation-coordinator.ts
 !apps/desktop/src/window-state-store.ts
+!apps/desktop/src/desktop-launch-readiness.ts
 !apps/desktop/src/main-liveness.ts
 !apps/desktop/src/voice-session.ts
 !apps/desktop/scripts/desktop-tray-contract.test.mjs

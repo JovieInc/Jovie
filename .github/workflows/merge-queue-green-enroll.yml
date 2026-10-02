@@ -14,14 +14,14 @@ name: Merge Queue Green Enroll
 # on a PR, or a PR loses a hold label.
 # The ruleset's required checks on the merge group stay the only gate. Uses the
 # Jovie Bot app token because GITHUB_TOKEN-created merge groups start no CI.
-# ponytail: scans 100 open PRs per event; page if open non-draft PRs routinely exceed it.
+# Scans every open PR to main (paginated, newest first) on each event.
 
 on:
   workflow_run:
-    workflows: [CI, Fork PR Gate, PR Size Guard]
+    workflows: ['Source Validation', 'CI', 'Fork PR Gate', 'PR Size Guard']
     types: [completed]
   pull_request_target:
-    types: [unlabeled]
+    types: [unlabeled, reopened]
   workflow_dispatch:
     inputs:
       dry_run:
@@ -37,11 +37,12 @@ concurrency:
 
 jobs:
   enroll:
-    name: Enqueue green PRs
     if: >-
       github.event_name != 'workflow_run' ||
-      (github.event.workflow_run.event == 'pull_request' &&
-       github.event.workflow_run.conclusion == 'success')
+      (github.event.workflow_run.conclusion == 'success' &&
+       (github.event.workflow_run.event == 'pull_request' ||
+        github.event.workflow_run.event == 'pull_request_target'))
+    name: Enqueue green PRs
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -61,29 +62,41 @@ jobs:
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
-            const BLOCKING = new Set(['hold', 'gated', 'incident', 'do-not-merge']);
+            // queue-poison: ejected twice in 24 h (scripts/lanes/pr_events.py, JOV-6904);
+            // the lanes remove it with their fix.
+            const BLOCKING = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'queue-poison']);
             const { owner, repo } = context.repo;
-            const { repository } = await github.graphql(`
-              query($owner: String!, $repo: String!) {
-                repository(owner: $owner, name: $repo) {
-                  pullRequests(states: OPEN, baseRefName: "main", first: 100,
-                               orderBy: { field: UPDATED_AT, direction: ASC }) {
-                    nodes {
-                      id number isDraft headRefOid mergeStateStatus
+            // REST inventory avoids multiplying commits/timeline resolvers across
+            // 100 PRs, which exceeded GitHub's GraphQL resource limit in production.
+            // Complete inventory before mutating; paginate beyond 100 open PRs.
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', base: 'main', per_page: 100,
+            });
+            core.info(`scanned=${prs.length}`);
+            let enqueued = 0;
+            for (const candidate of prs) {
+              if (candidate.draft || candidate.head.repo?.full_name !== `${owner}/${repo}`) continue;
+              if (candidate.labels.some(l => BLOCKING.has(l.name.toLowerCase()))) continue;
+              // Read one current PR at a time. The roster never authorizes enqueue.
+              const { repository } = await github.graphql(`
+                query($owner: String!, $repo: String!, $number: Int!) {
+                  repository(owner: $owner, name: $repo) {
+                    pullRequest(number: $number) {
+                      id number state isDraft baseRefName headRefOid mergeStateStatus
                       isInMergeQueue isCrossRepository
-                      labels(first: 30) { nodes { name } }
+                      labels(first: 100) { pageInfo { hasNextPage } nodes { name } }
                       commits(last: 1) { nodes { commit { committedDate } } }
                       timelineItems(last: 1, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT]) {
                         nodes { ... on RemovedFromMergeQueueEvent { createdAt } }
                       }
                     }
                   }
-                }
-              }`, { owner, repo });
-            let enqueued = 0;
-            for (const pr of repository.pullRequests.nodes) {
+                }`, { owner, repo, number: candidate.number });
+              const pr = repository.pullRequest;
+              if (!pr || pr.state !== 'OPEN' || pr.baseRefName !== 'main') continue;
               if (pr.isDraft || pr.isInMergeQueue || pr.isCrossRepository) continue;
-              if (pr.mergeStateStatus !== 'CLEAN') continue;
+              if (pr.headRefOid !== candidate.head.sha || pr.mergeStateStatus !== 'CLEAN') continue;
+              if (pr.labels.pageInfo.hasNextPage) continue;
               const labels = pr.labels.nodes.map(l => l.name.toLowerCase());
               if (labels.some(l => BLOCKING.has(l))) continue;
               // The queue already rejected this exact head; wait for a new push.

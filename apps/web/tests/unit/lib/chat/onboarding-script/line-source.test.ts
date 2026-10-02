@@ -10,6 +10,7 @@ vi.mock('@/lib/db', () => ({
 }));
 
 import {
+  isHoldoutSession,
   loadScriptBank,
   pickFromBank,
   resetScriptBankCache,
@@ -90,6 +91,32 @@ describe('loadScriptBank', () => {
     await loadScriptBank();
     await loadScriptBank();
     expect(hoisted.dbSelectMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('holdout sessions never serve promoted lines (JOV-7148)', async () => {
+    mockActiveRows([PROMOTED_ROW]);
+    const bank = await loadScriptBank();
+    const holdoutSessions: string[] = [];
+    const treatmentSessions: string[] = [];
+    for (
+      let i = 0;
+      i < 2000 && (holdoutSessions.length < 3 || treatmentSessions.length < 3);
+      i += 1
+    ) {
+      const sessionId = `sess-${i}`;
+      (isHoldoutSession(sessionId) ? holdoutSessions : treatmentSessions).push(
+        sessionId
+      );
+    }
+    expect(holdoutSessions.length).toBeGreaterThan(0);
+    for (const sessionId of holdoutSessions) {
+      const line = pickFromBank(bank, 'waitlist', sessionId);
+      expect(line.key).not.toBe('waitlist:cand_ab12cd34');
+      expect(line.stepId).toBe('waitlist');
+    }
+    // Treatment sessions still see the promoted line (weight dominates).
+    const treated = pickFromBank(bank, 'waitlist', treatmentSessions[0] ?? 's');
+    expect(treated.key).toBe('waitlist:cand_ab12cd34');
   });
 
   it('ignores rows with unknown step ids', async () => {

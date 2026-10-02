@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AddReleaseSidebar } from '@/features/dashboard/organisms/release-provider-matrix/AddReleaseSidebar';
+import { AddReleaseSidebar } from '@/components/features/dashboard/organisms/release-provider-matrix/AddReleaseSidebar';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 const { mockCreateRelease, mockToast } = vi.hoisted(() => ({
@@ -96,21 +96,21 @@ vi.mock('@/components/molecules/drawer', () => ({
       More
     </button>
   ),
-  EntityHeaderCard: ({
+  EntityHeader: ({
     title,
     subtitle,
     meta,
-    image,
+    thumbnail,
     actions,
   }: {
     title: ReactNode;
     subtitle?: ReactNode;
     meta?: ReactNode;
-    image?: ReactNode;
+    thumbnail?: ReactNode;
     actions?: ReactNode;
   }) => (
     <div data-testid='entity-header-card'>
-      {image}
+      {thumbnail}
       <div data-testid='entity-header-actions'>{actions}</div>
       <div data-testid='entity-header-title'>{title}</div>
       <div data-testid='entity-header-subtitle'>{subtitle}</div>
@@ -382,7 +382,11 @@ describe('AddReleaseSidebar', () => {
 
     expect(screen.getByLabelText('Title')).toBeInTheDocument();
     expect(screen.getByLabelText('Release Type')).toBeInTheDocument();
-    expect(screen.getByLabelText('Release Date')).toBeInTheDocument();
+    const releaseDateTrigger = screen.getByLabelText('Release Date');
+    expect(releaseDateTrigger).toBeInTheDocument();
+    // Shared DatePicker molecule renders a non-submitting button trigger.
+    expect(releaseDateTrigger.tagName).toBe('BUTTON');
+    expect(releaseDateTrigger).toHaveAttribute('type', 'button');
     expect(screen.getByText('Pick a date')).toBeInTheDocument();
     expect(screen.getByLabelText('Explicit')).toBeInTheDocument();
     expect(screen.getByText('Choose Genre')).toBeInTheDocument();
@@ -402,6 +406,8 @@ describe('AddReleaseSidebar', () => {
 
     const revealDatePicker = screen.getByLabelText('Reveal Date');
     expect(revealDatePicker).toBeInTheDocument();
+    expect(revealDatePicker.tagName).toBe('BUTTON');
+    expect(revealDatePicker).toHaveAttribute('type', 'button');
     expect(revealDatePicker).toHaveTextContent('Pick a date');
 
     await user.click(screen.getAllByTestId('calendar-select-date')[1]!);

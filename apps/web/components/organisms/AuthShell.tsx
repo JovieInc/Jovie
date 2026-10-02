@@ -7,18 +7,21 @@ import { useMemo } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { useComposerFocus } from '@/components/features/chat/Composer';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton';
-import { SidebarProvider, useSidebar } from '@/components/organisms/Sidebar';
+import { SidebarProvider, useSidebar } from '@/components/organisms/sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
 import { RuntimeUpdateProvider } from '@/components/shell/RuntimeUpdateProvider';
 import { useRightPanel } from '@/contexts/RightPanelContext';
 import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
 import { MobileProfileDrawer } from '@/features/dashboard/organisms/MobileProfileDrawer';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { env } from '@/lib/env-client';
 import type { AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
 import { OperatorMobileNavigation } from './OperatorMobileNavigation';
 import { PersistentAudioBar } from './PersistentAudioBar';
+import { WhatsNewBanner } from './whats-new/WhatsNewBanner';
 export interface AuthShellProps {
   readonly section: AppShellSection;
   readonly breadcrumbs: DashboardBreadcrumbItem[];
@@ -38,6 +41,19 @@ export interface AuthShellProps {
   readonly onSidebarOpenChange?: (open: boolean) => void;
   readonly sidebarDefaultOpen?: boolean;
   readonly children: ReactNode;
+}
+
+/** Mac app everywhere; on the web only the operator shell (dogfood). */
+export function isWhatsNewBannerEnabled({
+  section,
+  isElectron,
+  isAutomatedTest,
+}: {
+  readonly section: AppShellSection;
+  readonly isElectron: boolean;
+  readonly isAutomatedTest: boolean;
+}): boolean {
+  return !isAutomatedTest && (isElectron || section === 'ov');
 }
 
 function getContentClassName(showMobileTabs: boolean, isTableRoute: boolean) {
@@ -62,9 +78,20 @@ function AuthShellInner({
   const { isComposerFocused } = useComposerFocus();
   const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
-  const sidebarTrigger = isMobile ? null : sidebarState === 'closed' ? (
-    <SidebarCollapseButton />
-  ) : null;
+  const isElectron = useIsElectronRuntime();
+  const showWhatsNew = isWhatsNewBannerEnabled({
+    section,
+    isElectron,
+    isAutomatedTest: env.IS_TEST || env.IS_E2E,
+  });
+  // The desktop window-control row (DesktopTitlebar) owns the single canonical
+  // left-sidebar toggle in Electron. Keep the initial client tree identical to
+  // SSR; the runtime CSS hides the header slot before paint, and this hook
+  // removes it after hydration without replacing the shell or losing drafts.
+  const sidebarTrigger =
+    isMobile || isElectron ? null : sidebarState === 'closed' ? (
+      <SidebarCollapseButton />
+    ) : null;
 
   const isInSettings = section === 'settings';
   const hideTopHeader = isInSettings || isLyricsRoute;
@@ -128,6 +155,7 @@ function AuthShellInner({
         contentClassName={getContentClassName(hasMobileBottomNav, isTableRoute)}
         composerFocusActive={isComposerFocused && !isMobile}
       />
+      <WhatsNewBanner enabled={showWhatsNew} />
     </RuntimeUpdateProvider>
   );
 }

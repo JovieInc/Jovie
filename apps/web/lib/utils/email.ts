@@ -69,3 +69,111 @@ export function getEmailSendBlockReason(email: string): string | null {
 
   return null;
 }
+
+// ============================================================================
+// Internal / test account detection
+//
+// Company reads (e.g. Summer revenue + cohorts, JOV-6673) must only count real
+// external customers. Team inboxes live on jov.ie (and any configured admin
+// domain); seeded QA/E2E/demo accounts use recognizable local parts. Keep the
+// JS classifier and INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN in sync — the SQL copy
+// is a POSIX ERE used by Postgres `~*` queries where per-row JS filtering
+// would break aggregate counts.
+// ============================================================================
+
+/**
+ * Domains whose accounts are always internal, never customers. The admin
+ * email domain mirrors NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN (same default as
+ * `constants/domains.ts`); it is read from env directly so this module stays
+ * dependency-free for test mocks.
+ */
+const INTERNAL_ACCOUNT_EMAIL_DOMAINS = [
+  'jov.ie',
+  (process.env.NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN || 'jov.ie').trim().toLowerCase(),
+] as const;
+
+/**
+ * Dogfood/QA mailbox domains (JOV-7362). Accounts on these domains are created
+ * exclusively for internal dogfooding and QA (e.g. `*@test.jovie.com` E2E and
+ * auth-surface QA accounts) and must never count as customers in cohort,
+ * revenue, or growth metrics.
+ */
+const DOGFOOD_ACCOUNT_EMAIL_DOMAINS = ['test.jovie.com'] as const;
+
+/**
+ * Local-part prefixes used by seeded QA/E2E accounts. Written as a POSIX-safe
+ * alternation so the same source can drive both the JS RegExp below and the
+ * SQL pattern (`auth[-_]?qa` covers both `auth-qa` and `auth_qa`).
+ */
+const TEST_ACCOUNT_LOCAL_PART_PREFIXES =
+  '(e2e|browse|auth[-_]?qa|qa|smoke|staging|test|demo|dogfood|seed|fixture|autotest)';
+
+const TEST_ACCOUNT_LOCAL_PART_PATTERN = new RegExp(
+  `^${TEST_ACCOUNT_LOCAL_PART_PREFIXES}([-_.+]|$)`
+);
+
+/** Clerk test-address tag, e.g. browse+clerk_test@jov.ie */
+const CLERK_TEST_TAG_PATTERN = /\+clerk_test(\+|$)/;
+
+/** Seeded demo personas, e.g. dualipa-public@jov.ie */
+const DEMO_PLACEHOLDER_LOCAL_PART_PATTERN = /-public$/;
+
+/**
+ * POSIX ERE equivalent of `isInternalOrTestAccountEmail` for use in Postgres
+ * `~*` filters. `users.email` is compared lowercased + case-insensitively.
+ */
+export const INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN = [
+  // Internal team domains (jov.ie + configured admin domain), incl. subdomains
+  `@(.*\\.)?(${INTERNAL_ACCOUNT_EMAIL_DOMAINS.map(domain =>
+    domain.replaceAll('.', '\\.')
+  ).join('|')})$`,
+  // Dogfood/QA mailbox domains (test.jovie.com), incl. subdomains
+  `@(.*\\.)?(${DOGFOOD_ACCOUNT_EMAIL_DOMAINS.map(domain =>
+    domain.replaceAll('.', '\\.')
+  ).join('|')})$`,
+  // Reserved/test-only domains (+ subdomains)
+  '@(.*\\.)?(example\\.(com|net|org)|invalid|localhost|test)$',
+  // Clerk test-address tag anywhere in the local part
+  `^[^@]*\\+clerk_test(\\+[^@]*)?@`,
+  // Demo placeholder personas: *-public@…
+  '^[^@]+-public@',
+  // Known test/QA local-part prefixes on any domain (separator or bare local)
+  `^${TEST_ACCOUNT_LOCAL_PART_PREFIXES}([-_.+][^@]*)?@`,
+].join('|');
+
+/**
+ * True when the email belongs to an internal or test/demo account rather than
+ * a real external customer: team domains (jov.ie, admin domain), dogfood/QA
+ * mailbox domains (test.jovie.com), reserved test domains, Clerk `+clerk_test`
+ * tags, `*-public` demo placeholders, and seeded QA local-part prefixes (e2e,
+ * browse, qa, auth-qa, smoke, staging, test, demo, dogfood, seed, fixture,
+ * autotest).
+ */
+export function isInternalOrTestAccountEmail(
+  email: string | null | undefined
+): boolean {
+  if (!email) return false;
+  const normalized = normalizeEmail(email);
+  const atIndex = normalized.lastIndexOf('@');
+  if (atIndex <= 0 || atIndex === normalized.length - 1) return false;
+
+  const localPart = normalized.slice(0, atIndex);
+  const domain = normalized.slice(atIndex + 1);
+
+  if (
+    [...INTERNAL_ACCOUNT_EMAIL_DOMAINS, ...DOGFOOD_ACCOUNT_EMAIL_DOMAINS].some(
+      internalDomain =>
+        domain === internalDomain || domain.endsWith(`.${internalDomain}`)
+    )
+  ) {
+    return true;
+  }
+
+  if (isReservedTestEmailDomain(domain)) return true;
+
+  return (
+    TEST_ACCOUNT_LOCAL_PART_PATTERN.test(localPart) ||
+    CLERK_TEST_TAG_PATTERN.test(localPart) ||
+    DEMO_PLACEHOLDER_LOCAL_PART_PATTERN.test(localPart)
+  );
+}

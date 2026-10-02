@@ -11,6 +11,12 @@ import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { onboardingScriptLines } from '@/lib/db/schema/onboarding-script';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { logger } from '@/lib/utils/logger';
+import {
+  evaluatePromotionGate,
+  type PromotionGateEvidence,
+  type PromotionLineChange,
+} from './promotion-gate';
+import { mergedPromotionReceipts } from './promotion-receipts';
 
 /**
  * Nightly self-improvement job for the deterministic onboarding script
@@ -20,12 +26,16 @@ import { logger } from '@/lib/utils/logger';
  * 2. Recompute impressions/conversions per served line over a 90-day
  *    window (idempotent — no watermark).
  * 3. Mine candidate lines from LLM responses in onboarding conversations:
+ *    PII-redacted, injection-screened (transcripts are untrusted input),
  *    lint-clean, generic-step only, seen in ≥5 converted conversations.
  *    Candidates are stored but NOT served.
- * 4. Promote a candidate to active when its source-response conversion
- *    rate beats the best active line for that step by ≥1.2× with enough
- *    volume on both sides.
- * 5. Re-weight active promoted lines; retire ones that stopped converting.
+ * 4. Promotions/reweights/retirements are emitted as a versioned promotion
+ *    receipt and submitted through the PR machinery
+ *    (apps/web/data/onboarding-script-promotions/). Only receipt changes
+ *    that already merged — meaning the protected ci-promptfoo-evals lane
+ *    went green on that head — are applied here, and only when the receipt's
+ *    gate evidence (eval result + north-star cohort, JOV-7146) still holds
+ *    against current stats.
  *
  * Conversion = the conversation was claimed onto a profile that finished
  * onboarding (creator_profiles.onboarding_completed_at). Attribution is
@@ -112,8 +122,8 @@ function rate(stats: LineStats): number {
   return stats.impressions > 0 ? stats.conversions / stats.impressions : 0;
 }
 
-/** Promotion rule — pure, unit-tested. */
-export function shouldPromoteCandidate(input: {
+/** Statistical side of the promotion rule — pure, unit-tested. */
+function statsClearPromotionBar(input: {
   readonly candidate: LineStats & { readonly text: string };
   readonly bestActive: LineStats | null;
 }): boolean {
@@ -127,8 +137,22 @@ export function shouldPromoteCandidate(input: {
   return rate(candidate) >= rate(bestActive) * PROMOTION_LIFT;
 }
 
-/** Weight adjustment for active promoted lines — pure, unit-tested. */
-export function adjustPromotedWeight(input: {
+/**
+ * Promotion rule — pure, unit-tested. Requires a green protected
+ * `ci-promptfoo-evals` result plus north-star cohort evidence (JOV-7148):
+ * live copy never changes on stats alone.
+ */
+export function shouldPromoteCandidate(input: {
+  readonly candidate: LineStats & { readonly text: string };
+  readonly bestActive: LineStats | null;
+  readonly gate: PromotionGateEvidence | null;
+}): boolean {
+  if (!evaluatePromotionGate(input.gate).ok) return false;
+  return statsClearPromotionBar(input);
+}
+
+/** Statistical side of the weight rule — pure, unit-tested. */
+function statsAdjustPromotedWeight(input: {
   readonly stats: LineStats;
   readonly bestSeedRate: number | null;
 }): { readonly weight: number; readonly retire: boolean } | null {
@@ -144,6 +168,19 @@ export function adjustPromotedWeight(input: {
     Math.max(10, Math.round((100 * lineRate) / bestSeedRate))
   );
   return { weight, retire: false };
+}
+
+/**
+ * Weight adjustment for active promoted lines — pure, unit-tested.
+ * Same gate as promotion: protected eval green + north-star cohort evidence.
+ */
+export function adjustPromotedWeight(input: {
+  readonly stats: LineStats;
+  readonly bestSeedRate: number | null;
+  readonly gate: PromotionGateEvidence | null;
+}): { readonly weight: number; readonly retire: boolean } | null {
+  if (!evaluatePromotionGate(input.gate).ok) return null;
+  return statsAdjustPromotedWeight(input);
 }
 
 export function candidateLineKey(stepId: ScriptStepId, text: string): string {
@@ -224,6 +261,38 @@ export interface CandidateStat {
   readonly conversions: number;
 }
 
+const PII_PATTERNS: readonly [RegExp, string][] = [
+  [/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[email]'],
+  [
+    /\b(?:sk|pk|xox[baprs]|ghp|gho|glpat)-[A-Za-z0-9_-]{8,}|\bBearer\s+[A-Za-z0-9._-]{10,}/gi,
+    '[token]',
+  ],
+  [/(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b/g, '[phone]'],
+];
+
+/**
+ * Transcript rows are untrusted input. PII is stripped before candidate
+ * text is stored or counted, so mined lines can never smuggle a visitor's
+ * contact details or leaked credentials into serving copy.
+ */
+export function redactTranscriptPii(text: string): string {
+  return PII_PATTERNS.reduce(
+    (current, [pattern, replacement]) => current.replace(pattern, replacement),
+    text
+  ).replace(/\s{2,}/g, ' ');
+}
+
+/**
+ * Instruction-shaped transcript text is rejected outright: transcript
+ * content may inform which line we propose but must never steer tools,
+ * policy, or carry markup that would be interpreted as instructions.
+ */
+export function containsInstructionVector(text: string): boolean {
+  return /ignore\s+(all\s+|any\s+)?(previous|prior|above)\s+(instructions|prompts)|<\s*\/?\s*(system|developer|assistant|tool_call|untrusted-source)|jv-prompt-canary|ONBOARDING_SYSTEM_PROMPT|reveal\s+(your|the)\s+(system|hidden)\s+(prompt|instructions)|```\s*(system|prompt)/i.test(
+    text
+  );
+}
+
 /** Group LLM responses into per-(step, text) stats — pure, unit-tested. */
 export function aggregateLlmCandidates(
   rows: readonly LlmMessageRow[]
@@ -238,11 +307,12 @@ export function aggregateLlmCandidates(
     }
   >();
   for (const row of rows) {
-    const text = row.content.trim();
+    if (containsInstructionVector(row.content)) continue;
+    const text = redactTranscriptPii(row.content.trim());
     if (text.length < 20 || text.length > 500) continue;
     const stepId = deriveStepFromToolEvents(row.toolCalls);
     if (!stepId || !PROMOTABLE_STEPS.includes(stepId)) continue;
-    const key = `${stepId} ${text}`;
+    const key = `${stepId}\u0000${text}`;
     let entry = byKey.get(key);
     if (!entry) {
       entry = { stepId, text, impressions: new Set(), conversions: new Set() };
@@ -323,88 +393,180 @@ async function mineCandidates(): Promise<number> {
   return inserted;
 }
 
-async function promoteAndReweight(): Promise<{
-  promoted: number;
-  retired: number;
-  reweighted: number;
-}> {
-  const all = await db.select().from(onboardingScriptLines);
-  const byStep = new Map<string, typeof all>();
-  for (const row of all) {
+type ScriptLineRow = typeof onboardingScriptLines.$inferSelect;
+
+interface StepGroup {
+  readonly bestActive: LineStats | null;
+  readonly bestSeedRate: number | null;
+}
+
+function groupRowsByStep(rows: readonly ScriptLineRow[]) {
+  const byStep = new Map<string, ScriptLineRow[]>();
+  for (const row of rows) {
     const group = byStep.get(row.stepId) ?? [];
     group.push(row);
     byStep.set(row.stepId, group);
   }
+  return byStep;
+}
 
+function stepGroupStats(group: readonly ScriptLineRow[]): StepGroup {
+  const active = group.filter(row => row.status === 'active');
+  const bestActive = active
+    .filter(row => row.impressions >= MIN_IMPRESSIONS_FOR_PROMOTION)
+    .sort((a, b) => rate(b) - rate(a))[0];
+  const qualifiedSeeds = active.filter(
+    row =>
+      row.source === 'seed' && row.impressions >= MIN_IMPRESSIONS_FOR_PROMOTION
+  );
+  return {
+    bestActive: bestActive
+      ? {
+          impressions: bestActive.impressions,
+          conversions: bestActive.conversions,
+        }
+      : null,
+    bestSeedRate:
+      qualifiedSeeds.length > 0
+        ? Math.max(...qualifiedSeeds.map(row => rate(row)))
+        : null,
+  };
+}
+
+/**
+ * Propose the promotion batch a PR would carry. Statistical rules only —
+ * the emitted receipt records the gate evidence a reviewer must attach;
+ * nothing here touches live rows.
+ */
+function planPromotionChanges(
+  rows: readonly ScriptLineRow[]
+): PromotionLineChange[] {
+  const changes: PromotionLineChange[] = [];
+  for (const [stepId, group] of groupRowsByStep(rows)) {
+    const { bestActive, bestSeedRate } = stepGroupStats(group);
+    for (const row of group) {
+      if (row.status === 'candidate') {
+        if (
+          statsClearPromotionBar({
+            candidate: {
+              text: row.text,
+              impressions: row.impressions,
+              conversions: row.conversions,
+            },
+            bestActive,
+          })
+        ) {
+          changes.push({
+            lineKey: row.lineKey,
+            stepId,
+            action: 'promote',
+            status: 'active',
+            weight: PROMOTED_INITIAL_WEIGHT,
+            previous: { status: 'candidate', weight: row.weight },
+            text: row.text,
+          });
+        }
+        continue;
+      }
+      if (row.status === 'active' && row.source === 'promoted') {
+        const adjustment = statsAdjustPromotedWeight({
+          stats: { impressions: row.impressions, conversions: row.conversions },
+          bestSeedRate,
+        });
+        if (!adjustment) continue;
+        changes.push({
+          lineKey: row.lineKey,
+          stepId,
+          action: adjustment.retire ? 'retire' : 'reweight',
+          status: adjustment.retire ? 'retired' : 'active',
+          weight: adjustment.weight,
+          previous: { status: 'active', weight: row.weight },
+        });
+      }
+    }
+  }
+  return changes;
+}
+
+/**
+ * Apply only changes carried by merged promotion/rollback receipts. Each
+ * receipt is re-validated against its gate evidence and the current stats
+ * for that row, so a stale or fabricated change never ships. Idempotent:
+ * reapplying a receipt converges to the same state.
+ */
+async function applyMergedReceipts(): Promise<{
+  promoted: number;
+  retired: number;
+  reweighted: number;
+}> {
+  const pending = mergedPromotionReceipts();
+  if (pending.length === 0) return { promoted: 0, retired: 0, reweighted: 0 };
+
+  const all = await db.select().from(onboardingScriptLines);
+  const byKey = new Map(all.map(row => [row.lineKey, row]));
+  const byStep = groupRowsByStep(all);
+  const now = new Date();
   let promoted = 0;
   let retired = 0;
   let reweighted = 0;
-  const now = new Date();
 
-  for (const [, group] of byStep) {
-    const active = group.filter(row => row.status === 'active');
-    const bestActive = active
-      .filter(row => row.impressions >= MIN_IMPRESSIONS_FOR_PROMOTION)
-      .sort((a, b) => rate(b) - rate(a))[0];
-    const qualifiedSeeds = active.filter(
-      row =>
-        row.source === 'seed' &&
-        row.impressions >= MIN_IMPRESSIONS_FOR_PROMOTION
+  for (const { change, evidence, rollback } of pending) {
+    const row = byKey.get(change.lineKey);
+    if (!row || row.stepId !== change.stepId) continue;
+    if (row.status === change.status && row.weight === change.weight) continue;
+
+    const { bestActive, bestSeedRate } = stepGroupStats(
+      byStep.get(row.stepId) ?? []
     );
-    const bestSeedRate =
-      qualifiedSeeds.length > 0
-        ? Math.max(...qualifiedSeeds.map(row => rate(row)))
-        : null;
 
-    for (const row of group) {
-      if (row.status === 'candidate') {
-        const promote = shouldPromoteCandidate({
+    if (change.action === 'promote') {
+      if (
+        !shouldPromoteCandidate({
           candidate: {
             text: row.text,
             impressions: row.impressions,
             conversions: row.conversions,
           },
-          bestActive: bestActive
-            ? {
-                impressions: bestActive.impressions,
-                conversions: bestActive.conversions,
-              }
-            : null,
-        });
-        if (promote) {
-          await db
-            .update(onboardingScriptLines)
-            .set({
-              status: 'active',
-              weight: PROMOTED_INITIAL_WEIGHT,
-              updatedAt: now,
-            })
-            .where(eq(onboardingScriptLines.id, row.id));
-          promoted += 1;
-        }
+          bestActive,
+          gate: evidence,
+        })
+      ) {
         continue;
       }
-      if (row.status === 'active' && row.source === 'promoted') {
-        const adjustment = adjustPromotedWeight({
-          stats: { impressions: row.impressions, conversions: row.conversions },
-          bestSeedRate,
-        });
-        if (!adjustment) continue;
-        await db
-          .update(onboardingScriptLines)
-          .set({
-            weight: adjustment.weight,
-            status: adjustment.retire ? 'retired' : 'active',
-            updatedAt: now,
-          })
-          .where(eq(onboardingScriptLines.id, row.id));
-        if (adjustment.retire) retired += 1;
-        else reweighted += 1;
-      }
+    } else if (change.action === 'reweight' || change.action === 'retire') {
+      const adjustment = adjustPromotedWeight({
+        stats: { impressions: row.impressions, conversions: row.conversions },
+        bestSeedRate,
+        gate: evidence,
+      });
+      if (!adjustment) continue;
+      if (adjustment.retire !== (change.status === 'retired')) continue;
+      if (!adjustment.retire && adjustment.weight !== change.weight) continue;
+    } else if (change.action !== 'restore' || !rollback) {
+      continue;
     }
+    // Rollback 'restore' changes need no gate — reverting copy is always safe.
+
+    await db
+      .update(onboardingScriptLines)
+      .set({ status: change.status, weight: change.weight, updatedAt: now })
+      .where(eq(onboardingScriptLines.id, row.id));
+    row.status = change.status;
+    row.weight = change.weight;
+    if (change.action === 'promote') promoted += 1;
+    else if (change.status === 'retired') retired += 1;
+    else reweighted += 1;
   }
   return { promoted, retired, reweighted };
 }
+
+/**
+ * JOV-7148: live-copy changes require a merged promotion receipt — a PR on
+ * `apps/web/data/onboarding-script-promotions/` forces the protected
+ * ci-promptfoo-evals lane — plus north-star cohort evidence. The flag now
+ * gates the whole receipt-apply path, not ungated promotion.
+ */
+export const ONBOARDING_SCRIPT_AUTO_PROMOTION = true;
 
 export async function runOnboardingScriptAggregation(): Promise<
   Record<string, unknown>
@@ -412,11 +574,17 @@ export async function runOnboardingScriptAggregation(): Promise<
   const seedsInserted = await syncSeeds();
   const countersUpdated = await recomputeServedCounters();
   const candidatesInserted = await mineCandidates();
-  const { promoted, retired, reweighted } = await promoteAndReweight();
+  const all = await db.select().from(onboardingScriptLines);
+  const pendingChanges = planPromotionChanges(all);
+  const { promoted, retired, reweighted } = ONBOARDING_SCRIPT_AUTO_PROMOTION
+    ? await applyMergedReceipts()
+    : { promoted: 0, retired: 0, reweighted: 0 };
   const summary = {
     seedsInserted,
     countersUpdated,
     candidatesInserted,
+    promotion: ONBOARDING_SCRIPT_AUTO_PROMOTION ? 'receipt-gated' : 'frozen',
+    pendingPromotionChanges: pendingChanges.length,
     promoted,
     retired,
     reweighted,

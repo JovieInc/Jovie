@@ -71,6 +71,26 @@ vi.mock('@/components/atoms/InvisibleTurnstile', () => ({
 }));
 
 describe('ChangelogEmailSignup', () => {
+  it('binds the shared marketing opt-in on its actual semantic root', () => {
+    const { unmount } = render(
+      <ChangelogEmailSignup source='marketing:/pricing' marketingSection />
+    );
+    const root = screen.getByTestId('marketing-section-capture');
+    expect(root.tagName).toBe('SECTION');
+    expect(root).toHaveAttribute('data-marketing-variant', 'email-only');
+    expect(root).toHaveAttribute(
+      'data-marketing-occurrence',
+      'product-updates'
+    );
+    expect(root).toHaveAttribute(
+      'data-marketing-owner',
+      'apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx'
+    );
+    unmount();
+    render(<ChangelogEmailSignup />);
+    expect(screen.queryByTestId('marketing-section-capture')).toBeNull();
+  });
+
   const originalFetch = global.fetch;
 
   beforeEach(() => {

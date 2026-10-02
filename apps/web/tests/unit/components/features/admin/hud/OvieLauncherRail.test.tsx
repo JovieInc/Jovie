@@ -33,6 +33,34 @@ const INVENTORY = rankLaunchers({
 });
 
 describe('OvieLauncherRail', () => {
+  it('explains the admin step-up lock instead of a generic failure', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue({ ok: false, status: 403, json: async () => ({}) })
+    );
+    render(<OvieLauncherRail />);
+    expect(
+      await screen.findByText(
+        'Admin data is locked. Unlock with Touch ID, then retry.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the generic failure for real outages', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue({ ok: false, status: 500, json: async () => ({}) })
+    );
+    render(<OvieLauncherRail />);
+    expect(
+      await screen.findByText('Launcher destinations could not be loaded.')
+    ).toBeInTheDocument();
+  });
+
   it('separates local/SSH from web, disables unavailable, and hides agent CLI', async () => {
     vi.stubGlobal(
       'fetch',
@@ -64,5 +92,36 @@ describe('OvieLauncherRail', () => {
     expect(
       screen.queryByTestId('ovie-launcher-all-gmail')
     ).not.toBeInTheDocument();
+  });
+
+  it('compact renders only ready primary destinations and no chrome', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: async () => INVENTORY })
+    );
+    render(<OvieLauncherRail compact />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ovie-launcher-gbrain')).toBeEnabled();
+    });
+    expect(screen.queryByText('All tools')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('ovie-launcher-search')
+    ).not.toBeInTheDocument();
+  });
+
+  it('compact renders nothing while the inventory is locked or empty', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue({ ok: false, status: 403, json: async () => ({}) })
+    );
+    const { container } = render(<OvieLauncherRail compact />);
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalled();
+    });
+    expect(container).toBeEmptyDOMElement();
   });
 });

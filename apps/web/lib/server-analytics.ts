@@ -1,8 +1,24 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
+import { sql as drizzleSql } from 'drizzle-orm';
+import {
+  LIMITED_DROP_CARD_PLACEMENTS,
+  LIMITED_DROP_EVENT_NAMES,
+  LIMITED_DROP_FUNNEL_CONTRACT_VERSION,
+  LIMITED_DROP_ITEM_MODES,
+  LIMITED_DROP_PAGE_IDS,
+  LIMITED_DROP_STATES,
+  LIMITED_DROP_TERMINAL_REASONS,
+} from '@/lib/analytics/limited-drop-funnel';
 import { identifyUser } from '@/lib/analytics/runtime-aware';
-import { db } from '@/lib/db';
+import {
+  SIGNUP_FUNNEL_ALL_STEPS,
+  SIGNUP_FUNNEL_IDS,
+  SIGNUP_FUNNEL_OUTCOMES,
+  SIGNUP_FUNNEL_SURFACES,
+} from '@/lib/analytics/signup-funnel';
+import { type DbOrTransaction, db } from '@/lib/db';
 import { serverAnalyticsEvents } from '@/lib/db/schema/analytics';
 import { withTimeout } from '@/lib/resilience/primitives';
 
@@ -28,7 +44,9 @@ interface ServerAnalyticsEventDefinition {
     | 'release'
     | 'tour'
     | 'notification'
-    | 'entitlement';
+    | 'entitlement'
+    | 'funnel'
+    | 'billing';
   readonly properties: readonly string[];
   readonly source?: {
     readonly property: string;
@@ -57,6 +75,31 @@ const notificationProperties = [
 const notificationEvent = {
   category: 'notification',
   properties: notificationProperties,
+} as const satisfies ServerAnalyticsEventDefinition;
+
+const limitedDropProperties = [
+  'contract_version',
+  'event_id',
+  'session_id',
+  'artist_id',
+  'asset_id',
+  'drop_id',
+  'page_id',
+  'state',
+  'card_placement',
+  'share_id',
+  'campaign_id',
+  'experiment_id',
+  'variant_id',
+  'item_mode',
+  'channel',
+  'terminal_reason',
+] as const;
+
+const limitedDropEvent = {
+  category: 'funnel',
+  properties: limitedDropProperties,
+  source: { property: 'artist_id', type: 'creator_profile' },
 } as const satisfies ServerAnalyticsEventDefinition;
 
 export const SERVER_ANALYTICS_EVENTS = {
@@ -175,6 +218,81 @@ export const SERVER_ANALYTICS_EVENTS = {
     category: 'entitlement',
     properties: ['gate', 'source', 'toolName', 'code', 'planRequired'],
   },
+  claim_started: {
+    category: 'funnel',
+    properties: ['profileId', 'source'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
+  claim_completed: {
+    category: 'funnel',
+    properties: ['profileId', 'source'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
+  signup_completed: {
+    category: 'funnel',
+    properties: ['profileId', 'source'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
+  activation_achieved: {
+    category: 'funnel',
+    properties: ['profileId', 'source'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
+  checkout_initiated: {
+    category: 'funnel',
+    properties: ['checkoutSessionId', 'plan', 'source'],
+  },
+  payment_succeeded: {
+    category: 'billing',
+    properties: ['stripeEventId', 'billingReason', 'checkoutSessionId'],
+  },
+  subscription_renewed: {
+    category: 'billing',
+    properties: ['stripeEventId', 'billingReason'],
+  },
+  subscription_churned: {
+    category: 'billing',
+    properties: ['stripeEventId'],
+  },
+  // signup-funnel/v1: no source entity, so a step can never be joined back
+  // to a profile, user, or visitor.
+  funnel_step: {
+    category: 'funnel',
+    properties: ['funnel_id', 'step', 'outcome', 'surface', 'reason'],
+  },
+  asset_page_viewed: limitedDropEvent,
+  drop_countdown_viewed: limitedDropEvent,
+  drop_capture_started: limitedDropEvent,
+  drop_capture_submitted: limitedDropEvent,
+  drop_marketing_consent_granted: limitedDropEvent,
+  drop_purchase_started: limitedDropEvent,
+  drop_purchase_completed: limitedDropEvent,
+  drop_terminal_reached: limitedDropEvent,
+  profile_card_impression: limitedDropEvent,
+  profile_card_clicked: limitedDropEvent,
+  completed_drop_card_exposure: limitedDropEvent,
+  completed_drop_signup: limitedDropEvent,
+  /**
+   * Artist Presence ($199/mo) upgrade offer presented once per claimed
+   * artist after first profile claim (JOV-6675). Keyed by creator profile so
+   * the offer state survives sessions and the funnel resolves
+   * seen → accepted → checkout → paid.
+   */
+  onboarding_upgrade_offer_seen: {
+    category: 'billing',
+    properties: ['profileId', 'plan'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
+  onboarding_upgrade_offer_accepted: {
+    category: 'billing',
+    properties: ['profileId', 'plan'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
+  onboarding_upgrade_offer_dismissed: {
+    category: 'billing',
+    properties: ['profileId', 'plan'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
 } as const satisfies Record<string, ServerAnalyticsEventDefinition>;
 
 export type ServerAnalyticsEventName = keyof typeof SERVER_ANALYTICS_EVENTS;
@@ -241,7 +359,21 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
   {
     path: 'app/onboarding/actions/connect-spotify.ts',
     invocations: 1,
-    events: ['releases_synced'],
+    events: ['releases_synced', 'claim_completed', 'activation_achieved'],
+  },
+  {
+    path: 'app/onboarding/actions/index.ts',
+    invocations: 0,
+    events: ['claim_completed', 'signup_completed', 'activation_achieved'],
+  },
+  {
+    path: 'lib/onboarding/upgrade-offer.ts',
+    invocations: 1,
+    events: [
+      'onboarding_upgrade_offer_seen',
+      'onboarding_upgrade_offer_accepted',
+      'onboarding_upgrade_offer_dismissed',
+    ],
   },
   {
     path: 'app/r/[slug]/page.tsx',
@@ -265,6 +397,36 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     invocations: 1,
     events: ['entitlement_denial'],
   },
+  {
+    path: 'app/api/stripe/checkout/route.ts',
+    invocations: 1,
+    events: ['checkout_initiated'],
+  },
+  {
+    path: 'lib/stripe/webhooks/handlers/payment-handler.ts',
+    invocations: 1,
+    events: ['payment_succeeded', 'subscription_renewed'],
+  },
+  {
+    path: 'lib/stripe/webhooks/handlers/subscription-handler.ts',
+    invocations: 1,
+    events: ['subscription_churned'],
+  },
+  {
+    path: 'lib/claim/context.ts',
+    invocations: 1,
+    events: ['claim_started'],
+  },
+  {
+    path: 'lib/analytics/signup-funnel.server.ts',
+    invocations: 1,
+    events: ['funnel_step'],
+  },
+  {
+    path: 'lib/analytics/limited-drop-funnel.server.ts',
+    invocations: 1,
+    events: LIMITED_DROP_EVENT_NAMES,
+  },
 ] as const satisfies ReadonlyArray<{
   readonly path: string;
   readonly invocations: number;
@@ -275,27 +437,49 @@ type SafePropertyValue = string | number | boolean | null;
 
 const UUID_PROPERTY_NAMES = new Set([
   'artist_id',
+  'asset_id',
+  'drop_id',
   'eventId',
+  'event_id',
   'profileId',
   'releaseId',
+  'session_id',
   'tourDateId',
 ]);
 const SAFE_TOKEN_PROPERTY_NAMES = new Set([
+  'billingReason',
+  'campaign_id',
+  'checkoutSessionId',
   'code',
   'error_type',
+  'experiment_id',
   'gate',
+  'plan',
   'planRequired',
   'provider',
   'reason',
   'result',
+  'share_id',
   'source',
+  'stripeEventId',
   'toolName',
+  'variant_id',
 ]);
 const ENUM_PROPERTY_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
+  card_placement: new Set(LIMITED_DROP_CARD_PLACEMENTS),
   channel: new Set(['email', 'sms']),
   client: new Set(['web', 'ios', 'electron']),
+  contract_version: new Set([LIMITED_DROP_FUNNEL_CONTRACT_VERSION]),
   intent: new Set(['sign_in', 'sign_up']),
   method: new Set(['email_link', 'dashboard', 'api', 'dropdown']),
+  funnel_id: new Set(SIGNUP_FUNNEL_IDS),
+  step: new Set(SIGNUP_FUNNEL_ALL_STEPS),
+  outcome: new Set(SIGNUP_FUNNEL_OUTCOMES),
+  item_mode: new Set(LIMITED_DROP_ITEM_MODES),
+  page_id: new Set(LIMITED_DROP_PAGE_IDS),
+  state: new Set(LIMITED_DROP_STATES),
+  surface: new Set(SIGNUP_FUNNEL_SURFACES),
+  terminal_reason: new Set(LIMITED_DROP_TERMINAL_REASONS),
 };
 const UTM_PROPERTY_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
   utm_source: new Set([
@@ -381,7 +565,11 @@ const UUID_PATTERN =
 const SAFE_TOKEN_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 
 export type ServerAnalyticsDelivery =
-  | { readonly ok: true; readonly eventId: string }
+  | {
+      readonly ok: true;
+      readonly eventId: string | null;
+      readonly deduplicated: boolean;
+    }
   | {
       readonly ok: false;
       readonly error:
@@ -390,6 +578,18 @@ export type ServerAnalyticsDelivery =
         | 'persistence_failed'
         | 'delivery_unknown';
     };
+
+export interface ServerAnalyticsEmitOptions {
+  /**
+   * Stable, server-derived identity for idempotent emission. When present, the
+   * insert runs under the `event_identity` unique constraint so retries,
+   * refreshes, and webhook redeliveries record the business event exactly
+   * once. Must match the safe-token pattern (e.g. `stripe:evt_123`).
+   */
+  readonly eventIdentity?: string;
+  /** Authoritative server-side business timestamp for delayed/retried events. */
+  readonly occurredAt?: Date;
+}
 
 function isKnownEvent(event: string): event is ServerAnalyticsEventName {
   return Object.hasOwn(SERVER_ANALYTICS_EVENTS, event);
@@ -443,14 +643,22 @@ function sanitizeProperties(
   return sanitized;
 }
 
-export async function trackServerEvent(
-  event: string,
-  properties?: Record<string, unknown>,
-  _distinctId?: string
-): Promise<ServerAnalyticsDelivery> {
-  // JOV-5245 owns identity. This sink deliberately keeps its no-op identity
-  // contract and never persists the raw distinct id.
+type PreparedInsert =
+  | {
+      readonly ok: true;
+      readonly eventName: ServerAnalyticsEventName;
+      readonly values: typeof serverAnalyticsEvents.$inferInsert;
+    }
+  | {
+      readonly ok: false;
+      readonly error: 'unknown_event' | 'invalid_properties';
+    };
 
+function prepareServerAnalyticsInsert(
+  event: string,
+  properties: Record<string, unknown> | undefined,
+  options?: ServerAnalyticsEmitOptions
+): PreparedInsert {
   if (!isKnownEvent(event)) {
     Sentry.captureException(new Error('Unknown server analytics event'), {
       tags: {
@@ -481,31 +689,94 @@ export async function trackServerEvent(
     return { ok: false, error: 'invalid_properties' };
   }
 
-  try {
-    const [stored] = await withTimeout(
-      db
-        .insert(serverAnalyticsEvents)
-        .values({
-          contractVersion: SERVER_ANALYTICS_CONTRACT_VERSION,
-          eventName: event,
-          category: definition.category,
-          privacyClass: SERVER_ANALYTICS_PRIVACY_CLASS,
-          consentPolicy: SERVER_ANALYTICS_CONSENT_POLICY,
-          sourceEntityType: definition.source?.type ?? null,
-          sourceEntityId:
-            typeof sourceEntityId === 'string' ? sourceEntityId : null,
-          properties: sanitized,
-          occurredAt: new Date(),
-        })
-        .returning({ id: serverAnalyticsEvents.id }),
-      {
-        timeoutMs: SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS,
-        context: 'Server analytics delivery',
-      }
-    );
+  if (
+    options?.eventIdentity !== undefined &&
+    !SAFE_TOKEN_PATTERN.test(options.eventIdentity)
+  ) {
+    Sentry.captureException(new Error('Invalid server analytics identity'), {
+      tags: {
+        context: 'server_analytics_contract',
+        contract_version: SERVER_ANALYTICS_CONTRACT_VERSION,
+        event_name: event,
+      },
+    });
+    return { ok: false, error: 'invalid_properties' };
+  }
 
-    if (!stored) throw new Error('Server analytics insert returned no row');
-    return { ok: true, eventId: stored.id };
+  if (
+    options?.occurredAt !== undefined &&
+    !Number.isFinite(options.occurredAt.getTime())
+  ) {
+    Sentry.captureException(new Error('Invalid server analytics timestamp'), {
+      tags: {
+        context: 'server_analytics_contract',
+        contract_version: SERVER_ANALYTICS_CONTRACT_VERSION,
+        event_name: event,
+      },
+    });
+    return { ok: false, error: 'invalid_properties' };
+  }
+
+  return {
+    ok: true,
+    eventName: event,
+    values: {
+      contractVersion: SERVER_ANALYTICS_CONTRACT_VERSION,
+      eventName: event,
+      category: definition.category,
+      privacyClass: SERVER_ANALYTICS_PRIVACY_CLASS,
+      consentPolicy: SERVER_ANALYTICS_CONSENT_POLICY,
+      sourceEntityType: definition.source?.type ?? null,
+      sourceEntityId:
+        typeof sourceEntityId === 'string' ? sourceEntityId : null,
+      ...(options?.eventIdentity === undefined
+        ? {}
+        : { eventIdentity: options.eventIdentity }),
+      properties: sanitized,
+      occurredAt: options?.occurredAt ?? new Date(),
+    },
+  };
+}
+
+async function insertServerAnalyticsRow(
+  client: DbOrTransaction,
+  prepared: Extract<PreparedInsert, { ok: true }>
+): Promise<ServerAnalyticsDelivery> {
+  const insert = client.insert(serverAnalyticsEvents).values(prepared.values);
+  // Ordinary events do not need deduplication and must not depend on the
+  // optional identity column's unique index being available.
+  const query = prepared.values.eventIdentity
+    ? insert.onConflictDoNothing({
+        target: serverAnalyticsEvents.eventIdentity,
+      })
+    : insert;
+  const [stored] = await query.returning({ id: serverAnalyticsEvents.id });
+
+  if (!stored) {
+    // The event_identity unique constraint deduplicated this emission; the
+    // business event is already durably recorded.
+    return { ok: true, eventId: null, deduplicated: true };
+  }
+  return { ok: true, eventId: stored.id, deduplicated: false };
+}
+
+export async function trackServerEvent(
+  event: string,
+  properties?: Record<string, unknown>,
+  _distinctId?: string,
+  options?: ServerAnalyticsEmitOptions
+): Promise<ServerAnalyticsDelivery> {
+  // JOV-5245 owns identity. This sink deliberately keeps its no-op identity
+  // contract and never persists the raw distinct id.
+
+  const prepared = prepareServerAnalyticsInsert(event, properties, options);
+  if (!prepared.ok) return prepared;
+
+  try {
+    return await withTimeout(insertServerAnalyticsRow(db, prepared), {
+      timeoutMs: SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS,
+      context: 'Server analytics delivery',
+    });
   } catch (error) {
     const deliveryUnknown =
       error instanceof Error &&
@@ -516,7 +787,7 @@ export async function trackServerEvent(
         context: 'server_analytics_delivery',
         contract_version: SERVER_ANALYTICS_CONTRACT_VERSION,
         delivery_outcome: deliveryUnknown ? 'unknown' : 'failed',
-        event_name: event,
+        event_name: prepared.eventName,
       },
     });
     return {
@@ -524,6 +795,44 @@ export async function trackServerEvent(
       error: deliveryUnknown ? 'delivery_unknown' : 'persistence_failed',
     };
   }
+}
+
+/**
+ * Emit a server analytics event inside an existing transaction so the
+ * business state write and its measurement commit atomically. Use this for
+ * revenue-critical transitions (claim/signup/activation) where a post-commit
+ * emission could permanently lose the event. A duplicate `eventIdentity`
+ * deduplicates instead of throwing.
+ */
+export async function trackServerEventTx(
+  tx: DbOrTransaction,
+  event: string,
+  properties?: Record<string, unknown>,
+  options?: ServerAnalyticsEmitOptions
+): Promise<ServerAnalyticsDelivery> {
+  const prepared = prepareServerAnalyticsInsert(event, properties, options);
+  if (!prepared.ok) return prepared;
+
+  // Bound lock waits and execution in the database itself. A JavaScript race
+  // cannot cancel an in-flight statement and could let the surrounding
+  // transaction remain pinned after the caller has already timed out. Restore
+  // the caller's timeout after a successful insert so later business queries
+  // in the same transaction do not inherit this analytics-specific budget.
+  const previousTimeoutResult = await tx.execute<{
+    statementTimeout: string;
+  }>(
+    drizzleSql`SELECT current_setting('statement_timeout') AS "statementTimeout"`
+  );
+  const previousTimeout =
+    previousTimeoutResult.rows[0]?.statementTimeout ?? '0';
+  await tx.execute(
+    drizzleSql`SELECT set_config('statement_timeout', ${String(SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS)}, true)`
+  );
+  const delivery = await insertServerAnalyticsRow(tx, prepared);
+  await tx.execute(
+    drizzleSql`SELECT set_config('statement_timeout', ${previousTimeout}, true)`
+  );
+  return delivery;
 }
 
 export async function identifyServerUser(

@@ -22,23 +22,23 @@
   "dependencies": {
     "@opentelemetry/api": "1.9.1",
     "@vercel/blob": "2.8.0",
-    "ai": "7.0.107",
+    "ai": "7.0.122",
     "braintrust": "3.35.0",
-    "eve": "0.63.0",
+    "eve": "0.68.0",
     "just-bash": "3.4.2",
-    "microsandbox": "0.7.4",
+    "microsandbox": "0.7.5",
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "@types/node": "26.6.2",
-    "@vitest/coverage-v8": "5.0.1",
+    "@types/node": "26.6.3",
+    "@vitest/coverage-v8": "5.0.2",
     "typescript": "6.0.3",
     "vercel": "59.23.2",
-    "vitest": "5.0.1"
+    "vitest": "5.0.2"
   },
   "pnpm": {
     "patchedDependencies": {
-      "eve@0.63.0": "patches/eve@0.63.0.patch"
+      "eve@0.68.0": "patches/eve@0.68.0.patch"
     }
   }
 }

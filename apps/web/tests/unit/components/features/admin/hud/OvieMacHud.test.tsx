@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { OvieMacHud } from '@/components/features/admin/hud/OvieMacHud';
 import type { OvieMacHudSnapshot } from '@/lib/hud/ovie-mac-hud';
 
-vi.mock('@/components/atoms/DesktopTitlebar', () => ({
+vi.mock('@/components/organisms/DesktopTitlebar', () => ({
   DesktopTitlebar: () => <div data-testid='electron-titlebar-row' />,
 }));
 

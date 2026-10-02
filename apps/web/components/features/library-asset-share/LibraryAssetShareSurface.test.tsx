@@ -46,9 +46,13 @@ describe('web-194 private asset share source contract', () => {
     ).toHaveClass('object-contain');
   });
 
-  it('keeps private-token lookup and metadata in the server route', () => {
+  it("keeps private-token lookup and metadata in the route's server boundary", () => {
     const route = readFileSync(
       resolve(process.cwd(), 'app/p/[token]/page.tsx'),
+      'utf8'
+    );
+    const routeData = readFileSync(
+      resolve(process.cwd(), 'app/p/[token]/private-asset-share-page-data.ts'),
       'utf8'
     );
     const story = readFileSync(
@@ -59,7 +63,11 @@ describe('web-194 private asset share source contract', () => {
       'utf8'
     );
 
-    expect(route).toContain('buildLibraryAssetSharePublicViewByToken(token)');
+    expect(route).toContain('getPrivateAssetSharePageData(token)');
+    expect(routeData).toContain("import 'server-only'");
+    expect(routeData).toContain(
+      'buildLibraryAssetSharePublicViewByToken(token)'
+    );
     expect(route).toContain('notFound()');
     expect(route).toContain('<LibraryAssetShareSurface view={view} />');
     expect(story).toContain('component: LibraryAssetShareSurface');

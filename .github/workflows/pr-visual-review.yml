@@ -145,6 +145,9 @@ jobs:
           E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'
           E2E_TEST_AUTH_PERSONA: creator-ready
           E2E_CLERK_USER_ID: user_test
+          # Footer proof exercises the theme controls; keep light mode under
+          # test in this lane while production forces dark (route-policy.ts).
+          NEXT_PUBLIC_FEATURE_THEME_SWITCHING: '1'
 
       - name: Start production server
         id: server
@@ -170,6 +173,35 @@ jobs:
           set -euo pipefail
           PR_VISUAL_ROUTES="$(node -p "JSON.stringify(require('./pr-visual-artifacts/routing.json').routes)")" node .github/scripts/pr-visual-review-capture.mjs
           test -f pr-visual-artifacts/manifest.json
+
+      # Marketing DOM invariants (nested surfaces, stranded copy, heading
+      # hierarchy, clipped headings, misaligned stacks, placeholder copy)
+      # previously ran only after merge in screenshots.yml. Gate marketing
+      # PRs on the same detector while the server is already up. New taste
+      # kinds are ratcheted by route-dom-marketing-baseline.json.
+      - name: Certify marketing route DOM invariants
+        id: marketing_dom
+        if: steps.route.outputs.should_review == 'true' && steps.build.outcome == 'success' && steps.server.outcome == 'success'
+        working-directory: apps/web
+        env:
+          BASE_URL: http://127.0.0.1:3100
+          EXPECTED_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+          ROUTE_DOM_CERTIFICATION_SCOPE: marketing
+          ROUTE_DOM_CERTIFICATION_OUTPUT_DIR: ${{ github.workspace }}/pr-visual-artifacts/route-dom-certification
+        run: |
+          set -euo pipefail
+          marketing_surface='^(apps/web/(app/\((marketing|home)\)/|components/(marketing|site|homepage)/|data/marketing/|styles/|tests/e2e/utils/route-dom-detector\.ts|tests/product-screenshots/route-dom-)|packages/ui/)'
+          if ! grep -Eq "$marketing_surface" "$RUNNER_TEMP/changed-files.txt"; then
+            echo "No marketing surface changed; DOM certification skipped."
+            exit 0
+          fi
+          pnpm exec playwright test \
+            tests/product-screenshots/route-dom-certification.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1 \
+            --retries=0 \
+            -g 'deliberate-red|certifies every marketing route'
 
       - name: Stop server
         if: always()

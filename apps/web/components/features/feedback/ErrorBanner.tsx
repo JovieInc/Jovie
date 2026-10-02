@@ -178,8 +178,8 @@ export function ErrorBanner({
               className={ERROR_BANNER_DETAILS_TOGGLE_CLASS}
             >
               {showDetails
-                ? `Hide ${RECOVERY_COPY.detailsLabel}`
-                : `Show ${RECOVERY_COPY.detailsLabel}`}
+                ? `Hide ${RECOVERY_COPY.detailsLabel.toLowerCase()}`
+                : `Show ${RECOVERY_COPY.detailsLabel.toLowerCase()}`}
             </Button>
 
             {showDetails && (
@@ -198,19 +198,21 @@ export function ErrorBanner({
                   variant='ghost'
                   size={ERROR_BANNER_COPY_SIZE}
                   onClick={handleCopyErrorDetails}
-                  aria-label='Copy Error Details To Clipboard'
+                  // ui-casing-allow: recovery action sentence case (Tim, 2026-09-28)
+                  aria-label='Copy error details to clipboard'
                 >
                   <Copy
                     className={ERROR_BANNER_COPY_ICON_CLASS}
                     aria-hidden='true'
                   />
-                  Copy Error Details
+                  {/* ui-casing-allow: recovery action sentence case (Tim, 2026-09-28) */}
+                  Copy error details
                 </Button>
 
                 {process.env.NODE_ENV === 'development' && error?.message && (
                   <details className={ERROR_BANNER_DEV_PANEL_CLASS}>
                     <summary className={ERROR_BANNER_DEV_SUMMARY_CLASS}>
-                      Developer Info (dev only)
+                      Developer info (dev only)
                     </summary>
                     <pre className={ERROR_BANNER_DEV_PRE_CLASS}>
                       {error.message}
@@ -229,7 +231,8 @@ export function ErrorBanner({
             variant='ghost'
             size={ERROR_BANNER_DISMISS_SIZE}
             onClick={onDismiss}
-            aria-label='Dismiss Error'
+            // ui-casing-allow: recovery action sentence case (Tim, 2026-09-28)
+            aria-label='Dismiss error'
             className={ERROR_BANNER_DISMISS_LAYOUT_CLASS}
           >
             <X className={ERROR_BANNER_DISMISS_ICON_CLASS} aria-hidden='true' />

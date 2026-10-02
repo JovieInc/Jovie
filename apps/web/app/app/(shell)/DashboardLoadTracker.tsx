@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { track } from '@/lib/analytics';
+import { consumeSignupFirstValue } from '@/lib/analytics/signup-funnel-client';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 
 export function DashboardLoadTracker({
@@ -12,6 +13,10 @@ export function DashboardLoadTracker({
   userId: string;
 }>) {
   const trackedKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    consumeSignupFirstValue();
+  }, []);
 
   useEffect(() => {
     const trackingKey = `jovie:${ONBOARDING_FUNNEL_EVENTS.DASHBOARD_LOADED}:${userId}`;

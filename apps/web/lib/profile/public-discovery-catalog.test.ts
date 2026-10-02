@@ -1,15 +1,38 @@
 import { PgDialect } from 'drizzle-orm/pg-core';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
+const { cacheEntries } = vi.hoisted(() => ({
+  cacheEntries: new Map<string, unknown>(),
+}));
 vi.mock('next/cache', () => ({
-  unstable_cache: <T extends (...args: unknown[]) => unknown>(fn: T) => fn,
+  unstable_cache:
+    (fn: (...args: unknown[]) => Promise<unknown>, keys: string[]) =>
+    async (...args: unknown[]) => {
+      const key = JSON.stringify([keys, args]);
+      if (cacheEntries.has(key)) return cacheEntries.get(key);
+      const value = await fn(...args);
+      cacheEntries.set(key, value);
+      return value;
+    },
 }));
 vi.mock('@sentry/nextjs', () => ({
   captureException: vi.fn(),
   captureMessage: vi.fn(),
 }));
-vi.mock('@/lib/db', () => ({ db: { select: vi.fn() } }));
+vi.mock('@/lib/db', async () => ({
+  db: { select: vi.fn() },
+  withRetry: (await import('@/lib/db/client/retry')).withRetry,
+}));
+vi.mock('@/lib/db/client/circuit-breaker', () => ({
+  dbCircuitBreaker: {
+    execute: (operation: () => Promise<unknown>) => operation(),
+  },
+}));
+vi.mock('@/lib/db/client/logging', () => ({
+  logDbError: vi.fn(),
+  logDbInfo: vi.fn(),
+}));
 vi.mock('@/lib/db/schema/auth', () => ({
   users: { id: 'id', email: 'email' },
 }));
@@ -26,6 +49,7 @@ vi.mock('@/lib/db/schema/profiles', () => ({
   },
 }));
 
+import { captureException } from '@sentry/nextjs';
 import { db } from '@/lib/db';
 import {
   ARTISTS_DIRECTORY_PAGE_SIZE,
@@ -42,9 +66,11 @@ interface MockSelectChain {
   limitCalls: number[];
   whereSql: string[];
   orderBySql: string[];
+  reads: number;
 }
 
-function mockDbSelectRows(rows: unknown[]): MockSelectChain {
+function mockDbSelectBatches(batches: (unknown[] | Error)[]): MockSelectChain {
+  let callIndex = 0;
   const dialect = new PgDialect();
   const chain: MockSelectChain & {
     from: () => unknown;
@@ -52,8 +78,12 @@ function mockDbSelectRows(rows: unknown[]): MockSelectChain {
     where: (...args: unknown[]) => unknown;
     orderBy: (...args: unknown[]) => unknown;
     limit: (n: number) => unknown;
-    then: (resolve: (v: unknown[]) => unknown) => unknown;
+    then: (
+      resolve: (v: unknown[]) => unknown,
+      reject: (error: unknown) => unknown
+    ) => unknown;
   } = {
+    reads: 0,
     limitCalls: [],
     whereSql: [],
     orderBySql: [],
@@ -79,12 +109,32 @@ function mockDbSelectRows(rows: unknown[]): MockSelectChain {
       chain.limitCalls.push(n);
       return chain;
     },
-    then(resolve: (v: unknown[]) => unknown) {
-      return resolve(rows);
+    then(
+      resolve: (v: unknown[]) => unknown,
+      reject: (error: unknown) => unknown
+    ) {
+      chain.reads++;
+      const value = batches[callIndex++] ?? [];
+      return value instanceof Error
+        ? Promise.reject(value).then(resolve, reject)
+        : Promise.resolve(value).then(resolve, reject);
     },
   };
   selectMock.mockReturnValue(chain);
   return chain;
+}
+
+function mockDbSelectRows(rows: unknown[]): MockSelectChain {
+  return mockDbSelectBatches([rows]);
+}
+
+function makeIneligibleCatalogRow(index: number) {
+  const handle = `placeholder${index}`;
+  return {
+    ...makeCatalogRow(index),
+    username: handle,
+    displayName: handle,
+  };
 }
 
 function makeCatalogRow(index: number) {
@@ -98,6 +148,15 @@ function makeCatalogRow(index: number) {
     ownerEmail: `artist${index}@creators.jov.ie`,
   };
 }
+
+beforeEach(() => {
+  cacheEntries.clear();
+  vi.clearAllMocks();
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.useRealTimers();
+});
 
 describe('artists directory catalog (JOV-6260)', () => {
   it('excludes ineligible identities from the HTML directory, not only XML catalogs', () => {
@@ -287,6 +346,73 @@ describe('artists directory pagination (JOV-6451)', () => {
     expect(result.nextCursor).toBeNull();
   });
 
+  it('keeps scanning until the page fills with eligible profiles (JOV-6939)', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgres://test');
+    // First raw batch is entirely ineligible (placeholder identities); the
+    // eligible profiles live beyond it. A raw-row page bound would render an
+    // empty page with a dangling next cursor.
+    mockDbSelectBatches([
+      Array.from({ length: ARTISTS_DIRECTORY_PAGE_SIZE + 1 }, (_, i) =>
+        makeIneligibleCatalogRow(i)
+      ),
+      [makeCatalogRow(100), makeCatalogRow(101)],
+    ]);
+
+    const result = await loadArtistsDirectoryProfiles();
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    expect(result.profiles.map(profile => profile.username)).toEqual([
+      'artist100',
+      'artist101',
+    ]);
+    expect(result.nextCursor).toBeNull();
+  });
+
+  it('does not emit a nextCursor when all remaining rows are ineligible (JOV-6939)', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgres://test');
+    // Raw lookahead says "more rows", but every one is filtered out — the
+    // cursor must be null so "Load more" never leads to an empty dead end.
+    mockDbSelectBatches([
+      [
+        makeCatalogRow(0),
+        ...Array.from({ length: ARTISTS_DIRECTORY_PAGE_SIZE }, (_, i) =>
+          makeIneligibleCatalogRow(i + 1)
+        ),
+      ],
+      [],
+    ]);
+
+    const result = await loadArtistsDirectoryProfiles();
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    expect(result.profiles).toHaveLength(1);
+    expect(result.nextCursor).toBeNull();
+  });
+
+  it('emits a nextCursor only when another eligible profile exists', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgres://test');
+    mockDbSelectBatches([
+      Array.from({ length: ARTISTS_DIRECTORY_PAGE_SIZE + 1 }, (_, i) =>
+        i === ARTISTS_DIRECTORY_PAGE_SIZE
+          ? makeIneligibleCatalogRow(i)
+          : makeCatalogRow(i)
+      ),
+      [makeCatalogRow(200)],
+    ]);
+
+    const result = await loadArtistsDirectoryProfiles();
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    expect(result.profiles).toHaveLength(ARTISTS_DIRECTORY_PAGE_SIZE);
+    expect(result.nextCursor).not.toBeNull();
+
+    const decoded = decodeArtistsDirectoryCursor(result.nextCursor);
+    expect(decoded).toEqual({
+      key: `Artist ${ARTISTS_DIRECTORY_PAGE_SIZE - 1}`,
+      id: `id-${String(ARTISTS_DIRECTORY_PAGE_SIZE - 1).padStart(6, '0')}`,
+    });
+  });
+
   it('applies a keyset cursor predicate instead of an offset', async () => {
     vi.stubEnv('DATABASE_URL', 'postgres://test');
     const chain = mockDbSelectRows([makeCatalogRow(61)]);
@@ -314,13 +440,30 @@ describe('artists directory pagination (JOV-6451)', () => {
     expect(result.profiles).toHaveLength(1);
   });
 
-  it('runs the total as a separate bounded count query', async () => {
+  it('counts only the identities the directory renders (JOV-6435)', async () => {
     vi.stubEnv('DATABASE_URL', 'postgres://test');
-    const chain = mockDbSelectRows([{ value: 12345 }]);
+    const chain = mockDbSelectRows([
+      makeCatalogRow(0),
+      makeCatalogRow(1),
+      {
+        ...makeCatalogRow(2),
+        username: 'tim1',
+        displayName: 'tim1',
+        hasPublicRelease: true,
+      },
+      {
+        ...makeCatalogRow(3),
+        username: 'timwhite1',
+        hasPublicRelease: false,
+      },
+      { ...makeCatalogRow(4), ownerEmail: 'e2e+qa@jov.ie' },
+    ]);
 
     const total = await loadArtistsDirectoryCount();
-    expect(total).toBe(12345);
 
+    // Placeholder identity, empty profile, and test-account rows are excluded,
+    // matching the rendered card list instead of the raw claimed-public count.
+    expect(total).toBe(2);
     // The count path never takes a LIMIT-scanned row payload.
     expect(chain.limitCalls).toEqual([]);
   });
@@ -365,5 +508,124 @@ describe('artists directory catalog (JOV-6126)', () => {
     ]);
 
     expect(profiles.map(profile => profile.username)).toEqual(['tim']);
+  });
+});
+
+describe('artists directory connection recovery (JOV-6868)', () => {
+  function connectionTimeout() {
+    return new Error('Failed query: select creator_profiles', {
+      cause: new Error('Connection terminated due to connection timeout'),
+    });
+  }
+
+  it('retries a nested connection failure and caches the recovered profile page', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgres://test');
+    vi.useFakeTimers();
+    const chain = mockDbSelectBatches([
+      connectionTimeout(),
+      [makeCatalogRow(0)],
+    ]);
+    const pending = loadArtistsDirectoryProfiles();
+    await vi.runAllTimersAsync();
+    const result = await pending;
+    expect(result).toMatchObject({
+      status: 'ok',
+      profiles: [{ username: 'artist0' }],
+      nextCursor: null,
+    });
+    expect(await loadArtistsDirectoryProfiles()).toEqual(result);
+    expect(chain.reads).toBe(2);
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it('bounds retries and recovers on the next request instead of caching unavailable', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgres://test');
+    vi.useFakeTimers();
+    const error = connectionTimeout();
+    const chain = mockDbSelectBatches([error, error, [makeCatalogRow(1)]]);
+    const pending = loadArtistsDirectoryProfiles();
+    await vi.runAllTimersAsync();
+    expect(await pending).toEqual({ status: 'unavailable' });
+    expect(chain.reads).toBe(2);
+    expect(cacheEntries.size).toBe(0);
+    expect(captureException).toHaveBeenCalledWith(error);
+    expect(await loadArtistsDirectoryProfiles()).toMatchObject({
+      status: 'ok',
+      profiles: [{ username: 'artist1' }],
+    });
+    expect(chain.reads).toBe(3);
+  });
+
+  it('does not retry a permanent query failure or cache its fallback', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgres://test');
+    const error = new Error('column does not exist');
+    const chain = mockDbSelectBatches([error, [makeCatalogRow(2)]]);
+    expect(await loadArtistsDirectoryProfiles()).toEqual({
+      status: 'unavailable',
+    });
+    expect(chain.reads).toBe(1);
+    expect(await loadArtistsDirectoryProfiles()).toMatchObject({
+      status: 'ok',
+    });
+    expect(chain.reads).toBe(2);
+  });
+
+  it('keeps cursor pages isolated in the success cache', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgres://test');
+    const chain = mockDbSelectBatches([
+      [makeCatalogRow(0)],
+      [makeCatalogRow(1)],
+    ]);
+    const first = await loadArtistsDirectoryProfiles();
+    const next = await loadArtistsDirectoryProfiles(
+      encodeArtistsDirectoryCursor({ key: 'Artist 0', id: 'id-000000' })
+    );
+    expect(first).toMatchObject({ profiles: [{ username: 'artist0' }] });
+    expect(next).toMatchObject({ profiles: [{ username: 'artist1' }] });
+    expect(await loadArtistsDirectoryProfiles()).toEqual(first);
+    expect(chain.reads).toBe(2);
+  });
+
+  it('retries the count but never caches null after an exhausted connection failure', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgres://test');
+    vi.useFakeTimers();
+    const error = connectionTimeout();
+    const chain = mockDbSelectBatches([
+      error,
+      error,
+      error,
+      [makeCatalogRow(0)],
+    ]);
+    const failed = loadArtistsDirectoryCount();
+    await vi.runAllTimersAsync();
+    expect(await failed).toBeNull();
+    expect(chain.reads).toBe(2);
+    expect(cacheEntries.size).toBe(0);
+    const recovered = loadArtistsDirectoryCount();
+    await vi.runAllTimersAsync();
+    expect(await recovered).toBe(1);
+    expect(await loadArtistsDirectoryCount()).toBe(1);
+    expect(chain.reads).toBe(4);
+  });
+
+  it('caches successful empty results while missing configuration stays uncached', async () => {
+    vi.stubEnv('DATABASE_URL', undefined);
+    expect(await loadArtistsDirectoryProfiles()).toEqual({
+      status: 'unavailable',
+    });
+    expect(await loadArtistsDirectoryCount()).toBeNull();
+    expect(selectMock).not.toHaveBeenCalled();
+    expect(cacheEntries.size).toBe(0);
+    vi.stubEnv('DATABASE_URL', 'postgres://test');
+    const chain = mockDbSelectBatches([[], []]);
+    for (let request = 0; request < 2; request++) {
+      expect(await loadArtistsDirectoryProfiles()).toEqual({
+        status: 'ok',
+        profiles: [],
+        nextCursor: null,
+      });
+      expect(await loadArtistsDirectoryCount()).toBe(0);
+    }
+    expect(chain.reads).toBe(2);
   });
 });

@@ -32,8 +32,8 @@ const libraryFacts = [
   { label: 'Stats', value: 'Not connected' },
 ] as const;
 
-describe('ToolPartsRenderer library opportunities', () => {
-  it('reserves the presence artifact slot while Library lookup is running', () => {
+describe('ToolPartsRenderer work opportunities', () => {
+  it('reserves the presence artifact slot while Work lookup is running', () => {
     render(
       <ToolPartsRenderer
         variant='chat'
@@ -44,22 +44,22 @@ describe('ToolPartsRenderer library opportunities', () => {
     expect(
       screen.getByTestId('chat-generation-artifact-surface')
     ).toBeInTheDocument();
-    expect(screen.getByText('Library opportunities')).toBeInTheDocument();
+    expect(screen.getByText('Work opportunities')).toBeInTheDocument();
     const loading = screen.getByTestId('chat-presence-artifact-loading');
     expect(loading).toHaveClass('min-h-16');
     expect(screen.getByText('Running…')).toBeInTheDocument();
   });
 
-  it('renders truthful Library facts without sending or inventing stats', () => {
+  it('renders truthful Work facts without sending or inventing stats', () => {
     render(
       <ToolPartsRenderer
         variant='chat'
         parts={[
           toolEventToMessagePart(
             buildSucceededToolEvent(LIBRARY_STEP, {
-              title: 'Library opportunities',
+              title: 'Work opportunities',
               summary:
-                'Your Library presence queue is ready. Findings stay local and nothing was sent.',
+                'Your Work opportunity queue is ready. Findings stay local and nothing was sent.',
               facts: [...libraryFacts],
             })
           ),
@@ -77,30 +77,95 @@ describe('ToolPartsRenderer library opportunities', () => {
     expect(success.textContent).not.toMatch(/streams|revenue|license/i);
   });
 
-  it('keeps the failed Library artifact in the same card family', () => {
+  it('keeps the failed Work artifact in the same card family', () => {
     render(
       <ToolPartsRenderer
         variant='chat'
         parts={[
           toolEventToMessagePart(
-            buildFailedToolEvent(
-              LIBRARY_STEP,
-              'Library presence lookup failed.'
-            )
+            buildFailedToolEvent(LIBRARY_STEP, 'Work presence lookup failed.')
           ),
         ]}
       />
     );
 
+    expect(screen.getByText('Work opportunities failed')).toBeInTheDocument();
     expect(
-      screen.getByText('Library opportunities failed')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Library presence lookup failed.')
+      screen.getByText('Work presence lookup failed.')
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Try again' })
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('ToolPartsRenderer ops data cards', () => {
+  it('renders a summer.ops-card.v1 payload as an ops data card', () => {
+    render(
+      <ToolPartsRenderer
+        variant='chat'
+        parts={[
+          {
+            type: 'dynamic-tool',
+            toolName: 'summer_ops_snapshot',
+            toolCallId: 'tool-ops-card',
+            state: 'output-available',
+            input: {},
+            output: {
+              success: true,
+              summary: 'Shipping read complete.',
+              card: {
+                schema: 'summer.ops-card.v1',
+                kind: 'shipping',
+                title: 'Shipping lanes',
+                state: 'fresh',
+                observedAt: '2026-09-27T09:00:00.000Z',
+                source: 'ubuntu-operational-truth',
+                facts: [{ label: 'Merge queue', value: '3' }],
+                series: {
+                  label: 'Live counts',
+                  points: [{ label: 'Queued', value: 3 }],
+                },
+              },
+            },
+          },
+        ]}
+      />
+    );
+
+    const card = screen.getByTestId('chat-ops-data-card');
+    expect(card).toHaveAttribute('data-card-kind', 'shipping');
+    expect(screen.getByText('Shipping lanes')).toBeInTheDocument();
+    expect(screen.getByText('Shipping read complete.')).toBeInTheDocument();
+    expect(screen.getByText('Merge queue')).toBeInTheDocument();
+    expect(screen.getByTestId('chat-ops-data-card-chart')).toHaveTextContent(
+      'Queued'
+    );
+  });
+
+  it('falls back to a status row when the ops card payload is malformed', () => {
+    render(
+      <ToolPartsRenderer
+        variant='chat'
+        parts={[
+          {
+            type: 'dynamic-tool',
+            toolName: 'summer_ops_snapshot',
+            toolCallId: 'tool-ops-card-bad',
+            state: 'output-available',
+            input: {},
+            output: {
+              success: true,
+              summary: 'Shipping read complete.',
+              card: { schema: 'summer.ops-card.v1', kind: 'shipping' },
+            },
+          },
+        ]}
+      />
+    );
+
+    expect(screen.queryByTestId('chat-ops-data-card')).not.toBeInTheDocument();
+    expect(screen.getByTestId('tool-status-row')).toBeInTheDocument();
   });
 });
 

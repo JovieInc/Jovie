@@ -198,6 +198,7 @@
 | `/api/cron/purge-pixel-ips` | GET | `cron` | Purge stored pixel IP addresses |
 | `/api/cron/schedule-release-notifications` | GET | `cron` | Schedule upcoming release notifications |
 | `/api/cron/send-release-notifications` | GET | `cron` | Send queued release notifications |
+| `/api/cron/web-ai-health` | GET | `cron` | Probe five production AI surfaces and return a redacted health receipt |
 
 ### Dashboard
 
@@ -376,6 +377,12 @@
 | `/api/merch/checkout` | POST | `public` | Create a Stripe Checkout session for a live Jovie merch card |
 | `/{username}/merch/{cardId}` | GET | `public` | Public merch product page with mockups, size/quantity selection, and checkout |
 
+### Mobile
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/mobile/v1/push-devices` | PUT, DELETE | mobile session | Register or remove the signed-in user's encrypted APNs device token. |
+
 ### Notifications
 
 | Route | Methods | Auth | Description |
@@ -536,6 +543,6 @@
 | `admin` | ~38 |
 | `auth` | ~66 |
 | `public` | ~35 |
-| `cron` | ~16 |
+| `cron` | ~17 |
 | `webhook` | ~9 |
-| **Total** | **~163** |
+| **Total** | **~164** |
