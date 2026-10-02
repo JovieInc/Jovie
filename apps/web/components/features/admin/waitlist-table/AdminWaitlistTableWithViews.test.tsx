@@ -73,7 +73,7 @@ describe('AdminWaitlistTableWithViews', () => {
       screen.queryByRole('button', { name: 'Export waitlist to CSV file' })
     ).toBeNull();
     expect(screen.queryByRole('button', { name: 'Display' })).toBeNull();
-    const clear = screen.getByRole('button', { name: 'Clear', exact: true });
+    const clear = screen.getByRole('button', { name: 'Clear' });
     // The overlay's positioning boundary must not include the integrity notice.
     expect(clear.closest('.relative')).not.toContainElement(notice);
     await user.click(clear);
