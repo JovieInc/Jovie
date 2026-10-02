@@ -43,7 +43,7 @@ describe('UsageMenuItem', () => {
     expect(screen.getByText('7%')).toBeInTheDocument();
   });
 
-  it('expands to exactly one weekly meter with one warning marker', async () => {
+  it('expands to exactly one weekly meter without an unexplained warning marker', async () => {
     mockUsage();
     const user = userEvent.setup();
     render(<UsageMenuItem usageStatsUrl={APP_ROUTES.SETTINGS_USAGE} />);
@@ -56,10 +56,7 @@ describe('UsageMenuItem', () => {
     expect(meter).toHaveAttribute('value', '1');
     expect(screen.getAllByRole('progressbar')).toHaveLength(1);
     const track = screen.getByTestId('usage-meter-track');
-    expect(track.querySelectorAll('[data-threshold]')).toHaveLength(1);
-    expect(track.querySelector('[data-threshold="warning"]')).toHaveStyle({
-      left: '20%',
-    });
+    expect(track.querySelectorAll('[data-threshold]')).toHaveLength(0);
     expect(screen.getByRole('link', { name: /learn more/i })).toHaveAttribute(
       'href',
       APP_ROUTES.SETTINGS_USAGE
@@ -105,8 +102,28 @@ describe('UsageMenuItem', () => {
     render(<UsageMenuItem usageStatsUrl={APP_ROUTES.SETTINGS_USAGE} />);
 
     await user.click(screen.getByRole('button', { name: /usage remaining/i }));
-    expect(screen.getByText('Sync delayed')).toBeInTheDocument();
-    expect(screen.getByText('Weekly Messages')).toBeInTheDocument();
+    expect(screen.getByText('Usage may be out of date')).toBeInTheDocument();
+    expect(screen.getByText('Last Known Weekly Messages')).toBeInTheDocument();
     expect(screen.getAllByRole('progressbar')).toHaveLength(1);
+  });
+  it('does not claim a fresh balance after a failed refresh and exposes retry', async () => {
+    const refetch = vi.fn();
+    mockUseChatUsageQuery.mockReturnValue({
+      data: baseUsage,
+      isLoading: false,
+      error: new Error('offline'),
+      refetch,
+    });
+    render(<UsageMenuItem usageStatsUrl={APP_ROUTES.SETTINGS_USAGE} />);
+    expect(screen.getByText('7% (cached)')).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: /usage remaining/i })
+    );
+    expect(screen.queryByText('Updated now')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('usage-meter-state-label')
+    ).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Retry Usage' }));
+    expect(refetch).toHaveBeenCalledOnce();
   });
 });

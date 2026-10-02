@@ -7,7 +7,10 @@ import { type ReactNode, useId, useState } from 'react';
 import { UsageMeter } from '@/components/molecules/UsageMeter';
 import { APP_ROUTES } from '@/constants/routes';
 import { getChatUsageCopy } from '@/lib/chat-usage/copy';
-import { formatResetAt, getWeeklyUsageModel } from '@/lib/chat-usage/metrics';
+import {
+  formatUsageResetLabel,
+  getWeeklyUsageModel,
+} from '@/lib/chat-usage/metrics';
 import { env } from '@/lib/env-client';
 import { useChatUsageQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -37,11 +40,13 @@ export function UsageMenuItem({
   const showUpgradeNudge =
     copy?.state === 'near_limit' || copy?.state === 'exhausted';
   const isLoading = chatUsage.isLoading;
-  const isStale = chatUsage.data?._stale === true;
+  const isStale = chatUsage.data?._stale === true || Boolean(chatUsage.error);
   const hasAnyData = Boolean(chatUsage.data);
   const collapsedUsageLabel =
-    weeklyModel === null ? '—' : `${weeklyModel.remainingPercent}%`;
-  const syncLabel = isStale ? 'Sync delayed' : 'Updated now';
+    weeklyModel === null
+      ? '—'
+      : `${weeklyModel.remainingPercent}%${isStale ? ' (cached)' : ''}`;
+  const syncLabel = isStale ? 'Usage may be out of date' : '';
   const unavailableUsageLabel = isLoading
     ? 'Loading usage…'
     : 'Usage details are unavailable right now.';
@@ -121,9 +126,10 @@ export function UsageMenuItem({
           {weeklyModel ? (
             <UsageMeter
               density='compact'
-              label='Weekly Messages'
+              label={isStale ? 'Last Known Weekly Messages' : 'Weekly Messages'}
+              showStatus={!isStale}
               model={weeklyModel}
-              resetLabel={`Resets ${formatResetAt(weeklyModel.resetAt)}`}
+              resetLabel={formatUsageResetLabel(weeklyModel.resetAt)}
             />
           ) : null}
 
@@ -138,6 +144,22 @@ export function UsageMenuItem({
               Usage details could not be verified.
             </p>
           ) : null}
+
+          {!isLoading && (isStale || !weeklyModel) && (
+            <div className='px-2.5 py-1'>
+              <Button
+                type='button'
+                size='sm'
+                variant='secondary'
+                disabled={chatUsage.isFetching}
+                onClick={() => {
+                  void chatUsage.refetch();
+                }}
+              >
+                Retry Usage
+              </Button>
+            </div>
+          )}
 
           {upgradeAction ? (
             <div className='px-2.5 pt-1'>{upgradeAction}</div>
