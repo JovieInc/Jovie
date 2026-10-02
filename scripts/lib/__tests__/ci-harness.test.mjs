@@ -30,6 +30,7 @@ const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const EXPECTED_MERGE_GATE_NAMES = [
   'Path Changes',
   'ci-fast',
+  'Blog Content Qualification',
   'CI Risk Classifier',
   'Secret Scan (gitleaks + trufflehog)',
   'Golden Path Lock',
@@ -221,7 +222,7 @@ describe('ci-harness manifest', () => {
     const prReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
 
     expect(prReady).toContain(
-      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare]'
+      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare]'
     );
     expect(prReady).toContain('needs.ci-exact-head-coverage.result');
     expect(prReady).toContain('Evaluate deterministic source PR checks');

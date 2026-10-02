@@ -91,7 +91,7 @@ jobs:
           git config user.name "jovie-bot[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
-          git add docs/metrics/shipping-slo-latest.json
+          git add docs/metrics/shipping-slo-latest.json docs/metrics/blog-publish-latency-latest.json
           if git diff --staged --quiet; then
             echo "Snapshot unchanged — nothing to commit."
             exit 0
