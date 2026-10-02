@@ -30,6 +30,43 @@ test.describe('Legal Pages', () => {
   // Legal pages use heavy markdown rendering which can take 90s+ on first Turbopack compile
   test.setTimeout(300_000);
 
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 768, height: 1024 },
+    { width: 1440, height: 900 },
+  ]) {
+    for (const pathname of [
+      '/legal/privacy',
+      '/legal/terms',
+      '/legal/cookies',
+      '/legal/dmca',
+    ]) {
+      test(`allows native scrolling to the end of ${pathname} at ${viewport.width}px`, async ({
+        page,
+      }) => {
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await page.setViewportSize(viewport);
+        await page.goto(pathname, { waitUntil: 'domcontentloaded' });
+        await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+        await page.mouse.move(viewport.width / 2, viewport.height / 2);
+        await page.mouse.wheel(0, viewport.height);
+        await expect
+          .poll(() => page.evaluate(() => window.scrollY))
+          .toBeGreaterThan(0);
+        await page.keyboard.press('End');
+        await expect
+          .poll(() =>
+            page.evaluate(() => {
+              const documentEnd = document.documentElement.scrollHeight;
+              return documentEnd - window.scrollY - window.innerHeight;
+            })
+          )
+          .toBeLessThanOrEqual(2);
+        await expect(page.getByRole('contentinfo')).toBeInViewport();
+      });
+    }
+  }
+
   test('preserves shared header geometry at Pen desktop and narrow viewports', async ({
     page,
   }) => {

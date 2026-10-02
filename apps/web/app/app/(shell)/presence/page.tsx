@@ -1,17 +1,41 @@
-import { redirect } from 'next/navigation';
+import type { Metadata } from 'next';
 import { APP_ROUTES } from '@/constants/routes';
-import { getAppFlagValue } from '@/lib/flags/server';
+import {
+  loadAppShellRouteContext,
+  requireAppShellDashboardUserId,
+} from '../app-shell-route-context';
+import { loadProfilesWorkspaceData } from '../profiles/data';
+import { ProfilesWorkspace } from '../profiles/ProfilesWorkspace';
 
 export const runtime = 'nodejs';
 
-/**
- * Legacy presence alias. Profiles now live in the unified workspace.
- */
+export const metadata: Metadata = {
+  title: 'Identity',
+  description:
+    'Manage who you are and how you are represented across public surfaces',
+};
+
 export default async function PresencePage() {
-  const profilesWorkspaceEnabled = await getAppFlagValue('PROFILES_WORKSPACE');
-  redirect(
-    profilesWorkspaceEnabled
-      ? APP_ROUTES.PROFILES
-      : `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`
-  );
+  const routeContext = await loadAppShellRouteContext({
+    route: APP_ROUTES.PRESENCE,
+    authFailure: 'notFound',
+    requiredFlag: 'PROFILES_WORKSPACE',
+    dashboardErrorLogMessage: 'Dashboard data load failed on Identity page',
+    dashboardErrorMessage: 'Failed to load Identity. Please refresh the page.',
+  });
+  if (!routeContext.ok) return routeContext.error;
+
+  const identityId = routeContext.activeIdentityId;
+  if (!identityId) return <ProfilesWorkspace data={null} />;
+
+  const data = await loadProfilesWorkspaceData({
+    clerkUserId: routeContext.userId,
+    databaseUserId: requireAppShellDashboardUserId(
+      routeContext,
+      APP_ROUTES.PRESENCE
+    ),
+    profileId: identityId,
+  });
+
+  return <ProfilesWorkspace data={data} />;
 }

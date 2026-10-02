@@ -80,6 +80,81 @@ const approvedVariantBinding = (
 ): RenderedSectionBinding =>
   approvedBinding(componentPath, sectionId, variantId, occurrenceId);
 
+/**
+ * Product evidence kind (JOV-6917, invariant `product-page-shows-product`):
+ * the canonical product UI a product route must render.
+ * - `framed-screenshot`: a captured product frame (e.g. ProductScreenshotFrame
+ *   or an approved screenshot-registry image in a device/frame treatment).
+ * - `interactive-mockup`: the real interactive product primitive mounted on
+ *   the page (claim form, smart-link dial, merch design carousel, paste form,
+ *   demo visual, notification cards).
+ * - `annotated-callout`: an annotated callout from the callout family.
+ */
+export type ProductEvidenceKind =
+  | 'framed-screenshot'
+  | 'interactive-mockup'
+  | 'annotated-callout';
+
+export interface ProductEvidenceDeclaration {
+  readonly kind: ProductEvidenceKind;
+  /**
+   * Source file that renders the evidence (the landing component or the
+   * evidence component itself). Must exist on disk.
+   */
+  readonly componentPath: string;
+  /**
+   * `data-testid` the rendered page must expose inside the hero section
+   * (desktop above-the-fold) or the first two top-level sections (mobile).
+   */
+  readonly testId: string;
+}
+
+/**
+ * Recipes whose routes are product pages: they exist to demonstrate a real
+ * product capability, so every bound route must declare and render product
+ * evidence. Enforced by tests/unit/marketing/product-evidence-contract.
+ */
+export const PRODUCT_ROUTE_RECIPES: readonly RecipeId[] = [
+  'artist-lp',
+  'feature',
+];
+
+/**
+ * Whether a manifest entry is a product route that must render product
+ * evidence. Aliases are included — they serve the same product surface.
+ */
+export function isProductRouteEntry(
+  entry: Pick<RouteManifestEntry, 'recipeId' | 'status' | 'exempt'>
+): boolean {
+  return (
+    entry.status === 'active' &&
+    !entry.exempt &&
+    entry.recipeId !== undefined &&
+    PRODUCT_ROUTE_RECIPES.includes(entry.recipeId)
+  );
+}
+
+/**
+ * Declaration gate: returns a problem string when a product route declares
+ * no product evidence or an invalid one; null when the declaration is
+ * well-formed. Rendered-DOM enforcement lives in the contract test.
+ */
+export function productEvidenceDeclarationIssue(
+  entry: Pick<RouteManifestEntry, 'glob' | 'productEvidence'>
+): string | null {
+  const evidence = entry.productEvidence;
+  if (!evidence) {
+    return `${entry.glob} is a product route with no productEvidence declaration`;
+  }
+  if (!evidence.componentPath.trim()) {
+    return `${entry.glob} productEvidence.componentPath is empty`;
+  }
+  if (!evidence.testId.trim()) {
+    return `${entry.glob} productEvidence.testId is empty`;
+  }
+  return null;
+}
+
 /** A route entry — either bound to a recipe or exempt with a sanctioned reason. */
 export interface RouteManifestEntry {
   /** Route glob relative to apps/web/app/ (e.g. '(marketing)/about/page.tsx', '(home)/page.tsx'). */
@@ -88,6 +163,14 @@ export interface RouteManifestEntry {
   readonly recipeId?: RecipeId;
   /** Ordered production bindings. Repeated section ids are legal recipe beats. */
   readonly renderedSections: readonly RenderedSectionBinding[];
+  /**
+   * Evidence that `renderedSections` matches the mounted source. `verified`
+   * certifies section bindings only — NOT design-invariant compliance. A
+   * verified route can still carry invariant debt; that lives in
+   * tests/unit/marketing/marketing-route-source-invariants.baseline.json
+   * (source) and tests/product-screenshots/route-dom-marketing-baseline.json
+   * (rendered DOM), both decrease-only.
+   */
   readonly bindingEvidence: {
     readonly status: 'verified' | 'unverified' | 'exempt';
     readonly source: string;
@@ -131,6 +214,14 @@ export interface RouteManifestEntry {
     readonly allowsAuthShell?: boolean;
     readonly requiresSharedChrome?: boolean;
   };
+  /**
+   * Product evidence (JOV-6917): the canonical product-evidence component
+   * this route must render. Required on product routes
+   * (`isProductRouteEntry`); the product-evidence contract test renders the
+   * page and fails when the declared `testId` is absent from the hero or the
+   * first two top-level sections.
+   */
+  readonly productEvidence?: ProductEvidenceDeclaration;
   /** noindex flag — true if the route is noindex today (e.g. /ai, /demo/video). */
   readonly noindex?: boolean;
   /** Alias-of — when this route is an alias of another (e.g. /artist-profile → /artist-profiles). */
@@ -149,11 +240,11 @@ export interface RouteManifestEntry {
 
 /**
  * The route manifest. Per JOV-5650 — every recursive page.tsx under
- * (marketing), (home), and waitlist is represented exactly once. Dynamic
- * engineering article routes are explicit exemptions rather than being hidden
- * behind their index-route entries. This array is the current source authority;
- * generated ledgers and capture catalogs derive their counts instead of copying
- * a prose inventory that can drift.
+ * (marketing), (home), waitlist, and the guarded profile-admission route is
+ * represented exactly once. Dynamic engineering article routes are explicit
+ * exemptions rather than being hidden behind their index-route entries. This
+ * array is the current source authority; generated ledgers and capture catalogs
+ * derive their counts instead of copying a prose inventory that can drift.
  *
  * Exemptions are sanctioned (carry linearId + approvedBy + prUrl) per DX2.
  * The baseline exemption count for the ratchet = current sanctioned count.
@@ -167,49 +258,42 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       approvedVariantBinding(
         'apps/web/components/homepage/HomepageIdentityHero.tsx',
         'hero',
-        'centered-none'
+        'split-claim-card'
       ),
       // The unsupported adoption strip is intentionally omitted until it has
       // an attributable permission or adoption receipt.
       approvedVariantBinding(
-        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
+        'apps/web/components/homepage/HomepageIdentitySections.tsx',
         'feature-split',
         'editorial',
-        'connected'
+        'presence'
       ),
       approvedVariantBinding(
-        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
+        'apps/web/components/homepage/HomepageIdentitySections.tsx',
         'feature-split',
         'editorial',
-        'relationships'
+        'structure'
       ),
       approvedBinding(
-        'apps/web/components/homepage/HomepageClose.tsx',
+        'apps/web/components/homepage/HomepageIdentityClose.tsx',
         'cta',
         'editorial-search'
       ),
     ],
     bindingEvidence: {
-      status: 'unverified',
-      source: 'source history #17063, #17185, #17353; pinned 12b203f9',
+      status: 'verified',
+      source:
+        'JOV-6220 source owner reconciliation 2026-09-29; HomepageIdentityHero and HomepageIdentitySections render tests',
       notes:
-        'Locked connected and relationships beats plus the changelog preview and close actions are inventoried. The changelog preview is a route-local feed backed by published CHANGELOG.md entries and remains outside the recipe section registry. The unsupported adoption strip is omitted. Exact mounted validation remains pending and Pen identity is explicitly unknown. No-script fallback is a separate runtime state. No render or visual admission.',
+        'Identity v3 supersedes the legacy relationships/changelog composition (Tim 2026-09-28). Source inventory only; exact deployed mounted-section, visual, and outcome receipts remain separate. Pen identity is unknown.',
     },
     status: 'active',
-    specVersion: '1.3.0',
+    specVersion: '1.4.0',
     url: '/',
     healthCheck: {
       path: '/',
       expected: 'page',
       waitFor: '[data-testid="marketing-section-hero"]',
-      runtimeFallbacks: [
-        {
-          selector: '[data-marketing-runtime-state="no-script-fallback"]',
-          componentPath:
-            'apps/web/components/homepage/HomepageNoScriptContent.tsx',
-          hiddenWhen: 'scripting-enabled',
-        },
-      ],
     },
   },
   {
@@ -249,53 +333,140 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     glob: '(marketing)/pricing/page.tsx',
     recipeId: 'pricing',
     renderedSections: [
-      ...approvedBindings('apps/web/app/(marketing)/pricing/page.tsx', 'hero'),
       approvedVariantBinding(
-        'apps/web/app/(marketing)/pricing/page.tsx',
+        'apps/web/components/organisms/PricingRecipeBody.tsx',
+        'hero',
+        'centered-none'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/organisms/PricingRecipeBody.tsx',
         'pricing',
         'tier-cards-neutral'
       ),
-      ...approvedBindings(
-        'apps/web/app/(marketing)/pricing/page.tsx',
-        'social-proof',
+      approvedVariantBinding(
+        'apps/web/components/organisms/PricingRecipeBody.tsx',
         'comparison',
-        'cta'
+        'feature-matrix'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/organisms/PricingRecipeBody.tsx',
+        'cta',
+        'plan-actions'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx',
+        'capture',
+        'email-only',
+        'product-updates'
       ),
     ],
     bindingEvidence: {
       status: 'verified',
-      source: 'route audit 2026-07-11',
-      notes: 'FAQ recipe beat is not rendered.',
+      source: 'JOV-6220 source and live section census 2026-09-29',
+      notes:
+        'No social proof or FAQ is rendered. Shared product-update opt-in is included. Source identity only; native comparison visual owner, deployed strict validation, and outcomes remain separate.',
     },
     status: 'active',
-    specVersion: '1.2.0',
+    specVersion: '1.4.0',
     url: '/pricing',
   },
   {
     glob: '(marketing)/artist-profiles/page.tsx',
     recipeId: 'artist-lp',
-    renderedSections: approvedBindings(
-      'components/marketing/artist-profile/ArtistProfileLandingRoute.tsx',
-      'hero',
-      'logo-cloud',
-      'feature-split',
-      'feature-grid',
-      'capture',
-      'comparison',
-      'spec-wall',
-      'how-it-works',
-      'feature-grid',
-      'faq',
-      'cta'
-    ),
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/components/marketing/MarketingPosterHero.tsx',
+        'hero',
+        'centered-phone'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/features/home/HomeTrustSection.tsx',
+        'logo-cloud',
+        'inline-strip'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/artist-profile/ArtistProfileAdaptiveSection.tsx',
+        'feature-split',
+        'phone-right',
+        'adaptive'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/artist-profile/ArtistProfileOutcomesCarousel.tsx',
+        'feature-grid',
+        '4-ledger'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/artist-profile/ArtistProfileCaptureSection.tsx',
+        'capture',
+        'product-demo',
+        'fan-capture'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/artist-profile/ArtistProfileOpinionatedSection.tsx',
+        'feature-split',
+        'phone-right',
+        'opinionated'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/artist-profile/ArtistProfileLandingPage.tsx',
+        'feature-split',
+        'phone-left',
+        'annotated-truth'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/MarketingShippedSitesShowcase.tsx',
+        'product-gallery',
+        'profile-grid',
+        'product-examples'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/MarketingPlatformSpecBento.tsx',
+        'spec-wall',
+        '5-screenshot-bento'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.tsx',
+        'how-it-works',
+        'split-setup'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx',
+        'product-gallery',
+        'release-rail',
+        'release-cycle'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/FaqSection.tsx',
+        'faq',
+        'objection-handler'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/site/MarketingTerminalCta.tsx',
+        'cta',
+        'final-single-claim'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx',
+        'capture',
+        'email-only',
+        'product-updates'
+      ),
+    ],
     bindingEvidence: {
       status: 'verified',
-      source: 'route audit 2026-08-02',
-      notes: 'Release-cycle gallery is product evidence, not social proof.',
+      source: 'JOV-6220 actual source owner and section census 2026-09-29',
+      notes:
+        'Source inventory includes every page beat and the shared opt-in. Demo galleries are product examples, not customer adoption. Native design, deployed checks, and real outcomes require separate receipts.',
     },
     status: 'active',
     specVersion: '1.0.0',
     url: '/artist-profiles',
+    productEvidence: {
+      kind: 'framed-screenshot',
+      componentPath:
+        'apps/web/components/marketing/artist-profile/ArtistProfileHero.tsx',
+      testId: 'artist-profile-hero-product',
+    },
   },
   {
     glob: '(marketing)/artist-profile/page.tsx',
@@ -323,10 +494,16 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/artist-profile',
+    productEvidence: {
+      kind: 'framed-screenshot',
+      componentPath:
+        'apps/web/components/marketing/artist-profile/ArtistProfileHero.tsx',
+      testId: 'artist-profile-hero-product',
+    },
     aliasOf: '/artist-profiles',
   },
   {
-    glob: '(marketing)/solutions/artists/page.tsx',
+    glob: '(marketing)/solutions/[audience]/page.tsx',
     recipeId: 'artist-lp',
     renderedSections: approvedBindings(
       'components/marketing/artist-profile/ArtistProfileLandingRoute.tsx',
@@ -344,13 +521,24 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     ),
     bindingEvidence: {
       status: 'verified',
-      source: 'route audit 2026-09-26 (JOV-5861)',
+      source:
+        'route audit 2026-09-26 (JOV-5861); page record 2026-09-30 (JOV-7275)',
       notes:
-        'Real artist solution route; renders the same artist-lp component and chrome as /artist-profiles. /artists remains the directory. Release-cycle gallery is product evidence, not social proof.',
+        'Family renderer for content/pages/solutions records. The artists record composes the same artist-lp sections as /artist-profiles (zero pixel diff at 390 and 1440). /artists remains the directory. Release-cycle gallery is product evidence, not social proof.',
     },
     status: 'active',
-    specVersion: '1.3.0',
-    url: '/solutions/artists',
+    specVersion: '1.5.0',
+    url: '/solutions/*',
+    healthCheck: {
+      path: '/solutions/artists',
+      expected: 'page',
+    },
+    productEvidence: {
+      kind: 'framed-screenshot',
+      componentPath:
+        'apps/web/components/marketing/artist-profile/ArtistProfileHero.tsx',
+      testId: 'artist-profile-hero-product',
+    },
   },
   {
     glob: '(marketing)/artist-notifications/page.tsx',
@@ -373,6 +561,12 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/artist-notifications',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/marketing/artist-notifications/ArtistNotificationsHero.tsx',
+      testId: 'artist-notifications-card-stage',
+    },
   },
   {
     glob: '(marketing)/download/page.tsx',
@@ -393,6 +587,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/download',
+    productEvidence: {
+      kind: 'framed-screenshot',
+      componentPath: 'apps/web/app/(marketing)/download/page.tsx',
+      testId: 'download-desktop-screenshot',
+    },
   },
   {
     glob: '(marketing)/pay/page.tsx',
@@ -414,6 +613,12 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/pay',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/features/home/claim-handle/ClaimHandleForm.tsx',
+      testId: 'claim-handle-form',
+    },
     healthCheck: {
       path: '/pay',
       expected: 'page',
@@ -437,6 +642,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/voice',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath: 'apps/web/components/features/landing/VoiceDemoVisual.tsx',
+      testId: 'voice-demo-visual',
+    },
     noindex: true,
   },
   {
@@ -453,11 +663,17 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       status: 'verified',
       source: 'route audit 2026-08-01',
       notes:
-        'Uses the authenticated chat merch creation flow; product concepts are illustrative and not proof claims.',
+        'Hero mounts the real chat merch review surface (ChatMerchDesignCarousel) with Tim White dogfood concepts whose previews are garment mockups rendered by the canonical merch pipeline (scripts/generate-instant-merch-proof.ts); selection hands off into the authenticated merch conversation.',
     },
     status: 'active',
     specVersion: '1.0.0',
     url: '/instant-merch',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx',
+      testId: 'chat-merch-option-card',
+    },
   },
   {
     glob: '(marketing)/youtube-thumbnails/page.tsx',
@@ -491,8 +707,14 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'Current left/no-media hero, two-column title/body safeguards, and inline CTA are intentional source output. Hero/grid source variants are explicit; inline CTA has a source-only canonical root and included-single body binding; exact mounted validation remains pending and Pen identity is explicitly unknown. No render or visual admission.',
     },
     status: 'active',
-    specVersion: '1.3.0',
+    specVersion: '1.4.0',
     url: '/youtube-thumbnails',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailPasteForm.tsx',
+      testId: 'youtube-thumbnails-paste-form',
+    },
   },
   {
     glob: '(marketing)/product/page.tsx',
@@ -505,11 +727,16 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       status: 'unverified',
       source: 'Tim DESIGN_READY ship 2026-09-17 /product hero + claim card',
       notes:
-        'Locked PRODUCT / Be found. Be understood. hero with jov.ie/you claim-card proof. Live marketing page — index and sitemap; do not 410 or treat as a reserved-gone username. Source-only; Pen identity is explicitly unknown. No render or visual admission.',
+        'PRODUCT / Your living identity on the internet. hero with jov.ie/you claim-card proof (headline swapped with the homepage 2026-09-28). Live marketing page — index and sitemap; do not 410 or treat as a reserved-gone username. Source-only; Pen identity is explicitly unknown. No render or visual admission.',
     },
     status: 'active',
-    specVersion: '1.3.0',
+    specVersion: '1.4.0',
     url: '/product',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath: 'apps/web/app/(marketing)/product/ProductLanding.tsx',
+      testId: 'product-claim-card',
+    },
     healthCheck: {
       path: '/product',
       expected: 'page',
@@ -554,8 +781,13 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'Coming-soon feature page using canonical marketing sections, an explicitly illustrative card preview, and the approved public-profile screenshot registry. Exact mounted identities are exercised by marketing-route-health.',
     },
     status: 'active',
-    specVersion: '1.3.0',
+    specVersion: '1.4.0',
     url: '/card',
+    productEvidence: {
+      kind: 'framed-screenshot',
+      componentPath: 'apps/web/components/marketing/ProductScreenshotFrame.tsx',
+      testId: 'product-screenshot-frame-public-profile-mobile',
+    },
     healthCheck: {
       path: '/card',
       expected: 'page',
@@ -579,8 +811,13 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'Interactive two-release dial is source-backed; mounted render and native save proof are pending.',
     },
     status: 'active',
-    specVersion: '1.3.0',
+    specVersion: '1.4.0',
     url: '/smart-links',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath: 'apps/web/app/(marketing)/smart-links/SmartLinksDemo.tsx',
+      testId: 'smart-links-demo',
+    },
   },
   {
     glob: '(marketing)/launch/page.tsx',
@@ -632,14 +869,13 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       'apps/web/app/(marketing)/support/page.tsx',
       'hero',
       'content-prose',
-      'faq',
       'cta'
     ),
     bindingEvidence: {
       status: 'verified',
-      source: 'source binding audit 2026-09-01',
+      source: 'source binding audit 2026-09-26',
       notes:
-        'SupportPageContent renders MarketingHero, SupportChannels as the prose/help body, FaqSection, and the canonical MarketingFooterCta in that order.',
+        'SupportPageContent renders MarketingHero, SupportChannels as the prose/help body pointing at the canonical Help Center on docs.jov.ie, and SupportCta in that order. FAQs rehomed to the canonical troubleshooting article under JOV-5897, so the seo recipe faq beat intentionally no longer applies.',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -1105,7 +1341,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
-    glob: '(marketing)/renders/profile-admission/page.tsx',
+    glob: '(profile-admission)/renders/profile-admission/page.tsx',
     renderedSections: [],
     bindingEvidence: {
       status: 'exempt',

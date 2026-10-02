@@ -53,6 +53,15 @@ export async function buildMobileTasteInbox(): Promise<MobileInboxResponse> {
       primaryActionLabel: 'Decide',
       status: 'pending' as const,
       imageUrl: null,
+      summerCard: {
+        id: card.id,
+        kind: card.kind,
+        body: card.body,
+        defaultIfSilent: card.defaultIfSilent,
+        recipient: card.recipient,
+        amountUsd: card.amountUsd,
+        evidence: card.evidence,
+      },
     })),
   ].toSorted((left, right) => right.createdAt.localeCompare(left.createdAt));
 

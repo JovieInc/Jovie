@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -15,6 +16,7 @@ if str(_SYMPHONY_DIR) not in sys.path:
 from closure_health import (  # noqa: E402 - sibling executable module
     issue_intake_allowed,
 )
+from scoped_admission import build_scoped_admission  # noqa: E402
 
 SCHEMA = "jovie-fleet-gate/v1"
 CLOSURE_HEALTH_SCHEMA = "jovie-closure-health/v1"
@@ -149,10 +151,66 @@ def _project_signals(value: object) -> dict[str, Any]:
         "status": main_status,
         "sha": _hex_sha(main.get("sha"), "signals.main.sha"),
     }
+    # JOV-4970: carry the exact main-health reason and required/optional check
+    # classification through the bounded projection so an owner can tell a real
+    # red main from an optional pending workflow.
+    for key in ("reason", "combinedStatus"):
+        value = main.get(key)
+        if isinstance(value, str) and value:
+            projected_main[key] = value
+    if main.get("generationVerified") is True or main.get("generationVerified") is False:
+        projected_main["generationVerified"] = main["generationVerified"]
+    contract = main.get("contract")
+    if isinstance(contract, dict) and isinstance(contract.get("version"), str):
+        projected_main["contractVersion"] = contract["version"]
+    marker = main.get("marker")
+    if isinstance(marker, dict) and isinstance(marker.get("verified"), bool):
+        projected_main["marker"] = {
+            "name": marker.get("name"),
+            "verified": marker["verified"],
+            "stale": marker.get("stale") is True,
+        }
+    for key in ("pendingChecks", "failedChecks"):
+        names = main.get(key)
+        if isinstance(names, list) and all(isinstance(name, str) for name in names):
+            projected_main[key] = names[:64]
+    checks = main.get("checks")
+    if isinstance(checks, list):
+        degraded = [
+            {
+                "name": entry["name"],
+                "classification": entry["classification"],
+                "verdict": entry["verdict"],
+            }
+            for entry in checks
+            if isinstance(entry, dict)
+            and isinstance(entry.get("name"), str)
+            and entry.get("classification") in {"required", "optional"}
+            and entry.get("verdict") != "success"
+        ]
+        if degraded:
+            projected_main["checks"] = degraded[:64]
     projected_production: dict[str, Any] = {"status": production_status}
     deployed = production.get("deployedSha")
     if isinstance(deployed, str) and deployed:
         projected_production["deployedSha"] = deployed
+    dependencies = production.get("dependencies")
+    if isinstance(dependencies, dict):
+        projected_dependencies: dict[str, dict[str, str]] = {}
+        for name, dependency in dependencies.items():
+            if not isinstance(name, str) or not isinstance(dependency, dict):
+                raise AdmissionProjectionError("production dependencies are malformed")
+            projected_dependencies[name] = {
+                "status": _require_str(
+                    dependency.get("status"),
+                    f"signals.production.dependencies.{name}.status",
+                ),
+                "detail": _require_str(
+                    dependency.get("detail"),
+                    f"signals.production.dependencies.{name}.detail",
+                ),
+            }
+        projected_production["dependencies"] = projected_dependencies
     projected = {
         "main": projected_main,
         "production": projected_production,
@@ -568,7 +626,9 @@ def _reject_inventories(value: object, path: str) -> None:
             _reject_inventories(child, f"{path}[{index}]")
 
 
-def project_fleet_admission_receipt(receipt: object) -> dict[str, Any]:
+def project_fleet_admission_receipt(
+    receipt: object, request: object | None = None
+) -> dict[str, Any]:
     """Return a bounded jovie-fleet-gate/v1 admission projection."""
     source = _require_mapping(receipt, "fleet receipt")
     if source.get("schema") != SCHEMA:
@@ -631,6 +691,8 @@ def project_fleet_admission_receipt(receipt: object) -> dict[str, Any]:
         raise AdmissionProjectionError("closure signal and admission disagree")
     _validate_hold_intake_projection(projected)
     _validate_controller_repair_projection(projected)
+    if request is not None:
+        projected["scopedAdmission"] = build_scoped_admission(source, request)
     _reject_inventories(projected, "admission")
     encoded = json.dumps(projected, separators=(",", ":"), sort_keys=True)
     if len(encoded.encode("utf-8")) > MAX_ADMISSION_JSON_BYTES:
@@ -642,8 +704,12 @@ def project_fleet_admission_receipt(receipt: object) -> dict[str, Any]:
 
 def main() -> int:
     try:
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--request", type=Path)
+        args = parser.parse_args()
         receipt = json.load(sys.stdin)
-        projection = project_fleet_admission_receipt(receipt)
+        request = json.load(args.request.open(encoding="utf-8")) if args.request else None
+        projection = project_fleet_admission_receipt(receipt, request)
         json.dump(projection, sys.stdout, separators=(",", ":"), sort_keys=True)
         sys.stdout.write("\n")
         return 0

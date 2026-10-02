@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 const pilot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const common = [
   'scripts/check-built-app.mjs',
+  'patches/eve@0.68.0.patch',
+  'tests/prompt-prefix-stability.test.ts',
   'package.json',
   'pnpm-lock.yaml',
   'tsconfig.json',
@@ -77,13 +79,13 @@ const jovie = [
   'tests/eve-channel-auth-contract.test.ts',
   'tests/jovie_capability_manifest.test.ts',
 ];
+// Eve 0.66 retired the default `ask_question` and `todo` tools; an orphan
+// disableTool stub for either fails discovery, so they are not listed here.
 export const disabledTools = [
   'agent',
-  'ask_question',
   'bash',
   'read_file',
   'write_file',
-  'todo',
   'web_fetch',
   'web_search',
   'load_skill',
@@ -176,6 +178,15 @@ export default defineChannel({ routes: [GET('/runtime/v1/health', async () => {
     "import { disableRoute } from 'eve/channels';\nexport default disableRoute();\n"
   );
   if (identity === 'summer') {
+    put(
+      'agent/lib/summer-bottleneck-loop.ts',
+      files
+        .get('agent/lib/summer-bottleneck-loop.ts')
+        .replace(
+          '../../../../packages/agent-transport-contracts/prediction-receipt',
+          '../../vendor/agent-transport-contracts/prediction-receipt.js'
+        )
+    );
     put(
       'agent/channels/eve.ts',
       "import { disableRoute } from 'eve/channels';\nexport default disableRoute();\n"
@@ -281,10 +292,20 @@ The source export is preparatory; deployment and commissioning require separate 
           '../vendor/agent-transport-contracts/index'
         )
     );
-    for (const path of ['index.ts', 'symphony-outage.ts', 'package.json']) {
+    for (const path of [
+      'index.ts',
+      'prediction-outcome.ts',
+      'prediction-receipt.ts',
+      'symphony-outage.ts',
+      'package.json',
+    ]) {
       let contents = readFileSync(
         resolve(pilot, '../../packages/agent-transport-contracts', path),
         'utf8'
+      );
+      contents = contents.replaceAll(
+        "from './prediction-receipt';",
+        "from './prediction-receipt.js';"
       );
       if (
         path === 'index.ts' &&
@@ -311,6 +332,8 @@ The source export is preparatory; deployment and commissioning require separate 
     'scripts/templates/application-boundary.ts',
     'scripts/templates/application-boundary.test.ts',
     '../../packages/agent-transport-contracts/index.ts',
+    '../../packages/agent-transport-contracts/prediction-outcome.ts',
+    '../../packages/agent-transport-contracts/prediction-receipt.ts',
     '../../packages/agent-transport-contracts/symphony-outage.ts',
     '../../packages/agent-transport-contracts/package.json',
   ];

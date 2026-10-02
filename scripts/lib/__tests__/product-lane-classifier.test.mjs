@@ -21,6 +21,53 @@ const pkg = (before, after) =>
   });
 
 describe('product lane classifier', () => {
+  it('records the bounded blog qualification without admitting mixed paths', () => {
+    const receipt = classifyProductLanes(
+      ['apps/web/content/blog/a-safe-article.md'],
+      { qualificationProfile: 'content-only' }
+    );
+
+    expect(receipt.qualificationProfile).toBe('content-only');
+    expect(receipt.requiredGates.web.tests).toContain(
+      'JOV-7396 publication contract'
+    );
+    expect(() =>
+      classifyProductLanes(
+        [
+          'apps/web/content/blog/a-safe-article.md',
+          'apps/web/lib/blog/getBlogPosts.ts',
+        ],
+        { qualificationProfile: 'content-only' }
+      )
+    ).toThrow('approved blog content paths');
+  });
+
+  it('builds and releases canonical changelog content through web while ordinary docs stay operational', () => {
+    expect(classifyProductLanes(['CHANGELOG.md']).selectedLanes).toEqual([
+      'web',
+    ]);
+    expect(
+      classifyProductLanes(['docs/changelog.md', 'README.md']).selectedLanes
+    ).toEqual(['operations']);
+  });
+  it('routes all canary OTP worker artifacts through the web gate and rejects unknown workers', () => {
+    const receipt = classifyProductLanes([
+      'workers/canary-otp/src/index.ts',
+      'workers/canary-otp/src/index.test.mjs',
+      'workers/canary-otp/package.json',
+      'workers/canary-otp/tsconfig.json',
+      'workers/canary-otp/wrangler.example.toml',
+      'workers/canary-otp/README.md',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web']);
+    expect(
+      receipt.classifications.every(item => item.rule === 'web-product')
+    ).toBe(true);
+    expect(() =>
+      classifyProductLanes(['workers/canary-otp-other/src/index.ts'])
+    ).toThrow(ProductLaneClassificationError);
+  });
+
   it('maps shared Jev evaluator-only edits to the consuming web and contract lanes', () => {
     const receipt = classifyProductLanes([
       'packages/jev-evaluation/gateway.mjs',

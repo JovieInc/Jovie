@@ -39,7 +39,11 @@ const ADMIN_DEFAULT_TRUE_FLAGS = new Set<AppFlagName>(
       flagName !== 'INBOX_HOME' &&
       // External-recipient paid welcome stays founder-gated. Admins must
       // not receive a different default than customers (JOV-6445).
-      flagName !== 'PAID_WELCOME_EMAIL'
+      flagName !== 'PAID_WELCOME_EMAIL' &&
+      // Creator Financial Health is a release-blocking gate (JOV-4621):
+      // owner-only financial data must stay dark for everyone — including
+      // admins — until the privacy/correctness matrix is certified.
+      flagName !== 'CREATOR_FINANCE'
   )
 );
 

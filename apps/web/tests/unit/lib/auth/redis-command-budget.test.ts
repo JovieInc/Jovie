@@ -399,7 +399,8 @@ describe('redis command budget', () => {
     expect(shouldUseEssentialShellData('/app/library')).toBe(true);
     expect(shouldUseEssentialShellData('/app/ov/people')).toBe(true);
     expect(shouldUseEssentialShellData('/app/contacts')).toBe(false);
-    expect(shouldUseEssentialShellData('/app/profiles')).toBe(false);
+    expect(shouldUseEssentialShellData('/app/presence')).toBe(true);
+    expect(shouldUseEssentialShellData('/app/profiles')).toBe(true);
 
     await getCachedAuth();
     expect(mockGetSession).toHaveBeenCalledTimes(1);

@@ -22,7 +22,7 @@ interface LibraryShareDropCreatorProps {
   readonly releaseIds: readonly string[];
   /**
    * Optional release assets the artist can curate into the drop. When provided,
-   * the create form exposes multi-select so press kits can include a set.
+   * the create form exposes multi-select so a private send can include a set.
    */
   readonly candidateAssets?: readonly LibraryShareDropCandidate[];
   readonly defaultTitle: string;
@@ -149,7 +149,7 @@ export function LibraryShareDropCreator({
           Share drop ready
         </p>
         <p className='mt-1 text-xs text-secondary-token'>
-          Anyone with this link can view the press kit
+          Anyone with this link can view these files
           {selectedCount > 1 ? ` (${selectedCount} assets)` : ''}.
         </p>
         <div className='mt-3 flex items-center gap-1.5 rounded-xl border border-subtle bg-surface-1 p-1 pl-3'>
@@ -235,7 +235,7 @@ export function LibraryShareDropCreator({
         Create share drop
       </p>
       <p className='mt-1 text-xs text-secondary-token'>
-        Send a branded press-kit page with {selectedCount} selected asset
+        Send a branded share page with {selectedCount} selected asset
         {selectedCount === 1 ? '' : 's'}.
       </p>
       <div className='mt-4 space-y-3'>

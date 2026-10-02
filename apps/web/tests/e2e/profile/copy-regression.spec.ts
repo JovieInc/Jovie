@@ -25,7 +25,11 @@ import {
   PROFILE_METADATA_VIEWPORT,
 } from '../utils/profile-route-matrix';
 import { installPublicRouteMocks } from '../utils/public-surface-helpers';
-import { SMOKE_TIMEOUTS, waitForHydration } from '../utils/smoke-test-utils';
+import {
+  SMOKE_TIMEOUTS,
+  waitForAnyVisible,
+  waitForHydration,
+} from '../utils/smoke-test-utils';
 
 test.use({
   storageState: { cookies: [], origins: [] },
@@ -48,28 +52,6 @@ const PLACEHOLDER_PATTERNS: readonly RegExp[] = [
   /\bdebug only\b/i,
 ];
 
-async function waitForAnyVisible(
-  page: Page,
-  selectors: readonly string[],
-  timeout = SMOKE_TIMEOUTS.VISIBILITY
-) {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    for (const selector of selectors) {
-      const visible = await page
-        .locator(selector)
-        .first()
-        .isVisible()
-        .catch(() => false);
-      if (visible) return selector;
-    }
-    await page.waitForTimeout(150);
-  }
-  throw new Error(
-    `None of the expected selectors became visible: ${selectors.join(', ')}`
-  );
-}
-
 async function collectVisibleButtonLabels(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const labels: string[] = [];
@@ -78,9 +60,9 @@ async function collectVisibleButtonLabels(page: Page): Promise<string[]> {
       const element = node as HTMLElement;
       const style = window.getComputedStyle(element);
       const rect = element.getBoundingClientRect();
-      // JOV-4764: carousel items can have non-zero geometry while translated
-      // outside the viewport. Only controls a visitor can see simultaneously
-      // count toward the JOV-4433 duplicate-CTA runtime assertion.
+      // JOV-4764/JOV-7123: only controls a visitor can see simultaneously
+      // count toward the JOV-4433 duplicate-CTA runtime assertion — keep the
+      // viewport-intersection guard so off-screen surfaces never false-trip it.
       const intersectsViewport =
         rect.bottom > 0 &&
         rect.right > 0 &&
@@ -219,7 +201,7 @@ test.describe('Public profile copy regression @regression', () => {
         ).toBeLessThan(500);
 
         await waitForHydration(page);
-        await waitForAnyVisible(page, route.readySelectors);
+        await waitForAnyVisible(page, route.readySelectors, { label });
 
         await assertNoPlaceholderCopy(page, label);
         await assertNoDuplicateCtaClusters(page, label);

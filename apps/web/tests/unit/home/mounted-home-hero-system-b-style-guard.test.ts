@@ -62,28 +62,23 @@ describe('mounted homepage hero System B source contract', () => {
       ).not.toMatch(pattern);
     }
 
-    // The homepage copy module owns words; the hero owns the composition; the
-    // one primary action (Request access, or name search) is the only control.
+    // The homepage copy module owns words; the hero owns the composition;
+    // the jov.ie/you claim (Tim 2026-09-28) is the only control.
     expect(pageSource).toContain('<HomepageIdentityHero');
     expect(pageSource).not.toContain('HomeTrustSection');
     expect(pageSource).not.toMatch(/statsRow|stats=\{/);
     expect(pageSource).not.toContain('secondaryCta');
-    expect(heroComponentSource).toContain("appearance='editorial'");
-    expect(heroComponentSource).toContain(
-      "submitTestId='homepage-primary-cta'"
-    );
+    expect(heroComponentSource).toContain('<ProductClaimHandleForm');
+    expect(heroComponentSource).toContain("testIdPrefix='homepage'");
     expect(heroComponentSource).not.toMatch(/<Button|<Link|href=/);
-    expect(heroComponentSource).toContain('<HomepageProfileSpecimen');
-
-    for (const className of [
-      'homepage-identity-hero',
-      'homepage-identity-hero__texture',
-      'homepage-identity-hero__inner',
-      'homepage-identity-hero__headline',
-      'homepage-identity-hero__support',
-      'homepage-identity-hero__action',
+    // Illustrative claim preview, never a product screenshot.
+    expect(heroComponentSource).not.toContain('<ArtistProfilePhoneFrame');
+    for (const primitive of [
+      '<MarketingHero',
+      '<MarketingHeroPhoto',
+      '<MarketingSurfaceCard',
     ]) {
-      expect(heroComponentSource).toContain(className);
+      expect(heroComponentSource).toContain(primitive);
     }
   });
 
@@ -109,19 +104,11 @@ describe('mounted homepage hero System B source contract', () => {
       expect(css, `${cssPath} leaked ${pattern}`).not.toMatch(pattern);
     }
 
-    expect(css).toContain('var(--system-b-cinematic-black)');
-    expect(css).toContain('var(--color-text-primary-token)');
-    expect(css).toContain('var(--color-text-secondary-token)');
+    expect(css).toContain('var(--color-text-tertiary-token)');
     expect(css).toContain('var(--ds-public-content-max)');
     expect(css).toContain('var(--space-');
     expect(css).toContain('var(--font-mono)');
-    expect(css).toContain('border-radius: var(--radius-full);');
-    expect(css).toContain('border-radius: var(--radius-xl);');
+    expect(css).toContain('var(--font-display)');
     expect(css).not.toContain('var(--linear-');
-    // Every light-theme hero ink is mixed from a token, never a raw value.
-    const tokenMixes = css.match(
-      /color-mix\(\s*in oklab,\s*var\(--color-text-tooltip\)/g
-    );
-    expect(tokenMixes?.length ?? 0).toBeGreaterThanOrEqual(3);
   });
 });

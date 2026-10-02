@@ -130,8 +130,7 @@ export function getConnectionStatus(
       tone: 'error',
       needsAttention: true,
       sortPriority: 0,
-      nextAction:
-        'Inspect the source to check this identity conflict. Identity confirmation is not yet available here.',
+      nextAction: 'Resolve this identity using the retained source evidence.',
     };
   }
   if (row.qualificationStatus === 'suggested') {
@@ -140,8 +139,17 @@ export function getConnectionStatus(
       tone: 'warning',
       needsAttention: true,
       sortPriority: 0,
+      nextAction: 'Confirm whether this public identity belongs to the artist.',
+    };
+  }
+  if (row.qualificationStatus === 'rejected') {
+    return {
+      label: 'Not You',
+      tone: 'neutral',
+      needsAttention: false,
+      sortPriority: 4,
       nextAction:
-        'Inspect the source to check whether it belongs to the artist. Identity confirmation is not yet available here.',
+        'This identity was rejected and is retained as negative evidence.',
     };
   }
   if (row.monitoringState === 'locked') {

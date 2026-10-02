@@ -88,6 +88,22 @@ export function shouldRenderOperatorChrome(
   return mode === OVIE_APP_SHELL_WORKSPACE.id && context.isAdmin;
 }
 
+/** The legacy lock is Ovie-only; an old cookie must not block Jovie. */
+export function shouldLockOperatorWorkspace({
+  mode,
+  isAdmin,
+  needsAdminStepUp,
+  hasLegacyLockCookie,
+}: {
+  readonly mode: AppShellMode;
+  readonly isAdmin: boolean;
+  readonly needsAdminStepUp: boolean;
+  readonly hasLegacyLockCookie: boolean;
+}): boolean {
+  if (!shouldRenderOperatorChrome(mode, { isAdmin })) return false;
+  return needsAdminStepUp || hasLegacyLockCookie;
+}
+
 export function getPermittedAppShellWorkspaces(
   context: AppShellAccessContext
 ): readonly CanonicalAppShellWorkspace<AppShellMode>[] {

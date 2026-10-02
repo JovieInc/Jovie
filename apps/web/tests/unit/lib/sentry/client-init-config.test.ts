@@ -42,3 +42,28 @@ describe('client init configs (JOV-5182)', () => {
     expect(config.release).toBe(base.release);
   });
 });
+
+describe('Sentry 11 lite breadcrumb policy', () => {
+  it.each([true, false])(
+    'respects enableBreadcrumbs=%s for both breadcrumb integrations',
+    enabled => {
+      const config = getLiteClientConfig({ enableBreadcrumbs: enabled });
+      if (typeof config.integrations !== 'function')
+        throw new Error('Expected integration filter');
+      const defaults = [
+        'GlobalHandlers',
+        'Breadcrumbs',
+        'Console',
+        'BrowserTracing',
+        'Replay',
+      ].map(name => ({ name }));
+      expect(
+        config.integrations(defaults).map(integration => integration.name)
+      ).toEqual(
+        enabled
+          ? ['GlobalHandlers', 'Breadcrumbs', 'Console']
+          : ['GlobalHandlers']
+      );
+    }
+  );
+});

@@ -1,0 +1,1439 @@
+schema: jovie-workflow-topology/v1
+measuredBaseline:
+  sha: 06fe003f7e3c2cf4919aa2a115749bafa0bf0196
+  capturedAt: '2026-09-29'
+  workflowRuns: 293
+  checkRecords: 487
+budgets:
+  blockingPrChecks: 12
+  normalPrCheckRecords: 25
+  normalPrExternalAllowance: 8
+  mainShaWorkflowRuns: 72
+authoritativeOwners:
+  - category: source-validation
+    workflow: Source Validation
+  - category: release-orchestration
+    workflow: Production Controller
+  - category: production-verification
+    workflow: Production Controller
+  - category: telemetry-aggregation
+    workflow: Delivery Control Receipts
+  - category: remediation-dispatch
+    workflow: Lane Fix Relay
+authoritySurfaces:
+  - surface: staging
+    workflow: Staging Controller
+  - surface: production
+    workflow: Production Controller
+  - surface: rollback
+    workflow: Production Release
+  - surface: queue-admission
+    workflow: Merge Queue Green Enroll
+  - surface: release-truth
+    workflow: Production Controller
+blockingPrChecks:
+  - PR Ready
+  - Migration Guard
+  - Fork PR Gate
+  - PR Size Guard
+  - PR targets main
+  - llm-review
+normalPrWorkflows:
+  - Source Validation
+  - Auto-Merge Default
+  - Fork PR Gate
+  - PR Size Guard
+  - PR targets main
+  - Repository documentation shadow
+  - Summer Eve identity check
+inactiveWorkflows:
+  - Agent Pipeline
+  - Agent Tick
+  - Auto-PR on Agent Push
+  - Auto-Ready Agent Drafts
+  - GitHub AI Dispatcher
+  - GitHub AI Orchestrator (retired)
+  - Main CI health monitor
+  - PR Conflict Handler
+  - Real-Model Eval Lane
+  - Rolling CI Dispatch
+  - Stuck Draft Auto-Close
+  - Taste Classifier
+  - Taste Label Guard
+generatedAt: deterministic
+normalPrCheckRecords: 25
+nodes:
+  - name: Workflow Lint
+    path: .github/workflows/actionlint.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:actionlint
+    jobCount: 1
+  - name: Actions Cache GC
+    path: .github/workflows/actions-cache-gc.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:gc
+    jobCount: 1
+  - name: Actions Cache Supersede
+    path: .github/workflows/actions-cache-supersede.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:prune
+    jobCount: 1
+  - name: Agent Harness Health Report
+    path: .github/workflows/agent-harness-health-report.yml
+    active: true
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:report
+    jobCount: 1
+  - name: Agent Landing Sweep
+    path: .github/workflows/agent-landing-sweep.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:sweep
+    jobCount: 1
+  - name: Agent Pipeline
+    path: .github/workflows/agent-pipeline.yml
+    active: false
+    category: remediation-dispatch
+    authoritativeProducer: Lane Fix Relay
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_run
+    terminalReceipt: job:exhaust
+    jobCount: 5
+  - name: Agent Tick
+    path: .github/workflows/agent-tick.yml
+    active: false
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:synthetic-monitoring
+    jobCount: 7
+  - name: Auto-Merge Default
+    path: .github/workflows/auto-merge-default.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:self-test
+    jobCount: 3
+  - name: Auto-PR on Agent Push
+    path: .github/workflows/auto-pr-on-push.yml
+    active: false
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+    terminalReceipt: job:open-pr
+    jobCount: 1
+  - name: Auto-Ready Agent Drafts
+    path: .github/workflows/auto-ready-agent-drafts.yml
+    active: false
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - check_suite
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:green-source
+    jobCount: 2
+  - name: Brand Scrub
+    path: .github/workflows/brand-scrub.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:brand-scrub-unit-tests
+    jobCount: 2
+  - name: Canary Health Gate
+    path: .github/workflows/canary-health-gate.yml
+    active: true
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_call
+    terminalReceipt: job:canary-health-gate
+    jobCount: 1
+  - name: CI Duration Ratchet
+    path: .github/workflows/ci-duration-ratchet.yml
+    active: true
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:measure
+    jobCount: 2
+  - name: CI Shard Contract Canary
+    path: .github/workflows/ci-shard-contract-canary.yml
+    active: true
+    category: production-verification
+    authoritativeProducer: Production Controller
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+    terminalReceipt: job:contract-adapter
+    jobCount: 1
+  - name: CI
+    path: .github/workflows/ci.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers:
+      - Agent Pipeline
+      - Auto-Ready Agent Drafts
+      - iOS CI
+      - Merge Queue Green Enroll
+      - PR Conflict Handler
+      - Production Controller
+      - Rolling CI Dispatch
+      - Staging Controller
+      - Test Flakiness Report
+    triggeringStateTransition:
+      - merge_group
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:main-release-ready
+    jobCount: 61
+  - name: Claude Review (gbrain-aware)
+    path: .github/workflows/claude-review.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:review
+    jobCount: 1
+  - name: Claude Code
+    path: .github/workflows/claude.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - issue_comment
+    terminalReceipt: job:claude
+    jobCount: 1
+  - name: CodeQL Security Analysis
+    path: .github/workflows/codeql.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:analyze
+    jobCount: 1
+  - name: Cost Anomaly Gate
+    path: .github/workflows/cost-anomaly-gate.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:evaluate
+    jobCount: 1
+  - name: Delivery Control Receipts
+    path: .github/workflows/delivery-control-receipts.yml
+    active: true
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor:
+      - telemetry-aggregation
+    allowedConsumers: []
+    triggeringStateTransition:
+      - repository_dispatch
+      - workflow_run
+    terminalReceipt: job:receipt
+    jobCount: 1
+  - name: Dependabot Auto-Merge
+    path: .github/workflows/dependabot-auto-merge.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+    terminalReceipt: job:auto-merge
+    jobCount: 1
+  - name: Deprecation Intake (Linear devin lane)
+    path: .github/workflows/deprecation-intake.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:intake
+    jobCount: 1
+  - name: Design Governance
+    path: .github/workflows/design-governance.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+      - repository_dispatch
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:invariant-stewardship
+    jobCount: 2
+  - name: desktop-release
+    path: .github/workflows/desktop-release.yml
+    active: true
+    category: release-orchestration
+    authoritativeProducer: Production Controller
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:record-production-publish
+    jobCount: 4
+  - name: Doc Gardening Agent
+    path: .github/workflows/doc-gardening-agent.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:garden
+    jobCount: 1
+  - name: E2E Full Browser Matrix
+    path: .github/workflows/e2e-full-matrix.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers:
+      - Test Flakiness Report
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:notify
+    jobCount: 2
+  - name: Real-Model Eval Lane
+    path: .github/workflows/eval-real-model.yml
+    active: false
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:real-model-eval
+    jobCount: 1
+  - name: Eval Gate
+    path: .github/workflows/eval.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:eval
+    jobCount: 1
+  - name: Periodic Evals
+    path: .github/workflows/evals-periodic.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:evals
+    jobCount: 2
+  - name: Eve Pilot
+    path: .github/workflows/eve-pilot.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers:
+      - Safe PR Remediation
+    triggeringStateTransition:
+      - pull_request
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:verify
+    jobCount: 2
+  - name: Fixed Runner Canary
+    path: .github/workflows/fixed-runner-canary.yml
+    active: true
+    category: production-verification
+    authoritativeProducer: Production Controller
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:canary
+    jobCount: 1
+  - name: Fleet Gate Refresh
+    path: .github/workflows/fleet-gate-refresh.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+      - push
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:assess
+    jobCount: 2
+  - name: Fork PR Gate
+    path: .github/workflows/fork-pr-gate.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers:
+      - Auto-Ready Agent Drafts
+      - Lane Fix Relay
+      - Merge Queue Green Enroll
+    triggeringStateTransition:
+      - merge_group
+      - pull_request
+      - pull_request_review
+      - pull_request_target
+    terminalReceipt: job:fork-gate
+    jobCount: 3
+  - name: GitHub AI Dispatcher
+    path: .github/workflows/github-ai-dispatcher.yml
+    active: false
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:dispatch
+    jobCount: 1
+  - name: GitHub AI Orchestrator (retired)
+    path: .github/workflows/github-ai-orchestrator.yml
+    active: false
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:finalize_claim
+    jobCount: 4
+  - name: Golden Path Nightly
+    path: .github/workflows/golden-path-nightly.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:golden-path
+    jobCount: 1
+  - name: Golden Path Prod Autofix
+    path: .github/workflows/golden-path-prod-autofix.yml
+    active: true
+    category: remediation-dispatch
+    authoritativeProducer: Lane Fix Relay
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:probe-and-autofix
+    jobCount: 1
+  - name: HA CI remediator poke
+    path: .github/workflows/ha-ci-remediator-poke.yml
+    active: true
+    category: remediation-dispatch
+    authoritativeProducer: Lane Fix Relay
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:poke
+    jobCount: 1
+  - name: Help Center Recertification
+    path: .github/workflows/help-center-recertification.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+    terminalReceipt: job:affected-articles
+    jobCount: 1
+  - name: Hermes CLI Worker
+    path: .github/workflows/hermes-cli-worker.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:worker
+    jobCount: 1
+  - name: Internal PR Review (advisory)
+    path: .github/workflows/internal-review.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+    terminalReceipt: job:review
+    jobCount: 1
+  - name: iOS CI
+    path: .github/workflows/ios-ci.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_call
+      - workflow_dispatch
+    terminalReceipt: job:test
+    jobCount: 2
+  - name: iOS Signing Bootstrap
+    path: .github/workflows/ios-signing-bootstrap.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:bootstrap
+    jobCount: 1
+  - name: iOS TestFlight
+    path: .github/workflows/ios-testflight.yml
+    active: true
+    category: release-orchestration
+    authoritativeProducer: Production Controller
+    authoritativeFor: []
+    allowedConsumers:
+      - iOS CI
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:record-upload
+    jobCount: 4
+  - name: Jovie artist agent Eve release and rollback
+    path: .github/workflows/jovie-agent-release.yml
+    active: true
+    category: release-orchestration
+    authoritativeProducer: Production Controller
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:release
+    jobCount: 2
+  - name: Lane Fix Relay
+    path: .github/workflows/lane-fix-relay.yml
+    active: true
+    category: remediation-dispatch
+    authoritativeProducer: Lane Fix Relay
+    authoritativeFor:
+      - remediation-dispatch
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_review
+      - pull_request_review_comment
+      - pull_request_target
+      - push
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:relay
+    jobCount: 1
+  - name: Legacy Human Hold Scrub
+    path: .github/workflows/legacy-human-hold-scrub.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - issues
+      - pull_request_target
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:sweep
+    jobCount: 2
+  - name: Linear Sync on Merge
+    path: .github/workflows/linear-sync-on-merge.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+    terminalReceipt: job:sync_done
+    jobCount: 1
+  - name: M2 Revenue-Path Canary
+    path: .github/workflows/m2-revenue-path-canary.yml
+    active: true
+    category: production-verification
+    authoritativeProducer: Production Controller
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_call
+      - workflow_dispatch
+    terminalReceipt: job:m2-revenue-path
+    jobCount: 1
+  - name: Mac Runner Heartbeat
+    path: .github/workflows/mac-runner-heartbeat.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:heartbeat
+    jobCount: 1
+  - name: Main CI health monitor
+    path: .github/workflows/main-ci-health-monitor.yml
+    active: false
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:auto-rerun
+    jobCount: 2
+  - name: Marketing Certification Producer
+    path: .github/workflows/marketing-certification-producer.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:produce
+    jobCount: 1
+  - name: Merge Queue Green Enroll
+    path: .github/workflows/merge-queue-green-enroll.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:enroll
+    jobCount: 1
+  - name: Merge Queue Ruleset Verify
+    path: .github/workflows/merge-queue-ruleset-verify.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:verify
+    jobCount: 1
+  - name: Neon Ephemeral Branch Cleanup
+    path: .github/workflows/neon-ephemeral-branch-cleanup.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+    terminalReceipt: job:delete-neon-branch
+    jobCount: 1
+  - name: Neon Scheduled Branch Cleanup
+    path: .github/workflows/neon-scheduled-cleanup.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:scheduled-cleanup
+    jobCount: 1
+  - name: Next Build Cache Warm
+    path: .github/workflows/next-build-cache-warm.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:warm
+    jobCount: 1
+  - name: Nightly Testing Agent
+    path: .github/workflows/nightly-testing-agent.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:report
+    jobCount: 5
+  - name: Changed-Evidence Test Suites
+    path: .github/workflows/nightly-tests.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers:
+      - Test Flakiness Report
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:notify
+    jobCount: 4
+  - name: Node Runtime Compatibility
+    path: .github/workflows/node-runtime-compatibility.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:promotion-readiness
+    jobCount: 3
+  - name: Node Runtime Freshness
+    path: .github/workflows/node-runtime-freshness.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:policy
+    jobCount: 1
+  - name: Publish @jovie/cli to npm
+    path: .github/workflows/npm-publish.yml
+    active: true
+    category: release-orchestration
+    authoritativeProducer: Production Controller
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:publish
+    jobCount: 1
+  - name: Observability Report (Linear)
+    path: .github/workflows/observability-issue.yml
+    active: true
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - repository_dispatch
+    terminalReceipt: job:sync-issue
+    jobCount: 1
+  - name: Post-Deploy Probes
+    path: .github/workflows/postdeploy-probes.yml
+    active: true
+    category: release-orchestration
+    authoritativeProducer: Production Controller
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:notify-failure
+    jobCount: 5
+  - name: PR Conflict Handler
+    path: .github/workflows/pr-conflict-handler.yml
+    active: false
+    category: remediation-dispatch
+    authoritativeProducer: Lane Fix Relay
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+      - push
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:record_cohort
+    jobCount: 6
+  - name: PR Preparation Canary
+    path: .github/workflows/pr-preparation-canary.yml
+    active: true
+    category: production-verification
+    authoritativeProducer: Production Controller
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:prepare
+    jobCount: 2
+  - name: PR Size Guard Label Override
+    path: .github/workflows/pr-size-guard-label-override.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+    terminalReceipt: job:override
+    jobCount: 1
+  - name: PR Size Guard
+    path: .github/workflows/pr-size-guard.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers:
+      - Auto-Ready Agent Drafts
+      - Lane Fix Relay
+      - Merge Queue Green Enroll
+    triggeringStateTransition:
+      - merge_group
+      - pull_request
+    terminalReceipt: job:size
+    jobCount: 2
+  - name: PR targets main
+    path: .github/workflows/pr-targets-main.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - merge_group
+      - pull_request
+    terminalReceipt: job:pr-targets-main
+    jobCount: 1
+  - name: PR Visual Review
+    path: .github/workflows/pr-visual-review.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+    terminalReceipt: job:capture
+    jobCount: 1
+  - name: Production Continuity Guard
+    path: .github/workflows/production-continuity.yml
+    active: true
+    category: production-verification
+    authoritativeProducer: Production Controller
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:preserve-incident
+    jobCount: 4
+  - name: Production Controller Health
+    path: .github/workflows/production-controller-health.yml
+    active: true
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:recover
+    jobCount: 1
+  - name: Production Controller
+    path: .github/workflows/production-controller.yml
+    active: true
+    category: release-orchestration
+    authoritativeProducer: Production Controller
+    authoritativeFor:
+      - release-orchestration
+      - production-verification
+    allowedConsumers:
+      - Delivery Control Receipts
+      - desktop-release
+      - iOS TestFlight
+      - Production Release
+    triggeringStateTransition:
+      - workflow_run
+    terminalReceipt: job:publish-customer-changelog
+    jobCount: 9
+  - name: Production Marker Recovery
+    path: .github/workflows/production-marker-recovery.yml
+    active: true
+    category: production-verification
+    authoritativeProducer: Production Controller
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:recover-marker
+    jobCount: 1
+  - name: Production Release
+    path: .github/workflows/production-release.yml
+    active: true
+    category: release-orchestration
+    authoritativeProducer: Production Controller
+    authoritativeFor: []
+    allowedConsumers:
+      - Canary Health Gate
+    triggeringStateTransition:
+      - workflow_call
+    terminalReceipt: job:release-result
+    jobCount: 15
+  - name: Quality Gap Finder
+    path: .github/workflows/quality-gap-finder.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - repository_dispatch
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:find
+    jobCount: 1
+  - name: Repository documentation shadow
+    path: .github/workflows/repository-docs-shadow.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:parity
+    jobCount: 1
+  - name: Lint & Static Checks (reusable)
+    path: .github/workflows/reusable-ci-lint.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_call
+    terminalReceipt: job:golden-eval-set
+    jobCount: 6
+  - name: Rolling CI Dispatch
+    path: .github/workflows/rolling-ci-dispatch.yml
+    active: false
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_run
+    terminalReceipt: job:terminal
+    jobCount: 6
+  - name: Runner Autoscaler Canary
+    path: .github/workflows/runner-autoscaler-canary.yml
+    active: true
+    category: production-verification
+    authoritativeProducer: Production Controller
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:unit-shard
+    jobCount: 1
+  - name: Runner Health Monitor
+    path: .github/workflows/runner-health-monitor.yml
+    active: true
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:monitor
+    jobCount: 1
+  - name: Runner Heartbeat
+    path: .github/workflows/runner-heartbeat.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:remediation-clock
+    jobCount: 2
+  - name: Runner Isolation Smoke
+    path: .github/workflows/runner-isolation-smoke.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:unit-shard
+    jobCount: 1
+  - name: Safe PR Remediation
+    path: .github/workflows/safe-pr-remediation.yml
+    active: true
+    category: remediation-dispatch
+    authoritativeProducer: Lane Fix Relay
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_run
+    terminalReceipt: job:commit
+    jobCount: 4
+  - name: Product Screenshots
+    path: .github/workflows/screenshots.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:certify
+    jobCount: 3
+  - name: Security Suppression Audit
+    path: .github/workflows/security-suppression-audit.yml
+    active: true
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_review
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:nightly-audit
+    jobCount: 2
+  - name: Security Scanning
+    path: .github/workflows/security.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:workflow-execution-posture
+    jobCount: 6
+  - name: Sentry Autofix Recurrence
+    path: .github/workflows/sentry-autofix-recurrence.yml
+    active: true
+    category: remediation-dispatch
+    authoritativeProducer: Lane Fix Relay
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:recurrence
+    jobCount: 1
+  - name: Sentry Autofix
+    path: .github/workflows/sentry-autofix.yml
+    active: true
+    category: remediation-dispatch
+    authoritativeProducer: Lane Fix Relay
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - repository_dispatch
+    terminalReceipt: job:autofix
+    jobCount: 1
+  - name: Sentry Error Gate
+    path: .github/workflows/sentry-error-gate.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_call
+    terminalReceipt: job:sentry-gate
+    jobCount: 1
+  - name: Shipping SLO Ratchet
+    path: .github/workflows/shipping-slo.yml
+    active: true
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:measure
+    jobCount: 1
+  - name: SonarCloud
+    path: .github/workflows/sonarcloud.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:sonarcloud
+    jobCount: 1
+  - name: Source Admission Review Signal
+    path: .github/workflows/source-admission-review-signal.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_review
+    terminalReceipt: job:review-signal
+    jobCount: 1
+  - name: Source Validation
+    path: .github/workflows/source-validation.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor:
+      - source-validation
+    allowedConsumers:
+      - Auto-Ready Agent Drafts
+      - Lane Fix Relay
+      - Merge Queue Green Enroll
+    triggeringStateTransition:
+      - pull_request
+    terminalReceipt: job:ready
+    jobCount: 5
+  - name: Staging Controller
+    path: .github/workflows/staging-controller.yml
+    active: true
+    category: release-orchestration
+    authoritativeProducer: Production Controller
+    authoritativeFor: []
+    allowedConsumers:
+      - Production Release
+    triggeringStateTransition:
+      - workflow_run
+    terminalReceipt: job:staging-result
+    jobCount: 3
+  - name: Stuck Draft Auto-Close
+    path: .github/workflows/stuck-draft-autoclose.yml
+    active: false
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:autoclose
+    jobCount: 1
+  - name: Summer Eve identity check
+    path: .github/workflows/summer-eve-pin.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:check
+    jobCount: 2
+  - name: Production Synthetic Monitoring
+    path: .github/workflows/synthetic-monitoring.yml
+    active: true
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:limiter-store-health
+    jobCount: 3
+  - name: Taste Classifier
+    path: .github/workflows/taste-classifier.yml
+    active: false
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+    terminalReceipt: job:classify
+    jobCount: 1
+  - name: Taste Label Guard
+    path: .github/workflows/taste-label-guard.yml
+    active: false
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+    terminalReceipt: job:guard
+    jobCount: 1
+  - name: Test Coverage Audit
+    path: .github/workflows/test-coverage-audit.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers:
+      - SonarCloud
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:audit
+    jobCount: 1
+  - name: Test Flakiness Report
+    path: .github/workflows/test-flakiness-report.yml
+    active: true
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:analyze-flakiness
+    jobCount: 1
+  - name: TSC Cache Warm
+    path: .github/workflows/tsc-cache-warm.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:warm
+    jobCount: 1
+  - name: UI Story Coverage Audit
+    path: .github/workflows/ui-story-coverage-audit.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:audit
+    jobCount: 1
+  - name: Vercel Preview Cleanup
+    path: .github/workflows/vercel-preview-cleanup.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+    terminalReceipt: job:cleanup-pr-previews
+    jobCount: 1
+  - name: Visual & A11y Tests
+    path: .github/workflows/visual-a11y.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:report-scheduled-failure
+    jobCount: 3
+  - name: Visual Regression
+    path: .github/workflows/visual-regression.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:report-scheduled-failure
+    jobCount: 2
+edges:
+  - from: CI
+    to: iOS CI
+    type: workflow_call
+  - from: Production Controller
+    to: Delivery Control Receipts
+    type: workflow_run
+  - from: Production Controller
+    to: desktop-release
+    type: workflow_run
+  - from: Production Controller
+    to: iOS TestFlight
+    type: workflow_run
+  - from: iOS TestFlight
+    to: iOS CI
+    type: workflow_call
+  - from: Source Validation
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: Fork PR Gate
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: PR Size Guard
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: Source Validation
+    to: Merge Queue Green Enroll
+    type: workflow_run
+  - from: CI
+    to: Merge Queue Green Enroll
+    type: workflow_run
+  - from: Fork PR Gate
+    to: Merge Queue Green Enroll
+    type: workflow_run
+  - from: PR Size Guard
+    to: Merge Queue Green Enroll
+    type: workflow_run
+  - from: CI
+    to: Production Controller
+    type: workflow_run
+  - from: Production Controller
+    to: Production Release
+    type: workflow_call
+  - from: Production Release
+    to: Canary Health Gate
+    type: workflow_call
+  - from: Eve Pilot
+    to: Safe PR Remediation
+    type: workflow_run
+  - from: Test Coverage Audit
+    to: SonarCloud
+    type: workflow_run
+  - from: CI
+    to: Staging Controller
+    type: workflow_run
+  - from: Staging Controller
+    to: Production Release
+    type: workflow_call
+  - from: CI
+    to: Test Flakiness Report
+    type: workflow_run
+  - from: Changed-Evidence Test Suites
+    to: Test Flakiness Report
+    type: workflow_run
+  - from: E2E Full Browser Matrix
+    to: Test Flakiness Report
+    type: workflow_run

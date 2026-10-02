@@ -173,7 +173,7 @@ export function AddPlatformDialog({
               />
             </div>
             {error && (
-              <p className='text-xs text-red-500' role='alert'>
+              <p className='text-xs text-error' role='alert'>
                 {error}
               </p>
             )}

@@ -360,3 +360,26 @@ describe('DropdownMenu', () => {
     });
   });
 });
+
+describe('DropdownMenu submenu viewport fit', () => {
+  it('narrows submenus into the width Radix reports as available', () => {
+    render(
+      <DropdownMenu open>
+        <DropdownMenuTrigger>Open</DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuSub open>
+            <DropdownMenuSubTrigger>Move to</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent data-testid='fit-sub'>
+              <DropdownMenuItem>Playlist</DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+    const style = screen.getByTestId('fit-sub').getAttribute('style') ?? '';
+    expect(style).toContain(
+      'max-width: var(--radix-dropdown-menu-content-available-width)'
+    );
+    expect(screen.getByTestId('fit-sub').className).toContain('z-popover');
+  });
+});

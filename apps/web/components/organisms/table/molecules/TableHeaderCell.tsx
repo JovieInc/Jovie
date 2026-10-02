@@ -86,6 +86,9 @@ export function TableHeaderCell<TData extends RowData>({
       className={cn(
         stickyHeaderClass,
         tableAlignment.text[align],
+        // The sort pill pads 6px; inset the cell 6px so the label lands on
+        // the body cells' 12px text edge.
+        canSort && 'px-1.5',
         metaClassName,
         'whitespace-nowrap'
       )}

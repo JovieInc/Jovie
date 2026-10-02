@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { expect, type Page, test } from '@playwright/test';
+import { PROFILE_DESKTOP_SURFACE_ENABLED } from '../../../lib/profile/desktop-surface-flag';
 import {
   resetOwnedOutputDirectory,
   resolveFixedOwnedOutputDirectory,
@@ -176,9 +177,6 @@ async function collectLayoutMetrics(page: Page) {
     const compactCover = document.querySelector<HTMLElement>(
       '[data-testid="profile-cover"]'
     );
-    const scroll = document.querySelector<HTMLElement>(
-      '[data-testid="profile-content-scroll"]'
-    );
     const nav = document.querySelector<HTMLElement>(
       '[data-testid="profile-tab-bar"]'
     );
@@ -242,7 +240,7 @@ async function collectLayoutMetrics(page: Page) {
       document.querySelectorAll<HTMLElement>(
         [
           '[data-testid="profile-home-alerts-row"]',
-          '[data-testid="profile-home-alerts-fallback-card"]',
+          '[data-testid="profile-identity-get-updates"]',
           '[data-testid="profile-tab-bar"] button',
           '[data-testid="profile-desktop-surface"] nav button',
           '[data-testid="profile-desktop-surface"] button[aria-label="Menu"]',
@@ -290,6 +288,35 @@ async function collectLayoutMetrics(page: Page) {
     const homeRail = document.querySelector<HTMLElement>(
       '[data-testid="profile-home-rail"]'
     );
+    const homeContentColumn = document.querySelector<HTMLElement>(
+      '.profile-home-content-column'
+    );
+    const featuredCards = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        '[data-testid="profile-home-rail"] > [data-presentation="featured"]'
+      )
+    ).filter(isVisibleBox);
+    const homeCarouselCount = document.querySelectorAll(
+      '[data-testid="profile-home-carousel"]'
+    ).length;
+
+    const resolveCssLength = (
+      owner: HTMLElement | null,
+      customProperty: string
+    ) => {
+      if (!owner) return null;
+
+      const probe = document.createElement('div');
+      probe.style.position = 'absolute';
+      probe.style.visibility = 'hidden';
+      probe.style.pointerEvents = 'none';
+      probe.style.height = `var(${customProperty})`;
+      owner.append(probe);
+      const resolved = Number.parseFloat(window.getComputedStyle(probe).height);
+      probe.remove();
+
+      return Number.isFinite(resolved) ? resolved : null;
+    };
 
     return {
       viewportWidth,
@@ -311,13 +338,21 @@ async function collectLayoutMetrics(page: Page) {
         )
       ),
       homeRail: box(homeRail),
+      featuredCardCount: featuredCards.length,
+      homeCarouselCount,
+      homeContentColumnMarginBottom: homeContentColumn
+        ? Number.parseFloat(
+            window.getComputedStyle(homeContentColumn).marginBottom
+          )
+        : null,
+      profileBottomNavHeight: resolveCssLength(
+        root,
+        '--profile-bottom-nav-height'
+      ),
+      profileDockClearance: resolveCssLength(root, '--space-6'),
       desktopCover: box(desktopCover),
       desktopAlerts: box(desktopAlerts),
       desktopSecondaryGrid: box(desktopSecondaryGrid),
-      scroll: box(scroll),
-      scrollPaddingBottom: scroll
-        ? Number.parseFloat(window.getComputedStyle(scroll).paddingBottom)
-        : null,
       nav: box(nav),
       navRail: box(navRail),
       visibleLargeImages,
@@ -809,13 +844,14 @@ test.describe('Public profile /tim layout hardening @regression', () => {
           homeRail.top - identity.bottom,
           `${viewport.id} featured card should stay close to the identity`
         ).toBeLessThanOrEqual(8);
-        if (viewport.height >= 800 && metrics.nav && metrics.homeRail) {
-          const deadSpaceBelowCards = metrics.nav.top - metrics.homeRail.bottom;
-          expect(
-            deadSpaceBelowCards,
-            `${viewport.id} should not leave dead space below home cards`
-          ).toBeLessThanOrEqual(24);
-        }
+        expect(
+          metrics.featuredCardCount,
+          `${viewport.id} should render one featured editorial card`
+        ).toBe(1);
+        expect(
+          metrics.homeCarouselCount,
+          `${viewport.id} should not restore the retired home carousel`
+        ).toBe(0);
       }
 
       for (const image of metrics.visibleLargeImages) {
@@ -857,11 +893,26 @@ test.describe('Public profile /tim layout hardening @regression', () => {
         ).toBeLessThanOrEqual(2);
       }
 
-      if (metrics.nav && metrics.scroll) {
+      if (viewport.isMobile && metrics.nav) {
         expect(
-          metrics.scrollPaddingBottom ?? 0,
-          `${viewport.id} scroll content should reserve the floating bottom nav`
-        ).toBeGreaterThanOrEqual(metrics.nav.height);
+          metrics.profileBottomNavHeight,
+          `${viewport.id} should resolve --profile-bottom-nav-height`
+        ).not.toBeNull();
+        expect(
+          Math.abs(
+            (metrics.homeContentColumnMarginBottom ?? 0) -
+              (metrics.profileBottomNavHeight ?? 0)
+          ),
+          `${viewport.id} home content should reserve the exact bottom-nav token outside its scroll box`
+        ).toBeLessThanOrEqual(1);
+        expect(
+          Math.abs(
+            (metrics.profileBottomNavHeight ?? 0) -
+              metrics.nav.height -
+              (metrics.profileDockClearance ?? 0)
+          ),
+          `${viewport.id} bottom-nav token should add exactly --space-6 beyond the visible dock`
+        ).toBeLessThanOrEqual(1);
       }
 
       if (metrics.desktopCover && metrics.desktopAlerts) {
@@ -884,12 +935,19 @@ test.describe('Public profile /tim layout hardening @regression', () => {
       }
 
       await saveApprovalScreenshot(page, viewport);
-      await expect(page).toHaveScreenshot(
-        `tim-public-profile-${viewport.id}.png`,
-        {
-          fullPage: false,
-        }
-      );
+      // Desktop baselines capture the wide ProfileDesktopSurface. With the
+      // surface flagged off (the shipped default, Tim 2026-09-26), desktop
+      // renders the compact profile centered in a phone column, so those
+      // baselines structurally cannot match; geometric assertions above
+      // still cover the compact layout at desktop widths.
+      if (viewport.isMobile || PROFILE_DESKTOP_SURFACE_ENABLED) {
+        await expect(page).toHaveScreenshot(
+          `tim-public-profile-${viewport.id}.png`,
+          {
+            fullPage: false,
+          }
+        );
+      }
     });
   }
 });

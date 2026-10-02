@@ -3,9 +3,9 @@ import 'server-only';
 import {
   getPlaylistEngineSettings,
   getPlaylistSpotifyStatus,
-  readAccountLabel,
-  readExternalAccountScopes,
+  getSpotifyConnectorAccount,
 } from '@/lib/admin/platform-connections';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { REQUIRED_PLAYLIST_SPOTIFY_SCOPES } from '@/lib/spotify/system-account';
 
 export interface AdminPlatformConnectionsData {
@@ -30,18 +30,17 @@ export interface AdminPlatformConnectionsData {
 }
 
 export async function loadAdminPlatformConnectionsData(): Promise<AdminPlatformConnectionsData> {
-  const [spotifyStatus, engineSettings] = await Promise.all([
-    getPlaylistSpotifyStatus(),
-    getPlaylistEngineSettings(),
-  ]);
+  const { userId } = await getCachedAuth();
+  const [spotifyStatus, engineSettings, currentSpotifyAccount] =
+    await Promise.all([
+      getPlaylistSpotifyStatus(),
+      getPlaylistEngineSettings(),
+      userId ? getSpotifyConnectorAccount(userId) : Promise.resolve(null),
+    ]);
 
-  // Clerk-era surface: `user.externalAccounts` was a Clerk User resource
-  // field. The Better Auth-backed `JovieUser` shape does not model OAuth
-  // external accounts as sub-resources, so this is null post-cutover.
-  // Spotify connection status moves to a Better Auth account-based reader
-  // in a later commit of the migration.
-  const currentSpotifyAccount = null;
-  const approvedScopes = readExternalAccountScopes(currentSpotifyAccount);
+  const hasSpotify =
+    !!currentSpotifyAccount && currentSpotifyAccount.status !== 'disabled';
+  const approvedScopes = currentSpotifyAccount?.scopes ?? [];
   const missingScopes = REQUIRED_PLAYLIST_SPOTIFY_SCOPES.filter(
     scope => !approvedScopes.includes(scope)
   );
@@ -57,8 +56,10 @@ export async function loadAdminPlatformConnectionsData(): Promise<AdminPlatformC
       nextEligibleAt: engineSettings.nextEligibleAt?.toISOString() ?? null,
     },
     currentUser: {
-      hasSpotify: Boolean(currentSpotifyAccount),
-      label: readAccountLabel(currentSpotifyAccount),
+      hasSpotify,
+      label: hasSpotify
+        ? (currentSpotifyAccount?.providerAccountId ?? null)
+        : null,
       missingScopes,
     },
   };

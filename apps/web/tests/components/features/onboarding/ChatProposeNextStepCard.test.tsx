@@ -37,7 +37,11 @@ describe('ChatProposeNextStepCard waitlist truthfulness', () => {
     render(<ChatProposeNextStepCard payload={waitlistPayload} />);
 
     expect(screen.getByTestId('waitlist-signup')).toBeInTheDocument();
+    expect(
+      screen.getByText(/save this request and reserve your name and profile/i)
+    ).toBeInTheDocument();
     expect(screen.getByText(/you are not on the list/i)).toBeInTheDocument();
+    expect(screen.getByText(/save your spot/i)).toBeInTheDocument();
     expect(screen.queryByText(/you're on the list/i)).not.toBeInTheDocument();
   });
 
@@ -45,7 +49,11 @@ describe('ChatProposeNextStepCard waitlist truthfulness', () => {
     authState.isSignedIn = true;
     render(<ChatProposeNextStepCard payload={waitlistPayload} />);
 
-    expect(screen.getByText(/saving your request/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /saving your request and reserving your name and profile/i
+      )
+    ).toBeInTheDocument();
     expect(screen.queryByText(/you're on the list/i)).not.toBeInTheDocument();
   });
 

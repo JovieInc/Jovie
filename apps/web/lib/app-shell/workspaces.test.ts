@@ -8,6 +8,7 @@ import {
   getNextAppShellWorkspace,
   getNextPermittedAppShellWorkspace,
   getPermittedAppShellWorkspaces,
+  shouldLockOperatorWorkspace,
   shouldRenderOperatorChrome,
 } from './workspaces';
 
@@ -115,6 +116,37 @@ describe('app shell workspaces', () => {
 });
 
 describe('operator surfaces stay in Ovie (JOV-6771)', () => {
+  it('keeps Jovie usable despite legacy lock cookies or stale step-up', () => {
+    for (const isAdmin of [false, true]) {
+      expect(
+        shouldLockOperatorWorkspace({
+          mode: 'customer',
+          isAdmin,
+          needsAdminStepUp: true,
+          hasLegacyLockCookie: true,
+        })
+      ).toBe(false);
+    }
+  });
+
+  it('preserves existing Ovie cookie and step-up gates', () => {
+    expect(
+      shouldLockOperatorWorkspace({
+        mode: 'ov',
+        isAdmin: true,
+        needsAdminStepUp: false,
+        hasLegacyLockCookie: true,
+      })
+    ).toBe(true);
+    expect(
+      shouldLockOperatorWorkspace({
+        mode: 'ov',
+        isAdmin: true,
+        needsAdminStepUp: true,
+        hasLegacyLockCookie: false,
+      })
+    ).toBe(true);
+  });
   it('gives non-admins no workspace switch target anywhere', () => {
     for (const pathname of ['/app', '/app/chat', APP_ROUTES.OV, null]) {
       expect(

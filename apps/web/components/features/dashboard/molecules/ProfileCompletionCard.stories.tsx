@@ -43,9 +43,9 @@ const mockDashboardData: DashboardData = {
         href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
       },
       {
-        id: 'bio',
-        label: 'Write a short bio',
-        description: 'Tell new fans who you are in one or two lines.',
+        id: 'music-links',
+        label: 'Connect your music links',
+        description: 'Link Spotify or Apple Music so fans can listen.',
         href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
       },
       {

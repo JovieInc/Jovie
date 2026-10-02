@@ -110,6 +110,10 @@ describe('AdminProfileSidebar', () => {
       'items-start',
       'gap-3'
     );
+    expect(screen.getByTestId('admin-creator-entity-header')).toHaveAttribute(
+      'data-layout',
+      'inline'
+    );
     expect(screen.getByTestId('admin-creator-summary')).toBeInTheDocument();
     expect(
       screen.getByTestId('drawer-analytics-metric-value-linked-destinations')

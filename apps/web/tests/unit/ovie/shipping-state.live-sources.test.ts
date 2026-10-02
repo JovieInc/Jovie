@@ -45,6 +45,23 @@ const LANES_FEED = {
   diskFreePct: 29,
   held_by_reason: { 'gate-check-failed': 10, 'missing-test': 2 },
   failed_by_reason: { legacy: 28 },
+  capacity: {
+    schema: 'jovie.capacity-horizon/v1',
+    generatedAt: '2026-09-27T01:59:00Z',
+    leases: [],
+    outcomes: {
+      useful: 0,
+      certified: 0,
+      duplicate: 0,
+      retry: 0,
+      failed: 0,
+      unknown: 0,
+    },
+    incidents: [],
+    topBlocker: null,
+    founderJudgmentRequired: false,
+    controls: 'show-only',
+  },
 };
 
 function json(body: unknown, status = 200) {
@@ -124,6 +141,7 @@ describe('lanes-status (symphony-lanes-status/v1 gist)', () => {
           alerts: ['61 harness-failed runs in 24h'],
           heldByReason: { 'gate-check-failed': 10, 'missing-test': 2 },
           failedByReason: { legacy: 28 },
+          capacity: LANES_FEED.capacity,
           lanes: [
             { name: 'devin', running: 4, slots: 4 },
             { name: 'hyperagent', running: 0, slots: 2 },
@@ -582,6 +600,39 @@ describe('configured readers', () => {
     now += 1;
     await readers['lanes-status']();
     expect(calls).toBe(3);
+  });
+
+  it('measures the failure TTL from when the read settles, not request start', async () => {
+    let now = NOW;
+    let calls = 0;
+    const resolvers: Array<(response: Response) => void> = [];
+    const readers = createLiveShippingStateReaders(
+      io(
+        () =>
+          new Promise<Response>(resolve => {
+            calls += 1;
+            resolvers.push(resolve);
+          }),
+        { nowMs: () => now }
+      )
+    );
+
+    const pending = readers['lanes-status']();
+    now += 6_000;
+    resolvers.at(-1)?.(json({}, 502));
+    expect((await pending).status).toBe('unavailable');
+
+    now += 3_999;
+    const cachedPoll = readers['lanes-status']();
+    expect(calls).toBe(1);
+    resolvers.at(-1)?.(json(LANES_FEED));
+    await cachedPoll;
+
+    now += 2;
+    const retry = readers['lanes-status']();
+    resolvers.at(-1)?.(json(LANES_FEED));
+    expect((await retry).status).toBe('ok');
+    expect(calls).toBe(2);
   });
 
   it('fails each source soft: one dead source leaves only its metrics n/a', async () => {

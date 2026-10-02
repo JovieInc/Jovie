@@ -44,9 +44,21 @@ function ControlledSegmented({
 }
 
 export const Controlled: Story = {
+  args: {
+    currentTheme: 'system',
+    indicatorX: 0,
+    setTheme: () => {},
+    wrapButton: button => button,
+  },
   render: () => <ControlledSegmented />,
 };
 
 export const Linear: Story = {
+  args: {
+    currentTheme: 'system',
+    indicatorX: 0,
+    setTheme: () => {},
+    wrapButton: button => button,
+  },
   render: () => <ControlledSegmented variant='linear' />,
 };

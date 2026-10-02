@@ -379,6 +379,7 @@ function harness(
     async (
       task: import('../agent/lib/summer-bottleneck-loop').SymphonyRepairTask
     ) => {
+      expect([...store.records.keys()].join()).toContain('/predictions/');
       dispatchedTask = task;
       return { handle: 'symphony:task_0001' };
     }
@@ -841,6 +842,9 @@ describe('Summer bottleneck loop', () => {
       decision: 'pending-symphony',
       selected: { id: 'merge-group-flake-baseline-ratchet' },
     });
+    // biome-ignore format: keep the recovery fixture compact.
+    const predictionPath = [...shared.records.keys()].find(path => path.includes('/predictions/'))!;
+    shared.records.delete(predictionPath);
 
     const restarted = harness(shared);
     await expect(
@@ -855,6 +859,8 @@ describe('Summer bottleneck loop', () => {
     ]);
     expect(restarted.dispatchToSymphony).not.toHaveBeenCalled();
     expect(restarted.observeSymphonyOutcome).toHaveBeenCalledTimes(1);
+    // biome-ignore format: distinguish backfill from prospective evidence.
+    expect(shared.records.get(predictionPath)).toMatchObject({ temporalClass: 'retrospective' });
   });
 
   it('dispatches once when only freshness metadata changes on a later cadence', async () => {

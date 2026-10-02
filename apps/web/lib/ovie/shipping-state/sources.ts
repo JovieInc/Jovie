@@ -10,6 +10,8 @@ import {
   NOT_MEASURED_COUNT,
   type ObservationState,
   type OperationalTask,
+  type OperationalTaskChecks,
+  type OperationalTaskPullRequest,
   type OperationalTaskWorkflowState,
   SHIPPING_SOURCE_IDS,
   SHIPPING_SOURCE_SCHEMAS,
@@ -144,10 +146,27 @@ export function interpretCounts(
 ): SourceObservation['counts'] {
   if (status !== 'ok' || payload == null) return emptyCounts();
   if (sourceId === 'lanes-status') {
+    let terminalFailures: CountMeasurement = NOT_MEASURED_COUNT;
+    if (isRecord(payload.failed_by_reason)) {
+      let total = 0;
+      let valid = true;
+      for (const value of Object.values(payload.failed_by_reason)) {
+        if (!Number.isSafeInteger(value) || Number(value) < 0) {
+          valid = false;
+          break;
+        }
+        total += Number(value);
+      }
+      if (valid) terminalFailures = measuredCount(total);
+    }
     return {
       ...emptyCounts(),
       running: countFromNumber(payload.running),
       capacityAvailable: countFromNumber(payload.idle),
+      // Terminal (dead-lettered) lane failures are reported per reason by the
+      // feed; they never alias blocked work, and absent evidence stays
+      // not-measured.
+      terminalFailures,
     };
   }
   if (sourceId === 'lane-pull-requests') {
@@ -275,6 +294,60 @@ function safeDisplayText(value: unknown): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
+const LANE_AGENT_RE = /^(devin|codex)\//i;
+const CHECK_ROLLUPS = new Set(['success', 'failure', 'pending', 'unknown']);
+const MAX_FAILING_CHECKS = 20;
+
+function safeHttpsUrl(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.startsWith('https://')) return null;
+  return value.slice(0, 320);
+}
+
+/** Check rollup + failing names a lane read already normalized, else unknown. */
+function lanePrChecks(
+  pr: Readonly<Record<string, unknown>>
+): OperationalTaskChecks {
+  const checks = isRecord(pr.checks) ? pr.checks : null;
+  const rollup =
+    typeof checks?.rollup === 'string' && CHECK_ROLLUPS.has(checks.rollup)
+      ? (checks.rollup as OperationalTaskChecks['rollup'])
+      : 'unknown';
+  const failing = asList(checks?.failing)
+    .flatMap(name => {
+      const text = safeDisplayText(name);
+      return text == null ? [] : [text.slice(0, 120)];
+    })
+    .slice(0, MAX_FAILING_CHECKS);
+  return { rollup, failing };
+}
+
+function lanePrDetail(
+  pr: Readonly<Record<string, unknown>>,
+  prNumber: number
+): OperationalTaskPullRequest {
+  const agentMatch = LANE_AGENT_RE.exec(
+    typeof pr.headRefName === 'string' ? pr.headRefName : ''
+  );
+  return {
+    number: prNumber,
+    url: safeHttpsUrl(pr.url),
+    branch: safeDisplayText(pr.headRefName),
+    agent: agentMatch
+      ? (agentMatch[1]?.toLowerCase() as 'devin' | 'codex')
+      : null,
+    isDraft: pr.isDraft === true,
+    checks: lanePrChecks(pr),
+    queuePosition: Number.isSafeInteger(pr.mergeQueuePosition)
+      ? Number(pr.mergeQueuePosition)
+      : null,
+    queueState:
+      typeof pr.mergeQueueState === 'string'
+        ? pr.mergeQueueState.slice(0, 32)
+        : null,
+    createdAt: parseTimestamp(pr.createdAt),
+  };
+}
+
 function lanePullRequestEntities(
   payload: Readonly<Record<string, unknown>>,
   observationTimestamp: string,
@@ -322,6 +395,7 @@ function lanePullRequestEntities(
         retryAt: null,
         sourceRevision: sha,
         updatedAt,
+        pullRequest: lanePrDetail(pr, prNumber),
       } satisfies OperationalTask,
     });
   }

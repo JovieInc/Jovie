@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { BASE_URL } from '@/constants/app';
 import {
@@ -7,6 +8,8 @@ import {
   PUBLIC_ARTIST_API_RATE_LIMIT_POLICY_VALUE,
   PUBLIC_ARTIST_API_RATE_LIMIT_WINDOW_SECONDS,
 } from '@/lib/api/v1/contract';
+import { db } from '@/lib/db';
+import { creatorProfileRiders } from '@/lib/db/schema/riders';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
@@ -112,10 +115,16 @@ export async function GET(
     return addPublicApiHeaders(profileExclusion, rateLimitHeaders);
   }
 
-  const [releases, merch, events] = await Promise.all([
+  const [releases, merch, events, riderVisibility] = await Promise.all([
     getReleasesForProfileLite(profile.id),
     getLiveMerchCardsForProfile(profile.id),
     getUpcomingTourDatesForProfile(profile.id),
+    db
+      .select({ visibility: creatorProfileRiders.visibility })
+      .from(creatorProfileRiders)
+      .where(eq(creatorProfileRiders.creatorProfileId, profile.id))
+      .limit(1)
+      .then(rows => rows[0]?.visibility ?? null),
   ]);
 
   const profileUrl = `${BASE_URL}/${profile.username}`;
@@ -166,6 +175,10 @@ export async function GET(
       _links: {
         self: `${BASE_URL}/api/v1/${profile.username}`,
         profile: profileUrl,
+        // Advertised only when world-readable; private/link_only stay hidden.
+        ...(riderVisibility === 'profile_public'
+          ? { rider: `${BASE_URL}/api/rider/${profile.username}` }
+          : {}),
         llmsTxt: `${profileUrl}/llms.txt`,
         feed: `${profileUrl}/feed.xml`,
         mcp: `${BASE_URL}/api/mcp/${profile.username}`,

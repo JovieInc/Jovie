@@ -1,4 +1,5 @@
 import Foundation
+import JovieKit
 import Testing
 @testable import Jovie
 
@@ -162,47 +163,6 @@ struct ChatRepositoryTests {
   }
 
   // MARK: - JOV-5874 chat smoothness
-
-  @Test func streamCoalescerBuffersDeltasAndFlushesLifecycleEventsImmediately() {
-    let recorder = StreamBatchRecorder()
-    let coalescer = MobileChatStreamCoalescer(window: .seconds(60)) { batch in
-      recorder.batches.append(batch)
-    }
-
-    coalescer.ingest(.assistantDelta(clientTurnId: "turn", text: "A"))
-    coalescer.ingest(.assistantDelta(clientTurnId: "turn", text: "B"))
-    #expect(recorder.batches.isEmpty)
-
-    coalescer.ingest(
-      .assistantCompleted(clientTurnId: "turn", conversationId: "conv", turnId: "t1", text: "AB")
-    )
-    #expect(recorder.batches.count == 1)
-    #expect(recorder.batches.first?.count == 3)
-
-    coalescer.flush()
-    #expect(recorder.batches.count == 1)
-    #expect(coalescer.flushCount == 1)
-  }
-
-  @Test func streamCoalescerFlushesBufferedDeltasAfterWindowElapses() async {
-    let recorder = StreamBatchRecorder()
-    let coalescer = MobileChatStreamCoalescer(window: .milliseconds(5)) { batch in
-      recorder.batches.append(batch)
-    }
-
-    coalescer.ingest(.assistantDelta(clientTurnId: "turn", text: "A"))
-    coalescer.ingest(.assistantDelta(clientTurnId: "turn", text: "B"))
-    coalescer.ingest(.assistantDelta(clientTurnId: "turn", text: "C"))
-
-    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
-    while recorder.batches.isEmpty, ContinuousClock.now < deadline {
-      await Task.yield()
-      try? await Task.sleep(for: .milliseconds(5))
-    }
-
-    #expect(recorder.batches.count == 1)
-    #expect(recorder.batches.first?.count == 3)
-  }
 
   @Test func sendCoalescesRapidDeltasAndStillCompletesTheTurn() async {
     let client = ScriptedChatClient(
@@ -1951,12 +1911,6 @@ private func eyesFreeResponse(
     readback: readback,
     errorCode: errorCode
   )
-}
-
-/// Collects coalescer batches for assertions (JOV-5874).
-@MainActor
-private final class StreamBatchRecorder {
-  var batches: [[MobileChatStreamEvent]] = []
 }
 
 /// Holds `fetchConversation` open until the test releases it, so cache-first

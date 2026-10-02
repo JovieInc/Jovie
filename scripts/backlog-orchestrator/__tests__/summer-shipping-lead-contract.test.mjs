@@ -49,6 +49,21 @@ function fixture() {
     },
   };
 }
+function lybFixture() {
+  const task = fixture();
+  task.action = 'materialize-canonical-lyb-reviewed-plan-admission';
+  task.authority = 'authenticated-gem-reviewed-plan-admission-only';
+  task.safety = 'approval-labels-only-upstream-symphony-owns-pickup-dispatch';
+  task.maximumConcurrent = 1;
+  task.issue.identifier = 'LYB-46';
+  task.issue.state = 'Todo';
+  task.issue.repository = 'JovieInc/LogYourBody';
+  task.selected.id = 'shipping-lead-lyb-reviewed-plan';
+  task.selected.owner = 'Gem';
+  task.selected.handle = 'LYB-46';
+  task.source.snapshotDigest = task.selected.sourceDigest;
+  return task;
+}
 function signRecord(domain, body, privateKey, keyId) {
   const unsigned = { ...body, signatureKeyId: keyId };
   return {
@@ -159,6 +174,46 @@ test('completion requires owner acceptance, even with a valid signer', () => {
     /outcome-invalid/
   );
 });
+test('deliberate red: accepts the bounded LYB reviewed-plan approval event', () => {
+  assert.doesNotThrow(() => validateShippingTask(lybFixture()));
+});
+for (const [name, mutate] of [
+  [
+    'mismatched identifier',
+    task => {
+      task.issue.identifier = 'JOV-46';
+      task.selected.handle = 'JOV-46';
+    },
+  ],
+  [
+    'mismatched state',
+    task => {
+      task.issue.state = 'Backlog';
+    },
+  ],
+  [
+    'mismatched repository',
+    task => {
+      task.issue.repository = 'JovieInc/Jovie';
+    },
+  ],
+  [
+    'forged review digest',
+    task => {
+      task.source.snapshotDigest = '9'.repeat(64);
+    },
+  ],
+]) {
+  test(`rejects an LYB reviewed-plan event with ${name}`, () => {
+    const task = lybFixture();
+    assert.ok(typeof mutate === 'function');
+    mutate(task);
+    assert.throws(
+      () => validateShippingTask(task),
+      /shipping-lead-task-invalid/
+    );
+  });
+}
 test('signs accepted, completed work bound to its task digest', () => {
   const task = fixture();
   const result = signShippingOutcome(

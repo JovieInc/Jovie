@@ -20,9 +20,7 @@ describe('delivery-control-receipts workflow', () => {
     expect(WORKFLOW).not.toMatch(/^\s*concurrency:/mu);
   });
 
-  it('still records every non-success terminal run', () => {
-    expect(WORKFLOW).toContain(
-      "github.event.workflow_run.conclusion != 'success'"
-    );
+  it('records one bounded receipt for every controller terminal state', () => {
+    expect(WORKFLOW).not.toMatch(/^\s+if:.*workflow_run/m);
   });
 });

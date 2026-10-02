@@ -37,6 +37,9 @@ export function UnifiedTableHeader<TData extends RowData>({
   headerGroups,
   caption,
 }: UnifiedTableHeaderProps<TData>) {
+  'use no memo';
+  // TanStack keeps header groups stable while their column sorting state changes.
+  // Compiler caching by group identity would leave the accessible sort state stale.
   // Early return if no header groups
   if (headerGroups.length === 0) {
     return null;

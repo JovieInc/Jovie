@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CookieActions } from '@/components/molecules/CookieActions';
 import { CookieModal } from '@/components/organisms/CookieModal';
 import { APP_ROUTES } from '@/constants/routes';
@@ -45,6 +45,10 @@ export function CookieBannerSection({
   const shouldClearProfileDock =
     shouldPlaceCookieBannerAbovePublicProfileDock(effectivePathname);
 
+  const bannerRef = useRef<HTMLElement>(null);
+  const lastPageFocus = useRef<HTMLElement | null>(null);
+  const savingFocus = useRef<HTMLElement | null>(null);
+
   const [visible, setVisible] = useState(false);
   const [customize, setCustomize] = useState(false);
   const [_isMobileExpanded, setIsMobileExpanded] = useState(false);
@@ -76,6 +80,102 @@ export function CookieBannerSection({
       setIsMobileExpanded(false);
     }
   }, [visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const rememberPageFocus = () => {
+      const active = document.activeElement;
+      if (
+        active instanceof HTMLElement &&
+        active !== document.body &&
+        !bannerRef.current?.contains(active)
+      ) {
+        lastPageFocus.current = active;
+      }
+    };
+    rememberPageFocus();
+    document.addEventListener('focusin', rememberPageFocus);
+    return () => document.removeEventListener('focusin', rememberPageFocus);
+  }, [visible]);
+
+  useLayoutEffect(() => {
+    const initiatingAction = savingFocus.current;
+    if (isSavingConsent || !initiatingAction) return;
+    savingFocus.current = null;
+    // Disabling/removing the action can drop native keyboard focus to body.
+    // Respect deliberate focus changes made while the server save was pending.
+    const active = document.activeElement;
+    if (active !== document.body && active !== initiatingAction) return;
+
+    const canRestore = (
+      element: HTMLElement | null
+    ): element is HTMLElement => {
+      if (
+        !element?.isConnected ||
+        element.matches('[disabled], [aria-disabled="true"]') ||
+        element.closest('[hidden], [inert], [aria-hidden="true"]')
+      )
+        return false;
+      for (
+        let ancestor: HTMLElement | null = element;
+        ancestor;
+        ancestor = ancestor.parentElement
+      ) {
+        const style = globalThis.getComputedStyle(ancestor);
+        if (style.display === 'none' || style.visibility === 'hidden')
+          return false;
+      }
+      return true;
+    };
+    const pageAction = lastPageFocus.current;
+    const observer = new MutationObserver(restoreFocus);
+    function stopWaiting() {
+      observer.disconnect();
+      document.removeEventListener('focusin', stopWaiting);
+    }
+    function restoreFocus() {
+      const current = document.activeElement;
+      if (current !== document.body && current !== initiatingAction) {
+        stopWaiting();
+        return;
+      }
+      const targets = visible
+        ? [initiatingAction]
+        : [
+            pageAction,
+            ...document.querySelectorAll<HTMLElement>(
+              'main a[href], main button:not([disabled]), main [tabindex="0"]'
+            ),
+          ];
+      for (const target of targets) {
+        if (!canRestore(target)) continue;
+        target.focus({ preventScroll: true });
+        if (document.activeElement === target) {
+          stopWaiting();
+          return;
+        }
+      }
+    }
+    // A cookie server action can temporarily hide a refreshed React subtree.
+    // Wait for a real DOM change, not a timer, and cancel on visitor focus.
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: [
+        'style',
+        'class',
+        'hidden',
+        'inert',
+        'disabled',
+        'aria-disabled',
+        'aria-hidden',
+      ],
+    });
+    document.addEventListener('focusin', stopWaiting);
+    restoreFocus();
+    return stopWaiting;
+  }, [visible, isSavingConsent]);
 
   // Publish banner height + its rendered bottom offset + a separation gap as a
   // CSS custom property on :root so non-profile floating surfaces can reserve
@@ -175,6 +275,11 @@ export function CookieBannerSection({
     analytics: boolean;
     marketing: boolean;
   }) => {
+    const active = document.activeElement;
+    savingFocus.current =
+      active instanceof HTMLElement && bannerRef.current?.contains(active)
+        ? active
+        : null;
     setIsSavingConsent(true);
     setSaveError(null);
     try {
@@ -212,6 +317,7 @@ export function CookieBannerSection({
     <>
       {visible && !isSuppressedPath && !customize ? (
         <aside
+          ref={bannerRef}
           aria-label='Cookie Consent'
           data-testid='cookie-banner'
           className={`cookie-banner-card fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-85 ${

@@ -16,6 +16,9 @@ export const TASK_DATA_TABLE_CONTAINER_CLASSNAME =
 
 export const TASK_DATA_TABLE_ROW_CLASSNAME = 'group/row group/task-row';
 
+export const TASK_DATA_TABLE_MULTILINE_CELL_CONTENT_CLASSNAME =
+  'h-auto max-h-none overflow-visible text-clip whitespace-normal leading-normal';
+
 export type TaskDataTableProps<TData extends RowData> =
   UnifiedTableProps<TData>;
 

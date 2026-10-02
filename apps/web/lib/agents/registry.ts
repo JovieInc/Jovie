@@ -51,7 +51,7 @@ export const PUBLIC_SKILL_REGISTRY = {
     lifecycle: 'ga',
     activeVersion: '1.0.0',
     entitlement: 'aiCanUseTools',
-    model: 'anthropic/claude-haiku-4-5-20251001',
+    model: 'zai/glm-5.3-flash',
     inputSchemaZodPath: 'apps/web/lib/chat/tool-schemas.ts',
     outputSchemaZodPath: 'apps/web/components/jovie/tool-ui.tsx',
     metadata: {
@@ -70,7 +70,7 @@ export const PUBLIC_SKILL_REGISTRY = {
     lifecycle: 'ga',
     activeVersion: '1.0.0',
     entitlement: 'aiCanUseTools',
-    model: 'anthropic/claude-haiku-4-5-20251001',
+    model: 'zai/glm-5.3-flash',
     inputSchemaZodPath: 'apps/web/lib/services/packaging-intelligence/types.ts',
     outputSchemaZodPath:
       'apps/web/lib/services/packaging-intelligence/types.ts',
@@ -90,7 +90,7 @@ export const PUBLIC_SKILL_REGISTRY = {
     lifecycle: 'ga',
     activeVersion: '1.0.0',
     entitlement: 'aiCanUseTools',
-    model: 'anthropic/claude-haiku-4-5-20251001',
+    model: 'zai/glm-5.3-flash',
     inputSchemaZodPath: 'apps/web/lib/services/channel-intelligence/types.ts',
     outputSchemaZodPath: 'apps/web/lib/services/channel-intelligence/types.ts',
     metadata: {
@@ -111,7 +111,7 @@ export const PUBLIC_SKILL_REGISTRY = {
     lifecycle: 'ga',
     activeVersion: '1.0.0',
     entitlement: 'canEditSmartLinks',
-    model: 'anthropic/claude-haiku-4-5-20251001',
+    model: 'zai/glm-5.3-flash',
     inputSchemaZodPath: 'apps/web/lib/services/smart-link-switch/types.ts',
     outputSchemaZodPath: 'apps/web/lib/services/smart-link-switch/types.ts',
     metadata: {
@@ -129,7 +129,7 @@ export const PUBLIC_SKILL_REGISTRY = {
     lifecycle: 'ga',
     activeVersion: '1.0.0',
     entitlement: 'canAccessEmailCampaigns',
-    model: 'anthropic/claude-haiku-4-5-20251001',
+    model: 'zai/glm-5.3-flash',
     inputSchemaZodPath: 'apps/web/lib/services/fan-email/types.ts',
     outputSchemaZodPath: 'apps/web/lib/services/fan-email/types.ts',
     metadata: {

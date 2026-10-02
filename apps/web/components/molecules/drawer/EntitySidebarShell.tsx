@@ -8,9 +8,9 @@ import { RightDrawer } from '@/components/molecules/drawer/RightDrawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
-import { DrawerHeader } from './DrawerHeader';
 import { DrawerInlineNote } from './DrawerInlineNote';
 import { DrawerSurfaceCard } from './DrawerSurfaceCard';
+import { EntityHeader } from './EntityHeader';
 
 export interface EntitySidebarShellProps {
   /** Whether the sidebar drawer is open */
@@ -102,8 +102,9 @@ export interface EntitySidebarShellProps {
  * region. Use shell scroll only for stacked inspector content.
  *
  *  ┌─────────────────────────┐
- *  │ DrawerHeader (title +   │  shrink-0
- *  │ actions + close)        │
+ *  │ EntityHeader chrome bar │  shrink-0
+ *  │ (title + actions +      │
+ *  │ close)                  │
  *  ├─────────────────────────┤
  *  │ Entity header (image +  │  shrink-0  (optional, pinned)
  *  ├─────────────────────────┤
@@ -199,9 +200,9 @@ export function EntitySidebarShell({
       footerSurface === 'card' ? (
         <DrawerSurfaceCard
           variant='card'
-          className='shrink-0 px-3 py-2.5 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:mx-0'
+          className='shrink-0 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:mx-0'
         >
-          {footer}
+          <div className='px-3 py-2.5'>{footer}</div>
         </DrawerSurfaceCard>
       ) : (
         <div className='shrink-0 px-3 py-2.5 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:mx-0'>
@@ -251,7 +252,8 @@ export function EntitySidebarShell({
               >
                 <div className='border-b border-transparent bg-transparent backdrop-blur-[12px]'>
                   {showMinimalHeaderBar ? (
-                    <DrawerHeader
+                    <EntityHeader
+                      layout='chrome'
                       title={resolvedHeaderTitle}
                       actions={titleBarActions}
                       className={cn(
@@ -307,11 +309,10 @@ export function EntitySidebarShell({
 
         {isEmpty ? (
           <div className={bodyClassName} data-scroll-strategy={scrollStrategy}>
-            <DrawerSurfaceCard
-              variant={workspaceContentSurface}
-              className='p-4'
-            >
-              <DrawerInlineNote message={emptyMessage} />
+            <DrawerSurfaceCard variant={workspaceContentSurface}>
+              <div className='p-4'>
+                <DrawerInlineNote message={emptyMessage} />
+              </div>
             </DrawerSurfaceCard>
           </div>
         ) : (

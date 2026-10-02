@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { BASE_URL } from '@/constants/app';
@@ -10,6 +10,7 @@ import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { extractHandleFromSocialUrl } from '@/lib/ingestion/flows/handle-extraction';
 import { ingestSocialPlatformUrl } from '@/lib/ingestion/flows/social-platform-ingest';
 import { fetchSpotifyArtistData } from '@/lib/ingestion/flows/spotify-integration';
+import { getPublicProfileIndexingExclusionReason } from '@/lib/profile/public-profile-indexing-policy';
 import {
   agentProfileCreateLimiter,
   createRateLimitHeaders,
@@ -113,8 +114,11 @@ export async function POST(request: Request) {
     }
 
     // ponytail: unindexed spotify_id lookup (existing callers do the same);
-    // add an index if agent volume makes this hot.
-    const [existing] = await db
+    // add an index if agent volume makes this hot. spotify_id is not unique —
+    // QA duplicates (e.g. `tmoc*` machine handles, JOV-6201) can share it, so
+    // pick the canonical publicly resolvable handle: public surfaces exclude
+    // internal identities and would 404 them (a phantom profile).
+    const candidates = await db
       .select({
         username: creatorProfiles.usernameNormalized,
         isClaimed: creatorProfiles.isClaimed,
@@ -122,7 +126,18 @@ export async function POST(request: Request) {
       })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.spotifyId, spotify.spotifyId))
-      .limit(1);
+      .orderBy(asc(creatorProfiles.createdAt))
+      .limit(10);
+    const [existing] = candidates
+      .filter(
+        candidate =>
+          getPublicProfileIndexingExclusionReason(candidate.username) === null
+      )
+      .sort(
+        (a, b) =>
+          Number(b.isClaimed === true) - Number(a.isClaimed === true) ||
+          Number(b.isPublic !== false) - Number(a.isPublic !== false)
+      );
     if (existing) {
       return NextResponse.json(
         profilePayload({ ...existing, created: false }),

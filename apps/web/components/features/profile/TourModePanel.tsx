@@ -138,6 +138,9 @@ function TourDateRow({
       {canBuyTickets ? (
         <a
           href={item.date.ticketUrl ?? undefined}
+          // JOV-4429: unique accessible name per date — a shared ticketing
+          // URL would otherwise render as a duplicate "Tickets" CTA cluster.
+          aria-label={`Tickets for ${item.date.venueName} — ${location}`}
           onClick={event => {
             track('event_click', {
               artist_id: artistId,
@@ -269,7 +272,7 @@ function TourDatesContent({
     <div data-testid='tour-drawer-list'>
       {groups.map(group => (
         <section key={group.label} className='pb-4'>
-          <div className='px-4 pb-2 pt-3 text-2xs font-semibold text-tertiary-token'>
+          <div className='px-4 pb-2 pt-3 text-2xs font-semibold text-secondary-token'>
             {group.label}
           </div>
           <div className='border-y border-white/[0.075]'>

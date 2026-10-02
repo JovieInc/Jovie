@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
@@ -13,6 +15,40 @@ vi.mock('@/components/features/home/HomeTrustSection', () => ({
 }));
 
 describe('MarketingHero source-backed default story', () => {
+  it('puts an explicit delegated owner on the semantic root in both shell and content modes', () => {
+    const owner = 'apps/web/components/homepage/HomepageIdentityHero.tsx';
+    const shell = render(
+      <MarketingHero
+        variant='split'
+        testId='delegated-hero'
+        sectionVariant='split-claim-card'
+        sectionOwner={owner}
+      >
+        <h1>Claim your name</h1>
+      </MarketingHero>
+    );
+    const root = screen.getByTestId('delegated-hero');
+    expect(root.tagName).toBe('SECTION');
+    expect(root).toHaveAttribute('data-marketing-owner', owner);
+    expect(root).toHaveAttribute('data-marketing-variant', 'split-claim-card');
+    shell.unmount();
+    render(
+      <MarketingHero
+        headline='Pricing'
+        subtitle='Free profiles.'
+        primaryCta={{ label: 'Claim', href: '/start' }}
+        logos={false}
+        sectionVariant='centered-none'
+        sectionOwner={owner}
+        testId='delegated-content'
+      />
+    );
+    expect(screen.getByTestId('delegated-content')).toHaveAttribute(
+      'data-marketing-owner',
+      owner
+    );
+  });
+
   it('renders one labelled hero root with the canonical checked-in copy', () => {
     const { container } = render(
       <MarketingHero {...MARKETING_HERO_DEFAULT_PROPS} />
@@ -116,6 +152,16 @@ describe('MarketingHero source-backed default story', () => {
     });
   });
 
+  it('excludes the MARKETING_HERO_* fixture exports from the story index', () => {
+    const exclude = marketingHeroMeta.excludeStories;
+    expect(exclude).toEqual(/^MARKETING_HERO_/);
+    const pattern = exclude as RegExp;
+    expect(pattern.test('MARKETING_HERO_DEFAULT_PROPS')).toBe(true);
+    expect(pattern.test('MARKETING_HERO_SOURCE_SHA')).toBe(true);
+    expect(pattern.test('SourceBackedDefault')).toBe(false);
+    expect(pattern.test('LandingActions')).toBe(false);
+  });
+
   it('honors the shared root test id in landing mode', () => {
     render(
       <MarketingHero
@@ -135,6 +181,32 @@ describe('MarketingHero source-backed default story', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: 'Landing title' })
     ).toHaveClass('marketing-h1-max-two-lines');
+  });
+
+  it('lets a landing hero opt out of headline clamping', () => {
+    render(
+      <MarketingHero
+        eyebrow='Eyebrow'
+        headingId='unclamped-heading'
+        title='Never clipped headline'
+        body='Landing body'
+        media={<div>Media</div>}
+        headlineMaxLines='none'
+      />
+    );
+
+    const heading = screen.getByRole('heading', {
+      level: 1,
+      name: 'Never clipped headline',
+    });
+    expect(heading).not.toHaveClass(
+      'line-clamp-2',
+      'line-clamp-3',
+      'marketing-h1-max-two-lines'
+    );
+    expect(heading.getAttribute('style')).toBe(
+      'display: block; max-block-size: none; overflow: visible; -webkit-box-orient: initial; -webkit-line-clamp: unset;'
+    );
   });
 
   it('uses the canonical growing action contract for a landing secondary CTA', () => {
@@ -333,5 +405,20 @@ describe('MarketingHero source-backed default story', () => {
     const hero = screen.getByTestId('photo-landing-hero');
     const img = hero.querySelector('.marketing-hero-photo img');
     expect(img).toHaveStyle({ opacity: '0.2' });
+  });
+});
+
+describe('MarketingHero photo stacking', () => {
+  it('keeps hero copy above the positioned hero photo', () => {
+    // The photo layer is positioned (z-index 0); static copy after it would
+    // paint underneath, which hid the /pricing headline in production.
+    const css = readFileSync(
+      resolve(__dirname, '../../app/globals.css'),
+      'utf8'
+    );
+
+    expect(css).toMatch(
+      /\.marketing-hero-photo ~ \*\s*\{\s*position: relative;\s*z-index: 1;/
+    );
   });
 });

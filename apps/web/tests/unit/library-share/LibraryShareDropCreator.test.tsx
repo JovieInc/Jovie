@@ -18,7 +18,7 @@ describe('LibraryShareDropCreator', () => {
     vi.unstubAllGlobals();
   });
 
-  it('lets artists curate a multi-asset press kit set', async () => {
+  it('lets artists curate a multi-asset private share set', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({

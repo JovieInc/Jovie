@@ -148,6 +148,17 @@ describe('WorkspaceTabsSurface', () => {
       screen.getByRole('tablist', { name: 'People primary views' })
     ).toBeVisible();
   });
+
+  it('leaves tab navigation to Next Link so the app shell stays mounted', () => {
+    const source = readFileSync(
+      resolve(__dirname, './WorkspaceTabsSurface.tsx'),
+      'utf8'
+    );
+
+    expect(source).not.toContain('location.assign');
+    expect(source).not.toContain('event.preventDefault()');
+    expect(source).toContain('<Link');
+  });
 });
 
 describe('JOV-5466 token retire', () => {

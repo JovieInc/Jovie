@@ -1,8 +1,17 @@
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   evaluateTelemetryBudgets,
@@ -158,17 +167,62 @@ describe('telemetry budget gate (JOV-6585)', () => {
  * Runs the real script via Node type-stripping; no pnpm install required.
  */
 describe('compare-chunks CLI gate (JOV-6585)', () => {
-  it('exits 1 without a build manifest instead of silently passing', () => {
-    const root = repoRoot();
-    const script = join(root, 'apps/web/scripts/compare-chunks.ts');
-    expect(existsSync(script)).toBe(true);
-    const result = spawnSync('node', ['--experimental-strip-types', script], {
-      cwd: join(root, 'apps/web'),
-      encoding: 'utf8',
-      env: { ...process.env, NODE_OPTIONS: '' },
-    });
-    const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
-    expect(result.status).toBe(1);
-    expect(output).toContain('No build output found');
-  }, 60_000);
+  it.each(['direct', 'file symlink', 'directory symlink'])(
+    'exits 1 without a build manifest through a %s path',
+    invocation => {
+      const root = repoRoot();
+      const script = join(root, 'apps/web/scripts/compare-chunks.ts');
+      expect(existsSync(script)).toBe(true);
+      // Run a copy from an isolated dir: the script resolves .next relative to
+      // its own location, and a real build output in apps/web/.next (e.g. a lane
+      // that built earlier) would let compare() run instead of failing closed.
+      const isolated = mkdtempSync(join(tmpdir(), 'jov-6585-cli-'));
+      const isolatedScript = join(isolated, 'scripts', 'compare-chunks.ts');
+      try {
+        mkdirSync(dirname(isolatedScript), { recursive: true });
+        writeFileSync(isolatedScript, readFileSync(script, 'utf-8'));
+        let entry = isolatedScript;
+        if (invocation === 'file symlink') {
+          entry = join(isolated, 'entry.ts');
+          symlinkSync(isolatedScript, entry);
+        } else if (invocation === 'directory symlink') {
+          const alias = join(isolated, 'alias');
+          symlinkSync(dirname(isolatedScript), alias, 'dir');
+          entry = join(alias, 'compare-chunks.ts');
+        }
+        const result = spawnSync(
+          'node',
+          ['--experimental-strip-types', entry],
+          {
+            cwd: isolated,
+            encoding: 'utf8',
+            env: { ...process.env, NODE_OPTIONS: '' },
+          }
+        );
+        const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+        expect(result.status).toBe(1);
+        expect(output).toContain('No build output found');
+      } finally {
+        rmSync(isolated, { recursive: true, force: true });
+      }
+    },
+    60_000
+  );
+
+  it('imports budget helpers without running the CLI', () => {
+    const script = join(repoRoot(), 'apps/web/scripts/compare-chunks.ts');
+    const result = spawnSync(
+      'node',
+      [
+        '--experimental-strip-types',
+        '--input-type=module',
+        '-e',
+        `const helpers = await import(${JSON.stringify(pathToFileURL(script).href)}); console.log(typeof helpers.evaluateTelemetryBudgets);`,
+      ],
+      { encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: '' } }
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe('function');
+    expect(result.stderr).not.toContain('No build output found');
+  });
 });

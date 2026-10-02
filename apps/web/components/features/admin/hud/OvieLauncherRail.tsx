@@ -118,7 +118,48 @@ function AllToolsList({
   );
 }
 
-export function OvieLauncherRail() {
+/**
+ * Compact utility row for the cockpit: ready primary destinations only
+ * (Stripe, GitHub, Linear, Vercel…). Renders nothing while loading, locked,
+ * or empty — an empty launcher rail carries no information.
+ */
+function OvieLauncherRailCompact({
+  inventory,
+}: Readonly<{ readonly inventory: OvieLauncherInventory | null }>) {
+  const ready = (inventory?.primary ?? []).filter(
+    control => control.status === 'ready'
+  );
+  if (ready.length === 0) return null;
+  return (
+    <>
+      {ready.map(control => (
+        <Button
+          key={control.id}
+          type='button'
+          variant='secondary'
+          size='sm'
+          title={control.why}
+          data-testid={`ovie-launcher-${control.id}`}
+          data-group={control.group}
+          onClick={() =>
+            void launchOperatorControl({
+              id: control.id,
+              kind: control.kind,
+              href: control.href,
+              sshHost: control.sshHost,
+            })
+          }
+        >
+          {control.label}
+        </Button>
+      ))}
+    </>
+  );
+}
+
+export function OvieLauncherRail({
+  compact = false,
+}: Readonly<{ readonly compact?: boolean }> = {}) {
   const [inventory, setInventory] = useState<OvieLauncherInventory | null>(
     null
   );
@@ -171,6 +212,22 @@ export function OvieLauncherRail() {
     () => filterLaunchers(inventory?.all ?? [], query),
     [inventory, query]
   );
+
+  if (compact) {
+    if (
+      !(inventory?.primary ?? []).some(control => control.status === 'ready')
+    ) {
+      return null;
+    }
+    return (
+      <div
+        className='flex flex-wrap items-center gap-2'
+        data-testid='ovie-launcher-rail'
+      >
+        <OvieLauncherRailCompact inventory={inventory} />
+      </div>
+    );
+  }
 
   return (
     <ContentSurfaceCard surface='details' data-testid='ovie-launcher-rail'>

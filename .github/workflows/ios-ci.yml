@@ -37,9 +37,71 @@ concurrency:
   cancel-in-progress: ${{ inputs.concurrency-key != '' || github.ref != 'refs/heads/main' }}
 
 jobs:
+  # The fast gate prefers the self-hosted Mac when its exact heartbeat is fresh
+  # and idle. Busy, offline, stale, or uncertain evidence selects hosted
+  # macOS. Release regressions always stay on hosted macOS.
+  mac-runner-route:
+    name: Mac Runner Route
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      runner_class: ${{ steps.route.outputs.runner_class }}
+    steps:
+      - name: Checkout trusted runner routing policy
+        if: ${{ !inputs.full-regression && vars.JOVIE_MAC_RUNNER != 'off' }}
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          sparse-checkout: |
+            .github/scripts/await-runner-heartbeat.sh
+            .github/scripts/query-runner-heartbeat.sh
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Query Mac runner heartbeat
+        id: heartbeat
+        if: ${{ !inputs.full-regression && vars.JOVIE_MAC_RUNNER != 'off' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml
+          HEARTBEAT_MAX_AGE_SECONDS: '1500'
+          HEARTBEAT_API_TIMEOUT_SECONDS: '5'
+          HEARTBEAT_POLL_ATTEMPTS: '1'
+          HEARTBEAT_POLL_INTERVAL_SECONDS: '1'
+        run: |
+          set -uo pipefail
+          helper='.github/scripts/await-runner-heartbeat.sh'
+          if [ -x "$helper" ]; then
+            timeout 60s "$helper" || true
+          fi
+          exit 0
+
+      - name: Select Mac runner route
+        id: route
+        env:
+          HEARTBEAT_HEALTH: ${{ steps.heartbeat.outputs.health }}
+          HEARTBEAT_EVIDENCE: ${{ steps.heartbeat.outputs.evidence }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner_class='hosted'
+          if [ "$HEARTBEAT_HEALTH" = 'up' ]; then
+            runner_class='mac'
+          fi
+          echo "runner_class=$runner_class" >> "$GITHUB_OUTPUT"
+          echo "::notice::iOS runner route: $runner_class — ${HEARTBEAT_EVIDENCE:-not probed}"
+
   test:
     name: ${{ inputs.full-regression && 'Full Simulator Regression' || 'Fast Unit + Coverage' }}
-    runs-on: macos-26
+    needs: [mac-runner-route]
+    runs-on: ${{ needs.mac-runner-route.outputs.runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-26' }}
     timeout-minutes: ${{ inputs.full-regression && 55 || 18 }}
 
     steps:
@@ -49,12 +111,15 @@ jobs:
           persist-credentials: false
 
       - name: iOS best-practices lint
-        run: bash scripts/ios-best-practices-lint.sh apps/ios/Jovie
+        run: |
+          bash scripts/ios-best-practices-lint.sh apps/ios/Jovie
+          bash scripts/ios-best-practices-lint.sh apps/ios/Packages/JovieKit/Sources
 
       - name: Test iOS release configuration scripts
         run: |
           node --test apps/ios/scripts/write-configuration.test.mjs \
           apps/ios/scripts/run-xcodebuild.test.mjs \
+          apps/ios/scripts/validate-wallet-release-env.test.mjs \
           apps/ios/scripts/validate-testflight-env.test.mjs \
           apps/ios/scripts/validate-testflight-artifact.test.mjs \
           apps/ios/scripts/settings-style-guard.test.mjs
@@ -74,7 +139,10 @@ jobs:
       # resolution/checkouts, never the mutable build products in DerivedData.
       # The Xcode version and Package.resolved are both part of the key so a
       # toolchain or dependency change cannot restore an incompatible cache.
+      # Persistent Mac runners already retain these packages locally; uploading
+      # their multi-GB cache can exhaust the job budget after tests pass.
       - name: Restore Swift package cache
+        if: ${{ runner.environment == 'github-hosted' }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -93,13 +161,25 @@ jobs:
         timeout-minutes: 5
         run: bash apps/ios/scripts/run-xcodebuild.sh -resolvePackageDependencies -derivedDataPath .build/ios-ci
 
+      - name: Test shared JovieKit package
+        run: swift test --package-path apps/ios/Packages/JovieKit --enable-code-coverage
+
+      - name: Compile shared theme for macOS
+        timeout-minutes: 3
+        run: |
+          mac_theme_sdk="$(xcrun --sdk macosx --show-sdk-path)"
+          xcrun swiftc -typecheck -swift-version 5 \
+            -sdk "$mac_theme_sdk" -target "$(uname -m)-apple-macosx14.0" \
+            apps/ios/Jovie/DesignSystem/JovieTheme.swift
+
       - name: Run fast unit and coverage gate
         if: ${{ !inputs.full-regression }}
         timeout-minutes: 15
         env:
           # GitHub-hosted runners are fresh. Let xcodebuild boot its selected
           # simulator while it builds instead of blocking on an eager reset.
-          JOVIE_IOS_RESET_SIMULATOR: "0"
+          # The persistent self-hosted Mac resets to avoid inherited state.
+          JOVIE_IOS_RESET_SIMULATOR: ${{ runner.environment == 'self-hosted' && '1' || '0' }}
           JOVIE_IOS_XCODEBUILD_TIMEOUT_SECONDS: "840"
         run: |
           bash apps/ios/scripts/run-unit-tests.sh
@@ -118,6 +198,9 @@ jobs:
         if: ${{ inputs.full-regression }}
         timeout-minutes: 30
         env:
+          # GitHub-hosted macOS runners are fresh. A shutdown/boot reset added
+          # ten minutes to the release run without providing isolation.
+          JOVIE_IOS_RESET_SIMULATOR: "0"
           JOVIE_IOS_XCODEBUILD_TIMEOUT_SECONDS: "1680"
         run: bash apps/ios/scripts/run-xcodebuild.sh test -derivedDataPath .build/ios-ci
 

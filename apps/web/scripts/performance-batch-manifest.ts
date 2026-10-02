@@ -618,7 +618,7 @@ const PERF_BATCHES = [
       {
         id: 'creator-releases-budget-pass',
         label:
-          'Canonical Library warm navigation and the legacy Releases redirect pass strict budgets',
+          'Contextual Library route load and the legacy Releases redirect pass strict budgets',
         kind: 'budget-route',
         expectation: 'pass',
         authPersona: 'creator-ready',
@@ -644,7 +644,7 @@ const PERF_BATCHES = [
     ],
     shipLabels: ['testing'],
     doneRule:
-      'Canonical Library warm navigation and the legacy Releases redirect pass strict checks; the filtered direct load stays below 70 requests and 700KB JS.',
+      'Contextual Library route load and the legacy Releases redirect pass strict checks; the filtered direct load stays below 70 requests and 700KB JS.',
   },
   {
     id: 'B4-onboarding',

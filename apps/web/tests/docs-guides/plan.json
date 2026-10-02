@@ -1,0 +1,45 @@
+{
+  "$schema": "./plan.schema.json",
+  "version": 1,
+  "outputDir": "../docs/public/proof",
+  "manifestPath": "../docs/public/proof/manifest.json",
+  "entries": [
+    {
+      "id": "edit-smart-link-links-dashboard",
+      "articleId": "edit-smart-link",
+      "step": "links-dashboard",
+      "title": "Dashboard Links list with the smart link row highlighted",
+      "alt": "The Links screen in the Jovie dashboard listing smart links for the example artist.",
+      "route": "/app/dashboard/links",
+      "waitFor": "main",
+      "viewport": "desktop",
+      "theme": "dark",
+      "captureTarget": "page"
+    },
+    {
+      "id": "edit-smart-link-open-link-editor",
+      "articleId": "edit-smart-link",
+      "step": "open-link-editor",
+      "title": "Smart link row opened for editing",
+      "alt": "A smart link row expanded in the Links screen showing the editable fields.",
+      "route": "/app/dashboard/links",
+      "waitFor": "main",
+      "viewport": "desktop",
+      "theme": "dark",
+      "captureTarget": "page",
+      "interaction": "open-first-link"
+    },
+    {
+      "id": "edit-smart-link-public-page-mobile",
+      "articleId": "edit-smart-link",
+      "step": "public-page-mobile",
+      "title": "Public smart link page on a phone viewport",
+      "alt": "The public smart link page for the example artist rendered at phone size.",
+      "route": "/app/dashboard/links",
+      "waitFor": "main",
+      "viewport": "mobile",
+      "theme": "dark",
+      "captureTarget": "page"
+    }
+  ]
+}

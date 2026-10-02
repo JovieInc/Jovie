@@ -1,7 +1,9 @@
-import { fireEvent, render } from '@testing-library/react';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
-import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import {
+  DashboardDataContext,
+  type DashboardDataContextValue,
+} from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { FounderDoorProvider } from '@/contexts/FounderDoorContext';
 import { FOUNDER_DOOR_STORAGE_KEY } from '@/lib/ovie/founder-door';
 
@@ -9,10 +11,15 @@ const cycleTheme = vi.fn();
 const signOut = vi.fn();
 const push = vi.fn();
 const assign = vi.fn();
+const lockWorkspaceMock = vi.hoisted(() => vi.fn());
+const toastError = vi.hoisted(() => vi.fn());
 
 beforeEach(() => {
   assign.mockClear();
   push.mockClear();
+  lockWorkspaceMock.mockClear();
+  lockWorkspaceMock.mockResolvedValue(undefined);
+  toastError.mockClear();
   vi.stubGlobal('location', { assign });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -31,6 +38,15 @@ vi.mock('next/navigation', () => ({
   usePathname: () => shortcutState.pathname,
   useRouter: () => ({ push }),
 }));
+vi.mock('@/lib/workspace-lock/workspace-lock', () => ({
+  lockWorkspace: lockWorkspaceMock,
+}));
+vi.mock('@/components/feedback', async () => ({
+  ...(await vi.importActual<typeof import('@/components/feedback')>(
+    '@/components/feedback'
+  )),
+  toast: { error: toastError },
+}));
 
 import { useGlobalShortcutActions } from './useGlobalShortcutActions';
 
@@ -47,7 +63,9 @@ function Probe({ withProvider = true }: { readonly withProvider?: boolean }) {
       value={
         {
           isAdmin: shortcutState.isAdmin,
-        } as DashboardData
+          identities: [],
+          activeIdentity: null,
+        } as unknown as DashboardDataContextValue
       }
     >
       <FounderDoorProvider>{node}</FounderDoorProvider>
@@ -161,6 +179,62 @@ describe('useGlobalShortcutActions (JOV-1827)', () => {
 
     expect(push).not.toHaveBeenCalled();
     expect(assign).not.toHaveBeenCalled();
+  });
+
+  it('does not register manual workspace lock in Jovie', () => {
+    shortcutState.pathname = '/app/chat';
+    render(<Probe />);
+
+    fireEvent.keyDown(window, {
+      key: 'l',
+      code: 'KeyL',
+      altKey: true,
+      shiftKey: true,
+    });
+
+    expect(lockWorkspaceMock).not.toHaveBeenCalled();
+  });
+
+  it('retains manual workspace lock in Ovie', () => {
+    shortcutState.pathname = '/app/ov/ops';
+    render(<Probe />);
+
+    fireEvent.keyDown(window, {
+      key: 'l',
+      code: 'KeyL',
+      altKey: true,
+      shiftKey: true,
+    });
+
+    expect(lockWorkspaceMock).toHaveBeenCalledOnce();
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('waits for server lock confirmation and reports failure from the Ovie hotkey', async () => {
+    shortcutState.pathname = '/app/ov/ops';
+    let rejectLock!: (reason: Error) => void;
+    lockWorkspaceMock.mockReturnValue(
+      new Promise((_, reject) => {
+        rejectLock = reject;
+      })
+    );
+    render(<Probe />);
+
+    fireEvent.keyDown(window, {
+      key: 'l',
+      code: 'KeyL',
+      altKey: true,
+      shiftKey: true,
+    });
+    expect(lockWorkspaceMock).toHaveBeenCalledOnce();
+    expect(toastError).not.toHaveBeenCalled();
+
+    rejectLock(new Error('Could not confirm the Ovie privacy lock.'));
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        'Could not confirm the Ovie privacy lock.'
+      )
+    );
   });
 
   it('does not switch workspaces while typing or composing', () => {

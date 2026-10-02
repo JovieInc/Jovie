@@ -63,6 +63,7 @@ jobs:
             scripts/lib/fx-remediation-lane.mjs
             scripts/lib/rolling-ci-handoff.mjs
             scripts/lib/changed-test-coverage.mjs
+            scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
             scripts/lib/upsert-pr-comment.sh
           sparse-checkout-cone-mode: false
@@ -70,7 +71,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "22"
+          node-version: "24"
 
       - name: Plan authenticated current-head transition
         id: plan
@@ -543,6 +544,7 @@ jobs:
             scripts/lib/rolling-ci-dispatch.mjs
             scripts/lib/rolling-ci-handoff.mjs
             scripts/lib/changed-test-coverage.mjs
+            scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
           sparse-checkout-cone-mode: false
       - name: Download immutable patch artifact
@@ -593,7 +595,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "22"
+          node-version: "24"
           cache: pnpm
           cache-dependency-path: candidate/pnpm-lock.yaml
       - name: Install without package lifecycle scripts
@@ -820,6 +822,8 @@ jobs:
             scripts/lib/repo-hygiene-limits.mjs
             scripts/ci-fast-lanes.mjs
             scripts/invariants/scanned-paths.mjs
+            LESSONS.guards.json
+            scripts/invariants/overlay-layer-contract.mjs
             scripts/invariants/design-surfaces.mjs
             scripts/invariants/done-sprint-invariants.mjs
             scripts/invariants/ios-web-no-scroll-jank.mjs
@@ -827,13 +831,14 @@ jobs:
             scripts/invariants/latency-sensitive-execution-allowlist.json
             scripts/invariants/registry.mjs
             scripts/design-conformance-paths.mjs
+            scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
             scripts/version-fanout-guard.mjs
           sparse-checkout-cone-mode: false
       - name: Setup Node.js for trusted policy
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '22'
+          node-version: '24'
       - name: Discover provider-bound FX write receipts
         id: discover
         env:
@@ -941,6 +946,7 @@ jobs:
             scripts/lib/fx-remediation-lane.mjs
             scripts/lib/rolling-ci-handoff.mjs
             scripts/lib/changed-test-coverage.mjs
+            scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
             scripts/lib/upsert-pr-comment.sh
           sparse-checkout-cone-mode: false

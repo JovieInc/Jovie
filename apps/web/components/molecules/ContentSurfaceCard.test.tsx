@@ -116,4 +116,10 @@ describe('ContentSurfaceCard', () => {
     expect(inner.className).toContain('bg-surface-0');
     expect(inner.className).not.toContain('bg-surface-1');
   });
+
+  it('does not re-export the retired precomputed classname constant', async () => {
+    const mod = await import('./ContentSurfaceCard');
+    const retired = ['CONTENT_SURFACE_CARD', 'CLASSNAME'].join('_');
+    expect(retired in mod).toBe(false);
+  });
 });

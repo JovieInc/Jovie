@@ -926,7 +926,7 @@ test('desktop dedup cross-proves an actual-publish-only marker', () => {
     /all\(\.artifacts\[\];[\s\S]*\.name == "desktop-production-published"/,
     /publish_marker_presence_count="\$\(jq '\.artifacts \| length'/,
     /publish_marker_presence_count.*-gt 0/s,
-    /status=completed&per_page=25/,
+    /status=completed&per_page=100/,
     /Recovered exact asset-proven desktop publish/,
     /Verify exact published release assets/,
     /desktop-release\.yml\/runs\?branch=main&event=push&status=success&per_page=100/,
@@ -1013,6 +1013,9 @@ test('desktop selection finds an intervening JOV-5996 change from the durable ba
   const runId = 202;
   const workflowId = 303;
   const publisherJobId = 404;
+  // workflow_run publishes stamp the run with main's newer tip, not the
+  // published generation (the 26.9.15/26.9.16 marker regression).
+  const publisherRunHead = 'c'.repeat(40);
   const markerName = 'desktop-production-published.json';
   await writeFile(
     join(root, markerName),
@@ -1086,7 +1089,7 @@ esac
               {
                 id: publisherJobId,
                 name: 'Publish production desktop release',
-                head_sha: baseline,
+                head_sha: publisherRunHead,
                 status: 'completed',
                 conclusion: 'success',
                 steps: [
@@ -1120,7 +1123,7 @@ esac
           head_repository: { full_name: repository },
           path: '.github/workflows/desktop-release.yml',
           event: 'workflow_run',
-          head_sha: baseline,
+          head_sha: publisherRunHead,
           display_title: `Desktop release ${baseline}`,
         }),
         MOCK_WORKFLOW_ID: String(workflowId),
@@ -1364,6 +1367,7 @@ test('desktop recovery ignores legacy push titles and selects new run-name evide
   assert.ok(jqProgram, 'missing embedded recovery selector');
   const oldSha = 'a'.repeat(40);
   const newSha = 'b'.repeat(40);
+  const triggerHead = 'c'.repeat(40);
   const output = execFileSync('jq', ['-r', jqProgram], {
     encoding: 'utf8',
     input: JSON.stringify([
@@ -1378,14 +1382,16 @@ test('desktop recovery ignores legacy push titles and selects new run-name evide
       {
         id: 2,
         run_attempt: 1,
-        head_sha: newSha,
+        // The run head is main's tip at trigger time, newer than the
+        // generation it published.
+        head_sha: triggerHead,
         event: 'workflow_run',
         display_title: `Desktop release ${newSha}`,
         created_at: '2026-07-19T00:00:00Z',
       },
     ]),
   });
-  assert.equal(output.trim(), `2\t1\t${newSha}`);
+  assert.equal(output.trim(), `2\t1\t${newSha}\t${triggerHead}`);
 });
 
 test('automatic desktop publishing stamps production-impacting source before release', () => {
@@ -1519,8 +1525,9 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /\.behind_by == 0/,
     /desktop-release-assets\.mjs upload-and-publish/,
     /--environment staging/,
-    /--version "\$\{\{ steps\.staging-version\.outputs\.version \}\}"/,
+    /--version="\$\{\{ steps\.staging-version\.outputs\.version \}\}"/,
   ]);
+  assert.doesNotMatch(stagingPublish, /--version "/);
   assertPatterns(stagingVerify, [
     /codesign --verify --deep --strict/,
     /spctl --assess --type execute/,
@@ -1562,6 +1569,7 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /contents: read/,
     /Verify exact published release assets/,
     /Cross-prove exact production publisher/,
+    /WORKFLOW_SHA: \$\{\{ github\.sha \}\}/,
     /publisherJobId/,
     /Upload production desktop publish marker/,
     /overwrite: true/,
@@ -1577,6 +1585,111 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /electron-builder publish|--publish always/
   );
   assert.match(desktopReleaseAssets, /releases\?per_page=100/);
+});
+
+test('production publish proof separates the released generation from its workflow transport', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-publish-proof-'));
+  t.after(() => rm(root, { force: true, recursive: true }));
+  const releaseSha = 'a'.repeat(40);
+  const workflowSha = 'b'.repeat(40);
+  const repository = 'JovieInc/Jovie';
+  const runId = 101;
+  const workflowId = 202;
+  const publisherJobId = 303;
+  const mockBin = join(root, 'bin');
+  await mkdir(mockBin);
+  await writeFile(
+    join(mockBin, 'gh'),
+    `#!/usr/bin/env bash
+set -euo pipefail
+endpoint=""
+for arg in "$@"; do
+  case "$arg" in repos/*) endpoint="$arg" ;; esac
+done
+case "$endpoint" in
+  *"actions/runs/$MOCK_RUN_ID/attempts/$MOCK_RUN_ATTEMPT/jobs"*) printf '%s' "$MOCK_JOBS_JSON" ;;
+  *"actions/runs/$MOCK_RUN_ID/attempts/$MOCK_RUN_ATTEMPT") printf '%s' "$MOCK_RUN_JSON" ;;
+  *"actions/workflows/$MOCK_WORKFLOW_ID") printf '%s' "$MOCK_WORKFLOW_JSON" ;;
+  *) printf 'unexpected gh endpoint: %s\\n' "$endpoint" >&2; exit 64 ;;
+esac
+`
+  );
+  await chmod(join(mockBin, 'gh'), 0o755);
+
+  const result = spawnSync(
+    'bash',
+    [
+      '-c',
+      shellStepBody(desktopWorkflow, 'Cross-prove exact production publisher'),
+    ],
+    {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        MOCK_JOBS_JSON: JSON.stringify([
+          {
+            jobs: [
+              {
+                id: publisherJobId,
+                name: 'Publish production desktop release',
+                head_sha: workflowSha,
+                status: 'completed',
+                conclusion: 'success',
+                steps: [
+                  {
+                    name: 'Publish production desktop release',
+                    status: 'completed',
+                    conclusion: 'success',
+                  },
+                ],
+              },
+            ],
+          },
+        ]),
+        MOCK_RUN_ATTEMPT: '1',
+        MOCK_RUN_ID: String(runId),
+        MOCK_RUN_JSON: JSON.stringify({
+          id: runId,
+          run_attempt: 1,
+          workflow_id: workflowId,
+          head_sha: workflowSha,
+          head_branch: 'main',
+          head_repository: { full_name: repository },
+          path: '.github/workflows/desktop-release.yml',
+          event: 'workflow_run',
+          display_title: `Desktop release ${releaseSha}`,
+        }),
+        MOCK_WORKFLOW_ID: String(workflowId),
+        MOCK_WORKFLOW_JSON: JSON.stringify({
+          id: workflowId,
+          name: 'desktop-release',
+          path: '.github/workflows/desktop-release.yml',
+        }),
+        PATH: `${mockBin}:${process.env.PATH}`,
+        PUBLISHED_SHA: releaseSha,
+        PUBLISHER_ATTEMPT: '1',
+        REPOSITORY: repository,
+        RUN_ID: String(runId),
+        RUNNER_TEMP: root,
+        WORKFLOW_SHA: workflowSha,
+      },
+    }
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(
+    JSON.parse(
+      await readFile(join(root, 'desktop-production-published.json'), 'utf8')
+    ),
+    {
+      schema: 1,
+      environment: 'production',
+      sha: releaseSha,
+      runId: String(runId),
+      publisherAttempt: '1',
+      publisherJobId: String(publisherJobId),
+    }
+  );
 });
 
 test('scheduled staging reconciliation publishes only unpublished desktop changes', async () => {

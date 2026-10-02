@@ -10,9 +10,10 @@ import {
   Wrench,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FilterChip } from '@/components/molecules/filters/FilterChip';
 import { APP_ROUTES } from '@/constants/routes';
+import { isSafeChangelogActionHref } from '@/lib/changelog-parser';
 import {
   CUSTOMER_CHANGELOG_CATEGORIES,
   CUSTOMER_CHANGELOG_CATEGORY_LABELS,
@@ -24,8 +25,76 @@ import {
 } from '@/lib/customer-changelog';
 
 const INITIAL_MONTH_COUNT = 1;
+const MONTH_FRAGMENT_PREFIX = 'changelog-month-';
 
 type CategoryFilter = 'all' | CustomerChangelogCategory;
+
+type FragmentTarget =
+  | {
+      readonly kind: 'entry';
+      readonly entry: CustomerChangelogEntry;
+      readonly monthKey: string;
+    }
+  | { readonly kind: 'month'; readonly monthKey: string };
+
+/**
+ * JOV-7489 adds persistent `aliases` to published entries; tolerate their
+ * absence until that contract lands so legacy links keep resolving.
+ */
+function entryFragments(entry: CustomerChangelogEntry): readonly string[] {
+  const aliases = (entry as { readonly aliases?: readonly string[] }).aliases;
+  return aliases?.length ? [entry.slug, ...aliases] : [entry.slug];
+}
+
+/**
+ * One entry-navigation resolver (JOV-7490): maps a URL fragment to the entry
+ * or month section that owns it, regardless of pagination or the active
+ * category filter. Unknown or removed fragments resolve to null so callers
+ * never land on a different entry.
+ */
+function locateChangelogFragment(
+  months: readonly CustomerChangelogMonthGroup[],
+  rawFragment: string
+): FragmentTarget | null {
+  let fragment = rawFragment.startsWith('#')
+    ? rawFragment.slice(1)
+    : rawFragment;
+  try {
+    fragment = decodeURIComponent(fragment);
+  } catch {
+    // Undecodable fragments cannot match a target.
+  }
+  if (!fragment) return null;
+
+  if (fragment.startsWith(MONTH_FRAGMENT_PREFIX)) {
+    const monthKey = fragment.slice(MONTH_FRAGMENT_PREFIX.length);
+    return months.some(group => group.monthKey === monthKey)
+      ? { kind: 'month', monthKey }
+      : null;
+  }
+
+  for (const group of months) {
+    for (const entry of group.entries) {
+      if (entryFragments(entry).includes(fragment)) {
+        return { kind: 'entry', entry, monthKey: group.monthKey };
+      }
+    }
+  }
+  return null;
+}
+
+function filterMonthsByCategory(
+  months: readonly CustomerChangelogMonthGroup[],
+  category: CategoryFilter
+): readonly CustomerChangelogMonthGroup[] {
+  if (category === 'all') return months;
+  return months
+    .map(group => ({
+      ...group,
+      entries: group.entries.filter(entry => entry.category === category),
+    }))
+    .filter(group => group.entries.length > 0);
+}
 
 const CATEGORY_FILTER_LABELS: Record<CategoryFilter, string> = {
   all: 'All',
@@ -52,6 +121,37 @@ const ENTRY_MEDIA_ICONS: Record<
 
 export interface CustomerChangelogArchiveProps {
   readonly months: readonly CustomerChangelogMonthGroup[];
+  readonly technicalReleases?: readonly { version: string; date: string }[];
+}
+
+function TechnicalReleaseNav({
+  releases,
+}: {
+  readonly releases: readonly { version: string; date: string }[];
+}) {
+  if (!releases.length) return null;
+  return (
+    <nav aria-label='Technical Release Log' className='changelog-archive-nav'>
+      <p className='text-sm text-secondary-token'>Engineering history</p>
+      <ul className='changelog-archive-nav__links'>
+        {releases.map(release => (
+          <li key={release.version}>
+            <Link
+              href={versionHref(release.version)}
+              className='changelog-archive-nav__link'
+            >
+              <span className='changelog-archive-nav__link-date'>
+                {formatCustomerChangelogDate(release.date)}
+              </span>
+              <span className='changelog-archive-nav__link-title'>
+                {release.version}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
 }
 
 function versionHref(version: string): string {
@@ -84,6 +184,46 @@ function EntryMedia({
   );
 }
 
+/**
+ * Receipt-approved next step (JOV-7493). The parser already fails closed on
+ * unsafe destinations; the render re-checks so a stale or hand-built entry
+ * can never mint an arbitrary link.
+ */
+function EntryActionLink({
+  action,
+}: {
+  readonly action: NonNullable<CustomerChangelogEntry['action']>;
+}) {
+  if (!isSafeChangelogActionHref(action.href)) return null;
+  const content = (
+    <>
+      {action.label}
+      <ArrowRight
+        aria-hidden='true'
+        size={16}
+        className='changelog-archive-nav__link-arrow'
+      />
+    </>
+  );
+  if (action.href.startsWith('/')) {
+    return (
+      <Link href={action.href} className='changelog-entry__action'>
+        {content}
+      </Link>
+    );
+  }
+  return (
+    <a
+      href={action.href}
+      target='_blank'
+      rel='noopener noreferrer'
+      className='changelog-entry__action'
+    >
+      {content}
+    </a>
+  );
+}
+
 function EntryRow({
   entry,
   tone,
@@ -95,12 +235,20 @@ function EntryRow({
     entry.date,
     entry.technicalVersion
   );
-  const hasLevel2 = Boolean(entry.explanation) || entry.supporting.length > 0;
+  const hasLevel2 =
+    Boolean(entry.explanation) ||
+    entry.supporting.length > 0 ||
+    Boolean(entry.prerequisites?.length);
   const hasLevel3 = entry.technical.length > 0;
+  const action =
+    entry.action && isSafeChangelogActionHref(entry.action.href)
+      ? entry.action
+      : null;
 
   return (
     <article
       id={entry.slug}
+      tabIndex={-1}
       className='changelog-entry'
       data-changelog-prominence={entry.prominence}
     >
@@ -113,12 +261,25 @@ function EntryRow({
             {/* ui-casing-allow: tiny taxonomy caption, not IA heading */}
             {CUSTOMER_CHANGELOG_CATEGORY_LABELS[entry.category]}
           </p>
+          {entry.availability === 'preview' ||
+          entry.availability === 'limited' ? (
+            <p className='text-sm text-secondary-token'>
+              {entry.availability === 'preview'
+                ? 'Preview'
+                : 'Limited availability'}
+            </p>
+          ) : null}
           <h3 className='changelog-entry__title'>{entry.title}</h3>
           <EntryMedia entry={entry} tone={tone} variant='feature' />
           {hasLevel2 ? (
             <div className='space-y-2'>
               {entry.explanation ? (
                 <p className='changelog-entry__excerpt'>{entry.explanation}</p>
+              ) : null}
+              {entry.prerequisites?.length ? (
+                <p className='changelog-entry__excerpt'>
+                  {entry.prerequisites.join(' · ')}
+                </p>
               ) : null}
               {entry.supporting.length > 0 ? (
                 <ul className='space-y-1'>
@@ -133,6 +294,11 @@ function EntryRow({
                 </ul>
               ) : null}
             </div>
+          ) : null}
+          {action ? (
+            <p className='changelog-entry__action-row'>
+              <EntryActionLink action={action} />
+            </p>
           ) : null}
           <p className='changelog-entry__tertiary'>
             <Link href={versionHref(entry.technicalVersion)}>{tertiary}</Link>
@@ -171,6 +337,7 @@ function MonthSection({
   return (
     <section
       id={`changelog-month-${group.monthKey}`}
+      tabIndex={-1}
       aria-labelledby={`changelog-month-${group.monthKey}-heading`}
       className='changelog-month-section'
     >
@@ -283,27 +450,80 @@ function ArchiveJumpNav({
  */
 export function CustomerChangelogArchive({
   months,
+  technicalReleases = [],
 }: CustomerChangelogArchiveProps) {
   const [visibleMonthCount, setVisibleMonthCount] =
     useState(INITIAL_MONTH_COUNT);
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>('all');
+  const [pendingTargetId, setPendingTargetId] = useState<string | null>(null);
 
   const filteredMonths = useMemo(
-    () =>
-      activeCategory === 'all'
-        ? months
-        : months
-            .map(group => ({
-              ...group,
-              entries: group.entries.filter(
-                entry => entry.category === activeCategory
-              ),
-            }))
-            .filter(group => group.entries.length > 0),
+    () => filterMonthsByCategory(months, activeCategory),
     [months, activeCategory]
   );
 
+  const revealFragment = useCallback(
+    (rawFragment: string) => {
+      const target = locateChangelogFragment(months, rawFragment);
+      if (!target) return;
+
+      const targetId =
+        target.kind === 'month'
+          ? `${MONTH_FRAGMENT_PREFIX}${target.monthKey}`
+          : target.entry.slug;
+      // Reconcile an excluding filter explicitly: a deep link target must
+      // never stay hidden behind the active category.
+      const nextCategory =
+        target.kind === 'entry' &&
+        activeCategory !== 'all' &&
+        target.entry.category !== activeCategory
+          ? 'all'
+          : activeCategory;
+      const list = filterMonthsByCategory(months, nextCategory);
+      const monthIndex = list.findIndex(
+        group => group.monthKey === target.monthKey
+      );
+      if (monthIndex < 0) return;
+
+      if (nextCategory !== activeCategory) setActiveCategory(nextCategory);
+      setVisibleMonthCount(current => Math.max(current, monthIndex + 1));
+      setPendingTargetId(targetId);
+    },
+    [months, activeCategory]
+  );
+
+  // Resolve deep links on fresh loads, hash changes (in-page links,
+  // Back/Forward, legacy aliases), and clicks on same-page fragment links
+  // such as the hero timeline, which may not emit a hashchange.
+  useEffect(() => {
+    const onHashChange = () => revealFragment(globalThis.location.hash);
+    const onClick = (event: MouseEvent) => {
+      const anchor = (event.target as Element | null)?.closest?.('a[href]');
+      const href = anchor?.getAttribute('href') ?? '';
+      if (href.startsWith('#')) revealFragment(href);
+    };
+    document.addEventListener('click', onClick, true);
+    globalThis.addEventListener('hashchange', onHashChange);
+    onHashChange();
+    return () => {
+      document.removeEventListener('click', onClick, true);
+      globalThis.removeEventListener('hashchange', onHashChange);
+    };
+  }, [revealFragment]);
+
+  // Scroll and focus the resolved target once it mounts. Focus only moves in
+  // response to an explicit fragment navigation, never on passive renders.
+  useEffect(() => {
+    if (!pendingTargetId) return;
+    const element = document.getElementById(pendingTargetId);
+    if (!element) return;
+    element.scrollIntoView?.({ block: 'start' });
+    element.focus({ preventScroll: true });
+    setPendingTargetId(null);
+  }, [pendingTargetId, visibleMonthCount, activeCategory]);
+
   function handleCategoryChange(next: CategoryFilter) {
+    setPendingTargetId(null);
     setActiveCategory(next);
     setVisibleMonthCount(INITIAL_MONTH_COUNT);
   }
@@ -312,6 +532,12 @@ export function CustomerChangelogArchive({
     return (
       <div data-reduced-motion='static'>
         <p className='text-secondary-token'>No updates yet. Check back soon!</p>
+        <details className='mb-6'>
+          <summary className='min-h-11 cursor-pointer text-sm text-secondary-token'>
+            Browse engineering history
+          </summary>
+          <TechnicalReleaseNav releases={technicalReleases} />
+        </details>
       </div>
     );
   }
@@ -339,7 +565,13 @@ export function CustomerChangelogArchive({
         </p>
       ) : (
         <>
-          <ArchiveJumpNav months={visibleMonths} />
+          <details className='mb-6'>
+            <summary className='min-h-11 cursor-pointer text-sm text-secondary-token'>
+              Browse all updates
+            </summary>
+            <ArchiveJumpNav months={filteredMonths} />
+            <TechnicalReleaseNav releases={technicalReleases} />
+          </details>
           <div id='changelog-outcome-list'>
             {visibleMonths.map((group, index) => (
               <MonthSection

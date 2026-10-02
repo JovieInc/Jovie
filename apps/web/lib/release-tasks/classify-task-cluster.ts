@@ -1,5 +1,6 @@
 import 'server-only';
-import { getAnthropicClient } from '@/lib/ai/anthropic';
+import { gateway, generateText } from '@/lib/ai/sdk';
+import { CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
 import { captureError } from '@/lib/error-tracking';
 import { withTimeout } from '@/lib/resilience/primitives';
 
@@ -83,7 +84,8 @@ type ClassifyDeps = {
 };
 
 /**
- * Classify a free-form task into one of the known cluster slugs using Haiku.
+ * Classify a free-form task into one of the known cluster slugs using the
+ * lightweight gateway model.
  * Returns `{clusterSlug: null, confidence: 0}` on any failure; callers must
  * not treat classification failures as user-visible errors.
  */
@@ -99,21 +101,18 @@ export async function classifyTaskCluster(
   const prompt = buildPrompt(userText, clusters);
 
   const runReal = async (): Promise<{ text: string } | null> => {
-    const anthropic = getAnthropicClient();
-    const message = await withTimeout(
-      anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 200,
-        messages: [{ role: 'user', content: prompt }],
+    const result = await withTimeout(
+      generateText({
+        model: gateway(CHAT_MODEL_LIGHT),
+        maxOutputTokens: 200,
+        prompt,
       }),
       {
         timeoutMs: CLASSIFIER_TIMEOUT_MS,
         context: 'classifyTaskCluster',
       }
     );
-    const textBlock = message.content.find(b => b.type === 'text');
-    if (textBlock?.type !== 'text') return null;
-    return { text: textBlock.text };
+    return { text: result.text };
   };
 
   try {

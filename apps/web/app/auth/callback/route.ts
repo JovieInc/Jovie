@@ -176,6 +176,7 @@ export async function GET(request: Request) {
           state: stateRecord.state,
           desktopFlow: stateRecord.desktopFlow,
           returnCode,
+          desktopLoopbackPort: stateRecord.desktopLoopbackPort ?? null,
         }),
         request.url
       );

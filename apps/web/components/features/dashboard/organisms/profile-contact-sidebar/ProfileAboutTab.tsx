@@ -18,7 +18,6 @@ import {
   updateAllowProfilePhotoDownloads,
   updateShowOldReleases,
 } from '@/app/app/(shell)/dashboard/actions/creator-profile';
-import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
 import { useAvatarUpload } from '@/components/hooks/useAvatarUpload';
 import {
   DrawerAsyncToggle,
@@ -27,6 +26,7 @@ import {
 } from '@/components/molecules/drawer';
 import { GenrePicker } from '@/components/molecules/GenrePicker';
 import { LocationPicker } from '@/components/molecules/LocationPicker';
+import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 import { cn } from '@/lib/utils';
 import type { PressPhoto } from '@/types/press-photos';
 

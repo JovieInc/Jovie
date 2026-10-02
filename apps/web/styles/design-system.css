@@ -113,6 +113,12 @@
   --app-shell-radius: 12px;
   --app-shell-radius-item: 8px;
   --app-shell-radius-menu: 8px;
+  /* Nested surfaces sit inside the shell inset: outer radius − gap. */
+  --app-shell-radius-nested: calc(
+    var(--app-shell-radius) -
+    var(--app-shell-gap)
+  );
+  --app-shell-content-inset: var(--app-shell-gap);
   --app-shell-border: rgba(0, 0, 0, 0.05);
   --app-shell-sidebar-seam: rgba(0, 0, 0, 0.05);
   --app-shell-frame-seam: rgba(0, 0, 0, 0.045);
@@ -317,7 +323,14 @@
   --profile-rail-dot-active: rgba(255, 255, 255, 0.92);
   --profile-rail-dot-inactive: rgba(255, 255, 255, 0.18);
   --profile-composer-border: rgba(255, 255, 255, 0.1);
-  --profile-dock-bg: rgba(30, 32, 40, 0.52);
+  /* JOV-INV-019 image-contrast: the dock sits over the page's own photo
+     content (mode-card artwork, ambient backdrop), so its glass scrim must
+     stay opaque enough to guarantee 4.5:1 for its white glyphs against any
+     underlying image, not just a typical dark one. Darkened + raised opacity
+     2026-09-29 (was rgba(30, 32, 40, 0.52)); lens now shares the same dark
+     material instead of a white tint that diluted the scrim under the
+     active tab. */
+  --profile-dock-bg: rgba(18, 19, 24, 0.86);
   --profile-dock-border: rgba(255, 255, 255, 0.18);
   --profile-dock-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 14px 34px rgba(0, 0, 0, 0.3);
@@ -332,7 +345,7 @@
   --profile-dock-glow: rgba(255, 255, 255, 0.05);
   --profile-dock-rim-top: rgba(255, 255, 255, 0.38);
   --profile-dock-rim-bottom: rgba(0, 0, 0, 0.24);
-  --profile-dock-lens-bg: rgba(255, 255, 255, 0.13);
+  --profile-dock-lens-bg: rgba(18, 19, 24, 0.86);
   --profile-dock-lens-sheen: rgba(255, 255, 255, 0.14);
   --profile-dock-lens-rim: rgba(255, 255, 255, 0.34);
   --profile-dock-lens-rim-bottom: rgba(255, 255, 255, 0.06);
@@ -447,13 +460,19 @@
   }
 }
 
-:where(.profile-aeo-content) {
-  --profile-aeo-text: var(--color-text-tooltip);
+:where(
+  .profile-aeo-content,
+  [data-testid="profile-mobile-notifications-flow"]
+) {
   --profile-aeo-muted: color-mix(
     in oklab,
     var(--color-text-tooltip) 70%,
     transparent
   );
+}
+
+:where(.profile-aeo-content) {
+  --profile-aeo-text: var(--color-text-tooltip);
   --profile-aeo-border: color-mix(
     in oklab,
     var(--color-text-tooltip) 14%,
@@ -755,17 +774,38 @@
    static DOM, but out of mobile layout so it cannot add page scroll below the
    compact profile. Desktop keeps the readable AEO section. */
 @media (max-width: 767px) {
-  /* The consent card mounts lazily after geo/cookie checks. Keep it in the
-     safe-area top overlay on phones: the bottom region contains both the
-     profile's primary conversion action and the canonical glass dock. */
+  /* The consent card mounts lazily after geo/cookie checks. On phones it
+     sits at the bottom, directly above the dock stack (and the proof claim
+     bar, which grows --profile-bottom-nav-height), so it never covers the
+     profile identity or the dock (Tim 2026-09-29, JOV-7114). */
   .cookie-banner-card--above-public-profile-dock {
-    top: max(env(safe-area-inset-top), 8px);
-    bottom: auto;
+    top: auto;
+    bottom: var(--profile-bottom-nav-height);
     left: min(50vw, calc(var(--profile-shell-max-width) / 2));
     right: auto !important;
-    width: min(254px, calc(100vw - 136px)) !important;
+    /* Same edges as the claim bar and dock below it. */
+    width: min(358px, calc(100vw - 32px)) !important;
     max-width: none;
     transform: translateX(-50%);
+  }
+
+  /* The canonical launcher occupies the clear upper-right rail. Keep its
+     placement here with the profile dock and proof claim-bar geometry so it
+     cannot intercept either the navigation or the featured action. */
+  [data-ask-jovie-launcher] {
+    top: calc(env(safe-area-inset-top) + var(--space-16));
+    bottom: auto;
+  }
+
+  /* The proof claim bar rides inside the dock; content clears both. */
+  :root:has([data-testid="profile-proof-claim-bar"]) {
+    --profile-bottom-nav-height: calc(
+      var(--space-8) +
+      max(10px, env(safe-area-inset-bottom)) +
+      var(--space-2) +
+      var(--space-6) +
+      52px
+    );
   }
 
   .profile-viewport ~ .profile-aeo-content {
@@ -828,6 +868,46 @@
   flex: 0 0 auto;
 }
 
+/* Reserve the floating dock outside the home scroll box at every compact
+   breakpoint. End padding makes the last row reachable after scrolling, but
+   it cannot stop an absolute dock from covering the current viewport. The
+   desktop shell is a fixed-height phone card, so without this the last card
+   renders half-covered by the dock at rest even though it can technically
+   scroll into view (JOV-7192). Embedded previews render no dock, so they keep
+   the in-box padding instead. */
+:where(
+  [data-testid="profile-compact-surface"][data-mode="profile"]:not(
+      [data-presentation="embedded"]
+    )
+    > .profile-home-content-column
+) {
+  margin-bottom: var(--profile-bottom-nav-height);
+}
+
+[data-testid="profile-compact-surface"][data-mode="profile"]:not(
+    [data-presentation="embedded"]
+  )
+  .profile-home-content-scroll {
+  padding-bottom: 0;
+}
+
+/* From md up the compact surface is a fixed-height phone card with overflow
+   hidden. Natural-height content ran past the card, under the tab bar, and
+   could never be scrolled into view (jov.ie/tim dogfood 2026-09-27). Bound the
+   column so the content region scrolls inside the card; its bottom padding
+   keeps the last row reachable above the dock. */
+@media (min-width: 768px) {
+  :where(
+    [data-testid="profile-compact-surface"][data-mode="profile"]
+      > .profile-home-content-column,
+    [data-testid="profile-compact-surface"][data-mode="profile"]
+      .profile-home-content-scroll
+  ) {
+    flex: 1 1 0%;
+    min-height: 0;
+  }
+}
+
 /* Mobile home: the identity header and the rail share one scroll region.
    Keep the rail at the top of its remaining region so the featured card
    follows the identity header without an ownerless spacer. */
@@ -849,22 +929,6 @@
     flex: 1 1 0%;
     justify-content: flex-start;
     min-height: 0;
-  }
-
-  /* Reserve the floating dock outside the scroll box. The existing padding
-     utility reserves the same space inside the box, which would make the
-     layout metrics report content underneath the dock after the hero is
-     pinned to its token. */
-  :where(
-    [data-testid="profile-compact-surface"][data-mode="profile"]
-      > .profile-home-content-column
-  ) {
-    margin-bottom: var(--profile-bottom-nav-height);
-  }
-
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-    .profile-home-content-scroll {
-    padding-bottom: 0;
   }
 
   /* Large text can make the in-flow identity taller than the phone viewport.
@@ -1609,7 +1673,9 @@
   --profile-rail-dot-active: rgba(255, 255, 255, 0.92);
   --profile-rail-dot-inactive: rgba(255, 255, 255, 0.18);
   --profile-composer-border: rgba(255, 255, 255, 0.1);
-  --profile-dock-bg: rgba(30, 32, 40, 0.52);
+  /* JOV-INV-019 image-contrast: keep this in sync with the .profile-viewport
+     block above — see its comment for why the scrim must be this opaque. */
+  --profile-dock-bg: rgba(18, 19, 24, 0.86);
   --profile-dock-border: rgba(255, 255, 255, 0.18);
   --profile-dock-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 14px 34px rgba(0, 0, 0, 0.3);
@@ -1624,7 +1690,7 @@
   --profile-dock-glow: rgba(255, 255, 255, 0.05);
   --profile-dock-rim-top: rgba(255, 255, 255, 0.38);
   --profile-dock-rim-bottom: rgba(0, 0, 0, 0.24);
-  --profile-dock-lens-bg: rgba(255, 255, 255, 0.13);
+  --profile-dock-lens-bg: rgba(18, 19, 24, 0.86);
   --profile-dock-lens-sheen: rgba(255, 255, 255, 0.14);
   --profile-dock-lens-rim: rgba(255, 255, 255, 0.34);
   --profile-dock-lens-rim-bottom: rgba(255, 255, 255, 0.06);
@@ -1871,6 +1937,67 @@
   border-radius: var(--profile-card-radius);
   background: var(--profile-mode-card-bg);
   color: var(--profile-mode-card-fg);
+}
+
+/* Pen D14lo6 / tkdyb: retain the reserved card height, then compact the art
+   and spacing when the home region is shorter so the action clears the dock. */
+[data-testid="profile-compact-surface"]:not(
+    [data-profile-overflow-mode="scroll"]
+  )
+  [data-testid="profile-home-rail"]
+  > [data-presentation="featured"] {
+  height: calc(var(--spacing) * 80);
+  min-height: calc(var(--spacing) * 52);
+  container: profile-featured-card / size;
+}
+
+[data-testid="profile-compact-surface"]:not(
+    [data-profile-overflow-mode="scroll"]
+  )
+  [data-testid="profile-home-rail"]
+  > [data-presentation="featured"]
+  > .profile-mode-card {
+  height: 100%;
+  min-height: 0;
+}
+
+@media (max-width: 767px) {
+  [data-testid="profile-compact-surface"]:not(
+      [data-profile-overflow-mode="scroll"]
+    )
+    [data-testid="profile-home-rail"]
+    > [data-presentation="featured"] {
+    height: min(calc(var(--spacing) * 80), 100%);
+  }
+}
+
+@container profile-featured-card (height < 20rem) {
+  .profile-mode-card {
+    padding: var(--space-3);
+  }
+  .profile-mode-card > div:first-child {
+    min-height: var(--space-4);
+  }
+  .profile-mode-card > div:has(> [data-testid="profile-pac-featured-art"]) {
+    margin-top: var(--space-1);
+  }
+  [data-testid="profile-pac-featured-art"] {
+    width: var(--space-12);
+    height: var(--space-12);
+  }
+  .profile-mode-card > div:last-child {
+    padding-top: var(--space-1);
+  }
+  .profile-mode-card h2 {
+    line-height: var(--space-7);
+  }
+  .profile-mode-card p {
+    margin-top: 0;
+    line-height: var(--space-5);
+  }
+  .profile-mode-card [aria-live="polite"] {
+    min-height: 0;
+  }
 }
 
 :where(.profile-mode-card)::before {
@@ -2509,28 +2636,28 @@
      KEY: Linear uses 13px (0.8125rem) as the primary app UI size */
   --text-3xs: 0.625rem;
   /* 10px — micro labels, legal */
-  --text-2xs: 0.6875rem;
-  /* 11px — tiny labels, badges */
+  --text-2xs: 0.75rem;
+  /* 12px — small step (was 11px; consolidated 2026-09-27) */
   --text-xs: 0.75rem;
   /* 12px */
-  --text-app: 0.8125rem;
-  /* 13px — LINEAR'S DEFAULT APP UI SIZE (sidebar, issues, tabs) */
+  --text-app: 0.75rem;
+  /* 12px — app default UI size (was 13px; consolidated 2026-09-27) */
   --text-sm: 0.875rem;
   /* 14px */
-  --text-mid: 0.9375rem;
-  /* 15px — between sm and base; intentional tight fit */
+  --text-mid: 0.875rem;
+  /* 14px — body step (was 15px; consolidated 2026-09-27) */
   --text-base: 1rem;
   /* 16px */
-  --text-lg: 1.125rem;
-  /* 18px */
+  --text-lg: 1rem;
+  /* 16px (display ladder, was 18px) */
   --text-xl: 1.25rem;
   /* 20px */
   --text-2xl: 1.5rem;
   /* 24px */
-  --text-3xl: 1.875rem;
-  /* 30px */
-  --text-4xl: 2.25rem;
-  /* 36px */
+  --text-3xl: 2rem;
+  /* 32px (was 30px) */
+  --text-4xl: 2.5rem;
+  /* 40px (was 36px) */
   --text-5xl: 3rem;
   /* 48px */
 

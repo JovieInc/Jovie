@@ -7,6 +7,7 @@ import {
   useQueryStates,
 } from 'nuqs';
 import * as React from 'react';
+import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { DashboardErrorFallback } from '@/components/organisms/DashboardErrorFallback';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { audienceSortFields, audienceViews } from '@/lib/nuqs';
@@ -209,6 +210,7 @@ function DashboardAudienceClientInner({
         data-testid='dashboard-audience-client'
         className='flex h-full min-h-0 flex-col'
       >
+        <NavigationDestinationReady destination='contacts' />
         <div className='flex-1 min-h-0 flex flex-col'>
           <DashboardAudienceWorkspace
             mode={mode}

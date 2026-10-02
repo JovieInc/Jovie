@@ -1,4 +1,5 @@
-const TEST_FILE_PATTERN = /\.(test|spec)\.[cm]?[jt]sx?$/i;
+const TEST_FILE_PATTERN =
+  /(?:\.(?:test|spec)\.[cm]?[jt]sx?|(?:^|\/)test_[^/]+\.py)$/i;
 
 const BUG_FIX_COMMIT_PATTERN = /^fix[(:]/i;
 const BUG_FIX_BRANCH_PATTERN = /^(fix\/|.*\/fix-)/i;
@@ -6,8 +7,7 @@ const BUG_FIX_TITLE_PATTERN = /^fix[(:]/i;
 const BUG_FIX_PR_BODY_CHECKED_PATTERN =
   /- \[[xX]\] Bug fix \(non-breaking change which fixes an issue\)/;
 
-const REGRESSION_TEST_REFERENCE_PATTERN =
-  /Regression test:\s*[`']?([\w./-]+\.(?:test|spec)\.[cm]?[jt]sx?)/i;
+const REGRESSION_TEST_REFERENCE_PATTERN = /Regression test:\s*[`']?([\w./-]+)/i;
 const EXCEPTION_FIELD_PATTERNS = {
   scope: /Bug-to-test exception scope:\s*\S.+/i,
   rationale: /Bug-to-test exception rationale:\s*\S.+/i,
@@ -83,7 +83,11 @@ function collectRegressionTestSignals(input: BugToTestInput): string[] {
     const reference = input.prBody.match(
       REGRESSION_TEST_REFERENCE_PATTERN
     )?.[1];
-    if (reference && input.changedFiles.includes(reference)) {
+    if (
+      reference &&
+      isTestFile(reference) &&
+      input.changedFiles.includes(reference)
+    ) {
       signals.push(`PR body references changed regression test: ${reference}`);
     }
   }
@@ -183,7 +187,7 @@ export function evaluateBugToTestRule(
     passed: false,
     summary: `Bug fix detected (${bugFixSignals.join(
       '; '
-    )}) but no executable regression test evidence found. Add or update a *.test.* / *.spec.* file. A valid exception requires bounded scope, rationale, independent approval, expiry, review trigger, and residual count.`,
+    )}) but no executable regression test evidence found. Add or update a *.test.*, *.spec.*, or test_*.py file. A valid exception requires bounded scope, rationale, independent approval, expiry, review trigger, and residual count.`,
   };
 }
 

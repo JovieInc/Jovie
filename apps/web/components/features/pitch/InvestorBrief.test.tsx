@@ -20,6 +20,7 @@ describe('investor brief source contract', () => {
   it('keeps the shipped body bound to checked-in registry evidence', () => {
     const component = read('components/features/pitch/InvestorBrief.tsx');
 
+    expect(component).toContain('bg-(--color-bg-base)/90');
     expect(component).toContain('const registry = fundraisingRegistry');
     expect(component).toContain('registry.coreSlides.map');
     expect(component).toContain('registry.operatingLoop.map');

@@ -8,6 +8,7 @@ import {
   headerStyles,
   overlayClassName,
   overlayStyles,
+  sheetOverlayClassName,
   sheetSurfaceStyles,
   titleStyles,
 } from './overlay-styles';
@@ -17,8 +18,14 @@ describe('overlay-styles', () => {
     it('base includes fixed positioning and backdrop', () => {
       expect(overlayStyles.base).toContain('fixed');
       expect(overlayStyles.base).toContain('inset-0');
-      expect(overlayStyles.base).toContain('z-50');
+      expect(overlayStyles.base).toContain('z-modal');
       expect(overlayStyles.base).toContain('bg-black/52');
+    });
+
+    it('keeps the sheet scrim on the sheet layer, below modal dialogs', () => {
+      expect(sheetOverlayClassName).toContain('z-sheet');
+      expect(sheetOverlayClassName).not.toContain('z-modal');
+      expect(overlayClassName).toContain('z-modal');
     });
 
     it('animation includes open/close fade transitions', () => {
@@ -46,7 +53,7 @@ describe('overlay-styles', () => {
       expect(centeredContentStyles.position).toContain('fixed');
       expect(centeredContentStyles.position).toContain('left-1/2');
       expect(centeredContentStyles.position).toContain('top-1/2');
-      expect(centeredContentStyles.position).toContain('z-50');
+      expect(centeredContentStyles.position).toContain('z-modal');
     });
 
     it('layout includes grid and max-width', () => {
@@ -118,7 +125,7 @@ describe('overlay-styles', () => {
 
   describe('titleStyles', () => {
     it('base includes font sizing', () => {
-      expect(titleStyles.base).toContain('text-base');
+      expect(titleStyles.base).toContain('text-(length:--text-base)');
       expect(titleStyles.base).toContain('font-medium');
       expect(titleStyles.base).toContain('tracking-tight');
       expect(titleStyles.base).not.toContain('--ds-marketing');

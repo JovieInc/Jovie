@@ -160,7 +160,7 @@ async function assertConsentActions(
       .poll(() =>
         action.evaluate(element => getComputedStyle(element).boxShadow)
       )
-      .toContain('rgb(37, 99, 255)');
+      .toContain('rgb(17, 175, 255)');
   }
   for (let i = 0; i < targets.length; i += 1) {
     for (const other of targets.slice(i + 1)) {
@@ -284,7 +284,7 @@ test.describe('Cookie banner @smoke', () => {
       expect(findMeBox).not.toBeNull();
       expect(
         boxesOverlap(bannerBox!, findMeBox!),
-        `Cookie banner overlaps Find me at ${viewport.width}x${viewport.height}`
+        `Cookie banner overlaps the homepage primary CTA at ${viewport.width}x${viewport.height}`
       ).toBe(false);
 
       if (viewport.name === 'mobile') {

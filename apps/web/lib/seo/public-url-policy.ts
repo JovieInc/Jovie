@@ -100,6 +100,14 @@ export const PUBLIC_URL_POLICY = [
     note: 'Retired tipping landing page.',
   },
   {
+    path: '/solutions',
+    action: 'redirect',
+    destination: APP_ROUTES.SOLUTIONS_ARTISTS,
+    status: 308,
+    owner: 'web',
+    note: 'No /solutions index page ships; redirect to the live solutions route instead of resolving as an unclaimed profile handle.',
+  },
+  {
     path: '/product',
     action: 'shipping',
     owner: 'web',

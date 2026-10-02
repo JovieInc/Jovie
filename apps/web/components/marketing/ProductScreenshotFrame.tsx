@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/marketing/product-screenshot-frame.test.tsx
 'use client';
 
 import Image from 'next/image';
@@ -131,7 +132,7 @@ export function ProductScreenshotFrame({
       data-variant={variant}
       data-status={status}
       className={cn(
-        'psf relative overflow-hidden border border-(--color-bg-button) bg-(--color-accent-hover) shadow-[0_30px_80px_rgba(0,0,0,0.5)]',
+        'psf relative overflow-hidden border border-(--color-bg-button) bg-surface-1 shadow-[0_30px_80px_rgba(0,0,0,0.5)]',
         variant === 'dark-glass' && 'psf--dark-glass',
         isPhone ? 'rounded-3xl p-1.5' : 'rounded-xl p-1',
         fill && 'h-full w-full',

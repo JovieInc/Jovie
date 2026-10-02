@@ -4,7 +4,7 @@
 
 import type { VirtualItem, Virtualizer } from '@tanstack/react-virtual';
 import React from 'react';
-import type { Row, RowData } from '@/lib/tanstack-table';
+import type { Row, RowData, VisibilityState } from '@/lib/tanstack-table';
 import {
   type ContextMenuItemType,
   TableContextMenu,
@@ -18,6 +18,13 @@ export interface VirtualizedTableBodyProps<TData extends RowData> {
   readonly rows: Row<TData>[];
 
   /**
+   * Explicit compiler invalidation: TanStack rows retain identity when columns
+   * change. This prop makes the parent recreate the body; the body deliberately
+   * reads visible cells without compiler memoization.
+   */
+  readonly columnVisibility?: VisibilityState;
+
+  /**
    * Whether virtualization is enabled
    */
   readonly shouldVirtualize: boolean;
@@ -26,11 +33,6 @@ export interface VirtualizedTableBodyProps<TData extends RowData> {
    * Virtual rows from TanStack Virtual (when virtualization is enabled)
    */
   readonly virtualRows?: VirtualItem[];
-
-  /**
-   * Total height of virtualized content
-   */
-  readonly totalSize?: number;
 
   /**
    * Top padding for virtualization
@@ -178,7 +180,6 @@ export function VirtualizedTableBody<TData extends RowData>({
   rows,
   shouldVirtualize,
   virtualRows,
-  totalSize,
   paddingTop,
   paddingBottom,
   rowVirtualizer,
@@ -204,6 +205,8 @@ export function VirtualizedTableBody<TData extends RowData>({
   getExpandableRowId,
   columnCount,
 }: VirtualizedTableBodyProps<TData>) {
+  'use no memo';
+  // Row identity is stable across visibility changes; read fresh visible cells.
   // Determine which items to iterate over.
   // Fall back to non-virtualized rendering if virtualizer hasn't produced items yet
   // (can happen when the scroll container hasn't been measured by ResizeObserver).
@@ -211,12 +214,11 @@ export function VirtualizedTableBody<TData extends RowData>({
   const items = useVirtual ? virtualRows! : rows;
 
   return (
-    <tbody
-      style={{
-        position: useVirtual ? 'relative' : undefined,
-        height: useVirtual && totalSize ? `${totalSize}px` : undefined,
-      }}
-    >
+    // Virtualized rows stay in normal table flow between the top and bottom
+    // spacer rows. Absolutely positioned rows need <tbody> as their containing
+    // block, and WebKit never makes a table row group one: rows escaped to the
+    // page origin and painted over the page chrome in Safari.
+    <tbody>
       {/* Top padding for virtualization */}
       {useVirtual && paddingTop !== undefined && paddingTop > 0 && (
         <tr>
@@ -257,11 +259,11 @@ export function VirtualizedTableBody<TData extends RowData>({
           <VirtualizedTableRow
             key={row.id}
             row={row}
+            visibleCells={row.getVisibleCells()}
             rowIndex={rowIndex}
             rowRefsMap={rowRefsMap}
             shouldEnableKeyboardNav={shouldEnableKeyboardNav}
             shouldVirtualize={useVirtual}
-            virtualStart={virtualItem?.start}
             focusedIndex={focusedIndex}
             isSelected={isRowSelected?.(rowData, rowIndex)}
             onRowClick={onRowClick}

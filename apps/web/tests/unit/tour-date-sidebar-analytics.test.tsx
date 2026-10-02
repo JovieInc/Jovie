@@ -76,7 +76,7 @@ vi.mock('@/components/molecules/drawer', () => ({
     children: React.ReactNode;
     className?: string;
   }) => <div data-testid='surface-card'>{children}</div>,
-  EntityHeaderCard: ({
+  EntityHeader: ({
     title,
     subtitle,
     meta,
@@ -131,8 +131,8 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerCardActionBar: () => <div data-testid='drawer-card-action-bar' />,
 }));
 
-vi.mock('@/components/molecules/drawer/EntityHeaderCard', () => ({
-  EntityHeaderCard: ({
+vi.mock('@/components/molecules/drawer/EntityHeader', () => ({
+  EntityHeader: ({
     title,
     subtitle,
     meta,
@@ -269,6 +269,21 @@ describe('TourDateSidebar analytics section', () => {
       'true'
     );
     expect(screen.getByTestId('drawer-card-action-bar')).toBeInTheDocument();
+  });
+
+  it('renders the shared DatePicker wired to the tour start date', () => {
+    mockUseTourDateAnalyticsQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: false,
+    });
+
+    renderSidebar();
+
+    const dateTrigger = screen.getByLabelText('Date');
+    expect(dateTrigger.tagName).toBe('BUTTON');
+    expect(dateTrigger).toHaveAttribute('type', 'button');
+    expect(dateTrigger).toHaveTextContent(/\w{3} \d{1,2}, \d{4}/);
   });
 
   it('shows error message when analytics fail to load', () => {

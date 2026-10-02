@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx
+
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import type { ReactNode } from 'react';
@@ -36,6 +38,7 @@ import {
 import { track } from '@/lib/analytics';
 import {
   ONBOARDING_WIDGET_EVENTS,
+  WIDGET_COMPLETION_ACTIONS,
   widgetEventDisplayText,
 } from '@/lib/chat/onboarding-script/widget-events';
 import { useAppFlag } from '@/lib/flags/client';
@@ -71,6 +74,8 @@ import {
   getOnboardingErrorMessage,
   getToolName,
   getToolParts,
+  hasToolOutputAction,
+  hasWidgetEvent,
   isArtistConfirmedOutput,
   isArtistPickerOutput,
   isCheckoutPayload,
@@ -112,6 +117,12 @@ interface OnboardingChatProps {
   ) => void;
   /** Validated URL-provided context for an automatic first message. */
   readonly starterHandoff?: StartEntryHandoff | null;
+  /**
+   * Reserves extra top clearance inside the scroll region while a floating
+   * header control (the anonymous "Sign in" link) overlays the top-right
+   * corner, so the first right-aligned user bubble never renders beneath it.
+   */
+  readonly headerOverlay?: boolean;
 }
 
 class OnboardingChatTransport extends DefaultChatTransport<UIMessage> {
@@ -182,6 +193,8 @@ type OnboardingToolRendererArgs = {
   readonly onNoneOfTheseArtists: () => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
+  readonly handleStepDone: boolean;
+  readonly socialStepDone: boolean;
 };
 
 type OnboardingToolRenderer = (
@@ -237,9 +250,17 @@ const renderCheckHandle: OnboardingToolRenderer = ({
   part,
   key,
   isBusy,
+  handleStepDone,
 }) => {
   const output = part.output;
   if (!(isHandleCheckOutput(output) || output === undefined)) {
+    return null;
+  }
+
+  // Once the handle step is complete, only the `handle_confirmed` output
+  // renders (as a compact status) — stale `check_handle` parts collapse so
+  // no interactive card survives a completed step.
+  if (handleStepDone && output?.action !== 'handle_confirmed') {
     return null;
   }
 
@@ -260,9 +281,14 @@ const renderProposeSocialLink: OnboardingToolRenderer = ({
   key,
   isBusy,
   onAttachAccount,
+  socialStepDone,
 }) => {
   const output = part.output;
   if (!(isSocialLinkOutput(output) || output === undefined)) {
+    return null;
+  }
+
+  if (socialStepDone && output?.action !== 'social_attached') {
     return null;
   }
 
@@ -323,6 +349,8 @@ function renderOnboardingTools({
   onNoneOfTheseArtists,
   onSelectArtist,
   selectedArtistId,
+  handleStepDone,
+  socialStepDone,
 }: {
   readonly messageId: string;
   readonly toolParts: readonly ToolPart[];
@@ -334,6 +362,8 @@ function renderOnboardingTools({
   readonly onNoneOfTheseArtists: () => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
+  readonly handleStepDone: boolean;
+  readonly socialStepDone: boolean;
 }) {
   const genericParts: ToolPart[] = [];
   const cards: ReactNode[] = [];
@@ -362,6 +392,8 @@ function renderOnboardingTools({
         onNoneOfTheseArtists,
         onSelectArtist,
         selectedArtistId,
+        handleStepDone,
+        socialStepDone,
       });
       if (card) {
         cards.push(card);
@@ -413,6 +445,19 @@ function OnboardingMessageList({
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
 }) {
+  const handleStepDone =
+    hasToolOutputAction(
+      displayMessages,
+      WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED
+    ) ||
+    hasWidgetEvent(displayMessages, ONBOARDING_WIDGET_EVENTS.HANDLE_CONFIRMED);
+  const socialStepDone =
+    hasToolOutputAction(
+      displayMessages,
+      WIDGET_COMPLETION_ACTIONS.SOCIAL_ATTACHED
+    ) ||
+    hasWidgetEvent(displayMessages, ONBOARDING_WIDGET_EVENTS.SOCIAL_ATTACHED);
+
   return (
     <div className='flex flex-col pb-4'>
       {displayMessages.map(message => {
@@ -451,6 +496,8 @@ function OnboardingMessageList({
                   onNoneOfTheseArtists,
                   onSelectArtist,
                   selectedArtistId,
+                  handleStepDone,
+                  socialStepDone,
                 })
               : null}
           </div>
@@ -519,10 +566,6 @@ function getOnboardingComposerPlaceholder(
   return hasConversationStarted
     ? 'Reply to Jovie…'
     : 'Artist, release, or link...';
-}
-
-function getSendLocalError(chatError: ChatError | null) {
-  return chatError?.errorCode === 'TURNSTILE_REQUIRED' ? null : chatError;
 }
 
 function OnboardingFlowStatus({
@@ -646,6 +689,7 @@ function OnboardingMessageRegion({
 }
 
 export function OnboardingChat({
+  headerOverlay = false,
   intentId,
   onConversationActivity,
   onProfileBuilderChange,
@@ -687,6 +731,7 @@ export function OnboardingChat({
     hasInitialStarterPrompt ? initialStarterPrompt : null
   );
   const wasAwaitingTurnstileRetryRef = useRef(false);
+  const pendingVerifiedSubmitRef = useRef(false);
   const [localAutomationBypass, setLocalAutomationBypass] = useState<
     boolean | null
   >(null);
@@ -780,7 +825,10 @@ export function OnboardingChat({
       if (!text || isBusy || localAutomationBypass === null) return;
       if (isAwaitingFirstToken) {
         setVerificationRequested(true);
-        onTurnstileRequired?.('Verify you are human to send');
+        onTurnstileRequired?.('One quick check before we send');
+        pendingVerifiedSubmitRef.current = true;
+        pendingStarterPromptRef.current = null;
+        hasAutoSubmittedStarterPromptRef.current = true;
         return;
       }
       lastAttemptedMessageRef.current = text;
@@ -931,7 +979,7 @@ export function OnboardingChat({
       if (!hasRequestedStarterVerificationRef.current) {
         hasRequestedStarterVerificationRef.current = true;
         setVerificationRequested(true);
-        onTurnstileRequired?.('Verify you are human to send');
+        onTurnstileRequired?.('One quick check before we send');
       }
       return;
     }
@@ -953,6 +1001,15 @@ export function OnboardingChat({
     completedUserTurnsRef.current = 0;
     hasTrackedChatCompletedRef.current = false;
   }, [messages.length]);
+
+  useEffect(() => {
+    if (!pendingVerifiedSubmitRef.current) return;
+    if (isAwaitingFirstToken || isBusy || localAutomationBypass === null) {
+      return;
+    }
+    pendingVerifiedSubmitRef.current = false;
+    submitText(latestInputRef.current);
+  }, [isAwaitingFirstToken, isBusy, localAutomationBypass, submitText]);
 
   useEffect(() => {
     if (isAwaitingFirstToken) {
@@ -1055,7 +1112,7 @@ export function OnboardingChat({
     onAddSkill: chipTray.addSkill,
     onAddEntity: chipTray.addEntity,
   } as const;
-  const sendLocalError = getSendLocalError(chatError);
+  const sendLocalError = chatError;
   const onboardingComposerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
       {sendLocalError ? (
@@ -1081,7 +1138,10 @@ export function OnboardingChat({
       <div
         ref={scrollContainerRef}
         onScroll={onScroll}
-        className='relative flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-8'
+        className={cn(
+          'relative flex-1 overflow-y-auto px-4 pb-5 sm:px-6 lg:px-8',
+          headerOverlay ? 'pt-16' : 'pt-5'
+        )}
         aria-live='polite'
       >
         <div

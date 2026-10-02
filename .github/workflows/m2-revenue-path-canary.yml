@@ -5,7 +5,7 @@ name: M2 Revenue-Path Canary
 # necessary-trust-boundary: GitHub-hosted production-liveness clock probes signed-out claim, $199 Pro checkout, and activation on prod without Stripe credentials or session creation; Slack and Linear secrets stay in the hosted job.
 # removal-trigger: Remove this hop when Production Controller or a first-party checkout monitor emits the same four-step receipt and files Linear plus Slack on red without a separate scheduled workflow.
 #
-# JOV-6439: daily + deploy-hook money-path probe.
+# JOV-6439: daily and manually callable money-path probe.
 # Distinct from Canary Health Gate (generic uptime) and the auth/public-profile
 # canaries. Signed-out → claim → $199 Pro checkout → activation.
 # Does not create Stripe sessions, identities, or paid subscriptions.
@@ -34,11 +34,6 @@ on:
         required: false
       LINEAR_API_KEY:
         required: false
-  workflow_run:
-    workflows: [Production Controller]
-    types: [completed]
-    branches: [main]
-
 permissions:
   contents: read
 
@@ -49,7 +44,6 @@ concurrency:
 jobs:
   m2-revenue-path:
     name: Signed-out claim $199 checkout activation
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -81,12 +75,53 @@ jobs:
             --receipt "$M2_CANARY_RECEIPT_PATH"
           echo "receipt_path=$M2_CANARY_RECEIPT_PATH" >> "$GITHUB_OUTPUT"
 
+      # JOV-6920: the canonical artist profile is part of the revenue path.
+      # Read-only against production (no credentials); binds the deployed
+      # release SHA. A red certificate joins the M2 receipt so the existing
+      # fingerprinted Linear intake files it.
+      - name: Canonical artist profile certificate
+        id: profile
+        if: ${{ always() && (inputs.base_url || 'https://jov.ie') == 'https://jov.ie' }}
+        env:
+          M2_CANARY_RECEIPT_PATH: ${{ runner.temp }}/m2-revenue-path-receipt.json
+          PROFILE_CERT_DIR: ${{ runner.temp }}/canonical-profile-certificate
+        run: |
+          set -uo pipefail
+          result="$PROFILE_CERT_DIR.json"
+          pnpm --filter=@jovie/web exec tsx scripts/certify-artist-profile.ts --output "$PROFILE_CERT_DIR" > "$result"
+          status=$?
+          cat "$result"
+          if [ "$status" -ne 0 ]; then
+            node -e '
+              const fs = require("node:fs");
+              const [receiptPath, resultPath] = process.argv.slice(1);
+              let result = {};
+              try { result = JSON.parse(fs.readFileSync(resultPath, "utf8")); } catch {}
+              const failing = [
+                ...(result.checks ?? []).filter(c => c.status !== "pass").map(c => "check " + c.id),
+                ...(result.brokenInternalLinks ?? []).map(l => "link " + l.url + " " + l.status),
+              ];
+              let receipt = { steps: [] };
+              try { receipt = JSON.parse(fs.readFileSync(receiptPath, "utf8")); } catch {}
+              receipt.steps = [...(receipt.steps ?? []), {
+                name: "canonical-profile-certificate",
+                ok: false,
+                detail: failing.join("; ") || "certificate failed (see run log)",
+              }];
+              fs.writeFileSync(receiptPath, JSON.stringify(receipt));
+            ' "$M2_CANARY_RECEIPT_PATH" "$result"
+            exit 1
+          fi
+
       - name: Upload receipt
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: m2-revenue-path-receipt
-          path: ${{ runner.temp }}/m2-revenue-path-receipt.json
+          path: |
+            ${{ runner.temp }}/m2-revenue-path-receipt.json
+            ${{ runner.temp }}/canonical-profile-certificate
+            ${{ runner.temp }}/canonical-profile-certificate.json
           if-no-files-found: warn
           retention-days: 30
 

@@ -673,6 +673,16 @@
   --color-skeleton-shimmer: rgba(255, 255, 255, 0.11);
 }
 
+/* A selected row mode owns the same geometry during loading and after data arrives. */
+[data-table-row-mode] tbody > .system-b-table-row-height {
+  height: var(--table-row-height);
+}
+
+[data-table-row-mode] [data-table-cell-content="stable"] {
+  height: var(--table-cell-content-height);
+  max-height: var(--table-cell-content-height);
+}
+
 :where(.system-b-table-row-height) {
   height: 40px;
 }
@@ -6430,4 +6440,16 @@
 [data-empty-chat-region="true"]:has([data-chat-composer-overlay="true"])
 [data-empty-chat-suggestions="true"] {
   visibility: hidden;
+}
+
+/* Founder-review registries keep table geometry reserved while the canonical
+   app-shell right rail opens in flow beside them. */
+:where(.system-b-founder-review-table-shell) {
+  height: min(35rem, calc(100vh - 19rem));
+  min-height: 28rem;
+}
+
+:where(.system-b-founder-review-table) {
+  width: 100%;
+  table-layout: fixed;
 }

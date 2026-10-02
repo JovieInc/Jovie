@@ -23,6 +23,10 @@
   --homepage-identity-rule: var(--color-border-subtle);
 }
 
+.home-viewport [data-homepage-section-heading] {
+  scroll-margin-top: var(--homepage-sticky-nav-clearance);
+}
+
 /* ── Hero ─────────────────────────────────────────────────────────────── */
 
 .homepage-identity-hero {
@@ -103,20 +107,36 @@
     );
 }
 
-.homepage-identity-hero__texture {
+/* One Ion light enters from the lower right, as if its source sat just off
+   frame, and falls off optically into the page ground (Pen My0zu hero,
+   JOV-6914). The header band and centre stay dark for the copy; the last
+   layer fades the seam into the next section. */
+.homepage-identity-hero__light {
   position: absolute;
   z-index: -2;
-  /* Overscan covers the ambient drift so no edge is ever exposed. */
-  inset: calc(-1 * var(--space-3));
-  /* Offscreen subtrees skip rendering, which pauses the drift (CSS only). */
-  content-visibility: auto;
-  animation: homepage-identity-texture-drift 20s ease-in-out infinite alternate;
-  will-change: transform;
-}
-
-.homepage-identity-hero__texture-image {
-  object-fit: cover;
-  object-position: 100% 50%;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      transparent 72%,
+      var(--homepage-identity-hero-ground) 100%
+    ),
+    radial-gradient(
+      ellipse 60% 55% at 72% 102%,
+      color-mix(in oklab, var(--color-accent-blue) 16%, transparent),
+      transparent 100%
+    ),
+    radial-gradient(
+      ellipse 80% 58% at 98% 104%,
+      color-mix(in oklab, var(--color-accent-blue) 34%, transparent),
+      transparent 100%
+    ),
+    radial-gradient(
+      ellipse 110% 75% at 112% 118%,
+      color-mix(in oklab, var(--color-accent-blue) 55%, transparent),
+      transparent 100%
+    );
 }
 
 /* Narrow viewports put the bright perforation behind the copy, so the
@@ -133,32 +153,6 @@
         100%
     );
   }
-
-  .homepage-identity-hero__texture-image {
-    object-position: 72% 50%;
-  }
-}
-
-@keyframes homepage-identity-texture-drift {
-  from {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-
-  to {
-    transform: translate3d(
-        calc(-1 * var(--space-3)),
-        calc(-1 * var(--space-2)),
-        0
-      )
-      scale(1.02);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .homepage-identity-hero__texture {
-    animation: none;
-    will-change: auto;
-  }
 }
 
 .homepage-identity-hero__inner {
@@ -169,9 +163,10 @@
   text-align: center;
 }
 
-.homepage-identity-hero__eyebrow,
 .homepage-identity-specimen__handle,
-.homepage-identity-specimen__caption {
+.homepage-identity-specimen__caption,
+.homepage-identity-structure__label,
+.homepage-identity-structure__handle {
   margin: 0;
   font-family: var(--font-mono);
   font-size: var(--text-2xs, 0.6875rem);
@@ -180,14 +175,10 @@
   line-height: 1.4;
 }
 
-.homepage-identity-hero__eyebrow {
-  color: var(--homepage-identity-hero-ink-2);
-  text-transform: uppercase;
-}
-
 .homepage-identity-hero__headline {
-  max-width: 11ch;
-  margin: var(--space-6) 0 0;
+  /* "Your living identity / on the internet." balances to two lines. */
+  max-width: 20ch;
+  margin: 0;
   color: var(--homepage-identity-hero-ink);
   font-family: var(--homepage-identity-display);
   font-size: clamp(2.25rem, 4.6vw, 4rem);
@@ -328,6 +319,327 @@
 }
 
 /* The one Request access pill stays compact (Pen), not the legacy 240px face. */
-.homepage-identity-hero .homepage-request-access {
+.homepage-identity-hero .homepage-request-access,
+.homepage-identity-close .homepage-request-access {
   width: fit-content;
+}
+
+/* ── Editorial sections ───────────────────────────────────────────────── */
+
+.homepage-identity-section {
+  display: grid;
+  justify-items: center;
+  width: 100%;
+  padding-block: clamp(var(--space-12), 5vw, var(--space-16));
+  color: var(--color-text-primary-token);
+}
+
+/* Consecutive chapters share one gap, not two stacked paddings. */
+.homepage-identity-section + .homepage-identity-section {
+  padding-top: 0;
+}
+
+.homepage-identity-section__inner {
+  width: var(--homepage-identity-width);
+}
+
+.homepage-identity-section__header,
+.homepage-identity-presence__step {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+}
+
+.homepage-identity-section__eyebrow {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-2xs, 0.6875rem);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.homepage-identity-section__headline {
+  margin: 0;
+  font-family: var(--homepage-identity-display);
+  font-size: clamp(2rem, 3.9vw, 3.5rem);
+  font-weight: var(--font-weight-normal, 400);
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.homepage-identity-section__body {
+  max-width: 26rem;
+  margin: 0;
+  color: var(--color-text-secondary-token);
+  font-size: clamp(1rem, 1.2vw, 1.125rem);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+/* Connected Pen narrow instances use the 24px lead role so the complete
+   presence phrase fits at 320px without an orphaned final word. */
+@media (max-width: 767px) {
+  .homepage-identity-section--presence .homepage-identity-section__headline {
+    font-size: 1.5rem;
+  }
+}
+
+.homepage-identity-presence__material {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: 5 / 2;
+  margin-top: clamp(var(--space-6), 2.4vw, var(--space-8));
+  background: var(--system-b-cinematic-black);
+}
+
+.homepage-identity-presence__material-image {
+  object-fit: cover;
+  object-position: 100% 45%;
+}
+
+.homepage-identity-presence__step {
+  margin-top: clamp(var(--space-8), 3.4vw, var(--space-12));
+}
+
+.homepage-identity-presence__step-headline {
+  margin: 0;
+  font-family: var(--homepage-identity-display);
+  font-size: clamp(1.5rem, 2.2vw, 2rem);
+  font-weight: var(--font-weight-normal, 400);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.homepage-identity-presence__step .homepage-identity-section__body {
+  max-width: 32rem;
+}
+
+/* ── Structure anatomy ───────────────────────────────────────────────── */
+
+.homepage-identity-structure__anatomy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-10);
+  margin-top: clamp(var(--space-8), 3vw, var(--space-10));
+}
+
+.homepage-identity-structure__column {
+  min-width: 0;
+  padding-top: var(--space-5);
+  border-top: var(--space-px, 1px) solid var(--homepage-identity-rule);
+}
+
+.homepage-identity-structure__label {
+  color: var(--color-text-tertiary-token);
+  text-transform: uppercase;
+}
+
+.homepage-identity-structure__avatar {
+  display: grid;
+  place-items: center;
+  width: var(--space-12);
+  height: var(--space-12);
+  margin-top: var(--space-4);
+  border: var(--space-px, 1px) solid var(--homepage-identity-rule);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-surface-1);
+  color: var(--color-text-primary-token);
+}
+
+.homepage-identity-structure__title {
+  margin: var(--space-6) 0 0;
+  font-family: var(--homepage-identity-display);
+  font-size: clamp(1.5rem, 2.2vw, 2rem);
+  font-weight: var(--font-weight-normal, 400);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.homepage-identity-structure__handle {
+  margin-top: var(--space-4);
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-xs, 0.75rem);
+}
+
+.homepage-identity-structure__list {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.homepage-identity-structure__item {
+  display: grid;
+  grid-template-columns: var(--space-5) minmax(5.5rem, 7rem) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  min-height: calc(var(--space-12) + var(--space-2));
+  border-bottom: var(--space-px, 1px) solid var(--homepage-identity-rule);
+}
+
+.homepage-identity-structure__icon {
+  color: var(--color-text-secondary-token);
+}
+
+.homepage-identity-structure__item-title {
+  margin: 0;
+  color: var(--color-text-primary-token);
+  font-size: var(--text-base, 1rem);
+  font-weight: var(--font-weight-normal, 400);
+  line-height: 1.3;
+}
+
+.homepage-identity-structure__item-detail {
+  margin: 0;
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-sm, 0.875rem);
+  line-height: 1.4;
+}
+
+/* ── Close ────────────────────────────────────────────────────────────── */
+
+.homepage-identity-close {
+  display: grid;
+  justify-items: center;
+  width: 100%;
+  margin-top: clamp(var(--space-8), 3vw, var(--space-12));
+  padding-block: clamp(var(--space-12), 5vw, var(--space-16));
+  border-top: var(--space-px, 1px) solid var(--homepage-identity-rule);
+  text-align: center;
+}
+
+.homepage-identity-close__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: var(--homepage-identity-width);
+}
+
+.homepage-identity-close__headline {
+  margin: 0;
+  color: var(--color-text-primary-token);
+  font-family: var(--homepage-identity-display);
+  font-size: clamp(1.75rem, 2.8vw, 2.5rem);
+  font-weight: var(--font-weight-normal, 400);
+  letter-spacing: -0.025em;
+  line-height: 1.12;
+  text-wrap: balance;
+}
+
+.homepage-identity-close__actions {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-6);
+}
+
+/* ── Breakpoints ──────────────────────────────────────────────────────── */
+
+@media (min-width: 768px) {
+  .homepage-identity-presence__material {
+    aspect-ratio: 5 / 1;
+  }
+}
+
+/* Desktop: every editorial row sits on the shared 12-column grid with
+   explicit spans. Reading widths limit measure; they never position a
+   column (no auto margins). */
+@media (min-width: 1024px) {
+  .homepage-identity-section__header,
+  .homepage-identity-presence__step,
+  .homepage-identity-structure__anatomy {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: var(--space-6);
+  }
+
+  .homepage-identity-section__header {
+    align-items: end;
+  }
+
+  .homepage-identity-section__header > :first-child {
+    grid-column: 1 / span 7;
+  }
+
+  .homepage-identity-section__header > .homepage-identity-section__body {
+    grid-column: 9 / span 4;
+    padding-bottom: var(--space-2);
+  }
+
+  .homepage-identity-presence__step {
+    align-items: start;
+  }
+
+  .homepage-identity-presence__step > :first-child {
+    grid-column: 1 / span 6;
+  }
+
+  .homepage-identity-presence__step > .homepage-identity-section__body {
+    grid-column: 7 / span 6;
+  }
+
+  .homepage-identity-presence__material {
+    aspect-ratio: 9 / 1;
+  }
+
+  .homepage-identity-structure__anatomy > :first-child {
+    grid-column: 1 / span 4;
+  }
+
+  .homepage-identity-structure__anatomy > :last-child {
+    grid-column: 5 / span 8;
+  }
+}
+
+/* Real first-party proof (JOV-6946): Tim White's live profile rises out of
+   the Ion light under the name search. */
+.homepage-identity-hero__proof {
+  margin: clamp(var(--space-10), 5vw, var(--space-12)) 0 0;
+}
+
+.homepage-identity-hero__device {
+  width: min(70vw, 18rem);
+}
+
+/* ── Claim hero: identity + link claim (Pen STAGING Cyuz2 / xm2iz, 2026-09-28).
+   The rules above for .homepage-identity-hero* are retired with the old hero
+   and removed in the follow-up cleanup PR. ─────────────────────────────── */
+
+/* This hero's split shell breaks into two columns at md (768), a whole
+   breakpoint earlier than the shared marketing H1 ramp expects (that ramp
+   steps up to its medium size at the same 768 boundary, sized for a
+   full-width single column). In the half-width copy column here, "Be
+   understood." doesn't fit on one line at the medium size, wraps to a
+   third line, and the shared two-line clamp truncates it to "Be...". Hold
+   the headline at its mobile size through the medium window instead — the
+   same size step the shared ramp itself uses below 768, so this isn't a
+   new size, just this hero keeping it one window longer. The 1280+ step
+   (a wide-enough column again) is untouched (Pen x4j9f, 768 split). This
+   file stays outside the deprecated --linear-* namespace (see the
+   "tokenized" test below), so the value is written out rather than
+   aliased to that ramp's own token. */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .homepage-claim-hero .marketing-h1-linear {
+    font-size: 2.375rem;
+  }
+}
+
+.homepage-claim-hero .product-claim-card__status {
+  font-size: var(--text-2xs, 0.6875rem);
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.homepage-claim-hero .product-claim-card__path {
+  font-family: var(--font-display);
+  font-size: clamp(2.25rem, 4.6vw, 3.25rem);
+  font-weight: 510;
+  letter-spacing: -0.03em;
+  line-height: 1.02;
+}
+
+.homepage-claim-hero .product-claim-card__handle-input::placeholder {
+  color: var(--color-text-tertiary-token);
 }

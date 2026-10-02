@@ -24,6 +24,8 @@ export interface MarketingPosterHeroProps {
   readonly seam: ReactNode;
   readonly trackedLinkComponent?: ElementType;
   readonly headingId?: string;
+  readonly sectionVariant?: string;
+  readonly sectionOwner?: string;
 }
 
 /**
@@ -41,6 +43,8 @@ export function MarketingPosterHero({
   seam,
   trackedLinkComponent = Link,
   headingId = 'homepage-poster-hero-heading',
+  sectionVariant,
+  sectionOwner,
 }: MarketingPosterHeroProps) {
   const LinkComponent = trackedLinkComponent;
   const analyticsPropsFor = (cta: MarketingPosterHeroCta) =>
@@ -56,7 +60,9 @@ export function MarketingPosterHero({
       variant='unstyled'
       className='homepage-poster-hero'
       headingId={headingId}
-      testId='homepage-hero-shell'
+      testId={sectionVariant ? 'marketing-section-hero' : 'homepage-hero-shell'}
+      sectionVariant={sectionVariant}
+      sectionOwner={sectionOwner}
     >
       <div className='homepage-poster-hero__copy'>
         <h1

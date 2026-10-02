@@ -59,7 +59,7 @@ export function getReleaseDayNotificationSubject(
   data: ReleaseDayNotificationData
 ): string {
   if (data.campaignName) {
-    return `${data.artistName} — ${data.campaignName}`;
+    return `${data.artistName}: ${data.campaignName}`;
   }
   return `${data.artistName} just dropped new music`;
 }

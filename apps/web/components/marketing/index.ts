@@ -9,7 +9,6 @@ export { ArtistProfileLandingPage } from './artist-profile/ArtistProfileLandingP
 export { ArtistProfileLandingRoute } from './artist-profile/ArtistProfileLandingRoute';
 export { ArtistProfileMonetizationSection } from './artist-profile/ArtistProfileMonetizationSection';
 export { ArtistProfileOutcomesCarousel } from './artist-profile/ArtistProfileOutcomesCarousel';
-export { ArtistProfilePayFlowVideoSection } from './artist-profile/ArtistProfilePayFlowVideoSection';
 export { ArtistProfileReactivationSection } from './artist-profile/ArtistProfileReactivationSection';
 export { ArtistProfileSocialProof } from './artist-profile/ArtistProfileSocialProof';
 export { ArtistProfileSpecWall } from './artist-profile/ArtistProfileSpecWall';
@@ -29,6 +28,8 @@ export { MarketingContainer } from './MarketingContainer';
 export type { MarketingContentShellProps } from './MarketingContentShell';
 export { MarketingContentShell } from './MarketingContentShell';
 export { MarketingCtaPendingLabel } from './MarketingCtaPendingLabel';
+export type { MarketingEditorialBackgroundProps } from './MarketingEditorialBackground';
+export { MarketingEditorialBackground } from './MarketingEditorialBackground';
 export type { MarketingEditorialHeroPhotoProps } from './MarketingEditorialHeroPhoto';
 export { MarketingEditorialHeroPhoto } from './MarketingEditorialHeroPhoto';
 export type { MarketingElectricSeamProps } from './MarketingElectricSeam';
