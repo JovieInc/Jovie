@@ -12,7 +12,9 @@ const {
   const limitMock = vi.fn();
   const whereMock = vi.fn(() => ({ limit: limitMock }));
   const fromMock = vi.fn(() => ({ where: whereMock }));
-  const selectMock = vi.fn(() => ({ from: fromMock }));
+  const selectMock = vi.fn((_selection: Record<string, unknown>) => ({
+    from: fromMock,
+  }));
 
   return {
     doesColumnExistMock: vi.fn(),
