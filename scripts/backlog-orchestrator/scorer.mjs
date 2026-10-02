@@ -120,6 +120,67 @@ export function assessPreventionLeverage(candidate, queue = []) {
 }
 
 /**
+ * JOV-7423: impose only bounded, evidence-backed cluster dependencies. Broad
+ * area similarity remains a scoring hint; it cannot suppress a leaf dispatch.
+ * Recomputed from the live eligible queue on every admission, so new matching
+ * failures inherit the guard without a second queue or evidence store.
+ */
+export function routePreventionCluster(candidates, ranked) {
+  const emergency = candidate =>
+    candidate?.issue?.priority === 1 ||
+    candidateLabelNames(candidate).some(label =>
+      /^(?:production-red|launch-blocker|incident)$/i.test(label)
+    );
+  const routes = [];
+  for (const guard of candidates) {
+    if (!['trivial', 'small'].includes(guard.effort) || !guard.prevention)
+      continue;
+    const related = new Set(
+      (guard.relatedIssues ?? []).map(relation => relation.identifier)
+    );
+    const terms = defectClassTerms(
+      `${guard.title ?? ''} ${guard.issue?.description ?? ''}`
+    );
+    const leaves = candidates.filter(leaf => {
+      if (
+        leaf.identifier === guard.identifier ||
+        leaf.prevention ||
+        emergency(leaf)
+      )
+        return false;
+      if (!guard.prevention.affectedIssues.includes(leaf.identifier))
+        return false;
+      if (related.has(leaf.identifier)) return true;
+      const shared = defectClassTerms(
+        `${leaf.title ?? ''} ${leaf.issue?.description ?? ''}`
+      );
+      return [...terms].filter(term => shared.has(term)).length >= 2;
+    });
+    if (leaves.length < PREVENTION_MIN_AFFECTED) continue;
+    routes.push({
+      guard: guard.identifier,
+      affectedIssues: leaves.map(leaf => leaf.identifier).sort(),
+      duplicationAvoided: leaves.length - 1,
+      reason: 'bounded shared guard before matching duplicate leaf dispatch',
+    });
+  }
+  // Preserve the economic/score ordering within each tier. Never promote an
+  // unrelated guard over the current winner, or delay urgent revenue repair.
+  const winner = ranked[0];
+  if (!winner || emergency(winner)) return { ranked, routes, promoted: null };
+  const route = routes.find(item =>
+    item.affectedIssues.includes(winner.identifier)
+  );
+  if (!route) return { ranked, routes, promoted: null };
+  const guard = ranked.find(item => item.identifier === route.guard);
+  return {
+    ranked: [guard, ...ranked.filter(item => item !== guard)],
+    routes,
+    promoted: guard.identifier,
+  };
+}
+
+/**
  * Bounded score contribution of a prevention assessment. Evidence-gated, so a
  * noisy or mislabeled invariant yields zero adjustment.
  */
@@ -347,13 +408,23 @@ export function rankQueueCandidates(
       right.candidate.score - left.candidate.score ||
       left.candidate.identifier.localeCompare(right.candidate.identifier)
   );
-  const ranked = economic
+  const baselineRanked = economic
     ? records.toSorted(
         (left, right) =>
           right.expectedNetValue - left.expectedNetValue ||
           left.candidate.identifier.localeCompare(right.candidate.identifier)
       )
     : legacy;
+  const cluster = routePreventionCluster(
+    candidates,
+    baselineRanked.map(record => record.candidate)
+  );
+  const byId = new Map(
+    records.map(record => [record.candidate.identifier, record])
+  );
+  const ranked = cluster.ranked.map(candidate =>
+    byId.get(candidate.identifier)
+  );
   const selected = ranked[0] ?? null;
   const displaced = ranked[1] ?? null;
   const missingSourceContracts = [
@@ -389,7 +460,9 @@ export function rankQueueCandidates(
               preventionScoreAdjustment(left.candidate.prevention)) ||
           left.candidate.identifier.localeCompare(right.candidate.identifier)
       );
-  const orderingReasons = [];
+  const orderingReasons = cluster.promoted
+    ? ['bounded-prevention-cluster']
+    : [];
   if (
     selected &&
     withoutPrevention[0] &&
@@ -436,6 +509,7 @@ export function rankQueueCandidates(
       Boolean(selected && legacy[0]) &&
       selected.candidate.identifier !== legacy[0].candidate.identifier,
     orderingReasons,
+    preventionRoutes: cluster.routes,
     confidence,
     missingSourceContracts,
     rankings: ranked.map((record, index) => ({

@@ -70,6 +70,8 @@ export type CertificationBlockerCode =
   | 'source_path_missing'
   | 'canonical_reference_missing'
   | 'canonical_reference_failed'
+  | 'pen_round_trip_missing'
+  | 'pen_round_trip_failed'
   | 'invariant_evaluation_missing'
   | 'invariant_evaluation_failed'
   | 'tests_coverage_missing'
@@ -169,6 +171,112 @@ export interface CertificationSourceReceipt {
   readonly digest?: string | null;
 }
 
+/** Exact approved editable authority and the rendered state handed to implementers. */
+export interface ApprovedPenReference {
+  readonly artifact: string;
+  readonly frameId: string;
+  readonly revision: string;
+  readonly penDigest: string;
+  readonly renderedRef: string;
+  readonly renderedDigest: string;
+  readonly route: string;
+  readonly fixture: string;
+  readonly viewport: string;
+  readonly theme: string;
+  readonly interactionState: string;
+  readonly designSystemRevision: string;
+}
+
+export interface PenRoundTripComparison {
+  readonly referenceReceiptId: string;
+  readonly reference: ApprovedPenReference;
+  readonly deploymentReceiptId: string;
+  readonly productionRenderRef: string;
+  readonly productionRenderDigest: string;
+  readonly diffRef: string;
+  readonly diffDigest: string;
+  readonly changedPixels: number;
+  readonly geometryPassed: boolean;
+  readonly tokensPassed: boolean;
+  readonly unexplainedMaterialDiffs: number;
+  /** Every nonzero raster residual needs a scoped tolerance and visual judgment. */
+  readonly residuals: readonly {
+    readonly maskOrTolerance: string;
+    readonly rationale: string;
+    readonly judgmentReceiptId: string;
+  }[];
+}
+
+export function isApprovedPenReference(
+  value: unknown
+): value is ApprovedPenReference {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    [
+      'artifact',
+      'frameId',
+      'revision',
+      'penDigest',
+      'renderedRef',
+      'renderedDigest',
+      'route',
+      'fixture',
+      'viewport',
+      'theme',
+      'interactionState',
+      'designSystemRevision',
+    ].every(
+      key =>
+        typeof record[key] === 'string' &&
+        (record[key] as string).trim().length > 0
+    ) &&
+    /^sha256:[a-f0-9]{64}$/.test(String(record.penDigest)) &&
+    /^sha256:[a-f0-9]{64}$/.test(String(record.renderedDigest))
+  );
+}
+
+export function isPenRoundTripComparison(
+  value: unknown
+): value is PenRoundTripComparison {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    isApprovedPenReference(record.reference) &&
+    [
+      'referenceReceiptId',
+      'deploymentReceiptId',
+      'productionRenderRef',
+      'productionRenderDigest',
+      'diffRef',
+      'diffDigest',
+    ].every(
+      key =>
+        typeof record[key] === 'string' &&
+        (record[key] as string).trim().length > 0
+    ) &&
+    /^sha256:[a-f0-9]{64}$/.test(String(record.productionRenderDigest)) &&
+    /^sha256:[a-f0-9]{64}$/.test(String(record.diffDigest)) &&
+    Number.isSafeInteger(record.changedPixels) &&
+    Number(record.changedPixels) >= 0 &&
+    typeof record.geometryPassed === 'boolean' &&
+    typeof record.tokensPassed === 'boolean' &&
+    Number.isSafeInteger(record.unexplainedMaterialDiffs) &&
+    Number(record.unexplainedMaterialDiffs) >= 0 &&
+    Array.isArray(record.residuals) &&
+    record.residuals.every(
+      residual =>
+        residual &&
+        typeof residual === 'object' &&
+        !Array.isArray(residual) &&
+        ['maskOrTolerance', 'rationale', 'judgmentReceiptId'].every(
+          key =>
+            typeof residual[key] === 'string' && residual[key].trim().length > 0
+        )
+    )
+  );
+}
+
 export interface CertificationEvidenceReceipt {
   readonly id: string;
   readonly tier: CertificationEvidenceTier;
@@ -177,6 +285,12 @@ export interface CertificationEvidenceReceipt {
   readonly ref: string;
   readonly digest: string | null;
   readonly summary: string;
+  readonly approvedPenReference?: ApprovedPenReference;
+  readonly penRoundTrip?: PenRoundTripComparison;
+  readonly penResidualJudgment?: Pick<
+    PenRoundTripComparison,
+    'referenceReceiptId' | 'reference' | 'productionRenderDigest' | 'diffDigest'
+  >;
 }
 
 export interface CertificationRequiredVariant {
@@ -376,6 +490,27 @@ function receiptDigestInput(
   receipt: CertificationEvidenceReceipt
 ): StableObject {
   return {
+    ...(receipt.approvedPenReference
+      ? {
+          approvedPenReference: JSON.parse(
+            JSON.stringify(receipt.approvedPenReference)
+          ) as StableValue,
+        }
+      : {}),
+    ...(receipt.penRoundTrip
+      ? {
+          penRoundTrip: JSON.parse(
+            JSON.stringify(receipt.penRoundTrip)
+          ) as StableValue,
+        }
+      : {}),
+    ...(receipt.penResidualJudgment
+      ? {
+          penResidualJudgment: JSON.parse(
+            JSON.stringify(receipt.penResidualJudgment)
+          ) as StableValue,
+        }
+      : {}),
     digest: receipt.digest,
     id: receipt.id,
     ref: receipt.ref,
@@ -709,6 +844,134 @@ function collectMediaReceiptBlockers(
   return blockers;
 }
 
+/** Admission enforcement, not a pixel producer: receipts must come from existing producers. */
+function collectPenRoundTripBlockers(
+  packet: CertificationReviewPacket
+): CertificationBlocker[] {
+  const failures: CertificationBlocker[] = [];
+  const text = (value: unknown) =>
+    typeof value === 'string' && value.trim().length > 0;
+  const digest = (value: unknown) =>
+    typeof value === 'string' && /^sha256:[a-f0-9]{64}$/.test(value);
+  for (const referenceReceipt of packet.canonicalReferences) {
+    const reference = referenceReceipt.approvedPenReference;
+    if (!reference && !/(?:^pen:|\.pen(?:$|[#?]))/.test(referenceReceipt.ref))
+      continue;
+    const fail = (summary: string, missing = false) =>
+      failures.push(
+        blocker(
+          missing ? 'pen_round_trip_missing' : 'pen_round_trip_failed',
+          'visual_proof',
+          referenceReceipt.id,
+          summary
+        )
+      );
+    if (!isApprovedPenReference(reference)) {
+      fail(
+        'Approved Pen authority must include editable identity, exact revision/hash and rendered state.',
+        true
+      );
+      continue;
+    }
+    if (
+      referenceReceipt.digest !== reference.penDigest ||
+      referenceReceipt.ref !== reference.artifact
+    )
+      fail(
+        'Canonical Pen receipt must bind the approved artifact and exact source digest.'
+      );
+    const matches = packet.visualProof.filter(
+      receipt =>
+        receipt.penRoundTrip?.referenceReceiptId === referenceReceipt.id
+    );
+    if (matches.length !== 1) {
+      fail(
+        'Exactly one comparison against the approved Pen reference is required.',
+        true
+      );
+      continue;
+    }
+    const visual = matches[0];
+    const comparison = visual.penRoundTrip;
+    if (!isPenRoundTripComparison(comparison)) {
+      fail(
+        'Pen comparison has malformed binding, measurements or residual disposition.'
+      );
+      continue;
+    }
+    if (
+      stableSerialize(comparison.reference as unknown as StableValue) !==
+      stableSerialize(reference as unknown as StableValue)
+    )
+      fail(
+        'Pen comparison is stale or bound to a different revision, fixture, viewport or state.'
+      );
+    if (
+      visual.tier !== 'visual_proof' ||
+      visual.status !== 'passed' ||
+      visual.ref !== comparison.productionRenderRef ||
+      visual.digest !== comparison.productionRenderDigest ||
+      visual.sourceSha !== packet.source?.sha ||
+      !comparison.geometryPassed ||
+      !comparison.tokensPassed ||
+      comparison.unexplainedMaterialDiffs !== 0 ||
+      !text(comparison.productionRenderRef) ||
+      !digest(comparison.productionRenderDigest) ||
+      !text(comparison.diffRef)
+    )
+      fail(
+        'Rendered geometry, tokens and zero unexplained material divergence must be proven at the exact source SHA.'
+      );
+    const deployments = (packet.operational?.deploy ?? []).filter(
+      receipt => receipt.id === comparison.deploymentReceiptId
+    );
+    if (
+      deployments.length !== 1 ||
+      deployments[0].tier !== 'deploy' ||
+      deployments[0].status !== 'passed' ||
+      !text(deployments[0].ref) ||
+      !digest(deployments[0].digest) ||
+      deployments[0].sourceSha !== packet.source?.sha
+    )
+      fail(
+        'Pen round trip requires one passed deployment receipt for the exact source SHA.'
+      );
+    if (comparison.changedPixels > 0 && comparison.residuals.length === 0)
+      fail(
+        'Nonzero pixel differences require explicit scoped residual disposition.'
+      );
+    for (const residual of comparison.residuals) {
+      const judgments = packet.visualProof.filter(
+        receipt =>
+          receipt.id === residual.judgmentReceiptId && receipt !== visual
+      );
+      if (
+        !text(residual.maskOrTolerance) ||
+        !text(residual.rationale) ||
+        judgments.length !== 1 ||
+        stableSerialize(
+          judgments[0].penResidualJudgment as unknown as StableValue
+        ) !==
+          stableSerialize({
+            referenceReceiptId: comparison.referenceReceiptId,
+            reference,
+            productionRenderDigest: comparison.productionRenderDigest,
+            diffDigest: comparison.diffDigest,
+          } as unknown as StableValue) ||
+        judgments[0].tier !== 'visual_proof' ||
+        judgments[0].status !== 'passed' ||
+        judgments[0].ref !== comparison.diffRef ||
+        judgments[0].digest !== comparison.diffDigest ||
+        judgments[0].sourceSha !== packet.source?.sha
+      )
+        fail(
+          'Each raster residual requires a mask/tolerance, rationale and separate exact-source visual judgment.'
+        );
+    }
+  }
+  return failures;
+}
+
 function collectTasteBlockers(packet: CertificationReviewPacket) {
   if (packet.contract !== JOVIE_CERTIFICATION_CONTRACT) {
     return [
@@ -723,6 +986,7 @@ function collectTasteBlockers(packet: CertificationReviewPacket) {
 
   return [
     ...collectSourceBlockers(packet),
+    ...collectPenRoundTripBlockers(packet),
     ...requireReceiptGroup(
       packet,
       packet.canonicalReferences,

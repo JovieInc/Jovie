@@ -665,3 +665,213 @@ describe('first-human design baseline routing (JOV-6947)', () => {
     expect(admission.founderBaseline).toEqual(founderApproval);
   });
 });
+
+describe('approved Pen round-trip admission (JOV-6038)', () => {
+  function penPacket(): CertificationReviewPacket {
+    const reference = {
+      artifact: '/canonical.lib.pen',
+      frameId: 'button-primary',
+      revision: '10',
+      penDigest: `sha256:${'c'.repeat(64)}`,
+      renderedRef: 'artifact://reference.png',
+      renderedDigest: `sha256:${'d'.repeat(64)}`,
+      route: '/fixture/button',
+      fixture: 'button-primary-focus',
+      viewport: '390x844',
+      theme: 'dark',
+      interactionState: 'focus',
+      designSystemRevision: 'system-b-10',
+    };
+    return reviewPacket({
+      canonicalReferences: [
+        {
+          ...receipt('canonical_references', 'pen-button'),
+          approvedPenReference: reference,
+          digest: reference.penDigest,
+          ref: reference.artifact,
+        },
+      ],
+      visualProof: [
+        {
+          ...receipt('visual_proof', 'comparison'),
+          ref: 'artifact://production.png',
+          digest: `sha256:${'e'.repeat(64)}`,
+          penRoundTrip: {
+            referenceReceiptId: 'pen-button',
+            reference,
+            deploymentReceiptId: 'deploy',
+            productionRenderRef: 'artifact://production.png',
+            productionRenderDigest: `sha256:${'e'.repeat(64)}`,
+            diffRef: 'artifact://diff.png',
+            diffDigest: `sha256:${'f'.repeat(64)}`,
+            changedPixels: 0,
+            geometryPassed: true,
+            tokensPassed: true,
+            unexplainedMaterialDiffs: 0,
+            residuals: [],
+          },
+        },
+      ],
+      operational: {
+        deploy: [{ ...receipt('deploy'), digest: `sha256:${'a'.repeat(64)}` }],
+      },
+    });
+  }
+  const codes = (packet: CertificationReviewPacket) =>
+    evaluateCertificationAdmission({ packet }).blockers.map(item => item.code);
+  it('requires a comparison even when source, approval and visual receipts pass independently', () => {
+    const packet = penPacket();
+    expect(codes(packet)).not.toContain('pen_round_trip_failed');
+    expect(
+      codes({ ...packet, visualProof: [receipt('visual_proof')] })
+    ).toContain('pen_round_trip_missing');
+    expect(
+      codes({
+        ...packet,
+        canonicalReferences: [
+          { ...receipt('canonical_references'), ref: 'pen:/canonical.lib.pen' },
+        ],
+      })
+    ).toContain('pen_round_trip_missing');
+  });
+  it.each([
+    'revision',
+    'penDigest',
+    'frameId',
+    'viewport',
+    'theme',
+    'interactionState',
+    'fixture',
+    'route',
+    'designSystemRevision',
+  ] as const)(
+    'rejects wrong/stale %s and invalidates the decision digest',
+    field => {
+      const packet = penPacket();
+      const visual = packet.visualProof[0];
+      const comparison = visual.penRoundTrip!;
+      const drift = {
+        ...packet,
+        visualProof: [
+          {
+            ...visual,
+            penRoundTrip: {
+              ...comparison,
+              reference: {
+                ...comparison.reference,
+                [field]:
+                  field === 'penDigest'
+                    ? `sha256:${'f'.repeat(64)}`
+                    : 'changed',
+              },
+            },
+          },
+        ],
+      };
+      expect(codes(drift)).toContain('pen_round_trip_failed');
+      expect(buildCertificationDecisionDigest(drift)).not.toBe(
+        buildCertificationDecisionDigest(packet)
+      );
+    }
+  );
+  it.each([
+    'geometryPassed',
+    'tokensPassed',
+    'unexplainedMaterialDiffs',
+  ] as const)(
+    'deliberate %s drift fails and repair restores admission',
+    field => {
+      const packet = penPacket();
+      const visual = packet.visualProof[0];
+      const drift = {
+        ...packet,
+        visualProof: [
+          {
+            ...visual,
+            penRoundTrip: {
+              ...visual.penRoundTrip!,
+              [field]: field === 'unexplainedMaterialDiffs' ? 1 : false,
+            },
+          },
+        ],
+      };
+      expect(codes(drift)).toContain('pen_round_trip_failed');
+      expect(codes(packet)).not.toContain('pen_round_trip_failed');
+    }
+  );
+  it('requires deployed exact-source evidence and explicit independent residual judgment', () => {
+    const packet = penPacket();
+    expect(codes({ ...packet, operational: {} })).toContain(
+      'pen_round_trip_failed'
+    );
+    expect(
+      codes({
+        ...packet,
+        operational: { deploy: [receipt('deploy', 'deploy', CHANGED_SHA)] },
+      })
+    ).toContain('pen_round_trip_failed');
+    const visual = packet.visualProof[0];
+    const residual = {
+      ...visual,
+      penRoundTrip: {
+        ...visual.penRoundTrip!,
+        changedPixels: 1,
+        residuals: [
+          {
+            maskOrTolerance: 'font raster <=1px',
+            rationale: 'browser antialiasing',
+            judgmentReceiptId: 'visual-judge',
+          },
+        ],
+      },
+    };
+    expect(codes({ ...packet, visualProof: [residual] })).toContain(
+      'pen_round_trip_failed'
+    );
+    expect(
+      codes({
+        ...packet,
+        visualProof: [
+          residual,
+          {
+            ...receipt('visual_proof', 'visual-judge'),
+            ref: 'artifact://diff.png',
+            digest: `sha256:${'f'.repeat(64)}`,
+            penResidualJudgment: {
+              referenceReceiptId: visual.penRoundTrip!.referenceReceiptId,
+              reference: visual.penRoundTrip!.reference,
+              productionRenderDigest:
+                visual.penRoundTrip!.productionRenderDigest,
+              diffDigest: visual.penRoundTrip!.diffDigest,
+            },
+          },
+        ],
+      })
+    ).not.toContain('pen_round_trip_failed');
+  });
+  it('rejects forged deployment slots, unjudged pixels and malformed measurements', () => {
+    const packet = penPacket();
+    expect(
+      codes({ ...packet, operational: { deploy: [receipt('ci', 'deploy')] } })
+    ).toContain('pen_round_trip_failed');
+    const visual = packet.visualProof[0];
+    for (const override of [
+      { changedPixels: 1 },
+      { changedPixels: -1 },
+      { geometryPassed: 'yes' },
+      { residuals: [null] },
+    ]) {
+      expect(
+        codes({
+          ...packet,
+          visualProof: [
+            {
+              ...visual,
+              penRoundTrip: { ...visual.penRoundTrip!, ...override } as never,
+            },
+          ],
+        })
+      ).toContain('pen_round_trip_failed');
+    }
+  });
+});

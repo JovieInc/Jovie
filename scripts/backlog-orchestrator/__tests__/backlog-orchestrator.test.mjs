@@ -2658,3 +2658,92 @@ describe('unowned triage routes preserve existing admission boundaries', () => {
     );
   });
 });
+
+describe('JOV-7423 bounded prevention cluster routing', () => {
+  const leaf = (identifier, overrides = {}) => ({
+    identifier,
+    title: 'Repair approved reference drift',
+    score: 100,
+    effort: 'small',
+    issue: {},
+    ...overrides,
+  });
+  const guard = (overrides = {}) => ({
+    identifier: 'JOV-6038',
+    title: 'Guardrail approved reference drift',
+    score: 1,
+    effort: 'small',
+    issue: {},
+    relatedIssues: [],
+    prevention: {
+      amount: 10,
+      confidence: 1,
+      affectedIssues: ['JOV-1', 'JOV-2'],
+    },
+    ...overrides,
+  });
+  it('routes new matching leaves to the bounded shared guard even when the boost cannot win', () => {
+    const result = scorer.rankQueueCandidates([
+      leaf('JOV-1'),
+      leaf('JOV-2'),
+      guard(),
+    ]);
+    assert.equal(result.ranked[0].identifier, 'JOV-6038');
+    assert.ok(
+      result.receipt.orderingReasons.includes('bounded-prevention-cluster')
+    );
+    assert.deepEqual(result.receipt.preventionRoutes[0].affectedIssues, [
+      'JOV-1',
+      'JOV-2',
+    ]);
+    assert.equal(result.receipt.preventionRoutes[0].duplicationAvoided, 1);
+  });
+  it('does not hold urgent repair, unbounded guards, or unrelated work', () => {
+    for (const issue of [
+      { priority: 1 },
+      { labels: ['production-red'] },
+      { labels: ['launch-blocker'] },
+      { labels: ['incident'] },
+    ]) {
+      assert.equal(
+        scorer.rankQueueCandidates([
+          leaf('JOV-1', { issue }),
+          leaf('JOV-2'),
+          guard(),
+        ]).ranked[0].identifier,
+        'JOV-1'
+      );
+    }
+    assert.equal(
+      scorer.rankQueueCandidates([
+        leaf('JOV-1'),
+        leaf('JOV-2'),
+        guard({ effort: 'large' }),
+      ]).ranked[0].identifier,
+      'JOV-1'
+    );
+    assert.equal(
+      scorer.rankQueueCandidates([
+        leaf('JOV-1', { title: 'Unrelated revenue work' }),
+        leaf('JOV-2'),
+        guard(),
+      ]).ranked[0].identifier,
+      'JOV-1'
+    );
+    assert.equal(scorer.rankQueueCandidates([]).ranked.length, 0);
+  });
+  it('requires a cluster rather than broad area or a guard signal alone', () => {
+    assert.equal(
+      scorer.rankQueueCandidates([leaf('JOV-1'), guard()]).ranked[0].identifier,
+      'JOV-1'
+    );
+    assert.equal(
+      scorer.rankQueueCandidates([
+        leaf('JOV-1'),
+        leaf('JOV-2'),
+        guard({ prevention: null }),
+      ]).ranked[0].identifier,
+      'JOV-1'
+    );
+  });
+});

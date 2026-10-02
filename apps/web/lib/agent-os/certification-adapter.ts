@@ -14,6 +14,8 @@ import {
   type CertificationTasteInboxCard,
   evaluateCertificationAdmission,
   type FounderCertificationDecision,
+  isApprovedPenReference,
+  isPenRoundTripComparison,
   JOVIE_CERTIFICATION_CONTRACT,
   type RecordFounderCertificationDecisionInput,
   type RecordFounderCertificationDecisionResult,
@@ -566,7 +568,11 @@ function isEvidenceReceipt(value: unknown): boolean {
     isNullableString(value.sourceSha) &&
     typeof value.ref === 'string' &&
     isNullableString(value.digest) &&
-    typeof value.summary === 'string'
+    typeof value.summary === 'string' &&
+    (value.approvedPenReference === undefined ||
+      isApprovedPenReference(value.approvedPenReference)) &&
+    (value.penRoundTrip === undefined ||
+      isPenRoundTripComparison(value.penRoundTrip))
   );
 }
 
