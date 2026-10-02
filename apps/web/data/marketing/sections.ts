@@ -1980,6 +1980,18 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     optionalInputs: ['eyebrow', 'title', 'featuredPost'],
     variants: [
       {
+        id: 'editorial-four',
+        layout: 'contained',
+        media: 'none',
+        columns: 4,
+        density: 'large',
+        alignment: 'left',
+        chooseWhen:
+          'homepage editorial preview with 1–4 published indexed articles; never pad missing posts',
+        exemplar: { route: '/', section: 'blog-feed' },
+        status: 'active',
+      },
+      {
         id: 'featured-grid',
         layout: 'contained',
         media: 'none',
@@ -2023,7 +2035,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       },
     ],
     responsiveContract:
-      'columns:3 → 3→2→1 at md/sm; featured post spans full width above grid at md+',
+      'editorial-four: 1→2→4 at sm/xl, full wrapping titles and fixed media ratio; other variants: 3→2→1 at md/sm with featured post above grid at md+',
     accessibility: {
       keyboard:
         'cards are <article> with real <a> to post; Tab follows visual order',
@@ -2033,12 +2045,12 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     },
     component: 'apps/web/app/(marketing)/blog/BlogCard',
     failureModes: [
-      'Empty feed (require at least 3 posts; if fewer, omit the section — zero-proof analog for content)',
+      'Empty feed (omit the section); editorial-four shows only available posts without placeholders',
       'Missing featured post on a high-traffic blog-landing (featured post is the editorial emphasis)',
     ],
     neverUse: [
       'Immediately after hero (illegalAfter — hero is for the page promise, not the feed)',
-      'With <3 posts (omit the section)',
+      'With <3 posts for featured-grid/category-filtered-grid (omit those variants)',
     ],
     status: 'approved',
   },

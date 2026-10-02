@@ -9,6 +9,7 @@ import { HomepageEditorialChangelog } from '@/components/homepage/HomepageEditor
 import { HomepageIdentityClose } from '@/components/homepage/HomepageIdentityClose';
 import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
 import { HomepageIdentitySections } from '@/components/homepage/HomepageIdentitySections';
+import { HomepageLatestNews } from '@/components/homepage/HomepageLatestNews';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
@@ -173,6 +174,7 @@ function HomepageIdentityStoryStack() {
       data-testid='homepage-identity-story-stack'
     >
       <HomepageIdentitySections />
+      <HomepageLatestNews />
       <HomepageIdentityClose />
     </div>
   );

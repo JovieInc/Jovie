@@ -667,9 +667,19 @@ const SECTION_RESOLUTIONS = {
     MARKETING_PEN_CONTRACT_IDS.section.contentProse,
     'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.contentProse}'
   ),
-  'blog-feed': unresolved(
-    'The registered BlogCard path does not resolve to the shared BlogFeed root.'
-  ),
+  'blog-feed': {
+    ...unresolved(
+      'The legacy BlogCard path does not resolve to the shared BlogFeed root; editorial-four has a separate source occurrence, with no claimed Pen certification.'
+    ),
+    occurrenceProofs: [
+      {
+        variantId: 'editorial-four',
+        componentPath:
+          'apps/web/app/(marketing)/blog/components/BlogEditorialRow.tsx',
+        rootBinding: "data-marketing-variant='editorial-four'",
+      },
+    ],
+  },
 } as const satisfies Record<MarketingSectionId, SourceResolution>;
 
 export const MARKETING_SECTION_REGISTRY: readonly MarketingSectionRegistryEntry[] =
