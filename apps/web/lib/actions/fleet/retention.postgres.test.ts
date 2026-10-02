@@ -17,7 +17,7 @@ afterAll(async () => {
 });
 
 describe.skipIf(!url)('actual Postgres fleet dispatcher retention', () => {
-  it('compacts a full dispatcher document, preserves replay and scoped history after restart, and rejects a rotated token', async () => {
+  it('compacts full dispatcher state, preserves replay and scoped history after restart, and rejects a rotated token', async () => {
     const [
       { FleetDispatcher },
       { fleetArchiveKey },

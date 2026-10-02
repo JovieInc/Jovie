@@ -425,7 +425,7 @@ describe('fleet archival preserves authority and durable outcomes beyond lifetim
     ).toBeGreaterThan(1);
   });
 
-  it('admits a defect after reporting while the original lease window remains open, without orphaning its provider reservation', async () => {
+  it('admits a defect after reporting while the original lease remains valid, without orphaning its provider reservation', async () => {
     let appends = 0;
     const f = await fixture({
       find: async (fingerprint, issueId) => ({
@@ -486,7 +486,7 @@ describe('fleet archival preserves authority and durable outcomes beyond lifetim
     expect(f.state().pendingDefects).toEqual({});
   });
 
-  it('recovers a full invocation document, preserves exact replay and hash conflicts across restart, and authenticates before archives', async () => {
+  it('recovers full invocation state, preserves exact replay and hash conflicts across restart, and authenticates before archives', async () => {
     const f = await fixture();
     const key = randomUUID();
     const original = await f.invoke(
