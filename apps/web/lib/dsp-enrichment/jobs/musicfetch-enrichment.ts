@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { type DbOrTransaction, db as plainDb } from '@/lib/db';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { musicfetchCircuitBreaker } from '@/lib/discography/musicfetch-circuit-breaker';
 import { importReleasesFromSpotify } from '@/lib/discography/spotify-import';
 import {
   extractAllMusicFetchServices,
@@ -534,6 +535,10 @@ export async function processMusicFetchEnrichmentJob(
   }
 
   if (!artistData) {
+    if (musicfetchCircuitBreaker.getState() === 'OPEN') {
+      await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'idle');
+      return result;
+    }
     logger.warn('MusicFetch enrichment: API returned no data', {
       creatorProfileId,
       spotifyUrl,

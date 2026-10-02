@@ -38,6 +38,12 @@ vi.mock('@/lib/utils/logger', () => ({
   },
 }));
 
+const sentry = vi.hoisted(() => ({
+  addBreadcrumb: vi.fn(),
+  captureMessage: vi.fn(),
+}));
+vi.mock('@sentry/nextjs', () => sentry);
+
 describe('musicfetch resilient client', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -222,7 +228,15 @@ describe('musicfetch resilient client', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(mockReserveMusicfetchBudget).toHaveBeenCalledTimes(1);
       expect(musicfetchCircuitBreaker.getState()).toBe('OPEN');
-      expect(logger.warn).toHaveBeenCalledTimes(1);
+      expect(logger.warn).not.toHaveBeenCalled();
+      expect(sentry.captureMessage).not.toHaveBeenCalled();
+      expect(sentry.addBreadcrumb).toHaveBeenCalledTimes(1);
+      expect(sentry.addBreadcrumb).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'info',
+          message: expect.stringContaining('CLOSED -> OPEN'),
+        })
+      );
     }
   );
 

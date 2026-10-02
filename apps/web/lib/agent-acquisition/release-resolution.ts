@@ -7,6 +7,10 @@ import {
   getRegistryEntry,
   getRegistryEntryByService,
 } from '@/lib/dsp-registry';
+import {
+  type ResolverOutput,
+  resolveJovieRelease,
+} from '@/lib/music-resolver/shadow';
 import { isMusicfetchVendorUnavailable } from '@/lib/musicfetch/errors';
 import {
   MusicfetchRequestError,
@@ -345,6 +349,69 @@ interface MusicfetchFactsLookup {
   readonly unavailable: boolean;
 }
 
+function factsFromResolver(
+  resolved: ResolverOutput,
+  source: 'release_url' | 'upc',
+  upc?: string
+): ReleaseFacts | null {
+  if (resolved.status !== 'resolved') return null;
+  const links: Record<string, string> = {};
+  for (const [provider, url] of Object.entries(resolved.providers)) {
+    const entry = getRegistryEntry(provider);
+    if (
+      !entry?.showOnListenPage ||
+      !validateProviderUrl(url, provider as ProviderKey).valid ||
+      !isReleaseProviderUrl(url)
+    ) {
+      continue;
+    }
+    links[provider] = url;
+  }
+  const title = text(resolved.entity?.title);
+  const artistName = text(resolved.entity?.artist);
+  if (!title && !artistName && Object.keys(links).length === 0) return null;
+  return {
+    source,
+    content_type: null,
+    title,
+    artist_name: artistName,
+    release_date: null,
+    artwork_url: null,
+    upc:
+      digits(resolved.entity?.upc) ?? (source === 'upc' ? (upc ?? null) : null),
+    dsp_links: links,
+    artists: artistName ? [{ name: artistName, ids: {} }] : [],
+  };
+}
+
+async function inHouseReleaseFacts(
+  input: PrepareReleaseLaunchInput
+): Promise<ReleaseFacts | null> {
+  if (input.release_url) {
+    const byUrl = factsFromResolver(
+      await resolveJovieRelease({
+        kind: 'url',
+        url: input.release_url,
+        territory: 'US',
+      }),
+      'release_url'
+    );
+    if (byUrl) return byUrl;
+  }
+  if (input.upc) {
+    return factsFromResolver(
+      await resolveJovieRelease({
+        kind: 'upc',
+        upc: input.upc,
+        territory: 'US',
+      }),
+      'upc',
+      input.upc
+    );
+  }
+  return null;
+}
+
 function musicfetchVendorDown(error: unknown): boolean {
   if (isMusicfetchVendorUnavailable(error)) return true;
   return (
@@ -412,7 +479,15 @@ export async function resolveAgentRelease(
       result.facts ? [result.facts] : []
     );
     const vendorUnavailable = lookupResults.some(result => result.unavailable);
-    if (input.release_metadata) {
+    let resolvedInHouse = false;
+    if (vendorUnavailable && facts.length === 0) {
+      const inHouse = await inHouseReleaseFacts(input);
+      if (inHouse) {
+        facts.push(inHouse);
+        resolvedInHouse = true;
+      }
+    }
+    if (!resolvedInHouse && input.release_metadata) {
       const supplied = factsFromMetadata(input.release_metadata);
       if (!supplied)
         return { status: 'error', code: 'INVALID_INPUT', retryable: false };
@@ -424,8 +499,8 @@ export async function resolveAgentRelease(
     }
     return { status: 'error', code: 'RELEASE_NOT_FOUND', retryable: false };
   } catch (error) {
-    // Only a catalog miss says anything about the supplied release. Auth,
-    // subscription and request-contract failures belong to the provider path.
+    // Only a catalog miss says anything about the supplied release.
+    // Other provider failures stay on the provider path.
     const notFound =
       error instanceof MusicfetchRequestError && error.statusCode === 404;
     return {

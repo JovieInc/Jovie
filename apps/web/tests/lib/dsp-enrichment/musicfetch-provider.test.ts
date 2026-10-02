@@ -98,7 +98,7 @@ describe('musicfetch artist lookup provider', () => {
     );
   });
 
-  it('returns null when MusicFetch responds 401 subscription not active', async () => {
+  it('returns null when MusicFetch responds 401', async () => {
     const error = new Error('MusicFetch vendor unavailable');
     (error as Error & { statusCode: number }).statusCode = 401;
     mockMusicfetchRequest.mockRejectedValue(error);

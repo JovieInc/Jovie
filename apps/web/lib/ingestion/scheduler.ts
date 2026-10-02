@@ -210,7 +210,7 @@ export async function handleIngestionJobFailure(
     }
   }
 
-  if (!shouldRetry) {
+  if (!shouldRetry && !isMusicfetchVendorUnavailable(error)) {
     await captureError('Ingestion job permanently failed', error, {
       jobId: job.id,
       jobType: job.jobType,

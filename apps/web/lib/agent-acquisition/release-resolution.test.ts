@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 
 const request = vi.fn();
+const resolveJovieRelease = vi.fn();
+vi.mock('@/lib/music-resolver/shadow', () => ({
+  resolveJovieRelease: (...args: unknown[]) => resolveJovieRelease(...args),
+}));
 vi.mock('@/lib/musicfetch/resilient-client', () => {
   class MusicfetchRequestError extends Error {
     constructor(
@@ -112,7 +116,16 @@ describe('canonical release URL shapes', () => {
 });
 
 describe('agent release resolution', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    resolveJovieRelease.mockResolvedValue({
+      status: 'no_match',
+      providers: {},
+      provenance: {},
+      confidence: 0,
+      requestCount: 0,
+    });
+  });
 
   it('resolves a DSP URL into normalized public release and smart-link facts', async () => {
     request.mockResolvedValue({
@@ -395,6 +408,67 @@ describe('agent release resolution', () => {
       expect(request).toHaveBeenCalledTimes(1);
     }
   );
+
+  it('uses the in-house resolver when MusicFetch is unavailable, before cached metadata', async () => {
+    const { MusicfetchRequestError } = await import(
+      '@/lib/musicfetch/resilient-client'
+    );
+    request.mockRejectedValueOnce(
+      new MusicfetchRequestError('unavailable', 401)
+    );
+    resolveJovieRelease.mockResolvedValueOnce({
+      status: 'resolved',
+      entity: {
+        id: 'release-1',
+        title: 'Signal Fire',
+        artist: 'The Artist',
+        upc: '00123456789012',
+        isrc: null,
+      },
+      providers: {
+        spotify: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+      },
+      provenance: { spotify: 'provider_links:manual' },
+      confidence: 0.99,
+      requestCount: 0,
+    });
+    const result = await resolveAgentRelease(
+      prepareReleaseLaunchSchema.parse({
+        ...draft,
+        release_url: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+        release_metadata: {
+          title: 'Cached Title',
+          artist_name: 'Cached Artist',
+          dsp_links: {
+            spotify: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+          },
+        },
+      })
+    );
+    expect(resolveJovieRelease).toHaveBeenCalledWith({
+      kind: 'url',
+      url: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+      territory: 'US',
+    });
+    expect(result).toEqual({
+      status: 'resolved',
+      facts: [
+        {
+          source: 'release_url',
+          content_type: null,
+          title: 'Signal Fire',
+          artist_name: 'The Artist',
+          release_date: null,
+          artwork_url: null,
+          upc: '00123456789012',
+          dsp_links: {
+            spotify: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+          },
+          artists: [{ name: 'The Artist', ids: {} }],
+        },
+      ],
+    });
+  });
 
   it('falls back to supplied release metadata when MusicFetch is vendor-unavailable', async () => {
     const { MusicfetchRequestError } = await import(

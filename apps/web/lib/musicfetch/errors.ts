@@ -16,8 +16,9 @@ export class MusicfetchRequestError extends Error {
 }
 
 /**
- * MusicFetch rejected the account (401/403) or the circuit is open after that.
- * Callers must not retry; fall back to other resolvers or cached data.
+ * MusicFetch is unavailable (401/403) or the circuit is already open.
+ * Callers must not retry. Use the in-house resolver, then cached data.
+ * A lookup that only MusicFetch can answer is a known limitation.
  */
 export class MusicfetchVendorUnavailableError extends MusicfetchRequestError {
   readonly vendorUnavailable = true;

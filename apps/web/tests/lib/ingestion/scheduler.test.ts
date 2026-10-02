@@ -186,6 +186,40 @@ describe('ingestion scheduler helpers', () => {
     );
   });
 
+  it('does not page when a MusicFetch 401 fails the job permanently', async () => {
+    const where = vi.fn().mockResolvedValue(undefined);
+    const set = vi.fn().mockReturnValue({ where });
+    const update = vi.fn().mockReturnValue({ set });
+    const tx = { update } as never;
+    const error = new MusicfetchRequestError(
+      'MusicFetch vendor unavailable',
+      401
+    );
+
+    await handleIngestionJobFailure(
+      tx,
+      {
+        id: 'job-401',
+        jobType: 'musicfetch_enrichment',
+        payload: {
+          creatorProfileId: '7e093f2b-a8f9-4559-a9df-8f789b4432f8',
+          spotifyUrl: 'https://open.spotify.com/artist/123',
+          dedupKey: 'musicfetch_enrichment:123',
+        },
+        attempts: 1,
+        maxAttempts: 3,
+      } as never,
+      error
+    );
+
+    expect(mockRecordErrorForRetry).not.toHaveBeenCalled();
+    expect(mockMarkFailedAfterRetries).toHaveBeenCalled();
+    expect(mockCaptureError).not.toHaveBeenCalled();
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'failed' })
+    );
+  });
+
   it('extracts creatorProfileId for valid ingestion payloads', () => {
     const creatorProfileId = '7e093f2b-a8f9-4559-a9df-8f789b4432f8';
 

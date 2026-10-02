@@ -126,10 +126,6 @@ export function isMusicFetchAvailable(): boolean {
  * isMusicfetchInvalidServicesError().
  */
 function handleMusicfetchLookupError(error: unknown, spotifyUrl: string): null {
-  if (isMusicfetchVendorUnavailable(error)) {
-    return null;
-  }
-
   if (error instanceof MusicfetchRequestError) {
     logger.warn('MusicFetch request failed', {
       spotifyUrl,
@@ -208,6 +204,10 @@ export async function fetchArtistBySpotifyUrl(
         span.setStatus({ code: 1, message: 'ok' });
         return data.result;
       } catch (error) {
+        if (isMusicfetchVendorUnavailable(error)) {
+          span.setStatus({ code: 1, message: 'unavailable' });
+          return null;
+        }
         span.setStatus({ code: 2, message: 'error' });
         return handleMusicfetchLookupError(error, spotifyUrl);
       }

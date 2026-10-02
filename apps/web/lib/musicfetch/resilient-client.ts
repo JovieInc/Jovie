@@ -35,19 +35,10 @@ const requestRateLimiter = createRateLimiter({
 });
 
 const inFlightRequests = new Map<string, Promise<unknown>>();
-let loggedMusicfetchVendorUnavailable = false;
 
-function noteMusicfetchVendorUnavailable(status: number | undefined): void {
-  if (musicfetchCircuitBreaker.getState() !== 'OPEN') {
-    musicfetchCircuitBreaker.forceOpen();
-  }
-  if (loggedMusicfetchVendorUnavailable) return;
-  loggedMusicfetchVendorUnavailable = true;
-  logger.warn('MusicFetch vendor unavailable', {
-    failureClass: 'vendor_unavailable',
-    retryable: false,
-    status,
-  });
+function noteMusicfetchVendorUnavailable(): void {
+  // forceOpen no-ops while OPEN, so the info breadcrumb fires once per window.
+  musicfetchCircuitBreaker.forceOpen({ notify: false });
 }
 
 interface MusicfetchRequestOptions {
@@ -209,13 +200,11 @@ async function handleHttpResponse<T>(
   }
 
   if (response.status === 401 || response.status === 403) {
-    const errorBody = await response.text().catch(() => '');
-    const details = extractMusicfetchErrorDetail(errorBody);
-    noteMusicfetchVendorUnavailable(response.status);
+    await response.body?.cancel?.().catch(() => undefined);
+    noteMusicfetchVendorUnavailable();
     throw new MusicfetchVendorUnavailableError(
       'MusicFetch vendor unavailable',
-      response.status,
-      details
+      response.status
     );
   }
 
