@@ -186,11 +186,11 @@
 .changelog-subscribe-rail {
   grid-column: 2;
   grid-row: 1;
-  align-self: start;
+  align-self: stretch;
 }
 
 @media (min-width: 1024px) {
-  .changelog-subscribe-rail {
+  .changelog-subscribe-rail > .changelog-subscribe {
     position: sticky;
     top: calc(var(--public-shell-header-offset) + var(--space-4));
   }

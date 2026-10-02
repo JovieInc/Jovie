@@ -59,7 +59,7 @@ describe('customer changelog IA contract', () => {
       'top: calc(var(--public-shell-header-offset) + var(--space-4));'
     );
     expect(editorialCss).toMatch(
-      /\.changelog-subscribe-rail\s*\{[\s\S]*position: sticky/
+      /\.changelog-subscribe-rail > \.changelog-subscribe\s*\{\s*position: sticky/
     );
     expect(editorialCss).toMatch(
       /@media \(max-width: 1023px\)[\s\S]*\.changelog-subscribe-rail[\s\S]*position: static/
