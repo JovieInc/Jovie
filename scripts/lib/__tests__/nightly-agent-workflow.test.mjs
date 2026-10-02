@@ -195,6 +195,38 @@ describe('Nightly Testing Agent evidence flow', () => {
     }
   );
 
+  it('uploads staged report evidence before minting publication credentials', () => {
+    const producerIndex = report.steps.findIndex(
+      candidate => candidate.name === 'Publish evidence report and ops status'
+    );
+    const uploadIndex = report.steps.findIndex(
+      candidate => candidate.name === 'Upload final report'
+    );
+    const tokenIndex = report.steps.findIndex(
+      candidate => candidate.id === 'report-token'
+    );
+    const publishIndex = report.steps.findIndex(
+      candidate => candidate.name === 'Open nightly evidence PR'
+    );
+
+    expect(producerIndex).toBeGreaterThanOrEqual(0);
+    expect(uploadIndex).toBeGreaterThan(producerIndex);
+    expect(tokenIndex).toBeGreaterThan(uploadIndex);
+    expect(publishIndex).toBeGreaterThan(tokenIndex);
+    expect(report.steps[producerIndex].run).toContain(
+      'guard-playwright-artifacts.mjs --run --'
+    );
+    const artifactPaths = report.steps[uploadIndex].with.path;
+    if (typeof artifactPaths !== 'string')
+      throw new TypeError('Nightly report artifact paths must be a string');
+    expect(artifactPaths.trim().split('\n')).toEqual([
+      'apps/web/test-results/nightly-agent/nightly-report.md',
+      'apps/web/test-results/nightly-agent/skill-delta.json',
+      'docs/NIGHTLY_TESTING_AGENT_REPORT.md',
+      'apps/web/reports/nightly-agent/last-run.json',
+    ]);
+  });
+
   it('binds the compact report to the resolved workflow conclusion', () => {
     const resolveIndex = report.steps.findIndex(
       candidate => candidate.id === 'conclusion'

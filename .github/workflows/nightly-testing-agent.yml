@@ -270,6 +270,19 @@ jobs:
       - name: Add report to job summary
         run: cat apps/web/test-results/nightly-agent/nightly-report.md >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Upload final report
+        if: ${{ always() && hashFiles('apps/web/test-results/nightly-agent/nightly-report.md') != '' && hashFiles('apps/web/test-results/nightly-agent/skill-delta.json') != '' && hashFiles('docs/NIGHTLY_TESTING_AGENT_REPORT.md') != '' && hashFiles('apps/web/reports/nightly-agent/last-run.json') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: nightly-agent-report-${{ github.run_id }}
+          path: |
+            apps/web/test-results/nightly-agent/nightly-report.md
+            apps/web/test-results/nightly-agent/skill-delta.json
+            docs/NIGHTLY_TESTING_AGENT_REPORT.md
+            apps/web/reports/nightly-agent/last-run.json
+          allow-markdown: 'true'
+          retention-days: 90
+
       - name: Generate report publication token
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         id: report-token
@@ -286,16 +299,3 @@ jobs:
           GH_TOKEN: ${{ steps.report-token.outputs.token }}
         run: |
           node --input-type=module -e "import { publishNightlyReport } from './scripts/lib/publish-coverage-report.mjs'; console.log(publishNightlyReport());"
-
-      - name: Upload final report
-        if: ${{ always() && hashFiles('apps/web/test-results/nightly-agent/nightly-report.md') != '' && hashFiles('apps/web/test-results/nightly-agent/skill-delta.json') != '' && hashFiles('docs/NIGHTLY_TESTING_AGENT_REPORT.md') != '' && hashFiles('apps/web/reports/nightly-agent/last-run.json') != '' }}
-        uses: ./.github/actions/upload-safe-playwright-artifact
-        with:
-          name: nightly-agent-report-${{ github.run_id }}
-          path: |
-            apps/web/test-results/nightly-agent/nightly-report.md
-            apps/web/test-results/nightly-agent/skill-delta.json
-            docs/NIGHTLY_TESTING_AGENT_REPORT.md
-            apps/web/reports/nightly-agent/last-run.json
-          allow-markdown: 'true'
-          retention-days: 90
