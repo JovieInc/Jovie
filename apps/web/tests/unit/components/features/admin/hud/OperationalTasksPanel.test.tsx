@@ -92,7 +92,12 @@ describe('OperationalTasksPanelView', () => {
       operationalRequestState: 'error',
       operationalTasks: feed(),
     });
-    render(<OperationalTasksPanel presentation='page' />);
+    renderWithRoot(
+      <RightPanelProvider>
+        <OperationalTasksPanel presentation='page' />
+        <ShellRail />
+      </RightPanelProvider>
+    );
 
     expect(mockTaskQuery).toHaveBeenCalledWith(null);
     expect(screen.getByText('Stale Cache')).toBeInTheDocument();
