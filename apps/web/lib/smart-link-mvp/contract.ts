@@ -93,7 +93,8 @@ export type LinkResult = z.infer<typeof linkResultSchema>;
 export type LinkProvider = z.infer<typeof providerSchema>;
 export type LinkCandidate = z.infer<typeof candidateSchema>;
 
-const COMMERCIAL_COPY = /\$|upgrade|checkout|stripe|\/mo|per month|pricing/i;
+const COMMERCIAL_COPY =
+  /\$\s?\d|\bupgrade\b|\bcheckout\b|\bstripe\b|\bper month\b|\bpricing\b|\/mo\b/i;
 
 /** MCP tool text must stay neutral. The plans URL is the only commercial pointer. */
 export function assertNeutralToolResult(result: LinkResult): void {
