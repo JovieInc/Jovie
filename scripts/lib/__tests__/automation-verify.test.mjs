@@ -26,6 +26,64 @@ import {
 } from '../../run-affected-tests.mjs';
 
 describe('affected-test selector inventory', () => {
+  const certificationSource = 'apps/web/lib/ovie/certifications/normalize.ts';
+  const certificationTests = [
+    'apps/web/lib/ovie/certifications/normalize.test.ts',
+    'apps/web/lib/ovie/certifications/inventory.server.test.ts',
+    'apps/web/components/features/admin/certifications/CertificationDetailRail.test.tsx',
+  ];
+
+  it.each([
+    [certificationSource],
+    [certificationSource, certificationTests[0]],
+    [certificationSource, ...certificationTests],
+  ])(
+    'selects normalization and its inventory/rail consumers for %j',
+    (...files) => {
+      const plan = buildAffectedTestPlan(files);
+      expect(plan.mode).toBe('selected');
+      expect(plan.selectedTests).toEqual(certificationTests);
+      expect(buildSelectedTestCommands(plan, '2')).toEqual([
+        [
+          'pnpm',
+          [
+            '--filter',
+            '@jovie/web',
+            'exec',
+            'vitest',
+            'run',
+            ...certificationTests.map(file => file.replace(/^apps\/web\//, '')),
+            '--passWithNoTests',
+            '--maxWorkers',
+            '2',
+          ],
+        ],
+      ]);
+    }
+  );
+
+  it.each(certificationTests)(
+    'keeps full verification when normalization proof is missing: %s',
+    missing => {
+      expect(
+        buildAffectedTestPlan([certificationSource], {
+          isFileAvailable: file => file !== missing,
+        }).mode
+      ).toBe('full');
+    }
+  );
+
+  it.each([
+    'apps/web/lib/unknown.ts',
+    'apps/web/components/atoms/Button.tsx',
+    'scripts/run-affected-tests.mjs',
+  ])('keeps mixed normalization changes fail-closed: %s', peer => {
+    expect(
+      buildAffectedTestPlan([certificationSource, certificationTests[0], peer])
+        .mode
+    ).toBe('full');
+  });
+
   it('enforces real merge-sync writer coverage in its existing focused CI selector', () => {
     const plan = buildAffectedTestPlan([
       'scripts/lib/linear-sync-on-merge.mjs',

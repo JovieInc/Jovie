@@ -906,6 +906,17 @@ const VISUAL_QA_DIFF_ARTIFACTS_MANIFEST = new Set([
   VISUAL_QA_DIFF_ARTIFACTS_SOURCE,
   VISUAL_QA_DIFF_ARTIFACTS_TEST,
 ]);
+const CERTIFICATION_NORMALIZATION_SOURCE =
+  'apps/web/lib/ovie/certifications/normalize.ts';
+const CERTIFICATION_NORMALIZATION_TESTS = [
+  'apps/web/lib/ovie/certifications/normalize.test.ts',
+  'apps/web/lib/ovie/certifications/inventory.server.test.ts',
+  'apps/web/components/features/admin/certifications/CertificationDetailRail.test.tsx',
+];
+const CERTIFICATION_NORMALIZATION_MANIFEST = new Set([
+  CERTIFICATION_NORMALIZATION_SOURCE,
+  ...CERTIFICATION_NORMALIZATION_TESTS,
+]);
 const MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST = new Set([
   'apps/web/tests/e2e/mobile-overflow.spec.ts',
   'apps/web/tests/e2e/utils/mobile-overflow.ts',
@@ -1053,6 +1064,25 @@ export function buildAffectedTestPlan(
   const globalTestInput = files.find(file => GLOBAL_TEST_INPUTS.has(file));
   if (globalTestInput) {
     return fullSuitePlan(`global test input changed: ${globalTestInput}`);
+  }
+  if (files.includes(CERTIFICATION_NORMALIZATION_SOURCE)) {
+    if (!files.every(file => CERTIFICATION_NORMALIZATION_MANIFEST.has(file))) {
+      return fullSuitePlan('mixed certification normalization source changes');
+    }
+    if (![...CERTIFICATION_NORMALIZATION_MANIFEST].every(isFileAvailable)) {
+      return fullSuitePlan('certification normalization proof is unavailable');
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: files,
+      mandatoryTests: CERTIFICATION_NORMALIZATION_TESTS,
+      selectedTests: CERTIFICATION_NORMALIZATION_TESTS,
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: [],
+      nodeTests: [],
+    };
   }
   const isLinearSyncOnMerge =
     files.some(file => LINEAR_SYNC_ON_MERGE_PRIMARY.has(file)) &&
