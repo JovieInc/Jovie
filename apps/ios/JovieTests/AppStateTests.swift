@@ -5,25 +5,65 @@ import Testing
 import UserNotifications
 @testable import Jovie
 
+private actor ProfileRevalidationGate {
+  private var completion: CheckedContinuation<Void, Never>?
+  private var startedObserver: CheckedContinuation<Bool, Never>?
+  private var started = false
+  private var finished = false
+  private var released = false
+
+  func wait() async {
+    started = true
+    startedObserver?.resume(returning: true)
+    startedObserver = nil
+    if released { return }
+    await withCheckedContinuation { continuation in
+      completion = continuation
+    }
+  }
+
+  func waitUntilStarted() async -> Bool {
+    if started { return true }
+    if finished { return false }
+    return await withCheckedContinuation { startedObserver = $0 }
+  }
+
+  func ownerFinished() {
+    finished = true
+    startedObserver?.resume(returning: started)
+    startedObserver = nil
+  }
+
+  func release() {
+    released = true
+    completion?.resume()
+    completion = nil
+  }
+}
+
 private actor MockRepository: AppStateRepository {
   var nextResult: Result<MeRepositoryResult, Error>
   private var clearedUserIDs: [String] = []
   private var loadCallCount = 0
   private let loadDelay: Duration?
+  private let revalidationGate: ProfileRevalidationGate?
   private let cached: MobileMeResponse?
 
   init(
     nextResult: Result<MeRepositoryResult, Error>,
     loadDelay: Duration? = nil,
+    revalidationGate: ProfileRevalidationGate? = nil,
     cached: MobileMeResponse? = nil
   ) {
     self.nextResult = nextResult
     self.loadDelay = loadDelay
+    self.revalidationGate = revalidationGate
     self.cached = cached
   }
 
   func loadMe(for userID: String) async throws -> MeRepositoryResult {
     loadCallCount += 1
+    await revalidationGate?.wait()
     if let loadDelay {
       try await Task.sleep(for: loadDelay)
     }
@@ -153,9 +193,10 @@ struct AppStateTests {
       chatEnabled: true,
       continueOnWebURL: "https://jov.ie/app"
     )
+    let revalidation = ProfileRevalidationGate()
     let repository = MockRepository(
       nextResult: .success(MeRepositoryResult(response: fresh, isStale: false)),
-      loadDelay: .milliseconds(300),
+      revalidationGate: revalidation,
       cached: .previewReady
     )
     let appState = AppState(
@@ -166,14 +207,20 @@ struct AppStateTests {
     )
     appState.didInitializeAuth = true
 
-    async let change: Void = appState.handleSignedInUserChange("user_123")
+    async let change: Void = {
+      await appState.handleSignedInUserChange("user_123")
+      await revalidation.ownerFinished()
+    }()
 
-    // Well before the 300ms network delay resolves, the cached profile must
-    // already be on screen — this is the "blazing fast" guarantee.
-    try await Task.sleep(for: .milliseconds(40))
+    // Observe the cache after revalidation starts but before it can complete.
+    // This proves cache-first paint without depending on executor scheduling.
+    let revalidationStarted = await revalidation.waitUntilStarted()
+    #expect(revalidationStarted)
     #expect(appState.route == .ready)
     #expect(appState.dashboardState == .loaded(.previewReady))
+    #expect(appState.isOffline == false)
 
+    await revalidation.release()
     await change
 
     // Once revalidation lands, the fresh profile silently replaces the cache.
