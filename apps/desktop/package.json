@@ -31,7 +31,7 @@
     "test:desktop-auth-handback": "vitest run --config vitest.config.mts scripts/desktop-auth-handback.test.ts",
     "test:desktop-auth-loopback": "vitest run --config vitest.config.mts scripts/desktop-auth-loopback.test.ts",
     "test:desktop-passkey": "vitest run --config vitest.config.mts scripts/desktop-passkey.test.ts",
-    "test:desktop-window-state": "vitest run --config vitest.config.mts scripts/window-state.test.ts",
+    "test:desktop-window-state": "vitest run --config vitest.config.mts scripts/window-state.test.ts scripts/visual-activity.test.ts scripts/visual-activity-bridge.test.ts",
     "test:desktop-permissions": "vitest run --config vitest.config.mts scripts/desktop-permissions.test.ts",
     "test:desktop-tray-png": "vitest run --config vitest.config.mts scripts/desktop-tray-png.test.ts",
     "test:desktop-tray-menu": "vitest run --config vitest.config.mts scripts/desktop-tray-menu.test.ts",

@@ -54,8 +54,28 @@ describe('useStickToBottom', () => {
   });
 
   afterEach(() => {
+    Reflect.deleteProperty(globalThis, 'electronAPI');
     vi.restoreAllMocks();
   });
+
+  function installVisibilityBridge() {
+    let listener: ((active: boolean) => void) | undefined;
+    const unsubscribe = vi.fn();
+    Object.defineProperty(globalThis, 'electronAPI', {
+      configurable: true,
+      value: {
+        getVisualActivity: () => Promise.resolve(true),
+        onVisualActivity: (callback: (active: boolean) => void) => {
+          listener = callback;
+          return unsubscribe;
+        },
+      },
+    });
+    return {
+      emit: (active: boolean) => act(() => listener?.(active)),
+      unsubscribe,
+    };
+  }
 
   const flushRaf = () => {
     const callbacks = [...rafQueue];
@@ -252,6 +272,89 @@ describe('useStickToBottom', () => {
     });
 
     expect(scrollHeightSpy).not.toHaveBeenCalled();
+  });
+
+  it('rests hidden scroll work and reconciles the latest content once on return', () => {
+    const visibility = installVisibilityBridge();
+    const { result, unmount } = renderHook(() => useStickToBottom());
+    const container = attachSentinel(result);
+    const write = vi.fn();
+    let height = 400;
+    Object.defineProperty(container, 'scrollHeight', { get: () => height });
+    Object.defineProperty(container, 'scrollTop', { set: write });
+    act(() => result.current.totalSizeRef(document.createElement('div')));
+    visibility.emit(false);
+    // Native hidden state wins even while Chromium reports visible.
+    expect(document.visibilityState).toBe('visible');
+    act(() => {
+      resizeCallback?.([]);
+      resizeCallback?.([]);
+    });
+    flushRaf();
+    expect(write).not.toHaveBeenCalled();
+    height = 950;
+    visibility.emit(true);
+    visibility.emit(true);
+    // Hidden growth can deliver a stale offscreen observation before restore rAF.
+    act(() =>
+      intersectionCallback?.([
+        { isIntersecting: false } as IntersectionObserverEntry,
+      ])
+    );
+    flushRaf();
+    expect(write).toHaveBeenCalledExactlyOnceWith(950);
+    unmount();
+    expect(visibility.unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('cancels a queued scroll on hide and ignores hidden sentinel changes', () => {
+    const visibility = installVisibilityBridge();
+    const cancel = vi.spyOn(globalThis, 'cancelAnimationFrame');
+    const { result } = renderHook(() => useStickToBottom());
+    const container = attachSentinel(result);
+    const write = vi.fn();
+    Object.defineProperty(container, 'scrollTop', { set: write });
+    act(() => {
+      result.current.totalSizeRef(document.createElement('div'));
+      resizeCallback?.([]);
+    });
+    visibility.emit(false);
+    act(() =>
+      intersectionCallback?.([
+        { isIntersecting: false } as IntersectionObserverEntry,
+      ])
+    );
+    expect(cancel).toHaveBeenCalledOnce();
+    flushRaf();
+    expect(write).not.toHaveBeenCalled();
+    expect(result.current.isStuckToBottom).toBe(true);
+  });
+
+  it('preserves an unpinned reader across hide and restore', () => {
+    const visibility = installVisibilityBridge();
+    const { result } = renderHook(() => useStickToBottom());
+    const container = attachSentinel(result);
+    const write = vi.fn();
+    Object.defineProperty(container, 'scrollTop', { set: write });
+    act(() => result.current.setStuckToBottom(false));
+    visibility.emit(false);
+    visibility.emit(true);
+    flushRaf();
+    expect(write).not.toHaveBeenCalled();
+    expect(result.current.isStuckToBottom).toBe(false);
+  });
+
+  it('honors an explicit unpin before the restoration frame', () => {
+    const visibility = installVisibilityBridge();
+    const { result } = renderHook(() => useStickToBottom());
+    const container = attachSentinel(result);
+    const write = vi.fn();
+    Object.defineProperty(container, 'scrollTop', { set: write });
+    visibility.emit(false);
+    visibility.emit(true);
+    act(() => result.current.setStuckToBottom(false));
+    flushRaf();
+    expect(write).not.toHaveBeenCalled();
   });
 
   it('re-pins only on the initial 0 → positive message count (JOV-5044)', () => {
