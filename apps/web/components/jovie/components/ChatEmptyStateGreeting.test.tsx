@@ -21,7 +21,7 @@ describe('ChatEmptyStateGreeting', () => {
     expect(screen.queryByTestId('chat-empty-state-insight')).toBeNull();
   });
 
-  it('renders the insight sentence below the greeting when one is supplied', () => {
+  it('renders only the insight sentence when one is supplied', () => {
     render(
       <ChatEmptyStateGreeting
         firstName='Tim'
@@ -29,9 +29,12 @@ describe('ChatEmptyStateGreeting', () => {
       />
     );
 
-    expect(screen.getByTestId('chat-empty-state-insight')).toHaveTextContent(
+    expect(screen.getAllByRole('heading')).toHaveLength(1);
+    expect(screen.getByRole('heading')).toHaveTextContent(
       'Your streams are up 320% today.'
     );
+    expect(screen.queryByText('Good morning, Tim.')).toBeNull();
+    expect(screen.queryByTestId('chat-empty-state-insight')).toBeNull();
   });
 
   it('never fabricates an insight: omitted or undefined renders no insight paragraph', () => {

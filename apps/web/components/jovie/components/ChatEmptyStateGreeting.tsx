@@ -2,11 +2,9 @@ import { getChatEmptyStateGreetingText } from '../chat-empty-greeting';
 import { CHAT_CONTENT_SHELL_CLASSNAME } from '../chat-layout';
 
 /**
- * New-chat empty state (JOV-7150): one greeting plus one real insight, left-
- * aligned in the composer-width column. Replaces the "Just ask" heading and
- * the chip/suggestion state — no cards, no chips. `insight` renders only
- * when the caller resolved a real one (see `resolveChatEmptyStateInsight`);
- * omitted, the greeting stands alone.
+ * New-chat empty state (JOV-7150): one real insight or a personal greeting,
+ * left-aligned in the composer-width column. The caller resolves a truthful
+ * insight (see `resolveChatEmptyStateInsight`); without one, show the greeting.
  */
 export function ChatEmptyStateGreeting({
   firstName,
@@ -25,16 +23,8 @@ export function ChatEmptyStateGreeting({
           className='text-4xl font-medium text-primary-token'
           data-testid='chat-empty-state-greeting-text'
         >
-          {getChatEmptyStateGreetingText(firstName)}
+          {insight || getChatEmptyStateGreetingText(firstName)}
         </h2>
-        {insight ? (
-          <p
-            className='text-xl text-secondary-token'
-            data-testid='chat-empty-state-insight'
-          >
-            {insight}
-          </p>
-        ) : null}
       </div>
     </div>
   );
