@@ -20,8 +20,22 @@ vi.mock('@/components/atoms/Calendar', () => ({
 vi.mock('@jovie/ui/atoms/popover', () => ({
   Popover: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   PopoverTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
-  PopoverContent: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
+  PopoverContent: ({
+    children,
+    className,
+    size,
+  }: {
+    children: ReactNode;
+    className?: string;
+    size?: string;
+  }) => (
+    <div
+      data-testid='date-picker-popover-content'
+      data-size={size}
+      className={className}
+    >
+      {children}
+    </div>
   ),
 }));
 
@@ -72,8 +86,16 @@ describe('DatePicker', () => {
     const trigger = screen.getByRole('button', { name: /Pick a date/ });
     expect(trigger).toBeInTheDocument();
     expect(trigger.className).toContain('h-8');
+    expect(trigger.className).toContain('before:h-11');
     expect(trigger.className).toContain('rounded-lg');
     expect(trigger.className).toContain('text-tertiary-token');
+    expect(screen.getByTestId('date-picker-popover-content')).toHaveClass(
+      'w-auto'
+    );
+    expect(screen.getByTestId('date-picker-popover-content')).toHaveAttribute(
+      'data-size',
+      'bare'
+    );
   });
 
   it('renders the formatted selected date', () => {
