@@ -884,6 +884,11 @@ export function JovieChat({
           {showThreadView ? (
             <ChatThreadNavigationRail
               messages={messages}
+              scopeKey={JSON.stringify([
+                profileId ?? null,
+                chatMode ?? null,
+                knownConversationKey,
+              ])}
               scrollContainerRef={scrollContainerRef}
               shouldVirtualizeMessages={shouldVirtualizeMessages}
               virtualizer={virtualizer}

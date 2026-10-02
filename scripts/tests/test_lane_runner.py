@@ -31,7 +31,9 @@ SPEC.loader.exec_module(lane)
 
 
 def issue(identifier="JOV-1", priority=2, created="2026-09-01T00:00:00Z", labels=()):
-    return lane.Issue("id-" + identifier, identifier, "Tab indicator collapses", "body", priority, created, list(labels))
+    # Distinct titles: identical titles are one unit of work (pool_rejections).
+    return lane.Issue("id-" + identifier, identifier, f"Tab indicator collapses {identifier}", "body",
+                      priority, created, list(labels))
 
 
 def gate_proof(head, verdict="landing", sensitive=False):
@@ -224,6 +226,62 @@ class SelectionTest(unittest.TestCase):
                 self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
         task.description = "Change live `/pricing` schema fixture and pricing to $199"
         self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
+
+
+class WorkstreamAdmissionTest(unittest.TestCase):
+    """JOV-7514 / JOV-5555 / JOV-7423: one workstream rule for intake and backlog."""
+
+    def titled(self, identifier, title, priority=3, created="2026-10-01T00:00:00Z", labels=()):
+        task = issue(identifier, priority=priority, created=created, labels=labels)
+        task.title = title
+        return task
+
+    def test_exact_duplicate_titles_admit_only_the_oldest_canonical(self):
+        now = datetime(2026, 10, 2, tzinfo=timezone.utc).timestamp()
+        older = self.titled("JOV-20", "Bug: Fix redirect-only route", created="2026-09-30T00:00:00Z")
+        newer = self.titled("JOV-10", "fix redirect only route!", priority=1, created="2026-10-01T23:00:00Z")
+        self.assertEqual(lane.pool_rejections([older, newer]), {"JOV-10": "duplicate-candidate:JOV-20"})
+        self.assertEqual(lane.pick_issue([newer, older], {}, now=now).identifier, "JOV-20")
+        # The canonical stays claimable alone; a duplicate never resurrects once it is gone.
+        self.assertEqual(lane.pick_issue([newer], {}, now=now).identifier, "JOV-10")
+
+    def test_near_duplicates_and_tagged_variants_are_not_collapsed(self):
+        cases = [self.titled("JOV-1", "[web-053] Redirect only route"),
+                 self.titled("JOV-2", "[web-054] Redirect only route"),
+                 self.titled("JOV-3", "Fix it"), self.titled("JOV-4", "fix it"),
+                 self.titled("JOV-5", "Redirect only route regression")]
+        self.assertEqual(lane.pool_rejections(cases), {})
+
+    def test_compounding_infrastructure_precedes_non_urgent_product_work(self):
+        now = datetime(2026, 10, 2, tzinfo=timezone.utc).timestamp()
+        product = self.titled("JOV-1", "Sidebar jank on profile", priority=2, created="2026-10-01T20:00:00Z")
+        ci = self.titled("JOV-2", "Stabilize flaky Playwright CI shard", priority=3, created="2026-10-01T21:00:00Z")
+        throughput = self.titled("JOV-3", "Symphony lane admission singleflight", priority=3,
+                                 created="2026-10-01T20:30:00Z")
+        # A lower-priority throughput fix still beats higher-priority product work.
+        self.assertEqual(lane.pick_issue([product, throughput], {}, now=now).identifier, "JOV-3")
+        # Same tier and priority: CI outranks throughput even when younger.
+        self.assertEqual(lane.pick_issue([product, throughput, ci], {}, now=now).identifier, "JOV-2")
+        # Inside tier 0, aged priority still comes before workstream rank.
+        throughput.priority = 2
+        self.assertEqual(lane.pick_issue([product, throughput, ci], {}, now=now).identifier, "JOV-3")
+
+    def test_urgent_work_still_precedes_compounding_work(self):
+        now = datetime(2026, 10, 2, tzinfo=timezone.utc).timestamp()
+        urgent = self.titled("JOV-1", "Sidebar jank on profile", priority=1, created="2026-10-01T23:00:00Z")
+        ci = self.titled("JOV-2", "Stabilize flaky CI shard", priority=2, created="2026-10-01T22:00:00Z")
+        self.assertEqual(lane.pick_issue([ci, urgent], {}, now=now).identifier, "JOV-1")
+        # Work that has aged to P1 joins the urgent band, where CI rank then leads.
+        ci.created_at = "2026-09-30T22:00:00Z"
+        self.assertEqual(lane.pick_issue([urgent, ci], {}, now=now).identifier, "JOV-2")
+
+    def test_explicit_workstream_label_overrides_and_ranks(self):
+        self.assertEqual(lane.workstreams.classify("Sidebar jank", ["ws:ci"]), "ci")
+        self.assertEqual(lane.workstreams.classify("Sidebar jank", []), "ui-ia")
+        self.assertEqual(lane.workstreams.classify("Stabilize CI", ["needs-human"]), "human-decision")
+        self.assertEqual(lane.workstreams.classify("", ["ws:not-a-stream"]), "general")
+        self.assertEqual(lane.workstreams.KEYS[:2], ("ci", "symphony-throughput"))
+        self.assertEqual(lane.workstreams.KEYS[-1], "human-decision")
 
 
 class PromptTest(unittest.TestCase):
@@ -590,6 +648,20 @@ class LinearClientTest(unittest.TestCase):
                     client.gql("q", {})
             finally:
                 lane.urllib.request.urlopen = real
+
+    def test_lane_issue_reads_paginate_the_whole_todo_pool(self):
+        client = lane.Linear.__new__(lane.Linear)
+        node = lambda n: {"id": f"i{n}", "identifier": f"JOV-{n}", "title": "t", "description": None,
+                          "priority": 2, "createdAt": "2026-09-01T00:00:00Z", "labels": {"nodes": []}}
+        pages = [{"issues": {"pageInfo": {"hasNextPage": True, "endCursor": "c1"}, "nodes": [node(1)]}},
+                 {"issues": {"pageInfo": {"hasNextPage": False, "endCursor": "c2"}, "nodes": [node(2)]}}]
+        seen = []
+        client.gql = lambda query, variables: (seen.append(variables["after"]), pages.pop(0))[1]
+        self.assertEqual([i.identifier for i in client.lane_issues("codex")], ["JOV-1", "JOV-2"])
+        self.assertEqual(seen, [None, "c1"])
+        endless = {"issues": {"pageInfo": {"hasNextPage": True, "endCursor": "c"}, "nodes": [node(3)]}}
+        client.gql = lambda query, variables: endless
+        self.assertEqual(len(client.lane_issues("codex")), lane.LANE_ISSUE_PAGES)
 
     def test_missing_key_is_a_clear_error(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1130,6 +1202,27 @@ class NewIssueBudgetTest(unittest.TestCase):
         self.assertFalse(result["allowed"])
         self.assertTrue(lane.new_issue_budget("codex", 4, rows)["allowed"])
         self.assertEqual(lane.new_issue_budget("codex", 0, None)["reason"], "provider-disabled")
+
+    def test_terminal_prs_cannot_pin_the_lane_idle(self):
+        """JOV-7514 live shape: codex held 7 hold/exhausted PRs + 1 advanceable -> idle forever."""
+        terminal = [["hold", "lane-fix-exhausted"], ["lane-fix-exhausted"], ["hold"],
+                    ["lane-fix-exhausted", "queue-poison"], ["lane-fix-red", "lane-fix-exhausted"],
+                    ["lane-fix-exhausted"], ["hold", "queue-poison"]]
+        rows = [{**self.row(n), "labels": [{"name": name} for name in labels]}
+                for n, labels in enumerate(terminal, start=1)]
+        rows.append({**self.row(99), "labels": []})
+        result = lane.new_issue_budget("codex", 3, rows)
+        self.assertEqual((result["used"], result["terminal"], result["reason"]), (1, 7, "within-budget"))
+        self.assertTrue(result["allowed"])
+        # Parked work is still bounded: slots x TERMINAL_PRS_PER_SLOT.
+        parked = [{**self.row(n), "labels": [{"name": "hold"}]} for n in range(1, 13)]
+        result = lane.new_issue_budget("codex", 3, parked)
+        self.assertEqual((result["used"], result["terminal"], result["terminalCap"], result["reason"]),
+                         (0, 12, 12, "terminal-pr-backlog"))
+        self.assertFalse(result["allowed"])
+        # Active non-green work keeps its original cap and precedence.
+        active = [self.row(n) for n in range(20, 26)]
+        self.assertEqual(lane.new_issue_budget("codex", 3, parked + active)["reason"], "over-budget")
 
     def test_failed_malformed_and_truncated_reads_cannot_certify_empty_inventory(self):
         cases = [(1, "[]"), (1, json.dumps([self.row()])), (0, ""), (0, "{}"), (0, "null"),

@@ -409,6 +409,20 @@ class StatusFeedTest(unittest.TestCase):
         self.assertEqual(metric["accountIdleSecondsWhileQualifiedWorkExists"], 100)
         self.assertEqual(feed["_idleQualifiedSince"], {"codex": 900.0})
 
+    def test_terminal_pr_backlog_is_its_own_idle_reason(self):
+        """JOV-7514: parked hold/exhausted PRs must not be reported as the active open-PR cap."""
+        host = type("Host", (), {"state": Path("/tmp")})()
+        lane = type("Lane", (), {"HOST": "gem", "provider_throughput": staticmethod(throughput_stub)})
+        seats = {"codex": {"running": 0, "slots": 3}}
+        parked = doctor.status_feed(host, lane, obs(
+            capacityByProvider=seats,
+            newIssueBudgetByProvider={"codex": {"reason": "terminal-pr-backlog"}}), {}, {})
+        active = doctor.status_feed(host, lane, obs(
+            capacityByProvider=seats,
+            newIssueBudgetByProvider={"codex": {"reason": "over-budget"}}), {}, {})
+        self.assertEqual(parked["throughput"]["providers"]["codex"]["idleReason"], "terminal-pr-backlog")
+        self.assertEqual(active["throughput"]["providers"]["codex"]["idleReason"], "open-pr-budget")
+
 
 
 class RunnablePoolTest(unittest.TestCase):

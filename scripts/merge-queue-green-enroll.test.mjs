@@ -10,7 +10,14 @@ const workflow = load(
 const script = workflow.jobs.enroll.steps.find(step => step.with?.script).with
   .script;
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
-const run = new AsyncFunction('github', 'context', 'core', 'process', script);
+const run = new AsyncFunction(
+  'github',
+  'context',
+  'core',
+  'process',
+  'require',
+  script
+);
 const sha = 'a'.repeat(40);
 const candidate = number => ({
   number,
@@ -39,12 +46,16 @@ async function fixture({
   dry = false,
   failRead = false,
   failMutation = false,
+  statuses = [],
+  mutationError = undefined,
+  failureReceipt = '',
   eventName = 'workflow_dispatch',
   payload = {},
 } = {}) {
   const mutations = [];
   const reads = [];
   const warnings = [];
+  const statusWrites = [];
   const inventories = [];
   const gets = [];
   const github = {
@@ -63,8 +74,14 @@ async function fixture({
         },
       },
       commits: { listPullRequestsAssociatedWithCommit: Symbol('associated') },
+      repos: {
+        listCommitStatusesForRef: Symbol('statuses.list'),
+        createCommitStatus: async receipt => statusWrites.push(receipt),
+      },
     },
     paginate: async (endpoint, params) => {
+      if (endpoint === github.rest.repos.listCommitStatusesForRef)
+        return statuses;
       inventories.push(endpoint);
       if (
         endpoint === github.rest.commits.listPullRequestsAssociatedWithCommit
@@ -90,6 +107,7 @@ async function fixture({
     graphql: async (query, params) => {
       if (query.includes('enqueuePullRequest')) {
         mutations.push(params);
+        if (mutationError) throw mutationError;
         if (failMutation) throw new Error('head changed');
         return { enqueuePullRequest: { mergeQueueEntry: { position: 1 } } };
       }
@@ -116,9 +134,16 @@ async function fixture({
       notice() {},
       warning: message => warnings.push(message),
     },
-    { env: { DRY_RUN: String(dry) } }
+    {
+      env: {
+        DRY_RUN: String(dry),
+        GITHUB_WORKSPACE: process.cwd(),
+        FAILURE_HOLD_RECEIPT: failureReceipt,
+      },
+    },
+    createRequire(import.meta.url)
   );
-  return { reads, mutations, warnings, inventories, gets };
+  return { reads, mutations, warnings, statusWrites, inventories, gets };
 }
 
 test('scans 113 PRs without a multiplied GraphQL query and pins each enqueue head', async () => {
@@ -189,6 +214,94 @@ test('wakes both existing controllers on completed Source Validation without a p
   );
   assert.ok(ready.on.workflow_run.workflows.includes('Source Validation'));
   assert.match(ready.jobs['green-source'].if, /source-validation\.yml/);
+});
+
+const retryFailure = {
+  context: 'jovie-queue-failure-hold/v1',
+  state: 'success',
+  creator: { login: 'jovie-bot[bot]', type: 'Bot' },
+  description: 'class=transient-infrastructure;n=1;run=123;try=1',
+  target_url: 'https://github.com/JovieInc/Jovie/actions/runs/123',
+};
+test('trusted job receipt prevents enrollment while status replication is empty', async () => {
+  const receipt = {
+    schema: 'jovie-merge-group-failure-hold/v1',
+    repository: 'JovieInc/Jovie',
+    prNumber: 1,
+    sourceHeadSha: sha,
+    classification: 'deterministic-source',
+    failureNumber: 1,
+    workflowRunId: 123,
+    workflowRunAttempt: 1,
+  };
+  const held = await fixture({ failureReceipt: JSON.stringify(receipt) });
+  assert.deepEqual(held.mutations, []);
+  const retry = await fixture({
+    failureReceipt: JSON.stringify({
+      ...receipt,
+      classification: 'transient-infrastructure',
+    }),
+    eventName: 'workflow_run',
+    payload: {
+      workflow_run: {
+        event: 'merge_group',
+        head_sha: 'b'.repeat(40),
+        head_branch: `gh-readonly-queue/main/pr-1-${sha}`,
+        pull_requests: [],
+      },
+    },
+  });
+  assert.deepEqual(retry.gets, [1]);
+  assert.equal(retry.mutations.length, 1);
+  assert.deepEqual(
+    retry.statusWrites.map(item => item.description),
+    ['spent:run=123;try=1']
+  );
+  assert.deepEqual(retry.inventories, []);
+  const changed = await fixture({
+    failureReceipt: JSON.stringify({
+      ...receipt,
+      sourceHeadSha: 'b'.repeat(40),
+    }),
+  });
+  assert.equal(changed.mutations.length, 1);
+  await assert.rejects(fixture({ failureReceipt: 'malformed' }));
+  assert.equal(
+    workflow.jobs['hold-failed-revision'].outputs.failure_receipt,
+    '${{ steps.failure-hold.outputs.failure_receipt }}'
+  );
+  assert.match(
+    workflow.jobs.enroll.steps.find(step => step.with?.script).env
+      .FAILURE_HOLD_RECEIPT,
+    /needs.hold-failed-revision.outputs.failure_receipt/
+  );
+});
+test('definitive rejected mutation releases retry while ambiguous errors preserve its reservation', async () => {
+  const error = Object.assign(new Error('rejected'), {
+    data: { enqueuePullRequest: null },
+    errors: [{ type: 'UNPROCESSABLE', path: ['enqueuePullRequest'] }],
+  });
+  const rejected = await fixture({
+    statuses: [retryFailure],
+    mutationError: error,
+  });
+  assert.deepEqual(
+    rejected.statusWrites.map(item => item.description),
+    ['spent:run=123;try=1', 'released:run=123;try=1']
+  );
+  const uncertain = await fixture({
+    statuses: [retryFailure],
+    failMutation: true,
+  });
+  assert.deepEqual(
+    uncertain.statusWrites.map(item => item.description),
+    ['spent:run=123;try=1']
+  );
+  const success = await fixture({ statuses: [retryFailure] });
+  assert.deepEqual(
+    success.statusWrites.map(item => item.description),
+    ['spent:run=123;try=1']
+  );
 });
 
 test('a PR wake reads only its current candidate instead of rescanning the whole queue', async () => {
