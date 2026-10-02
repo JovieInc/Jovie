@@ -190,6 +190,7 @@ export function validateEscapedDefectClosureEvidence(
 
   const detection = isRecord(evidence.detection) ? evidence.detection : {};
   if (
+    /^JOV-\d+$/.test(originatingIssue) &&
     String(detection.originatingIssue ?? '').toUpperCase() !== originatingIssue
   ) {
     errors.push('detection.originatingIssue must link the originating defect');

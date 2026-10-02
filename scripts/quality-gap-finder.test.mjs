@@ -314,6 +314,27 @@ describe('quality-gap-finder', () => {
   });
 
   describe('escaped defect closure', () => {
+    it('reports an invalid parent issue without blaming a valid nested link', () => {
+      for (const originatingIssue of ['', 'invalid']) {
+        const result = evaluateEscapedDefectClosure({
+          identifier: 'JOV-9',
+          description: escapedDefectEvidence({ originatingIssue }),
+          labels: ['escaped-defect'],
+        });
+        assert.equal(result.ok, false);
+        assert.ok(
+          result.errors.includes(
+            'originatingIssue must be a JOV issue identifier'
+          )
+        );
+        assert.equal(
+          result.errors.includes(
+            'detection.originatingIssue must link the originating defect'
+          ),
+          false
+        );
+      }
+    });
     it('deliberate red: catches a completed defect with no paired closure evidence', () => {
       const [gap] = collectEscapedDefectClosureGaps([
         {
