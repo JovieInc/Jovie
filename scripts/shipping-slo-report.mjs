@@ -102,7 +102,7 @@ export function collectRaw({ workflows, days }) {
           'api',
           `repos/${ghRepo}/actions/workflows/${wf}/runs?created=>=${encodeURIComponent(sinceIso)}&${params}&per_page=100`,
           '--jq',
-          '[.workflow_runs[] | {id, event, path, status, conclusion, head_branch, head_sha, created_at, updated_at, run_started_at, run_attempt, prNumbers: [.pull_requests[].number]}]',
+          '[.workflow_runs[] | {id, event, path, status, conclusion, head_branch, head_sha, created_at, updated_at, run_started_at, run_attempt, prNumbers: [(.pull_requests // [])[].number]}]',
         ]);
         const parsed = typeof page === 'string' ? JSON.parse(page) : page;
         const list = Array.isArray(parsed) ? parsed : [parsed];
