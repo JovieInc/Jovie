@@ -341,12 +341,14 @@ describe('merge_group workflow contract', () => {
     expect(CI_WORKFLOW).not.toContain('steps.graphite');
   });
 
-  it('runs source checks once per revision and never on ready_for_review', () => {
+  it('revalidates size after contract edits without draft-state or label churn', () => {
     const sourceRevisionTrigger = 'types: [opened, synchronize, reopened]';
 
     // Draft state does not change the source SHA. The original source checks
     // remain authoritative when the owner pairs ready with native auto-merge.
-    expect(SIZE_GUARD_WORKFLOW).toContain(sourceRevisionTrigger);
+    expect(SIZE_GUARD_WORKFLOW).toContain(
+      'types: [opened, synchronize, reopened, edited]'
+    );
     expect(FORK_GATE_WORKFLOW).toContain(
       `pull_request:\n    ${sourceRevisionTrigger}`
     );

@@ -47,6 +47,7 @@ enum NativeSessionTokenStore {
     let lock = NSLock()
     var generation = UUID()
     var bearerRevision = UUID()
+    var passivelyExpiredProfileOwner: (originalGeneration: UUID, emptyGeneration: UUID)?
   }
 
   private static let state = State()
@@ -61,6 +62,7 @@ enum NativeSessionTokenStore {
     withLock {
       state.generation = UUID()
       state.bearerRevision = UUID()
+      state.passivelyExpiredProfileOwner = nil
       saveLocked(token: token, userID: userID, expiresAt: expiresAt)
     }
   }
@@ -123,6 +125,32 @@ enum NativeSessionTokenStore {
     }
   }
 
+  /// Presentation may continue after passive expiry until that exact empty
+  /// generation is replaced or explicitly cleared. This grants no authorization
+  /// and leaves the existing client/terminal path responsible for expiry.
+  static func canContinueProfileLoad(ownedBy ownership: NativeSessionOwnership) -> Bool {
+    withLock {
+      state.generation == ownership.generation || (
+        state.passivelyExpiredProfileOwner?.originalGeneration == ownership.generation &&
+        state.passivelyExpiredProfileOwner?.emptyGeneration == state.generation
+      )
+    }
+  }
+
+  /// Keeps a synchronous local mutation atomic with login replacement/clear.
+  /// The operation must not await or re-enter any token-store API.
+  @discardableResult
+  static func performIfCurrent(
+    _ ownership: NativeSessionOwnership,
+    _ operation: () -> Void
+  ) -> Bool {
+    withLock {
+      guard state.generation == ownership.generation else { return false }
+      operation()
+      return true
+    }
+  }
+
   /// A pending operation may use a rotated bearer only within its original login.
   static func requestAuthorization(
     ifOwnedBy ownership: NativeSessionOwnership
@@ -150,7 +178,9 @@ enum NativeSessionTokenStore {
     )
 
     guard expiresAt.timeIntervalSinceNow > expiryLeeway else {
+      let expiredGeneration = state.generation
       clearLocked()
+      state.passivelyExpiredProfileOwner = (expiredGeneration, state.generation)
       return nil
     }
 
@@ -164,6 +194,7 @@ enum NativeSessionTokenStore {
   private static func clearLocked() {
     state.generation = UUID()
     state.bearerRevision = UUID()
+    state.passivelyExpiredProfileOwner = nil
     clearToken()
     UserDefaults.standard.removeObject(forKey: fallbackTokenKey)
     UserDefaults.standard.removeObject(forKey: userIDKey)

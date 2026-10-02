@@ -16,9 +16,16 @@ remains historical evidence; its Electron-only prohibition is superseded.
 | iOS product and reusable client behavior | `apps/ios/Jovie` | Existing native implementation; desktop feature parity is unproven. |
 | iOS web preview | `PublicProfileBrowserView.swift` | Existing host-allowlisted WKWebView; not a hosted-chat precedent. |
 
-The planned native product owner is `apps/ios/JovieMac`; shared Swift extractions
-belong under `apps/ios/Packages/JovieKit`. These destinations do not certify that
-the complete package or product app is present. The deprecated standalone Swift Ovie implementation
+The native development target is `apps/ios/JovieMac.xcodeproj`, using the existing
+`JovieKit` package and canonical `JovieTheme`. Its distinct Development identity
+defaults to unavailable; only Debug accepts `--jovie-development-fixture` for
+immutable, read-only content. Release excludes that fixture. Required unsigned
+Mac Debug/Release tests cover this boundary and bundled Inter font resolution;
+they do not establish authentication, distribution or installed performance.
+The scaffold is a bounded extraction from Tim White's #18958 (`3dde45bbe4d5`,
+co-authored with Claude Opus 5.5). JOV-7528 owns this source slice; JOV-6750,
+JOV-6754, JOV-6748 and JOV-6759 retain shared-client, parity and release acceptance.
+The deprecated standalone Swift Ovie implementation
 stays read-only by policy. Do not grow MenuMonitor into a second product shell.
 
 ## Transition plan
@@ -46,4 +53,4 @@ under `JOV-INV-004`; broader adoption remains [JOV-6760](https://linear.app/jovi
 Agent routing: [macOS rule](../../.claude/rules/macos.md).
 Current-source assertions: `scripts/invariants/macos-swift-control.test.mjs`.
 They guard shipped ownership and accessory boundaries; they do not build or
-certify a future native target.
+certify native runtime acceptance; the required native CI job tests the development target.
