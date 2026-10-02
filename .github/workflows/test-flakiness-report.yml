@@ -193,7 +193,7 @@ jobs:
               console.log(`Created deflake issue #${issue.number}: ${deflakeTitle}`);
             }
 
-      - name: File Linear remediation when the ratchet is red and GitHub filing is retired
+      - name: File Linear remediation when the ratchet is red
         if: ${{ failure() && steps.ratchet.outcome == 'failure' }}
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}

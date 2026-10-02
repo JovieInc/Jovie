@@ -1,26 +1,19 @@
 #!/usr/bin/env node
 
-import { readFileSync } from 'node:fs';
 import { planFlakyTestFiling } from './lib/flaky-test-filing.mjs';
 import { upsertLinearIssueByTitleFingerprint } from './lib/linear-issue-intake.mjs';
 
-const WORKFLOW = '.github/workflows/test-flakiness-report.yml';
-
 async function main() {
-  const workflowSource = readFileSync(WORKFLOW, 'utf8');
   const ratchetFailed =
     process.env.RATCHET_FAILED === 'true' ||
     process.env.RATCHET_STATUS === 'failure';
   const plan = planFlakyTestFiling({
-    workflowSource,
     ratchetFailed,
     flakyCount: process.env.FLAKY_COUNT || '0',
     runUrl: process.env.RUN_URL || '',
   });
   if (!plan) {
-    console.log(
-      'Skipping remediation:flaky-test-filing (ratchet is green or GitHub issue filing is no longer retired).'
-    );
+    console.log('Skipping remediation:flaky-test-filing (ratchet is green).');
     return;
   }
   const result = await upsertLinearIssueByTitleFingerprint({
