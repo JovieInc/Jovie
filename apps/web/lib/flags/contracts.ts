@@ -81,6 +81,12 @@ export const APP_FLAG_DEFAULTS = {
    * independent of flag-resolution latency.
    */
   CREATOR_FINANCE: false,
+  /**
+   * One-off Digital Footprint & Visibility Audit checkout ($199, credited
+   * toward the first month of Artist Visibility Pro). Default off. The CTA
+   * also requires VISIBILITY_AUDIT_PAYMENT_LINK_URL.
+   */
+  VISIBILITY_AUDIT_OFFER: false,
 } as const;
 
 export type AppFlagName = keyof typeof APP_FLAG_DEFAULTS;
@@ -112,6 +118,7 @@ export const APP_FLAG_KEYS = {
   MERCH_QA_GATE: 'merch_qa_gate',
   AGENT_PROFILE_CREATE: 'agent_profile_create',
   CREATOR_FINANCE: 'creator_finance',
+  VISIBILITY_AUDIT_OFFER: 'visibility_audit_offer',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_OVERRIDE_KEYS = {
@@ -138,6 +145,7 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   MERCH_QA_GATE: 'code:MERCH_QA_GATE',
   AGENT_PROFILE_CREATE: 'code:AGENT_PROFILE_CREATE',
   CREATOR_FINANCE: 'code:CREATOR_FINANCE',
+  VISIBILITY_AUDIT_OFFER: 'code:VISIBILITY_AUDIT_OFFER',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_TO_STATSIG_GATE = {
@@ -194,6 +202,8 @@ export const APP_FLAG_DESCRIPTIONS = {
     'Anonymous agent profile creation via POST /api/agents/profiles (public CLI/MCP write path).',
   CREATOR_FINANCE:
     'Creator Financial Health owner-only surfaces (JOV-4621). Release-blocking gate — stays off until the privacy/correctness matrix is certified.',
+  VISIBILITY_AUDIT_OFFER:
+    'Digital Footprint & Visibility Audit offer ($199, credited toward the first month of Artist Visibility Pro). Default off. Renders only when this flag is on and VISIBILITY_AUDIT_PAYMENT_LINK_URL is a Stripe Payment Link.',
 } as const satisfies Record<AppFlagName, string>;
 
 /**
@@ -246,6 +256,8 @@ export const APP_FLAG_REMOVAL_CONDITIONS = {
     'Retain while the anonymous public write path needs an abuse stop control.',
   CREATOR_FINANCE:
     'Remove when the JOV-4621 release gate is certified and financial access no longer needs a fleet-wide stop control.',
+  VISIBILITY_AUDIT_OFFER:
+    'Remove when the audit is a permanent priced offer with its own checkout, or when the offer is retired.',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_AUDIT_OWNER = '@itstimwhite' as const;
@@ -313,4 +325,5 @@ export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
   'MERCH_QA_GATE', // JOV-4739 publish gate; default off until a real visual reviewer replaces the stub — no Statsig gate
   'AGENT_PROFILE_CREATE', // public agent write-path kill switch; env/admin override, no Statsig gate
   'CREATOR_FINANCE', // JOV-4621 release gate; env/admin override + FINANCE_DISABLE kill switch, no Statsig gate
+  'VISIBILITY_AUDIT_OFFER', // commercial one-off; default off and role-invariant so admins do not see checkout until the flag is published — no Statsig gate
 ]);

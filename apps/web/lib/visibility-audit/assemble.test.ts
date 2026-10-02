@@ -11,6 +11,7 @@ import { findDerivedSpotifyMetricKeys } from './derived-metrics';
 import { dspKeyForUrl } from './dsp-presence';
 import { ALLMUSIC_SUBMISSION_PROVIDER_ID } from './fixes';
 import { TIM_WHITE_VISIBILITY_AUDIT_INPUT } from './fixtures/tim-white';
+import { renderVisibilityAuditMarkdown } from './render-markdown';
 import type { VisibilityAuditInput } from './types';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -71,6 +72,16 @@ describe('visibility audit', () => {
     ).toBe(true);
     expect(report.searchOwnership.instruction).toContain('SerpAPI');
     expect(report.catalog.policy).toContain('Spotify Developer Policy III.13');
+
+    const markdown = renderVisibilityAuditMarkdown(report);
+    expect(markdown).toContain('MusicFetch is not called');
+    expect(markdown).toContain('SerpAPI requests: 0');
+    expect(markdown).toContain('Spotify Developer Policy III.13');
+    const committed = readFileSync(
+      path.resolve(HERE, '../../../../docs/examples/visibility-audit/tim.md'),
+      'utf8'
+    );
+    expect(committed).toBe(markdown);
   });
 
   it('resolves MBID to Wikidata QID to ISNI from stored identity links', () => {

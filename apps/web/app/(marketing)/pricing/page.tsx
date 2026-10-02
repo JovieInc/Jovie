@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
+import { VisibilityAuditOffer } from '@/components/features/visibility-audit/VisibilityAuditOffer';
 import { PricingRecipeBody } from '@/components/organisms/PricingRecipeBody';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import {
@@ -123,6 +124,7 @@ export default function PricingPage() {
       plans={
         <MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />
       }
+      auditOffer={<VisibilityAuditOffer />}
       comparisonChart={<PricingComparisonChart />}
     />
   );
