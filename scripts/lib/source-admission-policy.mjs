@@ -21,6 +21,7 @@ const HOLDS = new Set([
   'fast',
 ]);
 const TOMBSTONES = new Set([
+  'jovie-queue-failure-hold/v1',
   'jovie-queue-product-failure/v1',
   'jovie-native-unmergeable/v1',
 ]);
@@ -171,12 +172,21 @@ export function evaluateSourceAdmission({
       continue;
     }
     if (!TOMBSTONES.has(status.context)) continue;
+    const failureMatch =
+      status.context === 'jovie-queue-failure-hold/v1' &&
+      typeof status.description === 'string'
+        ? /^class=(deterministic-source|retryable-product|transient-infrastructure|unclassified);n=[1-9][0-9]*;run=([1-9][0-9]*);try=[1-9][0-9]*$/.exec(
+            status.description
+          )
+        : null;
     const description =
-      status.context === 'jovie-queue-product-failure/v1'
+      failureMatch !== null ||
+      (status.context === 'jovie-queue-product-failure/v1'
         ? status.description === 'blocked:merge-group-product-failure'
-        : typeof status.description === 'string' &&
-          status.description.startsWith('ejected:');
-    if (status.state !== 'success' || !description) continue;
+        : status.context === 'jovie-native-unmergeable/v1' &&
+          typeof status.description === 'string' &&
+          status.description.startsWith('ejected:'));
+    if (status.state !== 'success' || description !== true) continue;
     const prefix = `https://github.com/${repository}/actions/runs/`;
     if (!status.creator || typeof status.creator.login !== 'string') {
       blockers.push('tombstone-provenance-unavailable');
@@ -190,7 +200,9 @@ export function evaluateSourceAdmission({
     if (
       typeof status.target_url !== 'string' ||
       !status.target_url.startsWith(prefix) ||
-      !/^[1-9][0-9]*$/.test(status.target_url.slice(prefix.length))
+      !/^[1-9][0-9]*$/.test(status.target_url.slice(prefix.length)) ||
+      (failureMatch !== null &&
+        status.target_url.slice(prefix.length) !== failureMatch[2])
     ) {
       blockers.push('tombstone-provenance-unavailable');
       continue;
