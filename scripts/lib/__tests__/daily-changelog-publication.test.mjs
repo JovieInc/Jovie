@@ -9,7 +9,6 @@ import {
   planDailyPublication,
   readCustomerNote,
 } from '../daily-changelog-publication.mjs';
-
 const HEAD = 'a'.repeat(40),
   MERGE = 'b'.repeat(40);
 const observedAt = '2026-10-02T12:00:00Z';
@@ -62,7 +61,6 @@ const input = overrides => ({
   observedAt,
   ...overrides,
 });
-
 describe('customer release metadata', () => {
   it('requires a public/internal decision for new customer code without reclassifying existing PRs', () => {
     const event = {
@@ -127,7 +125,6 @@ describe('customer release metadata', () => {
     expect(readCustomerNote(body(note)).note).toEqual(note);
   });
 });
-
 describe('source → published changelog', () => {
   it('defers a verified superseded public generation while malformed bindings still fail', () => {
     expect(
@@ -330,7 +327,6 @@ describe('source → published changelog', () => {
     ]);
   });
 });
-
 describe('production candidate collection', () => {
   async function collect(overrides = {}) {
     const calls = [];
@@ -419,7 +415,6 @@ describe('production candidate collection', () => {
     ).toBe(false);
   });
 });
-
 describe('publication transport', () => {
   it('runs only after exact production verification and preserves the release DAG', () => {
     const workflow =

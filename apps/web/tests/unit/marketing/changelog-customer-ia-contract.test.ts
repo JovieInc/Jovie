@@ -47,6 +47,14 @@ describe('customer changelog IA contract', () => {
     expect(archive).not.toContain('<img');
 
     const editorialCss = readWebSource(EDITORIAL_CSS);
+    // The archive needs the full editorial width; reserving the subscription
+    // column squeezes the nested date/copy/media grid below readable widths.
+    expect(editorialCss).toMatch(
+      /\.changelog-entries\s*\{\s*grid-column: 1 \/ -1;/
+    );
+    expect(editorialCss).toMatch(
+      /\.changelog-subscribe-rail\s*\{\s*grid-column: 2;\s*grid-row: 1;/
+    );
     expect(editorialCss).toContain(
       'top: calc(var(--public-shell-header-offset) + var(--space-4));'
     );

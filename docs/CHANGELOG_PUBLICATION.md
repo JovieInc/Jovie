@@ -9,16 +9,14 @@ Subscriptions are unchanged; publishing a digest does not send email.
 Put this hidden block in the source PR body. Use a customer outcome, not a PR title or implementation description.
 Related PRs share an outcome key and identical copy; conflicting copy fails closed.
 Internal work uses `<!-- customer-changelog/v1 {"releaseWorthy":false} -->`.
-Source Validation requires an explicit decision for customer-code PRs created from 2026-10-03 UTC;
-older PRs retain their admission contract. Metadata-only repairs require rerunning Source Validation.
+Source Validation requires an explicit decision for customer-code PRs created from 2026-10-03 UTC; older PRs retain their admission contract. Metadata-only repairs require rerunning Source Validation.
 
 ```html
 <!-- customer-changelog/v1 {"issueId":"JOV-7447","outcomeKey":"profile-link-claim","audience":"public","visibility":"public","releaseWorthy":true,"section":"Added","text":"Choose your profile link: Start with a name on the homepage.","evidence":[{"url":"https://jov.ie/","contains":"Claim"}]} -->
 ```
 
 Sections: Added, Changed, Fixed, Removed. Public copy is at most 400 characters, without internal tooling or issue IDs.
-Evidence uses bounded read-only checks on jov.ie or docs.jov.ie. Approve only claims the path actually proves;
-authenticated actions, payments and entitlements need their actual customer-path receipt, not marketing headlines.
+Evidence uses bounded read-only checks on jov.ie or docs.jov.ie. Approve only claims the path actually proves; authenticated actions, payments and entitlements need their actual customer-path receipt, not marketing headlines.
 
 ## Release path
 
@@ -31,14 +29,11 @@ failed paths and conflicting claims cannot publish.
 `--write` requires a clean `release/daily-changelog-YYYY-MM-DD-<run>-<attempt>` checkout.
 The release PR changes only CHANGELOG.md and follows exact-head source CI, the native queue and Production Controller.
 No CalVer, package version, tag, desktop release or alias is mutated. Implementation-branch restrictions remain.
-The existing hourly Auto-Merge Default owner finishes only changelog-only drafts with every required check passing
-at the observed head, then requests native auto-merge. The production publisher is not a second merge owner.
+The existing hourly Auto-Merge Default owner finishes only changelog-only drafts with every required check passing at the observed head, then requests native auto-merge. The production publisher is not a second merge owner.
 
-At most three grouped outcomes per UTC date. Later changes append to that post, preserving copy, source/runtime
-provenance and whole-post dismissal. Overflow remains pending for the next date. Source IDs are persisted in receipts.
+At most three grouped outcomes per UTC date. Later changes append to that post, preserving copy, source/runtime provenance and whole-post dismissal. Overflow remains pending for the next date. Source IDs are persisted in receipts.
 No-change/deferral plans are retained as workflow artifacts; validation failures fail the job.
-Recovered work is dated when its path is verified, never its merge date. `--seed <file>` accepts reviewed
-`{number, note}` records for recovery without modifying historical PR bodies.
+Recovered work is dated when its path is verified, never its merge date. `--seed <file>` accepts reviewed `{number, note}` records for recovery without modifying historical PR bodies.
 
 ## Verification and cost
 
@@ -47,6 +42,4 @@ Recovery scans at most 5,000 first-parent commits; PR reads batch 50/request; pu
 Normal collection starts at the last published deployment head. No model, service, database, cron or automatic email.
 
 Adopt-first decision, 2026-10-02: extend the existing evaluator, parsers, verified artifact and release transport.
-A separate service/store adds an authority without fixing the missing publisher. Ship now: approved copy and
-verified outcomes. Re-evaluate when PR writers cannot maintain metadata; then assess the existing governed
-factual-writing model route with measured evaluation proof.
+A separate service/store adds an authority without fixing the missing publisher. Ship now: approved copy and verified outcomes. Re-evaluate when PR writers cannot maintain metadata; then assess the existing governed factual-writing model route with measured evaluation proof.
