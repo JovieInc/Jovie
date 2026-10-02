@@ -26,6 +26,7 @@ import {
   ShellSidebarOverrideProvider,
   useShellSidebarOverride,
 } from '@/contexts/ShellSidebarOverrideContext';
+import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 
 Element.prototype.scrollIntoView = vi.fn();
 
@@ -446,7 +447,7 @@ describe('LibrarySurface', () => {
       ),
     ].map(match => match[0]);
 
-    expect(statusPillClasses).toHaveLength(4);
+    expect(statusPillClasses).toHaveLength(3);
     for (const className of statusPillClasses ?? []) {
       expect(className).toContain('truncate');
       expect(className).toContain('rounded-full');
@@ -1013,7 +1014,7 @@ describe('LibrarySurface', () => {
     ).toBeGreaterThan(0);
     fireEvent.click(drawer.getByRole('tab', { name: 'Overview' }));
     expect(drawer.getByText('Apr 28')).toHaveAttribute('title', 'Apr 28, 2026');
-    expect(drawer.getByText('68/100')).toBeDefined();
+    expect(drawer.queryByText('68/100')).not.toBeInTheDocument();
     expect(drawer.getByText('Progressive House')).toBeDefined();
 
     fireEvent.keyDown(document, { key: 'Escape' });
@@ -1263,7 +1264,7 @@ describe('LibrarySurface', () => {
     );
 
     const drawer = within(screen.getByTestId('library-asset-drawer'));
-    expect(drawer.getAllByText('Merch').length).toBeGreaterThan(0);
+    expect(drawer.getAllByText(/Hoodie/u).length).toBeGreaterThan(0);
     expect(
       drawer.getByText('Black hoodie with Never Say A Word cover art.')
     ).toBeInTheDocument();
@@ -1302,6 +1303,100 @@ describe('LibrarySurface', () => {
     expect(
       tabs.queryByRole('tab', { name: 'Presence' })
     ).not.toBeInTheDocument();
+  });
+
+  it('states what the selected work is and what is public without conflating visibility', () => {
+    renderLibrary([
+      buildAsset({
+        profileVisibility: 'hidden',
+        source: { provider: 'discography', canonicalId: 'catalog-release-1' },
+        share: {
+          assetId: 'release-1',
+          visibility: 'private',
+          shareSlug: 'take-me-over',
+          accessToken: 'token-1',
+          shareUrl: 'https://jov.ie/p/token-1',
+          tokenRevokedAt: null,
+        },
+      }),
+    ]);
+
+    fireEvent.click(screen.getByTestId('library-release-row-release-1'));
+
+    const drawer = within(screen.getByTestId('library-asset-drawer'));
+    const presentation = within(
+      drawer.getByTestId('work-inspector-presentation')
+    );
+    const about = within(drawer.getByTestId('work-inspector-about'));
+
+    expect(
+      drawer.getByRole('link', { name: 'Open Full View' })
+    ).toHaveAttribute('href', '/tim/take-me-over');
+    expect(presentation.getByText('Released')).toBeInTheDocument();
+    expect(presentation.getByText('Not public')).toBeInTheDocument();
+    expect(presentation.getByText('Hidden from profile')).toBeInTheDocument();
+    expect(presentation.getByText('Listen')).toBeInTheDocument();
+    expect(presentation.getByText('Spotify')).toBeInTheDocument();
+    expect(about.getByText('Single')).toBeInTheDocument();
+    expect(
+      about.getByText('Discography · catalog-release-1')
+    ).toBeInTheDocument();
+    expect(about.queryByText('68/100')).not.toBeInTheDocument();
+  });
+
+  it('resets to scoped Overview data synchronously when selection changes', () => {
+    const postReleaseBundle: LibraryPostReleaseBundle = {
+      downloads: [
+        {
+          id: 'download-a',
+          releaseId: 'release-a',
+          title: 'A stems',
+          fileName: 'a.zip',
+        },
+        {
+          id: 'download-b-1',
+          releaseId: 'release-b',
+          title: 'B stems one',
+          fileName: 'b-one.zip',
+        },
+        {
+          id: 'download-b-2',
+          releaseId: 'release-b',
+          title: 'B stems two',
+          fileName: 'b-two.zip',
+        },
+      ],
+      findings: [],
+      rightsholders: [],
+      stats: [],
+    };
+
+    renderLibrary(
+      [
+        buildAsset({ id: 'release-a', title: 'Release A' }),
+        buildAsset({ id: 'release-b', title: 'Release B' }),
+      ],
+      { postReleaseBundle }
+    );
+
+    fireEvent.click(screen.getByTestId('library-release-row-release-a'));
+    let drawer = within(screen.getByTestId('library-asset-drawer'));
+    fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
+    expect(drawer.getByText('1 stem file')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('library-release-row-release-b'));
+    drawer = within(screen.getByTestId('library-asset-drawer'));
+    expect(drawer.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(drawer.getByTestId('library-asset-entity-header')).toHaveTextContent(
+      'Release B'
+    );
+    expect(drawer.queryByText('1 stem file')).not.toBeInTheDocument();
+
+    fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
+    expect(drawer.getByText('2 stem files')).toBeInTheDocument();
   });
 
   it('uses shell focus tokens for library cards and drawer actions', () => {
