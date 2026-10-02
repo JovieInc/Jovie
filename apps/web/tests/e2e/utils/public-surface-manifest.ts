@@ -685,11 +685,11 @@ const PROFILE_SURFACES = [
     family: 'profile-core',
     expectedState: 'redirect',
     path: '/[username]/notifications',
-    resolvePath: () => `/${resolveProfileHandle('tip')}/notifications`,
-    readySelectors: [
-      '[data-testid="profile-primary-tab-subscribe"]',
-      '[data-testid="profile-header"]',
-    ],
+    // Unclaimed tip profiles keep Home and never mount the subscribe flow.
+    // waitForAnyVisible treats this list as OR, so a generic header is a
+    // false pass. Require the flow that only claimed profiles render.
+    resolvePath: () => `/${resolveProfileHandle('music')}/notifications`,
+    readySelectors: ['[data-testid="profile-mobile-notifications-flow"]'],
     mainSelector: 'main',
     minMainTextLength: 60,
     expectedRedirects: [/\/[^/]+\?mode=subscribe$/],
