@@ -1,5 +1,4 @@
 'use client';
-// @coverage-via apps/web/tests/unit/app/surface-elevation-guardrails.test.ts
 
 import { AlertTriangle, CheckCircle, Copy, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
