@@ -481,7 +481,7 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
                 text = (rgb(GREEN, "● ") + rgb(FG, f"{name:<6} ", bold=True) + rgb(WHITE, f"{run['target']:<10}") + " " + shown_title
                         + rgb(DIM, f"  {kind:<7} ") + rgb(color, f"{phase:<14}") + rgb(DIM, f" {elapsed}"))
             elif worker:
-                text = rgb(DIM, "○ ") + rgb(FG, f"{name:<6} ") + rgb(DIM, "worker polling · " + pool_hint(name, linear))
+                text = rgb(DIM, "○ ") + rgb(FG, f"{name:<6} ") + rgb(DIM, "worker polling · " + pool_hint(name, local))
             else:
                 text = rgb(DIM, "○ ") + rgb(FG, f"{name:<6} ") + rgb(DIM, "vacant · " + vacancy_hint(name, local, linear))
             lines.append(pad("│ " + text, width - 1) + rgb(DIM, "│"))
@@ -617,10 +617,12 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     lines.append(rgb(DIM, "  THROUGHPUT 24h · " + " | ".join(provider_parts)))
 
     # backlog
+    for name in local["slots"]:
+        lines.append(rgb(FG, f"CLAIMABLE {name}  ", bold=True) + rgb(DIM, pool_hint(name, local)))
     if linear.get("ok"):
         pool = linear["pool"]
         backlog = " · ".join(f"{label} {pool.get(label, 0)}" for label in LANE_LABELS)
-        lines.append(rgb(FG, "BACKLOG  ", bold=True) + rgb(DIM, f"Todo pool {linear['poolTotal']} ({backlog}) · in progress {len(linear['active'])} · triage returns {linear['triage']}"))
+        lines.append(rgb(FG, "BACKLOG  ", bold=True) + rgb(DIM, f"Todo candidates {linear['poolTotal']} ({backlog}) · in progress {len(linear['active'])} · triage returns {linear['triage']}"))
     else:
         lines.append(rgb(FG, "BACKLOG  ", bold=True) + rgb(RED, "Linear unavailable: " + linear.get("error", "?")))
 
@@ -638,12 +640,25 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     return lines
 
 
-def pool_hint(name: str, linear: dict) -> str:
-    if not linear.get("ok"):
-        return "pool unknown (Linear unread)"
-    pool = linear["pool"]
-    total = pool.get(name, 0) + pool.get("agent-ready", 0)
-    return f"pool {total} (own {pool.get(name, 0)}, shared {pool.get('agent-ready', 0)})" if total else "pool empty"
+def pool_hint(name: str, local: dict) -> str:
+    feed = local.get("doctor") or {}
+    admission = feed.get("admission") or {}
+    try:
+        stamp = datetime.fromisoformat(feed["at"].replace("Z", "+00:00"))
+        elapsed = (utcnow() - stamp).total_seconds()
+        if elapsed < 0 or elapsed > 3 * REFRESH_REMOTE_S:
+            return "claimable unknown (doctor stale)"
+    except (KeyError, TypeError, ValueError):
+        return "claimable unknown (doctor unread)"
+    if admission.get("error"):
+        return "claimable unknown (" + admission["error"] + ")"
+    qualified = (admission.get("poolByProvider") or {}).get(name)
+    candidates = (admission.get("candidatePoolByProvider") or {}).get(name)
+    if qualified is None or candidates is None:
+        return "claimable unknown (admission unread)"
+    reasons = (admission.get("rejectedByProvider") or {}).get(name) or {}
+    distribution = ", ".join(f"{reason} {count}" for reason, count in sorted(reasons.items()))
+    return f"claimable {qualified}/{candidates}" + (" · " + distribution if distribution else "")
 
 
 def vacancy_hint(name: str, local: dict, linear: dict) -> str:
@@ -651,7 +666,7 @@ def vacancy_hint(name: str, local: dict, linear: dict) -> str:
         return f"provider cooling {dur(local['cooldowns'][name])}"
     if name == "codex" and not local["codex"].get("available"):
         return "no codex account available"
-    return "no worker (timer restarts idle lanes each minute) · " + pool_hint(name, linear)
+    return "no worker (timer restarts idle lanes each minute) · " + pool_hint(name, local)
 
 
 # ---------------------------------------------------------------- loop

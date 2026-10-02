@@ -107,7 +107,7 @@ class RenderTest(unittest.TestCase):
         text = "\n".join(plain(line) for line in hud.render(model(), 160, 45))
         self.assertIn("1 running / 3 (devin 1/2 · codex 0/1)", text)
         self.assertIn("JOV-6544   Audio browsing: verify and close intent prefetch", text)
-        self.assertIn("worker polling · pool 87 (own 0, shared 87)", text)
+        self.assertIn("worker polling · claimable unknown (doctor unread)", text)
         self.assertIn("codex  vacant · no worker", text)
         self.assertIn("✓ alpha 48% left · reset 10m · banked 2", text)
         self.assertIn("✕ beta 0% left · reset 1h30m · banked 1 · retry 1h30m", text)
@@ -136,7 +136,7 @@ class RenderTest(unittest.TestCase):
         self.assertIn("cooldown hyperagent 10m", text)
         self.assertIn("requeue pending #18720", text)
         self.assertIn("gate-timeout 2", text)
-        self.assertIn("Todo pool 99 (agent-ready 87 · devin 0 · codex 19)", text)
+        self.assertIn("Todo candidates 99 (agent-ready 87 · devin 0 · codex 19)", text)
         self.assertIn("autonomous 1 · manual Codex app 0 · old codex/* 0 · total 2 in 24h", text)
         self.assertIn("THROUGHPUT 24h · codex offer 0", text)
         self.assertIn("devin offer 1 start 1 productive 1 PR 1 first-pass 100%", text)
@@ -152,7 +152,7 @@ class RenderTest(unittest.TestCase):
         self.assertIn("Linear HTTPError: 429", text)
         self.assertIn("PR list: RuntimeError: HTTP 504", text)
         self.assertIn("merge queue timeout", text)
-        self.assertIn("pool unknown (Linear unread)", text)
+        self.assertIn("claimable unknown (doctor unread)", text)
         self.assertIn("FileNotFoundError: codex", text)
         self.assertIn("✓ nothing needs a human", text)
         self.assertNotIn("UNKNOWN", text)
@@ -162,6 +162,30 @@ class RenderTest(unittest.TestCase):
         stale["github"]["fetchedAt"] = "2026-01-01T00:00:00+00:00"
         header = plain(hud.render(stale, 160, 45)[0])
         self.assertIn("github stale", header)
+
+    def test_claimable_pool_uses_fresh_final_predicate_receipt_not_raw_labels(self):
+        value = model()
+        feed = value["local"]["doctor"]
+        feed.update(at=hud.utcnow().isoformat(), admission={
+            "poolByProvider": {"devin": 0, "codex": 1},
+            "candidatePoolByProvider": {"devin": 8, "codex": 1},
+            "rejectedByProvider": {"devin": {"excluded-label:type:epic": 5, "sensitive-text": 3}}})
+        text = "\n".join(plain(line) for line in hud.render(value, 160, 45))
+        self.assertIn("claimable 0/8 · excluded-label:type:epic 5, sensitive-text 3", text)
+        self.assertIn("CLAIMABLE devin", text)
+        self.assertNotIn("pool 87", text)
+        # An unrelated direct Linear read failure does not invalidate the fresh receipt.
+        value["linear"] = {"ok": False, "error": "HTTP 429"}
+        self.assertIn("claimable 0/8", hud.pool_hint("devin", value["local"]))
+        feed["admission"]["error"] = "ownership unreadable"
+        self.assertEqual(hud.pool_hint("devin", value["local"]), "claimable unknown (ownership unreadable)")
+        feed["admission"].pop("error")
+        self.assertEqual(hud.pool_hint("missing", value["local"]), "claimable unknown (admission unread)")
+        for stamp in ("2026-01-01T00:00:00Z", "2099-01-01T00:00:00Z"):
+            feed["at"] = stamp
+            self.assertEqual(hud.pool_hint("devin", value["local"]), "claimable unknown (doctor stale)")
+        feed["at"] = "malformed"
+        self.assertEqual(hud.pool_hint("devin", value["local"]), "claimable unknown (doctor unread)")
 
     def test_clip_keeps_ansi_balanced_and_width_exact(self):
         colored = hud.rgb(hud.RED, "x" * 50)
