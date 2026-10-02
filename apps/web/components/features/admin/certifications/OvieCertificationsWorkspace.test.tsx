@@ -191,6 +191,17 @@ describe('OvieCertificationsWorkspace', () => {
     expect(mocks.toastSuccess).toHaveBeenCalledWith('Certified');
   });
 
+  it('deep-links to the evidence rail when ?row= is present', () => {
+    mockQuery({ data: fixtureInventory() });
+    window.history.pushState({}, '', '?row=flows%3Asignup-golden-path');
+    try {
+      render(<OvieCertificationsWorkspace />);
+      expect(latestRailProps().row?.id).toBe('flows:signup-golden-path');
+    } finally {
+      window.history.pushState({}, '', '/');
+    }
+  });
+
   it('opens the walkthrough from the rail and certifies through the same digest-bound path', async () => {
     const inventory = fixtureInventory();
     mockQuery({ data: inventory });
