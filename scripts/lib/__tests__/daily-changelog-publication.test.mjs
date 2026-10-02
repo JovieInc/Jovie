@@ -153,6 +153,7 @@ describe('customer release metadata', () => {
       { ...note, text: 'Deploy the CI pipeline' },
       { ...note, text: '<script>oops</script>' },
       { ...note, section: 'Made up' },
+      { ...note, outcomeKey: 'Ünicode identity' },
       { ...note, evidence: [{ url: 'garbage', contains: 'ok' }] },
       ...[
         'http://jov.ie',
@@ -196,6 +197,12 @@ describe('source → published changelog', () => {
     expect(plan.result.receipt.deployments).toEqual([
       { id: 'dpl_1', sha: HEAD },
     ]);
+    expect(plan.result.receipt.stories[0]).toMatchObject({
+      id: 'profile-claim',
+      entryId: 'customer-update:profile-claim',
+      slug: 'update-profile-claim',
+      aliases: [],
+    });
     const release = parseChangelog(plan.content).releases[0];
     expect(release.sections.added).toEqual([note.text]);
     expect(release.date).toBe('2026-10-02');
@@ -231,6 +238,20 @@ describe('source → published changelog', () => {
     );
     expect(nextDay.status).toBe('publish');
     expect(parseChangelog(nextDay.content).releases).toHaveLength(2);
+    expect(() =>
+      planDailyPublication(
+        input({
+          markdown: first.content,
+          candidates: [
+            candidate({
+              pr: { ...candidate().pr, number: 3 },
+            }),
+          ],
+          windowKey: '2026-10-03',
+          observedAt: '2026-10-03T00:15:00Z',
+        })
+      )
+    ).toThrow('already published');
   });
   it('preserves same-day outcome copy, proof and the three-outcome cap across append attempts', () => {
     const first = planDailyPublication(
@@ -258,14 +279,17 @@ describe('source → published changelog', () => {
     expect(grouped.result.receipt.runtimeEvidence).toEqual([
       { url: 'https://jov.ie', sha256: 'receipt' },
     ]);
-    expect(() =>
-      planDailyPublication(
-        input({
-          markdown: first.content,
-          candidates: [make(2, note.outcomeKey, 'Changed claim')],
-        })
-      )
-    ).toThrow('Conflicting approved copy');
+    const edited = planDailyPublication(
+      input({
+        markdown: first.content,
+        candidates: [make(2, note.outcomeKey, 'Changed claim')],
+      })
+    );
+    expect(edited.result.stories[0]).toMatchObject({
+      summary: 'Changed claim',
+      entryId: 'customer-update:profile-claim',
+      slug: 'update-profile-claim',
+    });
     const capped = planDailyPublication(
       input({
         markdown: first.content,

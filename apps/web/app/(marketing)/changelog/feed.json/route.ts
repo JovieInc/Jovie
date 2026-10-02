@@ -1,19 +1,18 @@
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { getChangelogSnapshot } from '@/lib/changelog-source';
 import {
+  customerChangelogEntryPath,
   formatCustomerChangelogTertiary,
-  projectCustomerChangelog,
+  projectCustomerChangelogArchive,
 } from '@/lib/customer-changelog';
 
 export const revalidate = false;
 
-function versionPageUrl(version: string): string {
-  return `${BASE_URL}/changelog/${encodeURIComponent(version)}`;
-}
-
 export async function GET() {
   const snapshot = await getChangelogSnapshot();
-  const entries = projectCustomerChangelog(snapshot.releases).slice(0, 20);
+  const entries = projectCustomerChangelogArchive(
+    snapshot.sourceReleases
+  ).entries.slice(0, 20);
 
   const feed = {
     version: 'https://jsonfeed.org/version/1.1',
@@ -21,21 +20,25 @@ export async function GET() {
     home_page_url: `${BASE_URL}/changelog`,
     feed_url: `${BASE_URL}/changelog/feed.json`,
     description: `Product updates and improvements to ${APP_NAME}.`,
-    items: entries.map(entry => ({
-      id: `${versionPageUrl(entry.technicalVersion)}#${entry.slug}`,
-      url: versionPageUrl(entry.technicalVersion),
-      title: entry.title,
-      content_text: entry.summary,
-      date_published: entry.date ? `${entry.date}T00:00:00Z` : undefined,
-      _jovie: {
-        availability: entry.availability,
-        prerequisites: entry.prerequisites ?? [],
-        tertiary: formatCustomerChangelogTertiary(
-          entry.date,
-          entry.technicalVersion
-        ),
-      },
-    })),
+    items: entries.map(entry => {
+      const url = `${BASE_URL}${customerChangelogEntryPath(entry)}`;
+      return {
+        id: url,
+        url,
+        title: entry.title,
+        content_text: entry.summary,
+        date_published: entry.date ? `${entry.date}T00:00:00Z` : undefined,
+        _jovie: {
+          entry_id: entry.id,
+          availability: entry.availability,
+          prerequisites: entry.prerequisites ?? [],
+          tertiary: formatCustomerChangelogTertiary(
+            entry.date,
+            entry.technicalVersion
+          ),
+        },
+      };
+    }),
   };
 
   return Response.json(feed, {

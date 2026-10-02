@@ -53,19 +53,31 @@ const SNAPSHOT: ChangelogParseResult = {
 function reviewedSnapshot(
   snapshot: ChangelogParseResult
 ): ChangelogParseResult {
+  const releases = snapshot.releases.map(release => ({
+    ...release,
+    customerOutcomes: Object.entries(release.sections).flatMap(
+      ([section, entries]) =>
+        entries.map((summary: string, index: number) => ({
+          storyId: `${release.version}-${section}-${index}`,
+          entryId: `customer-update:${release.version.replaceAll('.', '-')}-${section}-${index}`,
+          slug: `update-${release.version.replaceAll('.', '-')}-${section}-${index}`,
+          aliases: [],
+          summary,
+          section: section as keyof typeof release.sections,
+          availability: 'unverified' as const,
+          prerequisites: [],
+        }))
+    ),
+  }));
   return {
     ...snapshot,
-    releases: snapshot.releases.map(release => ({
-      ...release,
-      customerOutcomes: Object.fromEntries(
-        Object.values(release.sections)
-          .flat()
-          .map(text => [
-            text,
-            { availability: 'unverified' as const, prerequisites: [] },
-          ])
+    releases,
+    sourceReleases: [
+      ...releases,
+      ...snapshot.sourceReleases.filter(
+        source => !releases.some(release => release.version === source.version)
       ),
-    })),
+    ],
   };
 }
 let currentSnapshot = reviewedSnapshot(SNAPSHOT);
@@ -149,6 +161,13 @@ describe('public changelog page', () => {
       screen.getByLabelText('Subscribe To Changelog Updates')
     ).toBeVisible();
     expect(screen.getAllByText('Product update')).toHaveLength(2);
+    const entryLinks = screen.getAllByRole('link', {
+      name: /Library filters/,
+    });
+    expect(entryLinks).toHaveLength(2);
+    for (const link of entryLinks) {
+      expect(link).toHaveAttribute('href', '/changelog#update-26-8-2-added-0');
+    }
   });
 
   it('uses a descriptive product-update title for search and sharing', () => {

@@ -28,10 +28,21 @@ function release(
     },
     ...overrides,
   };
-  value.customerOutcomes = Object.fromEntries(
-    Object.values(value.sections)
-      .flat()
-      .map(text => [text, { availability: 'unverified', prerequisites: [] }])
+  value.customerOutcomes = Object.entries(value.sections).flatMap(
+    ([section, entries]) =>
+      entries.map((summary: string, index: number) => {
+        const identity = `${version.replaceAll('.', '-')}-${section}-${index}`;
+        return {
+          storyId: identity,
+          entryId: `customer-update:${identity}`,
+          slug: `update-${identity}`,
+          aliases: [],
+          summary,
+          section: section as keyof ChangelogRelease['sections'],
+          availability: 'unverified',
+          prerequisites: [],
+        };
+      })
   );
   return value;
 }
@@ -84,7 +95,7 @@ describe('projectWhatsNew', () => {
           title: 'Chat is home',
           date: '2026-09-01',
           summary: 'A bigger release.',
-          url: 'https://jov.ie/changelog/3.0.0',
+          url: 'https://jov.ie/changelog#update-3-0-0-featured-0',
           highlights: [
             'Library filters',
             'Buttons use a lighter label',

@@ -18,8 +18,10 @@ const MONTHS: readonly CustomerChangelogMonthGroup[] = [
     label: 'August 2026',
     entries: [
       {
+        id: 'customer-update:brand-deals',
         title: 'Review qualified brand deals in your Inbox',
         slug: 'review-qualified-brand-deals-v26-8-1-0',
+        aliases: ['published-august-brand-deals'],
         date: '2026-08-16',
         summary: 'See the buyer, budget, and source.',
         category: 'new',
@@ -40,8 +42,10 @@ const MONTHS: readonly CustomerChangelogMonthGroup[] = [
     label: 'July 2026',
     entries: [
       {
+        id: 'customer-update:sign-out',
         title: 'Sign-out stays available when the store is missing',
         slug: 'sign-out-stays-available-v26-7-0-0',
+        aliases: [],
         date: '2026-07-21',
         summary: 'Customer sessions can still leave.',
         category: 'fixed',
@@ -161,33 +165,45 @@ describe('CustomerChangelogArchive', () => {
 
     expect(latestEntry).toHaveAttribute(
       'href',
-      `#${MONTHS[0].entries[0].slug}`
+      `/changelog#${MONTHS[0].entries[0].slug}`
     );
-    expect(olderEntry).toHaveAttribute('href', '/changelog/26.7.0');
+    expect(olderEntry).toHaveAttribute(
+      'href',
+      `/changelog#${MONTHS[1].entries[0].slug}`
+    );
     expect(olderMonth).toHaveAttribute('href', '/changelog/26.7.0');
-    expect(container.querySelector(`#${MONTHS[1].entries[0].slug}`)).toBeNull();
+    expect(
+      container.querySelector(`#${MONTHS[1].entries[0].slug}`)
+    ).toHaveAttribute('aria-hidden', 'true');
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Load Earlier Updates' })
     );
 
-    expect(olderEntry).toHaveAttribute('href', `#${MONTHS[1].entries[0].slug}`);
+    expect(olderEntry).toHaveAttribute(
+      'href',
+      `/changelog#${MONTHS[1].entries[0].slug}`
+    );
     expect(olderMonth).toHaveAttribute('href', '#changelog-month-2026-07');
     for (const link of archive.getAllByRole('link')) {
       const href = link.getAttribute('href');
-      expect(href).toMatch(/^#/);
-      expect(container.querySelector(href as string)).toBeInTheDocument();
+      const hash = new URL(href as string, 'https://jov.ie').hash;
+      expect(hash).toMatch(/^#/);
+      expect(container.querySelector(hash)).toBeInTheDocument();
     }
 
     fireEvent.click(screen.getByRole('button', { name: 'Fixed' }));
     expect(
       archive.queryByRole('link', { name: /Review qualified brand deals/ })
     ).toBeNull();
-    expect(olderEntry).toHaveAttribute('href', `#${MONTHS[1].entries[0].slug}`);
+    expect(olderEntry).toHaveAttribute(
+      'href',
+      `/changelog#${MONTHS[1].entries[0].slug}`
+    );
     fireEvent.click(screen.getByRole('button', { name: 'All' }));
     expect(
       archive.getByRole('link', { name: /Sign-out stays available/ })
-    ).toHaveAttribute('href', '/changelog/26.7.0');
+    ).toHaveAttribute('href', `/changelog#${MONTHS[1].entries[0].slug}`);
   });
 
   it('keeps published older releases crawlable in initial server-rendered HTML', () => {
@@ -240,6 +256,36 @@ describe('CustomerChangelogArchive', () => {
     expect(
       screen.getByRole('navigation', { name: 'Changelog Archive' })
     ).toBeVisible();
+  });
+
+  it('keeps legacy aliases targetable and gives withdrawn links a safe outcome', () => {
+    const { container } = render(
+      <CustomerChangelogArchive
+        months={MONTHS.slice(0, 1)}
+        tombstones={[
+          {
+            id: 'customer-update:withdrawn',
+            slug: 'update-withdrawn',
+            aliases: ['published-june-withdrawn'],
+          },
+        ]}
+      />
+    );
+
+    expect(
+      container.querySelector('#published-august-brand-deals')
+    ).toHaveAttribute('aria-hidden', 'true');
+    expect(
+      container
+        .querySelector('#published-august-brand-deals')
+        ?.closest('[data-changelog-entry-id]')
+    ).toHaveAttribute('data-changelog-entry-id', 'customer-update:brand-deals');
+    expect(
+      container.querySelector('#published-june-withdrawn')
+    ).toHaveTextContent('This update is no longer published.');
+    expect(container.querySelector('#published-june-withdrawn')).toHaveClass(
+      'target:block'
+    );
   });
 
   it('keeps JOV-IDs, Redis, and admission on Level 3', () => {
