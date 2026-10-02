@@ -4,6 +4,11 @@ import { HEALTH_CHECK_CONFIG } from '@/lib/db/config';
 import { getEnvironmentInfo, validateEnvironment } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
 import {
+  canReadHealthDetail,
+  HEALTH_DETAIL_HEADERS,
+  publicHealthLiveness,
+} from '@/lib/health/detail-access';
+import {
   createRateLimitHeaders,
   getClientIP,
   healthLimiter,
@@ -190,6 +195,7 @@ function buildRateLimitedResponse(
       status: 429,
       headers: {
         ...HEALTH_CHECK_CONFIG.cacheHeaders,
+        ...HEALTH_DETAIL_HEADERS,
         ...createRateLimitHeaders(rateLimitResult),
       },
     }
@@ -254,6 +260,7 @@ function buildErrorResponse(
     status: HEALTH_CHECK_CONFIG.statusCodes.unhealthy,
     headers: {
       ...HEALTH_CHECK_CONFIG.cacheHeaders,
+      ...HEALTH_DETAIL_HEADERS,
       'X-Health-Check-Duration': totalLatency.toString(),
       ...createRateLimitHeaders(rateLimitResult),
     },
@@ -269,6 +276,14 @@ export async function GET(request: Request) {
 
   if (!rateLimitResult.success) {
     return buildRateLimitedResponse(now, rateLimitResult);
+  }
+
+  const authorized = await canReadHealthDetail(
+    request,
+    '/api/health/comprehensive'
+  );
+  if (!authorized) {
+    return publicHealthLiveness(true, createRateLimitHeaders(rateLimitResult));
   }
 
   try {
@@ -341,6 +356,7 @@ export async function GET(request: Request) {
         : HEALTH_CHECK_CONFIG.statusCodes.unhealthy,
       headers: {
         ...HEALTH_CHECK_CONFIG.cacheHeaders,
+        ...HEALTH_DETAIL_HEADERS,
         'X-Health-Check-Duration': totalLatency.toString(),
         ...createRateLimitHeaders(rateLimitResult),
       },

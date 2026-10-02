@@ -25,6 +25,7 @@ vi.mock('@/lib/startup/environment-validator', () => ({
 }));
 
 vi.mock('@/lib/error-tracking', () => ({ captureWarning: mockCaptureWarning }));
+vi.mock('@/lib/health/detail-access', () => import('./detail-access-double'));
 
 describe('@critical GET /api/health/env', () => {
   beforeEach(() => {

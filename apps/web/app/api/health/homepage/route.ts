@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { captureWarning } from '@/lib/error-tracking';
 import { getFeaturedCreators } from '@/lib/featured-creators';
+import {
+  canReadHealthDetail,
+  HEALTH_DETAIL_HEADERS,
+  publicHealthLiveness,
+} from '@/lib/health/detail-access';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -13,7 +18,12 @@ export const runtime = 'nodejs';
  * - 200: All checks passed (healthy)
  * - 503: One or more checks failed (degraded/unhealthy)
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const authorized = await canReadHealthDetail(request, '/api/health/homepage');
+  if (!authorized) {
+    return publicHealthLiveness(true);
+  }
+
   const startTime = Date.now();
   interface HealthCheck {
     status: 'healthy' | 'unhealthy' | 'unknown';
@@ -79,8 +89,6 @@ export async function GET() {
 
   return NextResponse.json(health, {
     status: statusCode,
-    headers: {
-      'Cache-Control': 'no-store, must-revalidate',
-    },
+    headers: HEALTH_DETAIL_HEADERS,
   });
 }

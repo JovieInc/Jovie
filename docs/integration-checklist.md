@@ -83,9 +83,9 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=eyJhbGciOiJIUzI1NiIs...
 # Run the RLS verification script
 pnpm run db:verify  # Or manually run scripts/verify-rls.sql
 
-# Check health endpoints
+# Anonymous liveness only. Detail needs an admin session or CRON_SECRET bearer.
 curl http://localhost:3001/api/health/db
-curl http://localhost:3001/api/health/auth  # Development only
+curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3001/api/health/auth
 ```
 
 ### 2. Public Artist Pages

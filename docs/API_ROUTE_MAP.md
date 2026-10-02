@@ -294,16 +294,16 @@
 
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
-| `/api/health` | GET | `public` | Basic health check |
-| `/api/health/auth` | GET | `public` | Auth system health |
+| `/api/health` | GET | `public` liveness; detail on failure is admin or `CRON_SECRET` | Success stays `{status:"ok"}`. Failure is `{healthy:false,timestamp}` unless the caller is an admin session or `Authorization: Bearer $CRON_SECRET` |
+| `/api/health/auth` | GET | `public` liveness outside production; detail is admin or `CRON_SECRET` | Production returns 403 for every caller. Outside production, anonymous is `{healthy,timestamp}` and does not read the session |
 | `/api/health/build-info` | GET | `public` | Build and deployment metadata |
-| `/api/health/comprehensive` | GET | `public` | Full health check (DB, Redis, Stripe, etc.) |
-| `/api/health/db` | GET | `public` | Database connectivity |
-| `/api/health/db/performance` | GET | `public` | Database performance metrics |
-| `/api/health/deploy` | GET | `public` | Deployment status and version |
-| `/api/health/env` | GET | `public` | Environment variable presence check |
-| `/api/health/homepage` | GET | `public` | Homepage rendering health |
-| `/api/health/keys` | GET | `public` | Cryptographic key health |
+| `/api/health/comprehensive` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous `{healthy:true,timestamp}` with no DB or vendor calls. Full env/DB/system body requires admin session or `CRON_SECRET` |
+| `/api/health/db` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous connectivity is `{healthy,timestamp}` (200/503). Pool, config, and error strings require admin session or `CRON_SECRET` |
+| `/api/health/db/performance` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous is `{healthy:true,timestamp}` and does not run performance queries |
+| `/api/health/deploy` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous still runs env and DB checks, body is `{healthy,timestamp}`. `checks` and `issues` require admin session or `CRON_SECRET` |
+| `/api/health/env` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous local validation is `{healthy,timestamp}` with no error strings or integration flags |
+| `/api/health/homepage` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous is `{healthy:true,timestamp}` and does not fetch featured creators |
+| `/api/health/keys` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous is `{healthy,timestamp}` (503 when a required key is missing) with no key labels |
 | `/api/health/redis` | GET | `admin` or `CRON_SECRET` | Redis write/read operability (protected to prevent quota burn) |
 
 ### HUD

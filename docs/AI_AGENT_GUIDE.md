@@ -184,16 +184,16 @@ The optional per-user Ovie privacy gate protects operator data and actions serve
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/health` | GET | Public | Basic health check |
-| `/api/health/auth` | GET | Better Auth | Auth system health |
+| `/api/health` | GET | Public liveness; failure detail is admin session or `Authorization: Bearer $CRON_SECRET` | Success `{status:"ok"}`. Failure `{healthy:false,timestamp}` |
+| `/api/health/auth` | GET | Public liveness outside production; detail is admin session or `CRON_SECRET` | Production 403 for every caller. Anonymous callers do not read the session |
 | `/api/health/build-info` | GET | Public | Build metadata |
-| `/api/health/comprehensive` | GET | Admin | Full system health |
-| `/api/health/db` | GET | Admin | Database health |
-| `/api/health/db/performance` | GET | Admin | DB performance metrics |
-| `/api/health/deploy` | GET | Public | Deploy status |
-| `/api/health/env` | GET | Admin | Environment info |
-| `/api/health/homepage` | GET | Public | Homepage render check |
-| `/api/health/keys` | GET | Admin | API key health |
+| `/api/health/comprehensive` | GET | Public liveness; detail is admin session or `CRON_SECRET` | Anonymous body is `{healthy:true,timestamp}` and skips DB/vendor checks |
+| `/api/health/db` | GET | Public liveness; detail is admin session or `CRON_SECRET` | Anonymous `{healthy,timestamp}` after connectivity. No pool or config |
+| `/api/health/db/performance` | GET | Public liveness; detail is admin session or `CRON_SECRET` | Anonymous `{healthy:true,timestamp}` does not run query timings |
+| `/api/health/deploy` | GET | Public liveness; detail is admin session or `CRON_SECRET` | Anonymous `{healthy,timestamp}` (200/503). Checks and issues are authorized |
+| `/api/health/env` | GET | Public liveness; detail is admin session or `CRON_SECRET` | Anonymous `{healthy,timestamp}` with no validation strings |
+| `/api/health/homepage` | GET | Public liveness; detail is admin session or `CRON_SECRET` | Anonymous `{healthy:true,timestamp}` does not fetch featured creators |
+| `/api/health/keys` | GET | Public liveness; detail is admin session or `CRON_SECRET` | Anonymous `{healthy,timestamp}` with no missing-key labels |
 | `/api/health/redis` | GET | Admin or CRON_SECRET | Redis write/read operability probe |
 
 ### Library Documents (authenticated creator)

@@ -19,6 +19,7 @@ This document tracks required privilege levels by API namespace so new routes ar
 | `/api/webhooks/**` | Signed provider webhook | Must validate provider signature/token. |
 | `/api/mobile/**` | Authenticated mobile session | Native iOS session via `getMobileSessionUserId`. Summer/OV destinations additionally require admin (`canUseOvChatMode`) on the server. |
 | `/api/ovie/summer/reconcile` | Authenticated configured founder only | GET-only, source-bound recovery of one immutable Summer event. Must validate the app UUID with `authorizeFounderSummerUser`, obtain Vercel OIDC server-side, reject result-binding drift, and persist nothing before exact terminal validation. |
+| `/api/health` and `/api/health/{db,db/performance,env,comprehensive,keys,deploy,homepage,auth}` | Public liveness | Anonymous body is `{healthy,timestamp}` (root success stays `{status:"ok"}`). Full detail requires an admin session or `Authorization: Bearer $CRON_SECRET` via `verifyCronRequest`. Responses are `private, no-store` and `Vary: Authorization, Cookie`. `/api/health/redis` stays admin or cron. `/api/health/build-info` stays public deploy identity. Production `/api/health/auth` stays 403 for every caller. |
 | `/api/**` public endpoints (trackers, opt-ins, status probes, etc.) | Public | Must avoid exposing private user/admin data. |
 
 ## Audit Findings (JOV-1692)

@@ -25,6 +25,15 @@ vi.mock('@/lib/auth/test-mode', () => ({
   resolveTestBypassUserId: mockResolveTestBypassUserId,
 }));
 
+const mockCanReadHealthDetail = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('@/lib/health/detail-access', async () => {
+  const double = await import('./detail-access-double');
+  return {
+    ...double,
+    canReadHealthDetail: mockCanReadHealthDetail,
+  };
+});
+
 describe('@critical GET /api/health/auth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -35,6 +44,7 @@ describe('@critical GET /api/health/auth', () => {
     mockResolveTestBypassUserId.mockReturnValue(null);
     mockIsTestAuthBypassEnabled.mockReturnValue(false);
     mockGetOptionalAuth.mockResolvedValue({ userId: null });
+    mockCanReadHealthDetail.mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -45,11 +55,12 @@ describe('@critical GET /api/health/auth', () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('VERCEL_ENV', 'production');
     const { GET } = await import('@/app/api/health/auth/route');
-    const response = await GET();
+    const response = await GET(new Request('http://localhost/api/health/auth'));
     expect(response.status).toBe(403);
+    expect(mockGetOptionalAuth).not.toHaveBeenCalled();
   });
 
-  it('allows trusted test-bypass probes in preview deployments', async () => {
+  it('does not unlock preview detail for test-bypass alone', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('VERCEL_ENV', 'preview');
     mockResolveTestBypassUserId.mockReturnValue('user_bypass');
@@ -57,14 +68,31 @@ describe('@critical GET /api/health/auth', () => {
     mockGetDbUser.mockResolvedValue(null);
 
     const { GET } = await import('@/app/api/health/auth/route');
-    const response = await GET();
+    const response = await GET(new Request('http://localhost/api/health/auth'));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(Object.keys(body).sort()).toEqual(['healthy', 'timestamp']);
+    expect(body.healthy).toBe(true);
+    expect(mockGetOptionalAuth).not.toHaveBeenCalled();
+  });
+
+  it('returns preview auth detail for an authorized caller', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    mockCanReadHealthDetail.mockResolvedValue(true);
+    mockGetOptionalAuth.mockResolvedValue({ userId: 'user_admin' });
+    mockGetDbUser.mockResolvedValue(null);
+
+    const { GET } = await import('@/app/api/health/auth/route');
+    const response = await GET(new Request('http://localhost/api/health/auth'));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual(
       expect.objectContaining({
         ok: true,
         authenticated: true,
-        userId: 'user_bypass',
+        userId: 'user_admin',
         hasProfile: false,
       })
     );
@@ -76,9 +104,23 @@ describe('@critical GET /api/health/auth', () => {
     mockResolveTestBypassUserId.mockReturnValue('user_bypass');
 
     const { GET } = await import('@/app/api/health/auth/route');
-    const response = await GET();
+    const response = await GET(new Request('http://localhost/api/health/auth'));
 
     expect(response.status).toBe(403);
+    expect(mockGetOptionalAuth).not.toHaveBeenCalled();
+  });
+
+  it('keeps anonymous dev-fast probes on liveness', async () => {
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
+    mockIsTestAuthBypassEnabled.mockReturnValue(true);
+
+    const { GET } = await import('@/app/api/health/auth/route');
+    const response = await GET(new Request('http://localhost/api/health/auth'));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(Object.keys(body).sort()).toEqual(['healthy', 'timestamp']);
+    expect(mockGetOptionalAuth).not.toHaveBeenCalled();
   });
 
   it('returns dev-fast health response when auth mock flags are set', async () => {
@@ -86,6 +128,7 @@ describe('@critical GET /api/health/auth', () => {
     vi.stubEnv('NEXT_PUBLIC_AUTH_PROXY_DISABLED', '1');
     vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
     mockIsTestAuthBypassEnabled.mockReturnValue(true);
+    mockCanReadHealthDetail.mockResolvedValue(true);
     mockGetOptionalAuth.mockResolvedValue({
       userId: null,
       sessionId: null,
@@ -93,7 +136,7 @@ describe('@critical GET /api/health/auth', () => {
     });
 
     const { GET } = await import('@/app/api/health/auth/route');
-    const response = await GET();
+    const response = await GET(new Request('http://localhost/api/health/auth'));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual(
@@ -113,10 +156,11 @@ describe('@critical GET /api/health/auth', () => {
   });
 
   it('captures warning when auth check throws', async () => {
+    mockCanReadHealthDetail.mockResolvedValue(true);
     mockGetOptionalAuth.mockRejectedValue(new Error('Auth unavailable'));
 
     const { GET } = await import('@/app/api/health/auth/route');
-    const response = await GET();
+    const response = await GET(new Request('http://localhost/api/health/auth'));
 
     expect(response.status).toBe(500);
     expect(mockCaptureWarning).toHaveBeenCalledWith(

@@ -546,6 +546,26 @@ class ProductionHealthTests(unittest.TestCase):
         self.assertEqual(observed["reportedStatus"], "ok")
         self.assertEqual(observed["deployedSha"], "a" * 40)
 
+    def test_anonymous_liveness_healthy_is_green(self):
+        url = "https://jov.ie/api/health/deploy"
+        router = urlopen_router(
+            {
+                "/api/health/deploy": {
+                    "healthy": True,
+                    "timestamp": "2026-10-02T00:00:00.000Z",
+                },
+                "/api/health/build-info": {"commitSha": "b" * 40},
+            }
+        )
+
+        with mock.patch.object(MODULE.urllib.request, "urlopen", side_effect=router):
+            observed = MODULE.observe_production(url)
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["reportedStatus"], "healthy")
+        self.assertEqual(observed["dependencies"]["database"]["status"], "unknown")
+        self.assertEqual(observed["deployedSha"], "b" * 40)
+
     def test_green_health_without_build_info_is_green_but_unbound(self):
         url = "https://jov.ie/api/health/deploy"
         router = urlopen_router(

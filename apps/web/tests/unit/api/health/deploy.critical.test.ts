@@ -11,6 +11,7 @@ vi.mock('@/lib/env-server', () => ({
 }));
 vi.mock('@/lib/db', () => ({ validateDbConnection: mockValidateDbConnection }));
 vi.mock('@/lib/error-tracking', () => ({ captureWarning: mockCaptureWarning }));
+vi.mock('@/lib/health/detail-access', () => import('./detail-access-double'));
 
 describe('@critical GET /api/health/deploy', () => {
   beforeEach(() => {
@@ -30,7 +31,7 @@ describe('@critical GET /api/health/deploy', () => {
     mockValidateDbConnection.mockResolvedValue({ connected: false });
   });
 
-  it('returns the healthy deployment contract consumed by the fleet gate', async () => {
+  it('returns the authorized deployment contract', async () => {
     mockValidateEnvironment.mockReturnValue({
       critical: [],
       errors: [],
@@ -46,7 +47,9 @@ describe('@critical GET /api/health/deploy', () => {
     mockValidateDbConnection.mockResolvedValue({ connected: true });
 
     const { GET } = await import('@/app/api/health/deploy/route');
-    const response = await GET();
+    const response = await GET(
+      new Request('http://localhost/api/health/deploy')
+    );
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
@@ -61,7 +64,9 @@ describe('@critical GET /api/health/deploy', () => {
 
   it('captures warning when deploy health is unhealthy', async () => {
     const { GET } = await import('@/app/api/health/deploy/route');
-    const response = await GET();
+    const response = await GET(
+      new Request('http://localhost/api/health/deploy')
+    );
     expect(response.status).toBe(503);
     expect(mockCaptureWarning).toHaveBeenCalledWith(
       'Deploy health check unhealthy',

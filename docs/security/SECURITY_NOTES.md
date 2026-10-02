@@ -10,7 +10,7 @@ _Last reviewed: 2026-04-01_
 
 - **Validation**
   - `lib/env.ts` uses Zod to validate core envs (Clerk, Stripe, Cloudinary, DB) with a runtime-vs-build distinction.
-  - `lib/startup/environment-validator.ts` and `/api/health/*` routes surface missing/invalid envs and DB issues.
+  - `lib/startup/environment-validator.ts` validates missing/invalid envs. `/api/health/*` detail bodies that surface those issues require an admin session or `CRON_SECRET`. Anonymous callers get `{healthy,timestamp}` only (`/api/health` success stays `{status:"ok"}`). `/api/health/build-info` and `/api/health/redis` are unchanged.
 
 - **Client vs server env**
   - Today `lib/env.ts` builds a single `env` object that includes both public (`NEXT_PUBLIC_*`) and server-only values (DB URL, Stripe secret keys, etc.).

@@ -34,6 +34,7 @@ vi.mock('@/lib/utils/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 vi.mock('@/lib/error-tracking', () => ({ captureWarning: mockCaptureWarning }));
+vi.mock('@/lib/health/detail-access', () => import('./detail-access-double'));
 
 describe('@critical GET /api/health/db/performance', () => {
   beforeEach(() => {
