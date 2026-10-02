@@ -40,6 +40,7 @@ import disk_guard  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
 import pr_events  # noqa: E402
+import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
 import reason_lane  # noqa: E402
 import yc_corpus  # noqa: E402
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
@@ -90,6 +91,11 @@ RETRY_BACKOFF_S = 1800
 # JOV-6833: a lane may hold this many open non-green PRs per slot before it stops claiming
 # new issues and only fixes/adopts what it already opened.
 OPEN_PRS_PER_SLOT = 2
+# Held/exhausted lane PRs wait for a human and cannot be advanced by the owning lane
+# (codex may not adopt/gate). They are bounded separately so they cannot pin the
+# active budget at its cap forever (JOV-7514: codex idle with 7 terminal PRs).
+TERMINAL_PRS_PER_SLOT = 4
+LANE_ISSUE_PAGES = 5  # <=500 Todo candidates per lane read
 STALE_DRAFT_S = 24 * 3600
 SWEEP_EVERY_S = 1800
 PROVIDER_COOLDOWN_S = 900
@@ -496,27 +502,48 @@ def admission_rejection(issue: Issue, failures: dict, now: float,
     return None
 
 
+def pool_rejections(issues: list[Issue]) -> dict[str, str]:
+    """Pool-level admission (JOV-5555): exact normalized-title duplicates are one unit of
+    work. Non-canonical members are rejected; the canonical (oldest) one stays admissible."""
+    return {identifier: "duplicate-candidate:" + canonical
+            for identifier, canonical in workstreams.duplicate_of(issues).items()}
+
+
+def admission_order(issue: Issue, now: float) -> tuple:
+    """Dispatch rule shared by every lane and the doctor (JOV-7423 leverage-first):
+
+    1. tier 0 = urgent (effective P1, including aged work) or compounding infrastructure
+       (CI, Symphony throughput); everything else is tier 1;
+    2. aged priority: waiting work gains one level per day until it reaches P1;
+    3. workstream rank (workstreams.RANK);
+    4. age (createdAt, malformed dates last).
+    """
+    created_at = created_at_epoch(issue.created_at)
+    base_priority = issue.priority or 5
+    waited = max(0, now - created_at) if created_at is not None else 0
+    effective_priority = max(1, base_priority - int(waited // PRIORITY_AGING_S))
+    stream = workstreams.classify(issue.title, issue.labels)
+    tier = 0 if effective_priority == 1 or workstreams.compounding(stream) else 1
+    return (tier, effective_priority, workstreams.rank(stream),
+            created_at if created_at is not None else float("inf"))
+
+
 def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
                in_flight: frozenset[str] = frozenset(), provider: str | None = None) -> Issue | None:
-    """Symphony orders by aged priority then age, while preserving urgent-first admission.
+    """Symphony orders by tier, aged priority, workstream rank, then age (admission_order).
 
     Waiting work gains one priority level per day until it reaches P1, preventing a
     sustained stream of newer urgent work from starving older work. Excluded work,
-    3x failures, retry backoff, and issues with an open lane PR remain ineligible.
+    3x failures, retry backoff, issues with an open lane PR, and duplicate candidates
+    (pool_rejections) remain ineligible.
     """
     now = time.time() if now is None else now
     in_flight = frozenset(identifier.lower() for identifier in in_flight)
+    duplicates = pool_rejections(issues)
     eligible = [issue for issue in issues
-                if admission_rejection(issue, failures, now, in_flight, provider) is None]
-
-    def admission_order(issue: Issue) -> tuple[int, float]:
-        created_at = created_at_epoch(issue.created_at)
-        base_priority = issue.priority or 5
-        waited = max(0, now - created_at) if created_at is not None else 0
-        effective_priority = max(1, base_priority - int(waited // PRIORITY_AGING_S))
-        return effective_priority, created_at if created_at is not None else float("inf")
-
-    eligible.sort(key=admission_order)
+                if issue.identifier not in duplicates
+                and admission_rejection(issue, failures, now, in_flight, provider) is None]
+    eligible.sort(key=lambda issue: admission_order(issue, now))
     return eligible[0] if eligible else None
 
 
@@ -831,14 +858,27 @@ class Linear:
         return payload["data"]
 
     def lane_issues(self, label: str) -> list[Issue]:
-        """Todo issues carrying the lane's own label or the shared pool label."""
-        data = self.gql(
-            'query($labels:[String!]!){issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},'
-            'labels:{name:{in:$labels}}}){nodes{id identifier title description priority createdAt '
-            'labels{nodes{name}}}}}', {"labels": [label, SHARED_LABEL]})
+        """Todo issues carrying the lane's own label or the shared pool label.
+
+        Paginated (bounded by LANE_ISSUE_PAGES): the leverage-first rank and duplicate
+        identity are pool properties, so admission must see the whole pool rather than
+        whichever 100 issues Linear returns first."""
+        nodes, after = [], None
+        for _ in range(LANE_ISSUE_PAGES):
+            data = self.gql(
+                'query($labels:[String!]!,$after:String){issues(first:100,after:$after,'
+                'filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},'
+                'labels:{name:{in:$labels}}}){pageInfo{hasNextPage endCursor} '
+                'nodes{id identifier title description priority createdAt '
+                'labels{nodes{name}}}}}', {"labels": [label, SHARED_LABEL], "after": after})
+            nodes += data["issues"]["nodes"]
+            page = data["issues"].get("pageInfo") or {}
+            after = page.get("endCursor")
+            if not page.get("hasNextPage") or not after:
+                break
         return [Issue(n["id"], n["identifier"], n["title"], n.get("description") or "", n.get("priority") or 0,
                       n["createdAt"], [l["name"] for l in n["labels"]["nodes"]])
-                for n in data["issues"]["nodes"]]
+                for n in nodes]
 
     def create_triage(self, title: str, description: str, dedupe: str | None = None) -> str | None:
         """`dedupe`: a title fragment; an open issue already carrying it is returned instead of a new one."""
@@ -2586,18 +2626,35 @@ def over_budget(name: str, prs: list[dict], slots: int) -> bool:
     return sum(not is_green(pr) for pr in own) >= slots * OPEN_PRS_PER_SLOT
 
 
+def pr_is_terminal(pr: dict) -> bool:
+    """Held or repair-exhausted: only a human (or another lane's adopt) can move it."""
+    labels = {label.lower() for label in pr_events.label_names(pr)}
+    return bool(labels & (pr_events.HOLD_LABELS | {pr_events.PREFIX + pr_events.EXHAUSTED}))
+
+
 def new_issue_budget(name: str, slots: int, inventory: list[dict] | None) -> dict:
-    """One owning lane's new-issue budget; maintenance/orphan work is separate."""
+    """One owning lane's new-issue budget; maintenance/orphan work is separate.
+
+    Active (advanceable) non-green PRs are capped at slots x OPEN_PRS_PER_SLOT.
+    Terminal PRs (hold / lane-fix-exhausted) are capped separately at
+    slots x TERMINAL_PRS_PER_SLOT so a lane cannot accumulate unbounded parked work,
+    but parked work alone can no longer pin a lane idle (JOV-7514)."""
     cap = max(0, slots) * OPEN_PRS_PER_SLOT
+    terminal_cap = max(0, slots) * TERMINAL_PRS_PER_SLOT
     if slots <= 0:
-        return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": cap}
+        return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": cap,
+                "terminal": 0, "terminalCap": terminal_cap}
     if inventory is None:
-        return {"allowed": False, "reason": "pr-inventory-unavailable", "used": None, "cap": cap}
+        return {"allowed": False, "reason": "pr-inventory-unavailable", "used": None, "cap": cap,
+                "terminal": None, "terminalCap": terminal_cap}
     dated = re.compile(rf"^{re.escape(name)}/jov-\d+-\d{{8}}")
     own = {pr["number"]: pr for pr in inventory if dated.match(pr["headRefName"])}
-    used = sum(not is_green(pr) for pr in own.values())
-    return {"allowed": used < cap, "reason": "within-budget" if used < cap else "over-budget",
-            "used": used, "cap": cap}
+    terminal = sum(pr_is_terminal(pr) for pr in own.values())
+    used = sum(not is_green(pr) and not pr_is_terminal(pr) for pr in own.values())
+    reason = ("over-budget" if used >= cap else
+              "terminal-pr-backlog" if terminal >= terminal_cap else "within-budget")
+    return {"allowed": reason == "within-budget", "reason": reason, "used": used, "cap": cap,
+            "terminal": terminal, "terminalCap": terminal_cap}
 
 
 def read_new_issue_budget(name: str, slots: int) -> dict:

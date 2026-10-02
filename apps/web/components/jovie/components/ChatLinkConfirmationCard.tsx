@@ -198,7 +198,7 @@ export function ChatLinkConfirmationCard({
             {normalizedUrl}
           </p>
           {errorMessage && (
-            <output className='mt-1 block text-xs text-danger-token'>
+            <output className='mt-1 block text-xs text-error'>
               {errorMessage}
             </output>
           )}
