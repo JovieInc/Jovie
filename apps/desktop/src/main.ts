@@ -2823,7 +2823,9 @@ function requestAutomaticDesktopUpdateCheck(): void {
 
 function scheduleDesktopAutoUpdate(): void {
   configureDesktopAutoUpdater();
-  requestAutomaticDesktopUpdateCheck();
+  // The application menu is available while window-state/assets hydrate,
+  // before the startup gate exists. Honor an explicit check made there too.
+  if (lastDesktopUpdateCheckMs === null) requestAutomaticDesktopUpdateCheck();
 
   const UPDATE_INTERVAL_MS = 30 * 60 * 1000;
   const interval = setInterval(() => {
