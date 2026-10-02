@@ -1036,6 +1036,46 @@ describe('merge_group workflow contract', () => {
     }
   });
 
+  it('uses the trusted-base blog profile inside stable PR Ready aggregates', () => {
+    const paths = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    const blog = getJobBlock(CI_WORKFLOW, 'ci-blog-content');
+    const mergeReady = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
+    const sourceReady = getJobBlock(CI_WORKFLOW, 'ci-pr-ready');
+    const receipt = getJobBlock(CI_WORKFLOW, 'ci-product-lane-receipt');
+
+    expect(paths).toContain(
+      'git show "${BASE_SHA}:scripts/lib/blog-content-ci.mjs"'
+    );
+    expect(paths).toContain('--policy-ref "$BASE_SHA"');
+    expect(paths).toContain('reason:"trusted-classifier-unavailable"');
+    expect(paths).toContain('--qualification-profile "$profile"');
+    expect(blog).toContain('name: Blog Content Qualification');
+    expect(blog).toContain(
+      "needs.ci-path-changes.outputs.blog_content_only == 'true'"
+    );
+    expect(blog).toContain('tests/unit/lib/blog/publication.test.ts');
+    expect(blog).toContain('scripts/marketing-factory/blog-adapter.test.ts');
+    expect(blog).toContain('pnpm turbo build --filter=@jovie/web');
+    expect(blog).toContain('qualificationStartedAt');
+    expect(blog).toContain('confirmedLiveAt:null');
+    expect(mergeReady).toContain('ci-blog-content');
+    expect(sourceReady).toContain('ci-blog-content');
+    expect(receipt).toContain('ci-blog-content');
+    expect(receipt).toContain('web_results="[\\"$BLOG\\",\\"$FAST\\"]"');
+
+    for (const jobId of [
+      'ci-unit-tests',
+      'ci-build-layout',
+      'ci-build-ovie',
+      'ci-typecheck-ovie',
+      'ci-storybook-surfaces',
+    ]) {
+      expect(getJobBlock(CI_WORKFLOW, jobId)).toContain(
+        "needs.ci-path-changes.outputs.blog_content_only != 'true'"
+      );
+    }
+  });
+
   it('finishes exact-head coverage inside the native merge-queue check budget', () => {
     // V8 runs in the ci-exact-head-coverage-shard matrix; the gate job
     // merges the shard reports and runs the changed-line ratchet.
