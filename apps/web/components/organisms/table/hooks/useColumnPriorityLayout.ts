@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   COLUMN_PRIORITY_HYSTERESIS_PX,
   type ColumnPriorityLayout,
@@ -32,17 +32,14 @@ export function useColumnPriorityLayout(
   const initialWidth = options?.initialWidth ?? WIDE_INITIAL_WIDTH;
   const hysteresis = options?.hysteresis ?? COLUMN_PRIORITY_HYSTERESIS_PX;
   const width = useContainerWidth(node, initialWidth);
-  const previousRef = useRef<ColumnPriorityLayout | null>(null);
-  const layout = useMemo(() => {
-    const next = stabilizeColumnPriorityLayout(
-      columns,
-      width,
-      previousRef.current,
-      hysteresis
-    );
-    return next;
-  }, [columns, hysteresis, width]);
-  previousRef.current = layout;
+  const [previous, setPrevious] = useState<ColumnPriorityLayout | null>(null);
+  const layout = useMemo(
+    () => stabilizeColumnPriorityLayout(columns, width, previous, hysteresis),
+    [columns, hysteresis, previous, width]
+  );
+  useEffect(() => {
+    setPrevious(current => (current === layout ? current : layout));
+  }, [layout]);
 
   return { ...layout, width };
 }
