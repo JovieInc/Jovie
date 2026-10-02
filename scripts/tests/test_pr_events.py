@@ -73,6 +73,12 @@ def pr(number=5, branch="devin/jov-1-20260926t0900", sha="h1", draft=False, merg
             "labels": [{"name": name} for name in (labels or [])], "isCrossRepository": False, **extra}
 
 
+def retirement_page(pr, **overrides):
+    live = {**pr, "state": "OPEN", "isInMergeQueue": False,
+            "labels": {"pageInfo": {"hasNextPage": False}, "nodes": pr["labels"]}, **overrides}
+    return {"data": {"repository": {"pullRequest": live}}}
+
+
 RED_CHECK = {"name": "ci", "status": "COMPLETED", "conclusion": "FAILURE"}
 
 
@@ -104,6 +110,54 @@ class ReasonTest(unittest.TestCase):
                 "3": {"sha": "c", "evidence": ["check-failed:x"]}}
         self.assertEqual(events.by_reason(held), {"gate-check-failed": 1, "gate-timeout": 1, "missing-test": 1})
         self.assertEqual(events.by_reason(held, {2, 3}), {"gate-check-failed": 1, "missing-test": 1})
+
+
+class RetirementAuthorityTest(unittest.TestCase):
+    def test_explicit_duplicate_is_revalidated_before_close(self):
+        candidate = pr(labels=["duplicate"])
+        shell = Shell({("gh", "api", "graphql"): retirement_page(candidate)})
+        self.assertTrue(events.close_duplicate(fake_lane(shell), candidate, "source already landed"))
+        self.assertEqual(len(shell.made("gh", "pr", "close")), 1)
+
+    def test_revoked_or_unreadable_authority_preserves_branch(self):
+        candidate = pr(labels=["duplicate"])
+        cases = [({}, "unreadable"),
+                 (retirement_page(candidate, headRefOid="new-head"), "head moved"),
+                 (retirement_page(candidate, headRefName="other-branch"), "branch moved"),
+                 (retirement_page(candidate, state="MERGED"), "already merged"),
+                 (retirement_page(candidate, isInMergeQueue=True), "queued"),
+                 (retirement_page(candidate, isCrossRepository=True), "fork"),
+                 (retirement_page(candidate, labels={"nodes": [], "pageInfo": {"hasNextPage": False}}),
+                  "duplicate label revoked"),
+                 (retirement_page(candidate, labels={"nodes": [{"name": "duplicate"}, {"name": "hold"}],
+                                                     "pageInfo": {"hasNextPage": False}}), "hold added"),
+                 (retirement_page(candidate, labels={"nodes": [{"name": "duplicate"}],
+                                                     "pageInfo": {"hasNextPage": True}}), "incomplete labels")]
+        for response, why in cases:
+            with self.subTest(why=why):
+                shell = Shell({("gh", "api", "graphql"): response})
+                self.assertFalse(events.close_duplicate(fake_lane(shell), candidate, "stale"))
+                self.assertEqual(shell.made("gh", "pr", "close"), [])
+        for overrides in ({"labels": []}, {"labels": [{"name": "duplicate"}, {"name": "gated"}]},
+                          {"isInMergeQueue": True}, {"isCrossRepository": True}, {"state": "CLOSED"}):
+            shell = Shell()
+            self.assertFalse(events.close_duplicate(fake_lane(shell), {**candidate, **overrides}, "stale"))
+            self.assertEqual(shell.calls, [])
+
+    def test_rejected_close_does_not_return_work_to_the_pool(self):
+        candidate = pr(labels=["duplicate"])
+        shell = Shell({("gh", "api", "graphql"): retirement_page(candidate),
+                       ("gh", "pr", "close"): (1, "rejected")})
+        linear = SimpleNamespace(gql=lambda *a: self.fail("failed retirement must preserve issue state"))
+        self.assertFalse(events.return_to_pool(fake_lane(shell), linear, candidate, "duplicate"))
+
+    def test_disabled_provider_and_done_issue_do_not_grant_authority(self):
+        candidate = pr(branch="claude/jov-9-20260926t0100")
+        shell = Shell()
+        linear = SimpleNamespace(gql=lambda *a: {"issues": {"nodes": [
+            {"id": "issue", "state": {"type": "completed", "name": "Done"}}]}})
+        self.assertEqual(events.retire_orphan(fake_lane(shell), linear, candidate, [candidate]), "adopted")
+        self.assertEqual(shell.made("gh", "pr", "close"), [])
 
 
 class RelayTest(unittest.TestCase):
@@ -503,16 +557,16 @@ class TickTest(unittest.TestCase):
             comment=lambda issue_id, body: calls.comments.append(body), calls=calls)
 
     def test_orphans_are_closed_when_superseded_or_done_and_adopted_otherwise(self):
-        orphan = pr(number=2, branch="claude/jov-9-20260926t0100", draft=True)
+        orphan = pr(number=2, branch="claude/jov-9-20260926t0100", draft=True, labels=["duplicate"])
         newer = {"number": 3, "headRefName": "devin/jov-9-20260926t0500", "isDraft": False, "mergeStateStatus": "CLEAN"}
-        shell = Shell()
+        shell = Shell({("gh", "api", "graphql"): retirement_page(orphan)})
         self.assertEqual(events.retire_orphan(fake_lane(shell), self.linear(), orphan, [orphan, newer]), "superseded-by:3")
         self.assertIn("superseded by #3", shell.made("gh", "pr", "close")[0][-1])
-        shell = Shell()
+        shell = Shell({("gh", "api", "graphql"): retirement_page(orphan)})
         self.assertEqual(events.retire_orphan(fake_lane(shell), self.linear("completed", "Done"), orphan, [orphan]),
                          "issue-done")
         self.assertEqual(len(shell.made("gh", "pr", "close")), 1)
-        shell = Shell()
+        shell = Shell({("gh", "api", "graphql"): retirement_page(orphan)})
         self.assertEqual(events.retire_orphan(fake_lane(shell), self.linear(), orphan, [orphan]), "adopted")
         self.assertEqual((shell.made("gh", "pr", "close"), len(shell.made("gh", "pr", "comment"))), ([], 1))
         self.assertEqual(events.retire_orphan(fake_lane(Shell()), self.linear(), pr(branch="claude/x"), []), "not-a-lane-pr")
@@ -520,8 +574,9 @@ class TickTest(unittest.TestCase):
         self.assertEqual(events.retire_orphan(fake_lane(Shell()), broken, orphan, [orphan]), "linear-unreadable")
 
     def test_an_exhausted_orphan_is_closed_and_its_issue_returned_to_todo(self):
-        shell, linear = Shell(), self.linear()
-        events.return_to_pool(fake_lane(shell), linear, pr(branch="hyperagent/jov-9-20260926t0100"), "after two attempts")
+        candidate = pr(branch="hyperagent/jov-9-20260926t0100", labels=["duplicate"])
+        shell, linear = Shell({("gh", "api", "graphql"): retirement_page(candidate)}), self.linear()
+        events.return_to_pool(fake_lane(shell), linear, candidate, "after two attempts")
         self.assertEqual(len(shell.made("gh", "pr", "close")), 1)
         self.assertEqual(linear.calls.moves, [("iss", "Todo")])
         done = self.linear("completed", "Done")
@@ -617,6 +672,17 @@ class GapTest(unittest.TestCase):
         base.update(extra)
         return base
 
+    def test_age_exhaustion_and_same_issue_do_not_authorize_automatic_close(self):
+        old = "2033-05-01T00:00:00Z"
+        prs = [self.node(18509, isDraft=True, headRefName="claude/review-kernel",
+                         createdAt=old, updatedAt=old),
+               self.node(2, isDraft=True, headRefName="claude/jov-9-20260926t0100", updatedAt=old),
+               self.node(3, headRefName="devin/jov-9-20260926t0500"),
+               self.node(4, isDraft=True, headRefName="claude/jov-10-20260926t0100", updatedAt=old)]
+        plan = events.reconcile_plan(prs, {"4": {"count": 2, "head": "h"}}, {"claude"}, 2,
+                                     events.iso_ts("2033-05-18T03:00:00Z"))
+        self.assertEqual(plan["close"], [], "JOV-INV-011 requires explicit duplicate authority")
+
     def test_reconcile_labels_missed_events_and_names_orphans(self):
         now = events.iso_ts("2033-05-18T03:00:00Z")
         old = "2033-05-15T00:00:00Z"
@@ -638,10 +704,9 @@ class GapTest(unittest.TestCase):
             self.node(15, labels=[{"name": events.POISON_LABEL}]),
         ]
         plan = events.reconcile_plan(prs, {"8": {"count": 2}, "11": {"count": 2}}, set(), 2, now)
-        self.assertEqual(plan["label"], [(1, "conflict"), (2, "red"), (9, "green"), (12, "stale"),
+        self.assertEqual(plan["label"], [(1, "conflict"), (2, "red"), (9, "green"), (10, "stale"), (11, "stale"), (12, "stale"),
                                          (15, "dequeued")])
-        self.assertEqual(plan["close"], [(10, "superseded by #12 for the same issue"),
-                                         (11, "stale for 48h after its fix attempts ran out")])
+        self.assertEqual(plan["close"], [], "same issue and exhausted attempts do not authorize closure")
         self.assertEqual(plan["reset"], [3, 4, 9])
         self.assertEqual(plan["unlabel"], [(3, "exhausted")])
         self.assertEqual(plan["orphans"], [4, 8], "CLEAN but unqueued, and a spent fix label, have no owner")
@@ -651,9 +716,9 @@ class GapTest(unittest.TestCase):
                           counts["staleAgentDrafts"]), (15, 2, 2, 1, 1, 3, 0, 1),
                          "a stale agent-owned draft (tim/wip) is counted separately from a human's")
 
-    def test_an_abandoned_agent_draft_is_closed_or_held_on_a_live_dependency(self):
+    def test_stalled_agent_drafts_are_repaired_or_held_on_a_live_dependency(self):
         """JOV-7079 canary: an old non-lane agent draft cannot sit forever. Past the 7d SLO
-        and stalled it is closed unless a dependency it names is still open."""
+        and stalled it enters repair unless a dependency it names is still open."""
         now = events.iso_ts("2033-05-18T03:00:00Z")
         old, recent = "2033-05-15T00:00:00Z", "2033-05-18T00:00:00Z"
         ancient = "2033-05-01T00:00:00Z"
@@ -674,21 +739,19 @@ class GapTest(unittest.TestCase):
                       updatedAt=ancient),
         ]
         plan = events.reconcile_plan(prs, {}, set(), 2, now, deps={22: [9]})
-        self.assertEqual(plan["close"],
-                         [(20, "abandoned agent draft: open 17d with no advancing event and no open dependency"),
-                          (21, "abandoned agent draft: open 17d with no advancing event and no open dependency")])
+        self.assertEqual(plan["close"], [])
+        self.assertEqual(plan["label"], [], "non-lane drafts stay with their qualified writer")
         self.assertEqual(plan["depHolds"], [(22, [9])])
         counts = plan["counts"]
-        self.assertEqual((counts["staleAgentDrafts"], counts["staleOtherDrafts"]), (2, 1))
+        self.assertEqual((counts["staleAgentDrafts"], counts["staleOtherDrafts"]), (4, 1))
         states = {row["pr"]: row["state"] for row in plan["dispositions"]}
-        self.assertEqual(states[20], "closing")
+        self.assertEqual(states[20], "repair")
         self.assertEqual(states[22], "hold:dependency")
         self.assertEqual(states[24], "draft")
-        # the fixture: once the dependency is gone (merged/closed), the same draft reverts to
-        # abandoned and closes — the historical note is never authoritative for weeks
+        # A landed dependency releases repair; it never grants retirement authority.
         landed = events.reconcile_plan(prs, {}, set(), 2, now, deps={})
-        self.assertIn((22, "abandoned agent draft: open 17d with no advancing event and no open dependency"),
-                      landed["close"])
+        self.assertEqual(landed["close"], [])
+        self.assertEqual(next(row for row in landed["dispositions"] if row["pr"] == 22)["state"], "repair")
 
     def test_dependency_refs_and_revalidation_reads(self):
         body = ("Waiting on #17290 and https://github.com/JovieInc/Jovie/pull/17291 to land.\n"
@@ -738,7 +801,7 @@ class GapTest(unittest.TestCase):
         self.assertEqual(rows[30]["state"], "draft")
         self.assertEqual(rows[30]["reason"], "past the 48h stale SLO")
         self.assertIn("never closes non-agent drafts", rows[30]["next"])
-        self.assertEqual(rows[31]["next"], "closes as abandoned at the 7d age SLO")
+        self.assertEqual(rows[31]["next"], "repair unfinished work; closure requires an explicit duplicate label")
 
     def test_reconcile_applies_the_plan_on_its_own_cadence(self):
         page = {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": [
@@ -758,13 +821,13 @@ class GapTest(unittest.TestCase):
                       shell.calls)
         self.assertEqual(json.loads((self.host.state / "fix-attempts.json").read_text()), {"10": {"count": 2}},
                          "a PR that reached the queue starts a fresh episode")
-        self.assertEqual(record["closed"], [10])
+        self.assertEqual(record["closed"], [])
         self.assertIsNone(events.reconcile(self.host, fake_lane(shell), lambda: linear, NOW + 60), "one sweep per window")
         broken = Shell({("gh", "api", "graphql"): (1, "")})
         self.assertIsNone(events.reconcile(self.host, fake_lane(broken), lambda: linear, NOW, force=True))
         no_linear = Shell({("gh", "api", "graphql"): page})
         events.reconcile(self.host, fake_lane(no_linear), lambda: (_ for _ in ()).throw(OSError("x")), NOW, force=True)
-        self.assertEqual(len(no_linear.made("gh", "pr", "close")), 1, "closing never waits on Linear")
+        self.assertEqual(no_linear.made("gh", "pr", "close"), [], "unlabelled work is preserved even without Linear")
 
     def hold_ctx(self, events_list, notes=(), committed="2033-05-18T00:00:00Z", oid="h"):
         """A canned hold_context GraphQL reply: labeled events, comments, last commit."""
