@@ -35,5 +35,10 @@
     "typescript": "6.0.3",
     "vercel": "59.23.2",
     "vitest": "5.0.2"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "eve@0.68.0": "patches/eve@0.68.0.patch"
+    }
   }
 }
