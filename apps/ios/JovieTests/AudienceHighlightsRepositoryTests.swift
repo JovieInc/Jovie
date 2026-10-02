@@ -238,11 +238,14 @@ private actor SuspendedHomeDataClient: MobileHomeDataClient {
   private var calendar: CheckedContinuation<MobileActionLoopCalendarResponse, Error>?
   private var inbox: CheckedContinuation<MobileActionLoopInboxResponse, Error>?
   private var startWaiters: [CheckedContinuation<Void, Never>] = []
+  private var surfaceWaiters: [Surface: [CheckedContinuation<Void, Never>]] = [:]
   private(set) var started: Set<Surface> = []
   private(set) var requestedWorkspace: MobileWorkspaceMode?
 
   private func didStart(_ surface: Surface) {
     started.insert(surface)
+    let surfaceWaiting = surfaceWaiters.removeValue(forKey: surface) ?? []
+    for waiter in surfaceWaiting { waiter.resume() }
     if started.count == 3 {
       let waiters = startWaiters
       startWaiters = []
@@ -253,6 +256,16 @@ private actor SuspendedHomeDataClient: MobileHomeDataClient {
   func waitForAllRequests() async {
     guard started.count < 3 else { return }
     await withCheckedContinuation { startWaiters.append($0) }
+  }
+
+  func waitForRequest(_ surface: Surface) async {
+    guard !started.contains(surface) else { return }
+    await withCheckedContinuation { surfaceWaiters[surface, default: []].append($0) }
+  }
+
+  func failInbox() {
+    inbox?.resume(throwing: APIClientError.transportFailed(code: -1009))
+    inbox = nil
   }
 
   func fetchAudienceHighlights() async throws -> MobileAudienceHighlightsResponse {
@@ -510,6 +523,34 @@ struct MobileHomeDataStoreTests {
     #expect(store.audienceState == .loaded(.preview))
     #expect(store.inbox == .preview)
     #expect(store.calendar == .preview)
+  }
+
+  @Test func failedInboxCanRetryWhileOtherSurfacesAreStillLoading() async {
+    let store = MobileHomeDataStore(defaults: makeDefaults())
+    let client = SuspendedHomeDataClient()
+    let first = Task { await store.reload(userID: "artist", workspace: .jovie, client: client) }
+    await client.waitForAllRequests()
+    await client.failInbox()
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: .seconds(2))
+    while store.isLoadingInbox, clock.now < deadline {
+      try? await Task.sleep(for: .milliseconds(1))
+    }
+    #expect(store.isLoadingInbox == false)
+    #expect(store.audienceState == .loading)
+    #expect(store.isLoadingCalendar)
+    let retryClient = SuspendedHomeDataClient()
+    let retry = Task { await store.reload(userID: "artist", workspace: .jovie, client: retryClient) }
+    await retryClient.waitForRequest(.inbox)
+    #expect(await retryClient.started == [.inbox])
+    await retryClient.finishInbox()
+    await retry.value
+    #expect(store.inbox == .preview)
+    #expect(store.isLoadingCalendar)
+    #expect(store.audienceState == .loading)
+    await client.finishRemaining()
+    await first.value
+    #expect(store.inbox == .preview)
   }
 
 }

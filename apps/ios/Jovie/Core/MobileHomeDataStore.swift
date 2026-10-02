@@ -29,7 +29,8 @@ final class MobileHomeDataStore {
   @ObservationIgnored private var actionLoopCache: ActionLoopCache
   @ObservationIgnored private var audienceCache: AudienceHighlightsCache
   @ObservationIgnored private var context: Context?
-  @ObservationIgnored private var requestID: UUID?
+  private enum Surface: Hashable { case audience, calendar, inbox }
+  @ObservationIgnored private var requests: [Surface: UUID] = [:]
   @ObservationIgnored private var decidedCardIDs: Set<String> = []
 
   init(defaults: UserDefaults = .standard) {
@@ -44,7 +45,7 @@ final class MobileHomeDataStore {
   func setContext(userID: String?, workspace: MobileWorkspaceMode) {
     let next = userID.map { Context(userID: $0, workspace: workspace) }
     guard next != context else { return }
-    requestID = nil
+    requests = [:]
     if next?.userID != context?.userID {
       calendar = nil
       audienceState = .idle
@@ -65,7 +66,7 @@ final class MobileHomeDataStore {
     isLoadingCalendar: Bool = false,
     isLoadingInbox: Bool = false
   ) {
-    requestID = nil
+    requests = [:]
     audienceState = audience
     self.calendar = calendar
     self.inbox = inbox
@@ -76,22 +77,14 @@ final class MobileHomeDataStore {
   func reload(userID: String, workspace: MobileWorkspaceMode, client: any MobileHomeDataClient) async {
     guard !Task.isCancelled else { return }
     setContext(userID: userID, workspace: workspace)
-    // Retry taps and startup share one flight per account/workspace.
-    guard requestID == nil else { return }
-    let request = UUID()
-    requestID = request
-    defer {
-      if requestID == request {
-        requestID = nil
-        isLoadingCalendar = false
-        isLoadingInbox = false
-        if audienceState == .loading { audienceState = .idle }
-      }
-    }
-
-    async let audience: Void = reloadAudience(userID: userID, client: client, request: request)
-    async let calendar: Void = reloadCalendar(userID: userID, client: client, request: request)
-    async let inbox: Void = reloadInbox(userID: userID, workspace: workspace, client: client, request: request)
+    // Dedupe each surface separately: a completed/failed Inbox may retry
+    // while Audience is still suspended, without duplicating that request.
+    let audienceRequest = beginRequest(for: .audience)
+    let calendarRequest = beginRequest(for: .calendar)
+    let inboxRequest = beginRequest(for: .inbox)
+    async let audience: Void = reloadAudience(userID: userID, client: client, request: audienceRequest)
+    async let calendar: Void = reloadCalendar(userID: userID, client: client, request: calendarRequest)
+    async let inbox: Void = reloadInbox(userID: userID, workspace: workspace, client: client, request: inboxRequest)
     _ = await (audience, calendar, inbox)
   }
 
@@ -104,37 +97,60 @@ final class MobileHomeDataStore {
     await actionLoopCache.storeInbox(updated, for: userID, workspace: workspace)
   }
 
-  private func canPublish(_ request: UUID) -> Bool {
-    requestID == request && !Task.isCancelled
+  private func beginRequest(for surface: Surface) -> UUID? {
+    guard requests[surface] == nil else { return nil }
+    let request = UUID()
+    requests[surface] = request
+    return request
   }
 
-  private func reloadAudience(userID: String, client: any MobileHomeDataClient, request: UUID) async {
-    if let cached = await audienceCache.load(for: userID), canPublish(request) {
+  private func canPublish(_ request: UUID, for surface: Surface) -> Bool {
+    requests[surface] == request && !Task.isCancelled
+  }
+
+  private func finishRequest(_ request: UUID, for surface: Surface) {
+    guard requests[surface] == request else { return }
+    requests[surface] = nil
+    switch surface {
+    case .audience:
+      if audienceState == .loading { audienceState = .idle }
+    case .calendar:
+      isLoadingCalendar = false
+    case .inbox:
+      isLoadingInbox = false
+    }
+  }
+
+  private func reloadAudience(userID: String, client: any MobileHomeDataClient, request: UUID?) async {
+    guard let request else { return }
+    defer { finishRequest(request, for: .audience) }
+    if let cached = await audienceCache.load(for: userID), canPublish(request, for: .audience) {
       audienceState = .loaded(cached.response)
     }
-    guard canPublish(request) else { return }
+    guard canPublish(request, for: .audience) else { return }
     if audienceHighlightsShouldShowLoading(current: audienceState) { audienceState = .loading }
     do {
       let response = try await client.fetchAudienceHighlights()
-      guard canPublish(request) else { return }
+      guard canPublish(request, for: .audience) else { return }
       audienceState = .loaded(response)
       await audienceCache.store(response, for: userID)
     } catch {
-      guard canPublish(request) else { return }
+      guard canPublish(request, for: .audience) else { return }
       if case .loaded = audienceState { return }
       audienceState = .error("Couldn't load audience highlights.")
     }
   }
 
-  private func reloadCalendar(userID: String, client: any MobileHomeDataClient, request: UUID) async {
+  private func reloadCalendar(userID: String, client: any MobileHomeDataClient, request: UUID?) async {
+    guard let request else { return }
+    defer { finishRequest(request, for: .calendar) }
     let cached = await actionLoopCache.loadCalendar(for: userID)
-    guard canPublish(request) else { return }
+    guard canPublish(request, for: .calendar) else { return }
     if calendar == nil { calendar = cached }
     isLoadingCalendar = calendar == nil
-    defer { if requestID == request { isLoadingCalendar = false } }
     do {
       let response = try await client.fetchActionLoopCalendar()
-      guard canPublish(request) else { return }
+      guard canPublish(request, for: .calendar) else { return }
       calendar = response
       isLoadingCalendar = false
       await actionLoopCache.storeCalendar(response, for: userID)
@@ -144,16 +160,17 @@ final class MobileHomeDataStore {
   }
 
   private func reloadInbox(
-    userID: String, workspace: MobileWorkspaceMode, client: any MobileHomeDataClient, request: UUID
+    userID: String, workspace: MobileWorkspaceMode, client: any MobileHomeDataClient, request: UUID?
   ) async {
+    guard let request else { return }
+    defer { finishRequest(request, for: .inbox) }
     let cached = await actionLoopCache.loadInbox(for: userID, workspace: workspace)
-    guard canPublish(request) else { return }
+    guard canPublish(request, for: .inbox) else { return }
     if inbox == nil, let cached { inbox = excludingDecidedCards(from: cached) }
     isLoadingInbox = inbox == nil
-    defer { if requestID == request { isLoadingInbox = false } }
     do {
       let response = try await client.fetchActionLoopInbox(workspace: workspace)
-      guard canPublish(request) else { return }
+      guard canPublish(request, for: .inbox) else { return }
       let updated = excludingDecidedCards(from: response)
       inbox = updated
       isLoadingInbox = false
