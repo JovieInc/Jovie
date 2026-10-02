@@ -898,6 +898,9 @@ exit 0
                 scenario === 'other-lane' ? 'false' : 'true',
               CI_FAST_LANE_GROUP:
                 scenario === 'other-lane' ? 'typecheck' : 'remaining',
+              // Exercise the hosted Python job without unrelated mocked suites.
+              CI_FAST_STRUCTURAL_PYTEST:
+                scenario === 'other-lane' ? '' : 'only',
               CI_FAST_LANES_OUT: output,
               GITHUB_STEP_SUMMARY: summary,
               JOVIE_FAILURE_FIXTURE: fixture,
@@ -928,6 +931,34 @@ exit 0
           expect(annotation).toContain('tail-line');
           expect(annotation).not.toContain('Structural command');
         } else {
+          // Both shards start with invariants in the existing three-slot pool.
+          // Fail-fast may leave the fourth command (control) unstarted.
+          expect(diagnostic).toContain(
+            'Structural command 3/4 failed (exit 23)'
+          );
+          const timings = [
+            ...result.stdout.matchAll(
+              /^\| \d+ \| [\d.]+s \| (pass|exit \d+) \| `([^`]+)` \|$/gmu
+            ),
+          ];
+          expect(timings.length).toBeGreaterThanOrEqual(3);
+          expect(timings.length).toBeLessThanOrEqual(4);
+          expect(timings.filter(row => row[1] === 'exit 23')).toHaveLength(2);
+          expect(timings.map(row => [row[1], row[2]])).toContainEqual([
+            'pass',
+            'pnpm invariants:check',
+          ]);
+          expect(
+            timings.every(
+              row =>
+                (row[1] === 'exit 23' && row[2].startsWith('if python3 -c ')) ||
+                (row[1] === 'pass' &&
+                  ['pnpm invariants:check', 'pnpm ci:control:test'].includes(
+                    row[2]
+                  ))
+            )
+          ).toBe(true);
+          expect(diagnostic).not.toContain('preceding successful command');
           expect(diagnostic).toContain('failed (exit 23)');
           expect(diagnostic).toContain('later unittest stderr passed');
           const expectedNode =
