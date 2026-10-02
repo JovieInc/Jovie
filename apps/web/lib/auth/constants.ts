@@ -110,7 +110,16 @@ export function sanitizeRedirectUrl(
   } catch {
     return null; // Malformed percent-encoding
   }
-  if (decoded.includes('\\') || decoded.startsWith('//')) return null;
+  // Browsers remove ASCII controls before parsing a URL, potentially exposing //host.
+  if (
+    decoded.includes('\\') ||
+    decoded.startsWith('//') ||
+    [...decoded].some(
+      char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127
+    )
+  ) {
+    return null;
+  }
 
   // Strip hash fragment to prevent malformed URLs like /signin#/reset-password
   const hashIndex = url.indexOf('#');
