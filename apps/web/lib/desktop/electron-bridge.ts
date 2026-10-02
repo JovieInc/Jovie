@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { captureWarning } from '@/lib/error-tracking';
+import type { DesktopWorkState } from './session-work-state';
 
 // ---------------------------------------------------------------------------
 // ElectronAPI contract — mirrors what apps/desktop/src/preload.ts exposes.
@@ -30,6 +31,12 @@ export interface ElectronAPI {
   readonly electronVersion: string;
   /** Main-process-validated package provenance. Optional for older shells. */
   readonly getBuildIdentity?: () => Promise<DesktopBuildIdentity | null>;
+  /** Per-document idle evidence, optional for installed older shells. */
+  readonly setWorkState?: (state: DesktopWorkState | null) => void;
+  readonly getWorkState?: () => {
+    readonly state: DesktopWorkState;
+    readonly reportedAt: number;
+  } | null;
   /** Register a callback that fires when electron-updater detects a new version. */
   readonly onUpdateAvailable: (cb: () => void) => void | (() => void);
   /** Register a callback that fires when the update download is complete. */
@@ -248,6 +255,20 @@ export function getElectronAPI(): ElectronAPI | undefined {
  */
 export function isDesktopEnvironment(): boolean {
   return getRawElectronAPI() !== undefined;
+}
+
+/** Unknown/older shells remain safe and ordinary web tabs schedule no heartbeat. */
+export function reportDesktopWorkState(
+  state: DesktopWorkState | null
+): boolean {
+  const report = getRawElectronAPI()?.setWorkState;
+  if (typeof report !== 'function') return false;
+  try {
+    report(state);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

@@ -1,14 +1,25 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { type TableRowMode, tableRowModeStyle } from '../table.styles';
 
 export function TableRoot({
   children,
   className,
+  rowMode,
 }: Readonly<{
   children: ReactNode;
   className?: string;
+  rowMode?: TableRowMode;
 }>) {
-  return <table className={className}>{children}</table>;
+  return (
+    <table
+      className={className}
+      data-table-row-mode={rowMode}
+      style={tableRowModeStyle(rowMode)}
+    >
+      {children}
+    </table>
+  );
 }
 
 export function TableHead({

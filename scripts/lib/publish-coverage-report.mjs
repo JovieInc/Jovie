@@ -2,19 +2,43 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { retireCoverageReports } from './retire-coverage-reports.mjs';
 
-const REPORTS = [
-  'docs/TEST_COVERAGE_HEATMAP.md',
-  'apps/web/reports/test-coverage-snapshot.json',
-];
+const COVERAGE = {
+  files: [
+    'docs/TEST_COVERAGE_HEATMAP.md',
+    'apps/web/reports/test-coverage-snapshot.json',
+  ],
+  branch: 'coverage-audit',
+  title: 'chore(testing): refresh changed-evidence heatmap',
+  description: 'Refresh the generated coverage heatmap and baseline',
+  evidence:
+    'Full web coverage and RED-surface drift checks passed before generation.',
+};
+const NIGHTLY = {
+  files: [
+    'docs/NIGHTLY_TESTING_AGENT_REPORT.md',
+    'apps/web/reports/nightly-agent/last-run.json',
+  ],
+  branch: 'nightly-evidence',
+  title: 'chore(testing): refresh nightly testing evidence',
+  description:
+    'Refresh nightly testing evidence, including recorded failures and missing evidence',
+  evidence:
+    'Publication does not imply that the nightly tests passed; inspect the recorded workflow conclusion and evidence warnings.',
+};
 
 // The audited commit stays the parent: never rebase measured data onto a
 // different source revision. Publication is a draft PR, subject to normal CI.
-export function publishCoverageReport({
-  cwd = process.cwd(),
-  env = process.env,
-  gh = args => execFileSync('gh', args, { cwd, env, encoding: 'utf8' }).trim(),
-} = {}) {
+function publishReport(
+  {
+    cwd = process.cwd(),
+    env = process.env,
+    gh = args =>
+      execFileSync('gh', args, { cwd, env, encoding: 'utf8' }).trim(),
+  } = {},
+  profile = COVERAGE
+) {
   const git = (...args) =>
     execFileSync('git', args, { cwd, env, encoding: 'utf8' }).trim();
   const source = env.GITHUB_SHA;
@@ -35,13 +59,13 @@ export function publishCoverageReport({
   const changed = git('diff', 'HEAD', '--name-only')
     .split('\n')
     .filter(Boolean);
-  if (changed.some(path => !REPORTS.includes(path))) {
+  if (changed.some(path => !profile.files.includes(path))) {
     throw new Error('Refusing to publish unrelated tracked changes');
   }
   if (changed.length === 0) return { status: 'unchanged', source };
 
   // A rerun has its own attempt ref. Never force-push or replace another report.
-  const branch = `bot/coverage-audit-${runId}-${attempt}`;
+  const branch = `bot/${profile.branch}-${runId}-${attempt}`;
   const runUrl = `https://github.com/${repo}/actions/runs/${runId}/attempts/${attempt}`;
   git('switch', '-c', branch);
   git('config', 'user.name', 'github-actions[bot]');
@@ -50,14 +74,8 @@ export function publishCoverageReport({
     'user.email',
     '41898282+github-actions[bot]@users.noreply.github.com'
   );
-  git('add', '--', ...REPORTS);
-  git(
-    'commit',
-    '-m',
-    'chore(testing): refresh changed-evidence heatmap',
-    '-m',
-    `Measured source: ${source}`
-  );
+  git('add', '--', ...profile.files);
+  git('commit', '-m', profile.title, '-m', `Measured source: ${source}`);
   gh(['auth', 'setup-git', '--hostname', 'github.com']);
   git('push', 'origin', `HEAD:refs/heads/${branch}`);
 
@@ -66,9 +84,9 @@ export function publishCoverageReport({
     const bodyFile = join(bodyDir, 'body.md');
     writeFileSync(
       bodyFile,
-      `Refresh the generated coverage heatmap and baseline from [audit ${runId}](${runUrl}).\n\n` +
+      `${profile.description} from [audit ${runId}](${runUrl}).\n\n` +
         `Measured source: \`${source}\`. The report commit retains that exact parent.\n\n` +
-        'Full web coverage and RED-surface drift checks passed before generation. ' +
+        `${profile.evidence} ` +
         'This report does not measure later commits. Review and land through normal CI and the native merge queue.\n'
     );
     const url = gh([
@@ -82,21 +100,43 @@ export function publishCoverageReport({
       '--head',
       branch,
       '--title',
-      'chore(testing): refresh changed-evidence heatmap',
+      profile.title,
       '--body-file',
       bodyFile,
     ]);
     if (!url.startsWith(`https://github.com/${repo}/pull/`)) {
       throw new Error('Coverage report PR creation returned no receipt');
     }
+    const retired = retireCoverageReports({
+      gh,
+      repo,
+      url,
+      source,
+      isAncestor: (older, newer) => {
+        try {
+          git('merge-base', '--is-ancestor', older, newer);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+    });
     if (env.GITHUB_STEP_SUMMARY) {
       appendFileSync(
         env.GITHUB_STEP_SUMMARY,
-        `Coverage report: ${url}\nMeasured source: ${source}\n`
+        `Coverage report: ${url}\nMeasured source: ${source}\nRetired reports: ${retired.join(', ') || 'none'}\n`
       );
     }
     return { status: 'published', source, branch, url };
   } finally {
     rmSync(bodyDir, { recursive: true, force: true });
   }
+}
+
+export function publishCoverageReport(options = {}) {
+  return publishReport(options, COVERAGE);
+}
+
+export function publishNightlyReport(options = {}) {
+  return publishReport(options, NIGHTLY);
 }

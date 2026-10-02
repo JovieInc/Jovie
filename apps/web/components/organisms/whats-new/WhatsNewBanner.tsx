@@ -4,6 +4,11 @@ import { IconButton } from '@jovie/ui';
 import { Sparkles, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import {
+  parseDailyWhatsNewPrompt,
+  WHATS_NEW_DAILY_DISMISS_PATH,
+  WHATS_NEW_DAILY_PATH,
+} from '@/lib/release-communications/prompt';
+import {
   parseWhatsNewFeed,
   resolveUnseenWhatsNew,
   type UnseenWhatsNew,
@@ -30,6 +35,48 @@ export function writeWhatsNewLastSeen(id: string): void {
   }
 }
 
+interface ResolvedWhatsNew {
+  readonly unseen: UnseenWhatsNew;
+  /** Daily-post id when the prompt came from release communications. */
+  readonly postId?: string;
+}
+
+/**
+ * Resolve the server-driven daily post, or null when none qualifies (no
+ * material entries, dismissed, unauthenticated, or any failure). Dismissal is
+ * recorded server-side per user per post, so it persists across sessions.
+ */
+export async function loadDailyWhatsNew(
+  fetchImpl: typeof fetch = fetch
+): Promise<ResolvedWhatsNew | null> {
+  try {
+    const response = await fetchImpl(WHATS_NEW_DAILY_PATH, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) return null;
+    const prompt = parseDailyWhatsNewPrompt(await response.json());
+    if (!prompt) return null;
+    return {
+      postId: prompt.postId,
+      unseen: {
+        entry: {
+          id: prompt.postId,
+          title: prompt.title,
+          date: prompt.localDate,
+          summary: prompt.summary,
+          url: prompt.changelogUrl,
+          highlights: [],
+          dogfood: [],
+        },
+        unseenCount: prompt.materialCount,
+        href: prompt.changelogUrl,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Resolve the unseen entry, or null on any network or contract failure. */
 export async function loadUnseenWhatsNew(
   fetchImpl: typeof fetch = fetch
@@ -44,6 +91,15 @@ export async function loadUnseenWhatsNew(
   } catch {
     return null;
   }
+}
+
+/** Record a whole-post dismissal server-side; failure only re-shows later. */
+function dismissDailyPost(postId: string): void {
+  void fetch(WHATS_NEW_DAILY_DISMISS_PATH, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ postId }),
+  }).catch(() => {});
 }
 
 interface WhatsNewBannerViewProps {
@@ -129,15 +185,21 @@ interface WhatsNewBannerProps {
  * Silent while loading, when nothing is unseen, and on any failure.
  */
 export function WhatsNewBanner({ enabled }: WhatsNewBannerProps) {
-  const [unseen, setUnseen] = useState<UnseenWhatsNew | null>(null);
+  const [resolved, setResolved] = useState<ResolvedWhatsNew | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
     const timer = setTimeout(() => {
-      void loadUnseenWhatsNew().then(result => {
-        if (!cancelled) setUnseen(result);
-      });
+      void (async () => {
+        const daily = await loadDailyWhatsNew();
+        const result: ResolvedWhatsNew | null =
+          daily ??
+          (await loadUnseenWhatsNew().then(unseen =>
+            unseen ? { unseen } : null
+          ));
+        if (!cancelled) setResolved(result);
+      })();
     }, WHATS_NEW_CHECK_DELAY_MS);
     return () => {
       cancelled = true;
@@ -145,16 +207,25 @@ export function WhatsNewBanner({ enabled }: WhatsNewBannerProps) {
     };
   }, [enabled]);
 
-  if (!enabled || !unseen) return null;
+  if (!enabled || !resolved) return null;
+  const { unseen, postId } = resolved;
+
+  const markSeen = () => {
+    if (postId) {
+      dismissDailyPost(postId);
+    } else {
+      writeWhatsNewLastSeen(unseen.entry.id);
+    }
+  };
 
   const dismiss = () => {
-    writeWhatsNewLastSeen(unseen.entry.id);
-    setUnseen(null);
+    markSeen();
+    setResolved(null);
   };
   // Keep the link mounted until its own navigation has started.
   const open = () => {
-    writeWhatsNewLastSeen(unseen.entry.id);
-    setTimeout(() => setUnseen(null), 0);
+    markSeen();
+    setTimeout(() => setResolved(null), 0);
   };
 
   return (

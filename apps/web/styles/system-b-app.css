@@ -673,6 +673,16 @@
   --color-skeleton-shimmer: rgba(255, 255, 255, 0.11);
 }
 
+/* A selected row mode owns the same geometry during loading and after data arrives. */
+[data-table-row-mode] tbody > .system-b-table-row-height {
+  height: var(--table-row-height);
+}
+
+[data-table-row-mode] [data-table-cell-content="stable"] {
+  height: var(--table-cell-content-height);
+  max-height: var(--table-cell-content-height);
+}
+
 :where(.system-b-table-row-height) {
   height: 40px;
 }
