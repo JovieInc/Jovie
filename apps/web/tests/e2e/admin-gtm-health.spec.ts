@@ -90,20 +90,30 @@ test.describe('Admin GTM Health @smoke', () => {
     }
   });
 
-  test('admin growth outreach deep link opens accordion without runtime errors', async ({
-    page,
-  }, testInfo) => {
-    const { getContext, cleanup } = setupPageMonitoring(page);
+  for (const [surfaceId, accordionName] of [
+    ['growth-outreach', 'Outreach & Campaigns'],
+    ['growth-campaigns', 'Outreach & Campaigns'],
+    ['growth-ingest', 'Intake & Keywords'],
+  ] as const) {
+    test(`${surfaceId} deep link opens its operational accordion`, async ({
+      page,
+    }, testInfo) => {
+      const { getContext, cleanup } = setupPageMonitoring(page);
 
-    try {
-      await expectAdminPage(page, getAdminSurfaceById('growth-outreach').path);
-      // The page loads with the outreach accordion auto-opened via ?view=outreach
-      await expect(page.getByTestId('admin-growth-page')).toBeVisible({
-        timeout: SMOKE_TIMEOUTS.VISIBILITY,
-      });
-      await assertNoCriticalErrors(getContext(), testInfo);
-    } finally {
-      cleanup();
-    }
-  });
+      try {
+        await expectAdminPage(page, getAdminSurfaceById(surfaceId).path);
+        const accordion = page.getByRole('button', {
+          name: accordionName,
+          exact: true,
+        });
+        await expect(accordion).toHaveAttribute('aria-expanded', 'true');
+        // Refresh must preserve the selected operational context.
+        await page.reload();
+        await expect(accordion).toHaveAttribute('aria-expanded', 'true');
+        await assertNoCriticalErrors(getContext(), testInfo);
+      } finally {
+        cleanup();
+      }
+    });
+  }
 });
