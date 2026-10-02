@@ -325,33 +325,79 @@ POISON_WINDOW_S = 24 * 3600
 FAILED_DEQUEUE = "failed_checks"
 
 
-def queue_ejections(number: int, now: float, sh=run) -> int | None:
-    """Failure removals from the merge queue in the last 24 h (the current one included)."""
-    owner, name = REPO.split("/")
-    listed = sh(["gh", "api", "graphql", "-f", f"query={{repository(owner:\"{owner}\",name:\"{name}\"){{"
-                 f"pullRequest(number:{number}){{timelineItems(last:20,itemTypes:[REMOVED_FROM_MERGE_QUEUE_EVENT]){{"
-                 "nodes{... on RemovedFromMergeQueueEvent{createdAt reason}}}}}}",
-                 "--jq", ".data.repository.pullRequest.timelineItems.nodes"])
-    if listed.returncode != 0:
+def queue_ejections(number: int, now: float, sh=run, *, head: str) -> int | None:
+    """Count failed removals after the latest current-head event, never prior repairs.
+
+    Walk the ordered timeline backwards; force pushes can restore an old commit whose
+    committedDate predates the repair, so commit timestamps cannot define this boundary.
+    Missing, partial or changing history does not authorize a poison mutation.
+    """
+    if not head:
         return None
-    count = 0
-    for item in json.loads(listed.stdout or "[]"):
-        at = iso_ts(item.get("createdAt"))
-        if at and now - at <= POISON_WINDOW_S and str(item.get("reason") or "").lower() == FAILED_DEQUEUE:
-            count += 1
-    return count
+    owner, name = REPO.split("/")
+    cursor, seen, count = None, set(), 0
+    for _ in range(100):
+        before = f",before:{json.dumps(cursor)}" if cursor is not None else ""
+        query = (f'{{repository(owner:"{owner}",name:"{name}"){{pullRequest(number:{number}){{'
+                 'headRefOid state timelineItems(last:100' + before +
+                 ',itemTypes:[PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT]){'
+                 'pageInfo{hasPreviousPage startCursor} nodes{__typename '
+                 '... on PullRequestCommit{commit{oid}} '
+                 '... on HeadRefForcePushedEvent{afterCommit{oid}} '
+                 '... on RemovedFromMergeQueueEvent{createdAt reason}}}}}}')
+        listed = sh(["gh", "api", "graphql", "-f", f"query={query}"])
+        if listed.returncode != 0:
+            return None
+        try:
+            payload = json.loads(listed.stdout)
+            node = payload["data"]["repository"]["pullRequest"]
+            if payload.get("errors") or node["state"] != "OPEN" or node["headRefOid"] != head:
+                return None
+            timeline = node["timelineItems"]
+            if not isinstance(timeline["nodes"], list):
+                return None
+            for item in reversed(timeline["nodes"]):
+                kind = item.get("__typename")
+                if kind == "PullRequestCommit" and (item.get("commit") or {}).get("oid") == head:
+                    return count
+                if kind == "HeadRefForcePushedEvent" and (item.get("afterCommit") or {}).get("oid") == head:
+                    return count
+                if kind == "RemovedFromMergeQueueEvent":
+                    at = iso_ts(item.get("createdAt"))
+                    if at is not None and 0 <= now - at <= POISON_WINDOW_S \
+                            and str(item.get("reason") or "").lower() == FAILED_DEQUEUE:
+                        count += 1
+            page = timeline["pageInfo"]
+            if not page["hasPreviousPage"]:
+                return None
+            cursor = page["startCursor"]
+            if not cursor or cursor in seen:
+                return None
+            seen.add(cursor)
+        except (ValueError, KeyError, TypeError, AttributeError):
+            return None
+    return None
 
 
 def mark_poison(number: int, pr: dict, now: float, sh=run) -> bool:
-    """JOV-6904: a PR the queue ejected twice in 24 h is poison. Every re-entry (usually a sync
+    """JOV-6904: a source revision the queue ejected twice in 24 h is poison. Every re-entry (usually a sync
     with main, same defect) fails the group it joins and every group behind it. Label it so
     the enroll workflow skips it; the lanes still fix it and drop the label with their fix."""
-    if POISON_LABEL in label_names(pr) or (queue_ejections(number, now, sh) or 0) < 2:
+    if POISON_LABEL in label_names(pr) or (queue_ejections(number, now, sh, head=pr.get("headRefOid")) or 0) < 2:
+        return False
+    viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json",
+                 "state,isDraft,headRefName,headRefOid,isCrossRepository,labels"])
+    try:
+        live = json.loads(viewed.stdout or "{}")
+    except (ValueError, TypeError):
+        return False
+    if viewed.returncode or live.get("headRefOid") != pr.get("headRefOid") \
+            or not in_scope(live, "dequeued", set()) or POISON_LABEL in label_names(live):
         return False
     if sh(["gh", "api", "-X", "POST", f"repos/{REPO}/issues/{number}/labels", "-f", f"labels[]={POISON_LABEL}"]).returncode:
         return False
     sh(["gh", "pr", "comment", str(number), "--repo", REPO, "--body",
-        f"🤖 `{POISON_LABEL}`: the merge queue ejected this PR twice in 24 h, so it stays out of the queue "
+        f"🤖 `{POISON_LABEL}`: the merge queue ejected this source revision twice in 24 h, so it stays out of the queue "
         "until a fix lands (each re-entry fails every merge group behind it). The lanes are fixing it from "
         "the merge-group failure and remove this label when their fix pushes; remove it by hand once the "
         "failing merge-group check passes locally."])
@@ -446,8 +492,44 @@ def stale_holds(prs: list[dict], now: float, sh=run) -> list[dict]:
     return sorted(rows, key=lambda row: -row["holdAgeH"])
 
 
+def resolve_ci_pr(payload: dict, sh=run) -> dict:
+    """An empty CI association can resolve only to one current same-repo source head.
+
+    Read GitHub metadata, never code or artifacts from the triggering run. Ambiguous,
+    stale, fork and malformed events cannot put a different PR into the repair queue.
+    """
+    workflow = payload.get("workflow_run") or {}
+    if workflow.get("pull_requests") or workflow.get("event") != "pull_request" \
+            or workflow.get("conclusion") not in RED_CONCLUSIONS | {"success"}:
+        return payload
+    sha, branch = workflow.get("head_sha"), workflow.get("head_branch")
+    if (workflow.get("head_repository") or {}).get("full_name") != REPO \
+            or not isinstance(branch, str) or not branch \
+            or not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha):
+        return payload
+    result = sh(["gh", "api", f"repos/{REPO}/pulls", "--method", "GET", "-f", "state=open",
+                 "-f", f"head={REPO.split('/')[0]}:{branch}", "-f", "per_page=100"])
+    if result.returncode != 0:
+        raise RuntimeError("cannot resolve CI event's current PR")
+    candidates = json.loads(result.stdout or "[]")
+    if not isinstance(candidates, list) or len(candidates) != 1:
+        return payload
+    pr = candidates[0]
+    if not isinstance(pr, dict):
+        return payload
+    head, base = pr.get("head") or {}, pr.get("base") or {}
+    if pr.get("state") != "open" or head.get("sha") != sha or head.get("ref") != branch \
+            or (head.get("repo") or {}).get("full_name") != REPO \
+            or (base.get("repo") or {}).get("full_name") != REPO \
+            or not isinstance(pr.get("number"), int) or pr["number"] <= 0:
+        return payload
+    return {**payload, "workflow_run": {**workflow, "pull_requests": [{"number": pr["number"]}]}}
+
+
 def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -> list[tuple[int, str]]:
     disabled = disabled_lanes() if disabled is None else disabled
+    if event == "workflow_run":
+        payload = resolve_ci_pr(payload, sh)
     added = []
     for number, kind, sha in relay_targets(event, payload):
         viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json",
@@ -457,6 +539,8 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
         pr = json.loads(viewed.stdout or "{}")
         if sha and pr.get("headRefOid") != sha:
             continue  # a newer head is already running CI; its own events speak for it
+        if not in_scope(pr, kind, disabled):
+            continue
         if kind == "dequeued" and mark_poison(number, pr, time.time(), sh):
             added.append((number, POISON_LABEL))
         if PREFIX + kind in label_names(pr):

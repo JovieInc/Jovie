@@ -59,7 +59,7 @@
       "sources": [
         {
           "path": "docs/PR_FLOW.md",
-          "section": "## 1. Unit of work: one small PR → `main`",
+          "section": "## 1. Unit of work: one small PR \u2192 `main`",
           "sha256": "040d65d017d9e8e5b3d00a641fbffe00fadd4eaf1539b1124262e73527eb418e"
         }
       ]
@@ -150,7 +150,7 @@
     ".claude/rules/ios.md": {
       "owner": "@itstimwhite",
       "claim": "The hard-invariant table is implemented by the existing iOS lint.",
-      "documentSha256": "8672105de5e42eeac1d930649e6457f31f2628ecffa38a3dd911cf83f5743bd5",
+      "documentSha256": "575fd3bc9e10fd68ab624b374accd15510cce7c821aab7af5552a9f72382b81f",
       "sources": [
         {
           "path": "scripts/ios-best-practices-lint.sh",
@@ -171,13 +171,18 @@
     },
     ".claude/rules/macos.md": {
       "owner": "@itstimwhite",
-      "claim": "Mac product and MenuMonitor boundaries follow the existing Mac stack decision.",
-      "documentSha256": "329d5f19f996470e2c0a4e7a433e3c53aa55157f8f29c29881c8d1dd250e71c0",
+      "claim": "Current Mac owners and planned Swift-native direction follow the stack receipt and accepted ADR; no native parity is certified.",
+      "documentSha256": "9cc005256ec7213695b5bee957165489f0f273249b4f3dff2b9a894eb956a4e6",
       "sources": [
         {
           "path": "docs/macos/swift-control-invariants.md",
           "section": "## Current Mac stack",
-          "sha256": "516475b30c09a62fa0c1bfce77ef84327508677a547dd4af1b96e23273056cb9"
+          "sha256": "4734e9584f58bf5354e64b117b69cc74fd5f037d8ab4b7a059db9a37f153d6f4"
+        },
+        {
+          "path": "docs/macos/ADR-swift-native-mac.md",
+          "section": "## Decision",
+          "sha256": "46bb06e4e265a3540909db29274e4bfeb64fc6a5732cbe610d927d577962b501"
         }
       ]
     },
@@ -211,7 +216,7 @@
       "sources": [
         {
           "path": "docs/PR_FLOW.md",
-          "section": "## 1. Unit of work: one small PR → `main`",
+          "section": "## 1. Unit of work: one small PR \u2192 `main`",
           "sha256": "040d65d017d9e8e5b3d00a641fbffe00fadd4eaf1539b1124262e73527eb418e"
         }
       ]
@@ -219,7 +224,7 @@
     ".claude/rules/release.md": {
       "owner": "@itstimwhite",
       "claim": "Draft publication and exact-head qualification are separate canonical phases.",
-      "documentSha256": "543f67bef47e2aa7d757759145aa530ea82072c65b383480075cf83bec6dd20c",
+      "documentSha256": "650a00c3a586814b757200e8b62652b33975f6602f88e393f6ba8e8d6dd4633b",
       "sources": [
         {
           "path": "docs/PR_FLOW.md",
@@ -246,7 +251,7 @@
       "sources": [
         {
           "path": "docs/PR_FLOW.md",
-          "section": "## 1. Unit of work: one small PR → `main`",
+          "section": "## 1. Unit of work: one small PR \u2192 `main`",
           "sha256": "040d65d017d9e8e5b3d00a641fbffe00fadd4eaf1539b1124262e73527eb418e"
         }
       ]
@@ -429,7 +434,7 @@
     "docs/PR_FLOW.md": {
       "owner": "@itstimwhite",
       "claim": "Native queue authority is represented in the checked-in ruleset; live operation needs separate receipts.",
-      "documentSha256": "2b098bac57f7447ffd0cc577360e359178a269dbde0107cc99e4674c77c427c9",
+      "documentSha256": "86719983ab97b7497a9428a050642beb58049cd27d613144bf6bb0276b913dc9",
       "sources": [
         {
           "path": ".github/rulesets/branch-protection.yml",
@@ -451,7 +456,7 @@
     "docs/marketing/AGENT_GUIDE.md": {
       "owner": "@itstimwhite",
       "claim": "Marketing briefs and composition use the typed source registry.",
-      "documentSha256": "c9bdfb3fdd03a01e666072c57f009568134507d24b2e0ad7b25aaf8fb8349ff9",
+      "documentSha256": "3d55318b5a7ade0cf7326f72d7245f211e19ce6463ac57745078a10672fd1ba5",
       "sources": [
         {
           "path": "apps/web/data/marketing/spec.ts",

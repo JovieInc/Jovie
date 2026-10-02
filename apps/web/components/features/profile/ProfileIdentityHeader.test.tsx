@@ -111,6 +111,22 @@ describe('ProfileIdentityHeader', () => {
       expect(onGetUpdatesClick).toHaveBeenCalledTimes(1);
     });
 
+    it('keeps the hover footprint identical to rest: the overlay trigger paints nothing', () => {
+      // JOV-7413: the ghost Button overlay used to paint its hover fill across
+      // the full 44px hit slot, so the control looked bigger on hover than at
+      // rest. The trigger must stay layout-only; the 28px pill face owns any
+      // hover tint.
+      renderHeader({ onGetUpdatesClick: vi.fn() });
+
+      const primary = screen.getByRole('button', { name: 'Get Updates' });
+      expect(primary.className).not.toMatch(/hover:|active:|transition/);
+      expect(primary).toHaveClass('absolute', 'inset-0');
+      const pillFace = primary.parentElement?.querySelector(
+        '.profile-glass-pill'
+      );
+      expect(pillFace?.className).toContain('group-hover:bg-interactive-hover');
+    });
+
     it('reads Updates On when the viewer already gets updates, same geometry', () => {
       const { rerender } = renderHeader({ onGetUpdatesClick: vi.fn() });
       const before = screen.getByTestId('profile-identity-get-updates');

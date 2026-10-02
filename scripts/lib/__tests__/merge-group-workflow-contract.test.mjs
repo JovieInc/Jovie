@@ -18,6 +18,7 @@ import {
   runMergeGroupStorybookCertification,
   SHALLOW_DEEPEN_DEPTHS,
 } from '../../component-merge-group-storybook-cert.mjs';
+import { workflowDeclaresReadyForReviewType } from '../../invariants/pr-lifecycle-contract.mjs';
 import {
   EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES,
   EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
@@ -212,27 +213,6 @@ function parseExactCiFastFailureOperands(script) {
   return operands;
 }
 
-function workflowDeclaresReadyForReviewType(source) {
-  const lines = source.split('\n');
-  for (let index = 0; index < lines.length; index += 1) {
-    const match = lines[index].match(/^(\s*)types:\s*(.*?)\s*$/);
-    if (!match) continue;
-
-    const indentation = match[1].length;
-    const declaration = [match[2].replace(/\s+#.*$/, '')];
-    for (let next = index + 1; next < lines.length; next += 1) {
-      const line = lines[next];
-      if (line.trim() === '' || /^\s*#/.test(line)) continue;
-      const nextIndentation = line.match(/^\s*/)?.[0].length ?? 0;
-      if (nextIndentation <= indentation) break;
-      declaration.push(line.replace(/\s+#.*$/, '').trim());
-    }
-
-    if (/\bready_for_review\b/.test(declaration.join(' '))) return true;
-  }
-  return false;
-}
-
 const BLOBLESS_BASE_FETCH_JOBS = new Set([
   'ci-exact-head-coverage-shard',
   'ci-exact-head-coverage',
@@ -244,6 +224,42 @@ const BLOBLESS_BASE_FETCH_JOBS = new Set([
 const BACKGROUND_BASE_FETCH_JOBS = new Set(['ci-fast-remaining']);
 
 describe('merge_group workflow contract', () => {
+  it('runs the web build for changelog-only releases without turning ordinary docs into builds', () => {
+    const script = CI_WORKFLOW.slice(
+      CI_WORKFLOW.indexOf('# CHANGELOG.md is customer-facing web content'),
+      CI_WORKFLOW.indexOf('# Test paths')
+    );
+    const directory = mkdtempSync(join(tmpdir(), 'changelog-ci-routing-'));
+    try {
+      for (const { files, builds } of [
+        { files: 'CHANGELOG.md', builds: true },
+        { files: 'docs/changelog.md', builds: false },
+        { files: 'README.md', builds: false },
+      ]) {
+        const output = join(directory, 'outputs');
+        writeFileSync(output, '');
+        const result = spawnSync(
+          'bash',
+          ['-c', 'emit_ci_lanes() { :; };\n' + script],
+          {
+            env: {
+              ...process.env,
+              CHANGED_FILES: files,
+              GITHUB_OUTPUT: output,
+            },
+            encoding: 'utf8',
+          }
+        );
+        expect(result.status, result.stderr).toBe(0);
+        expect(readFileSync(output, 'utf8')).toContain('run_build=' + builds);
+        expect(readFileSync(output, 'utf8')).toContain(
+          'has_code_changes=' + builds
+        );
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
   it('accepts reordered exact ci-fast failure operands', () => {
     expect(
       parseExactCiFastFailureOperands(
@@ -349,18 +365,29 @@ describe('merge_group workflow contract', () => {
     );
   });
 
-  it('ignores the ready transition in every workflow', () => {
+  it('reserves ready_for_review for auto-merge enable only', () => {
     const workflowDir = resolve(REPO_ROOT, '.github/workflows');
     const offenders = readdirSync(workflowDir)
       .filter(file => file.endsWith('.yml') || file.endsWith('.yaml'))
+      .filter(file => file !== 'auto-merge-default.yml')
       .filter(file => {
         const source = readFileSync(resolve(workflowDir, file), 'utf8');
         return workflowDeclaresReadyForReviewType(source);
       });
 
     // A ready transition must never earn an unchanged head a second CI
-    // flight. GitHub native merge queue owns admission without a subscriber.
+    // flight. auto-merge-default.yml is the sole subscriber: it enables
+    // native auto-merge and still skips drafts.
     expect(offenders).toEqual([]);
+    expect(
+      workflowDeclaresReadyForReviewType(AUTO_MERGE_DEFAULT_WORKFLOW)
+    ).toBe(true);
+    expect(AUTO_MERGE_DEFAULT_WORKFLOW).toContain(
+      'types: [opened, reopened, ready_for_review]'
+    );
+    expect(getJobBlock(AUTO_MERGE_DEFAULT_WORKFLOW, 'enable')).toContain(
+      'github.event.pull_request.draft == false'
+    );
   });
 
   it('rejects every valid YAML spelling of a ready_for_review type', () => {
@@ -1006,6 +1033,46 @@ describe('merge_group workflow contract', () => {
       expect(job).toContain("github.event_name == 'workflow_dispatch'");
       expect(job).not.toContain("github.event_name == 'pull_request'");
       expect(job).toContain('runs-on: ubuntu-latest');
+    }
+  });
+
+  it('uses the trusted-base blog profile inside stable PR Ready aggregates', () => {
+    const paths = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    const blog = getJobBlock(CI_WORKFLOW, 'ci-blog-content');
+    const mergeReady = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
+    const sourceReady = getJobBlock(CI_WORKFLOW, 'ci-pr-ready');
+    const receipt = getJobBlock(CI_WORKFLOW, 'ci-product-lane-receipt');
+
+    expect(paths).toContain(
+      'git show "${BASE_SHA}:scripts/lib/blog-content-ci.mjs"'
+    );
+    expect(paths).toContain('--policy-ref "$BASE_SHA"');
+    expect(paths).toContain('reason:"trusted-classifier-unavailable"');
+    expect(paths).toContain('--qualification-profile "$profile"');
+    expect(blog).toContain('name: Blog Content Qualification');
+    expect(blog).toContain(
+      "needs.ci-path-changes.outputs.blog_content_only == 'true'"
+    );
+    expect(blog).toContain('tests/unit/lib/blog/publication.test.ts');
+    expect(blog).toContain('scripts/marketing-factory/blog-adapter.test.ts');
+    expect(blog).toContain('pnpm turbo build --filter=@jovie/web');
+    expect(blog).toContain('qualificationStartedAt');
+    expect(blog).toContain('confirmedLiveAt:null');
+    expect(mergeReady).toContain('ci-blog-content');
+    expect(sourceReady).toContain('ci-blog-content');
+    expect(receipt).toContain('ci-blog-content');
+    expect(receipt).toContain('web_results="[\\"$BLOG\\",\\"$FAST\\"]"');
+
+    for (const jobId of [
+      'ci-unit-tests',
+      'ci-build-layout',
+      'ci-build-ovie',
+      'ci-typecheck-ovie',
+      'ci-storybook-surfaces',
+    ]) {
+      expect(getJobBlock(CI_WORKFLOW, jobId)).toContain(
+        "needs.ci-path-changes.outputs.blog_content_only != 'true'"
+      );
     }
   });
 
@@ -3774,9 +3841,10 @@ describe('merge-queue green enroll scan window (JOV-6831)', () => {
   );
 
   it('pages through every open PR instead of one oldest-first window', () => {
-    expect(ENROLL).toContain('after: $cursor');
-    expect(ENROLL).toContain('pageInfo { hasNextPage endCursor }');
-    expect(ENROLL).toContain('} while (cursor);');
+    expect(ENROLL).toContain('github.paginate(github.rest.pulls.list');
+    expect(ENROLL).toContain("state: 'open', base: 'main', per_page: 100");
+    expect(ENROLL).toContain('pullRequest(number: $number)');
+    expect(ENROLL).not.toContain('pullRequests(');
     expect(ENROLL).not.toMatch(/direction:\s*ASC/);
   });
 

@@ -4,7 +4,7 @@ paths: ["apps/ios/**", "**/*.swift"]
 
 # iOS (Native SwiftUI App)
 
-Operating rules for the native iOS app at `apps/ios` (SwiftUI, dark-only, Clerk-auth, TestFlight via Fastlane). Read this before touching any Swift under `apps/ios/`. Mac product work is Electron, not an iOS Swift rewrite — [`.claude/rules/macos.md`](macos.md).
+Operating rules for the native iOS app at `apps/ios` (SwiftUI, dark-only, Clerk-auth, TestFlight via Fastlane). Read this before touching any Swift under `apps/ios/`. The Mac direction is SwiftUI/AppKit on shared iOS client foundations; Electron remains shipped until qualified cutover. Share platform-neutral client behavior and existing design owners while keeping UIKit/AppKit in platform shells — [`.claude/rules/macos.md`](macos.md).
 
 The north star: **rock solid and blazing fast — 0 jank.** Every change should make the existing surface faster or more reliable, never add main-thread work, flicker, or layout shift.
 

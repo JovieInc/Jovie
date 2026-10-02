@@ -1,4 +1,4 @@
-import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { DOCS_URL } from '@/constants/domains';
 import type { PublishedClaimId } from '@/content/published-claims';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
@@ -38,9 +38,7 @@ export function GET() {
 ## Brand Identity
 
 - **Official brand name**: ${APP_NAME} (capitalize the J and spell out "${APP_NAME}")
-- **Legal entity**: ${LEGAL_ENTITY_NAME}
 - **Primary domain**: jov.ie
-- **Founded**: 2024 by Tim White
 - **Product scope**: Presence, relationships, and growth for artists, founders, authors, creators, and independent experts
 
 ## Brand Disambiguation
@@ -62,22 +60,22 @@ ${COMPANY_IDENTITY.definition}
 
 ## Key Page Types
 
-- **Public profiles**: ${BASE_URL}/{username}
-- **Artist release smart links**: ${BASE_URL}/{username}/{slug}
-- **Homepage**: ${BASE_URL}
-- **About**: ${BASE_URL}/about
-- **Pricing**: ${BASE_URL}/pricing
-- **Help Center**: ${DOCS_URL}/docs
-- **Support**: ${BASE_URL}/support
-- **OpenAPI**: ${BASE_URL}/openapi.json (canonical contract: ${BASE_URL}/api/v1/openapi.json)
+- [Public profiles](${BASE_URL}/{username})
+- [Artist release smart links](${BASE_URL}/{username}/{slug})
+- [Homepage](${BASE_URL})
+- [About](${BASE_URL}/about)
+- [Pricing](${BASE_URL}/pricing)
+- [Help Center](${DOCS_URL}/docs)
+- [Support](${BASE_URL}/support)
+- [OpenAPI](${BASE_URL}/openapi.json) (canonical contract: ${BASE_URL}/api/v1/openapi.json)
 
 ${buildSiteLlmsGuidance()}
 
 ## Contact
 
-- Website: ${BASE_URL}
-- Help Center: ${DOCS_URL}/docs
-- Support: ${BASE_URL}/support
+- [Website](${BASE_URL})
+- [Help Center](${DOCS_URL}/docs)
+- [Support](${BASE_URL}/support)
 `;
 
   return new Response(content, {

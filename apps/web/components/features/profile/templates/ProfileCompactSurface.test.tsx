@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import type { DynamicOptions } from 'next/dist/shared/lib/app-dynamic';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Artist } from '@/types/db';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
+import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
 
 vi.mock('next/link', () => ({
   default: ({
@@ -18,9 +20,36 @@ vi.mock('next/link', () => ({
   }) => React.createElement('a', { href, ...props }, children),
 }));
 
-vi.mock('next/dynamic', () => ({
-  default: () => () => null,
+const lazyOverlays = vi.hoisted(() => ({
+  pending: new Map<
+    string,
+    {
+      promise: Promise<{ default: React.ComponentType }>;
+      resolve: (value: { default: React.ComponentType }) => void;
+    }
+  >(),
 }));
+
+// Execute the App Router's actual lazy/Suspense implementation. Only module
+// arrival is controlled; preserve each source call's loading/SSR options.
+vi.mock('next/dynamic', async () => {
+  const { default: appDynamic } = await vi.importActual<
+    typeof import('next/dist/shared/lib/app-dynamic')
+  >('next/dist/shared/lib/app-dynamic');
+  return {
+    default: (loader: () => Promise<unknown>, options?: DynamicOptions) => {
+      const kind = String(loader).includes('ProfileUnifiedDrawer')
+        ? 'drawer'
+        : 'notifications';
+      return appDynamic(
+        () =>
+          lazyOverlays.pending.get(kind)?.promise ??
+          Promise.resolve({ default: () => null }),
+        options
+      );
+    },
+  };
+});
 
 vi.mock('@/components/atoms/ImageWithFallback', () => ({
   ImageWithFallback: ({
@@ -201,6 +230,78 @@ describe('ProfileCompactSurface', () => {
   beforeEach(() => {
     mockUseIsAuthenticated.mockReturnValue(false);
   });
+
+  it.each(['drawer', 'notifications'])(
+    'keeps the mounted profile and focused claim available while the %s module loads',
+    async kind => {
+      let releaseModule!: (value: { default: React.ComponentType }) => void;
+      const promise = new Promise<{ default: React.ComponentType }>(resolve => {
+        releaseModule = resolve;
+      });
+      lazyOverlays.pending.set(kind, { promise, resolve: releaseModule });
+      const Overlay = () => <button type='button'>{kind} ready</button>;
+      const profile = (ready: boolean) => (
+        <React.Suspense fallback={<div role='status'>Loading profile</div>}>
+          <PublicProfileLayoutShell
+            artistName={artist.name}
+            heroImageUrl={null}
+            heroImageError={false}
+            isDesktopLayout={false}
+            shouldRenderHeading={false}
+            profileAccentStyle={{}}
+            compactSurface={
+              <ProfileCompactSurface
+                artist={artist}
+                socialLinks={[]}
+                contacts={[]}
+                drawerOpen={false}
+                drawerView='menu'
+                activeMode='profile'
+                onDrawerOpenChange={vi.fn()}
+                onDrawerViewChange={vi.fn()}
+                onBack={vi.fn()}
+                onOpenMenu={vi.fn()}
+                onPlayClick={vi.fn()}
+                onShare={vi.fn()}
+                profileHref='/timwhite'
+                proofClaimCta={{ href: '/start', label: 'Claim yours' }}
+                renderInteractiveOverlays={kind === 'drawer' ? ready : true}
+                visitorAssignmentResolved={
+                  kind === 'notifications' ? ready : false
+                }
+              />
+            }
+          />
+        </React.Suspense>
+      );
+      const view = render(profile(false));
+      // The already-present closed drawer may resolve before the per-visitor
+      // assignment enables the separate notifications module.
+      await act(async () => {});
+      const heading = screen.getByRole('heading', { name: artist.name });
+      const claim = screen.getByRole('link', { name: /Claim yours/ });
+      const dock = screen.getByTestId('profile-tab-bar');
+      claim.focus();
+      expect(claim).toHaveFocus();
+      view.rerender(profile(true));
+      try {
+        expect(heading).toBeVisible();
+        expect(claim).toBeVisible();
+        expect(dock).toBeVisible();
+        expect(claim).toHaveFocus();
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      } finally {
+        await act(async () => releaseModule({ default: Overlay }));
+        lazyOverlays.pending.delete(kind);
+      }
+      expect(
+        screen.getByRole('button', { name: `${kind} ready` })
+      ).toBeVisible();
+      expect(screen.getByRole('heading', { name: artist.name })).toBe(heading);
+      expect(screen.getByRole('link', { name: /Claim yours/ })).toBe(claim);
+      expect(claim).toHaveFocus();
+    }
+  );
 
   it('renders the floating bottom tab bar on the interactive profile', () => {
     renderSurface();
@@ -450,7 +551,10 @@ describe('ProfileCompactSurface', () => {
       'flex',
       'flex-col',
       'overflow-y-auto',
-      'overscroll-contain'
+      'overscroll-contain',
+      // JOV-7412: md+ the document scrolls, so the pane must chain overscroll
+      // to the page instead of trapping the wheel at its own edges.
+      'md:overscroll-auto'
     );
   });
 

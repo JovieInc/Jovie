@@ -8,6 +8,7 @@ export type FetchImplementation = (
 ) => Promise<Response>;
 
 export type ResourceOptions = {
+  readonly workerToken?: string;
   readonly baseUrl?: string;
   readonly fetchImpl?: FetchImplementation;
   readonly signal?: AbortSignal;
@@ -34,7 +35,8 @@ export class JovieRequestError extends Error {
     readonly responseBody?: string,
     readonly retryAfterSeconds?: number,
     /** Stable server error code (e.g. RATE_LIMITED) when the API sent one. */
-    readonly apiCode?: string
+    readonly apiCode?: string,
+    readonly retryable?: boolean
   ) {
     super(message);
     this.name = 'JovieRequestError';
@@ -140,7 +142,7 @@ function getFetch(options: ResourceOptions): FetchImplementation {
   return options.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
 }
 
-function parseRetryAfterSeconds(
+export function parseRetryAfterSeconds(
   value: string | null,
   nowMs = Date.now()
 ): number | undefined {

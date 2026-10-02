@@ -297,10 +297,11 @@ describe('source PR path-output reachability contract', () => {
     expect(detectStep).not.toContain('echo "skip=');
     expect(workflow).not.toContain('needs.ci-path-changes.outputs.skip');
 
-    // `.github/**` is explicitly not docs-only. ci-fast additionally keys only
+    // Workflows and canonical changelog content cannot take the docs-only exit.
+    // ci-fast additionally keys only
     // off the authoritative Path Changes conclusion, including docs-only PRs.
     expect(detectStep).toContain(
-      'if ! echo "$CHANGED_FILES" | grep -q -E \'^\\.github/\''
+      'if ! echo "$CHANGED_FILES" | grep -q -E \'^(\\.github/|CHANGELOG\\.md$)\''
     );
     expect(
       detectStep.lastIndexOf('echo "has_code_changes=true"')

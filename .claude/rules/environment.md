@@ -262,27 +262,22 @@ git worktree remove ../Jovie-agent-1
 
 No configuration is needed — Turbo detects worktrees automatically. Combined with remote caching, agents in separate worktrees get near-instant cache hits.
 
-### Concurrent Commit Pitfall — `git stash` Races Across Worktrees
+### Concurrent Commits Across Worktrees
 
-`git stash` is **repo-global** — every worktree writes to the same `.git/refs/stash` stack. lint-staged backs up the working tree to a stash before running tasks and pops it on cleanup. When multiple worktrees invoke `git commit` concurrently, their lint-staged runs step on each other's backup stashes.
+`git stash` is **repo-global** — every worktree writes to the same
+`.git/refs/stash` stack. The pre-commit hook therefore runs
+`pnpm exec lint-staged --no-stash`: lint-staged still selects files from each
+worktree's staged diff, but it does not create a shared automatic-backup stash.
+Concurrent `git commit` processes in isolated worktrees are supported.
 
-Symptom (from a parallel swarm of worktree agents):
+Do not replace `--no-stash` with stash cleanup or commit serialization, and
+never use `--no-verify`. When changing the hook, run
+`pnpm gate-ladder:test`; its regression creates two linked worktrees, commits in
+both at the same time, and verifies staged-only task inputs with no stash race.
 
-```
-[STARTED] Cleaning up temporary files...
-[FAILED] lint-staged automatic backup is missing!
-husky - pre-commit script failed (code 1)
-```
-
-Important: the commit itself often **succeeds** before husky errors on cleanup. Check `git log --oneline origin/main..HEAD` before assuming the work was lost and retrying — a blind retry after "failure" is how duplicate commits get introduced.
-
-Mitigations (in priority order):
-
-1. **Serialize commits across worktrees** in the orchestrator. Don't fire `git commit` in 5 worktrees at once; queue them.
-2. Before commit, drop only the stale lint-staged backup stashes left by prior failed runs: `git stash list | grep "lint-staged automatic backup" | cut -d: -f1 | xargs -r -n1 git stash drop`. This targets the matching refs by name, so it won't clobber an unrelated stash you have on top. Run it right before the commit, not preemptively.
-3. If you're running long-lived parallel worktree agents (like `/swarm`), dispatch each agent in its own backgrounded turn so their commit windows rarely overlap.
-
-**Never** use `--no-verify` to route around this. The hook failure message is cosmetic, but the fix is coordination, not skipping validation.
+Without the automatic backup, lint-staged leaves task modifications in the
+index when a task fails. Inspect and fix that worktree before retrying the
+commit; do not assume a failed hook restored the index.
 
 ## Quick Troubleshooting
 

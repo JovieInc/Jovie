@@ -9,13 +9,21 @@
  *   company right now.
  */
 
+import { APP_ROUTES } from '@/constants/routes';
 import type { FounderFunnelData } from '@/lib/admin/types';
+import {
+  formatSourceFreshness,
+  getSourceFreshnessState,
+  isSourceStale,
+} from '@/lib/hud/source-trust';
 import type { HudMetricSourceTrust, HudMetrics } from '@/types/hud';
 
 export interface OpsException {
   readonly id: string;
   readonly label: string;
   readonly detail: string | null;
+  /** Authoritative record for drill-down; null falls back to Operations. */
+  readonly href: string | null;
 }
 
 export interface OpsBottleneck {
@@ -41,17 +49,35 @@ function pluralize(count: number, singular: string): string {
   return `${count.toLocaleString('en-US')} ${singular}${count === 1 ? '' : 's'}`;
 }
 
-function sourceExceptions(metrics: HudMetrics): readonly OpsException[] {
+function sourceExceptions(
+  metrics: HudMetrics,
+  now: number
+): readonly OpsException[] {
   return Object.values(metrics.sources)
     .map(source => {
       const state = SOURCE_STATE_COPY[source.state];
-      return state === null
-        ? null
-        : {
-            id: `source-${source.key}`,
-            label: `${source.label} is ${state}`,
-            detail: source.nextStep ?? source.errorMessage,
-          };
+      if (state !== null) {
+        return {
+          id: `source-${source.key}`,
+          label: `${source.label} is ${state}`,
+          detail: source.nextStep ?? source.errorMessage,
+          href: source.dashboardUrl,
+        };
+      }
+      // False-green guard: a source that reports `ok` but whose observation is
+      // older than the staleness budget must surface as an exception, not pass
+      // silently as healthy.
+      if (source.state === 'ok' && isSourceStale(source.fetchedAtIso, now)) {
+        return {
+          id: `source-stale-${source.key}`,
+          label: `${source.label} data is stale`,
+          detail:
+            source.nextStep ??
+            `Last observed ${formatSourceFreshness(source.fetchedAtIso, now)}`,
+          href: source.dashboardUrl,
+        };
+      }
+      return null;
     })
     .filter((entry): entry is OpsException => entry !== null);
 }
@@ -60,7 +86,10 @@ function sourceExceptions(metrics: HudMetrics): readonly OpsException[] {
  * Founder-awareness health strip. Returns only exceptions; an empty result
  * means the operating chain is nominal.
  */
-export function deriveOpsExceptions(metrics: HudMetrics): OpsException[] {
+export function deriveOpsExceptions(
+  metrics: HudMetrics,
+  now = Date.now()
+): OpsException[] {
   const exceptions: OpsException[] = [];
 
   if (metrics.operations.status !== 'ok') {
@@ -71,6 +100,7 @@ export function deriveOpsExceptions(metrics: HudMetrics): OpsException[] {
         metrics.operations.dbLatencyMs === null
           ? null
           : `Latency ${metrics.operations.dbLatencyMs.toFixed(0)}ms`,
+      href: APP_ROUTES.ADMIN_OPERATIONS,
     });
   }
 
@@ -79,6 +109,7 @@ export function deriveOpsExceptions(metrics: HudMetrics): OpsException[] {
       id: 'deploy-failed',
       label: 'Latest deploy failed',
       detail: metrics.deployments.current.branch,
+      href: metrics.deployments.current.url,
     });
   }
 
@@ -91,6 +122,7 @@ export function deriveOpsExceptions(metrics: HudMetrics): OpsException[] {
         metrics.reliability.p95LatencyMs === null
           ? null
           : `p95 ${metrics.reliability.p95LatencyMs.toFixed(0)}ms`,
+      href: metrics.sources.sentry?.dashboardUrl ?? null,
     });
   }
 
@@ -100,12 +132,14 @@ export function deriveOpsExceptions(metrics: HudMetrics): OpsException[] {
       id: 'quarantine-invalid',
       label: 'Test quarantine ledger is invalid',
       detail: null,
+      href: null,
     });
   } else if (!quarantine.withinRetryBudget) {
     exceptions.push({
       id: 'quarantine-over-budget',
       label: 'Flaky tests are over the retry budget',
       detail: pluralize(quarantine.activeCount, 'quarantined test'),
+      href: null,
     });
   }
 
@@ -116,6 +150,7 @@ export function deriveOpsExceptions(metrics: HudMetrics): OpsException[] {
       id: 'agent-work-blocked',
       label: `${pluralize(agentExceptions, 'agent task')} blocked or failed`,
       detail: metrics.aiOps.blockers[0]?.summary ?? null,
+      href: metrics.aiOps.blockers[0]?.url ?? null,
     });
   }
 
@@ -124,10 +159,32 @@ export function deriveOpsExceptions(metrics: HudMetrics): OpsException[] {
       id: 'company-memory-down',
       label: 'Company memory is down',
       detail: null,
+      href: null,
     });
   }
 
-  return [...exceptions, ...sourceExceptions(metrics)];
+  const moneySources = [metrics.sources.stripe, metrics.sources.mercury];
+  // Contradiction guard: both money sources claim healthy `ok` observations
+  // while the company overview reports financial data is unavailable — the
+  // sources are false-green and cannot both be right.
+  if (
+    metrics.overview?.financialDataAvailable === false &&
+    moneySources.every(
+      source =>
+        source?.state === 'ok' &&
+        getSourceFreshnessState(source.fetchedAtIso, now) === 'fresh'
+    )
+  ) {
+    exceptions.push({
+      id: 'money-sources-contradiction',
+      label: 'Revenue sources disagree',
+      detail:
+        'Stripe and Mercury report healthy but financial data is unavailable',
+      href: APP_ROUTES.ADMIN_OPERATIONS,
+    });
+  }
+
+  return [...exceptions, ...sourceExceptions(metrics, now)];
 }
 
 /**

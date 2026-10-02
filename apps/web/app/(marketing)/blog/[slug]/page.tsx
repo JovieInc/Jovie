@@ -7,6 +7,8 @@ import {
   getBlogPost,
   getBlogPostSlugs,
   getRelatedPosts,
+  isBlogPostIndexable,
+  isBlogPostUnavailableError,
 } from '@/lib/blog/getBlogPosts';
 import { resolveAuthor } from '@/lib/blog/resolveAuthor';
 import {
@@ -33,6 +35,7 @@ interface BlogPostPageProps {
 
 // Fully static - blog posts are pre-generated at build time
 export const revalidate = false;
+export const dynamicParams = false;
 
 // JOV-6289: consented retargeting is limited to explicitly approved public
 // answer-article canonical paths. Every other blog post resolves to nothing.
@@ -57,6 +60,9 @@ export async function generateMetadata({ params }: BlogPostPageProps) {
       alternates: {
         canonical: `${BASE_URL}/blog/${post.slug}`,
       },
+      ...(!isBlogPostIndexable(post.slug)
+        ? { robots: { index: false, follow: true } }
+        : {}),
       openGraph: {
         title: post.title,
         description: post.excerpt,
@@ -74,10 +80,9 @@ export async function generateMetadata({ params }: BlogPostPageProps) {
         description: post.excerpt,
       },
     };
-  } catch {
-    return {
-      title: 'Blog Post',
-    };
+  } catch (error) {
+    if (isBlogPostUnavailableError(error)) return { title: 'Blog Post' };
+    throw error;
   }
 }
 
@@ -167,7 +172,8 @@ export default async function BlogPostRoute({
         />
       </>
     );
-  } catch {
-    notFound();
+  } catch (error) {
+    if (isBlogPostUnavailableError(error)) notFound();
+    throw error;
   }
 }

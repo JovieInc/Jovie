@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Badge, Button } from '@jovie/ui';
 import { Check, ExternalLink } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { HudObservationStatus } from '@/components/features/admin/hud/HudObservationStatus';
@@ -16,34 +16,12 @@ import { STANDARD_CACHE } from '@/lib/queries/cache-strategies';
 
 const FETCH_URL = '/api/admin/hud/tim-actions';
 
-// Priority display config — maps Linear priority number to label and tone
-const PRIORITY_CONFIG: Record<number, { label: string; className: string }> = {
-  1: {
-    label: 'Urgent',
-    className: 'bg-error/15 text-error border border-error/20',
-  },
-  2: {
-    label: 'High',
-    className: 'bg-orange-500/15 text-orange-400 border border-orange-500/20',
-  },
-  3: {
-    label: 'Medium',
-    className: 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20',
-  },
-  4: {
-    label: 'Low',
-    className: 'bg-zinc-500/15 text-zinc-400 border border-zinc-500/20',
-  },
+const PRIORITY_LABELS: Record<number, string> = {
+  1: 'Urgent',
+  2: 'High',
+  3: 'Medium',
+  4: 'Low',
 };
-
-const DEFAULT_PRIORITY_CONFIG = {
-  label: 'No Priority',
-  className: 'bg-zinc-500/15 text-zinc-400 border border-zinc-500/20',
-};
-
-function getPriorityConfig(priority: number) {
-  return PRIORITY_CONFIG[priority] ?? DEFAULT_PRIORITY_CONFIG;
-}
 
 function DaysOldBadge({ daysOld }: Readonly<{ readonly daysOld: number }>) {
   const isOverdue = daysOld > 7;
@@ -68,10 +46,10 @@ interface ActionRowProps {
 }
 
 function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
-  const priorityConfig = getPriorityConfig(issue.priority);
+  const priorityLabel = PRIORITY_LABELS[issue.priority] ?? 'No Priority';
 
   return (
-    <ShellListRowFrame className='flex items-center gap-3 border border-subtle bg-surface-0 px-3 py-2.5'>
+    <ShellListRowFrame className='flex items-center gap-3 px-3 py-2.5'>
       {/* Title + Linear link */}
       <div className='min-w-0 flex-1'>
         <a
@@ -94,11 +72,9 @@ function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
       </div>
 
       {/* Priority badge */}
-      <span
-        className={`shrink-0 rounded px-1.5 py-0.5 text-3xs font-semibold ${priorityConfig.className}`}
-      >
-        {priorityConfig.label}
-      </span>
+      <Badge variant='outline' size='sm' className='shrink-0'>
+        {priorityLabel}
+      </Badge>
 
       {/* Age */}
       <DaysOldBadge daysOld={issue.daysOld} />
@@ -118,7 +94,11 @@ function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
   );
 }
 
-export function TimActionRequiredSection() {
+export function TimActionRequiredSection({
+  presentation = 'section',
+}: {
+  readonly presentation?: 'section' | 'page';
+}) {
   const [data, setData] = useState<TimActionsResponse | null>(null);
   // isInitialLoad tracks whether we've ever received data — only show skeleton on first load
   const isInitialLoadRef = useRef(true);
@@ -221,28 +201,42 @@ export function TimActionRequiredSection() {
     visibleCount: visibleIssues.length,
   });
 
+  const Surface = presentation === 'page' ? 'section' : ContentSurfaceCard;
+
   return (
-    <ContentSurfaceCard surface='details' className='p-3'>
+    <Surface
+      aria-label='Founder Decisions'
+      className={presentation === 'page' ? 'min-w-0' : 'p-3'}
+    >
       <div className='space-y-2.5'>
-        <div className='flex items-center gap-2'>
-          <span
-            className='h-2 w-2 shrink-0 rounded-full bg-warning'
-            aria-hidden='true'
-          />
-          <p className='text-xs font-caption text-tertiary-token'>Needs You</p>
-          {!isLoading && visibleIssues.length > 0 ? (
-            <span className='ml-auto text-2xs tabular-nums text-tertiary-token'>
-              {visibleIssues.length}
-            </span>
-          ) : null}
-        </div>
+        {presentation === 'section' ? (
+          <div className='flex items-center gap-2'>
+            <span
+              className='h-2 w-2 shrink-0 rounded-full bg-warning'
+              aria-hidden='true'
+            />
+            <p className='text-xs font-caption text-tertiary-token'>
+              Needs You
+            </p>
+            {!isLoading && visibleIssues.length > 0 ? (
+              <span className='ml-auto text-2xs tabular-nums text-tertiary-token'>
+                {visibleIssues.length}
+              </span>
+            ) : null}
+          </div>
+        ) : !isLoading && visibleIssues.length > 0 ? (
+          <p className='px-3 text-xs tabular-nums text-tertiary-token'>
+            {visibleIssues.length}{' '}
+            {visibleIssues.length === 1 ? 'decision' : 'decisions'}
+          </p>
+        ) : null}
 
         {isLoading && !data ? (
           <div className='grid gap-2'>
             {[1, 2].map(i => (
               <div
                 key={i}
-                className='h-13 animate-pulse rounded-xl border border-subtle bg-surface-0'
+                className='h-13 animate-pulse rounded-md bg-surface-1'
                 aria-hidden='true'
               />
             ))}
@@ -288,7 +282,7 @@ export function TimActionRequiredSection() {
           />
         ) : null}
       </div>
-    </ContentSurfaceCard>
+    </Surface>
   );
 }
 

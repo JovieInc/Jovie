@@ -24,12 +24,18 @@ import type {
   MarketingNarrativePlan,
 } from '../generation';
 import type { LandingPagePipelineStage } from '../landingPageGrammar';
+import {
+  MarketClassificationSchema,
+  PERSUASION_JOB_ROUTES,
+  PERSUASION_PRIMITIVES,
+} from './persuasionBrief';
 import { SectionRequestSchema } from './sectionRequest';
 
 export const FACTORY_SPINE_VERSION = '1.0.0';
 
 export const FACTORY_STAGES = [
   'truth',
+  'persuasion',
   'outcomes',
   'narrative',
   'copy',
@@ -119,6 +125,33 @@ export const FactoryClaimSetSchema = z.object({
       })
     )
     .min(1),
+});
+
+/**
+ * The competitive persuasion plan (JOV-7335): which category-standard
+ * persuasion jobs the page must still perform and where each routes — a
+ * certified section, the section-request pipeline, registry work, or a proof
+ * gap. Emitted before composition so render can never run without it.
+ */
+export const FactoryPersuasionPlanSchema = z.object({
+  pageId: Id,
+  researchedAt: z.iso.date(),
+  classification: MarketClassificationSchema,
+  differentiator: Id,
+  requiredJobs: z.array(
+    z.object({
+      primitive: z.enum(PERSUASION_PRIMITIVES),
+      job: Id,
+      routed: z.enum(PERSUASION_JOB_ROUTES),
+    })
+  ),
+  sectionRequests: z.array(SectionRequestSchema),
+  proofGaps: z.array(
+    z.object({
+      primitive: z.enum(PERSUASION_PRIMITIVES),
+      reason: z.string().min(1),
+    })
+  ),
 });
 
 export const FactoryOutcomeBriefSchema = z.object({
@@ -349,6 +382,7 @@ export const FactoryPublishSchema = z.object({
 
 export const FACTORY_STAGE_ARTIFACT_SCHEMAS = {
   truth: FactoryClaimSetSchema,
+  persuasion: FactoryPersuasionPlanSchema,
   outcomes: FactoryOutcomeBriefSchema,
   narrative: FactoryNarrativePlanSchema,
   copy: FactoryCopyDocSchema,

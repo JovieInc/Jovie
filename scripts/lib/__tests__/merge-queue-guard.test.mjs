@@ -2695,7 +2695,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     inventoryFailure = false,
     malformedInventory = false,
     expectedFinalCliCalls = 1,
-    admissionReceipt,
+    admissionReceipt = undefined,
   } = {}) {
     const drain = readFileSync(
       resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),

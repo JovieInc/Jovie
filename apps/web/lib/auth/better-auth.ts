@@ -39,7 +39,10 @@ import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { adminPasskeyStepUp } from './admin-passkey-step-up';
 import { generateAppleClientSecret } from './apple-client-secret';
+import { mcpDynamicClientRegistrationOptions } from './mcp-dynamic-registration';
+import { mcpOAuthRedirectGuard } from './mcp-redirect-guard';
 import { oauthProviderErrorReturn } from './oauth-provider-error-return';
+import { OAUTH_PROVIDER_TRUSTED_CLIENT_IDS } from './oauth-trusted-clients';
 import { resolveOvieWebOrigin } from './ovie-web-origin';
 import { resolvePasskeyRpId } from './passkey-rp-id';
 import { provisionAppUser } from './provision';
@@ -68,10 +71,13 @@ export const DETERMINISTIC_TEST_OTP = '424242';
 /**
  * Trusted origins: production + staging + local dev + native deep-link
  * schemes. Exact Vercel deployment hosts (preview and production) are
- * added from VERCEL_URL / VERCEL_BRANCH_URL — never a bare *.vercel.app
- * wildcard (plan eng row 36). Production Controller smokes the staged
- * `*.vercel.app` URL before the jov.ie alias binds; that host must be
- * trusted for cookie-bearing POSTs or Better Auth CSRF rejects them.
+ * added from VERCEL_URL / VERCEL_BRANCH_URL / VERCEL_PROJECT_PRODUCTION_URL —
+ * never a bare *.vercel.app wildcard (plan eng row 36). Production
+ * Controller smokes the staged `*.vercel.app` URL before the jov.ie alias
+ * binds; that host must be trusted for cookie-bearing POSTs or Better Auth
+ * CSRF rejects them. VERCEL_PROJECT_PRODUCTION_URL covers the project's
+ * default `*-*.vercel.app` production domain, which Vercel keeps routable
+ * beside the jov.ie alias (JOV-4344).
  */
 export const STATIC_TRUSTED_ORIGINS = [
   'https://jov.ie',
@@ -93,7 +99,11 @@ function originFromVercelHost(host: string | undefined): string | undefined {
 }
 
 export function resolveTrustedOrigins(): string[] {
-  const vercelOrigins = [env.VERCEL_URL, env.VERCEL_BRANCH_URL]
+  const vercelOrigins = [
+    env.VERCEL_URL,
+    env.VERCEL_BRANCH_URL,
+    env.VERCEL_PROJECT_PRODUCTION_URL,
+  ]
     .map(originFromVercelHost)
     .filter((origin): origin is string => Boolean(origin));
   const ovieOrigin = resolveOvieWebOrigin(env.OVIE_WEB_ORIGIN, env);
@@ -213,6 +223,7 @@ function resolveBaseUrl(): NonNullable<BetterAuthOptions['baseURL']> {
           ...resolveLoopbackHostPatterns(),
           env.VERCEL_URL,
           env.VERCEL_BRANCH_URL,
+          env.VERCEL_PROJECT_PRODUCTION_URL,
           ovieOrigin?.host,
         ].filter((host): host is string => Boolean(host))
       ),
@@ -330,19 +341,19 @@ function buildPlugins() {
         gracePeriod: 60 * 60 * 24 * 30,
       },
     }),
+    mcpOAuthRedirectGuard(),
     oauthProvider({
       loginPage: '/identity',
       consentPage: '/identity',
       signup: { page: '/identity' },
       scopes: ['openid', 'profile', 'email', 'offline_access'],
       grantTypes: ['authorization_code', 'refresh_token'],
-      allowDynamicClientRegistration: false,
-      allowUnauthenticatedClientRegistration: false,
+      ...mcpDynamicClientRegistrationOptions(),
       accessTokenExpiresIn: 15 * 60,
       refreshTokenExpiresIn: 60 * 60 * 24 * 30,
       storeClientSecret: 'hashed',
       storeTokens: 'hashed',
-      cachedTrustedClients: new Set(['logyourbody-ios', 'logyourbody-web']),
+      cachedTrustedClients: new Set(OAUTH_PROVIDER_TRUSTED_CLIENT_IDS),
     }) as BetterAuthPlugin,
     oauthProviderErrorReturn(),
     oneTimeToken({

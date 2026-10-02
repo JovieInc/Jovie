@@ -14,6 +14,7 @@ These are local Codex automations for agent workflow hygiene. They are not produ
 | Name | Schedule | Purpose | Source |
 |------|----------|---------|--------|
 | `PR Comment Hardening Retro` (`pr-comment-hardening-retro`) | Mondays 09:00 America/Los_Angeles | Scans recent PR review comments, reports repeated agent mistake classes, and may open draft PRs only for bounded docs/tests/skill hardening. | Codex automation using `scripts/pr-comment-retro.mjs` |
+| `Weekly Paxel + Is Agentic` (`weekly-agent-readiness`) | Tuesdays 09:00 America/Los_Angeles | Runs the reviewed local Paxel wrapper, requires fresh 100/100 public reports for Jovie and LYB, and writes the bounded profile-delta + two-ship receipt outside the repository. Activation fails closed until the one-time YC SSO token exists. | Codex automation using `scripts/weekly-agent-readiness.mjs`; see `docs/operations/weekly-agent-readiness.md` |
 
 Before adding another Codex workspace automation, inspect existing Codex automations and repo schedules. Combine with this retro only when the job is about converting review feedback into durable agent hardening; keep product or production scheduling in the Vercel cron registry below.
 

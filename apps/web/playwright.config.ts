@@ -3,6 +3,7 @@ import {
   devices,
   type ReporterDescription,
 } from '@playwright/test';
+import { worktreeMetadata } from './scripts/playwright-worktree';
 import { vercelAutomationHeaders } from './tests/e2e/utils/vercel-automation-headers';
 import { resolveWebServerWarmupProfile } from './tests/e2e/utils/warmup-profile';
 
@@ -89,6 +90,11 @@ if (sentryE2eEnabled) {
 }
 
 export default defineConfig({
+  metadata: worktreeMetadata(
+    managedWebServerUrl.origin,
+    Boolean(usesManagedWebServer),
+    __dirname
+  ),
   captureGitInfo: { commit: false, diff: false },
   testDir: './tests/e2e',
   testMatch: '**/*.spec.ts',

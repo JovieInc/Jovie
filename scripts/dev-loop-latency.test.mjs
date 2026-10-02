@@ -17,7 +17,7 @@ test('parses top-level rungs and skips conditional blocks', () => {
       '# comment',
       'bash scripts/a.sh',
       'node scripts/b.mjs --staged',
-      'pnpm exec lint-staged',
+      'pnpm exec lint-staged --no-stash',
       'if true; then',
       '  pnpm run ios:lint',
       'fi',
@@ -26,7 +26,7 @@ test('parses top-level rungs and skips conditional blocks', () => {
   assert.deepEqual(steps, [
     'bash scripts/a.sh',
     'node scripts/b.mjs --staged',
-    'pnpm exec lint-staged',
+    'pnpm exec lint-staged --no-stash',
   ]);
 });
 
@@ -34,14 +34,14 @@ test('the real pre-commit hook yields the known rungs', () => {
   const steps = parseHookSteps(
     readFileSync(resolve(import.meta.dirname, '../.husky/pre-commit'), 'utf8')
   );
-  assert.ok(steps.includes('pnpm exec lint-staged'));
+  assert.ok(steps.includes('pnpm exec lint-staged --no-stash'));
   assert.ok(steps.length >= 5, steps.join('\n'));
 });
 
 test('flags slow rungs, failing rungs and total overruns', () => {
   const ok = evaluateBudgets([
     { step: 'bash a.sh', seconds: 1, code: 0 },
-    { step: 'pnpm exec lint-staged', seconds: 8, code: 0 },
+    { step: 'pnpm exec lint-staged --no-stash', seconds: 8, code: 0 },
     { step: PRE_PUSH_STEP, seconds: 4, code: 0 },
   ]);
   assert.deepEqual(ok.breaches, []);
