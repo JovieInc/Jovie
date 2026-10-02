@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { ColumnCompactProvider } from '@/components/organisms/table/column-priority-context';
 import { VirtualizedTableRow } from '@/components/organisms/table/organisms/VirtualizedTableRow';
 import type { Row } from '@/lib/tanstack-table';
 
@@ -376,5 +377,51 @@ describe('VirtualizedTableRow', () => {
     const row = screen.getByRole('row');
     expect(row.style.position).toBe('');
     expect(row.style.transform).toBe('');
+  });
+
+  it('folds hidden-column compact forms into the primary cell', () => {
+    const row = {
+      id: '1',
+      original: { id: '1', name: 'Avery Chen' },
+      getVisibleCells: () => [
+        {
+          id: '1-fan',
+          column: {
+            id: 'fan',
+            getSize: () => 400,
+            columnDef: {
+              meta: { primary: true },
+              cell: () => 'Avery Chen',
+            },
+          },
+          getContext: () => ({}),
+        },
+      ],
+      getIsSelected: () => false,
+    } as unknown as Row<TestRow>;
+
+    render(
+      <ColumnCompactProvider
+        value={{
+          primaryId: 'fan',
+          items: [{ id: 'state', render: () => 'Active' }],
+        }}
+      >
+        <table>
+          <tbody>
+            <VirtualizedTableRow
+              {...baseProps}
+              row={row}
+              visibleCells={row.getVisibleCells()}
+            />
+          </tbody>
+        </table>
+      </ColumnCompactProvider>
+    );
+
+    expect(screen.getByRole('cell')).toHaveTextContent('Avery Chen');
+    expect(screen.getByTestId('table-column-compacts')).toHaveTextContent(
+      'Active'
+    );
   });
 });
