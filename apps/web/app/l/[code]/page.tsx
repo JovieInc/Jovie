@@ -103,12 +103,12 @@ export default async function JovieLinkPage({ params }: PageProps) {
   return (
     <ReleaseLandingPage
       release={{
-        title: link.title ?? 'Jovie',
+        title: link.title ?? 'Jovie link',
         artworkUrl: link.artworkUrl,
         releaseDate: null,
       }}
       artist={{
-        name: link.artistName ?? 'Jovie',
+        name: link.artistName ?? '',
         handle: null,
         avatarUrl: null,
       }}

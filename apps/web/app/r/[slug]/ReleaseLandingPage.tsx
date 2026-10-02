@@ -268,6 +268,12 @@ function SmartLinkArtistLine({
 
   const bylineArtists =
     primaryArtists && primaryArtists.length > 0 ? primaryArtists : [artist];
+  if (
+    !hasFeatured &&
+    bylineArtists.every(entry => entry.name.trim().length === 0)
+  ) {
+    return null;
+  }
   const artistByHandle = new Map(
     bylineArtists.map(entry => [entry.name, entry])
   );
@@ -454,9 +460,11 @@ export function ReleaseLandingPage({
       {/* Content — streaming buttons (scrollable) */}
       <div className='relative z-10 flex min-h-0 flex-1 flex-col px-5 pt-3'>
         <p className='sr-only'>
-          {parentRelease
-            ? `${release.title} by ${artistByline}, from ${parentRelease.title}. Choose a streaming service.`
-            : `${release.title} by ${artistByline}. Choose a streaming service.`}
+          {artistByline
+            ? parentRelease
+              ? `${release.title} by ${artistByline}, from ${parentRelease.title}. Choose a streaming service.`
+              : `${release.title} by ${artistByline}. Choose a streaming service.`
+            : `${release.title}. Choose a streaming service.`}
         </p>
         <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
           {claimBanner && (
