@@ -73,13 +73,14 @@ function toolDefinition(command: CommandSpec) {
 }
 
 function errorText(error: unknown): string {
-  const { code, apiCode, status, retryAfterSeconds, responseBody } = (error ??
-    {}) as Record<string, unknown>;
+  const { code, apiCode, status, retryAfterSeconds, responseBody, retryable } =
+    (error ?? {}) as Record<string, unknown>;
   return JSON.stringify({
     error: {
       code: code ?? 'CLI_ERROR',
       message: error instanceof Error ? error.message : String(error),
       ...(apiCode === undefined ? {} : { apiCode }),
+      ...(retryable === undefined ? {} : { retryable }),
       ...(status === undefined ? {} : { status }),
       ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
       ...(typeof responseBody === 'string' ? { responseBody } : {}),

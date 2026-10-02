@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { runCli } from './cli.js';
+import { JovieRequestError } from './client.js';
 import { invokeFleetAction } from './fleet-client.js';
 import { handleMcpMessage } from './mcp.js';
 
@@ -77,6 +78,27 @@ describe('scoped fleet adapters', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
+  it.each([
+    { key: 'short' },
+    { key: 'x'.repeat(129) },
+    { value: '{' },
+    { value: '[]' },
+    { value: 'null' },
+  ])(
+    'rejects malformed invocation input before sending credentials: %#',
+    async invalid => {
+      const fetchImpl = vi.fn();
+      await expect(
+        invokeFleetAction(
+          'fleet.status',
+          { ...input, ...invalid },
+          { workerToken, fetchImpl }
+        )
+      ).rejects.toHaveProperty('code', 'INVALID_INPUT');
+      expect(fetchImpl).not.toHaveBeenCalled();
+    }
+  );
+
   it('preserves canonical denials rather than manufacturing success from HTTP status', async () => {
     const denied = {
       status: 'unavailable',
@@ -90,6 +112,115 @@ describe('scoped fleet adapters', () => {
         fetchImpl,
       })
     ).toEqual(denied);
+  });
+
+  it.each([
+    { status: 429, code: 'RATE_LIMITED', retryable: true, delay: 45 },
+    { status: 400, code: 'VALIDATION_FAILED', retryable: false },
+  ])(
+    'preserves HTTP $status error guidance through CLI and MCP',
+    async test => {
+      const fetchImpl = vi.fn(async () =>
+        Response.json(
+          {
+            error: {
+              code: test.code,
+              retryable: test.retryable,
+              message: workerToken,
+            },
+          },
+          {
+            status: test.status,
+            headers: test.delay ? { 'Retry-After': String(test.delay) } : {},
+          }
+        )
+      );
+      const expected = {
+        code: 'REQUEST_FAILED',
+        apiCode: test.code,
+        status: test.status,
+        retryable: test.retryable,
+        ...(test.delay ? { retryAfterSeconds: test.delay } : {}),
+      };
+      let output = '';
+      expect(
+        await runCli(
+          [
+            'fleet',
+            'status',
+            '--profile',
+            profile,
+            '--idempotency-key',
+            input.key,
+            '--input',
+            '{}',
+            '--json',
+          ],
+          {
+            workerToken,
+            fetchImpl,
+            stdout: {
+              write: value => {
+                output += value;
+              },
+            },
+          }
+        )
+      ).toBe(3);
+      const cliError = JSON.parse(output).error;
+      expect(cliError).toMatchObject(expected);
+      expect(cliError).not.toHaveProperty('responseBody');
+      expect(output).not.toContain(workerToken);
+      const response = await handleMcpMessage(
+        {
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: {
+            name: 'fleet_status',
+            arguments: { profile, 'idempotency-key': input.key, input: '{}' },
+          },
+        },
+        { workerToken, fetchImpl, version: 'test', baseUrl: 'https://jov.ie' }
+      );
+      const result = response?.result as {
+        isError: boolean;
+        content: { text: string }[];
+      };
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(result.content[0]!.text).error).toMatchObject(expected);
+      expect(JSON.stringify(response)).not.toContain(workerToken);
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    }
+  );
+
+  it.each([
+    { code: workerToken, retryable: false },
+    { code: { token: workerToken }, retryable: false },
+    { code: 'RATE_LIMITED', retryable: workerToken },
+  ])('does not forward untrusted HTTP error fields: %#', async error => {
+    const failure = await invokeFleetAction('fleet.status', input, {
+      workerToken,
+      fetchImpl: async () =>
+        Response.json(
+          { error },
+          { status: 429, headers: { 'Retry-After': workerToken } }
+        ),
+    }).catch(value => value);
+    if (!(failure instanceof JovieRequestError))
+      throw new Error('Expected a request failure.');
+    expect(failure).toMatchObject({
+      code: 'REQUEST_FAILED',
+      apiCode:
+        error.code === 'RATE_LIMITED'
+          ? 'RATE_LIMITED'
+          : 'TEMPORARILY_UNAVAILABLE',
+      retryAfterSeconds: undefined,
+      responseBody: undefined,
+    });
+    expect(failure.retryable).toBeUndefined();
+    expect(JSON.stringify(failure)).not.toContain(workerToken);
+    expect(failure.message).not.toContain(workerToken);
   });
 
   it('rejects an aborted bodyless response using the final public response guard', async () => {

@@ -135,6 +135,7 @@ function errorPayload(error: unknown): Record<string, unknown> {
       code: error.code,
       message: error.message,
       ...(error.apiCode ? { apiCode: error.apiCode } : {}),
+      ...(error.retryable === undefined ? {} : { retryable: error.retryable }),
       ...(error.status === undefined ? {} : { status: error.status }),
       ...(error.responseBody ? { responseBody: error.responseBody } : {}),
       ...(error.retryAfterSeconds === undefined
@@ -414,6 +415,10 @@ if (isMain) {
     } else {
       writeLine(process.stderr, error.message);
     }
-    process.exitCode = 2;
+    process.exitCode = COMMANDS.some(
+      command => command.internal && command.path[0] === commandFamily(argv)
+    )
+      ? 3
+      : 2;
   }
 }

@@ -2,6 +2,7 @@ import {
   JovieInputError,
   JovieRequestError,
   normalizeBaseUrl,
+  parseRetryAfterSeconds,
   type ResourceOptions,
   readResponseBody,
 } from './client.js';
@@ -108,12 +109,38 @@ export async function invokeFleetAction(
     'receipt' in payload
   )
     return payload;
+  // These are emitted before a canonical invocation exists. Never forward
+  // arbitrary server codes, messages or bodies into agent diagnostics.
+  const error =
+    payload && typeof payload === 'object' && 'error' in payload
+      ? payload.error
+      : undefined;
+  const knownError =
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    typeof error.code === 'string' &&
+    [
+      'FEATURE_DISABLED',
+      'VALIDATION_FAILED',
+      'RATE_LIMITED',
+      'TEMPORARILY_UNAVAILABLE',
+    ].includes(error.code)
+      ? {
+          code: error.code,
+          retryable:
+            'retryable' in error && typeof error.retryable === 'boolean'
+              ? error.retryable
+              : undefined,
+        }
+      : undefined;
   throw new JovieRequestError(
-    'Fleet transport unavailable.',
+    `Fleet request returned HTTP ${response.status}.`,
     origin,
     response.status,
     undefined,
-    undefined,
-    'TEMPORARILY_UNAVAILABLE'
+    parseRetryAfterSeconds(response.headers.get('retry-after')),
+    knownError?.code ?? 'TEMPORARILY_UNAVAILABLE',
+    knownError?.retryable
   );
 }
