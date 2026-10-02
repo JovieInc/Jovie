@@ -52,6 +52,10 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Internal admin wiki article reached from the /hud/wiki/:path* rewrite into the OV app shell',
   '/app/ov/playlists': 'Internal admin workflow (manual entry)',
   '/app/ov/presence': 'Internal admin workspace pending Ovie IA placement',
+  '/app/ov/screenshots':
+    'Internal screenshot QA utility retained for direct admin access outside founder navigation',
+  '/app/ov/system':
+    'Internal system diagnostics retained for direct admin access outside founder navigation',
   '/app/ov/agent-runs/[id]':
     'Dynamic operator debug route reached from an agent run action',
   '/app/dashboard/releases/[releaseId]/tasks':
