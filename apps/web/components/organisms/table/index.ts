@@ -101,7 +101,10 @@ export { SkeletonCell } from './atoms/SkeletonCell';
 export { SkeletonRow } from './atoms/SkeletonRow';
 export { TableBadge } from './atoms/TableBadge';
 export type { TableCellProps } from './atoms/TableCell';
-export { TableCell } from './atoms/TableCell';
+export {
+  TABLE_CELL_MULTILINE_CONTENT_CLASSNAME,
+  TableCell,
+} from './atoms/TableCell';
 export type {
   TableCheckboxCellLegacyProps,
   TableCheckboxCellProps,

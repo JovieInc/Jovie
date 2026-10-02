@@ -110,6 +110,7 @@ describe('CustomerChangelogArchive', () => {
 
   it('links unloaded months to version pages and mounted months to existing anchors', () => {
     const { container } = render(<CustomerChangelogArchive months={MONTHS} />);
+    fireEvent.click(screen.getByText('Browse all updates'));
     const archive = within(
       screen.getByRole('navigation', { name: 'Changelog Archive' })
     );
@@ -185,6 +186,25 @@ describe('CustomerChangelogArchive', () => {
       expect(checks.get(`/changelog/${version}`)?.status).toBe('passed');
     }
     expect(html).not.toContain(`id="${months[1].entries[0].slug}"`);
+  });
+
+  it('keeps current outcomes visible while the full crawlable archive stays in a native disclosure', () => {
+    render(<CustomerChangelogArchive months={MONTHS} />);
+    const disclosure = screen
+      .getByText('Browse all updates')
+      .closest('details');
+    expect(disclosure).not.toHaveAttribute('open');
+    expect(
+      screen.getByRole('heading', { name: MONTHS[0].entries[0].title })
+    ).toBeVisible();
+    expect(
+      screen.getByRole('navigation', { name: 'Changelog Archive' })
+    ).not.toBeVisible();
+    fireEvent.click(screen.getByText('Browse all updates'));
+    expect(disclosure).toHaveAttribute('open');
+    expect(
+      screen.getByRole('navigation', { name: 'Changelog Archive' })
+    ).toBeVisible();
   });
 
   it('keeps JOV-IDs, Redis, and admission on Level 3', () => {
