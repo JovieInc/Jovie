@@ -70,6 +70,7 @@ import {
   LibraryCatalogProvidersCell,
   LibraryCatalogStatusCell,
 } from '@/components/features/library/library-catalog-columns';
+import { WorkInspectorActions } from '@/components/features/library/WorkInspectorActions';
 import { LibraryAssetSharePanel } from '@/components/features/library-asset-share/LibraryAssetSharePanel';
 import { LibraryAssetShareUrlCell } from '@/components/features/library-asset-share/LibraryAssetShareUrlCell';
 import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
@@ -148,6 +149,7 @@ import {
   releaseStatusDotClasses,
 } from '@/lib/library/release-status';
 import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
+import type { WorkLaunchSummary } from '@/lib/library/work-actions';
 import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries';
 import {
   type ColumnDef,
@@ -2148,7 +2150,8 @@ function AssetDrawer({
   profileId,
   approvalSavingIds,
   artistHandle,
-  pressKitCandidates,
+  shareCandidates,
+  workLaunches,
   merchProducts,
   relationships,
   postReleaseBundle,
@@ -2167,7 +2170,8 @@ function AssetDrawer({
   readonly profileId: string | null;
   readonly approvalSavingIds: ReadonlySet<string>;
   readonly artistHandle: string | null;
-  readonly pressKitCandidates: readonly LibraryReleaseAsset[];
+  readonly shareCandidates: readonly LibraryReleaseAsset[];
+  readonly workLaunches: readonly WorkLaunchSummary[];
   readonly merchProducts: readonly {
     readonly id: string;
     readonly title: string;
@@ -2321,6 +2325,18 @@ function AssetDrawer({
                         disabledTabIndex={closedTabIndex}
                       />
                     </div>
+                  </InspectorSection>
+                ) : null}
+
+                {!isMerch ? (
+                  <InspectorSection title='Actions'>
+                    <WorkInspectorActions
+                      asset={current}
+                      launches={workLaunches}
+                      canPublish={profileId !== null}
+                      disabled={!open}
+                      onSharePrivately={() => setActiveTab('files')}
+                    />
                   </InspectorSection>
                 ) : null}
 
@@ -2513,11 +2529,11 @@ function AssetDrawer({
                   <InspectorSection title='Share Files Privately'>
                     <LibraryShareDropCreator
                       releaseIds={[current.id]}
-                      candidateAssets={pressKitCandidates.map(item => ({
+                      candidateAssets={shareCandidates.map(item => ({
                         id: item.id,
                         title: item.title,
                       }))}
-                      defaultTitle={`${current.title} press kit`}
+                      defaultTitle={`${current.title} files`}
                     />
                   </InspectorSection>
                 ) : null}
@@ -2554,6 +2570,7 @@ function LibraryStatusBar({
 }
 
 const EMPTY_MERCH_PRODUCTS: readonly LibraryMerchProductOption[] = [];
+const EMPTY_WORK_LAUNCHES: readonly WorkLaunchSummary[] = [];
 
 export function LibrarySurface({
   assets,
@@ -2567,6 +2584,7 @@ export function LibrarySurface({
   merchProducts = EMPTY_MERCH_PRODUCTS,
   relationships = EMPTY_RELATIONSHIPS,
   postReleaseBundle = EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
+  workLaunches = EMPTY_WORK_LAUNCHES,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly profileId?: string | null;
@@ -2579,6 +2597,11 @@ export function LibrarySurface({
   readonly merchProducts?: readonly LibraryMerchProductOption[];
   readonly relationships?: readonly LibraryRelationshipView[];
   readonly postReleaseBundle?: LibraryPostReleaseBundle;
+  /**
+   * Canonical launch summaries (JOV-7472 read contract). Only launches scoped
+   * to the selected work render; absent data means no press-kit slot is shown.
+   */
+  readonly workLaunches?: readonly WorkLaunchSummary[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -3291,9 +3314,10 @@ export function LibrarySurface({
         profileId={profileId}
         approvalSavingIds={approvalSavingIds}
         artistHandle={artistHandle}
-        pressKitCandidates={effectiveAssets.filter(
+        shareCandidates={effectiveAssets.filter(
           item => getLibraryItemKind(item) === 'release'
         )}
+        workLaunches={workLaunches}
         merchProducts={effectiveAssets.flatMap(asset =>
           getLibraryItemKind(asset) === 'merch' &&
           asset.source?.provider === 'merch'
@@ -3323,6 +3347,7 @@ export function LibrarySurface({
       profileId,
       relationships,
       selectedAsset,
+      workLaunches,
     ]
   );
 

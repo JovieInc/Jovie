@@ -65,7 +65,9 @@
               "work:next",
               "work:claim",
               "work:report",
-              "defect:report"
+              "defect:report",
+              "fleet:discover",
+              "work:request"
             ]
           }
         },
@@ -81,6 +83,118 @@
         },
         "revoked": {
           "type": "boolean"
+        },
+        "authority": {
+          "type": "object",
+          "properties": {
+            "identity": {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "accountRef": {
+                  "type": "string",
+                  "pattern": "^urn:[a-z0-9][a-z0-9:._-]{2,180}$"
+                },
+                "runtimeRef": {
+                  "type": "string",
+                  "pattern": "^urn:[a-z0-9][a-z0-9:._-]{2,180}$"
+                },
+                "displayName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "operator",
+                    "customer"
+                  ]
+                },
+                "attestationRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "provider",
+                "accountRef",
+                "runtimeRef",
+                "displayName",
+                "role",
+                "attestationRef"
+              ],
+              "additionalProperties": false
+            },
+            "visibility": {
+              "type": "string",
+              "enum": [
+                "operators",
+                "fleet"
+              ]
+            },
+            "allowedCommands": {
+              "minItems": 1,
+              "maxItems": 4,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "artist.get",
+                  "artist.llms",
+                  "api.openapi",
+                  "docs.llms"
+                ]
+              }
+            },
+            "allowedTools": {
+              "maxItems": 32,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            },
+            "allowedConnectors": {
+              "maxItems": 32,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            },
+            "maxDurationSeconds": {
+              "type": "integer",
+              "minimum": 30,
+              "maximum": 3600
+            },
+            "maxConcurrentLeases": {
+              "type": "number",
+              "const": 1
+            },
+            "spendUsd": {
+              "type": "number",
+              "const": 0
+            }
+          },
+          "required": [
+            "identity",
+            "visibility",
+            "allowedCommands",
+            "allowedTools",
+            "allowedConnectors",
+            "maxDurationSeconds",
+            "maxConcurrentLeases",
+            "spendUsd"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [

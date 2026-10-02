@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { observeDesktopVisualActivity } from '@/lib/desktop/electron-bridge';
 
 /** Scroll distance (px) from bottom before considering "scrolled away". */
 export const SCROLL_THRESHOLD = 200;
@@ -41,31 +42,67 @@ export function useStickToBottom(
   const sentinelNodeRef = useRef<HTMLDivElement | null>(null);
   const isStuckRef = useRef(true);
   const scrollRafRef = useRef<number | null>(null);
+  const visualActiveRef = useRef(true);
+  const restoringPinnedRef = useRef(false);
 
   const setStuckToBottom = useCallback((stuck: boolean) => {
+    if (!stuck) restoringPinnedRef.current = false;
     setIsStuckToBottom(stuck);
     isStuckRef.current = stuck;
   }, []);
 
   const updateStuckFromIntersection = useCallback((intersecting: boolean) => {
+    if (!visualActiveRef.current || restoringPinnedRef.current) return;
     if (isStuckRef.current === intersecting) return;
     isStuckRef.current = intersecting;
     setIsStuckToBottom(intersecting);
   }, []);
 
   const scheduleScrollToBottom = useCallback(() => {
-    if (scrollRafRef.current !== null) return;
+    if (!visualActiveRef.current || scrollRafRef.current !== null) return;
 
     scrollRafRef.current = requestAnimationFrame(() => {
       scrollRafRef.current = null;
-      if (!isStuckRef.current) return;
+      if (!visualActiveRef.current || !isStuckRef.current) {
+        restoringPinnedRef.current = false;
+        return;
+      }
 
       const container = scrollContainerRef.current;
-      if (!container) return;
+      if (!container) {
+        restoringPinnedRef.current = false;
+        return;
+      }
 
       container.scrollTop = container.scrollHeight;
+      if (restoringPinnedRef.current) {
+        // IO callbacks can deliver hidden samples after this restoration frame.
+        // Drain those samples; subsequent user-scroll observations still apply.
+        intersectionObserverRef.current?.takeRecords();
+      }
+      restoringPinnedRef.current = false;
     });
   }, []);
+
+  useEffect(
+    () =>
+      observeDesktopVisualActivity(active => {
+        if (active === visualActiveRef.current) return;
+        visualActiveRef.current = active;
+        if (!active) {
+          restoringPinnedRef.current = false;
+          if (scrollRafRef.current !== null) {
+            cancelAnimationFrame(scrollRafRef.current);
+            scrollRafRef.current = null;
+          }
+        } else if (isStuckRef.current) {
+          // Ignore the pre-restoration offscreen sentinel from hidden growth.
+          restoringPinnedRef.current = true;
+          scheduleScrollToBottom();
+        }
+      }),
+    [scheduleScrollToBottom]
+  );
   // Only re-pin on the initial load (0 → positive), never on per-message appends.
   // Pinning on every messageCount change forced the viewport back to bottom
   // whenever a new row was appended even when the user had scrolled up (JOV-11948).
@@ -95,7 +132,9 @@ export function useStickToBottom(
 
       const observer = new IntersectionObserver(
         entries => {
-          const entry = entries[0];
+          // This observer watches one sentinel; a delayed callback may batch
+          // several states, so the last sampled state is authoritative.
+          const entry = entries.at(-1);
           if (!entry) return;
           updateStuckFromIntersection(entry.isIntersecting);
         },

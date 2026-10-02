@@ -415,6 +415,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/virtual-models.test.mjs',
   'scripts/invariants/writing-surfaces.test.mjs',
   'scripts/ios-ci-cache-contract.test.mjs',
+  'scripts/inbound-loop/inbound-loop.test.mjs',
   'scripts/merge-queue-green-enroll.test.mjs',
   'scripts/retire-coverage-reports.test.mjs',
   'scripts/publish-coverage-report.test.mjs',
@@ -448,6 +449,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
 ]);
 export const SCRIPT_CONTRACT_NODE_COMMAND = `node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')} && node --test --experimental-test-coverage --test-coverage-include=.github/scripts/customer-notes-ready.js --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 .github/scripts/customer-notes-ready.test.js`;
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
+  'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/nightly-agent-workflow.test.mjs',
   'scripts/lib/__tests__/stryker-babel-compatibility.test.mjs',
   'scripts/lib/__tests__/actions-cache-supersede.test.mjs',
@@ -477,6 +479,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/m2-revenue-path-canary-intake.test.mjs',
   'scripts/lib/__tests__/main-release-readiness.test.mjs',
   'scripts/lib/__tests__/pr-comment-analysis.test.mjs',
+  'scripts/lib/__tests__/pr-liveness.test.mjs',
   'scripts/lib/__tests__/pr-preparation-safety.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-base-tip.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-label-override.test.mjs',

@@ -23,6 +23,7 @@ The harness, not the model, owns:
 | GBrain context pack in the prompt, plus the repo contract | `context_pack()`, `render_prompt()` |
 | Independent verification: diff rules, then the repo's own `pre-push-gate.sh affected` | `gate_pr()` |
 | Gate seats (`LANES_GATE_SLOTS`, default 2 per host) and streamed gate logs | `gate_slot()`, `sh(stream=True)` |
+| Host-local exact-head gate reservation before adoption setup or original verification; claims are never proof | `reserve_gate()`, `claim_adoptable_pr()`, `gate_pr()` |
 | Gate timeouts are transient: re-gated by adopt, held only after 3 on one head | `gate_timeouts()` |
 | Landing: only a gate-passing PR is marked ready and auto-merged; CI and the queue decide | `gate_pr()`, `requeue_verified()` |
 | Receipts (`runs/ledger.jsonl`) bind Linear issue, provider/account class and lease, worktree/branch, PR/head or terminal failure; per-run log and prompt, Linear handoff comments | `run_issue()`, `codex_lane.record_lease()`, `worker()` |
@@ -45,6 +46,31 @@ The harness, not the model, owns:
 Event-driven: a worker that finishes re-execs the current release and pulls the next
 issue. The minute timer only restarts idle lanes and applies updates; it never signals a
 running worker. Production deploys are a separate track: only a red main stops shipping.
+
+Gate reservations use kernel locks for the PR number and head SHA. An adopter carries
+its reservation through checkout, install, checks and terminal receipt publication;
+another contender skips that head without taking a heavy seat or charging an issue
+retry. A small gate-command process inherits the reservation and seat, retaining them
+across worker death even when command wrappers close inherited descriptors. It reuses
+the existing provider process observer to drain observed descendants on completion or
+timeout. If cleanup cannot be proven, it retains the locks and logs an operator boundary.
+As with the existing observer, a child daemonizing before its first observation cannot
+be recovered from process metadata. Lock files must not be unlinked as stale cleanup.
+
+`verified.json` holds atomic terminal gate results under `PR:SHA` keys, bound to the
+gate policy digest and sensitive-review mode. Legacy SHA strings were claim markers,
+not certification, and are ignored. Failed setup and transient timeouts remain
+retryable; legacy held records, active repairs and spent generations retain their
+existing dispositions without being converted into certification. A changed or
+unreadable remote/local head cannot publish proof; enqueue requests bind the expected
+head with `--match-head-commit`. A reused terminal result is reported as
+`gate-already-completed`, not another landing.
+
+This reservation is host-local. It does not replace the cross-host claim policy or
+JOV-5257 admission serialization. During a drain-safe release update, old workers
+still run their old code; runtime singleflight is proven only after those workers
+and their gate descendants have naturally drained. Never kill or reset their work
+to make an activation claim.
 
 ## Event queue (JOV-6672)
 

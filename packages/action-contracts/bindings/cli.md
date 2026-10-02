@@ -38,7 +38,7 @@ defines the binding a future `jovie` CLI must implement.
 
 ## Internal fleet transport
 
-The six fleet/work/defect commands bind the same canonical actions with a scoped
+The fleet/work/defect commands bind the same canonical actions with a scoped
 worker credential and an explicit stable idempotency key. Their `--input` is a
 JSON object string. Canonical statuses use the exit codes above. Public read
 commands retain their existing usage/transport error codes for compatibility;

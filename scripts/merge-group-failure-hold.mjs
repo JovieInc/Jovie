@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import {
   DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS,
@@ -246,6 +246,44 @@ export function revisionFailureDisposition({ statuses, repository }) {
 
 function failureDescription({ classification, failureNumber, run }) {
   return `class=${classification};n=${failureNumber};run=${run.id};try=${run.run_attempt}`;
+}
+
+/** Only consumes the trusted failure-hold job output, never PR-provided data. */
+export function failureReceiptStatus(raw, { repository, prNumber, headSha }) {
+  if (raw === undefined || raw === '') return null;
+  if (typeof raw !== 'string') fail('trusted failure receipt is malformed');
+  const receipt = JSON.parse(raw);
+  if (
+    !receipt ||
+    receipt.schema !== FAILURE_HOLD_SCHEMA ||
+    receipt.repository !== repository ||
+    !SHA.test(receipt.sourceHeadSha ?? '') ||
+    !FAILURE_CLASSES.includes(receipt.classification) ||
+    ![
+      receipt.prNumber,
+      receipt.failureNumber,
+      receipt.workflowRunId,
+      receipt.workflowRunAttempt,
+    ].every(value => Number.isSafeInteger(value) && value > 0)
+  ) {
+    fail('trusted failure receipt is malformed');
+  }
+  if (receipt.prNumber !== prNumber || receipt.sourceHeadSha !== headSha)
+    return null;
+  return {
+    context: FAILURE_HOLD_CONTEXT,
+    state: 'success',
+    creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+    description: failureDescription({
+      classification: receipt.classification,
+      failureNumber: receipt.failureNumber,
+      run: {
+        id: receipt.workflowRunId,
+        run_attempt: receipt.workflowRunAttempt,
+      },
+    }),
+    target_url: `https://github.com/${repository}/actions/runs/${receipt.workflowRunId}`,
+  };
 }
 
 export function retrySpentDescription(record) {
@@ -544,7 +582,14 @@ async function main(argv) {
       },
     }
   );
-  process.stdout.write(`${JSON.stringify(result)}\n`);
+  const serialized = JSON.stringify(result);
+  if (process.env.GITHUB_OUTPUT) {
+    appendFileSync(
+      process.env.GITHUB_OUTPUT,
+      `failure_receipt=${serialized}\n`
+    );
+  }
+  process.stdout.write(`${serialized}\n`);
 }
 
 if (

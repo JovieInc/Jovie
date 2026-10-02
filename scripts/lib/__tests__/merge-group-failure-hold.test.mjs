@@ -1,9 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import {
   applyMergeGroupFailure,
   classifyMergeGroupFailure,
   enqueueWasRejected,
   FAILURE_HOLD_CONTEXT,
+  failureReceiptStatus,
   parseMergeQueueBranch,
   retryReleasedDescription,
   retrySpentDescription,
@@ -17,6 +22,46 @@ const NEW_SOURCE = 'b'.repeat(40);
 const BASE = 'c'.repeat(40);
 const GROUP = 'd'.repeat(40);
 const RUN_URL = 'https://github.com/JovieInc/Jovie/actions/runs/123';
+it('validates trusted failure receipts and never applies them to a different revision', () => {
+  const receipt = {
+    schema: 'jovie-merge-group-failure-hold/v1',
+    repository: REPOSITORY,
+    prNumber: 42,
+    sourceHeadSha: SOURCE,
+    classification: 'deterministic-source',
+    failureNumber: 1,
+    workflowRunId: 123,
+    workflowRunAttempt: 1,
+  };
+  const scope = { repository: REPOSITORY, prNumber: 42, headSha: SOURCE };
+  const convert = value => failureReceiptStatus(JSON.stringify(value), scope);
+  const trusted = convert(receipt);
+  expect(
+    revisionFailureDisposition({ statuses: [trusted], repository: REPOSITORY })
+      .action
+  ).toBe('block');
+  expect(trusted.target_url).toBe(RUN_URL);
+  expect(failureReceiptStatus('', scope)).toBeNull();
+  expect(failureReceiptStatus(undefined, scope)).toBeNull();
+  expect(convert({ ...receipt, prNumber: 43 })).toBeNull();
+  expect(convert({ ...receipt, sourceHeadSha: NEW_SOURCE })).toBeNull();
+  for (const invalid of [
+    null,
+    {},
+    { ...receipt, schema: 'spoof' },
+    { ...receipt, repository: 'other/repo' },
+    { ...receipt, sourceHeadSha: 'bad' },
+    { ...receipt, classification: 'unknown' },
+    { ...receipt, prNumber: -1 },
+    { ...receipt, failureNumber: 0 },
+    { ...receipt, workflowRunId: 0 },
+    { ...receipt, workflowRunAttempt: 0 },
+  ]) {
+    expect(() => convert(invalid)).toThrow();
+  }
+  expect(() => failureReceiptStatus(null, scope)).toThrow();
+  expect(() => failureReceiptStatus('{', scope)).toThrow();
+});
 const run = {
   id: 123,
   workflow_id: 178737329,
@@ -43,6 +88,88 @@ const timeline = [
   { __typename: 'PullRequestCommit', commit: { oid: NEW_SOURCE } },
   { __typename: 'AddedToMergeQueueEvent', createdAt: '2026-09-30T10:20:00Z' },
 ];
+
+it('passes the actual failure-hold CLI receipt to enrollment without a replicated status', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'failure-hold-cli-'));
+  try {
+    const fixturePath = join(dir, 'fixture.json');
+    writeFileSync(
+      fixturePath,
+      JSON.stringify({ run, timeline, source: SOURCE })
+    );
+    writeFileSync(
+      join(dir, 'gh'),
+      `#!${process.execPath}
+const fs = require('node:fs');
+const fixture = JSON.parse(fs.readFileSync(process.env.HOLD_TEST_FIXTURE, 'utf8'));
+const args = process.argv.slice(2);
+let result;
+if (args[1] === 'graphql') {
+  const query = args.find(arg => arg.startsWith('query='));
+  const pr = query.includes('timelineItems')
+    ? { timelineItems: { nodes: fixture.timeline, pageInfo: { hasNextPage: false } } }
+    : { id: 'PR_42', state: 'OPEN', headRefOid: fixture.source,
+        isInMergeQueue: false, mergeQueueEntry: null, autoMergeRequest: null };
+  result = { data: { repository: { pullRequest: pr } } };
+} else if (args.includes('POST')) result = {};
+else if (args[1].includes('/jobs?')) result = { jobs: [
+  { steps: [{ name: 'Run structural ci-fast lane', conclusion: 'failure' }] }
+] };
+else if (args[1].includes('/statuses')) result = [];
+else result = fixture.run;
+process.stdout.write(JSON.stringify(result));
+`,
+      { mode: 0o755 }
+    );
+    const eventPath = join(dir, 'event.json');
+    writeFileSync(
+      eventPath,
+      JSON.stringify({
+        repository: { full_name: REPOSITORY },
+        workflow_run: { id: run.id },
+      })
+    );
+    const outputPath = join(dir, 'output');
+    const execution = spawnSync(
+      process.execPath,
+      [
+        resolve(import.meta.dirname, '../../merge-group-failure-hold.mjs'),
+        '--event-path',
+        eventPath,
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${dir}:${process.env.PATH}`,
+          HOLD_TEST_FIXTURE: fixturePath,
+          GITHUB_OUTPUT: outputPath,
+        },
+      }
+    );
+    expect(execution.status, execution.stderr).toBe(0);
+    const receipt = JSON.parse(execution.stdout);
+    expect(receipt.statusWritten).toBe(true);
+    const output = readFileSync(outputPath, 'utf8');
+    expect(output).toBe(`failure_receipt=${JSON.stringify(receipt)}\n`);
+    const trusted = failureReceiptStatus(
+      output.trim().slice('failure_receipt='.length),
+      {
+        repository: REPOSITORY,
+        prNumber: 42,
+        headSha: SOURCE,
+      }
+    );
+    expect(
+      revisionFailureDisposition({
+        repository: REPOSITORY,
+        statuses: [trusted],
+      }).action
+    ).toBe('block');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 const status = ({
   classification = 'deterministic-source',
