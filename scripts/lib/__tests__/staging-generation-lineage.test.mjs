@@ -41,7 +41,7 @@ function writeLineageZip(path, payload) {
 // The stub already answers as `gh api --jq` would: the filtered scalar.
 function decide({
   hasLineageArtifact = false,
-  lineage,
+  lineage = undefined,
   replacementRelation = 'ahead',
   expectedRelation = 'behind',
 } = {}) {
