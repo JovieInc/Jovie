@@ -17,6 +17,7 @@ import {
   projectCustomerChangelog,
 } from '@/lib/customer-changelog';
 import './changelog-editorial.css';
+import { ReleaseNotesIndex } from './ReleaseNotesIndex';
 
 export const revalidate = false;
 
@@ -168,6 +169,7 @@ export default async function ChangelogPage() {
 
           <div className='changelog-entries'>
             <CustomerChangelogArchive months={months} />
+            <ReleaseNotesIndex releases={snapshot.releases} />
           </div>
         </div>
       </MarketingContainer>
