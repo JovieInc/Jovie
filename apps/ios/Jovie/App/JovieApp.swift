@@ -135,6 +135,16 @@ final class PushNotificationManager: PushNotificationCoordinating {
     defaults.removeObject(forKey: Self.storedTokenKey)
   }
 
+  func deactivateLocally(ifOwnedBy ownership: NativeSessionOwnership) async {
+    NativeSessionTokenStore.performIfCurrent(ownership) {
+      epoch = UUID()
+      self.ownership = ownership
+      shouldRegister = false
+      system.unregister()
+      defaults.removeObject(forKey: Self.storedTokenKey)
+    }
+  }
+
   nonisolated static func tokenString(from data: Data) -> String {
     data.map { String(format: "%02x", $0) }.joined()
   }
