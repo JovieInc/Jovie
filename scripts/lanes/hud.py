@@ -149,7 +149,7 @@ def ledger_rows(state: Path) -> list[dict]:
 
 def ledger_window(state: Path, hours: int = 24) -> list[dict]:
     since = (utcnow() - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    return [row for row in ledger_rows(state) if row.get("endedAt", "") >= since]
+    return [row for row in ledger_rows(state) if (row.get("endedAt") or "") >= since]
 
 
 def local_model(host) -> dict:
@@ -161,10 +161,13 @@ def local_model(host) -> dict:
     current = (state / "current").resolve()
     all_receipts = ledger_rows(state)
     since = (utcnow() - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    receipts = [row for row in all_receipts if row.get("endedAt", "") >= since]
-    verdicts = Counter(r.get("verdict") for r in receipts)
+    receipts = [row for row in all_receipts if (row.get("endedAt") or "") >= since]
+    # Display classification only: a receipt missing verdict metadata is "unclassified",
+    # never inferred as success or failure. The raw receipt is preserved in receipts24h.
+    verdicts = Counter(r["verdict"] if isinstance(r.get("verdict"), str) and r["verdict"].strip()
+                       else "unclassified" for r in receipts)
     landed = sorted((r for r in receipts if r.get("verdict") in ("landing", "verified-not-queued")),
-                    key=lambda r: r.get("endedAt", ""), reverse=True)
+                    key=lambda r: r.get("endedAt") or "", reverse=True)
     cooldowns = {}
     for path in (state / "cooldown").glob("*"):
         try:
@@ -612,7 +615,7 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
                               f"productive {metric['productiveRuns']} PR {metric['prsCreated']} "
                               f"first-pass {'n/a' if first_pass is None else f'{round(first_pass * 100)}%'} "
                               f"repair {metric['remediationRuns']} landed {metric['landedOutput']}")
-    counts = " · ".join(f"{k} {v}" for k, v in sorted(ledger.items())) or "no runs"
+    counts = " · ".join(f"{k} {v}" for k, v in sorted(ledger.items(), key=lambda item: str(item[0]))) or "no runs"
     lines.append(rgb(DIM, f"  24h verdicts: {counts}"))
     lines.append(rgb(DIM, "  THROUGHPUT 24h · " + " | ".join(provider_parts)))
 

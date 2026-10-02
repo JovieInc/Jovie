@@ -6,10 +6,13 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import json
 import re
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("hud", ROOT / "scripts/lanes/hud.py")
@@ -193,6 +196,64 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(len(plain(hud.pad("ab", 5))), 5)
         self.assertEqual(hud.dur(5400), "1h30m")
         self.assertEqual(hud.dur(90000), "1d1h")
+
+
+class LedgerSchemaTest(unittest.TestCase):
+    """JOV-7497: receipts missing optional verdict/provider/kind metadata must render
+    as unclassified, not crash the display or be inferred as success."""
+
+    def host_with_ledger(self, receipts):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        state = Path(tmp.name)
+        (state / "runs").mkdir()
+        stamp = hud.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        with open(state / "runs" / "ledger.jsonl", "w") as handle:
+            for receipt in receipts:
+                row = {"runId": receipt.get("runId", "x"), "endedAt": receipt.pop("endedAt", stamp), **receipt}
+                handle.write(json.dumps(row) + "\n")
+        return SimpleNamespace(state=state, slots=lambda _name, default: default, gate_slots=2)
+
+    def test_missing_and_null_verdicts_become_unclassified_not_a_crash(self):
+        host = self.host_with_ledger([
+            {"runId": "a", "provider": "devin"},  # no verdict key at all
+            {"runId": "b", "provider": "devin", "verdict": None},
+            {"runId": "c", "provider": "devin", "verdict": ""},
+            {"runId": "d", "provider": "devin", "verdict": {"nested": True}},
+            {"runId": "e", "provider": "devin", "verdict": "landing"},
+            {"runId": "f", "provider": "devin", "verdict": "failed"},
+        ])
+        local = hud.local_model(host)
+        self.assertEqual(local["ledger24h"], {"unclassified": 4, "landing": 1, "failed": 1})
+        self.assertEqual(local["runs24h"], 6)
+        # Raw receipts keep their original verdict metadata; only the count is classified.
+        self.assertIsNone(next(r for r in local["receipts24h"] if r["runId"] == "b")["verdict"])
+        self.assertNotIn("verdict", next(r for r in local["receipts24h"] if r["runId"] == "a"))
+        text = "\n".join(plain(line) for line in hud.render(model(local=local), 160, 45))
+        self.assertIn("unclassified 4", text)
+        self.assertIn("landing 1", text)
+
+    def test_null_and_missing_ended_at_do_not_crash_local_model(self):
+        host = self.host_with_ledger([
+            {"runId": "a", "provider": "devin", "verdict": "landing", "endedAt": None},
+            {"runId": "b", "provider": "devin"},
+        ])
+        local = hud.local_model(host)
+        self.assertEqual(local["runs24h"], 1)
+        self.assertEqual(local["ledger24h"], {"unclassified": 1})
+
+    def test_empty_ledger_reports_no_runs(self):
+        host = self.host_with_ledger([])
+        local = hud.local_model(host)
+        self.assertEqual(local["ledger24h"], {})
+        text = "\n".join(plain(line) for line in hud.render(model(local=local), 160, 45))
+        self.assertIn("24h verdicts: no runs", text)
+
+    def test_render_survives_non_string_ledger_keys(self):
+        broken = model()
+        broken["local"]["ledger24h"] = {None: 2, 5: 1, "landing": 3}
+        text = "\n".join(plain(line) for line in hud.render(broken, 160, 45))
+        self.assertIn("24h verdicts:", text)
 
 
 if __name__ == "__main__":

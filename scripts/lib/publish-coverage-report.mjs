@@ -107,20 +107,23 @@ function publishReport(
     if (!url.startsWith(`https://github.com/${repo}/pull/`)) {
       throw new Error('Coverage report PR creation returned no receipt');
     }
-    const retired = retireCoverageReports({
-      gh,
-      repo,
-      url,
-      source,
-      isAncestor: (older, newer) => {
-        try {
-          git('merge-base', '--is-ancestor', older, newer);
-          return true;
-        } catch {
-          return false;
-        }
-      },
-    });
+    const retired =
+      profile === COVERAGE
+        ? retireCoverageReports({
+            gh,
+            repo,
+            url,
+            source,
+            isAncestor: (older, newer) => {
+              try {
+                git('merge-base', '--is-ancestor', older, newer);
+                return true;
+              } catch {
+                return false;
+              }
+            },
+          })
+        : [];
     if (env.GITHUB_STEP_SUMMARY) {
       appendFileSync(
         env.GITHUB_STEP_SUMMARY,
