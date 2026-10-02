@@ -25,29 +25,19 @@ export interface BillingSyncRemediationResult {
   skipped: boolean;
 }
 
-/**
- * Detector for a stale reconciliation heartbeat or stuck Stripe webhooks.
- *
- * Reads the database directly. It does not call `/api/billing/health`, so an
- * auth change on that route cannot hide the signal. Files one Linear issue
- * per fingerprint, labeled `remediation:<fingerprint>`, at most every 12 hours.
- */
+/** DB-backed detector. Does not call `/api/billing/health`. */
 export async function runBillingSyncRemediation(
   now = new Date()
 ): Promise<BillingSyncRemediationResult> {
   const snapshot = await loadBillingSyncSnapshot(now);
   const findings = evaluateBillingSyncRemediation(snapshot);
-  if (findings.length === 0) {
-    return { findings: 0, filed: [], skipped: false };
-  }
-
+  if (findings.length === 0) return { findings: 0, filed: [], skipped: false };
   const apiKey = env.LINEAR_API_KEY;
   if (!apiKey) {
     throw new Error(
       'LINEAR_API_KEY is not configured; billing sync remediation cannot file'
     );
   }
-
   const filed: string[] = [];
   for (const finding of findings) {
     await fileBillingSyncFinding(finding, apiKey);
@@ -61,7 +51,6 @@ export async function runBillingSyncRemediation(
     });
     filed.push(finding.fingerprint);
   }
-
   logger.info('[billing-sync-remediation] filed', { filed });
   return { findings: findings.length, filed, skipped: false };
 }
@@ -74,7 +63,6 @@ export async function loadBillingSyncSnapshot(now: Date): Promise<{
 }> {
   const stuckBefore = new Date(now.getTime() - STUCK_WEBHOOK_AFTER_MS);
   const filedSince = new Date(now.getTime() - REMEDIATION_REFIRING_MS);
-
   const [lastRunRows, stuckRows, filedRows] = await Promise.all([
     db
       .select({ createdAt: billingAuditLog.createdAt })
@@ -111,7 +99,6 @@ export async function loadBillingSyncSnapshot(now: Date): Promise<{
         )
       ),
   ]);
-
   const lastFiledAtByFingerprint: Record<string, Date | null> = {
     [BILLING_SYNC_STALE_FINGERPRINT]: null,
     [BILLING_WEBHOOKS_STUCK_FINGERPRINT]: null,
@@ -124,7 +111,6 @@ export async function loadBillingSyncSnapshot(now: Date): Promise<{
       lastFiledAtByFingerprint[fingerprint] = row.createdAt;
     }
   }
-
   return {
     now,
     lastReconciliationAt: lastRunRows[0]?.createdAt ?? null,
@@ -162,33 +148,13 @@ export async function fileBillingSyncFinding(
     apiKey,
     fetchImpl
   );
-
   if (!existing) {
-    const created = await linearGraphql<LinearIssueCreateData>(
+    const created = await linearGraphql(
+      `mutation CreateBillingRemediation($title: String!, $description: String!, $labelIds: [String!]) { issueCreate(input: { teamId: "${JOVIE_TEAM_ID}", title: $title, description: $description, priority: 2, labelIds: $labelIds }) { success issue { id identifier } } }`,
       {
-        query: `
-          mutation CreateBillingRemediation(
-            $title: String!
-            $description: String!
-            $labelIds: [String!]
-          ) {
-            issueCreate(input: {
-              teamId: "${JOVIE_TEAM_ID}"
-              title: $title
-              description: $description
-              priority: 2
-              labelIds: $labelIds
-            }) {
-              success
-              issue { id identifier }
-            }
-          }
-        `,
-        variables: {
-          title: finding.title,
-          description: finding.description,
-          labelIds: [labelId],
-        },
+        title: finding.title,
+        description: finding.description,
+        labelIds: [labelId],
       },
       apiKey,
       fetchImpl,
@@ -202,30 +168,9 @@ export async function fileBillingSyncFinding(
     }
     return { action: 'created', id: issue.id };
   }
-
-  const updated = await linearGraphql<LinearIssueUpdateData>(
-    {
-      query: `
-        mutation UpdateBillingRemediation(
-          $id: String!
-          $description: String!
-          $labelIds: [String!]
-        ) {
-          issueUpdate(id: $id, input: {
-            description: $description
-            addedLabelIds: $labelIds
-          }) {
-            success
-            issue { id }
-          }
-        }
-      `,
-      variables: {
-        id: existing.id,
-        description: finding.description,
-        labelIds: [labelId],
-      },
-    },
+  const updated = await linearGraphql(
+    `mutation UpdateBillingRemediation($id: String!, $description: String!, $labelIds: [String!]) { issueUpdate(id: $id, input: { description: $description, addedLabelIds: $labelIds }) { success issue { id } } }`,
+    { id: existing.id, description: finding.description, labelIds: [labelId] },
     apiKey,
     fetchImpl,
     'linear_update'
@@ -241,17 +186,9 @@ async function ensureRemediationLabel(
   apiKey: string,
   fetchImpl: typeof fetch
 ): Promise<string> {
-  const found = await linearGraphql<LinearLabelSearchData>(
-    {
-      query: `
-        query FindRemediationLabel($name: String!) {
-          issueLabels(filter: { name: { eq: $name } }, first: 5) {
-            nodes { id name }
-          }
-        }
-      `,
-      variables: { name },
-    },
+  const found = await linearGraphql(
+    `query FindRemediationLabel($name: String!) { issueLabels(filter: { name: { eq: $name } }, first: 5) { nodes { id name } } }`,
+    { name },
     apiKey,
     fetchImpl,
     'linear_label_search'
@@ -260,19 +197,9 @@ async function ensureRemediationLabel(
     node => node?.name === name && node.id
   );
   if (match?.id) return match.id;
-
-  const created = await linearGraphql<LinearLabelCreateData>(
-    {
-      query: `
-        mutation CreateRemediationLabel($name: String!) {
-          issueLabelCreate(input: { name: $name, teamId: "${JOVIE_TEAM_ID}" }) {
-            success
-            issueLabel { id name }
-          }
-        }
-      `,
-      variables: { name },
-    },
+  const created = await linearGraphql(
+    `mutation CreateRemediationLabel($name: String!) { issueLabelCreate(input: { name: $name, teamId: "${JOVIE_TEAM_ID}" }) { success issueLabel { id name } } }`,
+    { name },
     apiKey,
     fetchImpl,
     'linear_label_create'
@@ -289,29 +216,14 @@ async function findIssueByFingerprint(
   apiKey: string,
   fetchImpl: typeof fetch
 ): Promise<{ id: string } | null> {
-  const found = await linearGraphql<LinearIssueSearchData>(
-    {
-      query: `
-        query FindBillingRemediation($fingerprint: String!) {
-          issues(
-            filter: {
-              team: { id: { eq: "${JOVIE_TEAM_ID}" } }
-              title: { contains: $fingerprint }
-            }
-            first: 10
-          ) {
-            nodes { id title state { type } }
-          }
-        }
-      `,
-      variables: { fingerprint },
-    },
+  const found = await linearGraphql(
+    `query FindBillingRemediation($fingerprint: String!) { issues(filter: { team: { id: { eq: "${JOVIE_TEAM_ID}" } }, title: { contains: $fingerprint } }, first: 10) { nodes { id title state { type } } } }`,
+    { fingerprint },
     apiKey,
     fetchImpl,
     'linear_search'
   );
-  const nodes = found.issues?.nodes ?? [];
-  const matches = nodes.filter(node =>
+  const matches = (found.issues?.nodes ?? []).filter(node =>
     String(node.title ?? '').includes(fingerprint)
   );
   const open = matches.find(
@@ -321,63 +233,31 @@ async function findIssueByFingerprint(
   return chosen?.id ? { id: chosen.id } : null;
 }
 
-interface LinearIssueNode {
-  id?: string;
-  identifier?: string;
-  title?: string;
-  state?: { type?: string };
-}
-
-interface LinearIssueCreateData {
-  issueCreate?: {
-    success?: boolean;
-    issue?: LinearIssueNode | null;
-  };
-}
-
-interface LinearIssueUpdateData {
-  issueUpdate?: {
-    success?: boolean;
-    issue?: { id?: string } | null;
-  };
-}
-
-interface LinearLabelSearchData {
-  issueLabels?: {
-    nodes?: Array<{ id?: string; name?: string }>;
-  };
-}
-
-interface LinearLabelCreateData {
-  issueLabelCreate?: {
-    success?: boolean;
-    issueLabel?: { id?: string; name?: string } | null;
-  };
-}
-
-interface LinearIssueSearchData {
+interface GqlData {
+  issueCreate?: { success?: boolean; issue?: { id?: string } | null };
+  issueUpdate?: { success?: boolean; issue?: { id?: string } | null };
+  issueLabelCreate?: { success?: boolean; issueLabel?: { id?: string } | null };
+  issueLabels?: { nodes?: Array<{ id?: string; name?: string }> };
   issues?: {
-    nodes?: LinearIssueNode[];
+    nodes?: Array<{ id?: string; title?: string; state?: { type?: string } }>;
   };
 }
 
-async function linearGraphql<T>(
-  input: { query: string; variables: Record<string, unknown> },
+async function linearGraphql(
+  query: string,
+  variables: Record<string, unknown>,
   apiKey: string,
   fetchImpl: typeof fetch,
   caller: string
-): Promise<T> {
+): Promise<GqlData> {
   const response = await fetchImpl(LINEAR_API, {
     method: 'POST',
-    headers: {
-      Authorization: apiKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(input),
+    headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, variables }),
     signal: AbortSignal.timeout(15_000),
   });
   const body = (await response.json().catch(() => null)) as {
-    data?: Record<string, unknown>;
+    data?: GqlData;
     errors?: unknown[];
   } | null;
   if (!response.ok || (body?.errors && body.errors.length > 0) || !body?.data) {
@@ -387,5 +267,5 @@ async function linearGraphql<T>(
     });
     throw new Error(`${caller} failed`);
   }
-  return body.data as T;
+  return body.data;
 }

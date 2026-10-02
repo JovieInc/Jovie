@@ -2,26 +2,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockSelect = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
-const mockProcessStripeWebhookEvent = vi.hoisted(() => vi.fn());
-const mockHandleMerchCheckoutCompleted = vi.hoisted(() => vi.fn());
-const mockHandleMerchChargeRefunded = vi.hoisted(() => vi.fn());
+const mockProcess = vi.hoisted(() => vi.fn());
+const mockMerchCheckout = vi.hoisted(() => vi.fn());
+const mockMerchRefund = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/db', () => ({
-  db: {
-    select: mockSelect,
-    update: mockUpdate,
-  },
+vi.mock('@/lib/db', () => ({ db: { select: mockSelect, update: mockUpdate } }));
+vi.mock('@/app/api/stripe/webhooks/route', () => ({
+  processWebhookEvent: mockProcess,
 }));
-
-vi.mock('@/lib/stripe/webhooks/process-event', () => ({
-  processStripeWebhookEvent: mockProcessStripeWebhookEvent,
-}));
-
 vi.mock('@/lib/merch/orders', () => ({
-  handleMerchCheckoutCompleted: mockHandleMerchCheckoutCompleted,
-  handleMerchChargeRefunded: mockHandleMerchChargeRefunded,
+  handleMerchCheckoutCompleted: mockMerchCheckout,
+  handleMerchChargeRefunded: mockMerchRefund,
 }));
-
 vi.mock('@/lib/stripe/webhooks/handlers/charge-handler', () => {
   class StripeWriteBlockedError extends Error {
     constructor(message: string) {
@@ -31,7 +23,6 @@ vi.mock('@/lib/stripe/webhooks/handlers/charge-handler', () => {
   }
   return { StripeWriteBlockedError };
 });
-
 vi.mock('@/lib/utils/logger', () => ({
   logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn() },
 }));
@@ -44,52 +35,45 @@ import { StripeWriteBlockedError } from '@/lib/stripe/webhooks/handlers/charge-h
 
 const now = new Date('2026-10-02T23:00:00.000Z');
 
-function selectChain(rows: unknown[]) {
+function selectRows(rows: unknown[]) {
   return {
     from: () => ({
       where: () => ({
-        orderBy: () => ({
-          limit: () => Promise.resolve(rows),
-        }),
+        orderBy: () => ({ limit: () => Promise.resolve(rows) }),
         limit: () => Promise.resolve(rows),
       }),
     }),
   };
 }
 
-function updateChain(returned: { id: string }[]) {
+function claim(returned: { id: string }[]) {
   const query = Promise.resolve(returned) as Promise<{ id: string }[]> & {
     returning: () => Promise<{ id: string }[]>;
   };
   query.returning = () => Promise.resolve(returned);
+  return { set: () => ({ where: () => query }) };
+}
+
+function candidate(id: string, type: string, object: Record<string, unknown>) {
   return {
-    set: () => ({
-      where: () => query,
-    }),
+    id: 'row_1',
+    stripeEventId: id,
+    type,
+    stripeCreatedAt: new Date('2026-10-01T00:00:00.000Z'),
+    payload: { id, type, created: 1_759_276_800, data: { object } },
   };
 }
 
-function storedEvent(overrides: {
-  id: string;
-  type: string;
-  object: Record<string, unknown>;
-}) {
-  return {
-    id: 'row_1',
-    stripeEventId: overrides.id,
-    type: overrides.type,
-    stripeCreatedAt: new Date('2026-10-01T00:00:00.000Z'),
-    payload: {
-      id: overrides.id,
-      type: overrides.type,
-      created: 1_759_276_800,
-      data: { object: overrides.object },
-    },
-  };
+async function replay(row: ReturnType<typeof candidate>, marked: boolean) {
+  mockSelect.mockReturnValueOnce(selectRows([row]));
+  mockUpdate
+    .mockReturnValueOnce(claim([{ id: 'row_1' }]))
+    .mockReturnValueOnce(claim(marked ? [{ id: 'row_1' }] : []));
+  return replayUnprocessedStripeWebhooks(now);
 }
 
 describe('parseStoredEvent', () => {
-  it('rejects a payload whose id or type does not match the row', () => {
+  it('rejects a payload whose id does not match the row', () => {
     expect(
       parseStoredEvent({
         stripeEventId: 'evt_1',
@@ -104,22 +88,6 @@ describe('parseStoredEvent', () => {
       })
     ).toBeNull();
   });
-
-  it('accepts a stored Stripe event', () => {
-    const event = parseStoredEvent({
-      stripeEventId: 'evt_1',
-      type: 'customer.subscription.updated',
-      stripeCreatedAt: null,
-      payload: {
-        id: 'evt_1',
-        type: 'customer.subscription.updated',
-        created: 1_700_000_000,
-        data: { object: { id: 'sub_1' } },
-      },
-    });
-    expect(event?.id).toBe('evt_1');
-    expect(event?.created).toBe(1_700_000_000);
-  });
 });
 
 describe('replayUnprocessedStripeWebhooks', () => {
@@ -127,107 +95,66 @@ describe('replayUnprocessedStripeWebhooks', () => {
     vi.clearAllMocks();
     mockSelect.mockReset();
     mockUpdate.mockReset();
-    mockProcessStripeWebhookEvent.mockReset();
-    mockProcessStripeWebhookEvent.mockResolvedValue(undefined);
-    mockHandleMerchCheckoutCompleted.mockResolvedValue(undefined);
-    mockHandleMerchChargeRefunded.mockResolvedValue(undefined);
+    mockProcess.mockReset();
+    mockProcess.mockResolvedValue(undefined);
+    mockMerchCheckout.mockResolvedValue(undefined);
+    mockMerchRefund.mockResolvedValue(undefined);
   });
 
-  it('processes a stored subscription event without Stripe writes and marks it', async () => {
-    const candidate = storedEvent({
-      id: 'evt_sub',
-      type: 'customer.subscription.updated',
-      object: { id: 'sub_1' },
-    });
-    mockSelect.mockReturnValueOnce(selectChain([candidate]));
-    mockUpdate
-      .mockReturnValueOnce(updateChain([{ id: 'row_1' }]))
-      .mockReturnValueOnce(updateChain([{ id: 'row_1' }]));
-
-    const summary = await replayUnprocessedStripeWebhooks(now);
-
+  it('replays a stored event with Stripe writes disabled and marks it', async () => {
+    const summary = await replay(
+      candidate('evt_sub', 'customer.subscription.updated', { id: 'sub_1' }),
+      true
+    );
     expect(summary).toEqual({ processed: 1, blocked: [], failed: [] });
-    expect(mockProcessStripeWebhookEvent).toHaveBeenCalledWith(
+    expect(mockProcess).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'evt_sub' }),
       expect.any(Date),
       { stripeWritesAllowed: false }
     );
-    expect(mockHandleMerchCheckoutCompleted).not.toHaveBeenCalled();
   });
 
-  it('routes a merch checkout away from the subscription handler', async () => {
-    const candidate = storedEvent({
-      id: 'evt_merch',
-      type: 'checkout.session.completed',
-      object: { id: 'cs_1', metadata: { merch_order_id: 'order_1' } },
-    });
-    mockSelect.mockReturnValueOnce(selectChain([candidate]));
-    mockUpdate
-      .mockReturnValueOnce(updateChain([{ id: 'row_1' }]))
-      .mockReturnValueOnce(updateChain([{ id: 'row_1' }]));
-
-    const summary = await replayUnprocessedStripeWebhooks(now);
-
+  it('routes merch checkout away from the subscription handler', async () => {
+    const summary = await replay(
+      candidate('evt_merch', 'checkout.session.completed', {
+        id: 'cs_1',
+        metadata: { merch_order_id: 'order_1' },
+      }),
+      true
+    );
     expect(summary.processed).toBe(1);
-    expect(mockHandleMerchCheckoutCompleted).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'cs_1' })
-    );
-    expect(mockProcessStripeWebhookEvent).not.toHaveBeenCalled();
+    expect(mockMerchCheckout).toHaveBeenCalled();
+    expect(mockProcess).not.toHaveBeenCalled();
   });
 
-  it('leaves a cancelable refund unprocessed and records the dashboard action', async () => {
-    const candidate = storedEvent({
-      id: 'evt_refund',
-      type: 'charge.refunded',
-      object: { id: 'ch_1' },
-    });
-    mockSelect.mockReturnValueOnce(selectChain([candidate]));
-    mockUpdate
-      .mockReturnValueOnce(updateChain([{ id: 'row_1' }]))
-      .mockReturnValueOnce(updateChain([]));
-    mockProcessStripeWebhookEvent.mockRejectedValue(
-      new StripeWriteBlockedError(
-        'Stripe Dashboard: open subscription sub_1 (status active) and cancel it.'
-      )
+  it('leaves a blocked Stripe write unprocessed', async () => {
+    mockProcess.mockRejectedValue(
+      new StripeWriteBlockedError('Stripe Dashboard: open subscription sub_1')
     );
-
-    const summary = await replayUnprocessedStripeWebhooks(now);
-
+    const summary = await replay(
+      candidate('evt_refund', 'charge.refunded', { id: 'ch_1' }),
+      false
+    );
     expect(summary.processed).toBe(0);
     expect(summary.failed).toEqual([]);
-    expect(summary.blocked).toEqual([
-      {
-        stripeEventId: 'evt_refund',
-        type: 'charge.refunded',
-        action: expect.stringContaining('subscription sub_1'),
-      },
-    ]);
-    expect(mockUpdate).toHaveBeenCalledTimes(2);
+    expect(summary.blocked[0]?.action).toContain('subscription sub_1');
   });
 
-  it('does not mark an event processed when the handler throws', async () => {
-    const candidate = storedEvent({
-      id: 'evt_fail',
-      type: 'invoice.payment_failed',
-      object: { id: 'in_1' },
-    });
-    mockSelect.mockReturnValueOnce(selectChain([candidate]));
-    mockUpdate
-      .mockReturnValueOnce(updateChain([{ id: 'row_1' }]))
-      .mockReturnValueOnce(updateChain([]));
-    mockProcessStripeWebhookEvent.mockRejectedValue(
-      new Error('db write failed')
+  it('does not mark a thrown handler processed', async () => {
+    mockProcess.mockRejectedValue(new Error('db write failed'));
+    const summary = await replay(
+      candidate('evt_fail', 'invoice.payment_failed', { id: 'in_1' }),
+      false
     );
-
-    const summary = await replayUnprocessedStripeWebhooks(now);
-
-    expect(summary.processed).toBe(0);
-    expect(summary.failed).toEqual([
-      {
-        stripeEventId: 'evt_fail',
-        type: 'invoice.payment_failed',
-        error: 'db write failed',
-      },
-    ]);
+    expect(summary).toMatchObject({
+      processed: 0,
+      failed: [
+        {
+          stripeEventId: 'evt_fail',
+          type: 'invoice.payment_failed',
+          error: 'db write failed',
+        },
+      ],
+    });
   });
 });

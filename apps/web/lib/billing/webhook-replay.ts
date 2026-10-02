@@ -1,5 +1,6 @@
-import { and, asc, eq, isNull, lt, or } from 'drizzle-orm';
+import { and, asc, eq, isNull, lt, or, type SQL } from 'drizzle-orm';
 import type Stripe from 'stripe';
+import { processWebhookEvent } from '@/app/api/stripe/webhooks/route';
 import { db } from '@/lib/db';
 import { stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { merchOrders } from '@/lib/db/schema/merch';
@@ -8,7 +9,6 @@ import {
   handleMerchCheckoutCompleted,
 } from '@/lib/merch/orders';
 import { StripeWriteBlockedError } from '@/lib/stripe/webhooks/handlers/charge-handler';
-import { processStripeWebhookEvent } from '@/lib/stripe/webhooks/process-event';
 import { logger } from '@/lib/utils/logger';
 import { STUCK_WEBHOOK_AFTER_MS } from './sync-remediation-policy';
 
@@ -16,45 +16,26 @@ import { STUCK_WEBHOOK_AFTER_MS } from './sync-remediation-policy';
 const REPLAY_LEASE_MS = 10 * 60 * 1000;
 const REPLAY_BATCH_LIMIT = 10;
 
-export interface ReplayCandidate {
+type ReplayRow = {
   id: string;
   stripeEventId: string;
   type: string;
   payload: unknown;
   stripeCreatedAt: Date | null;
-}
+};
 
-export interface ReplayBlocked {
-  stripeEventId: string;
-  type: string;
-  action: string;
-}
+type ReplayHit = { stripeEventId: string; type: string; action: string };
+type ReplayMiss = { stripeEventId: string; type: string; error: string };
 
-export interface ReplayFailure {
-  stripeEventId: string;
-  type: string;
-  error: string;
-}
-
-export interface ReplaySummary {
-  processed: number;
-  blocked: ReplayBlocked[];
-  failed: ReplayFailure[];
-}
-
-/**
- * Replay stored Stripe events that never reached processed_at.
- *
- * Idempotent: a row with processed_at set is not selected, handlers are safe
- * to retry, and the claim lease matches the live webhook route. This path
- * does not call Stripe write APIs. A refund or dispute whose subscription is
- * still cancelable stays unprocessed and names the Dashboard cancel.
- */
+/** Replay stored events that never reached processed_at. No Stripe writes. */
 export async function replayUnprocessedStripeWebhooks(
   now = new Date()
-): Promise<ReplaySummary> {
+): Promise<{
+  processed: number;
+  blocked: ReplayHit[];
+  failed: ReplayMiss[];
+}> {
   const stuckBefore = new Date(now.getTime() - STUCK_WEBHOOK_AFTER_MS);
-  const leaseCutoff = new Date(now.getTime() - REPLAY_LEASE_MS);
   const candidates = await db
     .select({
       id: stripeWebhookEvents.id,
@@ -68,16 +49,16 @@ export async function replayUnprocessedStripeWebhooks(
       and(
         isNull(stripeWebhookEvents.processedAt),
         lt(stripeWebhookEvents.createdAt, stuckBefore),
-        or(
-          isNull(stripeWebhookEvents.processingStartedAt),
-          lt(stripeWebhookEvents.processingStartedAt, leaseCutoff)
-        )
+        claimable(now)
       )
     )
     .orderBy(asc(stripeWebhookEvents.createdAt))
     .limit(REPLAY_BATCH_LIMIT);
-
-  const summary: ReplaySummary = { processed: 0, blocked: [], failed: [] };
+  const summary = {
+    processed: 0,
+    blocked: [] as ReplayHit[],
+    failed: [] as ReplayMiss[],
+  };
   for (const candidate of candidates) {
     await replayOne(candidate, now, summary);
   }
@@ -85,36 +66,34 @@ export async function replayUnprocessedStripeWebhooks(
 }
 
 async function replayOne(
-  candidate: ReplayCandidate,
+  candidate: ReplayRow,
   now: Date,
-  summary: ReplaySummary
+  summary: { processed: number; blocked: ReplayHit[]; failed: ReplayMiss[] }
 ): Promise<void> {
-  const claimed = await claimReplay(candidate.id, now);
-  if (!claimed) return;
-
+  const claimed = await db
+    .update(stripeWebhookEvents)
+    .set({ processingStartedAt: now })
+    .where(and(eq(stripeWebhookEvents.id, candidate.id), claimable(now)))
+    .returning({ id: stripeWebhookEvents.id });
+  if (claimed.length === 0) return;
   try {
     const event = parseStoredEvent(candidate);
-    if (!event) {
-      throw new Error('Stored webhook payload is not a Stripe event');
-    }
+    if (!event) throw new Error('Stored webhook payload is not a Stripe event');
     await dispatchStoredEvent(event);
     const marked = await db
       .update(stripeWebhookEvents)
       .set({ processedAt: new Date(), processingStartedAt: null })
-      .where(
-        and(
-          eq(stripeWebhookEvents.id, candidate.id),
-          eq(stripeWebhookEvents.processingStartedAt, now),
-          isNull(stripeWebhookEvents.processedAt)
-        )
-      )
+      .where(owned(candidate.id, now))
       .returning({ id: stripeWebhookEvents.id });
     if (marked.length === 0) {
       throw new Error('Replay lease was lost before the event was marked');
     }
     summary.processed += 1;
   } catch (error) {
-    await releaseReplay(candidate.id, now);
+    await db
+      .update(stripeWebhookEvents)
+      .set({ processingStartedAt: null })
+      .where(owned(candidate.id, now));
     if (error instanceof StripeWriteBlockedError) {
       summary.blocked.push({
         stripeEventId: candidate.stripeEventId,
@@ -137,36 +116,20 @@ async function replayOne(
   }
 }
 
-async function claimReplay(id: string, now: Date): Promise<boolean> {
+function claimable(now: Date): SQL | undefined {
   const leaseCutoff = new Date(now.getTime() - REPLAY_LEASE_MS);
-  const claimed = await db
-    .update(stripeWebhookEvents)
-    .set({ processingStartedAt: now })
-    .where(
-      and(
-        eq(stripeWebhookEvents.id, id),
-        isNull(stripeWebhookEvents.processedAt),
-        or(
-          isNull(stripeWebhookEvents.processingStartedAt),
-          lt(stripeWebhookEvents.processingStartedAt, leaseCutoff)
-        )
-      )
-    )
-    .returning({ id: stripeWebhookEvents.id });
-  return claimed.length > 0;
+  return or(
+    isNull(stripeWebhookEvents.processingStartedAt),
+    lt(stripeWebhookEvents.processingStartedAt, leaseCutoff)
+  );
 }
 
-async function releaseReplay(id: string, startedAt: Date): Promise<void> {
-  await db
-    .update(stripeWebhookEvents)
-    .set({ processingStartedAt: null })
-    .where(
-      and(
-        eq(stripeWebhookEvents.id, id),
-        eq(stripeWebhookEvents.processingStartedAt, startedAt),
-        isNull(stripeWebhookEvents.processedAt)
-      )
-    );
+function owned(id: string, startedAt: Date): SQL | undefined {
+  return and(
+    eq(stripeWebhookEvents.id, id),
+    eq(stripeWebhookEvents.processingStartedAt, startedAt),
+    isNull(stripeWebhookEvents.processedAt)
+  );
 }
 
 export function parseStoredEvent(candidate: {
@@ -177,16 +140,11 @@ export function parseStoredEvent(candidate: {
 }): Stripe.Event | null {
   const payload = candidate.payload;
   if (!payload || typeof payload !== 'object') return null;
-  const record = payload as {
-    id?: unknown;
-    type?: unknown;
-    created?: unknown;
-    data?: unknown;
-  };
-  if (typeof record.id !== 'string' || typeof record.type !== 'string') {
+  const record = payload as Record<string, unknown>;
+  if (record.id !== candidate.stripeEventId || record.type !== candidate.type) {
     return null;
   }
-  if (record.id !== candidate.stripeEventId || record.type !== candidate.type) {
+  if (typeof record.id !== 'string' || typeof record.type !== 'string') {
     return null;
   }
   if (!record.data || typeof record.data !== 'object') return null;
@@ -197,11 +155,7 @@ export function parseStoredEvent(candidate: {
         ? Math.floor(candidate.stripeCreatedAt.getTime() / 1000)
         : null;
   if (created === null) return null;
-  return {
-    ...(payload as Stripe.Event),
-    id: record.id,
-    created,
-  };
+  return { ...(payload as Stripe.Event), id: record.id, created };
 }
 
 async function dispatchStoredEvent(event: Stripe.Event): Promise<void> {
@@ -215,8 +169,7 @@ async function dispatchStoredEvent(event: Stripe.Event): Promise<void> {
     await handleMerchChargeRefunded(event.data.object as Stripe.Charge);
     return;
   }
-  const createdAt = new Date(event.created * 1000);
-  await processStripeWebhookEvent(event, createdAt, {
+  await processWebhookEvent(event, new Date(event.created * 1000), {
     stripeWritesAllowed: false,
   });
 }

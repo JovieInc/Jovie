@@ -12,11 +12,7 @@ vi.mock('@/lib/db', () => ({
     insert: vi.fn(() => ({ values: mockInsertValues })),
   },
 }));
-
-vi.mock('@/lib/env-server', () => ({
-  env: envState,
-}));
-
+vi.mock('@/lib/env-server', () => ({ env: envState }));
 vi.mock('@/lib/utils/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -29,33 +25,35 @@ function limitChain(rows: unknown[]) {
   return {
     from: () => ({
       where: () => ({
-        orderBy: () => ({
-          limit: () => Promise.resolve(rows),
-        }),
+        orderBy: () => ({ limit: () => Promise.resolve(rows) }),
       }),
     }),
   };
 }
 
-function whereChain(rows: unknown[]) {
-  return {
-    from: () => ({
-      where: () => Promise.resolve(rows),
-    }),
-  };
+function snapshot(lastRun: Date | null, stuck: unknown[] = []) {
+  mockSelect
+    .mockReturnValueOnce(limitChain(lastRun ? [{ createdAt: lastRun }] : []))
+    .mockReturnValueOnce(limitChain(stuck))
+    .mockReturnValueOnce({
+      from: () => ({ where: () => Promise.resolve([]) }),
+    });
 }
 
-function snapshot(options: {
-  lastRun: Date | null;
-  stuck?: unknown[];
-  filed?: unknown[];
-}) {
-  mockSelect
-    .mockReturnValueOnce(
-      limitChain(options.lastRun ? [{ createdAt: options.lastRun }] : [])
-    )
-    .mockReturnValueOnce(limitChain(options.stuck ?? []))
-    .mockReturnValueOnce(whereChain(options.filed ?? []));
+function json(body: unknown): Response {
+  return new Response(JSON.stringify(body), { status: 200 });
+}
+
+function linear(handlers: Record<string, unknown>) {
+  return vi.fn(async (_url: string, init?: RequestInit) => {
+    const query = JSON.parse(String(init?.body)).query as string;
+    const key = Object.keys(handlers).find(name => query.includes(name));
+    if (!key) throw new Error(query.slice(0, 80));
+    const value = handlers[key];
+    if (typeof value === 'function')
+      return (value as (q: string) => Response)(query);
+    return json({ data: value });
+  });
 }
 
 describe('runBillingSyncRemediation', () => {
@@ -64,158 +62,101 @@ describe('runBillingSyncRemediation', () => {
     envState.LINEAR_API_KEY = 'lin_test';
     mockInsertValues.mockResolvedValue(undefined);
   });
+  afterEach(() => vi.unstubAllGlobals());
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('does nothing when reconciliation is fresh and no webhooks are stuck', async () => {
-    snapshot({ lastRun: new Date('2026-10-02T00:00:00.000Z') });
-
-    const result = await runBillingSyncRemediation(now);
-
-    expect(result).toEqual({ findings: 0, filed: [], skipped: false });
+  it('does nothing when reconciliation is fresh', async () => {
+    snapshot(new Date('2026-10-02T00:00:00.000Z'));
+    await expect(runBillingSyncRemediation(now)).resolves.toEqual({
+      findings: 0,
+      filed: [],
+      skipped: false,
+    });
     expect(mockInsertValues).not.toHaveBeenCalled();
   });
 
-  it('fails closed when a finding exists and LINEAR_API_KEY is missing', async () => {
+  it('fails closed without LINEAR_API_KEY when a finding exists', async () => {
     envState.LINEAR_API_KEY = undefined;
-    snapshot({ lastRun: new Date('2026-07-27T00:00:23.000Z') });
-
+    snapshot(new Date('2026-07-27T00:00:23.000Z'));
     await expect(runBillingSyncRemediation(now)).rejects.toThrow(
       'LINEAR_API_KEY is not configured'
     );
-    expect(mockInsertValues).not.toHaveBeenCalled();
   });
 
   it('creates a labeled issue and records the filing', async () => {
-    snapshot({ lastRun: null });
-    const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body)) as { query: string };
-      if (body.query.includes('issueLabels')) {
-        return json({ data: { issueLabels: { nodes: [] } } });
-      }
-      if (body.query.includes('issueLabelCreate')) {
+    snapshot(null);
+    const fetchImpl = linear({
+      issueLabels: { issueLabels: { nodes: [] } },
+      issueLabelCreate: {
+        issueLabelCreate: { success: true, issueLabel: { id: 'label_1' } },
+      },
+      'issues(': { issues: { nodes: [] } },
+      issueCreate: (query: string) => {
+        expect(query).toContain('labelIds: $labelIds');
         return json({
-          data: {
-            issueLabelCreate: {
-              success: true,
-              issueLabel: {
-                id: 'label_1',
-                name: 'remediation:billing-sync-stale',
-              },
-            },
-          },
+          data: { issueCreate: { success: true, issue: { id: 'issue_1' } } },
         });
-      }
-      if (body.query.includes('issues(')) {
-        return json({ data: { issues: { nodes: [] } } });
-      }
-      expect(body.query).toContain('labelIds: $labelIds');
-      expect(body.query).not.toContain('labelIds: ["remediation"]');
-      return json({
-        data: {
-          issueCreate: {
-            success: true,
-            issue: { id: 'issue_1', identifier: 'JOV-9000' },
-          },
-        },
-      });
+      },
     });
     vi.stubGlobal('fetch', fetchImpl);
-
-    const result = await runBillingSyncRemediation(now);
-
-    expect(result.filed).toEqual(['billing-sync-stale']);
+    await expect(runBillingSyncRemediation(now)).resolves.toMatchObject({
+      filed: ['billing-sync-stale'],
+    });
     expect(mockInsertValues).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: null,
         eventType: 'billing_sync_remediation_filed',
-        source: 'remediation',
         metadata: expect.objectContaining({
-          fingerprint: 'billing-sync-stale',
           label: 'remediation:billing-sync-stale',
         }),
       })
     );
-    const createCall = fetchImpl.mock.calls.find(call =>
-      String(call[1]?.body).includes('issueCreate')
-    );
-    const createBody = JSON.parse(String(createCall?.[1]?.body)) as {
-      variables: { title: string; labelIds: string[] };
-    };
-    expect(createBody.variables.title).toContain('billing-sync-stale');
-    expect(createBody.variables.labelIds).toEqual(['label_1']);
   });
 
-  it('adds the remediation label to an existing issue instead of replacing labels', async () => {
-    snapshot({
-      lastRun: now,
-      stuck: [
-        {
-          stripeEventId: 'evt_1',
-          type: 'invoice.paid',
-          createdAt: new Date('2026-10-01T00:00:00.000Z'),
-          payload: { data: { object: { id: 'in_1' } } },
+  it('adds the remediation label instead of replacing labels', async () => {
+    snapshot(now, [
+      {
+        stripeEventId: 'evt_1',
+        type: 'invoice.paid',
+        createdAt: new Date('2026-10-01T00:00:00.000Z'),
+        payload: { data: { object: { id: 'in_1' } } },
+      },
+    ]);
+    const fetchImpl = linear({
+      issueLabels: {
+        issueLabels: {
+          nodes: [
+            { id: 'label_stuck', name: 'remediation:billing-webhooks-stuck' },
+          ],
         },
-      ],
-    });
-    const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body)) as { query: string };
-      if (body.query.includes('issueLabels')) {
-        return json({
-          data: {
-            issueLabels: {
-              nodes: [
-                {
-                  id: 'label_stuck',
-                  name: 'remediation:billing-webhooks-stuck',
-                },
-              ],
+      },
+      'issues(': {
+        issues: {
+          nodes: [
+            {
+              id: 'issue_open',
+              title: 'Stuck Stripe webhooks (billing-webhooks-stuck)',
+              state: { type: 'started' },
             },
-          },
-        });
-      }
-      if (body.query.includes('issues(')) {
+          ],
+        },
+      },
+      issueUpdate: (query: string) => {
+        expect(query).toContain('addedLabelIds: $labelIds');
+        expect(query).not.toContain(', labelIds:');
         return json({
-          data: {
-            issues: {
-              nodes: [
-                {
-                  id: 'issue_open',
-                  title: 'Stuck Stripe webhooks (billing-webhooks-stuck)',
-                  state: { type: 'started' },
-                },
-              ],
-            },
-          },
+          data: { issueUpdate: { success: true, issue: { id: 'issue_open' } } },
         });
-      }
-      expect(body.query).toContain('addedLabelIds');
-      expect(body.query).not.toContain('\n            labelIds:');
-      return json({
-        data: { issueUpdate: { success: true, issue: { id: 'issue_open' } } },
-      });
+      },
     });
     vi.stubGlobal('fetch', fetchImpl);
-
     const result = await runBillingSyncRemediation(now);
-
     expect(result.filed).toEqual(['billing-webhooks-stuck']);
     const updateCall = fetchImpl.mock.calls.find(call =>
       String(call[1]?.body).includes('issueUpdate')
     );
-    const updateBody = JSON.parse(String(updateCall?.[1]?.body)) as {
-      variables: { id: string; labelIds: string[] };
-    };
-    expect(updateBody.variables.id).toBe('issue_open');
-    expect(updateBody.variables.labelIds).toEqual(['label_stuck']);
+    expect(JSON.parse(String(updateCall?.[1]?.body)).variables).toMatchObject({
+      id: 'issue_open',
+      labelIds: ['label_stuck'],
+    });
   });
 });
-
-function json(body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}

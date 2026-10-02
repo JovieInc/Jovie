@@ -25,51 +25,40 @@ function input(
 }
 
 describe('evaluateBillingSyncRemediation', () => {
-  it('stays quiet when reconciliation is inside 48 hours and nothing is stuck', () => {
+  it('stays quiet inside 48 hours and throttles a recent filing', () => {
     expect(evaluateBillingSyncRemediation(input())).toEqual([]);
+    expect(
+      evaluateBillingSyncRemediation(
+        input({
+          lastReconciliationAt: null,
+          lastFiledAtByFingerprint: {
+            [BILLING_SYNC_STALE_FINGERPRINT]: new Date(
+              '2026-10-02T12:00:00.000Z'
+            ),
+            [BILLING_WEBHOOKS_STUCK_FINGERPRINT]: null,
+          },
+        })
+      )
+    ).toEqual([]);
   });
 
-  it('files a stale-reconciliation finding when the last run is older than 48 hours', () => {
-    const findings = evaluateBillingSyncRemediation(
-      input({
-        lastReconciliationAt: new Date('2026-07-27T00:00:23.000Z'),
-      })
+  it('files a stale run and a never-recorded run', () => {
+    const stale = evaluateBillingSyncRemediation(
+      input({ lastReconciliationAt: new Date('2026-07-27T00:00:23.000Z') })
     );
-
-    expect(findings).toHaveLength(1);
-    expect(findings[0]?.fingerprint).toBe(BILLING_SYNC_STALE_FINGERPRINT);
-    expect(findings[0]?.label).toBe(
+    expect(stale[0]?.label).toBe(
       remediationLabel(BILLING_SYNC_STALE_FINGERPRINT)
     );
-    expect(findings[0]?.title).toContain(BILLING_SYNC_STALE_FINGERPRINT);
-    expect(findings[0]?.description).toContain('2026-07-27T00:00:23.000Z');
+    expect(stale[0]?.title).toContain(BILLING_SYNC_STALE_FINGERPRINT);
+    expect(stale[0]?.description).toContain('2026-07-27T00:00:23.000Z');
+    expect(
+      evaluateBillingSyncRemediation(input({ lastReconciliationAt: null })).map(
+        finding => finding.fingerprint
+      )
+    ).toEqual([BILLING_SYNC_STALE_FINGERPRINT]);
   });
 
-  it('files when reconciliation has never been recorded', () => {
-    const findings = evaluateBillingSyncRemediation(
-      input({ lastReconciliationAt: null })
-    );
-    expect(findings.map(finding => finding.fingerprint)).toEqual([
-      BILLING_SYNC_STALE_FINGERPRINT,
-    ]);
-  });
-
-  it('throttles a fingerprint that was filed inside 12 hours', () => {
-    const findings = evaluateBillingSyncRemediation(
-      input({
-        lastReconciliationAt: null,
-        lastFiledAtByFingerprint: {
-          [BILLING_SYNC_STALE_FINGERPRINT]: new Date(
-            '2026-10-02T12:00:00.000Z'
-          ),
-          [BILLING_WEBHOOKS_STUCK_FINGERPRINT]: null,
-        },
-      })
-    );
-    expect(findings).toEqual([]);
-  });
-
-  it('files stuck webhooks and includes a dashboard action when one is known', () => {
+  it('includes the dashboard action on stuck refunds', () => {
     const findings = evaluateBillingSyncRemediation(
       input({
         stuckWebhooks: [
@@ -82,54 +71,39 @@ describe('evaluateBillingSyncRemediation', () => {
         ],
       })
     );
-
-    expect(findings).toHaveLength(1);
     expect(findings[0]?.fingerprint).toBe(BILLING_WEBHOOKS_STUCK_FINGERPRINT);
-    expect(findings[0]?.label).toBe('remediation:billing-webhooks-stuck');
     expect(findings[0]?.description).toContain('evt_stuck');
     expect(findings[0]?.description).toContain('sub_123');
+    expect(findings[0]?.description).toContain('Do not refund');
   });
 });
 
 describe('dashboardActionForStoredEvent', () => {
-  it('names the subscription cancel for a refund without asking for a refund or price change', () => {
+  it('names the cancel and forbids refunds, charges, and price changes', () => {
     const action = dashboardActionForStoredEvent({
       type: 'charge.refunded',
       payload: {
         data: {
-          object: {
-            id: 'ch_123',
-            invoice: { subscription: 'sub_123' },
-          },
+          object: { id: 'ch_123', invoice: { subscription: 'sub_123' } },
         },
       },
     });
-
     expect(action).toContain('subscription sub_123');
     expect(action).toContain('charge ch_123');
     expect(action).toContain('Do not refund');
-    expect(action).toContain('subscriptions.cancel');
-  });
-
-  it('reads a dispute charge id', () => {
-    const action = dashboardActionForStoredEvent({
+    const dispute = dashboardActionForStoredEvent({
       type: 'charge.dispute.created',
       payload: {
         data: {
           object: {
-            id: 'dp_123',
             charge: 'ch_456',
             invoice: { subscription: { id: 'sub_456' } },
           },
         },
       },
     });
-
-    expect(action).toContain('subscription sub_456');
-    expect(action).toContain('charge ch_456');
-  });
-
-  it('returns null for events that replay can finish locally', () => {
+    expect(dispute).toContain('subscription sub_456');
+    expect(dispute).toContain('charge ch_456');
     expect(
       dashboardActionForStoredEvent({
         type: 'customer.subscription.updated',

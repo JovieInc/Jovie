@@ -19,7 +19,7 @@ import {
   type ReconciliationStats,
   updateStatsFromResult,
 } from '@/lib/billing/reconciliation/batch-processor';
-import { recordReconciliationHeartbeat } from '@/lib/billing/reconciliation-heartbeat';
+import { RECONCILIATION_RUN_EVENT } from '@/lib/billing/sync-remediation-policy';
 import { replayUnprocessedStripeWebhooks } from '@/lib/billing/webhook-replay';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
@@ -68,10 +68,8 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
   };
   const errors: string[] = [];
 
-  // Stored-event replay is idempotent and does not call Stripe write APIs.
-  // A thrown replay (database down) fails the job so we do not write a
-  // heartbeat for a pass that never looked at the stuck rows. A single
-  // event that fails or needs a Dashboard cancel stays in the summary.
+  // Replay is idempotent and does not call Stripe write APIs. A throw fails
+  // the job so a pass that never saw the stuck rows does not look fresh.
   const replay = await replayUnprocessedStripeWebhooks();
   if (replay.blocked.length > 0 || replay.failed.length > 0) {
     logger.info('[billing-reconciliation] stored webhook replay left rows', {
@@ -87,16 +85,26 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
 
   const duration = Date.now() - startTime;
 
-  // A failed user pass must not look fresh. Quiet successful days still
-  // write this row; billing health reads the newest reconciliation source.
   if (stats.errors === 0) {
-    await recordReconciliationHeartbeat({
-      stats,
-      durationMs: duration,
-      replay: {
-        processed: replay.processed,
-        blocked: replay.blocked.length,
-        failed: replay.failed.length,
+    await db.insert(billingAuditLog).values({
+      userId: null,
+      eventType: RECONCILIATION_RUN_EVENT,
+      previousState: {},
+      newState: {
+        usersChecked: stats.usersChecked,
+        mismatches: stats.mismatches,
+        fixed: stats.fixed,
+        errors: stats.errors,
+      },
+      source: 'reconciliation',
+      metadata: {
+        heartbeat: true,
+        durationMs: duration,
+        replay: {
+          processed: replay.processed,
+          blocked: replay.blocked.length,
+          failed: replay.failed.length,
+        },
       },
     });
   }

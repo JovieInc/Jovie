@@ -54,16 +54,7 @@ const CANCELABLE_STATUSES = new Set<Stripe.Subscription.Status>([
   'incomplete',
 ]);
 
-/**
- * Replay refuses Stripe writes. The subscription is still cancelable, so a
- * local revoke would be undone by reconciliation. A person has to cancel it
- * in the Dashboard; the next replay then applies the local revoke.
- */
 export class StripeWriteBlockedError extends Error {
-  readonly subscriptionId: string;
-  readonly chargeId: string;
-  readonly subscriptionStatus: string;
-
   constructor(input: {
     subscriptionId: string;
     chargeId: string;
@@ -74,9 +65,6 @@ export class StripeWriteBlockedError extends Error {
       `Stripe Dashboard: open subscription ${input.subscriptionId} (status ${input.subscriptionStatus}) and cancel it. Replay of ${input.eventType} for charge ${input.chargeId} will not call subscriptions.cancel, and will not refund, charge, or change a price.`
     );
     this.name = 'StripeWriteBlockedError';
-    this.subscriptionId = input.subscriptionId;
-    this.chargeId = input.chargeId;
-    this.subscriptionStatus = input.subscriptionStatus;
   }
 }
 
