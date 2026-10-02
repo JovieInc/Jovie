@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import {
   E2E_PREBUILT_CLAIM_TOKEN,
   E2E_PREBUILT_CLAIM_USERNAME,
@@ -374,18 +375,25 @@ const MARKETING_SURFACES = [
     perfGroups: ['marketing-public'],
     interactions: GLOBAL_INTERACTIONS,
   },
-  {
-    id: 'marketing-demo-video',
-    family: 'marketing',
-    expectedState: 'ok',
-    path: APP_ROUTES.DEMO_VIDEO,
-    readySelectors: ['main', 'video, iframe'],
-    mainSelector: 'main',
-    minMainTextLength: 40,
-    lighthouse: false,
-    perfGroups: ['marketing-public'],
-    interactions: GLOBAL_INTERACTIONS,
-  },
+  // JOV-7208 founder gate: the demo video page renders nothing while
+  // SHOW_PRODUCT_DEMO_VIDEO is off, so the surface only exists when the
+  // flag ships. demo-video.spec.ts covers the gated-off state.
+  ...(FEATURE_FLAGS.SHOW_PRODUCT_DEMO_VIDEO
+    ? ([
+        {
+          id: 'marketing-demo-video',
+          family: 'marketing',
+          expectedState: 'ok',
+          path: APP_ROUTES.DEMO_VIDEO,
+          readySelectors: ['main', 'video, iframe'],
+          mainSelector: 'main',
+          minMainTextLength: 40,
+          lighthouse: false,
+          perfGroups: ['marketing-public'],
+          interactions: GLOBAL_INTERACTIONS,
+        },
+      ] as const)
+    : []),
   {
     id: 'marketing-blog-index',
     family: 'marketing',
