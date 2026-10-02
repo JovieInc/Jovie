@@ -229,3 +229,287 @@ struct ActionLoopCacheTests {
     #expect(defaults.data(forKey: "ie.jov.Jovie.actionLoopInbox.user_ws.ov") != nil)
   }
 }
+
+/// Transport intentionally ignores cancellation, as a completion already
+/// delivered by URLSession can. Tests control each independent response.
+private actor SuspendedHomeDataClient: MobileHomeDataClient {
+  enum Surface: Hashable { case audience, calendar, inbox }
+  private var audience: CheckedContinuation<MobileAudienceHighlightsResponse, Error>?
+  private var calendar: CheckedContinuation<MobileActionLoopCalendarResponse, Error>?
+  private var inbox: CheckedContinuation<MobileActionLoopInboxResponse, Error>?
+  private var startWaiters: [CheckedContinuation<Void, Never>] = []
+  private(set) var started: Set<Surface> = []
+  private(set) var requestedWorkspace: MobileWorkspaceMode?
+
+  private func didStart(_ surface: Surface) {
+    started.insert(surface)
+    if started.count == 3 {
+      let waiters = startWaiters
+      startWaiters = []
+      for waiter in waiters { waiter.resume() }
+    }
+  }
+
+  func waitForAllRequests() async {
+    guard started.count < 3 else { return }
+    await withCheckedContinuation { startWaiters.append($0) }
+  }
+
+  func fetchAudienceHighlights() async throws -> MobileAudienceHighlightsResponse {
+    try await withCheckedThrowingContinuation {
+      audience = $0
+      didStart(.audience)
+    }
+  }
+
+  func fetchActionLoopCalendar() async throws -> MobileActionLoopCalendarResponse {
+    try await withCheckedThrowingContinuation {
+      calendar = $0
+      didStart(.calendar)
+    }
+  }
+
+  func fetchActionLoopInbox(workspace: MobileWorkspaceMode) async throws -> MobileActionLoopInboxResponse {
+    requestedWorkspace = workspace
+    return try await withCheckedThrowingContinuation {
+      inbox = $0
+      didStart(.inbox)
+    }
+  }
+
+  func finishInbox(_ response: MobileActionLoopInboxResponse = .preview) {
+    inbox?.resume(returning: response)
+    inbox = nil
+  }
+
+  func finishRemaining() {
+    audience?.resume(returning: .preview)
+    calendar?.resume(returning: .preview)
+    finishInbox()
+    audience = nil
+    calendar = nil
+  }
+
+  func failAll() {
+    audience?.resume(throwing: APIClientError.transportFailed(code: -1009))
+    calendar?.resume(throwing: APIClientError.transportFailed(code: -1009))
+    inbox?.resume(throwing: APIClientError.transportFailed(code: -1009))
+    audience = nil
+    calendar = nil
+    inbox = nil
+  }
+}
+
+@MainActor
+@Suite(.timeLimit(.minutes(1)))
+struct MobileHomeDataStoreTests {
+  private func makeDefaults() -> UserDefaults {
+    UserDefaults(suiteName: "MobileHomeDataStoreTests-\(UUID().uuidString)")!
+  }
+
+  private func waitForInbox(_ store: MobileHomeDataStore) async {
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: .seconds(2))
+    while store.inbox == nil, clock.now < deadline {
+      try? await Task.sleep(for: .milliseconds(1))
+    }
+    #expect(store.inbox != nil, "Inbox must publish before the other requests finish")
+  }
+
+  @Test func inboxPublishesWithoutWaitingForAudienceOrCalendar() async {
+    let store = MobileHomeDataStore(defaults: makeDefaults())
+    let client = SuspendedHomeDataClient()
+    let refresh = Task { await store.reload(userID: "artist", workspace: .jovie, client: client) }
+    await client.waitForAllRequests()
+    #expect(store.audienceState == .loading)
+    #expect(store.isLoadingCalendar)
+    #expect(store.isLoadingInbox)
+    await client.finishInbox()
+    await waitForInbox(store)
+    #expect(store.inbox == .preview)
+    #expect(store.isLoadingInbox == false)
+    #expect(store.calendar == nil)
+    #expect(store.audienceState == .loading)
+    await client.finishRemaining()
+    await refresh.value
+    #expect(store.calendar == .preview)
+    #expect(store.audienceState == .loaded(.preview))
+  }
+
+  @Test func cachedSnapshotsPaintWhileAllRequestsAreSuspendedAndSurviveFailure() async {
+    let defaults = makeDefaults()
+    let cache = ActionLoopCache(defaults: defaults)
+    await cache.storeInbox(.preview, for: "artist")
+    await cache.storeCalendar(.preview, for: "artist")
+    await AudienceHighlightsCache(defaults: defaults).store(.preview, for: "artist")
+    let store = MobileHomeDataStore(defaults: defaults)
+    let client = SuspendedHomeDataClient()
+    let refresh = Task { await store.reload(userID: "artist", workspace: .jovie, client: client) }
+    await client.waitForAllRequests()
+    #expect(store.inbox == .preview)
+    #expect(store.calendar == .preview)
+    #expect(store.audienceState == .loaded(.preview))
+    #expect(store.isLoadingInbox == false)
+    #expect(store.isLoadingCalendar == false)
+    await client.failAll()
+    await refresh.value
+    #expect(store.inbox == .preview)
+    #expect(store.calendar == .preview)
+    #expect(store.audienceState == .loaded(.preview))
+  }
+
+  @Test func duplicateRetryDoesNotStartAnotherFlight() async {
+    let store = MobileHomeDataStore(defaults: makeDefaults())
+    let client = SuspendedHomeDataClient()
+    let duplicate = SuspendedHomeDataClient()
+    let refresh = Task { await store.reload(userID: "artist", workspace: .jovie, client: client) }
+    await client.waitForAllRequests()
+    await store.reload(userID: "artist", workspace: .jovie, client: duplicate)
+    #expect(await duplicate.started.isEmpty)
+    await client.finishRemaining()
+    await refresh.value
+  }
+
+  @Test func signOutRejectsLateResultsAndCacheWrites() async {
+    let defaults = makeDefaults()
+    let store = MobileHomeDataStore(defaults: defaults)
+    let client = SuspendedHomeDataClient()
+    let refresh = Task { await store.reload(userID: "artist", workspace: .jovie, client: client) }
+    await client.waitForAllRequests()
+    store.setContext(userID: nil, workspace: .jovie)
+    await client.finishRemaining()
+    await refresh.value
+    #expect(store.inbox == nil)
+    #expect(store.calendar == nil)
+    #expect(store.audienceState == .idle)
+    #expect(store.isLoadingInbox == false)
+    #expect(store.isLoadingCalendar == false)
+    let cache = ActionLoopCache(defaults: defaults)
+    #expect(await cache.loadInbox(for: "artist") == nil)
+    #expect(await cache.loadCalendar(for: "artist") == nil)
+    #expect(await AudienceHighlightsCache(defaults: defaults).load(for: "artist") == nil)
+  }
+
+  @Test func workspaceChangeRejectsOldFlightWithoutClearingNewLoadingState() async {
+    let store = MobileHomeDataStore(defaults: makeDefaults())
+    let oldClient = SuspendedHomeDataClient()
+    let newClient = SuspendedHomeDataClient()
+    let oldRefresh = Task { await store.reload(userID: "artist", workspace: .jovie, client: oldClient) }
+    await oldClient.waitForAllRequests()
+    store.setContext(userID: "artist", workspace: .ovie)
+    let newRefresh = Task { await store.reload(userID: "artist", workspace: .ovie, client: newClient) }
+    await newClient.waitForAllRequests()
+    await oldClient.finishRemaining()
+    await oldRefresh.value
+    #expect(store.inbox == nil)
+    #expect(store.calendar == nil)
+    #expect(store.isLoadingInbox)
+    #expect(store.isLoadingCalendar)
+    #expect(await newClient.requestedWorkspace == .ovie)
+    await newClient.finishRemaining()
+    await newRefresh.value
+    #expect(store.inbox == .preview)
+  }
+
+  @Test func cancellationStopsLatePaintAndAllowsRetry() async {
+    let store = MobileHomeDataStore(defaults: makeDefaults())
+    let client = SuspendedHomeDataClient()
+    let refresh = Task { await store.reload(userID: "artist", workspace: .jovie, client: client) }
+    await client.waitForAllRequests()
+    refresh.cancel()
+    await client.finishRemaining()
+    await refresh.value
+    #expect(store.inbox == nil)
+    #expect(store.calendar == nil)
+    #expect(store.audienceState == .idle)
+    #expect(store.isLoadingInbox == false)
+    let retryClient = SuspendedHomeDataClient()
+    let retry = Task { await store.reload(userID: "artist", workspace: .jovie, client: retryClient) }
+    await retryClient.waitForAllRequests()
+    await retryClient.finishRemaining()
+    await retry.value
+    #expect(store.inbox == .preview)
+  }
+
+  @Test func emptyCacheFailureFinishesLoadingAndShowsAudienceError() async {
+    let store = MobileHomeDataStore(defaults: makeDefaults())
+    let client = SuspendedHomeDataClient()
+    let refresh = Task { await store.reload(userID: "artist", workspace: .jovie, client: client) }
+    await client.waitForAllRequests()
+    await client.failAll()
+    await refresh.value
+    #expect(store.inbox == nil)
+    #expect(store.calendar == nil)
+    #expect(store.isLoadingInbox == false)
+    #expect(store.isLoadingCalendar == false)
+    #expect(store.audienceState == .error("Couldn't load audience highlights."))
+  }
+  @Test func accountChangeClearsSnapshotsBeforeTheNewAccountFinishes() async {
+    let store = MobileHomeDataStore(defaults: makeDefaults())
+    let client = SuspendedHomeDataClient()
+    let first = Task { await store.reload(userID: "first", workspace: .jovie, client: client) }
+    await client.waitForAllRequests()
+    await client.finishRemaining()
+    await first.value
+    #expect(store.inbox == .preview)
+    store.setContext(userID: "second", workspace: .jovie)
+    #expect(store.inbox == nil)
+    #expect(store.calendar == nil)
+    #expect(store.audienceState == .idle)
+    let secondClient = SuspendedHomeDataClient()
+    let second = Task { await store.reload(userID: "second", workspace: .jovie, client: secondClient) }
+    await secondClient.waitForAllRequests()
+    #expect(store.inbox == nil)
+    await secondClient.failAll()
+    await second.value
+    #expect(store.inbox == nil)
+  }
+
+  @Test func staleRefreshCannotResurrectADecidedCardOrDecrementTheCountTwice() async {
+    let defaults = makeDefaults()
+    let snapshot = MobileActionLoopInboxResponse(
+      pendingCount: 1,
+      items: [MobileActionLoopInboxItem(
+        id: "summer-card:card-1", typeLabel: "Approval", createdAt: "2026-10-02T00:00:00Z",
+        title: "Review", why: "Pending review", primaryActionLabel: "Approve", status: "pending"
+      )],
+      emptyActionCards: [], chatPrompt: "Review my inbox"
+    )
+    await ActionLoopCache(defaults: defaults).storeInbox(snapshot, for: "artist", workspace: .ovie)
+    let store = MobileHomeDataStore(defaults: defaults)
+    let client = SuspendedHomeDataClient()
+    let refresh = Task { await store.reload(userID: "artist", workspace: .ovie, client: client) }
+    await client.waitForAllRequests()
+    #expect(store.inbox == snapshot)
+    await store.removeDecidedCard("card-1", userID: "artist", workspace: .ovie)
+    #expect(store.inbox?.items.isEmpty == true)
+    #expect(store.inbox?.pendingCount == 0)
+    await client.finishInbox(snapshot)
+    await client.finishRemaining()
+    await refresh.value
+    #expect(store.inbox?.items.isEmpty == true)
+    #expect(store.inbox?.pendingCount == 0)
+    await store.removeDecidedCard("card-1", userID: "artist", workspace: .ovie)
+    #expect(store.inbox?.pendingCount == 0)
+    let persisted = await ActionLoopCache(defaults: defaults).loadInbox(for: "artist", workspace: .ovie)
+    #expect(persisted == store.inbox)
+    // A decision from an old account/workspace cannot change the active inbox.
+    await store.removeDecidedCard("action-1", userID: "other", workspace: .jovie)
+    #expect(store.inbox == persisted)
+  }
+
+  @Test func cancelledRequestCannotReplaceTheCurrentContext() async {
+    let store = MobileHomeDataStore(defaults: makeDefaults())
+    store.setContext(userID: "current", workspace: .jovie)
+    store.showFixture(audience: .loaded(.preview), calendar: .preview, inbox: .preview)
+    let client = SuspendedHomeDataClient()
+    let cancelled = Task { await store.reload(userID: "old", workspace: .ovie, client: client) }
+    cancelled.cancel()
+    await cancelled.value
+    #expect(await client.started.isEmpty)
+    #expect(store.audienceState == .loaded(.preview))
+    #expect(store.inbox == .preview)
+    #expect(store.calendar == .preview)
+  }
+
+}
