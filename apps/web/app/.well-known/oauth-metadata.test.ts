@@ -21,8 +21,13 @@ vi.mock('@/lib/auth/better-auth', () => ({
   },
 }));
 
+import { GET as getArtistAuthorizationServerMetadata } from './oauth-authorization-server/api/auth/route';
 import { GET as getOvieAuthorizationServerMetadata } from './oauth-authorization-server/api/ovie/oauth/route';
 import { GET as getOAuthServerMetadata } from './oauth-authorization-server/route';
+import {
+  GET as getArtistProtectedResourceMetadata,
+  OPTIONS as getArtistProtectedResourceOptions,
+} from './oauth-protected-resource/api/mcp/[username]/route';
 import {
   GET as getOvieProtectedResourceMetadata,
   OPTIONS as getOvieProtectedResourceOptions,
@@ -133,5 +138,87 @@ describe('issuer discovery metadata', () => {
     expect(response.headers.get('location')).toBe(
       `${origin}${OVIE_OAUTH_PROTECTED_RESOURCE_METADATA_PATH}`
     );
+  });
+
+  it('serves per-artist protected-resource metadata without replacing Ovie', async () => {
+    const origin = 'https://staging.jov.ie';
+    const response = await getArtistProtectedResourceMetadata(
+      new Request(`${origin}/.well-known/oauth-protected-resource/api/mcp/tim`),
+      { params: Promise.resolve({ username: 'tim' }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('access-control-allow-origin')).toBe('*');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({
+      resource: `${origin}/api/mcp/tim`,
+      authorization_servers: [`${origin}/api/auth`],
+      bearer_methods_supported: ['header'],
+    });
+  });
+
+  it('rejects unsafe artist resource names in protected-resource metadata', async () => {
+    const response = await getArtistProtectedResourceMetadata(
+      new Request(
+        'https://jov.ie/.well-known/oauth-protected-resource/api/mcp/..'
+      ),
+      { params: Promise.resolve({ username: '..' }) }
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it('keeps artist protected-resource preflight public', async () => {
+    const response = await getArtistProtectedResourceOptions();
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get('access-control-allow-origin')).toBe('*');
+    expect(response.headers.get('access-control-allow-methods')).toBe(
+      'GET, HEAD, OPTIONS'
+    );
+  });
+
+  it('serves Better Auth authorization-server metadata with registration, authorize, and token', async () => {
+    const origin = 'https://staging.jov.ie';
+    getOAuthServerConfig.mockResolvedValue({
+      issuer: `${origin}/api/auth`,
+      authorization_endpoint: `${origin}/api/auth/oauth2/authorize`,
+      token_endpoint: `${origin}/api/auth/oauth2/token`,
+      scopes_supported: ['openid', 'profile', 'email'],
+    });
+
+    const response = await getArtistAuthorizationServerMetadata(
+      new Request(`${origin}/.well-known/oauth-authorization-server/api/auth`)
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('access-control-allow-origin')).toBe('*');
+    await expect(response.json()).resolves.toEqual({
+      issuer: `${origin}/api/auth`,
+      authorization_endpoint: `${origin}/api/auth/oauth2/authorize`,
+      token_endpoint: `${origin}/api/auth/oauth2/token`,
+      registration_endpoint: `${origin}/api/auth/oauth2/register`,
+      scopes_supported: ['openid', 'profile', 'email'],
+    });
+  });
+
+  it('keeps an authorization server registration endpoint the plugin already advertises', async () => {
+    const origin = 'https://jov.ie';
+    getOAuthServerConfig.mockResolvedValue({
+      issuer: `${origin}/api/auth`,
+      authorization_endpoint: `${origin}/api/auth/oauth2/authorize`,
+      token_endpoint: `${origin}/api/auth/oauth2/token`,
+      registration_endpoint: `${origin}/api/auth/oauth2/register`,
+    });
+
+    const response = await getArtistAuthorizationServerMetadata(
+      new Request(`${origin}/.well-known/oauth-authorization-server/api/auth`)
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      registration_endpoint: `${origin}/api/auth/oauth2/register`,
+      authorization_endpoint: `${origin}/api/auth/oauth2/authorize`,
+      token_endpoint: `${origin}/api/auth/oauth2/token`,
+    });
   });
 });
