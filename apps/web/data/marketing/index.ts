@@ -167,12 +167,37 @@ export {
   MARKETING_EDITORIAL_BACKGROUNDS,
 } from './editorialBackgrounds';
 export type {
+  FactoryStage,
+  FactoryStageArtifact,
+  StageReceipt,
+} from './factory/spine';
+export {
+  applyStagePassedBit,
+  COPY_LANDING_STAGE_TO_FACTORY,
+  FACTORY_CERTIFIER_HARNESS,
+  FACTORY_EVALUATOR_KINDS,
+  FACTORY_HERO_VARIANT_IDS,
+  FACTORY_MEDIA_KINDS,
+  FACTORY_RAMP_STATES,
+  FACTORY_RECEIPT_SCHEMA,
+  FACTORY_SPINE_VERSION,
+  FACTORY_STAGE_ARTIFACT_SCHEMAS,
+  FACTORY_STAGE_MAX_ATTEMPTS,
+  FACTORY_STAGES,
+  LANDING_PAGE_PIPELINE_STAGE_TO_FACTORY,
+  MARKETING_GENERATION_STAGE_TO_FACTORY,
+  StageReceiptSchema,
+  validateStageReceipt,
+} from './factory/spine';
+export type {
   MarketingCreativeRole,
   MarketingGateReceipt,
   MarketingGenerationFinding,
   MarketingGenerationStage,
   MarketingModelCandidate,
   MarketingModelCapability,
+  MarketingModelSelectionInput,
+  MarketingModelSelectionReceipt,
   MarketingNarrativePlan,
   MarketingNarrativeSectionPlan,
   MarketingTasteGateId,
@@ -183,6 +208,7 @@ export {
   MARKETING_ASSET_GENERATION_CHARACTER_CONTRACT,
   MARKETING_ASSET_GENERATION_COLOR_CONTRACT,
   MARKETING_ASSET_GENERATION_MEDIA_RECIPE_CONTRACT,
+  MARKETING_CREATIVE_ROLE_MODEL_ROLE,
   MARKETING_CREATIVE_ROLES,
   MARKETING_GENERATION_SPEC_VERSION,
   MARKETING_GENERATION_STAGES,
@@ -193,7 +219,9 @@ export {
   MARKETING_VISUAL_REVIEW_CHARACTER_CONTRACT,
   MARKETING_VISUAL_REVIEW_COLOR_CONTRACT,
   MARKETING_VISUAL_REVIEW_MEDIA_RECIPE_CONTRACT,
+  marketingModelCandidatesForRole,
   selectMarketingModelCandidate,
+  selectMarketingModelWithReceipt,
 } from './generation';
 export type {
   HomepageAssetShootout,
@@ -362,6 +390,17 @@ export {
   SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE,
   validateMarketingMediaRecipeInput,
 } from './mediaRecipes';
+export type {
+  MarketingModelChannel,
+  MarketingModelModality,
+  MarketingModelRole,
+  MarketingRoleModelCandidate,
+} from './modelRoles';
+export {
+  MARKETING_MODEL_CHANNEL_ORDER,
+  MARKETING_MODEL_ROLES,
+  MARKETING_ROLE_MODEL_CANDIDATES,
+} from './modelRoles';
 export type {
   MarketingPageContract,
   MarketingPageContractRouteGlob,

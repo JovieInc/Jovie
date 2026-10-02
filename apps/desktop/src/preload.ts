@@ -1,4 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import { createSessionWorkReporter } from './session-work-state';
+
+// Scoped to this document's isolated world; full navigation cannot inherit idle.
+const sessionWorkReporter = createSessionWorkReporter();
+const WORK_STATE_CHANGED_CHANNEL = 'desktop-work-state-changed';
 
 const UPDATE_AVAILABLE_CHANNEL = 'update-available';
 const UPDATE_DOWNLOADED_CHANNEL = 'update-downloaded';
@@ -6,13 +11,20 @@ const QUIT_AND_INSTALL_CHANNEL = 'quit-and-install';
 const GO_BACK_CHANNEL = 'go-back';
 const GO_FORWARD_CHANNEL = 'go-forward';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
+const CLIENT_NAVIGATION_CHANNEL = 'desktop-client-navigation';
+const CLIENT_NAVIGATION_READY_CHANNEL = 'desktop-client-navigation-ready';
 const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
 const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
+const OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL = 'open-current-ovie-in-browser';
 const COPY_DESKTOP_AUTH_URL_CHANNEL = 'copy-desktop-auth-url';
 const OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL = 'open-public-profile-in-browser';
 const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
 const REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL =
   'redeem-desktop-auth-return-code';
+const GET_DESKTOP_PASSKEY_STATE_CHANNEL = 'get-desktop-passkey-state';
+const SET_DESKTOP_PASSKEY_STATE_CHANNEL = 'set-desktop-passkey-state';
+const COMPLETE_DESKTOP_PASSKEY_SIGN_IN_CHANNEL =
+  'complete-desktop-passkey-sign-in';
 const CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL =
   'consume-desktop-auth-completion';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
@@ -76,6 +88,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
   electronVersion: process.versions.electron,
   getBuildIdentity: () => ipcRenderer.invoke(GET_BUILD_IDENTITY_CHANNEL),
+  setWorkState: (state: unknown) => {
+    sessionWorkReporter.report(state);
+    // Revoke any in-flight main-process idle decision, never assert safety.
+    ipcRenderer.send(WORK_STATE_CHANGED_CHANNEL);
+  },
+  getWorkState: () => sessionWorkReporter.read(),
 
   /** Fires when electron-updater detects a new version is available for download. */
   onUpdateAvailable: (cb: () => void) => {
@@ -103,6 +121,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   /** Navigate forward in the SPA history stack. */
   goForward: () => {
     return ipcRenderer.invoke(GO_FORWARD_CHANNEL);
+  },
+
+  /** Announce readiness only while a client-router listener is installed. */
+  onNavigate: (cb: (path: string) => void): (() => void) => {
+    if (typeof cb !== 'function') return () => undefined;
+    const listener = (_: unknown, path: unknown) => {
+      if (typeof path === 'string') cb(path);
+    };
+    ipcRenderer.on(CLIENT_NAVIGATION_CHANNEL, listener);
+    ipcRenderer.send(CLIENT_NAVIGATION_READY_CHANNEL, true);
+    return () => {
+      ipcRenderer.removeListener(CLIENT_NAVIGATION_CHANNEL, listener);
+      ipcRenderer.send(CLIENT_NAVIGATION_READY_CHANNEL, false);
+    };
   },
 
   /** Subscribe to nav-state changes (canGoBack / canGoForward). */
@@ -147,6 +179,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }>;
   },
 
+  /** Continue the current Ovie route in an independent browser session. */
+  openCurrentOvieInBrowser: () =>
+    ipcRenderer.invoke(OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL) as Promise<{
+      ok: boolean;
+      reason?: string;
+    }>,
+
   /** Open this isolated public profile in the system browser. */
   openPublicProfileInBrowser: () => {
     return ipcRenderer.invoke(
@@ -159,6 +198,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return ipcRenderer.invoke(
       REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL,
       returnCode
+    ) as Promise<{
+      ok: boolean;
+      reason?: string;
+    }>;
+  },
+  getDesktopPasskeyState: () => {
+    return ipcRenderer.invoke(GET_DESKTOP_PASSKEY_STATE_CHANNEL) as Promise<{
+      available: boolean;
+      enrolled: boolean;
+      dismissed: boolean;
+    }>;
+  },
+  setDesktopPasskeyState: (update: 'enrolled' | 'dismissed' | 'reset') => {
+    return ipcRenderer.invoke(SET_DESKTOP_PASSKEY_STATE_CHANNEL, update) as Promise<{
+      ok: boolean;
+      reason?: string;
+    }>;
+  },
+  completeDesktopPasskeySignIn: () => {
+    return ipcRenderer.invoke(
+      COMPLETE_DESKTOP_PASSKEY_SIGN_IN_CHANNEL
     ) as Promise<{
       ok: boolean;
       reason?: string;

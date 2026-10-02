@@ -267,13 +267,17 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       captureSelector: '[data-testid="homepage-phone-state-mock-home"]',
       viewport: 'mobile',
     },
-    {
-      id: 'tim-white-profile-live-desktop',
-      title: 'Tim White Profile — Latest Release Desktop',
-      route: '/demo/showcase/tim-white-profile?release=live',
-      waitFor: '[data-testid="profile-compact-shell"]',
-      publicExportPath: 'tim-white-profile-live-desktop.png',
-    },
+  ]),
+  defineScenario({
+    group: 'marketing',
+    consumers: ADMIN_MARKETING_AND_INVESTOR,
+    id: 'tim-white-profile-live-desktop',
+    title: 'Tim White Profile — Latest Release Desktop',
+    route: '/demo/showcase/tim-white-profile?release=live',
+    waitFor: '[data-testid="profile-compact-shell"]',
+    publicExportPath: 'tim-white-profile-live-desktop.png',
+  }),
+  ...defineScenarios('marketing', ADMIN_AND_INVESTOR, [
     {
       id: 'tim-white-profile-mainstream-desktop',
       title: 'Tim White Profile — Mainstream Desktop',
@@ -326,7 +330,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       id: 'tim-white-profile-alerts-fallback-mobile',
       title: 'Tim White Profile — Alerts Fallback',
       route: '/demo/showcase/tim-white-profile?state=alerts-fallback',
-      waitFor: '[data-testid="profile-home-alerts-fallback-card"]',
+      waitFor: '[data-testid="profile-identity-get-updates"]',
       viewport: 'mobile',
       publicExportPath: 'tim-white-profile-alerts-fallback-phone.png',
     },

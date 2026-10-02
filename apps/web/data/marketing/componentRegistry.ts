@@ -269,6 +269,25 @@ const SECTION_RESOLUTIONS = {
     ),
     occurrenceProofs: [
       {
+        variantId: 'centered-phone',
+        componentPath: 'apps/web/components/marketing/MarketingPosterHero.tsx',
+        rootBinding: 'sectionVariant={sectionVariant}',
+        delegatedProofs: [
+          {
+            source:
+              'apps/web/components/marketing/artist-profile/ArtistProfileHero.tsx',
+            binding: "sectionVariant='centered-phone'",
+            occurrences: 1,
+            kind: 'source',
+          },
+        ],
+      },
+      {
+        variantId: 'centered-none',
+        componentPath: 'apps/web/components/organisms/PricingRecipeBody.tsx',
+        rootBinding: "sectionVariant='centered-none'",
+      },
+      {
         variantId: 'split-claim-card',
         componentPath: 'apps/web/components/homepage/HomepageIdentityHero.tsx',
         rootBinding: "testId='marketing-section-hero'",
@@ -366,6 +385,24 @@ const SECTION_RESOLUTIONS = {
     ),
     occurrenceProofs: [
       {
+        variantId: 'phone-right',
+        componentPath:
+          'apps/web/components/marketing/artist-profile/ArtistProfileOpinionatedSection.tsx',
+        rootBinding: "sectionVariant='phone-right'",
+      },
+      {
+        variantId: 'phone-left',
+        componentPath:
+          'apps/web/components/marketing/artist-profile/ArtistProfileLandingPage.tsx',
+        rootBinding: "sectionVariant='phone-left'",
+      },
+      {
+        variantId: 'editorial',
+        componentPath:
+          'apps/web/components/homepage/HomepageIdentitySections.tsx',
+        rootBinding: "data-testid='marketing-section-feature-split'",
+      },
+      {
         variantId: 'editorial',
         componentPath:
           'apps/web/components/homepage/HomepageCertifiedSections.tsx',
@@ -419,15 +456,46 @@ const SECTION_RESOLUTIONS = {
     MARKETING_PEN_CONTRACT_IDS.section.stats,
     'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.stats}'
   ),
-  pricing: sourceRoot(
-    'apps/web/components/features/pricing/MarketingPricingPlans.tsx',
-    'MarketingPricingPlans',
-    MARKETING_PEN_CONTRACT_IDS.section.pricing,
-    'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.pricing}'
-  ),
-  comparison: unresolved(
-    'ComparisonData is data-only and has no canonical renderer root.'
-  ),
+  pricing: {
+    ...sourceRoot(
+      'apps/web/components/features/pricing/MarketingPricingPlans.tsx',
+      'MarketingPricingPlans',
+      MARKETING_PEN_CONTRACT_IDS.section.pricing,
+      'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.pricing}'
+    ),
+    occurrenceProofs: [
+      {
+        variantId: 'tier-cards-neutral',
+        componentPath: 'apps/web/components/organisms/PricingRecipeBody.tsx',
+        rootBinding: "data-testid='marketing-section-pricing'",
+      },
+    ],
+  },
+  comparison: {
+    ...sourceRoot(
+      'apps/web/components/features/pricing/PricingComparisonChart.tsx',
+      'PricingComparisonChart',
+      MARKETING_PEN_CONTRACT_IDS.section.comparison,
+      'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.comparison}'
+    ),
+    // x5gKwl is the natively read registry index, not a mapped visual owner.
+    // Visual import and native design approval remain pending separately.
+    occurrenceProofs: [
+      {
+        variantId: 'feature-matrix',
+        componentPath: 'apps/web/components/organisms/PricingRecipeBody.tsx',
+        rootBinding: "data-testid='marketing-section-comparison'",
+        delegatedProofs: [
+          {
+            source: 'apps/web/app/(marketing)/pricing/page.tsx',
+            binding: 'comparisonChart={<PricingComparisonChart />}',
+            occurrences: 1,
+            kind: 'source',
+          },
+        ],
+      },
+    ],
+  },
   faq: sourceRoot(
     'apps/web/components/marketing/FaqSection.tsx',
     'FaqSection',
@@ -440,7 +508,7 @@ const SECTION_RESOLUTIONS = {
     exportName: 'MarketingCtaSection',
     // Pen `y8oKXI` is the section.cta registry entry; it points at design owner
     // `K4ar1`. The rendered root still emits the caller's adapter shell id
-    // (footerCta `LCLXI` / finalCta `iY5Lp`), which Pen indexes through
+    // (footerCta `DiH2U` / finalCta `DKVHD`), which Pen indexes through
     // section.cta, so the root proofs below are unchanged.
     penRootIds: [MARKETING_PEN_CONTRACT_IDS.section.cta],
     rootProofs: [
@@ -457,6 +525,11 @@ const SECTION_RESOLUTIONS = {
     ],
     occurrenceProofs: [
       {
+        variantId: 'plan-actions',
+        componentPath: 'apps/web/components/organisms/PricingRecipeBody.tsx',
+        rootBinding: "data-testid='marketing-section-cta'",
+      },
+      {
         variantId: 'final-single-claim',
         componentPath: 'apps/web/components/site/MarketingTerminalCta.tsx',
         rootBinding: 'data-pen-contract={penContractId}',
@@ -465,6 +538,11 @@ const SECTION_RESOLUTIONS = {
         variantId: 'final-dual-path',
         componentPath: 'apps/web/components/site/MarketingTerminalCta.tsx',
         rootBinding: 'data-pen-contract={penContractId}',
+      },
+      {
+        variantId: 'editorial-search',
+        componentPath: 'apps/web/components/homepage/HomepageIdentityClose.tsx',
+        rootBinding: "data-marketing-variant='editorial-search'",
       },
       {
         variantId: 'editorial-search',
@@ -479,36 +557,92 @@ const SECTION_RESOLUTIONS = {
       },
     ],
   },
-  'spec-wall': sourceRoot(
-    'apps/web/components/marketing/artist-profile/ArtistProfileSpecWall.tsx',
-    'ArtistProfileSpecWall',
-    MARKETING_PEN_CONTRACT_IDS.section.specWall,
-    'penContractId={MARKETING_PEN_CONTRACT_IDS.section.specWall}',
-    2,
-    [
+  'product-gallery': {
+    ...sourceRoot(
+      'apps/web/components/marketing/MarketingShippedSitesShowcase.tsx',
+      'MarketingShippedSitesShowcase',
+      MARKETING_PEN_CONTRACT_IDS.section.productGallery,
+      'penContractId={MARKETING_PEN_CONTRACT_IDS.section.productGallery}',
+      1,
+      [
+        {
+          source:
+            'apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx',
+          binding: 'data-pen-contract={penContractId}',
+          occurrences: 1,
+        },
+      ]
+    ),
+    penVariantRoots: {
+      'release-rail':
+        MARKETING_PEN_CONTRACT_IDS.section.productGalleryReleaseRail,
+    },
+    occurrenceProofs: [
       {
-        source:
-          'apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx',
-        binding: 'data-pen-contract={penContractId}',
-        occurrences: 1,
+        variantId: 'profile-grid',
+        componentPath:
+          'apps/web/components/marketing/MarketingShippedSitesShowcase.tsx',
+        rootBinding: "sectionVariant='profile-grid'",
       },
-    ]
-  ),
-  capture: sourceRoot(
-    'apps/web/components/marketing/artist-profile/ArtistProfileCaptureSection.tsx',
-    'ArtistProfileCaptureSection',
-    MARKETING_PEN_CONTRACT_IDS.section.capture,
-    'penContractId={MARKETING_PEN_CONTRACT_IDS.section.capture}',
-    2,
-    [
       {
-        source:
-          'apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx',
-        binding: 'data-pen-contract={penContractId}',
-        occurrences: 1,
+        variantId: 'release-rail',
+        componentPath:
+          'apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx',
+        rootBinding: "sectionVariant='release-rail'",
       },
-    ]
-  ),
+    ],
+  },
+  'spec-wall': {
+    ...sourceRoot(
+      'apps/web/components/marketing/artist-profile/ArtistProfileSpecWall.tsx',
+      'ArtistProfileSpecWall',
+      MARKETING_PEN_CONTRACT_IDS.section.specWall,
+      'penContractId={MARKETING_PEN_CONTRACT_IDS.section.specWall}',
+      2,
+      [
+        {
+          source:
+            'apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx',
+          binding: 'data-pen-contract={penContractId}',
+          occurrences: 1,
+        },
+      ]
+    ),
+    occurrenceProofs: [
+      {
+        variantId: '5-screenshot-bento',
+        componentPath:
+          'apps/web/components/marketing/MarketingPlatformSpecBento.tsx',
+        rootBinding: "sectionVariant='5-screenshot-bento'",
+      },
+    ],
+  },
+  capture: {
+    ...sourceRoot(
+      'apps/web/components/marketing/artist-profile/ArtistProfileCaptureSection.tsx',
+      'ArtistProfileCaptureSection',
+      MARKETING_PEN_CONTRACT_IDS.section.capture,
+      'penContractId={MARKETING_PEN_CONTRACT_IDS.section.capture}',
+      2,
+      [
+        {
+          source:
+            'apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx',
+          binding: 'data-pen-contract={penContractId}',
+          occurrences: 1,
+        },
+      ]
+    ),
+    occurrenceProofs: [
+      {
+        variantId: 'email-only',
+        componentPath:
+          'apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx',
+        rootBinding:
+          "data-marketing-variant={marketingSection ? 'email-only' : undefined}",
+      },
+    ],
+  },
   monetization: sourceRoot(
     'apps/web/components/marketing/artist-profile/ArtistProfileMonetizationSection.tsx',
     'ArtistProfileMonetizationSection',

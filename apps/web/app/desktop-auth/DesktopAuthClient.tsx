@@ -5,6 +5,7 @@ import {
   type FormEvent,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -12,6 +13,7 @@ import {
 import { sanitizeDesktopAuthUrl } from '@/lib/desktop/auth-return';
 import {
   closeDesktopAuthWindow,
+  completeDesktopPasskeySignIn,
   copyDesktopAuthUrl,
   type DesktopAuthActionResult,
   openDesktopAuthUrl,
@@ -19,14 +21,30 @@ import {
   supportsDesktopAuthReturnCode,
   useDesktopAppBootSignal,
 } from '@/lib/desktop/electron-bridge';
+import { DesktopAuthCodeForm } from './DesktopAuthCodeForm';
+import { DesktopAuthMethodOptions } from './DesktopAuthMethodOptions';
+import {
+  DesktopAuthCancelButton,
+  DesktopAuthHeading,
+  DesktopAuthStatus,
+} from './DesktopAuthSharedView';
+import { DesktopAuthTouchIdButton } from './DesktopAuthTouchIdButton';
+import {
+  type CopyState,
+  type DesktopAuthOpenState,
+  isCompleteReturnCode,
+  type RedeemState,
+  type SelectedMethod,
+  type TouchIdState,
+} from './desktop-auth-contract';
 import { MacCinematicSurface } from './MacCinematicSurface';
 
-export type DesktopAuthOpenState = 'idle' | 'opening' | 'opened' | 'error';
-type CopyState = 'idle' | 'copying' | 'copied' | 'error';
-type RedeemState = 'idle' | 'redeeming' | 'redeemed' | 'error';
+export type { DesktopAuthOpenState } from './desktop-auth-contract';
 
 interface DesktopAuthClientProps {
   readonly authUrlParam: string | null;
+  /** Main process hint: this Mac enrolled Touch ID sign-in. */
+  readonly touchIdHint?: boolean;
 }
 
 interface DesktopAuthHandoffActionsProps {
@@ -34,29 +52,34 @@ interface DesktopAuthHandoffActionsProps {
   readonly onOpenStateChange?: (state: DesktopAuthOpenState) => void;
   readonly resolveAuthUrl?: () => string | null;
   readonly showCancelSignIn?: boolean;
+  readonly showTouchId?: boolean;
 }
 
 const DESKTOP_AUTH_ACTION_TIMEOUT_MS = 5000;
 const DESKTOP_AUTH_REDEEM_TIMEOUT_MS = 15_000;
 // Most browser sign-ins return well inside this window. After it, the browser
-// probably opened somewhere unseen (another Space, a full-screen app, a
-// different default browser) so point at the copy-link path. Any browser can
-// finish it; its return page shows a code for "Enter a Code".
+// probably opened somewhere unseen, so point at the copy-link path. Any
+// browser can finish it; its return page shows a code for "Enter a Code".
 export const DESKTOP_AUTH_STILL_WAITING_MS = 30_000;
-const STATUS_CHECK_BROWSER = 'Check your browser.';
-const STATUS_STILL_WAITING =
-  'Not seeing it? Copy the sign-in link and paste it into any browser.';
-const STATUS_COPIED = 'Sign-in link copied. Paste it into any browser.';
-const STATUS_ENTER_CODE =
-  'Signed in but Jovie did not open? Enter the code your browser shows.';
-const STATUS_QR_CODE = 'Scan with your phone to finish sign-in there.';
-const QR_CODE_SIZE = 176;
-const STATUS_REDEEMING = 'Signing in...';
-// Matches the return page: consonants only, formatted XXXX-XXXX.
 const RETURN_CODE_ALPHABET = 'BCDFGHJKLMNPQRSTVWXZ';
 const RETURN_CODE_LENGTH = 8;
-const INPUT_CLASS =
-  'h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 text-center font-mono text-app uppercase tracking-widest text-white placeholder:text-white/32 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25';
+const QR_CODE_SIZE = 176;
+
+interface DesktopAuthPresentationInput {
+  readonly copyError: string | null;
+  readonly copyState: CopyState;
+  readonly openError: string | null;
+  readonly openState: DesktopAuthOpenState;
+  readonly optionsOpen: boolean;
+  readonly qrError: string | null;
+  readonly qrReady: boolean;
+  readonly redeemError: string | null;
+  readonly redeemState: RedeemState;
+  readonly selectedMethod: SelectedMethod;
+  readonly stillWaiting: boolean;
+  readonly touchIdState: TouchIdState;
+}
+
 export function normalizeReturnCodeInput(value: string): string {
   let normalized = '';
   for (const char of value.toUpperCase()) {
@@ -66,10 +89,6 @@ export function normalizeReturnCodeInput(value: string): string {
   return normalized.length > 4
     ? `${normalized.slice(0, 4)}-${normalized.slice(4)}`
     : normalized;
-}
-
-function isCompleteReturnCode(value: string): boolean {
-  return value.replace('-', '').length === RETURN_CODE_LENGTH;
 }
 
 function formatRedeemError(reason?: string): string {
@@ -87,16 +106,10 @@ function formatRedeemError(reason?: string): string {
   }
 }
 
-const PRIMARY_ACTION_CLASS =
-  'inline-flex h-11 w-full items-center justify-center rounded-full bg-white px-4 text-app font-medium text-(--color-bg-base) transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55 dark:bg-white';
-const SECONDARY_ACTION_CLASS =
-  'inline-flex h-11 w-full items-center justify-center rounded-full border border-white/10 px-4 text-app font-medium text-white/72 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 disabled:cursor-not-allowed disabled:opacity-55';
-
 function formatOpenError(reason?: string): string {
   if (reason === 'blocked-url' || reason === 'invalid-auth-url') {
     return 'Sign-in could not start. Close this window and try again from Jovie.';
   }
-
   return 'The browser did not open. Try again, or copy the sign-in link.';
 }
 
@@ -104,7 +117,6 @@ function formatCopyError(reason?: string): string {
   if (reason === 'blocked-url' || reason === 'invalid-auth-url') {
     return 'The sign-in link is no longer valid. Try opening the browser again.';
   }
-
   return 'The sign-in link could not be copied. Try again.';
 }
 
@@ -125,9 +137,7 @@ async function runWithTimeout(
       }),
     ]);
   } finally {
-    if (timeoutId !== undefined) {
-      clearTimeout(timeoutId);
-    }
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
   }
 }
 
@@ -137,35 +147,164 @@ function getAppOrigin(): string {
     : globalThis.window.location.origin;
 }
 
+function getDesktopAuthPresentation({
+  copyError,
+  copyState,
+  openError,
+  openState,
+  optionsOpen,
+  qrError,
+  qrReady,
+  redeemError,
+  redeemState,
+  selectedMethod,
+  stillWaiting,
+  touchIdState,
+}: DesktopAuthPresentationInput) {
+  const openLabel =
+    openState === 'opening'
+      ? 'Opening Browser...'
+      : openState === 'opened'
+        ? 'Open Browser Again'
+        : openState === 'error'
+          ? 'Try Again'
+          : 'Continue In Browser';
+  const copyLabel =
+    copyState === 'copying'
+      ? 'Copying Sign-in Link...'
+      : copyState === 'copied'
+        ? 'Copy Sign-in Link Again'
+        : 'Copy Sign-in Link';
+  const actionStatusText =
+    copyState === 'copying'
+      ? 'Copying the sign-in link...'
+      : copyState === 'copied'
+        ? 'Sign-in link copied. Paste it into any browser.'
+        : (copyError ??
+          (openState === 'opening'
+            ? 'Opening your browser...'
+            : openState === 'opened'
+              ? stillWaiting
+                ? 'Not seeing it? Copy the sign-in link and paste it into any browser.'
+                : 'Check your browser.'
+              : openError));
+  const codeStatusText =
+    redeemState === 'redeeming'
+      ? 'Signing in...'
+      : redeemState === 'redeemed'
+        ? 'Sign-in complete. Returning to Jovie...'
+        : (redeemError ??
+          'Signed in but Jovie did not open? Enter the code shown in your browser or on your phone.');
+  const qrStatusText =
+    qrError ??
+    (qrReady
+      ? 'Finish signing in on your phone, then enter the code it shows.'
+      : 'Creating the QR code...');
+  const touchIdStatusText =
+    touchIdState === 'working' || touchIdState === 'signed-in'
+      ? 'Waiting for Touch ID...'
+      : touchIdState === 'error'
+        ? 'Touch ID did not sign you in. Continue in the browser instead.'
+        : null;
+  const statusText =
+    touchIdStatusText ??
+    (selectedMethod === 'code'
+      ? codeStatusText
+      : selectedMethod === 'qr'
+        ? qrStatusText
+        : actionStatusText);
+  const supportingCopy =
+    selectedMethod === 'touch-id'
+      ? 'Use Touch ID to unlock Jovie on this Mac.'
+      : selectedMethod === 'code'
+        ? 'Enter the return code shown in your browser or on your phone.'
+        : selectedMethod === 'qr'
+          ? 'Scan with your phone, finish signing in there, then enter the return code here.'
+          : optionsOpen
+            ? 'Choose another way to finish signing in.'
+            : 'Continue in your browser, then return to Jovie.';
+
+  return { copyLabel, openLabel, statusText, supportingCopy };
+}
+
 export function DesktopAuthHandoffActions({
   authUrl = null,
   onOpenStateChange,
   resolveAuthUrl,
   showCancelSignIn = false,
+  showTouchId = false,
 }: DesktopAuthHandoffActionsProps) {
   const [openState, setOpenState] = useState<DesktopAuthOpenState>('idle');
   const [openError, setOpenError] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<CopyState>('idle');
   const [copyError, setCopyError] = useState<string | null>(null);
   const [stillWaiting, setStillWaiting] = useState(false);
-  const [codeMode, setCodeMode] = useState(false);
-  const [qrMode, setQrMode] = useState(false);
+  const [selectedMethod, setSelectedMethod] = useState<SelectedMethod>(() =>
+    showTouchId ? 'touch-id' : 'browser'
+  );
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const [qrSvg, setQrSvg] = useState<string | null>(null);
   const [qrError, setQrError] = useState<string | null>(null);
   const [returnCode, setReturnCode] = useState('');
   const [redeemState, setRedeemState] = useState<RedeemState>('idle');
   const [redeemError, setRedeemError] = useState<string | null>(null);
   const [canRedeemCode, setCanRedeemCode] = useState(false);
+  const [touchIdState, setTouchIdState] = useState<TouchIdState>('idle');
+  const optionsId = useId();
+  const statusId = useId();
   const primaryActionRef = useRef<HTMLButtonElement>(null);
+  const touchIdPrimaryRef = useRef<HTMLButtonElement>(null);
+  const optionsDisclosureRef = useRef<HTMLButtonElement>(null);
+  const copyOptionRef = useRef<HTMLButtonElement>(null);
+  const codeOptionRef = useRef<HTMLButtonElement>(null);
+  const qrOptionRef = useRef<HTMLButtonElement>(null);
+  const browserOptionRef = useRef<HTMLButtonElement>(null);
+  const touchIdOptionRef = useRef<HTMLButtonElement>(null);
   const codeInputRef = useRef<HTMLInputElement>(null);
+  const qrInstructionsRef = useRef<HTMLDivElement>(null);
+  const returnFocusMethodRef = useRef<SelectedMethod | 'copy'>(
+    showTouchId ? 'browser' : 'copy'
+  );
+  const returnBaseMethodRef = useRef<SelectedMethod>(
+    showTouchId ? 'touch-id' : 'browser'
+  );
+  const focusBaseActionRef = useRef(false);
 
   useEffect(() => {
     setCanRedeemCode(supportsDesktopAuthReturnCode());
   }, []);
 
   useEffect(() => {
-    if (codeMode) codeInputRef.current?.focus();
-  }, [codeMode]);
+    if (selectedMethod === 'code') {
+      codeInputRef.current?.focus();
+      return;
+    }
+    if (selectedMethod === 'qr') {
+      qrInstructionsRef.current?.focus();
+      return;
+    }
+    if (!optionsOpen) {
+      if (!focusBaseActionRef.current) return;
+      focusBaseActionRef.current = false;
+      if (selectedMethod === 'touch-id') {
+        touchIdPrimaryRef.current?.focus();
+      } else {
+        primaryActionRef.current?.focus();
+      }
+      return;
+    }
+    const target =
+      returnFocusMethodRef.current === 'code'
+        ? codeOptionRef.current
+        : returnFocusMethodRef.current === 'qr'
+          ? qrOptionRef.current
+          : returnFocusMethodRef.current === 'browser'
+            ? browserOptionRef.current
+            : returnFocusMethodRef.current === 'touch-id'
+              ? touchIdOptionRef.current
+              : copyOptionRef.current;
+    target?.focus();
+  }, [optionsOpen, selectedMethod]);
 
   useEffect(() => {
     setStillWaiting(false);
@@ -186,13 +325,15 @@ export function DesktopAuthHandoffActions({
     [authUrl, resolveAuthUrl]
   );
 
-  // The QR encodes the same link "Copy Sign-In Link" copies — the PKCE
+  // The QR encodes the same link "Copy Sign-in Link" copies. The PKCE
   // challenge inside is public, the verifier never leaves the app.
   useEffect(() => {
-    if (!qrMode || qrSvg || qrError) return;
+    if (selectedMethod !== 'qr' || qrSvg || qrError) return;
     const currentAuthUrl = getAuthUrl();
     if (!currentAuthUrl) {
-      setQrError('The QR code could not be created. Copy the link instead.');
+      setQrError(
+        'The QR code could not be created. Choose another sign-in option.'
+      );
       return;
     }
     let cancelled = false;
@@ -206,14 +347,14 @@ export function DesktopAuthHandoffActions({
       .catch(() => {
         if (!cancelled) {
           setQrError(
-            'The QR code could not be created. Copy the link instead.'
+            'The QR code could not be created. Choose another sign-in option.'
           );
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [qrMode, qrSvg, qrError, getAuthUrl]);
+  }, [selectedMethod, qrSvg, qrError, getAuthUrl]);
 
   const updateOpenState = useCallback(
     (state: DesktopAuthOpenState) => {
@@ -230,6 +371,7 @@ export function DesktopAuthHandoffActions({
     }
 
     updateOpenState('opening');
+    setTouchIdState('idle');
     setOpenError(null);
     setCopyState('idle');
     setCopyError(null);
@@ -306,106 +448,139 @@ export function DesktopAuthHandoffActions({
     [redeemState, returnCode]
   );
 
-  const toggleCodeMode = useCallback(() => {
-    setCodeMode(current => !current);
-    setQrMode(false);
-    setRedeemState('idle');
-    setRedeemError(null);
+  const signInWithTouchId = useCallback(async () => {
+    if (touchIdState === 'working' || touchIdState === 'signed-in') return;
+    setTouchIdState('working');
+    try {
+      // Loaded on demand so browser handoff stays light.
+      const { authClient } = await import('@/lib/auth/client');
+      const signedIn = await authClient.signIn.passkey();
+      if (signedIn?.error) throw new Error(signedIn.error.message);
+      const completed = await completeDesktopPasskeySignIn();
+      if (!completed.ok) throw new Error(completed.reason);
+      setTouchIdState('signed-in');
+    } catch {
+      setTouchIdState('error');
+      returnBaseMethodRef.current = 'browser';
+      focusBaseActionRef.current = true;
+      setOptionsOpen(false);
+      setSelectedMethod('browser');
+    }
+  }, [touchIdState]);
+
+  const selectBrowserMethod = useCallback(() => {
+    returnBaseMethodRef.current = 'browser';
+    focusBaseActionRef.current = true;
+    setOptionsOpen(false);
+    setSelectedMethod('browser');
   }, []);
 
-  const toggleQrMode = useCallback(() => {
-    setQrMode(current => !current);
-    setCodeMode(false);
-    setRedeemState('idle');
-    setRedeemError(null);
+  const selectTouchIdMethod = useCallback(() => {
+    setTouchIdState('idle');
+    returnBaseMethodRef.current = 'touch-id';
+    focusBaseActionRef.current = true;
+    setOptionsOpen(false);
+    setSelectedMethod('touch-id');
+  }, []);
+
+  const selectCodeMethod = useCallback(() => {
+    if (selectedMethod === 'browser' || selectedMethod === 'touch-id') {
+      returnBaseMethodRef.current = selectedMethod;
+    }
+    returnFocusMethodRef.current = 'code';
+    setOptionsOpen(false);
+    setSelectedMethod('code');
+  }, [selectedMethod]);
+
+  const selectQrMethod = useCallback(() => {
+    if (selectedMethod === 'browser' || selectedMethod === 'touch-id') {
+      returnBaseMethodRef.current = selectedMethod;
+    }
+    returnFocusMethodRef.current = 'qr';
+    setOptionsOpen(false);
+    setQrSvg(null);
+    setQrError(null);
+    setSelectedMethod('qr');
+  }, [selectedMethod]);
+
+  const returnToOptions = useCallback(() => {
+    setSelectedMethod(returnBaseMethodRef.current);
+    setOptionsOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (!optionsOpen) return;
+    const handleEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setOptionsOpen(false);
+      optionsDisclosureRef.current?.focus();
+    };
+    globalThis.document.addEventListener('keydown', handleEscape);
+    return () =>
+      globalThis.document.removeEventListener('keydown', handleEscape);
+  }, [optionsOpen]);
+
+  const cancelSignIn = useCallback(() => {
+    void closeDesktopAuthWindow().catch(() => undefined);
   }, []);
 
   const hasAuthUrl = authUrl !== null || resolveAuthUrl !== undefined;
   const isBusy = openState === 'opening' || copyState === 'copying';
-  const openLabel =
-    openState === 'opening'
-      ? 'Opening Browser...'
-      : openState === 'opened'
-        ? 'Open Browser Again'
-        : openState === 'error'
-          ? 'Try Again'
-          : 'Continue in Browser';
-  const copyLabel =
-    copyState === 'copying' ? 'Copying Sign-In Link...' : 'Copy Sign-In Link';
-  const openedStatus = stillWaiting
-    ? STATUS_STILL_WAITING
-    : STATUS_CHECK_BROWSER;
-  const actionStatusText =
-    copyState === 'copied'
-      ? STATUS_COPIED
-      : (copyError ?? (openState === 'opened' ? openedStatus : openError));
-  const codeStatusText =
-    redeemState === 'redeeming' || redeemState === 'redeemed'
-      ? STATUS_REDEEMING
-      : (redeemError ?? STATUS_ENTER_CODE);
-  const statusText = codeMode
-    ? codeStatusText
-    : qrMode
-      ? (qrError ?? STATUS_QR_CODE)
-      : actionStatusText;
+  const { copyLabel, openLabel, statusText, supportingCopy } =
+    getDesktopAuthPresentation({
+      copyError,
+      copyState,
+      openError,
+      openState,
+      optionsOpen,
+      qrError,
+      qrReady: qrSvg !== null,
+      redeemError,
+      redeemState,
+      selectedMethod,
+      stillWaiting,
+      touchIdState,
+    });
   const cancelButton = showCancelSignIn ? (
-    <button
-      type='button'
-      className={SECONDARY_ACTION_CLASS}
-      onClick={() => {
-        closeDesktopAuthWindow().catch(() => {});
-      }}
-    >
-      Cancel Sign-In
-    </button>
+    <DesktopAuthCancelButton onCancel={cancelSignIn} />
   ) : null;
 
   return (
-    <>
-      {codeMode ? (
-        <form
-          className='mt-8 flex w-full flex-col items-center justify-center gap-2'
-          data-desktop-auth-state='code'
-          data-testid='desktop-auth-code-form'
-          onSubmit={submitReturnCode}
-        >
-          <input
-            ref={codeInputRef}
-            aria-label='Code From Your Browser'
-            autoCapitalize='characters'
-            autoComplete='one-time-code'
-            className={INPUT_CLASS}
-            inputMode='text'
-            maxLength={9}
-            placeholder='XXXX-XXXX'
-            spellCheck={false}
-            value={returnCode}
-            onChange={event => {
-              setReturnCode(normalizeReturnCodeInput(event.target.value));
-              if (redeemState === 'error') {
-                setRedeemState('idle');
-                setRedeemError(null);
-              }
-            }}
-          />
-          <button
-            type='submit'
-            className={PRIMARY_ACTION_CLASS}
-            disabled={
-              !isCompleteReturnCode(returnCode) ||
-              redeemState === 'redeeming' ||
-              redeemState === 'redeemed'
+    <div
+      className='flex w-full flex-col items-center'
+      data-auth-selected-method={selectedMethod}
+      data-testid='desktop-auth-hierarchy'
+    >
+      <DesktopAuthHeading copy={supportingCopy} />
+      {selectedMethod === 'code' ? (
+        <DesktopAuthCodeForm
+          cancelButton={cancelButton}
+          inputRef={codeInputRef}
+          onBack={returnToOptions}
+          onReturnCodeChange={value => {
+            setReturnCode(normalizeReturnCodeInput(value));
+            if (redeemState === 'error') {
+              setRedeemState('idle');
+              setRedeemError(null);
             }
-          >
-            {redeemState === 'redeeming' ? 'Signing In...' : 'Continue'}
-          </button>
-          {cancelButton}
-        </form>
-      ) : qrMode ? (
-        <div
-          className='mt-8 flex w-full flex-col items-center justify-center gap-3'
-          data-desktop-auth-state='qr'
+          }}
+          onSubmit={submitReturnCode}
+          redeemState={redeemState}
+          returnCode={returnCode}
+          statusId={statusId}
+        />
+      ) : selectedMethod === 'qr' ? (
+        <section
+          ref={qrInstructionsRef}
+          aria-label='Phone Sign-in Instructions'
+          className='mt-6 flex w-full flex-col items-center justify-center gap-3 focus-visible:outline-none'
+          data-desktop-auth-state={
+            qrError ? 'qr-error' : qrSvg ? 'qr' : 'qr-loading'
+          }
           data-testid='desktop-auth-qr'
+          tabIndex={-1}
         >
           {qrSvg ? (
             <div
@@ -416,87 +591,102 @@ export function DesktopAuthHandoffActions({
               role='img'
             />
           ) : null}
-        </div>
-      ) : (
-        <div
-          className='mt-8 flex w-full flex-col items-center justify-center gap-2'
-          data-desktop-auth-state={openState}
-          data-testid='desktop-auth-actions'
-        >
-          <button
-            ref={primaryActionRef}
-            type='button'
-            className={PRIMARY_ACTION_CLASS}
-            disabled={!hasAuthUrl || isBusy}
-            onClick={openAuthUrl}
-          >
-            {openLabel}
-          </button>
-          <button
-            type='button'
-            className={SECONDARY_ACTION_CLASS}
-            disabled={!hasAuthUrl || isBusy}
-            onClick={copyAuthUrl}
-          >
-            {copyLabel}
-          </button>
-          {cancelButton}
-        </div>
-      )}
-      <p
-        aria-live='polite'
-        role='status'
-        className='mt-3 min-h-10 text-xs leading-5 text-white/56'
-      >
-        {hasAuthUrl ? statusText : 'Start sign-in again from Jovie.'}
-      </p>
-      {hasAuthUrl ? (
-        <div className='mt-3 flex items-center justify-center gap-4'>
-          {codeMode || qrMode ? (
-            <Button
-              type='button'
-              variant='link'
-              size='sm'
-              disabled={
-                redeemState === 'redeeming' || redeemState === 'redeemed'
-              }
-              onClick={codeMode ? toggleCodeMode : toggleQrMode}
-            >
-              Back To Browser Sign-in
-            </Button>
-          ) : (
-            <>
-              {canRedeemCode ? (
-                <Button
-                  type='button'
-                  variant='link'
-                  size='sm'
-                  onClick={toggleCodeMode}
-                >
-                  Enter A Code
-                </Button>
-              ) : null}
+          <div className='flex items-center justify-center gap-4'>
+            {canRedeemCode ? (
               <Button
                 type='button'
                 variant='link'
                 size='sm'
-                onClick={toggleQrMode}
+                onClick={selectCodeMethod}
               >
-                Scan With Phone
+                Enter A Code
               </Button>
-            </>
-          )}
-        </div>
+            ) : null}
+            <Button
+              type='button'
+              variant='link'
+              size='sm'
+              onClick={returnToOptions}
+            >
+              Back To Sign-in Options
+            </Button>
+          </div>
+          {cancelButton}
+        </section>
       ) : (
-        // Reserve the row so the centered shell does not shift once the
-        // bridge capability check resolves after mount.
-        <div aria-hidden='true' className='mt-3 h-7' />
+        <div
+          className='mt-6 flex w-full flex-col items-center justify-center gap-3'
+          data-desktop-auth-state={
+            selectedMethod === 'touch-id'
+              ? `touch-id-${touchIdState}`
+              : openState
+          }
+          data-testid='desktop-auth-actions'
+        >
+          {selectedMethod === 'touch-id' ? (
+            <DesktopAuthTouchIdButton
+              ref={touchIdPrimaryRef}
+              state={touchIdState}
+              onClick={signInWithTouchId}
+            />
+          ) : (
+            <Button
+              ref={primaryActionRef}
+              type='button'
+              variant='primary'
+              size='md'
+              className='w-full'
+              data-auth-action='primary'
+              disabled={!hasAuthUrl || isBusy}
+              onClick={openAuthUrl}
+            >
+              {openLabel}
+            </Button>
+          )}
+          <DesktopAuthMethodOptions
+            browserOptionRef={browserOptionRef}
+            canRedeemCode={canRedeemCode}
+            codeOptionRef={codeOptionRef}
+            copyLabel={copyLabel}
+            copyOptionRef={copyOptionRef}
+            disabled={!hasAuthUrl || isBusy}
+            disclosureRef={optionsDisclosureRef}
+            onCopy={copyAuthUrl}
+            onSelectBrowser={selectBrowserMethod}
+            onSelectCode={selectCodeMethod}
+            onSelectQr={selectQrMethod}
+            onSelectTouchId={selectTouchIdMethod}
+            onToggle={() => {
+              returnFocusMethodRef.current =
+                selectedMethod === 'touch-id'
+                  ? 'browser'
+                  : showTouchId
+                    ? 'touch-id'
+                    : 'copy';
+              setOptionsOpen(current => !current);
+            }}
+            open={optionsOpen}
+            optionsId={optionsId}
+            qrOptionRef={qrOptionRef}
+            selectedMethod={selectedMethod}
+            showTouchId={showTouchId}
+            touchIdOptionRef={touchIdOptionRef}
+          />
+          {cancelButton}
+        </div>
       )}
-    </>
+      <DesktopAuthStatus
+        id={statusId}
+        text={hasAuthUrl ? statusText : 'Start sign-in again from Jovie.'}
+      />
+    </div>
   );
 }
 
-export function DesktopAuthClient({ authUrlParam }: DesktopAuthClientProps) {
+export function DesktopAuthClient({
+  authUrlParam,
+  touchIdHint = false,
+}: DesktopAuthClientProps) {
   useDesktopAppBootSignal();
   const [openState, setOpenState] = useState<DesktopAuthOpenState>('idle');
   const appOrigin = getAppOrigin();
@@ -507,12 +697,12 @@ export function DesktopAuthClient({ authUrlParam }: DesktopAuthClientProps) {
 
   return (
     <MacCinematicSurface state={openState} testId='desktop-auth-handoff'>
-      <section className='relative z-10 flex w-full max-w-90 flex-col items-center px-6 py-16 text-center'>
-        <h1 className='sr-only'>Sign In To Jovie</h1>
+      <section className='relative z-10 flex w-full max-w-90 flex-col items-center px-6 py-4 text-center'>
         <DesktopAuthHandoffActions
           authUrl={authUrl}
           onOpenStateChange={setOpenState}
           showCancelSignIn
+          showTouchId={touchIdHint}
         />
       </section>
     </MacCinematicSurface>

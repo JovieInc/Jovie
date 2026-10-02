@@ -2,6 +2,15 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql } from 'drizzle-orm';
+import {
+  LIMITED_DROP_CARD_PLACEMENTS,
+  LIMITED_DROP_EVENT_NAMES,
+  LIMITED_DROP_FUNNEL_CONTRACT_VERSION,
+  LIMITED_DROP_ITEM_MODES,
+  LIMITED_DROP_PAGE_IDS,
+  LIMITED_DROP_STATES,
+  LIMITED_DROP_TERMINAL_REASONS,
+} from '@/lib/analytics/limited-drop-funnel';
 import { identifyUser } from '@/lib/analytics/runtime-aware';
 import {
   SIGNUP_FUNNEL_ALL_STEPS,
@@ -66,6 +75,31 @@ const notificationProperties = [
 const notificationEvent = {
   category: 'notification',
   properties: notificationProperties,
+} as const satisfies ServerAnalyticsEventDefinition;
+
+const limitedDropProperties = [
+  'contract_version',
+  'event_id',
+  'session_id',
+  'artist_id',
+  'asset_id',
+  'drop_id',
+  'page_id',
+  'state',
+  'card_placement',
+  'share_id',
+  'campaign_id',
+  'experiment_id',
+  'variant_id',
+  'item_mode',
+  'channel',
+  'terminal_reason',
+] as const;
+
+const limitedDropEvent = {
+  category: 'funnel',
+  properties: limitedDropProperties,
+  source: { property: 'artist_id', type: 'creator_profile' },
 } as const satisfies ServerAnalyticsEventDefinition;
 
 export const SERVER_ANALYTICS_EVENTS = {
@@ -226,6 +260,18 @@ export const SERVER_ANALYTICS_EVENTS = {
     category: 'funnel',
     properties: ['funnel_id', 'step', 'outcome', 'surface', 'reason'],
   },
+  asset_page_viewed: limitedDropEvent,
+  drop_countdown_viewed: limitedDropEvent,
+  drop_capture_started: limitedDropEvent,
+  drop_capture_submitted: limitedDropEvent,
+  drop_marketing_consent_granted: limitedDropEvent,
+  drop_purchase_started: limitedDropEvent,
+  drop_purchase_completed: limitedDropEvent,
+  drop_terminal_reached: limitedDropEvent,
+  profile_card_impression: limitedDropEvent,
+  profile_card_clicked: limitedDropEvent,
+  completed_drop_card_exposure: limitedDropEvent,
+  completed_drop_signup: limitedDropEvent,
   /**
    * Artist Presence ($199/mo) upgrade offer presented once per claimed
    * artist after first profile claim (JOV-6675). Keyed by creator profile so
@@ -376,6 +422,11 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     invocations: 1,
     events: ['funnel_step'],
   },
+  {
+    path: 'lib/analytics/limited-drop-funnel.server.ts',
+    invocations: 1,
+    events: LIMITED_DROP_EVENT_NAMES,
+  },
 ] as const satisfies ReadonlyArray<{
   readonly path: string;
   readonly invocations: number;
@@ -386,35 +437,49 @@ type SafePropertyValue = string | number | boolean | null;
 
 const UUID_PROPERTY_NAMES = new Set([
   'artist_id',
+  'asset_id',
+  'drop_id',
   'eventId',
+  'event_id',
   'profileId',
   'releaseId',
+  'session_id',
   'tourDateId',
 ]);
 const SAFE_TOKEN_PROPERTY_NAMES = new Set([
   'billingReason',
+  'campaign_id',
   'checkoutSessionId',
   'code',
   'error_type',
+  'experiment_id',
   'gate',
   'plan',
   'planRequired',
   'provider',
   'reason',
   'result',
+  'share_id',
   'source',
   'stripeEventId',
   'toolName',
+  'variant_id',
 ]);
 const ENUM_PROPERTY_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
+  card_placement: new Set(LIMITED_DROP_CARD_PLACEMENTS),
   channel: new Set(['email', 'sms']),
   client: new Set(['web', 'ios', 'electron']),
+  contract_version: new Set([LIMITED_DROP_FUNNEL_CONTRACT_VERSION]),
   intent: new Set(['sign_in', 'sign_up']),
   method: new Set(['email_link', 'dashboard', 'api', 'dropdown']),
   funnel_id: new Set(SIGNUP_FUNNEL_IDS),
   step: new Set(SIGNUP_FUNNEL_ALL_STEPS),
   outcome: new Set(SIGNUP_FUNNEL_OUTCOMES),
+  item_mode: new Set(LIMITED_DROP_ITEM_MODES),
+  page_id: new Set(LIMITED_DROP_PAGE_IDS),
+  state: new Set(LIMITED_DROP_STATES),
   surface: new Set(SIGNUP_FUNNEL_SURFACES),
+  terminal_reason: new Set(LIMITED_DROP_TERMINAL_REASONS),
 };
 const UTM_PROPERTY_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
   utm_source: new Set([
@@ -664,7 +729,9 @@ function prepareServerAnalyticsInsert(
       sourceEntityType: definition.source?.type ?? null,
       sourceEntityId:
         typeof sourceEntityId === 'string' ? sourceEntityId : null,
-      eventIdentity: options?.eventIdentity ?? null,
+      ...(options?.eventIdentity === undefined
+        ? {}
+        : { eventIdentity: options.eventIdentity }),
       properties: sanitized,
       occurredAt: options?.occurredAt ?? new Date(),
     },
@@ -675,11 +742,15 @@ async function insertServerAnalyticsRow(
   client: DbOrTransaction,
   prepared: Extract<PreparedInsert, { ok: true }>
 ): Promise<ServerAnalyticsDelivery> {
-  const [stored] = await client
-    .insert(serverAnalyticsEvents)
-    .values(prepared.values)
-    .onConflictDoNothing({ target: serverAnalyticsEvents.eventIdentity })
-    .returning({ id: serverAnalyticsEvents.id });
+  const insert = client.insert(serverAnalyticsEvents).values(prepared.values);
+  // Ordinary events do not need deduplication and must not depend on the
+  // optional identity column's unique index being available.
+  const query = prepared.values.eventIdentity
+    ? insert.onConflictDoNothing({
+        target: serverAnalyticsEvents.eventIdentity,
+      })
+    : insert;
+  const [stored] = await query.returning({ id: serverAnalyticsEvents.id });
 
   if (!stored) {
     // The event_identity unique constraint deduplicated this emission; the

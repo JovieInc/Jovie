@@ -93,6 +93,16 @@ export const HomeFeaturedListen: StoryObj<typeof ProfileCompactSurface> = {
   },
 };
 
+/** Proof profile on phones: jov.ie/you claim bar above the dock (JOV-7114). */
+export const ProofClaimBar: StoryObj<typeof ProfileCompactSurface> = {
+  render: renderInPhoneColumn,
+  args: {
+    socialLinks: STORY_SOCIAL_LINKS,
+    activeMode: 'profile',
+    proofClaimCta: { href: '/start', label: 'Claim yours' },
+  },
+};
+
 /** Pen VpRf5: Events card with a truthful empty state. */
 export const EventsEmpty: StoryObj<typeof ProfileCompactSurface> = {
   render: renderInPhoneColumn,

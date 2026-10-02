@@ -84,9 +84,14 @@ function AuthShellInner({
     isElectron,
     isAutomatedTest: env.IS_TEST || env.IS_E2E,
   });
-  const sidebarTrigger = isMobile ? null : sidebarState === 'closed' ? (
-    <SidebarCollapseButton />
-  ) : null;
+  // The desktop window-control row (DesktopTitlebar) owns the single canonical
+  // left-sidebar toggle in Electron. Keep the initial client tree identical to
+  // SSR; the runtime CSS hides the header slot before paint, and this hook
+  // removes it after hydration without replacing the shell or losing drafts.
+  const sidebarTrigger =
+    isMobile || isElectron ? null : sidebarState === 'closed' ? (
+      <SidebarCollapseButton />
+    ) : null;
 
   const isInSettings = section === 'settings';
   const hideTopHeader = isInSettings || isLyricsRoute;

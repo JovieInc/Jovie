@@ -6,15 +6,15 @@ URL, then hand the artist a claim link. No login or API key is required.
 
 ## Install
 
-Install an exact public release globally from npm:
+Requires Node.js `>=24.21.0 <25`. Install an exact public release globally from npm:
 
 ```sh
-npm install --global @jovie/cli
+npm install --global @jovie/cli@26.9.16
 jovie --help
 jovie --version
 ```
 
-Or run without installing: `npx -y @jovie/cli --help`.
+Or run without installing: `npx -y @jovie/cli@26.9.16 --help`.
 
 Use `npm view @jovie/cli version` to confirm registry availability before an
 automated install. A repository build is not proof that npm has the package.
@@ -44,9 +44,27 @@ Creation is anonymous and rate limited per IP.
 the server's stable `apiCode` (for example `RATE_LIMITED`). Successful commands
 exit `0`, request/response failures exit `1`, and invalid usage exits `2`.
 
+`--help --json` returns `{ "content": "..." }`; `--version --json` returns `{ "version": "..." }`.
+
+Reads retry one transport failure. Writes never retry automatically: a timeout may
+have occurred after the server committed. Report tools therefore do not advertise
+idempotency. Responses share a 30-second request deadline and a 1 MiB body limit.
+
 Every command accepts `--base-url <url>` for a compatible deployment origin.
 The value must be an `http` or `https` origin without a path, credentials, or
 query parameters.
+
+## Proxies
+
+The standalone CLI and MCP server honor `HTTP_PROXY`, `HTTPS_PROXY`, and
+`NO_PROXY` (and their lowercase equivalents) through Node's built-in proxy
+support. No extra Node flags are needed. Existing TLS certificate settings
+remain in effect. A proxy must allow the deployment host (normally `jov.ie`);
+installing the CLI does not grant network access.
+
+Importing the JavaScript client does not change the host application's global
+transport settings. Configure Node's proxy support in that application or pass
+`fetchImpl` through the client options.
 
 ## MCP
 
@@ -99,12 +117,16 @@ The package directory is licensed under Apache-2.0 (see `LICENSE`); the
 repository root and unrelated packages remain proprietary. Its manifest is
 configured with `private: false` and public npm `publishConfig` for the
 `https://registry.npmjs.org` registry, including provenance. It intentionally
-has no source-manifest `version`; the manual main-only release workflow stamps
-the root `VERSION` into a temporary publication directory. A local build or
+has no source-manifest `version`; the manual main-only release workflow writes
+the selected CLI release into a temporary publication directory. Its optional
+`release_version` input accepts stable `YY.M.PATCH` (for example, `26.10.0`);
+leaving it blank uses the root `VERSION`. A CLI release can therefore proceed
+without changing the desktop stamp or the monorepo version fan-out. Invalid
+versions and conflicting source-manifest versions fail before registry access.
+A local build or
 merged source change does not claim that npm publication succeeded.
 
-The release-path smoke sequence, after the approval gate and a main-only
-version stamp, is:
+The release-path smoke sequence for an approved manual publication is:
 
 ```sh
 pnpm --filter @jovie/cli run typecheck
@@ -112,6 +134,11 @@ pnpm --filter @jovie/cli run test:coverage
 pnpm --filter @jovie/cli run build
 pnpm --filter @jovie/cli run pack:dry
 ```
+
+To smoke-test an independent version without publishing, set `RELEASE_VERSION`
+for the pack command (for example,
+`RELEASE_VERSION=26.10.0 pnpm --filter @jovie/cli run pack:dry`). The workflow
+passes its selected version to the same smoke path.
 
 `pack:dry` builds a temporary versioned package, checks its metadata,
 declarations, and contents, installs that tarball into a clean temporary

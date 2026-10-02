@@ -1,3 +1,7 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Codex
+# necessary-trust-boundary: Existing Jovie Bot credentials publish only generated nightly evidence through draft PRs that trigger normal checks; the read-only checkout token cannot do this. No merge, deploy, or founder-decision authority is added.
+# revisit-trigger: Remove this publication hop when canonical nightly evidence no longer requires committed report files.
 name: Nightly Testing Agent
 
 on:
@@ -69,11 +73,15 @@ jobs:
           retention-days: 30
 
   deterministic:
-    name: Deterministic Unit Telemetry
+    name: Deterministic Unit Telemetry (${{ matrix.shard }}/4)
     needs: [context]
     if: ${{ github.event_name == 'push' || inputs.run_unit }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -85,24 +93,28 @@ jobs:
       - name: Run unit suite
         id: unit
         continue-on-error: true
-        run: pnpm --filter=@jovie/web run test
+        run: pnpm --filter=@jovie/web run test --shard ${{ matrix.shard }}/4
         env:
           CI: 'true'
+          VITEST_JUNIT_OUTPUT_FILE: test-results/nightly-agent/unit-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}.junit.xml
 
       - name: Normalize unit telemetry
         if: always()
-        run: >-
-          node .github/scripts/guard-playwright-artifacts.mjs --run --
-          pnpm --filter=@jovie/web run test:nightly-agent:normalize --
-          --junit apps/web/test-report.junit.xml
-          --out apps/web/test-results/nightly-agent/deterministic
+        env:
+          PLAYWRIGHT_ARTIFACT_PATHS: apps/web/test-results/nightly-agent/deterministic/normalized-results.json
+        run: |
+          test -s apps/web/test-results/nightly-agent/unit-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}.junit.xml
+          node .github/scripts/guard-playwright-artifacts.mjs --run -- \
+          pnpm --filter=@jovie/web run test:nightly-agent:normalize -- \
+          --junit apps/web/test-results/nightly-agent/unit-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}.junit.xml \
+          --out apps/web/test-results/nightly-agent/deterministic \
           --name normalized-results.json
 
       - name: Upload deterministic telemetry
         if: ${{ always() && hashFiles('apps/web/test-results/nightly-agent/deterministic/normalized-results.json') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
-          name: nightly-agent-deterministic-${{ github.run_id }}
+          name: nightly-agent-deterministic-${{ matrix.shard }}-${{ github.run_id }}
           path: apps/web/test-results/nightly-agent/deterministic/
           retention-days: 30
 
@@ -190,7 +202,7 @@ jobs:
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -205,25 +217,37 @@ jobs:
         with:
           pattern: nightly-agent-*-${{ github.run_id }}
           path: apps/web/test-results/nightly-agent/incoming
-          merge-multiple: true
-
-      - name: Emit compact report and skill delta
-        run: >-
-          pnpm --filter=@jovie/web run test:nightly-agent:emit-delta --
-          --input-dir apps/web/test-results/nightly-agent/incoming
+          merge-multiple: false
 
       - name: Resolve workflow conclusion
         id: conclusion
         run: |
-          if [ "${{ needs.deterministic.result }}" = "failure" ]; then
-            echo "value=failure" >> "$GITHUB_OUTPUT"
-          elif [ "${{ needs.mutation-hotspots.result }}" = "cancelled" ]; then
-            echo "value=cancelled" >> "$GITHUB_OUTPUT"
-          elif [ "${{ needs.mutation-hotspots.result }}" = "failure" ]; then
+          results=("${{ needs.context.result }}" "${{ needs.deterministic.result }}" "${{ needs.mutation-hotspots.result }}" "${{ needs.candidate-validation.result }}")
+          for result in "${results[@]}"; do
+            if [ "$result" = "failure" ]; then
+              echo "value=failure" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          for result in "${results[@]}"; do
+            if [ "$result" = "cancelled" ]; then
+              echo "value=cancelled" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          if [ "${{ needs.context.result }}" != "success" ]; then
             echo "value=failure" >> "$GITHUB_OUTPUT"
           else
             echo "value=success" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Emit compact report and skill delta
+        env:
+          WORKFLOW_CONCLUSION: ${{ steps.conclusion.outputs.value }}
+        run: >-
+          pnpm --filter=@jovie/web run test:nightly-agent:emit-delta --
+          --input-dir apps/web/test-results/nightly-agent/incoming
+          --workflow-conclusion "$WORKFLOW_CONCLUSION"
 
       - name: Publish evidence report and ops status
         env:
@@ -246,32 +270,6 @@ jobs:
       - name: Add report to job summary
         run: cat apps/web/test-results/nightly-agent/nightly-report.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Commit evidence report when changed
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if git diff --quiet docs/NIGHTLY_TESTING_AGENT_REPORT.md apps/web/reports/nightly-agent/last-run.json 2>/dev/null; then
-            echo "No nightly report changes."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" pull --rebase --autostash origin main || {
-            echo "Rebase failed — exiting without push."
-            exit 1
-          }
-          git add docs/NIGHTLY_TESTING_AGENT_REPORT.md apps/web/reports/nightly-agent/last-run.json
-          if git diff --staged --quiet; then
-            echo "Nothing staged after rebase."
-            exit 0
-          fi
-          git commit -m "chore(testing): refresh testing agent evidence report" \
-            -m "Auto-generated by .github/workflows/nightly-testing-agent.yml." \
-            -m "Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
-          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" push
-
       - name: Upload final report
         if: ${{ always() && hashFiles('apps/web/test-results/nightly-agent/nightly-report.md') != '' && hashFiles('apps/web/test-results/nightly-agent/skill-delta.json') != '' && hashFiles('docs/NIGHTLY_TESTING_AGENT_REPORT.md') != '' && hashFiles('apps/web/reports/nightly-agent/last-run.json') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
@@ -284,3 +282,20 @@ jobs:
             apps/web/reports/nightly-agent/last-run.json
           allow-markdown: 'true'
           retention-days: 90
+
+      - name: Generate report publication token
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        id: report-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Open nightly evidence PR
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ steps.report-token.outputs.token }}
+        run: |
+          node --input-type=module -e "import { publishNightlyReport } from './scripts/lib/publish-coverage-report.mjs'; console.log(publishNightlyReport());"

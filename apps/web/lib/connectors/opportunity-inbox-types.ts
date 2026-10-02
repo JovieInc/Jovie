@@ -8,7 +8,28 @@ export type OpportunityInboxCardCategory =
   | 'report'
   | 'brand_deal'
   | 'workflow_capture'
-  | 'youtube_thumbnail';
+  | 'youtube_thumbnail'
+  | 'social_reply';
+
+export type OpportunityInboxSocialReplyExecutionState =
+  | 'pending'
+  | 'checking'
+  | 'sending'
+  | 'verified'
+  | 'blocked'
+  | 'ambiguous';
+
+/** Inbound social item + draft copy awaiting the creator's call (JOV-5128). */
+export interface OpportunityInboxSocialReplyData {
+  readonly platform: string;
+  readonly authorLabel: string;
+  readonly typeLabel: string;
+  readonly inboundText: string;
+  readonly draftedText: string;
+  readonly sourceUrl: string | null;
+  readonly executionState: OpportunityInboxSocialReplyExecutionState;
+  readonly revisionCount: number;
+}
 
 export interface OpportunityInboxYoutubeThumbnailData {
   readonly channelId: string;
@@ -83,6 +104,8 @@ export interface OpportunityInboxCardViewModel {
   readonly workflowCapture?: OpportunityInboxWorkflowCaptureData;
   /** Present only when category === 'youtube_thumbnail'. */
   readonly youtubeThumbnail?: OpportunityInboxYoutubeThumbnailData;
+  /** Present only when category === 'social_reply'. */
+  readonly socialReply?: OpportunityInboxSocialReplyData;
 }
 
 export interface OpportunityInboxTourDateItem {
@@ -97,6 +120,8 @@ export interface OpportunityInboxTourDateItem {
 }
 
 export interface OpportunityInboxTourDates {
+  /** Missing provenance cannot certify an attempted read as successful. */
+  readonly availability?: 'available' | 'unknown';
   readonly pending: readonly OpportunityInboxTourDateItem[];
   readonly confirmed: readonly OpportunityInboxTourDateItem[];
   readonly rejected: readonly OpportunityInboxTourDateItem[];
@@ -117,6 +142,10 @@ export interface OpportunityInboxEmptyActionCard {
 }
 
 export interface OpportunityInboxData {
+  readonly availability?: {
+    readonly suggestedActions: 'available' | 'unknown';
+    readonly tourDates: 'available' | 'unknown' | 'not_requested';
+  };
   readonly cards: readonly OpportunityInboxCardViewModel[];
   readonly emptyActionCards: readonly OpportunityInboxEmptyActionCard[];
   readonly tourDates?: OpportunityInboxTourDates;

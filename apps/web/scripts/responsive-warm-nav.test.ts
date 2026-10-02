@@ -24,28 +24,24 @@ const desktopVisibleHrefs = [
 const mobileMoreHrefs = mobileExpandedNavigation.map(item => item.href);
 
 describe('resolveResponsiveWarmNavMeasurement', () => {
-  it('keeps the OqZTF desktop rail as Library, Contacts, and Presence', () => {
+  it('keeps the desktop root rail job-based and ordered', () => {
     expect(canonicalSidebarNavigation.map(item => item.id)).toEqual([
-      'library',
-      'contacts',
+      'home',
       'presence',
+      'library',
+      'audience',
     ]);
-    expect(canonicalSidebarNavigation.map(item => item.href)).not.toContain(
-      APP_ROUTES.CALENDAR
-    );
+    expect(canonicalSidebarNavigation.map(item => item.href)).toEqual([
+      APP_ROUTES.DASHBOARD,
+      APP_ROUTES.PRESENCE,
+      APP_ROUTES.LIBRARY,
+      APP_ROUTES.CONTACTS_AUDIENCE,
+    ]);
   });
 
-  it.each([
-    ['Calendar', APP_ROUTES.CALENDAR],
-    ['Tasks', APP_ROUTES.TASKS],
-  ])('keeps %s in the mobile More menu, not on the desktop rail', (_, href) => {
-    expect(mobileMoreHrefs).toContain(href);
-    expect(desktopVisibleHrefs).not.toContain(href);
-  });
-
-  it('measures desktop-visible Library via the real rail link', () => {
+  it('measures desktop-visible Presence via the real rail link', () => {
     const measurement = resolveResponsiveWarmNavMeasurement({
-      destinationHref: APP_ROUTES.LIBRARY,
+      destinationHref: APP_ROUTES.PRESENCE,
       desktopVisibleHrefs,
       mobileMoreHrefs,
     });
@@ -53,20 +49,21 @@ describe('resolveResponsiveWarmNavMeasurement', () => {
     expect(measurement.reason).toBe('desktop-visible-link');
     expect(measurement.measureMode).toBe('warm-navigation');
     expect(measurement.warmupStrategy).toBe('authenticated-shell');
-    expect(measurement.navTrigger).toEqual(hrefNavTriggers(APP_ROUTES.LIBRARY));
+    expect(measurement.navTrigger).toEqual(
+      hrefNavTriggers(APP_ROUTES.PRESENCE)
+    );
   });
 
-  it('measures Calendar as a documented route-load because More is not desktop-visible', () => {
+  it('keeps Audience desktop-visible even when mobile places it in More', () => {
     const measurement = resolveResponsiveWarmNavMeasurement({
-      destinationHref: APP_ROUTES.CALENDAR,
+      destinationHref: APP_ROUTES.CONTACTS_AUDIENCE,
       desktopVisibleHrefs,
       mobileMoreHrefs,
     });
 
-    expect(measurement.reason).toBe('mobile-more-route-load');
-    expect(measurement.measureMode).toBe('page-load');
-    expect(measurement.warmupStrategy).toBe('authenticated-route');
-    expect(measurement.navTrigger).toBeUndefined();
+    expect(mobileMoreHrefs).toContain(APP_ROUTES.CONTACTS_AUDIENCE);
+    expect(measurement.reason).toBe('desktop-visible-link');
+    expect(measurement.measureMode).toBe('warm-navigation');
   });
 
   it('rejects destinations that are on neither the desktop rail nor mobile More', () => {
@@ -79,36 +76,38 @@ describe('resolveResponsiveWarmNavMeasurement', () => {
     ).toThrow(/does-not-exist/);
   });
 
-  it('keeps the shipped creator-calendar route on the Calendar measurement contract', () => {
-    const measurement = resolveResponsiveWarmNavMeasurement({
-      destinationHref: APP_ROUTES.CALENDAR,
-      desktopVisibleHrefs,
-      mobileMoreHrefs,
-    });
+  it('keeps Calendar reachable under its non-root route-load contract', () => {
     const route = getEndUserPerfRouteById(
       'creator-calendar'
     ) as PerfRouteDefinition;
 
     expect(route.path).toBe(APP_ROUTES.CALENDAR);
-    expect(route.measureMode).toBe(measurement.measureMode);
-    expect(route.warmupStrategy).toBe(measurement.warmupStrategy);
+    expect(route.measureMode).toBe('page-load');
+    expect(route.warmupStrategy).toBe('authenticated-route');
     expect(route.readySelectors.navTrigger).toBeUndefined();
     expect(route.warmNavigationStartPath).toBeUndefined();
   });
 
-  it('keeps the shipped creator-tasks-warm route on the Tasks measurement contract', () => {
-    const measurement = resolveResponsiveWarmNavMeasurement({
-      destinationHref: APP_ROUTES.TASKS,
-      desktopVisibleHrefs,
-      mobileMoreHrefs,
-    });
+  it('keeps Tasks reachable under its non-root route-load contract', () => {
     const route = getEndUserPerfRouteById(
       'creator-tasks-warm'
     ) as PerfRouteDefinition;
 
     expect(route.path).toBe(APP_ROUTES.TASKS);
-    expect(route.measureMode).toBe(measurement.measureMode);
-    expect(route.warmupStrategy).toBe(measurement.warmupStrategy);
+    expect(route.measureMode).toBe('page-load');
+    expect(route.warmupStrategy).toBe('authenticated-route');
+    expect(route.readySelectors.navTrigger).toBeUndefined();
+    expect(route.warmNavigationStartPath).toBeUndefined();
+  });
+
+  it('keeps Links reachable under its non-root route-load contract', () => {
+    const route = getEndUserPerfRouteById(
+      'creator-links'
+    ) as PerfRouteDefinition;
+
+    expect(route.path).toBe(APP_ROUTES.CHAT_PROFILE_PANEL);
+    expect(route.measureMode).toBe('page-load');
+    expect(route.warmupStrategy).toBe('authenticated-route');
     expect(route.readySelectors.navTrigger).toBeUndefined();
     expect(route.warmNavigationStartPath).toBeUndefined();
   });

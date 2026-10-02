@@ -17,11 +17,20 @@ describe('CostsTable', () => {
     render(<CostsTable items={[ITEM]} lastRefreshedLabel='Today' />);
 
     expect(screen.getByTestId('admin-costs-table')).toBeInTheDocument();
+    expect(screen.getByRole('table')).toHaveAttribute(
+      'data-table-row-mode',
+      'description'
+    );
     expect(
       screen.getByText('1 items • $12.50 in last 30d')
     ).toBeInTheDocument();
     expect(screen.getByText('Last refreshed: Today')).toBeInTheDocument();
     expect(screen.getByText('Application hosting')).toBeInTheDocument();
+    expect(
+      screen
+        .getByText('Application hosting')
+        .closest('[data-table-cell-content]')
+    ).toHaveClass('whitespace-normal');
 
     const action = screen.getByRole('link', {
       name: 'Open Vercel dashboard',

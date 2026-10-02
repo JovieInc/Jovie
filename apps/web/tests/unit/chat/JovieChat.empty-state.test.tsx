@@ -1,22 +1,10 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { FeatureIntroCatalog } from '@/components/jovie/feature-intro-contract';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import type { OvieHomeBriefing } from '@/lib/ovie/home-briefing';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
-
-const featureIntroCatalog: FeatureIntroCatalog = {
-  highlight: null,
-  whatsNewID: 'changelog:26.8.1',
-  whatsNewItems: [
-    {
-      id: '26.8.1:fixed:0',
-      text: 'Canceled sign-in stays recoverable.',
-      accent: 'accent',
-    },
-  ],
-};
 
 const ovieHomeBriefing: OvieHomeBriefing = {
   greeting: 'Good morning, Tim.',
@@ -177,6 +165,14 @@ const mockPendingOpportunityCards: Array<{
   readonly category: 'suggestion';
 }> = [];
 
+const mockOpportunityQueryOptions = vi.fn();
+
+let mockInsightsSummary: {
+  readonly insights: Array<{ readonly status: string; readonly title: string }>;
+  readonly totalActive: number;
+  readonly lastGeneratedAt: string | null;
+} = { insights: [], totalActive: 0, lastGeneratedAt: null };
+
 vi.mock('@/lib/queries', () => ({
   queryKeys: {
     releases: {
@@ -192,8 +188,16 @@ vi.mock('@/lib/queries', () => ({
     isLoading: false,
     isError: false,
   }),
-  usePendingOpportunityCardsQuery: () => ({
-    data: mockPendingOpportunityCards,
+  usePendingOpportunityCardsQuery: (options: { enabled?: boolean }) => {
+    mockOpportunityQueryOptions(options);
+    return {
+      data: mockPendingOpportunityCards,
+      isLoading: false,
+      isError: false,
+    };
+  },
+  useInsightsSummaryQuery: () => ({
+    data: mockInsightsSummary,
     isLoading: false,
     isError: false,
   }),
@@ -240,6 +244,11 @@ describe('JovieChat empty state', () => {
     window.sessionStorage.clear();
     mockSearchParams = new URLSearchParams();
     mockPendingOpportunityCards.length = 0;
+    mockInsightsSummary = {
+      insights: [],
+      totalActive: 0,
+      lastGeneratedAt: null,
+    };
     mockChatState.input = '';
     mockChatState.messages = [];
     mockChatState.hasMessages = false;
@@ -248,13 +257,15 @@ describe('JovieChat empty state', () => {
     mockChatState.chipTray.chips = [];
   });
 
-  it('renders a stable docked composer with the centered welcome when no skill is featured', () => {
+  it('renders a stable docked composer with the greeting-only empty state when no skill is featured (JOV-7150)', () => {
+    // 9am fixed clock: the greeting is time-of-day-dependent ("Good
+    // morning"/"afternoon"/"evening"), so pin the system time to assert the
+    // exact text without the test being time-of-day flaky.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T09:00:00'));
     const { container, getByTestId, queryByTestId, queryByText } =
       renderWithQueryClient(
-        <JovieChat
-          profileId='profile-1'
-          featureIntroCatalog={featureIntroCatalog}
-        />
+        <JovieChat profileId='profile-1' displayName='Tim White' />
       );
 
     expect(queryByTestId('chat-empty-state-top-signals')).toBeNull();
@@ -264,21 +275,22 @@ describe('JovieChat empty state', () => {
     expect(queryByText("Hey, I'm Jovie.")).toBeNull();
     const emptyViewport = getByTestId('chat-empty-state-viewport');
     expect(emptyViewport.className).toContain('flex-1');
-    expect(emptyViewport).toHaveAttribute('data-empty-affordance', 'none');
+    expect(emptyViewport).toHaveAttribute('data-empty-affordance', 'greeting');
     // one-chrome-layer-v1: no suggest/card chrome layer is showing, so the
     // single banner slot is allowed to render on the bare welcome.
     expect(getByTestId('chat-usage')).toBeTruthy();
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
-    // Clean start screen (JOV-5387): Just ask + executable sample, no mark.
-    expect(getByTestId('chat-empty-state-welcome')).toBeTruthy();
+    // JOV-7150: greeting + first name, no insight (none supplied) — no "Just
+    // ask" heading, no sample conversation, no chips, no cards.
+    expect(queryByTestId('chat-empty-state-welcome')).toBeNull();
     expect(queryByTestId('chat-empty-state-logo')).toBeNull();
-    expect(getByTestId('chat-empty-state-greeting').textContent).toBe(
-      'Just ask'
+    expect(getByTestId('chat-empty-state-greeting-text').textContent).toBe(
+      'Good morning, Tim.'
     );
+    expect(queryByTestId('chat-empty-state-insight')).toBeNull();
+    expect(queryByText('Just ask')).toBeNull();
+    expect(queryByTestId('chat-empty-state-sample')).toBeNull();
     expect(queryByText(/artist/i)).toBeNull();
-    expect(getByTestId('chat-empty-state-sample-user').textContent).toBe(
-      'Plan my next release'
-    );
     expect(getByTestId('chat-empty-state-viewport')).toHaveAttribute(
       'data-top-spacing-owner',
       'chat-empty-viewport'
@@ -287,22 +299,19 @@ describe('JovieChat empty state', () => {
       'data-grid-anchor',
       'desktop-content'
     );
-    expect(getByTestId('chat-empty-state-composer-region')).toHaveAttribute(
-      'data-top-spacing-owner',
-      'none'
+    // The greeting now fills the composer region's `above` slot (like the
+    // other empty-state affordances), so the region no longer claims top
+    // spacing for itself — the above content owns it, same as starter-
+    // actions/opportunity-cards.
+    expect(getByTestId('chat-empty-state-composer-region')).not.toHaveAttribute(
+      'data-top-spacing-owner'
     );
     expect(queryByText("What's next?")).toBeNull();
     expect(getByTestId('chat-empty-state-centered-composer')).toBeTruthy();
     expect(getByTestId('chat-message-scroll').className).toContain('pt-0');
-    expect(getByTestId('feature-intro-card')).toHaveAttribute(
-      'data-mode',
-      'whatsNew'
-    );
-    expect(getByTestId('feature-intro-card')).toHaveAttribute(
-      'data-source-id',
-      'changelog:26.8.1'
-    );
-    // No action cards and no featured skills: welcome + intro card + docked composer.
+    // JOV-7150: the greeting sentence is the only surface above the composer —
+    // no What's New card, no starter actions, no prompt rails.
+    expect(queryByTestId('feature-intro-card')).toBeNull();
     expect(queryByTestId('chat-empty-state-action-card-slot')).toBeNull();
     expect(queryByTestId('chat-composer-dock')).toBeNull();
     expect(queryByTestId('chat-empty-state-soft-suggestions-slot')).toBeNull();
@@ -326,20 +335,54 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Preview profile')).toBeNull();
     expect(queryByText('Change photo')).toBeNull();
     expect(queryByText('Release link')).toBeNull();
+    vi.useRealTimers();
   });
 
-  it('launches the visible sample prompt exactly when the sample is selected', () => {
-    const { getByRole, getByTestId } = renderWithQueryClient(
-      <JovieChat profileId='profile-1' />
+  it('renders the insight sentence when a real active insight exists (JOV-7150)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T09:00:00'));
+    mockInsightsSummary = {
+      insights: [
+        { status: 'active', title: 'Your streams are up 320% today.' },
+        { status: 'dismissed', title: 'Ignore me, not active.' },
+      ],
+      totalActive: 1,
+      lastGeneratedAt: '2026-09-29T00:00:00.000Z',
+    };
+    const { getByTestId, queryByText, queryByTestId } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' displayName='Tim White' />
     );
 
-    const sample = getByTestId('chat-empty-state-sample');
-    const prompt = sample.getAttribute('data-sample-prompt');
-    expect(prompt).toBe('Plan my next release');
-    fireEvent.click(getByRole('button', { name: `Ask “${prompt}”` }));
-    expect(mockChatState.handleSuggestedPrompt).toHaveBeenCalledExactlyOnceWith(
-      prompt
+    expect(getByTestId('chat-empty-state-greeting-text').textContent).toBe(
+      'Your streams are up 320% today.'
     );
+    expect(queryByText('Good morning, Tim.')).toBeNull();
+    expect(queryByTestId('chat-empty-state-insight')).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('never fabricates an insight when there is no real one (JOV-7150)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T09:00:00'));
+    mockInsightsSummary = {
+      insights: [],
+      totalActive: 0,
+      lastGeneratedAt: null,
+    };
+    const { getByTestId, queryByTestId } = renderWithQueryClient(
+      <JovieChat
+        profileId='profile-1'
+        displayName='Tim White'
+        isFirstSession={false}
+        isProfileComplete={false}
+      />
+    );
+
+    expect(getByTestId('chat-empty-state-greeting-text').textContent).toBe(
+      'Good morning, Tim.'
+    );
+    expect(queryByTestId('chat-empty-state-insight')).toBeNull();
+    vi.useRealTimers();
   });
 
   it('uses Ovie composer copy when chatMode is ov', () => {
@@ -388,203 +431,56 @@ describe('JovieChat empty state', () => {
     );
   });
 
-  it('renders the canonical starter-actions rail without the legacy card map', () => {
+  it('renders exactly one empty-state thought even when card data is pending (JOV-7150)', () => {
+    // Regression fixture: the empty state must never stack competing prompt
+    // surfaces — no "Just ask" welcome, no sample exchange, no starter-action
+    // carousel, no opportunity cards — only the greeting + composer.
+    mockPendingOpportunityCards.push({
+      id: 'opp-1',
+      typeLabel: 'Suggestion',
+      createdAt: '2026-07-01T12:00:00.000Z',
+      title: 'Detroit listeners up 340%',
+      why: 'Promoter at Magic Stick reached out.',
+      primaryActionLabel: 'Review pitch',
+      status: 'pending',
+      category: 'suggestion',
+    });
+
     renderWithQueryClient(
-      <JovieChat
-        profileId='profile-1'
-        featureIntroCatalog={featureIntroCatalog}
-        actionCards={[
-          {
-            id: 'build-artist-profile',
-            title: 'Build Artist Profile',
-            body: 'Add Spotify, Apple Music, or YouTube Music so Jovie can plan from real releases.',
-            actionLabel: 'Build Profile',
-            prompt: 'Help me connect my music catalog.',
-          },
-          {
-            id: 'plan-release',
-            title: 'Plan a Release',
-            body: 'Map the next release.',
-            actionLabel: 'Start Planning',
-            prompt: 'Help me plan my next release.',
-          },
-          {
-            id: 'review-signals',
-            title: 'Review Signals',
-            body: 'Surface traction signals.',
-            actionLabel: 'Review Signals',
-            prompt: "What's working for me right now?",
-          },
-        ]}
-      />
+      <JovieChat profileId='profile-1' displayName='Tim White' />
     );
 
-    expect(screen.getByText('Build Artist Profile')).toBeTruthy();
-    expect(screen.getByText(/Add Spotify/)).toBeTruthy();
+    expect(screen.getByTestId('chat-empty-state-greeting-text')).toBeTruthy();
+    expect(screen.getByTestId('chat-input')).toBeTruthy();
+    // Every retired surface stays off.
+    expect(screen.queryByTestId('chat-empty-state-welcome')).toBeNull();
+    expect(screen.queryByTestId('chat-empty-state-sample')).toBeNull();
+    expect(screen.queryByText('Just ask')).toBeNull();
+    expect(screen.queryByTestId('chat-starter-actions-rail')).toBeNull();
     expect(
-      screen.getByTestId('chat-empty-state-action-card-slot')
-    ).toBeTruthy();
-    expect(screen.getByTestId('chat-starter-actions-rail')).toBeTruthy();
-    expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
-      'Just ask'
-    );
-    expect(screen.getByTestId('chat-empty-state-sample-user').textContent).toBe(
-      'Plan my next release'
-    );
+      screen.queryByTestId('chat-empty-state-action-card-slot')
+    ).toBeNull();
     expect(
-      screen.getByRole('button', { name: 'Ask “Plan my next release”' })
-    ).toBeTruthy();
-    expect(screen.getByTestId('chat-empty-state-viewport')).toHaveAttribute(
-      'data-empty-affordance',
-      'starter-actions'
-    );
-    // JOV-7113: the What's New card docks above the composer only on the bare
-    // welcome; while starter-action cards own the empty state it must not
-    // crowd the dock and cover their CTA.
+      screen.queryByTestId('chat-empty-state-opportunity-cards')
+    ).toBeNull();
     expect(screen.queryByTestId('feature-intro-card')).toBeNull();
-    // one-chrome-layer-v1: starter-action chrome XOR the usage banner.
-    expect(screen.queryByTestId('chat-usage')).toBeNull();
-    expect(
-      screen.getByTestId('chat-empty-state-centered-composer')
-    ).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Just ask' })).toBeTruthy();
-    expect(screen.getByTestId('chat-empty-state-greeting')).not.toHaveAttribute(
-      'aria-hidden',
-      'true'
-    );
-    expect(screen.getByTestId('chat-empty-state-welcome').className).toContain(
-      'shrink-0'
-    );
-    expect(screen.getByTestId('chat-empty-state-action-card-slot')).toHaveClass(
-      'flex-col',
-      'items-center',
-      'justify-start'
-    );
-    // Docked layout: cards scroll above, composer at bottom of usable area.
+    expect(screen.queryByTestId('suggested-prompts-rail')).toBeNull();
+    expect(screen.queryAllByTestId('chat-action-card')).toHaveLength(0);
+    // Docked layout: greeting above, composer at bottom of the usable area.
     const region = screen.getByTestId('chat-empty-state-composer-region');
     expect(region.getAttribute('data-layout')).toBe('docked');
-    expect(screen.getByTestId('chat-empty-state-above-scroll')).toBeTruthy();
     expect(
       screen
         .getByTestId('chat-empty-state-centered-composer')
         .getAttribute('data-dock')
     ).toBe('bottom');
-    expect(screen.queryByTestId('suggested-prompts-rail')).toBeNull();
-    expect(screen.getAllByTestId('chat-action-card')).toHaveLength(1);
-    expect(
-      within(screen.getByTestId('chat-starter-actions-rail')).getByRole(
-        'button',
-        { name: 'Show More Starter Actions' }
-      )
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId('chat-starter-actions-rail')).getAllByRole(
-        'button',
-        { name: /Show Starter Action/ }
-      )
-    ).toHaveLength(3);
-
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Ask “Plan my next release”' })
-    );
-    expect(mockChatState.handleSuggestedPrompt).toHaveBeenCalledWith(
-      'Plan my next release'
-    );
   });
 
-  it('does not resurrect dismissed primary actions as chips or recenter the composer', () => {
-    const gtag = vi.fn();
-    Object.defineProperty(globalThis.window, 'gtag', {
-      configurable: true,
-      value: gtag,
-    });
-
-    renderWithQueryClient(
-      <JovieChat
-        profileId='profile-1'
-        isProfileComplete
-        actionCards={[
-          {
-            id: 'plan-release',
-            title: 'Plan a Release',
-            body: 'Map the next release.',
-            actionLabel: 'Start Planning',
-            prompt: 'Help me plan my next release.',
-          },
-          {
-            id: 'generate-album-art',
-            title: 'Generate Album Art',
-            body: 'Draft cover concepts.',
-            actionLabel: 'Generate Art',
-            prompt: 'Generate album art for my latest release.',
-          },
-          {
-            id: 'review-signals',
-            title: 'Review Signals',
-            body: 'Surface traction signals.',
-            actionLabel: 'Review Signals',
-            prompt: 'Help me see what is gaining traction.',
-          },
-        ]}
-      />
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Plan a Release' }));
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Dismiss Plan a Release' })
-    );
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Dismiss Generate Album Art' })
-    );
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Dismiss Review Signals' })
-    );
-
-    expect(screen.queryAllByTestId('chat-action-card')).toHaveLength(0);
-    expect(
-      screen.queryByTestId('chat-empty-state-action-card-slot')
-    ).toBeNull();
-    expect(
-      screen.queryByTestId('chat-empty-state-soft-suggestions-slot')
-    ).toBeNull();
-    expect(screen.getByTestId('chat-empty-state-viewport')).toHaveAttribute(
-      'data-empty-affordance',
-      'none'
-    );
-    expect(
-      screen.getByTestId('chat-empty-state-composer-region')
-    ).toHaveAttribute('data-layout', 'docked');
-    expect(screen.queryByLabelText('Plan a Release')).toBeNull();
-    expect(screen.queryByLabelText('Generate Album Art')).toBeNull();
-    expect(screen.queryByLabelText('Review Signals')).toBeNull();
-    expect(gtag).toHaveBeenCalledWith(
-      'event',
-      'chat_starter_action_selected',
-      expect.objectContaining({ action: 'plan_release', surface: 'card' })
-    );
-    expect(gtag).toHaveBeenCalledWith(
-      'event',
-      'chat_starter_action_dismissed',
-      expect.objectContaining({ action: 'review_signals', surface: 'card' })
-    );
-  });
-
-  it('hides scaffolding while typing so the composer owns attention', () => {
+  it('hides the greeting while typing so the composer owns attention', () => {
     mockChatState.input = 'Help me with';
 
     const { getByTestId, queryByTestId, queryByText } = renderWithQueryClient(
-      <JovieChat
-        profileId='profile-1'
-        actionCards={[
-          {
-            id: 'build-artist-profile',
-            title: 'Build Artist Profile',
-            body: 'Add Spotify, Apple Music, or YouTube Music so Jovie can plan from real releases.',
-            actionLabel: 'Build Profile',
-            prompt: 'Help me connect my music catalog.',
-          },
-        ]}
-      />
+      <JovieChat profileId='profile-1' />
     );
 
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
@@ -684,7 +580,7 @@ describe('JovieChat empty state', () => {
     ).toBeNull();
   });
 
-  it('renders compact opportunity cards instead of suggestion pills when pending', () => {
+  it('does not stack opportunity cards on the empty state (JOV-7150)', () => {
     mockPendingOpportunityCards.push({
       id: 'opp-1',
       typeLabel: 'Suggestion',
@@ -696,43 +592,16 @@ describe('JovieChat empty state', () => {
       category: 'suggestion',
     });
 
-    const { getByTestId, queryByTestId, getByText } = renderWithQueryClient(
-      <JovieChat profileId='profile-1' />
-    );
-
-    expect(getByTestId('chat-empty-state-opportunity-cards')).toBeTruthy();
-    expect(getByText('Detroit listeners up 340%')).toBeTruthy();
-    // Pills and the welcome stay hidden when opportunities own the stage.
-    expect(queryByTestId('suggested-prompts-rail')).toBeNull();
-    expect(queryByTestId('chat-empty-state-soft-suggestions-slot')).toBeNull();
-    expect(queryByTestId('chat-empty-state-welcome')).toBeNull();
-    expect(queryByTestId('chat-empty-state-logo')).toBeNull();
-    // one-chrome-layer-v1: opportunity cards XOR the usage banner.
-    expect(queryByTestId('chat-usage')).toBeNull();
-  });
-
-  it('enters pinned-card mode when an opportunity card is tapped', () => {
-    mockPendingOpportunityCards.push({
-      id: 'opp-pin',
-      typeLabel: 'Suggestion',
-      createdAt: '2026-07-01T12:00:00.000Z',
-      title: 'Playlist window this week',
-      why: 'Your latest single is peaking.',
-      primaryActionLabel: 'Draft pitch',
-      status: 'pending',
-      category: 'suggestion',
-    });
-
     const { getByTestId, queryByTestId } = renderWithQueryClient(
-      <JovieChat profileId='profile-1' />
+      <JovieChat profileId='profile-1' displayName='Tim White' />
     );
 
-    fireEvent.click(getByTestId('chat-empty-opportunity-card-opp-pin'));
-
-    expect(getByTestId('chat-pinned-opportunity-header')).toBeTruthy();
-    expect(getByTestId('chat-composer-dock')).toBeTruthy();
+    // Pending opportunities no longer own the empty state — the greeting
+    // sentence and composer stand alone.
     expect(queryByTestId('chat-empty-state-opportunity-cards')).toBeNull();
-    expect(queryByTestId('chat-empty-state-viewport')).toBeNull();
+    expect(getByTestId('chat-empty-state-greeting-text')).toBeTruthy();
+    expect(queryByTestId('suggested-prompts-rail')).toBeNull();
+    expect(queryByTestId('chat-empty-state-welcome')).toBeNull();
   });
 
   it('reproduces pinned-card mode from the ?opportunityId= deep link (JOV-3933)', () => {
@@ -757,7 +626,7 @@ describe('JovieChat empty state', () => {
     expect(queryByTestId('chat-empty-state-opportunity-cards')).toBeNull();
   });
 
-  it('collapses the pinned header when the unpin affordance is used (JOV-3933)', () => {
+  it('collapses the pinned header back to the greeting when unpinned (JOV-3933)', () => {
     mockPendingOpportunityCards.push({
       id: 'opp-pin',
       typeLabel: 'Suggestion',
@@ -768,19 +637,60 @@ describe('JovieChat empty state', () => {
       status: 'pending',
       category: 'suggestion',
     });
+    mockSearchParams = new URLSearchParams('opportunityId=opp-pin');
 
     const { getByTestId, queryByTestId } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />
     );
 
-    fireEvent.click(getByTestId('chat-empty-opportunity-card-opp-pin'));
     expect(getByTestId('chat-pinned-opportunity-header')).toBeTruthy();
 
     fireEvent.click(getByTestId('chat-pinned-opportunity-unpin'));
 
     expect(queryByTestId('chat-pinned-opportunity-header')).toBeNull();
-    // Thread scaffolding falls back to the empty-state cards once unpinned.
-    expect(getByTestId('chat-empty-state-opportunity-cards')).toBeTruthy();
+    expect(mockOpportunityQueryOptions).toHaveBeenLastCalledWith({
+      enabled: false,
+    });
+    // Unpinning returns to the one-sentence greeting, not a card stack.
+    expect(queryByTestId('chat-empty-state-opportunity-cards')).toBeNull();
+    expect(getByTestId('chat-empty-state-greeting-text')).toBeTruthy();
+  });
+
+  it('handles a revisited opportunity link after navigation without remounting', () => {
+    mockPendingOpportunityCards.push({
+      id: 'opp-revisit',
+      typeLabel: 'Suggestion',
+      createdAt: '2026-07-01T12:00:00.000Z',
+      title: 'Review this opportunity',
+      why: 'A new booking inquiry arrived.',
+      primaryActionLabel: 'Review inquiry',
+      status: 'pending',
+      category: 'suggestion',
+    });
+    mockSearchParams = new URLSearchParams('opportunityId=opp-revisit');
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const { getByTestId, queryByTestId, rerender } = render(
+      <JovieChat profileId='profile-1' />,
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        ),
+      }
+    );
+    expect(getByTestId('chat-pinned-opportunity-header')).toBeTruthy();
+    fireEvent.click(getByTestId('chat-pinned-opportunity-unpin'));
+    expect(queryByTestId('chat-pinned-opportunity-header')).toBeNull();
+
+    mockSearchParams = new URLSearchParams();
+    rerender(<JovieChat profileId='profile-1' />);
+    expect(queryByTestId('chat-pinned-opportunity-header')).toBeNull();
+    mockSearchParams = new URLSearchParams('opportunityId=opp-revisit');
+    rerender(<JovieChat profileId='profile-1' />);
+    expect(getByTestId('chat-pinned-opportunity-header')).toBeTruthy();
   });
 
   it('does not render opportunity cards when there are none pending', () => {

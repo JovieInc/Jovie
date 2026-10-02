@@ -22,7 +22,7 @@ export const COMMISSIONING_PARENT_ALLOWLIST = new Set([
 
 const IDENTIFIER_RE = /^JOV-(\d+)$/i;
 const COMMISSIONING_LABEL_RE = /commission/i;
-const PARENT_LABEL_RE = /^(parent|epic)$/i;
+const PARENT_LABEL_RE = /^(parent|epic|type:epic)$/i;
 const MAX_OPEN_PR_PAGES = 20;
 
 /**
@@ -182,11 +182,14 @@ export function pullRequestLinksIssue(pull, issue) {
  * @returns {{
  *   id: string,
  *   identifier: string,
+ *   title: string,
+ *   description: string,
  *   labels: string[],
  *   description: string,
  *   comments: string[],
  *   children: string[],
  *   hasChildren: boolean,
+ *   acceptanceMetadataVerified: boolean,
  *   states: { id?: string, name?: string, type?: string }[],
  * }}
  */
@@ -239,9 +242,10 @@ export function readIssueSnapshot(issue) {
       typeof record.identifier === 'string'
         ? record.identifier.toUpperCase()
         : '',
-    labels: labelNodes.map(labelName).filter(Boolean),
+    title: typeof record.title === 'string' ? record.title : '',
     description:
       typeof record.description === 'string' ? record.description : '',
+    labels: labelNodes.map(labelName).filter(Boolean),
     comments: commentNodes
       .map(comment => {
         if (typeof comment === 'string') return comment;
@@ -252,6 +256,17 @@ export function readIssueSnapshot(issue) {
       .filter(Boolean),
     children,
     hasChildren: childNodes.length > 0,
+    acceptanceMetadataVerified:
+      typeof record.title === 'string' &&
+      (record.description === null || typeof record.description === 'string') &&
+      Array.isArray(Reflect.get(Object(record.children), 'nodes')) &&
+      Array.isArray(Reflect.get(Object(record.labels), 'nodes')) &&
+      labelNodes.every(
+        label =>
+          label &&
+          typeof label === 'object' &&
+          typeof Reflect.get(label, 'name') === 'string'
+      ),
     states: states.filter(state => state && typeof state === 'object'),
   };
 }
@@ -259,6 +274,8 @@ export function readIssueSnapshot(issue) {
 /**
  * @param {{
  *   readonly identifier?: string,
+ *   readonly title?: string,
+ *   readonly description?: string,
  *   readonly labels?: readonly string[],
  *   readonly children?: readonly string[],
  *   readonly hasChildren?: boolean,
@@ -272,6 +289,13 @@ export function parentHoldReason(
 ) {
   const identifier = String(issue.identifier ?? '').toUpperCase();
   const signals = [];
+  if (
+    /^(?:codex\s+)?(?:goal|epic|commission(?:ing)?)(?:\s|:)/i.test(
+      issue.title ?? ''
+    ) ||
+    /^\s*\/goal(?:\s|$)/im.test(issue.description ?? '')
+  )
+    signals.push('goal or commissioning acceptance');
   if (identifier && allowlist.has(identifier)) signals.push('allowlist');
   const labels = (issue.labels ?? []).filter(
     name => COMMISSIONING_LABEL_RE.test(name) || PARENT_LABEL_RE.test(name)
@@ -332,8 +356,9 @@ export function nextLink(header) {
  *   readonly issue: {
  *     readonly id?: string,
  *     readonly identifier?: string,
- *     readonly labels?: readonly string[],
+ *     readonly title?: string,
  *     readonly description?: string,
+ *     readonly labels?: readonly string[],
  *     readonly comments?: readonly string[],
  *     readonly children?: readonly string[],
  *     readonly hasChildren?: boolean,
@@ -472,6 +497,9 @@ const ISSUE_QUERY = `query IssueDoneState($issueId: String!) {
   issue(id: $issueId) {
     id
     identifier
+
+
+    title
     description
     labels(first: 50) { nodes { name } }
     comments(first: 50) { nodes { body } }
@@ -514,6 +542,13 @@ export async function syncLinearIssueOnMerge(options = {}) {
   if (!issue.id || !issue.identifier) {
     log(`Could not resolve Linear issue for lookup '${lookupId}'; skipping`);
     return { action: 'skip', comment: '', identifier: ref.identifier };
+  }
+  if (!issue.acceptanceMetadataVerified) {
+    return {
+      action: 'skip',
+      comment: 'Canonical acceptance metadata is unverified; issue stays open.',
+      identifier: issue.identifier,
+    };
   }
   const repository = env.GITHUB_REPOSITORY ?? '';
   const token = env.GITHUB_TOKEN ?? '';

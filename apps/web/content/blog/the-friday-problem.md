@@ -1,11 +1,17 @@
 ---
+id: the-friday-problem
+slug: the-friday-problem
 title: The Friday Problem
+description: Most artists make the same mistake.
 date: 2025-01-15
 author: Tim White
 authorUsername: tim
 authorTitle: Founder at Jovie
+authorProfile: /tim
 category: Release Strategy
 tags: release strategy, momentum, content calendar, marketing
+image: /images/blog/friday-problem.svg
+imageAlt: Abstract artwork for The Friday Problem.
 ---
 
 # The Friday Problem
@@ -30,23 +36,23 @@ Music video one week. Lyric video the next. Then maybe a visualizer. TV performa
 
 The content itself mattered less than the rhythm. Every week, fans had something new to talk about.
 
-Here’s what that actually looked like in practice. Song drops Week 1. Week 2, drop the lyric video. Week 3, artist does a podcast with a big audience. Week 4, teaser for the music video. Week 5, radio appearances—morning shows, maybe a live session. Week 6, full music video. Week 7, exclusive merch drop. Week 8, some kind of stunt. Week 9, tour announcement. Week 10, tickets on sale. Week 11, next single while tour tickets are still selling.
+Here’s what that actually looked like in practice. Song drops Week 1. Week 2, drop the lyric video. Week 3, artist does a podcast with a big audience. Week 4, teaser for the music video. Week 5 brings radio appearances, including morning shows and maybe a live session. Week 6, full music video. Week 7, exclusive merch drop. Week 8, some kind of stunt. Week 9, tour announcement. Week 10, tickets on sale. Week 11, next single while tour tickets are still selling.
 
-This isn’t theory. This was the actual runbook.
+This was the actual runbook.
 
 And the artists who figured this out early built machines that nobody could compete with.
 
 Taylor Swift’s team understood this better than anyone. Look at what they did with 1989 in 2014.
 
-Album was announced in August via a Yahoo livestream. First single “Shake It Off” dropped immediately. Then they started running the calendar. She did these “Secret Sessions”—invited 89 people at a time to her actual houses to listen to the album early. Created massive FOMO. Week one of release, Target got exclusive editions with bonus tracks. Week two, different variant. Fans bought the same album multiple times because each version was slightly different.
+Album was announced in August via a Yahoo livestream. First single “Shake It Off” dropped immediately. Then they started running the calendar. She held “Secret Sessions” and invited 89 people at a time to her houses to hear the album early. Created massive FOMO. Week one of release, Target got exclusive editions with bonus tracks. Week two, different variant. Fans bought the same album multiple times because each version was slightly different.
 
 That album sold 1.287 million copies in its first week. In 2014. When streaming was already eating CD sales.
 
 Then the tour. Then the documentary footage. Then acoustic versions for Spotify’s chill playlists. Then merch capsules tied to holidays. Every single week, for basically two years, there was something to engage with.
 
-Reputation in 2017 was even more surgical. She announced it on August 23—exactly three years after the 1989 announcement. Not random. Fans noticed. They always notice. Pre-orders hit 400,000 units before the album even dropped, double what 1989 had done. First week sales: 1.28 million.
+Reputation in 2017 was even more surgical. She announced it on August 23, exactly three years after the 1989 announcement. Not random. Fans noticed. They always notice. Pre-orders hit 400,000 units before the album even dropped, double what 1989 had done. First week sales: 1.28 million.
 
-But here’s what most people miss. It’s not just about having stuff to release. It’s about what the algorithms actually see.
+But here’s what most people miss. Algorithms respond to the steady rhythm around a release.
 
 Instagram doesn’t reward sporadic posting. It rewards consistency. When people search for your name on Instagram, that signals to the platform that you’re relevant. Same thing on Google. Same thing on Spotify. When search volume spikes, you move up in autocomplete. You show up in “Fans Also Like.” You get pushed into recommendations.
 
@@ -54,7 +60,7 @@ Radio stations are watching social listening tools. They can see how much people
 
 Playlist editors at Spotify and Apple look at the same signals. Are people saving your songs? Sharing them? Searching for you? If you disappear for six months, all those signals die. If you’re constantly feeding the system, it feeds you back.
 
-And this compounds. You’re not just trying to get a spike. You’re trying to build a line that goes up and to the right.
+And this compounds. The goal is a steady line that goes up and to the right.
 
 But actually doing this is brutal.
 
@@ -62,7 +68,7 @@ You need a publicist coordinating with digital marketing coordinating with A&R c
 
 All these people in constant communication. Shared calendars. Asset libraries. Email threads with 50 people arguing about whether the lyric video should drop on Tuesday or Thursday.
 
-Independent artists don’t have any of this. They have themselves, maybe a manager, maybe a friend who’s decent at Instagram. And they’re trying to do everything—write music, book shows, answer DMs, edit videos, pitch playlists, update Spotify, email blogs, and somehow also have a life.
+Independent artists don’t have any of this. They have themselves, maybe a manager, maybe a friend who’s decent at Instagram. And they’re trying to write music, book shows, answer DMs, edit videos, pitch playlists, update Spotify, email blogs, and somehow also have a life.
 
 The ones who break through either have teams handling all of this, or they burn out trying to do it alone.
 

@@ -71,6 +71,8 @@ const nextConfig = {
       'runtime-data/apps/eve-pilot/identities/summer/instructions.md',
       'tests/quarantine.json',
       'content/**/*',
+      // Blog catalog validation checks these assets with fs.access at request time.
+      'public/images/blog/**/*',
       'lib/chat/knowledge/topics/**/*',
       'public/fonts/Satoshi-Bold.ttf',
       'public/fonts/DMSans-Regular.ttf',
@@ -539,6 +541,14 @@ const nextConfig = {
         destination: '/artists',
         permanent: true,
       },
+      // No /solutions index page exists; send it to the shipped solutions
+      // route instead of falling through to profile resolution ("Profile
+      // not found").
+      {
+        source: '/solutions',
+        destination: '/solutions/artists',
+        permanent: true,
+      },
       {
         source: '/engagement-engine',
         destination: '/artist-notifications',
@@ -812,7 +822,7 @@ module.exports = exposeBaseStaticConfigForTooling(
 // Sentry upload credentials; applying the plugin there has caused generated
 // interception helpers to be externalized without being copied into standalone.
 // The Sentry runtime SDK (sentry.server.config.ts) works independently.
-const { withSentryConfig } = require('@sentry/nextjs');
+const { withSentryConfig } = require('@sentry/nextjs/config');
 
 const hasSentryAuthToken = Boolean(process.env.SENTRY_AUTH_TOKEN);
 const shouldUseSentryPlugin =

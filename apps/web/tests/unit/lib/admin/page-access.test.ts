@@ -5,14 +5,19 @@ import {
   requireCurrentAdminPageAccess,
 } from '@/lib/admin/page-access';
 
-const { mockGetCachedAuth, mockIsAdmin, mockRedirect } = vi.hoisted(() => ({
-  mockGetCachedAuth: vi.fn(),
-  mockIsAdmin: vi.fn(),
-  mockRedirect: vi.fn((href: string) => {
-    throw new Error(`NEXT_REDIRECT:${href}`);
-  }),
-}));
+const { mockPrivacy, mockGetCachedAuth, mockIsAdmin, mockRedirect } =
+  vi.hoisted(() => ({
+    mockPrivacy: vi.fn(),
+    mockGetCachedAuth: vi.fn(),
+    mockIsAdmin: vi.fn(),
+    mockRedirect: vi.fn((href: string) => {
+      throw new Error(`NEXT_REDIRECT:${href}`);
+    }),
+  }));
 
+vi.mock('@/lib/ovie/privacy-lock/server', () => ({
+  assertOviePrivacyUnlocked: mockPrivacy,
+}));
 vi.mock('server-only', () => ({}));
 vi.mock('next/navigation', () => ({ redirect: mockRedirect }));
 
@@ -27,6 +32,7 @@ vi.mock('@/lib/admin/roles', () => ({
 describe('getCurrentAdminPageAccess', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrivacy.mockResolvedValue(undefined);
   });
 
   it('returns signed-out access without querying admin role', async () => {
@@ -80,5 +86,14 @@ describe('getCurrentAdminPageAccess', () => {
     mockIsAdmin.mockResolvedValue(true);
 
     await expect(requireCurrentAdminPageAccess()).resolves.toBe('user_admin');
+  });
+  it('denies private page loading while leaving navigation role intact', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_admin' });
+    mockIsAdmin.mockResolvedValue(true);
+    mockPrivacy.mockRejectedValue(Error('Privacy locked'));
+    expect((await getCurrentAdminPageAccess()).hasAdminRole).toBe(true);
+    await expect(requireCurrentAdminPageAccess()).rejects.toThrow(
+      'Privacy locked'
+    );
   });
 });

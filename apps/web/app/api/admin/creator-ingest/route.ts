@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { resolveHostedAvatarUrl } from '@/lib/ingestion/flows/avatar-hosting';
@@ -17,6 +16,7 @@ import {
   handleReingestProfile,
 } from '@/lib/ingestion/flows/reingest-flow';
 import { ingestSocialPlatformUrl } from '@/lib/ingestion/flows/social-platform-ingest';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import {
   checkAdminCreatorIngestRateLimit,
   createRateLimitHeaders,
@@ -140,13 +140,13 @@ async function processFullExtractionPlatform(
 async function resolveAdminEntitlements(_route: string): Promise<
   | {
       ok: true;
-      entitlements: Awaited<ReturnType<typeof getCurrentUserEntitlements>>;
+      entitlements: Awaited<ReturnType<typeof getOvieOperatorEntitlements>>;
     }
   | { ok: false; response: NextResponse }
 > {
-  // getCurrentUserEntitlements degrades gracefully on billing failure.
+  // getOvieOperatorEntitlements degrades gracefully on billing failure.
   // Admin status is fetched independently and preserved even when billing is down.
-  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
+  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
 
   if (!entitlements.isAuthenticated || !entitlements.userId) {
     return {

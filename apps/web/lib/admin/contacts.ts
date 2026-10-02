@@ -19,6 +19,7 @@ import { leads } from '@/lib/db/schema/leads';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { captureError } from '@/lib/error-tracking';
+import { isInternalOrTestAccountEmail } from '@/lib/utils/email';
 
 /**
  * Canonical customer/prospect read model (JOV-6888).
@@ -43,6 +44,7 @@ export interface CanonicalContactListRow extends CanonicalContactRow {
   /** Founder/agent override stage persisted on the contacts table, if any. */
   overrideStage: ContactLifecycleStage | null;
   certifiedAt: Date | null;
+  identityCorrected: boolean;
 }
 
 export interface GetCanonicalContactsParams {
@@ -75,6 +77,11 @@ interface ContactOverrideRow {
   dedupeKey: string;
   stage: ContactLifecycleStage;
   certifiedAt: Date | null;
+  displayName: string | null;
+  emailNormalized: string | null;
+  primaryHandle: string | null;
+  avatarUrl: string | null;
+  provenance: Record<string, unknown> | null;
 }
 
 function latestDate(...values: Array<Date | null | undefined>): Date | null {
@@ -231,11 +238,12 @@ type UserRow = {
 };
 
 function userSourceRow(user: UserRow): CanonicalContactSourceRow | null {
+  // Paying means an external customer with a Stripe subscription. A Pro plan
+  // flag alone is set by comps/admin grants, and team/dogfood/QA accounts are
+  // never revenue (Tim 2026-09-30: nobody is paying yet).
   const isPaying =
-    user.isPro === true ||
-    user.plan === 'pro' ||
-    user.plan === 'max' ||
-    user.stripeSubscriptionId != null;
+    user.stripeSubscriptionId != null &&
+    !isInternalOrTestAccountEmail(user.email);
   return sourceRow({
     stage: deriveContactStage({
       userStatus: user.userStatus,
@@ -412,6 +420,11 @@ async function getContactOverrides(): Promise<Map<string, ContactOverrideRow>> {
       dedupeKey: contacts.dedupeKey,
       stage: contacts.stage,
       certifiedAt: contacts.certifiedAt,
+      displayName: contacts.displayName,
+      emailNormalized: contacts.emailNormalized,
+      primaryHandle: contacts.primaryHandle,
+      avatarUrl: contacts.avatarUrl,
+      provenance: contacts.provenance,
     })
     .from(contacts);
 
@@ -430,7 +443,12 @@ function applyOverrides(
   return merged.map(row => {
     const override = overrides.get(row.dedupeKey);
     if (!override) {
-      return { ...row, overrideStage: null, certifiedAt: null };
+      return {
+        ...row,
+        overrideStage: null,
+        certifiedAt: null,
+        identityCorrected: false,
+      };
     }
     const effective =
       contactLifecycleStageRank(override.stage) >=
@@ -439,14 +457,32 @@ function applyOverrides(
         : row.stage;
     return {
       ...row,
+      displayName: override.displayName ?? row.displayName,
+      email: override.emailNormalized ?? row.email,
+      handle: override.primaryHandle ?? row.handle,
+      avatarUrl: override.avatarUrl ?? row.avatarUrl,
       stage: effective,
       overrideStage: override.stage,
       certifiedAt: override.certifiedAt,
+      identityCorrected: override.provenance?.identityCorrection === true,
       sources: row.sources.includes('contact')
         ? row.sources
         : [...row.sources, 'contact'].sort((a, b) => a.localeCompare(b)),
     };
   });
+}
+
+/** Resolve one exact row from the same projection used by the canonical CRM. */
+export async function getCanonicalContactByKey(
+  dedupeKey: string
+): Promise<CanonicalContactListRow | null> {
+  try {
+    const all = await buildCanonicalContacts();
+    return all.find(row => row.dedupeKey === dedupeKey) ?? null;
+  } catch (error) {
+    captureError('Error loading canonical contact', error, { dedupeKey });
+    return null;
+  }
 }
 
 async function buildCanonicalContacts(): Promise<CanonicalContactListRow[]> {

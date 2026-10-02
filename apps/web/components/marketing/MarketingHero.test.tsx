@@ -15,6 +15,40 @@ vi.mock('@/components/features/home/HomeTrustSection', () => ({
 }));
 
 describe('MarketingHero source-backed default story', () => {
+  it('puts an explicit delegated owner on the semantic root in both shell and content modes', () => {
+    const owner = 'apps/web/components/homepage/HomepageIdentityHero.tsx';
+    const shell = render(
+      <MarketingHero
+        variant='split'
+        testId='delegated-hero'
+        sectionVariant='split-claim-card'
+        sectionOwner={owner}
+      >
+        <h1>Claim your name</h1>
+      </MarketingHero>
+    );
+    const root = screen.getByTestId('delegated-hero');
+    expect(root.tagName).toBe('SECTION');
+    expect(root).toHaveAttribute('data-marketing-owner', owner);
+    expect(root).toHaveAttribute('data-marketing-variant', 'split-claim-card');
+    shell.unmount();
+    render(
+      <MarketingHero
+        headline='Pricing'
+        subtitle='Free profiles.'
+        primaryCta={{ label: 'Claim', href: '/start' }}
+        logos={false}
+        sectionVariant='centered-none'
+        sectionOwner={owner}
+        testId='delegated-content'
+      />
+    );
+    expect(screen.getByTestId('delegated-content')).toHaveAttribute(
+      'data-marketing-owner',
+      owner
+    );
+  });
+
   it('renders one labelled hero root with the canonical checked-in copy', () => {
     const { container } = render(
       <MarketingHero {...MARKETING_HERO_DEFAULT_PROPS} />

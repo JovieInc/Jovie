@@ -27,19 +27,66 @@ export function storybookAddonsForEnvironment(
   isLiveStorybookCert = process.env.JOVIE_LIVE_STORYBOOK_CERT === '1',
   hasManualAxeSuite = process.env.JOVIE_STORYBOOK_MANUAL_AXE === '1'
 ) {
+  // The live certificate reads the preview iframe directly and injects its
+  // own pinned Axe bundle. Loading docs, Vitest, Chromatic, and MCP here adds
+  // an unrelated production build graph that can exhaust the source-gate
+  // runner before any canonical story is measured.
+  if (isLiveStorybookCert) return [];
+
   return [
     '@storybook/addon-docs',
     // The live cert and the surface matrix run their own pinned, fail-closed
     // axe passes in the preview iframe. Keep Storybook's automatic scan for
     // normal and scheduled builds, but omit it from those manual suites so the
     // two axe runs cannot race.
-    ...(isLiveStorybookCert || hasManualAxeSuite
-      ? []
-      : ['@storybook/addon-a11y']),
+    ...(hasManualAxeSuite ? [] : ['@storybook/addon-a11y']),
     '@storybook/addon-vitest',
     '@chromatic-com/storybook',
     '@storybook/addon-mcp',
   ];
+}
+
+export function storybookStyleAliasesForEnvironment(
+  isLiveStorybookCert = process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+) {
+  return isLiveStorybookCert
+    ? [
+        {
+          find: '../app/globals.css',
+          replacement: require.resolve('./live-cert.css'),
+        },
+      ]
+    : [];
+}
+
+export function storybookFrameworkForEnvironment(
+  isLiveStorybookCert = process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+) {
+  return {
+    name: isLiveStorybookCert
+      ? '@storybook/react-vite'
+      : '@storybook/nextjs-vite',
+    options: isLiveStorybookCert
+      ? {}
+      : {
+          builder: {
+            viteConfigPath: undefined,
+          },
+        },
+  } as const;
+}
+
+// Pinned Vite 8 supports importer-aware alias resolution. Revisit at Vite 9.
+export function resolvePrivacyBoundaryShellAlias(
+  updatedId: string,
+  importer?: string
+) {
+  const boundary = require
+    .resolve('../app/app/(shell)/DashboardShellPrivacyBoundary.tsx')
+    .replaceAll('\\', '/');
+  return importer?.split('?')[0].replaceAll('\\', '/') === boundary
+    ? require.resolve('../components/organisms/AuthShellWrapper.tsx')
+    : updatedId;
 }
 
 const config: StorybookConfig = {
@@ -48,14 +95,7 @@ const config: StorybookConfig = {
       ? [...LIVE_CERT_STORIES]
       : [...FULL_CATALOG_STORIES],
   addons: storybookAddonsForEnvironment(),
-  framework: {
-    name: '@storybook/nextjs-vite',
-    options: {
-      builder: {
-        viteConfigPath: undefined,
-      },
-    },
-  },
+  framework: storybookFrameworkForEnvironment(),
   docs: {},
   typescript:
     process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
@@ -118,6 +158,7 @@ const config: StorybookConfig = {
       ...config.resolve,
       extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
       alias: [
+        ...storybookStyleAliasesForEnvironment(),
         // Must come before the generic '@' alias to avoid resolving to the real file.
         {
           // The real provider renders an inline bootstrap script. That script is
@@ -134,6 +175,7 @@ const config: StorybookConfig = {
         {
           find: '@/components/organisms/AuthShellWrapper',
           replacement: require.resolve('./dashboard-layout-client-mock.tsx'),
+          customResolver: resolvePrivacyBoundaryShellAlias,
         },
         {
           // lib/docs/getMarkdownDocument imports node:fs at module scope

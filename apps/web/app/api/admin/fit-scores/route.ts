@@ -10,7 +10,6 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { db } from '@/lib/db';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import {
   calculateMissingFitScores,
@@ -20,6 +19,7 @@ import {
   recalculateAllFitScores,
 } from '@/lib/fit-scoring';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import {
   checkAdminFitScoresRateLimit,
   createRateLimitHeaders,
@@ -40,7 +40,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
  */
 export async function GET(request: Request) {
   try {
-    const entitlements = await getCurrentUserEntitlements();
+    const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -131,7 +131,9 @@ const postActionSchema = z.object({
  */
 export async function POST(request: Request) {
   try {
-    const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
+    const entitlements = await getOvieOperatorEntitlements({
+      session: 'fresh',
+    });
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { error: 'Unauthorized' },

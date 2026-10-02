@@ -132,6 +132,25 @@ describe('quality-gap-finder', () => {
       assert.equal(gaps[0].mechanical, true);
     });
 
+    it('skips evidence owned by another repo', () => {
+      const gaps = collectInvariantGaps(
+        [
+          invariant('JOV-INV-905', [
+            {
+              path: 'scripts/tests/test_openai_symphony_install.py',
+              repo: 'JovieInc/symphony-control',
+            },
+            { path: 'scripts/a/unwired.test.mjs' },
+          ]),
+        ],
+        ''
+      );
+      assert.deepEqual(
+        gaps.map(gap => gap.key),
+        ['JOV-INV-905:scripts/a/unwired.test.mjs']
+      );
+    });
+
     it('reads Vitest include globs as runner prefixes', () => {
       const root = repo({
         'scripts/vitest.config.mts':
@@ -531,6 +550,25 @@ describe('quality-gap-finder', () => {
         completeCalls.some(call => call.includes('issueUpdate')),
         true
       );
+    });
+
+    it('rejects another issue closure receipt fetched through the real Linear adapter', async () => {
+      const issues = await fetchRecentDefects('lin_test', 30, async (_url, init) => {
+        const { query } = JSON.parse(String(init?.body ?? '{}'));
+        return { ok: true, json: async () => ({ data:
+          query.includes('EscapedDefectClosureComments')
+            ? { i0: { identifier: 'JOV-10', comments: { nodes: [
+                { body: escapedDefectEvidence() },
+              ] } } }
+            : { issues: { nodes: [{ identifier: 'JOV-10', title: 'different defect',
+                state: { name: 'Done', type: 'completed' },
+                labels: { nodes: [{ name: 'escaped-defect' }] } }] } },
+        }) };
+      });
+      const [gap] = collectEscapedDefectClosureGaps(issues);
+      assert.ok(gap, 'receipt for JOV-9 must not close JOV-10');
+      assert.equal(gap.originatingIssue, 'JOV-10');
+      assert.match(gap.evidence.join('\n'), /originatingIssue/);
     });
 
     it('fetches comments only for completed escaped-defect closure candidates', async () => {

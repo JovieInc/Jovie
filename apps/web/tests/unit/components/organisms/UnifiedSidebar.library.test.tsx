@@ -201,7 +201,7 @@ describe('UnifiedSidebar library route', () => {
   it('keeps the standard dashboard navigation on the library route', () => {
     renderUnifiedSidebar();
 
-    expect(screen.queryByText('Loading Library')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading Work')).not.toBeInTheDocument();
     expect(screen.getByTestId('dashboard-nav')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Search Sidebar' })
@@ -372,7 +372,7 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.getByRole('button', { name: 'Needs Assets' })
     ).toBeInTheDocument();
-    expect(screen.queryByText('Loading Library')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading Work')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to App' })).toHaveAttribute(
       'href',
       APP_ROUTES.CHAT

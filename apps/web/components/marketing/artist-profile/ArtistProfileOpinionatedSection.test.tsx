@@ -1,11 +1,23 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { ArtistProfileOpinionatedSection } from './ArtistProfileOpinionatedSection';
 import storyMeta, { Section } from './ArtistProfileOpinionatedSection.stories';
 
 describe('ArtistProfileOpinionatedSection', () => {
+  it('binds its product split to the real section and occurrence', () => {
+    render(
+      <ArtistProfileOpinionatedSection
+        opinionated={ARTIST_PROFILE_COPY.opinionated}
+      />
+    );
+    const root = screen.getByTestId('marketing-section-feature-split');
+    expect(root.tagName).toBe('SECTION');
+    expect(root).toHaveAttribute('data-marketing-variant', 'phone-right');
+    expect(root).toHaveAttribute('data-marketing-occurrence', 'opinionated');
+  });
   it('keeps the opinionated profile source contract bounded and accessible', () => {
     const source = readFileSync(
       resolve(

@@ -297,10 +297,11 @@ describe('source PR path-output reachability contract', () => {
     expect(detectStep).not.toContain('echo "skip=');
     expect(workflow).not.toContain('needs.ci-path-changes.outputs.skip');
 
-    // `.github/**` is explicitly not docs-only. ci-fast additionally keys only
+    // Workflows and canonical changelog content cannot take the docs-only exit.
+    // ci-fast additionally keys only
     // off the authoritative Path Changes conclusion, including docs-only PRs.
     expect(detectStep).toContain(
-      'if ! echo "$CHANGED_FILES" | grep -q -E \'^\\.github/\''
+      'if ! echo "$CHANGED_FILES" | grep -q -E \'^(\\.github/|CHANGELOG\\.md$)\''
     );
     expect(
       detectStep.lastIndexOf('echo "has_code_changes=true"')
@@ -1198,9 +1199,7 @@ describe('deploy workflow Vercel env resolution', () => {
     );
     const productionOauthJob = getJobBlock(workflow, 'production-oauth-gate');
 
-    expect(oauthStep).toContain(
-      'if PLAYWRIGHT_WORKERS=1 CI=true SMOKE_ONLY=1 \\\n'
-    );
+    expect(oauthStep).toContain('PLAYWRIGHT_WORKERS=1 CI=true SMOKE_ONLY=1');
     expect(oauthStep).toContain(
       'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run --'
     );
@@ -2319,7 +2318,17 @@ describe('iOS stage contract', () => {
     );
     expect(iosWorkflow).not.toMatch(/^  pull_request:/m);
     expect(iosWorkflow).not.toMatch(/^  push:/m);
-    expect(iosWorkflow).toContain('runs-on: macos-26');
+    // Hosted macOS stays the fallback; the self-hosted Mac is heartbeat-gated
+    // and never probed for release regressions.
+    expect(iosWorkflow).toContain(
+      `runs-on: \${{ needs.mac-runner-route.outputs.runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-26' }}`
+    );
+    expect(iosWorkflow).toContain(
+      'HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml'
+    );
+    expect(iosWorkflow).toContain(
+      "if: ${{ !inputs.full-regression && vars.JOVIE_MAC_RUNNER != 'off' }}"
+    );
     expect(pathChanges).toContain(
       "run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}"
     );
@@ -2546,6 +2555,12 @@ describe('canary health gate workflow', () => {
       'EXPECTED_VERCEL_ALIAS_ORIGIN: https://staging.jov.ie'
     );
     expect(oauthStep).toContain('PLAYWRIGHT_VERCEL_BYPASS_SECRET:');
+    expect(oauthStep).toContain(
+      'DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}'
+    );
+    expect(oauthStep).toContain(
+      '"$GITHUB_WORKSPACE/node_modules/.bin/vercel" alias set'
+    );
     expect(oauthStep).toContain('oauth-providers.spec.ts');
     expect(oauthStep).toContain(
       'oauth_retry_root="$RUNNER_TEMP/aliased-staging-oauth-retries"'
@@ -2624,12 +2639,17 @@ describe('canary health gate workflow', () => {
     expect(prove).toContain('for attempt in $(seq 1 15)');
     expect(prove).toContain('(.id | type == "string")');
     expect(prove).toContain('(.readyState | type == "string")');
-    expect(prove).toContain('(.target | type == "string")');
     expect(prove).toContain('[ "$alias_id" = "$EXPECTED_DEPLOYMENT_ID" ]');
     expect(prove).toContain('[ "$alias_state" = "READY" ]');
-    expect(prove).toContain('[ "$alias_target" = "preview" ]');
+    expect(prove).not.toContain('alias_target');
+    expect(prove).not.toContain('.target');
     expect(prove).toContain('[ "$attempt" -eq 15 ]');
     expect(prove).toContain('sleep 4');
+    expect(
+      prove.match(
+        /\.\/node_modules\/\.bin\/vercel alias set "\$deployment_url" staging\.jov\.ie/g
+      )
+    ).toHaveLength(2);
     expect(prove).toContain('https://staging.jov.ie/api/health/build-info');
     expect(prove).toContain('[ "$observed_sha" = "$EXPECTED_COMMIT_SHA" ]');
     expect(prove).toContain('[ "$observed_environment" = "preview" ]');
@@ -2771,6 +2791,7 @@ jq -n \
           resolve(vercelBin, 'vercel'),
           `#!/usr/bin/env bash
 set -euo pipefail
+if [ "$1" = "alias" ]; then exit 0; fi
 attempt=0
 if [ -f "$RECEIPT_ALIAS_COUNTER" ]; then
   attempt="$(cat "$RECEIPT_ALIAS_COUNTER")"
@@ -2781,7 +2802,7 @@ if [ "$attempt" -eq 1 ]; then
   printf '%s\\n' '{"id":42,"readyState":null,"target":{"unexpected":true}}'
 else
   jq -n --arg id "$EXPECTED_DEPLOYMENT_ID" \
-    '{id: $id, readyState: "READY", target: "preview"}'
+    '{id: $id, readyState: "READY"}'
 fi
 `,
           { mode: 0o700 }
@@ -2972,7 +2993,7 @@ esac
         ).toThrow();
         expect(readFileSync(counter, 'utf8')).toBe('2');
         expect(result.stdout).toContain(
-          `staging.jov.ie owns exact READY preview ${expectedDeploymentId}.`
+          `staging.jov.ie owns exact READY deployment ${expectedDeploymentId}.`
         );
       } finally {
         rmSync(root, { force: true, recursive: true });
@@ -2994,9 +3015,16 @@ esac
       const fakeBin = resolve(root, 'bin');
       const runnerTemp = resolve(root, 'runner-temp');
       const counter = resolve(root, 'attempt-count');
+      const vercelBin = resolve(workspace, 'node_modules/.bin');
       mkdirSync(web, { recursive: true });
       mkdirSync(fakeBin);
       mkdirSync(runnerTemp);
+      mkdirSync(vercelBin, { recursive: true });
+      writeFileSync(
+        resolve(vercelBin, 'vercel'),
+        '#!/usr/bin/env bash\nexit 0\n',
+        { mode: 0o700 }
+      );
       writeFileSync(
         resolve(fakeBin, 'node'),
         `#!/usr/bin/env bash
@@ -3034,11 +3062,15 @@ fi
           cwd: workspace,
           env: {
             ...process.env,
+            DEPLOYMENT_URL_B64: Buffer.from(
+              'https://jovie-exact-jovie.vercel.app'
+            ).toString('base64'),
             GITHUB_WORKSPACE: workspace,
             OAUTH_TEST_COUNTER: counter,
             PATH: `${fakeBin}:${process.env.PATH}`,
             PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
             RUNNER_TEMP: runnerTemp,
+            VERCEL_ORG_ID: 'team_test',
           },
           encoding: 'utf8',
         }
@@ -3076,9 +3108,16 @@ fi
       const runnerTemp = resolve(root, 'runner-temp');
       const counter = resolve(root, 'attempt-count');
       const sleepMarker = resolve(root, 'sleep-called');
+      const vercelBin = resolve(workspace, 'node_modules/.bin');
       mkdirSync(web, { recursive: true });
       mkdirSync(fakeBin);
       mkdirSync(runnerTemp);
+      mkdirSync(vercelBin, { recursive: true });
+      writeFileSync(
+        resolve(vercelBin, 'vercel'),
+        '#!/usr/bin/env bash\nexit 0\n',
+        { mode: 0o700 }
+      );
       writeFileSync(
         resolve(fakeBin, 'node'),
         `#!/usr/bin/env bash
@@ -3112,11 +3151,15 @@ exit 23
           cwd: workspace,
           env: {
             ...process.env,
+            DEPLOYMENT_URL_B64: Buffer.from(
+              'https://jovie-exact-jovie.vercel.app'
+            ).toString('base64'),
             GITHUB_WORKSPACE: workspace,
             OAUTH_SLEEP_MARKER: sleepMarker,
             OAUTH_TEST_COUNTER: counter,
             PATH: `${fakeBin}:${process.env.PATH}`,
             RUNNER_TEMP: runnerTemp,
+            VERCEL_ORG_ID: 'team_test',
           },
           encoding: 'utf8',
         }

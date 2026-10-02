@@ -1,5 +1,4 @@
 import { isAdmin } from '@/lib/admin/roles';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   extractBearer,
   getOvieOAuthIssuer,
@@ -7,6 +6,7 @@ import {
   ovieIssuerSecret,
 } from '@/lib/ovie/mcp/oauth';
 import type { OvieMcpPrincipal } from '@/lib/ovie/mcp/types';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 /**
  * Founder gate principal: OAuth/lander bearer first, then Better Auth session.
@@ -32,7 +32,12 @@ export async function resolveOviePrincipal(
     return { authenticated: false, isAdmin: false, scopes: [] };
   }
 
-  const entitlements = await getCurrentUserEntitlements();
+  let entitlements;
+  try {
+    entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
+  } catch {
+    return { authenticated: false, isAdmin: false, scopes: [] };
+  }
   const adminRole =
     entitlements.isAuthenticated && entitlements.userId
       ? await isAdmin(entitlements.userId)

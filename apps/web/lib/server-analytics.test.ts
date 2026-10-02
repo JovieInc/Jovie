@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import * as Sentry from '@sentry/nextjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { LIMITED_DROP_EVENT_NAMES } from '@/lib/analytics/limited-drop-funnel';
 
 const mocks = vi.hoisted(() => ({
   insert: vi.fn(),
@@ -63,6 +64,7 @@ describe('server analytics contract', () => {
     mocks.onConflictDoNothing.mockReturnValue({ returning: mocks.returning });
     mocks.values.mockReturnValue({
       onConflictDoNothing: mocks.onConflictDoNothing,
+      returning: mocks.returning,
     });
     mocks.insert.mockReturnValue({ values: mocks.values });
   });
@@ -79,19 +81,25 @@ describe('server analytics contract', () => {
     expect(SERVER_ANALYTICS_CONSENT_POLICY).toBe(
       'first_party_operational_measurement'
     );
-    expect(countProductionCallSites(WEB_ROOT)).toBe(35);
+    expect(countProductionCallSites(WEB_ROOT)).toBe(36);
     expect(
       SERVER_ANALYTICS_CALLSITE_INVENTORY.reduce(
         (total, entry) => total + entry.invocations,
         0
       )
-    ).toBe(35);
+    ).toBe(36);
 
     for (const entry of SERVER_ANALYTICS_CALLSITE_INVENTORY) {
       const source = readFileSync(join(WEB_ROOT, entry.path), 'utf8');
       expect(source.match(/\btrackServerEvent\s*\(/g)?.length ?? 0).toBe(
         entry.invocations
       );
+      if (entry.path === 'lib/analytics/limited-drop-funnel.server.ts') {
+        expect(entry.events).toEqual(LIMITED_DROP_EVENT_NAMES);
+        expect(source).toContain('limitedDropEventSchema.safeParse');
+        expect(source).toContain('trackServerEvent(eventName');
+        continue;
+      }
       for (const event of entry.events) {
         expect(source).toContain(`'${event}'`);
       }
@@ -146,6 +154,19 @@ describe('server analytics contract', () => {
     expect(JSON.stringify(mocks.values.mock.calls[0])).not.toContain(
       'must-not-persist@example.com'
     );
+  });
+
+  it('keeps non-idempotent events independent of the identity index', async () => {
+    await trackServerEvent('funnel_step', {
+      funnel_id: 'artist_signup',
+      step: 'cta_click',
+      outcome: 'reached',
+      surface: 'homepage',
+    });
+
+    expect(mocks.values.mock.calls[0][0]).not.toHaveProperty('eventIdentity');
+    expect(mocks.onConflictDoNothing).not.toHaveBeenCalled();
+    expect(mocks.returning).toHaveBeenCalledWith({ id: expect.anything() });
   });
 
   it('keeps attribution groupings without storing public query text', async () => {

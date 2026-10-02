@@ -23,3 +23,20 @@ type Story = StoryObj<typeof meta>;
 export const HiddenHomepageContract: Story = {
   render: () => <MarketingPageContractMarkers />,
 };
+
+export const RecordContract: Story = {
+  render: () => (
+    <MarketingPageContractMarkers
+      contract={{
+        routeGlob: '(marketing)/solutions/[audience]/page.tsx',
+        url: '/solutions/artists',
+        copyScope: 'music',
+        job: 'show artists how profiles connect music, links, and permissioned fan updates',
+        proof: 'profile gallery, capture flow, and conversion sections',
+        successEvent: 'artist claims a profile',
+        primaryCta: { href: '/signup', label: 'Claim your profile' },
+        recordFamily: 'solutions',
+      }}
+    />
+  ),
+};

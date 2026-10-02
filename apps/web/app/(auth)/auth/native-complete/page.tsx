@@ -1,14 +1,22 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useRef, useState } from 'react';
-import { consumeDesktopAuthCompletion } from '@/lib/desktop/electron-bridge';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import {
+  consumeDesktopAuthCompletion,
+  getDesktopPasskeyState,
+  setDesktopPasskeyState,
+} from '@/lib/desktop/electron-bridge';
 import {
   completeDesktopNativeAuth,
   type DesktopReturnRouteVerificationResult,
 } from '@/lib/desktop/native-complete';
 
-type CompletionState = 'loading' | 'error';
+type CompletionState = 'loading' | 'error' | 'touch-id-offer';
+type TouchIdEnrollState = 'idle' | 'working' | 'error';
+
+const DESKTOP_PASSKEY_NAME = 'Jovie for Mac';
 
 type NativeCompleteErrorClass =
   | 'replay'
@@ -128,7 +136,47 @@ function NativeCompleteContent() {
   const [state, setState] = useState<CompletionState>('loading');
   const [errorClass, setErrorClass] =
     useState<NativeCompleteErrorClass>('unknown');
+  const [offerReturnTo, setOfferReturnTo] = useState<string | null>(null);
+  const [enrollState, setEnrollState] = useState<TouchIdEnrollState>('idle');
   const didStartCompletionRef = useRef(false);
+
+  const openWorkspace = useCallback(
+    (returnTo: string) => {
+      router.replace(returnTo);
+      globalThis.setTimeout(() => {
+        if (globalThis.location?.pathname === '/auth/native-complete') {
+          globalThis.location.assign(returnTo);
+        }
+      }, 500);
+    },
+    [router]
+  );
+
+  // The sign-in that just finished is fresh, which is exactly when the
+  // server lets this Mac add a device passkey (JOV-6727).
+  const turnOnTouchId = useCallback(async () => {
+    if (!offerReturnTo || enrollState === 'working') return;
+    setEnrollState('working');
+    try {
+      const { authClient } = await import('@/lib/auth/client');
+      const added = await authClient.passkey.addPasskey({
+        name: DESKTOP_PASSKEY_NAME,
+        authenticatorAttachment: 'platform',
+      });
+      if (added?.error) throw new Error(added.error.message);
+      await setDesktopPasskeyState('enrolled');
+      openWorkspace(offerReturnTo);
+    } catch {
+      setEnrollState('error');
+    }
+  }, [enrollState, offerReturnTo, openWorkspace]);
+
+  const skipTouchId = useCallback(() => {
+    if (!offerReturnTo) return;
+    // This optional local preference must not delay the completed sign-in.
+    void setDesktopPasskeyState('dismissed').catch(() => undefined);
+    openWorkspace(offerReturnTo);
+  }, [offerReturnTo, openWorkspace]);
 
   useEffect(() => {
     if (didStartCompletionRef.current) {
@@ -146,14 +194,15 @@ function NativeCompleteContent() {
           verifyReturnRoute: verifyDesktopReturnRoute,
         });
 
-        if (isActive) {
-          router.replace(result.returnTo);
-          globalThis.setTimeout(() => {
-            if (globalThis.location.pathname === '/auth/native-complete') {
-              globalThis.location.assign(result.returnTo);
-            }
-          }, 500);
+        if (!isActive) return;
+        const passkey = await getDesktopPasskeyState();
+        if (!isActive) return;
+        if (passkey.available && !passkey.enrolled && !passkey.dismissed) {
+          setOfferReturnTo(result.returnTo);
+          setState('touch-id-offer');
+          return;
         }
+        openWorkspace(result.returnTo);
       } catch (error) {
         if (!isActive) return;
 
@@ -168,7 +217,7 @@ function NativeCompleteContent() {
             if (verification === 'ready') {
               router.replace(returnTo);
               globalThis.setTimeout(() => {
-                if (globalThis.location.pathname === '/auth/native-complete') {
+                if (globalThis.location?.pathname === '/auth/native-complete') {
                   globalThis.location.assign(returnTo);
                 }
               }, 500);
@@ -189,7 +238,49 @@ function NativeCompleteContent() {
     return () => {
       isActive = false;
     };
-  }, [router, searchParams]);
+  }, [openWorkspace, router, searchParams]);
+
+  if (state === 'touch-id-offer') {
+    return (
+      <main className='grid min-h-dvh place-items-center bg-base px-6 text-white dark:text-white [color-scheme:dark]'>
+        <section className='w-full max-w-sm px-6 py-7 text-center'>
+          <h1 className='text-xl font-semibold leading-7'>
+            Sign In With Touch ID Next Time?
+          </h1>
+          <p
+            className='mt-3 min-h-10 text-sm leading-5 text-white/64'
+            aria-live='polite'
+          >
+            {enrollState === 'error'
+              ? 'Touch ID was not turned on. You can keep signing in with the browser.'
+              : 'Skip the browser on this Mac. Your fingerprint stays on this Mac.'}
+          </p>
+          <div className='mt-6 flex flex-col gap-2'>
+            <Button
+              type='button'
+              variant='primary'
+              size='lg'
+              className='w-full'
+              disabled={enrollState === 'working'}
+              onClick={turnOnTouchId}
+            >
+              Turn On Touch ID
+            </Button>
+            <Button
+              type='button'
+              variant='secondary'
+              size='lg'
+              className='w-full'
+              disabled={enrollState === 'working'}
+              onClick={skipTouchId}
+            >
+              Not Now
+            </Button>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className='grid min-h-dvh place-items-center bg-base px-6 text-white dark:text-white [color-scheme:dark]'>

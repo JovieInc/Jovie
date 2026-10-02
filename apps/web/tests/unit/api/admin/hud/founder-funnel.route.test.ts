@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
-  getCurrentUserEntitlements: vi.fn(),
+  getOvieOperatorEntitlements: vi.fn(),
   getFounderFunnelData: vi.fn(),
   captureError: vi.fn(),
 }));
 
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: hoisted.getCurrentUserEntitlements,
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  getOvieOperatorEntitlements: hoisted.getOvieOperatorEntitlements,
 }));
 
 vi.mock('@/lib/admin/founder-funnel', () => ({
@@ -21,7 +21,7 @@ vi.mock('@/lib/error-tracking', () => ({
 describe('GET /api/admin/hud/founder-funnel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    hoisted.getCurrentUserEntitlements.mockResolvedValue({
+    hoisted.getOvieOperatorEntitlements.mockResolvedValue({
       isAuthenticated: true,
       isAdmin: true,
     });
@@ -56,7 +56,7 @@ describe('GET /api/admin/hud/founder-funnel', () => {
   });
 
   it('returns 401 for signed-out users', async () => {
-    hoisted.getCurrentUserEntitlements.mockResolvedValue({
+    hoisted.getOvieOperatorEntitlements.mockResolvedValue({
       isAuthenticated: false,
       isAdmin: false,
     });

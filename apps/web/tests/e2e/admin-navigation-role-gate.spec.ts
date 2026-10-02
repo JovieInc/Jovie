@@ -18,16 +18,16 @@ test.describe('Admin navigation role gate', () => {
     await page.goto(
       `/api/dev/test-auth/enter?persona=admin&redirect=${encodeURIComponent(APP_ROUTES.ADMIN_PEOPLE)}`
     );
-    await expect(page).toHaveURL(/\/app\/admin\/people/);
+    await expect(page).toHaveURL(/\/app\/ov\/people/);
     await waitForHydration(page, { timeout: 30_000 }).catch(() => {});
-    await expect(page.getByTestId('admin-people-view-waitlist')).toBeVisible({
+    await expect(page.getByTestId('admin-people-view-contacts')).toBeVisible({
       timeout: 30_000,
     });
 
     const creatorsTab = page.getByRole('tab', { name: 'Creators' });
     await expect(creatorsTab).toBeVisible({ timeout: 30_000 });
     await creatorsTab.click({ noWaitAfter: true });
-    await expect(page).toHaveURL(/\/app\/admin\/people\?view=creators/, {
+    await expect(page).toHaveURL(/\/app\/ov\/people\?view=creators/, {
       timeout: 60_000,
     });
     await expect(page).not.toHaveURL(/\/app\/chat/);

@@ -14,7 +14,6 @@ import {
   FileCheck2,
   HelpCircle,
   Keyboard,
-  Lock,
   LogOut,
   MessageSquare,
   Monitor,
@@ -25,26 +24,29 @@ import {
   Sparkles,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { DesktopReleaseIdentity } from '@/components/atoms/DesktopTitlebar';
+import { DesktopReleaseIdentity } from '@/components/organisms/DesktopTitlebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { DESKTOP_UPDATE_COPY } from '@/data/supportDesktopUpdateCopy';
 import { track } from '@/lib/analytics';
+import { getCurrentAppShellWorkspace } from '@/lib/app-shell/workspaces';
 import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
 import type { DesktopUpdateViewState } from '@/lib/desktop/desktop-updates';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { GLYPH_CMD, GLYPH_OPT, GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { useFeedbackMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { ensurePrivacyLockCanBeEnabled } from '@/lib/workspace-lock/unlock-with-passkey';
 import {
   isMoneyHidden,
-  lockWorkspace,
   setMoneyHidden,
 } from '@/lib/workspace-lock/workspace-lock';
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
 import { useDesktopUpdateContext } from '../desktop-update/DesktopUpdateProvider';
+import { OviePrivacyLockControl } from './OviePrivacyLockControl';
 import type { UserButtonProps } from './types';
 import { UsageMenuItem } from './UsageMenuItem';
 import { useUserButton } from './useUserButton';
@@ -89,6 +91,7 @@ interface BuildDropdownItemsParams {
   handleOpenShortcuts?: () => void;
   isElectronRuntime: boolean;
   moneyHidden: boolean;
+  showWorkspaceLock: boolean;
   desktopUpdate?: {
     state: DesktopUpdateViewState;
     openModal: () => void;
@@ -179,6 +182,7 @@ function buildDropdownItems({
   handleOpenShortcuts,
   isElectronRuntime,
   moneyHidden,
+  showWorkspaceLock,
   desktopUpdate,
 }: BuildDropdownItemsParams): CommonDropdownItem[] {
   const updateItems = desktopUpdate
@@ -404,21 +408,27 @@ function buildDropdownItems({
     });
   }
 
-  // Privacy controls (JOV-6829): quick workspace lock + money visibility.
+  // Ovie privacy lock is opt-in and server-owned; money visibility remains a
+  // separate customer preference.
   items.push(
     {
       type: 'separator',
       id: 'sep-privacy',
       className: USER_MENU_GROUP_SPACER_CLASS,
     },
-    {
-      type: 'action',
-      id: 'lock-workspace',
-      label: 'Lock Workspace',
-      icon: Lock,
-      onClick: () => lockWorkspace(),
-      shortcut: `${GLYPH_OPT} ${GLYPH_SHIFT} L`,
-    },
+    ...(showWorkspaceLock
+      ? [
+          {
+            type: 'custom' as const,
+            id: 'ovie-privacy-lock' as const,
+            render: () => (
+              <OviePrivacyLockControl
+                ensurePrivacyLockCanBeEnabled={ensurePrivacyLockCanBeEnabled}
+              />
+            ),
+          },
+        ]
+      : []),
     {
       type: 'action',
       id: 'toggle-money',
@@ -497,6 +507,8 @@ export function UserButton({
   calm = false,
   trigger,
 }: UserButtonProps) {
+  const pathname = usePathname();
+  const showWorkspaceLock = getCurrentAppShellWorkspace(pathname).id === 'ov';
   const keyboardShortcuts = useKeyboardShortcutsSafe();
   const isElectronRuntime = useIsElectronRuntime();
   const desktopUpdate = useDesktopUpdateContext();
@@ -671,6 +683,7 @@ export function UserButton({
     handleOpenShortcuts: keyboardShortcuts?.open,
     isElectronRuntime,
     moneyHidden,
+    showWorkspaceLock,
     desktopUpdate,
   });
 

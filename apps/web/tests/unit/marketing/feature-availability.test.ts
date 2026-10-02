@@ -20,6 +20,7 @@ import {
 import {
   MARKETING_FOOTER_COLUMNS,
   MARKETING_NAV_LINKS,
+  PUBLIC_COMMERCIAL_FOOTER_LINKS,
 } from '@/data/marketingNavigation';
 import {
   isNavigableRoute,
@@ -256,6 +257,9 @@ describe('navigation consumes the shared policy', () => {
       for (const link of column.links) {
         expect(link.external || isNavigationEligiblePath(link.href)).toBe(true);
       }
+    }
+    for (const link of PUBLIC_COMMERCIAL_FOOTER_LINKS) {
+      expect(isNavigationEligiblePath(link.href)).toBe(true);
     }
   });
 

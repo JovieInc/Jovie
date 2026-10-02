@@ -17,6 +17,7 @@ import { db } from '@/lib/db';
 import { adminAuditLog } from '@/lib/db/schema/admin';
 import { users } from '@/lib/db/schema/auth';
 import { captureError } from '@/lib/error-tracking';
+import { assertOviePrivacyUnlocked } from '@/lib/ovie/privacy-lock/server';
 import { generatePlaylist } from '@/lib/playlists/pipeline';
 
 type ActionState =
@@ -49,6 +50,7 @@ async function requireAdminUserId(): Promise<string> {
   if (!userId || !(await checkAdminRole(userId))) {
     throw new Error('Unauthorized');
   }
+  await assertOviePrivacyUnlocked();
   return userId;
 }
 

@@ -34,7 +34,10 @@ export const HeaderAlignment: Story = {
     <SidebarProvider>
       <AppShellFrame
         sidebar={
-          <Sidebar collapsible='offcanvas'>
+          // Icon collapsible matches the production UnifiedSidebar contract:
+          // collapsing leaves a visible icon rail rather than a 0-width mount,
+          // which is the composition the desktop titlebar geometry targets.
+          <Sidebar collapsible='icon'>
             <div className='p-3'>Jovie</div>
           </Sidebar>
         }

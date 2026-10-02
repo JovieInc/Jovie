@@ -56,6 +56,22 @@ vi.mock('@/components/organisms/desktop-update/DesktopUpdateProvider', () => ({
   useDesktopUpdateContext: vi.fn(),
 }));
 
+vi.mock('@/components/organisms/user-button/OviePrivacyLockControl', () => ({
+  OviePrivacyLockControl: ({
+    ensurePrivacyLockCanBeEnabled,
+  }: {
+    ensurePrivacyLockCanBeEnabled: () => Promise<void>;
+  }) => (
+    <div
+      data-testid='ovie-privacy-control'
+      data-readiness-check={String(Boolean(ensurePrivacyLockCanBeEnabled))}
+    />
+  ),
+}));
+vi.mock('@/lib/workspace-lock/unlock-with-passkey', () => ({
+  ensurePrivacyLockCanBeEnabled: vi.fn(async () => {}),
+}));
+
 import { usePathname, useRouter } from 'next/navigation';
 import { toast } from '@/components/feedback';
 import { useDesktopUpdateContext } from '@/components/organisms/desktop-update/DesktopUpdateProvider';
@@ -322,6 +338,11 @@ describe('UserButton billing actions', () => {
     expect(diagnostics).toContainElement(desktopIdentity);
     expect(desktopIdentity).toHaveTextContent(
       'Desktop · Version Unknown · Unverified'
+    );
+    expect(desktopIdentity).toHaveAttribute('role', 'status');
+    expect(desktopIdentity).toHaveAttribute('data-provenance', 'unverified');
+    expect(desktopIdentity).toHaveAccessibleName(
+      'Desktop environment, version unknown, source revision unverified'
     );
     expect(screen.queryByText(/^Version /u)).not.toBeInTheDocument();
   });
@@ -779,6 +800,32 @@ describe('UserButton billing actions', () => {
     expect(
       loading.querySelector('[data-user-button-loading-copy]')
     ).toHaveClass('group-data-[collapsible=icon]:hidden');
+  });
+
+  it('only offers manual workspace lock inside Ovie', async () => {
+    const user = userEvent.setup();
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+    mockUsePathname.mockReturnValue('/app');
+    const jovie = render(<UserButton showUserInfo />);
+    await user.click(screen.getByText('Adele Adkins'));
+    expect(
+      screen.queryByTestId('ovie-privacy-control')
+    ).not.toBeInTheDocument();
+    jovie.unmount();
+
+    mockUsePathname.mockReturnValue('/app/ov/ops');
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+    render(<UserButton showUserInfo />);
+    await user.click(screen.getByText('Adele Adkins'));
+    expect(screen.getByTestId('ovie-privacy-control')).toBeInTheDocument();
   });
 
   it('shows an inline usage remaining row in the user menu', async () => {

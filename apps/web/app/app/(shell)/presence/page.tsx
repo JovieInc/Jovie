@@ -10,9 +10,9 @@ import { ProfilesWorkspace } from '../profiles/ProfilesWorkspace';
 export const runtime = 'nodejs';
 
 export const metadata: Metadata = {
-  title: 'Presence',
+  title: 'Identity',
   description:
-    'Monitor your public profiles, social networks, and presence signals',
+    'Manage who you are and how you are represented across public surfaces',
 };
 
 export default async function PresencePage() {
@@ -20,8 +20,8 @@ export default async function PresencePage() {
     route: APP_ROUTES.PRESENCE,
     authFailure: 'notFound',
     requiredFlag: 'PROFILES_WORKSPACE',
-    dashboardErrorLogMessage: 'Dashboard data load failed on Presence page',
-    dashboardErrorMessage: 'Failed to load Presence. Please refresh the page.',
+    dashboardErrorLogMessage: 'Dashboard data load failed on Identity page',
+    dashboardErrorMessage: 'Failed to load Identity. Please refresh the page.',
   });
   if (!routeContext.ok) return routeContext.error;
 

@@ -10,9 +10,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { db } from '@/lib/db';
 import { campaignSettings } from '@/lib/db/schema/admin';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -27,7 +27,7 @@ const SETTINGS_ID = 1;
  */
 export async function GET() {
   try {
-    const entitlements = await getCurrentUserEntitlements();
+    const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -176,7 +176,9 @@ function isThrottlingConfigInvalid(config: {
  */
 export async function POST(request: NextRequest) {
   try {
-    const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
+    const entitlements = await getOvieOperatorEntitlements({
+      session: 'fresh',
+    });
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { error: 'Unauthorized' },

@@ -7,7 +7,11 @@ import { z } from 'zod';
 import { resolvedActionCapabilitySchema } from './descriptor';
 import { actionErrorSchema } from './errors';
 import { actionInvocationSchema, actionResultSchema } from './invocation';
-import { ACTION_MANIFEST, buildDiscoveryDocument } from './manifest';
+import {
+  ACTION_MANIFEST,
+  actionSchemaFileId,
+  buildDiscoveryDocument,
+} from './manifest';
 
 /**
  * Deterministic generator for the versioned artifacts derived from the
@@ -99,7 +103,9 @@ function buildOpenApiDocument() {
           required: true,
           content: {
             'application/json': {
-              schema: { $ref: `./schemas/${action.id}.invocation.json` },
+              schema: {
+                $ref: `./schemas/${actionSchemaFileId(action.id)}.invocation.json`,
+              },
             },
           },
         },
@@ -108,7 +114,9 @@ function buildOpenApiDocument() {
             description: 'Canonical action result union.',
             content: {
               'application/json': {
-                schema: { $ref: `./schemas/${action.id}.result.json` },
+                schema: {
+                  $ref: `./schemas/${actionSchemaFileId(action.id)}.result.json`,
+                },
               },
             },
           },
@@ -141,30 +149,34 @@ export function buildArtifacts(): Record<string, string> {
     ),
   };
   for (const action of ACTION_MANIFEST) {
-    artifacts[`schemas/${action.id}.input.json`] = serialize(
-      jsonSchema(
-        action.inputSchema,
-        `${action.id} input v${action.schemaVersion}`
-      )
-    );
-    artifacts[`schemas/${action.id}.output.json`] = serialize(
-      jsonSchema(
-        action.outputSchema,
-        `${action.id} output v${action.schemaVersion}`
-      )
-    );
-    artifacts[`schemas/${action.id}.invocation.json`] = serialize(
-      jsonSchema(
-        actionInvocationSchema(action.inputSchema),
-        `${action.id} invocation v${action.schemaVersion}`
-      )
-    );
-    artifacts[`schemas/${action.id}.result.json`] = serialize(
-      jsonSchema(
-        actionResultSchema(action.outputSchema),
-        `${action.id} result v${action.schemaVersion}`
-      )
-    );
+    artifacts[`schemas/${actionSchemaFileId(action.id)}.input.json`] =
+      serialize(
+        jsonSchema(
+          action.inputSchema,
+          `${action.id} input v${action.schemaVersion}`
+        )
+      );
+    artifacts[`schemas/${actionSchemaFileId(action.id)}.output.json`] =
+      serialize(
+        jsonSchema(
+          action.outputSchema,
+          `${action.id} output v${action.schemaVersion}`
+        )
+      );
+    artifacts[`schemas/${actionSchemaFileId(action.id)}.invocation.json`] =
+      serialize(
+        jsonSchema(
+          actionInvocationSchema(action.inputSchema),
+          `${action.id} invocation v${action.schemaVersion}`
+        )
+      );
+    artifacts[`schemas/${actionSchemaFileId(action.id)}.result.json`] =
+      serialize(
+        jsonSchema(
+          actionResultSchema(action.outputSchema),
+          `${action.id} result v${action.schemaVersion}`
+        )
+      );
   }
   return artifacts;
 }

@@ -972,6 +972,14 @@ export function ProfileCompactTemplate({
             ) : null}
             <div className='profile-compact-surface-slot relative min-h-0 flex-1'>
               <ProfileCompactSurface
+                proofClaimCta={
+                  proofClaim && claimFooterHref
+                    ? {
+                        href: claimFooterHref,
+                        label: claimFooterLabel ?? 'Claim yours',
+                      }
+                    : null
+                }
                 renderMode='interactive'
                 presentation={drawerPresentation}
                 onOpenReleaseCredits={

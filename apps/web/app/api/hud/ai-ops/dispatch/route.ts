@@ -17,7 +17,10 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 export async function POST(request: NextRequest) {
   try {
     const kioskToken = request.nextUrl.searchParams.get('kiosk');
-    const auth = await authorizeHud(kioskToken, { session: 'fresh' });
+    const auth = await authorizeHud(kioskToken, {
+      session: 'fresh',
+      privileged: true,
+    });
 
     if (!auth.ok) {
       return NextResponse.json(

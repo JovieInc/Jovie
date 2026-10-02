@@ -70,6 +70,138 @@ const MERGING_FOUNDATION = {
 };
 
 describe('linear sync on merge', () => {
+  it.each([
+    [
+      {
+        title: 'Codex goal: increase verified shipping throughput',
+        description: '/goal Deliver six outcomes',
+      },
+      'skip',
+    ],
+    [{ title: 'Implementation repair', description: '' }, 'close'],
+    [
+      {
+        title: 'Implementation repair',
+        description: '',
+        children: { nodes: [{ id: 'child', identifier: 'JOV-7286' }] },
+      },
+      'skip',
+    ],
+    [
+      { title: 'Implementation repair', description: '', children: null },
+      'skip',
+    ],
+    [
+      {
+        title: 'Implementation repair',
+        description: '',
+        labels: { nodes: [null] },
+      },
+      'skip',
+    ],
+    [
+      {
+        title: 'Implementation repair',
+        description: '',
+        labels: { nodes: [{ name: null }] },
+      },
+      'skip',
+    ],
+  ])(
+    'reads canonical acceptance metadata before merge-sync mutation: %j',
+    async (metadata, action) => {
+      const calls = [];
+      const result = await syncLinearIssueOnMerge({
+        env: {
+          LINEAR_API_KEY: 'test',
+          GITHUB_TOKEN: 'test',
+          GITHUB_REPOSITORY: 'JovieInc/Jovie',
+          PR_NUMBER: '19587',
+          PR_URL: MERGE_URL,
+          HEAD_REF: 'codex/jov-7227-repair',
+          PR_BODY:
+            'Refs JOV-7227.\n\n<!-- linear-issue-id:uuid -->\n<!-- linear-issue-identifier:JOV-7227 -->',
+          MERGE_SHA,
+        },
+        log: () => {},
+        fetchImpl: async (url, init) => {
+          const body = JSON.parse(String(init?.body ?? '{}'));
+          calls.push(body.query ?? 'GitHub');
+          if (String(url).includes('api.github.com'))
+            return {
+              ok: true,
+              headers: { get: () => '' },
+              json: async () => [],
+            };
+          if (body.query.includes('IssueDoneState')) {
+            expect(body.query).toContain('title');
+            expect(body.query).toContain('description');
+            return {
+              ok: true,
+              json: async () => ({
+                data: {
+                  issue: {
+                    id: 'uuid',
+                    identifier: 'JOV-7227',
+                    labels: { nodes: [] },
+                    children: { nodes: [] },
+                    team: {
+                      states: {
+                        nodes: [
+                          { id: 'done', name: 'Done', type: 'completed' },
+                        ],
+                      },
+                    },
+                    ...metadata,
+                  },
+                },
+              }),
+            };
+          }
+          return {
+            ok: true,
+            json: async () => ({
+              data: {
+                issueUpdate: { success: true },
+                commentCreate: { success: true },
+              },
+            }),
+          };
+        },
+      });
+      expect(result.action).toBe(action);
+      expect(calls.some(query => query.includes('issueUpdate'))).toBe(
+        action === 'close'
+      );
+    }
+  );
+
+  it.each([
+    {
+      title: 'Codex goal: increase verified shipping throughput',
+      description:
+        '/goal Increase shipping\n## Done means\n1. Production verified\n2. Hyperagent canary',
+    },
+    {
+      title: 'Repair throughput',
+      description: '/goal Deliver multiple outcomes',
+    },
+    { title: 'Epic: Marketing Page Factory' },
+    { title: 'Commission Summer: operational readiness' },
+    { labels: ['type:epic'] },
+  ])(
+    'holds unlabeled goal and parent acceptance beyond a supporting merge: %j',
+    metadata => {
+      const result = decideLinearCloseOnMerge({
+        issue: { ...JOV_6586_ISSUE, identifier: 'JOV-7227', ...metadata },
+        pullRequests: [],
+        mergingPull: MERGING_FOUNDATION,
+      });
+      expect(result.action).toBe('skip');
+      expect(result.comment).toContain('stays open');
+    }
+  );
+
   it('reads the JOV-6586 branch the way the merge workflow did', () => {
     expect(
       extractMergeIssueRef({
@@ -362,6 +494,8 @@ describe('linear sync on merge', () => {
                 issue: {
                   id: 'uuid-6586',
                   identifier: 'JOV-6586',
+                  title: 'Implementation repair',
+                  description: '',
                   labels: { nodes: [] },
                   children: { nodes: [] },
                   team: {
@@ -436,6 +570,8 @@ describe('linear sync on merge', () => {
                 issue: {
                   id: 'uuid-5853',
                   identifier: 'JOV-5853',
+                  title: 'Commission Summer',
+                  description: '',
                   labels: { nodes: [{ name: 'commissioning' }] },
                   children: { nodes: [{ identifier: 'JOV-6586' }] },
                   team: {
@@ -539,6 +675,8 @@ describe('linear sync on merge', () => {
                   issue: {
                     id: 'uuid-6586',
                     identifier: 'JOV-6586',
+                    title: 'Implementation repair',
+                    description: '',
                     labels: { nodes: [] },
                     children: { nodes: [] },
                     team: {

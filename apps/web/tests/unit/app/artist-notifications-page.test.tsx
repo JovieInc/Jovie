@@ -1,9 +1,14 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import ArtistNotificationsPage from '@/app/(marketing)/artist-notifications/page';
+import ArtistNotificationsPage, {
+  metadata,
+} from '@/app/(marketing)/artist-notifications/page';
 import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
 import { ARTIST_NOTIFICATIONS_SPEC_TILES } from '@/data/artistNotificationsFeatures';
 import { ARTIST_NOTIFICATIONS_SECTION_ORDER } from '@/data/artistNotificationsPageOrder';
+import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
+import { resolveMarketingRoutePolicy } from '@/lib/marketing/route-publication-policy';
+import { isSitemapIndexableMarketingRoute } from '@/lib/seo/sitemap-publication';
 import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 
 function expectArtistNotificationsSectionOrder() {
@@ -28,6 +33,21 @@ function expectArtistNotificationsSectionOrder() {
 }
 
 describe('ArtistNotificationsPage', () => {
+  it('renders indexable, matching its sitemap-published manifest entry (JOV-7277)', () => {
+    const entry = MARKETING_ROUTE_MANIFEST.find(
+      route => route.url === '/artist-notifications'
+    );
+    expect(entry).toBeDefined();
+    if (!entry) return;
+
+    // The capability is GA + public + proof-authorized, so policy and
+    // sitemap both publish it; the page must not opt out of indexing.
+    expect(resolveMarketingRoutePolicy(entry).indexable).toBe(true);
+    expect(isSitemapIndexableMarketingRoute(entry)).toBe(true);
+    expect(entry.noindex).not.toBe(true);
+    expect(metadata.robots).toBeUndefined();
+  });
+
   it('renders the notifications landing page with shared artist-profile sections', () => {
     render(<ArtistNotificationsPage />);
 

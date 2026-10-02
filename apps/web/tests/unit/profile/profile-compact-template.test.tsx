@@ -457,6 +457,25 @@ describe('ProfileCompactTemplate', () => {
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
   });
 
+  it('passes the proof claim to the phone claim bar (JOV-7114)', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        proofClaim
+        showClaimFooter
+        claimFooterHref='/start?campaign=proof-to-claim'
+        claimFooterLabel='Claim yours'
+      />
+    );
+
+    expect(
+      await screen.findByTestId('profile-proof-claim-bar-cta')
+    ).toHaveAttribute('href', '/start?campaign=proof-to-claim');
+  });
+
   it('hides the floating back control on the public profile root first landing', async () => {
     render(
       <ProfileCompactTemplate
@@ -857,9 +876,9 @@ describe('ProfileCompactTemplate', () => {
   // Regression: JOV-3377 — with overflow-y-auto, overflow-x computes to auto
   // (CSS Overflow 3), so the home scroll region clips at its own padding box.
   // Without the --page-pad bleed, that clip lands --page-pad inside the shell
-  // and hard-clips the catalog carousel's trailing card instead of letting it
-  // peek to the surface edge.
-  it('bleeds the home content scroll region to the shell edge so the catalog carousel is not clipped', async () => {
+  // and hard-clips the featured editorial card instead of letting it reach
+  // the surface edge (JOV-7123: the card replaces the old catalog carousel).
+  it('bleeds the home content scroll region to the shell edge so the editorial card is not clipped', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -1453,12 +1472,12 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(
-      screen.getByTestId('profile-home-alerts-fallback-card')
-    ).toHaveTextContent('Alerts');
-    expect(screen.getByTestId('profile-home-carousel')).toHaveTextContent(
-      'Tickets'
-    );
+    // JOV-7123: the featured editorial card carries the show — there is no
+    // carousel or separate alerts card on the home surface.
+    const pacCard = screen.getByTestId('profile-pac');
+    expect(pacCard).toHaveAttribute('data-state', 'tickets');
+    expect(pacCard).toHaveTextContent('Tickets');
+    expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
     expect(
       screen.queryByTestId('profile-hero-status-pill')
     ).not.toBeInTheDocument();
@@ -1481,25 +1500,19 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
-    const carousel = screen.getByTestId('profile-home-carousel');
     const pacCard = screen.getByTestId('profile-pac');
 
-    expect(alertsCard).toHaveTextContent('Alerts');
-    // The featured mode card carries the release and its Listen CTA; the
-    // alerts card stays last, inside the carousel below it.
+    // The featured editorial card carries the release and its Listen CTA as
+    // the single card surface on the home rail.
     expect(pacCard).toHaveTextContent("Don't Look Down");
     expect(pacCard).toHaveTextContent('Listen now');
-    expect(carousel.contains(alertsCard)).toBe(true);
-    expect(
-      screen.getByTestId('profile-pac').compareDocumentPosition(alertsCard)
-    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
     expect(
       screen.queryByTestId('profile-hero-status-pill')
     ).not.toBeInTheDocument();
   });
 
-  it('shows catalog releases in the home carousel when latestRelease is not provided', async () => {
+  it('leads the featured editorial card with the newest catalog release when latestRelease is not provided', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -1510,12 +1523,15 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
+    // JOV-7123: the editorial card resolves the newest catalog release as its
+    // subject; the rest of the catalog stays on the Music destination.
     const homeRail = screen.getByTestId('profile-home-rail');
     expect(homeRail).toHaveTextContent("Don't Look Down");
-    expect(homeRail).toHaveTextContent('Holding On');
+    expect(homeRail).not.toHaveTextContent('Holding On');
+    expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
   });
 
-  it('opens the alerts tab from the compact hero alerts row', async () => {
+  it('opens the alerts tab from the identity header Get Updates action', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -1525,11 +1541,9 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const alertsRow = screen.getByTestId('profile-home-alerts-fallback-card');
-    expect(alertsRow).toHaveTextContent('Alerts');
-    expect(alertsRow).not.toHaveTextContent('New music and shows');
-
-    fireEvent.click(alertsRow);
+    // JOV-7123: the alerts carousel card is gone; Get Updates on the
+    // identity header is the home capture entry point.
+    fireEvent.click(screen.getByTestId('profile-identity-get-updates'));
 
     await waitFor(() => {
       expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
@@ -1572,7 +1586,7 @@ describe('ProfileCompactTemplate', () => {
     // registered at mount, so clicks afterwards hit the reveal path.
     await screen.findByTestId('mock-inline-notifications-cta');
 
-    fireEvent.click(screen.getByTestId('profile-home-alerts-fallback-card'));
+    fireEvent.click(screen.getByTestId('profile-identity-get-updates'));
 
     await waitFor(() => {
       expect(revealNotifications).toHaveBeenCalledTimes(1);
@@ -1698,7 +1712,7 @@ describe('ProfileCompactTemplate', () => {
     // Early click: the visitor lands on the subscribe tab before the
     // assignment resolves; the panel receives the unresolved flag so its
     // capture control stays inert.
-    fireEvent.click(screen.getByTestId('profile-home-alerts-fallback-card'));
+    fireEvent.click(screen.getByTestId('profile-identity-get-updates'));
 
     await waitFor(() => {
       expect(mockProfilePrimaryTabPanel).toHaveBeenLastCalledWith(
@@ -1766,7 +1780,7 @@ describe('ProfileCompactTemplate', () => {
     });
   });
 
-  it('hides the compact hero alerts card for returning subscribers', async () => {
+  it('marks the Get Updates action subscribed for returning subscribers', async () => {
     mockUseProfileShell.mockImplementation(() => ({
       notificationsContextValue: {
         subscribedChannels: { email: true },
@@ -1789,15 +1803,15 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(
-      screen.queryByTestId('profile-home-alerts-fallback-card')
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('profile-home-alerts-row')
-    ).not.toBeInTheDocument();
+    // JOV-7123: no separate alerts card exists; subscribed visitors see the
+    // identity header's Updates On state instead of a capture CTA.
+    expect(screen.getByTestId('profile-identity-get-updates')).toHaveAttribute(
+      'data-subscribed',
+      'true'
+    );
   });
 
-  it('hides the compact hero alerts card after activation in the current session', async () => {
+  it('marks the Get Updates action subscribed after activation in the current session', async () => {
     mockProfileInlineNotificationsCTA.mockImplementation(
       (props: { readonly onSubscriptionActivated?: () => void }) => (
         <button
@@ -1838,12 +1852,10 @@ describe('ProfileCompactTemplate', () => {
 
     view.rerender(renderProfile());
 
-    expect(
-      screen.queryByTestId('profile-home-alerts-fallback-card')
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('profile-home-alerts-row')
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('profile-identity-get-updates')).toHaveAttribute(
+      'data-subscribed',
+      'true'
+    );
   });
 
   it('falls back to the mode prop when the URL has no mode param', async () => {
@@ -2003,7 +2015,7 @@ describe('ProfileCompactTemplate', () => {
     pushStateSpy.mockRestore();
   });
 
-  it('renders the confirmed playlist fallback when no release is available', async () => {
+  it('does not stack a playlist card under the featured editorial card', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -2024,15 +2036,14 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
+    // JOV-7123: one card surface on home — the playlist fallback no longer
+    // renders a second card under the editorial card.
+    expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
     expect(
-      screen.getByRole('link', {
+      screen.queryByRole('link', {
         name: /This Is Tim White/,
       })
-    ).toHaveAttribute(
-      'href',
-      'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu'
-    );
-    expect(screen.getByText('Open Playlist')).toBeInTheDocument();
+    ).not.toBeInTheDocument();
   });
 
   it('keeps optional hero role metadata out of the mobile hero chrome', async () => {
@@ -2096,9 +2107,10 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-home-carousel')).toHaveTextContent(
-      'The Ballroom'
-    );
+    // The featured editorial card resolves the upcoming show as its subject;
+    // nothing else stacks under it.
+    expect(screen.getByTestId('profile-pac')).toHaveTextContent('The Ballroom');
+    expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
     expect(
       screen.queryByRole('link', {
         name: `Open This Is playlist for ${mockArtist.name}`,

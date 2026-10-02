@@ -38,6 +38,7 @@ export {
   selectCampaignSettingsSchema,
 } from './admin';
 // Agent Registry (Skills Catalog, Tools Catalog, Retouch Jobs)
+export { agentVisibilityDrafts } from './agent-drafts';
 export {
   insertRetouchJobSchema,
   insertSkillsCatalogSchema,
@@ -251,6 +252,7 @@ export {
 export {
   type Contact,
   type ContactStageTransition,
+  contactEvidenceReviews,
   contactStageTransitions,
   contacts,
   insertContactSchema,
@@ -555,20 +557,47 @@ export {
   type NewFeedbackItem,
   selectFeedbackItemSchema,
 } from './feedback';
-// Finance (Owner-only personal financial data — JOV-4609)
+// Finance (Owner-only personal financial data — JOV-4609, JOV-4612)
 export {
   type FinanceAccount,
+  type FinanceAnomaly,
+  type FinanceBalanceSnapshot,
+  type FinanceBudgetSettings,
+  type FinanceBudgetTarget,
+  type FinanceClassificationRule,
   type FinanceExport,
   type FinanceInstitution,
+  type FinanceLedgerEvent,
+  type FinanceSyncState,
   type FinanceTransaction,
+  type FinanceTransactionClassification,
+  type FinanceTransactionSplit,
   financeAccounts,
+  financeAnomalies,
+  financeBalanceSnapshots,
+  financeBudgetSettings,
+  financeBudgetTargets,
+  financeClassificationRules,
   financeExports,
   financeInstitutions,
+  financeLedgerEvents,
+  financeSyncStates,
+  financeTransactionClassifications,
+  financeTransactionSplits,
   financeTransactions,
   type NewFinanceAccount,
+  type NewFinanceAnomaly,
+  type NewFinanceBalanceSnapshot,
+  type NewFinanceBudgetSettings,
+  type NewFinanceBudgetTarget,
+  type NewFinanceClassificationRule,
   type NewFinanceExport,
   type NewFinanceInstitution,
+  type NewFinanceLedgerEvent,
+  type NewFinanceSyncState,
   type NewFinanceTransaction,
+  type NewFinanceTransactionClassification,
+  type NewFinanceTransactionSplit,
 } from './finance';
 // Identity (Cross-platform artist identity links)
 export {
@@ -996,6 +1025,7 @@ export {
   type NewModelUsageEvent,
   selectModelExperimentSchema,
 } from './model-experiments';
+export { musicResolverReceipts } from './music-resolver';
 // Notifications (SMS subscribe intents, cross-artist contact identity)
 export {
   insertNotificationContactSchema,
@@ -1283,6 +1313,14 @@ export {
   type NewArtistRevenueCohortRow,
   selectArtistRevenueCohortSchema,
 } from './revenue-cohorts';
+export {
+  type CreatorProfileRider,
+  creatorProfileRiders,
+  type NewCreatorProfileRider,
+  RIDER_VISIBILITIES,
+  type RiderSection,
+  type RiderVisibility,
+} from './riders';
 // Sender (Email Quotas, Sending Reputation, Send Attribution)
 export {
   type CreatorEmailQuota,

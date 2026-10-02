@@ -105,14 +105,14 @@ export function buildHeaderSearchGroups(
       id: `library:${release.id}`,
       kind: 'library-assets' as const,
       label: release.title,
-      description: release.artistNames?.join(', ') || 'Library release',
+      description: release.artistNames?.join(', ') || 'Work release',
       href: release.smartLinkPath,
       provider: release.provider,
     }));
   if (libraryAssets.length > 0) {
     groups.push({
       kind: 'library-assets',
-      label: 'Library Assets',
+      label: 'Work',
       items: libraryAssets,
     });
   }

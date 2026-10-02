@@ -158,7 +158,7 @@ export async function buildMobileCalendar(
   const upcomingEvents = mobileEvents
     .filter(
       event =>
-        event.confirmationStatus !== 'rejected' &&
+        event.confirmationStatus === 'confirmed' &&
         isUpcomingEvent(event.eventDate, now)
     )
     .slice(0, UPCOMING_EVENT_LIMIT);

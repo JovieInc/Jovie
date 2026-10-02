@@ -19,8 +19,10 @@ import {
   screen,
   session,
   shell,
+  type WebContents,
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
+import { openCurrentOvieInBrowser } from './ovie-browser-recovery';
 import {
   OPERATOR_SPAWN_TIMEOUT_MS,
   runBoundedProcess,
@@ -50,6 +52,13 @@ import {
   redeemDesktopReturnCode,
 } from './desktop-auth-handback';
 import { startDesktopAuthLoopbackServer } from './desktop-auth-loopback';
+import {
+  applyDesktopPasskeyStateUpdate,
+  type DesktopPasskeyState,
+  describeWebAuthnAccounts,
+  parseDesktopPasskeyState,
+  resolveDesktopWebAuthnConfig,
+} from './desktop-passkey';
 import {
   bindPendingDesktopAuthCompletion,
   DESKTOP_AUTH_FLOW_PARAM,
@@ -90,10 +99,15 @@ import {
   getHudBuildFingerprint,
   isHudRoutePath,
   isWebBuildReloadPath,
+  SESSION_WORK_PROBE,
   shouldReloadWindowForWebBuild,
-  UNSENT_INPUT_PROBE,
 } from './hud-build-reload';
 import { resolveIpcSenderUrl } from './ipc-sender';
+import {
+  probeAllWindowWorkSafety,
+  probeSessionWorkSafety,
+  singleFlight,
+} from './session-work-state';
 import {
   type MainLivenessMonitor,
   createMainLivenessMonitor,
@@ -101,6 +115,7 @@ import {
   summarizeUnhandledRejection,
 } from './main-liveness';
 import { installNightlyUpdateLaunchAgent } from './nightly-update-launch-agent';
+import { DesktopNavigationCoordinator } from './navigation-coordinator';
 import {
   getUrlDisposition as getDesktopUrlDisposition,
   isAllowedExternalUrl as isAllowedDesktopExternalUrl,
@@ -121,6 +136,7 @@ import {
 import { evaluateRemoteDebuggingGuard } from './remote-debugging-guard';
 import {
   classifyDesktopLoadFailure,
+  createAuthHandoffNavigationRecovery,
   createLocalHostedLoadRetryController,
   type DesktopLoadFailureReason,
   type DesktopLoadFailureView,
@@ -134,6 +150,7 @@ import {
   decideRendererWatchdogExpiry,
   describeDesktopLoadFailure,
   hostedUrlCandidates,
+  isChromiumErrorDocument,
   parseDidStartNavigation,
   RECOVERY_UNLATCH_POLL_MS,
   rendererWatchdogMs,
@@ -171,6 +188,10 @@ if (APP_ENV === 'staging') {
 }
 
 const APP_ORIGIN = new URL(APP_URL).origin;
+const authNavigationRecoveries = new Map<
+  number,
+  ReturnType<typeof createAuthHandoffNavigationRecovery>
+>();
 const URL_DISPOSITION_OPTIONS = { appUrl: APP_URL, appEnv: APP_ENV } as const;
 const APP_ENTRY_URL = buildAppUrl('/app/chat');
 const SETTINGS_URL = buildAppUrl('/app/settings');
@@ -243,10 +264,15 @@ const GO_FORWARD_CHANNEL = 'go-forward';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
 const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
 const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
+const OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL = 'open-current-ovie-in-browser';
 const COPY_DESKTOP_AUTH_URL_CHANNEL = 'copy-desktop-auth-url';
 const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
 const REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL =
   'redeem-desktop-auth-return-code';
+const GET_DESKTOP_PASSKEY_STATE_CHANNEL = 'get-desktop-passkey-state';
+const SET_DESKTOP_PASSKEY_STATE_CHANNEL = 'set-desktop-passkey-state';
+const COMPLETE_DESKTOP_PASSKEY_SIGN_IN_CHANNEL =
+  'complete-desktop-passkey-sign-in';
 const CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL =
   'consume-desktop-auth-completion';
 const DESKTOP_AUTH_HANDOFF_PATH = '/desktop-auth';
@@ -269,6 +295,8 @@ const TRAY_ACTION_CHANNEL = 'tray-action';
 const DESKTOP_NOTIFICATION_CHANNEL = 'desktop-notification-show';
 /** Renderer → main: first successful React paint of the hosted app (JOV-3595). */
 const APP_BOOTED_CHANNEL = 'app-booted';
+const CLIENT_NAVIGATION_CHANNEL = 'desktop-client-navigation';
+const CLIENT_NAVIGATION_READY_CHANNEL = 'desktop-client-navigation-ready';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
 const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity';
 type UpdateChannel =
@@ -328,6 +356,7 @@ let desktopUpdatePhase: DesktopUpdatePhase = DESKTOP_UPDATE_INITIAL_STATE;
 // (up to date / error) shows a dialog; silent background checks stay silent.
 let pendingManualUpdateCheck = false;
 let mainWindow: BrowserWindow | null = null;
+const desktopNavigation = new DesktopNavigationCoordinator();
 let publicProfilePreviewWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
 let aboutWindow: BrowserWindow | null = null;
@@ -343,10 +372,31 @@ let lastCompletedAuthCode: string | null = null;
 // A request only completes a flow while one is pending — the flow nonce and
 // PKCE verifier still gate the handoff.
 let authLoopbackPort: number | null = null;
+// True once Touch ID WebAuthn is configured (signed build with profile).
+let desktopPasskeyAvailable = false;
 let mainWindowHiddenForAuthHandoff = false;
 let currentHudBuildFingerprint: string | null = null;
 // webContents ids still showing the web build that preceded the current one.
 const webBuildReloadPending = new Set<number>();
+const workDocumentGenerations = new WeakMap<WebContents, number>();
+ipcMain.on('desktop-work-state-changed', event => {
+  if (event.senderFrame !== event.sender.mainFrame) return;
+  workDocumentGenerations.set(
+    event.sender,
+    (workDocumentGenerations.get(event.sender) ?? 0) + 1
+  );
+});
+app.on('web-contents-created', (_event, contents) => {
+  contents.on('did-start-navigation', (...args: unknown[]) => {
+    const navigation = parseDidStartNavigation(args);
+    if (navigation?.isMainFrame && !navigation.isInPlace) {
+      workDocumentGenerations.set(
+        contents,
+        (workDocumentGenerations.get(contents) ?? 0) + 1
+      );
+    }
+  });
+});
 let lastDesktopUpdateCheckMs: number | null = null;
 let summerRuntimeBridge: SummerRuntimeBridge | null = null;
 let mainLivenessMonitor: MainLivenessMonitor | null = null;
@@ -768,6 +818,11 @@ function buildDesktopBrowserAuthUrl(urlString: string): string | null {
 function buildDesktopAuthHandoffUrl(authUrl: string): string {
   const url = new URL(DESKTOP_AUTH_HANDOFF_PATH, APP_URL);
   url.searchParams.set('auth_url', authUrl);
+  // UI hint only, so the handoff renders its Touch ID row without a layout
+  // shift. WebAuthn itself decides whether sign-in works.
+  if (desktopPasskeyAvailable && readDesktopPasskeyState().enrolled) {
+    url.searchParams.set('touch_id', '1');
+  }
   return url.toString();
 }
 
@@ -937,7 +992,12 @@ function restoreMainWindowAfterAuthHandoff(): void {
   if (!mainWindowHiddenForAuthHandoff) return;
   mainWindowHiddenForAuthHandoff = false;
   if (mainWindow && !mainWindow.isDestroyed()) {
-    if (
+    const recovery = authNavigationRecoveries.get(mainWindow.webContents.id);
+    const interruptedTarget = recovery?.cancel();
+    if (interruptedTarget) {
+      const completed = recovery!.navigationCompletion();
+      void mainWindow.loadURL(interruptedTarget).then(completed, () => {});
+    } else if (
       shouldRecoverAuthHandoffToCanonicalShell(mainWindow.webContents.getURL())
     ) {
       const authUrl = buildCentralDesktopAuthUrl('sign_in', '/app');
@@ -1037,6 +1097,9 @@ function loadAuthCompletion(completion: DesktopAuthCompletion): void {
     mainWindow && !mainWindow.isDestroyed()
       ? mainWindow
       : createWindow(targetUrl);
+  // Successful auth owns its returned route; cancellation recovery must not
+  // replay the earlier interrupted navigation when the handoff closes.
+  authNavigationRecoveries.get(win.webContents.id)?.clear();
 
   if (win.webContents.getURL() !== targetUrl) {
     void win.loadURL(targetUrl);
@@ -1120,6 +1183,98 @@ function handleAuthCompletion(
   return 'completed';
 }
 
+const DESKTOP_PASSKEY_STATE_FILE = path.join(
+  app.getPath('userData'),
+  'desktop-passkey.json'
+);
+
+// Loaded once when Touch ID is configured; writes keep it current. The
+// main process never blocks on disk after startup.
+let desktopPasskeyState = parseDesktopPasskeyState(undefined);
+
+function readDesktopPasskeyState(): DesktopPasskeyState {
+  return desktopPasskeyState;
+}
+
+async function writeDesktopPasskeyState(
+  state: DesktopPasskeyState
+): Promise<boolean> {
+  try {
+    await fs.promises.writeFile(
+      DESKTOP_PASSKEY_STATE_FILE,
+      JSON.stringify(state),
+      { mode: 0o600 }
+    );
+    desktopPasskeyState = state;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Touch ID sign-in (JOV-6727, docs/macos/desktop-auth.md). Only a signed
+// build that embeds the Developer ID provisioning profile may use the
+// keychain-access-groups entitlement; without it, stay off.
+async function configureDesktopWebAuthn(): Promise<void> {
+  const config = resolveDesktopWebAuthnConfig({
+    platform: process.platform,
+    isPackaged: app.isPackaged,
+    appEnv: APP_ENV,
+    hasEmbeddedProvisioningProfile: await fs.promises
+      .access(path.join(process.resourcesPath, '..', 'embedded.provisionprofile'))
+      .then(
+        () => true,
+        () => false
+      ),
+  });
+  if (!config) return;
+
+  try {
+    app.configureWebAuthn({ touchID: config });
+    desktopPasskeyAvailable = true;
+    try {
+      desktopPasskeyState = parseDesktopPasskeyState(
+        await fs.promises.readFile(DESKTOP_PASSKEY_STATE_FILE, 'utf8')
+      );
+    } catch {
+      // No state yet: not enrolled, never asked.
+    }
+  } catch (error) {
+    console.error('[Jovie Desktop] Touch ID WebAuthn unavailable', {
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    return;
+  }
+
+  session.defaultSession.on(
+    'select-webauthn-account',
+    (_event, details, callback) => {
+      // The request hangs until the callback runs, so every path calls it.
+      const choice = describeWebAuthnAccounts(details.accounts);
+      if (choice.kind !== 'choose') {
+        callback(choice.kind === 'single' ? choice.credentialId : undefined);
+        return;
+      }
+      const options = {
+        type: 'question' as const,
+        message: 'Choose an account',
+        buttons: [...choice.labels, 'Cancel'],
+        defaultId: 0,
+        cancelId: choice.labels.length,
+      };
+      const parent = BrowserWindow.getFocusedWindow();
+      (parent
+        ? dialog.showMessageBox(parent, options)
+        : dialog.showMessageBox(options)
+      )
+        .then(({ response }) =>
+          callback(details.accounts[response]?.credentialId)
+        )
+        .catch(() => callback());
+    }
+  );
+}
+
 function loadReturnedRoute(route: string): void {
   const targetUrl = new URL(route, APP_URL).toString();
   const win =
@@ -1127,6 +1282,8 @@ function loadReturnedRoute(route: string): void {
       ? mainWindow
       : createWindow(targetUrl);
 
+  // Successful handback owns its returned route, not the interrupted old one.
+  authNavigationRecoveries.get(win.webContents.id)?.clear();
   if (win.webContents.getURL() !== targetUrl) {
     void win.loadURL(targetUrl);
   }
@@ -1276,6 +1433,27 @@ function maybeShowDesktopAuthHandoff(urlString: string): boolean {
   if (!authUrl) return false;
 
   showDesktopAuthHandoff(authUrl);
+  return true;
+}
+
+function interceptMainWindowAuthNavigation(
+  win: BrowserWindow,
+  url: string
+): boolean {
+  const authUrl = buildDesktopBrowserAuthUrl(url);
+  if (!authUrl) return false;
+  const recovery = authNavigationRecoveries.get(win.webContents.id);
+  const action = recovery?.authIntercepted();
+  if (action === 'ignore') return true;
+  if (action === 'canonical-auth-shell') {
+    // A failed one-shot retry remains recoverable in this window, not a loop
+    // of newly opened handoffs. Existing server auth checks remain authority.
+    const completed = recovery!.navigationCompletion();
+    void win.loadURL(buildDesktopAuthHandoffUrl(authUrl)).then(completed, () => {});
+    showWindow(win);
+  } else {
+    showDesktopAuthHandoff(authUrl);
+  }
   return true;
 }
 
@@ -1463,6 +1641,11 @@ async function persistDesktopBuildIdentityEvidence(): Promise<void> {
 }
 
 function showDesktopAboutWindow(): void {
+  if (process.platform === 'darwin') {
+    app.showAboutPanel();
+    return;
+  }
+
   if (aboutWindow && !aboutWindow.isDestroyed()) {
     showWindow(aboutWindow);
     return;
@@ -1624,24 +1807,43 @@ function isWebBuildReloadWindow(win: BrowserWindow): boolean {
   );
 }
 
-/** Unreadable renderers count as holding input: never drop text on a guess. */
-async function windowHasUnsentInput(win: BrowserWindow): Promise<boolean> {
-  try {
-    return (
-      (await win.webContents.executeJavaScript(UNSENT_INPUT_PROBE)) === true
-    );
-  } catch {
-    return true;
-  }
+/** Auth remains main-owned even when the chat renderer is hidden or idle. */
+function hasPendingDesktopAuthentication(): boolean {
+  return Boolean(
+    isAuthHandoffOpen() ||
+    desktopBrowserAuthRouteState.pendingPkce ||
+    desktopBrowserAuthRouteState.recoveryNavigationPending ||
+    pendingAuthCompletion ||
+    pendingLegacyAuthReturnRoute
+  );
 }
 
-async function anyWindowHasUnsentInput(): Promise<boolean> {
-  const results = await Promise.all(
-    BrowserWindow.getAllWindows()
-      .filter(isWebBuildReloadWindow)
-      .map(windowHasUnsentInput)
-  );
-  return results.some(Boolean);
+/** Unknown state, draft probe failures and navigation during a probe block reload. */
+async function windowWorkStateSafe(win: BrowserWindow): Promise<boolean> {
+  if (win.isDestroyed() || win.webContents.isLoadingMainFrame()) return false;
+  const contents = win.webContents;
+  const generation = workDocumentGenerations.get(contents);
+  return probeSessionWorkSafety({
+    read: () => contents.executeJavaScript(SESSION_WORK_PROBE),
+    isCurrentDocument: () =>
+      !win.isDestroyed() &&
+      !contents.isLoadingMainFrame() &&
+      generation === workDocumentGenerations.get(contents),
+    isAuthenticating: hasPendingDesktopAuthentication,
+    now: Date.now,
+  });
+}
+
+function allWindowWorkStateSafe(): Promise<boolean> {
+  return probeAllWindowWorkSafety({
+    getWindows: () => BrowserWindow.getAllWindows().filter(
+      win => win === mainWindow || isWebBuildReloadWindow(win)
+    ),
+    getGeneration: win => workDocumentGenerations.get(win.webContents),
+    isLoading: win => win.isDestroyed() || win.webContents.isLoadingMainFrame(),
+    probe: windowWorkStateSafe,
+    isAuthenticating: hasPendingDesktopAuthentication,
+  });
 }
 
 function anyWindowAudible(): boolean {
@@ -1651,7 +1853,6 @@ function anyWindowAudible(): boolean {
 }
 
 async function reloadIdleWindowsForWebBuildChange(): Promise<void> {
-  const systemIdleSeconds = powerMonitor.getSystemIdleTime();
   const liveIds = new Set<number>();
   for (const win of BrowserWindow.getAllWindows()) {
     if (!isWebBuildReloadWindow(win)) continue;
@@ -1659,14 +1860,17 @@ async function reloadIdleWindowsForWebBuildChange(): Promise<void> {
     liveIds.add(id);
     if (!webBuildReloadPending.has(id)) continue;
 
+    const workStateSafe = await windowWorkStateSafe(win);
+    if (win.isDestroyed()) continue;
     const isHud = isHudWindow(win);
     const reload = shouldReloadWindowForWebBuild({
       isHud,
       visible: win.isVisible() && !win.isMinimized(),
       focused: win.isFocused(),
       audible: win.webContents.isCurrentlyAudible(),
-      hasUnsentInput: isHud ? false : await windowHasUnsentInput(win),
-      systemIdleSeconds,
+      hasUnsentInput: false, // Included in the request-time work probe.
+      workStateSafe,
+      systemIdleSeconds: powerMonitor.getSystemIdleTime(),
     });
     if (reload && !win.isDestroyed()) {
       webBuildReloadPending.delete(id);
@@ -1678,7 +1882,7 @@ async function reloadIdleWindowsForWebBuildChange(): Promise<void> {
   }
 }
 
-async function checkHudBuildAndReload(): Promise<void> {
+const checkHudBuildAndReload = singleFlight(async () => {
   const reloadable = BrowserWindow.getAllWindows().filter(
     isWebBuildReloadWindow
   );
@@ -1702,7 +1906,7 @@ async function checkHudBuildAndReload(): Promise<void> {
   if (webBuildReloadPending.size > 0) {
     await reloadIdleWindowsForWebBuildChange();
   }
-}
+});
 
 function showPublicProfilePreview(urlString: string): boolean {
   const canonicalUrl = canonicalPublicProfileUrl(urlString);
@@ -2252,6 +2456,36 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   });
 
   mainWindow = win;
+  const navigationContentsId = win.webContents.id;
+  win.webContents.on('render-process-gone', () => {
+    desktopNavigation.setReady(navigationContentsId, false);
+  });
+  win.webContents.on('destroyed', () => {
+    desktopNavigation.setReady(navigationContentsId, false);
+  });
+  const authNavigationRecovery = createAuthHandoffNavigationRecovery(APP_ORIGIN);
+  const authNavigationContentsId = win.webContents.id;
+  authNavigationRecoveries.set(authNavigationContentsId, authNavigationRecovery);
+  win.on('closed', () => {
+    authNavigationRecovery.clear();
+    authNavigationRecoveries.delete(authNavigationContentsId);
+  });
+  win.webContents.on('did-start-navigation', (...args: unknown[]) => {
+    const navigation = parseDidStartNavigation(args);
+    if (!navigation) return;
+    if (navigation.isMainFrame && !navigation.isInPlace) {
+      desktopNavigation.setReady(navigationContentsId, false);
+    }
+    authNavigationRecovery.navigationStarted({
+      ...navigation,
+      currentUrl: win.webContents.getURL(),
+    });
+  });
+  win.webContents.on('did-finish-load', () => {
+    if (!isChromiumErrorDocument(win.webContents.getURL())) {
+      authNavigationRecovery.documentFinished();
+    }
+  });
 
   win.webContents.setUserAgent(
     `${win.webContents.getUserAgent()} ${DESKTOP_USER_AGENT_PRODUCT}`
@@ -2267,7 +2501,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   attachRendererRecovery(win, {
     shouldSkipWatchdog: isAuthHandoffInteractive,
     onAbortedMainFrame: validatedURL =>
-      maybeShowDesktopAuthHandoff(resolveNavigationUrl(validatedURL)),
+      interceptMainWindowAuthNavigation(win, resolveNavigationUrl(validatedURL)),
   });
 
   registerMainWindowPermissionHandlers(win.webContents.session);
@@ -2276,7 +2510,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   // dedicated handoff; all other safe URLs open in the system browser.
   win.webContents.on('will-navigate', (event, url) => {
     const navigationUrl = resolveNavigationUrl(url);
-    if (maybeShowDesktopAuthHandoff(navigationUrl)) {
+    if (interceptMainWindowAuthNavigation(win, navigationUrl)) {
       event.preventDefault();
       return;
     }
@@ -2314,7 +2548,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
 
   win.webContents.on('will-redirect', (event, url, _isInPlace, isMainFrame) => {
     const navigationUrl = resolveNavigationUrl(url);
-    if (maybeShowDesktopAuthHandoff(navigationUrl)) {
+    if (isMainFrame && interceptMainWindowAuthNavigation(win, navigationUrl)) {
       event.preventDefault();
       return;
     }
@@ -2349,7 +2583,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     if (disposition === 'profile-preview') {
       showPublicProfilePreview(url);
     } else if (disposition === 'in-app') {
-      void win.loadURL(url);
+      navigateInApp(win, url);
     } else if (disposition === 'external') {
       void openExternalUrl(url);
     }
@@ -2411,6 +2645,21 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   return win;
 }
 
+function navigateInApp(win: BrowserWindow, url: string): void {
+  if (win.isDestroyed()) return;
+  const action = desktopNavigation.resolve(
+    win.webContents.id,
+    win.webContents.getURL(),
+    url,
+    URL_DISPOSITION_OPTIONS
+  );
+  if (action?.kind === 'client') {
+    win.webContents.send(CLIENT_NAVIGATION_CHANNEL, action.path);
+  } else if (action?.kind === 'document') {
+    void win.loadURL(action.url);
+  }
+}
+
 function openPreferences(): void {
   // Mid-handoff the focused window is the small, non-resizable auth window and
   // the main window is intentionally hidden — loading settings into either
@@ -2422,7 +2671,7 @@ function openPreferences(): void {
     return;
   }
 
-  void mainWindow.loadURL(SETTINGS_URL);
+  navigateInApp(mainWindow, SETTINGS_URL);
   showWindow(mainWindow);
 }
 
@@ -2532,29 +2781,35 @@ function scheduleDesktopAutoUpdate(): void {
 }
 
 /** Restart into a downloaded update only overnight, idle, and with no work at risk. */
-async function installDownloadedUpdateIfIdle(): Promise<void> {
+const installDownloadedUpdateIfIdle = singleFlight(async () => {
   if (!updateReadyToInstall || nightlyUpdateLaunch) return;
-  const baseline = {
-    updateReadyToInstall,
-    localHour: new Date().getHours(),
-    systemIdleSeconds: powerMonitor.getSystemIdleTime(),
-    audible: anyWindowAudible(),
-  };
-  if (
-    !shouldInstallDownloadedUpdateWhileRunning({
-      ...baseline,
-      hasUnsentInput: false,
-    })
-  ) {
-    return;
-  }
+  const workStateSafe = await allWindowWorkStateSafe();
   if (
     shouldInstallDownloadedUpdateWhileRunning({
-      ...baseline,
-      hasUnsentInput: await anyWindowHasUnsentInput(),
+      updateReadyToInstall,
+      localHour: new Date().getHours(),
+      systemIdleSeconds: powerMonitor.getSystemIdleTime(),
+      audible: anyWindowAudible(),
+      hasUnsentInput: false, // Included in the request-time work probe.
+      workStateSafe,
     })
   ) {
     autoUpdater.quitAndInstall(true, true);
+  }
+});
+
+async function installNightlyDownloadedUpdate(): Promise<void> {
+  const workStateSafe = await allWindowWorkStateSafe();
+  if (
+    shouldInstallDownloadedUpdateNow({
+      nightlyLaunch: nightlyUpdateLaunch,
+      hasVisibleWindow: BrowserWindow.getAllWindows().some(
+        win => !win.isDestroyed() && win.isVisible() && !win.isMinimized()
+      ),
+      workStateSafe,
+    })
+  ) {
+    autoUpdater.quitAndInstall(true, false);
   }
 }
 
@@ -2779,16 +3034,8 @@ autoUpdater.on('update-downloaded', info => {
   sendToAppWindows(UPDATE_DOWNLOADED_CHANNEL);
   pushUpdateEvent({ type: 'update-downloaded', version: info.version });
 
-  const hasVisibleWindow = BrowserWindow.getAllWindows().some(
-    win => !win.isDestroyed() && win.isVisible() && !win.isMinimized()
-  );
-  if (
-    shouldInstallDownloadedUpdateNow({
-      nightlyLaunch: nightlyUpdateLaunch,
-      hasVisibleWindow,
-    })
-  ) {
-    autoUpdater.quitAndInstall(true, false);
+  if (nightlyUpdateLaunch) {
+    void installNightlyDownloadedUpdate();
     return;
   }
   void installDownloadedUpdateIfIdle();
@@ -2882,6 +3129,24 @@ ipcMain.handle(DESKTOP_UPDATE_INSTALL_CHANNEL, event => {
   return { ok: true };
 });
 
+// Only the live main document may announce a mounted client router.
+ipcMain.on(CLIENT_NAVIGATION_READY_CHANNEL, (event, ready: unknown) => {
+  if (
+    typeof ready !== 'boolean' ||
+    !mainWindow ||
+    mainWindow.isDestroyed() ||
+    event.sender !== mainWindow.webContents ||
+    !event.senderFrame ||
+    event.senderFrame.detached ||
+    event.senderFrame !== mainWindow.webContents.mainFrame ||
+    event.senderFrame.parent !== null ||
+    parseUrl(getIpcSenderUrl(event))?.origin !== APP_ORIGIN
+  ) {
+    return;
+  }
+  desktopNavigation.setReady(event.sender.id, ready);
+});
+
 // Hosted app first-paint heartbeat (JOV-3595). Uses send (not invoke) so a
 // missing main handler on a stale binary cannot reject the renderer promise.
 ipcMain.on(APP_BOOTED_CHANNEL, event => {
@@ -2934,6 +3199,25 @@ ipcMain.handle(GO_FORWARD_CHANNEL, (event: IpcMainInvokeEvent) => {
   if (win && !win.isDestroyed() && win.webContents.canGoForward())
     win.webContents.goForward();
 });
+
+ipcMain.handle(
+  OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL,
+  (event: IpcMainInvokeEvent, ...args: unknown[]) =>
+    openCurrentOvieInBrowser(
+      {
+        isMainWindow: event.sender === mainWindow?.webContents,
+        isMainFrame:
+          event.senderFrame != null &&
+          !event.senderFrame.detached &&
+          event.senderFrame.parent === null,
+        senderUrl: getIpcSenderUrl(event),
+        currentUrl: mainWindow?.webContents.getURL() ?? '',
+        args,
+        options: URL_DISPOSITION_OPTIONS,
+      },
+      url => shell.openExternal(url)
+    )
+);
 
 ipcMain.handle(
   OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL,
@@ -3071,6 +3355,51 @@ ipcMain.handle(
     }
 
     handleAuthCompletion(result.completion);
+    return { ok: true };
+  }
+);
+
+ipcMain.handle(
+  GET_DESKTOP_PASSKEY_STATE_CHANNEL,
+  (event: IpcMainInvokeEvent, ...args: unknown[]) => {
+    if (!isTrustedIpcSender(event) || args.length !== 0) {
+      return { available: false, enrolled: false, dismissed: false };
+    }
+    return { available: desktopPasskeyAvailable, ...readDesktopPasskeyState() };
+  }
+);
+
+ipcMain.handle(
+  SET_DESKTOP_PASSKEY_STATE_CHANNEL,
+  async (
+    event: IpcMainInvokeEvent,
+    update: unknown,
+    ...args: unknown[]
+  ): Promise<DesktopAuthOpenResult> => {
+    const next = applyDesktopPasskeyStateUpdate(update);
+    if (!isTrustedIpcSender(event) || args.length !== 0 || !next) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+    return (await writeDesktopPasskeyState(next))
+      ? { ok: true }
+      : { ok: false, reason: 'state-write-failed' };
+  }
+);
+
+ipcMain.handle(
+  COMPLETE_DESKTOP_PASSKEY_SIGN_IN_CHANNEL,
+  (event: IpcMainInvokeEvent, ...args: unknown[]): DesktopAuthOpenResult => {
+    if (
+      !isTrustedDesktopAuthSender(event) ||
+      args.length !== 0 ||
+      !desktopPasskeyAvailable
+    ) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+    // The passkey sign-in already set the session cookie in this session.
+    // Drop the browser flow and open the workspace; /app re-checks auth.
+    clearPendingDesktopAuthFlow();
+    loadReturnedRoute('/app');
     return { ok: true };
   }
 );
@@ -3226,6 +3555,8 @@ app.whenReady().then(async () => {
     return;
   }
 
+  await configureDesktopWebAuthn();
+
   const appIconPath = getAppIconPath();
   if (process.platform === 'darwin' && appIconPath && app.dock) {
     app.dock.setIcon(appIconPath);
@@ -3371,7 +3702,7 @@ function routeDesktopNotificationClick(urlString: string | undefined): void {
     URL_DISPOSITION_OPTIONS
   );
   if (action.kind === 'load-url') {
-    void win.loadURL(action.url);
+    navigateInApp(win, action.url);
   } else if (action.kind === 'profile-preview') {
     showPublicProfilePreview(action.url);
   } else if (action.kind === 'open-external') {

@@ -655,16 +655,22 @@ jobs:
         if: ${{ steps.head.outputs.is_current == 'true' }}
         env:
           BASE_URL: https://staging.jov.ie
+          DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
           EXPECTED_VERCEL_ALIAS_ORIGIN: https://staging.jov.ie
           EXPECTED_VERCEL_ENVIRONMENT: preview
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_DYNAMIC_SECRETS_FILE: ${{ runner.temp }}/playwright-dynamic-cookie-values
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           # Provider-console callback allowlists intentionally name the shared
           # staging alias. This proof must run only after this exact deployment
           # owns staging.jov.ie; pre-alias probes can test a stale generation.
+          set -euo pipefail
+          deployment_url="$(printf '%s' "$DEPLOYMENT_URL_B64" | base64 --decode)"
+          test -n "$deployment_url"
           cd apps/web
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
@@ -686,7 +692,12 @@ jobs:
           attempt=1
           max_attempts=3
           while [ "$attempt" -le "$max_attempts" ]; do
-            if PLAYWRIGHT_WORKERS=1 CI=true SMOKE_ONLY=1 \
+            # Production promotion rewrites every project domain. Reassert the
+            # exact preview on every retry so an overlapping rollout cannot
+            # turn a safe retry into a permanent wrong-environment failure.
+            if "$GITHUB_WORKSPACE/node_modules/.bin/vercel" alias set \
+              "$deployment_url" staging.jov.ie --scope "$VERCEL_ORG_ID" && \
+              PLAYWRIGHT_WORKERS=1 CI=true SMOKE_ONLY=1 \
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
                 pnpm exec playwright test tests/e2e/oauth-providers.spec.ts \
                   --project=chromium --reporter=line; then
@@ -1417,21 +1428,27 @@ jobs:
           }
 
           for attempt in $(seq 1 15); do
+            # Production promotion may rewrite project domains while this
+            # staging generation is becoming durable. Reassert before each
+            # control-plane observation, then prove the exact deployment.
+            ./node_modules/.bin/vercel alias set "$deployment_url" staging.jov.ie \
+              --scope "$VERCEL_ORG_ID"
             alias_json="$(./node_modules/.bin/vercel inspect staging.jov.ie \
               --format=json --scope "$VERCEL_ORG_ID" 2>/dev/null || true)"
             if jq -e '
               type == "object" and
               (.id | type == "string") and
-              (.readyState | type == "string") and
-              (.target | type == "string")
+              (.readyState | type == "string")
             ' >/dev/null 2>&1 <<<"$alias_json"; then
               alias_id="$(jq -r '.id' <<<"$alias_json")"
               alias_state="$(jq -r '.readyState | ascii_upcase' <<<"$alias_json")"
-              alias_target="$(jq -r '.target | ascii_downcase' <<<"$alias_json")"
               if [ "$alias_id" = "$EXPECTED_DEPLOYMENT_ID" ] &&
-                [ "$alias_state" = "READY" ] &&
-                [ "$alias_target" = "preview" ]; then
-                echo "staging.jov.ie owns exact READY preview $alias_id."
+                [ "$alias_state" = "READY" ]; then
+                # Vercel inspect does not consistently expose target metadata.
+                # The live build-info proof below binds the exact deployment to
+                # the preview environment without making alias convergence race
+                # an optional inspect field.
+                echo "staging.jov.ie owns exact READY deployment $alias_id."
                 break
               fi
             fi
@@ -1479,6 +1496,8 @@ jobs:
           # stale content retries; transport/auth/schema failures stay terminal.
           build_info_path="$RUNNER_TEMP/staging-build-info.json"
           for identity_attempt in $(seq 1 5); do
+            ./node_modules/.bin/vercel alias set "$deployment_url" staging.jov.ie \
+              --scope "$VERCEL_ORG_ID"
             curl_status=0
             response_meta="$(curl "${curl_args[@]}" \
               --output "$build_info_path" \

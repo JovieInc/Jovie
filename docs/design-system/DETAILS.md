@@ -707,23 +707,27 @@ duration token (subtle, cinematic, and raw scale) drops to 0ms automatically.
 
 The authenticated product has one shell and one reviewed default navigation.
 `apps/web/components/features/dashboard/dashboard-nav/config.ts` is the code
-source of truth; this table records the founder-approved six entries rendered
-by the canonical customer shell. Settings and OV operator tools are contextual
-or mutually exclusive surfaces, not additions to this primary six-item IA.
+source of truth; this table records the founder-approved root, utilities, and
+contextual model rendered by the canonical customer shell. Settings and OV operator tools are contextual
+or mutually exclusive surfaces, not additions to the four-item root IA.
 
 | Group | Item | Canonical destination | Behavior |
 |-------|------|-----------------------|----------|
-| Primary | Inbox | `/app` | Opens the opportunity and work queue |
-| Primary | Chat | `/app/chat` | Starts or resumes the conversation workspace |
-| Primary | Library | `/app/library` | Opens releases, audio, video, images, and files |
-| Primary | Contacts | `/app/contacts` | Opens the artist contact workspace |
-| Primary | Calendar | `/app/calendar` | Opens release dates, events, and calendar moments |
-| Primary | Tasks | `/app/tasks` | Opens the task workspace |
-| Contextual | Presence | `/app/presence` | Published output for the active identity, rendered in the artist group (`artistNavigation`), never the primary rail |
+| Primary | Home | `/app` | Opens the opportunity and attention queue without exposing its internal entity model |
+| Primary | Identity | `/app/presence` | Owns bio, profile, social, contact, and search representation |
+| Primary | Work | `/app/library` | Owns releases, videos, merch, products, events, writing, campaigns, and shareable links |
+| Primary | Audience | `/app/contacts?tab=audience` | Opens the audience context inside the Contacts workspace |
+| Utility | Inbox | `/app` | Compact shell action for pending opportunities and runtime attention |
+| Utility | New Chat | `/app/chat` | Compact shell action that starts a conversation |
+| Contextual | Links | `/app/chat?panel=profile` and existing destination routes | Represents or distributes Identity and Work without becoming a third top-level concept |
+| Contextual | Events, Products, Releases, Videos, and other entities | Existing workspace routes and entity rails | Materialize as concrete Work filters or in-context views instead of permanent peer rows |
 
 Any permanent IA change must update `primaryNavigation`, its exact structure
 test, this table, and the route coverage test in the same change. Desktop and
 mobile navigation derive from the same ordered item identities.
+
+One data model supports many contextual views. Users navigate by the job they
+are completing; they do not need to understand Jovie's internal entity graph.
 
 ### Five Page Types
 
@@ -756,6 +760,9 @@ shift.
   or command-palette popup.
 - Release rows and other entity rows open the right detail rail; task workflows
   that are true multi-step workspaces retain their reviewed canonical route.
+- Calendar, Tasks, Releases, and other entity/workflow routes remain reachable
+  from Work, contextual links, search, Home, or chat. Root placement never
+  changes their canonical route contract.
 - Reuse the canonical `EmptyState` family. New bespoke `*EmptyState.tsx`
   components are blocked; compose an existing primitive or add a state variant.
 
@@ -763,8 +770,10 @@ shift.
 
 | Date | Decision | Operating trigger |
 |------|----------|-------------------|
+| 2026-09-30 | **EVENT: Identity / Work ontology.** The canonical customer root is Home, Identity, Work, Audience. Links represent or distribute Identity and Work. Existing presence and library routes remain canonical compatibility contracts. | **Ship now:** use the paired nouns in navigation and product copy. **Re-evaluate when:** the new telemetry variant has 200 consented activations per measured platform or 14 complete days of evidence, whichever takes longer. **Then:** retain the vocabulary only if destination-ready and short-return rates are no worse and the five audience fixtures do not read Work as tasks or a workspace. |
+| 2026-09-29 | **EVENT: Job-level root IA, superseded by JOV-7305 labels and ownership.** The four-slot capacity and contextual entity model remain valid. | Keep the four-item capacity and shared desktop/mobile source of truth. |
 | 2026-07-22 | **EVENT: One authenticated app shell.** Header, sidebar, content frame, and right rail are one system; routes may not introduce a parallel shell. | Ship now: extend the shared shell. Re-evaluate only for a mutually exclusive security boundary that cannot share authenticated navigation. Then: document that boundary before introducing another shell. |
-| 2026-07-22 | **Inbox is home.** `/app` renders the opportunity Inbox and Inbox is the first canonical customer navigation entry. | Ship now: keep `/app` as Inbox. Re-evaluate when 30 days of production navigation telemetry shows more than 25% of signed-in home visits immediately leave without an Inbox action. Then: test a different home entry while preserving one shell and one canonical `/app` route. |
+| 2026-07-22 | **Inbox is home.** `/app` renders the opportunity Inbox; JOV-7159 later names this root destination Home while retaining the route and outcome. | Ship now: keep `/app` as Home. Re-evaluate when 30 days of production navigation telemetry shows more than 25% of signed-in home visits immediately leave without an Inbox action. Then: test a different home entry while preserving one shell and one canonical `/app` route. |
 
 ## Component Patterns
 
@@ -789,6 +798,14 @@ ActionButton / product CTAs are a 28px visible pill (weight 510, radius 999).
 Mobile wraps that pill in a 44px tap target. Not 32-in-44 and not density-32
 on every size. CTA labels use medium (`--font-weight-medium` / 510). Do not
 keep them at semibold (~590) and do not drop medium surfaces to book/400.
+
+#### Focused task-action hierarchy
+
+In focused auth, onboarding, connection, and recovery states, visual prominence follows the recommended next step. Alternate routes to the same outcome form one subordinate group and stay progressively disclosed when the normal path does not need them. Peer alternatives use one peer row primitive, regardless of implementation history. Routine cancellation is a separate, visually quiet exit, never a peer CTA.
+
+This is an applicability rule, not a universal button-count cap. Passive and completed states may have no primary action. Safety-critical Stop actions and genuine decision or confirmation dialogs keep their explicit action semantics.
+
+Each focused surface declares its default-state control budget and covers loading, failure, disabled, keyboard, focus, reduced-motion, long-copy, and compact-window states. The desktop auth specialization and deliberate-red / neighboring-green evaluator live in `docs/macos/desktop-auth.md` and `apps/web/tests/unit/design-system/desktop-auth-task-hierarchy-v1.test.tsx`.
 
 ### Sidebar (App Shell)
 
@@ -1055,5 +1072,6 @@ the JSX-comment form for a text child).
 | 2026-09-10 | Ion / product focus is `#11AFFF` (lighter blue), not `#1F7BF5` | Tim KEEP ~1:26 PT. Ultra/pulse/mint/orange/red stay noir-ion lock hexes. Exactly 5 elevations; no panel. |
 | 2026-09-10 | ActionButton / product CTAs: 28px visible, 510, radius 999; mobile 44px hit wrapping the 28px pill | Tim KEEP ~1:26 PT. Not 32-in-44 and not density-32 everywhere. Homepage not rewritten. `#17156` HOLD. `#17453` untouched. |
 | 2026-09-10 | Pen node ZiaWI is the canonical color SoT (`ziawi-color-sot-v1`) | Tim add ~1:34 PT. React tokens in #17584 must match ZiaWI. Do not invent a parallel React-only color root. |
+| 2026-09-29 | **EVENT: Focused task actions follow the recommended next step.** | Tim review on JOV-6709. Alternate completion paths form one progressively disclosed peer group; routine cancellation is a separate quiet exit. This specializes JOV-6942 hierarchy rules without creating a whole-app control cap. |
 
 | 2026-09-14 | BlogCard editorial titles: full live-text titles, no truncation or global fixed height, per-row subgrid tracks (`data-wrap="editorial-title"`) | Founder decision, PR #17852. Only BlogCard is exempt from heading bounds via the explicit marker + both required subgrid tracks; all other heading bounds remain enforced. |

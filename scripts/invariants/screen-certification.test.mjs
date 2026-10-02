@@ -23,6 +23,7 @@ import {
   evaluateScreenProof,
   PROTECTED_REVENUE_SCREEN_SOURCES,
   RETAINED_SWEEP_WORKFLOWS,
+  resolveDiffBase,
   routeArtifactRequests,
   runScreenCertification,
   runScreenCertificationFromArtifact,
@@ -39,6 +40,7 @@ import {
   validateScreenRegistry,
   verifyProofArtifact,
 } from './screen-certification.mjs';
+import { SCREEN_DECISION_SCHEMA } from './screen-decision-routing.mjs';
 import { emitScreenProof } from './screen-proof-emit.mjs';
 import {
   MARKETING_EVIDENCE_SCHEMA,
@@ -627,10 +629,11 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       chmodSync(git, 0o755);
       process.env.PATH = `${root}:${priorPath}`;
       process.env.SCREEN_CERT_DIFF_BASE = 'c'.repeat(40);
-      const certify = () =>
+      const certify = decisionDeclarations =>
         runScreenCertificationFromArtifact({
           artifactId: 42,
           screenId: 'web.homepage',
+          decisionDeclarations,
         });
       const resolveProof = () =>
         resolveTrustedScreenProof({
@@ -646,6 +649,28 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       const result = certify();
       assert.deepEqual([result.ok, result.receipt.certified], [true, true]);
       assert.equal(result.receipt.status, 'certified');
+      const withEvent = certify({
+        schema: SCREEN_DECISION_SCHEMA,
+        headSha: head,
+        changedPaths: ['apps/web/app/(home)/page.tsx'],
+        decisions: [
+          {
+            id: 'permanent-identity',
+            kind: 'event',
+            eventClass: 'identity',
+            paths: ['apps/web/app/(home)/page.tsx'],
+            proposedEffect: 'Change the permanent public identity.',
+            evidence: ['canon/VOICE.md'],
+          },
+        ],
+      });
+      assert.equal(withEvent.receipt.certified, true);
+      assert.equal(
+        withEvent.receipt.decisionRouting.status,
+        'founder-routing-unavailable'
+      );
+      assert.equal(withEvent.receipt.decisionRouting.approvalVerified, false);
+      assert.equal(withEvent.receipt.decisionRouting.deliveryVerified, false);
       assert.equal(
         result.receipt.certificationScope,
         'targeted-screen-plus-change-set'
@@ -2618,6 +2643,66 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.equal(result.ok, false);
     assert.equal(result.receipt.certified, false);
     assert.match(result.receipt.issues.join('\n'), /missing exact-head proof/);
+  });
+
+  it('audits the landed head commit when the implicit base is the checkout tip (JOV-7293)', () => {
+    // workflow_dispatch/push runs on main have no PR base or event.before;
+    // the implicit origin/main fallback resolves to HEAD itself and used to
+    // fail closed. ci-fast's changedFiles() convention for non-PR events is
+    // HEAD^1, so the gate follows it.
+    const repo = mkdtempSync(join(tmpdir(), 'screen-cert-diff-base-'));
+    const runGit = args =>
+      spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+    const savedEnv = {
+      SCREEN_CERT_DIFF_BASE: process.env.SCREEN_CERT_DIFF_BASE,
+      COMPONENT_SHIP_DIFF_BASE: process.env.COMPONENT_SHIP_DIFF_BASE,
+      TURBO_SCM_BASE: process.env.TURBO_SCM_BASE,
+    };
+    try {
+      delete process.env.SCREEN_CERT_DIFF_BASE;
+      delete process.env.COMPONENT_SHIP_DIFF_BASE;
+      delete process.env.TURBO_SCM_BASE;
+      assert.equal(runGit(['init', '--initial-branch=main']).status, 0);
+      assert.equal(
+        runGit(['config', 'user.email', 'ci-contract@jov.ie']).status,
+        0
+      );
+      assert.equal(runGit(['config', 'user.name', 'CI Contract']).status, 0);
+      writeFileSync(join(repo, 'a.txt'), 'a\n');
+      assert.equal(runGit(['add', '.']).status, 0);
+      assert.equal(runGit(['commit', '-m', 'base']).status, 0);
+      const baseSha = runGit(['rev-parse', 'HEAD']).stdout.trim();
+      writeFileSync(join(repo, 'b.txt'), 'b\n');
+      assert.equal(runGit(['add', '.']).status, 0);
+      assert.equal(runGit(['commit', '-m', 'tip']).status, 0);
+
+      // Base tip checkout: origin/main == HEAD must not self-diff.
+      assert.equal(
+        runGit(['update-ref', 'refs/remotes/origin/main', 'HEAD']).status,
+        0
+      );
+      assert.equal(resolveDiffBase(undefined, repo), 'HEAD^1');
+
+      // A real ancestor base still resolves to origin/main.
+      assert.equal(
+        runGit(['update-ref', 'refs/remotes/origin/main', baseSha]).status,
+        0
+      );
+      assert.equal(resolveDiffBase(undefined, repo), 'origin/main');
+
+      // No base ref fails closed as before.
+      assert.equal(
+        runGit(['update-ref', '-d', 'refs/remotes/origin/main']).status,
+        0
+      );
+      assert.equal(resolveDiffBase(undefined, repo), null);
+    } finally {
+      for (const [key, value] of Object.entries(savedEnv)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 
   it('rejects self or missing diff bases in registration-only mode', () => {

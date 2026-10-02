@@ -12,6 +12,7 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { projectScreenDecisionRouting } from './screen-decision-routing.mjs';
 import {
   resolveTrustedArtifactId,
   resolveTrustedScreenProof,
@@ -105,6 +106,20 @@ export const SCREEN_PROOF_ROUTES = Object.freeze({
   // out of scope for this producer until a human decides how (or whether)
   // to give it one.
   'web.hud-isolated': '/hud?fs=1',
+  // web.tasks and web.contacts are authenticated app-shell screens gated by
+  // a real session (redirect to sign-in with none) plus, for tasks, a
+  // Pro-plan entitlement whose billing lookup has no noop-DB fallback. Both
+  // capture the real routes directly — unlike the smartlink fixture, there
+  // is no separate reserved URL — because the visual-capture synthetic
+  // dashboard fallback already resolves any bypass session's profile to one
+  // reserved id once E2E_FAST_ONBOARDING is set (createE2EDashboardCoreData,
+  // apps/web/app/app/(shell)/dashboard/actions/dashboard-data.ts). Both
+  // getTasks()/getTask() (task-actions.ts) and GET /api/dashboard/contacts
+  // (route.ts) serve a typed fixture instead of the database only for that
+  // exact reserved profile id, additionally gated by isRenderFixtureEnabled()
+  // — see apps/web/lib/screen-cert/app-shell-fixture-gate.ts.
+  'web.tasks': '/app/tasks',
+  'web.contacts': '/app/contacts',
 });
 export const SCREEN_PLATFORMS = Object.freeze(['web', 'macos-electron', 'ios']);
 export const EXCLUDED_OWNERS = Object.freeze([
@@ -223,7 +238,8 @@ web.report|web|abuse-report-intake|apps/web/app/report/page.tsx|desktop,mobile
 web.dashboard-releases|web|dashboard-releases|apps/web/app/app/(shell)/dashboard/releases/page.tsx|desktop,mobile
 web.dashboard-presence|web|dashboard-presence|apps/web/app/app/(shell)/dashboard/presence/page.tsx|desktop,mobile
 web.dashboard-contacts|web|dashboard-contacts|apps/web/app/app/(shell)/dashboard/contacts/|desktop,mobile
-web.contacts|web|contacts|apps/web/app/app/(shell)/contacts/page.tsx|desktop,mobile
+web.contacts|web|contacts|apps/web/app/app/(shell)/contacts/page.tsx,apps/web/app/api/dashboard/contacts/route.ts,apps/web/app/api/dashboard/contacts/_lib/screen-cert-fixture.ts,apps/web/lib/screen-cert/app-shell-fixture-gate.ts|desktop,mobile
+web.tasks|web|tasks|apps/web/app/app/(shell)/tasks/page.tsx,apps/web/app/app/(shell)/tasks/TasksRoute.tsx,apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts,apps/web/app/app/(shell)/dashboard/tasks/_lib/screen-cert-fixture.ts,apps/web/lib/screen-cert/app-shell-fixture-gate.ts|desktop,mobile
 web.presence|web|presence|apps/web/app/app/(shell)/presence/page.tsx|desktop,mobile
 web.profiles|web|profiles|apps/web/app/app/(shell)/profiles/page.tsx|desktop,mobile
 web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
@@ -250,8 +266,10 @@ web.youtube-channel-pilot|web|screen.youtube.channel-pilot|apps/web/app/app/(she
 web.shipping-statistics|web|shipping-statistics|apps/web/app/app/(shell)/admin/shipping/page.tsx|desktop,mobile
 web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx,apps/web/app/(dynamic)/start/layout.tsx|desktop,mobile
 web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
+web.chat|web|screen.chat|apps/web/app/app/(shell)/chat/page.tsx|desktop,mobile
 web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
 web.settings-billing|web|screen.settings.billing|apps/web/app/app/(shell)/settings/billing/page.tsx|desktop,mobile
+web.settings-connectors|web|settings-connectors|apps/web/app/app/(shell)/settings/connectors/|desktop,mobile
 web.settings|web|screen.settings|apps/web/app/app/(shell)/settings/layout.tsx|desktop,mobile
 web.onboarding-checkout|web|onboarding-checkout|apps/web/app/onboarding/checkout/page.tsx|desktop,mobile
 web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx|desktop,mobile
@@ -268,7 +286,7 @@ ios.teleprompter|ios|ios-teleprompter|apps/ios/Jovie/Features/Teleprompter/|comp
 ios.inbox|ios|ios-inbox|apps/ios/Jovie/Features/Inbox/|compact
 macos-electron.ovie-door|macos-electron|ovie|apps/desktop/src/ovie-door.ts|desktop|x|Product-surface implementation owned by Ovie
 macos-electron.auth-security|macos-electron|auth-security|apps/desktop/src/desktop-auth-security.ts|desktop|x|Auth/security lane is out of scope
-web.auth|web|auth-security|apps/web/app/(auth)/,apps/web/app/@auth/,apps/web/app/auth-return/,apps/web/app/mobile-auth-return/|desktop,mobile|x|Auth/security lane is out of scope
+web.auth|web|auth-security|apps/web/app/(auth)/,apps/web/app/@auth/,apps/web/app/auth-return/,apps/web/app/desktop-auth/,apps/web/app/mobile-auth-return/|desktop,mobile|x|Auth/security lane is out of scope
 macos.menu-monitor|macos-electron|macos-menu-monitor|apps/macos/MenuMonitor/|desktop|x|MenuMonitor is out of scope
 ios.auth|ios|auth-security|apps/ios/Jovie/Features/Auth/|compact|x|Auth/security lane is out of scope
 ios.shell|ios|ios-shell|apps/ios/Jovie/Features/AppShell/|compact|x|iOS shell lane is out of scope
@@ -862,18 +880,43 @@ function resolveHeadSha(explicit, repoRoot = REPO_ROOT) {
   return sha.toLowerCase();
 }
 
-function resolveDiffBase(explicit, repoRoot = REPO_ROOT) {
+export function resolveDiffBase(explicit, repoRoot = REPO_ROOT) {
   if (explicit) return explicit;
   if (process.env.SCREEN_CERT_DIFF_BASE)
     return process.env.SCREEN_CERT_DIFF_BASE;
   if (process.env.COMPONENT_SHIP_DIFF_BASE)
     return process.env.COMPONENT_SHIP_DIFF_BASE;
   if (process.env.TURBO_SCM_BASE) return process.env.TURBO_SCM_BASE;
-  const probe = spawnSync('git', ['rev-parse', '--verify', 'origin/main'], {
+  const probe = spawnSync(
+    'git',
+    ['rev-parse', '--verify', 'origin/main^{commit}'],
+    {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    }
+  );
+  if (probe.status !== 0) return null;
+  // A checkout on the base tip (main push or workflow_dispatch, which carry
+  // no PR base or event.before) would self-diff and fail closed. Audit the
+  // landed head commit instead — the same HEAD^1 convention ci-fast's
+  // changedFiles() uses for non-PR events.
+  const head = spawnSync('git', ['rev-parse', '--verify', 'HEAD^{commit}'], {
     cwd: repoRoot,
     encoding: 'utf8',
   });
-  return probe.status === 0 ? 'origin/main' : null;
+  if (
+    head.status === 0 &&
+    head.stdout?.trim() &&
+    head.stdout.trim() === probe.stdout?.trim()
+  ) {
+    const parent = spawnSync(
+      'git',
+      ['rev-parse', '--verify', 'HEAD^1^{commit}'],
+      { cwd: repoRoot, encoding: 'utf8' }
+    );
+    if (parent.status === 0) return 'HEAD^1';
+  }
+  return 'origin/main';
 }
 
 function resolveCommitSha(ref, repoRoot = REPO_ROOT) {
@@ -1257,6 +1300,13 @@ export function runScreenCertification(options = {}) {
       status,
       issues,
       changedScreens: changed.changedScreens,
+      // Shadow qualification cannot change the existing runtime-proof verdict.
+      decisionRouting: projectScreenDecisionRouting({
+        headSha,
+        changedPaths: normalizeChanged(changedFiles).map(file => file.path),
+        declarations: options.decisionDeclarations,
+        inputError: options.decisionInputError,
+      }),
       excludedChanges: changed.excludedChanges,
       removedScreens: changed.removedScreens,
       fixtures: red.receipts,
@@ -1276,13 +1326,15 @@ export function runScreenCertification(options = {}) {
  * The controlled resolver binds the candidate to the trusted workflow, the
  * completed producer job, the exact main head, the registered source paths,
  * and GitHub's artifact digest before the normal admission checks run.
- * @param {{ artifactId?: number; screenId?: string; repoRoot?: string; diffBase?: string }} options
+ * @param {{ artifactId?: number; screenId?: string; repoRoot?: string; diffBase?: string; decisionDeclarations?: object; decisionInputError?: boolean }} options
  */
 export function runScreenCertificationFromArtifact({
   artifactId,
   screenId,
   repoRoot = REPO_ROOT,
   diffBase,
+  decisionDeclarations,
+  decisionInputError,
 } = {}) {
   const headSha = resolveHeadSha(undefined, repoRoot);
   return runScreenCertification({
@@ -1291,6 +1343,8 @@ export function runScreenCertificationFromArtifact({
     diffBase,
     targetScreenIds: typeof screenId === 'string' && screenId ? [screenId] : [],
     proofRequests: [{ artifactId: Number(artifactId), screenId }],
+    decisionDeclarations,
+    decisionInputError,
   });
 }
 
@@ -1301,6 +1355,22 @@ if (isMain) {
   const diffBase = process.argv
     .find(arg => arg.startsWith('--diff-base='))
     ?.slice(12);
+  const decisionFile = process.argv
+    .find(arg => arg.startsWith('--decision-file='))
+    ?.slice('--decision-file='.length);
+  let decisionDeclarations;
+  let decisionInputError = false;
+  if (decisionFile) {
+    try {
+      decisionDeclarations = JSON.parse(
+        readFileSync(resolve(decisionFile), 'utf8')
+      );
+    } catch {
+      // Classification is shadow-only; record the failure without altering
+      // the current screen gate or mistaking missing data for ordinary work.
+      decisionInputError = true;
+    }
+  }
   const proofFile = process.argv
     .find(arg => arg.startsWith('--proof-file='))
     ?.slice('--proof-file='.length);
@@ -1343,9 +1413,13 @@ if (isMain) {
         artifactId: artifactId ? Number(artifactId) : undefined,
         screenId,
         diffBase,
+        decisionDeclarations,
+        decisionInputError,
       })
     : runScreenCertification({
         diffBase,
+        decisionDeclarations,
+        decisionInputError,
         proofs,
         registrationOnly,
         artifactRoot,
@@ -1360,6 +1434,9 @@ if (isMain) {
       `${JSON.stringify(result.receipt, null, 2)}\n`
     );
   }
+  process.stdout.write(
+    `[${activeGate}] decision-routing=${result.receipt.decisionRouting.status} mode=qualification-only founder-candidates=${result.receipt.decisionRouting.founderReviewCandidates.length} delivery=not-verified\n`
+  );
   if (result.ok) {
     process.stdout.write(
       `[${activeGate}] PASS head=${result.receipt.headSha} changed=${result.receipt.changedScreens.length} status=${result.receipt.status} certified=${result.receipt.certified}\n`

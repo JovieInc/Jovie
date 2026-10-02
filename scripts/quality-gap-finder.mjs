@@ -61,6 +61,9 @@ import {
   ESCAPED_DEFECT_LABEL,
   evaluateEscapedDefectClosure,
 } from './lib/escaped-defect-closure.mjs';
+
+
+import { ownedHere } from './invariants/registry.mjs';
 import {
   JOVIE_TEAM_ID,
   upsertLinearIssueByTitleFingerprint,
@@ -360,7 +363,12 @@ export function collectInvariantGaps(
       );
       continue;
     }
-    for (const path of new Set(tests.map(test => test.path))) {
+    // Evidence owned by another repo (e.g. JovieInc/symphony-control) is
+    // verified by that repo's CI against the same canon, not wired here.
+    const localPaths = new Set(
+      tests.filter(test => ownedHere(test)).map(test => test.path)
+    );
+    for (const path of localPaths) {
       if (ciSources.includes(path)) continue;
       // A directory glob (`scripts/verification/*.test.mjs`) may run it.
       if (ciSources.includes(`${dirname(path)}/*`)) continue;
@@ -945,6 +953,7 @@ export async function fetchRecentDefects(apiKey, sinceDays, fetchImpl) {
   );
   const issues = (data?.issues?.nodes ?? []).map(node => ({
     id: node.identifier,
+    identifier: node.identifier,
     title: node.title,
     description: node.description ?? '',
     status: node.state?.name,
