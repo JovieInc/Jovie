@@ -85,6 +85,7 @@ describe('GET /api/ovie/certifications/metrics', () => {
     const jov = body.lanes.jov;
     for (const key of [
       'founderBlockingMinutes',
+      'fleetHardening',
       'founderCardsPerDay',
       'silencePromotionRegretPer100',
       'escapedDefectsPer100Promotions',

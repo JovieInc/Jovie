@@ -86,19 +86,31 @@ describe('AdminSystemPage', () => {
       undefined
     );
   });
+
+  it('keeps direct diagnostic access behind the admin gate', async () => {
+    const { default: AdminSystemPage } = await import(
+      '@/app/app/(shell)/admin/system/page'
+    );
+    mockRequireAccess.mockRejectedValueOnce(new Error('Admin access required'));
+
+    await expect(
+      AdminSystemPage({ searchParams: Promise.resolve({ tab: 'tools' }) })
+    ).rejects.toThrow('Admin access required');
+    expect(mockAdminSystemMap).not.toHaveBeenCalled();
+  });
 });
 
 describe('admin system navigation contract', () => {
-  it('keeps the canonical system route and registry entry', async () => {
+  it('keeps the canonical diagnostic route outside founder navigation', async () => {
     const { ADMIN_NAV_REGISTRY, ADMIN_SETTINGS_TOOL_IDS } = await import(
       '@/constants/admin-navigation'
     );
     const { APP_ROUTES } = await import('@/constants/routes');
 
     expect(
-      ADMIN_NAV_REGISTRY.find(entry => entry.id === 'system_map')?.label
-    ).toBe('System Map');
-    expect(ADMIN_SETTINGS_TOOL_IDS).toContain('system_map');
+      ADMIN_NAV_REGISTRY.find(entry => entry.id === 'system_map')
+    ).toBeUndefined();
+    expect(ADMIN_SETTINGS_TOOL_IDS).not.toContain('system_map');
     expect(APP_ROUTES.ADMIN_SYSTEM).toBe('/app/ov/system');
   });
 });

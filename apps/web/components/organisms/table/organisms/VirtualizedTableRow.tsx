@@ -25,6 +25,8 @@ type ManagedTrProps =
 
 export interface VirtualizedTableRowProps<TData extends RowData> {
   readonly row: Row<TData>;
+  /** TanStack rows retain identity when visibility changes; cells must invalidate memoization. */
+  readonly visibleCells?: ReturnType<Row<TData>['getVisibleCells']>;
   readonly rowIndex: number;
   readonly rowRefsMap: Map<number, HTMLTableRowElement>;
   readonly shouldEnableKeyboardNav: boolean;
@@ -68,6 +70,7 @@ export interface VirtualizedTableRowProps<TData extends RowData> {
  */
 function VirtualizedTableRowComponent<TData extends RowData>({
   row,
+  visibleCells = row.getVisibleCells(),
   rowIndex,
   rowRefsMap,
   shouldEnableKeyboardNav,
@@ -178,7 +181,7 @@ function VirtualizedTableRowComponent<TData extends RowData>({
       onFocus={handleFocusChange}
       onContextMenu={handleContextMenu}
     >
-      {row.getVisibleCells().map(cell => {
+      {visibleCells.map(cell => {
         const meta = cell.column.columnDef.meta;
         const metaClassName = meta?.className;
         const align = meta?.align ?? 'left';
