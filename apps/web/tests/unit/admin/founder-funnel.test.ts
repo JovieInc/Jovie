@@ -117,4 +117,123 @@ describe('getFounderFunnelData', () => {
 
     expect(mockExecute).toHaveBeenCalledTimes(3);
   });
+
+  it('marks the anonymous chat stage non-identifiable with no drill-down', async () => {
+    mockExecute.mockResolvedValue({ rows: [makeFunnelRow()] });
+
+    const { getFounderFunnelData } = await import('@/lib/admin/founder-funnel');
+    const result = await getFounderFunnelData('30d');
+
+    const chats = result.stages[0];
+    expect(chats.key).toBe('onboarding_chats');
+    expect(chats.identifiable).toBe(false);
+    expect(chats.drillDownHref).toBeNull();
+  });
+
+  it('encodes cohort stage and range in identifiable drill-down hrefs', async () => {
+    mockExecute.mockResolvedValue({ rows: [makeFunnelRow()] });
+
+    const { getFounderFunnelData } = await import('@/lib/admin/founder-funnel');
+    const result = await getFounderFunnelData('7d');
+
+    for (const stage of result.stages.slice(1)) {
+      expect(stage.identifiable).toBe(true);
+      expect(stage.drillDownHref).toContain(`funnelStage=${stage.key}`);
+      expect(stage.drillDownHref).toContain('funnelRange=7d');
+    }
+  });
+
+  it('reports the versioned metric definition', async () => {
+    mockExecute.mockResolvedValue({ rows: [makeFunnelRow()] });
+
+    const { getFounderFunnelData, FOUNDER_FUNNEL_DEFINITION_VERSION } =
+      await import('@/lib/admin/founder-funnel');
+    const result = await getFounderFunnelData('30d');
+
+    expect(result.definitionVersion).toBe(FOUNDER_FUNNEL_DEFINITION_VERSION);
+  });
+});
+
+describe('getFounderFunnelStageRows', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function makeStageRows(total = 2) {
+    return {
+      rows: [
+        {
+          id: 'u1',
+          name: 'Ada',
+          email: 'ada@example.fm',
+          created_at: '2026-09-20T00:00:00.000Z',
+          total,
+        },
+        {
+          id: 'u2',
+          name: null,
+          email: 'bob@example.fm',
+          created_at: '2026-09-21T00:00:00.000Z',
+          total,
+        },
+      ],
+    };
+  }
+
+  it('returns the stage population and total from one query', async () => {
+    mockExecute.mockResolvedValue(makeStageRows(2));
+
+    const { getFounderFunnelStageRows } = await import(
+      '@/lib/admin/founder-funnel'
+    );
+    const result = await getFounderFunnelStageRows('paid', '30d');
+
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+    expect(result.total).toBe(2);
+    expect(result.rows).toHaveLength(2);
+    expect(result.rows[0]).toEqual({
+      id: 'u1',
+      displayName: 'Ada',
+      email: 'ada@example.fm',
+      enteredAt: '2026-09-20T00:00:00.000Z',
+    });
+    expect(result.errors).toEqual([]);
+  });
+
+  it('returns zero total when the stage is empty', async () => {
+    mockExecute.mockResolvedValue({ rows: [] });
+
+    const { getFounderFunnelStageRows } = await import(
+      '@/lib/admin/founder-funnel'
+    );
+    const result = await getFounderFunnelStageRows('accounts_created', 'all');
+
+    expect(result.total).toBe(0);
+    expect(result.rows).toEqual([]);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('surfaces query failures as errors, not a healthy empty list', async () => {
+    mockExecute.mockRejectedValue(new Error('relation users does not exist'));
+
+    const { getFounderFunnelStageRows } = await import(
+      '@/lib/admin/founder-funnel'
+    );
+    const result = await getFounderFunnelStageRows('paid', '7d');
+
+    expect(result.rows).toEqual([]);
+    expect(result.errors[0]).toContain('relation users does not exist');
+    expect(mockCaptureError).toHaveBeenCalled();
+  });
+
+  it('only exposes identifiable stages', async () => {
+    const { isFounderFunnelDrilldownStage } = await import(
+      '@/lib/admin/founder-funnel'
+    );
+
+    expect(isFounderFunnelDrilldownStage('paid')).toBe(true);
+    expect(isFounderFunnelDrilldownStage('onboarding_chats')).toBe(false);
+    expect(isFounderFunnelDrilldownStage('nonsense')).toBe(false);
+    expect(isFounderFunnelDrilldownStage(null)).toBe(false);
+  });
 });
