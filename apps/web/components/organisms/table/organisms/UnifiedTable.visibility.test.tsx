@@ -26,9 +26,7 @@ describe('UnifiedTable responsive columns', () => {
       };
       const { rerender } = render(<UnifiedTable {...props} />);
       const cells = () =>
-        within(
-          screen.getByRole('cell', { name: 'Fan', exact: true }).closest('tr')!
-        )
+        within(screen.getByRole('cell', { name: /^Fan$/ }).closest('tr')!)
           .getAllByRole('cell')
           .map(cell => cell.textContent);
 
