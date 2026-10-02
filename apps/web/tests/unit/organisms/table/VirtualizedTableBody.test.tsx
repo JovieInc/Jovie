@@ -29,11 +29,8 @@ vi.mock('@/components/organisms/table/molecules/TableContextMenu', () => ({
 
 type TestRow = { id: string; name: string };
 
-// The renderer is mocked; check the fields supplied by this partial row fixture.
-const rowFixture = (fields: Partial<Row<TestRow>>) => fields;
-
 const createRow = (id: string, name: string): Row<TestRow> =>
-  rowFixture({
+  ({
     id,
     original: { id, name },
   }) as Row<TestRow>;
