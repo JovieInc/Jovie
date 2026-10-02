@@ -16,8 +16,10 @@ vi.mock('@/lib/merch/orders', () => ({
 }));
 vi.mock('@/lib/stripe/webhooks/handlers/charge-handler', () => {
   class StripeWriteBlockedError extends Error {
-    constructor(message: string) {
-      super(message);
+    constructor(input: { subscriptionId: string; subscriptionStatus: string }) {
+      super(
+        `Stripe Dashboard: open subscription ${input.subscriptionId} (status ${input.subscriptionStatus})`
+      );
       this.name = 'StripeWriteBlockedError';
     }
   }
@@ -129,7 +131,12 @@ describe('replayUnprocessedStripeWebhooks', () => {
 
   it('leaves a blocked Stripe write unprocessed', async () => {
     mockProcess.mockRejectedValue(
-      new StripeWriteBlockedError('Stripe Dashboard: open subscription sub_1')
+      new StripeWriteBlockedError({
+        subscriptionId: 'sub_1',
+        chargeId: 'ch_1',
+        subscriptionStatus: 'active',
+        eventType: 'charge.refunded',
+      })
     );
     const summary = await replay(
       candidate('evt_refund', 'charge.refunded', { id: 'ch_1' }),
