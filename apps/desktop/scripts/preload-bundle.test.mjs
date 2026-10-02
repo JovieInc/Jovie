@@ -181,4 +181,37 @@ test('the production bundle command writes a sandbox-compatible preload', async 
   assert.equal(loadDocument().getWorkState(), null);
   currentDocument.setWorkState(null);
   assert.equal(currentDocument.getWorkState(), null);
+
+  const invoked = [];
+  let api;
+  vm.runInNewContext(source, {
+    document: { documentElement: { dataset: {} } },
+    process: { platform: 'darwin', versions: { electron: '44.0.0' } },
+    require(id) {
+      assert.equal(id, 'electron');
+      return {
+        contextBridge: {
+          exposeInMainWorld(name, value) {
+            if (name === 'electronAPI') api = value;
+          },
+        },
+        ipcRenderer: {
+          send() {},
+          invoke(...args) {
+            invoked.push(args);
+            return Promise.resolve(true);
+          },
+          on() {},
+          removeListener() {},
+        },
+      };
+    },
+  });
+  assert.equal(await api.notifyComposerReadiness('visible-editable'), true);
+  assert.equal(await api.notifyComposerReadiness('focused'), true);
+  assert.equal(await api.notifyComposerReadiness({ userId: 'private' }), false);
+  assert.deepEqual(invoked, [
+    ['desktop-composer-readiness', 'visible-editable'],
+    ['desktop-composer-readiness', 'focused'],
+  ]);
 });
