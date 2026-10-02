@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import type { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
 import { CanonicalLifecycleFunnel } from '@/components/features/admin/contacts-table/CanonicalLifecycleFunnel';
-import { FounderFunnelBand } from '@/components/features/admin/hud/FounderFunnelBand';
 import { FounderFunnelDrilldown } from '@/components/features/admin/hud/FounderFunnelDrilldown';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { GtmCollapsibles } from '@/components/features/admin/leads/GtmCollapsibles';
@@ -22,6 +21,7 @@ import {
 } from '@/lib/admin/founder-funnel';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { adminGrowthSearchParams } from '@/lib/nuqs';
+import { GrowthFounderFunnel } from './GrowthFounderFunnel';
 
 interface AdminGrowthPageProps {
   readonly searchParams: Promise<SearchParams>;
@@ -69,7 +69,7 @@ export default async function AdminGrowthPage({
       testId='admin-growth-page'
       viewTestId='admin-growth-view-leads'
     >
-      <FounderFunnelBand
+      <GrowthFounderFunnel
         initialFunnel={funnel}
         urlSearchParams={urlSearchParams}
       />

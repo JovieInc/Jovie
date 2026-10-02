@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import { Suspense, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { GrowthFounderFunnel } from '@/app/app/(shell)/admin/growth/GrowthFounderFunnel';
 import type {
   FounderFunnelData,
   FounderFunnelStageRows,
@@ -83,7 +84,7 @@ function ServerCohort({
   };
   return (
     <>
-      <FounderFunnelBand initialFunnel={data} urlSearchParams={params} />
+      <GrowthFounderFunnel initialFunnel={data} urlSearchParams={params} />
       <FounderFunnelDrilldown result={rows} urlSearchParams={params} />
     </>
   );

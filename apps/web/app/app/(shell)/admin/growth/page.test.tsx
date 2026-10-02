@@ -14,8 +14,8 @@ vi.mock(
   '@/components/features/admin/contacts-table/CanonicalLifecycleFunnel',
   () => ({ CanonicalLifecycleFunnel: () => <div>Lifecycle funnel</div> })
 );
-vi.mock('@/components/features/admin/hud/FounderFunnelBand', () => ({
-  FounderFunnelBand: ({
+vi.mock('./GrowthFounderFunnel', () => ({
+  GrowthFounderFunnel: ({
     initialFunnel,
   }: {
     initialFunnel: { timeRange: string; count: number };

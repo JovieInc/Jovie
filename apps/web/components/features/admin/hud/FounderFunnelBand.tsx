@@ -2,9 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useQueryState } from 'nuqs';
-import { useState, useTransition } from 'react';
+import { useState } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { HudObservationStatus } from '@/components/features/admin/hud/HudObservationStatus';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
@@ -19,7 +17,6 @@ import {
   type HudObservationState,
   isSuccessfulHudObservation,
 } from '@/lib/hud/observation';
-import { founderFunnelRangeParser } from '@/lib/nuqs';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
 import { cn } from '@/lib/utils';
 
@@ -266,57 +263,6 @@ function observationMessage(
  * live once in the survival and noise bands.
  */
 export function FounderFunnelBand({
-  initialFunnel = null,
-  urlSearchParams,
-}: Readonly<{
-  readonly initialFunnel?: FounderFunnelData | null;
-  readonly urlSearchParams?: string;
-}>) {
-  return initialFunnel && urlSearchParams !== undefined ? (
-    <GrowthFounderFunnelBand
-      initialFunnel={initialFunnel}
-      urlSearchParams={urlSearchParams}
-    />
-  ) : (
-    <FounderFunnelBandContent initialFunnel={initialFunnel} />
-  );
-}
-
-function GrowthFounderFunnelBand({
-  initialFunnel,
-  urlSearchParams,
-}: {
-  readonly initialFunnel: FounderFunnelData;
-  readonly urlSearchParams: string;
-}) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [, setRange] = useQueryState(
-    'funnelRange',
-    founderFunnelRangeParser.withOptions({
-      shallow: false,
-      clearOnDefault: false,
-      history: 'push',
-      scroll: false,
-      startTransition,
-    })
-  );
-  return (
-    <FounderFunnelBandContent
-      initialFunnel={initialFunnel}
-      growth={{
-        pending,
-        urlSearchParams,
-        onChange: range => {
-          void setRange(range);
-        },
-        onRetry: () => startTransition(() => router.refresh()),
-      }}
-    />
-  );
-}
-
-function FounderFunnelBandContent({
   initialFunnel = null,
   growth,
 }: {
