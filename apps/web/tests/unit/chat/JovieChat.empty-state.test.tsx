@@ -349,16 +349,15 @@ describe('JovieChat empty state', () => {
       totalActive: 1,
       lastGeneratedAt: '2026-09-29T00:00:00.000Z',
     };
-    const { getByTestId } = renderWithQueryClient(
+    const { getByTestId, queryByText, queryByTestId } = renderWithQueryClient(
       <JovieChat profileId='profile-1' displayName='Tim White' />
     );
 
     expect(getByTestId('chat-empty-state-greeting-text').textContent).toBe(
-      'Good morning, Tim.'
-    );
-    expect(getByTestId('chat-empty-state-insight').textContent).toBe(
       'Your streams are up 320% today.'
     );
+    expect(queryByText('Good morning, Tim.')).toBeNull();
+    expect(queryByTestId('chat-empty-state-insight')).toBeNull();
     vi.useRealTimers();
   });
 

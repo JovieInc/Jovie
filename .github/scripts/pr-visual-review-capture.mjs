@@ -102,7 +102,7 @@ async function waitForAuthenticatedShell(page, route) {
     // aria-hidden skeleton inside chat-empty-state-greeting-region, so the
     // -text testid is unique to the loaded state.
     await page
-      .getByRole('heading', { name: /Good (morning|afternoon|evening)/ })
+      .getByRole('heading', { level: 2 })
       .and(page.getByTestId('chat-empty-state-greeting-text'))
       .filter({ visible: true })
       .first()

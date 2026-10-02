@@ -519,7 +519,7 @@ describe('JovieChat styling regressions', () => {
     ).toBeNull();
   });
 
-  it('renders the one real insight under the greeting when an active insight exists (JOV-7150)', () => {
+  it('renders the one real insight as the only empty-state sentence (JOV-7150)', () => {
     mockChatState.hasMessages = false;
     mockChatState.isLoading = false;
     mockChatState.isSubmitting = false;
@@ -534,10 +534,12 @@ describe('JovieChat styling regressions', () => {
     );
 
     const insight = container.querySelector(
-      '[data-testid="chat-empty-state-insight"]'
+      '[data-testid="chat-empty-state-greeting-text"]'
     );
     expect(insight?.textContent).toBe('Streams are up 12% this week');
-    expect(insight?.className).toContain('text-secondary-token');
+    expect(
+      container.querySelector('[data-testid="chat-empty-state-insight"]')
+    ).toBeNull();
   });
 
   it('renders the Ovie editorial briefing as the empty-state affordance in ov mode', () => {
