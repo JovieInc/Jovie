@@ -12,6 +12,7 @@ vi.mock('@/lib/spotify/client', () => ({
   spotifyClient: { requestJson: vi.fn() },
 }));
 
+import { lookupSpotifyByIsrc } from '@/lib/discography/provider-links';
 import { resolveInHouseIsrc, searchInHouseTracks } from './in-house';
 
 const APPLE = {
@@ -143,5 +144,6 @@ describe('in-house track search', () => {
     ]);
     expect(release?.title).toBe('Motion Sickness');
     expect(release?.artist).toBe('Phoebe Bridgers');
+    expect(lookupSpotifyByIsrc).not.toHaveBeenCalled();
   });
 });

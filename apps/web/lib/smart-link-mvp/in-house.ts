@@ -272,7 +272,7 @@ async function fanOutNames(
   );
   let spotify: LinkProvider | null = null;
   const isrc = selected.find(hit => hit.isrc)?.isrc;
-  if (isrc) {
+  if (isrc && isSpotifyAvailable()) {
     const found = await lookupSpotifyByIsrc(isrc);
     if (found?.url) spotify = linkProvider('spotify', found.url);
   }
@@ -316,7 +316,7 @@ export async function resolveInHouseIsrc(
   const [deezerPayload, appleLookup, spotifyLookup] = await Promise.all([
     readJson(`https://api.deezer.com/track/isrc:${encodeURIComponent(isrc)}`),
     lookupAppleMusicByIsrc(isrc),
-    lookupSpotifyByIsrc(isrc),
+    isSpotifyAvailable() ? lookupSpotifyByIsrc(isrc) : Promise.resolve(null),
   ]);
   const deezer =
     deezerPayload &&
