@@ -286,7 +286,7 @@ function renderComposerSurface({
     onExpandManifest: () => undefined,
   };
 
-  return render(
+  const content = (currentProps = surfaceProps) => (
     <QueryClientProvider client={client}>
       <TooltipProvider>
         {draft ? (
@@ -301,17 +301,68 @@ function renderComposerSurface({
               status='ready'
               messages={[]}
             />
-            <ChatDraftComposerSurface {...surfaceProps} draft={draft} />
+            <ChatDraftComposerSurface {...currentProps} draft={draft} />
           </>
         ) : (
-          <ChatComposerSurface {...surfaceProps} />
+          <ChatComposerSurface {...currentProps} />
         )}
       </TooltipProvider>
     </QueryClientProvider>
   );
+  const view = render(content());
+  return {
+    ...view,
+    rerenderSurface: (updates: Partial<typeof surfaceProps> = {}) =>
+      view.rerender(content({ ...surfaceProps, ...updates })),
+  };
 }
 
 describe('draft-connected composer sections', () => {
+  it('skips unchanged parent props but keeps draft and control changes live through memo', () => {
+    const memoSurface =
+      ChatDraftComposerSurface as typeof ChatDraftComposerSurface & {
+        type: (
+          props: ComponentProps<typeof ChatDraftComposerSurface>
+        ) => ReactNode;
+      };
+    expect(typeof memoSurface.type).toBe('function');
+    const renders = vi.spyOn(memoSurface, 'type');
+    const draft = createComposerDraft('Before');
+    const view = renderComposerSurface({ draft });
+    try {
+      const input = screen.getByRole('textbox', { name: 'Chat Message Input' });
+      const initialRenders = renders.mock.calls.length;
+      view.rerenderSurface();
+      expect(renders).toHaveBeenCalledTimes(initialRenders);
+
+      act(() => draft.set('After'));
+      expect(input).toHaveValue('After');
+      expect(renders.mock.calls.length).toBeGreaterThan(initialRenders);
+      const draftRenders = renders.mock.calls.length;
+
+      view.rerenderSurface({ isRateLimited: true });
+      expect(
+        screen.getByText(
+          'Sending too fast. Please wait a second before your next message.'
+        )
+      ).toBeVisible();
+      expect(renders.mock.calls.length).toBeGreaterThan(draftRenders);
+      view.rerenderSurface({ isRateLimited: false });
+      expect(
+        screen.queryByText(
+          'Sending too fast. Please wait a second before your next message.'
+        )
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Chat Message Input' })).toBe(
+        input
+      );
+      expect(input).toHaveValue('After');
+    } finally {
+      view.unmount();
+      renders.mockRestore();
+    }
+  });
+
   it('keeps the real input and committed work state current without a parent rerender', () => {
     const draft = createComposerDraft('Restored draft');
     const view = renderComposerSurface({ draft });
