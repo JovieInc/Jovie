@@ -3147,33 +3147,32 @@ def worker(host: Host, name: str) -> int:
     red = adopt = issue = None
     rate_limited = False
     try:
-        try:
-            # Finish before starting: PRs a GitHub event queued, red PRs (any open PR in the repo),
-            # then ungated lane drafts, then new issues.
-            prs = lane_prs(name)
-            candidates = fix_candidates(name)
-            events = pr_events.queued_prs(THIS, pr_events.FIX_KINDS)
-            requeue_verified(host, prs)
-            escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
-            red = pr_events.claim_event_pr(host, THIS, name, events) or claim_red_pr(host, name, candidates)
-            adopt = None if red or not provider_may_run(name, "adopt") else claim_adoptable_pr(host, name, prs)
-            issue = None
-            sweep_lane_prs(host, name, linear)
-            budget = None if red or adopt else read_new_issue_budget(name, host.slots(name, spec.get("slots", 1)))
-            blocked = budget is not None and not budget["allowed"]
-            in_flight = None if red or adopt or blocked else in_flight_issues()
-            if in_flight is not None:
-                failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
-                issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
-                                   provider=name)
-                if issue and linear.state_of(issue.id) != "Todo":
-                    issue = None  # another host claimed it between our read and now
-                if issue:
-                    linear.move(issue.id, "In Progress")
-        except LinearRateLimited:
-            # A repair already chosen can proceed without another Linear read. An idle scan stops.
-            issue = None
-            rate_limited = red is None and adopt is None
+        # Finish before starting: PRs a GitHub event queued, red PRs (any open PR in the repo),
+        # then ungated lane drafts, then new issues.
+        prs = lane_prs(name)
+        candidates = fix_candidates(name)
+        events = pr_events.queued_prs(THIS, pr_events.FIX_KINDS)
+        requeue_verified(host, prs)
+        escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
+        red = pr_events.claim_event_pr(host, THIS, name, events) or claim_red_pr(host, name, candidates)
+        adopt = None if red or not provider_may_run(name, "adopt") else claim_adoptable_pr(host, name, prs)
+        issue = None
+        sweep_lane_prs(host, name, linear)
+        budget = None if red or adopt else read_new_issue_budget(name, host.slots(name, spec.get("slots", 1)))
+        blocked = budget is not None and not budget["allowed"]
+        in_flight = None if red or adopt or blocked else in_flight_issues()
+        if in_flight is not None:
+            failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
+            issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
+                               provider=name)
+            if issue and linear.state_of(issue.id) != "Todo":
+                issue = None  # another host claimed it between our read and now
+            if issue:
+                linear.move(issue.id, "In Progress")
+    except LinearRateLimited:
+        # A repair already chosen can proceed without another Linear read. An idle scan stops.
+        issue = None
+        rate_limited = red is None and adopt is None
     finally:
         claim.release()
     if rate_limited:

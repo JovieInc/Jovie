@@ -786,6 +786,10 @@ def locked_doctor_write(state: Path, write) -> None:
         handle = open(state / "doctor.lock", "a")
         fcntl.flock(handle, fcntl.LOCK_EX)
     except OSError:
+        # flock can fail after open. Dropping the handle without closing it leaks an fd
+        # on every doctor tick.
+        if handle is not None:
+            handle.close()
         handle = None
     try:
         write()
