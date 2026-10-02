@@ -753,7 +753,11 @@ export function ProfileCompactSurface({
 
           <div
             className={cn(
-              'profile-content-scroll-region overflow-y-auto overscroll-contain',
+              // md+ the document scrolls (globals.css unlock), so the pane
+              // must chain overscroll to the page; contain trapped the wheel
+              // at the pane's edges (JOV-7412). Mobile keeps contain — the
+              // document is locked there anyway.
+              'profile-content-scroll-region overflow-y-auto overscroll-contain md:overscroll-auto',
               // Home and Music bleed this scrollport to the shell edge. With
               // overflow-y-auto, overflow-x computes to auto (CSS Overflow 3),
               // so the region clips at its own padding box. The parent column
