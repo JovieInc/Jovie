@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { getTableName, type PgTable } from 'drizzle-orm';
-import { getTableConfig } from 'drizzle-orm/pg-core';
+import { getTableName } from 'drizzle-orm';
+import { getTableConfig, type PgTable } from 'drizzle-orm/pg-core';
 import { describe, expect, it } from 'vitest';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
