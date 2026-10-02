@@ -91,8 +91,11 @@ def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, d
     qualified, rejected = {}, {}
     for name in capacity:
         qualified[name], rejected[name] = [], {}
+        duplicates = lane.pool_rejections(candidates.get(name, []))
         for issue in candidates.get(name, []):
-            reason = lane.admission_rejection(issue, failures, now, in_flight, name)
+            # Census key stays bounded: one bucket for all duplicate candidates.
+            reason = ("duplicate-candidate" if issue.identifier in duplicates
+                      else lane.admission_rejection(issue, failures, now, in_flight, name))
             if reason is None:
                 qualified[name].append(issue)
             else:
@@ -660,6 +663,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "pr-inventory-unavailable" if budget.get("reason") == "pr-inventory-unavailable" else
             "fully-utilized" if not metric["idleSlots"] else
             "open-pr-budget" if budget.get("reason") == "over-budget" else
+            "terminal-pr-backlog" if budget.get("reason") == "terminal-pr-backlog" else
             "account-status-unknown" if provider == "codex" and account_state["state"] == "unknown" else
             "account-leases-occupied" if provider == "codex" and account_state["state"] == "leases-occupied" else
             "account-quota-banked" if provider == "codex" and account_state["state"] == "quota-banked" else
