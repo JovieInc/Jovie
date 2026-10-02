@@ -2,28 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 
-// Opt-in, disposable loopback database only; never a production URL.
 const url = process.env.FLEET_LOCAL_DB_URL;
 const clients: { end: () => Promise<void> }[] = [];
 vi.mock('@/lib/db', async () => {
-  if (!url) return { db: undefined };
-  const parsed = new URL(url);
-  if (
-    !['localhost', '127.0.0.1'].includes(parsed.hostname) ||
-    parsed.pathname !== '/jov7331_canary'
-  ) {
-    throw new Error('Disposable local canary database required');
-  }
-  const [{ drizzle }, { default: postgres }, { ovieOperatingKv }] =
-    await Promise.all([
-      import('drizzle-orm/postgres-js'),
-      import('postgres'),
-      import('@/lib/db/schema/ovie'),
-    ]);
-  const client = postgres(url, { max: 4 });
-  clients.push(client);
-  await client`CREATE TABLE IF NOT EXISTS ovie_operating_kv (key text PRIMARY KEY,value jsonb NOT NULL,updated_at timestamptz NOT NULL DEFAULT now())`;
-  return { db: drizzle(client, { schema: { ovieOperatingKv } }) };
+  const { setupLocalPostgresCanary } = await import(
+    './postgres-canary.test-utils'
+  );
+  return setupLocalPostgresCanary(url, clients);
 });
 afterAll(async () => {
   await Promise.all(clients.map(client => client.end()));
