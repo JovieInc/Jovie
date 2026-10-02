@@ -90,6 +90,32 @@ describe('projectWhatsNew', () => {
     });
   });
 
+  it('keeps the daily title and explanation on the same outcome with one dismissal identity', () => {
+    const result = projectWhatsNew(
+      [
+        release('2026-10-02', {
+          kind: 'daily',
+          date: '2026-10-02',
+          summary: 'Get updates from an artist: Open the signup form.',
+          sections: {
+            featured: [],
+            added: ['**Choose your Jovie link:** Start on the homepage.'],
+            changed: ['**Get artist updates:** Open the signup form.'],
+            fixed: [],
+            removed: [],
+          },
+        }),
+      ],
+      BASE_URL
+    );
+    expect(result.entries[0]).toMatchObject({
+      id: '2026-10-02',
+      title: 'Choose your Jovie link',
+      summary: 'Start on the homepage.',
+      highlights: ['Get artist updates'],
+    });
+    expect(resolveUnseenWhatsNew(result, '2026-10-02')).toBeNull();
+  });
   it('falls back to the lead outcome summary and an empty dogfood list', () => {
     const [only] = projectWhatsNew([release('2.0.0')], BASE_URL).entries;
     expect(only?.summary).toBe('It does the thing.');
