@@ -206,7 +206,11 @@ function matchesExisting(candidate, corpus) {
   return corpus.find(
     entry =>
       entry?.dedupeKey === candidate.dedupeKey ||
-      (typeof entry?.canonicalEntity === 'string' &&
+      (typeof entry?.audience === 'string' &&
+        /[a-z0-9]/i.test(entry.audience) &&
+        normalizeKeyPart(entry.audience) ===
+          normalizeKeyPart(candidate.audience) &&
+        typeof entry?.canonicalEntity === 'string' &&
         typeof entry?.readerJob === 'string' &&
         /[a-z0-9]/i.test(entry.canonicalEntity) &&
         /[a-z0-9]/i.test(entry.readerJob) &&

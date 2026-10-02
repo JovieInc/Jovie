@@ -295,3 +295,29 @@ test('private source records never appear in public artifacts', () => {
     )
   );
 });
+
+test('legacy corpus fallback deduplicates only a complete matching audience, reader job and entity', () => {
+  const candidate = normalizeDemandSignal(demandInput, registry);
+  const legacy = {
+    ...corpus[0],
+    dedupeKey: undefined,
+    audience: demandInput.audience,
+  };
+  const decide = entry =>
+    decideCandidate(candidate, {
+      registry,
+      now: Date.parse('2026-10-01T00:00:00Z'),
+      existingContent: [entry],
+    });
+  assert.equal(decide(legacy).decision, 'update-or-merge');
+  for (const audience of ['labels', undefined, '---']) {
+    assert.notEqual(
+      decide({ ...legacy, audience }).decision,
+      'update-or-merge'
+    );
+  }
+  assert.equal(
+    decide({ ...legacy, audience: 'Independent ARTISTS.' }).decision,
+    'update-or-merge'
+  );
+});
