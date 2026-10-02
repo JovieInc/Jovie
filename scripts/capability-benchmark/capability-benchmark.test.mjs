@@ -127,19 +127,20 @@ test('JOV-7341 records workload-scoped dispositions on the pinned cohorts', () =
       latencyMs: 0,
       executed: false,
     }));
-    const metrics =
-      workload.id === 'release-task-clustering'
-        ? summarizeRelease(corpus, outcomes, {}, {})
-        : summarizeInbox(corpus, outcomes, {}, {});
-    assert.equal(baseline.evaluated, metrics.evaluated);
-    assert.equal(baseline.macroF1, metrics.macroF1);
-    assert.equal(baseline.abstentionRate, metrics.abstentionRate);
     if (workload.id === 'release-task-clustering') {
+      const metrics = summarizeRelease(corpus, outcomes, {}, {});
+      assert.equal(baseline.evaluated, metrics.evaluated);
+      assert.equal(baseline.macroF1, metrics.macroF1);
+      assert.equal(baseline.abstentionRate, metrics.abstentionRate);
       assert.equal(
         baseline.falseAutoAssignmentRate,
         metrics.falseAutoAssignmentRate
       );
     } else {
+      const metrics = summarizeInbox(corpus, outcomes, {}, {});
+      assert.equal(baseline.evaluated, metrics.evaluated);
+      assert.equal(baseline.macroF1, metrics.macroF1);
+      assert.equal(baseline.abstentionRate, metrics.abstentionRate);
       assert.equal(baseline.highValueMissRate, metrics.highValueMissRate);
     }
   }
@@ -171,6 +172,14 @@ test('JOV-7341 fails closed on cohort drift, hidden calls, or missing resume eve
   const rolledUp = structuredClone(report);
   rolledUp.aggregateScore = 0.99;
   assert.throws(() => validateDecisionRoutingBenchmark(rolledUp), /aggregate/);
+
+  for (const companyWinner of [false, null, '', 0, 'openai-decisions']) {
+    const companyWide = { ...structuredClone(report), companyWinner };
+    assert.throws(
+      () => validateDecisionRoutingBenchmark(companyWide),
+      /company-wide winner/
+    );
+  }
 
   const wrongIssue = structuredClone(report);
   wrongIssue.issue = 'JOV-2966';

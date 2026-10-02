@@ -391,7 +391,10 @@ export function validateDecisionRoutingBenchmark(report) {
     throw new Error('report.issue must be JOV-7341');
   }
   requireIsoTimestamp(report.observedAt, 'report.observedAt');
-  if (Object.hasOwn(report, 'aggregateScore') || report.companyWinner) {
+  if (
+    Object.hasOwn(report, 'aggregateScore') ||
+    Object.hasOwn(report, 'companyWinner')
+  ) {
     throw new Error('company-wide winner and aggregate score are forbidden');
   }
   if (report.promotionGate !== 'JOV-6414') {
