@@ -41,7 +41,7 @@ export const WithOverlay: Story = {
     caption: 'Preview — not claimed yet',
     overlay: (
       <div
-        className='flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2 py-1.5 text-white shadow-[0_14px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl dark:text-white'
+        className='flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2 py-1.5 text-white backdrop-blur-xl dark:text-white'
         data-testid='onboarding-dsp-match-strip'
       >
         {['Spotify', 'Apple Music'].map(label => (
