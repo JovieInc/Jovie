@@ -6,6 +6,7 @@ import {
   MarketingPageShell,
 } from '@/components/marketing';
 import { APP_ROUTES } from '@/constants/routes';
+import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import { SmartLinksDemo } from './SmartLinksDemo';
 
 const SMART_LINKS_HERO_PHOTO = {
@@ -56,7 +57,10 @@ export function SmartLinksLanding() {
               </p>
               <div className='mt-8 flex flex-wrap gap-3'>
                 <Button asChild variant='primary' size='md'>
-                  <Link href={`${APP_ROUTES.SIGNUP}?source=smart-links`}>
+                  <Link
+                    href={`${APP_ROUTES.SIGNUP}?source=smart-links`}
+                    prefetch={resolveMarketingAuthPrefetch(APP_ROUTES.SIGNUP)}
+                  >
                     Create a Smart Link
                   </Link>
                 </Button>
@@ -127,6 +131,7 @@ export function SmartLinksLanding() {
             <Button asChild variant='secondary' size='md'>
               <Link
                 href={`${APP_ROUTES.SIGNUP}?source=smart-links&intent=create`}
+                prefetch={resolveMarketingAuthPrefetch(APP_ROUTES.SIGNUP)}
               >
                 Create a Smart Link
               </Link>

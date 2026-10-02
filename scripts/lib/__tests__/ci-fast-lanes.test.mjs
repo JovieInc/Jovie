@@ -1,5 +1,12 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -63,57 +70,74 @@ const SUMMER_BRIDGE_COVERAGE_COMMAND =
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 
 describe('CI control selector', () => {
-  it('includes the structural execution regressions in the actual control command', () => {
-    const directory = mkdtempSync(join(tmpdir(), 'jovie-ci-control-selector-'));
-    const capture = join(directory, 'commands');
-    try {
-      writeFileSync(join(directory, 'node'), '#!/bin/sh\nexit 0\n', {
-        mode: 0o755,
-      });
-      writeFileSync(
-        join(directory, 'pnpm'),
-        '#!/bin/sh\nprintf "%s\\n" "$*" >> "$JOVIE_CI_CAPTURE"\n',
-        { mode: 0o755 }
+  it.each(['whole', 'fragmented'])(
+    'includes the structural execution regressions in the actual control command with %s capture writes',
+    captureMode => {
+      const directory = mkdtempSync(
+        join(tmpdir(), 'jovie-ci-control-selector-')
       );
-
-      const result = spawnSync(
-        process.execPath,
-        [join(REPO_ROOT, 'scripts/run-affected-tests.mjs'), '--control'],
-        {
-          cwd: REPO_ROOT,
-          env: {
-            ...process.env,
-            PATH: `${directory}:${process.env.PATH}`,
-            JOVIE_CI_CAPTURE: capture,
-          },
-          encoding: 'utf8',
-          timeout: 10_000,
-        }
-      );
-      expect(result.status, result.stderr).toBe(0);
-      const scriptCommand = readFileSync(capture, 'utf8')
-        .split('\n')
-        // The control pool runs commands concurrently, so match the suite, not the order.
-        .find(
-          command =>
-            command.startsWith('exec vitest --root scripts ') &&
-            command.includes(
-              'lib/__tests__/native-queue-group-evidence.test.mjs'
-            )
+      const capture = join(directory, 'commands');
+      try {
+        mkdirSync(capture);
+        writeFileSync(join(directory, 'node'), '#!/bin/sh\nexit 0\n', {
+          mode: 0o755,
+        });
+        writeFileSync(
+          join(directory, 'pnpm'),
+          `#!${process.execPath}
+const fs = require('node:fs');
+const path = require('node:path');
+const data = Buffer.from(process.argv.slice(2).join(' ') + '\\n');
+const fd = fs.openSync(path.join(process.env.JOVIE_CI_CAPTURE, String(process.pid)), 'w');
+const chunkSize = ${captureMode === 'fragmented' ? 1024 : 65536};
+for (let offset = 0; offset < data.length; offset += chunkSize) {
+  fs.writeSync(fd, data.subarray(offset, offset + chunkSize));
+}
+fs.closeSync(fd);
+`,
+          { mode: 0o755 }
         );
-      expect(scriptCommand).toBeDefined();
-      expect(scriptCommand.split(' ')).toContain(
-        'lib/__tests__/ci-fast-lanes.test.mjs'
-      );
-      // The structural lane relies on this run instead of repeating it.
-      expect(scriptCommand.split(' ')).toContain(
-        'lib/__tests__/merge-group-workflow-contract.test.mjs'
-      );
-      expect(scriptCommand).toContain('--coverage');
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
+
+        const result = spawnSync(
+          process.execPath,
+          [join(REPO_ROOT, 'scripts/run-affected-tests.mjs'), '--control'],
+          {
+            cwd: REPO_ROOT,
+            env: {
+              ...process.env,
+              PATH: `${directory}:${process.env.PATH}`,
+              JOVIE_CI_CAPTURE: capture,
+            },
+            encoding: 'utf8',
+            timeout: 10_000,
+          }
+        );
+        expect(result.status, result.stderr).toBe(0);
+        // Each invocation owns its record; shared append writes can interleave.
+        const scriptCommands = readdirSync(capture)
+          .map(name => readFileSync(join(capture, name), 'utf8').trim())
+          .filter(
+            command =>
+              command.startsWith('exec vitest --root scripts ') &&
+              command.includes(
+                'lib/__tests__/native-queue-group-evidence.test.mjs'
+              )
+          );
+        expect(scriptCommands).toHaveLength(1);
+        const [scriptCommand] = scriptCommands;
+        expect(scriptCommand.split(' ')).toContain(
+          'lib/__tests__/ci-fast-lanes.test.mjs'
+        );
+        // The structural lane relies on this run instead of repeating it.
+        expect(scriptCommand.split(' ')).toContain(
+          'lib/__tests__/merge-group-workflow-contract.test.mjs'
+        );
+        expect(scriptCommand).toContain('--coverage');
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
     }
-  });
+  );
 });
 
 describe('runDesignConformance', () => {
