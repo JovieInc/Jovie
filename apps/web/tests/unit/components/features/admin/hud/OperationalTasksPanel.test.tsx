@@ -6,7 +6,10 @@ import {
 import userEvent from '@testing-library/user-event';
 import { type ReactNode, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { OperationalTasksPanelView } from '@/components/features/admin/hud/OperationalTasksPanel';
+import {
+  OperationalTasksPanel,
+  OperationalTasksPanelView,
+} from '@/components/features/admin/hud/OperationalTasksPanel';
 import {
   RightPanelProvider,
   useRightPanel,
@@ -15,6 +18,11 @@ import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client
 
 type OperationalTaskFeed = ShippingCockpitProjection['operationalTasks'];
 type OperationalTask = OperationalTaskFeed['tasks'][number];
+
+const { mockTaskQuery } = vi.hoisted(() => ({ mockTaskQuery: vi.fn() }));
+vi.mock('@/components/features/admin/hud/useHudShippingStateQuery', () => ({
+  useHudShippingStateQuery: mockTaskQuery,
+}));
 
 function ShellRail() {
   return <div data-testid='shell-rail'>{useRightPanel()}</div>;
@@ -78,6 +86,30 @@ function feed(
 }
 
 describe('OperationalTasksPanelView', () => {
+  it('connects the live query wrapper to page inspection and request state', () => {
+    mockTaskQuery.mockReturnValue({
+      isFetching: false,
+      operationalRequestState: 'error',
+      operationalTasks: feed(),
+    });
+    render(<OperationalTasksPanel presentation='page' />);
+
+    expect(mockTaskQuery).toHaveBeenCalledWith(null);
+    expect(screen.getByText('Stale Cache')).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole('region', { name: 'Operational Tasks' })
+        .querySelector('.overflow-y-auto')
+    ).toBeNull();
+    const inspect = screen.getByRole('button', { name: /Inspect JOV-5544/ });
+    fireEvent.click(inspect);
+    expect(inspect).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('shell-rail')).toContainElement(
+      screen.getByTestId('shipping-row-rail')
+    );
+    mockTaskQuery.mockReset();
+  });
+
   it('renders the stable Linear identity from the local reconciled cache', () => {
     render(<OperationalTasksPanelView feed={feed()} />);
 
