@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -124,4 +124,47 @@ describe('UnifiedTable sorting ownership', () => {
       'none'
     );
   });
+});
+
+const data = [
+  { id: 'fan', name: 'Fan', engagement: 'High', lastSeen: 'Today' },
+];
+const responsiveColumns: ColumnDef<(typeof data)[number], unknown>[] = [
+  { accessorKey: 'name', header: 'Fan' },
+  { accessorKey: 'engagement', header: 'Engagement' },
+  { accessorKey: 'lastSeen', header: 'Last Seen' },
+];
+
+describe('UnifiedTable responsive columns', () => {
+  it.each([false, true])(
+    'keeps body cells aligned when columns change (grouped: %s)',
+    grouped => {
+      const props = {
+        data,
+        columns: responsiveColumns,
+        enableVirtualization: false,
+        groupingConfig: grouped
+          ? { getGroupKey: () => 'fans', getGroupLabel: () => 'Fans' }
+          : undefined,
+      };
+      const { rerender } = render(<UnifiedTable {...props} />);
+      const cells = () =>
+        within(screen.getByRole('cell', { name: /^Fan$/ }).closest('tr')!)
+          .getAllByRole('cell')
+          .map(cell => cell.textContent);
+
+      expect(cells()).toEqual(['Fan', 'High', 'Today']);
+      rerender(
+        <UnifiedTable {...props} columnVisibility={{ engagement: false }} />
+      );
+      expect(screen.getAllByRole('columnheader')).toHaveLength(2);
+      expect(cells()).toEqual(['Fan', 'Today']);
+
+      rerender(
+        <UnifiedTable {...props} columnVisibility={{ engagement: true }} />
+      );
+      expect(screen.getAllByRole('columnheader')).toHaveLength(3);
+      expect(cells()).toEqual(['Fan', 'High', 'Today']);
+    }
+  );
 });
