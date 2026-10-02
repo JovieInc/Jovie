@@ -17,8 +17,11 @@ name: Merge Queue Green Enroll
 # Scans every open PR to main (paginated, newest first) on each event.
 
 on:
+  workflow_run:
+    workflows: ['Source Validation', 'CI', 'Fork PR Gate', 'PR Size Guard']
+    types: [completed]
   pull_request_target:
-    types: [unlabeled]
+    types: [unlabeled, ready_for_review, reopened]
   workflow_dispatch:
     inputs:
       dry_run:
@@ -34,6 +37,11 @@ concurrency:
 
 jobs:
   enroll:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       (github.event.workflow_run.event == 'pull_request' ||
+        github.event.workflow_run.event == 'pull_request_target'))
     name: Enqueue green PRs
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -58,38 +66,37 @@ jobs:
             // the lanes remove it with their fix.
             const BLOCKING = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'queue-poison']);
             const { owner, repo } = context.repo;
-            // Page through every open PR: a single first:100 window ordered
-            // UPDATED_AT ASC hid every recently fixed PR once >100 were open.
-            const prs = [];
-            let cursor = null;
-            do {
+            // REST inventory avoids multiplying commits/timeline resolvers across
+            // 100 PRs, which exceeded GitHub's GraphQL resource limit in production.
+            // Complete inventory before mutating; paginate beyond 100 open PRs.
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', base: 'main', per_page: 100,
+            });
+            core.info(`scanned=${prs.length}`);
+            let enqueued = 0;
+            for (const candidate of prs) {
+              if (candidate.draft || candidate.head.repo?.full_name !== `${owner}/${repo}`) continue;
+              if (candidate.labels.some(l => BLOCKING.has(l.name.toLowerCase()))) continue;
+              // Read one current PR at a time. The roster never authorizes enqueue.
               const { repository } = await github.graphql(`
-              query($owner: String!, $repo: String!, $cursor: String) {
-                repository(owner: $owner, name: $repo) {
-                  pullRequests(states: OPEN, baseRefName: "main", first: 100, after: $cursor,
-                               orderBy: { field: UPDATED_AT, direction: DESC }) {
-                    pageInfo { hasNextPage endCursor }
-                    nodes {
-                      id number isDraft headRefOid mergeStateStatus
+                query($owner: String!, $repo: String!, $number: Int!) {
+                  repository(owner: $owner, name: $repo) {
+                    pullRequest(number: $number) {
+                      id number state isDraft baseRefName headRefOid mergeStateStatus
                       isInMergeQueue isCrossRepository
-                      labels(first: 30) { nodes { name } }
+                      labels(first: 100) { pageInfo { hasNextPage } nodes { name } }
                       commits(last: 1) { nodes { commit { committedDate } } }
                       timelineItems(last: 1, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT]) {
                         nodes { ... on RemovedFromMergeQueueEvent { createdAt } }
                       }
                     }
                   }
-                }
-              }`, { owner, repo, cursor });
-              prs.push(...repository.pullRequests.nodes);
-              const page = repository.pullRequests.pageInfo;
-              cursor = page.hasNextPage ? page.endCursor : null;
-            } while (cursor);
-            core.info(`scanned=${prs.length}`);
-            let enqueued = 0;
-            for (const pr of prs) {
+                }`, { owner, repo, number: candidate.number });
+              const pr = repository.pullRequest;
+              if (!pr || pr.state !== 'OPEN' || pr.baseRefName !== 'main') continue;
               if (pr.isDraft || pr.isInMergeQueue || pr.isCrossRepository) continue;
-              if (pr.mergeStateStatus !== 'CLEAN') continue;
+              if (pr.headRefOid !== candidate.head.sha || pr.mergeStateStatus !== 'CLEAN') continue;
+              if (pr.labels.pageInfo.hasNextPage) continue;
               const labels = pr.labels.nodes.map(l => l.name.toLowerCase());
               if (labels.some(l => BLOCKING.has(l))) continue;
               // The queue already rejected this exact head; wait for a new push.
