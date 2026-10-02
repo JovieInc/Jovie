@@ -2,7 +2,7 @@
 
 import { Input } from '@jovie/ui';
 import { Search, X } from 'lucide-react';
-import type * as React from 'react';
+import * as React from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 
@@ -33,6 +33,9 @@ export function AppSearchField({
   className,
   inputClassName,
 }: AppSearchFieldProps) {
+  const internalInputRef = React.useRef<HTMLInputElement>(null);
+  React.useImperativeHandle(inputRef, () => internalInputRef.current!, []);
+
   return (
     <div
       className={cn(
@@ -42,7 +45,7 @@ export function AppSearchField({
     >
       <Search className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
       <Input
-        ref={inputRef}
+        ref={internalInputRef}
         autoFocus={autoFocus}
         type='search'
         data-app-search-field='true'
@@ -54,7 +57,7 @@ export function AppSearchField({
         placeholder={placeholder}
         aria-label={ariaLabel}
         className={cn(
-          'h-full border-0 bg-transparent px-0 text-app tracking-tight text-secondary-token shadow-none ring-0 placeholder:text-tertiary-token focus-visible:border-0 focus-visible:ring-0',
+          'h-full appearance-none border-0 bg-transparent px-0 text-app tracking-tight text-secondary-token shadow-none ring-0 placeholder:text-tertiary-token focus-visible:border-0 focus-visible:ring-0 focus-visible:ring-offset-0 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden',
           inputClassName
         )}
       />
@@ -64,6 +67,7 @@ export function AppSearchField({
           ariaLabel='Clear search'
           className='border-transparent bg-transparent text-tertiary-token hover:border-transparent hover:bg-surface-1 hover:text-secondary-token'
           onClick={() => {
+            internalInputRef.current?.focus({ preventScroll: true });
             onChange('');
             onClear?.();
           }}
