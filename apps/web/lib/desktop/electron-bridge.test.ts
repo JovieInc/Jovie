@@ -20,8 +20,8 @@ import {
   __testing,
   isDesktopEnvironment,
   notifyDesktopComposerReadiness,
-  reportDesktopWorkState,
   observeDesktopVisualActivity,
+  reportDesktopWorkState,
   useDesktopBuildIdentity,
 } from './electron-bridge';
 
