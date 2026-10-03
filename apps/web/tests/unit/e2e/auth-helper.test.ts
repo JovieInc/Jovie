@@ -45,7 +45,7 @@ describe('resolveBypassFallbackUserId', () => {
 });
 
 describe('signInUser test-auth bypass navigation', () => {
-  function withBypassEnv(run: () => Promise<void>) {
+  function withBypassEnv<T>(run: () => Promise<T>) {
     const originalBypass = process.env.E2E_USE_TEST_AUTH_BYPASS;
     const originalBaseUrl = process.env.BASE_URL;
     process.env.E2E_USE_TEST_AUTH_BYPASS = '1';
@@ -66,10 +66,15 @@ describe('signInUser test-auth bypass navigation', () => {
   }
 
   function buildPage(enterStatus = 303) {
-    const requestGet = vi.fn(async () => ({
-      status: () => enterStatus,
-      text: () => Promise.resolve('enter error body'),
-    }));
+    const requestGet = vi.fn(
+      async (
+        _url: string,
+        _options?: { maxRedirects?: number; timeout?: number }
+      ) => ({
+        status: () => enterStatus,
+        text: () => Promise.resolve('enter error body'),
+      })
+    );
     const goto = vi.fn(
       async (_url: string, _options?: Parameters<Page['goto']>[1]) =>
         ({ status: () => 200 }) as unknown as Awaited<ReturnType<Page['goto']>>
@@ -97,7 +102,7 @@ describe('signInUser test-auth bypass navigation', () => {
         timeout: expect.any(Number),
       })
     );
-    const { timeout } = requestGet.mock.calls[0][1] as { timeout: number };
+    const { timeout } = requestGet.mock.calls[0][1] ?? {};
     expect(timeout).toBeGreaterThan(45_000);
     expect(goto).toHaveBeenCalledWith(
       'http://localhost:3100/app',
