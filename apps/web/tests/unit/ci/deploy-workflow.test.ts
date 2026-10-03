@@ -631,7 +631,7 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(ciTrigger).toContain('branches: [main]');
     expect(ciTrigger).not.toContain('paths-ignore:');
     expect(controllerTrigger).toContain('workflow_run:');
-    expect(controllerTrigger).toContain('workflows: [CI]');
+    expect(controllerTrigger).toContain('workflows: [Staging Controller]');
     expect(controllerTrigger).toContain('types: [completed]');
     expect(controllerTrigger).toContain('branches: [main]');
     expect(controllerTrigger).not.toContain('paths-ignore:');
