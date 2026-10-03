@@ -72,7 +72,7 @@ if (remediationIntakeDisabled(env)) {
 }
 
 const chosen = decision();
-if (chosen.reason === 'unknown_mode') {
+if ('reason' in chosen && chosen.reason === 'unknown_mode') {
   console.error('remediation-signal-intake: set REMEDIATION_MODE');
   process.exit(1);
 }

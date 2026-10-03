@@ -121,7 +121,7 @@ describe('gateSteadyGreen', () => {
       { action: 'red', fingerprint: 'production-monitor-continuity' },
       { source: 'production-continuity.yml', apiKey: '' }
     );
-    expect(result.reason).toBe('missing_linear_api_key');
+    expect('reason' in result && result.reason).toBe('missing_linear_api_key');
   });
 });
 

@@ -92,11 +92,11 @@ export function decideLoginSignal({
   return { action: 'skip' };
 }
 
-export function decideAuthSmokeSignal({
-  jobResult,
-  authStatus = '',
-  loginTimeout = false,
-}) {
+/** @param {{ jobResult?: string, authStatus?: string, loginTimeout?: boolean | string }} [input] */
+export function decideAuthSmokeSignal(input = {}) {
+  const jobResult = input.jobResult;
+  const authStatus = input.authStatus ?? '';
+  const loginTimeout = input.loginTimeout;
   if (
     !jobResult ||
     jobResult === 'skipped' ||
@@ -187,10 +187,9 @@ export async function resolveRemediationSignal({
   });
 }
 
-export async function applyRemediationDecision(
-  decision,
-  { fingerprint, source, runUrl, detail, apiKey, fetchImpl } = {}
-) {
+/** @param {any} decision @param {any} [context] */
+export async function applyRemediationDecision(decision = {}, context = {}) {
+  const { fingerprint, source, runUrl, detail, apiKey, fetchImpl } = context;
   if (!decision || decision.action === 'skip') {
     return { ok: true, action: 'skip' };
   }
