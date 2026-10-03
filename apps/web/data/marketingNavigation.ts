@@ -138,6 +138,7 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
     links: [
       MARKETING_DEVELOPER_LINK,
       MARKETING_CLI_LINK,
+      { href: APP_ROUTES.ENGINEERING, label: 'Engineering' },
       { href: APP_ROUTES.SUPPORT, label: 'Support' },
       { href: APP_ROUTES.COMPARE, label: 'Compare' },
       { href: APP_ROUTES.ALTERNATIVES, label: 'Alternatives' },

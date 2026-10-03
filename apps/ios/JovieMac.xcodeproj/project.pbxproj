@@ -18,6 +18,17 @@
 		E55663FD7607AEF97C8ACC9D /* MacDevelopmentBoundaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D5ED72B96DE18C73D3034E /* MacDevelopmentBoundaryTests.swift */; };
 		F75280000000000000000001 /* JovieKit in Frameworks */ = {isa = PBXBuildFile; productRef = F75280000000000000000003 /* JovieKit */; };
 		F75280000000000000000002 /* JovieKit in Frameworks */ = {isa = PBXBuildFile; productRef = F75280000000000000000004 /* JovieKit */; };
+		A076610000000000000000C9 /* ChatRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000C8 /* ChatRepository.swift */; };
+		A076610000000000000000CB /* ChatCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000CA /* ChatCache.swift */; };
+		A076610000000000000000CD /* NativeSessionTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000CC /* NativeSessionTokenStore.swift */; };
+		A076610000000000000000CF /* MobileChatClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000CE /* MobileChatClient.swift */; };
+		A076610000000000000000D1 /* NativeAPIContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000D0 /* NativeAPIContracts.swift */; };
+		A076610000000000000000D3 /* ChatStateModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000D2 /* ChatStateModels.swift */; };
+		A076610000000000000000D5 /* MobileWorkspaceMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000D4 /* MobileWorkspaceMode.swift */; };
+		A076610000000000000000D7 /* VoiceCaptureContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000D6 /* VoiceCaptureContracts.swift */; };
+		A076610000000000000000D9 /* NativeChatRepositoryFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000D8 /* NativeChatRepositoryFactory.swift */; };
+		A076610000000000000000DB /* IntentNavigationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000DA /* IntentNavigationStore.swift */; };
+		A076610000000000000000DD /* ConversationUserActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000DC /* ConversationUserActivity.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -41,6 +52,17 @@
 		C7307463378A4CD5C32D2818 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CF034425181827A1F0DE391F /* MacDevelopmentContent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacDevelopmentContent.swift; sourceTree = "<group>"; };
 		E8620D0FAF554FF421D51A6C /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
+		A076610000000000000000C8 /* ChatRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRepository.swift; sourceTree = "<group>"; };
+		A076610000000000000000CA /* ChatCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatCache.swift; sourceTree = "<group>"; };
+		A076610000000000000000CC /* NativeSessionTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSessionTokenStore.swift; sourceTree = "<group>"; };
+		A076610000000000000000CE /* MobileChatClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileChatClient.swift; sourceTree = "<group>"; };
+		A076610000000000000000D0 /* NativeAPIContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAPIContracts.swift; sourceTree = "<group>"; };
+		A076610000000000000000D2 /* ChatStateModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStateModels.swift; sourceTree = "<group>"; };
+		A076610000000000000000D4 /* MobileWorkspaceMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileWorkspaceMode.swift; sourceTree = "<group>"; };
+		A076610000000000000000D6 /* VoiceCaptureContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCaptureContracts.swift; sourceTree = "<group>"; };
+		A076610000000000000000D8 /* NativeChatRepositoryFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeChatRepositoryFactory.swift; sourceTree = "<group>"; };
+		A076610000000000000000DA /* IntentNavigationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntentNavigationStore.swift; sourceTree = "<group>"; };
+		A076610000000000000000DC /* ConversationUserActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationUserActivity.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -102,6 +124,8 @@
 			isa = PBXGroup;
 			children = (
 				439F3503579FAE5E1B0CE7D2 /* DesignSystem */,
+				A0766100000000000000012C /* Core */,
+				A0766100000000000000012D /* Features */,
 				4A923170AE15028DA071DFF8 /* Resources */,
 			);
 			path = Jovie;
@@ -151,6 +175,39 @@
 				5BA86AF0D2BC7D1ABB048185 /* OS X */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		A0766100000000000000012C /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				A076610000000000000000C8 /* ChatRepository.swift */,
+				A076610000000000000000CA /* ChatCache.swift */,
+				A076610000000000000000CC /* NativeSessionTokenStore.swift */,
+				A076610000000000000000CE /* MobileChatClient.swift */,
+				A076610000000000000000D0 /* NativeAPIContracts.swift */,
+				A076610000000000000000D2 /* ChatStateModels.swift */,
+				A076610000000000000000D4 /* MobileWorkspaceMode.swift */,
+				A076610000000000000000D6 /* VoiceCaptureContracts.swift */,
+				A076610000000000000000D8 /* NativeChatRepositoryFactory.swift */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		A0766100000000000000012D /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				A0766100000000000000012E /* Intents */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		A0766100000000000000012E /* Intents */ = {
+			isa = PBXGroup;
+			children = (
+				A076610000000000000000DA /* IntentNavigationStore.swift */,
+				A076610000000000000000DC /* ConversationUserActivity.swift */,
+			);
+			path = Intents;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -262,6 +319,17 @@
 			buildActionMask = 2147483647;
 			files = (
 				1896A3883415894102BD7253 /* JovieTheme.swift in Sources */,
+				A076610000000000000000C9 /* ChatRepository.swift in Sources */,
+				A076610000000000000000CB /* ChatCache.swift in Sources */,
+				A076610000000000000000CD /* NativeSessionTokenStore.swift in Sources */,
+				A076610000000000000000CF /* MobileChatClient.swift in Sources */,
+				A076610000000000000000D1 /* NativeAPIContracts.swift in Sources */,
+				A076610000000000000000D3 /* ChatStateModels.swift in Sources */,
+				A076610000000000000000D5 /* MobileWorkspaceMode.swift in Sources */,
+				A076610000000000000000D7 /* VoiceCaptureContracts.swift in Sources */,
+				A076610000000000000000D9 /* NativeChatRepositoryFactory.swift in Sources */,
+				A076610000000000000000DB /* IntentNavigationStore.swift in Sources */,
+				A076610000000000000000DD /* ConversationUserActivity.swift in Sources */,
 				3353B95B121A56335FF6FE38 /* JovieMacApp.swift in Sources */,
 				BAFBC828F71AF1EDD6AD73A4 /* MacDevelopmentContent.swift in Sources */,
 				A07571000000000000000002 /* MacComposerTextView.swift in Sources */,

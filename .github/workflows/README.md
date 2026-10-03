@@ -225,7 +225,7 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `Storybook Surface Matrix (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/web exec playwright test tests/e2e/storybook-elevation.spec.ts tests/e2e/storybook-input.spec.ts --config=playwright.config.storybook.ts --project=chromium` |
 | `iOS Fast Unit + Coverage (combined)` | merge-group | combined-integration | `pnpm run ios:lint && bash apps/ios/scripts/run-unit-tests.sh && bash apps/ios/scripts/check_coverage.sh` |
 | `Mac Build + Test (combined)` | merge-group | combined-integration | `pnpm run macos:test && pnpm run macos:build && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging` |
-| `Cross-Product Integration (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test` |
+| `Cross-Product Integration (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test && pnpm --filter @jovie/release-channel-contracts test` |
 | `Promptfoo Evals (deterministic)` | merge-group | combined-integration | `pnpm run evals` |
 | `Golden Eval Set (deterministic)` | merge-group | combined-integration | `pnpm run evals:golden` |
 | `Lighthouse (dashboard gate)` | merge-group | combined-integration | `pnpm --filter=@jovie/web run test:lighthouse:dashboard:pr` |

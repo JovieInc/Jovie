@@ -153,6 +153,8 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           DEDUPE_KEY: ${{ github.event.client_payload.dedupe_key || github.event.client_payload.issue_id }}
           ISSUE_ID: ${{ github.event.client_payload.issue_id }}
+          SENTRY_SHORT_ID: ${{ github.event.client_payload.short_id }}
+          LINEAR_IDENTIFIER: ${{ github.event.client_payload.linear_identifier }}
           ERROR_TITLE: ${{ github.event.client_payload.title }}
           SENTRY_URL: ${{ github.event.client_payload.url }}
           SENTRY_ENVIRONMENT: ${{ github.event.client_payload.context.environment }}
@@ -205,6 +207,8 @@ jobs:
           - **Error:** ${ERROR_TITLE}
           - **Sentry:** ${SENTRY_URL}
           - **Issue ID:** ${ISSUE_ID}
+          - **Sentry short ID:** ${SENTRY_SHORT_ID}
+          - **Linear:** ${LINEAR_IDENTIFIER}
           - **Root-cause fingerprint:** ${SENTRY_FINGERPRINT}
           - **Environment:** ${SENTRY_ENVIRONMENT}
           - **Release:** ${SENTRY_RELEASE}

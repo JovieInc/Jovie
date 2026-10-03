@@ -138,7 +138,7 @@ private struct AppContentView: View {
           NeedsOnboardingView(
             initialDisplayName: appState.loadedDashboardResponse?.displayName ?? "",
             initialUsername: appState.loadedDashboardResponse?.username ?? "",
-            onComplete: { displayName, username in
+            onComplete: { [userID = appState.activeUserID, owner = appState.activeSessionOwnership] displayName, username in
               if appState.launchMode == .uiTestingNeedsOnboardingUnauthorized {
                 await appState.handleExpiredSession()
                 return nil
@@ -148,26 +148,15 @@ private struct AppContentView: View {
                 return "Profile completion is temporarily unavailable. Try again."
               }
 
-              do {
-                try await APIClient(
-                  baseURL: appState.configuration.apiBaseURL,
-                  tokenProvider: NativeSessionTokenProvider()
-                ).completeProfile(displayName: displayName, username: username)
-                await appState.retry()
-                guard appState.route == .ready else {
-                  return "Your profile was saved, but the app couldn't refresh it. Try again."
-                }
-                return nil
-              } catch APIClientError.missingToken,
-                      APIClientError.requestFailed(statusCode: 401)
-              {
-                await appState.handleExpiredSession()
-                return nil
-              } catch {
-                return error.localizedDescription
-              }
+              guard let userID, let owner else { return nil }
+              return await appState.completeProfile(
+                displayName: displayName, username: username, for: userID, ifOwnedBy: owner,
+                using: APIClient(baseURL: appState.configuration.apiBaseURL,
+                                 tokenProvider: NativeSessionTokenProvider())
+              )
             }
           )
+          .id(appState.activeSessionOwnership)
         } audienceContent: { _ in
           EmptyView()
         } libraryContent: { _, _ in
@@ -443,18 +432,11 @@ private struct AppContentView: View {
   }
 
   private func makeChatRepository(identity: NativeChatIdentity) -> ChatRepository {
-    ChatRepository(
-      client: MobileChatClient(
-        baseURL: appState.configuration.apiBaseURL,
-        tokenProvider: NativeSessionTokenProvider(),
-        workspace: identity.workspace,
-        identity: identity
-      ),
-      cache: ChatCache(),
-      userID: identity.userID,
-      webBaseURL: appState.configuration.webBaseURL,
-      workspace: identity.workspace,
+    NativeChatRepositoryFactory.make(
       identity: identity,
+      apiBaseURL: appState.configuration.apiBaseURL,
+      webBaseURL: appState.configuration.webBaseURL,
+      cache: ChatCache(),
       onSessionExpired: { [appState] receipt in await appState.handleExpiredSession(receipt) }
     )
   }

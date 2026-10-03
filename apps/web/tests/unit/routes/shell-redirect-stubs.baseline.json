@@ -39,7 +39,6 @@
     "/app/releases",
     "/app/settings",
     "/app/settings/admin",
-    "/app/settings/appearance",
     "/app/settings/delete-account",
     "/app/settings/profile",
     "/app/threads",

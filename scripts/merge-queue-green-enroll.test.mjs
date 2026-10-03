@@ -19,6 +19,17 @@ const run = new AsyncFunction(
   script
 );
 const sha = 'a'.repeat(40);
+const mainSha = 'c'.repeat(40);
+test('both native queue mutation clients request repository contents write', () => {
+  for (const job of [
+    workflow.jobs['hold-failed-revision'],
+    workflow.jobs.enroll,
+  ]) {
+    const token = job.steps.find(step => step.id === 'app-token');
+    assert.equal(token.with['permission-contents'], 'write');
+    assert.equal(token.with['permission-pull-requests'], 'write');
+  }
+});
 const candidate = number => ({
   number,
   draft: false,
@@ -50,6 +61,7 @@ async function fixture(
     statuses = [],
     mutationError = undefined,
     failureReceipt = '',
+    currentMainSha = mainSha,
     eventName = 'workflow_dispatch',
     payload = {},
     associatedPages,
@@ -63,6 +75,16 @@ async function fixture(
   const gets = [];
   const github = {
     rest: {
+      git: {
+        getRef: async params => {
+          assert.deepEqual(params, {
+            owner: 'JovieInc',
+            repo: 'Jovie',
+            ref: 'heads/main',
+          });
+          return { data: { object: { sha: currentMainSha } } };
+        },
+      },
       pulls: {
         list: Symbol('pulls.list'),
         get: async params => {
@@ -211,7 +233,7 @@ test('failure-hold dequeue uses the Jovie Bot token without a merge-queue grant'
   );
   assert.equal(token.with['app-id'], '${{ vars.JOVIE_BOT_APP_ID }}');
   assert.equal(token.with['permission-actions'], 'read');
-  assert.equal(token.with['permission-contents'], 'read');
+  assert.equal(token.with['permission-contents'], 'write');
   assert.equal(token.with['permission-pull-requests'], 'write');
   assert.equal(token.with['permission-statuses'], 'write');
   assert.equal(token.with['permission-merge-queues'], undefined);
@@ -327,6 +349,60 @@ test('definitive rejected mutation releases retry while ambiguous errors preserv
     success.statusWrites.map(item => item.description),
     ['spent:run=123;try=1']
   );
+});
+
+test('a moved base permits one reserved enqueue and only explicit rejection releases it', async () => {
+  const recordedMainSha = 'd'.repeat(40);
+  const baseHold = {
+    ...retryFailure,
+    description: `class=base-branch;n=1;run=123;try=1;main=${recordedMainSha}`,
+  };
+  const retry = await fixture({ statuses: [baseHold] });
+  assert.deepEqual(retry.mutations, [{ id: 'PR_1', oid: sha }]);
+  assert.deepEqual(retry.statusWrites, [
+    {
+      owner: 'JovieInc',
+      repo: 'Jovie',
+      sha,
+      state: 'success',
+      context: 'jovie-queue-failure-retry/v1',
+      description: 'spent:run=123;try=1',
+      target_url: baseHold.target_url,
+    },
+  ]);
+  const spent = { ...retry.statusWrites[0], creator: baseHold.creator };
+  const blocked = await fixture({ statuses: [spent, baseHold] });
+  assert.deepEqual(blocked.mutations, []);
+  assert.deepEqual(blocked.statusWrites, []);
+
+  const rejected = await fixture({
+    statuses: [baseHold],
+    mutationError: Object.assign(new Error('rejected'), {
+      data: { enqueuePullRequest: null },
+      errors: [{ type: 'UNPROCESSABLE', path: ['enqueuePullRequest'] }],
+    }),
+  });
+  assert.deepEqual(rejected.mutations, [{ id: 'PR_1', oid: sha }]);
+  assert.deepEqual(
+    rejected.statusWrites.map(item => item.description),
+    ['spent:run=123;try=1', 'released:run=123;try=1']
+  );
+  const released = {
+    ...rejected.statusWrites[1],
+    creator: baseHold.creator,
+  };
+  const reattempt = await fixture({ statuses: [released, spent, baseHold] });
+  assert.deepEqual(reattempt.mutations, [{ id: 'PR_1', oid: sha }]);
+  assert.deepEqual(reattempt.statusWrites, retry.statusWrites);
+
+  for (const currentMainSha of [recordedMainSha, '', 'unknown']) {
+    const held = await fixture({
+      statuses: [released, spent, baseHold],
+      currentMainSha,
+    });
+    assert.deepEqual(held.mutations, []);
+    assert.deepEqual(held.statusWrites, []);
+  }
 });
 
 test('a PR wake reads only its current candidate instead of rescanning the whole queue', async () => {
