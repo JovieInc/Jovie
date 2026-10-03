@@ -20,7 +20,7 @@ describe('SETTINGS_SIDEBAR_GROUPS', () => {
     ]);
   });
 
-  it('assigns the 10 sub-pages to their approved groups', () => {
+  it('assigns the 11 sub-pages to their approved groups', () => {
     const membership = Object.fromEntries(
       SETTINGS_SIDEBAR_GROUPS.map(group => [
         group.id,
@@ -32,7 +32,7 @@ describe('SETTINGS_SIDEBAR_GROUPS', () => {
       profile: ['artist-profile', 'contacts', 'appearance'],
       account: ['account', 'data-privacy', 'delete-account'],
       workspace: ['connections', 'retargeting-ads'],
-      billing: ['billing', 'usage'],
+      billing: ['billing', 'usage', 'referral'],
     });
   });
 
@@ -51,10 +51,10 @@ describe('SETTINGS_SIDEBAR_GROUPS', () => {
 });
 
 describe('filterSettingsGroups', () => {
-  it('returns all 10 items for an empty query', () => {
+  it('returns all 11 items for an empty query', () => {
     const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, '');
     const ids = groups.flatMap(group => group.items.map(item => item.id));
-    expect(ids).toHaveLength(10);
+    expect(ids).toHaveLength(11);
   });
 
   it('filters by item label, case-insensitively', () => {
@@ -66,12 +66,16 @@ describe('filterSettingsGroups', () => {
   it('matches a group label and keeps its visible items', () => {
     const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, 'billing');
     expect(groups.map(group => group.id)).toEqual(['billing']);
-    expect(groups[0].items.map(item => item.id)).toEqual(['billing', 'usage']);
+    expect(groups[0].items.map(item => item.id)).toEqual([
+      'billing',
+      'usage',
+      'referral',
+    ]);
   });
 
   it('drops groups with no matching items', () => {
     const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, 'referral');
-    expect(groups).toEqual([]);
+    expect(groups.map(group => group.id)).toEqual(['billing']);
   });
 
   it('returns an empty list when nothing matches', () => {
@@ -89,11 +93,11 @@ describe('filterSettingsGroups', () => {
     }
   });
 
-  it('shows admins the same 10 items as creators', () => {
+  it('shows admins the same 11 items as creators', () => {
     const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, '', {
       isAdmin: true,
     });
-    expect(groups.flatMap(group => group.items)).toHaveLength(10);
+    expect(groups.flatMap(group => group.items)).toHaveLength(11);
   });
 });
 
