@@ -9,6 +9,7 @@ import {
   type SummerBottleneckStore,
   type SummerCiImprovementClassId,
   signSummerBottleneckProducerAttestation,
+  summerBottleneckSnapshotSchema,
   summerCiImprovementClassIds,
   verifySummerBottleneckReceipt,
 } from '../agent/lib/summer-bottleneck-loop';
@@ -465,6 +466,38 @@ function harness(
 }
 
 describe('Summer bottleneck loop', () => {
+  it('accepts omitted, unknown, and observed runner activity counts', () => {
+    for (const runner of [
+      {},
+      { running: null, blocked: null },
+      { running: 0, blocked: 2 },
+    ]) {
+      const input = snapshot({ runner });
+      const parsed = summerBottleneckSnapshotSchema.safeParse(input);
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.signals.runner).toMatchObject(runner);
+      }
+    }
+  });
+
+  it('rejects malformed runner activity counts and unrecognized fields', () => {
+    for (const name of ['running', 'blocked']) {
+      for (const value of [-1, 0.5, '1', true]) {
+        expect(
+          summerBottleneckSnapshotSchema.safeParse(
+            snapshot({ runner: { [name]: value } })
+          ).success
+        ).toBe(false);
+      }
+    }
+    expect(
+      summerBottleneckSnapshotSchema.safeParse(
+        snapshot({ runner: { unsupportedCount: 1 } })
+      ).success
+    ).toBe(false);
+  });
+
   it('deterministically ranks one bottleneck by blocked time, impact, then id', () => {
     const input = snapshot({
       closure: {

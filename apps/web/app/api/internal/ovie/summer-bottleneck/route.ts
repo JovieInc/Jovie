@@ -189,6 +189,8 @@ const unsignedSnapshotSchema = z
             workSource: runnerAuthority,
             capacityAvailable: safeCount.nullable(),
             queuedWork: safeCount.nullable(),
+            running: safeCount.nullable().optional(),
+            blocked: safeCount.nullable().optional(),
           })
           .strict(),
         ciAudit: ciAuditSchema.nullable(),
