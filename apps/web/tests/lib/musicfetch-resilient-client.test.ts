@@ -235,7 +235,7 @@ describe('musicfetch resilient client', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(mockReserveMusicfetchBudget).toHaveBeenCalledTimes(1);
       expect(musicfetchCircuitBreaker.getState()).toBe('OPEN');
-      expect(logger.warn).not.toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalledTimes(status === 401 ? 1 : 0);
       expect(sentry.captureMessage).not.toHaveBeenCalled();
       expect(sentry.addBreadcrumb).toHaveBeenCalledTimes(1);
       expect(sentry.addBreadcrumb).toHaveBeenCalledWith(

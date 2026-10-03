@@ -206,11 +206,16 @@ async function handleHttpResponse<T>(
   }
 
   if (response.status === 401 || response.status === 403) {
-    await response.body?.cancel?.().catch(() => undefined);
+    const errorBody = await response.text().catch(() => '');
+    const details = extractMusicfetchErrorDetail(errorBody);
+    noteMusicfetchHttpStatus(response.status, details);
     noteMusicfetchVendorUnavailable();
     throw new MusicfetchVendorUnavailableError(
-      'MusicFetch vendor unavailable',
-      response.status
+      details
+        ? `MusicFetch vendor unavailable: ${details}`
+        : 'MusicFetch vendor unavailable',
+      response.status,
+      details
     );
   }
 
@@ -242,10 +247,6 @@ async function requestWithRetries<T>(
   params: URLSearchParams,
   options: MusicfetchRequestOptions
 ): Promise<T> {
-  if (!musicfetchCircuitBreaker.canExecute()) {
-    throw new MusicfetchVendorUnavailableError('MusicFetch vendor unavailable');
-  }
-
   const token = env.MUSICFETCH_API_TOKEN;
   if (!token) {
     const remediation = noteMusicfetchMissingToken();
@@ -256,12 +257,14 @@ async function requestWithRetries<T>(
   const dormant = musicfetchDormantReason();
   if (dormant) {
     const remediation = musicfetchRemediation(dormant);
-    throw new MusicfetchRequestError(
+    throw new MusicfetchVendorUnavailableError(
       `MusicFetch dormant ${remediation.fingerprint} ${remediation.issue}`,
       401,
-      undefined,
       remediation.fingerprint
     );
+  }
+  if (!musicfetchCircuitBreaker.canExecute()) {
+    throw new MusicfetchVendorUnavailableError('MusicFetch vendor unavailable');
   }
 
   const query = params.toString();
