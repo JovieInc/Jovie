@@ -41,7 +41,7 @@ vi.mock('@/components/features/release/ReleaseCountdown', () => ({
     readonly compact?: boolean;
   }) => (
     <div
-      data-testid='release-countdown'
+      data-testid='release-countdown-inner'
       data-date={releaseDate.toISOString()}
       data-compact={String(compact)}
     >
@@ -87,7 +87,7 @@ const defaultProps = {
 describe('PreSaveActions', () => {
   it('renders countdown timer', () => {
     render(<PreSaveActions {...defaultProps} />);
-    const countdown = screen.getByTestId('release-countdown');
+    const countdown = screen.getByTestId('release-countdown-inner');
     expect(countdown).toHaveAttribute('data-compact', 'true');
   });
 
