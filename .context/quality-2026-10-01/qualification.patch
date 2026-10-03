@@ -1,0 +1,482 @@
+diff --git a/apps/web/components/atoms/InlineIconButton.tsx b/apps/web/components/atoms/InlineIconButton.tsx
+index 4f4001d3df78..77918dc0843f 100644
+--- a/apps/web/components/atoms/InlineIconButton.tsx
++++ b/apps/web/components/atoms/InlineIconButton.tsx
+@@ -4,6 +4,7 @@ import {
+   ICON_BUTTON_FADE_CLASSNAME,
+   ICON_BUTTON_VISIBLE_CLASSNAME,
+   IconButton,
++  type IconButtonSize,
+ } from '@jovie/ui';
+ import type {
+   AnchorHTMLAttributes,
+@@ -31,6 +32,7 @@ interface InlineIconButtonSharedProps {
+   readonly children: ReactNode;
+   readonly className?: string;
+   readonly fadeOnParentHover?: boolean;
++  readonly size?: IconButtonSize;
+ }
+ 
+ type InlineIconButtonAnchorProps = InlineIconButtonSharedProps &
+@@ -63,6 +65,7 @@ export const InlineIconButton = React.memo(function InlineIconButton(
+       children,
+       className,
+       fadeOnParentHover = false,
++      size = 'lg',
+       href,
+       ...anchorProps
+     } = props;
+@@ -70,7 +73,7 @@ export const InlineIconButton = React.memo(function InlineIconButton(
+     return (
+       <IconButton
+         variant='inline'
+-        size='lg'
++        size={size}
+         asChild
+         className={sharedClassName(className, fadeOnParentHover)}
+       >
+@@ -85,6 +88,7 @@ export const InlineIconButton = React.memo(function InlineIconButton(
+     children,
+     className,
+     fadeOnParentHover = false,
++    size = 'lg',
+     type = 'button',
+     ...buttonProps
+   } = props;
+@@ -92,7 +96,7 @@ export const InlineIconButton = React.memo(function InlineIconButton(
+   return (
+     <IconButton
+       variant='inline'
+-      size='lg'
++      size={size}
+       type={type}
+       className={sharedClassName(className, fadeOnParentHover)}
+       {...buttonProps}
+diff --git a/apps/web/components/features/admin/admin-creator-profiles/utils/column-renderers.tsx b/apps/web/components/features/admin/admin-creator-profiles/utils/column-renderers.tsx
+index 2c7edd7b6cec..044972ff9da0 100644
+--- a/apps/web/components/features/admin/admin-creator-profiles/utils/column-renderers.tsx
++++ b/apps/web/components/features/admin/admin-creator-profiles/utils/column-renderers.tsx
+@@ -12,7 +12,7 @@ import type { CellContext } from '@/lib/tanstack-table';
+  */
+ export function renderAvatarCell({
+   row,
+-}: CellContext<AdminCreatorProfileRow, string>) {
++}: CellContext<AdminCreatorProfileRow, unknown>) {
+   const profile = row.original;
+   const displayName =
+     'displayName' in profile ? (profile.displayName ?? null) : null;
+@@ -28,8 +28,9 @@ export function renderAvatarCell({
+       isFeatured={profile.isFeatured}
+       disableUsernameLink
+       usernameActions={
+-        <span className='flex shrink-0 items-center gap-0.5'>
++        <span className='flex shrink-0 items-center gap-5'>
+           <InlineIconButton
++            size='xs'
+             aria-label={`Copy link for @${profile.username}`}
+             fadeOnParentHover
+             className='[&_svg]:h-3 [&_svg]:w-3'
+@@ -47,6 +48,7 @@ export function renderAvatarCell({
+             <Copy className='h-3 w-3' />
+           </InlineIconButton>
+           <InlineIconButton
++            size='xs'
+             href={profileUrl}
+             target='_blank'
+             rel='noopener noreferrer'
+diff --git a/apps/web/components/organisms/table/atoms/AvatarCell.test.tsx b/apps/web/components/organisms/table/atoms/AvatarCell.test.tsx
+new file mode 100644
+index 000000000000..c6f84ee0782c
+--- /dev/null
++++ b/apps/web/components/organisms/table/atoms/AvatarCell.test.tsx
+@@ -0,0 +1,53 @@
++import { fireEvent, render, screen } from '@testing-library/react';
++import { describe, expect, it, vi } from 'vitest';
++import { InlineIconButton } from '@/components/atoms/InlineIconButton';
++import { AvatarCell } from './AvatarCell';
++
++describe('AvatarCell', () => {
++  it('renders the creator name and profile link with a read-only avatar', () => {
++    const { container } = render(
++      <AvatarCell
++        profileId='creator'
++        username='artist'
++        displayName='An Artist'
++        avatarUrl={null}
++        verified
++        isFeatured
++      />
++    );
++    expect(screen.getByText('An Artist')).toBeVisible();
++    expect(screen.getByRole('link', { name: '@artist' })).toHaveAttribute(
++      'href',
++      '/artist'
++    );
++    expect(
++      container.querySelector('[data-slot="app-avatar"]')
++    ).toBeInTheDocument();
++    expect(screen.getByRole('button')).toBeDisabled();
++  });
++
++  it('keeps row actions usable when the username is plain text', () => {
++    const onClick = vi.fn();
++    render(
++      <AvatarCell
++        profileId='creator'
++        username='artist'
++        avatarUrl={null}
++        disableUsernameLink
++        usernameActions={
++          <InlineIconButton
++            size='xs'
++            aria-label='Copy artist'
++            onClick={onClick}
++          >
++            <svg aria-hidden='true' />
++          </InlineIconButton>
++        }
++      />
++    );
++    expect(screen.getByText('@artist')).toBeVisible();
++    expect(screen.queryByRole('link')).not.toBeInTheDocument();
++    fireEvent.click(screen.getByRole('button', { name: 'Copy artist' }));
++    expect(onClick).toHaveBeenCalledOnce();
++  });
++});
+diff --git a/apps/web/components/organisms/table/atoms/AvatarCell.tsx b/apps/web/components/organisms/table/atoms/AvatarCell.tsx
+index 7ec5452839fc..e940d8e389b0 100644
+--- a/apps/web/components/organisms/table/atoms/AvatarCell.tsx
++++ b/apps/web/components/organisms/table/atoms/AvatarCell.tsx
+@@ -99,7 +99,14 @@ export const AvatarCell = React.memo(function AvatarCell({
+   usernameActions,
+ }: AvatarCellProps) {
+   return (
+-    <div className={cn('flex items-center gap-3', className)}>
++    <div
++      className={cn(
++        'flex items-center gap-3',
++        isFeatured && 'pl-1',
++        usernameActions && 'pr-1',
++        className
++      )}
++    >
+       {/* Avatar with badges */}
+       <div className='relative'>
+         <AvatarUploadable
+@@ -122,11 +129,11 @@ export const AvatarCell = React.memo(function AvatarCell({
+       {/* Name and username */}
+       <div className='min-w-0 flex-1'>
+         {displayName && (
+-          <div className='font-caption text-primary-token line-clamp-1 overflow-hidden text-ellipsis text-app'>
++          <div className='font-caption text-primary-token line-clamp-1 overflow-hidden text-ellipsis text-app leading-4'>
+             {displayName}
+           </div>
+         )}
+-        <div className='flex min-w-0 items-center gap-1.5'>
++        <div className='flex min-w-0 items-center gap-1.5 leading-4'>
+           {disableUsernameLink ? (
+             <span
+               className={cn(
+@@ -152,9 +159,9 @@ export const AvatarCell = React.memo(function AvatarCell({
+               @{username}
+             </Link>
+           )}
+-          {usernameActions}
+         </div>
+       </div>
++      {usernameActions}
+     </div>
+   );
+ });
+diff --git a/apps/web/components/organisms/table/atoms/TableCell.stories.tsx b/apps/web/components/organisms/table/atoms/TableCell.stories.tsx
+index 742cd14d9f59..70686356429b 100644
+--- a/apps/web/components/organisms/table/atoms/TableCell.stories.tsx
++++ b/apps/web/components/organisms/table/atoms/TableCell.stories.tsx
+@@ -1,4 +1,8 @@
+ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
++import { renderAvatarCell } from '@/components/features/admin/admin-creator-profiles/utils/column-renderers';
++import type { AdminCreatorProfileRow } from '@/lib/admin/types';
++import type { ColumnDef } from '@/lib/tanstack-table';
++import { UnifiedTable } from '../organisms/UnifiedTable';
+ import { TableCell } from './TableCell';
+ 
+ const meta = {
+@@ -38,3 +42,79 @@ export const SecondaryTone: Story = {
+     </table>
+   ),
+ };
++
++/** Reproduces the padded inline badges used by the audience table. */
++export const InlineBadges: Story = {
++  args: { children: 'High' },
++  render: () => (
++    <table
++      style={{ width: 320, tableLayout: 'fixed' }}
++      data-testid='inline-badge-table'
++    >
++      <tbody>
++        {(['left', 'center', 'right'] as const).map(align => (
++          <tr key={align}>
++            <TableCell align={align}>
++              <span
++                data-testid={`badge-${align}`}
++                className='inline-flex items-center rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-2xs font-medium ring-1 ring-emerald-500/25 ring-inset'
++              >
++                High
++              </span>
++            </TableCell>
++            <TableCell>
++              A long email@example.com label that must stay on one line
++            </TableCell>
++          </tr>
++        ))}
++      </tbody>
++    </table>
++  ),
++};
++
++const creator: AdminCreatorProfileRow = {
++  id: 'creator-geometry',
++  username: 'long_creator_username',
++  usernameNormalized: 'long_creator_username',
++  displayName: 'A long creator display name',
++  avatarUrl: null,
++  isVerified: true,
++  isFeatured: true,
++  marketingOptOut: false,
++  isClaimed: false,
++  claimToken: null,
++  claimTokenExpiresAt: null,
++  userId: null,
++  createdAt: null,
++  ingestionStatus: 'idle',
++  location: null,
++  hometown: null,
++  activeSinceYear: null,
++  lastIngestionError: null,
++};
++const creatorColumns: ColumnDef<AdminCreatorProfileRow>[] = [
++  { accessorKey: 'username', header: 'Creator', cell: renderAvatarCell },
++];
++
++export const CreatorIdentity: Story = {
++  args: { children: null },
++  render: () => (
++    <div style={{ width: 320 }} data-testid='creator-identity-table'>
++      <UnifiedTable
++        data={[creator]}
++        columns={creatorColumns}
++        enableVirtualization={false}
++      />
++    </div>
++  ),
++};
++
++export const InlineBadgesLight: Story = {
++  ...InlineBadges,
++  parameters: { themes: { themeOverride: 'light' } },
++};
++
++export const CreatorIdentityLight: Story = {
++  ...CreatorIdentity,
++  parameters: { themes: { themeOverride: 'light' } },
++};
+diff --git a/apps/web/components/organisms/table/atoms/TableCell.tsx b/apps/web/components/organisms/table/atoms/TableCell.tsx
+index 2e6d8449897c..361ee5fd6b35 100644
+--- a/apps/web/components/organisms/table/atoms/TableCell.tsx
++++ b/apps/web/components/organisms/table/atoms/TableCell.tsx
+@@ -2,7 +2,7 @@ import { cn } from '@jovie/ui/lib/utils';
+ import { borders, presets, tableAlignment } from '../table.styles';
+ 
+ export const TABLE_CELL_CONTENT_CLASSNAME =
+-  'block h-8 max-h-8 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap leading-8 [&>*]:max-w-full';
++  'block h-8 max-h-8 min-w-0 content-center overflow-hidden text-ellipsis whitespace-nowrap leading-normal [&>*]:max-w-full';
+ 
+ export interface TableCellProps {
+   readonly children: React.ReactNode;
+diff --git a/apps/web/tests/e2e/storybook-task-row-geometry.spec.ts b/apps/web/tests/e2e/storybook-task-row-geometry.spec.ts
+index 515641153ed5..0231c8644d6a 100644
+--- a/apps/web/tests/e2e/storybook-task-row-geometry.spec.ts
++++ b/apps/web/tests/e2e/storybook-task-row-geometry.spec.ts
+@@ -6,6 +6,150 @@ const VIEWPORTS = [
+   { name: 'narrow desktop split', width: 390 },
+ ] as const;
+ 
++for (const viewport of VIEWPORTS) {
++  for (const theme of ['dark', 'light']) {
++    const suffix = theme === 'light' ? '-light' : '';
++    test(`contains padded inline badges in a ${viewport.name} (${theme})`, async ({
++      page,
++    }) => {
++      await page.setViewportSize({ width: viewport.width, height: 820 });
++      await page.goto(
++        `/iframe.html?id=organisms-table-atoms-tablecell--inline-badges${suffix}&viewMode=story`,
++        { waitUntil: 'domcontentloaded' }
++      );
++      await expect(page.getByTestId('inline-badge-table')).toBeVisible();
++
++      for (const align of ['left', 'center', 'right']) {
++        const badge = page.getByTestId(`badge-${align}`);
++        const geometry = await badge.evaluate(element => {
++          const content = element.closest(
++            '[data-table-cell-content="stable"]'
++          )!;
++          const bounds = element.getBoundingClientRect();
++          const container = content.getBoundingClientRect();
++          const longLabel = element
++            .closest('tr')!
++            .lastElementChild!.querySelector(
++              '[data-table-cell-content="stable"]'
++            )!;
++          return {
++            top: bounds.top - container.top,
++            bottom: container.bottom - bounds.bottom,
++            left: bounds.left - container.left,
++            right: container.right - bounds.right,
++            labelScrollWidth: longLabel.scrollWidth,
++            labelClientWidth: longLabel.clientWidth,
++            labelScrollHeight: longLabel.scrollHeight,
++            labelClientHeight: longLabel.clientHeight,
++          };
++        });
++        expect(geometry.top, `${align} badge top`).toBeGreaterThanOrEqual(0);
++        expect(geometry.bottom, `${align} badge bottom`).toBeGreaterThanOrEqual(
++          0
++        );
++        expect(Math.abs(geometry.top - geometry.bottom)).toBeLessThanOrEqual(2);
++        if (align === 'center') {
++          expect(Math.abs(geometry.left - geometry.right)).toBeLessThanOrEqual(
++            1
++          );
++        } else {
++          expect(geometry[align as 'left' | 'right']).toBeLessThanOrEqual(1);
++        }
++        expect(geometry.labelScrollWidth).toBeGreaterThan(
++          geometry.labelClientWidth
++        );
++        expect(geometry.labelScrollHeight).toBeLessThanOrEqual(
++          geometry.labelClientHeight
++        );
++      }
++    });
++    test(`keeps creator avatars and focused actions whole in a ${viewport.name} (${theme})`, async ({
++      page,
++    }) => {
++      await page.setViewportSize({ width: viewport.width, height: 820 });
++      await page.goto(
++        `/iframe.html?id=organisms-table-atoms-tablecell--creator-identity${suffix}&viewMode=story`,
++        { waitUntil: 'domcontentloaded' }
++      );
++      const table = page.getByTestId('creator-identity-table');
++      await expect(table).toBeVisible();
++      const avatar = table.locator('[data-slot="app-avatar"]');
++      await expect(avatar).toBeVisible();
++      // Measure the whole circular frame, not pixels intentionally masked by its radius.
++      const clipping = await avatar.evaluate(element => {
++        const bounds = element.getBoundingClientRect();
++        const violations: string[] = [];
++        for (
++          let parent = element.parentElement;
++          parent && parent.tagName !== 'TABLE';
++          parent = parent.parentElement
++        ) {
++          const style = getComputedStyle(parent);
++          const rect = parent.getBoundingClientRect();
++          if (
++            ['hidden', 'clip', 'auto', 'scroll'].includes(style.overflowY) &&
++            (bounds.top < rect.top - 1 || bounds.bottom > rect.bottom + 1)
++          )
++            violations.push(parent.className);
++          if (
++            ['hidden', 'clip', 'auto', 'scroll'].includes(style.overflowX) &&
++            (bounds.left < rect.left - 1 || bounds.right > rect.right + 1)
++          )
++            violations.push(parent.className);
++        }
++        return violations;
++      });
++      expect(
++        clipping,
++        'interior avatar must fit every clipping ancestor'
++      ).toEqual([]);
++      for (const action of [
++        table.getByRole('button', {
++          name: 'Copy link for @long_creator_username',
++        }),
++        table.getByRole('link', {
++          name: 'Open profile for @long_creator_username',
++        }),
++      ]) {
++        await action.focus();
++        await expect(action).toBeFocused();
++        await expect(action).toHaveCSS('opacity', '1');
++        const bounds = await action.evaluate(element => {
++          const rect = element.getBoundingClientRect();
++          const content = element
++            .closest('[data-table-cell-content="stable"]')!
++            .getBoundingClientRect();
++          return {
++            top: rect.top - content.top,
++            bottom: content.bottom - rect.bottom,
++            left: rect.left - content.left,
++            right: content.right - rect.right,
++            hitAtLeft:
++              document
++                .elementFromPoint(rect.left + 1, rect.top + rect.height / 2)
++                ?.closest('button, a') === element,
++            hitAtRight:
++              document
++                .elementFromPoint(rect.right - 1, rect.top + rect.height / 2)
++                ?.closest('button, a') === element,
++          };
++        });
++        // The canonical focus ring is 2px plus a 2px offset.
++        for (const inset of [
++          bounds.top,
++          bounds.bottom,
++          bounds.left,
++          bounds.right,
++        ]) {
++          expect(inset).toBeGreaterThanOrEqual(4);
++        }
++        expect(bounds.hitAtLeft).toBe(true);
++        expect(bounds.hitAtRight).toBe(true);
++      }
++    });
++  }
++}
++
+ test.describe('Tasks multiline row geometry', () => {
+   for (const viewport of VIEWPORTS) {
+     test(`keeps title and wrapped metadata visible in a ${viewport.name}`, async ({
+diff --git a/apps/web/tests/unit/atoms/InlineIconButton.test.tsx b/apps/web/tests/unit/atoms/InlineIconButton.test.tsx
+index 6eec2e83d567..a0c25d2e713d 100644
+--- a/apps/web/tests/unit/atoms/InlineIconButton.test.tsx
++++ b/apps/web/tests/unit/atoms/InlineIconButton.test.tsx
+@@ -9,6 +9,26 @@ import {
+ import { expectNoA11yViolations } from '../../utils/a11y';
+ 
+ describe('InlineIconButton', () => {
++  it.each(['button', 'link'] as const)(
++    'supports compact %s actions without losing activation',
++    kind => {
++      const onClick = vi.fn();
++      render(
++        <InlineIconButton
++          size='sm'
++          aria-label='Compact action'
++          onClick={onClick}
++          {...(kind === 'link' ? { href: '#profile' } : {})}
++        >
++          <svg aria-hidden='true' />
++        </InlineIconButton>
++      );
++      const action = screen.getByRole(kind, { name: 'Compact action' });
++      expect(action).toHaveAttribute('data-size', 'icon-sm');
++      fireEvent.click(action);
++      expect(onClick).toHaveBeenCalledOnce();
++    }
++  );
+   it('renders a button by default', () => {
+     render(
+       <InlineIconButton aria-label='Edit item'>

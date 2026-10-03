@@ -1,0 +1,77 @@
+diff --git a/apps/web/components/organisms/table/atoms/TableCell.stories.tsx b/apps/web/components/organisms/table/atoms/TableCell.stories.tsx
+index d55a42623095..088b28f8a908 100644
+--- a/apps/web/components/organisms/table/atoms/TableCell.stories.tsx
++++ b/apps/web/components/organisms/table/atoms/TableCell.stories.tsx
+@@ -106,6 +106,7 @@ export const CreatorIdentity: Story = {
+       <UnifiedTable
+         data={[creator]}
+         columns={creatorColumns}
++        minWidth='320px'
+         enableVirtualization={false}
+       />
+     </div>
+diff --git a/apps/web/components/organisms/table/atoms/TableCell.test.tsx b/apps/web/components/organisms/table/atoms/TableCell.test.tsx
+index 81487c991c35..e8091941f059 100644
+--- a/apps/web/components/organisms/table/atoms/TableCell.test.tsx
++++ b/apps/web/components/organisms/table/atoms/TableCell.test.tsx
+@@ -24,14 +24,25 @@ describe('TableCell', () => {
+     expect(cell).not.toHaveClass('py-0.5');
+   });
+ 
+-  it('applies right alignment without dropping the canonical cell preset', () => {
+-    renderInTable(<TableCell align='right'>42</TableCell>);
++  it.each(['left', 'center', 'right'] as const)(
++    'preserves %s alignment for inline content within the stable cell',
++    align => {
++      renderInTable(
++        <TableCell align={align}>
++          <span>High</span>
++        </TableCell>
++      );
+ 
+-    const cell = screen.getByRole('cell');
+-    expect(cell).toHaveClass('text-right');
+-    expect(cell).toHaveClass('px-3');
+-    expect(cell).toHaveClass('py-1');
+-  });
++      const cell = screen.getByRole('cell');
++      expect(cell).toHaveClass(`text-${align}`);
++      expect(cell).toHaveClass('px-3');
++      expect(cell).toHaveClass('py-1');
++      expect(screen.getByText('High').parentElement).toHaveAttribute(
++        'data-table-cell-content',
++        'stable'
++      );
++    }
++  );
+ 
+   it('lets consumer tone overrides replace the canonical cell tone', () => {
+     renderInTable(
+diff --git a/apps/web/tests/e2e/storybook-task-row-geometry.spec.ts b/apps/web/tests/e2e/storybook-task-row-geometry.spec.ts
+index 7305480c77a8..e8361367c061 100644
+--- a/apps/web/tests/e2e/storybook-task-row-geometry.spec.ts
++++ b/apps/web/tests/e2e/storybook-task-row-geometry.spec.ts
+@@ -92,7 +92,7 @@ for (const viewport of VIEWPORTS) {
+         const violations: string[] = [];
+         for (
+           let parent = element.parentElement;
+-          parent && parent.tagName !== 'TABLE';
++          parent;
+           parent = parent.parentElement
+         ) {
+           const style = getComputedStyle(parent);
+@@ -156,6 +156,14 @@ for (const viewport of VIEWPORTS) {
+         }
+         expect(bounds.hitAtLeft).toBe(true);
+         expect(bounds.hitAtRight).toBe(true);
++        const avatarBounds = await avatar.boundingBox();
++        const tableBounds = await table.boundingBox();
++        expect(avatarBounds).not.toBeNull();
++        expect(tableBounds).not.toBeNull();
++        expect(avatarBounds!.x).toBeGreaterThanOrEqual(tableBounds!.x);
++        expect(avatarBounds!.x + avatarBounds!.width).toBeLessThanOrEqual(
++          tableBounds!.x + tableBounds!.width
++        );
+       }
+     });
+   }

@@ -1,0 +1,78 @@
+[
+  {
+    "href": "/hud",
+    "name": "Now"
+  },
+  {
+    "href": "/app/ov/growth",
+    "name": "Growth"
+  },
+  {
+    "href": "/app/ov/product",
+    "name": "Product"
+  },
+  {
+    "href": "/app/ov/operations",
+    "name": "Operations"
+  },
+  {
+    "href": "/app/ov/needs-you",
+    "name": "Needs You"
+  },
+  {
+    "href": "/app/ov/chat",
+    "name": "Chat"
+  },
+  {
+    "href": "/app/ov/certifications",
+    "name": "Certifications"
+  },
+  {
+    "href": "/app/ov/shipping",
+    "name": "Shipping"
+  },
+  {
+    "href": "/app/ov/people",
+    "name": "People"
+  },
+  {
+    "href": "/app/ov/platform-connections",
+    "name": "Platform Connections"
+  },
+  {
+    "href": "/app/ov/activity",
+    "name": "Timeline"
+  },
+  {
+    "href": "/app/ov/investors",
+    "name": "Investors"
+  },
+  {
+    "href": "/app/ov/feature-registry",
+    "name": "Feature Registry"
+  },
+  {
+    "href": "/app/ov/screenshots",
+    "name": "Screenshots"
+  },
+  {
+    "href": "/app/ov/costs",
+    "name": "Costs"
+  },
+  {
+    "href": "/app/ov/revenue-lift",
+    "name": "Revenue Lift"
+  },
+  {
+    "href": "/app/ov/share-studio",
+    "name": "Share Studio"
+  },
+  {
+    "href": "/app/ov/system",
+    "name": "System Map"
+  },
+  {
+    "href": "/app/ov/features",
+    "name": "Features"
+  }
+]
