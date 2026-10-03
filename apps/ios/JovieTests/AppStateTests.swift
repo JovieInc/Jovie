@@ -836,28 +836,30 @@ struct AppStateTests {
   }
 
   @Test func signedOutTransitionClearsObservabilityUserID() async throws {
-    let observability = RecordingObservabilityProvider()
-    Observability.useProviderForTesting(observability)
-    defer { Observability.resetForTesting() }
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let observability = RecordingObservabilityProvider()
+      Observability.useProviderForTesting(observability)
+      defer { Observability.resetForTesting() }
 
-    let repository = MockRepository(
-      nextResult: .success(
-        MeRepositoryResult(response: .previewReady, isStale: false)
+      let repository = MockRepository(
+        nextResult: .success(
+          MeRepositoryResult(response: .previewReady, isStale: false)
+        )
       )
-    )
-    let appState = AppState(
-      configuration: configuration,
-      launchMode: .live,
-      repository: repository,
-      brightnessManager: MockBrightnessController(),
-      captureProfileLoadCurrentness: { _ in .unmanaged() }
-    )
-    appState.didInitializeAuth = true
+      let appState = AppState(
+        configuration: configuration,
+        launchMode: .live,
+        repository: repository,
+        brightnessManager: MockBrightnessController(),
+        captureProfileLoadCurrentness: { _ in .unmanaged() }
+      )
+      appState.didInitializeAuth = true
 
-    await appState.handleSignedInUserChange("observability_user_123")
-    await appState.handleSignedInUserChange(nil)
+      await appState.handleSignedInUserChange("observability_user_123")
+      await appState.handleSignedInUserChange(nil)
 
-    #expect(observability.clearUserCount == 1)
+      #expect(observability.clearUserCount == 1)
+    }
   }
 
   @Test func duplicateSignedInUserLoadIsIgnoredWhileInFlight() async throws {
