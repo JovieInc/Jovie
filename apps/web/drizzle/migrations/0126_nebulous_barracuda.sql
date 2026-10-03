@@ -1,0 +1,1 @@
+ALTER TABLE "discog_tracks" ADD COLUMN "cue_timeline" jsonb;

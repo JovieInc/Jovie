@@ -883,6 +883,13 @@
       "when": 1790800906539,
       "tag": "0125_sturdy_yellow_claw",
       "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "7",
+      "when": 1790820089668,
+      "tag": "0126_nebulous_barracuda",
+      "breakpoints": true
     }
   ]
 }

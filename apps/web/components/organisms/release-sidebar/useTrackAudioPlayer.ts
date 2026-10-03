@@ -1,5 +1,17 @@
 'use client';
 
+import {
+  type AudioCueJumpTarget,
+  type AudioTimelineDocumentV1,
+  type AudioTimelineEdit,
+  type AudioTimelineHistory,
+  applyAudioTimelineHistoryEdit,
+  createAudioTimelineDocument,
+  createAudioTimelineHistory,
+  redoAudioTimelineEdit,
+  resolveAudioCueJump,
+  undoAudioTimelineEdit,
+} from '@jovie/audio-contracts';
 import { useCallback, useEffect, useState } from 'react';
 
 export interface AudioTrackSource {
@@ -22,6 +34,9 @@ export interface AudioTrackSource {
   readonly bpm?: number | null;
   /** Musical/Camelot key, when known. Never fabricated — omit rather than guess. */
   readonly musicalKey?: string | null;
+  /** Canonical cue timeline document — rides the queue so cue jumps and edits
+   * survive track switches (queue round-trip). */
+  readonly timeline?: AudioTimelineDocumentV1 | null;
 }
 
 export interface ToggleTrackOptions {
@@ -49,6 +64,10 @@ interface PlaybackState {
   readonly bpm: number | null;
   /** Musical/Camelot key for the active track, when known. Null when absent — never fabricated. */
   readonly musicalKey: string | null;
+  /** Present cue timeline document for the tracked edit session, when any. */
+  readonly timeline: AudioTimelineDocumentV1 | null;
+  readonly canUndoTimelineEdit: boolean;
+  readonly canRedoTimelineEdit: boolean;
   readonly queueLength: number;
   readonly queueIndex: number;
   readonly hasNext: boolean;
@@ -71,6 +90,9 @@ let _activeSource: AudioTrackSource | null = null;
 let _interruptionDepth = 0;
 let _wasPlayingBeforeInterruption = false;
 let _mediaSessionBound = false;
+/** Cue timeline edit session — keyed by `present.trackId`, survives playback
+ * state changes so rail edits are not tied to transport. */
+let _timelineHistory: AudioTimelineHistory | null = null;
 /** ~4 Hz progress notify for cross-surface scrub without rAF thrash. */
 const PROGRESS_NOTIFY_MS = 250;
 
@@ -139,6 +161,9 @@ let state: PlaybackState = {
   hasLyrics: false,
   bpm: null,
   musicalKey: null,
+  timeline: null,
+  canUndoTimelineEdit: false,
+  canRedoTimelineEdit: false,
   queueLength: 0,
   queueIndex: -1,
   hasNext: false,
@@ -273,6 +298,80 @@ function notifyPlaybackError(reason: PlaybackState['lastErrorReason']): void {
   }
 }
 
+function commitTimelineHistory(history: AudioTimelineHistory): void {
+  _timelineHistory = history;
+  const patchTimeline = (track: AudioTrackSource): AudioTrackSource =>
+    track.id === history.present.trackId
+      ? { ...track, timeline: history.present }
+      : track;
+  _queue = _queue.map(patchTimeline);
+  if (_activeSource) _activeSource = patchTimeline(_activeSource);
+  setState({
+    timeline: history.present,
+    canUndoTimelineEdit: history.past.length > 0,
+    canRedoTimelineEdit: history.future.length > 0,
+  });
+}
+
+/**
+ * Adopt a persisted cue timeline document for a track — the entry point used
+ * by the cue editing surface after loading the canonical timeline.
+ */
+function adoptTrackTimeline(
+  document: AudioTimelineDocumentV1
+): AudioTimelineDocumentV1 {
+  const normalized = createAudioTimelineDocument(document);
+  commitTimelineHistory(createAudioTimelineHistory(normalized));
+  return normalized;
+}
+
+function editTimeline(
+  edit: AudioTimelineEdit
+): AudioTimelineDocumentV1 | null {
+  const history = _timelineHistory;
+  if (!history) return null;
+  try {
+    const next = applyAudioTimelineHistoryEdit(history, {
+      expectedRevision: history.present.revision,
+      edit,
+    });
+    commitTimelineHistory(next);
+    return next.present;
+  } catch {
+    return null;
+  }
+}
+
+function undoTimeline(): AudioTimelineDocumentV1 | null {
+  const history = _timelineHistory;
+  if (!history) return null;
+  const next = undoAudioTimelineEdit(history, history.present.revision);
+  if (next === history) return history.present;
+  commitTimelineHistory(next);
+  return next.present;
+}
+
+function redoTimeline(): AudioTimelineDocumentV1 | null {
+  const history = _timelineHistory;
+  if (!history) return null;
+  const next = redoAudioTimelineEdit(history, history.present.revision);
+  if (next === history) return history.present;
+  commitTimelineHistory(next);
+  return next.present;
+}
+
+/** Resolve a cue to a media time and move the playhead there. */
+function jumpToCue(cueId: string): AudioCueJumpTarget | null {
+  const history = _timelineHistory;
+  if (!history) return null;
+  const audio = getAudio();
+  const mediaDuration =
+    audio && Number.isFinite(audio.duration) ? audio.duration : null;
+  const target = resolveAudioCueJump(history.present, cueId, mediaDuration);
+  seekToTime(target.targetSeconds);
+  return target;
+}
+
 function handlePlaybackFailure(
   audio: HTMLAudioElement | null,
   reason: PlaybackState['lastErrorReason']
@@ -315,6 +414,13 @@ async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
   _activeTrackIsrc = track.isrc ?? null;
   _hasRetriedRefresh = false;
   _activeSource = track;
+  // Cue edit sessions are keyed by track: adopt the incoming timeline only
+  // when it belongs to a different track so in-flight rail edits survive.
+  if (_timelineHistory?.present.trackId !== track.id) {
+    _timelineHistory = track.timeline
+      ? createAudioTimelineHistory(createAudioTimelineDocument(track.timeline))
+      : null;
+  }
   audio.pause();
   audio.src = track.audioUrl;
   setState({
@@ -331,6 +437,9 @@ async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
     hasLyrics: Boolean(track.hasLyrics),
     bpm: track.bpm ?? null,
     musicalKey: track.musicalKey ?? null,
+    timeline: _timelineHistory?.present ?? null,
+    canUndoTimelineEdit: (_timelineHistory?.past.length ?? 0) > 0,
+    canRedoTimelineEdit: (_timelineHistory?.future.length ?? 0) > 0,
     ...getQueueSnapshot(),
   });
 
@@ -667,6 +776,18 @@ export function useTrackAudioPlayer() {
     []
   );
 
+  const adoptTimeline = useCallback(
+    (document: AudioTimelineDocumentV1) => adoptTrackTimeline(document),
+    []
+  );
+  const applyTimelineEdit = useCallback(
+    (edit: AudioTimelineEdit) => editTimeline(edit),
+    []
+  );
+  const undoTimelineEdit = useCallback(() => undoTimeline(), []);
+  const redoTimelineEdit = useCallback(() => redoTimeline(), []);
+  const jumpToCuePoint = useCallback((cueId: string) => jumpToCue(cueId), []);
+
   return {
     playbackState,
     toggleTrack,
@@ -675,6 +796,11 @@ export function useTrackAudioPlayer() {
     seek,
     stop,
     onError,
+    adoptTimeline,
+    applyTimelineEdit,
+    undoTimelineEdit,
+    redoTimelineEdit,
+    jumpToCuePoint,
     pauseForInterruption: pausePlaybackForInterruption,
     resumeAfterInterruption: resumePlaybackAfterInterruption,
   };

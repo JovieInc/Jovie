@@ -674,3 +674,91 @@ describe('useTrackAudioPlayer', () => {
     expect(result.current.playbackState).toEqual(before);
   });
 });
+
+describe('cue timeline', () => {
+  const RATE = 48_000;
+
+  function timelineDoc(trackId: string) {
+    return {
+      version: 1 as const,
+      trackId,
+      revision: 0,
+      sampleRateHz: RATE as never,
+      durationSamples: (RATE * 60) as never,
+      cues: [],
+      beatGrid: null,
+    };
+  }
+
+  it('adopts a timeline, applies edits, and supports undo/redo', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    act(() => {
+      result.current.adoptTimeline(timelineDoc('track-1'));
+    });
+    expect(result.current.playbackState.timeline?.trackId).toBe('track-1');
+    expect(result.current.playbackState.canUndoTimelineEdit).toBe(false);
+
+    act(() => {
+      result.current.applyTimelineEdit({
+        type: 'add',
+        cue: {
+          id: 'cue_1',
+          kind: 'verse',
+          label: 'Verse',
+          sampleOffset: RATE * 10,
+        },
+      });
+    });
+    expect(result.current.playbackState.timeline?.cues).toHaveLength(1);
+    expect(result.current.playbackState.canUndoTimelineEdit).toBe(true);
+
+    act(() => {
+      result.current.undoTimelineEdit();
+    });
+    expect(result.current.playbackState.timeline?.cues).toHaveLength(0);
+    expect(result.current.playbackState.canRedoTimelineEdit).toBe(true);
+
+    act(() => {
+      result.current.redoTimelineEdit();
+    });
+    expect(result.current.playbackState.timeline?.cues).toHaveLength(1);
+  });
+
+  it('adopts the queued track timeline on load and jumps to a cue', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    const withTimeline = {
+      ...timelineDoc('track-1'),
+      cues: [
+        {
+          id: 'cue_1' as never,
+          kind: 'chorus' as const,
+          label: 'Hook',
+          sampleOffset: RATE * 30 as never,
+        },
+      ],
+    };
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+        timeline: withTimeline,
+      });
+    });
+
+    expect(result.current.playbackState.timeline?.cues).toHaveLength(1);
+
+    mockAudio.duration = 60;
+    let target: unknown;
+    act(() => {
+      target = result.current.jumpToCuePoint('cue_1');
+    });
+    expect((target as { targetSeconds: number }).targetSeconds).toBeCloseTo(30);
+    expect(mockAudio.currentTime).toBeCloseTo(30);
+  });
+});

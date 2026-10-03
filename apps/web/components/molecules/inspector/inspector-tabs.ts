@@ -1,6 +1,7 @@
 export const INSPECTOR_TAB_IDS = [
   'details',
   'assets',
+  'cues',
   'links',
   'rights',
 ] as const;
@@ -10,6 +11,7 @@ export type InspectorTabId = (typeof INSPECTOR_TAB_IDS)[number];
 export const INSPECTOR_TAB_OPTIONS = [
   { value: 'details', label: 'Details' },
   { value: 'assets', label: 'Assets' },
+  { value: 'cues', label: 'Cues' },
   { value: 'links', label: 'Links' },
   { value: 'rights', label: 'Rights' },
 ] as const satisfies ReadonlyArray<{

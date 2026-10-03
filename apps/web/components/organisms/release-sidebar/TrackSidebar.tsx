@@ -2,7 +2,15 @@
 
 // @coverage-via apps/web/tests/components/organisms/release-sidebar/TrackSidebar.test.tsx
 import type { CommonDropdownItem } from '@jovie/ui';
-import { Check, Copy, ExternalLink, Pause, Play, VolumeX } from 'lucide-react';
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  Flag,
+  Pause,
+  Play,
+  VolumeX,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SeekBar } from '@/components/atoms/SeekBar';
 import { toast } from '@/components/feedback';
@@ -31,6 +39,7 @@ import type {
 } from '@/lib/discography/types';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
+import { TrackCuesPanel } from './TrackCuesPanel';
 import { TrackPlatformLinksSection } from './TrackPlatformLinksSection';
 import { useTrackAudioPlayer } from './useTrackAudioPlayer';
 
@@ -238,6 +247,13 @@ export function TrackSidebar({
           <Copy className='h-4 w-4' />
         ),
         onClick: handleCopySmartLink,
+      },
+      {
+        type: 'action',
+        id: 'edit-cues',
+        label: 'Edit Cues',
+        icon: <Flag className='h-4 w-4' />,
+        onClick: () => setActiveTab('cues'),
       },
       {
         type: 'action',
@@ -490,6 +506,14 @@ export function TrackSidebar({
                 : ''}
             </div>
           </div>
+        </DrawerSurfaceCard>
+      ) : activeTab === 'cues' && track ? (
+        <DrawerSurfaceCard
+          variant='flat'
+          className='overflow-hidden'
+          testId='track-cues-card'
+        >
+          <TrackCuesPanel trackId={track.id} durationMs={track.durationMs} />
         </DrawerSurfaceCard>
       ) : activeTab === 'links' && track ? (
         <div className='space-y-2'>

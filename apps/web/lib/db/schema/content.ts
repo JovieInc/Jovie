@@ -210,6 +210,11 @@ export const discogTracks = pgTable(
     sourceType: ingestionSourceTypeEnum('source_type')
       .default('manual')
       .notNull(),
+    /**
+     * Canonical cue timeline (`AudioTimelineDocumentV1` JSON from
+     * `@jovie/audio-contracts`). Null until the track has cue edits.
+     */
+    cueTimeline: jsonb('cue_timeline').$type<Record<string, unknown>>(),
     metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
