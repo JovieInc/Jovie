@@ -34,6 +34,7 @@ vi.stubGlobal('navigator', {
 function resetRuntimeMarker() {
   document.documentElement.removeAttribute('data-desktop-runtime');
   document.documentElement.removeAttribute('data-dev-chrome-disabled');
+  document.documentElement.removeAttribute('data-electron-platform');
   document.documentElement.style.removeProperty('--dev-toolbar-height');
   serviceWorkerMocks.unregister.mockClear();
   serviceWorkerMocks.getRegistrations.mockClear();
@@ -84,6 +85,38 @@ describe('electron-runtime-init', () => {
     );
   });
 
+  it.each([
+    [
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Electron/37 JovieDesktop/26.9.16',
+      'darwin',
+    ],
+    [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Electron/37 JovieDesktop/26.9.16',
+      'win32',
+    ],
+  ])('marks the window platform before paint for %s', (userAgent, platform) => {
+    setUserAgent(userAgent);
+
+    runRuntimeInit();
+
+    expect(document.documentElement).toHaveAttribute(
+      'data-electron-platform',
+      platform
+    );
+  });
+
+  it('keeps the platform the preload already set', () => {
+    document.documentElement.dataset.electronPlatform = 'darwin';
+    setUserAgent('Mozilla/5.0 (Windows NT 10.0) JovieDesktop/26.9.16');
+
+    runRuntimeInit();
+
+    expect(document.documentElement).toHaveAttribute(
+      'data-electron-platform',
+      'darwin'
+    );
+  });
+
   it('does not mark normal browser sessions', () => {
     runRuntimeInit();
 
@@ -92,6 +125,9 @@ describe('electron-runtime-init', () => {
     );
     expect(document.documentElement).not.toHaveAttribute(
       'data-dev-chrome-disabled'
+    );
+    expect(document.documentElement).not.toHaveAttribute(
+      'data-electron-platform'
     );
     expect(serviceWorkerMocks.getRegistrations).not.toHaveBeenCalled();
   });

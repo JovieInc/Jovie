@@ -96,23 +96,26 @@ export async function DashboardShellContent({
     : !dashboardData.sidebarCollapsed;
 
   const shellContents = (
-    <div className='h-full'>
+    <div className='flex h-full flex-col'>
       {/* ENG-004: Show environment issues to admins in non-production */}
       <OperatorBannerWrapper isAdmin={dashboardData.isAdmin} />
       <ImpersonationBannerWrapper />
       {needsAdminStepUp ? <AdminStepUpBanner /> : null}
-      <DashboardDataProvider value={dashboardData}>
-        <DashboardLoadTracker pathname={pathname} userId={userId} />
-        <ProfileCompletionRedirect />
-        <AuthShellWrapper
-          mode={mode}
-          persistSidebarCollapsed={setSidebarCollapsed}
-          sidebarDefaultOpen={sidebarDefaultOpen}
-          previewPanelDefaultOpen={!useEssentialShell}
-        >
-          {children}
-        </AuthShellWrapper>
-      </DashboardDataProvider>
+      {/* The in-flow step-up bar takes its height from the shell, not the window. */}
+      <div data-dashboard-shell-slot='true' className='min-h-0 flex-1'>
+        <DashboardDataProvider value={dashboardData}>
+          <DashboardLoadTracker pathname={pathname} userId={userId} />
+          <ProfileCompletionRedirect />
+          <AuthShellWrapper
+            mode={mode}
+            persistSidebarCollapsed={setSidebarCollapsed}
+            sidebarDefaultOpen={sidebarDefaultOpen}
+            previewPanelDefaultOpen={!useEssentialShell}
+          >
+            {children}
+          </AuthShellWrapper>
+        </DashboardDataProvider>
+      </div>
     </div>
   );
 

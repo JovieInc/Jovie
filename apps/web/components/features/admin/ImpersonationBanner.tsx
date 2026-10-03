@@ -130,6 +130,7 @@ export function ImpersonationBanner({
       role='alert'
       aria-live='polite'
       data-testid='impersonation-banner'
+      data-window-edge-banner='true'
     >
       <div className='mx-auto flex max-w-7xl items-center justify-between gap-4'>
         {/* Warning indicator */}

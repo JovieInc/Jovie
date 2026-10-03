@@ -9,6 +9,16 @@
 
     const root = document.documentElement;
     root.dataset.desktopRuntime = 'electron';
+    // The preload also sets this; mark it before paint so the traffic-light
+    // inset (hiddenInset title bar, macOS only) never flashes off.
+    if (!root.dataset.electronPlatform) {
+      const ua = window.navigator.userAgent;
+      root.dataset.electronPlatform = /\bMac OS X\b|\bMacintosh\b/.test(ua)
+        ? 'darwin'
+        : /\bWindows\b/.test(ua)
+          ? 'win32'
+          : 'linux';
+    }
     root.dataset.devChromeDisabled = '1';
     root.style.setProperty('--dev-toolbar-height', '0px');
 

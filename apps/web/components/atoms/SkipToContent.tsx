@@ -26,6 +26,7 @@ export function SkipToContent({
   return (
     <a
       href={`#${targetId}`}
+      data-skip-to-content='true'
       className={cn(
         // Visually hidden by default
         'sr-only',

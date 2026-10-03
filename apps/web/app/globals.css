@@ -181,6 +181,35 @@ html[data-desktop-runtime="electron"]
   padding-left: var(--electron-controls-width);
 }
 
+/* Top banners stack above the dashboard shell, so the shell fills what is
+   left of the window rather than a full viewport height. */
+[data-dashboard-shell-slot="true"] [data-sidebar-wrapper="true"] {
+  height: 100%;
+}
+
+/* Banners that paint at the window's top edge share the hiddenInset title bar
+   with the native traffic lights, so their content starts past the lights and
+   the row stays a window-drag region (buttons opt out below). */
+html[data-desktop-runtime="electron"][data-electron-platform="darwin"]
+[data-window-edge-banner="true"] {
+  min-height: var(--electron-titlebar-height);
+  padding-left: calc(var(--electron-traffic-light-safe-width) + 12px);
+  -webkit-app-region: drag;
+}
+
+/* Public pages (marketing, changelog, profiles) open in the same hiddenInset
+   window, so their fixed header clears the traffic lights the same way. */
+html[data-desktop-runtime="electron"][data-electron-platform="darwin"]
+header.header-nav {
+  padding-left: var(--electron-traffic-light-safe-width);
+  -webkit-app-region: drag;
+}
+
+html[data-desktop-runtime="electron"][data-electron-platform="darwin"]
+  [data-skip-to-content="true"]:focus {
+  left: calc(var(--electron-traffic-light-safe-width) + 12px);
+}
+
 html[data-desktop-runtime="electron"] [data-electron-drag-region="true"] {
   -webkit-app-region: drag;
 }

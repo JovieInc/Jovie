@@ -96,6 +96,7 @@ export const SidebarProvider = React.forwardRef<
             'group/sidebar-wrapper flex h-svh w-full overflow-x-hidden bg-base',
             className
           )}
+          data-sidebar-wrapper='true'
           ref={ref}
           {...props}
         >

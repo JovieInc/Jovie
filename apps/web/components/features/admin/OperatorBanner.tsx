@@ -85,6 +85,7 @@ export function OperatorBanner({
   return (
     <div
       data-testid='operator-banner'
+      data-window-edge-banner='true'
       role='alert'
       aria-live='polite'
       className={`fixed inset-x-0 top-0 z-9999 bg-amber-500 px-4 py-2 text-amber-950 shadow-lg ${OPERATOR_BANNER_HEIGHT_CLASS}`}
