@@ -907,9 +907,9 @@ class GapTest(unittest.TestCase):
     def hold_ctx(self, events_list, notes=(), committed="2033-05-18T00:00:00Z", oid="h"):
         """A canned hold_context GraphQL reply: labeled events, comments, last commit."""
         return {"data": {"repository": {"pullRequest": {
-            "timelineItems": {"nodes": [{"createdAt": at, "label": {"name": label},
+            "timelineItems": {"pageInfo": {"hasPreviousPage": False}, "nodes": [{"createdAt": at, "label": {"name": label},
                                          "actor": {"login": actor}} for at, label, actor in events_list]},
-            "comments": {"nodes": [{"createdAt": at, "author": {"login": who}, "body": body}
+            "comments": {"pageInfo": {"hasPreviousPage": False}, "nodes": [{"createdAt": at, "author": {"login": who}, "body": body}
                                    for at, who, body in notes]},
             "commits": {"nodes": [{"commit": {"oid": oid, "committedDate": committed}}]}}}}}
 
@@ -954,6 +954,24 @@ class GapTest(unittest.TestCase):
         row = events.stale_hold(5, pr(merge="CLEAN", labels=["hold"]), now,
                                 Shell({("gh", "api", "graphql"): same_head}))
         self.assertFalse(row["auto"], "the head never moved past the hold")
+
+    def test_founder_note_before_a_later_bot_hold_remains_authoritative(self):
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        ctx = self.hold_ctx([("2033-05-16T00:00:00Z", "hold", "jovie-lanes[bot]")],
+                            notes=[("2033-05-10T00:00:00Z", "itstimwhite",
+                                    "On hold: scanners are subscription-only; no AI Gateway key in scanner paths.")])
+        self.assertIsNone(events.stale_hold(5, pr(merge="CLEAN", labels=["hold"]), now,
+                                          Shell({("gh", "api", "graphql"): ctx})))
+
+    def test_truncated_or_unproven_hold_history_never_authorizes_unhold_advice(self):
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        for connection in ("timelineItems", "comments"):
+            for page_info in ({"hasPreviousPage": True}, {}, None):
+                with self.subTest(connection=connection, page_info=page_info):
+                    ctx = self.hold_ctx([("2033-05-16T00:00:00Z", "hold", "jovie-lanes[bot]")])
+                    ctx["data"]["repository"]["pullRequest"][connection]["pageInfo"] = page_info
+                    self.assertIsNone(events.stale_hold(5, pr(merge="CLEAN", labels=["hold"]), now,
+                                                      Shell({("gh", "api", "graphql"): ctx})))
 
     def test_reconcile_alerts_once_per_stale_hold_episode(self):
         now = events.iso_ts("2033-05-18T03:00:00Z")
