@@ -1,0 +1,12 @@
+{
+ "schema": "jovie-preserved-repair/v1",
+ "runId": "20261002T135119Z-PR19719-devin-adopt-d8fb3e",
+ "pr": null,
+ "issue": null,
+ "reason": [
+  "cleanup-not-idle:process-state-unavailable"
+ ],
+ "branch": null,
+ "headBefore": null,
+ "at": "2026-10-02T14:33:26Z"
+}
