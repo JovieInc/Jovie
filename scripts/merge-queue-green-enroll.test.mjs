@@ -40,19 +40,21 @@ const current = number => ({
   timelineItems: { nodes: [] },
 });
 
-async function fixture(/** @type {any} */ {
-  roster = [candidate(1)],
-  overrides = {},
-  dry = false,
-  failRead = false,
-  failMutation = false,
-  statuses = [],
-  mutationError = undefined,
-  failureReceipt = '',
-  eventName = 'workflow_dispatch',
-  payload = {},
-  associatedPages,
-} = {}) {
+async function fixture(
+  /** @type {any} */ {
+    roster = [candidate(1)],
+    overrides = {},
+    dry = false,
+    failRead = false,
+    failMutation = false,
+    statuses = [],
+    mutationError = undefined,
+    failureReceipt = '',
+    eventName = 'workflow_dispatch',
+    payload = {},
+    associatedPages,
+  } = {}
+) {
   const mutations = [];
   const reads = [];
   const warnings = [];
@@ -84,9 +86,7 @@ async function fixture(/** @type {any} */ {
       if (endpoint === github.rest.repos.listCommitStatusesForRef)
         return statuses;
       inventories.push(endpoint);
-      if (
-        endpoint === github.rest.repos.listPullRequestsAssociatedWithCommit
-      ) {
+      if (endpoint === github.rest.repos.listPullRequestsAssociatedWithCommit) {
         assert.deepEqual(params, {
           owner: 'JovieInc',
           repo: 'Jovie',
