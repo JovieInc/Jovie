@@ -486,8 +486,9 @@ describe('terminal failure hold application', () => {
   });
 
   it('classifies only the integration denial and an already-removed queue', () => {
-    const denied = new Error('Command failed: gh api graphql');
-    denied.stderr = 'gh: Resource not accessible by integration\n';
+    const denied = Object.assign(new Error('Command failed: gh api graphql'), {
+      stderr: 'gh: Resource not accessible by integration\n',
+    });
     expect(classifyDequeueDenial(denied)).toBe('inaccessible');
     expect(
       classifyDequeueDenial(
@@ -518,8 +519,10 @@ describe('terminal failure hold application', () => {
       readPullRequest: vi.fn(async () => structuredClone(state)),
       dequeuePullRequest: vi.fn(async () => {
         order.push('dequeue');
-        const error = new Error('Command failed: gh api graphql');
-        error.stderr = 'gh: Resource not accessible by integration\n';
+        const error = Object.assign(
+          new Error('Command failed: gh api graphql'),
+          { stderr: 'gh: Resource not accessible by integration\n' }
+        );
         throw error;
       }),
       disableAutoMerge: vi.fn(async () => {
