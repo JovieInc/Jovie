@@ -21,7 +21,9 @@ export type RouteDomFindingKind =
   | 'heading-hierarchy-inversion'
   | 'clipped-heading'
   | 'misaligned-text-stack'
-  | 'placeholder-copy';
+  | 'placeholder-copy'
+  | 'orphaned-line'
+  | 'layout-shift';
 
 export const MARKETING_TASTE_FINDING_KINDS: readonly RouteDomFindingKind[] = [
   'nested-decorative-surface',
@@ -30,6 +32,7 @@ export const MARKETING_TASTE_FINDING_KINDS: readonly RouteDomFindingKind[] = [
   'clipped-heading',
   'misaligned-text-stack',
   'placeholder-copy',
+  'orphaned-line',
 ];
 
 export interface RouteDomFinding {
@@ -514,6 +517,59 @@ export async function inspectRouteDom(
           });
         }
 
+        // 7. Line-break quality (ui.md): a single word alone on the last
+        //    rendered line of a headline, lede, or CTA label is a design bug.
+        const wordLines = (element: Element): string[][] => {
+          const walker = document.createTreeWalker(
+            element,
+            NodeFilter.SHOW_TEXT
+          );
+          const words: { word: string; top: number }[] = [];
+          for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+            const text = node.textContent ?? '';
+            for (const match of text.matchAll(/\S+/g)) {
+              const range = document.createRange();
+              range.setStart(node, match.index ?? 0);
+              range.setEnd(node, (match.index ?? 0) + match[0].length);
+              const rect = range.getClientRects()[0];
+              if (rect && rect.width > 0) {
+                words.push({ word: match[0], top: Math.round(rect.top) });
+              }
+            }
+          }
+          const lines: string[][] = [];
+          let lineTop: number | null = null;
+          for (const { word, top } of words) {
+            if (lineTop === null || Math.abs(top - lineTop) > 4) {
+              lines.push([]);
+              lineTop = top;
+            }
+            lines[lines.length - 1]?.push(word);
+          }
+          return lines;
+        };
+        const lineBreakTargets = Array.from(
+          root.querySelectorAll(
+            'h1, h2, h3, [data-lede], section > p:first-of-type, a[href], button'
+          )
+        ).filter(
+          element =>
+            visibleIn(element) &&
+            !element.closest('nav, footer, [role="dialog"], form') &&
+            normalizedText(element.textContent).split(' ').length >= 3
+        );
+        for (const element of lineBreakTargets) {
+          const lines = wordLines(element);
+          const last = lines.at(-1);
+          if (lines.length < 2 || !last || last.length !== 1) continue;
+          findings.push({
+            kind: 'orphaned-line',
+            message: `A single word ("${last[0]}") sits alone on the last line.`,
+            elements: [describe(element)],
+            measurements: { lines: lines.length },
+          });
+        }
+
         // 6. Placeholder content presented as the product.
         const placeholder = /^(?:your name|lorem ipsum\b.*|placeholder)$/i;
         for (const element of Array.from(
@@ -683,5 +739,78 @@ export async function inspectRouteDom(
     ...dom,
     ariaSnapshot,
     inspectedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Layout stability (DESIGN.md "Layout Shift Prevention"): cumulative layout
+ * shift from load through a full scroll must stay under Google's "good"
+ * threshold. Install before navigation; measure after inspection.
+ */
+export const LAYOUT_SHIFT_BUDGET = 0.1;
+
+export async function installLayoutShiftObserver(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const state = {
+      value: 0,
+      observed: false,
+      sessionValue: 0,
+      sessionStart: 0,
+      lastShift: 0,
+    };
+    Object.defineProperty(window, '__jovieLayoutShift', { value: state });
+    new PerformanceObserver(list => {
+      for (const entry of list.getEntries() as Array<
+        PerformanceEntry & { value: number; hadRecentInput: boolean }
+      >) {
+        if (entry.hadRecentInput) continue;
+        // CLS uses the largest session window (1s gap, at most 5s), not an
+        // unbounded sum of unrelated shifts during a long scroll.
+        if (
+          entry.startTime - state.lastShift > 1000 ||
+          entry.startTime - state.sessionStart > 5000
+        ) {
+          state.sessionStart = entry.startTime;
+          state.sessionValue = 0;
+        }
+        state.lastShift = entry.startTime;
+        state.sessionValue += entry.value;
+        state.value = Math.max(state.value, state.sessionValue);
+      }
+    }).observe({ type: 'layout-shift', buffered: true });
+    state.observed =
+      PerformanceObserver.supportedEntryTypes.includes('layout-shift');
+  });
+}
+
+export async function measureLayoutShift(
+  page: Page
+): Promise<RouteDomFinding | null> {
+  await page.evaluate(async () => {
+    const step = Math.max(200, Math.floor(window.innerHeight * 0.8));
+    for (let y = 0; y < document.documentElement.scrollHeight; y += step) {
+      window.scrollTo(0, y);
+      await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
+    }
+    window.scrollTo(0, 0);
+  });
+  await page.waitForTimeout(250);
+  const cls = await page.evaluate(() => {
+    const state = (
+      window as unknown as {
+        __jovieLayoutShift?: { value: number; observed: boolean };
+      }
+    ).__jovieLayoutShift;
+    if (!state?.observed || !Number.isFinite(state.value) || state.value < 0) {
+      throw new Error('Layout-shift observation is unavailable');
+    }
+    return state.value;
+  });
+  if (cls <= LAYOUT_SHIFT_BUDGET) return null;
+  return {
+    kind: 'layout-shift',
+    message: `Cumulative layout shift ${cls.toFixed(3)} exceeds ${LAYOUT_SHIFT_BUDGET}.`,
+    elements: ['document'],
+    measurements: { cls: Math.round(cls * 1000) / 1000 },
   };
 }

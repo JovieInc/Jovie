@@ -89,11 +89,11 @@
 
 /* ---------- Screenshot crop frame ---------- */
 
+/* The tile card border is the only frame; no inner hairline (ui.md nested
+   decorative carding). */
 .ap-spec-wall__shot {
   border-radius: 0.85rem;
   background: var(--color-bg-base);
-  box-shadow: inset 0 0 0 1px
-    color-mix(in oklab, var(--color-text-primary-token) 7%, transparent);
 }
 
 /* ---------- Cinematic stages ---------- */
