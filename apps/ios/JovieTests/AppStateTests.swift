@@ -4207,7 +4207,16 @@ extension AppStateTests {
         #expect(state.dashboardState == .idle)
         await caches.expectContents(present: false)
       } else {
-        #expect(NativeSessionTokenStore.captureSessionContext() == context)
+        if change == "pending", status == 200 {
+          // Pending intent freezes presentation, while A may still rotate its own bearer.
+          let refreshed = NativeSessionTokenStore.captureSessionContext()
+          #expect(refreshed.ownership == context.ownership)
+          #expect(NativeSessionTokenStore.load()?.userID == caches.userID)
+          #expect(refreshed.authorization?.bearerToken == "late-a")
+          #expect(refreshed.authorization != context.authorization)
+        } else {
+          #expect(NativeSessionTokenStore.captureSessionContext() == context)
+        }
         #expect(state.activeSessionOwnership == owner && state.dashboardState == dashboard)
       }
       if let pending { #expect(NativeSessionTokenStore.performIfCurrent(pending, {})) }
