@@ -9,6 +9,7 @@ import {
   footerStyles,
   headerStyles,
   overlayClassName,
+  overlayStyles,
   titleStyles,
 } from '../lib/overlay-styles';
 import { cn } from '../lib/utils';
@@ -82,7 +83,10 @@ const DialogContent = React.forwardRef<
     );
     const contentClassName = cn(
       variant === 'fullscreen'
-        ? 'fixed inset-0 z-modal grid h-dvh w-full max-w-none gap-0 overflow-hidden bg-(--app-shell-content-surface) text-primary-token data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0'
+        ? cn(
+            'fixed inset-0 z-modal grid h-dvh w-full max-w-none gap-0 overflow-hidden bg-(--app-shell-content-surface) text-primary-token',
+            overlayStyles.animation
+          )
         : cn(
             centeredContentStyles.position,
             centeredContentStyles.layout,
