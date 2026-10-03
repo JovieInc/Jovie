@@ -116,6 +116,15 @@ if (args[0] === 'api') {
 }
 
 describe('Staging Controller supersession', () => {
+  it('queries successful runs when searching for a superseding generation', () => {
+    expect(workflow).toContain(
+      'branch=main&event=push&status=success&per_page=100'
+    );
+    expect(workflow).not.toContain(
+      'branch=main&event=push&status=completed&per_page=100'
+    );
+  });
+
   it.each(['behind', 'identical', 'diverged', ''])(
     'keeps the source generation when a later CI run is %s to its SHA',
     relation => {
