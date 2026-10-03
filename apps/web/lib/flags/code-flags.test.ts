@@ -15,4 +15,12 @@ describe('code flags', () => {
     process.env.FEATURE_CANVAS_GRAIN = 'false';
     expect(isCodeFlagEnabled('CANVAS_GRAIN')).toBe(false);
   });
+
+  it('keeps the auth offer summary off unless the env override is true', () => {
+    expect(CODE_FLAGS.AUTH_OFFER_SUMMARY).toBe(false);
+    expect(isCodeFlagEnabled('AUTH_OFFER_SUMMARY')).toBe(false);
+    process.env.FEATURE_AUTH_OFFER_SUMMARY = 'true';
+    expect(isCodeFlagEnabled('AUTH_OFFER_SUMMARY')).toBe(true);
+    delete process.env.FEATURE_AUTH_OFFER_SUMMARY;
+  });
 });

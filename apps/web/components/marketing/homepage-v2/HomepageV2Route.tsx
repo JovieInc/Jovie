@@ -108,6 +108,7 @@ function HomepageV2Hero() {
             <div className='mt-7 flex flex-wrap items-center gap-3'>
               <Link
                 href={HOMEPAGE_FRONT_DOOR_CTA.primary.href}
+                prefetch={false}
                 data-testid='homepage-v2-hero-primary-cta'
                 className='public-action-primary'
               >

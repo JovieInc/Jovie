@@ -48,6 +48,7 @@ per instruction. Context/checkpoint guidance: [agent context](docs/agent-context
 | UI/design | [DESIGN.md](DESIGN.md), [ui.md](.claude/rules/ui.md) |
 | Marketing pages (fully static) | [marketing guide](docs/marketing/AGENT_GUIDE.md) |
 | Writing/copy | [writing contract](docs/writing/SURFACE_COVERAGE.md) |
+| Strategy-sensitive planning (pricing, free tier, business model, delegation, substrate) | [strategy canon](canon/strategy/README.md) |
 | Tests/coverage | [testing.md](.claude/rules/testing.md) |
 | PR, CI, merge, deploy | [PR_FLOW.md](docs/PR_FLOW.md), [MERGE_QUEUE.md](.github/MERGE_QUEUE.md), [BRANCH_PROTECTION.md](.github/BRANCH_PROTECTION.md), [release.md](.claude/rules/release.md) |
 | iOS / macOS | [ios.md](.claude/rules/ios.md) / [macos.md](.claude/rules/macos.md) |
@@ -87,9 +88,9 @@ Docs use [parity](docs/DOCUMENTATION.md), policy, link and context evals; they
 must not be presented as live model or UI proof. UI changes require state coverage
 and layout stability checks; see DESIGN.md for bounded disclosure exceptions.
 
-Run the narrow relevant checks first; broaden for changed boundaries, failures,
-or required CI coverage. Once relevant checks pass, avoid redundant reruns.
-Report changes, exact checks, failures, and limitations. Distinguish local source,
-hosted CI, native merge queue, deployed build, and observed runtime. Never infer
-one from another. Preserve the original objective and user corrections across
-compaction; resume from the next unfinished step, not from the beginning.
+Run narrow relevant checks first; broaden for changed boundaries, failures, or
+required CI coverage. Avoid redundant reruns. Report changes, exact checks,
+failures, and limitations. Keep local source, hosted CI, native merge queue,
+deployed build and observed runtime distinct; never infer one from another.
+Preserve the original goal and user corrections across compaction; resume at
+the next unfinished step.

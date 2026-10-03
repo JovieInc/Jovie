@@ -22,6 +22,28 @@ describe('ProductScreenshotFrame — dark-glass product frame (JOV-6247)', () =>
     expect(el).not.toHaveClass('psf--dark-glass');
   });
 
+  it('keeps mobile web captures bezel-free while retaining desktop framing', () => {
+    const { rerender } = render(
+      <ProductScreenshotFrame
+        scenarioId={FOCUS_SCENARIO}
+        device='phone'
+        sizes={SIZES}
+        focus={null}
+      />
+    );
+    const phone = frame(FOCUS_SCENARIO);
+    expect(phone).toHaveClass('mobile-web-screen');
+    expect(phone.className).not.toMatch(/(?:^|\s)(?:shadow-|border(?:\s|-))/);
+    expect(screen.getByRole('img').className).not.toMatch(/rounded-/);
+
+    rerender(
+      <ProductScreenshotFrame scenarioId={DESKTOP_SCENARIO} sizes={SIZES} />
+    );
+    expect(frame()).not.toHaveClass('mobile-web-screen');
+    expect(frame()).toHaveClass('border');
+    expect(screen.getByRole('img')).toHaveClass('rounded-lg');
+  });
+
   it('keeps the bezel on the neutral surface token, not the accent hover fill', () => {
     render(
       <ProductScreenshotFrame scenarioId={DESKTOP_SCENARIO} sizes={SIZES} />

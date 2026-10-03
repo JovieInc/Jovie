@@ -1052,10 +1052,11 @@ class RunnerHookTest(unittest.TestCase):
         self.assertGreater(record["endedAt"], 1)
 
     def test_dispatch_survives_a_broken_event_tick(self):
-        saved = (runner.load_providers, runner.sh, runner.doctor.run, events.tick)
+        saved = (runner.load_providers, runner.sh, runner.doctor.run, events.tick, runner.disk_guard.check)
         runner.load_providers = lambda: {}
         runner.sh = lambda *a, **k: SimpleNamespace(returncode=0, stdout="", stderr="")
         runner.doctor.run = lambda *a, **k: {}
+        runner.disk_guard.check = lambda host: {"freePct": 50.0, "low": False, "critical": False, "admitted": True}
         events.tick = lambda *a: (_ for _ in ()).throw(RuntimeError("gh down"))
         try:
             with tempfile.TemporaryDirectory() as tmp:
@@ -1063,7 +1064,7 @@ class RunnerHookTest(unittest.TestCase):
                 self.assertEqual(runner.dispatch(host), 0)
                 tick = json.loads((host.state / "tick.json").read_text())
         finally:
-            runner.load_providers, runner.sh, runner.doctor.run, events.tick = saved
+            runner.load_providers, runner.sh, runner.doctor.run, events.tick, runner.disk_guard.check = saved
         self.assertIn("gh down", tick["eventsError"])
 
 

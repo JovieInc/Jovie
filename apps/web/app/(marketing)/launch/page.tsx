@@ -25,6 +25,7 @@ import {
 } from '@/components/marketing';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import { AiDemo } from '@/features/home/AiDemo';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { ProfileMockup } from '@/features/home/ProfileMockup';
@@ -479,6 +480,7 @@ export default function LaunchPage() {
                 <div className='system-b-launch-hero-actions'>
                   <Link
                     href={APP_ROUTES.SIGNUP}
+                    prefetch={resolveMarketingAuthPrefetch(APP_ROUTES.SIGNUP)}
                     className='system-b-launch-primary-link'
                   >
                     Request access
@@ -865,7 +867,12 @@ export default function LaunchPage() {
               Your music deserves better than a stack of links.
             </h2>
             <div>
-              <Link href={APP_ROUTES.SIGNUP}>Request access</Link>
+              <Link
+                href={APP_ROUTES.SIGNUP}
+                prefetch={resolveMarketingAuthPrefetch(APP_ROUTES.SIGNUP)}
+              >
+                Request access
+              </Link>
               <a href='mailto:hello@jov.ie'>Contact us</a>
             </div>
           </MarketingContainer>
