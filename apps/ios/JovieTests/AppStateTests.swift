@@ -4085,3 +4085,305 @@ extension AppStateTests {
     }
   }
 }
+
+
+private struct DelayedProfileCompletionResult: ProfileCompleting {
+  let gate: ProfileLoadGate
+  var authorizationToExpire: NativeRequestAuthorization?
+  func completeProfile(displayName: String, username: String, for userID: String,
+                       ifOwnedBy owner: NativeSessionOwnership) async throws {
+    if let authorizationToExpire {
+      do {
+        _ = try NativeSessionTokenStore.resolveUnauthorized(authorizedBy: authorizationToExpire, allowRetry: false)
+        Issue.record("Expected current-owner expiry")
+      } catch {
+        _ = await gate.wait()
+        throw error
+      }
+    } else { _ = await gate.wait() }
+  }
+}
+
+extension AppStateTests {
+  @MainActor
+  private func completionState(_ caches: CleanupCacheHarness, push: PushLifecycleHarness,
+                               revoker: MockSessionRevoker, client: APIClient) -> AppState {
+    let state = AppState(configuration: .mock, launchMode: .live,
+      repository: MeRepository(apiClient: client, cache: caches.me),
+      brightnessManager: MockBrightnessController(), sessionRevoker: revoker,
+      pushNotifications: push.manager, chatCache: caches.chat,
+      audienceHighlightsCache: caches.audience, actionLoopCache: caches.actionLoop)
+    state.didInitializeAuth = true
+    return state
+  }
+
+  @Test(arguments: ["ready", "waitlist", "onboarding", "decode", "transport"])
+  func profileCompletionRequiresItsFreshAcceptedProfile(outcome: String) async throws {
+    try await withNativeAuthSecurityScript { @MainActor _ in
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness()
+      defer { caches.cleanup(); push.cleanup() }
+      let original = try saveSession()
+      await caches.seed(profile: .previewNeedsOnboarding)
+      let response: MobileMeResponse = outcome == "ready" ? .previewReady
+        : outcome == "waitlist" ? .previewWaitlistPending : .previewNeedsOnboarding
+      let script = ProfileCompletionHTTP([
+        .init(body: try JSONEncoder().encode(MobileMeResponse.previewNeedsOnboarding)),
+        .init(),
+        .init(body: outcome == "decode" ? Data("{".utf8) : try JSONEncoder().encode(response),
+          failure: outcome == "transport" ? .networkConnectionLost : nil),
+      ])
+      let session = ProfileCompletionURLProtocol.session(script)
+      defer { session.invalidateAndCancel() }
+      let client = APIClient(baseURL: URL(string: "https://jov.ie")!, session: session,
+        tokenProvider: NativeSessionTokenProvider())
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = completionState(caches, push: push, revoker: revoker, client: client)
+      await state.handleSignedInUserChange(caches.userID)
+      let message = await state.completeProfile(displayName: "A", username: "a", for: caches.userID,
+        ifOwnedBy: original.ownership!, using: client)
+      await ProfileCompletionURLProtocol.drain()
+      let accepted = outcome == "ready" || outcome == "waitlist"
+      #expect((message == nil) == accepted)
+      #expect(state.route == (outcome == "ready" ? .ready : outcome == "waitlist" ? .waitlistPending : .needsOnboarding))
+      #expect(state.dashboardState == .loaded(response))
+      #expect(state.isOffline == (outcome == "decode" || outcome == "transport"))
+      #expect(state.activeSessionOwnership == original.ownership)
+      #expect(NativeSessionTokenStore.requestAuthorization() == original)
+      await caches.expectContents(present: true, profile: response)
+      let requests = await script.requests
+      #expect(requests.map(\.httpMethod) == ["GET", "POST", "GET"])
+      #expect(requests.filter { $0.url?.path == "/api/mobile/v1/me" }.count == 2)
+      #expect(await revoker.calls() == 0)
+    }
+  }
+
+  @Test(arguments: ["same-user", "different-user", "pending"], [200, 401, 409])
+  func oldProfileCompletionCannotPublishOrReloadAReplacement(change: String, status: Int) async throws {
+    try await withNativeAuthSecurityScript { @MainActor _ in
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness(), gate = ProfileLoadGate()
+      defer { caches.cleanup(); push.cleanup() }
+      let original = try saveSession()
+      await caches.seed(profile: .previewNeedsOnboarding)
+      let script = ProfileCompletionHTTP([
+        .init(body: try JSONEncoder().encode(MobileMeResponse.previewNeedsOnboarding)),
+        .init(status: status, body: Data((status == 409 ? #"{"error":"Old form error"}"# : #"{"profileId":"p"}"#).utf8),
+          headers: ["set-auth-token": "late-a"], gate: gate),
+        .init(body: try JSONEncoder().encode(MobileMeResponse.previewWaitlistPending)),
+      ])
+      let session = ProfileCompletionURLProtocol.session(script)
+      defer { session.invalidateAndCancel() }
+      let client = APIClient(baseURL: URL(string: "https://jov.ie")!, session: session,
+        tokenProvider: NativeSessionTokenProvider())
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = completionState(caches, push: push, revoker: revoker, client: client)
+      await state.handleSignedInUserChange(caches.userID)
+      let caller = Task {
+        let result = await state.completeProfile(displayName: "A", username: "a", for: caches.userID,
+          ifOwnedBy: original.ownership!, using: client)
+        await gate.ownerFinished()
+        return result
+      }
+      #expect(await gate.waitUntilEntered())
+      var pending: NativeAuthAttempt?
+      let nextUser = change == "different-user" ? "other-user" : caches.userID
+      if change == "pending" {
+        let attempt = NativeSessionTokenStore.beginAuthAttempt()
+        pending = attempt
+        state.acceptAuthAttempt(attempt)
+      } else {
+        NativeSessionTokenStore.save(token: "b", userID: nextUser, expiresAt: .distantFuture)
+        await state.handleSignedInUserChange(nextUser)
+      }
+      let context = NativeSessionTokenStore.captureSessionContext()
+      let route = state.route, dashboard = state.dashboardState, owner = state.activeSessionOwnership
+      await gate.complete(true)
+      let message = await caller.value
+      await ProfileCompletionURLProtocol.drain()
+      #expect(message == nil && state.route == route)
+      // Pending auth keeps its route while the exact receipt cleans A's profile.
+      if change == "pending", status == 401 {
+        #expect(NativeSessionTokenStore.load() == nil)
+        #expect(state.activeUserID == nil && state.activeSessionOwnership == nil)
+        #expect(state.dashboardState == .idle)
+        await caches.expectContents(present: false)
+      } else {
+        if change == "pending", status == 200 {
+          // Pending intent freezes presentation, while A may still rotate its own bearer.
+          let refreshed = NativeSessionTokenStore.captureSessionContext()
+          #expect(refreshed.ownership == context.ownership)
+          #expect(NativeSessionTokenStore.load()?.userID == caches.userID)
+          #expect(refreshed.authorization?.bearerToken == "late-a")
+          #expect(refreshed.authorization != context.authorization)
+        } else {
+          #expect(NativeSessionTokenStore.captureSessionContext() == context)
+        }
+        #expect(state.activeSessionOwnership == owner && state.dashboardState == dashboard)
+      }
+      if let pending { #expect(NativeSessionTokenStore.performIfCurrent(pending, {})) }
+      else {
+        #expect(await caches.me.load(for: nextUser)?.response == .previewWaitlistPending)
+        #expect(await MeCache(defaults: caches.defaults).load(for: nextUser)?.response == .previewWaitlistPending)
+      }
+      #expect(await script.requests.count == (change == "pending" ? 2 : 3))
+      #expect(await revoker.calls() == 0)
+    }
+  }
+
+  @Test func postCompletionReloadRetiresOldLoadAndOutlivesCaller() async throws {
+    try await withNativeAuthSecurityScript { @MainActor _ in
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness()
+      defer { caches.cleanup(); push.cleanup() }
+      let original = try saveSession(), oldGate = ProfileLoadGate(), newGate = ProfileLoadGate()
+      await caches.seed(profile: .previewNeedsOnboarding)
+      let script = ProfileCompletionHTTP([
+        .init(body: try JSONEncoder().encode(MobileMeResponse.previewNeedsOnboarding), gate: oldGate),
+        .init(),
+        .init(body: try JSONEncoder().encode(MobileMeResponse.previewReady), gate: newGate),
+      ])
+      let session = ProfileCompletionURLProtocol.session(script)
+      defer { session.invalidateAndCancel() }
+      let client = APIClient(baseURL: URL(string: "https://jov.ie")!, session: session,
+        tokenProvider: NativeSessionTokenProvider())
+      let state = completionState(caches, push: push, revoker: MockSessionRevoker(result: .revoked), client: client)
+      let initial = Task { await state.handleSignedInUserChange(caches.userID); await oldGate.ownerFinished() }
+      #expect(await oldGate.waitUntilEntered())
+      #expect(state.route == .needsOnboarding)
+      let caller = Task {
+        let result = await state.completeProfile(displayName: "A", username: "a", for: caches.userID,
+          ifOwnedBy: original.ownership!, using: client)
+        await newGate.ownerFinished()
+        return result
+      }
+      #expect(await newGate.waitUntilEntered())
+      caller.cancel()
+      await oldGate.complete(true); await newGate.complete(true)
+      await initial.value
+      let message = await caller.value
+      await ProfileCompletionURLProtocol.drain()
+      #expect(message == nil && state.route == .ready && state.dashboardState == .loaded(.previewReady))
+      #expect(state.activeSessionOwnership == original.ownership)
+      #expect(NativeSessionTokenStore.requestAuthorization() == original)
+      await caches.expectContents(present: true)
+      #expect(await script.requests.map(\.httpMethod) == ["GET", "POST", "GET"])
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func canceledCompletionStillDeliversAnAlreadyIssuedExpiry(expire: Bool) async throws {
+    try await withNativeAuthSecurityScript { @MainActor _ in
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness(), gate = ProfileLoadGate()
+      defer { caches.cleanup(); push.cleanup() }
+      let original = try saveSession()
+      await caches.seed(profile: .previewNeedsOnboarding)
+      await caches.api.updateMode(.success(.previewNeedsOnboarding))
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = cleanupState(caches, push: push, revoker: revoker)
+      await state.handleSignedInUserChange(caches.userID)
+      await push.manager.activate()
+      let unregisterBefore = push.unregisterCount
+      let caller = Task {
+        let result = await state.completeProfile(displayName: "A", username: "a", for: caches.userID,
+          ifOwnedBy: original.ownership!, using: DelayedProfileCompletionResult(gate: gate,
+            authorizationToExpire: expire ? original : nil))
+        await gate.ownerFinished()
+        return result
+      }
+      #expect(await gate.waitUntilEntered())
+      caller.cancel()
+      await gate.complete(true)
+      let message = await caller.value
+      #expect(message == nil)
+      #expect(state.route == (expire ? .signedOut : .needsOnboarding))
+      #expect(NativeSessionTokenStore.requestAuthorization() == (expire ? nil : original))
+      #expect(push.unregisterCount == unregisterBefore + (expire ? 1 : 0))
+      #expect(await push.service.requests().deletions.isEmpty)
+      #expect(await revoker.calls() == 0)
+      await caches.expectContents(present: !expire, profile: .previewNeedsOnboarding)
+    }
+  }
+
+  @Test(arguments: [401, 409])
+  func currentProfileCompletionDeliversOnlyItsCurrentError(status: Int) async throws {
+    try await withNativeAuthSecurityScript { @MainActor _ in
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness()
+      defer { caches.cleanup(); push.cleanup() }
+      let original = try saveSession()
+      await caches.seed(profile: .previewNeedsOnboarding)
+      let script = ProfileCompletionHTTP([
+        .init(body: try JSONEncoder().encode(MobileMeResponse.previewNeedsOnboarding)),
+        .init(status: status, body: Data(#"{"error":"Username is taken"}"#.utf8)),
+      ])
+      let session = ProfileCompletionURLProtocol.session(script)
+      defer { session.invalidateAndCancel() }
+      let client = APIClient(baseURL: URL(string: "https://jov.ie")!, session: session,
+        tokenProvider: NativeSessionTokenProvider())
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = completionState(caches, push: push, revoker: revoker, client: client)
+      await state.handleSignedInUserChange(caches.userID)
+      await push.manager.activate()
+      let unregisterBefore = push.unregisterCount
+      let message = await state.completeProfile(displayName: "A", username: "a", for: caches.userID,
+        ifOwnedBy: original.ownership!, using: client)
+      await ProfileCompletionURLProtocol.drain()
+      #expect(message == (status == 401 ? nil : "Username is taken"))
+      #expect(state.route == (status == 401 ? .signedOut : .needsOnboarding))
+      #expect(NativeSessionTokenStore.requestAuthorization() == (status == 401 ? nil : original))
+      #expect(push.unregisterCount == unregisterBefore + (status == 401 ? 1 : 0))
+      #expect(await push.service.requests().deletions.isEmpty)
+      #expect(await revoker.calls() == 0)
+      await caches.expectContents(present: status != 401, profile: .previewNeedsOnboarding)
+      #expect(await script.requests.map(\.httpMethod) == ["GET", "POST"])
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func postCompletionProfileCannotOutliveItsSession(expire: Bool) async throws {
+    try await withNativeAuthSecurityScript { @MainActor _ in
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness(), gate = ProfileLoadGate()
+      defer { caches.cleanup(); push.cleanup() }
+      let original = try saveSession()
+      await caches.seed(profile: .previewNeedsOnboarding)
+      let script = ProfileCompletionHTTP([
+        .init(body: try JSONEncoder().encode(MobileMeResponse.previewNeedsOnboarding)),
+        .init(),
+        .init(body: try JSONEncoder().encode(MobileMeResponse.previewReady), gate: gate),
+        .init(body: try JSONEncoder().encode(MobileMeResponse.previewWaitlistPending)),
+      ])
+      let session = ProfileCompletionURLProtocol.session(script)
+      defer { session.invalidateAndCancel() }
+      let client = APIClient(baseURL: URL(string: "https://jov.ie")!, session: session,
+        tokenProvider: NativeSessionTokenProvider())
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = completionState(caches, push: push, revoker: revoker, client: client)
+      await state.handleSignedInUserChange(caches.userID)
+      let caller = Task {
+        let result = await state.completeProfile(displayName: "A", username: "a", for: caches.userID,
+          ifOwnedBy: original.ownership!, using: client)
+        await gate.ownerFinished()
+        return result
+      }
+      #expect(await gate.waitUntilEntered())
+      if expire {
+        do { await state.handleExpiredSession(try ownedProfileExpiryReceipt(original)) }
+        catch {
+          await gate.complete(true); _ = await caller.value
+          await ProfileCompletionURLProtocol.drain()
+          throw error
+        }
+      } else {
+        NativeSessionTokenStore.save(token: "b", userID: caches.userID, expiresAt: .distantFuture)
+        await state.handleSignedInUserChange(caches.userID)
+      }
+      let preserved = NativeSessionTokenStore.captureSessionContext()
+      await gate.complete(true)
+      let message = await caller.value
+      await ProfileCompletionURLProtocol.drain()
+      #expect(message == nil && NativeSessionTokenStore.captureSessionContext() == preserved)
+      #expect(state.route == (expire ? .signedOut : .waitlistPending))
+      #expect(state.dashboardState == (expire ? .idle : .loaded(.previewWaitlistPending)))
+      await caches.expectContents(present: !expire, profile: .previewWaitlistPending)
+      #expect(await script.requests.count == (expire ? 3 : 4))
+      #expect(await revoker.calls() == 0)
+    }
+  }
+}

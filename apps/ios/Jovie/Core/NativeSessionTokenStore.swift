@@ -35,7 +35,7 @@ struct NativeRequestAuthorization: Equatable, Sendable {
 }
 
 /// Login ownership outlives bearer rotation, but never an explicit save or clear.
-struct NativeSessionOwnership: Equatable, Sendable {
+struct NativeSessionOwnership: Hashable, Sendable {
   fileprivate let generation: UUID
 }
 
@@ -113,12 +113,21 @@ enum NativeSessionTokenStore {
   }
 
   private static let state = State()
-  private static let service = "ie.jov.Jovie"
+  private static let service = NativeAuthPlatform.service
   private static let account = "nativeSessionToken"
-  private static let fallbackTokenKey = "ie.jov.Jovie.nativeSession.token"
-  private static let userIDKey = "ie.jov.Jovie.nativeSession.userID"
-  private static let expiresAtKey = "ie.jov.Jovie.nativeSession.expiresAt"
+  private static let fallbackTokenKey = NativeAuthPlatform.storagePrefix + ".nativeSession.token"
+  private static let userIDKey = NativeAuthPlatform.storagePrefix + ".nativeSession.userID"
+  private static let expiresAtKey = NativeAuthPlatform.storagePrefix + ".nativeSession.expiresAt"
   private static let expiryLeeway: TimeInterval = 30
+
+  private static var defaultsLocked: UserDefaults { NativeAuthPlatform.defaults }
+
+#if DEBUG
+  /// Hold the test isolation lease; restore only after all owned tasks finish.
+  static func replaceDefaultsForTesting(_ defaults: UserDefaults?) -> UserDefaults? {
+    withLock { NativeAuthPlatform.replaceDefaultsForTesting(defaults) }
+  }
+#endif
 
   static func save(token: String, userID: String, expiresAt: Date) {
     withLock {
@@ -145,17 +154,17 @@ enum NativeSessionTokenStore {
     let status = state.security.add(addQuery as CFDictionary)
 
     if status == errSecSuccess {
-      UserDefaults.standard.removeObject(forKey: fallbackTokenKey)
-      UserDefaults.standard.set(userID, forKey: userIDKey)
-      UserDefaults.standard.set(expiresAt.timeIntervalSince1970, forKey: expiresAtKey)
+      defaultsLocked.removeObject(forKey: fallbackTokenKey)
+      defaultsLocked.set(userID, forKey: userIDKey)
+      defaultsLocked.set(expiresAt.timeIntervalSince1970, forKey: expiresAtKey)
       return WriteResult(deleted: deleted, added: status)
     }
 
 #if targetEnvironment(simulator)
     if status == errSecMissingEntitlement {
-      UserDefaults.standard.set(token, forKey: fallbackTokenKey)
-      UserDefaults.standard.set(userID, forKey: userIDKey)
-      UserDefaults.standard.set(expiresAt.timeIntervalSince1970, forKey: expiresAtKey)
+      defaultsLocked.set(token, forKey: fallbackTokenKey)
+      defaultsLocked.set(userID, forKey: userIDKey)
+      defaultsLocked.set(expiresAt.timeIntervalSince1970, forKey: expiresAtKey)
     }
 #endif
     return WriteResult(deleted: deleted, added: status)
@@ -391,13 +400,13 @@ enum NativeSessionTokenStore {
   private static func storageSnapshotLocked() -> StorageSnapshot {
     let (status, data) = copyToken()
 #if targetEnvironment(simulator)
-    let fallback = UserDefaults.standard.string(forKey: fallbackTokenKey)
+    let fallback = defaultsLocked.string(forKey: fallbackTokenKey)
 #else
     let fallback: String? = nil
 #endif
     return StorageSnapshot(status: status, data: data,
-      userID: UserDefaults.standard.string(forKey: userIDKey),
-      expiry: UserDefaults.standard.object(forKey: expiresAtKey) as? Double,
+      userID: defaultsLocked.string(forKey: userIDKey),
+      expiry: defaultsLocked.object(forKey: expiresAtKey) as? Double,
       fallback: fallback)
   }
 
@@ -413,8 +422,8 @@ enum NativeSessionTokenStore {
   }
 
   private static func clearMetadataLocked() {
-    UserDefaults.standard.removeObject(forKey: userIDKey)
-    UserDefaults.standard.removeObject(forKey: expiresAtKey)
+    defaultsLocked.removeObject(forKey: userIDKey)
+    defaultsLocked.removeObject(forKey: expiresAtKey)
   }
 
   static func load() -> NativeStoredSession? {
@@ -438,7 +447,7 @@ enum NativeSessionTokenStore {
   }
 
   private static func matchesUserLocked(_ userID: String) -> Bool {
-    let storedUserID = UserDefaults.standard.string(forKey: userIDKey)
+    let storedUserID = defaultsLocked.string(forKey: userIDKey)
       ?? currentReceiptLocked()?.userID
     return storedUserID == nil || storedUserID == userID
   }
@@ -665,14 +674,14 @@ enum NativeSessionTokenStore {
 
   private static func loadLocked() -> NativeStoredSession? {
     guard
-      let userID = UserDefaults.standard.string(forKey: userIDKey),
+      let userID = defaultsLocked.string(forKey: userIDKey),
       let token = loadToken()
     else {
       return nil
     }
 
     let expiresAt = Date(
-      timeIntervalSince1970: UserDefaults.standard.double(forKey: expiresAtKey)
+      timeIntervalSince1970: defaultsLocked.double(forKey: expiresAtKey)
     )
 
     guard expiresAt.timeIntervalSinceNow > expiryLeeway else {
@@ -697,9 +706,9 @@ enum NativeSessionTokenStore {
     state.bearerRevision = UUID()
     state.expiryReceipt = nil
     clearToken()
-    UserDefaults.standard.removeObject(forKey: fallbackTokenKey)
-    UserDefaults.standard.removeObject(forKey: userIDKey)
-    UserDefaults.standard.removeObject(forKey: expiresAtKey)
+    defaultsLocked.removeObject(forKey: fallbackTokenKey)
+    defaultsLocked.removeObject(forKey: userIDKey)
+    defaultsLocked.removeObject(forKey: expiresAtKey)
   }
 
   /// Persists the Better Auth bearer-plugin roll emitted on successful API calls.
@@ -746,7 +755,7 @@ enum NativeSessionTokenStore {
     let (status, data) = copyToken()
     guard status == errSecSuccess else {
 #if targetEnvironment(simulator)
-      return UserDefaults.standard.string(forKey: fallbackTokenKey)
+      return defaultsLocked.string(forKey: fallbackTokenKey)
 #else
       return nil
 #endif
@@ -772,11 +781,15 @@ enum NativeSessionTokenStore {
   }
 
   private static func baseQuery() -> [String: Any] {
-    [
+    var query: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: service,
       kSecAttrAccount as String: account,
     ]
+#if os(macOS)
+    query[kSecUseDataProtectionKeychain as String] = true
+#endif
+    return query
   }
 }
 
@@ -869,5 +882,44 @@ struct NativeSessionRevoker: NativeSessionRevoking, Sendable {
     } catch {
       return .failed(statusCode: nil)
     }
+  }
+}
+
+/// Fixed credential namespace per target, selected before canonical store access.
+enum NativeAuthPlatform {
+#if os(macOS)
+  static let storagePrefix = "ie.jov.JovieMac.Development.production"
+  static let service = storagePrefix + ".session"
+  private static let productionDefaults: UserDefaults = {
+    guard let value = UserDefaults(suiteName: storagePrefix) else {
+      preconditionFailure("The Mac session defaults domain is unavailable")
+    }
+    return value
+  }()
+#else
+  static let storagePrefix = "ie.jov.Jovie"
+  static let service = "ie.jov.Jovie"
+  private static let productionDefaults = UserDefaults.standard
+#endif
+  // Separate configuration lock: diagnostics can run inside the session lock.
+  // This holds no credential or session authority and never calls the store.
+#if DEBUG
+  private static let defaultsLock = NSLock()
+  private static var defaultsOverride: UserDefaults?
+  static func replaceDefaultsForTesting(_ value: UserDefaults?) -> UserDefaults? {
+    defaultsLock.lock()
+    defer { defaultsLock.unlock() }
+    let previous = defaultsOverride
+    defaultsOverride = value
+    return previous
+  }
+#endif
+  static var defaults: UserDefaults {
+#if DEBUG
+    defaultsLock.lock()
+    defer { defaultsLock.unlock() }
+    if let defaultsOverride { return defaultsOverride }
+#endif
+    return productionDefaults
   }
 }
