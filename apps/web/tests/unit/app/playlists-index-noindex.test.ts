@@ -5,25 +5,27 @@
  * index (O-10 orphan / S-04 should-not-have-shipped, JOV-7602).
  */
 
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-const TEST_DIR = dirname(
-  import.meta.url.startsWith('file:')
-    ? fileURLToPath(import.meta.url)
-    : import.meta.url
-);
+vi.mock('@/lib/db', () => ({
+  db: { select: vi.fn() },
+}));
 
-const INDEX_PAGE = join(TEST_DIR, '../../../app/(dynamic)/playlists/page.tsx');
+vi.mock('@/lib/env-server', () => ({
+  env: { DATABASE_URL: undefined },
+}));
+
+vi.mock('../../../app/(dynamic)/playlists/_components/PlaylistGrid', () => ({
+  PlaylistGrid: () => null,
+}));
 
 describe('/playlists index — noindex guard (JOV-7602)', () => {
-  it('marks the index page with the shared NOINDEX_ROBOTS metadata', () => {
-    const source = readFileSync(INDEX_PAGE, 'utf8');
-    expect(source).toContain(
-      "import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata'"
-    );
-    expect(source).toContain('robots: NOINDEX_ROBOTS');
+  it('marks the index page with the shared NOINDEX_ROBOTS metadata', async () => {
+    const [{ metadata }, { NOINDEX_ROBOTS }] = await Promise.all([
+      import('../../../app/(dynamic)/playlists/page'),
+      import('@/lib/seo/noindex-metadata'),
+    ]);
+
+    expect(metadata.robots).toBe(NOINDEX_ROBOTS);
   });
 });
