@@ -58,6 +58,21 @@ export function resolveCanonicalStagingReceipt({
       artifact.workflow_run?.head_sha === producer.head_sha,
       'canonical staging artifact source mismatch'
     );
+    // An authenticated terminal failure is not a release candidate. Keep
+    // searching other receipts; malformed identity or transport still fails.
+    requireProof(
+      producer.id === Number(receipt.controllerRunId) &&
+        producer.run_attempt === Number(receipt.controllerRunAttempt) &&
+        producer.repository?.full_name === repository &&
+        producer.head_repository?.full_name === repository &&
+        producer.path === '.github/workflows/staging-controller.yml' &&
+        producer.event === 'workflow_run' &&
+        producer.head_branch === 'main' &&
+        producer.status === 'completed',
+      'canonical staging producer identity mismatch'
+    );
+    if (['failure', 'cancelled', 'timed_out'].includes(producer.conclusion))
+      continue;
     const resolved = resolveStagingReleaseSource({
       repository,
       trigger: producer,
