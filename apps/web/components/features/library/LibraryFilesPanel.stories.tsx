@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
-import { LibraryInspectorAssetSlots } from './LibraryInspectorAssetSlots';
+import { LibraryFilesPanel } from './LibraryFilesPanel';
 
 const asset = {
   id: 'release-1',
@@ -10,19 +10,19 @@ const asset = {
 } as LibraryReleaseAsset;
 
 const meta = {
-  title: 'Library/LibraryInspectorAssetSlots',
-  component: LibraryInspectorAssetSlots,
+  title: 'Library/LibraryFilesPanel',
+  component: LibraryFilesPanel,
   args: {
     asset,
     downloads: [],
     disabled: false,
   },
-} satisfies Meta<typeof LibraryInspectorAssetSlots>;
+} satisfies Meta<typeof LibraryFilesPanel>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const PopulatedArtwork: Story = {};
-export const EmptyArtwork: Story = {
+export const EmptyFiles: Story = {
   args: { asset: { ...asset, artworkUrl: null, hasArtwork: false } },
 };
