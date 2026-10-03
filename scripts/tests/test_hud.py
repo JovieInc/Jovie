@@ -92,6 +92,7 @@ class MergeEvidenceTest(unittest.TestCase):
                     "window": {"since": 1, "until": 2}, "pages": 20, "scans": 1}
         with mock.patch.object(hud.lane, "load_github_env"), \
                 mock.patch.object(hud.lane, "load_providers", return_value={}), \
+                mock.patch.object(hud, "promotion_model", return_value={"error": "fixture"}), \
                 mock.patch.object(hud, "gh_json", side_effect=RuntimeError("fixture")), \
                 mock.patch.object(hud.merge_evidence, "collect", return_value=evidence) as collect:
             result = hud.github_model()
