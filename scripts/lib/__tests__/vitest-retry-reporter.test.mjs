@@ -302,6 +302,26 @@ describe('execution receipt negative cases', () => {
     fs.writeFileSync(file, 'changed source');
     expect(executionReceipt(module, root, hash)).toBeNull();
   });
+  it('keeps other execution receipts when a started file disappears before run end', () => {
+    const gone = moduleFixture();
+    const present = moduleFixture();
+    const outputFile = path.join(gone.root, 'report.json');
+    const reporter = new RetryVisibilityReporter({
+      workspaceRoot: path.dirname(gone.root),
+      outputFile,
+      env: {},
+      log: () => {},
+    });
+    reporter.onTestModuleStart(gone.module);
+    reporter.onTestModuleStart(present.module);
+    fs.unlinkSync(gone.file);
+    reporter.onTestRunEnd([gone.module, present.module]);
+    const report = JSON.parse(fs.readFileSync(outputFile, 'utf8'));
+    expect(report.complete).toBe(false);
+    expect(report.executions).toHaveLength(1);
+    expect(report.executions[0].file).toContain(path.basename(present.root));
+  });
+
   it('records a failed execution and marks skipped, pending and hook failures incomplete', async () => {
     const hash = (await import('node:crypto'))
       .createHash('sha256')
