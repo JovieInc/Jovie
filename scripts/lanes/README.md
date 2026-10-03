@@ -539,24 +539,55 @@ checked-in projection of `apps/web/data/product-truth/registry.ts`:
 publication `public`, `marketing.proofAuthorized` true, maturity not
 `proposed`, access not `unavailable`.
 
-`design_gate.py` is pure stdlib, no I/O at import. An issue is gated on
-`ws:ui-ia`, `ws:profiles-marketing`, or `ws:design-gate`, or when title or
-description names a `GATED_PATH_PREFIXES` path or clearly targets a
-homepage, landing, or marketing page. `worker()` calls
-`design_gate.pick_build_issue(...)`, passing the existing `pick_issue`; a
-gated issue with an incomplete brief gets `needs-design-brief` plus the
-matching Linear label at most once, and goes to the design/brief lane: the
-same provider claims it once (`run_brief`) with a brief-only prompt, writes
-steps 1–9 to `.design-brief.md`, and the runner appends that inline to the
-issue under `<!-- design-gate:brief-lane -->`. No PR is opened, so merge sync
-cannot close the issue before it is built. The issue returns to Todo; a
-complete brief is admitted on the next claim, an incomplete one (usually step
-9, which needs a real Pen or ImageGen artifact) stays held for a design pass
-and is never re-run. Linked `Design brief:` docs are never overwritten.
+`design_gate.py` is pure stdlib, with no I/O at import.
 
-`doctor.py` adds `designGate` to the admission census (`gated`, `admitted`,
-`needsBrief`, `missingSteps`), deduped; incomplete briefs also increment
-`rejectedByProvider["needs-design-brief"]`.
+**What is gated.** Only visible-UI work. An issue is gated when it has
+`ws:ui-ia`, `ws:profiles-marketing` or `ws:design-gate`, when its description
+names a `GATED_PATH_PREFIXES` path, or when its title targets a homepage,
+landing or marketing page. A homepage mentioned only in passing in the
+description does not gate. Neither does a plumbing title: a redirect, alias,
+orphan, route handler, endpoint, webhook, cron, migration or backend.
+
+**Which template.** Marketing and landing issues use
+`docs/design/design-brief-template.md`. App-surface issues use
+`docs/design/app-ui-brief-template.md`. Its steps 5–7 are screens and states
+(JOV-7713 class 6), canonical primitives, and viewports. Primitives are
+checked against `app-ui-primitives.gen.json`, a projection of
+`DESIGN_SYSTEM_COMPONENT_IDS` and `AppScreenComponentId` that a test keeps
+in sync with those registries.
+
+**What happens to a held issue (JOV-7717: a brief must never block forever).**
+`worker()` calls `design_gate.pick_build_issue(...)` with the existing
+`pick_issue`. That call does five things:
+
+1. **First claim.** A held issue goes ahead of build work: among issues whose
+   brief run is due, `pick_issue` order and eligibility choose one. The gate
+   adds `needs-design-brief` and a `held-at` marker once.
+2. **Brief run.** `run_brief` runs the same provider with a brief-only prompt.
+   The prompt says to write `.design-brief.md` and not to invent artifacts.
+   The runner appends the result inline under
+   `<!-- design-gate:brief-lane -->`, even if the run produced nothing, and
+   opens no PR. The issue returns to Todo.
+3. **Frontier retry.** If steps are still missing, the next claim runs one
+   retry on the `codex` lane (if healthy, otherwise the same lane). It fills
+   the steps from canon (DESIGN.md and the registries) and replaces the draft
+   under `<!-- design-gate:brief-retry -->`.
+4. **Auto-admission.** After the retry, or 24h after `held-at`, an incomplete
+   brief is admitted as `brief-auto`. The gate labels it, comments a warning,
+   and appends one founder `jovie.work-order/v1` block for the taste call.
+   Summer's founder path (JOV-7739) posts that block to Ovie with no model
+   turn.
+5. **Linked briefs.** A linked `Design brief:` doc is never overwritten. It
+   gets no brief run and follows the 24h rule.
+
+`doctor.py` adds `designGate` to the admission census, deduped:
+
+- `gated`, `admitted`, `autoAdmitted`, `needsBrief` and `missingSteps`;
+- `ageHistogram`: time since `held-at` for issues still held or labeled;
+- `stale`: issues held past 25h. Any entry raises the `design-brief-stale`
+  alert.
+
+Incomplete briefs also increment `rejectedByProvider["needs-design-brief"]`.
 
 CI (`.github/workflows/design-gate.yml`) warns when a PR touches the same
 paths with no completed brief; it enforces only when `DESIGN_GATE_ENFORCE`
