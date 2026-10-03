@@ -42,6 +42,7 @@ import continuity_clock  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
+import file_overlap  # noqa: E402
 import hyperagent_lane  # noqa: E402
 import pr_events  # noqa: E402
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
@@ -92,6 +93,7 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_continuity_clock.py",
               "scripts/tests/test_worktree_sweep.py",
               "scripts/tests/test_design_gate.py",
+              "scripts/tests/test_file_overlap.py",
               "scripts/tests/test_remediation.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
@@ -1247,6 +1249,25 @@ class Linear:
         return [Issue(row["id"], row["identifier"], row["title"], row.get("description") or "",
                       row.get("priority") or 0, row["created_at"], list(row.get("labels") or []))
                 for row in rows]
+
+    def active_lane_issues(self, labels: list[str]) -> list[Issue]:
+        """In Progress work claimed from a lane pool, for cross-host overlap admission."""
+        nodes, after = [], None
+        for _ in range(LANE_ISSUE_PAGES):
+            data = self.gql(
+                'query($labels:[String!]!,$after:String){issues(first:100,after:$after,'
+                'filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"In Progress"}},'
+                'labels:{name:{in:$labels}}}){pageInfo{hasNextPage endCursor} '
+                'nodes{id identifier title description priority createdAt labels{nodes{name}}}}}',
+                {"labels": labels, "after": after})
+            nodes += data["issues"]["nodes"]
+            page = data["issues"].get("pageInfo") or {}
+            after = page.get("endCursor")
+            if not page.get("hasNextPage") or not after:
+                break
+        return [Issue(n["id"], n["identifier"], n["title"], n.get("description") or "", n.get("priority") or 0,
+                      n["createdAt"], [label["name"] for label in n["labels"]["nodes"]])
+                for n in nodes]
 
     def create_triage(self, title: str, description: str, dedupe: str | None = None) -> str | None:
         """`dedupe`: a title fragment; an open issue already carrying it is returned instead of a new one."""
@@ -3003,6 +3024,9 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
                    "conflict keeping both sides' intent. If both sides added a migration with the same",
                    "number, renumber yours after main's and regenerate its snapshot/journal entry.",
                    "For a pnpm-lock.yaml conflict take main's lockfile and run `pnpm install --lockfile-only`.",
+                   "Never hand-merge generated files: take main's generated copy, then run its canonical",
+                   "generator (`pnpm ci:topology:write` for workflow topology or",
+                   "`pnpm --filter @jovie/web drizzle:generate` for migration metadata).",
                    "Run the related checks after resolving.", ""]
     else:
         problem = []
@@ -3731,7 +3755,7 @@ def repo_prs() -> list[dict]:
     return sorted(ready, key=lambda pr: pr.get("updatedAt") or "", reverse=True)[:60]
 
 
-_SUMMARY: dict = {"at": 0.0, "prs": []}
+_SUMMARY: dict = {"at": 0.0, "prs": [], "readable": False}
 SUMMARY_TTL_S = 60
 # One claim scan per minute for every idle worker on the host. The 500-issue Linear
 # pagination runs only as this cache's fill, never as an uncached read.
@@ -3777,8 +3801,9 @@ def open_prs_summary() -> list[dict]:
     now = time.time()
     if now - _SUMMARY["at"] < SUMMARY_TTL_S:
         return _SUMMARY["prs"]
-    prs = shared("open-prs", SUMMARY_TTL_S, lambda: pr_events.open_prs_state(sys.modules[__name__]))
+    prs = shared("open-prs", SUMMARY_TTL_S, lambda: pr_events.open_prs_state(THIS))
     if prs is None:
+        _SUMMARY["readable"] = False
         return []
     for pr in prs:
         rollup = pr.get("rollup")
@@ -3786,8 +3811,50 @@ def open_prs_summary() -> list[dict]:
             "name": "rollup", "synthetic": True,
             "status": "COMPLETED" if rollup in ("SUCCESS", "FAILURE", "ERROR") else "PENDING",
             "conclusion": {"SUCCESS": "SUCCESS", "FAILURE": "FAILURE", "ERROR": "FAILURE"}.get(rollup)}]
-    _SUMMARY.update(at=now, prs=prs)
+    _SUMMARY.update(at=now, prs=prs, readable=True)
     return prs
+
+
+def overlap_prs_summary() -> list[dict] | None:
+    """Cached PR overlap inventory, preserving unreadable rather than certifying empty."""
+    prs = open_prs_summary()
+    complete = all(pr.get("filesComplete") is True for pr in prs if not pr.get("isDraft"))
+    return prs if _SUMMARY["readable"] and complete else None
+
+
+def overlap_inventory(host: Host, linear: Linear) -> tuple[list[dict], list[dict]] | None:
+    """The cached open-PR file inventory plus claimed work that has not opened a PR yet."""
+    local = file_overlap.local_tasks(host.state)
+    if file_overlap.guard_mode() == "off" or os.environ.get("LANES_EXECUTION_BACKEND") == "local-test":
+        return [], local
+    prs = overlap_prs_summary()
+    if prs is None:
+        return None
+    provider_labels = [spec["label"] for spec in load_providers().values() if spec.get("label")]
+
+    def fetch_active():
+        return [{"id": issue.id, "identifier": issue.identifier, "title": issue.title,
+                 "description": issue.description, "priority": issue.priority,
+                 "createdAt": issue.created_at, "labels": issue.labels}
+                for issue in linear.active_lane_issues([SHARED_LABEL, *provider_labels])]
+    try:
+        active = shared("file-overlap-tasks", SUMMARY_TTL_S, fetch_active)
+    except LinearRateLimited:
+        raise
+    except Exception:
+        return None
+    if active is None:
+        return None
+    pr_text = "\n".join(f"{pr.get('headRefName', '')}\n{pr.get('body', '')}" for pr in prs).lower()
+    tasks = []
+    for issue in active:
+        if issue["identifier"].lower() in pr_text:
+            continue
+        prediction = file_overlap.predict_issue_files(issue, workstreams.classify)
+        tasks.append({"kind": "task", "identifier": issue["identifier"], **prediction})
+    known = {row.get("identifier") for row in tasks}
+    tasks.extend(row for row in local if row.get("identifier") not in known)
+    return prs, tasks
 
 
 def with_checks(pr: dict) -> dict:
@@ -4218,17 +4285,38 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         budget = None if red or adopt or labeled else read_new_issue_budget(name, host.slots(name, spec.get("slots", 1)))
         blocked = budget is not None and not budget["allowed"]
         in_flight = None if red or adopt or blocked or labeled else in_flight_issues()
+        overlap_blocked = False
+        overlap_unreadable = False
+        overlap_prediction = None
         if labeled is None and in_flight is not None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
+            pool = linear.lane_issues(spec["label"])
             holds = open_hotspot_holds()
-            issue = design_gate.pick_build_issue(
-                linear.lane_issues(spec["label"]), failures, in_flight=in_flight, provider=name,
-                pick=lambda *args, **kwargs: pick_issue(*args, holds=holds, **kwargs),
-                linear=linear, repo=host.repo)
-            if issue and linear.state_of(issue.id) != "Todo":
-                issue = None  # another host claimed it between our read and now
-            if issue:
+            overlap_inventory_rows = overlap_inventory(host, linear)
+            overlap_unreadable = overlap_inventory_rows is None
+            overlap_prs, overlap_tasks = overlap_inventory_rows or ([], [])
+            while pool and not overlap_unreadable:
+                issue = design_gate.pick_build_issue(
+                    pool, failures, in_flight=in_flight, provider=name,
+                    pick=lambda *args, **kwargs: pick_issue(*args, holds=holds, **kwargs),
+                    linear=linear, repo=host.repo)
+                if issue is None:
+                    break
+                admission = file_overlap.admission_decisions(
+                    host, THIS, issue, overlap_prs, overlap_tasks, workstreams.classify)
+                if not admission["allowed"]:
+                    overlap_blocked = True
+                    rejected = issue.identifier
+                    issue = None
+                    pool = [candidate for candidate in pool if candidate.identifier != rejected]
+                    continue
+                overlap_prediction = admission
+                if linear.state_of(issue.id) != "Todo":
+                    issue = None  # another host claimed it between our read and now
+                    break
                 linear.move(issue.id, "In Progress")
+                file_overlap.reserve_task(host.state, issue, overlap_prediction)
+                break
         if red is None and adopt is None and issue is None:
             pr_events.cleanup_one_event(host, THIS, events)
     except LinearRateLimited:
@@ -4254,12 +4342,17 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         return reexec(host, name)
     if issue is None:
         record_idle_exit(host, name, budget["reason"] if blocked else
-                         "in-flight-unknown" if in_flight is None else "none-eligible")
+                         "in-flight-unknown" if in_flight is None else
+                         "file-overlap-inventory-unavailable" if overlap_unreadable else
+                         "file-overlap-blocked" if overlap_blocked else "none-eligible")
         slot.release()
         return 0
     notify_issue_claim(linear, issue, name, spec)
     runner = run_brief if design_gate.wants_brief(issue, host.repo) else run_issue
-    receipt = runner(host, name, spec, linear, issue)
+    try:
+        receipt = runner(host, name, spec, linear, issue)
+    finally:
+        file_overlap.release_task(host.state, issue.identifier)
     verdict = receipt.get("verdict")
     note_event_outcome(host, issue, verdict)
     if verdict == "disk-held":
