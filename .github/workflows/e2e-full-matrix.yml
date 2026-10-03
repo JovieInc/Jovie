@@ -34,6 +34,11 @@ jobs:
     env:
       E2E_FULL_MATRIX: '1'
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+      # The hosted runner lost communication running the full suite at the
+      # default 4 workers: browser workers plus the managed dev server starve
+      # it for CPU/memory. Cap at 2; browsers already serialize via
+      # max-parallel: 1.
+      PLAYWRIGHT_WORKERS: '2'
     strategy:
       fail-fast: false
       # Preserve both browsers without occupying two self-hosted runners at once.
