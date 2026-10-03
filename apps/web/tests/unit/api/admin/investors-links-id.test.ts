@@ -122,12 +122,14 @@ describe('PATCH /api/admin/investors/links/[id]', () => {
     expect(mockEq).toHaveBeenCalledWith('investor_links.id', 'link-1');
   });
 
-  it('allows clearing expiresAt with null', async () => {
-    await PATCH(patchRequest({ expiresAt: null }), paramsFor('link-1'));
-
-    expect(mockSet).toHaveBeenCalledWith(
-      expect.objectContaining({ expiresAt: null })
+  it('rejects clearing expiresAt because claim links must expire', async () => {
+    const res = await PATCH(
+      patchRequest({ expiresAt: null }),
+      paramsFor('link-1')
     );
+
+    expect(res.status).toBe(400);
+    expect(mockSet).not.toHaveBeenCalled();
   });
 
   it.each(['not-a-date', 123])(
