@@ -553,6 +553,18 @@ enum AppRouteManifest {
       exit: "Consumed by the live root → root transition"
     ),
     AppRouteEntry(
+      id: "deeplink.pushCtaUrl",
+      classification: .shipped,
+      presentation: .externalLink,
+      source: "Jovie/App/JovieApp.swift",
+      userTask: "Open a push notification's call-to-action link",
+      stateOwner: "UIApplication.open",
+      entry: "APNs payload.url via notification response tap",
+      exit: "Hands off to the system browser",
+      issue: "JOV-7730",
+      test: "PushNotificationDeepLinkTests"
+    ),
+    AppRouteEntry(
       id: "deeplink.conversationActivity",
       classification: .shipped,
       presentation: .intent,
