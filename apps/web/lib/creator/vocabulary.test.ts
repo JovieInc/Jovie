@@ -8,7 +8,9 @@ import {
   MERCH_LANE_LABELS,
   MUSIC_EVENTS_ROUTE,
   merchLaneLabel,
+  RELATED_ARTISTS_LABEL,
   RELATED_CREATORS_LABEL,
+  relatedSubjectsLabel,
   SPOTIFY_RELATED_SECTION_TITLE,
   WORK_ROUTE,
 } from './vocabulary';
@@ -47,5 +49,11 @@ describe('creator vocabulary', () => {
   it('keeps the Spotify section title and offers a creator label beside it', () => {
     expect(SPOTIFY_RELATED_SECTION_TITLE).toBe('Fans Also Like');
     expect(RELATED_CREATORS_LABEL).toBe('Related creators');
+  });
+
+  it('reserves artist framing for music-sourced recommendations', () => {
+    expect(RELATED_ARTISTS_LABEL).toBe('Related artists');
+    expect(relatedSubjectsLabel(true)).toBe(RELATED_ARTISTS_LABEL);
+    expect(relatedSubjectsLabel(false)).toBe(RELATED_CREATORS_LABEL);
   });
 });

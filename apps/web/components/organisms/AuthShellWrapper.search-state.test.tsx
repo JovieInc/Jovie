@@ -208,8 +208,9 @@ function Boundary({
     </DashboardShellPrivacyBoundary>
   );
 }
-function openSearch() {
+async function openSearch() {
   fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+  await screen.findByRole('combobox', { name: 'Command Palette Search' });
 }
 function closeSearch() {
   fireEvent.keyDown(
@@ -232,7 +233,7 @@ afterEach(() => {
 });
 
 describe('main-plane Search route recovery', () => {
-  it('preserves the ordinary Jovie route independently of the optional Ovie boundary', () => {
+  it('preserves the ordinary Jovie route independently of the optional Ovie boundary', async () => {
     render(
       <DashboardDataProvider value={dashboard}>
         <AuthShellWrapper mode='customer'>
@@ -244,7 +245,7 @@ describe('main-plane Search route recovery', () => {
       screen.getByRole('button', { name: 'Select synthetic task' })
     );
     const selectedDocument = screen.getByLabelText('Synthetic draft');
-    openSearch();
+    await openSearch();
     expect(selectedDocument).not.toBeVisible();
     closeSearch();
     expect(screen.getByLabelText('Synthetic draft')).toBe(selectedDocument);
@@ -265,7 +266,7 @@ describe('main-plane Search route recovery', () => {
     const draft = screen.getByLabelText('Synthetic draft');
     fireEvent.change(draft, { target: { value: 'Unsaved synthetic draft' } });
     draft.focus();
-    openSearch();
+    await openSearch();
     expect(draft).not.toBeVisible();
     expect(screen.getByTestId('cmdk-main-plane')).toBeVisible();
     expect(lifecycle).toHaveBeenLastCalledWith('cleanup', 'tasks');
@@ -280,7 +281,7 @@ describe('main-plane Search route recovery', () => {
     expect(screen.queryByTestId('cmdk-main-plane')).not.toBeInTheDocument();
   });
 
-  it('suspends ambient route Escape while Search is visible and resumes it afterwards', () => {
+  it('suspends ambient route Escape while Search is visible and resumes it afterwards', async () => {
     render(
       <Boundary>
         <RouteDocument />
@@ -289,7 +290,7 @@ describe('main-plane Search route recovery', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Select synthetic task' })
     );
-    openSearch();
+    await openSearch();
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.getByLabelText('Synthetic draft')).toBeVisible();
     expect(routeEscape).not.toHaveBeenCalled();
@@ -298,7 +299,7 @@ describe('main-plane Search route recovery', () => {
     expect(screen.queryByLabelText('Synthetic draft')).not.toBeInTheDocument();
   });
 
-  it('does not resurrect the old route when navigation occurs during Search', () => {
+  it('does not resurrect the old route when navigation occurs during Search', async () => {
     const view = render(
       <Boundary>
         <RouteDocument key='tasks' />
@@ -307,7 +308,7 @@ describe('main-plane Search route recovery', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Select synthetic task' })
     );
-    openSearch();
+    await openSearch();
     route.pathname = '/app/calendar';
     view.rerender(
       <Boundary>
@@ -324,7 +325,7 @@ describe('main-plane Search route recovery', () => {
     expect(screen.queryByLabelText('Synthetic draft')).not.toBeInTheDocument();
   });
 
-  it('removes retained private DOM on an actual C lock event while Search is open', () => {
+  it('removes retained private DOM on an actual C lock event while Search is open', async () => {
     render(
       <Boundary>
         <RouteDocument />
@@ -334,7 +335,7 @@ describe('main-plane Search route recovery', () => {
       screen.getByRole('button', { name: 'Select synthetic task' })
     );
     const privateInput = screen.getByLabelText('Synthetic draft');
-    openSearch();
+    await openSearch();
     act(() => {
       window.dispatchEvent(
         new CustomEvent('ovie:privacy-lock-confirmed', {
@@ -394,7 +395,7 @@ describe('main-plane Search route recovery', () => {
     );
     expect(screen.getByText('Unlock Ovie')).toBeVisible();
     expect(lifecycle).not.toHaveBeenCalled();
-    openSearch();
+    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
     expect(screen.queryByTestId('cmdk-main-plane')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('region', { name: 'Route tasks', hidden: true })
