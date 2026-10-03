@@ -43,7 +43,7 @@ export function VisibilityAuditOffer({
 
   return (
     <aside
-      aria-label='Visibility audit offer'
+      aria-label='Visibility Audit Offer'
       className='flex flex-col gap-3'
       data-testid='visibility-audit-offer'
     >
