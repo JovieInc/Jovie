@@ -1050,6 +1050,11 @@ const LINEAR_SYNC_ON_MERGE_PRIMARY = new Set([
   '.github/workflows/linear-sync-on-merge.yml',
   'scripts/lib/linear-sync-on-merge.mjs',
   'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+  'scripts/lib/validation-lifecycle.mjs',
+  'scripts/lib/__tests__/validation-lifecycle.test.mjs',
+  'scripts/lib/validation-sync.mjs',
+  'scripts/lib/__tests__/validation-sync.test.mjs',
+  'scripts/lib/__tests__/fixtures/validation-world.mjs',
 ]);
 const LINEAR_SYNC_ON_MERGE_LANE = new Set([
   ...LINEAR_SYNC_ON_MERGE_PRIMARY,
@@ -1202,11 +1207,15 @@ function planAffectedTests(
       pythonUnittestTests: [],
       scriptVitestTests: [
         'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+        'scripts/lib/__tests__/validation-lifecycle.test.mjs',
+        'scripts/lib/__tests__/validation-sync.test.mjs',
         'scripts/lib/__tests__/automation-verify.test.mjs',
       ],
       scriptVitestCoverageArgs: [
         '--coverage',
         '--coverage.include=lib/linear-sync-on-merge.mjs',
+        '--coverage.include=lib/validation-lifecycle.mjs',
+        '--coverage.include=lib/validation-sync.mjs',
         '--coverage.reporter=text',
         '--coverage.reporter=json-summary',
         '--coverage.thresholds.perFile=true',
