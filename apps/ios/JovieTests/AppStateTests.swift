@@ -3493,7 +3493,8 @@ extension AppStateTests {
           return
         }
         #expect(state.route == .signedOut && state.dashboardState == .idle)
-        #expect(await cancellations.recorded() == [kind == "retired-receipt"])
+        #expect(await api.cancellations.recorded() == (kind == "retired-receipt" ? [false, true] : [false]))
+        #expect(await cancellations.recorded() == [false])
         #expect(push.unregisterCount == 1 && push.storedToken == nil)
         if replaceDuringCleanup {
           _ = try saveSession()
@@ -3506,7 +3507,7 @@ extension AppStateTests {
         }
         let context = NativeSessionTokenStore.captureSessionContext()
         await cleanupGate.complete(true); await caller.value
-        #expect(await cancellations.recorded() == [kind == "retired-receipt", kind == "retired-receipt"])
+        #expect(await cancellations.recorded() == [false, false])
         await caches.expectContents(present: replaceDuringCleanup, profile: .previewNeedsOnboarding)
         #expect(state.route == (replaceDuringCleanup ? .needsOnboarding : .signedOut))
         #expect(NativeSessionTokenStore.captureSessionContext() == context)
