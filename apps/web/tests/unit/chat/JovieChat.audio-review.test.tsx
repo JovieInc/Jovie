@@ -333,13 +333,17 @@ describe('JovieChat audio upload — review-before-send (GH-11950)', () => {
       releaseId: 'rel-review',
       releaseTitle: 'Review',
       inference: {
-        kind: 'release' as const,
+        kind: 'attach-to-existing',
+        confidence: 'high',
+        suggestedTitle: 'Review',
         releaseId: 'rel-review',
-        artistId: 'artist-1',
-        confidence: 0.9,
+        releaseTitle: 'Review',
+        matchScore: 1,
       },
       prompt: 'Review this recording',
-    };
+    } satisfies Parameters<
+      NonNullable<typeof capturedCallbacks.onAudioUploaded>
+    >[0];
     act(() => capturedCallbacks.onAudioUploaded?.(audioResult));
     expect(panel?.target?.id).toBe('rel-review');
     expect(panel?.contextTargets).toContainEqual(
