@@ -9,7 +9,7 @@ vi.mock('@/lib/hooks/useNotifications', () => ({
 
 const row = {
   id: 'member-1',
-  type: 'subscriber',
+  type: 'email',
   displayName: 'Ada',
   locationLabel: 'Unknown',
   geoCity: null,
