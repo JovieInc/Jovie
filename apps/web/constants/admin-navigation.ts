@@ -50,7 +50,10 @@ export type AdminWorkspaceId =
   | 'revenue_lift'
   | 'share_studio'
   | 'system_map'
-  | 'features';
+  | 'features'
+  | 'interviews'
+  | 'playlists'
+  | 'company_presence';
 
 export type AdminNavigationSection = 'workspaces' | 'utilities';
 
@@ -83,6 +86,9 @@ export const ADMIN_SETTINGS_TOOL_IDS = [
   'costs',
   'revenue_lift',
   'features',
+  'interviews',
+  'playlists',
+  'company_presence',
 ] as const satisfies readonly AdminWorkspaceId[];
 
 export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
@@ -208,6 +214,27 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     label: 'Features',
     href: APP_ROUTES.ADMIN_FEATURES,
     description: 'Runtime feature flags with per-environment toggles',
+    section: 'utilities',
+  },
+  {
+    id: 'interviews',
+    label: 'Interviews',
+    href: APP_ROUTES.ADMIN_INTERVIEWS,
+    description: 'Review recorded interviews',
+    section: 'utilities',
+  },
+  {
+    id: 'playlists',
+    label: 'Playlists',
+    href: APP_ROUTES.ADMIN_PLAYLISTS,
+    description: 'Review generated playlists',
+    section: 'utilities',
+  },
+  {
+    id: 'company_presence',
+    label: 'Company presence',
+    href: APP_ROUTES.ADMIN_PRESENCE,
+    description: 'Jovie pages and search certification',
     section: 'utilities',
   },
 ] as const;
