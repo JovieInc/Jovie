@@ -22,7 +22,8 @@ export const useRouter = () => ({
   },
 });
 
-export const usePathname = () => '/test';
+export const usePathname = () =>
+  globalThis.__jovieStorybookPathname ?? '/test';
 export const useSearchParams = () => new URLSearchParams();
 export const useParams = () => ({});
 export function redirect() {}
