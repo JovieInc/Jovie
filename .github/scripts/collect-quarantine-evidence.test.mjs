@@ -229,6 +229,70 @@ test('paginates complete collections and rejects truncation, drifting totals and
     []
   );
 });
+test('restarts a drifting collection from page one without retaining old rows', () => {
+  const rows = Array.from({ length: 102 }, (_, id) => ({ id: id + 1000 }));
+  const calls = [];
+  let attempt = 0;
+  const result = collectPaged('repos/r/actions/runs', 'runs', endpoint => {
+    const page = endpoint.endsWith('page=1') ? 1 : 2;
+    calls.push(page);
+    if (page === 1) attempt++;
+    if (attempt === 1)
+      return {
+        total_count: page === 1 ? 101 : 102,
+        runs:
+          page === 1 ? Array.from({ length: 100 }, (_, id) => ({ id })) : [],
+      };
+    return {
+      total_count: rows.length,
+      runs: page === 1 ? rows.slice(0, 100) : rows.slice(100),
+    };
+  });
+  assert.deepEqual(calls, [1, 2, 1, 2]);
+  assert.deepEqual(result, rows);
+});
+
+test('stops after three drifting snapshots and never returns partial evidence', () => {
+  let calls = 0;
+  assert.throws(
+    () =>
+      collectPaged('repos/r/actions/runs', 'runs', endpoint => {
+        calls++;
+        return {
+          total_count: endpoint.endsWith('page=1') ? 101 : 102,
+          runs: endpoint.endsWith('page=1')
+            ? Array.from({ length: 100 }, (_, id) => ({ id }))
+            : [{ id: 100 }],
+        };
+      }),
+    /Collection changed during pagination/
+  );
+  assert.equal(calls, 6);
+});
+
+test('does not retry malformed, truncated, over-budget or failed API responses', () => {
+  for (const value of [
+    { total_count: 1001, runs: [] },
+    { total_count: 2, runs: [{ id: 1 }] },
+    { total_count: 1 },
+    {
+      total_count: 101,
+      runs: Array.from({ length: 101 }, (_, id) => ({ id })),
+    },
+    new Error('API unavailable'),
+  ]) {
+    let calls = 0;
+    assert.throws(() =>
+      collectPaged('repos/r/actions/runs', 'runs', () => {
+        calls++;
+        if (value instanceof Error) throw value;
+        return value;
+      })
+    );
+    assert.equal(calls, 1);
+  }
+});
+
 function zipBytes(entries) {
   return execFileSync(
     'python3',

@@ -385,3 +385,38 @@ extension MobileAuthFinalizationTests {
     }
   }
 }
+
+extension MobileAuthFinalizationTests {
+  @Test(arguments: [
+    NativeAuthExchangeError.rejectedBeforeConsume(reason: "missing"),
+    .requestFailed(statusCode: 401, reason: "missing"),
+    .requestFailed(statusCode: 401, reason: "ott_invalid"),
+    .transportFailed(code: -1005), .decodingFailed,
+  ]) @MainActor
+  func exchangePhaseSurvivesStageWrappingWithoutReclassifyingOtherFailures(error: NativeAuthExchangeError) async throws {
+    try await withNativeAuthSecurityScript { @MainActor _ in
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+      let previous = NativeSessionTokenStore.captureSessionContext()
+      let attempt = NativeSessionTokenStore.beginAuthAttempt()
+      var resolutions = 0, failures = 0, settled = 0
+      await finalizeMobileAuthAttempt(attempt, exchange: { throw error }, reconcile: { result, received in
+        NativeSessionTokenStore.consume(result) { _, receipt in
+          resolutions += 1
+          #expect(result.origin == .cancellation && receipt == nil)
+          #expect(received?.localizedDescription.contains("Native auth exchange failed") == true)
+        }
+        return nil
+      }, failure: { claim, received in
+        NativeSessionTokenStore.performIfCurrent(claim) { _ in failures += 1 }
+        #expect(received.localizedDescription.contains("Native auth exchange failed"))
+        return nil
+      }, settled: { result in
+        NativeSessionTokenStore.performIfCurrent(result) { settled += 1 }
+      })
+      let rejected = error == .rejectedBeforeConsume(reason: "missing")
+      #expect(resolutions == (rejected ? 1 : 0) && failures == (rejected ? 0 : 1))
+      #expect(settled == (rejected ? 1 : 0))
+      if rejected { #expect(NativeSessionTokenStore.captureSessionContext() == previous) }
+    }
+  }
+}

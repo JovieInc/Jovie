@@ -3965,3 +3965,123 @@ extension NativeSessionTokenStoreTestLockTests {
     #expect(await contenderEntries.recorded() == [true])
   }
 }
+
+extension AppStateTests {
+  @Test(arguments: ["current", "empty", "cancelled", "pending-replacement", "installed-replacement", "expired"])
+  func realPreconsumeRejectionPreservesOnlyItsCurrentAcceptedSession(scenario: String) async throws {
+    try await withNativeAuthSecurityScript { @MainActor _ in
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness(), exchangeGate = ProfileLoadGate()
+      defer { caches.cleanup(); push.cleanup() }
+      await caches.seed()
+      let original = scenario == "empty" ? nil : try saveSession()
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = cleanupState(caches, push: push, revoker: revoker)
+      if original != nil { await state.handleSignedInUserChange(caches.userID) }
+      else { await state.handleSignedInUserChange(nil) }
+      await push.manager.activate()
+      let unregisterBefore = push.unregisterCount
+      let session = NativeExchangeReplyProtocol.session(status: 401,
+        body: "{\"exchangePhase\":\"preconsume\",\"reason\":\"wrong_verifier\"}")
+      defer { session.invalidateAndCancel() }
+      let client = NativeAuthExchangeClient(baseURL: URL(string: "https://jov.ie")!, session: session)
+      let attempt = NativeSessionTokenStore.beginAuthAttempt()
+      state.acceptAuthAttempt(attempt)
+      var errors = 0, deliveries = 0, settled = 0
+      let caller = Task {
+        await finalizeMobileAuthAttempt(attempt, exchange: {
+          do { return try await client.exchange(MobileAuthReturn(code: "code", state: "state", codeVerifier: "verifier")) }
+          catch { _ = await exchangeGate.wait(); throw error }
+        }, reconcile: { result, error in
+          state.reconcileAuth(result) { deliveries += 1; if error != nil { errors += 1 } }
+        }, failure: { claim, _ in
+          Issue.record("Preconsume rejection attempted destructive failure cleanup")
+          return state.reconcileAuthFailure(claim) { _ in }
+        }, settled: { result in
+          NativeSessionTokenStore.performIfCurrent(result) { settled += 1 }
+        })
+        await exchangeGate.ownerFinished()
+      }
+      #expect(await exchangeGate.waitUntilEntered())
+      var replacement: NativeAuthAttempt?
+      if scenario.hasSuffix("replacement") {
+        let next = NativeSessionTokenStore.beginAuthAttempt()
+        replacement = next
+        state.acceptAuthAttempt(next)
+        if scenario == "installed-replacement" {
+          await caches.api.updateMode(.success(.previewNeedsOnboarding))
+          if let result = NativeSessionTokenStore.commit(next, session: NativeStoredSession(
+            userID: caches.userID, token: "b", expiresAt: .distantFuture)) {
+            await state.reconcileAuth(result)?.value
+          } else { Issue.record("Replacement did not install") }
+        }
+      } else if scenario == "expired", let original {
+        do { await state.handleExpiredSession(try ownedProfileExpiryReceipt(original)) }
+        catch {
+          await exchangeGate.complete(true)
+          await caller.value
+          throw error
+        }
+      } else if scenario == "cancelled" { caller.cancel() }
+      let context = NativeSessionTokenStore.captureSessionContext()
+      await exchangeGate.complete(true); await caller.value
+      #expect(NativeExchangeReplyProtocol.requests.count == 1)
+      #expect(deliveries == (replacement == nil ? 1 : 0))
+      #expect(errors == (replacement == nil && scenario != "cancelled" ? 1 : 0))
+      #expect(settled == (replacement == nil && scenario != "cancelled" ? 1 : 0))
+      #expect(NativeSessionTokenStore.captureSessionContext() == context)
+      #expect(await revoker.calls() == 0)
+      #expect(await push.service.requests().deletions.isEmpty)
+      #expect(push.unregisterCount == unregisterBefore + (scenario == "expired" ? 1 : 0))
+      await caches.expectContents(present: scenario != "expired",
+        profile: scenario == "installed-replacement" ? .previewNeedsOnboarding : .previewReady)
+      let route: AppRouter = scenario == "pending-replacement" ? .launching
+        : scenario == "installed-replacement" ? .needsOnboarding
+        : ["empty", "expired"].contains(scenario) ? .signedOut : .ready
+      #expect(state.route == route)
+      if scenario == "pending-replacement", let replacement {
+        #expect(NativeSessionTokenStore.performIfCurrent(replacement, {}))
+      } else { #expect(!NativeSessionTokenStore.hasPendingAuth) }
+    }
+  }
+
+  @Test func preconsumeRecoveryProfileOutlivesItsFinalizerCaller() async throws {
+    try await withNativeAuthSecurityScript { @MainActor _ in
+      let original = try saveSession(), cacheGate = ProfileLoadGate()
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness()
+      defer { caches.cleanup(); push.cleanup() }
+      await caches.seed()
+      let repository = MeRepository(apiClient: caches.api,
+        cache: PausedMeCache(base: caches.me, gate: cacheGate, phase: .write))
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = AppState(configuration: .mock, launchMode: .live, repository: repository,
+        brightnessManager: MockBrightnessController(), sessionRevoker: revoker, pushNotifications: push.manager,
+        chatCache: caches.chat, audienceHighlightsCache: caches.audience, actionLoopCache: caches.actionLoop)
+      state.didInitializeAuth = true
+      let session = NativeExchangeReplyProtocol.session(status: 401,
+        body: "{\"exchangePhase\":\"preconsume\",\"reason\":\"expired\"}")
+      defer { session.invalidateAndCancel() }
+      let client = NativeAuthExchangeClient(baseURL: URL(string: "https://jov.ie")!, session: session)
+      let attempt = NativeSessionTokenStore.beginAuthAttempt()
+      state.acceptAuthAttempt(attempt)
+      var deliveries = 0
+      let caller = Task {
+        await finalizeMobileAuthAttempt(attempt, exchange: {
+          try await client.exchange(MobileAuthReturn(code: "code", state: "state", codeVerifier: "verifier"))
+        }, reconcile: { result, _ in state.reconcileAuth(result) { deliveries += 1 } },
+          failure: { _, _ in Issue.record("Preconsume recovery claimed cleanup"); return nil }, settled: { _ in })
+        await cacheGate.ownerFinished()
+      }
+      #expect(await cacheGate.waitUntilEntered())
+      caller.cancel()
+      await cacheGate.complete(true); await caller.value
+      #expect(deliveries == 1 && NativeExchangeReplyProtocol.requests.count == 1)
+      #expect(state.dashboardState == .loaded(.previewReady) && state.route == .ready)
+      #expect(NativeSessionTokenStore.requestAuthorization() == original)
+      #expect(!NativeSessionTokenStore.hasPendingAuth)
+      #expect(await revoker.calls() == 0)
+      #expect(push.unregisterCount == 0)
+      #expect(await push.service.requests().deletions.isEmpty)
+      await caches.expectContents(present: true)
+    }
+  }
+}

@@ -494,6 +494,10 @@ struct LiveRootContainer: View {
         if let reason, !reason.isEmpty {
           context["reason"] = reason
         }
+      case let .rejectedBeforeConsume(reason):
+        context["status_code"] = 401
+        context["reason"] = reason
+        context["exchange_phase"] = "preconsume"
       case let .transportFailed(code):
         context["transport_code"] = code
       case .decodingFailed, .invalidResponse:
