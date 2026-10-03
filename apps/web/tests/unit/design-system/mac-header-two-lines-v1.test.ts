@@ -58,6 +58,9 @@ const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
   // /card section titles wrap to three lines at 390px; the clamp cut
   // "An introduction. Not a list of usernames" mid-sentence.
   'apps/web/app/(marketing)/card/JovieCardLanding.tsx',
+  // Record-driven /solutions heroes and feature splits render record copy as
+  // the page's value proposition; the marketing clamp guard forbids clamps.
+  'apps/web/components/marketing/solutions/SolutionsRecordSections.tsx',
 ]);
 
 function hasEditorialTitleContract(

@@ -97,6 +97,7 @@ export function SolutionsRecordHero({
       <div className='max-w-xl'>
         <h1
           id='solutions-record-hero-heading'
+          data-wrap='editorial-title'
           className='marketing-hero-headline'
         >
           {copy.headline}
@@ -124,7 +125,9 @@ export function SolutionsRecordFeatureSplit({
     >
       <div className='grid items-center gap-12 md:grid-cols-2'>
         <div className='max-w-xl'>
-          <h2 className='homepage-story-heading'>{copy.headline}</h2>
+          <h2 data-wrap='editorial-title' className='homepage-story-heading'>
+            {copy.headline}
+          </h2>
           <p className='mt-6 text-lg leading-relaxed text-secondary-token'>
             {copy.body}
           </p>
