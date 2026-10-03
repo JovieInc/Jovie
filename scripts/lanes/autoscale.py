@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Adaptive per-lane slots on the minute dispatch tick. Default mode is apply. Kill switch: SYMPHONY_AUTOSCALE=0. decide() is pure and does no I/O at import."""
 from __future__ import annotations
-import json; import math; import os; import re; import time; from pathlib import Path; SCHEMA = "symphony-lanes-autoscale/v1"
+import json; import math; import os; import re; import time; from datetime import datetime, timezone; from pathlib import Path; SCHEMA = "symphony-lanes-autoscale/v1"
 MIN_SLOTS, STALE_S, RATE_QUIET_S = 1, 600, 900; MULTIPLICATIVE_WINDOW_S, HOST_COOLDOWN_S = 300, 120; DEFAULT_INTERVAL_S = LANE_COOLDOWN_S = 1800
 UP_STREAK_REQUIRED = IDLE_STREAK_REQUIRED = DEFAULT_INTERVAL_S // 60; HISTORY_CAP, GIB = 50, 1024 ** 3
 MEM_HEADROOM_BYTES, MEM_EMERGENCY_BYTES = 8 * GIB, 4 * GIB; GITHUB_INCREASE_MIN, GITHUB_DECREASE_BELOW = 1500, 600
@@ -17,13 +17,24 @@ def streak_ticks(interval_s: int) -> int:
 def idle_floor(base: int) -> int:
     return 0 if base <= 0 else max(MIN_SLOTS, math.ceil(base / 2))
 def _pint(value) -> int | None:
-    try:
-        number = int(str(value).strip())
-    except (TypeError, ValueError):
-        return None
+    try: number = int(str(value).strip())
+    except (TypeError, ValueError): return None
     return number if number > 0 else None
 def _int(value) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
+def _budget_int(value) -> int | None:
+    if isinstance(value, bool): return None
+    try:
+        number = float(value if isinstance(value, (int, float)) else str(value).strip()); whole = int(number)
+    except (TypeError, ValueError, OverflowError): return None
+    return whole if number == whole and whole >= 0 else None
+def _epoch(value) -> float | None:
+    if isinstance(value, bool): return None
+    if isinstance(value, (int, float)): return float(value)
+    try: return datetime.strptime(str(value), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()
+    except (TypeError, ValueError): return None
+def _iso(when: float) -> str:
+    return datetime.fromtimestamp(when, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 def _num(value) -> float | None:
     return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 def _count(value) -> int | None:
@@ -146,8 +157,8 @@ def collect(state_dir: Path, tick: dict, now: float) -> dict:
             "alerts": [key for key in _obj(doctor.get("alerts")) if isinstance(key, str)],
             "gateWaitMedianS24h": observed.get("gateWaitMedianS24h"),
             "githubRemaining": _int(observed.get("githubRemaining")),
-            "linearRemaining": _int(api.get("linearRemaining")), "linearLimit": _int(api.get("linearLimit")),
-            "linearRateLimitedAt": _num(api.get("linearRateLimitedAt")),
+            "linearRemaining": _budget_int(api["remaining"] if "remaining" in api else api.get("linearRemaining")), "linearLimit": _budget_int(api["limit"] if "limit" in api else api.get("linearLimit")),
+            "linearRateLimitedAt": _epoch(api["rateLimitedAt"] if "rateLimitedAt" in api else api.get("linearRateLimitedAt")),
             "disk": {"admitted": disk.get("admitted"), "freePct": disk.get("freePct")}}
 def _load_ratio(sample: dict) -> float | None:
     load, cpu = _num(sample.get("load1")), _int(sample.get("cpuCount")); return None if load is None or cpu is None or cpu <= 0 else load / cpu
@@ -251,6 +262,7 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
         multi, additive = _multi_reason(name, obs, sample, now), _additive_reason(obs, sample)
         effective, reason, blockers, want = current, "hold:steady", [], False; lane_ready = changed is None or now - changed >= interval
         host_ready = host_last is None or now - host_last >= HOST_COOLDOWN_S
+        # TODO(JOV-7587): merge-queue brake plugs in here, with the safety brakes (brainstorm only; do not scale on throughput). Signals: merged/hour vs opened/hour, queue p50 wait, entries per merge.
         if multi:
             effective, reason, blockers, up, idle = max(MIN_SLOTS, math.ceil(current / 2)), multi, [multi], 0, 0
         elif additive:
@@ -345,31 +357,28 @@ def public_block(state_dir) -> dict:
     history = state.get("history") if isinstance(state.get("history"), list) else []
     return {"mode": state.get("mode") or mode(), "lanes": lanes, "history": history[-10:]}
 def record_linear_budget(state_dir, headers, status: int, raw: bytes) -> None:
-    """Best-effort Linear rate-limit capture. Callers swallow errors from this function."""
-    path, current, updated = Path(state_dir) / "api-budget.json", _obj(_read_json(Path(state_dir) / "api-budget.json")), False
-    if headers is not None and hasattr(headers, "get"):
-        for header, key in (("X-RateLimit-Requests-Remaining", "linearRemaining"),
-                            ("X-RateLimit-Requests-Limit", "linearLimit"), ("X-RateLimit-Requests-Reset", "linearReset")):
-            raw_value = headers.get(header)
-            if raw_value in (None, ""):
-                continue
-            if key == "linearReset":
-                current[key], updated = str(raw_value), True; continue
-            parsed = _pint(raw_value)
-            if parsed is None:
-                try:
-                    parsed = int(str(raw_value).strip())
-                except (TypeError, ValueError):
-                    parsed = None
-            if parsed is not None and parsed >= 0:
-                current[key], updated = parsed, True
+    """Write ``api-budget.json`` as #20141 schema 1. Callers swallow errors from this function."""
+    path, previous = Path(state_dir) / "api-budget.json", _obj(_read_json(Path(state_dir) / "api-budget.json")); fresh = {"remaining": None, "limit": None, "reset": None}
+    groups = (("X-RateLimit-Requests-Remaining", "X-RateLimit-Requests-Limit", "X-RateLimit-Requests-Reset"),
+              ("X-RateLimit-Complexity-Remaining", "X-RateLimit-Complexity-Limit", "X-RateLimit-Complexity-Reset"))
+    readable = headers is not None and hasattr(headers, "get")
+    for names in groups:
+        nums = tuple(_budget_int(headers.get(name)) if readable and headers.get(name) not in (None, "") else None for name in names)
+        if any(num is not None for num in nums):
+            fresh = dict(zip(("remaining", "limit", "reset"), nums)); break
+    limited = status == 429
     if status == 400 and raw:
-        try:
-            payload = json.loads(raw.decode())
-        except (UnicodeDecodeError, ValueError):
-            payload = None
+        try: payload = json.loads(raw.decode())
+        except (UnicodeDecodeError, ValueError): payload = None
         errors = payload.get("errors") if isinstance(payload, dict) else None
-        if isinstance(errors, list) and any(isinstance(item, dict) and _obj(item.get("extensions")).get("code") == "RATELIMITED" for item in errors):
-            current["linearRateLimitedAt"], updated = time.time(), True
-    if updated:
-        current["observedAt"] = time.time(); _atomic_json(path, current)
+        limited = limited or bool(isinstance(errors, list) and any(isinstance(item, dict) and _obj(item.get("extensions")).get("code") == "RATELIMITED" for item in errors))
+    if not limited and all(value is None for value in fresh.values()): return
+    def keep(key, legacy):
+        return fresh[key] if fresh[key] is not None else _budget_int(previous.get(key) if key in previous else previous.get(legacy))
+    now = time.time(); prior = previous.get("rateLimitedAt") if "rateLimitedAt" in previous else None
+    if "rateLimitedAt" not in previous:
+        legacy_at = _epoch(previous.get("linearRateLimitedAt")); prior = None if legacy_at is None else _iso(legacy_at)
+    elif isinstance(prior, (int, float)) and not isinstance(prior, bool):
+        prior = _iso(float(prior))
+    _atomic_json(path, {"schema": 1, "remaining": keep("remaining", "linearRemaining"), "limit": keep("limit", "linearLimit"),
+                        "reset": keep("reset", "linearReset"), "rateLimitedAt": _iso(now) if limited else prior, "observedAt": _iso(now)})
