@@ -42,6 +42,7 @@ import autoscale  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
 import pr_events  # noqa: E402
+import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
 import reason_lane  # noqa: E402
 import yc_corpus  # noqa: E402
@@ -86,7 +87,8 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py",
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_continuity_clock.py",
-              "scripts/tests/test_design_gate.py", "scripts/tests/test_autoscale.py"]
+              "scripts/tests/test_design_gate.py",
+              "scripts/tests/test_remediation.py", "scripts/tests/test_autoscale.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
@@ -493,6 +495,11 @@ def admission_rejection(issue: Issue, failures: dict, now: float,
     """Final claim predicate; in_flight contains normalized lowercase identifiers."""
     labels = {label.lower() for label in issue.labels}
     excluded = sorted(HARD_EXCLUDED_LABELS & labels)
+    # `remediation:*` outranks `no-symphony` (JOV-7540, JOV-7551). Other hard
+    # exclusions still apply. The bare `remediation` label does not.
+    if ("no-symphony" in excluded and remediation.escalation_enabled()
+            and remediation.has_remediation_event_label(issue.labels)):
+        excluded = [name for name in excluded if name != "no-symphony"]
     if excluded:
         return "excluded-label:" + excluded[0]
     if issue_hits_red_line(issue):
