@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 /** Detector intake. Files unless REMEDIATION_INTAKE_DISABLED=1. */
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 import {
   applyRemediationDecision,
   decideAuthSmokeSignal,
   decideLoginSignal,
   decideMonitorSignal,
+  gateSteadyGreen,
   isLoginTimeout,
   remediationIntakeDisabled,
 } from './lib/remediation-signal.mjs';
@@ -75,12 +77,36 @@ if (chosen.reason === 'unknown_mode') {
   process.exit(1);
 }
 
-const result = await applyRemediationDecision(chosen, {
-  fingerprint: chosen.fingerprint || env.REMEDIATION_FINGERPRINT,
+const previous = readText(env.REMEDIATION_PREVIOUS_FILE).trim();
+const gated = gateSteadyGreen(
+  chosen,
+  previous,
+  env.REMEDIATION_GATE_STEADY_GREEN
+);
+const result = await applyRemediationDecision(gated, {
+  fingerprint: gated.fingerprint || env.REMEDIATION_FINGERPRINT,
   source: env.REMEDIATION_SOURCE,
   runUrl: env.REMEDIATION_RUN_URL,
-  detail: chosen.detail || env.REMEDIATION_DETAIL,
+  detail: gated.detail || env.REMEDIATION_DETAIL,
   apiKey: env.LINEAR_API_KEY,
 });
-console.log(JSON.stringify(result));
+console.log(JSON.stringify({ ...result, previous: previous || null }));
+if (
+  result.ok &&
+  env.REMEDIATION_STATE_FILE &&
+  (gated.action === 'red' || gated.action === 'green')
+) {
+  mkdirSync(dirname(env.REMEDIATION_STATE_FILE), { recursive: true });
+  writeFileSync(
+    env.REMEDIATION_STATE_FILE,
+    `${gated.action === 'red' ? 'red' : 'green'}\n`
+  );
+}
+const healthy = gated.action !== 'red';
+if (!result.ok && env.REMEDIATION_FAIL_OPEN === '1' && healthy) {
+  console.warn(
+    '::warning::Linear intake failed while production is healthy; continuing.'
+  );
+  process.exit(0);
+}
 if (!result.ok) process.exit(1);

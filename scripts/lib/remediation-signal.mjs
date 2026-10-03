@@ -142,6 +142,13 @@ export function decideMonitorSignal({ conclusion }) {
   return { action: 'skip' };
 }
 
+/** Steady green skips Linear. The first green after a recorded red still resolves. */
+export function gateSteadyGreen(decision, previous, enabled) {
+  if (enabled !== '1' || decision?.action !== 'green') return decision;
+  if (previous === 'red') return decision;
+  return { action: 'skip', reason: 'steady_green' };
+}
+
 export async function fileRemediationSignal({
   fingerprint,
   source,

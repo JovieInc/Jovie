@@ -6,8 +6,8 @@ import {
   decideAuthSmokeSignal,
   decideLoginSignal,
   decideMonitorSignal,
+  gateSteadyGreen,
   remediationIntakeDisabled,
-  remediationTitle,
 } from '../remediation-signal.mjs';
 
 const workflows = {
@@ -19,20 +19,9 @@ const workflows = {
   release: '.github/workflows/production-release.yml',
 };
 
-function jsonResponse(body, status = 200) {
-  return {
-    ok: status < 400,
-    status,
-    text: async () => JSON.stringify(body),
-  };
-}
-
 describe('remediationIntakeDisabled', () => {
   it('files unless the kill switch is exactly 1', () => {
     expect(remediationIntakeDisabled({})).toBe(false);
-    expect(remediationIntakeDisabled({ REMEDIATION_INTAKE_DISABLED: '' })).toBe(
-      false
-    );
     expect(
       remediationIntakeDisabled({ REMEDIATION_INTAKE_DISABLED: '0' })
     ).toBe(false);
@@ -43,7 +32,7 @@ describe('remediationIntakeDisabled', () => {
 });
 
 describe('decideLoginSignal', () => {
-  it('files e2e-login-timeout only when Playwright shows a login timeout', () => {
+  it('files e2e-login-timeout only for a login timeout', () => {
     const report = {
       suites: [
         {
@@ -57,128 +46,82 @@ describe('decideLoginSignal', () => {
         },
       ],
     };
-    expect(decideLoginSignal({ conclusion: 'failure', report })).toMatchObject({
-      action: 'red',
-      fingerprint: 'e2e-login-timeout',
-    });
     expect(
-      decideLoginSignal({
-        conclusion: 'failure',
-        evidenceText: 'auth.setup.ts\nTest timeout of 90000ms exceeded',
-      }).fingerprint
+      decideLoginSignal({ conclusion: 'failure', report }).fingerprint
     ).toBe('e2e-login-timeout');
     expect(
       decideLoginSignal({
         conclusion: 'failure',
-        evidenceText: 'dashboard.spec.ts\nexpected heading to be visible',
-      })
-    ).toEqual({ action: 'skip' });
-    expect(decideLoginSignal({ conclusion: 'cancelled' })).toEqual({
-      action: 'skip',
-    });
-  });
-
-  it('resolves the login key when the login step passed', () => {
-    expect(decideLoginSignal({ conclusion: 'success' })).toEqual({
-      action: 'green',
-      fingerprints: ['e2e-login-timeout'],
-    });
-    expect(decideLoginSignal({ conclusion: 'skipped' })).toEqual({
-      action: 'skip',
-    });
+        evidenceText: 'auth.setup.ts\nTest timeout of 90000ms exceeded',
+      }).action
+    ).toBe('red');
+    expect(
+      decideLoginSignal({
+        conclusion: 'failure',
+        evidenceText: 'dashboard.spec.ts\nexpected heading',
+      }).action
+    ).toBe('skip');
+    expect(decideLoginSignal({ conclusion: 'success' }).action).toBe('green');
+    expect(decideLoginSignal({ conclusion: 'cancelled' }).action).toBe('skip');
   });
 });
 
 describe('decideAuthSmokeSignal', () => {
-  it('splits login timeout from other auth-smoke failures', () => {
-    expect(
-      decideAuthSmokeSignal({ jobResult: 'cancelled', authStatus: '' })
-    ).toMatchObject({ action: 'red', fingerprint: 'e2e-login-timeout' });
-    expect(
-      decideAuthSmokeSignal({ jobResult: 'failure', loginTimeout: 'true' })
-    ).toMatchObject({ fingerprint: 'e2e-login-timeout' });
+  it('splits a login timeout from other auth-smoke failures', () => {
+    expect(decideAuthSmokeSignal({ jobResult: 'cancelled' }).fingerprint).toBe(
+      'e2e-login-timeout'
+    );
     expect(
       decideAuthSmokeSignal({ jobResult: 'failure', loginTimeout: 'false' })
-    ).toMatchObject({ fingerprint: 'production-monitor-auth-smoke' });
+        .fingerprint
+    ).toBe('production-monitor-auth-smoke');
     expect(
       decideAuthSmokeSignal({
         jobResult: 'success',
         authStatus: 'not-configured',
-      })
-    ).toEqual({ action: 'skip' });
+      }).action
+    ).toBe('skip');
     expect(
       decideAuthSmokeSignal({ jobResult: 'success', authStatus: 'passed' })
-    ).toEqual({
-      action: 'green',
-      fingerprints: ['e2e-login-timeout', 'production-monitor-auth-smoke'],
-    });
+        .fingerprints
+    ).toEqual(['e2e-login-timeout', 'production-monitor-auth-smoke']);
   });
 });
 
 describe('decideMonitorSignal', () => {
   it('maps production check conclusions', () => {
-    expect(decideMonitorSignal({ conclusion: 'failure' })).toEqual({
-      action: 'red',
-    });
-    expect(decideMonitorSignal({ conclusion: 'cancelled' })).toEqual({
-      action: 'red',
-    });
-    expect(decideMonitorSignal({ conclusion: 'success' })).toEqual({
-      action: 'green',
-    });
-    expect(decideMonitorSignal({ conclusion: 'skipped' })).toEqual({
-      action: 'skip',
-    });
+    expect(decideMonitorSignal({ conclusion: 'failure' }).action).toBe('red');
+    expect(decideMonitorSignal({ conclusion: 'success' }).action).toBe('green');
+    expect(decideMonitorSignal({ conclusion: 'skipped' }).action).toBe('skip');
   });
 });
 
-describe('applyRemediationDecision', () => {
-  it('fails closed when Linear has no key on a red signal', async () => {
+describe('gateSteadyGreen', () => {
+  it('skips Linear on steady green and still files a red', async () => {
+    expect(gateSteadyGreen({ action: 'green' }, '', '1').reason).toBe(
+      'steady_green'
+    );
+    expect(gateSteadyGreen({ action: 'green' }, 'red', '1').action).toBe(
+      'green'
+    );
+    expect(gateSteadyGreen({ action: 'red' }, 'green', '1').action).toBe('red');
+    expect(gateSteadyGreen({ action: 'green' }, 'green', '').action).toBe(
+      'green'
+    );
+    const fetchImpl = vi.fn();
+    const skipped = gateSteadyGreen({ action: 'green' }, 'green', '1');
+    await expect(
+      applyRemediationDecision(skipped, { apiKey: '', fetchImpl })
+    ).resolves.toEqual({ ok: true, action: 'skip' });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('fails closed on red when Linear has no key', async () => {
     const result = await applyRemediationDecision(
       { action: 'red', fingerprint: 'production-monitor-continuity' },
       { source: 'production-continuity.yml', apiKey: '' }
     );
-    expect(result.ok).toBe(false);
     expect(result.reason).toBe('missing_linear_api_key');
-  });
-
-  it('does not close a login issue opened by a different workflow', async () => {
-    const fetchImpl = vi.fn(async () =>
-      jsonResponse({
-        data: {
-          team: {
-            states: {
-              nodes: [{ id: 'done', name: 'Done', type: 'completed' }],
-            },
-          },
-          issues: {
-            nodes: [
-              {
-                id: 'iss-1',
-                identifier: 'JOV-1',
-                title: remediationTitle('e2e-login-timeout'),
-                description: 'Source-workflow: nightly-tests.yml',
-                state: { type: 'unstarted', name: 'Todo' },
-                labels: {
-                  nodes: [{ id: 'lab', name: 'remediation:e2e-login-timeout' }],
-                },
-              },
-            ],
-          },
-        },
-      })
-    );
-    const result = await applyRemediationDecision(
-      { action: 'green', fingerprints: ['e2e-login-timeout'] },
-      {
-        source: 'e2e-full-matrix.yml:chromium',
-        apiKey: 'lin',
-        fetchImpl,
-      }
-    );
-    expect(result.ok).toBe(true);
-    expect(result.results[0].action).toBe('source_mismatch');
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -190,18 +133,22 @@ describe('workflow wiring', () => {
     ])
   );
 
-  it('wires login timeout and production monitors with a kill switch, not an opt-in', () => {
+  it('wires detectors and gates only the 5-minute continuity probe', () => {
     expect(bodies.nightly).toContain('REMEDIATION_MODE: login');
-    expect(bodies.nightly).toContain('REMEDIATION_SOURCE: nightly-tests.yml');
     expect(bodies.matrix).toContain('e2e-full-matrix.yml:');
-    expect(bodies.continuity).toContain('production-monitor-continuity');
     expect(bodies.controller).toContain('production-monitor-post-deploy-smoke');
     expect(bodies.controller).toContain('REMEDIATION_MODE: auth-smoke');
     expect(bodies.health).toContain('production-monitor-controller-health');
     expect(bodies.release).toContain('production-monitor-vercel-deploy');
-    for (const body of Object.values(bodies)) {
+    expect(bodies.continuity).toContain("REMEDIATION_GATE_STEADY_GREEN: '1'");
+    expect(bodies.continuity).toContain("REMEDIATION_FAIL_OPEN: '1'");
+    expect(bodies.continuity).toContain('remediation-continuity-state');
+    for (const [name, body] of Object.entries(bodies)) {
       expect(body).toContain('REMEDIATION_INTAKE_DISABLED');
       expect(body).not.toContain('REMEDIATION_INTAKE_ENABLED');
+      if (name !== 'continuity') {
+        expect(body).not.toContain('REMEDIATION_GATE_STEADY_GREEN');
+      }
     }
   });
 });

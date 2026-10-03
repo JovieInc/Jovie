@@ -479,27 +479,13 @@ export async function noteFingerprintedIssueGreen({
       identifier: match.identifier ?? null,
     };
   }
-  const listed = await listLinearIssueComments({
+  const posted = await addLinearIssueComment({
     issueId: match.id,
+    body: comment || `${commentMarker}\n${sourceLine} is green.`,
     apiKey,
     fetchImpl,
   });
-  if (!listed.ok) return listed;
-  const alreadyNoted = listed.comments.some(entry => {
-    const body = String(entry.body ?? '');
-    return (
-      body.includes(commentMarker) && (!sourceLine || body.includes(sourceLine))
-    );
-  });
-  if (!alreadyNoted) {
-    const posted = await addLinearIssueComment({
-      issueId: match.id,
-      body: comment || `${commentMarker}\n${sourceLine} is green.`,
-      apiKey,
-      fetchImpl,
-    });
-    if (!posted.ok) return posted;
-  }
+  if (!posted.ok) return posted;
   const states = found.data?.team?.states?.nodes ?? [];
   const done =
     states.find(state => state?.name === 'Done') ??
