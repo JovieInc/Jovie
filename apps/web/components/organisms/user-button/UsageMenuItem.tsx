@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 import { ChevronDown, ChevronRight, ExternalLink, Gauge } from 'lucide-react';
 import Link from 'next/link';
-import { type ReactNode, useId, useState } from 'react';
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { UsageMeter } from '@/components/molecules/UsageMeter';
 import { APP_ROUTES } from '@/constants/routes';
 import { getChatUsageCopy } from '@/lib/chat-usage/copy';
@@ -13,6 +13,7 @@ import {
 } from '@/lib/chat-usage/metrics';
 import { env } from '@/lib/env-client';
 import { useChatUsageQuery } from '@/lib/queries';
+import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
 import { cn } from '@/lib/utils';
 
 interface UsageMenuItemProps {
@@ -33,20 +34,77 @@ export function UsageMenuItem({
   const chatUsage = useChatUsageQuery({
     enabled: !env.IS_E2E,
   });
+  const [retrying, setRetrying] = useState(false);
+  const [retryFailed, setRetryFailed] = useState(false);
+  const [failedSnapshot, setFailedSnapshot] = useState<ChatUsageData>();
+  const retryInFlight = useRef(false);
+  const focusAfterRetry = useRef(false);
+  const retryButtonRef = useRef<HTMLButtonElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!focusAfterRetry.current || retrying) return;
+    focusAfterRetry.current = false;
+    if (
+      chatUsage.data &&
+      !chatUsage.error &&
+      !chatUsage.data._stale &&
+      getWeeklyUsageModel(chatUsage.data)
+    ) {
+      toggleRef.current?.focus({ preventScroll: true });
+    }
+  }, [chatUsage.data, chatUsage.error, retrying]);
+
+  async function retry() {
+    if (retryInFlight.current || chatUsage.isFetching) return;
+    retryInFlight.current = true;
+    focusAfterRetry.current = false;
+    setFailedSnapshot(chatUsage.data);
+    setRetryFailed(false);
+    setRetrying(true);
+    try {
+      const result = await chatUsage.refetch();
+      const verified =
+        result.data &&
+        !result.error &&
+        !result.data._stale &&
+        getWeeklyUsageModel(result.data);
+      setRetryFailed(!verified);
+      focusAfterRetry.current = Boolean(
+        verified && document.activeElement === retryButtonRef.current
+      );
+    } catch {
+      setRetryFailed(true);
+    } finally {
+      retryInFlight.current = false;
+      setRetrying(false);
+    }
+  }
+
   const weeklyModel = chatUsage.data
     ? getWeeklyUsageModel(chatUsage.data)
     : null;
   const copy = chatUsage.data ? getChatUsageCopy(chatUsage.data) : null;
+  const isLoading = chatUsage.isLoading && !chatUsage.data && !retrying;
+  const isStale =
+    chatUsage.data?._stale === true ||
+    Boolean(chatUsage.error) ||
+    (retryFailed && failedSnapshot === chatUsage.data) ||
+    retrying;
   const showUpgradeNudge =
-    copy?.state === 'near_limit' || copy?.state === 'exhausted';
-  const isLoading = chatUsage.isLoading;
-  const isStale = chatUsage.data?._stale === true || Boolean(chatUsage.error);
+    !isStale &&
+    Boolean(weeklyModel) &&
+    (copy?.state === 'near_limit' || copy?.state === 'exhausted');
   const hasAnyData = Boolean(chatUsage.data);
   const collapsedUsageLabel =
     weeklyModel === null
       ? '—'
       : `${weeklyModel.remainingPercent}%${isStale ? ' (cached)' : ''}`;
-  const syncLabel = isStale ? 'Usage may be out of date' : '';
+  const syncLabel = retrying
+    ? 'Checking latest usage…'
+    : isStale
+      ? 'Usage may be out of date'
+      : '';
   const unavailableUsageLabel = isLoading
     ? 'Loading usage…'
     : 'Usage details are unavailable right now.';
@@ -90,6 +148,7 @@ export function UsageMenuItem({
       <Button
         type='button'
         variant='ghost'
+        ref={toggleRef}
         onClick={toggleExpanded}
         aria-expanded={expanded}
         aria-controls={detailsId}
@@ -151,12 +210,12 @@ export function UsageMenuItem({
                 type='button'
                 size='sm'
                 variant='secondary'
-                disabled={chatUsage.isFetching}
-                onClick={() => {
-                  void chatUsage.refetch();
-                }}
+                ref={retryButtonRef}
+                aria-disabled={retrying || chatUsage.isFetching}
+                aria-busy={retrying || chatUsage.isFetching}
+                onClick={retry}
               >
-                Retry Usage
+                {retrying ? 'Retrying…' : 'Retry Usage'}
               </Button>
             </div>
           )}
