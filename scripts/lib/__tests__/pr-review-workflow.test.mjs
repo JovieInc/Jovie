@@ -54,6 +54,11 @@ describe('pr-review workflow contract', () => {
     );
   });
 
+  it('classifies the exact source diff without requesting an artifact from another producer', () => {
+    expect(workflow).not.toContain('ci-risk-classification-');
+    expect(workflow).not.toContain('RISK_JSON:');
+  });
+
   it('never gets write access, never posts, never executes PR code', () => {
     expect(workflow).not.toMatch(/:\s*write\b/);
     expect(workflow).toContain('permissions: {}');
