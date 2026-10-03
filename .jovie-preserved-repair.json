@@ -1,0 +1,12 @@
+{
+ "schema": "jovie-preserved-repair/v1",
+ "runId": "20261002T164437Z-PR20019-devin-fix-8cf7ca",
+ "pr": 20019,
+ "issue": null,
+ "reason": [
+  "agent-running:disk-critical"
+ ],
+ "branch": "devin/jov-7475-20261002t162519",
+ "headBefore": "d4d655771b49b773be0c88e94b78c935ab590ced",
+ "at": "2026-10-02T16:48:39Z"
+}
