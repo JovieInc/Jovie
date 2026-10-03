@@ -55,6 +55,17 @@ final class ChatRepository {
   /// appear, so this can't be solved by the call site alone.
   private var isFixtureSeeded = false
   private var sendTask: Task<Void, Never>?
+  private var pendingRetries: Set<RetryKey> = []
+
+  private struct RetryKey: Hashable {
+    let clientTurnId: String
+    let selection: Int
+  }
+
+  private struct RetryTarget {
+    let key: RetryKey
+    let userItem: MobileChatTimelineItem
+  }
 
   init(
     client: MobileChatClientProtocol,
@@ -259,8 +270,15 @@ final class ChatRepository {
   }
 
   func send(text: String) async {
+    await send(text: text, retrying: nil)
+  }
+
+  private func send(text: String, retrying target: RetryTarget?) async {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty, await acceptsCompletion() else { return }
+    if let target {
+      guard target.key.selection == selectionRevision, timeline.contains(target.userItem) else { return }
+    }
 
     let wasSending = isSending
     sendGeneration += 1
@@ -272,13 +290,13 @@ final class ChatRepository {
 
     let selection = selectionRevision
     let task = Task { [weak self] in
-      _ = await self?.performSend(text: trimmed, generation: generation, selection: selection)
+      _ = await self?.performSend(text: trimmed, generation: generation, selection: selection, retrying: target)
     }
     sendTask = task
     await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
   }
 
-  private func performSend(text: String, generation: Int, selection: Int) async {
+  private func performSend(text: String, generation: Int, selection: Int, retrying target: RetryTarget?) async {
     let clientTurnId = UUID().uuidString
     let clientMessageId = UUID().uuidString
     let context = SendContext()
@@ -326,6 +344,13 @@ final class ChatRepository {
           throw NativeSessionRequestError.superseded
         }
         if context.authorization == .notAcquired {
+          if let target {
+            guard target.key.selection == selectionRevision, timeline.contains(target.userItem) else {
+              throw NativeSessionRequestError.superseded
+            }
+            // Keep the original pair until this replacement is actually admitted.
+            timeline.removeAll { $0.clientTurnId == target.key.clientTurnId }
+          }
           context.authorization = owner.map(SendAuthorization.managed) ?? .unmanaged
           appendOptimisticTurn(text: text, clientTurnId: clientTurnId)
         }
@@ -489,14 +514,16 @@ final class ChatRepository {
   }
 
   func retry(clientTurnId: String) async {
-    guard let userItem = timeline.first(where: {
+    let key = RetryKey(clientTurnId: clientTurnId, selection: selectionRevision)
+    guard !pendingRetries.contains(key), let userItem = timeline.first(where: {
       $0.clientTurnId == clientTurnId && $0.role == .user
     }) else {
       return
     }
 
-    timeline.removeAll { $0.clientTurnId == clientTurnId }
-    await send(text: userItem.content)
+    pendingRetries.insert(key)
+    defer { pendingRetries.remove(key) }
+    await send(text: userItem.content, retrying: RetryTarget(key: key, userItem: userItem))
   }
 
   private func applyFailure(_ error: Error) {
