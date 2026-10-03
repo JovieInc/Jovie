@@ -1269,12 +1269,17 @@ def test_deep_lanes_are_event_driven_and_bounded() -> None:
 def test_full_matrix_supersedes_stale_runs_cleanly() -> None:
     """Main pushes outpace the serial matrix; only the freshest run should
     survive, and supersession must be a workflow-level cancellation rather
-    than an external mid-test runner kill (JOV-7167)."""
+    than an external mid-test runner kill (JOV-7167, JOV-7569)."""
     workflow = (WORKFLOWS / "e2e-full-matrix.yml").read_text(encoding="utf-8")
 
+    triggers = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+    push_trigger = triggers.split("  push:\n", 1)[1].split(
+        "  workflow_dispatch:\n", 1
+    )[0]
     concurrency = workflow.split("\nconcurrency:\n", 1)[1].split(
         "\njobs:\n", 1
     )[0]
+    assert "paths:" not in push_trigger
     assert "group: e2e-full-matrix-" in concurrency
     assert "github.event_name" in concurrency
     assert "cancel-in-progress: true" in concurrency
@@ -1731,7 +1736,15 @@ def test_fleet_controllers_share_one_evaluate_action() -> None:
         assert "python3 scripts/fleet-gate/gem-priority-gate.py" not in text, workflow
     production = (WORKFLOWS / "production-controller.yml").read_text(encoding="utf-8")
     assert "consumer: deployment" in production
-    assert "expected-sha: ${{ github.event.workflow_run.head_sha }}" in production
+    assert (
+        "expected-sha: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}"
+        in production
+    )
+    source = (REPO_ROOT / ".github/scripts/staging-release-source.mjs").read_text(
+        encoding="utf-8"
+    )
+    assert "exactRun(ci, repository, CI_PATH, 'push')" in source
+    assert "ci.head_sha === completion.sha" in source
 
 
 def test_github_ai_dispatcher_is_manual_only_and_hard_disabled() -> None:
