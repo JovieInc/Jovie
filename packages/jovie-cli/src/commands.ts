@@ -4,6 +4,7 @@ import {
   fetchArtistLlms,
   fetchOpenApi,
   fetchSiteLlms,
+  lookupCreator,
   type ReportKind,
   type ResourceOptions,
   reportIssue,
@@ -127,6 +128,18 @@ export const COMMANDS: readonly CommandSpec[] = [
     },
     readOnly: false,
     run: (input, options) => createProfile(required(input), options),
+  },
+  {
+    path: ['creator', 'lookup'],
+    tool: 'lookup_creator',
+    summary:
+      'Extract public creator fields from a YouTube, Instagram, TikTok, or Linktree URL without creating a profile.',
+    arg: {
+      name: 'url',
+      description: 'Supported creator profile URL',
+    },
+    readOnly: true,
+    run: (input, options) => lookupCreator(required(input), options),
   },
   {
     path: ['artist', 'get'],
