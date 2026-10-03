@@ -569,10 +569,15 @@ function validateUiAssurance(matrix, repoRoot, errors) {
       .map(item => item.id)
   );
   const uiRows = (matrix?.rows ?? []).filter(isUiRow);
-  // A class without a row reports UNKNOWN; two rows would split ownership.
-  for (const failureClass of UI_FAILURE_CLASSES)
-    if (uiRows.filter(row => row.failureClass === failureClass).length > 1)
-      errors.push(`ui:class:${failureClass}:duplicate-row`);
+  // Every class needs exactly one owning row: a missing class would only
+  // report UNKNOWN, and two rows would split ownership.
+  for (const failureClass of UI_FAILURE_CLASSES) {
+    const count = uiRows.filter(
+      row => row.failureClass === failureClass
+    ).length;
+    if (count === 0) errors.push(`ui:class:${failureClass}:missing-row`);
+    if (count > 1) errors.push(`ui:class:${failureClass}:duplicate-row`);
+  }
   for (const row of uiRows) validateUiRow(row, uiObjects, repoRoot, errors);
   const rowIds = new Set(uiRows.map(row => row.id));
   const seen = new Set();
@@ -680,6 +685,25 @@ export function uiAssuranceReport(matrix) {
     },
     classes,
   };
+}
+
+/**
+ * Exact-build UI evidence a merged change owes before Done (JOV-7694 hook):
+ * every UI row the changed paths invalidate, with its required targets.
+ */
+export function uiEvidenceRequirements(matrix, changedPaths = []) {
+  const hits = new Set(invalidatedRows(matrix, changedPaths));
+  return (matrix?.rows ?? [])
+    .filter(row => isUiRow(row) && hits.has(row.id))
+    .map(row => {
+      const targets = [...(row.ui?.requiredEvidence ?? [])];
+      return {
+        row: row.id,
+        failureClass: row.failureClass,
+        targets,
+        reason: `${row.failureClass} invalidated; exact-build evidence required on ${targets.join(', ')}`,
+      };
+    });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

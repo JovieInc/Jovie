@@ -378,7 +378,8 @@ function processIdentity(pid, { readFileSync, spawnSync }) {
     try {
       stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
     } catch (error) {
-      if (error.code === 'ENOENT') return null;
+      // A reaped process vanishes (ENOENT) or dies mid-read (ESRCH).
+      if (error.code === 'ENOENT' || error.code === 'ESRCH') return null;
       throw error;
     }
     const fields = stat
