@@ -248,6 +248,7 @@
   "lib/social/shortcut-platforms.test.ts",
   "lib/spotify/",
   "lib/stripe/",
+  "lib/synthetic/",
   "lib/tasks/",
   "lib/theme/route-policy.test.ts",
   "lib/tour-dates/queries.test.ts",

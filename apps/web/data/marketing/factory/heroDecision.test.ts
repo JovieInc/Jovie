@@ -212,7 +212,6 @@ describe('route hero audit', () => {
         "/about": "unbound: - -> left-content",
         "/alternatives/*": "unbound: - -> left-content",
         "/artist-notifications": "unbound: - -> split-link-claim",
-        "/artist-profile": "unbound: - -> split-link-claim",
         "/artist-profiles": "unlocked-code-variant: centered-phone -> split-link-claim",
         "/blog": "unbound: - -> left-content",
         "/blog/category/*": "unbound: - -> left-content",

@@ -530,10 +530,15 @@ publication `public`, `marketing.proofAuthorized` true, maturity not
 description names a `GATED_PATH_PREFIXES` path or clearly targets a
 homepage, landing, or marketing page. `worker()` calls
 `design_gate.pick_build_issue(...)`, passing the existing `pick_issue`; a
-gated issue with an incomplete brief is not claimed, and the runner writes
-`needs-design-brief` plus the matching Linear label at most once. The label
-routes a design pass — it does not itself block — and the next claim admits
-the issue once steps 1–9 are complete.
+gated issue with an incomplete brief gets `needs-design-brief` plus the
+matching Linear label at most once, and goes to the design/brief lane: the
+same provider claims it once (`run_brief`) with a brief-only prompt, writes
+steps 1–9 to `.design-brief.md`, and the runner appends that inline to the
+issue under `<!-- design-gate:brief-lane -->`. No PR is opened, so merge sync
+cannot close the issue before it is built. The issue returns to Todo; a
+complete brief is admitted on the next claim, an incomplete one (usually step
+9, which needs a real Pen or ImageGen artifact) stays held for a design pass
+and is never re-run. Linked `Design brief:` docs are never overwritten.
 
 `doctor.py` adds `designGate` to the admission census (`gated`, `admitted`,
 `needsBrief`, `missingSteps`), deduped; incomplete briefs also increment

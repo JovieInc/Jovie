@@ -70,6 +70,14 @@ NEEDS_BRIEF_LABEL = "needs-design-brief"
 NEEDS_BRIEF_LABEL_ID = "5fa70dd4-2c23-4ed7-a6db-73bf4910b333"
 NEEDS_BRIEF_REASON = "needs-design-brief"
 
+# The brief lane is the same provider, run once per issue with a brief-only
+# prompt. Its output lands inline in the issue under this marker; no PR is
+# opened, so merge sync cannot close the issue before it is built.
+BRIEF_MARKER = "<!-- design-gate:brief-lane -->"
+BRIEF_FILE = ".design-brief.md"
+# Remote-only lanes have no local worktree for the brief file.
+BRIEF_SKIP_PROVIDERS = frozenset({"hyperagent"})
+
 BRIEF_STEPS = tuple(range(1, 10))
 _CERTIFIED_CACHE: dict | None = None
 
@@ -604,8 +612,9 @@ def ensure_needs_brief_label(linear, issue, decision: dict) -> bool:
         issue.id,
         "🤖 design gate: needs-design-brief. Build lanes will not claim this until "
         f"steps {missing} are complete in the issue or a linked design brief.{extra} "
-        "There is no separate design lane yet; this label is the route. "
-        "Fill docs/design/design-brief-template.md (Pen or ImageGen for step 9). "
+        "The brief lane drafts it once, inline; anything it cannot fill (often the "
+        "step 9 Pen or ImageGen artifact) needs a design pass against "
+        "docs/design/design-brief-template.md. "
         "Admission clears on its own once steps 1–9 are complete.",
     )
     return True
@@ -629,7 +638,8 @@ def pick_build_issue(issues, failures, *, pick, linear=None, repo=None,
     """The build-lane admission wrapper around `pick`.
 
     The issue `pick` would have claimed is labeled `needs-design-brief` when
-    its brief is incomplete, then skipped. The next admissible issue is
+    its brief is incomplete. It is returned for one brief-lane run when
+    `brief_due`; otherwise it is skipped and the next admissible issue is
     returned. Later incomplete issues in the same pass are not labeled.
     """
     remaining = list(issues)
@@ -645,8 +655,79 @@ def pick_build_issue(issues, failures, *, pick, linear=None, repo=None,
         if not reported:
             report_needs_brief(chosen, decision, linear)
             reported = True
+        if provider not in BRIEF_SKIP_PROVIDERS and brief_due(chosen, decision):
+            return chosen
         remaining = [item for item in remaining if item.identifier != chosen.identifier]
     return None
+
+
+def brief_due(issue, decision: dict) -> bool:
+    """Gated, incomplete, inline (no linked doc), and the brief lane has not run."""
+    description = getattr(issue, "description", "") or ""
+    return (decision["gated"] and not decision["admit"]
+            and find_brief_link(description) is None and BRIEF_MARKER not in description)
+
+
+def wants_brief(issue, repo=None) -> bool:
+    """The runner's mode switch: True means run the brief lane, not a build."""
+    return brief_due(issue, build_admission(issue, read_text=repo_reader(repo)))
+
+
+def render_brief_prompt(issue, context_pack: str = "") -> str:
+    """Brief-only instructions. Steps the agent cannot ground stay empty."""
+    return "\n".join([
+        f"# Design brief for {issue.title} ({issue.identifier})",
+        "",
+        getattr(issue, "description", "") or "(no description)",
+        "",
+        "---",
+        "## Company context (GBrain; verify against source)",
+        context_pack or "(GBrain unavailable for this run; rely on repo docs.)",
+        "",
+        "## Contract (design/brief lane, JOV-7541)",
+        "- This run writes the design brief only. Do not build, commit, push or open a PR.",
+        f"- Write `{BRIEF_FILE}` at the repository root, copying the headings `## 1.` through",
+        "  `## 9.` and their field lines from docs/design/design-brief-template.md. The lane",
+        "  validates it and appends it to the issue.",
+        "- Step 2 cites only ids from scripts/lanes/certified-capabilities.gen.json `ids`.",
+        "  Steps 5 to 7 use only the section ids and imagery types the template lists.",
+        "- Step 9 needs a real Pen node or ImageGen artifact. If this run cannot produce",
+        "  one, leave the `Pen:` and `ImageGen:` lines empty; a design pass fills them.",
+        "- Never invent a capability, claim, artifact or reference. An empty field is",
+        "  correct when the source does not support a value.",
+        "- You are unattended: nobody will answer a question. Do not run skill workflows.",
+    ])
+
+
+def publish_brief(linear, issue, text: str) -> dict:
+    """Append the lane's brief inline, once, and report what is still missing."""
+    text = (text or "").strip()
+    if not _section_bodies(text):
+        return {"verdict": "failed", "reasons": ["brief-empty"]}
+    current = linear.gql("query($id:String!){issue(id:$id){description}}", {"id": issue.id})
+    description = ((current.get("issue") or {}).get("description") or "").rstrip()
+    if BRIEF_MARKER in description:  # a stale claim-scan cache; the first run stands
+        return {"verdict": "brief-incomplete", "missing": brief_status(description)["missing"],
+                "reasons": ["brief-already-published"]}
+    updated = f"{description}\n\n{BRIEF_MARKER}\n{text}\n"
+    linear.gql(
+        "mutation($id:String!,$d:String!){issueUpdate(id:$id,input:{description:$d}){success}}",
+        {"id": issue.id, "d": updated},
+    )
+    status = brief_status(updated)
+    if status["complete"]:
+        linear.gql(
+            "mutation($id:String!,$label:String!){issueUpdate(id:$id,input:{removedLabelIds:[$label]}){success}}",
+            {"id": issue.id, "label": NEEDS_BRIEF_LABEL_ID},
+        )
+        body = "🤖 design/brief lane: steps 1–9 complete inline. A build lane admits this next."
+    else:
+        missing = ", ".join(str(step) for step in status["missing"])
+        body = ("🤖 design/brief lane: drafted the brief inline. Steps "
+                f"{missing} still need a design pass; the lane does not run again for this issue.")
+    linear.comment(issue.id, body)
+    return {"verdict": "brief-complete" if status["complete"] else "brief-incomplete",
+            "missing": status["missing"], "reasons": []}
 
 
 def enforce_enabled(value: str | None = None) -> bool:
