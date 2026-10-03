@@ -433,7 +433,9 @@ class RelayTest(unittest.TestCase):
         self.assertTrue(events.in_scope(pr(branch="claude/jov-9-20260926t0100", draft=True), "orphan", disabled))
         self.assertFalse(events.in_scope(pr(draft=True), "orphan", disabled))
         self.assertEqual(events.disabled_lanes(PROVIDERS), {"claude", "hyperagent"})
-        self.assertIn("claude", events.disabled_lanes())
+        # JOV-7706: claude repairs locally; remote-only Hyperagent's drafts stay orphan-maintained.
+        self.assertNotIn("claude", events.disabled_lanes())
+        self.assertIn("hyperagent", events.disabled_lanes())
 
     def test_relay_labels_only_the_current_head_once(self):
         view = {"state": "OPEN", "isDraft": False, "headRefName": "tim/fix", "headRefOid": "h1",

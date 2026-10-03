@@ -680,10 +680,14 @@ class ProviderAndLockTest(unittest.TestCase):
         self.assertTrue(providers["devin"]["model"].startswith("swe-2"))
         self.assertEqual(providers["codex"]["reasoningEffort"], "xhigh")
         self.assertIn("xhigh", providers["codex"]["cmd"])
-        # Tim 2026-09-26: Devin and Codex are the shipping lanes; every other lane stays off.
+        # Tim 2026-10-03 (JOV-7706): Claude Code and Hyperagent join Devin and Codex as regular lanes.
         enabled = {name for name, spec in providers.items() if spec.get("enabled", True)}
-        self.assertTrue(enabled <= {"devin", "codex"}, enabled)
-        self.assertIn("devin", enabled)
+        self.assertEqual(enabled, {"devin", "codex", "claude", "hyperagent"})
+        # Claude rides the subscription wrapper with a routed model; never a bare `claude` with API env.
+        claude = providers["claude"]
+        self.assertIn("{here}/claude_lane.py", claude["cmd"])
+        self.assertEqual(claude["cmd"][claude["cmd"].index("--model") + 1], "{model}")
+        self.assertEqual({route["model"] for route in claude["routes"]}, {"claude-opus-5-5", "claude-sonnet-5-5"})
         # Every lane run is a fresh worktree; Devin refuses untrusted dirs unless told not to.
         cmd = providers["devin"]["cmd"]
         self.assertEqual(cmd[cmd.index("--respect-workspace-trust") + 1], "false")

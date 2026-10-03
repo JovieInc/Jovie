@@ -1,12 +1,13 @@
 # Symphony: the shipping lanes
 
 This directory is Symphony. One harness, one release, one policy, one test set, one HUD.
-Devin and Codex are the lanes that ship; Claude and Hyperagent stay `enabled: false` until
-Tim turns them on. Symphony Elixir on Gem is retired (its units are stopped and masked by
+Devin, Codex, Claude Code and Hyperagent are the lanes that ship (Claude and Hyperagent since
+JOV-7706); grok and kimi stay `enabled: false`. Symphony Elixir on Gem is retired (its units are stopped and masked by
 `gem-retire-elixir.sh`); nothing else claims JOV work.
 
 A lane is a Linear label plus a provider command in `providers.json`. Every enabled lane
-drains the shared `agent-ready` pool as well as its own label. Issues carrying
+reads the shared `agent-ready` pool as well as its own label; the cost-aware router (below)
+decides which lane takes each issue. Issues carrying
 `no-symphony`, billing, auth, infra or epic labels are never taken.
 
 The harness, not the model, owns:
@@ -42,7 +43,8 @@ The harness, not the model, owns:
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
 | Codex accounts: lease one per run; a burst 429 backs off 2 min and rotates, a spent plan (usage limit / quota) banks until its reset, and only a failed run's closing lines can bank an account | `codex_lane.py` |
 | Provider throughput: matched-work offers, accepts, starts, productive/PR/first-pass rates, remediation, issue→PR→merge time, landed output, idle qualified capacity and failure reasons; landed attribution comes from receipts, never a branch prefix | `provider_throughput()`, `doctor.status_feed()`, `hud.py` |
-| Provider failover: a lane that exits non-zero mid-issue (every account spent, auth, crash, HTTP 404, unhealthy) hands the same worktree to the next enabled, healthy, uncooled lane in `providers.json` tier order, up to 2 handoffs; the receipt records `handoffs` (with `reason`) and `finishedBy`. Disabled entries, including Hyperagent, are never chosen | `run_issue()`, `next_provider()`, `remediation.route_lane()` |
+| Provider failover: a lane that exits non-zero mid-issue (every account spent, auth, crash, HTTP 404, unhealthy) hands the same worktree to the next enabled, healthy, uncooled lane in `providers.json` tier order, up to 2 handoffs; the receipt records `handoffs` (with `reason`) and `finishedBy`. Disabled entries and remote-only lanes (`repairs: false`, Hyperagent) are never chosen | `run_issue()`, `next_provider()`, `remediation.route_lane()` |
+| Cost-aware routing: one capability floor per issue (`routing.json`), then the cheapest available `(lane, model)` route that clears it by effective cost; every claim is logged with its rationale | `remediation.route_issue()`, `issue_router()`, `runs/routing.jsonl` |
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
 | Stop revokes publication: a kill writes `runs/publication-revocations.jsonl` before the kill is acked, and every irreversible boundary (push, PR open, label, enqueue) revalidates it — revoked branches never ship (JOV-5060) | `run_agent(on_kill=)`, `revoke_publication()`, `require_publishable()` |
 
@@ -277,6 +279,65 @@ hosts, and stay draft until the normal Migration Guard/security/boundary checks 
 separate max-effort Codex review pass. `no-symphony`, secret/credential rotation, and
 live billing pricing remain excluded. Other providers retain their sensitive-label
 exclusions.
+
+## Routing (JOV-7706)
+
+Each lane lists its `routes` in `providers.json`: a model, the capability it clears
+(`bounded` < `standard` < `frontier`), a `costClass` and a base `cost`. Today: Devin SWE-2
+(free, 0), Hyperagent GLM 5.3 Developer (subsidized credits, 1), Claude Sonnet 5.5
+(subscription, 2), Claude Opus 5.5 (subscription, frontier, 3), Codex xhigh (subscription,
+frontier, 3.5; kept with headroom because sensitive labels are Codex-only). No route calls a
+raw model API key.
+
+`routing.json` sets the floor. Frontier: protected surfaces from JOV-7343 (staging/production
+controllers, merge queue, admission/promotion/rollback, model routing, governor/control plane,
+migrations, entitlements) and the `ws:release-deploy`, `ws:symphony-throughput`,
+`ws:security-auth`, `protected`, `governance` and `route:frontier` labels. Bounded: frozen plans
+(`<!-- frozen-plan` marker, `frozen-plan`, `mechanical`, `route:bounded`, docs). A frozen plan
+on a protected surface is still frontier. Everything else is standard.
+
+Effective cost = base cost x (1 + quota pressure). Pressure is the share of the lane's quota
+window already spent: Claude runs in its 5h window (`claude-quota.json`), banked Codex accounts,
+Hyperagent runs per day from the ledger. A banked lane, a lane with no slots on this host, a
+cooling or unhealthy lane, a lane whose last worker stopped on a budget or rate limit, and a
+lane with every slot busy are unavailable; the next cheapest qualifying route takes the work.
+Nothing drops below the floor: frontier work with no frontier route available is held
+(`route-held:frontier`), not handed to a cheaper lane. `route:<lane>[:<alias>]` (or the lane's
+own label) pins the lane and model when it clears the floor; otherwise the pin is ignored and
+the receipt notes it. Sensitive labels still route only to Codex.
+
+Every claim appends the decision (required floor, reasons, candidates with cost, pressure and
+availability, chosen route, rationale) to `runs/routing.jsonl`, copies it onto the run receipt
+as `route`, and states the rationale in the Linear claim comment. The doctor applies the same
+router, so work routed to another lane is not counted as this lane's idle capacity.
+
+## Claude lane
+
+`claude_lane.py run --model <id>` runs headless Claude Code in the worktree:
+`claude -p --model claude-opus-5-5|claude-sonnet-5-5 --permission-mode bypassPermissions
+--output-format json --no-session-persistence`, prompt on stdin. It uses the host's claude.ai
+subscription login (or `CLAUDE_CODE_OAUTH_TOKEN` from `~/.config/jovie-lanes/claude.env`,
+written by `claude setup-token`). Every Anthropic API credential is stripped from the child
+environment and `health` refuses an API-key login. Repo and user hooks stay on (no `--bare`).
+A usage-limit answer banks the lane until the reset Claude reports (default 5h); a burst
+limit or overload backs off 5 minutes. A banked run exits 75 so the harness fails over.
+`claude_lane.py status` is the JSON the router reads. Claude repairs and adopts like Devin and
+Codex, on its default model (Sonnet).
+
+## Hyperagent lane
+
+Hyperagent runs on agent `cmtj3n2q901i407adklzzq01t` ("GLM 5.3 Developer", `auto` mode). The
+agent id picks the model; `--model` is only a label. Astra Planner is `confirm` mode and a
+planner, so frontier implementation goes to Opus or Codex. The lane is remote-only
+(`repairs: false`): it claims issues through `hyperagent_lane.py`, never repairs or adopts a
+local checkout, and the local lanes maintain its PRs like an orphan's.
+
+Each attempt rebuilds its spend proof: a live `list_agents` read (id, name, `auto` mode) joined
+with the owner's settings attestation at `~/.config/jovie-lanes/hyperagent-attestation.json`
+(`agentId`, `model`, `repository`, `currentInstructions`, `allInCap`, `balanceUsd`, `maxCostUsd`,
+`attestedAt`, `expiresAt`, `attestedBy`). The API exposes no balance or cap, so the owner checks
+them in Hyperagent settings and writes this file. Without a current attestation the lane is
+unhealthy (`provider-down:hyperagent` reaches Triage) and no remote thread is created.
 
 ## Install on a host
 
