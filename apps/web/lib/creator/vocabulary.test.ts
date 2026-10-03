@@ -1,16 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
-import {
-  creatorTypeEnum,
-  merchDesignLaneEnum,
-} from '@/lib/db/schema/enums';
+import { creatorTypeEnum, merchDesignLaneEnum } from '@/lib/db/schema/enums';
 import { getCreatorTypeLabel } from '@/types';
 import {
   CREATOR_PROFESSION_LABELS,
   creatorProfessionLabel,
   MERCH_LANE_LABELS,
-  merchLaneLabel,
   MUSIC_EVENTS_ROUTE,
+  merchLaneLabel,
   RELATED_CREATORS_LABEL,
   SPOTIFY_RELATED_SECTION_TITLE,
   WORK_ROUTE,
