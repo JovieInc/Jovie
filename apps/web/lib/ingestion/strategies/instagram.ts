@@ -7,6 +7,7 @@
 import type { ExtractionResult } from '../types';
 import {
   createExtractionResult,
+  decodeHtmlEntities,
   ExtractionError,
   extractLinks,
   extractMetaContent,
@@ -63,9 +64,32 @@ export async function fetchInstagramDocument(
   return html;
 }
 
+/** og:title is "Name (@handle) • Instagram photos and videos". */
+function profileName(title: string | null): string | null {
+  const name = title
+    ? decodeHtmlEntities(title)
+        .replace(/\s*\(@[^)]*\)\s*•.*$/u, '')
+        .trim()
+    : null;
+  return name && name !== 'Instagram' ? name : null;
+}
+
 export function extractInstagram(html: string): ExtractionResult {
+  // Logged-out datacenter requests get a login page that still answers 200.
+  // Its generic title and logo must never be reported as the creator.
+  if (extractMetaContent(html, 'og:type') !== 'profile') {
+    throw new ExtractionError(
+      'Instagram returned a login page instead of the profile',
+      'LOGIN_REQUIRED'
+    );
+  }
   const ogProfile = extractOpenGraphProfile(html);
-  const bio = extractMetaContent(html, 'og:description') ?? null;
+  const description = extractMetaContent(html, 'og:description') ?? null;
+  // The OpenGraph description is follower counts, not the creator's bio.
+  const bio =
+    description && /\bFollowers\b.*\bFollowing\b/i.test(description)
+      ? null
+      : description;
 
   const links = extractLinks(html, {
     skipHosts: SKIP_HOSTS,
@@ -76,7 +100,7 @@ export function extractInstagram(html: string): ExtractionResult {
   return {
     ...createExtractionResult(
       links,
-      ogProfile.displayName,
+      profileName(ogProfile.displayName),
       ogProfile.avatarUrl
     ),
     sourcePlatform: 'instagram',
