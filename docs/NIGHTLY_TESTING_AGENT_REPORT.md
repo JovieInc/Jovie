@@ -3,18 +3,26 @@
   Do not edit manually — changes are overwritten on the next scheduled run.
 -->
 
-> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/27411234883)
+> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/37086843323)
 
 # Nightly Testing Agent — Daily Report
 
 Repo: jovie
-Generated: 2026-06-12T11:31:02.768Z
+Generated: 2026-10-03T02:03:26.952Z
+Workflow conclusion: failure
+
+## Evidence warnings
+
+- Missing mutation report at /home/runner/work/Jovie/Jovie/apps/web/reports/mutation/mutation.json
 
 ## Suites
 
 | Lane | Total | Passed | Failed | Flaky | Skipped |
 |---|---:|---:|---:|---:|---:|
-| unit | 13741 | 13717 | 0 | 0 | 24 |
+| unit | 7593 | 7577 | 3 | 0 | 13 |
+| unit | 7193 | 7158 | 0 | 0 | 35 |
+| unit | 7688 | 7640 | 1 | 0 | 47 |
+| unit | 7677 | 7670 | 0 | 0 | 7 |
 
 ## Selected Targets
 
@@ -38,4 +46,7 @@ Generated: 2026-06-12T11:31:02.768Z
 
 | Lane | Test | File | Message |
 |---|---|---|---|
-| none | none | none | none |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > inherits child env without JSON disclosure and rejects a real credential trace |  |  Running 1 test using 1 worker F    1) .artifact-json-cfP4tg/sentinel.spec.ts:1:47 › env ─────────────────────────────────────────────       |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > accepts only decoded metadata-free Playwright PNG bytes |  |  Running 1 test using 1 worker  [1A[2K[1/1] .artifact-comparison-A66sLD/comparison.spec.ts:1:47 › comparison [1A[2K  1) .artifact-comparison |
+| unit | tests/unit/design-system/story-source-sha-ancestry.test.ts story receipt SHA ancestry > keeps every literal receipt ancestral and able to replay its story path |  | expected 3 to be 5 // Object.is equality |
+| unit | tests/unit/storybook/story-quality-guard.test.ts storybook story quality guard > passes on the current product story library and provenance receipts |  | Test timed out in 60000ms. If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTime |
