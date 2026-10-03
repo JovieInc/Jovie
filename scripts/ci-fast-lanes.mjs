@@ -2113,6 +2113,7 @@ export async function runStructural(opts = {}) {
     'pnpm ci:harness:check',
     'pnpm ci:incident-contract:validate',
     'node --test scripts/ci-release-trigger-contract.test.mjs .github/scripts/analyze-test-flakiness.test.js',
+    'node --test .github/scripts/marketing-dom-workflow.test.mjs',
     'node --test .github/scripts/update-quarantine.test.js',
     // Orphan sweep: script contracts no other CI command ran.
     SCRIPT_CONTRACT_NODE_COMMAND,
