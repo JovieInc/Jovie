@@ -499,6 +499,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/pr-comment-analysis.test.mjs',
   'scripts/lib/__tests__/pr-liveness.test.mjs',
   'scripts/lib/__tests__/pr-preparation-safety.test.mjs',
+  'scripts/lib/__tests__/production-environment-secrets.test.mjs',
   'scripts/lib/__tests__/pr-review-workflow.test.mjs',
   'scripts/lib/__tests__/pr-review-contracts.test.mjs',
   'scripts/lib/__tests__/pr-review-kernel.test.mjs',
