@@ -62,16 +62,15 @@ function DiagnosticPanel({
           <AlertTriangle className='mt-0.5 h-3.5 w-3.5 shrink-0' />
           <div>
             <p className='font-medium'>
-              Google CSE returned 0 results for all queries
+              Web search returned 0 results for all queries
             </p>
             <p className='mt-0.5 opacity-80'>
-              This likely means your keywords are too specific, or your Google
-              CSE engine is misconfigured. Try broader queries like{' '}
+              This likely means your keywords are too specific, or your search
+              provider is misconfigured. Try broader queries like{' '}
               <code className='rounded bg-surface-0 px-1 text-primary-token'>
                 site:linktr.ee spotify music
               </code>{' '}
-              or check your CSE settings in the Google Programmable Search
-              Console.
+              or check the configured search provider.
             </p>
           </div>
         </div>
@@ -116,10 +115,10 @@ function KeywordDiagnosticRow({
         {d.query}
       </code>
       <div className='flex shrink-0 items-center gap-3 text-secondary-token'>
-        <span title='Google CSE start index (page offset)'>
+        <span title='Search start index (page offset)'>
           p{Math.ceil(d.searchOffset / 10)}
         </span>
-        <span title='Raw Google results'>{d.rawResultCount} raw</span>
+        <span title='Raw search results'>{d.rawResultCount} raw</span>
         <span title='Linktree URLs extracted'>
           {d.linktreeUrlsFound} linktr.ee
         </span>
@@ -188,7 +187,7 @@ export function LeadPipelineControls({
 
       if (totalRaw === 0) {
         toast.warning(
-          `Discovery ran ${queriesUsed} queries but Google returned 0 results. Check keyword configuration.`
+          `Discovery ran ${queriesUsed} queries but web search returned 0 results. Check keyword configuration.`
         );
       } else {
         toast.success(
@@ -258,7 +257,7 @@ export function LeadPipelineControls({
         <div>
           <p className='text-sm text-primary-token'>Discovery enabled</p>
           <p className='text-xs text-secondary-token'>
-            Run Google CSE searches on cron to find new leads.
+            Run web searches on cron to find new leads.
           </p>
         </div>
         <Switch
