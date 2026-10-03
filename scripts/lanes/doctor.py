@@ -4,10 +4,13 @@
 An alert is a stable key plus a one-line cause. New keys open a Linear issue in Triage
 (label `symphony`, title "Symphony doctor: <key>") so Summer routes it; a key that clears
 moves its issue to Done with a comment; a key that fires again within the cool-off reopens
-the same issue instead of spamming a new one. `doctor.json` is what the HUD renders.
+the same issue instead of spamming a new one. While `LANES_ESCALATION` is on, open, reopen,
+and close also apply `remediation:<alert-key-slug>` (created on the JOV team when missing,
+color `#E5484D`). `doctor.json` is what the HUD renders.
 """
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import shutil
@@ -21,6 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pr_events  # noqa: E402  (sibling module of the release)
 import design_gate  # noqa: E402  (design-brief admission census)
+import remediation  # noqa: E402
 
 COOL_OFF_S = 6 * 3600
 NO_LANDING_S = 6 * 3600
@@ -208,6 +212,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "heldByReason": pr_events.by_reason(held, open_numbers),
         "reconcile": read_json(state / "reconcile.json", {}),
         "failedByReason": failed_by_reason(failures),
+        "escalation": remediation.escalation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
+        "remediation": remediation.remediation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
         "_receipts24h": receipts, "_allReceipts": all_receipts,
     }
 
@@ -400,6 +406,9 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["disk-low"] = f"root disk {obs['diskFreePct']}% free; worktrees and installs will start failing"
     if obs.get("githubRemaining") is not None and obs["githubRemaining"] < GITHUB_MIN_REMAINING:
         alerts["github-quota"] = f"GitHub GraphQL budget {obs['githubRemaining']} left this hour; enqueues and listings will fail"
+    escalation_line = remediation.alert_reason(obs.get("escalation") or {})
+    if escalation_line:
+        alerts["escalation-needs-human"] = escalation_line
     sweep = obs.get("reconcile") or {}
     swept_age = obs["now"] - float(sweep.get("atEpoch") or 0) if obs.get("now") else None
     if sweep.get("orphans") and swept_age is not None and swept_age < 2 * pr_events.RECONCILE_S:
@@ -496,9 +505,51 @@ class Tracker:
     """Linear Triage issues, one per alert key, reused within the cool-off."""
     def __init__(self, linear, host_name: str):
         self.linear, self.host = linear, host_name
+        self._team_node = None
 
     def title(self, key: str) -> str:
         return f"Symphony doctor: {key} ({self.host})"
+
+    def _team(self) -> dict:
+        if self._team_node is None:
+            self._team_node = self.linear.gql(
+                'query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}',
+                {})["teams"]["nodes"][0]
+        return self._team_node
+
+    def _remediation_label_id(self, key: str) -> str | None:
+        """`remediation:<slug>` on the JOV team. Created when missing, color #E5484D."""
+        if not remediation.escalation_enabled():
+            return None
+        name = remediation.remediation_label_for_alert(key)
+        if not name:
+            return None
+        team = self._team()
+        for label in team["labels"]["nodes"]:
+            if label.get("name") == name and label.get("id"):
+                return label["id"]
+        created = self.linear.gql(
+            'mutation($i:IssueLabelCreateInput!){issueLabelCreate(input:$i){issueLabel{id name}}}',
+            {"i": {"teamId": team["id"], "name": name, "color": remediation.REMEDIATION_LABEL_COLOR}})
+        label = ((created or {}).get("issueLabelCreate") or {}).get("issueLabel") or {}
+        if not label.get("id"):
+            return None
+        team["labels"]["nodes"].append({"id": label["id"], "name": label.get("name") or name})
+        return label["id"]
+
+    def apply_alert_label(self, issue_id: str | None, key: str) -> None:
+        """Attach the alert's remediation label. No-op when the router flag is off."""
+        if not issue_id:
+            return
+        try:
+            label_id = self._remediation_label_id(key)
+            if not label_id:
+                return
+            self.linear.gql(
+                'mutation($id:String!,$l:String!){issueAddLabel(id:$id,labelId:$l){success}}',
+                {"id": issue_id, "l": label_id})
+        except Exception:
+            return
 
     def existing(self, key: str) -> str | None:
         """An open issue for this key and host, if a previous tick (or a lost doctor.json)
@@ -515,13 +566,17 @@ class Tracker:
     def open(self, key: str, text: str) -> str | None:
         found = self.existing(key)
         if found:
+            self.apply_alert_label(found, key)
             return found
         try:
             priority = 1 if key.startswith(("provider-idle:", "provider-down:", "pr-inventory-unavailable:")) or key in (
                 "linear-down", "spawn-exit", "tick-error") else 2
-            team = self.linear.gql('query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}', {})["teams"]["nodes"][0]
+            team = self._team()
             triage = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Triage")
             labels = [l["id"] for l in team["labels"]["nodes"] if l["name"] == "symphony"]
+            remediation_label = self._remediation_label_id(key)
+            if remediation_label:
+                labels.append(remediation_label)
             data = self.linear.gql(
                 'mutation($i:IssueCreateInput!){issueCreate(input:$i){issue{id identifier}}}',
                 {"i": {"teamId": team["id"], "stateId": triage, "labelIds": labels, "priority": priority,
@@ -552,17 +607,21 @@ class Tracker:
         except Exception:
             pass
 
-    def reopen(self, issue_id: str, text: str) -> None:
+    def reopen(self, issue_id: str, text: str, key: str | None = None) -> None:
         try:
             self.linear.move(issue_id, "Triage")
             self.linear.comment(issue_id, f"🤖 doctor: fired again on `{self.host}` at {now_iso()}: {text}")
+            if key:
+                self.apply_alert_label(issue_id, key)
         except Exception:
             pass
 
-    def close(self, issue_id: str) -> None:
+    def close(self, issue_id: str, key: str | None = None) -> None:
         try:
             self.linear.comment(issue_id, f"🤖 doctor: cleared on `{self.host}` at {now_iso()}.")
             self.linear.move(issue_id, "Done")
+            if key:
+                self.apply_alert_label(issue_id, key)
         except Exception:
             pass
 
@@ -584,7 +643,7 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
             continue
         if entry and now - float(entry.get("closedAt") or 0) < COOL_OFF_S and entry.get("id"):
             if tracker:
-                tracker.reopen(entry["id"], text)
+                tracker.reopen(entry["id"], text, key)
                 contradict = getattr(tracker, "contradict_invariant", None)
                 if contradict and conditions and key in conditions:
                     contradict(conditions[key])
@@ -599,7 +658,7 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
     for key, entry in issues.items():
         if key not in alerts and entry.get("closedAt") is None:
             if tracker and entry.get("id"):
-                tracker.close(entry["id"])
+                tracker.close(entry["id"], key)
             entry["closedAt"] = now
     receipts = {}
     for key, event in (conditions or {}).items():
@@ -730,7 +789,9 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "orphan_prs": (obs.get("reconcile") or {}).get("orphans") or [],
             "oldest_prs": [row for row in (obs.get("reconcile") or {}).get("dispositions") or []][:10],
             "dep_holds": (obs.get("reconcile") or {}).get("depHolds") or [],
-            "slo": obs.get("slo")}
+            "slo": obs.get("slo"),
+            "escalation": obs.get("escalation") or remediation.empty_escalation(),
+            "remediation": obs.get("remediation") or remediation.empty_remediation()}
 
 
 PRIMARY_FLAG = Path.home() / ".config/jovie-lanes/primary"
@@ -772,6 +833,39 @@ def _issue_id(lane, host, identifier: str) -> str:
     return data["issues"]["nodes"][0]["id"]
 
 
+def apply_linear_budget(result: dict, state: Path) -> None:
+    """Copy the best-effort Linear snapshot onto the doctor report. Never raises."""
+    try:
+        budget = read_json(state / "api-budget.json", None)
+        if not isinstance(budget, dict):
+            return
+        result["linearBudget"] = {key: budget.get(key)
+                                  for key in ("remaining", "limit", "reset", "rateLimitedAt", "observedAt")}
+    except Exception:
+        return
+
+
+def locked_doctor_write(state: Path, write) -> None:
+    """Serialize doctor.json updates with the lane's budget stamp. A missing lock still writes."""
+    handle = None
+    try:
+        state.mkdir(parents=True, exist_ok=True)
+        handle = open(state / "doctor.lock", "a")
+        fcntl.flock(handle, fcntl.LOCK_EX)
+    except OSError:
+        # flock can fail after open. Dropping the handle without closing it leaks an fd
+        # on every doctor tick.
+        if handle is not None:
+            handle.close()
+        handle = None
+    try:
+        write()
+    finally:
+        if handle is not None:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+            handle.close()
+
+
 def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     path = host.state / "doctor.json"
     previous = read_json(path, {})
@@ -794,6 +888,11 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     result["poolEmptySince"] = previous["poolEmptySince"]
     result["codexIdleSince"] = previous["codexIdleSince"]
     result["providerIdleSince"] = previous["providerIdleSince"]
+    result["escalation"] = obs.get("escalation") or remediation.empty_escalation()
+    result["remediation"] = obs.get("remediation") or remediation.empty_remediation()
+    for key in ("eventsOpen", "eventsClaimed", "eventsHuman", "eventsExhausted"):
+        result[key] = result["remediation"].get(key, 0)
+    result["byFingerprint"] = result["remediation"].get("byFingerprint") or {}
     result["observed"] = {k: v for k, v in obs.items() if k not in ("tick", "codex", "_receipts24h", "_allReceipts")}
     if not os.environ.get("LANES_SELFTEST"):
         try:
@@ -807,8 +906,11 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
             result["statusFeed"] = publish_status(host, lane, feed)
         except Exception as error:  # a broken feed never blocks the doctor
             result["statusFeedError"] = f"{type(error).__name__}: {error}"[:120]
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(result, indent=1, default=str))
-    os.replace(tmp, path)
+    def write_report():
+        apply_linear_budget(result, host.state)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(result, indent=1, default=str))
+        os.replace(tmp, path)
+    locked_doctor_write(host.state, write_report)
     return result

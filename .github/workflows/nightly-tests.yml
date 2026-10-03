@@ -383,6 +383,12 @@ jobs:
       SLACK_CI_CHANNEL_ID: ${{ vars.SLACK_CI_CHANNEL_ID }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
+      - name: Skip Slack when bot token or channel is unset
+        if: ${{ (needs.knip.result == 'failure' || needs.unit-tests.result == 'failure') && (env.SLACK_BOT_TOKEN == '' || env.SLACK_CI_CHANNEL_ID == '') }}
+        run: |
+          echo "::notice::SLACK_BOT_TOKEN or SLACK_CI_CHANNEL_ID is unset. Skipping Slack. Tim sets these later."
+          exit 0
+
       - name: Slack notification on Knip failure
         if: ${{ needs.knip.result == 'failure' && env.SLACK_BOT_TOKEN != '' && env.SLACK_CI_CHANNEL_ID != '' }}
         uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d # v4.0.0

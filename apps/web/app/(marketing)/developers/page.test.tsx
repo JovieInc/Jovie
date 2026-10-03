@@ -88,7 +88,7 @@ describe('developer guide contract vs llms guidance (JOV-6265)', () => {
     const guidance = await getLlmsTxt().text();
 
     expect(guidance).toContain(
-      'the public artist API and anonymous MCP tools are read-only'
+      'the public profile API and anonymous MCP tools are read-only'
     );
     // The HTML guide must agree with the machine guidance: neither surface
     // may claim a capability the other denies.
