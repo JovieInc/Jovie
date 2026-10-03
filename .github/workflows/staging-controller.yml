@@ -3,6 +3,7 @@ name: Staging Controller
 # accountable-writer: Symphony
 # capability-gap: Exact successful CI receipts are available only after the source CI workflow completes.
 # revisit-trigger: Remove this hop when CI can invoke one post-success staging job without a workflow boundary.
+run-name: ${{ github.event.workflow_run.head_sha }} from CI ${{ github.event.workflow_run.id }} attempt ${{ github.event.workflow_run.run_attempt }}
 on:
   workflow_run:
     workflows: [CI]
@@ -111,7 +112,20 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$AUTHORIZATION_RESULT" != success ]; then echo "::error::Staging blocker: exact CI lineage authorization failed. Next: inspect the product-lane receipt. Proof: CI run ${{ github.event.workflow_run.id }}."; exit 1; fi
-          if [ "$AUTHORIZATION_OUTCOME" = not_applicable ] || [ "$AUTHORIZATION_OUTCOME" = superseded ]; then echo "Staging generation $EXACT_SHA finished as $AUTHORIZATION_OUTCOME."; exit 0; fi
-          if [ "$RELEASE_RESULT" = success ] && [ "$STAGING_ELIGIBLE" != true ]; then echo "Staging generation $EXACT_SHA finished as superseded before mutation."; exit 0; fi
-          if [ "$RELEASE_RESULT" != success ] || [ "$STAGING_DEPLOYED" != true ]; then echo "::error::Staging blocker: exact environment mutation or verification failed. Next: inspect build, canary, alias, and build-info proof. Proof: staging-deployment-$EXACT_SHA."; exit 1; fi
-          echo "Staging generation $EXACT_SHA finished as $STAGING_STATE with an exact immutable receipt."
+          if [ "$AUTHORIZATION_OUTCOME" = not_applicable ] || [ "$AUTHORIZATION_OUTCOME" = superseded ]; then
+            outcome="$AUTHORIZATION_OUTCOME"
+          elif [ "$RELEASE_RESULT" = success ] && [ "$STAGING_ELIGIBLE" != true ]; then
+            outcome=superseded
+          elif [ "$RELEASE_RESULT" != success ] || [ "$STAGING_DEPLOYED" != true ]; then
+            echo "::error::Staging blocker: exact environment mutation or verification failed. Next: inspect build, canary, alias, and build-info proof. Proof: staging-deployment-$EXACT_SHA."; exit 1
+          else
+            outcome=deployed
+          fi
+          # Terminal data reconciles late completion and no-op outcomes.
+          jq -n --arg repository '${{ github.repository }}' --arg sha "$EXACT_SHA" --arg outcome "$outcome" \
+            --arg sourceCiRunId '${{ github.event.workflow_run.id }}' --arg sourceCiRunAttempt '${{ github.event.workflow_run.run_attempt }}' \
+            --arg controllerRunId '${{ github.run_id }}' --arg controllerRunAttempt '${{ github.run_attempt }}' \
+            '{schema:"jovie-staging-completion/v1", terminal:true, repository:$repository, sha:$sha, outcome:$outcome, sourceCiRunId:$sourceCiRunId, sourceCiRunAttempt:$sourceCiRunAttempt, controllerRunId:$controllerRunId, controllerRunAttempt:$controllerRunAttempt}' > "$RUNNER_TEMP/staging-completion.json"
+          echo "Staging generation $EXACT_SHA finished as $outcome ($STAGING_STATE)."
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with: {name: "staging-completion-${{ github.run_attempt }}", path: "${{ runner.temp }}/staging-completion.json", if-no-files-found: error, retention-days: 30}
