@@ -204,6 +204,58 @@ describe('marketing generation pipeline', () => {
     );
   });
 
+  it('fails closed when the visual reviewer identity is omitted', () => {
+    const receipts: readonly MarketingGateReceipt[] =
+      MARKETING_TASTE_GATE_IDS.map(gateId => ({
+        gateId,
+        verdict: 'pass',
+        executionId: `execution-${gateId}`,
+        candidateDigest: 'digest-a',
+        reviewerModelId: gateId === 'visual-review' ? undefined : 'reviewer',
+        findings: [],
+      }));
+
+    expect(
+      auditMarketingTasteAdmission({
+        candidateDigest: 'digest-a',
+        generatorModelId: 'image-generator',
+        receipts,
+      }).map(finding => finding.code)
+    ).toContain('missing-visual-reviewer');
+  });
+
+  it('rejects a forged visual receipt with no positive pass signal', () => {
+    const receipts = MARKETING_TASTE_GATE_IDS.map(gateId => ({
+      gateId,
+      verdict: 'pass',
+      executionId: `execution-${gateId}`,
+      candidateDigest: 'digest-a',
+      reviewerModelId:
+        gateId === 'visual-review' ? 'vision-reviewer' : undefined,
+      findings: [],
+    })) as MarketingGateReceipt[];
+    const visualReceipt = receipts.find(
+      receipt => receipt.gateId === 'visual-review'
+    );
+    if (!visualReceipt) throw new Error('visual receipt fixture missing');
+    (visualReceipt as { verdict?: string }).verdict = undefined;
+
+    const findings = auditMarketingTasteAdmission({
+      candidateDigest: 'digest-a',
+      generatorModelId: 'image-generator',
+      receipts,
+    });
+
+    expect(findings.map(finding => finding.code)).toEqual(
+      expect.arrayContaining(['failed-taste-gate', 'failed-taste-gate'])
+    );
+    expect(
+      findings.some(finding =>
+        finding.message.includes('visual_review_not_passed')
+      )
+    ).toBe(true);
+  });
+
   it('canonizes Scene Palette v1 without changing production UI anchors', () => {
     expect(JOVIE_IMAGE_COLOR_POLICY.schema).toBe('jovie-image-color-policy/v1');
     expect(JOVIE_IMAGE_COLOR_POLICY.version).toBe('scene-palette-v1');

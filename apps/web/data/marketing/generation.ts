@@ -8,6 +8,7 @@
  * v1 plus the approved dark-glass / flowing-accent media recipes.
  */
 
+import { evaluateIndependentVisualReviewTrust } from '../../lib/agent-os/visual-review-trust';
 import {
   formatJovieImageColorPolicyForPrompt,
   JOVIE_IMAGE_COLOR_POLICY,
@@ -45,6 +46,15 @@ export const MARKETING_STAGE_ATTEMPT_LIMITS: Readonly<
   'adversarial-review': 3,
   'taste-admission': 1,
 };
+
+/**
+ * Bounded page decisions build on the stage budgets above. These limits are
+ * deliberately small: a candidate set is a decision aid, not a second
+ * optimizer, and total attempts must remain bounded across all repairs.
+ */
+export const MARKETING_DECISION_CANDIDATE_MIN = 2;
+export const MARKETING_DECISION_CANDIDATE_MAX = 4;
+export const MARKETING_DECISION_TOTAL_ATTEMPT_LIMIT = 12;
 
 export const MARKETING_CREATIVE_ROLES = [
   'truth-curator',
@@ -376,15 +386,41 @@ export function auditMarketingTasteAdmission(input: {
   const visualReview = input.receipts.find(
     receipt => receipt.gateId === 'visual-review'
   );
-  if (
-    visualReview?.reviewerModelId &&
-    visualReview.reviewerModelId === input.generatorModelId
-  ) {
-    findings.push({
-      code: 'self-reviewed-visual',
-      stage: 'taste-admission',
-      message: 'The asset generator cannot be its own visual reviewer.',
+  const visualReviews = input.receipts.filter(
+    receipt => receipt.gateId === 'visual-review'
+  );
+  if (visualReviews.length === 1 && visualReview) {
+    const trust = evaluateIndependentVisualReviewTrust({
+      expectedCandidateDigest: input.candidateDigest,
+      generatorModelId: input.generatorModelId,
+      receipt: visualReview,
     });
+    for (const failure of trust.failures) {
+      const code =
+        failure === 'self_reviewed_visual'
+          ? 'self-reviewed-visual'
+          : failure === 'missing_review_execution_id'
+            ? 'missing-gate-execution'
+            : failure === 'visual_review_candidate_digest_mismatch'
+              ? 'stale-gate-receipt'
+              : failure === 'missing_expected_candidate_digest' ||
+                  failure === 'missing_review_candidate_digest'
+                ? 'missing-visual-review-candidate-digest'
+                : failure === 'missing_reviewer_model_id'
+                  ? 'missing-visual-reviewer'
+                  : failure === 'missing_generator_model_id'
+                    ? 'missing-visual-generator'
+                    : 'failed-taste-gate';
+      const message =
+        failure === 'self_reviewed_visual'
+          ? 'The asset generator cannot be its own visual reviewer.'
+          : `The independent visual review is not trusted: ${failure}.`;
+      findings.push({
+        code,
+        stage: 'taste-admission',
+        message,
+      });
+    }
   }
 
   return findings;

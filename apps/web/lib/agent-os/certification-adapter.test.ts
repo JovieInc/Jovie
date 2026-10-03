@@ -22,6 +22,9 @@ import {
 } from '@/lib/agent-os/certification-adapter';
 
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const CANDIDATE_DIGEST = 'sha256:candidate-digest';
+const GENERATOR_MODEL_ID = 'image-generator';
+const REVIEWER_MODEL_ID = 'vision-reviewer';
 const REGISTRY = MARKETING_COMPONENT_REGISTRY.filter(
   entry => entry.sourceBacked
 ).slice(0, 2);
@@ -51,7 +54,7 @@ function proof(
   id: string,
   status: CertificationEvidenceStatus = 'passed'
 ): CertificationEvidenceReceipt {
-  return {
+  const receipt = {
     digest: `sha256:${id.padEnd(64, '0').slice(0, 64)}`,
     id,
     ref: `github:JovieInc/Jovie/${id}`,
@@ -60,6 +63,14 @@ function proof(
     summary: `${tier} ${status}`,
     tier,
   };
+  return tier === 'visual_proof'
+    ? {
+        ...receipt,
+        candidateDigest: CANDIDATE_DIGEST,
+        executionId: `execution:${id}`,
+        reviewerModelId: REVIEWER_MODEL_ID,
+      }
+    : receipt;
 }
 
 function binding(
@@ -156,6 +167,7 @@ function packet(
   const mediaId = `${entry.id}-media`;
   const variantId = `${entry.id}-default`;
   return {
+    candidateDigest: CANDIDATE_DIGEST,
     canonicalReferences: [
       proof('canonical_references', `${entry.id}-ref`),
       {
@@ -165,6 +177,7 @@ function packet(
       proof('canonical_references', `${entry.id}-assurance-security`),
     ],
     contract: 'jovie.certification/v1',
+    generatorModelId: GENERATOR_MODEL_ID,
     invariantEvaluation: [
       proof('invariant_evaluation', `${entry.id}-invariant`),
       proof('invariant_evaluation', `${entry.id}-assurance-integrity`),
@@ -291,6 +304,50 @@ describe('MarketingCertificationStore', () => {
         existingEntryId: null,
       })
     ).resolves.toMatchObject({ eligibleSubjectIds: [], selected: null });
+  });
+
+  it('requires independent visual identity and exact candidate evidence at the marketing gate', async () => {
+    const entry = REGISTRY[0];
+    const store = new MarketingCertificationStore(memoryBackend(), [entry]);
+    const base = packet(entry);
+    const missingReviewer = await store.ingestPacket(
+      {
+        ...base,
+        visualProof: base.visualProof.map(
+          ({ reviewerModelId, ...receipt }) => receipt
+        ),
+      },
+      '2026-09-04T20:01:30.000Z'
+    );
+    expect(missingReviewer.admission.state).toBe('working');
+    expect(missingReviewer.admission.blockers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'visual_proof_failed',
+          id: `${entry.id}-visual`,
+          summary: expect.stringContaining('missing_reviewer_model_id'),
+        }),
+      ])
+    );
+
+    const staleCandidate = await store.ingestPacket(
+      {
+        ...base,
+        candidateDigest: 'sha256:changed-candidate',
+      },
+      '2026-09-04T20:01:31.000Z'
+    );
+    expect(staleCandidate.admission.state).toBe('working');
+    expect(staleCandidate.admission.blockers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'visual_proof_failed',
+          summary: expect.stringContaining(
+            'visual_review_candidate_digest_mismatch'
+          ),
+        }),
+      ])
+    );
   });
 
   it('selects deterministically at most one and preserves occupied Badge', async () => {
@@ -692,17 +749,20 @@ describe('MarketingCertificationStore', () => {
       },
       'cannot satisfy more than one requirement',
     ],
-  ])('rejects malformed assurance mapping: %s', async (_label, profile, error) => {
-    const store = new MarketingCertificationStore(memoryBackend(), [
-      REGISTRY[0],
-    ]);
-    await expect(
-      store.projectReviewReady({
-        assuranceProfiles: [profile as MarketingAssuranceProfile],
-        existingEntryId: null,
-      })
-    ).rejects.toThrow(error);
-  });
+  ])(
+    'rejects malformed assurance mapping: %s',
+    async (_label, profile, error) => {
+      const store = new MarketingCertificationStore(memoryBackend(), [
+        REGISTRY[0],
+      ]);
+      await expect(
+        store.projectReviewReady({
+          assuranceProfiles: [profile as MarketingAssuranceProfile],
+          existingEntryId: null,
+        })
+      ).rejects.toThrow(error);
+    }
+  );
 
   it('rejects ambiguous, stale-source, unknown, and duplicate assurance mappings', async () => {
     const entry = REGISTRY[0];
@@ -1080,18 +1140,17 @@ describe('MarketingCertificationStore', () => {
     ).rejects.toThrow('has no resolved canonical source');
   });
 
-  it.each([
-    42,
-    '{',
-    '{}',
-  ] as const)('fails closed for corrupt ledger %j', async raw => {
-    const backend = memoryBackend(
-      new Map([[MARKETING_CERTIFICATION_STORE_KEY, raw]])
-    );
-    await expect(
-      new MarketingCertificationStore(backend, REGISTRY).projectLedger()
-    ).rejects.toBeInstanceOf(MarketingCertificationPersistenceError);
-  });
+  it.each([42, '{', '{}'] as const)(
+    'fails closed for corrupt ledger %j',
+    async raw => {
+      const backend = memoryBackend(
+        new Map([[MARKETING_CERTIFICATION_STORE_KEY, raw]])
+      );
+      await expect(
+        new MarketingCertificationStore(backend, REGISTRY).projectLedger()
+      ).rejects.toBeInstanceOf(MarketingCertificationPersistenceError);
+    }
+  );
 
   it('rejects persisted packet, decision, audit, and replay corruption', async () => {
     for (const corruption of [

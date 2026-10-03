@@ -561,7 +561,13 @@ function isEvidenceReceipt(value: unknown): boolean {
     isNullableString(value.sourceSha) &&
     typeof value.ref === 'string' &&
     isNullableString(value.digest) &&
-    typeof value.summary === 'string'
+    typeof value.summary === 'string' &&
+    (value.reviewerModelId === undefined ||
+      typeof value.reviewerModelId === 'string') &&
+    (value.executionId === undefined ||
+      typeof value.executionId === 'string') &&
+    (value.candidateDigest === undefined ||
+      typeof value.candidateDigest === 'string')
   );
 }
 
@@ -799,6 +805,15 @@ function isCertificationReviewPacket(value: unknown): boolean {
   }
 
   if (
+    (value.candidateDigest !== undefined &&
+      !isNullableString(value.candidateDigest)) ||
+    (value.generatorModelId !== undefined &&
+      !isNullableString(value.generatorModelId))
+  ) {
+    return false;
+  }
+
+  if (
     value.source !== null &&
     (!isRecord(value.source) ||
       typeof value.source.repository !== 'string' ||
@@ -1013,6 +1028,7 @@ function projectionRow(
       decisions: record.decisions,
       evaluatedAt,
       packet: record.packet,
+      requireTrustedVisualReview: true,
     });
   } catch {
     throw new MarketingCertificationPersistenceError(
@@ -1089,6 +1105,7 @@ export class MarketingCertificationStore {
         decisions: existing.decisions,
         evaluatedAt,
         packet,
+        requireTrustedVisualReview: true,
       });
       const nextRecord: MarketingCertificationRecord = {
         auditHistory: [...existing.auditHistory, ...admission.auditHistory],
@@ -1162,6 +1179,7 @@ export class MarketingCertificationStore {
           decisions: existing.decisions,
           evaluatedAt: decidedAt,
           packet: existing.packet,
+          requireTrustedVisualReview: true,
         });
         const assurance = evaluateMarketingAssurance(
           existing.packet,
@@ -1207,6 +1225,7 @@ export class MarketingCertificationStore {
           decision: input.decision,
           existingDecisions: existing.decisions,
           packet: existing.packet,
+          requireTrustedVisualReview: true,
         });
         if (!recorded.ok) {
           return { ledger, result: { ...recorded, assurance } };

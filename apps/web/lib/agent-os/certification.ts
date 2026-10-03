@@ -1,5 +1,14 @@
 import { createHash } from 'node:crypto';
 
+import { evaluateIndependentVisualReviewTrust } from './visual-review-trust';
+
+export {
+  evaluateIndependentVisualReviewTrust,
+  type VisualReviewTrustFailure as CertificationVisualReviewTrustFailure,
+  type VisualReviewTrustInput as CertificationVisualReviewTrustInput,
+  type VisualReviewTrustResult as CertificationVisualReviewTrustResult,
+} from './visual-review-trust';
+
 export const JOVIE_CERTIFICATION_CONTRACT = 'jovie.certification/v1' as const;
 
 export const CERTIFICATION_STATES = [
@@ -162,6 +171,14 @@ export interface CertificationEvidenceReceipt {
   readonly ref: string;
   readonly digest: string | null;
   readonly summary: string;
+  /**
+   * Visual evidence provenance. These fields stay optional in the shared
+   * envelope so non-visual domains can remain advisory, but the marketing
+   * adapter requires all of them before it admits visual proof.
+   */
+  readonly reviewerModelId?: string;
+  readonly executionId?: string;
+  readonly candidateDigest?: string;
 }
 
 export interface CertificationRequiredVariant {
@@ -194,6 +211,10 @@ export interface CertificationReviewPacket {
   readonly contract: string;
   readonly subject: CertificationSubject;
   readonly source: CertificationSourceReceipt | null;
+  /** Exact generated candidate covered by visual review, when available. */
+  readonly candidateDigest?: string | null;
+  /** Model identity that generated the candidate, when available. */
+  readonly generatorModelId?: string | null;
   readonly canonicalReferences: readonly CertificationEvidenceReceipt[];
   readonly invariantEvaluation: readonly CertificationEvidenceReceipt[];
   readonly testsCoverage: readonly CertificationEvidenceReceipt[];
@@ -268,11 +289,18 @@ export interface EvaluateCertificationAdmissionInput {
   readonly decisions?: readonly FounderCertificationDecision[];
   readonly requestedState?: CertificationState | null;
   readonly evaluatedAt?: string;
+  /**
+   * Marketing's persisted gate opts into the stronger visual provenance
+   * contract. Other domains remain advisory until they supply the same
+   * candidate/reviewer evidence.
+   */
+  readonly requireTrustedVisualReview?: boolean;
 }
 
 export interface RecordFounderCertificationDecisionInput {
   readonly packet: CertificationReviewPacket;
   readonly existingDecisions?: readonly FounderCertificationDecision[];
+  readonly requireTrustedVisualReview?: boolean;
   readonly decision: Omit<
     FounderCertificationDecision,
     'decidedAt' | 'subjectId' | 'evidenceDigest'
@@ -335,9 +363,12 @@ function receiptDigestInput(
   receipt: CertificationEvidenceReceipt
 ): StableObject {
   return {
+    candidateDigest: receipt.candidateDigest ?? null,
     digest: receipt.digest,
+    executionId: receipt.executionId ?? null,
     id: receipt.id,
     ref: receipt.ref,
+    reviewerModelId: receipt.reviewerModelId ?? null,
     sourceSha: receipt.sourceSha,
     status: receipt.status,
     summary: receipt.summary,
@@ -377,7 +408,9 @@ function buildDecisionDigestInput(
     canonicalReferences: byId(packet.canonicalReferences).map(
       receiptDigestInput
     ),
+    candidateDigest: packet.candidateDigest ?? null,
     contract: packet.contract,
+    generatorModelId: packet.generatorModelId ?? null,
     invariantEvaluation: byId(packet.invariantEvaluation).map(
       receiptDigestInput
     ),
@@ -492,6 +525,38 @@ function requireReceiptGroup(
       receiptPassedForSource(packet, receipt),
     ].filter((issue): issue is CertificationBlocker => issue !== null)
   );
+}
+
+function trustedVisualReviewBlockers(
+  packet: CertificationReviewPacket
+): CertificationBlocker[] {
+  return packet.visualProof.flatMap(receipt => {
+    const trust = evaluateIndependentVisualReviewTrust({
+      expectedCandidateDigest: packet.candidateDigest,
+      generatorModelId: packet.generatorModelId,
+      receipt,
+    });
+    return trust.failures.map(failure =>
+      blocker(
+        'visual_proof_failed',
+        'visual_proof',
+        receipt.id,
+        `Visual proof ${receipt.id} is not trusted: ${failure}.`
+      )
+    );
+  });
+}
+
+/**
+ * Marketing packets carry their domain in the adapter-owned subject kind.
+ * Keep this derivation in the kernel so a caller cannot disable the stronger
+ * visual provenance contract by invoking the generic API directly.
+ */
+function requiresTrustedVisualReviewForPacket(
+  packet: CertificationReviewPacket
+): boolean {
+  const subjectKind = packet.subject.kind.trim().toLowerCase();
+  return subjectKind === 'marketing' || subjectKind.startsWith('marketing-');
 }
 
 function collectSourceBlockers(packet: CertificationReviewPacket) {
@@ -668,7 +733,10 @@ function collectMediaReceiptBlockers(
   return blockers;
 }
 
-function collectTasteBlockers(packet: CertificationReviewPacket) {
+function collectTasteBlockers(
+  packet: CertificationReviewPacket,
+  requireTrustedVisualReview: boolean
+) {
   if (packet.contract !== JOVIE_CERTIFICATION_CONTRACT) {
     return [
       blocker(
@@ -695,6 +763,7 @@ function collectTasteBlockers(packet: CertificationReviewPacket) {
     ...requireReceiptGroup(packet, packet.testsCoverage, 'tests_coverage'),
     ...requireReceiptGroup(packet, packet.visualProof, 'visual_proof'),
     ...collectRequiredVariantBlockers(packet),
+    ...(requireTrustedVisualReview ? trustedVisualReviewBlockers(packet) : []),
   ];
 }
 
@@ -969,8 +1038,14 @@ export function evaluateCertificationAdmission({
   decisions = [],
   requestedState = null,
   evaluatedAt = new Date().toISOString(),
+  requireTrustedVisualReview = false,
 }: EvaluateCertificationAdmissionInput): CertificationAdmission {
-  const tasteBlockers = collectTasteBlockers(packet);
+  const trustedVisualReviewRequired =
+    requireTrustedVisualReview || requiresTrustedVisualReviewForPacket(packet);
+  const tasteBlockers = collectTasteBlockers(
+    packet,
+    trustedVisualReviewRequired
+  );
   const digest =
     packet.contract === JOVIE_CERTIFICATION_CONTRACT
       ? buildCertificationDecisionDigest(packet)
@@ -1030,11 +1105,13 @@ export function recordFounderCertificationDecision(
     existingDecisions = [],
     decision,
     decidedAt = new Date().toISOString(),
+    requireTrustedVisualReview = false,
   } = input;
   const admission = evaluateCertificationAdmission({
     packet,
     decisions: existingDecisions,
     evaluatedAt: decidedAt,
+    requireTrustedVisualReview,
   });
 
   if (
@@ -1098,6 +1175,7 @@ export function recordFounderCertificationDecision(
       packet,
       decisions,
       evaluatedAt: decidedAt,
+      requireTrustedVisualReview,
     }),
     decision: recordedDecision,
     decisions,

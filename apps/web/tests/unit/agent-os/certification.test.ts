@@ -5,6 +5,7 @@ import {
   type CertificationReviewPacket,
   type CertificationState,
   evaluateCertificationAdmission,
+  evaluateIndependentVisualReviewTrust,
   recordFounderCertificationDecision,
   shouldEmitTasteInboxCard,
 } from '@/lib/agent-os/certification';
@@ -95,27 +96,142 @@ function approve(packet: CertificationReviewPacket) {
   return recorded.decision;
 }
 describe('certification admission kernel', () => {
-  it.each([
-    undefined,
-    '',
-    'sha256:stale-review',
-  ])('rejects founder approval without the exact reviewed digest (%s)', evidenceDigest => {
-    const packet = reviewPacket();
-    const result = recordFounderCertificationDecision({
-      packet,
-      decision: {
-        decision: 'approved',
-        id: 'unbound-decision',
-        notes: null,
-        reviewer: 'founder',
-        evidenceDigest: evidenceDigest as string,
+  it('requires an independent reviewer, execution, pass, and exact candidate evidence', () => {
+    const trusted = evaluateIndependentVisualReviewTrust({
+      expectedCandidateDigest: 'sha256:candidate',
+      generatorModelId: 'image-generator',
+      receipt: {
+        candidateDigest: 'sha256:candidate',
+        executionId: 'visual-execution-1',
+        reviewerModelId: 'vision-reviewer',
+        status: 'passed',
       },
     });
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error('unbound approval must fail');
-    expect(result.reason).toBe('decision_digest_mismatch');
-    expect(result.admission.state).toBe('review_ready');
+    expect(trusted).toEqual({ failures: [], trusted: true });
+
+    expect(
+      evaluateIndependentVisualReviewTrust({
+        expectedCandidateDigest: 'sha256:candidate',
+        generatorModelId: 'image-generator',
+        receipt: {
+          candidateDigest: 'sha256:stale',
+          executionId: ' ',
+          reviewerModelId: 'image-generator',
+          status: undefined,
+        },
+      })
+    ).toEqual({
+      failures: [
+        'self_reviewed_visual',
+        'missing_review_execution_id',
+        'visual_review_candidate_digest_mismatch',
+        'visual_review_not_passed',
+      ],
+      trusted: false,
+    });
   });
+
+  it('fails closed when both pass signals are omitted from a visual receipt', () => {
+    const result = evaluateIndependentVisualReviewTrust({
+      expectedCandidateDigest: 'sha256:candidate',
+      generatorModelId: 'image-generator',
+      receipt: {
+        candidateDigest: 'sha256:candidate',
+        executionId: 'visual-execution-1',
+        reviewerModelId: 'vision-reviewer',
+      },
+    });
+    expect(result.trusted).toBe(false);
+    expect(result.failures).toContain('visual_review_not_passed');
+  });
+
+  it('rejects missing expected or observed candidate evidence independently', () => {
+    const missingExpected = evaluateIndependentVisualReviewTrust({
+      expectedCandidateDigest: undefined,
+      generatorModelId: 'image-generator',
+      receipt: {
+        candidateDigest: 'sha256:candidate',
+        executionId: 'visual-execution-1',
+        reviewerModelId: 'vision-reviewer',
+        status: 'passed',
+      },
+    });
+    expect(missingExpected.failures).toContain(
+      'missing_expected_candidate_digest'
+    );
+    expect(missingExpected.trusted).toBe(false);
+
+    const missingObserved = evaluateIndependentVisualReviewTrust({
+      expectedCandidateDigest: 'sha256:candidate',
+      generatorModelId: 'image-generator',
+      receipt: {
+        executionId: 'visual-execution-1',
+        reviewerModelId: 'vision-reviewer',
+        status: 'passed',
+      },
+    });
+    expect(missingObserved.failures).toContain(
+      'missing_review_candidate_digest'
+    );
+    expect(missingObserved.trusted).toBe(false);
+  });
+
+  it('derives the strict visual gate from marketing subject identity', () => {
+    const packet = reviewPacket({
+      candidateDigest: 'sha256:candidate',
+      generatorModelId: 'image-generator',
+      subject: {
+        id: 'section.profile-hero',
+        kind: 'marketing-section',
+        title: 'Profile hero',
+      },
+      visualProof: [
+        {
+          ...receipt('visual_proof', 'marketing-visual-proof'),
+          candidateDigest: 'sha256:candidate',
+          executionId: 'visual-execution-1',
+          reviewerModelId: 'image-generator',
+        },
+      ],
+    });
+
+    const admission = evaluateCertificationAdmission({
+      packet,
+      // A direct generic call must not opt a marketing packet out.
+      requireTrustedVisualReview: false,
+    });
+    expect(admission.blockers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'visual_proof_failed',
+          id: 'marketing-visual-proof',
+          summary: expect.stringContaining('self_reviewed_visual'),
+        }),
+      ])
+    );
+    expect(admission.state).toBe('working');
+  });
+
+  it.each([undefined, '', 'sha256:stale-review'])(
+    'rejects founder approval without the exact reviewed digest (%s)',
+    evidenceDigest => {
+      const packet = reviewPacket();
+      const result = recordFounderCertificationDecision({
+        packet,
+        decision: {
+          decision: 'approved',
+          id: 'unbound-decision',
+          notes: null,
+          reviewer: 'founder',
+          evidenceDigest: evidenceDigest as string,
+        },
+      });
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error('unbound approval must fail');
+      expect(result.reason).toBe('decision_digest_mismatch');
+      expect(result.admission.state).toBe('review_ready');
+    }
+  );
   it('rejects a previously displayed digest when the evidence packet changes', () => {
     const displayed = reviewPacket();
     const evidenceDigest = buildCertificationDecisionDigest(displayed);
@@ -142,25 +258,23 @@ describe('certification admission kernel', () => {
     expect(result.reason).toBe('decision_digest_mismatch');
   });
 
-  it.each([
-    '',
-    'not-a-commit',
-    'a'.repeat(39),
-    'g'.repeat(40),
-  ])('rejects malformed source identity %s', sha => {
-    const packet = reviewPacket();
-    if (!packet.source) throw new Error('missing fixture source');
-    const admission = evaluateCertificationAdmission({
-      packet: {
-        ...packet,
-        source: { ...packet.source, sha, expectedSha: sha },
-      },
-    });
-    expect(admission.state).toBe('working');
-    expect(admission.blockers.map(item => item.code)).toContain(
-      'source_missing'
-    );
-  });
+  it.each(['', 'not-a-commit', 'a'.repeat(39), 'g'.repeat(40)])(
+    'rejects malformed source identity %s',
+    sha => {
+      const packet = reviewPacket();
+      if (!packet.source) throw new Error('missing fixture source');
+      const admission = evaluateCertificationAdmission({
+        packet: {
+          ...packet,
+          source: { ...packet.source, sha, expectedSha: sha },
+        },
+      });
+      expect(admission.state).toBe('working');
+      expect(admission.blockers.map(item => item.code)).toContain(
+        'source_missing'
+      );
+    }
+  );
 
   it.each([
     'canonicalReferences',
@@ -213,36 +327,34 @@ describe('certification admission kernel', () => {
     }
   });
 
-  it.each([
-    'ci',
-    'queueMerge',
-    'deploy',
-    'runtimeDogfood',
-  ] as const)('rejects unbound %s operational proof', group => {
-    const packet = reviewPacket();
-    const decision = approve(packet);
-    const operational = {
-      ci: [receipt('ci')],
-      queueMerge: [receipt('queue_merge')],
-      deploy: [receipt('deploy')],
-      runtimeDogfood: [receipt('runtime_dogfood')],
-    };
-    const admission = evaluateCertificationAdmission({
-      packet: {
-        ...packet,
-        operational: {
-          ...operational,
-          [group]: [{ ...operational[group][0], sourceSha: null }],
+  it.each(['ci', 'queueMerge', 'deploy', 'runtimeDogfood'] as const)(
+    'rejects unbound %s operational proof',
+    group => {
+      const packet = reviewPacket();
+      const decision = approve(packet);
+      const operational = {
+        ci: [receipt('ci')],
+        queueMerge: [receipt('queue_merge')],
+        deploy: [receipt('deploy')],
+        runtimeDogfood: [receipt('runtime_dogfood')],
+      };
+      const admission = evaluateCertificationAdmission({
+        packet: {
+          ...packet,
+          operational: {
+            ...operational,
+            [group]: [{ ...operational[group][0], sourceSha: null }],
+          },
         },
-      },
-      decisions: [decision],
-      requestedState: 'monitored',
-    });
-    expect(admission.transition.allowed).toBe(false);
-    expect(admission.transition.blockers.map(item => item.code)).toContain(
-      `${operational[group][0].tier}_failed`
-    );
-  });
+        decisions: [decision],
+        requestedState: 'monitored',
+      });
+      expect(admission.transition.allowed).toBe(false);
+      expect(admission.transition.blockers.map(item => item.code)).toContain(
+        `${operational[group][0].tier}_failed`
+      );
+    }
+  );
 
   it('emits one Taste Inbox card only when a review packet is complete', () => {
     const packet = reviewPacket();
