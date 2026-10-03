@@ -1866,6 +1866,91 @@ class PreservedRecoveryTest(unittest.TestCase):
             lock.release()
 
 
+class RetryReceiptTest(unittest.TestCase):
+    def request(self, **changes):
+        pr = {"number": 19883, "headRefOid": "0" * 40, "isDraft": False,
+              "headRefName": "devin/jov-6234-20260926", "mergeStateStatus": "UNSTABLE"}
+        ident = lane.execution_attempt.identity("pr-remediation", {"pr": pr["number"]}, {"headSha": pr["headRefOid"]})
+        row = {**ident, "schema": lane.execution_attempt.SCHEMA, "event": "attempt_finished",
+               "fencingToken": "old-fence", "result": "failed_known", "terminalState": None,
+               "retryDecision": "retry", "failureClass": "repair_incomplete",
+               "remainingBudgets": {"attempts": 1, "wallSeconds": 10}, "_remote": {"eventId": "finished"}}
+        row.update(changes)
+        check = {"context": f"jovie-execution/{ident['identityDigest']}", "state": "PENDING",
+                 "targetUrl": f"https://github.com/{lane.REPO_SLUG}/commit/{pr['headRefOid']}#jovie-execution="
+                              + lane.execution_attempt._pack(row)}
+        return {**pr, "statusCheckRollup": [check]}, row
+
+    def test_finished_retry_is_admitted_without_resetting_outer_budget(self):
+        pr, row = self.request()
+        self.assertEqual(lane.repair_retry.hint(pr, lane.REPO_SLUG), row)
+        self.assertEqual(lane.red_pr([pr], {}), pr)
+        self.assertIsNone(lane.red_pr([pr], {"19883": {"sha": pr["headRefOid"], "count": 2}}))
+        self.assertIsNone(lane.red_pr([{**pr, "labels": [{"name": "hold"}]}], {}))
+        summary = {**pr, "statusCheckRollup": [{"synthetic": True, "status": "PENDING"}]}
+        with patch.object(lane, "with_checks", return_value=pr) as read:
+            self.assertEqual(lane.red_pr([summary], {}), pr)
+            read.assert_called_once()
+        with patch.object(lane, "with_checks", side_effect=AssertionError("spent head must not fetch")):
+            self.assertIsNone(lane.red_pr([summary], {"19883": {"sha": pr["headRefOid"], "count": 2}}))
+
+    def test_live_ambiguous_foreign_malformed_and_exhausted_receipts_stay_fenced(self):
+        for change in ({"event": "attempt_started"}, {"terminalState": "succeeded"}, {"result": "failed_unknown"},
+                       {"failureClass": "unknown"}, {"retryDecision": "stop"}, {"workKey": "other:x"},
+                       {"identityDigest": "bad"}, {"executionGeneration": "old"}, {"_remote": {}},
+                       {"remainingBudgets": {"attempts": 0, "wallSeconds": 10}},
+                       {"remainingBudgets": {"attempts": True, "wallSeconds": 10}},
+                       {"remainingBudgets": {"attempts": 1, "wallSeconds": float("inf")}}):
+            pr, _ = self.request(**change)
+            self.assertIsNone(lane.red_pr([pr], {}), change)
+        pr, _ = self.request()
+        for altered in ({**pr, "isDraft": True}, {**pr, "isCrossRepository": True},
+                        {**pr, "statusCheckRollup": pr["statusCheckRollup"] * 2},
+                        {**pr, "statusCheckRollup": [*pr["statusCheckRollup"], {"status": "IN_PROGRESS"}]}):
+            self.assertIsNone(lane.repair_retry.hint(altered, lane.REPO_SLUG))
+        for target in ("bad", pr["statusCheckRollup"][0]["targetUrl"].replace("github.com", "example.org"),
+                       "https://github.com/" + "x" * 2100,
+                       pr["statusCheckRollup"][0]["targetUrl"].split("#")[0] + "#jovie-execution=bad"):
+            self.assertIsNone(lane.repair_retry.hint({**pr, "statusCheckRollup":
+                [{**pr["statusCheckRollup"][0], "targetUrl": target}]}, lane.REPO_SLUG))
+
+    def test_canonical_refresh_proves_stopped_owner_and_exact_identity(self):
+        pr, row = self.request()
+        start = {"event": "attempt_started", "fencingToken": row["fencingToken"],
+                 "trigger": {"correlationId": "pr-19883", "causationId": pr["headRefOid"]}}
+        with patch.object(lane.execution_attempt, "_github_rows", return_value=([start, row], 1)):
+            ident = lane.repair_retry.canonical_identity(pr, row, {})
+            self.assertEqual(ident["identityDigest"], row["identityDigest"])
+        for rows in ([], [start, {**row, "_remote": {"eventId": "new-owner"}}], [row],
+                     [{**start, "trigger": {"correlationId": "pr-7"}}, row],
+                     [start, {**row, "terminalState": "budget_exhausted"}]):
+            with patch.object(lane.execution_attempt, "_github_rows", return_value=(rows, 1)), \
+                    self.assertRaises(RuntimeError):
+                lane.repair_retry.canonical_identity(pr, row, {})
+
+    def test_unused_debit_refund_is_bound_to_one_claim_and_idempotent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = SimpleNamespace(state=Path(tmp))
+            path = host.state / "fix-attempts.json"
+            before = {"19883": {"sha": "head", "count": 2, "claimToken": "mine", "pushedHead": "new"},
+                      "7": {"sha": "other", "count": 2}}
+            path.write_text(json.dumps(before))
+            pr = {"number": 19883, "headRefOid": "head"}
+            receipt = {"runId": "cancel", "localAttemptToken": "mine", "executionNotStarted": True,
+                       "verdict": "cancelled", "reasons": ["target-head-superseded"]}
+            lane.end_local_fix_attempt(host, pr, receipt)
+            lane.end_local_fix_attempt(host, pr, receipt)
+            after = json.loads(path.read_text())
+            self.assertEqual(after["19883"]["count"], 1)
+            self.assertEqual(after["19883"]["pushedHead"], "new")
+            self.assertEqual(after["7"], before["7"])
+            for changed in ({"localAttemptToken": "other"}, {"execution": {"admitted": True}},
+                            {"agentExit": 0}, {"executionNotStarted": False}):
+                path.write_text(json.dumps(before))
+                lane.end_local_fix_attempt(host, pr, {**receipt, **changed})
+                self.assertEqual(json.loads(path.read_text())["19883"]["count"], 2)
+
+
 class FixRedTest(unittest.TestCase):
     def setUp(self):
         disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)

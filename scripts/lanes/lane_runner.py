@@ -40,6 +40,7 @@ import disk_guard  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
 import pr_events  # noqa: E402
+import repair_retry  # noqa: E402
 import reason_lane  # noqa: E402
 import yc_corpus  # noqa: E402
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
@@ -1540,15 +1541,24 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
             continue  # a hold no push clears (e.g. diff-too-large): intake owns it, not attempts
         gate_held = held_entry.get("sha") == pr["headRefOid"]
         reviewed = pr.get("reviewDecision") == "CHANGES_REQUESTED"
-        if not conflicted and not gate_held and not reviewed:
-            if any(check.get("status") in ("IN_PROGRESS", "QUEUED", "PENDING") for check in checks):
-                continue
-            if not any(check.get("conclusion") in RED for check in checks):
-                continue
         record = attempts.get(str(pr["number"]), {})
         if pr_events.in_flight(record, pr, time.time()) \
                 or pr_events.spent(record, pr["headRefOid"], MAX_FIX_ATTEMPTS):
             continue
+        if not conflicted and not gate_held and not reviewed:
+            if pr.get("mergeStateStatus") == "UNSTABLE" and any(check.get("synthetic") for check in checks):
+                # Existing shared cache bounds this lazy read across all worker wrappers.
+                fresh = shared(f"repair-checks-{pr['number']}-{pr['headRefOid']}", SUMMARY_TTL_S,
+                               lambda: with_checks(pr))
+                if not fresh:
+                    continue
+                pr, checks = fresh, fresh.get("statusCheckRollup") or []
+            retry = repair_retry.hint(pr, REPO_SLUG)
+            if any(repair_retry.pending(check) for check in checks) and not retry:
+                continue
+            if not retry and not any(check.get("conclusion") in RED or check.get("state") in {"FAILURE", "ERROR"}
+                                     for check in checks):
+                continue
         return pr
     return None
 
@@ -1796,6 +1806,13 @@ def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
         attempt = attempts.get(str(pr["number"]))
         if not attempt or attempt.get("sha") != pr.get("headRefOid"):
             return
+        token = receipt.get("localAttemptToken")
+        if (receipt.get("executionNotStarted") is True and token and attempt.get("claimToken") == token
+            and not receipt.get("execution") and receipt.get("agentExit") is None
+            and attempt.get("unusedDebit", {}).get("runId") != receipt["runId"]):
+            attempt["count"] = max(0, attempt.get("count", 0) - 1)
+            attempt["unusedDebit"] = {"runId": receipt["runId"], "claimToken": token,
+                                      "reason": receipt.get("reasons", []), "at": now_iso()}
         attempt.update(endedAt=time.time(), pushed=receipt.get("verdict") == "fix-pushed")
         if receipt.get("verdict") == "fix-pushed" and receipt.get("headAfter"):
             attempt["pushedHead"] = receipt["headAfter"]
@@ -2006,6 +2023,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                "attribution": {"category": "autonomous-remediation", "provider": name},
                "worktree": str(worktree), "branch": pr["headRefName"], "pr": pr["number"],
                "headBefore": pr["headRefOid"], "requestSource": fix_request_source(pr),
+               "localAttemptToken": pr.get("localAttemptToken"),
                "startedAt": now_iso()}
     live = reconcile_fix_target(pr)
     receipt["targetStateReads"] = 1
@@ -2018,6 +2036,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
         verdict = "reconcile-unavailable" if live is None else "cancelled"
         receipt.update(
             verdict=verdict,
+            executionNotStarted=True,
             reasons=[reason],
             cancellation={
                 "schema": "jovie-fix-cancellation/v1",
@@ -2046,11 +2065,21 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
     try:
         if not branch_held:
             raise RecoveryHandoff("repair-owner-active", worktree)
+        retry = repair_retry.hint(pr, REPO_SLUG)
+        if not retry and any(check.get("context", "").startswith("jovie-execution/")
+                             and repair_retry.pending(check) for check in pr.get("statusCheckRollup") or []):
+            raise RecoveryHandoff("pending-execution-receipt-needs-reconciliation", worktree)
+        if retry:
+            try:
+                ident = repair_retry.canonical_identity(pr, retry, coordination)
+            except (RuntimeError, OSError, subprocess.SubprocessError) as error:
+                raise RecoveryHandoff(f"retry-reconciliation:{error}", worktree) from error
         preserved = preserved_run(host, pr=pr["number"])
         if preserved:
             ident = qualify_preserved_pr(host, pr, preserved)
     except RecoveryHandoff as error:
         receipt.update(verdict="recovery-handoff", reasons=[str(error)], recovery=error.evidence,
+                       executionNotStarted=True,
                        endedAt=now_iso(), result={"verdict": "recovery-handoff", "pr": pr["number"], "commit": None})
         if branch_held:
             end_local_fix_attempt(host, pr, receipt)
@@ -2507,6 +2536,9 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
         if entry.get("sha") == pr["headRefOid"]:
             pr = {**pr, "gateEvidence": entry.get("evidence", [])}
         pr_events.record_attempt(attempts, pr["number"], pr["headRefOid"], name, now)
+        token = uuid.uuid4().hex
+        attempts[str(pr["number"])]["claimToken"] = token
+        pr = {**pr, "localAttemptToken": token}
         path.write_text(json.dumps(attempts))
         post_claim(pr["number"], pr["headRefOid"], "fix")
     return pr
