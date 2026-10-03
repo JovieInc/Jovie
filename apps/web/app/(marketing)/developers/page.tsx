@@ -13,14 +13,14 @@ export const revalidate = false;
 export const metadata: Metadata = {
   title: `Developers - ${APP_NAME}`,
   description:
-    'Jovie’s public, anonymous, read-only artist API pairs with machine-readable site resources.',
+    'Jovie’s public, anonymous, read-only profile API pairs with machine-readable site resources.',
   alternates: {
     canonical: `${BASE_URL}${APP_ROUTES.DEVELOPERS}`,
   },
   openGraph: {
     title: `Developers - ${APP_NAME}`,
     description:
-      'Jovie’s public, anonymous, read-only artist API pairs with machine-readable site resources.',
+      'Jovie’s public, anonymous, read-only profile API pairs with machine-readable site resources.',
     url: `${BASE_URL}${APP_ROUTES.DEVELOPERS}`,
     type: 'website',
   },
@@ -44,13 +44,14 @@ const RESOURCE_LINKS = [
     // validate; kept identical to the matching, test-pinned link text on
     // /api-versioning (ui-casing-allow: fixed technical spec name)
     label: 'OpenAPI 3.1 contract',
-    description: 'The machine-readable contract for the public artist API.',
+    description: 'The machine-readable contract for the public profile API.',
   },
   {
     href: '/cli',
+    // ui-casing-allow: existing link label; MCP is the product acronym
     label: 'Jovie CLI and MCP server',
     description:
-      'Anonymous `jovie` commands for agents: read public artist data and create claimable artist profiles.',
+      'Anonymous `jovie` commands for agents: read public profile data and create claimable profiles.',
   },
   {
     href: '/api-versioning',
@@ -112,12 +113,12 @@ export default function DevelopersPage() {
             className='system-b-marketing-route-title mt-6 max-w-3xl text-primary-token line-clamp-2'
           >
             {/* ui-casing-allow: marketing headline, sentence case per DESIGN.md */}
-            Public artist data, in the open.
+            Public profile data, in the open.
           </h1>
           <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
-            Read public artist profiles, releases, events, and merch with
-            Jovie&apos;s anonymous, read-only API. Start with the contract, then
-            follow the links returned for each artist.
+            Read public profiles, releases, events, and merch with Jovie&apos;s
+            anonymous, read-only API. Start with the contract, then follow the
+            links returned for each profile.
           </p>
           <div className='mt-8 flex flex-wrap gap-3'>
             <Link
@@ -146,17 +147,17 @@ export default function DevelopersPage() {
               Quickstart
             </h2>
             <p className='mt-4 text-base leading-relaxed text-secondary-token'>
-              Fetch one public artist&apos;s structured profile with a normal
+              Fetch one public creator&apos;s structured profile with a normal
               HTTP GET request. Replace <code>{'{username}'}</code> with the
-              artist&apos;s public Jovie handle.
+              creator&apos;s public Jovie handle.
             </p>
             <pre className='mt-6 overflow-x-auto rounded-xl border border-subtle bg-surface-0 p-5 text-sm leading-relaxed text-secondary-token'>
               <code>{`curl ${BASE_URL}/api/v1/{username}`}</code>
             </pre>
             <p className='mt-4 text-base leading-relaxed text-secondary-token'>
-              The response includes the artist identity plus public releases,
+              The response includes the profile identity plus public releases,
               upcoming events, merch, and related resource links. Unknown or
-              non-public artists return a JSON 404 response.
+              non-public profiles return a JSON 404 response.
             </p>
           </section>
 
@@ -182,7 +183,7 @@ export default function DevelopersPage() {
               >
                 /llms.txt
               </Link>{' '}
-              or a specific artist&apos;s <code>{'{username}/llms.txt'}</code>,
+              or a specific profile&apos;s <code>{'{username}/llms.txt'}</code>,
               and run the same jobs from a terminal with the{' '}
               <Link
                 href={APP_ROUTES.CLI}
@@ -228,8 +229,8 @@ export default function DevelopersPage() {
               Public by design
             </h2>
             <p className='mt-4 text-base leading-relaxed text-secondary-token'>
-              This page documents Jovie&apos;s public artist surface: anonymous
-              GET access to data an artist has made public. It does not add a
+              This page documents Jovie&apos;s public profile surface: anonymous
+              GET access to data a creator has made public. It does not add a
               write API, credentials, or a separate developer account. Keep
               private or sensitive information out of requests and use the
               OpenAPI contract as the source of truth.
