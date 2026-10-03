@@ -139,7 +139,13 @@ Gaps closed after the first week (no PR may sit unowned):
   Once per stuck episode; a second removal goes to a model with the merge group's failing log.
 - Every 30 minutes the tick reconciles all open PRs in a few GraphQL pages (missed events
   only): DIRTY gets `conflict`, a red rollup gets `red`, a CLEAN lane draft gets `green`, a lane
-  draft idle for 48h gets `stale`; exhausted attempts retain a bounded repair disposition, and a PR that went CLEAN or entered the queue starts a fresh episode.
+  draft idle for 48h gets `stale` when it is still eligible. CLEAN/queued observations clear
+  only synchronization bookkeeping, never consumed attempts or exhaustion labels. Terminal
+  work, explicit holds and active repairs survive stale/supersession retirement and event
+  ready/update-branch handlers. A genuine external head needing repair re-enters only after
+  the existing fenced claim writes its linked receipt, retained across later attempts.
+  An exhausted CLEAN external head without that receipt stays held; observing green is not
+  a repair attempt or new authority.
 - Age SLOs are per class (JOV-7079): queued/ready PRs live on the merge queue's clock, lane
   drafts on the 48h idle `stale` SLO, and non-lane agent drafts (`codex/…`, `tim/…`, `devin/…`,
   etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). Stalled agent
@@ -358,3 +364,31 @@ Re-evaluate when observed dispatches and real workflow/check-in receipts prove
 recurrence, or native scheduling reliably supplies the cadence again. Then:
 remove unnecessary recovery calls while retaining the independent deadman.
 JOV-6909 remains commissioning until recurrence is observed after deployment.
+
+## Design gate (JOV-7541)
+
+UI and landing work does not enter a build lane until a design brief has
+finished the founder's IA-first pipeline (steps 1–9 of
+`docs/design/design-brief-template.md`). Step 2 may cite only certified
+capability ids from `scripts/lanes/certified-capabilities.gen.json`, a
+checked-in projection of `apps/web/data/product-truth/registry.ts`:
+publication `public`, `marketing.proofAuthorized` true, maturity not
+`proposed`, access not `unavailable`.
+
+`design_gate.py` is pure stdlib, no I/O at import. An issue is gated on
+`ws:ui-ia`, `ws:profiles-marketing`, or `ws:design-gate`, or when title or
+description names a `GATED_PATH_PREFIXES` path or clearly targets a
+homepage, landing, or marketing page. `worker()` calls
+`design_gate.pick_build_issue(...)`, passing the existing `pick_issue`; a
+gated issue with an incomplete brief is not claimed, and the runner writes
+`needs-design-brief` plus the matching Linear label at most once. The label
+routes a design pass — it does not itself block — and the next claim admits
+the issue once steps 1–9 are complete.
+
+`doctor.py` adds `designGate` to the admission census (`gated`, `admitted`,
+`needsBrief`, `missingSteps`), deduped; incomplete briefs also increment
+`rejectedByProvider["needs-design-brief"]`.
+
+CI (`.github/workflows/design-gate.yml`) warns when a PR touches the same
+paths with no completed brief; it enforces only when `DESIGN_GATE_ENFORCE`
+is truthy, and unreadable briefs stay warnings even then.

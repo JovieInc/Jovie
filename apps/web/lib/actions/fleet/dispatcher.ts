@@ -30,6 +30,19 @@ import {
   fleetHistoryPrefix,
   readArchiveValue,
 } from './retention';
+import {
+  applySummerDecision,
+  enqueueSummerRequest,
+  FleetSummerError,
+  type FleetSummerEvent,
+  type FleetSummerState,
+  installSummerDelegation,
+  pendingSummerEvents,
+  planSummerDecision,
+  revokeSummerDelegation,
+  summerDelegationInputSchema,
+  summerUndelegationInputSchema,
+} from './summer';
 
 // One CAS document in Summer's existing operating store. PostgreSQL is the
 // sole authority: no Redis failover/split-brain, no new dispatcher service.
@@ -66,6 +79,8 @@ export type HelpRequest = z.infer<typeof fleetRequestSchema>;
 export type FleetControlOperation =
   | 'provision'
   | 'rotate'
+  | 'delegate'
+  | 'undelegate'
   | 'revoke'
   | 'assign'
   | 'accept'
@@ -131,6 +146,7 @@ type DefectOperation = {
 };
 export type FleetState = {
   schema: 'jovie.summer.fleet/v1';
+  summer?: FleetSummerState;
   credentials: Record<string, Credential>;
   workers: Record<string, Worker>;
   missions: Record<string, Mission>;
@@ -141,7 +157,6 @@ export type FleetState = {
   requestWorkers: Record<string, string[]>;
   receiptHistoryRecorded: Record<string, boolean>;
   // Pending Summer deliveries pin their source until authoritative resolution.
-  summer?: { events: Record<string, { requestId: string; state: string }> };
   receipts: Record<string, TerminalReceipt>;
   invocations: Record<string, InvocationRecord>;
   defects: Record<string, Issue>;
@@ -638,15 +653,19 @@ export class FleetDispatcher {
       .object({ workerId: z.string().regex(/^[a-z][a-z0-9-]{2,63}$/) })
       .strict();
     const parsed = (
-      operation === 'assign'
-        ? fleetMissionSchema
-        : operation === 'accept'
-          ? acceptSchema
-          : operation === 'reject'
-            ? rejectSchema
-            : operation === 'provision' || operation === 'rotate'
-              ? provisionSchema
-              : revokeSchema
+      operation === 'delegate'
+        ? summerDelegationInputSchema
+        : operation === 'undelegate'
+          ? summerUndelegationInputSchema
+          : operation === 'assign'
+            ? fleetMissionSchema
+            : operation === 'accept'
+              ? acceptSchema
+              : operation === 'reject'
+                ? rejectSchema
+                : operation === 'provision' || operation === 'rotate'
+                  ? provisionSchema
+                  : revokeSchema
     ).parse(input) as Record<string, unknown>;
     safeText(parsed);
     const token =
@@ -663,7 +682,19 @@ export class FleetDispatcher {
         approval.hash !== digest(stable({ profileId, operation, input }))
       )
         throw new FleetError('CONFIRMATION_REQUIRED');
-      if (operation === 'provision' || operation === 'rotate') {
+      if (operation === 'delegate') {
+        const delegation = installSummerDelegation(
+          s,
+          profileId,
+          actor,
+          parsed,
+          this.now()
+        );
+        approval.consumed = true;
+        return { delegation };
+      } else if (operation === 'undelegate') {
+        revokeSummerDelegation(s, profileId, this.now());
+      } else if (operation === 'provision' || operation === 'rotate') {
         const workerId = parsed.workerId as string;
         const previous = s.credentials[workerId];
         if (operation === 'provision' ? !!previous : !previous)
@@ -829,6 +860,7 @@ export class FleetDispatcher {
             ),
           }
         : {}),
+      summer: s.summer ?? null,
       workers: Object.values(s.workers),
       missions: Object.values(s.missions),
       leases: Object.values(s.leases),
@@ -843,6 +875,71 @@ export class FleetDispatcher {
   async requestMission(profileId: string, input: unknown) {
     return admission(state(await this.deps.backend.get(key(profileId))), input);
   }
+  /** OIDC route calls these methods only after exact founder-profile binding. */
+  async pendingSummerEvents(profileId: string) {
+    if (!this.deps.enabled) throw new FleetError('FEATURE_DISABLED');
+    return pendingSummerEvents(
+      state(await this.deps.backend.get(key(profileId)))
+    );
+  }
+  async processSummerEvent(
+    profileId: string,
+    eventId: string,
+    validateMission: (mission: unknown) => Promise<boolean>
+  ) {
+    if (!this.deps.enabled) throw new FleetError('FEATURE_DISABLED');
+    const archivedDecision = async (s: FleetState) => {
+      if (s.summer?.events[eventId]) return;
+      const archived = await this.archived<FleetSummerEvent>(
+        profileId,
+        'summerEvents',
+        eventId
+      );
+      if (!archived) return;
+      if (!archived.receipt || archived.state === 'pending')
+        throw new FleetSummerError('CONFLICT');
+      // Reuse binding checks without restoring archived work to hot state.
+      const replay = planSummerDecision(
+        { ...s, summer: { events: { [eventId]: archived } } },
+        profileId,
+        eventId,
+        this.now()
+      );
+      if (replay.kind !== 'terminal') throw new FleetSummerError('CONFLICT');
+      return replay;
+    };
+    // Stamp before any provider read so one unavailable canonical issue cannot
+    // monopolize repair. Attempt metadata is deliberately outside plan authority.
+    const plan = await this.mutate(profileId, async s => {
+      const replay = await archivedDecision(s);
+      if (replay) return replay;
+      const event = s.summer?.events[eventId];
+      if (event?.state === 'pending') event.lastAttemptAt = iso(this.now());
+      return planSummerDecision(s, profileId, eventId, this.now());
+    });
+    if (plan.kind === 'terminal')
+      return { status: 'completed' as const, receipt: plan.receipt };
+    if (plan.kind === 'blocked')
+      return { status: 'blocked' as const, reason: plan.reason };
+    // Provider reads are bounded by the existing Linear adapter. The exact plan
+    // is rechecked in the final CAS; an OIDC wake never grants arbitrary work.
+    const valid =
+      plan.kind === 'accept' ? await validateMission(plan.mission) : false;
+    const receipt = await this.mutate(
+      profileId,
+      async s =>
+        (await archivedDecision(s))?.receipt ??
+        applySummerDecision(
+          s,
+          profileId,
+          eventId,
+          plan.proof,
+          valid,
+          this.now()
+        )
+    );
+    return { status: 'completed' as const, receipt };
+  }
   async invoke(
     id: FleetActionId,
     raw: unknown,
@@ -856,8 +953,10 @@ export class FleetDispatcher {
       receipt: { ...receipt, status: 'unavailable' },
       error: {
         code:
-          error instanceof FleetError ? error.code : 'TEMPORARILY_UNAVAILABLE',
-        messageKey: `errors.actions.fleet.${error instanceof FleetError ? error.code : 'TEMPORARILY_UNAVAILABLE'}`,
+          error instanceof FleetError || error instanceof FleetSummerError
+            ? error.code
+            : 'TEMPORARILY_UNAVAILABLE',
+        messageKey: `errors.actions.fleet.${error instanceof FleetError || error instanceof FleetSummerError ? error.code : 'TEMPORARILY_UNAVAILABLE'}`,
         retryable: error instanceof FleetError ? error.retryable : true,
       },
     });
@@ -1108,6 +1207,7 @@ export class FleetDispatcher {
                 state: 'pending',
               });
               s.requests[requestId] = request;
+              enqueueSummerRequest(s, profileId, request, this.now());
               data = { request };
             }
           } else if (id === 'work.next') {

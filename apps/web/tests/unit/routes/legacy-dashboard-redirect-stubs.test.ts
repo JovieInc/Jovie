@@ -24,14 +24,14 @@ describe('legacy dashboard redirect stubs', () => {
     expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
   });
 
-  it('sends legacy links traffic to the canonical profile panel', async () => {
+  it('sends legacy links traffic to the canonical Links workspace', async () => {
     const { default: LinksPage } = await import(
       '../../../app/app/(shell)/dashboard/links/page'
     );
 
     LinksPage();
 
-    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.CHAT_PROFILE_PANEL);
+    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.LINKS);
   });
 
   it('sends legacy tipping traffic to the canonical artist pay settings', async () => {

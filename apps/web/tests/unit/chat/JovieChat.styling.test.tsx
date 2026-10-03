@@ -12,6 +12,7 @@ import {
   vi,
 } from 'vitest';
 import { CHAT_COMPOSER_DOCK_CLASSNAME } from '@/components/jovie/chat-layout';
+import { createComposerDraft } from '@/components/jovie/hooks/useComposerDraft';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { CHAT_TRANSCRIPT_ROW_ESTIMATE_PX } from '@/lib/chat/transcript-window';
 import { getDesktopWorkState } from '@/lib/desktop/session-work-state';
@@ -138,8 +139,8 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
       reject: vi.fn(),
       isActioning: false,
     }),
-    useJovieChat: () => ({
-      input: '',
+    useJovieChatController: () => ({
+      draft: createComposerDraft(''),
       setInput: vi.fn(),
       messages: mockChatState.messages,
       chatError: null,
@@ -691,6 +692,38 @@ describe('JovieChat styling regressions', () => {
     expect(
       container.querySelector('[data-testid="ovie-editorial-briefing"]')
     ).toBeNull();
+  });
+
+  it.each([
+    { profileId: 'profile-2', conversationId: 'one' },
+    { profileId: 'profile-1', conversationId: 'two' },
+    { profileId: 'profile-1', conversationId: 'one', chatMode: 'ov' as const },
+  ])('resets navigation hover for a new chat scope: %j', nextScope => {
+    mockChatState.messages = Array.from({ length: 14 }, (_, index) => ({
+      id: `message-${index}`,
+      role: index % 2 === 0 ? 'user' : 'assistant',
+      parts: [{ type: 'text', text: `Message ${index}` }],
+    }));
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const { getByRole, rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <JovieChat profileId='profile-1' conversationId='one' />
+      </QueryClientProvider>
+    );
+    const firstMarker = getByRole('button', { name: /Jump to turn 1:/ });
+    fireEvent.mouseEnter(firstMarker);
+    expect(firstMarker).toHaveClass('is-hovered');
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <JovieChat {...nextScope} />
+      </QueryClientProvider>
+    );
+    expect(getByRole('button', { name: /Jump to turn 1:/ })).not.toHaveClass(
+      'is-hovered'
+    );
   });
 
   it('publishes rail context only when its meaning changes during streaming', () => {

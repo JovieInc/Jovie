@@ -5244,21 +5244,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   padding: var(--space-1);
 }
 
-.homepage-artist-profile-preview .ap-phone-frame {
-  border-color: var(--system-b-app-frame-seam);
-  background: var(--system-b-bg-surface-0);
-  box-shadow: none;
-}
-
-.homepage-artist-profile-preview .ap-phone-frame__overlay {
-  background: none;
-}
-
-.homepage-artist-profile-preview .ap-phone-frame__notch {
-  background: var(--system-b-cinematic-black);
-  box-shadow: none;
-}
-
 .homepage-artist-profile-preview__screen {
   display: block;
   width: 100%;

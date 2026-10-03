@@ -326,6 +326,27 @@ describe('musicfetch client', () => {
       expect(mockCaptureException).not.toHaveBeenCalled();
     });
 
+    it('returns null when the MusicFetch subscription is inactive', async () => {
+      const { MusicfetchRequestError } = await import(
+        '@/lib/musicfetch/resilient-client'
+      );
+      mockMusicfetchRequest.mockRejectedValue(
+        new MusicfetchRequestError(
+          'MusicFetch API error: 401 - subscription not active',
+          401
+        )
+      );
+
+      const { fetchArtistBySpotifyUrl } = await import(
+        '@/lib/dsp-enrichment/providers/musicfetch'
+      );
+
+      await expect(
+        fetchArtistBySpotifyUrl('https://open.spotify.com/artist/123')
+      ).resolves.toBeNull();
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
     it('rethrows invalid-service 400 responses instead of returning null', async () => {
       const { MusicfetchRequestError } = await import(
         '@/lib/musicfetch/resilient-client'

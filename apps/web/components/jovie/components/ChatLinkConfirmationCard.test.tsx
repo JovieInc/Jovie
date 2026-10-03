@@ -3,8 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ChatLinkConfirmationCard } from './ChatLinkConfirmationCard';
 
+const { confirmMutate } = vi.hoisted(() => ({ confirmMutate: vi.fn() }));
+
 vi.mock('@/lib/queries', () => ({
-  useConfirmChatLinkMutation: () => ({ mutate: vi.fn() }),
+  useConfirmChatLinkMutation: () => ({ mutate: confirmMutate }),
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
@@ -72,5 +74,33 @@ describe('ChatLinkConfirmationCard', () => {
     expect(confirm?.className).toContain('--color-btn-primary-bg');
     expect(confirm?.className).toContain('--color-btn-primary-hover');
     expect(confirm?.className).not.toContain('linear-btn');
+  });
+
+  it('renders the mutation error in the canonical error token', async () => {
+    confirmMutate.mockImplementationOnce((_variables, options) => {
+      options?.onError?.(new Error('request failed'));
+    });
+    const user = userEvent.setup();
+    render(
+      <ChatLinkConfirmationCard
+        profileId='profile-1'
+        platform={{
+          id: 'spotify',
+          name: 'Spotify',
+          icon: 'spotify',
+          color: 'brand-spotify',
+        }}
+        normalizedUrl='https://open.spotify.com/artist/example'
+        originalUrl='https://open.spotify.com/artist/example'
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    const error = await screen.findByText(
+      'Unable to add link. Please try again.'
+    );
+    expect(error).toHaveClass('text-error');
+    expect(error).not.toHaveClass('text-danger-token');
   });
 });

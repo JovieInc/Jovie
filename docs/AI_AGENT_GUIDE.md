@@ -91,7 +91,7 @@ The optional per-user Ovie privacy gate protects operator data and actions serve
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/billing/health` | GET | Better Auth | Billing system health |
+| `/api/billing/health` | GET | Public liveness; admin session or `CRON_SECRET` for detail | Anonymous `{healthy, timestamp}` only. Counts, check messages, and Stripe/DB probes require `Authorization: Bearer ${CRON_SECRET}` or an admin session |
 | `/api/billing/history` | GET | Better Auth | Invoice history |
 | `/api/billing/status` | GET | Better Auth | Current billing status |
 | `/api/stripe/cancel` | POST/GET | Better Auth | Cancel subscription |

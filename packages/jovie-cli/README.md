@@ -158,19 +158,31 @@ only on loopback), refuses redirects, and does not persist it. Ordinary public
 commands do not send it. Fleet MCP tools are exposed only when the credential is
 present; the server independently authenticates and authorizes every request.
 
-Provisioning, rotation, revocation and mission admission use the existing
-founder control endpoint with an exact one-use approval. Worker tokens cannot
-call that endpoint. Rotation preserves the worker ID, invalidates the prior
-token and outstanding leases, and requires the new runtime to register again.
+Provisioning, rotation, revocation, direct mission admission and Summer delegation
+use the existing founder control endpoint with an exact one-use approval. Worker
+tokens cannot call that endpoint. Rotation preserves the worker ID, invalidates
+the prior token and outstanding leases, and requires the new runtime to register
+again. Only the configured founder can grant or revoke Summer delegation.
 
 The initial mission contract allows `artist.get`, `artist.llms`, `api.openapi`
 and `docs.llms`, with one concurrent lease and zero spend. Customer agents retain
 customer visibility and authority. A display name is never identity proof.
 
-This channel currently records durable requests and receipts; it does not start
-an agent process, subscribe a runtime to events, or automatically admit a request.
-The canary's bounded registry is not a continuous-operation scheduler. Live fleet
-commissioning and continuous operation remain tracked in
+Once the complete web and Summer runtime chain is deployed and explicitly enabled,
+a founder delegation can admit requests for named operator workers, canonical
+issues and read-only commands. It expires, caps admissions and permits zero spend.
+Each eligible request persists an event atomically with its proposal. A fixed,
+OIDC-authenticated Summer inlet receives only event IDs; the Jovie callback
+rechecks current delegation, worker authority and canonical Linear work before
+admission. Decisions retain the exact delegation receipt. The existing Summer
+heartbeat repairs missed delivery in bounded batches; duplicate delivery replays
+the durable decision, including after archival.
+
+This source does not start the named worker processes or provide a verified wake
+adapter for their external runtimes. Each worker still needs its own authenticated
+runtime to register, claim and report work. No live enablement, fleet registration,
+continuous operation or external artist outreach is established by installing the
+CLI or merging this source. Live commissioning remains tracked in
 [JOV-7331](https://linear.app/jovie/issue/JOV-7331) and
 [JOV-7393](https://linear.app/jovie/issue/JOV-7393).
 
