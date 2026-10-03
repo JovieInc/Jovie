@@ -1,6 +1,18 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Activity } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  getDesktopWorkState,
+  useDesktopWorkState,
+} from '@/lib/desktop/session-work-state';
 import { SessionManagementCard } from './SessionManagementCard';
 
 const listSessions = vi.fn();
@@ -34,9 +46,114 @@ const otherSession = {
   updatedAt: new Date('2026-09-25T00:00:00Z'),
 };
 
+const idleWork = {
+  hasDraft: false,
+  isStreaming: false,
+  isUploading: false,
+  hasPendingAction: false,
+  isAuthenticating: false,
+};
+
+function IdleWorkOwner() {
+  useDesktopWorkState(idleWork);
+  return null;
+}
+
 describe('SessionManagementCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it.each([
+    ['single', 'success', 'hide'],
+    ['bulk', 'returned error', 'unmount'],
+    ['single', 'rejection', 'unmount'],
+  ] as const)(
+    'keeps %s revocation busy through %s after %s',
+    async (action, outcome, removal) => {
+      const pending = Promise.withResolvers<{ error: Error | null }>();
+      const revoke = action === 'single' ? revokeSession : revokeOtherSessions;
+      revoke.mockImplementation(() => {
+        expect(getDesktopWorkState()?.hasPendingAction).toBe(true);
+        return pending.promise;
+      });
+      listSessions.mockResolvedValue({
+        data: [currentSession, otherSession],
+        error: null,
+      });
+      const view = render(
+        <Activity mode='visible'>
+          <IdleWorkOwner />
+          <SessionManagementCard activeSessionId='session-current' />
+        </Activity>
+      );
+      try {
+        const name =
+          action === 'single' ? 'End session' : 'Sign out other sessions';
+        await userEvent.click(await screen.findByRole('button', { name }));
+        await userEvent.click(
+          within(screen.getByRole('dialog')).getByRole('button', { name })
+        );
+        expect(revoke).toHaveBeenCalledTimes(1);
+        if (removal === 'hide') {
+          view.rerender(
+            <Activity mode='hidden'>
+              <IdleWorkOwner />
+              <SessionManagementCard activeSessionId='session-current' />
+            </Activity>
+          );
+        } else {
+          view.unmount();
+        }
+        expect(getDesktopWorkState()).toBeNull();
+        renderHook(() => useDesktopWorkState(idleWork));
+        expect(getDesktopWorkState()).toEqual({
+          ...idleWork,
+          hasPendingAction: true,
+        });
+      } finally {
+        await act(async () => {
+          if (outcome === 'rejection') pending.reject(new Error('offline'));
+          else
+            pending.resolve({
+              error: outcome === 'success' ? null : new Error('unavailable'),
+            });
+          await pending.promise.catch(() => {});
+        });
+      }
+      expect(getDesktopWorkState()).toEqual(idleWork);
+    }
+  );
+
+  it('retains authentication work until the awaited sign-in handoff settles', async () => {
+    const pending = Promise.withResolvers<void>();
+    signOut.mockReturnValue(pending.promise);
+    listSessions.mockResolvedValue({
+      data: null,
+      error: { code: 'UNAUTHORIZED' },
+    });
+    const view = render(
+      <SessionManagementCard activeSessionId='session-current' />
+    );
+    try {
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Sign In Again' })
+      );
+      expect(signOut).toHaveBeenCalledTimes(1);
+      view.unmount();
+      expect(getDesktopWorkState()).toBeNull();
+      renderHook(() => useDesktopWorkState(idleWork));
+      expect(getDesktopWorkState()).toEqual({
+        ...idleWork,
+        isAuthenticating: true,
+      });
+    } finally {
+      await act(async () => {
+        pending.resolve();
+        await pending.promise;
+      });
+    }
+    expect(getDesktopWorkState()).toEqual(idleWork);
   });
 
   it('shows an error state when the session list request fails', async () => {

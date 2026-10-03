@@ -312,7 +312,6 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/settings/page.tsx',
   'apps/web/app/app/(shell)/settings/payments/page.tsx',
   'apps/web/app/app/(shell)/settings/profile/page.tsx',
-  'apps/web/app/app/(shell)/settings/retargeting-ads/page.tsx',
   'apps/web/app/app/(shell)/settings/touring/page.tsx',
   'apps/web/app/app/(shell)/settings/usage/page.tsx',
   'apps/web/app/app/(shell)/tasks/page.tsx',

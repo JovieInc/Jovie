@@ -14,6 +14,7 @@ import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { signOut } from '@/hooks/useJovieAuth';
 import { authClient } from '@/lib/auth/client';
+import { beginDesktopWorkOperation } from '@/lib/desktop/session-work-state';
 import { captureError } from '@/lib/error-tracking';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
@@ -93,6 +94,7 @@ export function SessionManagementCard({
   }, [retryCount]);
 
   const handleEndSession = async (session: BetterAuthSessionResource) => {
+    const finishWork = beginDesktopWorkOperation('pending-action');
     setEndingSessionId(session.id);
     try {
       const { error } = await authClient.revokeSession({
@@ -105,11 +107,13 @@ export function SessionManagementCard({
       const message = extractErrorMessage(error);
       notifications.error(message);
     } finally {
+      finishWork();
       setEndingSessionId(null);
     }
   };
 
   const handleEndAllOtherSessions = async () => {
+    const finishWork = beginDesktopWorkOperation('pending-action');
     setEndingAllOthers(true);
     try {
       const { error } = await authClient.revokeOtherSessions();
@@ -120,6 +124,7 @@ export function SessionManagementCard({
       const message = extractErrorMessage(error);
       notifications.error(message);
     } finally {
+      finishWork();
       setEndingAllOthers(false);
     }
   };
@@ -155,12 +160,14 @@ export function SessionManagementCard({
               size='sm'
               disabled={signingIn}
               onClick={async () => {
+                const finishWork = beginDesktopWorkOperation('authentication');
                 setSigningIn(true);
                 try {
                   await signOut({
                     redirectUrl: `${APP_ROUTES.SIGNIN}?redirect_url=${encodeURIComponent(APP_ROUTES.SETTINGS_ACCOUNT)}`,
                   });
                 } finally {
+                  finishWork();
                   setSigningIn(false);
                 }
               }}
