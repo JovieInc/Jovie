@@ -980,7 +980,15 @@ async function main() {
     fs.writeFileSync(
       clustersPath,
       JSON.stringify(
-        { generatedAt: new Date().toISOString(), clusters },
+        {
+          schemaVersion: 1,
+          repository: `${owner}/${repo}`,
+          headSha: execFileSync('git', ['rev-parse', 'HEAD'], {
+            encoding: 'utf8',
+          }).trim(),
+          generatedAt: new Date().toISOString(),
+          clusters,
+        },
         null,
         2
       )
