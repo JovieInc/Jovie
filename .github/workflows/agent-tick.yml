@@ -543,7 +543,14 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-production-waitlist-results.json
-        run: doppler run --project jovie-web --config prd --only-secrets=E2E_PROD_SIGNUP_EMAIL_BASE,E2E_PROD_MAILBOX_PROVIDER,E2E_PROD_OTP_CHECK_ORIGIN,E2E_PROD_OTP_CHECK_TOKEN,E2E_PROD_OTP_CHECK_URL,PRODUCTION_WAITLIST_CANARY_READ_TOKEN --no-fallback -- env -u DOPPLER_TOKEN node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-production-waitlist.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-production-waitlist
+        run: |
+          WAITLIST_SECRETS='E2E_PROD_SIGNUP_EMAIL_BASE,E2E_PROD_MAILBOX_PROVIDER,E2E_PROD_OTP_CHECK_ORIGIN,E2E_PROD_OTP_CHECK_TOKEN,E2E_PROD_OTP_CHECK_URL,PRODUCTION_WAITLIST_CANARY_READ_TOKEN'
+          if doppler run --project jovie-web --config prd --only-secrets="$WAITLIST_SECRETS" --no-fallback -- env >/dev/null 2>&1; then
+            doppler run --project jovie-web --config prd --only-secrets="$WAITLIST_SECRETS" --no-fallback -- env -u DOPPLER_TOKEN node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-production-waitlist.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-production-waitlist
+          else
+            echo "::warning::waitlist canary secrets missing from jovie-web/prd; running the spec without secret injection so the failure is reported in-band with a results file"
+            node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-production-waitlist.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-production-waitlist
+          fi
         continue-on-error: true
 
       - name: Run Public Profile Smoke Test

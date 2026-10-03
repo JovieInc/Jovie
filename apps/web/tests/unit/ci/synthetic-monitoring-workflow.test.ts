@@ -74,8 +74,11 @@ describe('synthetic monitoring workflow parser', () => {
       expect(canaryStep).toContain(
         'tests/e2e/synthetic-production-waitlist.spec.ts'
       );
-      expect(canaryStep).toContain('--only-secrets=E2E_PROD_SIGNUP_EMAIL_BASE');
+      expect(canaryStep).toContain(
+        'E2E_PROD_SIGNUP_EMAIL_BASE,E2E_PROD_MAILBOX_PROVIDER,E2E_PROD_OTP_CHECK_ORIGIN,E2E_PROD_OTP_CHECK_TOKEN,E2E_PROD_OTP_CHECK_URL,PRODUCTION_WAITLIST_CANARY_READ_TOKEN'
+      );
       expect(canaryStep).toContain('--no-fallback -- env -u DOPPLER_TOKEN');
+      expect(canaryStep).toContain('secrets missing from jovie-web/prd');
       expect(canaryStep).not.toContain('DATABASE_URL');
       expect(workflow).toContain(
         'SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-production-waitlist-results.json'
