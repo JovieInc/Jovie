@@ -89,9 +89,8 @@ function readRepoFile(relativePath: string): string {
 }
 
 describe('feature flag registry integrity', () => {
-  it('keeps runtime app flags default-on for internal v1 access', () => {
+  it('keeps shipped app flags default-on and guarded features default-off', () => {
     // RELEASE_PLAN_DEMO is off in production; dev/preview turns it on in getAppFlagValue.
-    // INBOX_HOME is an intentional default-off rollout gate (JOV-3931 / GH #13171).
     // MERCH_QA_GATE ships fail-closed until a real visual reviewer lands (JOV-4739).
     // CREATOR_FINANCE is a release-blocking gate that stays dark until the
     // JOV-4621 privacy/correctness matrix is certified.
@@ -99,9 +98,6 @@ describe('feature flag registry integrity', () => {
       .filter(
         ([name]) =>
           ![
-            'INBOX_HOME',
-            'PROFILES_WORKSPACE',
-            'PROFILE_SEARCH_MONITORING',
             'PAID_WELCOME_EMAIL',
             'MERCH_QA_GATE',
             'CREATOR_FINANCE',
@@ -111,9 +107,9 @@ describe('feature flag registry integrity', () => {
       )
       .map(([, value]) => value);
     expect(defaultsExcludingRolloutGates.every(Boolean)).toBe(true);
-    expect(APP_FLAG_DEFAULTS.INBOX_HOME).toBe(false);
-    expect(APP_FLAG_DEFAULTS.PROFILES_WORKSPACE).toBe(false);
-    expect(APP_FLAG_DEFAULTS.PROFILE_SEARCH_MONITORING).toBe(false);
+    expect(APP_FLAG_DEFAULTS.INBOX_HOME).toBe(true);
+    expect(APP_FLAG_DEFAULTS.PROFILES_WORKSPACE).toBe(true);
+    expect(APP_FLAG_DEFAULTS.PROFILE_SEARCH_MONITORING).toBe(true);
     expect(APP_FLAG_DEFAULTS.PAID_WELCOME_EMAIL).toBe(false);
     expect(APP_FLAG_DEFAULTS.MERCH_QA_GATE).toBe(false);
     expect(APP_FLAG_DEFAULTS.CREATOR_FINANCE).toBe(false);

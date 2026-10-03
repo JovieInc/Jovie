@@ -51,11 +51,11 @@ export const APP_FLAG_DEFAULTS = {
   TELEPROMPTER_RECORDING: true,
   /**
    * Opportunity Inbox as named /app home (GH #13171 / JOV-3931).
-   * Default off in prod; enable via env override, admin dogfood, or FEATURE gate.
+   * Shipped everywhere by default; the override remains an incident kill switch.
    */
-  INBOX_HOME: false,
-  PROFILES_WORKSPACE: false,
-  PROFILE_SEARCH_MONITORING: false,
+  INBOX_HOME: true,
+  PROFILES_WORKSPACE: true,
+  PROFILE_SEARCH_MONITORING: true,
   /**
    * Post-signup wow-moment: seed real presence-build tasks into workflow_runs
    * and stream tool artifacts in the welcome chat (JOV-3988). Kill-switchable.
@@ -316,9 +316,9 @@ export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
   'ALBUM_ART_GENERATION', // default-true feature; controlled by Statsig experiment separately in usage, not a gate
   'RELEASE_PLAN_DEMO', // mock EP planner; default off in production, on in dev/preview, no remote gate
   'RELEASE_TO_REVENUE_AUTOPILOT', // internal v1 default-on pilot surface; no remote gate
-  'INBOX_HOME', // rollout gate for Inbox-as-home IA; default off in prod (JOV-3931)
-  'PROFILES_WORKSPACE', // JOV-2659 Tim-first unified Profiles rollout
-  'PROFILE_SEARCH_MONITORING', // JOV-2659 server runner remains separately health-gated
+  'INBOX_HOME', // shipped default-on; env/admin override remains the navigation kill switch
+  'PROFILES_WORKSPACE', // shipped default-on; env/admin override remains the workspace kill switch
+  'PROFILE_SEARCH_MONITORING', // shipped default-on; server runner remains separately health-gated
   'ONBOARDING_WOW_TASK_QUEUE', // JOV-3988 kill-switch; local default + env/admin override, no Statsig gate
   'PAID_WELCOME_EMAIL', // JOV-6445 external-recipient send; founder-gated default off, no Statsig gate
   'MERCH_QA_GATE', // JOV-4739 publish gate; default off until a real visual reviewer replaces the stub — no Statsig gate
