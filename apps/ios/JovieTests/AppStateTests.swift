@@ -3300,10 +3300,14 @@ private actor PausedProfileAPIClient: APIClientProtocol {
   let gate: ProfileLoadGate
   let cancellations = ProfileTaskCancellationLog()
   private var calls = 0
-  init(base: MutableAPIClient, gate: ProfileLoadGate) { self.base = base; self.gate = gate }
+  private let heldCall: Int
+  init(base: MutableAPIClient, gate: ProfileLoadGate, heldCall: Int = 1) {
+    self.base = base; self.gate = gate; self.heldCall = heldCall
+  }
+  func callCount() -> Int { calls }
   func fetchMe() async throws -> MobileMeResponse {
     calls += 1
-    if calls == 1 { _ = await gate.wait() }
+    if calls == heldCall { _ = await gate.wait() }
     await cancellations.record(Task.isCancelled)
     return try await base.fetchMe()
   }
@@ -3526,6 +3530,130 @@ extension AppStateTests {
       caller = nil
       state = nil
       #expect(observed == nil)
+    }
+  }
+}
+
+
+extension AppStateTests {
+  @Test(arguments: [false, true])
+  func exactExpiryCleanupSurvivesCallerCancellationAndReplay(profileOrigin: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let authorization = try saveSession(), apiGate = ProfileLoadGate(), cleanupGate = ProfileLoadGate()
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness(), log = ProfileTaskCancellationLog()
+      defer { caches.cleanup(); push.cleanup() }
+      await caches.seed()
+      let api = PausedProfileAPIClient(base: caches.api, gate: apiGate)
+      let repository = FirstHeldAuthCleanupRepository(base: MeRepository(apiClient: api, cache: caches.me),
+        gate: cleanupGate, cancellations: log)
+      let awaitedPush = ChatReceiptPush(push.manager), revoker = MockSessionRevoker(result: .revoked)
+      let state = AppState(configuration: .mock, launchMode: .live, repository: repository,
+        brightnessManager: MockBrightnessController(), sessionRevoker: revoker, pushNotifications: awaitedPush,
+        chatCache: caches.chat, audienceHighlightsCache: caches.audience, actionLoopCache: caches.actionLoop)
+      state.didInitializeAuth = true
+      let profile = Task {
+        await state.handleSignedInUserChange(caches.userID)
+        if profileOrigin { await cleanupGate.ownerFinished() }
+      }
+      #expect(await apiGate.waitUntilEntered())
+      #expect(await awaitedPush.waitForActivation())
+      if !profileOrigin { await apiGate.complete(true); await profile.value }
+      let receipt: NativeSessionExpiryReceipt
+      do { receipt = try ownedProfileExpiryReceipt(authorization) }
+      catch { await apiGate.complete(true); await cleanupGate.complete(true); await profile.value; throw error }
+      let caller: Task<Void, Never>
+      if profileOrigin {
+        await caches.api.updateMode(.failure(NativeSessionRequestError.expired(receipt)))
+        await apiGate.complete(true); caller = profile
+      } else { caller = Task { await state.handleExpiredSession(receipt); await cleanupGate.ownerFinished() } }
+      let entered = await cleanupGate.waitUntilEntered()
+      #expect(entered)
+      caller.cancel()
+      let duplicate = Task { await state.handleExpiredSession(receipt) }
+      await state.handleSignedInUserChange(caches.userID)
+      await state.handleSignedInUserChange(nil); await state.handleSignedInUserChange(caches.userID)
+      #expect(state.route == .signedOut && state.activeUserID == nil && state.dashboardState == .idle)
+      await cleanupGate.complete(true); await caller.value; await duplicate.value
+      #expect(await log.recorded() == [false, false], "Caller cancellation must not abandon retained cleanup")
+      await state.handleExpiredSession(receipt)
+      await state.handleSignedInUserChange(caches.userID)
+      await state.handleSignedInUserChange(nil); await state.handleSignedInUserChange(caches.userID)
+      #expect(state.route == .signedOut && state.dashboardState == .idle)
+      #expect(await log.recorded().count == 2, "Running and completed receipt replays must not dispatch again")
+      await caches.expectContents(present: false)
+      #expect(await revoker.calls() == 0)
+      #expect(await push.service.requests().deletions.isEmpty)
+      #expect(push.unregisterCount == 1 && NativeSessionTokenStore.captureOwnership() == receipt.ownership)
+    }
+  }
+}
+
+private actor FirstHeldAuthCleanupRepository: AppStateRepository {
+  let base: MeRepository
+  let gate: ProfileLoadGate
+  private var removals = 0
+  private let cancellations: ProfileTaskCancellationLog?
+  init(base: MeRepository, gate: ProfileLoadGate, cancellations: ProfileTaskCancellationLog? = nil) {
+    self.base = base; self.gate = gate; self.cancellations = cancellations
+  }
+  func cachedSnapshot(for userID: String) async -> MobileMeResponse? { await base.cachedSnapshot(for: userID) }
+  func loadMe(for userID: String) async throws -> MeRepositoryResult { try await base.loadMe(for: userID) }
+  func loadMe(for userID: String, ifOwnedBy owner: NativeSessionOwnership) async throws -> MeRepositoryResult {
+    try await base.loadMe(for: userID, ifOwnedBy: owner)
+  }
+  func clearCachedUser(_ userID: String) async { await base.clearCachedUser(userID) }
+  func clearCachedUser(_ userID: String, ifOwnedBy owner: NativeSessionOwnership) async {
+    removals += 1
+    let isFirst = removals == 1
+    await cancellations?.record(Task.isCancelled)
+    if isFirst { _ = await gate.wait() }
+    await base.clearCachedUser(userID, ifOwnedBy: owner)
+    await cancellations?.record(Task.isCancelled)
+  }
+}
+
+extension AppStateTests {
+  @Test(arguments: [false, true])
+  func replacementOfHeldTerminalKeepsItsCleanupUserAndNewProfile(installs: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let original = try saveSession(), terminalGate = ProfileLoadGate(), profileGate = ProfileLoadGate()
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness()
+      defer { caches.cleanup(); push.cleanup() }
+      await caches.seed()
+      let api = PausedProfileAPIClient(base: caches.api, gate: profileGate, heldCall: 2)
+      let repository = FirstHeldAuthCleanupRepository(base: MeRepository(apiClient: api, cache: caches.me), gate: terminalGate)
+      let revoker = MockSessionRevoker(result: .noSession)
+      let state = AppState(configuration: .mock, launchMode: .live, repository: repository,
+        brightnessManager: MockBrightnessController(), sessionRevoker: revoker, pushNotifications: push.manager,
+        chatCache: caches.chat, audienceHighlightsCache: caches.audience, actionLoopCache: caches.actionLoop)
+      state.didInitializeAuth = true
+      await state.handleSignedInUserChange(caches.userID)
+      await push.manager.activate()
+      let receipt = try ownedProfileExpiryReceipt(original)
+      let old = Task { await state.handleExpiredSession(receipt); await terminalGate.ownerFinished() }
+      #expect(await terminalGate.waitUntilEntered())
+      let next: Task<Void, Never>
+      if installs {
+        _ = try saveSession()
+        next = Task {
+          await state.handleSignedInUserChange(caches.userID)
+          await profileGate.ownerFinished()
+        }
+      } else { next = Task { _ = await state.signOut() } }
+      if installs { #expect(await profileGate.waitUntilEntered()) }
+      else { await next.value; await caches.expectContents(present: false) }
+      let current = NativeSessionTokenStore.captureSessionContext()
+      await terminalGate.complete(true); await old.value
+      if installs {
+        #expect(state.activeSessionOwnership == current.ownership && state.route == .ready)
+        await state.handleSignedInUserChange(caches.userID)
+        #expect(await api.callCount() == 2, "Old terminal release must not drop B's dedupe owner")
+        await profileGate.complete(true); await next.value
+        #expect(state.dashboardState == .loaded(.previewReady))
+        await caches.expectContents(present: true)
+      }
+      #expect(NativeSessionTokenStore.captureSessionContext() == current)
+      #expect(await revoker.calls() == (installs ? 0 : 1))
     }
   }
 }
