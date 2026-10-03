@@ -82,6 +82,7 @@ ${runUrl ? `\nRun: ${runUrl}` : ''}`;
     title,
     description,
     priority: 1,
+    reopenTerminal: true,
     apiKey,
     fetchImpl,
   });

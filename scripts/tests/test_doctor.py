@@ -54,6 +54,11 @@ class JudgeTest(unittest.TestCase):
     def test_healthy_host_raises_nothing(self):
         self.assertEqual(doctor.judge(obs()), {})
 
+    def test_escalation_alert_names_the_pr_and_class(self):
+        alerts = doctor.judge(obs(escalation={"surfaced": [{"pr": 7, "cls": "needs-human-decision"}]}))
+        self.assertIn("#7 needs-human-decision", alerts["escalation-needs-human"])
+        self.assertEqual(doctor.judge(obs(escalation={"surfaced": []})), {})
+
     def test_each_rule_names_its_cause(self):
         alerts = doctor.judge(obs(
             tick={"at": "x", "unhealthy": ["devin"], "error": "Boom"},
@@ -141,10 +146,10 @@ class FakeTracker:
         self.opened.append((key, text))
         return f"id-{key}"
 
-    def reopen(self, issue_id, text):
+    def reopen(self, issue_id, text, key=None):
         self.reopened.append((issue_id, text))
 
-    def close(self, issue_id):
+    def close(self, issue_id, key=None):
         self.closed.append(issue_id)
 
     def contradict_invariant(self, event):
@@ -232,14 +237,23 @@ class ReconcileTest(unittest.TestCase):
                 self.calls = []
 
             def gql(self, query, variables):
-                self.calls.append(query)
+                self.calls.append((query, variables))
                 if "title:{eq:$t}" in query:
                     return {"issues": {"nodes": [{"id": "existing-1"}]}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{
+                        "id": "triage", "name": "Triage"}]}, "labels": {"nodes": [{
+                            "id": "symphony", "name": "symphony"}, {
+                            "id": "disk", "name": "remediation:disk-low"}]}}]}}
+                if "issueAddLabel" in query:
+                    return {"issueAddLabel": {"success": True}}
                 raise AssertionError("must not create when one exists")
         linear = FakeLinear()
         tracker = doctor.Tracker(linear, "gem")
         self.assertEqual(tracker.title("disk-low"), "Symphony doctor: disk-low (gem)")
         self.assertEqual(tracker.open("disk-low", "x"), "existing-1")
+        added = [variables for query, variables in linear.calls if "issueAddLabel" in query]
+        self.assertEqual(added, [{"id": "existing-1", "l": "disk"}])
 
     def test_idle_codex_alert_opens_as_urgent(self):
         captured = []
@@ -251,12 +265,71 @@ class ReconcileTest(unittest.TestCase):
                 if "teams(filter" in query:
                     return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{
                         "id": "triage", "name": "Triage"}]}, "labels": {"nodes": [{
-                            "id": "symphony", "name": "symphony"}]}}]}}
+                            "id": "symphony", "name": "symphony"}, {
+                            "id": "idle", "name": "remediation:provider-idle-codex"}]}}]}}
                 captured.append(variables["i"])
                 return {"issueCreate": {"issue": {"id": "urgent", "identifier": "JOV-1"}}}
 
         self.assertEqual(doctor.Tracker(FakeLinear(), "gem").open("provider-idle:codex", "idle"), "urgent")
         self.assertEqual(captured[0]["priority"], 1)
+        self.assertEqual(captured[0]["labelIds"], ["symphony", "idle"])
+
+    def test_alert_label_is_created_on_open_reopen_and_close(self):
+        created = []
+        added = []
+
+        class FakeLinear:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{
+                        "id": "triage", "name": "Triage"}]}, "labels": {"nodes": [{
+                            "id": "symphony", "name": "symphony"}]}}]}}
+                if "issueLabelCreate" in query:
+                    created.append(variables["i"])
+                    return {"issueLabelCreate": {"issueLabel": {"id": "new-label", "name": variables["i"]["name"]}}}
+                if "issueAddLabel" in query:
+                    added.append(variables)
+                    return {"issueAddLabel": {"success": True}}
+                if "issueCreate" in query:
+                    return {"issueCreate": {"issue": {"id": "iss-1", "identifier": "JOV-1"}}}
+                raise AssertionError(query)
+
+            def move(self, issue_id, state):
+                return None
+
+            def comment(self, issue_id, text):
+                return None
+
+        tracker = doctor.Tracker(FakeLinear(), "gem")
+        self.assertEqual(tracker.open("provider-down:codex", "down"), "iss-1")
+        self.assertEqual(created, [{
+            "teamId": "team", "name": "remediation:provider-down-codex", "color": "#E5484D"}])
+        tracker.reopen("iss-1", "again", "provider-down:codex")
+        tracker.close("iss-1", "provider-down:codex")
+        self.assertEqual([row["l"] for row in added], ["new-label", "new-label"])
+        self.assertEqual(doctor.remediation.alert_key_slug("provider-down:codex"), "provider-down-codex")
+        self.assertEqual(doctor.remediation.remediation_label_for_alert("provider-down:codex"),
+                         "remediation:provider-down-codex")
+        self.assertIsNone(doctor.remediation.alert_key_slug("---"))
+        os.environ["LANES_ESCALATION"] = "0"
+        try:
+            quiet = []
+
+            class OffLinear(FakeLinear):
+                def gql(self, query, variables):
+                    if "issueLabelCreate" in query or "issueAddLabel" in query:
+                        quiet.append(query)
+                    return super().gql(query, variables)
+
+            off = doctor.Tracker(OffLinear(), "gem")
+            self.assertEqual(off.open("disk-low", "low"), "iss-1")
+            off.reopen("iss-1", "again", "disk-low")
+            off.close("iss-1", "disk-low")
+            self.assertEqual(quiet, [])
+        finally:
+            os.environ.pop("LANES_ESCALATION", None)
 
     def test_new_condition_generation_reopens_completed_liveness_owner(self):
         class FakeLinear:
@@ -724,10 +797,40 @@ class RunTest(unittest.TestCase):
                 os.environ.pop("LANES_SELFTEST", None)
             self.assertIn("provider-down:devin", result["alerts"])
             self.assertIn("linear-down", result["alerts"])
+            self.assertEqual(result["eventsOpen"], 0)
+            self.assertEqual(result["eventsClaimed"], 0)
+            self.assertEqual(result["eventsHuman"], 0)
+            self.assertEqual(result["eventsExhausted"], 0)
+            self.assertEqual(result["byFingerprint"], {})
             written = json.loads((state / "doctor.json").read_text())
             self.assertEqual(set(written["alerts"]) >= {"provider-down:devin", "linear-down"}, True)
             self.assertEqual(written["conditions"]["linear-down"]["source"]["status"], "unknown")
             self.assertEqual(sorted(k for k, _ in tracker.opened), sorted(result["alerts"]))
+
+
+class DoctorLockTest(unittest.TestCase):
+    def test_flock_failure_closes_the_lock_fd_and_still_writes(self):
+        import fcntl
+        state = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(state, ignore_errors=True))
+        opened = []
+        real_open = open
+
+        def tracking_open(file, mode="r", *args, **kwargs):
+            handle = real_open(file, mode, *args, **kwargs)
+            if str(file).endswith("doctor.lock"):
+                opened.append(handle)
+            return handle
+
+        def fail_lock(handle, operation):
+            raise OSError("flock failed")
+
+        wrote = []
+        with mock.patch("builtins.open", tracking_open), mock.patch.object(fcntl, "flock", fail_lock):
+            doctor.locked_doctor_write(state, lambda: wrote.append("ok"))
+        self.assertEqual(wrote, ["ok"])
+        self.assertEqual(len(opened), 1)
+        self.assertTrue(opened[0].closed)
 
 
 if __name__ == "__main__":
