@@ -150,14 +150,10 @@ describe('release artist links', () => {
     renderWithQueryClient(
       <UnreleasedReleaseHero
         release={{
-          id: 'release-1',
           slug: 'future-release',
           title: 'Future Release',
           artworkUrl: null,
           releaseDate: new Date(Date.now() + 1000 * 60 * 60 * 24),
-          trackId: null,
-          hasSpotify: true,
-          hasAppleMusic: true,
         }}
         artist={{
           id: 'artist-1',
