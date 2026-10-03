@@ -325,7 +325,13 @@ export function OvieCertificationsWorkspace() {
     useState<CertificationStateFilter>('all');
   const [domainFilter, setDomainFilter] =
     useState<CertificationDomainFilter>('all');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Needs You judgment cards deep-link here with ?row=<rowId> so the founder
+  // lands on the exact evidence rail, not a re-search.
+  const [selectedId, setSelectedId] = useState<string | null>(() =>
+    typeof window === 'undefined'
+      ? null
+      : new URLSearchParams(window.location.search).get('row')
+  );
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'state', desc: false },
   ]);

@@ -3,6 +3,7 @@
 import { Badge, Button } from '@jovie/ui';
 import { Check, ExternalLink } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { CertificationJudgments } from '@/components/features/admin/CertificationJudgments';
 import { HudObservationStatus } from '@/components/features/admin/hud/HudObservationStatus';
 import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -12,7 +13,9 @@ import type {
   TimActionsResponse,
 } from '@/lib/hud/linear-actions';
 import type { HudObservationState } from '@/lib/hud/observation';
+import { OVIE_CERTIFICATION_INVENTORY_CONTRACT } from '@/lib/ovie/certifications/types';
 import { STANDARD_CACHE } from '@/lib/queries/cache-strategies';
+import { useOvieCertificationsQuery } from '@/lib/queries/useOvieCertificationsQuery';
 
 const FETCH_URL = '/api/admin/hud/tim-actions';
 
@@ -191,9 +194,16 @@ export function TimActionRequiredSection({
     }
   }
 
+  const certificationQuery = useOvieCertificationsQuery();
+  const judgmentCount =
+    certificationQuery.data?.contract === OVIE_CERTIFICATION_INVENTORY_CONTRACT
+      ? certificationQuery.data.queue.needsYou.length
+      : 0;
+
   const visibleIssues = (data?.issues ?? []).filter(
     issue => !optimisticallyClosedIds.has(issue.id)
   );
+  const pendingCount = judgmentCount + visibleIssues.length;
   const observation = resolveTimActionsObservation({
     isLoading,
     fetchFailed,
@@ -218,18 +228,19 @@ export function TimActionRequiredSection({
             <p className='text-xs font-caption text-tertiary-token'>
               Needs You
             </p>
-            {!isLoading && visibleIssues.length > 0 ? (
+            {!isLoading && pendingCount > 0 ? (
               <span className='ml-auto text-2xs tabular-nums text-tertiary-token'>
-                {visibleIssues.length}
+                {pendingCount}
               </span>
             ) : null}
           </div>
-        ) : !isLoading && visibleIssues.length > 0 ? (
+        ) : !isLoading && pendingCount > 0 ? (
           <p className='px-3 text-xs tabular-nums text-tertiary-token'>
-            {visibleIssues.length}{' '}
-            {visibleIssues.length === 1 ? 'decision' : 'decisions'}
+            {pendingCount} {pendingCount === 1 ? 'decision' : 'decisions'}
           </p>
         ) : null}
+
+        <CertificationJudgments />
 
         {isLoading && !data ? (
           <div className='grid gap-2'>
@@ -242,17 +253,22 @@ export function TimActionRequiredSection({
             ))}
           </div>
         ) : visibleIssues.length > 0 ? (
-          <div className='grid gap-2'>
-            {visibleIssues.map(issue => (
-              <ActionRow
-                key={issue.id}
-                issue={issue}
-                onClose={handleClose}
-                isClosing={closingIds.has(issue.id)}
-              />
-            ))}
+          <div className='space-y-1.5'>
+            <p className='text-2xs text-tertiary-token'>
+              Linear tracking tasks — closing one does not record a judgment.
+            </p>
+            <div className='grid gap-2'>
+              {visibleIssues.map(issue => (
+                <ActionRow
+                  key={issue.id}
+                  issue={issue}
+                  onClose={handleClose}
+                  isClosing={closingIds.has(issue.id)}
+                />
+              ))}
+            </div>
           </div>
-        ) : (
+        ) : pendingCount === 0 && !certificationQuery.isLoading ? (
           <HudObservationStatus
             state={observation}
             message={timActionsMessage(observation, data, locked)}
@@ -270,7 +286,7 @@ export function TimActionRequiredSection({
             }
             testId='tim-action-observation'
           />
-        )}
+        ) : null}
         {visibleIssues.length > 0 && observation === 'unavailable' ? (
           <HudObservationStatus
             state='unavailable'
