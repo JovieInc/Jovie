@@ -1085,7 +1085,7 @@ describe('canonical molecule ownership receipt', () => {
     expect(receipt.schema).toBe('jovie.ui-molecule-ownership/v1');
     expect(receipt.scope).toBe('JOV-5308');
     expect(receipt.families.map(family => family.consumers.length)).toEqual([
-      23, 39,
+      22, 39,
     ]);
     expect(
       validateMoleculeOwnershipReceipt({

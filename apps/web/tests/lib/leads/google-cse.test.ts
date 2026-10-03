@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  GOOGLE_CSE_MAX_RETRIES,
-  GOOGLE_CSE_RETRY_BASE_DELAY_MS,
+  SEARCH_API_MAX_RETRIES,
+  SEARCH_API_RETRY_BASE_DELAY_MS,
 } from '@/lib/leads/constants';
 
 const { captureErrorMock, pipelineLogMock, pipelineWarnMock } = vi.hoisted(
@@ -21,169 +21,204 @@ vi.mock('@/lib/leads/pipeline-logger', () => ({
   pipelineWarn: pipelineWarnMock,
 }));
 
-describe('searchGoogleCSE', () => {
+describe('web search providers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
   });
 
-  it('returns an empty list when search API env vars are missing', async () => {
-    vi.stubEnv('SERPAPI_API_KEY', '');
-    vi.stubEnv('GOOGLE_CSE_API_KEY', '');
-    vi.stubEnv('GOOGLE_CSE_ENGINE_ID', '');
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
 
+  it('returns not_configured and ignores legacy Google CSE credentials', async () => {
+    vi.stubEnv('SERPAPI_API_KEY', '');
+    vi.stubEnv('EXA_API_KEY', '');
+    vi.stubEnv('GOOGLE_CSE_API_KEY', 'legacy-api-key');
+    vi.stubEnv('GOOGLE_CSE_ENGINE_ID', 'legacy-engine-id');
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
-    const { searchGoogleCSE } = await import('@/lib/leads/google-cse');
+    const { searchWebWithStatus } = await import('@/lib/leads/google-cse');
 
     await expect(
-      searchGoogleCSE('site:linktr.ee artist spotify')
-    ).resolves.toEqual([]);
-
+      searchWebWithStatus('site:linktr.ee artist spotify')
+    ).resolves.toEqual({
+      status: 'not_configured',
+      provider: 'none',
+      results: [],
+      error: 'missing env: SERPAPI_API_KEY, EXA_API_KEY',
+    });
     expect(pipelineWarnMock).toHaveBeenCalledWith(
       'discovery',
       'Search API not configured',
-      {
-        missing: [
-          'SERPAPI_API_KEY',
-          'GOOGLE_CSE_API_KEY',
-          'GOOGLE_CSE_ENGINE_ID',
-        ],
-      }
+      { missing: ['SERPAPI_API_KEY', 'EXA_API_KEY'] }
     );
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(captureErrorMock).not.toHaveBeenCalled();
-
-    fetchSpy.mockRestore();
   });
 
-  it('captures API errors and returns an empty array', async () => {
+  it('uses Exa domain filters and preserves 1-based pagination', async () => {
     vi.stubEnv('SERPAPI_API_KEY', '');
-    vi.stubEnv('GOOGLE_CSE_API_KEY', 'test-api-key');
-    vi.stubEnv('GOOGLE_CSE_ENGINE_ID', 'test-engine-id');
-
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(
-      async () =>
-        new Response(
-          JSON.stringify({ error: { code: 500, message: 'Internal Error' } }),
-          {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' },
-          }
-        )
-    );
-
-    const { searchGoogleCSE } = await import('@/lib/leads/google-cse');
-
-    const results = await searchGoogleCSE('site:linktr.ee songwriter');
-
-    expect(results).toEqual([]);
-    expect(captureErrorMock).toHaveBeenCalledWith(
-      'Google CSE API error',
-      expect.any(Error),
-      expect.objectContaining({
-        route: 'leads/google-cse',
-        contextData: expect.objectContaining({ code: 500 }),
+    vi.stubEnv('EXA_API_KEY', 'exa-key');
+    const exaResults = Array.from({ length: 20 }, (_, index) => ({
+      url: `https://linktr.ee/artist-${index + 1}`,
+      title: `Artist ${index + 1}`,
+    }));
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ results: exaResults }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
       })
     );
 
-    fetchMock.mockRestore();
+    const { searchWebWithStatus } = await import('@/lib/leads/google-cse');
+    const result = await searchWebWithStatus(
+      'site:linktr.ee indie artist spotify',
+      11
+    );
+
+    expect(result).toMatchObject({
+      status: 'ok',
+      provider: 'exa',
+    });
+    expect(result.results).toHaveLength(10);
+    expect(result.results[0]).toEqual({
+      link: 'https://linktr.ee/artist-11',
+      title: 'Artist 11',
+      snippet: '',
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe('https://api.exa.ai/search');
+    expect(init).toMatchObject({
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': 'exa-key',
+      },
+    });
+    expect(JSON.parse(String(init?.body))).toEqual({
+      query: 'indie artist spotify',
+      includeDomains: ['linktr.ee'],
+      type: 'auto',
+      numResults: 20,
+    });
   });
 
-  it('retries transient failures and succeeds without capturing an error', async () => {
+  it('prefers SerpAPI when both providers are configured', async () => {
+    vi.stubEnv('SERPAPI_API_KEY', 'serp-key');
+    vi.stubEnv('EXA_API_KEY', 'exa-key');
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          organic_results: [
+            {
+              link: 'https://linktr.ee/example',
+              title: 'Example Artist',
+              snippet: 'Example snippet',
+            },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const { searchWebWithStatus } = await import('@/lib/leads/google-cse');
+    await expect(searchWebWithStatus('artist', 1)).resolves.toMatchObject({
+      status: 'ok',
+      provider: 'serpapi',
+    });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      'https://serpapi.com/search.json'
+    );
+  });
+
+  it('classifies Exa quota responses without reporting empty demand', async () => {
+    vi.stubEnv('SERPAPI_API_KEY', '');
+    vi.stubEnv('EXA_API_KEY', 'exa-key');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Credits exhausted' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const { searchWebWithStatus } = await import('@/lib/leads/google-cse');
+    await expect(searchWebWithStatus('artist', 1)).resolves.toEqual({
+      status: 'quota_exceeded',
+      provider: 'exa',
+      results: [],
+      error: 'Credits exhausted',
+    });
+    expect(captureErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('retries transient Exa failures and succeeds', async () => {
     vi.useFakeTimers();
     vi.stubEnv('SERPAPI_API_KEY', '');
-    vi.stubEnv('GOOGLE_CSE_API_KEY', 'test-api-key');
-    vi.stubEnv('GOOGLE_CSE_ENGINE_ID', 'test-engine-id');
-
+    vi.stubEnv('EXA_API_KEY', 'exa-key');
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            error: { code: 503, message: 'Service Unavailable' },
-          }),
-          {
-            status: 503,
-            headers: { 'Content-Type': 'application/json' },
-          }
-        )
+        new Response(JSON.stringify({ error: 'Service unavailable' }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' },
+        })
       )
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            items: [
-              {
-                link: 'https://linktr.ee/example',
-                title: 'Example Artist',
-                snippet: 'Example snippet',
-              },
+            results: [
+              { url: 'https://linktr.ee/example', title: 'Example Artist' },
             ],
           }),
-          {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          }
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
         )
       );
 
-    const { searchGoogleCSE } = await import('@/lib/leads/google-cse');
-
-    const pending = searchGoogleCSE('site:linktr.ee producer');
-
-    await vi.advanceTimersByTimeAsync(GOOGLE_CSE_RETRY_BASE_DELAY_MS);
+    const { searchWeb } = await import('@/lib/leads/google-cse');
+    const pending = searchWeb('site:linktr.ee producer');
+    await vi.advanceTimersByTimeAsync(SEARCH_API_RETRY_BASE_DELAY_MS);
 
     await expect(pending).resolves.toEqual([
       {
         link: 'https://linktr.ee/example',
         title: 'Example Artist',
-        snippet: 'Example snippet',
+        snippet: '',
       },
     ]);
-
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(captureErrorMock).not.toHaveBeenCalled();
-
-    vi.useRealTimers();
-    fetchMock.mockRestore();
   });
 
-  it('fails fast after retries are exhausted and captures request failure', async () => {
+  it('captures an Exa network failure after retries are exhausted', async () => {
     vi.useFakeTimers();
     vi.stubEnv('SERPAPI_API_KEY', '');
-    vi.stubEnv('GOOGLE_CSE_API_KEY', 'test-api-key');
-    vi.stubEnv('GOOGLE_CSE_ENGINE_ID', 'test-engine-id');
-
+    vi.stubEnv('EXA_API_KEY', 'exa-key');
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockRejectedValue(new Error('socket hang up'));
 
-    const { searchGoogleCSE } = await import('@/lib/leads/google-cse');
-
-    const pending = searchGoogleCSE('site:linktr.ee songwriter');
-
+    const { searchWeb } = await import('@/lib/leads/google-cse');
+    const pending = searchWeb('site:linktr.ee songwriter');
     let totalBackoffMs = 0;
-    for (let attempt = 1; attempt <= GOOGLE_CSE_MAX_RETRIES; attempt++) {
-      totalBackoffMs += GOOGLE_CSE_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
+    for (let attempt = 1; attempt <= SEARCH_API_MAX_RETRIES; attempt++) {
+      totalBackoffMs += SEARCH_API_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
     }
-
     await vi.advanceTimersByTimeAsync(totalBackoffMs + 1);
 
     await expect(pending).resolves.toEqual([]);
-
-    expect(fetchMock).toHaveBeenCalledTimes(GOOGLE_CSE_MAX_RETRIES + 1);
+    expect(fetchMock).toHaveBeenCalledTimes(SEARCH_API_MAX_RETRIES + 1);
     expect(captureErrorMock).toHaveBeenCalledWith(
-      'Google CSE request failed',
+      'Exa request failed',
       expect.any(Error),
       expect.objectContaining({
-        route: 'leads/google-cse',
+        route: 'leads/web-search',
         contextData: expect.objectContaining({
-          attempts: GOOGLE_CSE_MAX_RETRIES + 1,
+          attempts: SEARCH_API_MAX_RETRIES + 1,
         }),
       })
     );
-
-    vi.useRealTimers();
-    fetchMock.mockRestore();
   });
 });

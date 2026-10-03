@@ -86,6 +86,30 @@ unreadable remote/local head cannot publish proof; enqueue requests bind the exp
 head with `--match-head-commit`. A reused terminal result is reported as
 `gate-already-completed`, not another landing.
 
+Every existing publisher (`gate_pr`, event `ready_green`, `requeue_verified` and
+repair completion) now converges on `publish_verified`. A successful completed
+proof is required before ready or enqueue. Repair completion records exact-head
+intent and ended-owner provenance for the existing adopter; it does not enqueue
+directly or replenish the repair budget. A final successful self-push can receive
+its first gate after the owner ends, including the gap before its final ledger
+append. Manual branches must already be in the adopter's repair inventory.
+
+The publisher consumes the canonical source-admission policy from its immutable
+release through the existing `gh` identity. Revision failure holds, incomplete
+reads and queue ejection history remain authoritative. Before readiness, only a
+strict draft-only policy refusal permits that transition; after readiness, full
+admission is required. Ownership, revocation and exact-head proof are rechecked
+after the policy reads. Failed publication retains its intent for governed retry.
+
+Release identity includes the unchanged canonical policy dependency closure as
+well as lane source and tests. `.tree` remains the Git tree for `scripts/lanes`;
+`.bundle` identifies all packaged objects and `.release.json` records their
+pinned source commit. A policy-only change activates a new tested bundle. An old
+updater cannot package the new dependencies, so its self-test must refuse without
+moving `current`. The first deployment requires a reviewed handoff that excludes
+the old updater while the new source's existing update command runs, restores the
+prior timer state and retains all running worker releases.
+
 This reservation is host-local. It does not replace the cross-host claim policy or
 JOV-5257 admission serialization. During a drain-safe release update, old workers
 still run their old code; runtime singleflight is proven only after those workers

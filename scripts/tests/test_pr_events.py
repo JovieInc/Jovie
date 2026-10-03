@@ -48,7 +48,14 @@ class Shell:
                 reply = reply(args) if callable(reply) else reply
                 code, out = reply if isinstance(reply, tuple) else (0, reply)
                 return SimpleNamespace(returncode=code, stdout=out if isinstance(out, str) else json.dumps(out), stderr="")
-        return SimpleNamespace(returncode=0, stdout="", stderr="")
+        if len(args) > 1 and Path(args[1]).name == "source_admission.mjs":
+            out = {"schema": "jovie-source-admission/v1", "allowed": True, "blockers": [],
+                   "prNumber": int(args[-2]), "headSha": args[-1]}
+        elif "check-reenroll" in args:
+            out = {"number": int(args[-1]), "reenrollable": True}
+        else:
+            out = None
+        return SimpleNamespace(returncode=0, stdout=json.dumps(out) if out else "", stderr="")
 
     def made(self, *prefix):
         return [call for call in self.calls if tuple(call[:len(prefix)]) == prefix]
@@ -63,6 +70,12 @@ def fake_lane(shell, claimed=False):
         claimed_elsewhere=lambda number, sha, kind: claimed, post_claim=lambda number, sha, kind: posted.append(number),
         publication_revocation=runner.publication_revocation,
         reconcile_fix_target=lambda pr: {**pr, "state": "OPEN"})
+    def publish(host, target):
+        # Exercise the actual common consumer with this fixture's external boundaries.
+        with patch.object(runner, 'sh', shell), patch.object(runner, 'claimed_elsewhere', return_value=claimed), \
+             patch.object(runner, 'reconcile_fix_target', side_effect=lambda pr: {**pr, 'state': 'OPEN'}):
+            return runner.publish_verified(host, target)
+    module.publish_verified = publish
     module.posted = posted
     return module
 
@@ -445,6 +458,10 @@ class ClaimTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.host = SimpleNamespace(state=Path(self.tmp.name))
+        proofs = {f"{n}:h1": {"schema": runner.GATE_RESULT_SCHEMA, "headSha": "h1", "verdict": "verified-not-queued",
+                  "completedAt": runner.now_iso(), "policyDigest": runner.GATE_POLICY_DIGEST, "sensitive": False}
+                  for n in (1, 5)}
+        (self.host.state / "verified.json").write_text(json.dumps(proofs))
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -569,6 +586,10 @@ class TickTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.host = SimpleNamespace(state=Path(self.tmp.name))
+        proofs = {f"{n}:h1": {"schema": runner.GATE_RESULT_SCHEMA, "headSha": "h1", "verdict": "verified-not-queued",
+                  "completedAt": runner.now_iso(), "policyDigest": runner.GATE_POLICY_DIGEST, "sensitive": False}
+                  for n in (1, 5)}
+        (self.host.state / "verified.json").write_text(json.dumps(proofs))
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -577,7 +598,8 @@ class TickTest(unittest.TestCase):
         shell = Shell()
         outcome = events.ready_green(self.host, fake_lane(shell), pr(draft=True, merge="CLEAN"), {}, NOW)
         self.assertEqual(outcome, "landing")
-        self.assertEqual([call[:3] for call in shell.calls], [["gh", "pr", "ready"], ["gh", "pr", "merge"]])
+        self.assertEqual([call[:3] for call in shell.calls if call[0] == "gh"],
+                         [["gh", "pr", "ready"], ["gh", "pr", "merge"]])
         ledger = [json.loads(line) for line in (self.host.state / "runs/ledger.jsonl").read_text().splitlines()]
         self.assertEqual((ledger[0]["kind"], ledger[0]["verdict"]), ("ready-green", "landing"))
 
@@ -596,12 +618,14 @@ class TickTest(unittest.TestCase):
                          "verified-not-queued")
         self.assertEqual(json.loads((self.host.state / "requeue.json").read_text()), {"5": "h1"})
 
-    def test_diff_policy_holds_stand_but_green_ci_supersedes_the_local_gate(self):
+    def test_diff_policy_and_legacy_gate_holds_stand_despite_green_ci(self):
         draft = pr(draft=True, merge="CLEAN")
         policy = {"5": events.held_record("h1", ["code-change-without-test"])}
         self.assertEqual(events.ready_green(self.host, fake_lane(Shell()), draft, policy, NOW), "held:missing-test")
         legacy_timeout = {"5": {"sha": "h1", "evidence": ["gate-timeout:x3"]}}
-        self.assertEqual(events.ready_green(self.host, fake_lane(Shell()), draft, legacy_timeout, NOW), "landing")
+        (self.host.state / "held.json").write_text(json.dumps(legacy_timeout))
+        self.assertTrue(events.ready_green(self.host, fake_lane(Shell()), draft, legacy_timeout, NOW).startswith("held:"))
+        (self.host.state / "held.json").unlink()
         moved = {"5": events.held_record("h0", ["secret-like-file-changed"])}
         self.assertEqual(events.ready_green(self.host, fake_lane(Shell()), draft, moved, NOW), "landing")
 
@@ -672,6 +696,10 @@ class GapTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.host = SimpleNamespace(state=Path(self.tmp.name))
+        proofs = {f"{n}:h1": {"schema": runner.GATE_RESULT_SCHEMA, "headSha": "h1", "verdict": "verified-not-queued",
+                  "completedAt": runner.now_iso(), "policyDigest": runner.GATE_POLICY_DIGEST, "sensitive": False}
+                  for n in (1, 5)}
+        (self.host.state / "verified.json").write_text(json.dumps(proofs))
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -1389,3 +1417,53 @@ class TerminalPreservationTest(unittest.TestCase):
                 self.assertEqual(json.loads((self.host.state/'fix-attempts.json').read_text()),history)
                 self.assertFalse(shell.calls)
                 self.assertFalse(lane.posted)
+
+
+class GreenPublicationProofTest(unittest.TestCase):
+    def test_spent_final_self_push_can_publish_then_requeue_without_another_repair(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = runner.Host(state=Path(tmp))
+            target = pr(draft=True, merge="CLEAN", kinds=["green", "dequeued"], labels=["lane-fix-green"])
+            history = {"5": {"sha": "prior", "count": 2, "pushed": True, "pushedHead": "h1", "endedAt": time.time() - 1}}
+            (host.state / "fix-attempts.json").write_text(json.dumps(history))
+            proof = {"schema": runner.GATE_RESULT_SCHEMA, "headSha": "h1", "verdict": "verified-not-queued",
+                     "completedAt": runner.now_iso(), "policyDigest": runner.GATE_POLICY_DIGEST, "sensitive": False}
+            (host.state / "verified.json").write_text(json.dumps({"5:h1": proof}))
+            shell = Shell({("gh", "pr", "merge"): (1, "temporary failure")})
+            with patch.object(events, "reconcile", return_value=None), patch.object(events, "queued_prs", return_value=[target]):
+                outcome = events.tick(host, fake_lane(shell), lambda: self.fail("no retirement"), NOW)
+            self.assertEqual(outcome[5], "verified-not-queued")
+            self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {"5": "h1"})
+            self.assertFalse(any("update-branch" in " ".join(call) for call in shell.calls))
+            self.assertEqual(len(shell.made("gh", "api", "-X", "DELETE")), 1, "consume only green")
+            shell = Shell()
+            with patch.object(runner, "sh", shell), patch.object(runner, "claimed_elsewhere", return_value=False), \
+                 patch.object(runner, "reconcile_fix_target", return_value={**target, "state": "OPEN", "isDraft": False}):
+                runner.requeue_verified(host, [target])
+            self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {})
+            self.assertEqual(json.loads((host.state / "fix-attempts.json").read_text()), history)
+            self.assertEqual(shell.made("gh", "pr", "ready"), [])
+            self.assertEqual(shell.made("gh", "pr", "merge")[0][-2:], ["--match-head-commit", "h1"])
+
+    def test_actual_tick_retains_green_event_without_terminal_proof_or_with_active_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = runner.Host(state=Path(tmp))
+            target = pr(draft=True, merge='CLEAN', kinds=['green'], labels=['lane-fix-green'])
+            for busy in (False, True):
+                shell = Shell()
+                lane = fake_lane(shell)
+                claim = runner.reserve_gate(host, target) if busy else None
+                try:
+                    with patch.object(events,'reconcile',return_value=None), patch.object(events,'queued_prs',return_value=[target]):
+                        outcome = events.tick(host,lane,lambda:None,NOW)
+                    self.assertTrue(outcome[5].startswith('held:'))
+                    # The normal remediation read is allowed; every publication,
+                    # label, closure, sync and other command remains forbidden.
+                    self.assertEqual(shell.calls, [[
+                        "gh", "issue", "list", "--repo", "JovieInc/Jovie", "--state", "open",
+                        "--label", "symphony-remediation", "--limit", "30",
+                        "--json", "number,title,body,updatedAt",
+                    ]])
+                    self.assertFalse((host.state/'runs/ledger.jsonl').exists())
+                finally:
+                    if claim:claim.lock.release()
