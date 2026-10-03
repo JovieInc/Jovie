@@ -168,6 +168,7 @@ import { GET, POST } from '@/app/api/admin/outreach/route';
 describe('GET /api/admin/outreach', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('FEATURE_INSTANTLY_OUTBOUND', 'true');
     mockSelect.mockReset();
     mockSelect.mockImplementation(() => ({
       from: vi.fn(() => ({

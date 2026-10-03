@@ -42,6 +42,7 @@ import {
   resolveFxNamedOutcome,
   resolveWebhookRemediationRoute,
   revalidateHostedCanaryState,
+  symphonyRemediationEvent,
   validateHostedRepairPath,
   validateHostedTestCompanion,
   validateHostedTestReports,
@@ -1202,9 +1203,27 @@ describe('hosted rolling CI repair policy', () => {
     }
   );
 
+  it('emits a Symphony remediation event for a PR without a new secret', () => {
+    const event = symphonyRemediationEvent({
+      prNumber: 17,
+      expectedHeadOid: 'abc',
+      workflow: 'CI',
+      failedChecks: ['component-ship-gate', 'lint'],
+    });
+    expect(event.schema).toBe('jovie.remediation-event/v1');
+    expect(event.ws).toBe('ci');
+    expect(event.intake).toBe('lane-fix-red');
+    expect(event.fingerprint).toBe('component-ship-gate\nlint\nCI');
+    expect(event.subject).toEqual({ pr: 17, sha: 'abc', workflow: 'CI' });
+    expect(
+      symphonyRemediationEvent({ failedChecks: ['lint'], workflow: 'CI' })
+        .intake
+    ).toBe('symphony-remediation');
+  });
+
   it.each([
-    ['success', 'ha-remediation-receipt-present'],
-    ['pending', 'ha-remediation-receipt-present'],
+    ['success', 'symphony-remediation-receipt-present'],
+    ['pending', 'symphony-remediation-receipt-present'],
   ])(
     'blocks FX when an exact-head HA %s receipt predates the run',
     async (state, reason) => {
@@ -1223,7 +1242,7 @@ describe('hosted rolling CI repair policy', () => {
             labels: [],
           };
         }
-        return [{ context: 'ha-ci-remediator-poke', state }];
+        return [{ context: 'symphony-remediation', state }];
       });
       await expect(
         revalidateHostedCanaryState({
@@ -1265,7 +1284,7 @@ describe('hosted rolling CI repair policy', () => {
       })
     ).resolves.toEqual({
       allowed: false,
-      reason: 'ha-receipt-inventory-incomplete',
+      reason: 'symphony-receipt-inventory-incomplete',
     });
   });
 
@@ -1285,7 +1304,7 @@ describe('hosted rolling CI repair policy', () => {
           labels: [],
         };
       }
-      return [{ context: 'ha-ci-remediator-poke', state: 'pending' }];
+      return [{ context: 'symphony-remediation', state: 'pending' }];
     });
     await expect(
       commitHostedRepair({
@@ -1302,7 +1321,7 @@ describe('hosted rolling CI repair policy', () => {
     ).resolves.toMatchObject({
       committed: false,
       outcome: 'stale_head',
-      blockedBy: 'ha-remediation-receipt-present',
+      blockedBy: 'symphony-remediation-receipt-present',
     });
     expect(request).toHaveBeenCalledTimes(2);
     expect(request.mock.calls.some(([path]) => path === '/graphql')).toBe(
