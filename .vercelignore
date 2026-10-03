@@ -102,12 +102,6 @@ apps/docs/scripts/*.test.mjs
 !/docs/
 /docs/*
 !/docs/FEATURE_REGISTRY.md
-# Help Center pages reference /proof/*, a symlink to this directory. Re-open
-# the parent, then only help-center. Other docs/screenshots trees stay excluded.
-!/docs/screenshots/
-/docs/screenshots/*
-!/docs/screenshots/help-center/
-!/docs/screenshots/help-center/**
 !/scripts/
 /scripts/*
 !apps/eve-pilot/identities/jovie/instructions.md

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { lstatSync, readdirSync, readFileSync, readlinkSync } from 'node:fs';
+import { lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 
@@ -89,11 +89,10 @@ describe('Vercel source contract', () => {
     assert.deepEqual(ignoredFiles(modules), []);
 
     const proof = 'apps/docs/public/proof';
-    assert.equal(lstatSync(proof).isSymbolicLink(), true);
-    const proofDir = resolve(dirname(proof), readlinkSync(proof));
-    const proofFiles = readdirSync(proofDir).map(name =>
-      relative('.', join(proofDir, name))
-    );
+    assert.equal(lstatSync(proof).isSymbolicLink(), false);
+    const proofFiles = readdirSync(proof)
+      .filter(name => name.endsWith('.png'))
+      .map(name => join(proof, name));
     assert.ok(proofFiles.length > 0);
     assert.deepEqual(ignoredFiles(proofFiles), []);
 

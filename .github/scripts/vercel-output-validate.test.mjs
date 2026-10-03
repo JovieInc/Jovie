@@ -357,8 +357,20 @@ test('real repository .vercelignore parses and re-includes runtime files', () =>
   assert.equal(ignore.ignores('apps/docs/lib/visual-proof-assets.mjs'), true);
   assert.equal(ignore.ignores('apps/docs/lib/article-registry.test.mjs'), true);
   assert.equal(
-    ignore.ignores('docs/screenshots/help-center/connect-music-accounts.png'),
+    ignore.ignores('apps/docs/scripts/build-pagefind.mjs'),
     false
+  );
+  assert.equal(
+    ignore.ignores('apps/docs/scripts/materialize-proof.mjs'),
+    false
+  );
+  assert.equal(
+    ignore.ignores('apps/docs/public/proof/connect-music-accounts.png'),
+    false
+  );
+  assert.equal(
+    ignore.ignores('docs/screenshots/help-center/connect-music-accounts.png'),
+    true
   );
   assert.equal(ignore.ignores('docs/screenshots/pitch-v1/deck.png'), true);
   assert.equal(ignore.ignores('apps/web/tests/quarantine.json'), false);

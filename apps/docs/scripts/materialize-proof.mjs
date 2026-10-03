@@ -13,11 +13,12 @@ import { pathToFileURL } from 'node:url';
 
 const proofLink = join(import.meta.dirname, '..', 'public', 'proof');
 
-// Vercel follows `public/proof` -> `docs/screenshots/help-center` while
-// copying build output. Once that directory is in the upload, the copy
-// source and destination are the same path and the build exits with
-// "Cannot copy ... to a subdirectory of itself". Replace the symlink
-// with a real directory before `next build` on Vercel only.
+// Published pages serve /proof/* from apps/docs/public/proof. That path is a
+// real directory after the screenshot move. If it is a symlink whose target
+// is also in the upload, Vercel copies the link onto itself and exits with
+// "Cannot copy ... to a subdirectory of itself". Replace a symlink with a
+// real directory before `next build` on Vercel only. A real directory is a
+// no-op.
 export function materializeProofDirectory(proofPath, env = process.env) {
   if (!env.VERCEL) return { materialized: false, reason: 'not-vercel' };
   const stat = lstatSync(proofPath, { throwIfNoEntry: false });
