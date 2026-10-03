@@ -7,7 +7,6 @@ import {
   defineConfig,
   type TestProjectInlineConfiguration,
 } from 'vitest/config';
-import { readCliExcludePatterns } from '../../scripts/lib/ci-web-vitest-fast-args.mjs';
 import DurationShardSequencer from './scripts/vitest-duration-sequencer.mjs';
 
 // Resolve the real filesystem path (handles Windows short-name paths like TIMWHI~1)
@@ -26,6 +25,11 @@ const workspaceRoot = realRoot.includes(`${path.sep}.stryker-tmp${path.sep}`)
 const { default: RetryVisibilityReporter } = await import(
   pathToFileURL(
     path.resolve(workspaceRoot, 'scripts/lib/vitest-retry-reporter.mjs')
+  ).href
+);
+const { readCliExcludePatterns } = await import(
+  pathToFileURL(
+    path.resolve(workspaceRoot, 'scripts/lib/ci-web-vitest-fast-args.mjs')
   ).href
 );
 
