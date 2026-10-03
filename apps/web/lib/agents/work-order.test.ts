@@ -34,6 +34,7 @@ function order(overrides: Partial<WorkOrder> = {}): WorkOrder {
     idempotencyKey: 'jov-7703-code',
     gate,
     state: 'open',
+    title: 'Ship the WorkOrder adapter fixture',
     outcome: 'Lanes ship the WorkOrder adapter fixture',
     successPredicate: {
       id: 'p-ci',

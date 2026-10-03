@@ -57,6 +57,7 @@ export const WorkOrderSchema = z.strictObject({
   idempotencyKey: z.string().regex(/^[A-Za-z0-9_-]{8,128}$/u),
   gate: z.strictObject({ objectiveRef: id, gateId: id }),
   state: z.enum(['open', 'canceled']),
+  title: z.string().trim().min(1).max(120),
   outcome: text,
   successPredicate: z.strictObject({
     id,

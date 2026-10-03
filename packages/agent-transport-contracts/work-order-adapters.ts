@@ -110,7 +110,7 @@ const unmet = (): Pick<Fields, 'outcome' | 'certification'> => ({
 export function toLaneIntake(order: SealedWorkOrder) {
   requireClass(order, 'code-lane');
   return {
-    title: order.outcome.slice(0, 200),
+    title: order.title,
     description: `${brief(order)}\n\n${renderWorkBlock(order)}`,
     labels: ['agent-ready'],
     searchMarker: dispatchMarker(order),
@@ -324,7 +324,7 @@ export function toSummerCard(
     idempotencyKey: founderCardKey(order),
     kind,
     product: 'company' as const,
-    title: order.outcome.slice(0, 120),
+    title: order.title,
     body: [
       `Why now: ${ask.whyNow}`,
       `Blocked: ${ask.blocked}`,
@@ -480,7 +480,7 @@ export function toReasoningJob(order: SealedWorkOrder) {
     deadline: order.budget.deadline,
   };
   return {
-    title: order.outcome.slice(0, 200),
+    title: order.title,
     description: `\`\`\`json\n${JSON.stringify(job, null, 2)}\n\`\`\`\n\n${renderWorkBlock(order)}`,
     labels: ['reasoning-job'],
     searchMarker: dispatchMarker(order),
