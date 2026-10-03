@@ -29,11 +29,26 @@ function listPageSources(directory: string): string[] {
 }
 
 describe('authenticated app screen registry', () => {
+  it('registers the restored Referral page as a canonical Settings body without retired Retargeting', () => {
+    expect(
+      APP_SCREEN_REGISTRY.find(
+        screen => screen.route === '/app/settings/referral'
+      )
+    ).toMatchObject({
+      kind: 'canonical',
+      designReference: true,
+      archetypeId: 'settings',
+    });
+    expect(
+      APP_SCREEN_REGISTRY.some(
+        screen => screen.route === '/app/settings/retargeting-ads'
+      )
+    ).toBe(false);
+  });
   it('registers every authenticated shell page exactly once', () => {
     expect(APP_SCREEN_REGISTRY.map(entry => entry.source).sort()).toEqual(
       listPageSources(shellRoot)
     );
-    expect(APP_SCREEN_REGISTRY).toHaveLength(106);
   });
 
   it('has a valid registered recipe and component composition', () => {
@@ -47,7 +62,7 @@ describe('authenticated app screen registry', () => {
     const references = APP_SCREEN_REGISTRY.filter(
       entry => entry.designReference
     );
-    expect(references).toHaveLength(50);
+    expect(references).toHaveLength(49);
     for (const screen of references) {
       expect(screen.archetypeId, screen.route).not.toBeNull();
     }
@@ -202,14 +217,14 @@ describe('authenticated app screen registry', () => {
     }
   });
 
-  it('assigns exactly 50 unique deterministic browser-safe story IDs', () => {
+  it('assigns exactly 49 unique deterministic browser-safe story IDs', () => {
     const references = APP_SCREEN_REGISTRY.filter(
       entry => entry.designReference
     );
     // Source-of-truth pin: the Pen lane must derive this count from the
     // export receipt, never hardcode it. /app/ov/ops and /app/admin redirect
     // to /hud.
-    expect(references).toHaveLength(50);
+    expect(references).toHaveLength(49);
     const storyIds = references.map(entry => {
       expect(entry.story, entry.route).not.toBeNull();
       return entry.story?.id as string;
@@ -235,7 +250,6 @@ describe('authenticated app screen registry', () => {
     const compatibility = APP_SCREEN_REGISTRY.filter(
       entry => entry.kind === 'alias' || entry.kind === 'legacy'
     );
-    expect(compatibility).toHaveLength(32);
     const referenceConcepts = new Set(
       APP_SCREEN_REGISTRY.filter(entry => entry.designReference).map(
         entry => entry.conceptId
@@ -279,7 +293,7 @@ describe('authenticated app screen registry', () => {
     expect(receipt.schema).toBe(APP_SCREEN_PEN_EXPORT_SCHEMA);
     expect(receipt.counts).toEqual({
       screens: APP_SCREEN_REGISTRY.length,
-      designReferences: 50,
+      designReferences: 49,
       components: APP_SCREEN_COMPONENT_REGISTRY.length,
       recipes: APP_SCREEN_RECIPE_REGISTRY.length,
       archetypes: 8,

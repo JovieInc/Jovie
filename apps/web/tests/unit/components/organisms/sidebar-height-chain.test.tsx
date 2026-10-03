@@ -36,7 +36,7 @@ describe('sidebar full-height flex chain (JOV-3960)', () => {
       "SidebarGroupContent className='flex min-h-0 flex-1 flex-col'"
     );
     expect(unifiedSource).toMatch(
-      /<DashboardNav>[\s\S]*?HeaderSearchSurfaceFromContext[\s\S]*?<\/DashboardNav>/
+      /<DashboardNav(?:\s[^>]*)?>[\s\S]*?HeaderSearchSurfaceFromContext[\s\S]*?<\/DashboardNav>/
     );
     expect(unifiedSource).toContain('SidebarFooter');
     expect(unifiedSource).toMatch(/SidebarFooter className='mt-auto/);

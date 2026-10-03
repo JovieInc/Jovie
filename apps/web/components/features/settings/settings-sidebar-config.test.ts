@@ -20,7 +20,7 @@ describe('SETTINGS_SIDEBAR_GROUPS', () => {
     ]);
   });
 
-  it('assigns the 11 sub-pages to their approved groups', () => {
+  it('assigns the 9 sub-pages to their approved groups', () => {
     const membership = Object.fromEntries(
       SETTINGS_SIDEBAR_GROUPS.map(group => [
         group.id,
@@ -29,9 +29,9 @@ describe('SETTINGS_SIDEBAR_GROUPS', () => {
     );
 
     expect(membership).toEqual({
-      profile: ['artist-profile', 'contacts', 'appearance'],
+      profile: ['artist-profile', 'contacts'],
       account: ['account', 'data-privacy', 'delete-account'],
-      workspace: ['connections', 'retargeting-ads'],
+      workspace: ['connections'],
       billing: ['billing', 'usage', 'referral'],
     });
   });
@@ -51,10 +51,10 @@ describe('SETTINGS_SIDEBAR_GROUPS', () => {
 });
 
 describe('filterSettingsGroups', () => {
-  it('returns all 11 items for an empty query', () => {
+  it('returns all 9 items for an empty query', () => {
     const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, '');
     const ids = groups.flatMap(group => group.items.map(item => item.id));
-    expect(ids).toHaveLength(11);
+    expect(ids).toHaveLength(9);
   });
 
   it('filters by item label, case-insensitively', () => {
@@ -73,9 +73,10 @@ describe('filterSettingsGroups', () => {
     ]);
   });
 
-  it('drops groups with no matching items', () => {
+  it('finds Referral in Billing', () => {
     const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, 'referral');
     expect(groups.map(group => group.id)).toEqual(['billing']);
+    expect(groups[0].items.map(item => item.id)).toEqual(['referral']);
   });
 
   it('returns an empty list when nothing matches', () => {
@@ -93,11 +94,11 @@ describe('filterSettingsGroups', () => {
     }
   });
 
-  it('shows admins the same 11 items as creators', () => {
+  it('shows admins the same 9 items as creators', () => {
     const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, '', {
       isAdmin: true,
     });
-    expect(groups.flatMap(group => group.items)).toHaveLength(11);
+    expect(groups.flatMap(group => group.items)).toHaveLength(9);
   });
 });
 

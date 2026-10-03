@@ -556,6 +556,13 @@ const nextConfig = {
         destination: '/artists',
         permanent: true,
       },
+      // Consolidate the singular marketing alias onto the canonical lander.
+      // Use an explicit 301 for search engines and existing inbound links.
+      {
+        source: '/artist-profile',
+        destination: '/artist-profiles',
+        statusCode: 301,
+      },
       // No /solutions index page exists; send it to the shipped solutions
       // route instead of falling through to profile resolution ("Profile
       // not found").
@@ -775,6 +782,9 @@ const nextConfig = {
       '@dnd-kit/utilities',
       'framer-motion',
       'motion',
+      // Motion's React entry declares full motion aliases beside wildcard
+      // exports. Resolve named helpers to their leaves before bundling.
+      'motion/react',
       'zod',
       '@tanstack/react-table',
       '@tanstack/react-virtual',
