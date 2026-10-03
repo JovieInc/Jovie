@@ -307,8 +307,13 @@ case "$DRAIN_PROMOTION_MODE" in
           .productionUnboundRepairAdmission.mainSha == null and
           .productionUnboundRepairAdmission.deployedSha == null
         end) and
-        # JOV-5913: unbound repair concurrency is seat-derived (1..8), never pinned to 1.
-        (.productionUnboundRepairAdmission.maxConcurrent | type == "number" and . == floor and . >= 1 and . <= 8) and
+        (.productionUnboundRepairAdmission.maxConcurrent | type == "number" and . == floor) and
+        (if .productionUnboundRepairAdmission.allowed then
+          .productionUnboundRepairAdmission.maxConcurrent >= 1 and
+          .productionUnboundRepairAdmission.maxConcurrent <= 40
+        else
+          .productionUnboundRepairAdmission.maxConcurrent == 0
+        end) and
         .productionUnboundRepairAdmission.deploymentsAllowed == false and
         .alreadyAdmittedCohort.preserve == true and
         .closureAdmission.authority == "Summer" and

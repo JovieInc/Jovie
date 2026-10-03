@@ -4,7 +4,9 @@ After=symphony-elixir.service
 
 [Service]
 Type=oneshot
-ExecStart=%h/.local/bin/symphony-concurrency-controller
+ExecStartPre=/usr/bin/python3 %h/gem-workspace/scripts/provider-capacity-bootstrap.py --ledger %h/gem-workspace/state/provider-useful-turns.jsonl --launcher %h/.local/bin/codex-rotate --helper %h/gem-workspace/scripts/provider_useful_turns.py
+ExecStartPre=/usr/bin/python3 %h/gem-workspace/scripts/gem-concurrency-evidence.py --ledger %h/gem-workspace/state/provider-useful-turns.jsonl --out %h/gem-workspace/state/concurrency.json
+ExecStart=%h/.local/bin/symphony-concurrency-controller --capacity-evidence %h/gem-workspace/state/concurrency.json --receipt %h/gem-workspace/state/symphony-concurrency.json
 Nice=10
 
 # Missing or drifted workflow evidence exits 2 and stays a real unit failure;

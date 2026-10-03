@@ -25,7 +25,7 @@ jobs:
     # The fixed fleet is provisioned on the Gem host. The installer establishes
     # and verifies the shared user-systemd context before any controller write.
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
-    timeout-minutes: 8
+    timeout-minutes: 15
     steps:
       - name: Checkout the exact successful production revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -64,9 +64,17 @@ jobs:
           GEM_CONTROLLER_EXPECTED_REVISION: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          bash scripts/hermes/update-symphony-burrito.sh --skip-binary
-          bash scripts/hermes/install-gem-fleet-controller.sh
+          # Stage the wrapper/unit without restarting onto a stale pre-upgrade
+          # fleet receipt. Seed identity-bound capacity and refresh the gate
+          # first, then use the updater's guarded idle restart.
+          bash scripts/hermes/update-symphony-burrito.sh --skip-binary --no-restart
+          FLEET_INSTALL_STAGE_ONLY=true \
+            bash scripts/hermes/install-gem-fleet-controller.sh
           bash scripts/hermes/install-gem-pr-rehabilitation.sh
+          bash scripts/hermes/update-symphony-burrito.sh --skip-binary
+          bash scripts/hermes/update-symphony-burrito.sh --runtime-readback
+          # Re-attest current listener PIDs after the guarded restart.
+          bash scripts/hermes/install-gem-fleet-controller.sh
       - name: Verify runtime identity after reload
         env:
           GEM_WORKSPACE: /home/timwhite/gem-workspace
@@ -85,7 +93,12 @@ jobs:
             .listener.wrapperPid > 0 and
             .listener.boundToService == true and
             .workflow.matches == true and
-            .unit.matches == true
+            .unit.matches == true and
+            .controllerTick.matchesInstalledFiles == true and
+            .controllerTick.matchesInstalledRuntime == false and
+            .controllerTick.runtimeProof.status == "UNKNOWN" and
+            .controllerTimer.enabled == true and
+            .controllerTimer.active == true
           ' "$GEM_WORKSPACE/state/gem-service-attestation.json" >/dev/null
           curl --fail --silent --show-error --max-time 5 http://127.0.0.1:4041/api/v1/state \
             | jq -e '.counts | has("running") and has("retrying") and has("blocked")' >/dev/null
@@ -99,6 +112,8 @@ jobs:
           ' "$GEM_WORKSPACE/state/gem-pr-rehabilitation-attestation.json" >/dev/null
           systemctl --user is-enabled --quiet gem-pr-drain.timer
           systemctl --user is-active --quiet gem-pr-drain.timer
+          systemctl --user is-enabled --quiet symphony-concurrency-controller.timer
+          systemctl --user is-active --quiet symphony-concurrency-controller.timer
           bash scripts/hermes/update-symphony-burrito.sh --check
           systemctl --user is-enabled --quiet symphony-elixir.service
           systemctl --user is-active --quiet symphony-elixir.service

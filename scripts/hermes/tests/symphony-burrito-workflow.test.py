@@ -39,13 +39,62 @@ def _load_helper():
     return module
 
 
-def _fleet_gate_payload(status="healthy", intake=True, observed_at=None):
+def _capacity_payload(observed_at, target=4):
+    profiles = [f"{index + 1:064x}" for index in range(target)]
+    rows = [
+        {
+            "schema": "gem-provider-useful-turn/v1",
+            "provider": "openai",
+            "profile": profile,
+            "model": "gpt-5.6-sol",
+            "completedAt": observed_at,
+            "rc": 0,
+            "useful": True,
+            "outputDigest": f"{index + 101:064x}",
+            "outputBytes": 12,
+            "tokens": {"input": 20, "output": 4, "total": 24},
+        }
+        for index, profile in enumerate(profiles)
+    ]
+    return {
+        "schema": "gem-concurrency-evidence/v1",
+        "source": "execution-proven-useful-turns",
+        "observedAt": observed_at,
+        "target": target,
+        "approved": target > 0,
+        "severeIncidents": 0,
+        "rows": rows,
+        "providers": {
+            "openai": {
+                "enrolled": target,
+                "enrolledProfiles": profiles,
+                "ready": target,
+            }
+        },
+        "ledger": {"schema": "gem-provider-useful-turn/v1"},
+    }
+
+
+def _fleet_gate_payload(
+    status="healthy", intake=True, observed_at=None, *, capacity_ready=True
+):
     observed = observed_at or (
         dt.datetime.now(dt.timezone.utc)
         .replace(microsecond=0)
         .isoformat()
         .replace("+00:00", "Z")
     )
+    capacity = _capacity_payload(observed) if capacity_ready else {
+        "schema": "gem-concurrency-evidence/v1",
+        "source": "execution-proven-useful-turns",
+        "observedAt": None,
+        "target": 0,
+        "approved": False,
+        "severeIncidents": 0,
+        "rows": [],
+        "providers": {},
+        "ledger": {"schema": "gem-provider-useful-turn/v1"},
+    }
     return {
         "schema": "jovie-fleet-gate/v1",
         "observedAt": observed,
@@ -59,7 +108,13 @@ def _fleet_gate_payload(status="healthy", intake=True, observed_at=None):
                 "promotionContinues": True,
                 "remediationContinues": True,
                 "reasons": [] if intake else ["duplicate-issue-lanes-unresolved"],
-            }
+            },
+            "concurrencyEvidence": {
+                **capacity,
+                "accepted": capacity_ready,
+                "proofAccepted": capacity_ready,
+                "actionableTarget": 4 if capacity_ready else 0,
+            },
         },
         "closureAdmission": {
             "allowed": intake,
@@ -71,16 +126,41 @@ def _fleet_gate_payload(status="healthy", intake=True, observed_at=None):
             "promotionContinues": True,
             "remediationContinues": True,
         },
+        "workAdmission": {
+            "allowed": capacity_ready,
+            "newIssueLeaseAllowed": intake and capacity_ready,
+            "newImplementationAllowed": intake and capacity_ready,
+            "activities": ["approved-issue-lease"] if intake and capacity_ready else [],
+        },
+        "concurrency": {
+            "gem": {
+                "evidenceAccepted": capacity_ready,
+                "newMutationAllowed": capacity_ready,
+                "maxConcurrent": 4 if capacity_ready else 0,
+                "proofTarget": 4 if capacity_ready else None,
+                "leaseCapacity": 4 if capacity_ready else None,
+                "matchedCapacity": 4 if capacity_ready else 0,
+                "matchedAvailableCapacity": 4 if capacity_ready else 0,
+            }
+        },
     }
 
 
 def _closure_run_args(tmp):
     """Green fleet-gate fixture plus hermetic stop-line paths for run tests."""
     closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
-    closure_gate.write_text(json.dumps(_fleet_gate_payload()), encoding="utf-8")
+    gate_payload = _fleet_gate_payload()
+    closure_gate.write_text(json.dumps(gate_payload), encoding="utf-8")
+    capacity = pathlib.Path(tmp) / "capacity.json"
+    capacity.write_text(
+        json.dumps(_capacity_payload(gate_payload["signals"]["concurrencyEvidence"]["observedAt"])),
+        encoding="utf-8",
+    )
     return [
         "--closure-gate-file",
         str(closure_gate),
+        "--capacity-evidence-file",
+        str(capacity),
         "--closure-hold-receipt",
         str(pathlib.Path(tmp) / "closure-hold.json"),
         "--dead-letter-dir",
@@ -104,7 +184,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertNotIn("jovie-ba6736cbfbb9", WORKFLOW)
         self.assertIn("root: ~/symphony-elixir-workspaces", WORKFLOW)
         self.assertIn("timeout_ms: 900000", WORKFLOW)
-        self.assertIn("max_concurrent_agents: 8", WORKFLOW)
+        self.assertIn("max_concurrent_agents: 1", WORKFLOW)
         self.assertIn("api_key: $LINEAR_API_KEY", WORKFLOW)
         self.assertNotIn("required_labels:", WORKFLOW)
         self.assertIn("excluded_labels:", WORKFLOW)
@@ -593,7 +673,9 @@ class OfficialSymphonyContractTests(unittest.TestCase):
     def test_unit_binds_closure_stop_line_gate(self):
         helper = _load_helper()
         flag = "--closure-gate-file %h/gem-workspace/state/gem-priority-gate/latest.json"
+        capacity_flag = "--capacity-evidence-file %h/gem-workspace/state/concurrency.json"
         self.assertIn(flag, UNIT)
+        self.assertIn(capacity_flag, UNIT)
         with tempfile.TemporaryDirectory() as tmp:
             variant = pathlib.Path(tmp) / "symphony-elixir.service"
             variant.write_text(UNIT.replace(f"{flag} ", ""), encoding="utf-8")
@@ -606,6 +688,16 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             )
             self.assertFalse(result["ok"])
             self.assertIn("unit_missing_closure_stop_line_gate", result["errors"])
+            variant.write_text(UNIT.replace(f"{capacity_flag} ", ""), encoding="utf-8")
+            result = helper.validate_source(
+                repo_root=ROOT,
+                workflow_path=WORKFLOW_PATH,
+                unit_path=variant,
+                service_name="symphony-elixir.service",
+                active_issues=helper.MEASURED_ACTIVE_ISSUES,
+            )
+            self.assertFalse(result["ok"])
+            self.assertIn("unit_missing_capacity_evidence_stop_line", result["errors"])
 
     def test_closure_stop_line_red_receipt_holds_new_admission(self):
         helper = _load_helper()
@@ -681,7 +773,86 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
             verdict = helper.read_closure_stop_line(closure_gate)
             self.assertFalse(verdict["hold"])
-            self.assertEqual(verdict["reason"], "closure-health-green")
+            self.assertEqual(verdict["reason"], "fleet-work-admission-open")
+
+    def test_green_closure_with_zero_capacity_holds_scheduler(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
+            closure_gate.write_text(
+                json.dumps(_fleet_gate_payload(capacity_ready=False)),
+                encoding="utf-8",
+            )
+            verdict = helper.read_closure_stop_line(closure_gate)
+            self.assertTrue(verdict["hold"])
+            self.assertEqual(verdict["reason"], "work-capacity-admission-closed")
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(HELPER_PATH),
+                    "run",
+                    "--gate-file",
+                    str(pathlib.Path(tmp) / "linear-rate-limit.json"),
+                    "--closure-gate-file",
+                    str(closure_gate),
+                    "--closure-hold-receipt",
+                    str(pathlib.Path(tmp) / "closure-hold.json"),
+                    "--dead-letter-dir",
+                    str(pathlib.Path(tmp) / "dead-letters"),
+                    "--max-gate-sleep-seconds",
+                    "0",
+                    "--",
+                    "python3",
+                    "-c",
+                    "print('must-not-run')",
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, helper.CLOSURE_HOLD_EXIT_CODE)
+            self.assertNotIn("must-not-run", result.stdout)
+
+    def test_capacity_validator_rejects_python_bool_aliases_and_malformed_providers(self):
+        helper = _load_helper()
+        observed = "2026-09-03T11:59:00Z"
+        now = dt.datetime(2026, 9, 3, 12, 0, tzinfo=dt.timezone.utc)
+
+        def false_rc(payload):
+            payload["rows"][0]["rc"] = False
+
+        def boolean_provider_counts(payload):
+            payload["providers"]["openai"].update(enrolled=True, ready=True)
+
+        def malformed_extra_provider(payload):
+            payload["providers"]["anthropic"] = {"enrolled": 0, "ready": 0}
+
+        def malformed_provider_identity(payload):
+            payload["providers"][" openai"] = payload["providers"].pop("openai")
+
+        def noncanonical_time(payload):
+            timestamp = "2026-09-03 11:59:00+00:00"
+            payload["observedAt"] = timestamp
+            payload["rows"][0]["completedAt"] = timestamp
+
+        def out_of_range_offset(payload):
+            timestamp = "2026-09-03T11:59:00+01:60"
+            payload["observedAt"] = timestamp
+            payload["rows"][0]["completedAt"] = timestamp
+
+        for mutate in (
+            false_rc,
+            boolean_provider_counts,
+            malformed_extra_provider,
+            malformed_provider_identity,
+            noncanonical_time,
+            out_of_range_offset,
+        ):
+            with self.subTest(mutate=mutate.__name__):
+                payload = _capacity_payload(observed, target=1)
+                mutate(payload)
+                accepted, _reason = helper._validate_capacity_evidence(payload, now)
+                self.assertIsNone(accepted)
 
     def test_closure_stop_line_missing_stale_future_or_tampered_fails_closed(self):
         helper = _load_helper()
@@ -703,6 +874,15 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             gate.write_text("[]", encoding="utf-8")
             verdict = helper.read_closure_stop_line(gate, now=now)
             self.assertEqual(verdict["reason"], "fleet-gate-receipt-schema-mismatch")
+
+            gate.write_text(
+                json.dumps(_fleet_gate_payload(observed_at="2026-09-03T11:59:00")),
+                encoding="utf-8",
+            )
+            verdict = helper.read_closure_stop_line(gate, now=now)
+            self.assertEqual(
+                verdict["reason"], "fleet-gate-receipt-observed-at-missing"
+            )
 
             # Stale: observed 11 minutes before now with the 600s window.
             gate.write_text(
@@ -769,6 +949,61 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(verdict["reason"], "closure-admission-disagrees")
             verdict = write_tampered(lambda payload: payload.pop("signals"))
             self.assertEqual(verdict["reason"], "closure-health-missing")
+            verdict = write_tampered(
+                lambda payload: payload["signals"]["concurrencyEvidence"].pop(
+                    "rows"
+                )
+            )
+            self.assertEqual(
+                verdict["reason"], "work-capacity-proof-invalid:rows"
+            )
+            verdict = write_tampered(
+                lambda payload: payload["signals"]["concurrencyEvidence"][
+                    "rows"
+                ][0].update(profile="not-an-opaque-identity")
+            )
+            self.assertEqual(
+                verdict["reason"],
+                "work-capacity-proof-invalid:turn-shape-or-freshness",
+            )
+            verdict = write_tampered(
+                lambda payload: payload["signals"]["concurrencyEvidence"][
+                    "providers"
+                ]["openai"].update(enrolledProfiles=["abc", 1])
+            )
+            self.assertEqual(
+                verdict["reason"],
+                "work-capacity-proof-invalid:provider-enrollment",
+            )
+
+            def expire_nested_proof(payload):
+                evidence = payload["signals"]["concurrencyEvidence"]
+                completed = "2026-09-02T11:58:00Z"
+                evidence["observedAt"] = completed
+                for row in evidence["rows"]:
+                    row["completedAt"] = completed
+
+            verdict = write_tampered(expire_nested_proof)
+            self.assertEqual(
+                verdict["reason"],
+                "work-capacity-proof-invalid:turn-shape-or-freshness",
+            )
+            verdict = write_tampered(
+                lambda payload: payload["signals"]["concurrencyEvidence"].update(
+                    actionableTarget=1
+                )
+            )
+            self.assertEqual(
+                verdict["reason"], "work-capacity-admission-disagrees"
+            )
+            verdict = write_tampered(
+                lambda payload: payload["concurrency"]["gem"].update(
+                    matchedAvailableCapacity=0
+                )
+            )
+            self.assertEqual(
+                verdict["reason"], "work-capacity-admission-disagrees"
+            )
 
             # Grace is internally consistent but is not the green admission state.
             gate.write_text(
@@ -783,6 +1018,50 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertTrue(verdict["hold"])
             self.assertEqual(verdict["reason"], "closure-health-not-green")
             self.assertEqual(verdict["closureStatus"], "grace")
+
+    def test_current_capacity_contraction_holds_a_fresh_embedded_gate(self):
+        helper = _load_helper()
+        observed = "2026-09-03T11:59:00Z"
+        now = dt.datetime(2026, 9, 3, 12, 0, tzinfo=dt.timezone.utc)
+        with tempfile.TemporaryDirectory() as tmp:
+            gate = pathlib.Path(tmp) / "fleet-gate.json"
+            capacity = pathlib.Path(tmp) / "capacity.json"
+            gate.write_text(
+                json.dumps(_fleet_gate_payload(observed_at=observed)),
+                encoding="utf-8",
+            )
+            capacity.write_text(
+                json.dumps(_capacity_payload(observed, target=3)),
+                encoding="utf-8",
+            )
+            verdict = helper.read_closure_stop_line(
+                gate, now=now, capacity_path=capacity
+            )
+
+        self.assertTrue(verdict["hold"])
+        self.assertEqual(verdict["reason"], "work-capacity-proof-drift")
+
+    def test_newer_capacity_proof_for_same_admitted_seats_remains_open(self):
+        helper = _load_helper()
+        embedded = "2026-09-03T11:58:00Z"
+        current = "2026-09-03T11:59:00Z"
+        now = dt.datetime(2026, 9, 3, 12, 0, tzinfo=dt.timezone.utc)
+        with tempfile.TemporaryDirectory() as tmp:
+            gate = pathlib.Path(tmp) / "fleet-gate.json"
+            capacity = pathlib.Path(tmp) / "capacity.json"
+            gate.write_text(
+                json.dumps(_fleet_gate_payload(observed_at=embedded)),
+                encoding="utf-8",
+            )
+            capacity.write_text(
+                json.dumps(_capacity_payload(current)), encoding="utf-8"
+            )
+            verdict = helper.read_closure_stop_line(
+                gate, now=now, capacity_path=capacity
+            )
+
+        self.assertFalse(verdict["hold"])
+        self.assertEqual(verdict["reason"], "fleet-work-admission-open")
 
     def test_closure_hold_releases_when_receipt_turns_green(self):
         helper = _load_helper()
@@ -826,7 +1105,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(
                 receipt["holdSleepSecondsUsed"], helper.CLOSURE_HOLD_RECHECK_SECONDS
             )
-            self.assertEqual(receipt["reason"], "closure-health-green")
+            self.assertEqual(receipt["reason"], "fleet-work-admission-open")
 
     def test_closure_hold_pauses_live_scheduler_without_terminating_child(self):
         helper = _load_helper()
@@ -885,7 +1164,47 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             process.terminate()
             process.wait(timeout=5)
 
-    def test_closure_hold_exhaustion_resumes_scheduler_for_collection(self):
+    def test_silent_scheduler_is_paused_when_capacity_closes_mid_run(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
+            hold = pathlib.Path(tmp) / "closure-hold.json"
+            closure_gate.write_text(
+                json.dumps(_fleet_gate_payload()), encoding="utf-8"
+            )
+            closure = helper.ClosureStopLine(
+                receipt_path=closure_gate,
+                hold_receipt_path=hold,
+                dead_letter_dir=pathlib.Path(tmp) / "dead-letters",
+            )
+
+            def close_capacity():
+                helper.time.sleep(0.08)
+                closure_gate.write_text(
+                    json.dumps(_fleet_gate_payload(capacity_ready=False)),
+                    encoding="utf-8",
+                )
+
+            closer = threading.Thread(target=close_capacity)
+            closer.start()
+            started = helper.time.monotonic()
+            with mock.patch.object(helper, "CLOSURE_HOLD_RECHECK_SECONDS", 0.05):
+                returncode = helper.run_official_binary_once(
+                    ["python3", "-c", "import time; time.sleep(0.35)"],
+                    gate_file=pathlib.Path(tmp) / "linear-rate-limit.json",
+                    closure=closure,
+                    max_gate_sleep_seconds=0.15,
+                )
+            elapsed = helper.time.monotonic() - started
+            closer.join(timeout=1)
+            self.assertEqual(returncode, -helper.signal.SIGKILL)
+            self.assertGreaterEqual(elapsed, 0.18)
+            self.assertLess(elapsed, 0.8)
+            receipt = json.loads(hold.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["reason"], "work-capacity-admission-closed")
+            self.assertIn(receipt["status"], {"holding", "exhausted"})
+
+    def test_closure_hold_exhaustion_terminates_scheduler_for_safe_restart(self):
         helper = _load_helper()
         process = subprocess.Popen(
             ["python3", "-c", "import time; time.sleep(30)"],
@@ -928,6 +1247,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     [
                         (process.pid, helper.signal.SIGSTOP),
                         (process.pid, helper.signal.SIGCONT),
+                        (process.pid, helper.signal.SIGKILL),
                     ],
                 )
                 receipt = json.loads(hold.read_text())
@@ -937,6 +1257,29 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         finally:
             process.terminate()
             process.wait(timeout=5)
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux signal semantics")
+    def test_linux_exhaustion_kills_a_group_stopped_scheduler(self):
+        helper = _load_helper()
+        process = subprocess.Popen(
+            ["python3", "-c", "import time; time.sleep(30)"],
+            cwd=ROOT,
+            text=True,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
+            closure_gate.write_text(
+                json.dumps(_fleet_gate_payload(status="red", intake=False)),
+                encoding="utf-8",
+            )
+            closure = helper.ClosureStopLine(
+                receipt_path=closure_gate,
+                hold_receipt_path=pathlib.Path(tmp) / "closure-hold.json",
+                dead_letter_dir=pathlib.Path(tmp) / "dead-letters",
+            )
+            verdict = helper.read_closure_stop_line(closure_gate)
+            helper._pause_child_for_closure_hold(process, closure, verdict, 0)
+            self.assertEqual(process.wait(timeout=2), -helper.signal.SIGKILL)
 
     def test_linear_permanent_error_dead_letters_after_bounded_ceiling(self):
         helper = _load_helper()
@@ -1182,7 +1525,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertEqual(dry.returncode, 0, dry.stderr)
         self.assertIn("SERVICE symphony-elixir.service", dry.stdout)
         self.assertIn("PORT 4041", dry.stdout)
-        self.assertIn("BUDGET_OK steady=1100 budget=2500 headroom=1400 pages=3 polls=120", dry.stdout)
+        self.assertIn("BUDGET_OK steady=2060 budget=2500 headroom=440 pages=3 polls=120", dry.stdout)
         self.assertIn("UNTOUCHED symphony-lyb.service http://127.0.0.1:4042/api/v1/state", dry.stdout)
         self.assertNotIn("4043", dry.stdout)
         obsolete = subprocess.run(
@@ -1227,7 +1570,22 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertFalse((pathlib.Path(tmp) / "home/.config/systemd/user/symphony-burrito.service").exists())
             existing.write_text(
                 existing.read_text().replace(
-                    "max_concurrent_agents: 8", "max_concurrent_agents: 4"
+                    "max_concurrent_agents: 1", "max_concurrent_agents: 30"
+                )
+            )
+            preserved = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(preserved.returncode, 0, preserved.stderr)
+            self.assertIn("PRESERVED max_concurrent_agents=30", preserved.stdout)
+            self.assertIn("max_concurrent_agents: 30", existing.read_text())
+            existing.write_text(
+                existing.read_text().replace(
+                    "max_concurrent_agents: 30", "max_concurrent_agents: 4"
                 )
             )
             overlay = subprocess.run(
@@ -1305,6 +1663,8 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 "#!/usr/bin/env bash\n"
                 "case \"$*\" in\n"
                 "  *\"show-environment\"*) exit 0 ;;\n"
+                "  *\"is-active --quiet symphony-elixir.service\"*) exit 0 ;;\n"
+                "  *\"show symphony-elixir.service --property=MainPID --value\"*) printf '4242\\n'; exit 0 ;;\n"
                 "esac\n"
                 "exit 1\n",
                 encoding="utf-8",
@@ -1348,6 +1708,76 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertIn("cannot prove the official runtime is idle", result.stderr)
             self.assertFalse(
                 (target_home / ".config/systemd/user/symphony-elixir.service").exists()
+            )
+
+    def test_inactive_official_service_starts_only_when_4041_is_unowned(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            bin_dir = root / "bin"
+            target_home = root / "home"
+            runtime_dir = root / "runtime"
+            marker = root / "started"
+            bin_dir.mkdir()
+            runtime_dir.mkdir()
+            account_home = target_home / ".codex-accounts/meetjovie"
+            account_home.mkdir(parents=True)
+            account_env = target_home / ".config/symphony/codex-account.env"
+            account_env.parent.mkdir(parents=True)
+            account_env.write_text(f"CODEX_HOME={account_home}\n")
+            account_env.chmod(0o600)
+            systemctl = bin_dir / "systemctl"
+            systemctl.write_text(
+                "#!/usr/bin/env bash\n"
+                "case \"$*\" in\n"
+                "  *\"show-environment\"*) exit 0 ;;\n"
+                "  *\"is-active --quiet symphony-elixir.service\"*) [ -e \"$FAKE_STARTED\" ]; exit ;;\n"
+                "  *\"is-active --quiet\"*) exit 1 ;;\n"
+                "  *\"restart symphony-elixir.service\"*) : > \"$FAKE_STARTED\"; exit 0 ;;\n"
+                "  *\"show symphony-elixir.service\"*) printf '4242\\n'; exit 0 ;;\n"
+                "  *\"--property=LoadState --value\"*) printf 'masked\\n'; exit 0 ;;\n"
+                "esac\n"
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            systemctl.chmod(0o755)
+            fake_ss = bin_dir / "ss"
+            fake_ss.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            fake_ss.chmod(0o755)
+            fake_curl = bin_dir / "curl"
+            fake_curl.write_text(
+                "#!/usr/bin/env bash\nprintf '{}\\n'\n", encoding="utf-8"
+            )
+            fake_curl.chmod(0o755)
+            bus = socket.socket(socket.AF_UNIX)
+            bus.bind(str(runtime_dir / "bus"))
+            bus.listen(1)
+            try:
+                result = subprocess.run(
+                    [
+                        "bash",
+                        str(ROOT / "scripts/hermes/update-symphony-burrito.sh"),
+                        "--skip-binary",
+                    ],
+                    cwd=ROOT,
+                    env={
+                        **os.environ,
+                        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                        "FAKE_STARTED": str(marker),
+                        "XDG_RUNTIME_DIR": str(runtime_dir),
+                        "DBUS_SESSION_BUS_ADDRESS": f"unix:path={runtime_dir / 'bus'}",
+                        "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110",
+                        "SYMPHONY_ELIXIR_HOME": str(target_home),
+                    },
+                    capture_output=True,
+                    text=True,
+                )
+            finally:
+                bus.close()
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            self.assertTrue(marker.exists())
+            self.assertIn(
+                "inactive with no :4041 listener; guarded start allowed",
+                result.stdout,
             )
 
     def test_deliberate_red_promotion_requires_host_owned_account_selection(self):

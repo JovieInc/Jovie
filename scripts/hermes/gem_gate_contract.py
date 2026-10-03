@@ -82,15 +82,6 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
     promotion_allowed = _typed_allowed(receipt, "promotion")
     direct_gem_allowed = _typed_allowed(receipt, "direct-gem")
     remediation_allowed = _typed_allowed(receipt, "remediation")
-    expected_admission = {
-        "GREEN": (True, True),
-        "AMBER": (True, False),
-        "RED": (False, False),
-    }[state]
-    if (work_allowed, promotion_allowed) != expected_admission:
-        raise GateContractError(
-            f"{state} admission invariant disagrees with typed work/promotion fields"
-        )
     review_admission = receipt.get("reviewAdmission")
     if not isinstance(review_admission, dict):
         raise GateContractError("independent review admission is missing")
@@ -193,8 +184,8 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
     if receipt.get("ownership", {}).get("review") != INDEPENDENT_REVIEW_AUTHORITY:
         raise GateContractError("review ownership must remain with Gem")
     remediation = receipt.get("remediationAdmission", {})
-    if not remediation_allowed or remediation.get("localAllowed") is not True:
-        raise GateContractError("observation and bounded local remediation must remain live")
+    if remediation.get("localAllowed") is not True:
+        raise GateContractError("local observation and diagnosis must remain available")
     push_allowed = remediation.get("pushAllowed")
     if not isinstance(push_allowed, bool):
         raise GateContractError("remediation push admission is missing or is not boolean")
@@ -210,12 +201,18 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
         raise GateContractError("capacity evidence acceptance is missing or is not boolean")
     if not isinstance(new_mutation_allowed, bool):
         raise GateContractError("new mutation admission is missing or is not boolean")
-    # symphony-concurrency-autoscale-v1: mutation admission follows the
-    # fleet state, not the presence of a capacity file. Non-RED receipts
-    # always carry at least the runtime floor; RED (severe integrity) is the
-    # only state that zeroes mutation.
-    if new_mutation_allowed is not (state != "RED"):
-        raise GateContractError("new mutation admission must follow non-RED fleet state")
+    expected_mutation = state != "RED" and capacity_accepted
+    if new_mutation_allowed is not expected_mutation:
+        raise GateContractError(
+            "new mutation admission requires non-RED state and execution-proven capacity"
+        )
+    if work_allowed is not expected_mutation:
+        raise GateContractError("work admission contradicts mutation capacity")
+    if remediation_allowed is not expected_mutation:
+        raise GateContractError("remediation admission contradicts mutation capacity")
+    expected_promotion = state == "GREEN" and review_allowed
+    if promotion_allowed is not expected_promotion:
+        raise GateContractError("promotion admission contradicts fleet state or review")
     capacity_signal = receipt.get("signals", {}).get("concurrencyEvidence") or {}
     capacity_signal_accepted = (
         capacity_signal.get("accepted") if isinstance(capacity_signal, dict) else None
@@ -227,8 +224,10 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
     runtime_floor = gem_concurrency.get("runtimeFloor")
     if isinstance(runtime_floor, bool) or runtime_floor != 1:
         raise GateContractError("runtimeFloor must admit exactly one local repair")
-    if push_allowed != (state != "RED"):
-        raise GateContractError("remote remediation must follow non-RED fleet state")
+    if push_allowed is not expected_mutation:
+        raise GateContractError(
+            "remote remediation requires non-RED state and execution-proven capacity"
+        )
     remote_update_listed = "expected-head-pr-update" in remediation.get("activities", [])
     if remote_update_listed is not push_allowed:
         raise GateContractError("remote remediation activity contradicts push admission")
@@ -238,17 +237,42 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
     gem_maximum = gem_concurrency.get("maxConcurrent")
     if isinstance(gem_maximum, bool) or not isinstance(gem_maximum, int) or gem_maximum < 0:
         raise GateContractError("Gem mutation concurrency must be a non-negative integer")
-    if state != "RED":
-        if gem_maximum < runtime_floor:
+    if expected_mutation and gem_maximum < runtime_floor:
+        raise GateContractError("accepted capacity must admit at least one mutation")
+    proof_target = gem_concurrency.get("proofTarget")
+    lease_capacity = gem_concurrency.get("leaseCapacity")
+    matched_capacity = gem_concurrency.get("matchedCapacity")
+    matched_available = gem_concurrency.get("matchedAvailableCapacity")
+    if capacity_accepted:
+        if (
+            isinstance(proof_target, bool)
+            or not isinstance(proof_target, int)
+            or isinstance(lease_capacity, bool)
+            or not isinstance(lease_capacity, int)
+            or proof_target < 1
+            or lease_capacity < 1
+            or isinstance(matched_capacity, bool)
+            or not isinstance(matched_capacity, int)
+            or matched_capacity < 1
+            or isinstance(matched_available, bool)
+            or not isinstance(matched_available, int)
+            or matched_available < 1
+            or matched_available > matched_capacity
+            or matched_capacity > min(proof_target, lease_capacity, 40)
+        ):
             raise GateContractError(
-                "capacity must never zero a non-RED factory (symphony-concurrency-autoscale-v1)"
+                "accepted capacity requires identity-matched proof and a free live lease"
             )
-        if not capacity_accepted and gem_maximum != runtime_floor:
-            raise GateContractError("missing capacity evidence must run at the runtime floor")
-        if maximum != gem_maximum:
-            raise GateContractError("remediation concurrency contradicts Gem concurrency")
-    elif maximum != runtime_floor:
-        raise GateContractError("RED must bound local remediation to one")
+    if expected_mutation and gem_maximum != matched_capacity:
+        raise GateContractError(
+            "mutation concurrency must match the proof and live-lease identity intersection"
+        )
+    if capacity_accepted and capacity_signal.get("actionableTarget") != matched_capacity:
+        raise GateContractError("capacity signal actionable target contradicts identity match")
+    if not expected_mutation and gem_maximum != 0:
+        raise GateContractError("unproven or RED capacity must close mutation")
+    if maximum != gem_maximum:
+        raise GateContractError("remediation concurrency contradicts Gem concurrency")
     if remediation.get("authority") != "single-pr-writer-exact-head":
         raise GateContractError("remediation authority must require one exact-head writer")
     reasons = receipt.get("reasons")

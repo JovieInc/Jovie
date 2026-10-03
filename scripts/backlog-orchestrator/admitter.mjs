@@ -25,6 +25,8 @@ export const TODO_STATE_ID = 'c6c00506-dc9f-4910-8ff7-3874dd77174c';
 export const ADMISSION_RECEIPT_PREFIX = '<!-- symphony-admission:v1 ';
 export const FLEET_GATE_SCHEMA = 'jovie-fleet-gate/v1';
 export const GEM_CONCURRENCY_EVIDENCE_SCHEMA = 'gem-concurrency-evidence/v1';
+export const PROVIDER_USEFUL_TURN_SCHEMA = 'gem-provider-useful-turn/v1';
+export const PROVIDER_USEFUL_TURN_SOURCE = 'execution-proven-useful-turns';
 export const INDEPENDENT_REVIEW_RECEIPT_SCHEMA = 'jovie-independent-review/v1';
 export const INDEPENDENT_REVIEW_AUTHORITY = 'Gem';
 export const INDEPENDENT_REVIEWER = 'Gem';
@@ -74,6 +76,7 @@ const DEFAULT_GEM_CONCURRENCY = CAPACITY_POLICY.baseline;
 const CONTROLLER_RECEIPT_MAX_AGE_MS = 10 * 60 * 1000;
 const CONCURRENCY_EVIDENCE_MAX_AGE_MS =
   CAPACITY_POLICY.freshnessHours * 60 * 60 * 1000;
+const MAX_GEM_CONCURRENCY = CAPACITY_POLICY.maximum;
 export const FLEET_PROMOTION_MODE = Object.freeze({
   NORMAL: 'normal',
   ISOLATED_ONLY: 'isolated-only',
@@ -409,39 +412,366 @@ function deploymentBound(mainSha, deployedSha) {
   );
 }
 
+function nonNegativeInteger(value) {
+  return Number.isSafeInteger(value) && value >= 0;
+}
+
+function validProviderIdentity(value) {
+  return typeof value === 'string' && /^[a-z][a-z0-9._-]{0,63}$/.test(value);
+}
+
+function validProfileIdentity(value) {
+  return typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
+}
+
+function parseAwareIsoTimestamp(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(Z|([+-])(\d{2}):(\d{2}))$/.exec(
+      value
+    );
+  if (!match) return null;
+  const [
+    ,
+    yearText,
+    monthText,
+    dayText,
+    hourText,
+    minuteText,
+    secondText,
+    fractionText = '',
+    zoneText,
+  ] = match;
+  const [year, month, day, hour, minute, second] = [
+    yearText,
+    monthText,
+    dayText,
+    hourText,
+    minuteText,
+    secondText,
+  ].map(Number);
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [
+    31,
+    leapYear ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  ];
+  const offsetHour = match[10] === undefined ? 0 : Number(match[10]);
+  const offsetMinute = match[11] === undefined ? 0 : Number(match[11]);
+  if (
+    year < 1 ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > daysInMonth[month - 1] ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59 ||
+    offsetHour > 23 ||
+    offsetMinute > 59
+  ) {
+    return null;
+  }
+  const epochMilliseconds = Date.parse(
+    `${yearText}-${monthText}-${dayText}T${hourText}:${minuteText}:${secondText}${zoneText}`
+  );
+  if (!Number.isFinite(epochMilliseconds)) return null;
+  const fractionMicros = BigInt(fractionText.padEnd(6, '0') || '0');
+  return BigInt(epochMilliseconds) * 1000n + fractionMicros;
+}
+
+function validateUsefulTurn(row, nowMicros, maxAgeMicros) {
+  if (
+    !row ||
+    typeof row !== 'object' ||
+    Array.isArray(row) ||
+    row.schema !== PROVIDER_USEFUL_TURN_SCHEMA
+  ) {
+    return null;
+  }
+  const identity = ['provider', 'profile', 'model'].map(key => row[key]);
+  if (
+    !validProviderIdentity(identity[0]) ||
+    !validProfileIdentity(identity[1]) ||
+    typeof identity[2] !== 'string' ||
+    identity[2].length === 0 ||
+    identity[2] !== identity[2].trim()
+  ) {
+    return null;
+  }
+  const completedMicros = parseAwareIsoTimestamp(row.completedAt);
+  const digest = row.outputDigest;
+  const tokens = row.tokens;
+  if (
+    completedMicros === null ||
+    completedMicros > nowMicros ||
+    nowMicros - completedMicros > maxAgeMicros ||
+    row.rc !== 0 ||
+    row.useful !== true ||
+    typeof digest !== 'string' ||
+    !/^(?:sha256:)?[0-9a-f]{64}$/.test(digest) ||
+    !Number.isSafeInteger(row.outputBytes) ||
+    row.outputBytes <= 0 ||
+    !tokens ||
+    typeof tokens !== 'object' ||
+    Array.isArray(tokens) ||
+    !nonNegativeInteger(tokens.input) ||
+    !Number.isSafeInteger(tokens.output) ||
+    tokens.output <= 0 ||
+    !Number.isSafeInteger(tokens.total) ||
+    tokens.total !== tokens.input + tokens.output
+  ) {
+    return null;
+  }
+  return {
+    provider: identity[0],
+    profile: identity[1],
+    completedAt: row.completedAt,
+    completedMicros,
+  };
+}
+
+function validatedLeaseCapacity(lease) {
+  const capacity = lease?.capacity;
+  if (
+    lease?.status !== 'ok' ||
+    !capacity ||
+    typeof capacity !== 'object' ||
+    Array.isArray(capacity) ||
+    !['available', 'saturated'].includes(capacity.state)
+  ) {
+    return null;
+  }
+  const counts = ['accounts', 'locked', 'cooldown', 'available'].map(
+    key => capacity[key]
+  );
+  if (!counts.every(nonNegativeInteger)) return null;
+  const [accounts, locked, , available] = counts;
+  const cooldown = counts[2];
+  const expectedState = available > 0 ? 'available' : 'saturated';
+  const listKeys = [
+    'lockedProfiles',
+    'cooldownProfiles',
+    'availableProfiles',
+    'eligibleProfiles',
+  ];
+  const lists = listKeys.map(key => capacity[key]);
+  if (
+    !validProviderIdentity(capacity.provider) ||
+    !lists.every(
+      profiles =>
+        Array.isArray(profiles) &&
+        profiles.every(validProfileIdentity) &&
+        profiles.length === new Set(profiles).size &&
+        profiles.every(
+          (profile, index) => index === 0 || profiles[index - 1] < profile
+        )
+    )
+  ) {
+    return null;
+  }
+  const [
+    lockedProfiles,
+    cooldownProfiles,
+    availableProfiles,
+    eligibleProfiles,
+  ] = lists;
+  const partition = [
+    ...lockedProfiles,
+    ...cooldownProfiles,
+    ...availableProfiles,
+  ];
+  const expectedEligible = [...lockedProfiles, ...availableProfiles].sort();
+  if (
+    accounts <= 0 ||
+    accounts !== locked + cooldown + available ||
+    capacity.state !== expectedState ||
+    lockedProfiles.length !== locked ||
+    cooldownProfiles.length !== cooldown ||
+    availableProfiles.length !== available ||
+    new Set(partition).size !== accounts ||
+    eligibleProfiles.length !== expectedEligible.length ||
+    eligibleProfiles.some(
+      (profile, index) => profile !== expectedEligible[index]
+    )
+  ) {
+    return null;
+  }
+  return {
+    provider: capacity.provider,
+    profiles: new Set(eligibleProfiles),
+    availableProfiles: new Set(availableProfiles),
+    ceiling: eligibleProfiles.length,
+  };
+}
+
+function executionProofTarget(evidence, nowMicros, maxAgeMs) {
+  if (
+    !evidence ||
+    typeof evidence !== 'object' ||
+    Array.isArray(evidence) ||
+    evidence.schema !== GEM_CONCURRENCY_EVIDENCE_SCHEMA ||
+    evidence.source !== PROVIDER_USEFUL_TURN_SOURCE ||
+    evidence.approved !== true ||
+    evidence.severeIncidents !== 0 ||
+    !Array.isArray(evidence.rows)
+  ) {
+    return null;
+  }
+  if (!Number.isSafeInteger(maxAgeMs) || maxAgeMs < 0) return null;
+  const maxAgeMicros = BigInt(maxAgeMs) * 1000n;
+  const rows = evidence.rows.map(row =>
+    validateUsefulTurn(row, nowMicros, maxAgeMicros)
+  );
+  if (rows.some(row => row === null)) return null;
+  const target = evidence.target;
+  if (
+    !Number.isInteger(target) ||
+    target !== rows.length ||
+    target < 1 ||
+    target > MAX_GEM_CONCURRENCY
+  ) {
+    return null;
+  }
+  const identityKeys = new Set(
+    rows.map(row => JSON.stringify([row.provider, row.profile]))
+  );
+  if (identityKeys.size !== rows.length) return null;
+  const newest = rows.reduce(
+    (current, row) =>
+      row.completedMicros > current.completedMicros ? row : current,
+    rows[0]
+  );
+  if (!newest || evidence.observedAt !== newest.completedAt) return null;
+
+  const expectedReady = new Map();
+  const readyProfiles = new Map();
+  for (const row of rows) {
+    expectedReady.set(row.provider, (expectedReady.get(row.provider) || 0) + 1);
+    if (!readyProfiles.has(row.provider))
+      readyProfiles.set(row.provider, new Set());
+    readyProfiles.get(row.provider).add(row.profile);
+  }
+  if (
+    !evidence.providers ||
+    typeof evidence.providers !== 'object' ||
+    Array.isArray(evidence.providers)
+  ) {
+    return null;
+  }
+  for (const [provider, record] of Object.entries(evidence.providers)) {
+    const profiles = record?.enrolledProfiles;
+    if (
+      !validProviderIdentity(provider) ||
+      !record ||
+      typeof record !== 'object' ||
+      Array.isArray(record) ||
+      !Array.isArray(profiles) ||
+      profiles.some(profile => !validProfileIdentity(profile)) ||
+      profiles.length !== new Set(profiles).size ||
+      profiles.some(
+        (profile, index) => index > 0 && profiles[index - 1] >= profile
+      ) ||
+      record.enrolled !== profiles.length ||
+      record.ready !== (expectedReady.get(provider) || 0)
+    ) {
+      return null;
+    }
+    const enrolled = new Set(profiles);
+    if (
+      [...(readyProfiles.get(provider) || [])].some(
+        profile => !enrolled.has(profile)
+      )
+    ) {
+      return null;
+    }
+  }
+  if (
+    [...expectedReady].some(
+      ([provider]) => !Object.hasOwn(evidence.providers, provider)
+    )
+  )
+    return null;
+  return {
+    target,
+    identities: rows.map(({ provider, profile }) => ({ provider, profile })),
+  };
+}
+
 /**
- * symphony-concurrency-autoscale-v1: concurrency autoscales from the live-seat
- * receipt with no upper clamp and no clean-run ratchet. Missing, malformed,
- * or stale evidence degrades to the runtime floor (one seat) instead of
- * zeroing the factory; only a RED fleet state blocks mutation.
+ * symphony-execution-proven-capacity-v1: useful-turn proof and the live lease
+ * jointly bound dispatch. Any unavailable or contradictory evidence closes
+ * new mutation at zero while already queued work remains preserved.
  */
 export function resolveGemConcurrency(
   evidence,
   {
     now = new Date().toISOString(),
     maxAgeMs = CONCURRENCY_EVIDENCE_MAX_AGE_MS,
+    lease = null,
   } = {}
 ) {
-  const nowMs = Date.parse(now);
-  const measuredTarget = evidence?.target;
+  const nowMicros = parseAwareIsoTimestamp(now);
+  const proof =
+    nowMicros !== null
+      ? executionProofTarget(evidence, nowMicros, maxAgeMs)
+      : null;
+  const leaseState = validatedLeaseCapacity(lease);
+  const proofTarget = proof?.target ?? null;
+  const leaseCapacity = leaseState?.ceiling ?? null;
+  const matchedCapacity =
+    proof && leaseState
+      ? proof.identities.filter(({ provider, profile }) => {
+          return (
+            provider === leaseState.provider && leaseState.profiles.has(profile)
+          );
+        }).length
+      : 0;
+  const matchedAvailableCapacity =
+    proof && leaseState
+      ? proof.identities.filter(({ provider, profile }) => {
+          return (
+            provider === leaseState.provider &&
+            leaseState.availableProfiles.has(profile)
+          );
+        }).length
+      : 0;
+  const proofAccepted = proof !== null;
   const evidenceAccepted =
-    evidence?.schema === GEM_CONCURRENCY_EVIDENCE_SCHEMA &&
-    Number.isInteger(measuredTarget) &&
-    measuredTarget >= CAPACITY_POLICY.minimum &&
-    evidence?.approved === true &&
-    evidence?.severeIncidents === 0 &&
-    isFreshTimestamp(evidence?.observedAt, nowMs, maxAgeMs);
+    proofAccepted && leaseState !== null && matchedAvailableCapacity > 0;
+  const maxConcurrent = evidenceAccepted
+    ? Math.min(matchedCapacity, MAX_GEM_CONCURRENCY)
+    : 0;
+  const newMutationAllowed = maxConcurrent > 0;
 
   return {
-    maxConcurrent: evidenceAccepted ? measuredTarget : CAPACITY_POLICY.minimum,
-    runtimeFloor: CAPACITY_POLICY.minimum,
+    maxConcurrent,
+    runtimeFloor: CAPACITY_POLICY.bootFloor,
     baseline: DEFAULT_GEM_CONCURRENCY,
+    proofTarget,
+    leaseCapacity,
+    matchedCapacity,
+    matchedAvailableCapacity,
+    proofAccepted,
     evidenceAccepted,
-    newMutationAllowed: true,
+    newMutationAllowed,
     preserveQueuedWork: CAPACITY_POLICY.preserveQueuedWork,
-    reason: evidenceAccepted
-      ? 'live-seat-capacity'
-      : 'capacity-evidence-missing-runtime-floor',
+    reason: newMutationAllowed
+      ? 'execution-proven-capacity'
+      : proofAccepted
+        ? 'lease-capacity-unavailable'
+        : 'capacity-evidence-unavailable-dispatch-closed',
   };
 }
 
@@ -605,6 +935,7 @@ export function evaluateFleetGate(
       : FLEET_GATE_STATE.GREEN;
   const concurrency = resolveGemConcurrency(evidence.concurrencyEvidence, {
     now,
+    lease: evidence.lease,
   });
   const queueStatus = evidence?.queue?.status || 'unknown';
   const greenReadyPrs =
@@ -700,7 +1031,7 @@ export function evaluateFleetGate(
     reviewAdmission,
     closureAdmission,
     workAdmission: {
-      allowed: state !== FLEET_GATE_STATE.RED,
+      allowed: state !== FLEET_GATE_STATE.RED && concurrency.newMutationAllowed,
       activities: workActivities,
       newIssueLeaseAllowed: workActivities.includes('approved-issue-lease'),
       newImplementationAllowed: workActivities.includes('approved-issue-lease'),

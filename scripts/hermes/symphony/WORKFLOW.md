@@ -45,7 +45,9 @@ hooks:
       find ./apps ./packages ./workers -mindepth 2 -maxdepth 2 -type d -name node_modules -exec rm -rf {} + 2>/dev/null || true
     fi
 agent:
-  max_concurrent_agents: 8
+  # Safe cold start. The existing pressure controller raises only to the
+  # execution-proven, currently leasable, host-safe ceiling (max 40).
+  max_concurrent_agents: 1
   max_turns: 20
 codex:
   command: ./scripts/hermes/symphony-codex-router app-server

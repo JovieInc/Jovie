@@ -59,19 +59,16 @@ class StaleCapacityLocalRemediationTests(unittest.TestCase):
             text=True,
         )
 
-    def test_stale_capacity_admits_exactly_one_local_repair(self):
+    def test_stale_capacity_never_admits_legacy_local_repair(self):
         with tempfile.TemporaryDirectory() as tmp:
             gate = pathlib.Path(tmp) / "gate.json"
             gate.write_text(json.dumps(stale_capacity_receipt()), encoding="utf-8")
             self.assertEqual(
                 MODULE._stale_capacity_local_remediation_limit(gate),
-                (1, "fleet_gate_stale_capacity_local_only"),
+                (0, "fleet_gate_capacity_unproven"),
             )
 
-    def test_floor_receipt_admits_one_local_repair_regardless_of_intake_fields(self):
-        """symphony-concurrency-autoscale-v1: missing evidence runs at the
-        runtime floor with push and new leases allowed; the local alternate
-        repair lane stays bounded to exactly one attempt."""
+    def test_unaccepted_receipt_never_recreates_floor_lane(self):
         for field, value in (
             ("pushAllowed", True),
             ("newIssueLeaseAllowed", True),
@@ -91,7 +88,7 @@ class StaleCapacityLocalRemediationTests(unittest.TestCase):
                 gate = pathlib.Path(tmp) / "gate.json"
                 gate.write_text(json.dumps(receipt), encoding="utf-8")
                 limit, _reason = MODULE._stale_capacity_local_remediation_limit(gate)
-                self.assertEqual(limit, 1)
+                self.assertEqual(limit, 0)
 
     def test_zero_capacity_receipt_never_admits_local_repair(self):
         for section in ("remediationAdmission", "concurrency"):

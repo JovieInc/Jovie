@@ -17,11 +17,13 @@ three consecutive low-pressure samples and a two-minute change cooldown.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import pathlib
 import re
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -29,10 +31,17 @@ from datetime import datetime, timezone
 from typing import Any
 
 
+HERMES_DIR = str(pathlib.Path(__file__).resolve().parent)
+if HERMES_DIR not in sys.path:
+    sys.path.insert(0, HERMES_DIR)
+
+from provider_useful_turns import validate_capacity_receipt  # noqa: E402
+
+
 SCHEMA = "symphony-concurrency/v1"
 STATE_SCHEMA = "symphony-concurrency-state/v1"
 MIN_CONCURRENCY = 1
-MAX_CONCURRENCY = 8
+MAX_CONCURRENCY = 40
 LOW_STREAK_REQUIRED = 3
 CHANGE_COOLDOWN_SECONDS = 120
 MIN_AVAILABLE_MEMORY_BYTES = 8 * 1024**3
@@ -50,6 +59,8 @@ CONCURRENCY_LINE = re.compile(r"^(\s*max_concurrent_agents:\s*)([0-9]+)(\s*)$", 
 CANONICAL_CONCURRENCY = frozenset(
     str(value) for value in range(MIN_CONCURRENCY, MAX_CONCURRENCY + 1)
 )
+PROVIDER_IDENTITY = re.compile(r"^[a-z][a-z0-9._-]{0,63}$")
+PROFILE_IDENTITY = re.compile(r"^[0-9a-f]{64}$")
 
 
 def utc_now() -> str:
@@ -71,6 +82,10 @@ def write_json_atomic(path: pathlib.Path, value: dict[str, Any], mode: int = 0o6
     os.replace(temporary, path)
 
 
+def sha256_file(path: pathlib.Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def resource_scope(args: argparse.Namespace) -> dict[str, str]:
     return {
         "kind": "gem-host-provider-accounts-workflow",
@@ -78,6 +93,7 @@ def resource_scope(args: argparse.Namespace) -> dict[str, str]:
         "workflow": str(args.workflow),
         "runtimeUrl": str(args.runtime_url),
         "leaseGuard": str(args.lease_guard),
+        "capacityEvidence": str(args.capacity_evidence),
     }
 
 
@@ -137,11 +153,74 @@ def read_provider_capacity(guard_bin: pathlib.Path) -> dict[str, Any] | None:
     typed: dict[str, Any] = {}
     for key in ("accounts", "locked", "cooldown", "available"):
         item = capacity.get(key)
-        if not isinstance(item, int) or item < 0:
+        if isinstance(item, bool) or not isinstance(item, int) or item < 0:
             return None
         typed[key] = item
     typed["state"] = capacity["state"]
+    if typed["accounts"] != (
+        typed["locked"] + typed["cooldown"] + typed["available"]
+    ):
+        return None
+    expected_state = "available" if typed["available"] > 0 else "saturated"
+    if typed["state"] != expected_state:
+        return None
+    if typed["accounts"] <= 0:
+        return None
+    provider = capacity.get("provider")
+    if (
+        not isinstance(provider, str)
+        or PROVIDER_IDENTITY.fullmatch(provider) is None
+    ):
+        return None
+    lists: dict[str, list[str]] = {}
+    for key in (
+        "lockedProfiles",
+        "cooldownProfiles",
+        "availableProfiles",
+        "eligibleProfiles",
+    ):
+        profiles = capacity.get(key)
+        if (
+            not isinstance(profiles, list)
+            or any(
+                not isinstance(profile, str)
+                or PROFILE_IDENTITY.fullmatch(profile) is None
+                for profile in profiles
+            )
+            or profiles != sorted(set(profiles))
+        ):
+            return None
+        lists[key] = profiles
+    partition = (
+        lists["lockedProfiles"]
+        + lists["cooldownProfiles"]
+        + lists["availableProfiles"]
+    )
+    expected_eligible = sorted(
+        lists["lockedProfiles"] + lists["availableProfiles"]
+    )
+    if (
+        len(lists["lockedProfiles"]) != typed["locked"]
+        or len(lists["cooldownProfiles"]) != typed["cooldown"]
+        or len(lists["availableProfiles"]) != typed["available"]
+        or len(set(partition)) != typed["accounts"]
+        or lists["eligibleProfiles"] != expected_eligible
+    ):
+        return None
+    typed["provider"] = provider
+    typed.update(lists)
     return typed
+
+
+def read_execution_capacity(
+    path: pathlib.Path, now: datetime
+) -> dict[str, Any] | None:
+    try:
+        value = read_json(path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+    accepted, _ = validate_capacity_receipt(value, now)
+    return accepted
 
 
 def read_runtime_state(url: str) -> dict[str, Any] | None:
@@ -197,7 +276,7 @@ def verify_concurrency_overlay(source_text: str, installed_text: str) -> int:
 
     The pressure controller rewrites only that scalar on the installed workflow.
     Any other difference, a missing or duplicated line, a non-numeric value, a
-    zero-padded numeral, or a runtime value outside 1..8 fails closed.
+    zero-padded numeral, or a runtime value outside 1..40 fails closed.
     """
     source_matches = list(CONCURRENCY_LINE.finditer(source_text))
     installed_matches = list(CONCURRENCY_LINE.finditer(installed_text))
@@ -288,19 +367,31 @@ def choose_target(
     state: dict[str, Any],
     sample: dict[str, Any],
     provider: dict[str, Any] | None,
+    capacity: dict[str, Any] | None,
     runtime: dict[str, Any] | None,
     integrity_allowed: bool,
     now_epoch: float,
 ) -> tuple[int, int, str]:
-    if provider is None or runtime is None or not integrity_allowed:
+    if provider is None or capacity is None or runtime is None or not integrity_allowed:
         reason = "integrity-blocked" if not integrity_allowed else "required-telemetry-unavailable"
         return MIN_CONCURRENCY, 0, reason
     cpu_count = sample.get("cpuCount")
     if not isinstance(cpu_count, int) or cpu_count <= 0:
         return MIN_CONCURRENCY, 0, "required-telemetry-unavailable"
-    provider_ceiling = provider["locked"] + provider["available"]
+    eligible = set(provider["eligibleProfiles"])
+    proven_profiles = {
+        row["profile"]
+        for row in capacity.get("rows", [])
+        if row.get("provider") == provider["provider"]
+    }
+    execution_ceiling = len(eligible & proven_profiles)
+    if execution_ceiling <= 0:
+        return MIN_CONCURRENCY, 0, "required-telemetry-unavailable"
     host_ceiling = max(MIN_CONCURRENCY, min(MAX_CONCURRENCY, cpu_count - 1))
-    ceiling = max(MIN_CONCURRENCY, min(MAX_CONCURRENCY, provider_ceiling, host_ceiling))
+    ceiling = max(
+        MIN_CONCURRENCY,
+        min(MAX_CONCURRENCY, execution_ceiling, host_ceiling),
+    )
     pressure = classify_pressure(sample)
     if pressure == "unknown":
         return MIN_CONCURRENCY, 0, "required-telemetry-unavailable"
@@ -321,6 +412,7 @@ def choose_target(
 
 def run(args: argparse.Namespace) -> dict[str, Any]:
     now_epoch = time.time()
+    observed_now = datetime.now(timezone.utc)
     workflow_text, current = read_current_target(args.workflow)
     scope = resource_scope(args)
     state = load_state(args.state, current, scope)
@@ -333,6 +425,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "availableMemoryBytes": read_available_memory(proc_root),
     }
     provider = read_provider_capacity(args.lease_guard)
+    capacity = read_execution_capacity(args.capacity_evidence, observed_now)
     runtime = read_runtime_state(args.runtime_url)
     integrity_allowed, integrity_status = integrity_allows_scale(args.integrity_receipt)
     target, low_streak, reason = choose_target(
@@ -340,6 +433,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         state=state,
         sample=sample,
         provider=provider,
+        capacity=capacity,
         runtime=runtime,
         integrity_allowed=integrity_allowed,
         now_epoch=now_epoch,
@@ -347,6 +441,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     changed = target != current
     if changed and not args.dry_run:
         write_workflow_atomic(args.workflow, render_target(workflow_text, target))
+    applied_workflow_sha256 = hashlib.sha256(
+        (render_target(workflow_text, target) if changed else workflow_text).encode(
+            "utf-8"
+        )
+    ).hexdigest()
     next_state = {
         "schema": STATE_SCHEMA,
         "resourceScope": scope,
@@ -364,11 +463,14 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "current": current,
         "target": target,
         "changed": changed,
+        "workflowSha256": applied_workflow_sha256,
+        "controllerSha256": sha256_file(pathlib.Path(__file__).resolve()),
         "reason": reason,
         "lowStreak": low_streak,
         "bounds": {"min": MIN_CONCURRENCY, "max": MAX_CONCURRENCY},
         "sample": sample,
         "provider": provider,
+        "capacityEvidence": capacity,
         "runtime": runtime,
         "utilizationRatio": (
             round(runtime["running"] / target, 4)
@@ -410,6 +512,11 @@ def parse_args() -> argparse.Namespace:
         "--lease-guard",
         type=pathlib.Path,
         default=home / ".local/bin/symphony-lease-guard",
+    )
+    parser.add_argument(
+        "--capacity-evidence",
+        type=pathlib.Path,
+        default=pathlib.Path("/home/timwhite/gem-workspace/state/concurrency.json"),
     )
     parser.add_argument("--proc-root", type=pathlib.Path, default=pathlib.Path("/proc"))
     parser.add_argument("--runtime-url", default="http://127.0.0.1:4041/api/v1/state")

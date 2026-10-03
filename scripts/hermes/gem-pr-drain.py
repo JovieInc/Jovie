@@ -54,7 +54,19 @@ ARTIFACT = STATE / "latest.json"
 TARGET = int(os.environ.get("GEM_PR_DRAIN_TARGET", "5"))
 MAX_CAP = int(os.environ.get("GEM_PR_DRAIN_MAX_PARALLEL", "4"))
 GATE = ROOT / "scripts" / "gem-priority-gate.py"
-EXCLUDED = {"needs-human-taste", "needs-human-review", "hold", "no-auto", "gated", "taste"}
+EXCLUDED = {
+    "human-review-required",
+    "needs-human",
+    "needs:human",
+    "blocked",
+    "needs-human-taste",
+    "needs-human-review",
+    "no-symphony",
+    "hold",
+    "no-auto",
+    "gated",
+    "taste",
+}
 MAIN_GREEN_LABELS = {
     "main-green-fix",
     "main-green",
@@ -213,6 +225,20 @@ def labels(pr):
     return {label["name"].lower() for label in pr.get("labels", [])}
 
 
+def mutation_disposition(pr):
+    """Classify PR ownership before any remote mutation is considered."""
+    if labels(pr) & EXCLUDED:
+        return "protected_human"
+    head = pr.get("head")
+    head_repo = head.get("repo") if isinstance(head, dict) else None
+    full_name = head_repo.get("full_name") if isinstance(head_repo, dict) else None
+    if not isinstance(full_name, str) or full_name.casefold() not in JOVIE_REPOSITORIES:
+        return "protected_external"
+    if head_repo.get("fork") is True and pr.get("maintainer_can_modify") is not True:
+        return "protected_external"
+    return "machine_repairable"
+
+
 def excluded(pr):
     head = pr.get("head", {}).get("ref", "")
     title = pr.get("title", "")
@@ -220,7 +246,7 @@ def excluded(pr):
         pr.get("draft")
         or head.startswith("gtmq_")
         or "[graphite mq]" in title.lower()
-        or bool(labels(pr) & EXCLUDED)
+        or mutation_disposition(pr) != "machine_repairable"
     )
 
 
@@ -230,6 +256,29 @@ AUTONOMOUS_HEAD_PREFIXES = ("symphony/", "grok/JOV-", "grok/LYB-", "fallback/")
 def autonomous_head(pr):
     ref = pr.get("head", {}).get("ref") or ""
     return any(ref.startswith(prefix) for prefix in AUTONOMOUS_HEAD_PREFIXES)
+
+
+def revalidate_mutation_target(pr, *, require_draft):
+    """Re-read protection and ownership fields under the exact-head lease."""
+    try:
+        current = gh_json(f"repos/{REPO}/pulls/{pr['number']}")
+    except Exception as error:
+        return None, f"pr_recheck_failed:{type(error).__name__}"
+    if not isinstance(current, dict):
+        return None, "pr_recheck_malformed"
+    expected_head = pr.get("head", {}).get("sha")
+    if current.get("head", {}).get("sha") != expected_head:
+        return None, "expected_head_changed_fail_closed"
+    disposition = mutation_disposition(current)
+    if disposition != "machine_repairable":
+        return None, disposition
+    if current.get("base", {}).get("ref") != REPO_POLICY.default_branch:
+        return None, "base_branch_changed_fail_closed"
+    if current.get("draft") is not require_draft:
+        return None, "draft_state_changed_fail_closed"
+    if require_draft and not autonomous_head(current):
+        return None, "autonomous_head_changed_fail_closed"
+    return current, None
 
 
 def ready_autonomous_draft(pr):
@@ -247,6 +296,9 @@ def ready_autonomous_draft(pr):
     }
     if not pr.get("draft") or not autonomous_head(pr):
         return {**result, "result": "skipped", "reason": "not_autonomous_draft"}
+    disposition = mutation_disposition(pr)
+    if disposition != "machine_repairable":
+        return {**result, "result": "skipped", "reason": disposition}
     if "big-pr" in labels(pr):
         return {**result, "result": "skipped", "reason": "too_large_for_queue"}
     if pr.get("mergeable_state") == "dirty":
@@ -272,19 +324,14 @@ def ready_autonomous_draft(pr):
         blocker = work_mutation_blocker(max_age=0)
         if blocker:
             return {**result, "result": "skipped", "reason": blocker}
-        observed_head = run(
-            "gh",
-            "api",
-            f"repos/{REPO}/pulls/{pr['number']}",
-            "--jq",
-            ".head.sha",
-            timeout=60,
-        ).strip()
-        if observed_head != head_sha:
+        _current, recheck_reason = revalidate_mutation_target(
+            pr, require_draft=True
+        )
+        if recheck_reason:
             return {
                 **result,
                 "result": "skipped",
-                "reason": "expected_head_changed_fail_closed",
+                "reason": recheck_reason,
             }
         run("gh", "pr", "ready", str(pr["number"]), "--repo", REPO, timeout=60)
     except Exception as error:
@@ -373,6 +420,19 @@ def select_prs(prs, *, main_green, worker_capacity):
     return bounded_selection(main_repairs + others, max(0, worker_capacity))
 
 
+def select_ready_drafts(prs, *, worker_capacity, selected_count):
+    remaining = max(0, worker_capacity - selected_count)
+    candidates = [
+        pr
+        for pr in prs
+        if pr.get("draft")
+        and autonomous_head(pr)
+        and mutation_disposition(pr) == "machine_repairable"
+    ]
+    candidates.sort(key=lambda pr: (pr.get("created_at", ""), pr.get("number", 0)))
+    return bounded_selection(candidates, remaining)
+
+
 def inventory():
     all_open = gh_json(
         f"repos/{REPO}/pulls", "-X", "GET", "-f", "state=open", "-f", "per_page=100"
@@ -417,6 +477,14 @@ def update_one(pr):
         "before_state": pr.get("mergeable_state"),
         "priority_class": pr.get("priority_class") or priority_class(pr),
     }
+    disposition = mutation_disposition(pr)
+    if disposition != "machine_repairable":
+        return {
+            **result,
+            "action": "protected_observe_only",
+            "result": "skipped",
+            "reason": disposition,
+        }
     head_sha = pr.get("head", {}).get("sha")
     if not isinstance(head_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", head_sha):
         return {
@@ -450,6 +518,16 @@ def update_one(pr):
                 "action": action,
                 "result": "skipped",
                 "reason": "classified_for_bounded_rehabilitation",
+            }
+        _current, recheck_reason = revalidate_mutation_target(
+            pr, require_draft=False
+        )
+        if recheck_reason:
+            return {
+                **result,
+                "action": "protected_observe_only",
+                "result": "skipped",
+                "reason": recheck_reason,
             }
         try:
             response = run(
@@ -557,6 +635,7 @@ def main():
                     "head": pr["head"]["ref"],
                     "mergeable_state": pr.get("mergeable_state"),
                     "priority_class": priority_class(pr),
+                    "disposition": mutation_disposition(pr),
                     "excluded": excluded(pr),
                 }
                 for pr in all_open
@@ -601,10 +680,13 @@ def main():
         else:
             ready_results = []
             if gate["remediationAdmission"]["pushAllowed"]:
+                ready_candidates = select_ready_drafts(
+                    all_open,
+                    worker_capacity=worker_capacity,
+                    selected_count=len(selected),
+                )
                 ready_results = [
-                    ready_autonomous_draft(pr)
-                    for pr in all_open
-                    if pr.get("draft") and autonomous_head(pr)
+                    ready_autonomous_draft(pr) for pr in ready_candidates
                 ]
             with concurrent.futures.ThreadPoolExecutor(
                 max_workers=max(1, len(selected))

@@ -16,11 +16,10 @@ STATES = frozenset({"GREEN", "AMBER", "RED"})
 INTEGRITY_STATUSES = frozenset({"clear", "resolved", "active", "invalid"})
 CLOSURE_STATUSES = frozenset({"healthy", "grace", "red"})
 MAX_ADMISSION_JSON_BYTES = 32 * 1024
-# JOV-5913: unbound repair concurrency is seat-derived (live Grok/Kimi OAuth
-# probes in gem-priority-gate.py), bounded by the symphony-concurrency
-# controller policy window. It is never pinned to 1.
+# Unbound repair concurrency is bounded by the same execution-proven account
+# capacity as every other mutation lane. It is never independently inflated.
 UNBOUND_REPAIR_MIN_CONCURRENCY = 1
-UNBOUND_REPAIR_MAX_CONCURRENCY = 8
+UNBOUND_REPAIR_MAX_CONCURRENCY = 40
 DIAGNOSTIC_INVENTORY_KEYS = frozenset(
     {
         "classifications",
@@ -177,7 +176,7 @@ def _project_unbound_repair(value: object, promotion_mode: str) -> dict[str, Any
             "condition": None,
             "mainSha": None,
             "deployedSha": None,
-            "maxConcurrent": 1,
+            "maxConcurrent": 0,
             "deploymentsAllowed": False,
         }
     admission = _require_mapping(value, "productionUnboundRepairAdmission")
@@ -199,14 +198,18 @@ def _project_unbound_repair(value: object, promotion_mode: str) -> dict[str, Any
     if (
         not isinstance(max_concurrent, int)
         or isinstance(max_concurrent, bool)
-        or not UNBOUND_REPAIR_MIN_CONCURRENCY
-        <= max_concurrent
-        <= UNBOUND_REPAIR_MAX_CONCURRENCY
+        or (
+            allowed
+            and not UNBOUND_REPAIR_MIN_CONCURRENCY
+            <= max_concurrent
+            <= UNBOUND_REPAIR_MAX_CONCURRENCY
+        )
+        or (not allowed and max_concurrent != 0)
     ):
         raise AdmissionProjectionError(
-            f"unbound repair maxConcurrent must be an integer from "
-            f"{UNBOUND_REPAIR_MIN_CONCURRENCY} through "
-            f"{UNBOUND_REPAIR_MAX_CONCURRENCY}"
+            "unbound repair maxConcurrent must be zero when denied or an "
+            f"integer from {UNBOUND_REPAIR_MIN_CONCURRENCY} through "
+            f"{UNBOUND_REPAIR_MAX_CONCURRENCY} when allowed"
         )
     # Unbound production is a deploy hold only: repair concurrency may scale,
     # but it never carries deployment authority.
@@ -290,6 +293,80 @@ def _project_cohort(value: object, promotion_mode: str, intake: bool) -> dict[st
     return projected
 
 
+def _validate_mutation_capacity(
+    source: dict[str, Any], unbound: dict[str, Any]
+) -> None:
+    work = _require_mapping(source.get("workAdmission"), "workAdmission")
+    remediation = _require_mapping(
+        source.get("remediationAdmission"), "remediationAdmission"
+    )
+    concurrency = _require_mapping(source.get("concurrency"), "concurrency")
+    gem = _require_mapping(concurrency.get("gem"), "concurrency.gem")
+    signal = _require_mapping(
+        _require_mapping(source.get("signals"), "signals").get(
+            "concurrencyEvidence"
+        ),
+        "signals.concurrencyEvidence",
+    )
+    mutation_allowed = _require_bool(
+        gem.get("newMutationAllowed"), "concurrency.gem.newMutationAllowed"
+    )
+    evidence_accepted = _require_bool(
+        gem.get("evidenceAccepted"), "concurrency.gem.evidenceAccepted"
+    )
+    if _require_bool(signal.get("accepted"), "signals.concurrencyEvidence.accepted") is not evidence_accepted:
+        raise AdmissionProjectionError("capacity evidence signal and admission disagree")
+    for value, name in (
+        (work.get("allowed"), "workAdmission.allowed"),
+        (remediation.get("allowed"), "remediationAdmission.allowed"),
+        (remediation.get("pushAllowed"), "remediationAdmission.pushAllowed"),
+    ):
+        if _require_bool(value, name) is not mutation_allowed:
+            raise AdmissionProjectionError(f"{name} contradicts mutation admission")
+    issue_lease_allowed = _require_bool(
+        work.get("newIssueLeaseAllowed"), "workAdmission.newIssueLeaseAllowed"
+    )
+    implementation_allowed = _require_bool(
+        work.get("newImplementationAllowed"),
+        "workAdmission.newImplementationAllowed",
+    )
+    activities = work.get("activities")
+    if not isinstance(activities, list) or not all(
+        isinstance(activity, str) for activity in activities
+    ):
+        raise AdmissionProjectionError("workAdmission.activities must be strings")
+    activity_allows_lease = "approved-issue-lease" in activities
+    if (
+        issue_lease_allowed is not implementation_allowed
+        or issue_lease_allowed is not activity_allows_lease
+        or (issue_lease_allowed and not mutation_allowed)
+    ):
+        raise AdmissionProjectionError(
+            "work lease fields contradict mutation capacity or activities"
+        )
+    gem_maximum = gem.get("maxConcurrent")
+    remediation_maximum = remediation.get("maxConcurrent")
+    for value, name in (
+        (gem_maximum, "concurrency.gem.maxConcurrent"),
+        (remediation_maximum, "remediationAdmission.maxConcurrent"),
+    ):
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise AdmissionProjectionError(f"{name} must be an integer")
+    expected_range = (
+        UNBOUND_REPAIR_MIN_CONCURRENCY <= gem_maximum <= UNBOUND_REPAIR_MAX_CONCURRENCY
+        if mutation_allowed
+        else gem_maximum == 0
+    )
+    if not expected_range or remediation_maximum != gem_maximum:
+        raise AdmissionProjectionError(
+            "mutation concurrency must be equal and bounded by execution proof"
+        )
+    if unbound["allowed"] and unbound["maxConcurrent"] != gem_maximum:
+        raise AdmissionProjectionError(
+            "unbound repair concurrency must equal Gem mutation concurrency"
+        )
+
+
 def _reject_inventories(value: object, path: str) -> None:
     if isinstance(value, dict):
         leaked = DIAGNOSTIC_INVENTORY_KEYS.intersection(value)
@@ -319,6 +396,10 @@ def project_fleet_admission_receipt(receipt: object) -> dict[str, Any]:
     isolated = _project_isolated(source.get("isolatedPromotionAdmission"))
     promotion = _require_mapping(source.get("promotionAdmission"), "promotionAdmission")
     work = _require_mapping(source.get("workAdmission"), "workAdmission")
+    unbound = _project_unbound_repair(
+        source.get("productionUnboundRepairAdmission"), promotion_mode
+    )
+    _validate_mutation_capacity(source, unbound)
     projected: dict[str, Any] = {
         "schema": SCHEMA,
         "observedAt": _require_str(source.get("observedAt"), "observedAt"),
@@ -332,9 +413,7 @@ def project_fleet_admission_receipt(receipt: object) -> dict[str, Any]:
             )
         },
         "isolatedPromotionAdmission": isolated,
-        "productionUnboundRepairAdmission": _project_unbound_repair(
-            source.get("productionUnboundRepairAdmission"), promotion_mode
-        ),
+        "productionUnboundRepairAdmission": unbound,
         "closureAdmission": closure_admission,
         "alreadyAdmittedCohort": _project_cohort(
             source.get("alreadyAdmittedCohort"),
@@ -345,6 +424,10 @@ def project_fleet_admission_receipt(receipt: object) -> dict[str, Any]:
             "allowed": _require_bool(work.get("allowed"), "workAdmission.allowed"),
             "newIssueLeaseAllowed": _require_bool(
                 work.get("newIssueLeaseAllowed"), "workAdmission.newIssueLeaseAllowed"
+            ),
+            "newImplementationAllowed": _require_bool(
+                work.get("newImplementationAllowed"),
+                "workAdmission.newImplementationAllowed",
             ),
         },
     }

@@ -553,8 +553,10 @@ describe('ci-fast bounded parallel workflow', () => {
       'ci-profile-admission-browser'
     );
 
+    expect(remaining).toContain('provider[-_][^/]+\\.py$');
+    expect(remaining).toContain('symphony_official_runtime\\.py$');
     expect(remaining).toContain(
-      'scripts/hermes/(closure_health\\.py$|config/(gem-repo-registry|model-registry)\\.json$|evaluate-fleet-gate\\.sh$|fleet_admission_receipt\\.py$|gbrain-runtime/|gem-|gem_|install-gem-(fleet-controller|pr-rehabilitation)\\.sh$|model-router\\.py$|symphony-reconciler\\.py$|systemd/gem-pr-drain\\.(service|timer)$)'
+      'systemd/(gem-pr-drain\\.(service|timer)|symphony-'
     );
     expect(remaining).toContain('gbrain-runtime-assets|merge-group');
     expect(CI_FAST_SOURCE).toContain(
@@ -564,7 +566,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain('elif [ "${CI:-}" = "true" ]');
     expect(CI_FAST_SOURCE).not.toContain('elif [[');
     expect(remaining).toContain(
-      'scripts/hermes/tests/(closure-health\\.test\\.py$|gem-(pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\\.test\\.py$|symphony-reconciler\\.test\\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt)\\.py$)'
+      'provider-(capacity-bootstrap|useful-turns)\\.test\\.py$'
     );
     expect(CI_FAST_SOURCE).toContain(
       'coverage run --branch scripts/hermes/tests/gem-rehabilitation-policy.test.py'
@@ -593,6 +595,28 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     expect(CI_FAST_SOURCE).toContain(
       'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs'
+    );
+  });
+
+  it('enforces branch coverage for Symphony capacity authority in structural CI', () => {
+    expect(CI_FAST_SOURCE).toContain(
+      'jovie-symphony-capacity.coverage'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'coverage run --branch scripts/hermes/tests/provider-useful-turns.test.py'
+    );
+    for (const testPath of [
+      'scripts/hermes/tests/provider-capacity-bootstrap.test.py',
+      'scripts/hermes/tests/symphony-concurrency-controller.test.py',
+    ]) {
+      expect(CI_FAST_SOURCE).toContain(`coverage run --append --branch ${testPath}`);
+    }
+    expect(CI_FAST_SOURCE).toContain(
+      'provider_useful_turns.py,*/scripts/hermes/provider-capacity-bootstrap.py,*/scripts/hermes/gem-concurrency-evidence.py,*/scripts/hermes/symphony-concurrency-controller.py'
+    );
+    expect(CI_FAST_SOURCE).toContain('--precision=2 --fail-under=74');
+    expect(CI_FAST_SOURCE).toContain(
+      'coverage.py missing from hosted Symphony capacity lane'
     );
   });
 
@@ -873,15 +897,30 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/hermes/fleet_admission_receipt.py',
       'scripts/hermes/install-gem-fleet-controller.sh',
       'scripts/hermes/model-router.py',
+      'scripts/hermes/provider_useful_turns.py',
+      'scripts/hermes/provider-capacity-bootstrap.py',
+      'scripts/hermes/gem-concurrency-evidence.py',
+      'scripts/hermes/codex-rotate',
+      'scripts/hermes/symphony-concurrency-controller.py',
+      'scripts/hermes/symphony-lease-guard',
+      'scripts/hermes/symphony_official_runtime.py',
       'scripts/hermes/symphony-reconciler.py',
       'scripts/hermes/systemd/gem-pr-drain.service',
       'scripts/hermes/systemd/gem-pr-drain.timer',
+      'scripts/hermes/systemd/symphony-concurrency-controller.service',
+      'scripts/hermes/systemd/symphony-concurrency-controller.timer',
+      'scripts/hermes/systemd/symphony-elixir.service',
       'scripts/hermes/tests/closure-health.test.py',
       'scripts/hermes/tests/gem-pr-drain.test.py',
       'scripts/hermes/tests/gem-ops-hud.test.py',
       'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
       'scripts/hermes/tests/gem-priority-gate.test.py',
       'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+      'scripts/hermes/tests/provider-capacity-bootstrap.test.py',
+      'scripts/hermes/tests/provider-useful-turns.test.py',
+      'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+      'scripts/hermes/tests/symphony-concurrency-controller.test.py',
+      'scripts/hermes/tests/symphony-lease-guard.test.py',
       'scripts/hermes/tests/symphony-reconciler.test.py',
       'scripts/hermes/tests/test-model-router.py',
       'scripts/hermes/tests/test_evaluate_fleet_gate.py',

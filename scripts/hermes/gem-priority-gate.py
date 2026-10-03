@@ -12,12 +12,10 @@ Linear leases.
 from __future__ import annotations
 
 import argparse
-import concurrent.futures
 import fcntl
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import time
@@ -40,11 +38,16 @@ from closure_health import (  # noqa: E402 - sibling executable module
 )
 from closure_health import SCHEMA as CLOSURE_HEALTH_SCHEMA  # noqa: E402
 from closure_health import observe_closure_health  # noqa: E402
+from provider_useful_turns import (  # noqa: E402 - sibling executable module
+    CAPACITY_SCHEMA,
+    MAX_CAPACITY,
+    validate_capacity_receipt,
+)
 
 
 SCHEMA = "jovie-fleet-gate/v1"
 INTEGRITY_SCHEMA = "jovie-integrity/v1"
-CONCURRENCY_SCHEMA = "gem-concurrency-evidence/v1"
+CONCURRENCY_SCHEMA = CAPACITY_SCHEMA
 INDEPENDENT_REVIEW_SCHEMA = "jovie-independent-review/v1"
 INDEPENDENT_REVIEW_AUTHORITY = "Gem"
 INDEPENDENT_REVIEWER = "Gem"
@@ -70,27 +73,6 @@ SEVERE_REASONS = {
 }
 DEFAULT_GEM_CONCURRENCY = 4
 LOCAL_REMEDIATION_CONCURRENCY_FLOOR = 1
-# JOV-5913: production-unbound is a deploy hold only (deploymentsAllowed stays
-# False). Unbound-repair concurrency must follow the live Grok/Kimi OAuth
-# seats, never the Codex account state: an exhausted Codex pool must not
-# serialize the fallback lanes (symphony-concurrency-autoscale-v1).
-FALLBACK_SEAT_SCHEMA = "gem-fallback-seats/v1"
-FALLBACK_SEAT_PROVIDERS = ("grok", "kimi")
-# One live OAuth seat safely runs four workers on Gem (16c/62GB), matching
-# DEFAULT_GROK_MAX in scripts/hermes/symphony-codex-exhausted.py.
-FALLBACK_SEAT_WORKER_BUDGET = 4
-UNBOUND_REPAIR_MIN_CONCURRENCY = 1
-# Bounded by the symphony-concurrency-controller policy ceiling (MIN=1 MAX=8).
-UNBOUND_REPAIR_MAX_CONCURRENCY = 8
-DEFAULT_FALLBACK_PROBE_TIMEOUT_SECONDS = 20.0
-MAX_FALLBACK_PROBE_TIMEOUT_SECONDS = 30.0
-# Keep in sync with model-router.py QUOTA_RE.
-FALLBACK_QUOTA_RE = re.compile(
-    r"(429|402|rate.?limit|quota|usage (limit|exceeded|cap)|too many requests|"
-    r"insufficient (credit|quota)|weekly usage|limit reached|can only afford|"
-    r"max_tokens)",
-    re.I,
-)
 CONTROL_PLANE_PREFIXES = (
     "canon/",
     "scripts/backlog-orchestrator/",
@@ -606,15 +588,7 @@ def observe_integrity(path: Path) -> dict[str, Any]:
 
 
 def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:
-    """Read the live-seat capacity receipt (gem-concurrency-evidence/v1).
-
-    Tim lock symphony-concurrency-autoscale-v1: concurrency autoscales from
-    live seats. The receipt's measured ``target`` is accepted as-is when it is
-    approved, fresh, and incident-free — no 1..8 clamp and no clean-run
-    ratchet, both of which were arbitrary caps. Missing, malformed, or stale
-    evidence is reported as unaccepted; ``evaluate`` then degrades to the
-    runtime floor rather than zeroing the factory.
-    """
+    """Accept only capacity cross-checked to fresh useful-turn rows."""
     if not path.exists():
         return {
             "schema": CONCURRENCY_SCHEMA,
@@ -635,247 +609,10 @@ def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:
             "accepted": False,
             "reason": "capacity-evidence-malformed",
         }
-    observed_at = parse_time(receipt.get("observedAt"))
-    target = receipt.get("target")
-    eligible = (
-        receipt.get("schema") == CONCURRENCY_SCHEMA
-        and isinstance(target, int)
-        and not isinstance(target, bool)
-        and target >= LOCAL_REMEDIATION_CONCURRENCY_FLOOR
-        and receipt.get("approved") is True
-        and receipt.get("severeIncidents") == 0
-        and observed_at is not None
-        and timedelta(0) <= now - observed_at <= timedelta(hours=24)
-    )
-    return {**receipt, "accepted": eligible}
-
-
-def _fallback_probe_timeout() -> float:
-    try:
-        value = float(
-            os.environ.get(
-                "GEM_FALLBACK_PROBE_TIMEOUT_SECONDS",
-                DEFAULT_FALLBACK_PROBE_TIMEOUT_SECONDS,
-            )
-        )
-    except (TypeError, ValueError):
-        return DEFAULT_FALLBACK_PROBE_TIMEOUT_SECONDS
-    if value <= 0:
-        return DEFAULT_FALLBACK_PROBE_TIMEOUT_SECONDS
-    return min(value, MAX_FALLBACK_PROBE_TIMEOUT_SECONDS)
-
-
-def _fallback_registry_path(configured: Path | None) -> Path | None:
-    env_value = os.environ.get("GEM_MODEL_REGISTRY")
-    explicit = configured or (Path(env_value).expanduser() if env_value else None)
-    if explicit is not None:
-        return explicit if explicit.is_file() else None
-    script_dir = Path(__file__).resolve().parent
-    candidates = [
-        script_dir / "config" / "model-registry.json",
-        script_dir / "model-registry.json",
-        # Installed Symphony fallback bundle on the Gem host.
-        Path.home()
-        / ".local/bin/.symphony-codex-auth-fallback/current/model-registry.json",
-    ]
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate
-    return None
-
-
-def _resolve_seat_executable(model: dict[str, Any]) -> str | None:
-    candidates: list[str] = []
-    env_key = model.get("executable_env")
-    if isinstance(env_key, str) and env_key:
-        explicit = os.environ.get(env_key)
-        if explicit:
-            candidates.append(explicit)
-    if model.get("provider") == "grok":
-        alias = os.environ.get("GEM_GROK_BIN")
-        if alias:
-            candidates.append(alias)
-        home = Path.home()
-        candidates.extend([str(home / ".local/bin/grok"), str(home / ".grok/bin/grok")])
-    default = model.get("executable_default")
-    if isinstance(default, str) and default:
-        candidates.append(default)
-    for candidate in candidates:
-        expanded = Path(candidate).expanduser()
-        resolved = (
-            str(expanded) if expanded.is_absolute() else shutil.which(candidate)
-        )
-        if resolved and os.access(resolved, os.X_OK):
-            return resolved
-    return None
-
-
-def _probe_fallback_seat(model: dict[str, Any], timeout: float) -> tuple[bool, str]:
-    """Prove one fallback OAuth seat with the registry's own probe definition."""
-    executable = _resolve_seat_executable(model)
-    if executable is None:
-        return False, "executable-missing"
-    argv_template = model.get("probe_argv")
-    if (
-        not isinstance(argv_template, list)
-        or not argv_template
-        or not all(isinstance(part, str) for part in argv_template)
-    ):
-        return False, "probe-undefined"
-    argv = [
-        part.format(executable=executable, model=model["model"])
-        for part in argv_template
-    ]
-    try:
-        result = subprocess.run(
-            argv,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            timeout=timeout,
-        )
-    except (OSError, subprocess.SubprocessError, ValueError):
-        return False, "probe-failed"
-    raw = (result.stdout or b"") + b"\n" + (result.stderr or b"")
-    output = raw.decode(errors="replace")
-    lowered = output.lower()
-    forbidden = [
-        pattern.lower()
-        for pattern in (model.get("probe_forbidden_patterns") or [])
-        if isinstance(pattern, str) and pattern
-    ]
-    if any(pattern in lowered for pattern in forbidden):
-        return False, "auth-or-runtime-failed"
-    if FALLBACK_QUOTA_RE.search(output):
-        return False, "pool-quota-exhausted"
-    if model.get("probe_mode") == "json-model-key":
-        try:
-            payload = json.loads(result.stdout.decode(errors="replace"))
-        except (ValueError, UnicodeDecodeError):
-            return False, "probe-invalid-json"
-        models = payload.get("models") if isinstance(payload, dict) else None
-        if result.returncode != 0 or not isinstance(models, dict) or model["model"] not in models:
-            return False, "model-unlisted"
-        return True, "ready"
-    if result.returncode != 0:
-        return False, "probe-failed"
-    if model.get("provider") == "grok" and model["model"] not in output:
-        return False, "model-unlisted"
-    return True, "ready"
-
-
-def _unavailable_fallback_seats(reason: str) -> dict[str, Any]:
-    return {
-        "schema": FALLBACK_SEAT_SCHEMA,
-        "availableSeats": 0,
-        "providers": {},
-        "reason": reason,
-    }
-
-
-def observe_fallback_seats(
-    now: datetime, registry_path: Path | None = None
-) -> dict[str, Any]:
-    """Count live Grok/Kimi OAuth seats from the model registry probes.
-
-    Observation only: a missing registry, an unresolvable executable, or a
-    failed probe degrades the seat to unavailable and the receipt falls back
-    to the fail-closed floor. Codex account state is never consulted, so a
-    Codex outage cannot shrink fallback repair capacity.
-    """
-    path = _fallback_registry_path(registry_path)
-    if path is None:
-        return _unavailable_fallback_seats("model-registry-missing")
-    try:
-        registry = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, json.JSONDecodeError):
-        return _unavailable_fallback_seats("model-registry-malformed")
-    models = registry.get("models") if isinstance(registry, dict) else None
-    if not isinstance(models, list):
-        return _unavailable_fallback_seats("model-registry-malformed")
-    selected: dict[str, dict[str, Any]] = {}
-    for model in models:
-        provider = model.get("provider") if isinstance(model, dict) else None
-        if (
-            provider in FALLBACK_SEAT_PROVIDERS
-            and provider not in selected
-            and isinstance(model.get("model"), str)
-        ):
-            selected[provider] = model
-    missing = [name for name in FALLBACK_SEAT_PROVIDERS if name not in selected]
-    if missing:
-        return _unavailable_fallback_seats(
-            f"fallback-providers-missing:{','.join(missing)}"
-        )
-    timeout = _fallback_probe_timeout()
-    providers: dict[str, dict[str, Any]] = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(selected)) as pool:
-        futures = {
-            pool.submit(_probe_fallback_seat, model, timeout): name
-            for name, model in selected.items()
-        }
-        for future in concurrent.futures.as_completed(futures):
-            name = futures[future]
-            try:
-                available, reason = future.result()
-            except Exception:  # noqa: BLE001 - observation must never crash the gate
-                available, reason = False, "probe-error"
-            providers[name] = {"available": available, "reason": reason}
-    return {
-        "schema": FALLBACK_SEAT_SCHEMA,
-        "observedAt": isoformat(now),
-        "providers": providers,
-        "availableSeats": sum(
-            1 for entry in providers.values() if entry["available"]
-        ),
-    }
-
-
-def normalize_fallback_seats(value: object) -> dict[str, Any]:
-    """Fail-closed normalization of the fallback seat signal."""
-    if not isinstance(value, dict) or value.get("schema") != FALLBACK_SEAT_SCHEMA:
-        return _unavailable_fallback_seats("fallback-seat-evidence-unavailable")
-    providers = value.get("providers")
-    if not isinstance(providers, dict):
-        return _unavailable_fallback_seats("fallback-seat-evidence-malformed")
-    normalized: dict[str, dict[str, Any]] = {}
-    for name in FALLBACK_SEAT_PROVIDERS:
-        entry = providers.get(name)
-        if not isinstance(entry, dict) or not isinstance(entry.get("available"), bool):
-            return _unavailable_fallback_seats("fallback-seat-evidence-malformed")
-        normalized[name] = {
-            "available": entry["available"],
-            "reason": str(entry.get("reason") or "unknown"),
-        }
-    result: dict[str, Any] = {
-        "schema": FALLBACK_SEAT_SCHEMA,
-        "providers": normalized,
-        "availableSeats": sum(
-            1 for entry in normalized.values() if entry["available"]
-        ),
-    }
-    observed_at = value.get("observedAt")
-    if isinstance(observed_at, str) and observed_at:
-        result["observedAt"] = observed_at
-    return result
-
-
-def unbound_repair_concurrency(seats: dict[str, Any]) -> int:
-    """Seat-derived unbound-repair concurrency, bounded to [1, 8].
-
-    Missing or malformed seat evidence fails closed to the floor (the pre-
-    JOV-5913 behavior). Host pressure is enforced separately at the worker
-    launch layer (symphony-codex-exhausted _grok_limit), so this admission
-    never re-introduces a Codex-exhaustion cap on Grok/Kimi.
-    """
-    available = seats.get("availableSeats")
-    if not isinstance(available, int) or isinstance(available, bool) or available < 0:
-        return UNBOUND_REPAIR_MIN_CONCURRENCY
-    derived = available * FALLBACK_SEAT_WORKER_BUDGET
-    return max(
-        UNBOUND_REPAIR_MIN_CONCURRENCY,
-        min(UNBOUND_REPAIR_MAX_CONCURRENCY, derived),
-    )
+    accepted, reason = validate_capacity_receipt(receipt, now)
+    if accepted is None:
+        return {**receipt, "accepted": False, "reason": reason}
+    return accepted
 
 
 def validate_independent_review(
@@ -1398,22 +1135,139 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     closure_health = validate_closure_health(signals.get("closureHealth"))
     closure_intake_allowed = closure_health["newIssueIntakeAllowed"] is True
     concurrency_evidence_value = signals.get("concurrencyEvidence")
+    evaluated_now = parse_time(observed_at) or utc_now()
+    validated_capacity, capacity_reason = validate_capacity_receipt(
+        concurrency_evidence_value, evaluated_now
+    )
+    lease_value = signals.get("lease")
+    lease = lease_value if isinstance(lease_value, dict) else {}
+    lease_capacity = lease.get("capacity")
+    lease_ceiling: int | None = None
+    lease_provider: str | None = None
+    eligible_profiles: set[str] | None = None
+    available_profiles_set: set[str] | None = None
+    if (
+        lease.get("status") == "ok"
+        and isinstance(lease_capacity, dict)
+        and lease_capacity.get("state") in {"available", "saturated"}
+    ):
+        lease_counts = [
+            lease_capacity.get(key)
+            for key in ("accounts", "locked", "cooldown", "available")
+        ]
+        if all(
+            isinstance(value, int) and not isinstance(value, bool) and value >= 0
+            for value in lease_counts
+        ):
+            accounts, locked, cooldown, available = lease_counts
+            candidate = locked + available
+            expected_state = "available" if available > 0 else "saturated"
+            if (
+                accounts > 0
+                and accounts == locked + cooldown + available
+                and lease_capacity.get("state") == expected_state
+            ):
+                profile_keys = (
+                    "lockedProfiles",
+                    "cooldownProfiles",
+                    "availableProfiles",
+                    "eligibleProfiles",
+                )
+                profile_lists = [lease_capacity.get(key) for key in profile_keys]
+                provider_name = lease_capacity.get("provider")
+                if (
+                    isinstance(provider_name, str)
+                    and bool(provider_name.strip())
+                    and provider_name == provider_name.strip()
+                    and all(
+                        isinstance(profiles, list)
+                        and all(
+                            isinstance(profile, str)
+                            and bool(profile.strip())
+                            and profile == profile.strip()
+                            for profile in profiles
+                        )
+                        and profiles == sorted(set(profiles))
+                        for profiles in profile_lists
+                    )
+                ):
+                    locked_profiles, cooldown_profiles, available_profiles, eligible = profile_lists
+                    partition = locked_profiles + cooldown_profiles + available_profiles
+                    expected_eligible = sorted(locked_profiles + available_profiles)
+                    if (
+                        len(locked_profiles) == locked
+                        and len(cooldown_profiles) == cooldown
+                        and len(available_profiles) == available
+                        and len(set(partition)) == accounts
+                        and eligible == expected_eligible
+                        and candidate == len(eligible)
+                    ):
+                        lease_provider = provider_name
+                        eligible_profiles = set(eligible)
+                        available_profiles_set = set(available_profiles)
+                        lease_ceiling = len(eligible)
+    proof_accepted = validated_capacity is not None
+    raw_target = validated_capacity.get("target") if validated_capacity else None
+    matched_capacity = (
+        len(
+            {
+                row["profile"]
+                for row in validated_capacity.get("rows", [])
+                if row.get("provider") == lease_provider
+                and row.get("profile") in eligible_profiles
+            }
+        )
+        if proof_accepted and eligible_profiles is not None
+        else 0
+    )
+    matched_available_capacity = (
+        len(
+            {
+                row["profile"]
+                for row in validated_capacity.get("rows", [])
+                if row.get("provider") == lease_provider
+                and row.get("profile") in available_profiles_set
+            }
+        )
+        if proof_accepted and available_profiles_set is not None
+        else 0
+    )
+    actionable_target = (
+        min(matched_capacity, MAX_CAPACITY)
+        if proof_accepted
+        and isinstance(raw_target, int)
+        and lease_ceiling is not None
+        and matched_capacity > 0
+        else 0
+    )
+    capacity_ready = (
+        proof_accepted
+        and actionable_target > 0
+        and matched_available_capacity > 0
+    )
     concurrency_evidence = (
-        concurrency_evidence_value
-        if isinstance(concurrency_evidence_value, dict)
-        and isinstance(concurrency_evidence_value.get("accepted"), bool)
+        {
+            **validated_capacity,
+            "accepted": capacity_ready,
+            "proofAccepted": True,
+            "matchedCapacity": matched_capacity,
+            "matchedAvailableCapacity": matched_available_capacity,
+            "actionableTarget": actionable_target,
+            "reason": "accepted"
+            if capacity_ready
+            else "lease-capacity-unavailable",
+        }
+        if validated_capacity is not None
         else {
             "schema": CONCURRENCY_SCHEMA,
             "accepted": False,
-            "reason": "capacity-evidence-missing-malformed-or-stale",
+            "reason": capacity_reason,
         }
     )
-    fallback_seats = normalize_fallback_seats(signals.get("fallbackSeats"))
     normalized_signals = {
         **signals,
         "closureHealth": closure_health,
         "concurrencyEvidence": concurrency_evidence,
-        "fallbackSeats": fallback_seats,
     }
     review = validate_independent_review(
         signals.get("independentReview"),
@@ -1566,19 +1420,21 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     )
     evidence = concurrency_evidence
     capacity_fresh = evidence.get("accepted") is True
-    measured_target = evidence.get("target")
-    # symphony-concurrency-autoscale-v1: live seats are the only concurrency
-    # authority and carry no upper clamp. Missing or stale evidence degrades
-    # to the runtime floor (one seat) instead of zeroing the factory.
+    measured_target = evidence.get("actionableTarget")
+    # Credential/configuration presence is not capacity. New dispatch and
+    # remote remediation close when useful-turn evidence is absent or stale.
     gem_concurrency = (
         measured_target
         if capacity_fresh
         and isinstance(measured_target, int)
         and not isinstance(measured_target, bool)
-        and measured_target >= LOCAL_REMEDIATION_CONCURRENCY_FLOOR
-        else LOCAL_REMEDIATION_CONCURRENCY_FLOOR
+        and LOCAL_REMEDIATION_CONCURRENCY_FLOOR <= measured_target <= MAX_CAPACITY
+        else 0
     )
     capacity_fresh = capacity_fresh and gem_concurrency == measured_target
+    mutation_allowed = state != "RED" and capacity_fresh
+    if not mutation_allowed:
+        gem_concurrency = 0
     remediation_concurrency = gem_concurrency
     green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
     queue_target = queue.get("target")
@@ -1592,7 +1448,6 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and queue_target > 0
     )
     queue_below_backpressure = queue_shape_valid and green_ready_prs < queue_target
-    evaluated_now = parse_time(observed_at) or utc_now()
     lane_capacity_valid = valid_lane_capacity_receipt(
         queue.get("laneCapacity"), evaluated_now
     )
@@ -1636,6 +1491,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     )
     unbound_repair_allowed = (
         hold_intake_allowed
+        and capacity_fresh
         and review_allowed
         and valid_commit_sha(main.get("sha"), exact=True)
         and valid_commit_sha(production.get("deployedSha"))
@@ -1676,12 +1532,11 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     elif not closure_intake_allowed:
         # Existing validation/review work remains useful, but no new
         # implementation or fallback PR may begin while Summer holds intake
-        # (JOV-INV-011). Capacity evidence no longer gates intake: missing
-        # evidence runs at the runtime floor (symphony-concurrency-autoscale-v1).
+        # (JOV-INV-011). Useful-turn capacity remains a separate dispatch gate.
         work_activities = ["tests", "review"]
     else:
-        new_implementation_allowed = (
-            queue_shape_valid and repository_capacity_available
+        new_implementation_allowed = bool(
+            capacity_fresh and queue_shape_valid and repository_capacity_available
         )
         work_activities = ["tests", "review"]
         if new_implementation_allowed:
@@ -1703,9 +1558,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         "focused-tests",
         "review",
     ]
-    # Remediation is liveness: decoupled from capacity evidence and from Summer
-    # closure, so duplicate lanes cannot freeze Grok/Kimi remediations.
-    remediation_push_allowed = state != "RED"
+    remediation_push_allowed = mutation_allowed
     cohort = already_admitted_cohort_semantics(promotion_mode)
     if not closure_intake_allowed:
         cohort = {
@@ -1744,7 +1597,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             "remediationContinues": True,
         },
         "workAdmission": {
-            "allowed": state != "RED",
+            "allowed": mutation_allowed,
             "activities": work_activities,
             "newIssueLeaseAllowed": "approved-issue-lease" in work_activities,
             "newImplementationAllowed": "approved-issue-lease" in work_activities,
@@ -1756,7 +1609,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             else [],
         },
         "remediationAdmission": {
-            "allowed": True,
+            "allowed": mutation_allowed,
             "localAllowed": True,
             "pushAllowed": remediation_push_allowed,
             "activities": remediation_local_activities
@@ -1781,10 +1634,9 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             if unbound_repair_allowed
             else None,
             "scope": "event-scoped-exact-pr-head-with-bound-repair-attestation",
-            # JOV-5913: seat-derived (live Grok/Kimi OAuth probes), never 1 by
-            # fiat and never reduced by Codex exhaustion. Deployments stay
-            # forbidden: unbound is a deploy hold, not a repair blocker.
-            "maxConcurrent": unbound_repair_concurrency(fallback_seats),
+            # The same execution-proven capacity bounds every repair lane.
+            # Deployments stay forbidden: unbound is a deploy hold.
+            "maxConcurrent": remediation_concurrency if unbound_repair_allowed else 0,
             "deploymentsAllowed": False,
             "authority": "canonical-merge-queue-controller",
         },
@@ -1810,12 +1662,16 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
                 "maxConcurrent": gem_concurrency,
                 "runtimeFloor": LOCAL_REMEDIATION_CONCURRENCY_FLOOR,
                 "baseline": DEFAULT_GEM_CONCURRENCY,
+                "proofTarget": raw_target,
+                "leaseCapacity": lease_ceiling,
+                "matchedCapacity": actionable_target,
+                "matchedAvailableCapacity": matched_available_capacity,
                 "evidenceAccepted": capacity_fresh,
-                "newMutationAllowed": True,
+                "newMutationAllowed": mutation_allowed,
                 "preserveQueuedWork": True,
-                "reason": "live-seat-capacity"
+                "reason": "execution-proven-capacity"
                 if capacity_fresh
-                else "capacity-evidence-missing-runtime-floor",
+                else "capacity-evidence-unavailable-dispatch-closed",
             },
             "symphonyImplementation": "event-driven-backpressure",
         },
@@ -2017,7 +1873,7 @@ def failed_evaluation_receipt(
         },
         "promotionAdmission": {"allowed": False, "activities": []},
         "remediationAdmission": {
-            "allowed": True,
+            "allowed": False,
             "localAllowed": True,
             "pushAllowed": False,
             "activities": [
@@ -2027,7 +1883,7 @@ def failed_evaluation_receipt(
                 "focused-tests",
                 "review",
             ],
-            "maxConcurrent": LOCAL_REMEDIATION_CONCURRENCY_FLOOR,
+            "maxConcurrent": 0,
             "authority": "single-pr-writer-exact-head",
         },
         "deploymentAdmission": {
@@ -2158,7 +2014,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--integrity-receipt", type=Path)
     parser.add_argument("--concurrency-evidence", type=Path)
     parser.add_argument("--independent-review-receipt", type=Path)
-    parser.add_argument("--model-registry", type=Path)
     return parser.parse_args()
 
 
@@ -2168,8 +2023,9 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
     main = observe_main(args.repo)
     concurrency = observe_concurrency(concurrency_path, now)
     measured_target = concurrency.get("target")
-    # Lane budget follows live seats; without accepted evidence it falls to
-    # the runtime floor, never to zero (symphony-concurrency-autoscale-v1).
+    # The queue receipt requires a positive structural budget. This floor is
+    # not a seat: work/remediation admission below remains closed unless the
+    # useful-turn receipt is accepted.
     default_lane_budget = (
         measured_target
         if concurrency.get("accepted") is True
@@ -2204,9 +2060,6 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
             now,
         ),
         "concurrencyEvidence": concurrency,
-        "fallbackSeats": observe_fallback_seats(
-            now, registry_path=getattr(args, "model_registry", None)
-        ),
         "independentReview": refresh_independent_review_receipt(
             review_path, main, now
         ),

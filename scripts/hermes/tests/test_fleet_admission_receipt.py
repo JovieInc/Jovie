@@ -38,6 +38,62 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def capacity_evidence(target: int = 4) -> dict[str, object]:
+    observed = now_iso()
+    rows = [
+        {
+            "schema": "gem-provider-useful-turn/v1",
+            "provider": "openai",
+            "profile": f"profile-{index}",
+            "model": "gpt-5.6-sol",
+            "completedAt": observed,
+            "rc": 0,
+            "useful": True,
+            "outputDigest": f"{index + 1:064x}",
+            "outputBytes": 16,
+            "tokens": {"input": 12, "output": 4, "total": 16},
+        }
+        for index in range(target)
+    ]
+    return {
+        "schema": "gem-concurrency-evidence/v1",
+        "source": "execution-proven-useful-turns",
+        "target": target,
+        "approved": True,
+        "severeIncidents": 0,
+        "observedAt": observed,
+        "rows": rows,
+        "providers": {
+            "openai": {
+                "enrolled": target,
+                "enrolledProfiles": sorted(row["profile"] for row in rows),
+                "ready": target,
+                "enrollmentSource": "credential-file-presence-only",
+                "readinessSource": "execution-proven-useful-turns",
+            }
+        },
+    }
+
+
+def lease_capacity(target: int = 4) -> dict[str, object]:
+    profiles = sorted(f"profile-{index}" for index in range(target))
+    return {
+        "status": "ok",
+        "capacity": {
+            "provider": "openai",
+            "state": "available",
+            "accounts": target,
+            "locked": 0,
+            "cooldown": 0,
+            "available": target,
+            "lockedProfiles": [],
+            "cooldownProfiles": [],
+            "availableProfiles": profiles,
+            "eligibleProfiles": profiles,
+        },
+    }
+
+
 def signals(**overrides):
     review = {
         "schema": "jovie-independent-review/v1",
@@ -81,15 +137,8 @@ def signals(**overrides):
             "reasons": [],
         },
         "independentReview": review,
-        "concurrencyEvidence": {
-            "schema": "gem-concurrency-evidence/v1",
-            "target": 4,
-            "approved": True,
-            "cleanRuns": 1,
-            "severeIncidents": 0,
-            "observedAt": now_iso(),
-            "accepted": True,
-        },
+        "concurrencyEvidence": capacity_evidence(),
+        "lease": lease_capacity(),
     }
     payload.update(overrides)
     return payload
@@ -274,18 +323,18 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         self.assertNotIn("stackHealth", blocked["signals"]["closureHealth"])
         self.assertNotIn("repairActions", blocked["signals"]["closureHealth"])
 
-    def test_unbound_repair_accepts_seat_derived_concurrency(self):
-        hold = evaluate_receipt(
-            production={"status": "green", "deployedSha": "b" * 40}
-        )
-        self.assertEqual(hold["promotionMode"], "hold-intake")
-        self.assertTrue(hold["productionUnboundRepairAdmission"]["allowed"])
+    def test_unbound_repair_accepts_execution_proven_concurrency(self):
         jq = shutil.which("jq")
         self.assertIsNotNone(jq)
-        for value in (1, 2, 4, 8):
+        for value in (1, 2, 4, 8, 40):
             with self.subTest(maxConcurrent=value):
-                receipt = json.loads(json.dumps(hold))
-                receipt["productionUnboundRepairAdmission"]["maxConcurrent"] = value
+                receipt = evaluate_receipt(
+                    production={"status": "green", "deployedSha": "b" * 40},
+                    concurrencyEvidence=capacity_evidence(value),
+                    lease=lease_capacity(value),
+                )
+                self.assertEqual(receipt["promotionMode"], "hold-intake")
+                self.assertTrue(receipt["productionUnboundRepairAdmission"]["allowed"])
                 projection = PROJECT.project_fleet_admission_receipt(receipt)
                 self.assertEqual(
                     projection["productionUnboundRepairAdmission"]["maxConcurrent"],
@@ -305,12 +354,37 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
                 )
                 self.assertEqual(accepted.returncode, 0, accepted.stderr)
 
+    def test_unbound_repair_rejects_capacity_inflation_beyond_gate_proof(self):
+        receipt = evaluate_receipt(
+            production={"status": "green", "deployedSha": "b" * 40}
+        )
+        receipt["productionUnboundRepairAdmission"]["maxConcurrent"] = 40
+
+        with self.assertRaisesRegex(
+            PROJECT.AdmissionProjectionError,
+            "must equal Gem mutation concurrency",
+        ):
+            PROJECT.project_fleet_admission_receipt(receipt)
+
+    def test_capacity_closed_receipt_cannot_inflate_work_lease_admission(self):
+        receipt = evaluate_receipt(concurrencyEvidence=None)
+        self.assertFalse(receipt["concurrency"]["gem"]["newMutationAllowed"])
+        tampered = json.loads(json.dumps(receipt))
+        tampered["workAdmission"]["newIssueLeaseAllowed"] = True
+        tampered["workAdmission"]["newImplementationAllowed"] = True
+        tampered["workAdmission"]["activities"].append("approved-issue-lease")
+        with self.assertRaisesRegex(
+            PROJECT.AdmissionProjectionError,
+            "work lease fields contradict mutation capacity",
+        ):
+            PROJECT.project_fleet_admission_receipt(tampered)
+
     def test_unbound_repair_rejects_out_of_bounds_concurrency_and_deployments(self):
         hold = evaluate_receipt(
             production={"status": "green", "deployedSha": "b" * 40}
         )
         self.assertEqual(hold["promotionMode"], "hold-intake")
-        for value in (0, 9, -1, 2.5, "4", True, None):
+        for value in (0, 41, -1, 2.5, "4", True, None):
             with self.subTest(maxConcurrent=value):
                 receipt = json.loads(json.dumps(hold))
                 receipt["productionUnboundRepairAdmission"]["maxConcurrent"] = value

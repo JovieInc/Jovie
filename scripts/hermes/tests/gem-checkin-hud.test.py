@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import copy
 import importlib.util
 import json
 import pathlib
@@ -35,7 +36,7 @@ def receipt(**overrides):
     return base
 
 
-def paint(symphony=None, mq=None, review=None, measured=None, width=200, height=None, sha="469d4bb", ship_path=None, tps=None, pr_flow=None, system_pressure=None):
+def paint(symphony=None, mq=None, review=None, measured=None, width=200, height=None, sha="469d4bb", ship_path=None, tps=None, pr_flow=None, system_pressure=None, linear=None):
     return HUD.render(
         symphony=symphony or {"ok": True, "running": 0, "retrying": 0, "blocked": 0, "cap": 3, "rows": [], "up": True, "totals": None, "rate_limits": None, "seconds_running": None},
         mq=mq or {"ok": True, "count": 0, "rows": []},
@@ -49,6 +50,7 @@ def paint(symphony=None, mq=None, review=None, measured=None, width=200, height=
         tps=tps,
         pr_flow=pr_flow,
         system_pressure=system_pressure,
+        linear=linear,
     )
 
 
@@ -105,6 +107,20 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertIn("project(id: $id)", HUD.LINEAR_QUERY)
         self.assertIn("project(id: $id)", HUD.LINEAR_STAGES_QUERY)
         self.assertIn("In Review", HUD.LINEAR_QUERY)
+        self.assertIn("Rework", HUD.LINEAR_STAGES_QUERY)
+        self.assertIn("Merging", HUD.LINEAR_STAGES_QUERY)
+        for field in (
+            "id",
+            "identifier",
+            "title",
+            "updatedAt",
+            "priority",
+            "priorityLabel",
+            "sortOrder",
+            "assignee",
+            "state { id name type }",
+        ):
+            self.assertIn(field, HUD.LINEAR_STAGES_QUERY)
         self.assertIsNone(TEAM_JOV.search(source))
         self.assertNotIn("team:JOV", source)
         self.assertNotIn("team: JOV", source)
@@ -180,7 +196,283 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertNotIn("receipted this week", plain)
 
     def test_workflow_cap_reads_max_concurrent_agents(self):
-        self.assertEqual(HUD.read_workflow_cap(ROOT / "scripts/hermes/symphony/WORKFLOW.md"), 8)
+        self.assertEqual(HUD.read_workflow_cap(ROOT / "scripts/hermes/symphony/WORKFLOW.md"), 1)
+
+    def test_linear_snapshot_is_typed_deduplicated_and_revisioned(self):
+        payload = {
+            "data": {
+                "project": {
+                    "issues": {
+                        "nodes": [
+                            {
+                                "id": "issue-1",
+                                "identifier": "JOV-1",
+                                "title": "First",
+                                "createdAt": "2026-08-31T10:00:00Z",
+                                "startedAt": "2026-08-31T11:00:00Z",
+                                "completedAt": None,
+                                "updatedAt": "2026-08-31T11:59:00Z",
+                                "priority": 1,
+                                "priorityLabel": "Urgent",
+                                "sortOrder": -42.5,
+                                "assignee": {"id": "user-1", "name": "Symphony"},
+                                "state": {"id": "state-review", "name": "In Review", "type": "started"},
+                            }
+                        ],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    }
+                }
+            }
+        }
+        with mock.patch.object(HUD, "_linear_request", return_value=payload):
+            snapshot = HUD.fetch_linear_project(now=NOW)
+        self.assertTrue(snapshot["ok"])
+        self.assertEqual(snapshot["schema"], "gem-linear-issue-snapshot/v1")
+        self.assertEqual(snapshot["source"], "Linear")
+        self.assertEqual(snapshot["freshness"], "fresh")
+        self.assertEqual(snapshot["fetchedAt"], NOW.isoformat())
+        self.assertEqual(snapshot["lastSuccessfulReconciliationAt"], NOW.isoformat())
+        self.assertRegex(snapshot["sourceRevision"], r"^[0-9a-f]{64}$")
+        self.assertEqual(snapshot["rows"][0]["linearState"], "In Review")
+        self.assertEqual(snapshot["rows"][0]["priority"], 1)
+        self.assertEqual(snapshot["rows"][0]["sortOrder"], -42.5)
+
+        payload["data"]["project"]["issues"]["nodes"].append(
+            {**payload["data"]["project"]["issues"]["nodes"][0], "id": "issue-2"}
+        )
+        with mock.patch.object(HUD, "_linear_request", return_value=payload):
+            duplicate = HUD.fetch_linear_project(now=NOW)
+        self.assertFalse(duplicate["ok"])
+        self.assertEqual(duplicate["error"], "linear-snapshot-duplicate-identifier")
+
+    def test_linear_snapshot_paginates_before_claiming_canonical_truth(self):
+        def issue(index):
+            return {
+                "id": f"issue-{index}",
+                "identifier": f"JOV-{index + 1}",
+                "title": f"Issue {index}",
+                "createdAt": "2026-08-31T10:00:00Z",
+                "startedAt": None,
+                "completedAt": None,
+                "updatedAt": "2026-08-31T11:59:00Z",
+                "priority": 2,
+                "priorityLabel": "High",
+                "sortOrder": float(index),
+                "assignee": None,
+                "state": {"id": "todo", "name": "Todo", "type": "unstarted"},
+            }
+
+        first = {
+            "data": {
+                "project": {
+                    "issues": {
+                        "nodes": [issue(index) for index in range(100)],
+                        "pageInfo": {"hasNextPage": True, "endCursor": "page-2"},
+                    }
+                }
+            }
+        }
+        second = {
+            "data": {
+                "project": {
+                    "issues": {
+                        "nodes": [issue(100)],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    }
+                }
+            }
+        }
+        with mock.patch.object(
+            HUD, "_linear_request", side_effect=[first, second]
+        ) as request:
+            snapshot = HUD.fetch_linear_project(now=NOW)
+        self.assertTrue(snapshot["ok"])
+        self.assertEqual(len(snapshot["rows"]), 101)
+        self.assertEqual(
+            request.call_args_list[1].kwargs["variables"], {"cursor": "page-2"}
+        )
+
+        partial = copy.deepcopy(first)
+        partial["data"]["project"]["issues"].pop("pageInfo")
+        with mock.patch.object(HUD, "_linear_request", return_value=partial):
+            rejected = HUD.fetch_linear_project(now=NOW)
+        self.assertFalse(rejected["ok"])
+        self.assertEqual(rejected["freshness"], HUD.UNKNOWN)
+        self.assertEqual(rejected["error"], "linear-snapshot-missing-page")
+
+    def test_linear_cache_expiry_and_rate_limit_recovery_are_explicit(self):
+        HUD.FRAME_SOURCE_CACHE.clear()
+        HUD.LINEAR_NEXT_REFRESH_AT = None
+        good = {
+            "ok": True,
+            "schema": "gem-linear-issue-snapshot/v1",
+            "source": "Linear",
+            "freshness": "fresh",
+            "fetchedAt": NOW.isoformat(),
+            "expiresAt": (NOW + dt.timedelta(seconds=120)).isoformat(),
+            "lastSuccessfulReconciliationAt": NOW.isoformat(),
+            "sourceRevision": "a" * 64,
+            "rows": [],
+        }
+        self.assertEqual(
+            HUD.retain_last_good_source("linear", good, now=NOW)["freshness"],
+            "fresh",
+        )
+        stale = HUD.retain_last_good_source(
+            "linear",
+            {"ok": False, "error": "linear-rate-limited"},
+            now=NOW + dt.timedelta(seconds=60),
+        )
+        self.assertEqual(stale["freshness"], "stale")
+        self.assertTrue(stale["stale"])
+        expired = HUD.retain_last_good_source(
+            "linear",
+            {"ok": False, "error": "linear-rate-limited"},
+            now=NOW + dt.timedelta(seconds=121),
+        )
+        self.assertEqual(expired["freshness"], "expired")
+        recovered = {
+            **good,
+            "fetchedAt": (NOW + dt.timedelta(seconds=122)).isoformat(),
+            "expiresAt": (NOW + dt.timedelta(seconds=242)).isoformat(),
+            "lastSuccessfulReconciliationAt": (NOW + dt.timedelta(seconds=122)).isoformat(),
+            "sourceRevision": "b" * 64,
+        }
+        live = HUD.retain_last_good_source(
+            "linear", recovered, now=NOW + dt.timedelta(seconds=122)
+        )
+        self.assertEqual(live["freshness"], "fresh")
+        self.assertNotIn("source_error", live)
+
+    def test_five_second_repaints_reuse_linear_snapshot_until_refresh_due(self):
+        HUD.FRAME_SOURCE_CACHE.clear()
+        HUD.LINEAR_NEXT_REFRESH_AT = None
+        snapshots = [
+            {
+                "ok": True,
+                "schema": "gem-linear-issue-snapshot/v1",
+                "source": "Linear",
+                "freshness": "fresh",
+                "fetchedAt": instant.isoformat(),
+                "expiresAt": (instant + dt.timedelta(seconds=120)).isoformat(),
+                "lastSuccessfulReconciliationAt": instant.isoformat(),
+                "sourceRevision": str(index) * 64,
+                "review": 0,
+                "todo": 0,
+                "pickup_durations": None,
+                "rows": [],
+            }
+            for index, instant in enumerate(
+                (NOW, NOW + dt.timedelta(seconds=60)), start=1
+            )
+        ]
+        with mock.patch.object(
+            HUD, "fetch_linear_project", side_effect=snapshots
+        ) as fetch:
+            first = HUD.fetch_cached_linear_project(now=NOW)
+            second = HUD.fetch_cached_linear_project(
+                now=NOW + dt.timedelta(seconds=5)
+            )
+            refreshed = HUD.fetch_cached_linear_project(
+                now=NOW + dt.timedelta(seconds=60)
+            )
+        self.assertEqual(fetch.call_count, 2)
+        self.assertEqual(first["sourceRevision"], "1" * 64)
+        self.assertEqual(second["sourceRevision"], "1" * 64)
+        self.assertEqual(refreshed["sourceRevision"], "2" * 64)
+
+    def test_linear_truth_and_local_execution_divergence_render_separately(self):
+        linear = {
+            "ok": True,
+            "schema": "gem-linear-issue-snapshot/v1",
+            "source": "Linear",
+            "freshness": "fresh",
+            "fetchedAt": NOW.isoformat(),
+            "expiresAt": (NOW + dt.timedelta(seconds=120)).isoformat(),
+            "lastSuccessfulReconciliationAt": NOW.isoformat(),
+            "sourceRevision": "c" * 64,
+            "rows": [
+                {
+                    "id": "issue-2",
+                    "identifier": "JOV-2",
+                    "title": "Second by Linear order",
+                    "linearState": "Todo",
+                    "stateId": "todo",
+                    "stateType": "unstarted",
+                    "priority": 2,
+                    "priorityLabel": "High",
+                    "sortOrder": 2.0,
+                    "sourceOrder": 0,
+                    "updatedAt": NOW.isoformat(),
+                    "assignee": None,
+                },
+                {
+                    "id": "issue-1",
+                    "identifier": "JOV-1",
+                    "title": "First local retry",
+                    "linearState": "In Review",
+                    "stateId": "review",
+                    "stateType": "started",
+                    "priority": 1,
+                    "priorityLabel": "Urgent",
+                    "sortOrder": 1.0,
+                    "sourceOrder": 1,
+                    "updatedAt": NOW.isoformat(),
+                    "assignee": {"id": "u1", "name": "Symphony"},
+                },
+            ],
+        }
+        symphony = {
+            "ok": True,
+            "running": 0,
+            "retrying": 1,
+            "blocked": 0,
+            "cap": 1,
+            "rows": [{"kind": "retrying", "id": "JOV-1", "error": "provider wait", "due_at": "2026-08-31T12:05:00Z"}],
+            "up": True,
+        }
+        rows = HUD.project_issue_rows(linear, symphony)
+        self.assertEqual([row["id"] for row in rows], ["JOV-2", "JOV-1"])
+        self.assertEqual(rows[1]["linear_state"], "In Review")
+        self.assertEqual(rows[1]["local_exec"], "retrying")
+        plain = strip(paint(symphony=symphony, linear=linear, width=240, height=60))
+        self.assertIn("CURRENT WORK · LINEAR CANONICAL / LOCAL EXECUTION", plain)
+        self.assertIn("LINEAR In Review · LOCAL retrying", plain)
+        self.assertLess(plain.index("JOV-2"), plain.index("JOV-1"))
+
+        stale = {**linear, "freshness": "expired", "stale": True}
+        stale_plain = strip(paint(symphony=symphony, linear=stale, width=240, height=60))
+        self.assertIn("LINEAR STALE", stale_plain)
+        self.assertIn("P1 / order 1", stale_plain)
+
+    def test_remote_issue_text_cannot_inject_terminal_controls(self):
+        linear = {
+            "ok": True,
+            "freshness": "fresh",
+            "rows": [
+                {
+                    "id": "issue-1",
+                    "identifier": "JOV-1",
+                    "title": "hello\x1b]52;c;Zm9v\x07world\u202espoof",
+                    "linearState": "Rework",
+                    "priority": 1,
+                    "priorityLabel": "Urgent",
+                    "sortOrder": 1.0,
+                    "sourceOrder": 0,
+                    "updatedAt": NOW.isoformat(),
+                    "assignee": {"id": "u1", "name": "A\x1b[2JB\u2066C"},
+                }
+            ],
+        }
+        rendered = paint(linear=linear, width=240, height=60)
+        plain = strip(rendered)
+        self.assertIn("helloworldspoof", plain)
+        self.assertNotIn("]52", rendered)
+        self.assertNotIn("Zm9v", rendered)
+        self.assertNotIn("\x07", rendered)
+        self.assertNotIn("\u202e", rendered)
+        self.assertNotIn("\u2066", rendered)
+        self.assertNotIn("\x1b[2J", rendered)
 
     def test_official_state_totals_render_tps_runtime_in_out(self):
         state, _ = fetch_state(official_state())
@@ -993,7 +1285,7 @@ class UltrawideHudTests(unittest.TestCase):
             mock.patch.object(HUD, "read_workflow_cap", return_value=4),
             mock.patch.object(HUD, "fetch_symphony", return_value=symphony),
             mock.patch.object(HUD, "fetch_mq", return_value={"ok": True, "count": 0, "rows": []}),
-            mock.patch.object(HUD, "fetch_linear_project", return_value={"ok": True, "review": 0, "todo": 0}),
+            mock.patch.object(HUD, "fetch_cached_linear_project", return_value={"ok": True, "review": 0, "todo": 0}),
             mock.patch.object(HUD, "fetch_github_ship", return_value={"ok": False}),
             mock.patch.object(HUD, "load_measured", return_value={}),
             mock.patch.object(HUD, "load_tps_snapshots", return_value=[]),

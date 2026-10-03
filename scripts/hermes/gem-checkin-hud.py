@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import math
 import os
@@ -13,6 +14,7 @@ import subprocess
 import sys
 import threading
 import time
+import unicodedata
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -32,6 +34,8 @@ UNMEASURED = "unmeasured"
 PROD_SHA_RE = re.compile(r"^[0-9a-f]{7,40}$", re.I)
 CAP_RE = re.compile(r"^\s*max_concurrent_agents:\s*([0-9]+)\s*$", re.M)
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+OSC_RE = re.compile(r"\x1b\].*?(?:\x07|\x1b\\)", re.S)
+ESCAPE_RE = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|[@-_])")
 LIVE_SLUG = "symphony-ui-pilot-96d6b9c5b2d5"
 LIVE_PROJECT_ID = "440ea404-041f-461e-ae45-dd6a2e98e4a1"
 DEFAULT_MEASURED = Path.home() / ".local/state/gem-checkin-hud/measured.json"
@@ -54,10 +58,17 @@ LINEAR_QUERY = (
     "{ totalCount } } }"
 )
 LINEAR_STAGES_QUERY = (
-    "query($id: String!) { project(id: $id) { issues(first: 100, filter: { "
-    "state: { name: { in: [\"Todo\", \"In Progress\", \"In Review\"] } } }) "
-    "{ nodes { createdAt startedAt completedAt state { name } } } } }"
+    "query($id: String!, $cursor: String) { project(id: $id) { issues(first: 100, after: $cursor, filter: { "
+    "state: { name: { in: [\"Todo\", \"In Progress\", \"Rework\", \"Merging\", \"In Review\"] } } }) "
+    "{ nodes { id identifier title createdAt startedAt completedAt updatedAt "
+    "priority priorityLabel sortOrder assignee { id name } state { id name type } } "
+    "pageInfo { hasNextPage endCursor } } } }"
 )
+LINEAR_SNAPSHOT_SCHEMA = "gem-linear-issue-snapshot/v1"
+LINEAR_SNAPSHOT_TTL_SECONDS = 120
+LINEAR_SNAPSHOT_REFRESH_SECONDS = 60
+LINEAR_SNAPSHOT_RETRY_SECONDS = 15
+LINEAR_SNAPSHOT_MAX_PAGES = 20
 SHIP_STAGES = (
     ("todo", "Todo/pickup"),
     ("running", "agent running"),
@@ -95,6 +106,8 @@ SHIPPING_DISPLAY_IA = {
 }
 _GITHUB_REFRESH_THREAD: threading.Thread | None = None
 FRAME_SOURCE_CACHE: dict[str, dict[str, Any]] = {}
+LINEAR_NEXT_REFRESH_AT: datetime | None = None
+LINEAR_REFRESH_LOCK = threading.Lock()
 PRESSURE_METRICS = ("cpu", "memory", "disk", "io", "network", "slots")
 
 
@@ -160,10 +173,23 @@ def visible_len(text: str) -> int:
     return len(ANSI_RE.sub("", text))
 
 
+def sanitize_terminal_text(value: Any) -> str:
+    """Remove terminal controls and invisible direction changes from source text."""
+    raw = OSC_RE.sub("", str(value))
+    raw = ESCAPE_RE.sub("", raw)
+    clean: list[str] = []
+    for character in unicodedata.normalize("NFC", raw):
+        if character in "\r\n\t":
+            clean.append(" ")
+        elif not unicodedata.category(character).startswith("C"):
+            clean.append(character)
+    return "".join(clean)
+
+
 def clip(text: str, width: int, *, tail: bool = False) -> str:
     if width <= 0:
         return ""
-    plain = ANSI_RE.sub("", text)
+    plain = sanitize_terminal_text(ANSI_RE.sub("", text))
     if len(plain) <= width:
         return plain + (" " * (width - len(plain)))
     if width <= 1:
@@ -228,6 +254,17 @@ def retain_last_good_source(
                 display["partial_stale"] = True
                 display["source_error"] = "partial metric source failure"
             return display
+        if key == "linear":
+            expires_at = _iso(current.get("expiresAt"))
+            if expires_at is None or now > expires_at:
+                expired = copy.deepcopy(current)
+                expired.update({"stale": True, "freshness": "expired"})
+                return expired
+            current = copy.deepcopy(current)
+            current.update({"stale": False, "freshness": "fresh"})
+            current.pop("source_error", None)
+            current.pop("source_error_at", None)
+            current.pop("retained_all", None)
         if current.get("stale") is not True and current.get("source_error") is None:
             FRAME_SOURCE_CACHE[key] = copy.deepcopy(current)
         return current
@@ -246,6 +283,11 @@ def retain_last_good_source(
     )
     if key == "symphony":
         retained["up"] = False
+    if key == "linear":
+        expires_at = _iso(retained.get("expiresAt"))
+        retained["freshness"] = (
+            "expired" if expires_at is None or now > expires_at else "stale"
+        )
     return retained
 
 
@@ -1214,13 +1256,20 @@ def fetch_mq(*, timeout: float = 8.0) -> dict[str, Any]:
     return {"ok": True, "count": len(rows), "rows": rows, "generated_at": _now().isoformat()}
 
 
-def _linear_request(query: str, *, timeout: float) -> dict[str, Any] | None:
+def _linear_request(
+    query: str, *, timeout: float, variables: dict[str, Any] | None = None
+) -> dict[str, Any] | None:
     key = os.environ.get("LINEAR_API_KEY")
     if not key:
         return None
     request = urllib.request.Request(
         LINEAR_API,
-        data=json.dumps({"query": query, "variables": {"id": LIVE_PROJECT_ID}}).encode(),
+        data=json.dumps(
+            {
+                "query": query,
+                "variables": {"id": LIVE_PROJECT_ID, **(variables or {})},
+            }
+        ).encode(),
         headers={"Authorization": key, "Content-Type": "application/json", "User-Agent": "gem-checkin-hud/3"},
         method="POST",
     )
@@ -1240,24 +1289,199 @@ def fetch_review(*, timeout: float = 8.0) -> int | None:
     return count if isinstance(count, int) else None
 
 
-def fetch_linear_project(*, timeout: float = 8.0) -> dict[str, Any]:
-    payload = _linear_request(LINEAR_STAGES_QUERY, timeout=timeout)
-    project = (payload.get("data") or {}).get("project") if payload else None
-    if not isinstance(project, dict):
-        review = fetch_review(timeout=timeout)
-        return {"ok": review is not None, "review": review, "todo": None, "pickup_durations": None}
+def _linear_snapshot_unavailable(error: str) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "schema": LINEAR_SNAPSHOT_SCHEMA,
+        "source": "Linear",
+        "freshness": UNKNOWN,
+        "review": None,
+        "todo": None,
+        "pickup_durations": None,
+        "rows": [],
+        "error": error,
+    }
+
+
+def fetch_linear_project(
+    *, timeout: float = 8.0, now: datetime | None = None
+) -> dict[str, Any]:
+    nodes: list[Any] = []
+    cursor: str | None = None
+    seen_cursors: set[str] = set()
+    deadline = time.monotonic() + max(0.1, timeout)
+    for _page in range(LINEAR_SNAPSHOT_MAX_PAGES):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return _linear_snapshot_unavailable("linear-snapshot-deadline")
+        payload = _linear_request(
+            LINEAR_STAGES_QUERY,
+            timeout=max(0.1, min(timeout, remaining)),
+            variables={"cursor": cursor},
+        )
+        if payload and payload.get("errors"):
+            return _linear_snapshot_unavailable("linear-graphql-error")
+        project = (payload.get("data") or {}).get("project") if payload else None
+        if not isinstance(project, dict):
+            return _linear_snapshot_unavailable("linear-source-unavailable")
+        issues = project.get("issues")
+        page_nodes = issues.get("nodes") if isinstance(issues, dict) else None
+        page_info = issues.get("pageInfo") if isinstance(issues, dict) else None
+        if not isinstance(page_nodes, list) or not isinstance(page_info, dict):
+            return _linear_snapshot_unavailable("linear-snapshot-missing-page")
+        nodes.extend(page_nodes)
+        has_next = page_info.get("hasNextPage")
+        end_cursor = page_info.get("endCursor")
+        if has_next is False:
+            break
+        if (
+            has_next is not True
+            or not isinstance(end_cursor, str)
+            or not end_cursor
+            or end_cursor in seen_cursors
+        ):
+            return _linear_snapshot_unavailable("linear-snapshot-invalid-page")
+        seen_cursors.add(end_cursor)
+        cursor = end_cursor
+    else:
+        return _linear_snapshot_unavailable("linear-snapshot-page-limit")
+    clock = now or _now()
     todo = review = 0
     pickup: list[float] = []
-    for node in (project.get("issues") or {}).get("nodes") or []:
+    rows: list[dict[str, Any]] = []
+    issue_ids: set[str] = set()
+    identifiers: set[str] = set()
+    for source_order, node in enumerate(nodes):
         if not isinstance(node, dict):
-            continue
-        state = ((node.get("state") or {}).get("name") if isinstance(node.get("state"), dict) else None) or ""
-        todo += state == "Todo"
-        review += state == "In Review"
+            return _linear_snapshot_unavailable("linear-snapshot-invalid-row")
+        issue_id = node.get("id")
+        identifier = node.get("identifier")
+        title = node.get("title")
+        state = node.get("state")
+        state_id = state.get("id") if isinstance(state, dict) else None
+        state_name = state.get("name") if isinstance(state, dict) else None
+        state_type = state.get("type") if isinstance(state, dict) else None
+        priority = node.get("priority")
+        priority_label = node.get("priorityLabel")
+        sort_order = node.get("sortOrder")
+        updated_at = node.get("updatedAt")
+        assignee = node.get("assignee")
+        valid_assignee = assignee is None or (
+            isinstance(assignee, dict)
+            and isinstance(assignee.get("id"), str)
+            and bool(assignee["id"].strip())
+            and isinstance(assignee.get("name"), str)
+            and bool(assignee["name"].strip())
+        )
+        if (
+            not isinstance(issue_id, str)
+            or not issue_id.strip()
+            or not isinstance(identifier, str)
+            or re.fullmatch(r"[A-Z][A-Z0-9]*-[1-9][0-9]*", identifier) is None
+            or not isinstance(title, str)
+            or not title.strip()
+            or not isinstance(state_id, str)
+            or not state_id.strip()
+            or not isinstance(state_name, str)
+            or not state_name.strip()
+            or not isinstance(state_type, str)
+            or not state_type.strip()
+            or isinstance(priority, bool)
+            or not isinstance(priority, int)
+            or not 0 <= priority <= 4
+            or not isinstance(priority_label, str)
+            or not priority_label.strip()
+            or isinstance(sort_order, bool)
+            or not isinstance(sort_order, (int, float))
+            or not math.isfinite(float(sort_order))
+            or _iso(updated_at) is None
+            or not valid_assignee
+        ):
+            return _linear_snapshot_unavailable("linear-snapshot-invalid-row")
+        if issue_id in issue_ids:
+            return _linear_snapshot_unavailable("linear-snapshot-duplicate-id")
+        if identifier in identifiers:
+            return _linear_snapshot_unavailable(
+                "linear-snapshot-duplicate-identifier"
+            )
+        issue_ids.add(issue_id)
+        identifiers.add(identifier)
+        state_label = state_name
+        todo += state_label == "Todo"
+        review += state_label == "In Review"
         created, started = _iso(node.get("createdAt")), _iso(node.get("startedAt"))
         if created is not None and started is not None and (started - created).total_seconds() > 0:
             pickup.append((started - created).total_seconds())
-    return {"ok": True, "review": review, "todo": todo, "pickup_durations": pickup or None}
+        rows.append(
+            {
+                "id": issue_id,
+                "identifier": identifier,
+                "title": title.strip(),
+                "linearState": state_label,
+                "stateId": state_id,
+                "stateType": state_type,
+                "priority": priority,
+                "priorityLabel": priority_label.strip(),
+                "sortOrder": float(sort_order),
+                "sourceOrder": source_order,
+                "updatedAt": updated_at,
+                "assignee": copy.deepcopy(assignee),
+            }
+        )
+    fetched_at = clock.isoformat()
+    revision_body = json.dumps(rows, sort_keys=True, separators=(",", ":"))
+    return {
+        "ok": True,
+        "schema": LINEAR_SNAPSHOT_SCHEMA,
+        "source": "Linear",
+        "freshness": "fresh",
+        "sourceRevision": hashlib.sha256(revision_body.encode("utf-8")).hexdigest(),
+        "fetchedAt": fetched_at,
+        "expiresAt": (clock + timedelta(seconds=LINEAR_SNAPSHOT_TTL_SECONDS)).isoformat(),
+        "lastSuccessfulReconciliationAt": fetched_at,
+        "review": review,
+        "todo": todo,
+        "pickup_durations": pickup or None,
+        "rows": rows,
+    }
+
+
+def fetch_cached_linear_project(
+    *, timeout: float = 8.0, now: datetime | None = None
+) -> dict[str, Any]:
+    """Refresh Linear at a bounded cadence while every repaint uses one snapshot."""
+    global LINEAR_NEXT_REFRESH_AT
+    clock = now or _now()
+    cached = FRAME_SOURCE_CACHE.get("linear")
+    if (
+        isinstance(cached, dict)
+        and LINEAR_NEXT_REFRESH_AT is not None
+        and clock < LINEAR_NEXT_REFRESH_AT
+    ):
+        return retain_last_good_source("linear", cached, now=clock)
+    if not LINEAR_REFRESH_LOCK.acquire(blocking=False):
+        if isinstance(cached, dict):
+            return retain_last_good_source("linear", cached, now=clock)
+        return _linear_snapshot_unavailable("linear-refresh-in-flight")
+    try:
+        cached = FRAME_SOURCE_CACHE.get("linear")
+        if (
+            isinstance(cached, dict)
+            and LINEAR_NEXT_REFRESH_AT is not None
+            and clock < LINEAR_NEXT_REFRESH_AT
+        ):
+            return retain_last_good_source("linear", cached, now=clock)
+        current = fetch_linear_project(timeout=timeout, now=clock)
+        result = retain_last_good_source("linear", current, now=clock)
+        delay = (
+            LINEAR_SNAPSHOT_REFRESH_SECONDS
+            if current.get("ok") is True
+            else LINEAR_SNAPSHOT_RETRY_SECONDS
+        )
+        LINEAR_NEXT_REFRESH_AT = clock + timedelta(seconds=delay)
+        return result
+    finally:
+        LINEAR_REFRESH_LOCK.release()
 
 
 def _gh_json(args: list[str], *, timeout: float) -> Any | None:
@@ -1703,6 +1927,62 @@ def _job_row(
     stage_baselines: dict[str, dict[str, Any]] | None = None,
 ) -> str:
     kind = row.get("kind")
+    if kind == "linear_issue":
+        local_exec = str(row.get("local_exec") or "idle")
+        freshness = str(row.get("linear_freshness") or UNKNOWN)
+        linear_state = str(row.get("linear_state") or UNKNOWN)
+        priority = row.get("priority")
+        sort_order = row.get("sort_order")
+        order_label = (
+            str(int(sort_order))
+            if isinstance(sort_order, (int, float)) and float(sort_order).is_integer()
+            else dash(sort_order)
+        )
+        if freshness == "fresh":
+            truth = f"LINEAR {linear_state}"
+        elif linear_state == UNKNOWN:
+            truth = "LINEAR UNKNOWN"
+        else:
+            truth = f"LINEAR STALE · P{dash(priority)} / order {order_label} · STATE {linear_state}"
+        title = f"{truth} · LOCAL {local_exec} · {dash(row.get('title'))}"
+        if freshness != "fresh":
+            color, glyph = (RED, "?") if linear_state == UNKNOWN else (ORANGE, "!")
+        elif local_exec == "blocked":
+            color, glyph = RED, "✕"
+        elif local_exec == "retrying":
+            color, glyph = ORANGE, "↻"
+        elif local_exec == "running":
+            color, glyph = BLUE, "●"
+        else:
+            color, glyph = DIM, "·"
+        assignee = row.get("assignee")
+        assignee_name = (
+            assignee.get("name")
+            if isinstance(assignee, dict) and isinstance(assignee.get("name"), str)
+            else None
+        )
+        elapsed = (
+            due_label(row.get("due_at"), now=now)
+            if local_exec == "retrying"
+            else elapsed_label(row.get("started"), now=now, seconds=row.get("seconds"))
+            if local_exec in {"running", "blocked"}
+            else natural_time(row.get("updated_at"), now=now)
+        )
+        return _cells(
+            color,
+            widths,
+            glyph,
+            f"P{dash(priority)}",
+            dash(row.get("id")),
+            title,
+            dash(row.get("attempt")),
+            dash(row.get("turn")),
+            compact_tokens(
+                row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")
+            ),
+            elapsed,
+            short_path(row.get("workspace") or assignee_name),
+        )
     if kind == "mq":
         ident = f"#{row['number']}" if isinstance(row.get("number"), int) else "-"
         health = queue_age_health(row, (stage_baselines or {}).get("mq"), now=now)
@@ -1719,7 +1999,7 @@ def _job_row(
 def _compact_work_header(width: int) -> list[str]:
     ident, age = 12, 20
     title = max(12, width - ident - age - 8)
-    heading = _rgb(FG, clip("CURRENT WORK · critical and stalled receipts first", width), bold=True)
+    heading = _rgb(FG, clip("CURRENT WORK · LINEAR CANONICAL / LOCAL EXECUTION", width), bold=True)
     columns = "  ".join((_cell("ST", 2), _cell("ID / POS", ident), _cell("TITLE", title), _cell("AGE / HEALTH", age, right=True)))
     return [heading, _rgb(DIM, clip(columns, width))]
 
@@ -1736,7 +2016,36 @@ def _compact_job_row(
     kind = str(row.get("kind") or "running")
     ident = dash(row.get("id"))
     title = dash(row.get("title") or row.get("error") or row.get("last_message"))
-    if kind == "mq":
+    if kind == "linear_issue":
+        local_exec = str(row.get("local_exec") or "idle")
+        freshness = str(row.get("linear_freshness") or UNKNOWN)
+        linear_state = str(row.get("linear_state") or UNKNOWN)
+        truth = (
+            f"LINEAR {linear_state}"
+            if freshness == "fresh"
+            else "LINEAR UNKNOWN"
+            if linear_state == UNKNOWN
+            else f"LINEAR STALE · STATE {linear_state}"
+        )
+        title = f"{truth} · LOCAL {local_exec} · {title}"
+        if freshness != "fresh":
+            status, glyph = ("failure", "?") if linear_state == UNKNOWN else ("warning", "!")
+        elif local_exec == "blocked":
+            status, glyph = "failure", "×"
+        elif local_exec == "retrying":
+            status, glyph = "warning", "!"
+        elif local_exec == "running":
+            status, glyph = "healthy", "●"
+        else:
+            status, glyph = "unknown", "·"
+        age = (
+            due_label(row.get("due_at"), now=now)
+            if local_exec == "retrying"
+            else elapsed_label(row.get("started"), now=now, seconds=row.get("seconds"))
+            if local_exec in {"running", "blocked"}
+            else natural_time(row.get("updated_at"), now=now)
+        )
+    elif kind == "mq":
         ident = f"#{row['number']}" if isinstance(row.get("number"), int) else "-"
         if row.get("position") is not None:
             ident = f"{ident}/p{row['position']}"
@@ -1765,6 +2074,69 @@ def _compact_job_row(
         )
     )
     return _rgb(color, clip(columns, width), bold=status == "failure")
+
+
+def project_issue_rows(
+    linear: dict[str, Any] | None, symphony: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Join Linear truth to local execution without letting either overwrite the other."""
+    local_rows = [
+        copy.deepcopy(row)
+        for row in (symphony.get("rows") or [])
+        if isinstance(row, dict)
+    ]
+    if linear is None:
+        return local_rows
+    local_by_identifier: dict[str, dict[str, Any]] = {}
+    local_without_identifier: list[dict[str, Any]] = []
+    for row in local_rows:
+        identifier = row.get("id")
+        if isinstance(identifier, str) and identifier not in local_by_identifier:
+            local_by_identifier[identifier] = row
+        else:
+            local_without_identifier.append(row)
+    freshness = str(linear.get("freshness") or UNKNOWN)
+    canonical_rows = linear.get("rows") if isinstance(linear.get("rows"), list) else []
+    projected: list[dict[str, Any]] = []
+    for canonical in canonical_rows:
+        if not isinstance(canonical, dict):
+            continue
+        identifier = canonical.get("identifier")
+        if not isinstance(identifier, str):
+            continue
+        local = local_by_identifier.pop(identifier, None)
+        projected.append(
+            {
+                **(local or {}),
+                "kind": "linear_issue",
+                "id": identifier,
+                "title": canonical.get("title"),
+                "linear_state": canonical.get("linearState"),
+                "linear_freshness": freshness,
+                "priority": canonical.get("priority"),
+                "priority_label": canonical.get("priorityLabel"),
+                "sort_order": canonical.get("sortOrder"),
+                "source_order": canonical.get("sourceOrder"),
+                "updated_at": canonical.get("updatedAt"),
+                "assignee": copy.deepcopy(canonical.get("assignee")),
+                "local_exec": str(local.get("kind")) if local else "idle",
+            }
+        )
+    for local in [*local_by_identifier.values(), *local_without_identifier]:
+        projected.append(
+            {
+                **local,
+                "kind": "linear_issue",
+                "linear_state": UNKNOWN,
+                "linear_freshness": UNKNOWN,
+                "priority": None,
+                "sort_order": None,
+                "updated_at": None,
+                "assignee": None,
+                "local_exec": str(local.get("kind") or UNKNOWN),
+            }
+        )
+    return projected
 
 
 def _hero_metrics(
@@ -2168,6 +2540,7 @@ def render(
     tps: float | None = None,
     pr_flow: dict[str, Any] | None = None,
     system_pressure: dict[str, Any] | None = None,
+    linear: dict[str, Any] | None = None,
 ) -> str:
     clock = now or _now()
     # Direct render callers get the canonical full canvas unless they request a
@@ -2214,6 +2587,7 @@ def render(
         for stage in (path.get("stages") or [])
         if isinstance(stage, dict) and stage.get("id")
     }
+    issue_rows = project_issue_rows(linear, symphony)
     compact = cols < 160
     health_band = _operator_health_lines(
         symphony=symphony,
@@ -2229,7 +2603,7 @@ def render(
         lines = [header, *health_band, *pressure_lines, *_compact_work_header(cols)]
         work_rows = [
             _compact_job_row(row, cols, now=clock, stage_baselines=stage_baselines)
-            for row in [*(symphony.get("rows") or []), *(mq.get("rows") or [])]
+            for row in [*issue_rows, *(mq.get("rows") or [])]
             if isinstance(row, dict)
         ]
         footer = [*_ship_path_lines(path, cols)]
@@ -2247,11 +2621,11 @@ def render(
             "",
             *pressure_lines,
             "",
-            _rgb(FG, "CURRENT WORK · critical and stalled receipts first", bold=True),
+            _rgb(FG, "CURRENT WORK · LINEAR CANONICAL / LOCAL EXECUTION", bold=True),
             _table_header(widths),
             _rgb(DIM, "─" * cols),
         ]
-        work_rows = [_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (symphony.get("rows") or [])]
+        work_rows = [_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in issue_rows]
         work_rows.extend(_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (mq.get("rows") or []))
         if review is not None and review > 0:
             work_rows.append(_rgb(ORANGE, clip(f"!  REVIEW QUEUE {review}", cols)))
@@ -2267,11 +2641,11 @@ def render(
             "",
             *pressure_lines,
             "",
-            _rgb(FG, "CURRENT WORK · critical and stalled receipts first", bold=True),
+            _rgb(FG, "CURRENT WORK · LINEAR CANONICAL / LOCAL EXECUTION", bold=True),
             _table_header(widths),
             _rgb(DIM, "─" * cols),
         ]
-        work_rows = [_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (symphony.get("rows") or [])]
+        work_rows = [_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in issue_rows]
         work_rows.extend(_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (mq.get("rows") or []))
         if review is not None and review > 0:
             work_rows.append(_rgb(ORANGE, clip(f"!  REVIEW QUEUE {review}", cols)))
@@ -2318,7 +2692,7 @@ def frame(
     cap = read_workflow_cap()
     symphony = retain_last_good_source("symphony", fetch_symphony(symphony_url, cap=cap), now=clock)
     mq = retain_last_good_source("mq", fetch_mq(), now=clock)
-    linear = retain_last_good_source("linear", fetch_linear_project(), now=clock)
+    linear = fetch_cached_linear_project(now=clock)
     github_path = Path(os.environ.get("HUD_GITHUB_PATH", str(DEFAULT_GITHUB_STATE)))
     github = fetch_github_ship(
         cache_path=github_path,
@@ -2347,6 +2721,7 @@ def frame(
         tps=tps,
         pr_flow=github,
         system_pressure=pressure,
+        linear=linear,
     )
 
 

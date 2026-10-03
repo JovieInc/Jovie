@@ -18,6 +18,7 @@ UNIT_SRC="${REPO_ROOT}/scripts/hermes/systemd/symphony-elixir.service"
 UNIT_DST="${TARGET_HOME}/.config/systemd/user/${SERVICE_NAME}"
 WORKFLOW_SRC="${SYMPHONY_WORKFLOW_SRC:-${REPO_ROOT}/scripts/hermes/symphony/WORKFLOW.md}"
 WORKFLOW_DST="${TARGET_HOME}/.config/symphony/WORKFLOW.md"
+WORKFLOW_INSTALL_SRC="$WORKFLOW_SRC"
 ACCOUNT_ENV="${TARGET_HOME}/.config/symphony/codex-account.env"
 LINEAR_ENV="${TARGET_HOME}/.config/symphony/linear.env"
 HELPER_SRC="${REPO_ROOT}/scripts/hermes/symphony_official_runtime.py"
@@ -148,7 +149,7 @@ def normalized(path):
     if len(matches) != 1:
         return None
     value = int(matches[0][1])
-    if not 1 <= value <= 8:
+    if not 1 <= value <= 40:
         return None
     return pattern.sub(r"\g<1>__RUNTIME_OVERLAY__\g<3>", text)
 
@@ -254,6 +255,18 @@ PY
 
 stop_idle_official_for_restart() {
   local snapshot running checking next_poll_ms
+  if [ "$official_was_active" -ne 1 ]; then
+    if ! command -v ss >/dev/null 2>&1; then
+      echo "PROMOTION_RED cannot verify ownership of inactive runtime port :4041 (ss missing)" >&2
+      return 6
+    fi
+    if [ -n "$(ss -H -ltn 'sport = :4041' 2>/dev/null)" ]; then
+      echo "PROMOTION_RED inactive $SERVICE_NAME has a foreign or unowned :4041 listener" >&2
+      return 6
+    fi
+    echo "PROMOTION_OK $SERVICE_NAME inactive with no :4041 listener; guarded start allowed"
+    return 0
+  fi
   for _ in $(seq 1 45); do
     if ! snapshot="$(promotion_idle_snapshot)"; then
       echo "PROMOTION_RED cannot prove the official runtime is idle" >&2
@@ -488,12 +501,46 @@ backup_target unit "$UNIT_DST"
 backup_target workflow "$WORKFLOW_DST"
 promotion_started=1
 
+# max_concurrent_agents is the sole controller-owned runtime overlay. Preserve
+# it across an exact-source promotion only when every other workflow byte
+# matches and the installed value is within the official 1..40 bound.
+if [ -f "$WORKFLOW_DST" ]; then
+  overlay_candidate="${rollback_dir}/WORKFLOW.overlay"
+  if preserved_cap="$(python3 - "$WORKFLOW_SRC" "$WORKFLOW_DST" "$overlay_candidate" <<'PY'
+import pathlib, re, sys
+
+source_path, installed_path, candidate_path = map(pathlib.Path, sys.argv[1:])
+pattern = re.compile(r"^(\s*max_concurrent_agents:\s*)(\d+)(\s*)$", re.MULTILINE)
+source = source_path.read_text(encoding="utf-8")
+installed = installed_path.read_text(encoding="utf-8")
+source_matches = list(pattern.finditer(source))
+installed_matches = list(pattern.finditer(installed))
+if len(source_matches) != 1 or len(installed_matches) != 1:
+    raise SystemExit(1)
+installed_cap = int(installed_matches[0].group(2))
+if not 1 <= installed_cap <= 40:
+    raise SystemExit(1)
+normalize = lambda text: pattern.sub(r"\g<1>__RUNTIME_OVERLAY__\g<3>", text)
+if normalize(source) != normalize(installed):
+    raise SystemExit(1)
+candidate = pattern.sub(
+    lambda match: f"{match.group(1)}{installed_cap}{match.group(3)}", source
+)
+candidate_path.write_text(candidate, encoding="utf-8")
+print(installed_cap)
+PY
+)"; then
+    WORKFLOW_INSTALL_SRC="$overlay_candidate"
+    echo "PRESERVED max_concurrent_agents=$preserved_cap"
+  fi
+fi
+
 if [ "$SKIP_BINARY" -eq 0 ]; then
   install_one "${tmpdir}/${BIN_NAME}" "$BIN_DST" 0755
 fi
 install_one "$HELPER_SRC" "$HELPER_DST" 0755
 install_one "$UNIT_SRC" "$UNIT_DST"
-install_one "$WORKFLOW_SRC" "$WORKFLOW_DST"
+install_one "$WORKFLOW_INSTALL_SRC" "$WORKFLOW_DST"
 
 if [ "$RETIRE_LEGACY" -eq 1 ]; then
   retire_legacy_units

@@ -26,6 +26,13 @@ if GATE_SPEC is None or GATE_SPEC.loader is None:
     raise RuntimeError(f"could not load {GATE_SOURCE}")
 GATE_MODULE = importlib.util.module_from_spec(GATE_SPEC)
 GATE_SPEC.loader.exec_module(GATE_MODULE)
+from provider_useful_turns import profile_identity  # noqa: E402
+
+
+def provider_profiles(count: int) -> list[str]:
+    return sorted(
+        profile_identity("openai", f"profile-{index}") for index in range(count)
+    )
 
 
 def stale_capacity_receipt():
@@ -74,9 +81,68 @@ def stale_capacity_receipt():
                 "accepted": False,
                 "error": "capacity-evidence-stale",
             },
+            "lease": {
+                "status": "ok",
+                "capacity": {
+                    "provider": "openai",
+                    "state": "available",
+                    "accounts": 4,
+                    "locked": 0,
+                    "cooldown": 0,
+                    "available": 4,
+                    "lockedProfiles": [],
+                    "cooldownProfiles": [],
+                    "availableProfiles": provider_profiles(4),
+                    "eligibleProfiles": provider_profiles(4),
+                },
+            },
         },
         observed_at,
     )
+
+
+def valid_capacity_receipt(target: int = 4):
+    observed_at = GATE_MODULE.isoformat(GATE_MODULE.utc_now())
+    receipt = stale_capacity_receipt()
+    signals = dict(receipt["signals"])
+    signals["independentReview"] = {
+        **signals["independentReview"],
+        "observedAt": observed_at,
+    }
+    rows = [
+        {
+            "schema": "gem-provider-useful-turn/v1",
+            "provider": "openai",
+            "profile": profile_identity("openai", f"profile-{index}"),
+            "model": "gpt-5.6-sol",
+            "completedAt": observed_at,
+            "rc": 0,
+            "useful": True,
+            "outputDigest": f"{index + 1:064x}",
+            "outputBytes": 16,
+            "tokens": {"input": 12, "output": 4, "total": 16},
+        }
+        for index in range(target)
+    ]
+    signals["concurrencyEvidence"] = {
+        "schema": "gem-concurrency-evidence/v1",
+        "source": "execution-proven-useful-turns",
+        "target": target,
+        "approved": True,
+        "severeIncidents": 0,
+        "observedAt": observed_at,
+        "rows": rows,
+        "providers": {
+            "openai": {
+                "enrolled": target,
+                "enrolledProfiles": provider_profiles(target),
+                "ready": target,
+                "enrollmentSource": "credential-file-presence-only",
+                "readinessSource": "execution-proven-useful-turns",
+            }
+        },
+    }
+    return GATE_MODULE.evaluate(signals, observed_at)
 
 
 class JovieOwnershipTests(unittest.TestCase):
@@ -89,9 +155,7 @@ class JovieOwnershipTests(unittest.TestCase):
         self.assertFalse(MODULE.repo_drain_enabled("other/repo", False))
         self.assertTrue(MODULE.repo_drain_enabled("other/repo", True))
 
-    def test_stale_capacity_receipt_runs_remote_drain_at_the_runtime_floor(self):
-        """symphony-concurrency-autoscale-v1: missing/stale capacity evidence
-        never zeroes the drain. One seat stays open for remote remediation."""
+    def test_stale_capacity_receipt_closes_remote_drain(self):
         receipt = stale_capacity_receipt()
         first = self._open_pr(
             1, mergeable_state="behind", created_at="2026-08-28T20:00:00Z"
@@ -120,45 +184,41 @@ class JovieOwnershipTests(unittest.TestCase):
 
         document = json.loads(stdout.getvalue())
         self.assertEqual(exit_code, 0, document)
-        self.assertEqual(document["capacity"], 1)
-        self.assertEqual(len(document["selected"]), 1)
-        self.assertNotEqual(document.get("remediation_admission"), "local_only")
-        # New leases here are governed by lane capacity (no laneCapacity in this
-        # fixture), not by capacity evidence; remediation itself stays live.
-        self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
-        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 1)
+        self.assertEqual(document["capacity"], 0)
+        self.assertEqual(document["selected"], [])
+        self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
         update_one.assert_not_called()
         remote.assert_not_called()
 
-    def test_floor_capacity_contract_rejects_zero_or_mismatched_mutation(self):
+    def test_unproven_capacity_contract_rejects_mutation_claims(self):
         receipt = stale_capacity_receipt()
-        validated = MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
-        self.assertEqual(MODULE.effective_capacity(8, validated), 1)
+        validated = MODULE.validate_gate_result(2, json.dumps(receipt), "remediation")
+        self.assertEqual(MODULE.effective_capacity(8, validated), 0)
         self.assertEqual(validated["concurrency"]["gem"]["runtimeFloor"], 1)
         for field, value, expected in (
-            ("pushAllowed", False, "remote remediation must follow non-RED fleet state"),
-            ("maxConcurrent", 0, "capacity must never zero a non-RED factory"),
+            (
+                "pushAllowed",
+                True,
+                "remote remediation requires non-RED state and execution-proven capacity",
+            ),
             ("maxConcurrent", 2, "remediation concurrency contradicts Gem concurrency"),
         ):
             with self.subTest(field=field, value=value):
                 broken = json.loads(json.dumps(receipt))
                 broken["remediationAdmission"][field] = value
                 if field == "pushAllowed":
-                    broken["remediationAdmission"]["activities"] = [
-                        activity
-                        for activity in broken["remediationAdmission"]["activities"]
-                        if activity != "expected-head-pr-update"
-                    ]
-                if field == "maxConcurrent" and value == 0:
-                    broken["concurrency"]["gem"]["maxConcurrent"] = 0
+                    broken["remediationAdmission"]["activities"].append(
+                        "expected-head-pr-update"
+                    )
                 with self.assertRaisesRegex(RuntimeError, expected):
-                    MODULE.validate_gate_result(0, json.dumps(broken), "remediation")
+                    MODULE.validate_gate_result(2, json.dumps(broken), "remediation")
 
-    def test_failed_gate_receipt_is_valid_local_only_capacity_remediation(self):
+    def test_failed_gate_receipt_is_valid_but_denies_remediation_dispatch(self):
         receipt = GATE_MODULE.failed_evaluation_receipt(ValueError("capacity unavailable"))
-        validated = MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
+        validated = MODULE.validate_gate_result(2, json.dumps(receipt), "remediation")
         self.assertEqual(validated["state"], "RED")
-        self.assertEqual(validated["remediationAdmission"]["maxConcurrent"], 1)
+        self.assertEqual(validated["remediationAdmission"]["maxConcurrent"], 0)
         self.assertEqual(MODULE.effective_capacity(8, validated), 0)
 
     def test_typed_remediation_capacity_caps_host_parallelism(self):
@@ -177,8 +237,8 @@ class JovieOwnershipTests(unittest.TestCase):
                     },
                 )
 
-    def test_floor_capacity_authenticates_exactly_one_remote_writer(self):
-        receipt = stale_capacity_receipt()
+    def test_execution_proven_capacity_authenticates_exactly_one_remote_writer(self):
+        receipt = valid_capacity_receipt(1)
         first = self._open_pr(
             1, mergeable_state="behind", created_at="2026-08-28T20:00:00Z"
         )
@@ -235,7 +295,7 @@ class JovieOwnershipTests(unittest.TestCase):
         self.assertEqual(MODULE.effective_capacity(8, gate), 0)
 
     def test_floor_receipt_rejects_push_disabled_outside_red(self):
-        receipt = stale_capacity_receipt()
+        receipt = valid_capacity_receipt(1)
         receipt["remediationAdmission"]["pushAllowed"] = False
         receipt["remediationAdmission"]["activities"] = [
             activity
@@ -245,12 +305,12 @@ class JovieOwnershipTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             RuntimeError,
-            "remote remediation must follow non-RED fleet state",
+            "remote remediation requires non-RED state and execution-proven capacity",
         ):
             MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
 
     def test_floor_receipt_rejects_remediation_above_gem_concurrency(self):
-        receipt = stale_capacity_receipt()
+        receipt = valid_capacity_receipt(1)
         receipt["remediationAdmission"]["maxConcurrent"] = 2
 
         with self.assertRaisesRegex(
@@ -260,7 +320,7 @@ class JovieOwnershipTests(unittest.TestCase):
             MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
 
     def test_null_capacity_evidence_fails_closed_with_typed_contract_error(self):
-        receipt = stale_capacity_receipt()
+        receipt = valid_capacity_receipt(1)
         receipt["signals"]["concurrencyEvidence"] = None
 
         with self.assertRaisesRegex(
@@ -293,7 +353,11 @@ class JovieOwnershipTests(unittest.TestCase):
     def test_exact_head_lease_allows_only_one_cross_process_writer(self):
         pr = {
             "number": 42,
-            "head": {"ref": "codex/fix", "sha": "a" * 40},
+            "head": {
+                "ref": "codex/fix",
+                "sha": "a" * 40,
+                "repo": {"full_name": "JovieInc/Jovie", "fork": False},
+            },
         }
         with tempfile.TemporaryDirectory() as tmp, mock.patch.object(
             MODULE, "STATE", pathlib.Path(tmp)
@@ -323,7 +387,14 @@ class JovieOwnershipTests(unittest.TestCase):
     def test_fleet_hold_does_not_block_exact_head_branch_refresh(self):
         pr = {
             "number": 42,
-            "head": {"ref": "codex/fix", "sha": "a" * 40},
+            "head": {
+                "ref": "codex/fix",
+                "sha": "a" * 40,
+                "repo": {"full_name": "JovieInc/Jovie", "fork": False},
+            },
+            "base": {"ref": "main"},
+            "draft": False,
+            "labels": [],
             "mergeable_state": "behind",
             "priority_class": "existing_pr_remediation",
         }
@@ -336,6 +407,7 @@ class JovieOwnershipTests(unittest.TestCase):
             with (
                 mock.patch.object(MODULE, "STATE", pathlib.Path(tmp)),
                 mock.patch.object(MODULE, "evaluate_remediation_gate", return_value=gate),
+                mock.patch.object(MODULE, "gh_json", return_value=pr),
                 mock.patch.object(MODULE, "run", return_value='{"message":"Updating pull request branch"}') as run,
             ):
                 MODULE.WORK_GATE_CACHE.update(checked_at=0.0, blocker="fleet_gate_not_checked")
@@ -348,7 +420,11 @@ class JovieOwnershipTests(unittest.TestCase):
     def test_red_gate_keeps_local_diagnosis_but_blocks_remote_refresh(self):
         pr = {
             "number": 42,
-            "head": {"ref": "codex/fix", "sha": "a" * 40},
+            "head": {
+                "ref": "codex/fix",
+                "sha": "a" * 40,
+                "repo": {"full_name": "JovieInc/Jovie", "fork": False},
+            },
             "mergeable_state": "behind",
             "priority_class": "existing_pr_remediation",
         }
@@ -380,7 +456,12 @@ class JovieOwnershipTests(unittest.TestCase):
             "labels": [],
             "mergeable_state": mergeable_state,
             "base": {"ref": "main"},
-            "head": {"ref": f"branch-{number}", "sha": f"{number:040x}"},
+            "head": {
+                "ref": f"branch-{number}",
+                "sha": f"{number:040x}",
+                "repo": {"full_name": "JovieInc/Jovie", "fork": False},
+            },
+            "maintainer_can_modify": True,
             "changed_files": [],
         }
 
@@ -418,16 +499,16 @@ class JovieOwnershipTests(unittest.TestCase):
         pr["head"]["ref"] = "grok/JOV-4894-fix"
         with (
             mock.patch.object(MODULE, "work_mutation_blocker", return_value=None),
-            mock.patch.object(MODULE, "run", side_effect=[pr["head"]["sha"], ""]) as run,
+            mock.patch.object(MODULE, "gh_json", return_value=pr),
+            mock.patch.object(MODULE, "run", return_value="") as run,
         ):
             with tempfile.TemporaryDirectory() as tmp, mock.patch.object(
                 MODULE, "STATE", pathlib.Path(tmp)
             ):
                 result = MODULE.ready_autonomous_draft(pr)
         self.assertEqual(result["result"], "ok")
-        self.assertEqual(run.call_args_list[0].args[:3], ("gh", "api", "repos/JovieInc/Jovie/pulls/16211"))
-        self.assertEqual(run.call_args_list[1].args[:3], ("gh", "pr", "ready"))
-        self.assertEqual(run.call_args_list[1].args[3], "16211")
+        self.assertEqual(run.call_args.args[:3], ("gh", "pr", "ready"))
+        self.assertEqual(run.call_args.args[3], "16211")
 
     def test_ready_autonomous_draft_rechecks_gate_and_exact_head_before_mutation(self):
         pr = self._open_pr(16211, mergeable_state="unstable", created_at="2026-08-19T18:59:08Z")
@@ -451,12 +532,63 @@ class JovieOwnershipTests(unittest.TestCase):
 
             with (
                 mock.patch.object(MODULE, "work_mutation_blocker", return_value=None),
-                mock.patch.object(MODULE, "run", return_value="b" * 40) as run,
+                mock.patch.object(
+                    MODULE,
+                    "gh_json",
+                    return_value={
+                        **pr,
+                        "head": {**pr["head"], "sha": "b" * 40},
+                    },
+                ),
+                mock.patch.object(MODULE, "run") as run,
             ):
                 changed = MODULE.ready_autonomous_draft(pr)
             self.assertEqual(changed["reason"], "expected_head_changed_fail_closed")
-            self.assertEqual(run.call_count, 1)
-            self.assertEqual(run.call_args.args[:3], ("gh", "api", "repos/JovieInc/Jovie/pulls/16211"))
+            run.assert_not_called()
+
+    def test_ready_draft_rechecks_protected_labels_under_lease(self):
+        pr = self._open_pr(
+            16212,
+            mergeable_state="clean",
+            created_at="2026-08-19T19:00:00Z",
+        )
+        pr["draft"] = True
+        pr["head"]["ref"] = "symphony/JOV-9998-fix"
+        current = json.loads(json.dumps(pr))
+        current["labels"] = [{"name": "human-review-required"}]
+        with tempfile.TemporaryDirectory() as tmp:
+            with (
+                mock.patch.object(MODULE, "STATE", pathlib.Path(tmp)),
+                mock.patch.object(
+                    MODULE, "work_mutation_blocker", return_value=None
+                ),
+                mock.patch.object(MODULE, "gh_json", return_value=current),
+                mock.patch.object(MODULE, "run") as run,
+            ):
+                result = MODULE.ready_autonomous_draft(pr)
+        self.assertEqual(result["reason"], "protected_human")
+        run.assert_not_called()
+
+    def test_update_branch_rechecks_protected_labels_under_lease(self):
+        pr = self._open_pr(
+            16213,
+            mergeable_state="behind",
+            created_at="2026-08-19T19:01:00Z",
+        )
+        current = json.loads(json.dumps(pr))
+        current["labels"] = [{"name": "hold"}]
+        with tempfile.TemporaryDirectory() as tmp:
+            with (
+                mock.patch.object(MODULE, "STATE", pathlib.Path(tmp)),
+                mock.patch.object(
+                    MODULE, "work_mutation_blocker", return_value=None
+                ),
+                mock.patch.object(MODULE, "gh_json", return_value=current),
+                mock.patch.object(MODULE, "run") as run,
+            ):
+                result = MODULE.update_one(pr)
+        self.assertEqual(result["reason"], "protected_human")
+        run.assert_not_called()
 
     def test_ready_autonomous_draft_ignores_unrelated_drafts(self):
         pr = self._open_pr(1, mergeable_state="clean", created_at="2026-08-19T18:00:00Z")
@@ -479,6 +611,107 @@ class JovieOwnershipTests(unittest.TestCase):
         with mock.patch.object(MODULE, "run") as run:
             self.assertEqual(MODULE.ready_autonomous_draft(big)["reason"], "too_large_for_queue")
             self.assertEqual(MODULE.ready_autonomous_draft(dirty)["reason"], "conflicting")
+        run.assert_not_called()
+
+    def test_protected_and_external_prs_are_observe_only(self):
+        for label in (
+            "hold",
+            "no-auto",
+            "human-review-required",
+            "needs-human",
+            "needs:human",
+            "blocked",
+            "no-symphony",
+        ):
+            with self.subTest(label=label):
+                pr = self._open_pr(
+                    17000,
+                    mergeable_state="behind",
+                    created_at="2026-09-04T12:00:00Z",
+                )
+                pr["labels"] = [{"name": label}]
+                self.assertEqual(MODULE.mutation_disposition(pr), "protected_human")
+                with mock.patch.object(MODULE, "run") as run:
+                    result = MODULE.update_one(pr)
+                self.assertEqual(result["reason"], "protected_human")
+                run.assert_not_called()
+
+        external = self._open_pr(
+            17001,
+            mergeable_state="behind",
+            created_at="2026-09-04T12:01:00Z",
+        )
+        external["head"]["repo"] = {"full_name": "outside/contributor", "fork": True}
+        self.assertEqual(MODULE.mutation_disposition(external), "protected_external")
+        with mock.patch.object(MODULE, "run") as run:
+            result = MODULE.update_one(external)
+        self.assertEqual(result["reason"], "protected_external")
+        run.assert_not_called()
+
+    def test_ready_and_update_recheck_each_human_stop_label_under_lease(self):
+        for label in ("needs-human", "needs:human", "blocked"):
+            with self.subTest(label=label):
+                ready = self._open_pr(
+                    17002,
+                    mergeable_state="clean",
+                    created_at="2026-09-04T12:02:00Z",
+                )
+                ready["draft"] = True
+                ready["head"]["ref"] = "symphony/JOV-17002-fix"
+                update = self._open_pr(
+                    17003,
+                    mergeable_state="behind",
+                    created_at="2026-09-04T12:03:00Z",
+                )
+                for original, operation in (
+                    (ready, MODULE.ready_autonomous_draft),
+                    (update, MODULE.update_one),
+                ):
+                    current = json.loads(json.dumps(original))
+                    current["labels"] = [{"name": label}]
+                    with tempfile.TemporaryDirectory() as tmp:
+                        with (
+                            mock.patch.object(MODULE, "STATE", pathlib.Path(tmp)),
+                            mock.patch.object(
+                                MODULE, "work_mutation_blocker", return_value=None
+                            ),
+                            mock.patch.object(MODULE, "gh_json", return_value=current),
+                            mock.patch.object(MODULE, "run") as run,
+                        ):
+                            result = operation(original)
+                    self.assertEqual(result["reason"], "protected_human")
+                    run.assert_not_called()
+
+    def test_ready_draft_protection_and_total_mutation_budget(self):
+        drafts = []
+        for number in range(17010, 17015):
+            pr = self._open_pr(
+                number,
+                mergeable_state="clean",
+                created_at=f"2026-09-04T12:{number - 17010:02d}:00Z",
+            )
+            pr["draft"] = True
+            pr["head"]["ref"] = f"symphony/JOV-{number}-fix"
+            drafts.append(pr)
+        drafts[0]["labels"] = [{"name": "hold"}]
+        selected = MODULE.select_ready_drafts(
+            drafts, worker_capacity=3, selected_count=1
+        )
+        self.assertEqual([pr["number"] for pr in selected], [17011, 17012])
+
+        fork = drafts[1]
+        fork["head"]["repo"] = {"full_name": "itstimwhite/Jovie", "fork": True}
+        fork["maintainer_can_modify"] = False
+        with mock.patch.object(MODULE, "run") as run:
+            result = MODULE.ready_autonomous_draft(fork)
+        self.assertEqual(result["reason"], "protected_external")
+        run.assert_not_called()
+
+        already_ready = drafts[2]
+        already_ready["draft"] = False
+        with mock.patch.object(MODULE, "run") as run:
+            result = MODULE.ready_autonomous_draft(already_ready)
+        self.assertEqual(result["reason"], "not_autonomous_draft")
         run.assert_not_called()
 
 

@@ -59,11 +59,11 @@ hooks:
     git config push.negotiate true
 agent:
   # Safe cold-start baseline. The event-driven JOV-5123 controller renders this
-  # scalar within 1..8 from Linux pressure, provider capacity, integrity, and
+  # scalar within 1..40 from Linux pressure, provider capacity, integrity, and
   # live runtime evidence. Leases remain authoritative, so concurrency never
   # duplicates ownership of an issue or workspace. Gem verification shard
   # concurrency is a separate control and remains 4.
-  max_concurrent_agents: 4
+  max_concurrent_agents: 1
   max_turns: 24
 codex:
   # The admission controller writes a semantically verified symphony-routing/v1
@@ -110,14 +110,14 @@ The spawned app-server must use the receipt-selected model; no fixed model
 default is permitted. The receipt is durable in the Linear workpad and is
 included in the PR/scoreboard evidence.
 
-The versioned Gem controller writes `/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json` with schema `jovie-fleet-gate/v1`. Read it before moving a Todo issue to In Progress, before push, and before removing a typed PR hold. State color alone is not mutation authority: new leases, new implementation, and remote branch updates also require the matching typed admission field. Concurrency autoscales from live seats (`concurrency.gem.maxConcurrent`, lock symphony-concurrency-autoscale-v1); it is never clamped and never zero outside `RED`.
+The versioned Gem controller writes `/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json` with schema `jovie-fleet-gate/v1`. Read it before moving a Todo issue to In Progress, before push, and before removing a typed PR hold. State color alone is not mutation authority: new leases, new implementation, and remote branch updates also require the matching typed admission field. Concurrency is bounded by distinct provider/profile subscriptions with fresh successful useful-turn receipts, the live account lease, host pressure, and the policy ceiling of 40 (`concurrency.gem.maxConcurrent`, lock `symphony-execution-proven-capacity-v1`).
 
 - `GREEN`: pickup, isolated implementation, tests, review, ready-but-held PR, merge queue, deploy, and promotion may proceed through their normal independent gates only when the corresponding typed admission is allowed.
 - `AMBER`: do not claim a new issue unless `workAdmission.newIssueLeaseAllowed=true`. An already-owned workspace may continue only the activities listed by `workAdmission`; branch push and ready-but-held PR creation require `remediationAdmission.pushAllowed=true`. The PR must carry `queue-deferred`. Production-red/main-green may permit one existing UI/docs PR to have that hold removed only when the canonical exact-head semantic classifier returns an allowed receipt; the native queue controller revalidates it. Deployment and production promotion remain frozen. Every other AMBER reason stays held.
 - `RED`: a severe security/integrity incident is active. Do not pick up new work, change or push the branch, mark ready, merge, deploy, or promote. Record the typed gate reasons in `BLOCKER.md` and stop.
 - Missing, malformed, or more-than-10-minute-old controller state is `AMBER`, unless it contains an explicit active severe integrity reason, which remains `RED`. This prevents stale controller state from stranding a safe existing lease while still failing closed at the promotion layer.
 
-Missing, malformed, or stale capacity evidence never zeroes the factory: `concurrency.gem.maxConcurrent` degrades to the runtime floor (`runtimeFloor=1`, one seat) and `remediationAdmission.pushAllowed` stays true outside `RED`. Accepted live-seat evidence (Codex + Grok + Kimi seats from the autoscale writer) sets the seat count as-is, with no upper clamp and no clean-run ratchet.
+Missing, malformed, stale, future, duplicate, or over-limit useful-turn proof—or an unavailable live account lease—sets `concurrency.gem.maxConcurrent=0`, `workAdmission.allowed=false`, and `remediationAdmission.pushAllowed=false`. The configured workflow value of one is cold-start safety only and never capacity proof. Preserve already queued work, but do not begin or remotely mutate another lane until fresh execution proof and lease capacity reopen the typed admission.
 
 Gem owns the controller and queue observation. Symphony is the only implementation owner. Never start a second implementation because a Gem direct-ship loop exists.
 

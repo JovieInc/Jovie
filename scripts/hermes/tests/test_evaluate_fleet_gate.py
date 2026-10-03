@@ -8,12 +8,19 @@ import json
 import os
 import pathlib
 import subprocess
+import sys
 import tempfile
 import unittest
 from datetime import datetime, timezone
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
+HERMES_DIR = str(ROOT / "scripts/hermes")
+if HERMES_DIR not in sys.path:
+    sys.path.insert(0, HERMES_DIR)
+
+from provider_useful_turns import profile_identity  # noqa: E402
+
 SCRIPT = ROOT / "scripts/hermes/evaluate-fleet-gate.sh"
 GATE = ROOT / "scripts/hermes/gem-priority-gate.py"
 SHA = "a3eeefdd4dc681d1c9b5b4385720d661f5129137"
@@ -21,6 +28,49 @@ SHA = "a3eeefdd4dc681d1c9b5b4385720d661f5129137"
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def provider_profiles(count: int) -> list[str]:
+    return sorted(
+        profile_identity("openai", f"profile-{index}") for index in range(count)
+    )
+
+
+def capacity_evidence(target: int = 4) -> dict[str, object]:
+    observed = now_iso()
+    rows = [
+        {
+            "schema": "gem-provider-useful-turn/v1",
+            "provider": "openai",
+            "profile": profile_identity("openai", f"profile-{index}"),
+            "model": "gpt-5.6-sol",
+            "completedAt": observed,
+            "rc": 0,
+            "useful": True,
+            "outputDigest": f"{index + 1:064x}",
+            "outputBytes": 16,
+            "tokens": {"input": 12, "output": 4, "total": 16},
+        }
+        for index in range(target)
+    ]
+    return {
+        "schema": "gem-concurrency-evidence/v1",
+        "source": "execution-proven-useful-turns",
+        "target": target,
+        "approved": True,
+        "severeIncidents": 0,
+        "observedAt": observed,
+        "rows": rows,
+        "providers": {
+            "openai": {
+                "enrolled": target,
+                "enrolledProfiles": sorted(row["profile"] for row in rows),
+                "ready": target,
+                "enrollmentSource": "credential-file-presence-only",
+                "readinessSource": "execution-proven-useful-turns",
+            }
+        },
+    }
 
 
 def signals(**overrides):
@@ -66,14 +116,21 @@ def signals(**overrides):
             "reasons": [],
         },
         "independentReview": review,
-        "concurrencyEvidence": {
-            "schema": "gem-concurrency-evidence/v1",
-            "target": 4,
-            "approved": True,
-            "cleanRuns": 1,
-            "severeIncidents": 0,
-            "observedAt": now_iso(),
-            "accepted": True,
+        "concurrencyEvidence": capacity_evidence(),
+        "lease": {
+            "status": "ok",
+            "capacity": {
+                "provider": "openai",
+                "state": "available",
+                "accounts": 4,
+                "locked": 0,
+                "cooldown": 0,
+                "available": 4,
+                "lockedProfiles": [],
+                "cooldownProfiles": [],
+                "availableProfiles": provider_profiles(4),
+                "eligibleProfiles": provider_profiles(4),
+            },
         },
     }
     payload.update(overrides)

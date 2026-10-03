@@ -78,7 +78,9 @@ describe('Summer commissioning affected-test lane', () => {
 });
 
 const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
+  '.github/workflows/gem-delivery-controller-activation.yml',
   '.husky/pre-push',
+  'canon/invariants.jsonl',
   'scripts/automation-verify.sh',
   'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
   'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
@@ -87,15 +89,45 @@ const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
   'scripts/backlog-orchestrator/backlog-orchestrator.mjs',
   'scripts/backlog-orchestrator/deterministic-gates.mjs',
   'scripts/backlog-orchestrator/gate-next-hold.mjs',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/drain-pr-queue.sh',
+  'scripts/hermes/WORKFLOW.jovie-ui-pilot.md',
   'scripts/hermes/codex-rotate',
   'scripts/hermes/codex-account-probe.sh',
+  'scripts/hermes/fleet_admission_receipt.py',
+  'scripts/hermes/gem-concurrency-evidence.py',
+  'scripts/hermes/gem-pr-drain.py',
+  'scripts/hermes/gem-priority-gate.py',
+  'scripts/hermes/gem_gate_contract.py',
+  'scripts/hermes/install-gem-fleet-controller.sh',
+  'scripts/hermes/install-symphony-ui-pilot.sh',
+  'scripts/hermes/provider-capacity-bootstrap.py',
+  'scripts/hermes/provider_useful_turns.py',
+  'scripts/hermes/symphony-concurrency-controller.py',
   'scripts/hermes/symphony-lease-guard',
+  'scripts/hermes/symphony-reconciler.py',
+  'scripts/hermes/symphony/WORKFLOW.md',
+  'scripts/hermes/symphony_official_runtime.py',
+  'scripts/hermes/systemd/symphony-concurrency-controller.service',
+  'scripts/hermes/update-symphony-burrito.sh',
   'scripts/hermes/tests/codex-account-probe.test.py',
   'scripts/hermes/tests/codex-rotate.test.py',
+  'scripts/hermes/tests/gem-pr-drain.test.py',
+  'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
+  'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/provider-capacity-bootstrap.test.py',
+  'scripts/hermes/tests/provider-useful-turns.test.py',
+  'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+  'scripts/hermes/tests/symphony-concurrency-controller.test.py',
   'scripts/hermes/tests/symphony-lease-guard.test.py',
+  'scripts/hermes/tests/symphony-reconciler.test.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+  'scripts/hermes/tests/test_fleet_admission_receipt.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
   'scripts/run-affected-tests.mjs',
+  'scripts/tests/test_symphony_ui_pilot_runtime.py',
+  'scripts/tests/test_openai_symphony_install.py',
 ];
 const CI_UI_DRIFT_GUARDRAIL_INPUTS = [
   '.github/workflows/ci.yml',
@@ -793,10 +825,22 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/pre-push-gate.test.mjs',
       ],
       pythonUnittestTests: [
+        'scripts/tests/test_openai_symphony_install.py',
         'scripts/hermes/tests/codex-account-probe.test.py',
         'scripts/hermes/tests/codex-rotate.test.py',
+        'scripts/hermes/tests/gem-pr-drain.test.py',
+        'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
+        'scripts/hermes/tests/gem-priority-gate.test.py',
+        'scripts/hermes/tests/provider-capacity-bootstrap.test.py',
+        'scripts/hermes/tests/provider-useful-turns.test.py',
+        'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+        'scripts/hermes/tests/symphony-concurrency-controller.test.py',
         'scripts/hermes/tests/symphony-lease-guard.test.py',
+        'scripts/hermes/tests/symphony-reconciler.test.py',
+        'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+        'scripts/hermes/tests/test_fleet_admission_receipt.py',
       ],
+      pythonTests: ['scripts/tests/test_symphony_ui_pilot_runtime.py'],
     });
     expect(
       buildAffectedTestPlan([
@@ -804,6 +848,23 @@ describe('automation-verify affected scope', () => {
         'scripts/backlog-orchestrator/unknown.mjs',
       ]).mode
     ).toBe('full');
+  });
+
+  it.each([
+    'scripts/hermes/provider_useful_turns.py',
+    'scripts/hermes/provider-capacity-bootstrap.py',
+    'scripts/hermes/gem-concurrency-evidence.py',
+    'scripts/hermes/symphony-concurrency-controller.py',
+  ])('selects throughput tests for a single capacity input %s', input => {
+    const plan = buildAffectedTestPlan([input]);
+    expect(plan.mode).toBe('selected');
+    expect(plan.pythonUnittestTests).toEqual(
+      expect.arrayContaining([
+        'scripts/hermes/tests/provider-useful-turns.test.py',
+        'scripts/hermes/tests/provider-capacity-bootstrap.test.py',
+        'scripts/hermes/tests/symphony-concurrency-controller.test.py',
+      ])
+    );
   });
 
   it('selects the official Symphony backlog remediation lane', () => {

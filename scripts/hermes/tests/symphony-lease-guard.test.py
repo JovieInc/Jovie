@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import contextlib
 import fcntl
+import hashlib
 import importlib.util
 from importlib.machinery import SourceFileLoader
 import io
@@ -25,6 +26,12 @@ if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"could not load {GUARD}")
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
+
+
+def profile_token(name: str) -> str:
+    return hashlib.sha256(
+        b"symphony-provider-profile/v1\0openai\0" + name.encode("utf-8")
+    ).hexdigest()
 
 ACTIVE = frozenset(("todo", "in progress"))
 JOVIE_TOMBSTONE = "JovieInc/Jovie:JOV-5029"
@@ -327,6 +334,7 @@ class CapacityStateTests(unittest.TestCase):
         self.assertEqual(capacity["state"], "available")
         self.assertEqual(capacity["accounts"], 1)
         self.assertEqual(capacity["available"], 1)
+        self.assertEqual(capacity["eligibleProfiles"], [profile_token("account-a")])
 
     def test_cooldown_and_lock_saturate(self):
         self.add_account("account-a")
@@ -342,6 +350,9 @@ class CapacityStateTests(unittest.TestCase):
         self.assertEqual(capacity["locked"], 1)
         self.assertEqual(capacity["cooldown"], 1)
         self.assertEqual(capacity["available"], 0)
+        self.assertEqual(capacity["lockedProfiles"], [profile_token("account-b")])
+        self.assertEqual(capacity["cooldownProfiles"], [profile_token("account-a")])
+        self.assertEqual(capacity["eligibleProfiles"], [profile_token("account-b")])
 
     def test_missing_state_file_is_unknown(self):
         self.add_account("account-a")
@@ -349,7 +360,45 @@ class CapacityStateTests(unittest.TestCase):
         self.assertEqual(capacity["state"], "unknown")
         self.assertEqual(capacity["reason"], "account_state_unreadable")
 
-    def test_fresh_authenticated_readiness_recovers_only_that_cooldown(self):
+    def test_missing_or_malformed_cooldown_state_fails_closed(self):
+        self.add_account("account-a")
+        for state in (
+            {"active": None, "readiness": {}, "last_error": {}},
+            {
+                "active": None,
+                "cooldowns": {"account-a": "not-an-epoch"},
+                "readiness": {},
+                "last_error": {},
+            },
+        ):
+            with self.subTest(state=state):
+                (self.accounts / "state.json").write_text(
+                    json.dumps(state), encoding="utf-8"
+                )
+                capacity = MODULE.capacity_state()
+                self.assertEqual(
+                    capacity,
+                    {"state": "unknown", "reason": "account_cooldowns_invalid"},
+                )
+
+    def test_unreadable_account_lock_fails_closed_without_eligible_profiles(self):
+        self.add_account("account-a")
+        self.write_state({})
+        locks = self.accounts / "locks"
+        locks.mkdir()
+        (locks / "account-a.lock").write_text("", encoding="utf-8")
+
+        with mock.patch.object(MODULE.os, "open", side_effect=PermissionError):
+            capacity = MODULE.capacity_state()
+
+        self.assertEqual(
+            capacity,
+            {"state": "unknown", "reason": "account_lock_unreadable"},
+        )
+        self.assertNotIn("availableProfiles", capacity)
+        self.assertNotIn("eligibleProfiles", capacity)
+
+    def test_older_authenticated_readiness_cannot_override_newer_cooldown(self):
         self.add_account("account-a")
         self.add_account("account-b")
         now = int(time.time())
@@ -364,9 +413,10 @@ class CapacityStateTests(unittest.TestCase):
             },
         )
         capacity = MODULE.capacity_state()
-        self.assertEqual(capacity["available"], 1)
-        self.assertEqual(capacity["cooldown"], 1)
-        self.assertEqual(capacity["freshReadiness"], 1)
+        self.assertEqual(capacity["available"], 0)
+        self.assertEqual(capacity["cooldown"], 2)
+        self.assertEqual(capacity["freshReadiness"], 0)
+        self.assertEqual(capacity["eligibleProfiles"], [])
 
     def test_untrusted_readiness_cannot_clear_cooldown(self):
         self.add_account("account-a")

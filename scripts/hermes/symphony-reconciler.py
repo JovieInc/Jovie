@@ -70,7 +70,12 @@ FLEET_GATE_RECEIPT_MAX_AGE = dt.timedelta(minutes=10)
 def _stale_capacity_local_remediation_limit(
     receipt_path: pathlib.Path | None = None,
 ) -> tuple[int, str]:
-    """Admit only the fail-closed, local-only stale-capacity recovery lane."""
+    """Retire the legacy alternate lane when capacity is not execution-proven.
+
+    The canonical fleet gate owns all remediation admission. This reconciler
+    must never recreate the superseded one-seat fallback from an unaccepted
+    receipt, even for a local-only repair.
+    """
     path = receipt_path or pathlib.Path(
         os.path.expanduser(
             os.environ.get("GEM_FLEET_GATE_RECEIPT", DEFAULT_FLEET_GATE_RECEIPT)
@@ -82,49 +87,7 @@ def _stale_capacity_local_remediation_limit(
         return 0, "fleet_gate_unavailable"
     if not isinstance(receipt, dict):
         return 0, "fleet_gate_local_remediation_not_admitted"
-    remediation = receipt.get("remediationAdmission") or {}
-    work = receipt.get("workAdmission") or {}
-    concurrency = receipt.get("concurrency") or {}
-    signals = receipt.get("signals") or {}
-    if not all(
-        isinstance(value, dict)
-        for value in (remediation, work, concurrency, signals)
-    ):
-        return 0, "fleet_gate_local_remediation_not_admitted"
-    gem = concurrency.get("gem") or {}
-    evidence = signals.get("concurrencyEvidence") or {}
-    if not isinstance(gem, dict) or not isinstance(evidence, dict):
-        return 0, "fleet_gate_local_remediation_not_admitted"
-    observed_at = _parse_time(receipt.get("observedAt"))
-    try:
-        age = _now() - observed_at if observed_at is not None else None
-    except TypeError:
-        age = None
-    # symphony-concurrency-autoscale-v1: a receipt without accepted capacity
-    # evidence runs at the runtime floor (one seat) instead of zero. The local
-    # alternate-repair lane stays bounded to one attempt regardless of how
-    # many seats the floor or live evidence grants.
-    safe_floor_lane = (
-        receipt.get("schema") == "jovie-fleet-gate/v1"
-        and receipt.get("state") in {"GREEN", "AMBER"}
-        and remediation.get("allowed") is True
-        and remediation.get("localAllowed") is True
-        and work.get("allowed") is True
-        and isinstance(remediation.get("maxConcurrent"), int)
-        and not isinstance(remediation.get("maxConcurrent"), bool)
-        and remediation.get("maxConcurrent") >= LOCAL_REPAIR_MAX_ATTEMPTS
-        and gem.get("runtimeFloor") == 1
-        and evidence.get("accepted") is False
-        and gem.get("evidenceAccepted") is False
-        and isinstance(gem.get("maxConcurrent"), int)
-        and not isinstance(gem.get("maxConcurrent"), bool)
-        and gem.get("maxConcurrent") >= 1
-        and age is not None
-        and dt.timedelta(0) <= age <= FLEET_GATE_RECEIPT_MAX_AGE
-    )
-    if not safe_floor_lane:
-        return 0, "fleet_gate_local_remediation_not_admitted"
-    return LOCAL_REPAIR_MAX_ATTEMPTS, "fleet_gate_stale_capacity_local_only"
+    return 0, "fleet_gate_capacity_unproven"
 
 
 def _acquire_local_remediation_lease():
@@ -944,14 +907,15 @@ def _workspace_dirty_content_digest(
     untracked = _git_bytes(workspace, "ls-files", "--others", "--exclude-standard", "-z")
     if untracked is None:
         return None
-    root = workspace.resolve()
+    root = workspace.absolute()
     for raw_path in sorted(value for value in untracked.split(b"\0") if value):
         relative = pathlib.Path(os.fsdecode(raw_path))
+        if relative.is_absolute() or ".." in relative.parts:
+            return None
         try:
             target = root / relative
-            target.resolve().relative_to(root)
             stat_result = target.lstat()
-        except (OSError, ValueError):
+        except OSError:
             return None
         digest.update(b"untracked\0")
         digest.update(raw_path)
@@ -965,10 +929,12 @@ def _workspace_dirty_content_digest(
                 return None
         elif target.is_file():
             try:
+                resolved_root = workspace.resolve(strict=True)
+                target.resolve(strict=True).relative_to(resolved_root)
                 with target.open("rb") as handle:
                     for chunk in iter(lambda: handle.read(1024 * 1024), b""):
                         digest.update(chunk)
-            except OSError:
+            except (OSError, RuntimeError, ValueError):
                 return None
         else:
             digest.update(b"non-file")

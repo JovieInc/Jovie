@@ -22,6 +22,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -37,7 +38,8 @@ TEAM_KEY_PATTERN = re.compile(r"^[A-Z][A-Z0-9]*$")
 OFFICIAL_WORKSPACE_ROOT = "~/symphony-elixir-workspaces"
 OFFICIAL_WORKFLOW_TARGET = "%h/.config/symphony/WORKFLOW.md"
 OFFICIAL_LOGS_ROOT = "%h/symphony-elixir-logs"
-OFFICIAL_MAX_CONCURRENT_AGENTS = 8
+OFFICIAL_BOOT_CONCURRENT_AGENTS = 1
+OFFICIAL_MAX_CONCURRENT_AGENTS = 40
 MIN_POLL_INTERVAL_MS = 30_000
 LINEAR_HOURLY_REQUEST_BUDGET = 2_500
 LINEAR_PAGE_SIZE = 50
@@ -60,6 +62,15 @@ DEFAULT_RATE_LIMIT_GATE = (
 # "healthy" is the green admission state; grace/red, a missing receipt, a stale
 # receipt, or any schema/authority/consistency violation all fail closed.
 FLEET_GATE_SCHEMA = "jovie-fleet-gate/v1"
+CAPACITY_EVIDENCE_SCHEMA = "gem-concurrency-evidence/v1"
+CAPACITY_EVIDENCE_SOURCE = "execution-proven-useful-turns"
+USEFUL_TURN_SCHEMA = "gem-provider-useful-turn/v1"
+CAPACITY_EVIDENCE_MAX_AGE_SECONDS = 24 * 60 * 60
+CAPACITY_PROFILE_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+CAPACITY_DIGEST_PATTERN = re.compile(r"^(?:sha256:)?[0-9a-f]{64}$")
+ISO_TIMESTAMP_PATTERN = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$"
+)
 CLOSURE_HEALTH_SCHEMA = "jovie-closure-health/v1"
 CLOSURE_HEALTH_AUTHORITY = "Summer"
 CLOSURE_HEALTHY_STATUS = "healthy"
@@ -68,6 +79,9 @@ CLOSURE_HOLD_SCHEMA = "symphony-closure-hold/v1"
 CLOSURE_HOLD_EXIT_CODE = 76
 DEFAULT_FLEET_GATE_RECEIPT = (
     pathlib.Path.home() / "gem-workspace/state/gem-priority-gate/latest.json"
+)
+DEFAULT_CAPACITY_EVIDENCE_RECEIPT = (
+    pathlib.Path.home() / "gem-workspace/state/concurrency.json"
 )
 DEFAULT_CLOSURE_HOLD_RECEIPT = (
     pathlib.Path.home() / ".local/state/symphony-elixir/closure-hold.json"
@@ -148,6 +162,7 @@ class BudgetInputs:
 @dataclass(frozen=True)
 class ClosureStopLine:
     receipt_path: pathlib.Path = DEFAULT_FLEET_GATE_RECEIPT
+    capacity_receipt_path: pathlib.Path | None = None
     hold_receipt_path: pathlib.Path = DEFAULT_CLOSURE_HOLD_RECEIPT
     dead_letter_dir: pathlib.Path = DEFAULT_DEAD_LETTER_DIR
     max_receipt_age_seconds: int = FLEET_GATE_RECEIPT_MAX_AGE_SECONDS
@@ -512,7 +527,7 @@ def validate_source(
             errors.append(f"poll_interval_too_low:{workflow.poll_interval_ms}")
         if workflow.workspace_root != OFFICIAL_WORKSPACE_ROOT:
             errors.append(f"workflow_workspace_root:{workflow.workspace_root}")
-        if workflow.max_concurrent_agents != OFFICIAL_MAX_CONCURRENT_AGENTS:
+        if workflow.max_concurrent_agents != OFFICIAL_BOOT_CONCURRENT_AGENTS:
             errors.append(
                 f"workflow_max_concurrent_agents:{workflow.max_concurrent_agents}"
             )
@@ -532,7 +547,9 @@ def validate_source(
                 BudgetInputs(
                     active_issues=active_issues,
                     poll_interval_ms=workflow.poll_interval_ms,
-                    max_concurrent_agents=workflow.max_concurrent_agents,
+                    # Validate Linear capacity against the controller's full
+                    # policy ceiling, not the one-seat cold-start overlay.
+                    max_concurrent_agents=OFFICIAL_MAX_CONCURRENT_AGENTS,
                 )
             )
             if not budget["withinBudget"]:
@@ -563,6 +580,8 @@ def validate_source(
             errors.append("unit_missing_rate_limit_sleep_bound")
         if "--closure-gate-file" not in unit:
             errors.append("unit_missing_closure_stop_line_gate")
+        if "--capacity-evidence-file" not in unit:
+            errors.append("unit_missing_capacity_evidence_stop_line")
         if "ExecStartPre=%h/.local/bin/symphony-official-runtime reset-gate" in unit:
             errors.append("unit_uses_tight_restart_rate_limit_gate")
         if (
@@ -847,22 +866,153 @@ def _write_json_receipt(path: pathlib.Path, payload: dict[str, Any]) -> None:
             os.unlink(tmp_name)
 
 
+def _aware_time(value: object) -> dt.datetime | None:
+    if (
+        not isinstance(value, str)
+        or ISO_TIMESTAMP_PATTERN.fullmatch(value) is None
+    ):
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(dt.timezone.utc)
+
+
+def _validate_capacity_evidence(
+    value: object, observed_at: dt.datetime
+) -> tuple[dict[str, Any] | None, str]:
+    if (
+        not isinstance(value, dict)
+        or value.get("schema") != CAPACITY_EVIDENCE_SCHEMA
+        or value.get("source") != CAPACITY_EVIDENCE_SOURCE
+    ):
+        return None, "schema-or-source"
+    rows = value.get("rows")
+    if not isinstance(rows, list):
+        return None, "rows"
+    target = value.get("target")
+    if (
+        isinstance(target, bool)
+        or not isinstance(target, int)
+        or target != len(rows)
+        or not 1 <= target <= OFFICIAL_MAX_CONCURRENT_AGENTS
+        or value.get("approved") is not True
+        or isinstance(value.get("severeIncidents"), bool)
+        or value.get("severeIncidents") != 0
+    ):
+        return None, "target-or-approval"
+    normalized: list[dict[str, Any]] = []
+    identities: set[tuple[str, str]] = set()
+    ready: dict[str, int] = {}
+    newest: dt.datetime | None = None
+    for row in rows:
+        if not isinstance(row, dict) or row.get("schema") != USEFUL_TURN_SCHEMA:
+            return None, "turn-schema"
+        provider = row.get("provider")
+        profile = row.get("profile")
+        model = row.get("model")
+        completed = _aware_time(row.get("completedAt"))
+        tokens = row.get("tokens")
+        output_bytes = row.get("outputBytes")
+        if (
+            not isinstance(provider, str)
+            or re.fullmatch(r"[a-z][a-z0-9._-]{0,63}", provider) is None
+            or not isinstance(profile, str)
+            or CAPACITY_PROFILE_PATTERN.fullmatch(profile) is None
+            or not isinstance(model, str)
+            or not model.strip()
+            or model != model.strip()
+            or completed is None
+            or completed > observed_at
+            or (observed_at - completed).total_seconds()
+            > CAPACITY_EVIDENCE_MAX_AGE_SECONDS
+            or type(row.get("rc")) is not int
+            or row.get("rc") != 0
+            or row.get("useful") is not True
+            or not isinstance(row.get("outputDigest"), str)
+            or CAPACITY_DIGEST_PATTERN.fullmatch(row["outputDigest"]) is None
+            or isinstance(output_bytes, bool)
+            or not isinstance(output_bytes, int)
+            or output_bytes <= 0
+            or not isinstance(tokens, dict)
+        ):
+            return None, "turn-shape-or-freshness"
+        token_values = [tokens.get(key) for key in ("input", "output", "total")]
+        if (
+            any(isinstance(token, bool) or not isinstance(token, int) for token in token_values)
+            or token_values[0] < 0
+            or token_values[1] <= 0
+            or token_values[2] != token_values[0] + token_values[1]
+        ):
+            return None, "turn-tokens"
+        identity = (provider, profile)
+        if identity in identities:
+            return None, "duplicate-seat"
+        identities.add(identity)
+        ready[provider] = ready.get(provider, 0) + 1
+        newest = completed if newest is None or completed > newest else newest
+        normalized.append(row)
+    evidence_observed = _aware_time(value.get("observedAt"))
+    if newest is None or evidence_observed != newest:
+        return None, "observed-at"
+    providers = value.get("providers")
+    if not isinstance(providers, dict):
+        return None, "providers"
+    if not set(ready).issubset(providers):
+        return None, "provider-enrollment"
+    for provider, record in providers.items():
+        profiles = record.get("enrolledProfiles") if isinstance(record, dict) else None
+        enrolled = record.get("enrolled") if isinstance(record, dict) else None
+        provider_ready = record.get("ready") if isinstance(record, dict) else None
+        if (
+            not isinstance(provider, str)
+            or re.fullmatch(r"[a-z][a-z0-9._-]{0,63}", provider) is None
+            or not isinstance(record, dict)
+            or not isinstance(profiles, list)
+            or any(
+                not isinstance(profile, str)
+                or CAPACITY_PROFILE_PATTERN.fullmatch(profile) is None
+                for profile in profiles
+            )
+            or profiles != sorted(set(profiles))
+            or type(enrolled) is not int
+            or enrolled != len(profiles)
+            or type(provider_ready) is not int
+            or provider_ready != ready.get(provider, 0)
+            or any(
+                profile not in profiles
+                for row_provider, profile in identities
+                if row_provider == provider
+            )
+        ):
+            return None, "provider-enrollment"
+    return {**value, "rows": normalized, "identities": identities}, "accepted"
+
+
 def read_closure_stop_line(
     path: pathlib.Path,
     now: dt.datetime | None = None,
     *,
+    capacity_path: pathlib.Path | None = None,
     max_age_seconds: int = FLEET_GATE_RECEIPT_MAX_AGE_SECONDS,
 ) -> dict[str, Any]:
-    """Fail-closed admission verdict from the freshest Gem fleet gate receipt.
+    """Fail-closed work-admission verdict from the freshest Gem fleet receipt.
 
-    New issue admission is allowed only while Summer's closure health signal is
-    healthy (the green admission state). A missing, unreadable, stale,
-    future-dated, or internally inconsistent receipt holds new admission.
+    Summer closure health, the typed work admission, and execution-proven
+    concurrency must all agree before the scheduler may start or resume. A
+    missing, unreadable, stale, future-dated, or inconsistent receipt holds.
     """
     observed_at = now or _now()
 
     def hold(reason: str, **extra: Any) -> dict[str, Any]:
         return {"hold": True, "reason": reason, "path": str(path), **extra}
+
+    if observed_at.tzinfo is None or observed_at.utcoffset() is None:
+        return hold("watchdog-observed-at-invalid")
+    observed_at = observed_at.astimezone(dt.timezone.utc)
 
     if not path.exists():
         return hold("fleet-gate-receipt-missing")
@@ -873,14 +1023,7 @@ def read_closure_stop_line(
     if not isinstance(payload, dict) or payload.get("schema") != FLEET_GATE_SCHEMA:
         return hold("fleet-gate-receipt-schema-mismatch")
     receipt_observed_raw = payload.get("observedAt")
-    try:
-        receipt_observed = (
-            dt.datetime.fromisoformat(str(receipt_observed_raw).replace("Z", "+00:00"))
-            if receipt_observed_raw
-            else None
-        )
-    except ValueError:
-        receipt_observed = None
+    receipt_observed = _aware_time(receipt_observed_raw)
     if receipt_observed is None:
         return hold("fleet-gate-receipt-observed-at-missing")
     age_seconds = math.ceil((observed_at - receipt_observed).total_seconds())
@@ -921,9 +1064,141 @@ def read_closure_stop_line(
     details["newIssueIntakeAllowed"] = intake
     if status != CLOSURE_HEALTHY_STATUS or intake is not True:
         return hold("closure-health-not-green", **details)
+
+    work = payload.get("workAdmission")
+    concurrency = payload.get("concurrency")
+    gem = concurrency.get("gem") if isinstance(concurrency, dict) else None
+    capacity_signal = signals.get("concurrencyEvidence")
+    if (
+        not isinstance(work, dict)
+        or not isinstance(gem, dict)
+        or not isinstance(capacity_signal, dict)
+    ):
+        return hold("work-capacity-admission-missing", **details)
+    work_allowed = work.get("allowed")
+    issue_lease_allowed = work.get("newIssueLeaseAllowed")
+    implementation_allowed = work.get("newImplementationAllowed")
+    evidence_accepted = gem.get("evidenceAccepted")
+    mutation_allowed = gem.get("newMutationAllowed")
+    capacity_accepted = capacity_signal.get("accepted")
+    maximum = gem.get("maxConcurrent")
+    actionable_target = capacity_signal.get("actionableTarget")
+    proof_target = gem.get("proofTarget")
+    lease_capacity = gem.get("leaseCapacity")
+    matched_capacity = gem.get("matchedCapacity")
+    matched_available = gem.get("matchedAvailableCapacity")
+    validated_capacity = None
+    if capacity_accepted is True:
+        validated_capacity, capacity_reason = _validate_capacity_evidence(
+            capacity_signal, observed_at
+        )
+        if validated_capacity is None:
+            return hold(
+                f"work-capacity-proof-invalid:{capacity_reason}", **details
+            )
+        details.update(
+            {
+                "capacityObservedAt": validated_capacity.get("observedAt"),
+                "capacityEvidenceAgeSeconds": math.ceil(
+                    (
+                        observed_at
+                        - (_aware_time(validated_capacity.get("observedAt")) or observed_at)
+                    ).total_seconds()
+                ),
+            }
+        )
+        if capacity_signal.get("proofAccepted") is not True:
+            return hold("work-capacity-proof-invalid:proof-not-accepted", **details)
+    accepted_capacity_shape = (
+        all(
+            isinstance(value, int) and not isinstance(value, bool) and value >= 1
+            for value in (
+                actionable_target,
+                proof_target,
+                lease_capacity,
+                matched_capacity,
+                matched_available,
+            )
+        )
+        and actionable_target == matched_capacity == maximum
+        and validated_capacity is not None
+        and proof_target == validated_capacity.get("target")
+        and matched_available <= matched_capacity
+        and matched_capacity <= min(
+            proof_target, lease_capacity, OFFICIAL_MAX_CONCURRENT_AGENTS
+        )
+    )
+    consistent = (
+        all(
+            isinstance(value, bool)
+            for value in (
+                work_allowed,
+                issue_lease_allowed,
+                implementation_allowed,
+                evidence_accepted,
+                mutation_allowed,
+                capacity_accepted,
+            )
+        )
+        and work_allowed is mutation_allowed
+        and issue_lease_allowed is implementation_allowed
+        and capacity_accepted is evidence_accepted
+        and isinstance(maximum, int)
+        and not isinstance(maximum, bool)
+        and 0 <= maximum <= OFFICIAL_MAX_CONCURRENT_AGENTS
+        and (
+            (
+                mutation_allowed
+                and evidence_accepted
+                and capacity_accepted
+                and accepted_capacity_shape
+            )
+            or (not mutation_allowed and not evidence_accepted and maximum == 0)
+        )
+    )
+    if not consistent:
+        return hold("work-capacity-admission-disagrees", **details)
+    if capacity_accepted is True and capacity_path is not None:
+        try:
+            current_capacity = json.loads(capacity_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            return hold(
+                f"work-capacity-current-invalid:{type(exc).__name__}", **details
+            )
+        validated_current, current_reason = _validate_capacity_evidence(
+            current_capacity, observed_at
+        )
+        if validated_current is None:
+            return hold(
+                f"work-capacity-current-invalid:{current_reason}", **details
+            )
+        embedded_observed = _aware_time(validated_capacity.get("observedAt"))
+        current_observed = _aware_time(validated_current.get("observedAt"))
+        embedded_identities = validated_capacity.get("identities")
+        current_identities = validated_current.get("identities")
+        if (
+            embedded_observed is None
+            or current_observed is None
+            or current_observed < embedded_observed
+            or not isinstance(embedded_identities, set)
+            or not isinstance(current_identities, set)
+            or not embedded_identities.issubset(current_identities)
+            or validated_current.get("target", 0) < matched_capacity
+        ):
+            return hold("work-capacity-proof-drift", **details)
+    details.update(
+        {
+            "workAdmissionAllowed": work_allowed,
+            "newIssueLeaseAllowed": issue_lease_allowed,
+            "capacityEvidenceAccepted": evidence_accepted,
+            "maxConcurrent": maximum,
+        }
+    )
+    if not (work_allowed and issue_lease_allowed and implementation_allowed):
+        return hold("work-capacity-admission-closed", **details)
     return {
         "hold": False,
-        "reason": "closure-health-green",
+        "reason": "fleet-work-admission-open",
         "path": str(path),
         **details,
     }
@@ -1017,7 +1292,9 @@ def _closure_hold_wait(
             break
         sleep_used += _sleep_closure_hold(verdict, chunk)
         verdict = read_closure_stop_line(
-            stop_line.receipt_path, max_age_seconds=stop_line.max_receipt_age_seconds
+            stop_line.receipt_path,
+            capacity_path=stop_line.capacity_receipt_path,
+            max_age_seconds=stop_line.max_receipt_age_seconds,
         )
     return sleep_used, verdict
 
@@ -1045,14 +1322,16 @@ def _pause_child_for_closure_hold(
 
     Same contract as the rate-limit pause: agent processes already launched by
     the scheduler keep running to completion. The budget bounds one continuous
-    hold episode; on exhaustion the scheduler resumes so finished agents are
-    collected before the next bounded episode starts on a still-red receipt.
+    hold episode. If proof stays closed at exhaustion, terminate the stopped
+    scheduler so systemd restarts through the startup preflight; never create a
+    resume window on a stale or closed admission receipt.
     """
     if process.poll() is not None or not verdict.get("hold"):
         return 0
     if not isinstance(process.pid, int) or process.pid <= 0:
         return 0
     os.kill(process.pid, signal.SIGSTOP)
+    resume = False
     try:
         slept, latest = _closure_hold_wait(
             stop_line, verdict, max_sleep_seconds=max_gate_sleep_seconds, sleep_used=0
@@ -1067,6 +1346,7 @@ def _pause_child_for_closure_hold(
             )
             _print_closure_hold_exhausted(max_gate_sleep_seconds)
         else:
+            resume = True
             write_closure_hold_receipt(
                 stop_line.hold_receipt_path,
                 latest,
@@ -1088,7 +1368,14 @@ def _pause_child_for_closure_hold(
     finally:
         if process.poll() is None:
             try:
-                os.kill(process.pid, signal.SIGCONT)
+                if resume:
+                    os.kill(process.pid, signal.SIGCONT)
+                else:
+                    # SIGTERM remains pending while a scheduler is group-stopped
+                    # on Linux. Wake it only to deliver an immediate, uncatchable
+                    # termination; systemd then restarts through fresh admission.
+                    os.kill(process.pid, signal.SIGCONT)
+                    os.kill(process.pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
 
@@ -1237,38 +1524,69 @@ def run_official_binary_once(
     rate_limited = False
     issue_errors: dict[str, dict[str, Any]] = {}
     dead_letter_noted: set[str] = set()
-    last_closure_check = 0.0
+    stop_monitor = threading.Event()
+    pause_lock = threading.Lock()
+
+    def monitor_admission() -> None:
+        # Admission can close while Symphony emits no logs. Re-read on wall
+        # clock time so a silent scheduler cannot dispatch past an expired or
+        # contracted execution-capacity receipt.
+        while not stop_monitor.wait(CLOSURE_HOLD_RECHECK_SECONDS):
+            if process.poll() is not None:
+                return
+            try:
+                verdict = read_closure_stop_line(
+                    closure.receipt_path,
+                    capacity_path=closure.capacity_receipt_path,
+                    max_age_seconds=closure.max_receipt_age_seconds,
+                )
+                if verdict["hold"]:
+                    with pause_lock:
+                        _pause_child_for_closure_hold(
+                            process, closure, verdict, max_gate_sleep_seconds
+                        )
+            except BaseException as exc:
+                fail_closed = {
+                    "hold": True,
+                    "reason": f"closure-watchdog-error:{type(exc).__name__}",
+                    "path": str(closure.receipt_path),
+                }
+                with pause_lock:
+                    _pause_child_for_closure_hold(
+                        process, closure, fail_closed, max_gate_sleep_seconds
+                    )
+
+    monitor = threading.Thread(
+        target=monitor_admission,
+        name="symphony-admission-watchdog",
+        daemon=True,
+    )
+    monitor.start()
     assert process.stdout is not None
-    for line in process.stdout:
-        print(line, end="", flush=True)
-        classification = classify_linear_log_line(line)
-        if classification and write_rate_limit_gate(gate_file, classification):
-            # The official scheduler may be supervising active agents. Record the
-            # reset gate and suspend only the scheduler process; do not
-            # terminate the process tree that may contain active Codex jobs.
-            rate_limited = True
-            gate = read_rate_limit_gate(gate_file)
-            _pause_child_for_gate(process, gate, max_gate_sleep_seconds)
-        else:
-            issue_error = classify_linear_issue_error_log_line(line)
-            if issue_error is not None:
-                record_linear_issue_error(
-                    closure.dead_letter_dir,
-                    issue_error,
-                    issue_errors,
-                    dead_letter_noted,
-                )
-        monotonic_now = time.monotonic()
-        if monotonic_now - last_closure_check >= CLOSURE_HOLD_RECHECK_SECONDS:
-            last_closure_check = monotonic_now
-            verdict = read_closure_stop_line(
-                closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
-            )
-            if verdict["hold"]:
-                _pause_child_for_closure_hold(
-                    process, closure, verdict, max_gate_sleep_seconds
-                )
-    returncode = process.wait()
+    try:
+        for line in process.stdout:
+            print(line, end="", flush=True)
+            classification = classify_linear_log_line(line)
+            if classification and write_rate_limit_gate(gate_file, classification):
+                # Serialize scheduler signals with the admission watchdog.
+                rate_limited = True
+                gate = read_rate_limit_gate(gate_file)
+                with pause_lock:
+                    _pause_child_for_gate(process, gate, max_gate_sleep_seconds)
+            else:
+                issue_error = classify_linear_issue_error_log_line(line)
+                if issue_error is not None:
+                    record_linear_issue_error(
+                        closure.dead_letter_dir,
+                        issue_error,
+                        issue_errors,
+                        dead_letter_noted,
+                    )
+        returncode = process.wait()
+    finally:
+        stop_monitor.set()
+        monitor.join(timeout=1)
+        process.stdout.close()
     return RATE_LIMIT_EXIT_CODE if rate_limited else returncode
 
 
@@ -1285,7 +1603,9 @@ def run_official_binary(
     closure_sleep_used = 0
     while True:
         verdict = read_closure_stop_line(
-            closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
+            closure.receipt_path,
+            capacity_path=closure.capacity_receipt_path,
+            max_age_seconds=closure.max_receipt_age_seconds,
         )
         if verdict["hold"]:
             # The closure stop-line holds NEW admission only. Already-running
@@ -1509,6 +1829,11 @@ def main(argv: list[str] | None = None) -> int:
         default=FLEET_GATE_RECEIPT_MAX_AGE_SECONDS,
     )
     run_parser.add_argument(
+        "--capacity-evidence-file",
+        type=pathlib.Path,
+        default=DEFAULT_CAPACITY_EVIDENCE_RECEIPT,
+    )
+    run_parser.add_argument(
         "--closure-hold-receipt",
         type=pathlib.Path,
         default=DEFAULT_CLOSURE_HOLD_RECEIPT,
@@ -1595,6 +1920,7 @@ def main(argv: list[str] | None = None) -> int:
             gate_file=args.gate_file,
             closure=ClosureStopLine(
                 receipt_path=args.closure_gate_file,
+                capacity_receipt_path=args.capacity_evidence_file,
                 hold_receipt_path=args.closure_hold_receipt,
                 dead_letter_dir=args.dead_letter_dir,
                 max_receipt_age_seconds=args.closure_gate_max_age_seconds,

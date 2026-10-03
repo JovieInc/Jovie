@@ -425,8 +425,17 @@ const DELIVERY_LIVENESS_TESTS = [
   'scripts/lib/__tests__/codex-issue-shipper.test.mjs',
   'scripts/lib/__tests__/hermes-launchd.test.mjs',
 ];
-const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = new Set([
+const SYMPHONY_THROUGHPUT_CONTROL_PRIMARY_INPUTS = new Set([
+  'scripts/hermes/gem-concurrency-evidence.py',
+  'scripts/hermes/provider-capacity-bootstrap.py',
+  'scripts/hermes/provider_useful_turns.py',
+  'scripts/hermes/symphony-concurrency-controller.py',
+]);
+const SYMPHONY_THROUGHPUT_CONTROL_LANE = new Set([
+  ...SYMPHONY_THROUGHPUT_CONTROL_PRIMARY_INPUTS,
+  '.github/workflows/gem-delivery-controller-activation.yml',
   '.husky/pre-push',
+  'canon/invariants.jsonl',
   'scripts/automation-verify.sh',
   'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
   'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
@@ -435,15 +444,41 @@ const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = new Set([
   'scripts/backlog-orchestrator/backlog-orchestrator.mjs',
   'scripts/backlog-orchestrator/deterministic-gates.mjs',
   'scripts/backlog-orchestrator/gate-next-hold.mjs',
+  'scripts/drain-pr-queue.sh',
+  'scripts/hermes/WORKFLOW.jovie-ui-pilot.md',
   'scripts/hermes/codex-rotate',
   'scripts/hermes/codex-account-probe.sh',
+  'scripts/hermes/fleet_admission_receipt.py',
+  'scripts/hermes/gem-pr-drain.py',
+  'scripts/hermes/gem-priority-gate.py',
+  'scripts/hermes/gem_gate_contract.py',
+  'scripts/hermes/install-gem-fleet-controller.sh',
+  'scripts/hermes/install-symphony-ui-pilot.sh',
   'scripts/hermes/symphony-lease-guard',
+  'scripts/hermes/symphony-reconciler.py',
+  'scripts/hermes/symphony/WORKFLOW.md',
+  'scripts/hermes/symphony_official_runtime.py',
+  'scripts/hermes/systemd/symphony-concurrency-controller.service',
+  'scripts/hermes/update-symphony-burrito.sh',
   'scripts/hermes/tests/codex-account-probe.test.py',
   'scripts/hermes/tests/codex-rotate.test.py',
+  'scripts/hermes/tests/gem-pr-drain.test.py',
+  'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
+  'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/provider-capacity-bootstrap.test.py',
+  'scripts/hermes/tests/provider-useful-turns.test.py',
+  'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+  'scripts/hermes/tests/symphony-concurrency-controller.test.py',
   'scripts/hermes/tests/symphony-lease-guard.test.py',
+  'scripts/hermes/tests/symphony-reconciler.test.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+  'scripts/hermes/tests/test_fleet_admission_receipt.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
   'scripts/run-affected-tests.mjs',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/tests/test_symphony_ui_pilot_runtime.py',
+  'scripts/tests/test_openai_symphony_install.py',
 ]);
 const SYMPHONY_THROUGHPUT_NODE_TESTS = [
   'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
@@ -455,9 +490,23 @@ const SYMPHONY_THROUGHPUT_SCRIPT_TESTS = [
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
 ];
 const SYMPHONY_THROUGHPUT_PYTHON_TESTS = [
+  'scripts/tests/test_openai_symphony_install.py',
   'scripts/hermes/tests/codex-account-probe.test.py',
   'scripts/hermes/tests/codex-rotate.test.py',
+  'scripts/hermes/tests/gem-pr-drain.test.py',
+  'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
+  'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/provider-capacity-bootstrap.test.py',
+  'scripts/hermes/tests/provider-useful-turns.test.py',
+  'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+  'scripts/hermes/tests/symphony-concurrency-controller.test.py',
   'scripts/hermes/tests/symphony-lease-guard.test.py',
+  'scripts/hermes/tests/symphony-reconciler.test.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+  'scripts/hermes/tests/test_fleet_admission_receipt.py',
+];
+const SYMPHONY_THROUGHPUT_PYTEST_TESTS = [
+  'scripts/tests/test_symphony_ui_pilot_runtime.py',
 ];
 const BACKLOG_REMEDIATION_PRIMARY_INPUTS = new Set([
   'scripts/backlog-orchestrator/backlog-remediation.mjs',
@@ -980,21 +1029,26 @@ export function buildAffectedTestPlan(
       nodeTests: ['scripts/typecheck-scripts.mjs'],
     };
   }
-  const isExactSymphonyThroughputControl =
-    files.length === SYMPHONY_THROUGHPUT_CONTROL_MANIFEST.size &&
-    files.every(file => SYMPHONY_THROUGHPUT_CONTROL_MANIFEST.has(file));
-  if (isExactSymphonyThroughputControl) {
+  const isBoundedSymphonyThroughputControl =
+    files.some(file => SYMPHONY_THROUGHPUT_CONTROL_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => SYMPHONY_THROUGHPUT_CONTROL_LANE.has(file));
+  if (isBoundedSymphonyThroughputControl) {
     return {
       mode: 'selected',
       relatedFiles: [],
       mandatoryTests: [],
       selectedTests: [],
       rootVitestTests: [],
-      pythonTests: [],
+      pythonTests: SYMPHONY_THROUGHPUT_PYTEST_TESTS,
       pythonUnittestTests: SYMPHONY_THROUGHPUT_PYTHON_TESTS,
       scriptVitestTests: SYMPHONY_THROUGHPUT_SCRIPT_TESTS,
       nodeTests: SYMPHONY_THROUGHPUT_NODE_TESTS,
     };
+  }
+  if (
+    files.some(file => SYMPHONY_THROUGHPUT_CONTROL_PRIMARY_INPUTS.has(file))
+  ) {
+    return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
   }
   const isBoundedRollingCiFxCacheGcChange =
     files.some(file => ROLLING_CI_FX_CACHE_GC_PRIMARY_INPUTS.has(file)) &&

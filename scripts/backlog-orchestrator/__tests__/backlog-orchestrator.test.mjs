@@ -967,6 +967,66 @@ describe('deterministic Symphony admission boundary', () => {
     };
   }
 
+  function executionCapacity(
+    target = 4,
+    observedAt = '2026-08-09T05:00:00.000Z'
+  ) {
+    const profileIdentity = index => (index + 1).toString(16).padStart(64, '0');
+    const rows = Array.from({ length: target }, (_, index) => ({
+      schema: admitter.PROVIDER_USEFUL_TURN_SCHEMA,
+      provider: 'openai',
+      profile: profileIdentity(index),
+      model: 'gpt-5.6-sol',
+      completedAt: observedAt,
+      rc: 0,
+      useful: true,
+      outputDigest: `${index.toString(16).padStart(64, '0')}`,
+      outputBytes: 24 + index,
+      tokens: { input: 10 + index, output: 5, total: 15 + index },
+    }));
+    return {
+      schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
+      source: admitter.PROVIDER_USEFUL_TURN_SOURCE,
+      target,
+      approved: true,
+      severeIncidents: 0,
+      observedAt,
+      rows,
+      providers: {
+        openai: {
+          enrolled: target,
+          enrolledProfiles: rows.map(row => row.profile).sort(),
+          ready: target,
+        },
+      },
+    };
+  }
+
+  function leaseCapacity(accounts = 4, available = accounts, locked = 0) {
+    const profiles = Array.from({ length: accounts }, (_, index) =>
+      (index + 1).toString(16).padStart(64, '0')
+    );
+    const cooldown = accounts - locked - available;
+    const lockedProfiles = profiles.slice(0, locked).sort();
+    const availableProfiles = profiles.slice(locked, locked + available).sort();
+    const cooldownProfiles = profiles.slice(locked + available).sort();
+    return {
+      status: 'ok',
+      capacity: {
+        provider: 'openai',
+        state: available > 0 ? 'available' : 'saturated',
+        accounts,
+        locked,
+        cooldown,
+        available,
+        lockedProfiles,
+        cooldownProfiles,
+        availableProfiles,
+        eligibleProfiles: [...lockedProfiles, ...availableProfiles].sort(),
+      },
+    };
+  }
+
   function fleetEvidence(overrides = {}) {
     return {
       main: {
@@ -1006,15 +1066,8 @@ describe('deterministic Symphony admission boundary', () => {
         scope: admitter.INDEPENDENT_REVIEW_SCOPE,
         observedAt: '2026-08-09T05:00:00.000Z',
       },
-      concurrencyEvidence: {
-        schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
-        target: 4,
-        approved: true,
-        cleanRuns: 1,
-        severeIncidents: 0,
-        observedAt: '2026-08-09T05:00:00.000Z',
-        accepted: true,
-      },
+      concurrencyEvidence: executionCapacity(),
+      lease: leaseCapacity(),
       observedAt: '2026-08-09T05:00:00.000Z',
       ...overrides,
     };
@@ -1334,14 +1387,8 @@ describe('deterministic Symphony admission boundary', () => {
   it('keeps the bounded concurrency receipt independent from review freshness', () => {
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({
-        concurrencyEvidence: {
-          schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
-          target: 8,
-          approved: true,
-          cleanRuns: 20,
-          severeIncidents: 0,
-          observedAt: '2026-08-09T05:00:00.000Z',
-        },
+        concurrencyEvidence: executionCapacity(8),
+        lease: leaseCapacity(8),
       }),
       { now: '2026-08-09T05:01:00.000Z' }
     );
@@ -1501,77 +1548,279 @@ describe('deterministic Symphony admission boundary', () => {
     assert.ok(stale.reasons.some(reason => reason.code === 'controller-stale'));
   });
 
-  it('runs at the runtime floor when capacity evidence is missing or stale', () => {
-    // symphony-concurrency-autoscale-v1: missing evidence never zeroes the
-    // factory; one seat stays open for leases and remediation.
+  it('closes dispatch when capacity evidence is missing or stale', () => {
     const now = '2026-08-09T05:01:00.000Z';
-    const approved = {
-      schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
-      target: 8,
-      approved: true,
-      severeIncidents: 0,
-      observedAt: '2026-08-09T05:00:00.000Z',
-    };
-    const missing = admitter.resolveGemConcurrency(null, { now });
+    const lease = leaseCapacity(8);
+    const missing = admitter.resolveGemConcurrency(null, { now, lease });
     const stale = admitter.resolveGemConcurrency(
-      { ...approved, observedAt: '2026-08-07T05:00:00.000Z' },
-      { now }
+      executionCapacity(8, '2026-08-07T05:00:00.000Z'),
+      { now, lease }
     );
-    assert.equal(missing.maxConcurrent, 1);
+    assert.equal(missing.maxConcurrent, 0);
     assert.equal(missing.evidenceAccepted, false);
-    assert.equal(missing.newMutationAllowed, true);
-    assert.equal(missing.reason, 'capacity-evidence-missing-runtime-floor');
+    assert.equal(missing.newMutationAllowed, false);
+    assert.equal(
+      missing.reason,
+      'capacity-evidence-unavailable-dispatch-closed'
+    );
     assert.equal(missing.preserveQueuedWork, true);
-    assert.equal(stale.maxConcurrent, 1);
+    assert.equal(stale.maxConcurrent, 0);
     assert.equal(stale.evidenceAccepted, false);
     const gate = admitter.evaluateFleetGate(
       fleetEvidence({ concurrencyEvidence: null }),
       { now }
     );
-    assert.equal(gate.workAdmission.allowed, true);
-    assert.equal(gate.workAdmission.newIssueLeaseAllowed, true);
-    assert.equal(gate.concurrency.gem.maxConcurrent, 1);
-    assert.ok(
-      gate.workAdmission.activities.includes('isolated-implementation')
-    );
+    assert.equal(gate.workAdmission.allowed, false);
+    assert.equal(gate.workAdmission.newIssueLeaseAllowed, false);
+    assert.equal(gate.concurrency.gem.maxConcurrent, 0);
   });
 
-  it('accepts live-seat capacity as-is without a clamp or clean-run ratchet', () => {
+  it('accepts execution-proven capacity only within the live lease and ceiling', () => {
     const now = '2026-09-02T19:20:00.000Z';
-    const seats = {
-      schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
-      source: 'live-oauth-cli-seats',
-      target: 2,
-      approved: true,
-      severeIncidents: 0,
-      observedAt: '2026-09-02T19:19:00.000Z',
-    };
+    const seats = executionCapacity(2, '2026-09-02T19:19:00.000Z');
     assert.equal(
-      admitter.resolveGemConcurrency(seats, { now }).maxConcurrent,
+      admitter.resolveGemConcurrency(seats, {
+        now,
+        lease: leaseCapacity(2),
+      }).maxConcurrent,
       2
     );
     assert.equal(
-      admitter.resolveGemConcurrency(seats, { now }).reason,
-      'live-seat-capacity'
+      admitter.resolveGemConcurrency(seats, {
+        now,
+        lease: leaseCapacity(2),
+      }).reason,
+      'execution-proven-capacity'
     );
     for (const target of [8, 12, 40]) {
       const live = admitter.resolveGemConcurrency(
-        { ...seats, target, cleanRuns: 0 },
-        { now }
+        executionCapacity(target, '2026-09-02T19:19:00.000Z'),
+        { now, lease: leaseCapacity(target) }
       );
       assert.equal(live.maxConcurrent, target);
       assert.equal(live.evidenceAccepted, true);
     }
-    // A severe incident or an unapproved receipt still degrades to the floor.
     assert.equal(
-      admitter.resolveGemConcurrency({ ...seats, severeIncidents: 1 }, { now })
-        .maxConcurrent,
-      1
+      admitter.resolveGemConcurrency(
+        executionCapacity(4, '2026-09-02T19:19:00.000Z'),
+        { now, lease: leaseCapacity(4, 2) }
+      ).maxConcurrent,
+      2
     );
     assert.equal(
-      admitter.resolveGemConcurrency({ ...seats, approved: false }, { now })
-        .maxConcurrent,
-      1
+      admitter.resolveGemConcurrency(
+        { ...seats, severeIncidents: 1 },
+        {
+          now,
+          lease: leaseCapacity(2),
+        }
+      ).maxConcurrent,
+      0
+    );
+    assert.equal(
+      admitter.resolveGemConcurrency(
+        { ...seats, approved: false },
+        {
+          now,
+          lease: leaseCapacity(2),
+        }
+      ).maxConcurrent,
+      0
+    );
+  });
+
+  it('rejects duplicate subscription identities, over-limit proof, and unknown lease capacity', () => {
+    const now = '2026-09-02T19:20:00.000Z';
+    const duplicate = executionCapacity(2, '2026-09-02T19:19:00.000Z');
+    duplicate.rows[1].profile = duplicate.rows[0].profile;
+    duplicate.rows[1].model = 'gpt-5.6-terra';
+    assert.equal(
+      admitter.resolveGemConcurrency(duplicate, {
+        now,
+        lease: leaseCapacity(2),
+      }).maxConcurrent,
+      0
+    );
+    assert.equal(
+      admitter.resolveGemConcurrency(
+        executionCapacity(41, '2026-09-02T19:19:00.000Z'),
+        { now, lease: leaseCapacity(41) }
+      ).maxConcurrent,
+      0
+    );
+    assert.equal(
+      admitter.resolveGemConcurrency(
+        executionCapacity(2, '2026-09-02T19:19:00.000Z'),
+        {
+          now,
+          lease: { status: 'unknown' },
+        }
+      ).maxConcurrent,
+      0
+    );
+    assert.equal(
+      admitter.resolveGemConcurrency(
+        executionCapacity(4, '2026-09-02T19:19:00.000Z'),
+        {
+          now,
+          lease: {
+            status: 'ok',
+            capacity: {
+              state: 'available',
+              accounts: 4,
+              locked: 0,
+              cooldown: 4,
+              available: 4,
+            },
+          },
+        }
+      ).maxConcurrent,
+      0
+    );
+    const replaced = executionCapacity(1, '2026-09-02T19:19:00.000Z');
+    replaced.providers.openai.enrolledProfiles = ['f'.repeat(64)];
+    assert.equal(
+      admitter.resolveGemConcurrency(replaced, {
+        now,
+        lease: leaseCapacity(1),
+      }).maxConcurrent,
+      0
+    );
+    const mismatchedLease = leaseCapacity(1);
+    mismatchedLease.capacity.availableProfiles = ['f'.repeat(64)];
+    mismatchedLease.capacity.eligibleProfiles = ['f'.repeat(64)];
+    assert.equal(
+      admitter.resolveGemConcurrency(
+        executionCapacity(1, '2026-09-02T19:19:00.000Z'),
+        { now, lease: mismatchedLease }
+      ).maxConcurrent,
+      0
+    );
+    const allLocked = admitter.resolveGemConcurrency(
+      executionCapacity(1, '2026-09-02T19:19:00.000Z'),
+      { now, lease: leaseCapacity(1, 0, 1) }
+    );
+    assert.equal(allLocked.maxConcurrent, 0);
+    assert.equal(allLocked.matchedCapacity, 1);
+    assert.equal(allLocked.matchedAvailableCapacity, 0);
+    assert.equal(allLocked.newMutationAllowed, false);
+
+    const injected = executionCapacity(1, '2026-09-02T19:19:00.000Z');
+    injected.rows[0].profile = `${leaseCapacity(1).capacity.availableProfiles[0]}\u0000suffix`;
+    injected.providers.openai.enrolledProfiles = [injected.rows[0].profile];
+    assert.equal(
+      admitter.resolveGemConcurrency(injected, {
+        now,
+        lease: leaseCapacity(1),
+      }).maxConcurrent,
+      0
+    );
+
+    const malformedLease = leaseCapacity(1);
+    malformedLease.capacity.availableProfiles = ['not-an-opaque-profile-id'];
+    malformedLease.capacity.eligibleProfiles = ['not-an-opaque-profile-id'];
+    assert.equal(
+      admitter.resolveGemConcurrency(
+        executionCapacity(1, '2026-09-02T19:19:00.000Z'),
+        { now, lease: malformedLease }
+      ).maxConcurrent,
+      0
+    );
+
+    for (const completedAt of [
+      '2026-09-04T14:00:00',
+      '2026-02-30T00:00:00Z',
+      '2026-01-01T24:00:00Z',
+      '2026-09-04T14:00:00.1234567Z',
+    ]) {
+      const invalidTimestamp = executionCapacity(1, completedAt);
+      assert.equal(
+        admitter.resolveGemConcurrency(invalidTimestamp, {
+          now: '2026-09-04T22:00:00Z',
+          lease: leaseCapacity(1),
+        }).maxConcurrent,
+        0,
+        completedAt
+      );
+    }
+
+    const coercedDigest = executionCapacity(1, '2026-09-02T19:19:00.000Z');
+    coercedDigest.rows[0].outputDigest = ['a'.repeat(64)];
+    assert.equal(
+      admitter.resolveGemConcurrency(coercedDigest, {
+        now,
+        lease: leaseCapacity(1),
+      }).maxConcurrent,
+      0
+    );
+
+    const inheritedProvider = executionCapacity(1, '2026-09-02T19:19:00.000Z');
+    inheritedProvider.rows[0].provider = 'constructor';
+    inheritedProvider.providers = {};
+    const inheritedProviderLease = leaseCapacity(1);
+    inheritedProviderLease.capacity.provider = 'constructor';
+    assert.equal(
+      admitter.resolveGemConcurrency(inheritedProvider, {
+        now,
+        lease: inheritedProviderLease,
+      }).maxConcurrent,
+      0
+    );
+
+    const unsafeTokens = executionCapacity(1, '2026-09-02T19:19:00.000Z');
+    unsafeTokens.rows[0].tokens = {
+      input: 9_007_199_254_740_992,
+      output: 1,
+      total: 9_007_199_254_740_992,
+    };
+    assert.equal(
+      admitter.resolveGemConcurrency(unsafeTokens, {
+        now,
+        lease: leaseCapacity(1),
+      }).maxConcurrent,
+      0
+    );
+
+    const subMillisecond = executionCapacity(2, '2026-09-04T22:00:00.000100Z');
+    subMillisecond.rows[1].completedAt = '2026-09-04T22:00:00.000900Z';
+    assert.equal(
+      admitter.resolveGemConcurrency(subMillisecond, {
+        now: '2026-09-04T22:00:00.001000Z',
+        lease: leaseCapacity(2),
+      }).maxConcurrent,
+      0
+    );
+    subMillisecond.observedAt = '2026-09-04T22:00:00.000900Z';
+    assert.equal(
+      admitter.resolveGemConcurrency(subMillisecond, {
+        now: '2026-09-04T22:00:00.001000Z',
+        lease: leaseCapacity(2),
+      }).maxConcurrent,
+      2
+    );
+
+    const subMillisecondFuture = executionCapacity(
+      1,
+      '2026-09-04T22:00:00.000900Z'
+    );
+    assert.equal(
+      admitter.resolveGemConcurrency(subMillisecondFuture, {
+        now: '2026-09-04T22:00:00.000100Z',
+        lease: leaseCapacity(1),
+      }).maxConcurrent,
+      0
+    );
+
+    const beyondAgeBoundary = executionCapacity(
+      1,
+      '2026-09-04T00:00:00.000100Z'
+    );
+    assert.equal(
+      admitter.resolveGemConcurrency(beyondAgeBoundary, {
+        now: '2026-09-05T00:00:00.000900Z',
+        lease: leaseCapacity(1),
+      }).maxConcurrent,
+      0
     );
   });
 
@@ -1590,6 +1839,15 @@ describe('deterministic Symphony admission boundary', () => {
         ...controllerSignals.independentReview,
         observedAt: new Date().toISOString(),
       };
+      if (Array.isArray(controllerSignals.concurrencyEvidence?.rows)) {
+        const completedAt = new Date().toISOString().replace('Z', '000Z');
+        controllerSignals.concurrencyEvidence.observedAt = completedAt;
+        controllerSignals.concurrencyEvidence.rows =
+          controllerSignals.concurrencyEvidence.rows.map(row => ({
+            ...row,
+            completedAt,
+          }));
+      }
       if (controllerSignals.queue?.laneCapacity) {
         controllerSignals.queue.laneCapacity.observedAt =
           new Date().toISOString();
@@ -1661,7 +1919,7 @@ describe('deterministic Symphony admission boundary', () => {
     );
     const workflowSource = await readFile(workflow, 'utf8');
 
-    assert.equal(amber.exitCode, 0);
+    assert.equal(amber.exitCode, 0, JSON.stringify(amber.receipt));
     assert.equal(amber.receipt.state, 'AMBER');
     assert.equal(amber.receipt.workAdmission.allowed, true);
     assert.equal(amber.receipt.workAdmission.newIssueLeaseAllowed, true);
@@ -1717,7 +1975,7 @@ describe('deterministic Symphony admission boundary', () => {
       workflowSource,
       /Labels and path-only classification are not eligibility evidence/
     );
-    assert.match(workflowSource, /max_concurrent_agents: 4/);
+    assert.match(workflowSource, /max_concurrent_agents: 1/);
     assert.doesNotMatch(workflowSource, /Open a non-draft PR/);
   });
 
@@ -1746,9 +2004,9 @@ describe('deterministic Symphony admission boundary', () => {
     assert.deepEqual(activeStates, ['Todo', 'In Progress']);
     assert.ok(!activeStates.includes('In Review'));
 
-    // Capacity and lease invariants are preserved: four concurrent agents,
-    // each bound to one issue and one workspace.
-    assert.match(workflowSource, /max_concurrent_agents: 4/);
+    // The retired pilot remains cold-start safe; the canonical fleet
+    // controller owns any identity-proven runtime overlay above one.
+    assert.match(workflowSource, /max_concurrent_agents: 1/);
 
     // The ownership boundary is documented: Symphony implements through
     // draft PR / In Review; Gem + GitHub own review, fleet-gate promotion,
@@ -1777,7 +2035,7 @@ from gem_gate_contract import GateContractError, drain_state_dir, gate_state_dir
 receipt = {
     "schema": "jovie-fleet-gate/v1",
     "state": "AMBER",
-    "signals": {"main": {"status": "red", "sha": "a" * 40}, "closureHealth": {"schema": "jovie-closure-health/v1", "status": "healthy", "authority": "Summer", "newIssueIntakeAllowed": True, "promotionContinues": True, "remediationContinues": True, "reasons": []}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}, "concurrencyEvidence": {"accepted": True}},
+    "signals": {"main": {"status": "red", "sha": "a" * 40}, "closureHealth": {"schema": "jovie-closure-health/v1", "status": "healthy", "authority": "Summer", "newIssueIntakeAllowed": True, "promotionContinues": True, "remediationContinues": True, "reasons": []}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}, "concurrencyEvidence": {"accepted": True, "proofAccepted": True, "actionableTarget": 1, "matchedCapacity": 1, "matchedAvailableCapacity": 1}},
     "reasons": [{"code": "main-not-green", "layer": "promotion", "severity": "warning", "detail": "main red"}],
     "reviewAdmission": {"allowed": False, "required": True, "authority": "Gem", "scope": "exact-main-head", "headSha": None, "observedAt": None, "reviewId": None, "reviewer": None, "reason": "independent-review-receipt-missing"},
     "closureAdmission": {"allowed": True, "newIssueIntakeAllowed": True, "newImplementationAllowed": True, "fallbackPrGenerationAllowed": True, "authority": "Summer", "promotionContinues": True, "remediationContinues": True},
@@ -1792,7 +2050,7 @@ receipt = {
         "activities": ["expected-head-pr-update"],
         "authority": "single-pr-writer-exact-head",
     },
-    "concurrency": {"gem": {"evidenceAccepted": True, "newMutationAllowed": True, "maxConcurrent": 1, "runtimeFloor": 1}},
+    "concurrency": {"gem": {"evidenceAccepted": True, "newMutationAllowed": True, "maxConcurrent": 1, "runtimeFloor": 1, "proofTarget": 1, "leaseCapacity": 1, "matchedCapacity": 1, "matchedAvailableCapacity": 1}},
     "ownership": {"review": "Gem", "directGemPickup": False},
 }
 validate_gate_result(0, json.dumps(receipt), "fleet")
@@ -1906,7 +2164,7 @@ spec.loader.exec_module(module)
 result = module.update_one({
     "number": 1,
     "mergeable_state": "behind",
-    "head": {"ref": "test", "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+    "head": {"ref": "test", "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "repo": {"full_name": "JovieInc/Jovie", "fork": False}},
     "labels": [],
     "statusCheckRollup": [],
 })
@@ -1934,7 +2192,7 @@ print(json.dumps(result))
 receipt = {
     "schema": "jovie-fleet-gate/v1",
     "state": "AMBER",
-    "signals": {"main": {"status": "red", "sha": "a" * 40}, "closureHealth": {"schema": "jovie-closure-health/v1", "status": "healthy", "authority": "Summer", "newIssueIntakeAllowed": True, "promotionContinues": True, "remediationContinues": True, "reasons": []}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}, "concurrencyEvidence": {"accepted": True}},
+    "signals": {"main": {"status": "red", "sha": "a" * 40}, "closureHealth": {"schema": "jovie-closure-health/v1", "status": "healthy", "authority": "Summer", "newIssueIntakeAllowed": True, "promotionContinues": True, "remediationContinues": True, "reasons": []}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}, "concurrencyEvidence": {"accepted": True, "proofAccepted": True, "actionableTarget": 1, "matchedCapacity": 1, "matchedAvailableCapacity": 1}},
     "reasons": [{"code": "main-not-green", "layer": "promotion", "severity": "warning", "detail": "test"}],
     "reviewAdmission": {"allowed": False, "required": True, "authority": "Gem", "scope": "exact-main-head", "headSha": None, "observedAt": None, "reviewId": None, "reviewer": None, "reason": "independent-review-receipt-missing"},
     "closureAdmission": {"allowed": True, "newIssueIntakeAllowed": True, "newImplementationAllowed": True, "fallbackPrGenerationAllowed": True, "authority": "Summer", "promotionContinues": True, "remediationContinues": True},
@@ -1949,7 +2207,7 @@ receipt = {
         "activities": ["expected-head-pr-update"],
         "authority": "single-pr-writer-exact-head",
     },
-    "concurrency": {"gem": {"evidenceAccepted": True, "newMutationAllowed": True, "maxConcurrent": 1, "runtimeFloor": 1}},
+    "concurrency": {"gem": {"evidenceAccepted": True, "newMutationAllowed": True, "maxConcurrent": 1, "runtimeFloor": 1, "proofTarget": 1, "leaseCapacity": 1, "matchedCapacity": 1, "matchedAvailableCapacity": 1}},
     "ownership": {"review": "Gem", "directGemPickup": False},
 }
 print(json.dumps(receipt))
@@ -1970,17 +2228,24 @@ def fake_run(*args, **kwargs):
     calls.append(args)
     return "{}"
 module.run = fake_run
+module.gh_json = lambda *args: {
+    "number": 1,
+    "draft": False,
+    "base": {"ref": "main"},
+    "head": {"ref": "test", "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "repo": {"full_name": "JovieInc/Jovie", "fork": False}},
+    "labels": [],
+}
 behind = module.update_one({
     "number": 1,
     "mergeable_state": "behind",
-    "head": {"ref": "test", "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+    "head": {"ref": "test", "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "repo": {"full_name": "JovieInc/Jovie", "fork": False}},
     "labels": [],
     "statusCheckRollup": [],
 })
 clean = module.update_one({
     "number": 2,
     "mergeable_state": "clean",
-    "head": {"ref": "test-2", "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+    "head": {"ref": "test-2", "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "repo": {"full_name": "JovieInc/Jovie", "fork": False}},
     "labels": [],
     "statusCheckRollup": [],
 })

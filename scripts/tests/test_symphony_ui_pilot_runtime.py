@@ -3,16 +3,15 @@ Symphony UI pilot on gem (JOV-4962).
 
 Guards the contract that the orphan beam.smp incident violated:
 - the versioned workflow carries the approved throughput posture
-  (max_concurrent_agents: 4) and the expected admission/server shape;
+  (cold-start max_concurrent_agents: 1) and the expected admission/server shape;
 - the versioned systemd user unit owns the runtime with a bounded restart
   policy, a clean stop (beam exits 1 on SIGTERM), and a single-listener guard
   for 127.0.0.1:4041;
 - the install script materializes both onto a target home idempotently, keeps
   timestamped backups, and detects drift in --check mode except the bounded
   runtime overlay on agent.max_concurrent_agents (1..8);
-- the same installer activates the pressure-driven concurrency controller:
-  executable beside the reconciler, a systemd user service+timer pair, and
-  enable --now for its timer alongside symphony-reconciler.timer.
+- the legacy pilot installer does not own the canonical fleet concurrency
+  controller or its timer.
 
 No network, no systemd, no host state: everything runs against the repo
 checkout and a tmp_path target home. CI's pytest lane has no PyYAML, so the
@@ -126,9 +125,9 @@ def _unit_sections() -> dict[str, dict[str, str]]:
 
 def test_workflow_restores_approved_concurrency_posture() -> None:
     agent = _section(_front_matter_lines(), "agent")
-    assert _scalar(agent, "max_concurrent_agents") == "4", (
-        "approved throughput posture is 4 concurrent agents; 1 was a "
-        "temporary lease-repair fallback, not a stability target"
+    assert _scalar(agent, "max_concurrent_agents") == "1", (
+        "the checked-in workflow must cold-start at one agent; the official "
+        "controller alone owns the evidence-bound 1..40 runtime overlay"
     )
 
 
@@ -497,23 +496,19 @@ def test_installer_deploys_workflow_and_unit(tmp_path: Path) -> None:
     assert stored_receipt["sourceHashes"] == stored_receipt["files"]
     assert reconciler_service.read_text() == RECONCILER_SERVICE.read_text()
     assert reconciler_timer.read_text() == RECONCILER_TIMER.read_text()
-    # The pressure-driven concurrency controller installs executable beside the
-    # reconciler with its systemd user service+timer pair.
-    controller = tmp_path / ".local/bin/symphony-concurrency-controller"
-    controller_service = (
+    # Canonical concurrency belongs exclusively to the fleet-controller
+    # installer; the recovery pilot does not install a competing timer.
+    assert not (tmp_path / ".local/bin/symphony-concurrency-controller").exists()
+    assert not (
         tmp_path / ".config/systemd/user/symphony-concurrency-controller.service"
-    )
-    controller_timer = (
+    ).exists()
+    assert not (
         tmp_path / ".config/systemd/user/symphony-concurrency-controller.timer"
-    )
-    assert controller.read_text() == CONTROLLER.read_text()
-    assert controller.stat().st_mode & 0o111
-    assert controller_service.read_text() == CONTROLLER_SERVICE.read_text()
-    assert controller_timer.read_text() == CONTROLLER_TIMER.read_text()
+    ).exists()
     # Freshly installed state must pass drift detection.
     check = _run_installer(tmp_path, "--check")
     assert check.returncode == 0, check.stdout
-    assert check.stdout.count("OK") == 13
+    assert check.stdout.count("OK") == 10
 
 
 def test_reconciler_records_exact_first_failure_without_escalating(tmp_path: Path) -> None:
@@ -732,27 +727,27 @@ def test_installer_accepts_only_the_bounded_runtime_concurrency_overlay(tmp_path
     workflow = tmp_path / "symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
     source = WORKFLOW.read_text()
 
-    for target in range(1, 9):
+    for target in range(1, 41):
         _rewrite_installed_concurrency(workflow, str(target))
         accepted = _run_installer(tmp_path, "--check")
         assert accepted.returncode == 0, accepted.stdout
         assert f"OK {workflow}" in accepted.stdout
         assert f"runtime max_concurrent_agents={target}" in accepted.stdout
 
-    for invalid in ("0", "9", "01", "08", "0001", "0008", "not-a-number"):
+    for invalid in ("0", "41", "01", "08", "0001", "0008", "not-a-number"):
         workflow.write_text(
-            source.replace("  max_concurrent_agents: 4", f"  max_concurrent_agents: {invalid}", 1)
+            source.replace("  max_concurrent_agents: 1", f"  max_concurrent_agents: {invalid}", 1)
         )
         rejected = _run_installer(tmp_path, "--check")
         assert rejected.returncode == 1, invalid
         assert f"DRIFT {workflow}" in rejected.stdout
 
     for malformed in (
-        source.replace("  max_concurrent_agents: 4\n", ""),
-        source.replace("  max_concurrent_agents: 4", "  max_concurrent_workers: 4", 1),
+        source.replace("  max_concurrent_agents: 1\n", ""),
+        source.replace("  max_concurrent_agents: 1", "  max_concurrent_workers: 1", 1),
         source.replace(
-            "  max_concurrent_agents: 4",
-            "  max_concurrent_agents: 4\n  max_concurrent_agents: 4",
+            "  max_concurrent_agents: 1",
+            "  max_concurrent_agents: 1\n  max_concurrent_agents: 1",
             1,
         ),
     ):
@@ -761,7 +756,7 @@ def test_installer_accepts_only_the_bounded_runtime_concurrency_overlay(tmp_path
         assert rejected.returncode == 1
         assert f"DRIFT {workflow}" in rejected.stdout
 
-    runtime = source.replace("  max_concurrent_agents: 4", "  max_concurrent_agents: 1", 1)
+    runtime = source.replace("  max_concurrent_agents: 1", "  max_concurrent_agents: 4", 1)
     workflow.write_text(runtime.replace("  max_turns: 24", "  max_turns: 25", 1))
     other_drift = _run_installer(tmp_path, "--check")
     assert other_drift.returncode == 1
@@ -803,9 +798,6 @@ def test_installer_check_fails_closed_for_each_missing_reconciler_artifact(
         tmp_path / ".local/lib/symphony-reconciler/runtime-receipt.json",
         tmp_path / ".config/systemd/user/symphony-reconciler.service",
         tmp_path / ".config/systemd/user/symphony-reconciler.timer",
-        tmp_path / ".local/bin/symphony-concurrency-controller",
-        tmp_path / ".config/systemd/user/symphony-concurrency-controller.service",
-        tmp_path / ".config/systemd/user/symphony-concurrency-controller.timer",
     )
     for path in artifacts:
         original = path.read_bytes()
@@ -856,9 +848,8 @@ def test_installer_enables_reconciler_timer_without_restarting_main_service(
     commands = log.read_text().splitlines()
     assert "command=--user daemon-reload" in commands
     assert "command=--user enable --now symphony-reconciler.timer" in commands
-    assert "command=--user enable --now symphony-concurrency-controller.timer" in commands
+    assert all("symphony-concurrency-controller" not in line for line in commands)
     assert all("symphony-ui-pilot.service" not in line for line in commands)
     assert "TIMER_ENABLED symphony-reconciler.timer" in result.stdout
-    assert "TIMER_ENABLED symphony-concurrency-controller.timer" in result.stdout
     check = _run_installer(tmp_path, "--check")
     assert check.returncode == 0, check.stdout

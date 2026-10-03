@@ -20,14 +20,28 @@ WAIT_SECONDS="${CODEX_ACCOUNT_WAIT_SECONDS:-900}"
 # can never strand behind a dead reader.
 HEARTBEAT_SECONDS="${CODEX_ROTATE_HEARTBEAT_SECONDS:-2}"
 DEFAULT_COOLDOWN_SECONDS="${CODEX_DEFAULT_COOLDOWN_SECONDS:-21600}"
+USEFUL_TURN_HELPER="${SYMPHONY_USEFUL_TURN_HELPER:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/provider_useful_turns.py}"
+USEFUL_TURN_LEDGER="${GEM_PROVIDER_TURN_LEDGER:-$HOME/gem-workspace/state/provider-useful-turns.jsonl}"
 
 app_server_mode=0
+exec_json_mode=0
+has_exec=0
+has_json=0
+model=""
 for arg in "$@"; do
   if [[ "$arg" == "app-server" ]]; then
     app_server_mode=1
     break
   fi
+  [[ "$arg" == "exec" ]] && has_exec=1
+  [[ "$arg" == "--json" ]] && has_json=1
+  if [[ "$arg" == model=* ]]; then
+    model="${arg#model=}"
+    model="${model#\"}"
+    model="${model%\"}"
+  fi
 done
+(( has_exec == 1 && has_json == 1 )) && exec_json_mode=1
 
 mkdir -p "$LOCKS_DIR"
 touch "$LOG_FILE"
@@ -49,7 +63,7 @@ if [[ ! -f "$STATE_FILE" ]]; then
 fi
 
 account_order() {
-  ACCOUNTS_ROOT="$ACCOUNTS_ROOT" STATE_FILE="$STATE_FILE" python3 - <<'PY'
+  ACCOUNTS_ROOT="$ACCOUNTS_ROOT" STATE_FILE="$STATE_FILE" REQUIRED_ACCOUNT="${CODEX_REQUIRED_ACCOUNT:-}" python3 - <<'PY'
 import json
 import os
 import time
@@ -69,11 +83,12 @@ accounts = sorted(
     for path in root.iterdir()
     if path.is_dir() and (path / "auth.json").is_file()
 )
+required = os.environ.get("REQUIRED_ACCOUNT") or ""
+if required:
+    accounts = [name for name in accounts if name == required]
 now = int(time.time())
 cooldowns = state.get("cooldowns") or {}
 ready = [name for name in accounts if int(cooldowns.get(name) or 0) <= now]
-if not ready and accounts:
-    ready = [min(accounts, key=lambda name: int(cooldowns.get(name) or 0))]
 active = state.get("active")
 if active in ready:
     ready.remove(active)
@@ -127,6 +142,12 @@ with open(str(path) + ".lock", "a+") as lock:
         "at": int(time.time()),
         "until": until,
     }
+    # A newer provider/auth failure invalidates any earlier successful probe.
+    # Otherwise the lease guard can count a cooling account as available until
+    # the old readiness TTL expires.
+    readiness = state.get("readiness")
+    if isinstance(readiness, dict):
+        readiness.pop(account, None)
     if state.get("active") == account:
         state["active"] = None
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -234,25 +255,55 @@ set_active "$account"
 export CODEX_HOME="$home"
 log "START account=$account lease_fd=$account_lock_fd args=$*"
 
-tmp_err=$(mktemp)
-trap 'rm -f "$tmp_err"' EXIT
+tmp_stdout=$(mktemp)
+tmp_stderr=$(mktemp)
+trap 'rm -f "$tmp_stdout" "$tmp_stderr"' EXIT
+proof_started_at=$(date +%s)
 set +e
 # Codex CLI reports limits on stderr, while app-server reports the same
-# provider error inside its stdout JSON-RPC stream. Preserve both streams for
-# the caller and inspect both after exit so an exhausted account is quarantined
-# instead of returning repeated zero-token turns.
-"$REAL_CODEX" "$@" \
-  > >(tee -a "$tmp_err") \
-  2> >(tee -a "$tmp_err" >&2)
-rc=$?
+# provider error inside its stdout JSON-RPC stream. The stdout tee is a
+# synchronous pipeline: proof parsing cannot race an asynchronous process
+# substitution, and stderr cannot interleave into the structured JSON stream.
+"$REAL_CODEX" "$@" 2>"$tmp_stderr" | tee "$tmp_stdout"
+rc=${PIPESTATUS[0]}
 set -e
+cat "$tmp_stderr" >&2
 
-if grep -qiE 'usage limit|rate limit|429|token_invalidated|refresh token was revoked|token_expired|token is expired|session has ended|hit your usage limit' "$tmp_err"; then
-  until="$(cooldown_until "$tmp_err")"
+if grep -qihE 'usage limit|rate limit|429|token_invalidated|refresh token was revoked|token_expired|token is expired|session has ended|hit your usage limit' "$tmp_stdout" "$tmp_stderr"; then
+  until="$(cooldown_until "$tmp_stderr")"
+  if ! grep -qiE 'try again at' "$tmp_stderr"; then
+    until="$(cooldown_until "$tmp_stdout")"
+  fi
   mark_cooldown "$account" "$until"
   log "COOLDOWN account=$account until=$until rc=$rc"
   if [[ "$rc" -eq 0 ]]; then
     rc=75
+  fi
+fi
+
+# A configured profile or successful process exit is not capacity. Persist an
+# immutable proof row only when the v2 app-server stream contains a completed
+# turn, nonempty agent output, and positive provider-reported output tokens.
+if (( app_server_mode == 1 && rc == 0 )) && [[ -n "$model" && -f "$USEFUL_TURN_HELPER" ]]; then
+  if ! python3 "$USEFUL_TURN_HELPER" record-app-server \
+    --stream "$tmp_stdout" \
+    --ledger "$USEFUL_TURN_LEDGER" \
+    --provider openai \
+    --profile "$account" \
+    --model "$model" \
+    --started-at-epoch "$proof_started_at" >/dev/null; then
+    log "CAPACITY_PROOF_REJECTED account=$account reason=no-useful-completed-turn"
+  fi
+fi
+if (( exec_json_mode == 1 && rc == 0 )) && [[ -n "$model" && -f "$USEFUL_TURN_HELPER" ]]; then
+  if ! python3 "$USEFUL_TURN_HELPER" record-exec \
+    --stream "$tmp_stdout" \
+    --ledger "$USEFUL_TURN_LEDGER" \
+    --provider openai \
+    --profile "$account" \
+    --model "$model" \
+    --started-at-epoch "$proof_started_at" >/dev/null; then
+    log "CAPACITY_PROOF_REJECTED account=$account reason=no-useful-completed-turn"
   fi
 fi
 

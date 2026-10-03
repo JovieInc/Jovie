@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import fcntl
 import json
 import os
 import pathlib
@@ -143,6 +144,61 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertIn("systemctl --user is-enabled --quiet gem-pr-drain.timer", workflow)
         self.assertIn("systemctl --user is-active --quiet gem-pr-drain.timer", workflow)
         self.assertIn("([.artifacts[].matches] | all)", workflow)
+        self.assertIn(
+            "systemctl --user is-enabled --quiet symphony-concurrency-controller.timer",
+            workflow,
+        )
+        self.assertIn(
+            "systemctl --user is-active --quiet symphony-concurrency-controller.timer",
+            workflow,
+        )
+
+    def test_activation_seeds_capacity_before_guarded_runtime_restart(self):
+        workflow = ACTIVATION.read_text(encoding="utf-8")
+        stage = workflow.index(
+            "update-symphony-burrito.sh --skip-binary --no-restart"
+        )
+        seed_capacity = workflow.index("install-gem-fleet-controller.sh", stage)
+        refresh_gate = workflow.index("install-gem-pr-rehabilitation.sh", seed_capacity)
+        restart = workflow.index(
+            "update-symphony-burrito.sh --skip-binary\n",
+            refresh_gate,
+        )
+        readback = workflow.index(
+            "update-symphony-burrito.sh --runtime-readback",
+            restart,
+        )
+        reattest = workflow.index("install-gem-fleet-controller.sh", readback)
+
+        self.assertLess(stage, seed_capacity)
+        self.assertLess(seed_capacity, refresh_gate)
+        self.assertLess(refresh_gate, restart)
+        self.assertLess(restart, readback)
+        self.assertLess(readback, reattest)
+
+    def test_activation_can_stage_capacity_when_official_service_is_inactive(self):
+        workflow = ACTIVATION.read_text(encoding="utf-8")
+        installer = FLEET_INSTALLER.read_text(encoding="utf-8")
+        stage = workflow.index("FLEET_INSTALL_STAGE_ONLY=true")
+        first_install = workflow.index(
+            "bash scripts/hermes/install-gem-fleet-controller.sh", stage
+        )
+        guarded_restart = workflow.index(
+            "update-symphony-burrito.sh --skip-binary\n", first_install
+        )
+        final_install = workflow.index(
+            "bash scripts/hermes/install-gem-fleet-controller.sh", guarded_restart
+        )
+
+        self.assertLess(stage, first_install)
+        self.assertLess(first_install, guarded_restart)
+        self.assertLess(guarded_restart, final_install)
+        self.assertIn('readonly STAGE_ONLY="${FLEET_INSTALL_STAGE_ONLY:-false}"', installer)
+        self.assertEqual(installer.count("assert_official_service_ready"), 3)
+        self.assertLess(
+            installer.index('if [[ "${STAGE_ONLY}" == true ]]'),
+            installer.rindex("assert_official_service_ready"),
+        )
 
     def test_verify_only_installer_is_source_clean_and_side_effect_free(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -413,6 +469,7 @@ class FleetControllerInstallerContractTests(unittest.TestCase):
             "registry_config": gem / "config/gem-repo-registry.json",
             "workflow": symphony / "WORKFLOW.md",
             "attestation": gem / "state/gem-service-attestation.json",
+            "controller_receipt": gem / "state/symphony-concurrency.json",
         }
         (gem / "scripts").mkdir(parents=True)
         (gem / "config").mkdir(parents=True)
@@ -442,6 +499,25 @@ case "$*" in
   *"show-environment"*) exit 0 ;;
   *"is-active --quiet gem-pr-drain.timer"*) exit 1 ;;
   *"is-active --quiet gem-pr-drain.service"*) exit 1 ;;
+  *"is-active --quiet symphony-concurrency-controller.service"*)
+    [ "${FAKE_STUCK_CONTROLLER:-false}" = true ]
+    exit
+    ;;
+  *"stop symphony-concurrency-controller.service"*) exit 0 ;;
+  *"disable --now gem-oauth-concurrency-evidence.timer"*)
+    [ "${FAKE_RETIREMENT_FAILURE:-false}" != true ]
+    exit
+    ;;
+  *"list-unit-files gem-oauth-concurrency-evidence.timer"*)
+    [ "${FAKE_RETIREMENT_FAILURE:-false}" = true ] && printf 'gem-oauth-concurrency-evidence.timer enabled\n'
+    exit 0
+    ;;
+  *"is-active --quiet gem-oauth-concurrency-evidence.timer"*) exit 1 ;;
+  *"is-enabled --quiet gem-oauth-concurrency-evidence.timer"*) exit 1 ;;
+  *"enable --now symphony-concurrency-controller.timer"*)
+    [ -z "${FAKE_TIMER_ENABLE_MARKER:-}" ] || : > "$FAKE_TIMER_ENABLE_MARKER"
+    exit 0
+    ;;
   *"daemon-reload"*)
     if { [ -n "${FAKE_WORKFLOW_OVERLAY_VALUE:-}" ] || [ "${FAKE_WORKFLOW_UNRELATED_DRIFT:-false}" = true ]; } &&
        [ ! -e "$FAKE_WORKFLOW_MUTATION_MARKER" ]; then
@@ -464,6 +540,33 @@ case "$*" in
   *"show symphony-elixir.service --property=MainPID"*) printf '3131\n'; exit 0 ;;
   *"show symphony-elixir.service --property=ControlGroup"*)
     printf '/user.slice/user-1000.slice/user@1000.service/app.slice/symphony-elixir.service\n'
+    exit 0
+    ;;
+  *"start symphony-concurrency-controller.service"*)
+    [ "${FAKE_CONTROLLER_FAILURE:-false}" != true ] || exit 1
+    python3 - "$FAKE_CONTROLLER_RECEIPT" "$FAKE_WORKFLOW_OVERLAY_TARGET" "$FAKE_CONTROLLER_TARGET" <<'PY'
+import datetime
+import hashlib
+import json
+import pathlib
+import re
+import sys
+
+receipt_path, workflow_path, controller_path = map(pathlib.Path, sys.argv[1:])
+workflow = workflow_path.read_bytes()
+controller = controller_path.read_bytes()
+target = int(re.search(rb"max_concurrent_agents:\\s*(\\d+)", workflow).group(1))
+receipt_path.parent.mkdir(parents=True, exist_ok=True)
+receipt_path.write_text(json.dumps({
+    "schema": "symphony-concurrency/v1",
+    "mode": "applied",
+    "observedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    "resourceScope": {"workflow": str(workflow_path)},
+    "target": target,
+    "workflowSha256": hashlib.sha256(workflow).hexdigest(),
+    "controllerSha256": hashlib.sha256(controller).hexdigest(),
+}) + "\\n")
+PY
     exit 0
     ;;
 esac
@@ -491,6 +594,22 @@ exit 0
             encoding="utf-8",
         )
         ss.chmod(0o755)
+        flock = fake_bin / "flock"
+        flock.write_text(
+            "#!/usr/bin/env python3\n"
+            "import fcntl, sys\n"
+            "args = sys.argv[1:]\n"
+            "fd = int(args[-1])\n"
+            "operation = fcntl.LOCK_UN if '-u' in args else fcntl.LOCK_EX\n"
+            "if '-n' in args:\n"
+            "    operation |= fcntl.LOCK_NB\n"
+            "try:\n"
+            "    fcntl.flock(fd, operation)\n"
+            "except BlockingIOError:\n"
+            "    raise SystemExit(1)\n",
+            encoding="utf-8",
+        )
+        flock.chmod(0o755)
         proc_root = root / "proc"
         for pid in ("3131", "4242"):
             (proc_root / pid).mkdir(parents=True)
@@ -504,6 +623,11 @@ exit 0
             "SYMPHONY_RUNTIME": str(symphony),
             "FAKE_WORKFLOW_MUTATION_MARKER": str(root / "workflow-mutated"),
             "FAKE_WORKFLOW_OVERLAY_TARGET": str(paths["workflow"]),
+            "FAKE_CONTROLLER_RECEIPT": str(paths["controller_receipt"]),
+            "FAKE_CONTROLLER_TARGET": str(
+                home / ".local/bin/symphony-concurrency-controller"
+            ),
+            "FAKE_TIMER_ENABLE_MARKER": str(root / "timer-enabled"),
             "GEM_PROC_ROOT": str(proc_root),
             "PATH": f"{fake_bin}:/usr/bin:/bin:/usr/sbin:/sbin",
         }
@@ -515,18 +639,26 @@ exit 0
         env: dict[str, str],
         *,
         fail_restart: bool = False,
+        fail_controller: bool = False,
+        fail_retirement: bool = False,
+        stuck_controller: bool = False,
         workflow_overlay: str = "",
         unrelated_workflow_drift: bool = False,
+        stage_only: bool = False,
     ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             ["bash", str(fixture / FLEET_INSTALLER.relative_to(ROOT)), str(fixture)],
             env={
                 **env,
                 "FAKE_RUNTIME_FAILURE": "true" if fail_restart else "false",
+                "FAKE_CONTROLLER_FAILURE": "true" if fail_controller else "false",
+                "FAKE_RETIREMENT_FAILURE": "true" if fail_retirement else "false",
+                "FAKE_STUCK_CONTROLLER": "true" if stuck_controller else "false",
                 "FAKE_WORKFLOW_OVERLAY_VALUE": workflow_overlay,
                 "FAKE_WORKFLOW_UNRELATED_DRIFT": (
                     "true" if unrelated_workflow_drift else "false"
                 ),
+                "FLEET_INSTALL_STAGE_ONLY": "true" if stage_only else "false",
             },
             text=True,
             capture_output=True,
@@ -572,7 +704,44 @@ exit 0
         self.assertNotEqual(process.returncode, 0)
         self.assertIn("cannot import name 'bounded_selection'", process.stderr)
 
-    def test_install_attests_the_exact_runtime_policy(self):
+    def test_verify_only_rejects_untracked_install_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(fixture),
+                    "rm",
+                    "--cached",
+                    "scripts/hermes/provider_useful_turns.py",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(fixture),
+                    "-c",
+                    "user.name=Gem Test",
+                    "-c",
+                    "user.email=gem-test@example.invalid",
+                    "commit",
+                    "-qm",
+                    "remove tracked provider helper",
+                ],
+                check=True,
+                env=_git_env(),
+            )
+            process = self._verify(fixture, directory)
+
+        self.assertNotEqual(process.returncode, 0)
+        self.assertIn("install source is not tracked at HEAD", process.stderr)
+
+    def test_install_attests_the_exact_installed_policy_without_claiming_runtime_load(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._fixture(directory)
             paths, env = self._runtime(directory)
@@ -604,42 +773,95 @@ exit 0
         self.assertTrue(attestation["policy"]["matches"])
         self.assertTrue(attestation["gate"]["matches"])
         self.assertTrue(attestation["closureHealth"]["matches"])
+        self.assertTrue(attestation["controllerTick"]["matchesInstalledFiles"])
+        self.assertFalse(attestation["controllerTick"]["matchesInstalledRuntime"])
+        self.assertEqual(attestation["controllerTick"]["runtimeProof"]["status"], "UNKNOWN")
+        self.assertTrue(attestation["controllerTimer"]["enabled"])
+        self.assertTrue(attestation["controllerTimer"]["active"])
+        self.assertTrue(
+            all(
+                item["matches"]
+                for item in attestation["capacityPipeline"].values()
+            )
+        )
         self.assertEqual(
             attestation["policy"]["sourceSha256"],
             attestation["policy"]["installedSha256"],
         )
         self.assertEqual(attestation["workflow"]["matchMode"], "exact")
-        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 8)
-        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 8)
+        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 1)
+        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 1)
         self.assertEqual(attestation["listener"]["wrapperPid"], 3131)
         self.assertEqual(attestation["listener"]["pid"], 4242)
+
+    def test_stage_only_runs_one_tick_without_enabling_the_timer(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            timer_marker = pathlib.Path(env["FAKE_TIMER_ENABLE_MARKER"])
+            process = self._install(fixture, env, stage_only=True)
+            receipt_exists = paths["controller_receipt"].is_file()
+            attestation_exists = paths["attestation"].is_file()
+
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertTrue(receipt_exists)
+        self.assertFalse(timer_marker.exists())
+        self.assertFalse(attestation_exists)
+        self.assertIn("staged fleet capacity pipeline", process.stdout)
 
     def test_install_attests_controller_owned_bounded_concurrency_overlay(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._fixture(directory)
             paths, env = self._runtime(directory)
-            process = self._install(fixture, env, workflow_overlay="1")
+            process = self._install(fixture, env, workflow_overlay="4")
             installed_workflow = paths["workflow"].read_text(encoding="utf-8")
             attestation = json.loads(paths["attestation"].read_text(encoding="utf-8"))
 
         self.assertEqual(process.returncode, 0, process.stderr)
-        self.assertIn("max_concurrent_agents: 1", installed_workflow)
+        self.assertIn("max_concurrent_agents: 4", installed_workflow)
         self.assertTrue(attestation["workflow"]["matches"])
         self.assertEqual(
             attestation["workflow"]["matchMode"], "bounded_concurrency_overlay"
         )
-        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 8)
-        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 1)
+        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 1)
+        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 4)
         self.assertNotEqual(
             attestation["workflow"]["sourceSha256"],
             attestation["workflow"]["installedSha256"],
         )
 
+    def test_install_preserves_validated_thirty_seat_runtime_overlay(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            workflow_source = (
+                fixture / "scripts/hermes/symphony/WORKFLOW.md"
+            ).read_text(encoding="utf-8")
+            paths["workflow"].write_text(
+                workflow_source.replace(
+                    "max_concurrent_agents: 1", "max_concurrent_agents: 30"
+                ),
+                encoding="utf-8",
+            )
+            process = self._install(fixture, env)
+            installed_workflow = paths["workflow"].read_text(encoding="utf-8")
+            attestation = json.loads(
+                paths["attestation"].read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertIn("max_concurrent_agents: 30", installed_workflow)
+        self.assertEqual(
+            attestation["workflow"]["matchMode"],
+            "bounded_concurrency_overlay",
+        )
+        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 30)
+
     def test_install_rejects_out_of_bounds_concurrency_overlay(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._fixture(directory)
             paths, env = self._runtime(directory)
-            process = self._install(fixture, env, workflow_overlay="9")
+            process = self._install(fixture, env, workflow_overlay="41")
             restored_workflow = paths["workflow"].read_text(encoding="utf-8")
             attestation_exists = paths["attestation"].exists()
 
@@ -683,6 +905,62 @@ exit 0
         self.assertFalse(policy_exists)
         self.assertFalse(backup_root_exists)
         self.assertIn("official Symphony service symphony-elixir.service is not active", process.stderr)
+
+    def test_install_rolls_back_when_first_controller_tick_fails(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            process = self._install(fixture, env, fail_controller=True)
+            restored_gate = paths["gate"].read_text(encoding="utf-8")
+            attestation_exists = paths["attestation"].exists()
+
+        self.assertNotEqual(process.returncode, 0)
+        self.assertEqual(restored_gate, "old gate\n")
+        self.assertFalse(attestation_exists)
+
+    def test_install_refuses_an_inflight_controller_before_backup_or_writes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            process = self._install(fixture, env, stuck_controller=True)
+            gate = paths["gate"].read_text(encoding="utf-8")
+            backup_root_exists = (paths["gem"] / "state/backups").exists()
+
+        self.assertEqual(process.returncode, 3, process.stderr)
+        self.assertEqual(gate, "old gate\n")
+        self.assertFalse(backup_root_exists)
+        self.assertIn(
+            "symphony-concurrency-controller.service is still active",
+            process.stderr,
+        )
+
+    def test_install_rolls_back_when_legacy_writer_cannot_be_retired(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            process = self._install(fixture, env, fail_retirement=True)
+            restored_gate = paths["gate"].read_text(encoding="utf-8")
+            attestation_exists = paths["attestation"].exists()
+
+        self.assertEqual(process.returncode, 6)
+        self.assertEqual(restored_gate, "old gate\n")
+        self.assertFalse(attestation_exists)
+        self.assertIn("failed to retire legacy capacity writer", process.stderr)
+
+    def test_contended_install_lock_exits_before_runtime_mutation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            lock = paths["gem"] / "state/fleet-controller-install.lock"
+            lock.parent.mkdir(parents=True, exist_ok=True)
+            with lock.open("w") as held:
+                fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                process = self._install(fixture, env)
+            gate = paths["gate"].read_text(encoding="utf-8")
+
+        self.assertEqual(process.returncode, 5, process.stderr)
+        self.assertEqual(gate, "old gate\n")
+        self.assertIn("install lock is already held", process.stderr)
 
     def test_fleet_installer_replaces_stale_registry_before_target_smoke(self):
         installer = FLEET_INSTALLER.read_text(encoding="utf-8")

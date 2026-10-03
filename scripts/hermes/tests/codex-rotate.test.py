@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import os
 import pathlib
@@ -35,6 +36,7 @@ class CodexRotateTests(unittest.TestCase):
         )
         self.events = self.root / "events"
         self.events.mkdir()
+        self.ledger = self.root / "provider-useful-turns.jsonl"
         self.codex = self.root / "codex"
         self.codex.write_text(
             "#!/usr/bin/env bash\n"
@@ -56,6 +58,10 @@ class CodexRotateTests(unittest.TestCase):
                 "CODEX_ACCOUNT_WAIT_SECONDS": "5",
                 "EVENTS_DIR": str(self.events),
                 "FAKE_CODEX_SLEEP": "1",
+                "GEM_PROVIDER_TURN_LEDGER": str(self.ledger),
+                "SYMPHONY_USEFUL_TURN_HELPER": str(
+                    ROOT / "scripts/hermes/provider_useful_turns.py"
+                ),
             }
         )
         env.update({key: str(value) for key, value in overrides.items()})
@@ -96,6 +102,40 @@ class CodexRotateTests(unittest.TestCase):
         self.assertTrue((self.events / "account-a.started").exists())
         self.assertTrue((self.events / "account-b.started").exists())
 
+    def test_immediate_exit_and_stderr_volume_still_record_distinct_useful_turns(self):
+        useful = self.root / "useful-app-server"
+        useful.write_text(
+            "#!/usr/bin/env python3\n"
+            "import json, os, pathlib, sys\n"
+            "pathlib.Path(os.environ['EVENTS_DIR'], pathlib.Path(os.environ['CODEX_HOME']).name + '.started').touch()\n"
+            "turn = pathlib.Path(os.environ['CODEX_HOME']).name\n"
+            "events = [\n"
+            " {'method':'turn/started','params':{'turn':{'id':turn}}},\n"
+            " {'method':'item/completed','params':{'turnId':turn,'item':{'type':'agentMessage','text':'done'}}},\n"
+            " {'method':'thread/tokenUsage/updated','params':{'turnId':turn,'tokenUsage':{'last':{'inputTokens':5,'outputTokens':2,'totalTokens':7}}}},\n"
+            " {'method':'turn/completed','params':{'turn':{'id':turn,'status':'completed'}}},\n"
+            "]\n"
+            "for event in events: print(json.dumps(event), flush=True)\n"
+            "sys.stderr.write('diagnostic-only\\n' * 1000)\n"
+        )
+        useful.chmod(0o755)
+        first = self.start_app_server(CODEX_REAL_BIN=useful)
+        deadline = time.time() + 3
+        while not (self.events / "account-a.started").exists() and time.time() < deadline:
+            time.sleep(0.02)
+        second = self.start_app_server(CODEX_REAL_BIN=useful)
+        self.assertEqual(first.wait(timeout=5), 0)
+        self.assertEqual(second.wait(timeout=5), 0)
+        rows = [json.loads(line) for line in self.ledger.read_text().splitlines()]
+        expected_profiles = {
+            hashlib.sha256(
+                b"symphony-provider-profile/v1\0openai\0" + name.encode("utf-8")
+            ).hexdigest()
+            for name in ("account-a", "account-b")
+        }
+        self.assertEqual({row["profile"] for row in rows}, expected_profiles)
+        self.assertTrue(all(row["useful"] is True for row in rows))
+
     def test_excess_launch_waits_for_a_released_slot(self):
         first = self.start(FAKE_CODEX_SLEEP=2)
         second = self.start(FAKE_CODEX_SLEEP=2)
@@ -114,6 +154,16 @@ class CodexRotateTests(unittest.TestCase):
             "exit 1\n"
         )
         limited.chmod(0o755)
+        state_path = self.accounts / "state.json"
+        state = json.loads(state_path.read_text())
+        state["readiness"] = {
+            "account-a": {
+                "source": "authenticated_completion_probe/v1",
+                "checkedAt": 1_800_000_000,
+                "expiresAt": 1_900_000_000,
+            }
+        }
+        state_path.write_text(json.dumps(state))
         result = subprocess.run(
             [str(LAUNCHER), "exec", "test"],
             stdout=subprocess.DEVNULL,
@@ -125,6 +175,7 @@ class CodexRotateTests(unittest.TestCase):
         state = json.loads((self.accounts / "state.json").read_text())
         self.assertEqual(state["cooldowns"]["account-a"], 1893553445)
         self.assertEqual(state["last_error"]["account-a"]["reason"], "limit_or_auth")
+        self.assertNotIn("account-a", state.get("readiness", {}))
 
     def test_app_server_stdout_limit_quarantines_zero_exit_account(self):
         limited = self.root / "limited-app-server"

@@ -25,11 +25,14 @@ Stdlib only; state lives in a single atomically-replaced JSON file.
 from __future__ import annotations
 
 import argparse
+import errno
 import fcntl
+import hashlib
 import json
 import os
 import pathlib
 import re
+import stat
 import sys
 import time
 import urllib.error
@@ -38,6 +41,7 @@ from datetime import datetime, timezone
 
 SCHEMA = "symphony-lease-guard/v1"
 REPORT_SCHEMA = "symphony-lease-guard-report/v1"
+PROFILE_IDENTITY_CONTEXT = b"symphony-provider-profile/v1\0"
 DEFAULT_STATE_DIR = "~/.local/state/symphony-lease-guard"
 DEFAULT_WORKFLOW = "~/.config/symphony/WORKFLOW.md"
 FALLBACK_ACTIVE_STATES = ("Todo", "In Progress", "Rework", "Merging")
@@ -447,9 +451,13 @@ def count_orphan_launchers() -> int | None:
 
 
 def capacity_state() -> dict:
-    """Typed account capacity: configured accounts vs. held locks vs. active
-    cooldowns. State is 'available' or 'saturated'; 'unknown' when the account
-    root or state file cannot be observed (never synthesized)."""
+    """Typed OpenAI profile capacity with a mutually exclusive partition.
+
+    Profile identities are configuration directory names, not credential
+    contents. They let admission intersect fresh useful-turn proof with the
+    profiles that are still enrolled and not cooling instead of trusting
+    unrelated counts after a profile replacement.
+    """
     root = _accounts_root()
     try:
         accounts = sorted(
@@ -465,55 +473,104 @@ def capacity_state() -> dict:
         cooldowns = stored.get("cooldowns") if isinstance(stored, dict) else None
     except (OSError, TypeError, ValueError):
         return {"state": "unknown", "reason": "account_state_unreadable"}
+    if not isinstance(cooldowns, dict):
+        return {"state": "unknown", "reason": "account_cooldowns_invalid"}
     readiness = stored.get("readiness") if isinstance(stored, dict) else None
-    fresh_readiness = 0
-    cooling = 0
+    last_error = stored.get("last_error") if isinstance(stored, dict) else None
+    cooldown_profiles: list[str] = []
     for name in accounts:
-        try:
-            until = int((cooldowns or {}).get(name) or 0)
-        except (TypeError, ValueError):
-            until = 0
-        receipt = readiness.get(name) if isinstance(readiness, dict) else None
-        try:
-            ready = (
-                isinstance(receipt, dict)
-                and receipt.get("source") == "authenticated_completion_probe/v1"
-                and int(receipt.get("checkedAt")) <= now
-                and int(receipt.get("expiresAt")) > now
-            )
-        except (TypeError, ValueError):
-            ready = False
-        if until > now and ready:
-            fresh_readiness += 1
-        elif until > now:
-            cooling += 1
-    locked = 0
+        raw_until = cooldowns.get(name, 0)
+        if isinstance(raw_until, bool) or not isinstance(raw_until, int) or raw_until < 0:
+            return {"state": "unknown", "reason": "account_cooldowns_invalid"}
+        until = raw_until
+        if until > now:
+            cooldown_profiles.append(name)
+    cooldown_set = set(cooldown_profiles)
+    locked_profiles: list[str] = []
     locks_dir = root / "locks"
     for name in accounts:
-        lock_file = locks_dir / f"{name}.lock"
-        if not lock_file.is_file():
+        if name in cooldown_set:
             continue
+        lock_file = locks_dir / f"{name}.lock"
+        try:
+            lock_stat = lock_file.lstat()
+        except FileNotFoundError:
+            continue
+        except OSError:
+            return {"state": "unknown", "reason": "account_lock_unreadable"}
+        if not stat.S_ISREG(lock_stat.st_mode):
+            return {"state": "unknown", "reason": "account_lock_unreadable"}
         try:
             descriptor = os.open(lock_file, os.O_RDONLY)
         except OSError:
-            continue
+            return {"state": "unknown", "reason": "account_lock_unreadable"}
+        observable = True
         try:
             try:
                 fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except OSError:
-                locked += 1
+            except OSError as error:
+                if isinstance(error, BlockingIOError) or error.errno in {
+                    errno.EACCES,
+                    errno.EAGAIN,
+                }:
+                    locked_profiles.append(name)
+                else:
+                    observable = False
             else:
-                fcntl.flock(descriptor, fcntl.LOCK_UN)
+                try:
+                    fcntl.flock(descriptor, fcntl.LOCK_UN)
+                except OSError:
+                    observable = False
         finally:
-            os.close(descriptor)
-    available = max(0, len(accounts) - locked - cooling)
+            try:
+                os.close(descriptor)
+            except OSError:
+                observable = False
+        if not observable:
+            return {"state": "unknown", "reason": "account_lock_unreadable"}
+    locked_set = set(locked_profiles)
+    available_profiles = sorted(
+        name for name in accounts if name not in cooldown_set and name not in locked_set
+    )
+    eligible_profiles = sorted(locked_profiles + available_profiles)
+    fresh_readiness = 0
+    for name in eligible_profiles:
+        receipt = readiness.get(name) if isinstance(readiness, dict) else None
+        error = last_error.get(name) if isinstance(last_error, dict) else None
+        try:
+            checked_at = int(receipt.get("checkedAt")) if isinstance(receipt, dict) else 0
+            error_at = int(error.get("at")) if isinstance(error, dict) else 0
+            ready = (
+                isinstance(receipt, dict)
+                and receipt.get("source") == "authenticated_completion_probe/v1"
+                and checked_at <= now
+                and int(receipt.get("expiresAt")) > now
+                and checked_at >= error_at
+            )
+        except (TypeError, ValueError):
+            ready = False
+        if ready:
+            fresh_readiness += 1
+    cooling = len(cooldown_profiles)
+    locked = len(locked_profiles)
+    available = len(available_profiles)
+    def profile_identity(name: str) -> str:
+        return hashlib.sha256(
+            PROFILE_IDENTITY_CONTEXT + b"openai\0" + name.encode("utf-8")
+        ).hexdigest()
+
     return {
+        "provider": "openai",
         "state": "available" if available > 0 else "saturated",
         "reason": None,
         "accounts": len(accounts),
         "locked": locked,
         "cooldown": cooling,
         "available": available,
+        "lockedProfiles": sorted(profile_identity(name) for name in locked_profiles),
+        "cooldownProfiles": sorted(profile_identity(name) for name in cooldown_profiles),
+        "availableProfiles": sorted(profile_identity(name) for name in available_profiles),
+        "eligibleProfiles": sorted(profile_identity(name) for name in eligible_profiles),
         "freshReadiness": fresh_readiness,
     }
 
