@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import type { Virtualizer } from '@tanstack/react-virtual';
-import type { ReactNode, RefCallback } from 'react';
+import { memo, type ReactNode, type RefCallback } from 'react';
 import { useDesktopChatWorkState } from '@/lib/desktop/chat-work-state';
 import { composerPlaceholderForChatMode } from './chat-composer-copy';
 import {
@@ -70,7 +70,7 @@ interface ChatDraftComposerSurfaceProps
 }
 
 /** Only this leaf subscribes to characters; the transcript owns the runtime. */
-export function ChatDraftComposerSurface({
+export const ChatDraftComposerSurface = memo(function ChatDraftComposerSurface({
   draft,
   chatInputProps,
   ...surface
@@ -82,7 +82,7 @@ export function ChatDraftComposerSurface({
       chatInputProps={{ ...chatInputProps, value }}
     />
   );
-}
+});
 
 /** Keep committed draft safety live without rerendering the transcript owner. */
 export function ChatDraftWorkState({

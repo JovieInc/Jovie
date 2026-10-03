@@ -1593,7 +1593,7 @@ export function useJovieChatController({
         toolIntent: skillChip ? inferToolIntentFromSkill(skillChip.id) : null,
       });
     },
-    [chipTray, draft, rateLimitedSubmitter]
+    [chipTray.chips, draft, rateLimitedSubmitter]
   );
 
   const handleSuggestedPrompt = useCallback(
@@ -1615,7 +1615,7 @@ export function useJovieChatController({
       toolIntent: skillChip ? inferToolIntentFromSkill(skillChip.id) : null,
       interrupt: true,
     });
-  }, [chipTray, doSubmit, draft]);
+  }, [chipTray.chips, doSubmit, draft]);
 
   // Consume a pending prompt set before the chat component mounted
   // (e.g. via "open-chat-with-prompt"). This is programmatic/automated, not
