@@ -4,6 +4,7 @@ const owner = '11111111-1111-4111-8111-111111111111';
 const mocks = vi.hoisted(() => ({
   requireOwner: vi.fn(),
   setupSession: vi.fn(),
+  tx: { marker: 'pinned transaction' },
   institutions: vi.fn(),
   accounts: vi.fn(),
   transactions: vi.fn(),
@@ -11,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/finance/owner', () => ({
   requireFinancialOwnerId: mocks.requireOwner,
 }));
-vi.mock('@/lib/auth/session', () => ({ setupDbSession: mocks.setupSession }));
+vi.mock('@/lib/auth/session', () => ({ withDbSessionTx: mocks.setupSession }));
 vi.mock('@/lib/finance/repository', () => ({
   listFinanceInstitutions: mocks.institutions,
   listFinanceAccounts: mocks.accounts,
@@ -24,7 +25,11 @@ describe('Money overview owner-scoped database session', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.requireOwner.mockResolvedValue(owner);
-    mocks.setupSession.mockResolvedValue({ userId: owner });
+    mocks.setupSession.mockImplementation(
+      async (
+        operation: (tx: typeof mocks.tx, userId: string) => Promise<unknown>
+      ) => operation(mocks.tx, owner)
+    );
     mocks.institutions.mockResolvedValue([]);
     mocks.accounts.mockResolvedValue([]);
     mocks.transactions.mockResolvedValue([]);
@@ -33,23 +38,34 @@ describe('Money overview owner-scoped database session', () => {
   it('waits for the authenticated owner session before starting any finance read', async () => {
     let release!: () => void;
     mocks.setupSession.mockImplementation(
-      () =>
-        new Promise<void>(resolve => {
+      async (
+        operation: (tx: typeof mocks.tx, userId: string) => Promise<unknown>
+      ) => {
+        await new Promise<void>(resolve => {
           release = resolve;
-        })
+        });
+        return operation(mocks.tx, owner);
+      }
     );
     const overview = getMoneyOverview();
     await vi.waitFor(() =>
-      expect(mocks.setupSession).toHaveBeenCalledWith(owner)
+      expect(mocks.setupSession).toHaveBeenCalledWith(expect.any(Function), {
+        clerkUserId: owner,
+        isolationLevel: 'repeatable read',
+      })
     );
     expect(mocks.institutions).not.toHaveBeenCalled();
     expect(mocks.accounts).not.toHaveBeenCalled();
     expect(mocks.transactions).not.toHaveBeenCalled();
     release();
     await overview;
-    expect(mocks.institutions).toHaveBeenCalledWith(owner);
-    expect(mocks.accounts).toHaveBeenCalledWith(owner);
-    expect(mocks.transactions).toHaveBeenCalledWith(owner, { limit: 10_000 });
+    expect(mocks.institutions).toHaveBeenCalledWith(owner, mocks.tx);
+    expect(mocks.accounts).toHaveBeenCalledWith(owner, mocks.tx);
+    expect(mocks.transactions).toHaveBeenCalledWith(
+      owner,
+      { limit: 10_000 },
+      mocks.tx
+    );
   });
 
   it.each(['owner', 'session'])(

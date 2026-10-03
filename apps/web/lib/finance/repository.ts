@@ -2,6 +2,7 @@ import 'server-only';
 
 import { and, desc, eq, lt, or } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db/client/types';
 import {
   type FinanceAccount,
   type FinanceClassificationRule,
@@ -36,20 +37,22 @@ import { assertFinancialOwnerId } from './owner';
  */
 
 export async function listFinanceInstitutions(
-  ownerUserId: string
+  ownerUserId: string,
+  client: DbOrTransaction = db
 ): Promise<FinanceInstitution[]> {
   const owner = assertFinancialOwnerId(ownerUserId);
-  return db
+  return client
     .select()
     .from(financeInstitutions)
     .where(eq(financeInstitutions.ownerUserId, owner));
 }
 
 export async function listFinanceAccounts(
-  ownerUserId: string
+  ownerUserId: string,
+  client: DbOrTransaction = db
 ): Promise<FinanceAccount[]> {
   const owner = assertFinancialOwnerId(ownerUserId);
-  return db
+  return client
     .select()
     .from(financeAccounts)
     .where(eq(financeAccounts.ownerUserId, owner));
@@ -75,14 +78,15 @@ export async function getFinanceAccount(
 
 export async function listFinanceTransactions(
   ownerUserId: string,
-  options?: { accountId?: string; limit?: number }
+  options?: { accountId?: string; limit?: number },
+  client: DbOrTransaction = db
 ): Promise<FinanceTransaction[]> {
   const owner = assertFinancialOwnerId(ownerUserId);
   const conditions = [eq(financeTransactions.ownerUserId, owner)];
   if (options?.accountId) {
     conditions.push(eq(financeTransactions.accountId, options.accountId));
   }
-  return db
+  return client
     .select()
     .from(financeTransactions)
     .where(and(...conditions))

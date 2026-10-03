@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { setupDbSession } from '@/lib/auth/session';
+import { withDbSessionTx } from '@/lib/auth/session';
 import { buildMoneyOverview, type MoneyOverview } from '@/lib/finance/metrics';
 import { requireFinancialOwnerId } from '@/lib/finance/owner';
 import {
@@ -18,12 +18,16 @@ import {
  */
 export async function getMoneyOverview(): Promise<MoneyOverview> {
   const ownerUserId = await requireFinancialOwnerId();
-  await setupDbSession(ownerUserId);
-  const [institutions, accounts, transactions] = await Promise.all([
-    listFinanceInstitutions(ownerUserId),
-    listFinanceAccounts(ownerUserId),
-    // Trend + prior-window comparisons need the full available history.
-    listFinanceTransactions(ownerUserId, { limit: 10_000 }),
-  ]);
-  return buildMoneyOverview({ institutions, accounts, transactions });
+  return withDbSessionTx(
+    async tx => {
+      const [institutions, accounts, transactions] = await Promise.all([
+        listFinanceInstitutions(ownerUserId, tx),
+        listFinanceAccounts(ownerUserId, tx),
+        // Trend + prior-window comparisons need the full available history.
+        listFinanceTransactions(ownerUserId, { limit: 10_000 }, tx),
+      ]);
+      return buildMoneyOverview({ institutions, accounts, transactions });
+    },
+    { clerkUserId: ownerUserId, isolationLevel: 'repeatable read' }
+  );
 }
