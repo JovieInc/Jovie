@@ -200,14 +200,20 @@ test('read failures abort without enqueue and a raced mutation does not stop the
   assert.equal(result.warnings.length, 2);
 });
 
-test('wakes both existing controllers on completed Source Validation without a polling schedule', () => {
+test('wakes on completed Source Validation and on the bounded reconciliation sweep', () => {
   assert.ok(workflow.on.workflow_run.workflows.includes('Source Validation'));
   assert.deepEqual(workflow.on.workflow_run.types, ['completed']);
   assert.deepEqual(workflow.on.pull_request_target.types, [
     'unlabeled',
     'reopened',
   ]);
-  assert.equal(workflow.on.schedule, undefined);
+  // JOV-7589: a dequeue while checks are already green emits no completion
+  // event, so a periodic full-roster sweep re-arms within the cadence.
+  const [sweep] = workflow.on.schedule;
+  const cadenceMinutes = Number(
+    /^\*\/([1-9][0-9]*) \* \* \* \*$/.exec(sweep.cron)?.[1]
+  );
+  assert.ok(cadenceMinutes > 0 && cadenceMinutes <= 15);
   assert.match(workflow.jobs.enroll.if, /conclusion == 'success'/);
   const ready = load(
     readFileSync('.github/workflows/auto-ready-agent-drafts.yml', 'utf8')
@@ -322,6 +328,25 @@ test('a PR wake reads only its current candidate instead of rescanning the whole
     assert.deepEqual(result.reads, [7]);
     assert.equal(result.mutations.length, 1);
   }
+});
+
+test('a scheduled sweep re-enqueues a dequeued PR whose repaired head turned green', async () => {
+  // JOV-7589 regression: after a merge-queue ejection the lane pushes a newer
+  // head and the checks go green without a wake. The sweep must find and
+  // re-enroll it; a still-removed head stays blocked without a bounded retry.
+  const overrides = {
+    1: { timelineItems: { nodes: [{ createdAt: '2026-10-02T11:00:00Z' }] } },
+    2: {
+      timelineItems: { nodes: [{ createdAt: '2026-10-02T13:00:00Z' }] },
+    },
+  };
+  const result = await fixture({
+    roster: [candidate(1), candidate(2)],
+    overrides,
+    eventName: 'schedule',
+  });
+  assert.equal(result.inventories.length, 1);
+  assert.deepEqual(result.mutations, [{ id: 'PR_1', oid: sha }]);
 });
 
 test('an unattributable automatic wake cannot authorize a global queue scan', async () => {

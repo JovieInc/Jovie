@@ -737,6 +737,7 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - pull_request_target
+      - schedule
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:enroll

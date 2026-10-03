@@ -3,6 +3,7 @@
 # capability-gap: GitHub merge queue has no native auto-enroll for green PRs; GITHUB_TOKEN-created merge groups start no CI, so a hosted hop with the Jovie Bot app token must enqueue.
 # removal-trigger: Remove when GitHub offers native auto-enqueue of CLEAN PRs with merge-group CI, or when Summer's own enqueue tool proves 30 consecutive days of queue admission.
 name: Merge Queue Green Enroll
+# clock-class: temporal-resource
 
 # Tim 2026-09-26: production holds never stall merging. A held production
 # promote and a red main are separate issues from source admission, so green
@@ -10,11 +11,14 @@ name: Merge Queue Green Enroll
 #
 # Enqueues open, non-draft, same-repo PRs into main whose mergeStateStatus is
 # CLEAN (required checks green, no conflicts), that carry no hold/gated/incident
-# label. Event-driven, no timer: it runs when a required-check workflow finishes
-# on a PR, or a PR loses a hold label.
+# label. It runs when a required-check workflow finishes on a PR, or a PR loses
+# a hold label, plus a 15-minute reconciliation sweep: a queue ejection while
+# checks are already green produces no new check completion, so without the
+# sweep a dequeued green head is never re-armed (JOV-7589).
 # The ruleset's required checks on the merge group stay the only gate. Uses the
 # Jovie Bot app token because GITHUB_TOKEN-created merge groups start no CI.
-# Automatic wakes inspect only the signaled PR. Manual dispatch scans the complete roster.
+# Automatic wakes inspect only the signaled PR. The sweep and manual dispatch
+# scan the complete roster.
 
 on:
   workflow_run:
@@ -22,6 +26,11 @@ on:
     types: [completed]
   pull_request_target:
     types: [unlabeled, reopened]
+  # Reconciliation sweep (JOV-7589): re-enrolls green PRs whose dequeue left no
+  # event-driven wake. Bounded by the shared concurrency group; 15 minutes caps
+  # how long a green dequeued head can sit unarmed.
+  schedule:
+    - cron: '*/15 * * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -147,8 +156,8 @@ jobs:
             // on every check completion exhausts the shared app GraphQL quota.
             const validNumber = n => Number.isSafeInteger(n) && n > 0;
             let prs;
-            if (context.eventName === 'workflow_dispatch') {
-              // Explicit reconciliation retains a complete paginated inventory.
+            if (context.eventName === 'workflow_dispatch' || context.eventName === 'schedule') {
+              // Explicit and scheduled reconciliation retain a complete paginated inventory.
               prs = await github.paginate(github.rest.pulls.list, {
                 owner, repo, state: 'open', base: 'main', per_page: 100,
               });
