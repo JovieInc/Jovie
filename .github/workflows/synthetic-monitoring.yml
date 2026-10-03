@@ -512,7 +512,7 @@ jobs:
       - name: Probe anonymous billing health
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          REMEDIATION_TRIGGERS_ENABLED: ${{ vars.REMEDIATION_TRIGGERS_ENABLED }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -537,7 +537,7 @@ jobs:
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          REMEDIATION_TRIGGERS_ENABLED: ${{ vars.REMEDIATION_TRIGGERS_ENABLED }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -566,5 +566,5 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          REMEDIATION_TRIGGERS_ENABLED: ${{ vars.REMEDIATION_TRIGGERS_ENABLED }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
         run: node scripts/docs-deploy-intake.mjs

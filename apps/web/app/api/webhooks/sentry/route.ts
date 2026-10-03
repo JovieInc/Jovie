@@ -478,9 +478,9 @@ async function syncSentryRemediationIssue({
   culprit: string;
 }): Promise<{ identifier?: string | null } | null> {
   const key = sentryRemediationKey(shortId, issueId);
-  const enabled = process.env.REMEDIATION_TRIGGERS_ENABLED === 'true';
+  const disabled = process.env.REMEDIATION_TRIGGERS_DISABLED === 'true';
   const summerLive = process.env.SUMMER_SENTRY_INTAKE_LIVE === 'true';
-  if (!enabled || summerLive) {
+  if (disabled || summerLive) {
     if (!summerLive) {
       const planned = action === 'resolved' ? 'resolve' : 'upsert';
       console.log(
