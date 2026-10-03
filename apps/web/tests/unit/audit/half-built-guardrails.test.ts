@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
+import { MARKETING_TOOLS_FLYOUT_LINKS } from '@/data/marketingNavigation';
 import { PRODUCT_CAPABILITIES } from '@/data/product-truth/registry';
 import { CODE_FLAGS } from '@/lib/flags/code-flags';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
@@ -21,8 +23,11 @@ const DARK_CAPABILITIES = [
 ] as const;
 
 describe('half-built product surfaces stay dark', () => {
-  it('keeps YouTube thumbnail generation off until it is certified', () => {
+  it('keeps YouTube thumbnail generation off and out of navigation until certified', () => {
     expect(CODE_FLAGS.YOUTUBE_THUMBNAILS_PASTE_GENERATE).toBe(false);
+    expect(MARKETING_TOOLS_FLYOUT_LINKS.map(link => link.href)).not.toContain(
+      APP_ROUTES.YOUTUBE_THUMBNAILS
+    );
   });
 
   it('keeps creator finance off and the budget route closed', () => {

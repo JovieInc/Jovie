@@ -5,6 +5,7 @@ export const INVESTOR_PORTAL_EVENT_NAMES = [
   'deck_progressed',
   'founder_letter_opened',
   'meeting_cta_clicked',
+  'call_requested',
   'invest_cta_clicked',
 ] as const;
 
