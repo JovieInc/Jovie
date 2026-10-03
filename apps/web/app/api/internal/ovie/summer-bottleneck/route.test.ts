@@ -192,6 +192,59 @@ function fixtureProjection(
 }
 
 describe('POST /api/internal/ovie/summer-bottleneck', () => {
+  it('signs and forwards optional runner activity counts without fabricating missing values', async () => {
+    for (const counts of [
+      {},
+      { running: null, blocked: null },
+      { running: 0, blocked: 2 },
+    ]) {
+      const baseline = publisherSnapshot();
+      const input = {
+        ...baseline,
+        signals: {
+          ...baseline.signals,
+          runner: { ...baseline.signals.runner, ...counts },
+        },
+      };
+      vi.setSystemTime(new Date(input.observedAt));
+      vi.stubEnv('VERCEL_GIT_COMMIT_SHA', input.signals.release.productionSha);
+      const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+        Response.json(
+          {
+            ok: true,
+            receipt: { eventId: input.eventId, decision: 'accepted' },
+          },
+          { status: 202 }
+        )
+      );
+      vi.stubGlobal('fetch', fetch);
+      expect((await POST(request(input))).status).toBe(202);
+      const delivered = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+      expect(delivered.signals.runner).toEqual(input.signals.runner);
+    }
+  });
+
+  it('rejects malformed runner activity counts before delivery', async () => {
+    const baseline = publisherSnapshot();
+    vi.setSystemTime(new Date(baseline.observedAt));
+    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', baseline.signals.release.productionSha);
+    const fetch = vi.fn<typeof globalThis.fetch>();
+    vi.stubGlobal('fetch', fetch);
+    for (const name of ['running', 'blocked']) {
+      for (const value of [-1, 0.5, '1', true]) {
+        const input = {
+          ...baseline,
+          signals: {
+            ...baseline.signals,
+            runner: { ...baseline.signals.runner, [name]: value },
+          },
+        };
+        expect((await POST(request(input))).status).toBe(422);
+      }
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.bridgeEvents.length = 0;
