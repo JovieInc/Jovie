@@ -98,6 +98,11 @@ vi.mock('@/lib/musicfetch/resilient-client', () => {
       ),
     MusicfetchRequestError,
     MusicfetchBudgetExceededError,
+    isMusicfetchVendorUnavailable: (error: unknown) => {
+      if (!(error instanceof Error)) return false;
+      const status = (error as { statusCode?: number }).statusCode;
+      return status === 401 || status === 403;
+    },
   };
 });
 

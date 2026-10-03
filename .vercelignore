@@ -59,6 +59,21 @@ cleanup_old_branches*.sh
 
 # The docs project needs its Nextra wrapper to compile MDX app routes.
 !apps/docs/next.config.mjs
+# Docs prebuild (`scripts/validate-articles.mjs`) and the registry modules the
+# app and next.config import. `scripts/` and `*.mjs` exclude them; un-ignore
+# the directory before the files. Test modules and visual-proof-assets.mjs
+# stay excluded — nothing in the docs build imports that audit helper.
+!apps/docs/scripts/
+!apps/docs/scripts/*.mjs
+apps/docs/scripts/*.test.mjs
+!apps/docs/lib/article-metadata.mjs
+!apps/docs/lib/article-registry.mjs
+!apps/docs/lib/article-structure.mjs
+!apps/docs/lib/help-analytics.mjs
+!apps/docs/lib/help-center-home.mjs
+!apps/docs/lib/help-center-seo.mjs
+!apps/docs/lib/help-nav.mjs
+!apps/docs/lib/help-search.mjs
 
 # Build-critical web postbuild script
 !apps/web/scripts/

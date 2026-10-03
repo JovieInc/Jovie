@@ -31,6 +31,7 @@ import {
   type SentryMode,
 } from '@/lib/sentry/init';
 import {
+  isMusicfetchCutoverCapture,
   isOpaqueUpstashErrorJsonBag,
   isSpotifyReleaseCreditBoundCapture,
   isUpstashQuotaNoise,
@@ -175,6 +176,10 @@ function sendToSentry(params: {
       tags.error_class = context.error_class;
     }
 
+    if (typeof context?.remediation === 'string' && context.remediation) {
+      tags.remediation = context.remediation;
+    }
+
     const quotaFailure = isRedisQuotaFailure(error);
     if (quotaFailure && !tags.error_class) {
       tags.error_class = 'redis_quota_exceeded';
@@ -306,8 +311,17 @@ export async function captureError(
   const boundedCreditReceipt =
     isSpotifyReleaseCreditBoundCapture(resolvedError, resolvedContext) ||
     isSpotifyReleaseCreditBoundCapture(error, context);
+  const musicfetchCutover =
+    isMusicfetchCutoverCapture(resolvedError) ||
+    isMusicfetchCutoverCapture(message) ||
+    isMusicfetchCutoverCapture(errorData.message);
 
-  if (!opaqueBag && !quotaNoise && !boundedCreditReceipt) {
+  if (
+    !opaqueBag &&
+    !quotaNoise &&
+    !boundedCreditReceipt &&
+    !musicfetchCutover
+  ) {
     sendToSentry({
       error: resolvedError ?? message,
       errorMessage: errorData.message,

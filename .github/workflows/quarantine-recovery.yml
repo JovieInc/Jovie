@@ -1,0 +1,72 @@
+name: Quarantine Recovery
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# capability-gap: Complete execution artifacts and canonical Linear intake must precede a guarded ledger-only draft; the fast flakiness report cannot collect seven days of evidence on every main completion.
+# removal-trigger: Retire when the canonical producer provides an authenticated complete history and guarded proposal receipt in-band.
+# clock-class: temporal-resource
+
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: quarantine-recovery
+  cancel-in-progress: false
+
+jobs:
+  recover-quarantine:
+    if: ${{ vars.QUARANTINE_AUTO_HEAL_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Collect verified quarantine execution history
+        id: collect
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/collect-quarantine-evidence.mjs
+
+      - name: Analyze current failure signatures
+        id: analyze
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node .github/scripts/analyze-test-flakiness.js
+
+      - name: File verified failure clusters in Linear
+        id: intake
+        if: ${{ success() && steps.collect.outcome == 'success' && steps.analyze.outcome == 'success' }}
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: node scripts/file-quarantine-clusters.mjs
+
+      - name: Generate guarded proposal token
+        id: proposal-token
+        if: ${{ success() && steps.intake.outcome == 'success' }}
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Propose guarded quarantine ledger reconciliation
+        if: ${{ success() && steps.intake.outcome == 'success' && steps.proposal-token.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ steps.proposal-token.outputs.token }}
+        run: node scripts/propose-quarantine-ledger.mjs

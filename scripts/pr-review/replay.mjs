@@ -3,9 +3,13 @@
 //   [{ "id": "...", "receipt": "<path to pr-review-receipt.json>",
 //      "clean": false, "expected": [{ "path": "apps/...", "line": 42 }] }]
 // Receipts are produced by running cli.mjs against each base/head pair.
+// --ledger <path> merges each case's outcomes into a model-outcomes/v1
+// ledger, which ./rank.mjs reads (PR_REVIEW_OUTCOMES) so model choice follows
+// measured cost per successful review.
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { emptyLedger, mergeLedger } from './ledger.mjs';
 
 const LINE_TOLERANCE = 15;
 
@@ -60,6 +64,52 @@ export function scoreReplay(cases) {
   };
 }
 
+/**
+ * One outcome per model per completed case. A case succeeds when every
+ * labelled defect was found and no verified finding is a false alarm. Stale or
+ * incomplete receipts are skipped so provider outages do not count as misses.
+ */
+export function outcomesFromCases(cases) {
+  const outcomes = [];
+  for (const entry of cases) {
+    const { receipt } = entry;
+    if (receipt.status !== 'complete' || !receipt.routing) continue;
+    const posted = receipt.findings.filter(f => f.state === 'verified');
+    const expected = entry.clean ? [] : (entry.expected ?? []);
+    const found = expected.every(e => posted.some(f => matches(f, e)));
+    const noFalseAlarm = posted.every(f => expected.some(e => matches(f, e)));
+    const success = found && noFalseAlarm;
+    const roles = Object.entries(receipt.routing);
+    for (const [roleName, role] of roles) {
+      const usage = receipt.stats?.usage?.[role.model] ?? {};
+      outcomes.push({
+        modelId: role.registryId,
+        capability: roleName === 'verification' ? 'review-verify' : 'review',
+        success,
+        tokensIn: usage.inputTokens ?? 0,
+        tokensOut: usage.outputTokens ?? 0,
+        minutes: (receipt.stats?.minutes ?? 0) / roles.length,
+      });
+    }
+  }
+  return outcomes;
+}
+
+/** Merge scored cases into a ledger, one entry per case id. */
+export function recordOutcomes(ledger, cases, now) {
+  const updates = {};
+  for (const entry of cases) {
+    const outcomes = outcomesFromCases([entry]);
+    if (outcomes.length === 0) continue;
+    updates[entry.id] = {
+      headSha: entry.headSha ?? null,
+      clean: Boolean(entry.clean),
+      outcomes,
+    };
+  }
+  return mergeLedger(ledger, updates, now);
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const seedPath = process.argv[2];
   if (!seedPath) {
@@ -72,5 +122,16 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     ...entry,
     receipt: JSON.parse(readFileSync(resolve(base, entry.receipt), 'utf8')),
   }));
-  process.stdout.write(`${JSON.stringify(scoreReplay(cases), null, 2)}\n`);
+  const score = scoreReplay(cases);
+  const ledgerIndex = process.argv.indexOf('--ledger');
+  if (ledgerIndex > 0 && process.argv[ledgerIndex + 1]) {
+    const ledgerPath = process.argv[ledgerIndex + 1];
+    const previous = existsSync(ledgerPath)
+      ? JSON.parse(readFileSync(ledgerPath, 'utf8'))
+      : emptyLedger();
+    const ledger = recordOutcomes(previous, cases);
+    writeFileSync(ledgerPath, `${JSON.stringify(ledger, null, 2)}\n`);
+    score.ledgerCases = Object.keys(ledger.cases).length;
+  }
+  process.stdout.write(`${JSON.stringify(score, null, 2)}\n`);
 }

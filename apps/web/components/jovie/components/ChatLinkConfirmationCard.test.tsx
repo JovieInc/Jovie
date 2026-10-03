@@ -24,6 +24,36 @@ vi.mock('@/components/atoms/SocialIcon', () => ({
 }));
 
 describe('ChatLinkConfirmationCard', () => {
+  it('retains the real confirmation mutation outside preview fixtures', async () => {
+    confirmMutate.mockClear();
+    const user = userEvent.setup();
+    render(
+      <ChatLinkConfirmationCard
+        profileId='profile-1'
+        platform={{
+          id: 'spotify',
+          name: 'Spotify',
+          icon: 'spotify',
+          color: 'brand-spotify',
+        }}
+        normalizedUrl='https://open.spotify.com/artist/example'
+        originalUrl='https://open.spotify.com/artist/example'
+      />
+    );
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    expect(confirmMutate).toHaveBeenCalledWith(
+      {
+        profileId: 'profile-1',
+        platform: 'spotify',
+        url: 'https://open.spotify.com/artist/example',
+        normalizedUrl: 'https://open.spotify.com/artist/example',
+      },
+      expect.objectContaining({
+        onSuccess: expect.any(Function),
+        onError: expect.any(Function),
+      })
+    );
+  });
   it('keeps the dismissed Undo action at the canonical 28px visible / 44px hit geometry', async () => {
     const user = userEvent.setup();
     render(

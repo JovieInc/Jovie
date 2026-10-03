@@ -77,6 +77,7 @@ import {
 } from '@/lib/chat/message-text';
 import { canUseOvChatMode, parseChatMode } from '@/lib/chat/ov-mode';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
+import { buildRelatedSuggestionsFraming } from '@/lib/chat/related-recommendations';
 import {
   updateOwnedReleaseGeneratedPitches,
   updateOwnedReleaseMetadata,
@@ -899,16 +900,20 @@ function createCheckCanvasStatusTool(
 
 /**
  * Creates the suggestRelatedArtists tool.
- * Uses the artist's profile data to suggest related artists for pitching and ad targeting.
+ * Uses the creator's profile data to suggest related subjects for pitching,
+ * outreach, and ad targeting. The framing is source-aware (JOV-7635): music
+ * similarity language only applies when the creator's work is music;
+ * everything else stays "related creators".
  */
 function createSuggestRelatedArtistsTool(context: ArtistContext) {
+  const framing = buildRelatedSuggestionsFraming(context);
+
   return tool({
-    description:
-      "Suggest related artists for playlist pitching, ad targeting, and collaboration based on the artist's genre, style, and popularity level. Returns advice on which artists to target.",
+    description: framing.description,
     inputSchema: chatToolSchema({
       purpose: z
         .enum(['playlist_pitching', 'ad_targeting', 'collaboration', 'all'])
-        .describe('What the related artists will be used for'),
+        .describe(`What the ${framing.subjectTerm} will be used for`),
       count: z
         .number()
         .int()
@@ -921,7 +926,9 @@ function createSuggestRelatedArtistsTool(context: ArtistContext) {
       // Provide the AI with structured context to generate recommendations
       return {
         success: true,
-        artistContext: {
+        summary: framing.summary,
+        subjectKind: framing.isMusicSource ? 'artist' : 'creator',
+        creatorContext: {
           name: context.displayName,
           genres: context.genres,
           spotifyFollowers: context.spotifyFollowers,
@@ -929,8 +936,7 @@ function createSuggestRelatedArtistsTool(context: ArtistContext) {
           purpose,
           requestedCount: suggestionCount ?? 5,
         },
-        instructions:
-          'Based on the artist context above, suggest related artists. Consider: genre alignment, similar popularity tier (aim slightly higher for pitching), audience overlap potential, and the specific purpose. For ad targeting, include both larger and smaller artists in the same niche. For playlist pitching, focus on artists who are on playlists the user would want to be on.',
+        instructions: framing.instructions,
       };
     },
   });

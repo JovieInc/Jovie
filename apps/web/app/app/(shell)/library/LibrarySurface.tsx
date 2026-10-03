@@ -601,11 +601,7 @@ const ReleaseDateCell = memo(function ReleaseDateCell({
 
 const libraryColumnHelper = createColumnHelper<LibraryReleaseAsset>();
 
-function createLibraryTypeColumn(
-  metaClassName: string,
-  size: number,
-  minSize: number
-) {
+function createLibraryTypeColumn(size: number, minSize: number) {
   return libraryColumnHelper.display({
     id: 'type',
     header: 'Type',
@@ -616,7 +612,12 @@ function createLibraryTypeColumn(
     ),
     size,
     minSize,
-    meta: { className: metaClassName },
+    meta: {
+      className: 'px-2',
+      priority: 2,
+      minWidth: size,
+      compact: asset => formatLibraryItemType(asset),
+    },
   });
 }
 
@@ -675,7 +676,7 @@ export const LIBRARY_TABLE_COLUMNS = [
     minSize: 220,
     size: 9999,
     enableSorting: false,
-    meta: { className: alignment.workspaceSeamX },
+    meta: { className: alignment.workspaceSeamX, primary: true, minWidth: 220 },
   }),
   libraryColumnHelper.display({
     id: 'releaseDate',
@@ -683,17 +684,26 @@ export const LIBRARY_TABLE_COLUMNS = [
     cell: ({ row }) => <ReleaseDateCell asset={row.original} />,
     size: 112,
     minSize: 96,
-    meta: { className: 'pl-2 pr-3' },
+    meta: {
+      className: 'pl-2 pr-3',
+      priority: 5,
+      minWidth: 112,
+      compact: asset => <ReleaseDateCell asset={asset} />,
+    },
   }),
-  // Release + Approval share the same md breakpoint so a Released+Draft
-  // row never shows bare "Draft" alone (JOV-3333 / #10384).
+  // Release and Approval share a tier so a row never shows bare "Draft" alone.
   libraryColumnHelper.display({
     id: 'status',
     header: 'Release',
     cell: ({ row }) => <LibraryCatalogStatusCell asset={row.original} />,
     size: 112,
     minSize: 96,
-    meta: { className: 'hidden md:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 4,
+      minWidth: 112,
+      compact: asset => <LibraryCatalogStatusCell asset={asset} />,
+    },
   }),
   libraryColumnHelper.display({
     id: 'approval',
@@ -701,16 +711,26 @@ export const LIBRARY_TABLE_COLUMNS = [
     cell: ({ row }) => <ApprovalStatusCell asset={row.original} />,
     size: 128,
     minSize: 108,
-    meta: { className: 'hidden md:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 4,
+      minWidth: 128,
+      compact: asset => <ApprovalStatusCell asset={asset} />,
+    },
   }),
-  createLibraryTypeColumn('hidden lg:table-cell px-2', 104, 88),
+  createLibraryTypeColumn(104, 88),
   libraryColumnHelper.display({
     id: 'providers',
     header: 'Providers',
     cell: ({ row }) => <LibraryCatalogProvidersCell asset={row.original} />,
     size: 120,
     minSize: 96,
-    meta: { className: 'hidden md:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 3,
+      minWidth: 120,
+      compact: asset => <LibraryCatalogProvidersCell asset={asset} />,
+    },
   }),
   libraryColumnHelper.display({
     id: 'shareUrl',
@@ -724,7 +744,14 @@ export const LIBRARY_TABLE_COLUMNS = [
     size: 220,
     minSize: 180,
     enableSorting: false,
-    meta: { className: 'hidden lg:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 1,
+      minWidth: 220,
+      compact: asset => (
+        <LibraryAssetShareUrlCell asset={asset} share={asset.share} />
+      ),
+    },
   }),
   createLibraryActionColumn('w-10 pl-1 pr-2'),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
