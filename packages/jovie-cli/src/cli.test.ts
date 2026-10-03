@@ -69,6 +69,13 @@ describe('jovie CLI', () => {
 
   it.each([
     {
+      args: ['creator', 'lookup', 'https://youtube.com/@creator'],
+      body: '{"platform":"youtube","displayName":"Creator"}',
+      expectedPath:
+        '/api/agents/creator-lookup?url=https%3A%2F%2Fyoutube.com%2F%40creator',
+      expectedOutput: { platform: 'youtube', displayName: 'Creator' },
+    },
+    {
       args: ['artist', 'get', 'demo'],
       body: '{"artist":{"username":"demo"}}',
       expectedPath: '/api/v1/demo',

@@ -399,7 +399,7 @@
     "docs/AI_AGENT_GUIDE.md": {
       "owner": "@itstimwhite",
       "claim": "API inventory uses Better Auth per the canonical auth rule; inventories are not runtime certification.",
-      "documentSha256": "a72ff588f03a09c0abe10824f09192d5865f2b087f697ba8d0355397c1ed436e",
+      "documentSha256": "44b4060ada4b5abc02f735ecc934446d295edf72cbd3c55dfa922fb4763ccf77",
       "sources": [
         {
           "path": ".claude/rules/auth.md",

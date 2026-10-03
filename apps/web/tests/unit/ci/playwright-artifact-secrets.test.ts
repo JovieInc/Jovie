@@ -107,7 +107,7 @@ const protectedJobs: Record<string, string[]> = {
 const producerCounts: Record<string, number> = {
   'agent-tick.yml': 6,
   'canary-health-gate.yml': 1,
-  'ci.yml': 16,
+  'ci.yml': 17,
   'e2e-full-matrix.yml': 2,
   'nightly-testing-agent.yml': 2,
   'nightly-tests.yml': 4,
@@ -1576,6 +1576,18 @@ ${fixtureCheckout}
     ).toBeLessThan(chaosSweep.indexOf('exit \\"\\$status\\"'));
     expect(nightly.indexOf(chaosSweep)).toBeLessThan(
       nightly.indexOf(chaosUpload)
+    );
+    expect(chaosSweep).toMatch(/^        continue-on-error: true$/m);
+    expect(chaosSweep).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
+    expect(nightly).toContain(
+      'PORT=3100 node .next/standalone/apps/web/server.js'
+    );
+    expect(nightly).not.toContain('dev:local:playwright');
+    const nightlyE2e = stepBlock(nightly, 'Run nightly E2E tests');
+    expect(nightlyE2e).toContain('BASE_URL: http://127.0.0.1:3100');
+    expect(nightlyE2e).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
+    expect(nightly.indexOf('Run nightly E2E tests')).toBeLessThan(
+      nightly.indexOf('Stop route QA bypass server')
     );
     expect(stepBlock(nightly, 'Upload route QA ledger')).toMatch(
       /workflow_dispatch[\s\S]*suite != 'design-v1'[\s\S]*route-matrix\.json[\s\S]*findings-ledger\.json/

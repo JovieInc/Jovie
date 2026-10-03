@@ -426,6 +426,39 @@ test('fork approval must be current human collaborator latest opinionated state'
   input.reviews = [review('APPROVED'), review('DISMISSED', 2)];
   assert.equal(evaluateSourceAdmission(input).allowed, false);
 });
+test('generic admission preserves base holds and their provenance after main moves', () => {
+  const input = fixture();
+  const recorded = 'a'.repeat(40);
+  input.statuses = [tombstone('jovie-queue-failure-hold/v1')];
+  input.statuses[0].description = `class=base-branch;n=1;run=123;try=1;main=${recorded}`;
+  assert.ok(
+    evaluateSourceAdmission(input).blockers.includes(
+      'tombstone:jovie-queue-failure-hold/v1'
+    )
+  );
+  input.currentMainSha = recorded;
+  assert.equal(evaluateSourceAdmission(input).allowed, false);
+  input.currentMainSha = 'b'.repeat(40);
+  assert.equal(evaluateSourceAdmission(input).allowed, false);
+  for (const currentMainSha of ['', 'invalid', 'b'.repeat(40)]) {
+    input.currentMainSha = currentMainSha;
+    assert.equal(evaluateSourceAdmission(input).allowed, false);
+  }
+  input.statuses[0].creator = null;
+  assert.ok(
+    evaluateSourceAdmission(input).blockers.includes(
+      'tombstone-provenance-unavailable'
+    )
+  );
+  input.statuses[0].creator = { type: 'Bot', login: 'jovie-bot[bot]' };
+  input.statuses[0].target_url =
+    'https://github.com/JovieInc/Jovie/actions/runs/999';
+  assert.ok(
+    evaluateSourceAdmission(input).blockers.includes(
+      'tombstone-provenance-unavailable'
+    )
+  );
+});
 test('pre-land changelog collision preserves existing release branch exception', () => {
   const input = fixture();
   input.files = [{ filename: 'CHANGELOG.md' }];
