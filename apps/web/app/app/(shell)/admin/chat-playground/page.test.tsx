@@ -10,8 +10,8 @@ vi.mock('@/components/features/admin/layout/AdminPage', () => ({
     <main>{children}</main>
   ),
 }));
-vi.mock('./ChatUiPlayground', () => ({
-  ChatUiPlayground: () => <div>Chat scenario catalog</div>,
+vi.mock('./DeferredChatUiPlayground', () => ({
+  DeferredChatUiPlayground: () => <div>Chat scenario catalog</div>,
 }));
 
 describe('AdminChatPlaygroundPage', () => {
