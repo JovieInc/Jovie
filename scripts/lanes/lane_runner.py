@@ -2572,7 +2572,7 @@ def _rerun_failed(pr: dict):
 
 
 def arm_ready_prs(host: Host, prs: list[dict]) -> None:
-    """Green, unarmed, non-draft PRs get squash auto-merge. Drafts stay on ready_green."""
+    """Select green rearming intent; the shared terminal consumer owns publication."""
     if not prs or not remediation.escalation_enabled():
         return
     path = host.state / "fix-attempts.json"
@@ -2583,9 +2583,9 @@ def arm_ready_prs(host: Host, prs: list[dict]) -> None:
         classified = remediation.classify_blocker(pr, held.get(str(pr.get("number"))), record)
         if classified.get("next_action") != "arm":
             continue
-        sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto", "--squash"])
-        for label in sorted(remediation.STALE_LABELS):
-            sh(["gh", "api", "-X", "DELETE", f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/{label}"])
+        # A cached ready classification cannot retire preservation signals or replace
+        # exact-head proof, owner, source-policy and native queue-history authority.
+        publish_verified(host, pr)
 
 
 def failure_excerpt(pr: dict, limit: int = 6000) -> str:
@@ -3728,6 +3728,12 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
     # outside the global claim lock, then refresh inventory for ordinary admission.
     requeue_verified(host, lane_prs(name))
     claim = Locked(host.state / "claim.lock", blocking=True)
+    try:
+        ready_candidates = fix_candidates(name) if remediation.escalation_enabled() else []
+    finally:
+        claim.release()
+    arm_ready_prs(host, ready_candidates)
+    claim = Locked(host.state / "claim.lock", blocking=True)
     # The claim lock serializes the scan, so the shared cache fill happens once. A rate
     # limit skips the API for every worker until the cooldown file expires.
     red = adopt = issue = None
@@ -3738,7 +3744,6 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         prs = lane_prs(name)
         candidates = fix_candidates(name)
         events = pr_events.queued_prs(THIS, pr_events.FIX_KINDS)
-        arm_ready_prs(host, candidates)
         escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
         red = pr_events.claim_event_pr(host, THIS, name, events) or claim_red_pr(host, name, candidates)
         adopt = None if red or not provider_may_run(name, "adopt") else claim_adoptable_pr(host, name, prs, candidates)

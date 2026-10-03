@@ -1337,6 +1337,51 @@ class WorkerTest(unittest.TestCase):
         self.assertIn("passed the lane gate", self.linear.comments[-1][1])
         self.assertEqual(self.execs[0][-3:], ["worker", "--provider", "devin"])
 
+    def test_rearming_publishes_outside_claim_lock_then_refreshes_admission(self):
+        pr = {"number": 7, "headRefOid": "abc", "headRefName": "devin/jov-7-20261002t0000",
+              "state": "OPEN", "isDraft": False, "mergeStateStatus": "CLEAN", "labels": [],
+              "statusCheckRollup": [{"name": "PR Ready", "status": "COMPLETED", "conclusion": "SUCCESS"}]}
+        (self.host.state / "verified.json").write_text(json.dumps({"7:abc": gate_proof("abc")}))
+        real_lock, scans, policies, calls, selected = lane.Locked, [], [], [], []
+        def checked_lock(path, blocking):
+            if path == self.host.state / "claim.lock" and blocking:
+                probe = real_lock(path, False)
+                try: self.assertTrue(probe.held, "nested claim acquisition would deadlock publication")
+                finally: probe.release()
+            return real_lock(path, blocking)
+        def candidates(name):
+            probe = real_lock(self.host.state / "claim.lock", False)
+            try: self.assertFalse(probe.held, "cache scans remain serialized")
+            finally: probe.release()
+            scans.append(name)
+            return [pr] if len(scans) == 1 else []
+        def policy(pr, **kwargs):
+            probe = real_lock(self.host.state / "claim.lock", False)
+            try: self.assertTrue(probe.held, "slow policy runs outside the global claim lock")
+            finally: probe.release()
+            policies.append(kwargs["before_ready"])
+            return None
+        def shell(cmd, **kwargs):
+            calls.append(cmd)
+            return SimpleNamespace(returncode=0, stdout=publication_response(cmd), stderr="")
+        lane.run_issue = lambda *args: {"verdict": "landing", "prUrl": "u"}
+        lane.fix_candidates = candidates
+        lane.claim_red_pr = lambda host, name, prs=None: selected.append(prs)
+        with patch.object(lane, "Locked", side_effect=checked_lock), \
+                patch.object(lane.remediation, "escalation_enabled", return_value=True), \
+                patch.object(lane, "reconcile_fix_target", return_value=pr), \
+                patch.object(lane, "claimed_elsewhere", return_value=False), \
+                patch.object(lane, "source_publication_authority", side_effect=policy), \
+                patch.object(lane, "sh", side_effect=shell):
+            lane.worker(self.host, "devin")
+        self.assertEqual(scans, ["devin", "devin"])
+        self.assertEqual(policies, [True, False])
+        self.assertEqual(selected, [[]], "admission uses the refreshed candidate inventory")
+        writes = [cmd for cmd in calls if cmd[:3] == ["gh", "pr", "merge"]]
+        self.assertEqual(len(writes), 1)
+        self.assertEqual(writes[0][-2:], ["--match-head-commit", "abc"])
+        self.assertFalse(any("DELETE" in cmd for cmd in calls))
+
     def test_disk_cleanup_requires_a_slot_and_denial_releases_it_without_claiming(self):
         held = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
         with patch.object(lane.disk_guard, "check") as check:
@@ -4243,6 +4288,76 @@ class TerminalPublicationTest(unittest.TestCase):
 
     def proof(self, record=None):
         (self.host.state / "verified.json").write_text(json.dumps({"7:abc": gate_proof("abc") if record is None else record}))
+
+    def armable(self):
+        self.pr.update(isDraft=False, statusCheckRollup=[
+            {"name": "PR Ready", "status": "COMPLETED", "conclusion": "SUCCESS"}])
+        self.live = dict(self.pr)
+        return self.pr
+
+    def test_rearming_requires_terminal_proof_and_preserves_signal_history(self):
+        pr = self.armable()
+        history = {"7": {"sha": "abc", "count": 2, "at": 0}}
+        path = self.host.state / "fix-attempts.json"
+        path.write_text(json.dumps(history))
+        for proof in (None, "abc", gate_proof("abc", "held"), gate_proof("other"),
+                      {**gate_proof("abc"), "policyDigest": "old"}):
+            with self.subTest(proof=proof), patch.object(lane.remediation, "escalation_enabled", return_value=True):
+                (self.host.state / "verified.json").unlink(missing_ok=True)
+                if proof is not None: self.proof(proof)
+                lane.arm_ready_prs(self.host, [pr])
+                self.assertEqual(self.calls, [])
+                self.assertEqual(json.loads(path.read_text()), history)
+
+    def test_rearming_obeys_spent_hold_revocation_and_owner_authority(self):
+        pr = self.armable()
+        self.proof()
+        paths = [self.host.state / "fix-attempts.json", lane.held_path(self.host), lane.revocations_path(self.host)]
+        for mode in ("spent", "held", "revoked", "foreign-owner", "active-gate", "fresh-hold", "moved"):
+            with self.subTest(mode=mode), patch.object(lane.remediation, "escalation_enabled", return_value=True):
+                for path in paths: path.unlink(missing_ok=True)
+                self.live = dict(pr); self.calls.clear()
+                if mode == "spent": paths[0].write_text(json.dumps({"7": {"sha": "abc", "count": 2, "at": 0}}))
+                if mode == "held": paths[1].write_text(json.dumps({"7": {"sha": "abc", "reason": "unfixable"}}))
+                if mode == "revoked": lane.revoke_publication(self.host, branch=pr["headRefName"], reason="fixture-stop")
+                if mode == "fresh-hold": self.live["labels"] = [{"name": "hold"}]
+                if mode == "moved": self.live["headRefOid"] = "new-head"
+                before = {str(path): path.read_bytes() for path in paths if path.exists()}
+                claim = lane.reserve_gate(self.host, pr) if mode == "active-gate" else None
+                try:
+                    with patch.object(lane, "claimed_elsewhere", return_value=mode == "foreign-owner"):
+                        lane.arm_ready_prs(self.host, [pr])
+                finally:
+                    if claim: claim.lock.release()
+                self.assertEqual(self.calls, [])
+                self.assertEqual({str(path): path.read_bytes() for path in paths if path.exists()}, before)
+
+    def test_rearming_uses_exact_head_consumer_and_never_blindly_deletes_labels(self):
+        pr = self.armable(); self.proof()
+        for failed in (False, True):
+            with self.subTest(enqueue_failed=failed), patch.object(lane.remediation, "escalation_enabled", return_value=True):
+                self.calls.clear()
+                def shell(cmd, **kwargs):
+                    self.calls.append(cmd)
+                    return SimpleNamespace(returncode=int(failed and cmd[:3] == ["gh", "pr", "merge"]),
+                                           stdout=publication_response(cmd), stderr="")
+                with patch.object(lane, "sh", side_effect=shell): lane.arm_ready_prs(self.host, [pr])
+                writes = [cmd for cmd in self.calls if cmd[:3] == ["gh", "pr", "merge"]]
+                self.assertEqual(len(writes), 1)
+                self.assertEqual(writes[0][-2:], ["--match-head-commit", "abc"])
+                self.assertFalse(any("DELETE" in cmd for cmd in self.calls))
+                self.assertFalse(any(cmd[:3] == ["gh", "pr", "ready"] for cmd in self.calls))
+                if failed: self.assertEqual(json.loads((self.host.state / "requeue.json").read_text()), {"7": "abc"})
+
+    def test_rearming_preserves_classifier_and_disabled_switch(self):
+        pr = self.armable(); self.proof()
+        with patch.object(lane.remediation, "escalation_enabled", return_value=False), \
+                patch.object(lane, "publish_verified") as publish:
+            lane.arm_ready_prs(self.host, [pr]); publish.assert_not_called()
+        with patch.object(lane.remediation, "escalation_enabled", return_value=True), \
+                patch.object(lane, "publish_verified") as publish:
+            lane.arm_ready_prs(self.host, [{**pr, "isDraft": True}, {**pr, "mergeStateStatus": "DIRTY"}])
+            publish.assert_not_called()
 
     def test_policy_reads_release_inventory_lock_and_cleanup_preserves_concurrent_head(self):
         self.proof()
