@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 
-import { upsertLinearIssueByTitleFingerprint } from './lib/linear-issue-intake.mjs';
+import {
+  logRemediationDryRun,
+  remediationTriggersEnabled,
+  upsertLinearIssueByTitleFingerprint,
+} from './lib/linear-issue-intake.mjs';
 import { buildObservabilityIssuePayload } from './observability-issue-sync.mjs';
 
 export async function syncObservabilityLinearIssue({
@@ -26,6 +30,15 @@ async function main() {
   const payload = process.env.OBSERVABILITY_PAYLOAD;
   if (!payload) {
     throw new Error('OBSERVABILITY_PAYLOAD is required.');
+  }
+  if (!remediationTriggersEnabled()) {
+    const dry = logRemediationDryRun({
+      action: 'upsert',
+      key: 'observability',
+      fingerprint: 'observability',
+    });
+    console.log(JSON.stringify(dry));
+    return;
   }
   const report = JSON.parse(payload);
   const occurrenceDelta = Number.parseInt(
