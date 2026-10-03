@@ -1250,7 +1250,13 @@ class TerminalPreservationTest(unittest.TestCase):
                 with patch.object(events,'reconcile',return_value=None), patch.object(events,'queued_prs',return_value=[target]):
                     outcome = events.tick(self.host,fake_lane(shell),lambda: self.fail('must not load Linear'),NOW)
                 self.assertTrue(outcome[5].startswith('held:'))
-                self.assertEqual(shell.calls, [], 'no ready, merge, close, update-branch or label consumption')
+                # The tick reads open symphony-remediation issues. That read is not
+                # ready, merge, close, update-branch, or label consumption.
+                self.assertEqual(shell.calls, [[
+                    "gh", "issue", "list", "--repo", "JovieInc/Jovie", "--state", "open",
+                    "--label", "symphony-remediation", "--limit", "30",
+                    "--json", "number,title,body,updatedAt",
+                ]])
 
     def test_direct_helpers_cannot_bypass_missing_history_exhaustion(self):
         target = pr(draft=True,merge='CLEAN',labels=['lane-fix-exhausted'])
