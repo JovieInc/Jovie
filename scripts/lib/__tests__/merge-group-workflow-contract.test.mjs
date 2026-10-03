@@ -864,9 +864,12 @@ describe('merge_group workflow contract', () => {
     );
     expect(unitTests).not.toContain('fail-fast: true');
     expect(unitTests).not.toContain('fail-fast: false');
-    expect(unitTests).toContain('Preserve failed unit-shard diagnosis');
+    expect(unitTests).toContain('Preserve completed unit-shard diagnosis');
     expect(unitTests).toContain(
-      "if: ${{ failure() && !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' }}"
+      "if: ${{ always() && !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui' }}"
+    );
+    expect(unitTests).toContain(
+      'VITEST_JUNIT_OUTPUT_FILE: test-report.quarantine.junit.xml'
     );
     expect(unitTests).toContain(
       'unit-test-failure-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}'

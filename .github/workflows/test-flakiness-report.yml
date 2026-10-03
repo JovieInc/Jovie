@@ -8,12 +8,12 @@ on:
   workflow_run:
     workflows: [CI, Changed-Evidence Test Suites, E2E Full Browser Matrix]
     types: [completed]
-    branches: [main]
+    branches: [main, 'gh-readonly-queue/main/**']
   workflow_dispatch:
 
 concurrency:
   group: test-flakiness-report
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -27,9 +27,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Collect verified quarantine execution history
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node .github/scripts/collect-quarantine-evidence.mjs
+
       - name: Analyze test results from recent runs
         id: analyze
-        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # gh run download reads Unit Tests unit-flaky-* artifacts.
@@ -40,15 +44,18 @@ jobs:
       - name: Check flaky-rate ratchet
         id: ratchet
         env:
-          FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count || '0' }}
+          FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count }}
         run: node .github/scripts/check-flaky-ratchet.js
 
       - name: Upload flakiness report
-        if: always() && hashFiles('flakiness-report.md') != ''
+        if: always() && (hashFiles('flakiness-report.md') != '' || hashFiles('quarantine-evidence.json') != '')
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: flakiness-report-${{ github.run_id }}-${{ github.run_attempt }}
-          path: flakiness-report.md
+          path: |
+            flakiness-report.md
+            flakiness-clusters.json
+            quarantine-evidence.json
           retention-days: 90
 
       - name: Find or create tracking issue
@@ -205,9 +212,9 @@ jobs:
       - name: Summarize report
         if: always()
         env:
-          FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count || '0' }}
-          RETRY_RATE: ${{ steps.analyze.outputs.retry_rate || '0' }}
-          HIGH_SEVERITY: ${{ steps.analyze.outputs.high_severity || '0' }}
+          FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count || 'unknown' }}
+          RETRY_RATE: ${{ steps.analyze.outputs.retry_rate || 'unknown' }}
+          HIGH_SEVERITY: ${{ steps.analyze.outputs.high_severity || 'unknown' }}
           RATCHET_STATUS: ${{ steps.ratchet.outcome }}
         run: |
           {
