@@ -11,6 +11,7 @@ enum MobileBrowserAuthURLBuilder {
     baseURL: URL,
     returnRoute: String = "/app",
     codeChallenge: String,
+    nativeAttempt: String? = nil,
     processInfo: ProcessInfo = .processInfo
   ) -> URL? {
     let safeReturnRoute = sanitizeReturnRoute(returnRoute) ?? "/app"
@@ -53,6 +54,11 @@ enum MobileBrowserAuthURLBuilder {
       URLQueryItem(name: "code_challenge", value: codeChallenge),
       URLQueryItem(name: "code_challenge_method", value: "S256"),
     ]
+
+    if let nativeAttempt {
+      guard MobileAuthReturnParser.isValidNativeAttempt(nativeAttempt) else { return nil }
+      components.queryItems?.append(URLQueryItem(name: "native_attempt", value: nativeAttempt))
+    }
 
     if isRealBrowserAuthTest {
       components.queryItems?.append(
@@ -249,6 +255,7 @@ struct MobileAuthBrowserDependencies {
   var dispatch: @Sendable (@escaping @MainActor @Sendable () -> Void) -> Task<Void, Never> = { operation in
     Task { @MainActor in operation() }
   }
+  var makeNativeAttempt: @MainActor () throws -> String = MobileAuthCoordinator.makeNativeAttempt
   var makeVerifier: @MainActor () throws -> String
   var waitForPresentation: @MainActor () async -> Void
   var hasPresentationAnchor: @MainActor () -> Bool
@@ -289,6 +296,7 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
   private let dispatch: @Sendable (@escaping @MainActor @Sendable () -> Void) -> Task<Void, Never>
   private var producerID: UUID?
   private var producerPending: MobileAuthPendingStore.Snapshot?
+  private var acceptedPending: MobileAuthPendingStore.Snapshot?
   private var producerTask: Task<Void, Never>?
   private var sessionID: UUID?
   private var session: MobileAuthBrowserSession?
@@ -323,10 +331,12 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
     for task in callbackTasks.values { task.cancel() }
     let cancel = cancelSession
     let pending = producerPending
+    let accepted = acceptedPending
     let pendingStore = pendingStore
     _ = dispatch { @MainActor in
       cancel?()
       if let pending { pendingStore.clear(matching: pending) }
+      if let accepted { pendingStore.clear(matching: accepted) }
     }
   }
 
@@ -392,6 +402,9 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
   }
 
   private func retireAcceptedAttempt() {
+    let pending = acceptedPending
+    acceptedPending = nil
+    if let pending { pendingStore.clear(matching: pending) }
     if let attempt = authReturnSlot.attempt {
       authReturnSlot.cancel(attempt) { _ = appState.reconcileAuth($0) }
     }
@@ -399,16 +412,21 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
 
   func startSignIn(
     baseURL: URL,
-    completion: @escaping @MainActor @Sendable (Result<MobileAuthReturn, Error>) -> Void
+    completion: @escaping @MainActor @Sendable (Result<MobileAuthPendingStore.Claim, Error>) -> Void
   ) {
     let codeVerifier: String
-    do { codeVerifier = try browser.makeVerifier() }
+    let nativeAttempt: String
+    do {
+      codeVerifier = try browser.makeVerifier()
+      nativeAttempt = try browser.makeNativeAttempt()
+    }
     catch { completion(.failure(error)); return }
     let codeChallenge = Self.makeCodeChallenge(verifier: codeVerifier)
 
     guard let authURL = MobileBrowserAuthURLBuilder.signInURL(
       baseURL: baseURL,
-      codeChallenge: codeChallenge
+      codeChallenge: codeChallenge,
+      nativeAttempt: nativeAttempt
     ) else {
       Observability.addBreadcrumb(
         .authSessionClosed,
@@ -420,35 +438,38 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
       return
     }
 
+    guard pendingStore.save(codeVerifier: codeVerifier, nativeAttempt: nativeAttempt, baseURL: baseURL) else {
+      completion(.failure(MobileAuthCoordinatorError.invalidAuthURL))
+      return
+    }
     retireBrowserProducer()
     retireAcceptedAttempt()
-    pendingStore.save(codeVerifier: codeVerifier)
     let producer = UUID()
     producerID = producer
     producerPending = pendingStore.snapshot()
-    scheduleAuthenticationSession(authURL: authURL, codeVerifier: codeVerifier,
+    scheduleAuthenticationSession(authURL: authURL,
       producer: producer, pending: pendingStore.snapshot(), attempt: 1, completion: completion)
   }
 
   private func scheduleAuthenticationSession(
-    authURL: URL, codeVerifier: String, producer: UUID,
+    authURL: URL, producer: UUID,
     pending: MobileAuthPendingStore.Snapshot, attempt: Int,
-    completion: @escaping @MainActor @Sendable (Result<MobileAuthReturn, Error>) -> Void
+    completion: @escaping @MainActor @Sendable (Result<MobileAuthPendingStore.Claim, Error>) -> Void
   ) {
     let waitForPresentation = browser.waitForPresentation
     producerTask = Task { @MainActor [weak self] in
       await waitForPresentation()
       guard !Task.isCancelled, let self, self.producerID == producer,
             self.pendingStore.isCurrent(pending) else { return }
-      self.openAuthenticationSession(authURL: authURL, codeVerifier: codeVerifier,
+      self.openAuthenticationSession(authURL: authURL,
         producer: producer, pending: pending, attempt: attempt, completion: completion)
     }
   }
 
   private func openAuthenticationSession(
-    authURL: URL, codeVerifier: String, producer: UUID,
+    authURL: URL, producer: UUID,
     pending: MobileAuthPendingStore.Snapshot, attempt: Int,
-    completion: @escaping @MainActor @Sendable (Result<MobileAuthReturn, Error>) -> Void
+    completion: @escaping @MainActor @Sendable (Result<MobileAuthPendingStore.Claim, Error>) -> Void
   ) {
 
     Observability.addBreadcrumb(
@@ -491,7 +512,7 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
               "auth_session_presentation_retry",
               detail: error.localizedDescription
             )
-            self.scheduleAuthenticationSession(authURL: authURL, codeVerifier: codeVerifier,
+            self.scheduleAuthenticationSession(authURL: authURL,
               producer: producer, pending: pending, attempt: attempt + 1, completion: completion)
             return
           }
@@ -530,6 +551,11 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
           detail: "\(callbackURL.scheme ?? "unknown")://\(callbackURL.host ?? "unknown")\(callbackURL.path)"
         )
 
+        guard self.pendingStore.matches(callbackURL, snapshot: pending,
+          baseURL: self.appState.configuration.webBaseURL) else {
+          completion(.failure(MobileAuthCoordinatorError.missingCallbackURL))
+          return
+        }
         if let providerError = MobileAuthReturnParser.parseProviderError(callbackURL) {
           self.pendingStore.clear(matching: pending)
           Observability.addBreadcrumb(
@@ -545,10 +571,8 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
           return
         }
 
-        guard let authReturn = MobileAuthReturnParser.parse(
-          callbackURL,
-          codeVerifier: codeVerifier
-        ) else {
+        guard let authReturn = self.pendingStore.claim(callbackURL, matching: pending,
+          baseURL: self.appState.configuration.webBaseURL) else {
           Observability.addBreadcrumb(
             .deepLinkParseFailed,
             level: .warning,
@@ -565,7 +589,6 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
           context: ["callback_url": callbackURL]
         )
         MobileAuthDiagnostics.record("auth_callback_parsed")
-        guard self.pendingStore.consumeCodeVerifier(matching: pending) != nil else { return }
         completion(.success(authReturn))
       }
     }
@@ -636,11 +659,12 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
   private func resolveAuthURL(_ url: URL, pending: MobileAuthPendingStore.Snapshot,
                               isRetry: Bool) -> Bool {
     guard pendingStore.isCurrent(pending) else { return false }
-    if let state = MobileAuthReturnParser.callbackState(url), handledAuthReturnStates.contains(state) {
+    if !pending.isCorrelated, let state = MobileAuthReturnParser.callbackState(url), handledAuthReturnStates.contains(state) {
       return false
     }
     if let providerError = MobileAuthReturnParser.parseProviderError(url) {
-      guard shouldHandleMobileAuthProviderError(route: appState.route,
+      guard pendingStore.matches(url, snapshot: pending, baseURL: appState.configuration.webBaseURL),
+        shouldHandleMobileAuthProviderError(route: appState.route,
         hasPendingVerifier: pendingStore.hasCodeVerifier()) else {
         Observability.addBreadcrumb(.deepLinkParseFailed, level: .warning,
           context: ["reason": "provider_error_without_pending_auth"])
@@ -658,10 +682,7 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
       }
       return false
     }
-    if pendingStore.hasCodeVerifier(), let state = MobileAuthReturnParser.callbackState(url) {
-      handledAuthReturnStates.insert(state)
-    }
-    if let authReturn = MobileAuthReturnParser.parse(url, pendingStore: pendingStore, matching: pending) {
+    if let authReturn = pendingStore.claim(url, matching: pending, baseURL: appState.configuration.webBaseURL) {
       Observability.addBreadcrumb(.deepLinkRouteMatched, context: ["route": "auth_return", "url": url])
       handleAuthReturn(authReturn)
       return false
@@ -676,6 +697,7 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
       }
       return false
     }
+    if pending.isCorrelated { return false }
     guard isRetry else { return true }
     guard shouldSignOutAfterMissingVerifier(callbackState: MobileAuthReturnParser.callbackState(url),
       handledStates: handledAuthReturnStates, hasFinalizeInFlight: isAuthFinalizeInFlight(for: url),
@@ -694,12 +716,13 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
   }
 
 #if DEBUG
-  func handleLaunchInputOnce(verifier: String?, callbackURL: URL?) {
+  func handleLaunchInputOnce(verifier: String?, nativeAttempt: String? = nil, callbackURL: URL?) {
     guard appState.launchMode == .uiTestingLiveAuth, !didHandleLaunchAuthCallback else { return }
     didHandleLaunchAuthCallback = true
-    if let verifier {
+    if let verifier, let nativeAttempt {
       LiveAuthUITestStatus.set("waiting")
-      pendingStore.save(codeVerifier: verifier)
+      pendingStore.save(codeVerifier: verifier, nativeAttempt: nativeAttempt,
+        baseURL: appState.configuration.webBaseURL)
     }
     if let callbackURL { handleAuthReturn(callbackURL) }
   }
@@ -719,9 +742,11 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
   }
 
   @MainActor
-  private func handleAuthReturn(_ authReturn: MobileAuthReturn) {
+  private func handleAuthReturn(_ claim: MobileAuthPendingStore.Claim) {
+    guard pendingStore.isCurrent(claim) else { return }
+    let authReturn = claim.authReturn
+    acceptedPending = pendingStore.snapshot()
     handledAuthReturnStates.insert(authReturn.state)
-    guard !startedAuthFinalizeStates.contains(authReturn.state) else { return }
     startedAuthFinalizeStates.insert(authReturn.state)
     retireBrowserProducer()
     isOpening = false
@@ -736,18 +761,31 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
     let appState = appState
     let slot = authReturnSlot
     let exchange = exchange
+    let pendingStore = pendingStore
     authReturnSlot.install(attempt) { [weak self, weak slot] in
       let span = Observability.startSpan(name: .nativeAuthExchangeStarted,
         context: ["stage": "native_auth_return"])
-      defer { span.finish(); slot?.release(attempt) }
+      defer { pendingStore.finish(claim); span.finish(); slot?.release(attempt) }
       await finalizeMobileAuthAttempt(attempt, exchange: {
         Observability.addBreadcrumb(.nativeAuthExchangeStarted,
           context: ["stage": "native_auth_return"])
         return try await exchange(authReturn)
       }, reconcile: { result, error in
         appState.reconcileAuth(result) {
-          // This publication is inside the store's one-shot delivery guard.
-          guard slot?.attempt == attempt, let self else { return }
+          // Only an explicit pre-consume rejection can reopen this exact claim.
+          if let error, isPreconsumeMobileAuthRejection(error), pendingStore.rearm(claim),
+             let nonce = authReturn.nativeAttempt {
+            MobileAuthCallbackURLInbox.shared.allowRetry(nativeAttempt: nonce)
+            self?.acceptedPending = pendingStore.snapshot()
+            self?.handledAuthReturnStates.remove(authReturn.state)
+            self?.startedAuthFinalizeStates.remove(authReturn.state)
+            self?.seenAuthCallbackURLs = self?.seenAuthCallbackURLs.filter {
+              guard let url = URL(string: $0) else { return true }
+              return MobileAuthReturnParser.nativeAttempt(url) != nonce
+            } ?? []
+          }
+          guard slot?.attempt == attempt, let self, let owned = self.acceptedPending,
+                pendingStore.isCurrent(owned) else { return }
           if result.outcome == .persisted {
             MobileAuthDiagnostics.record("native_exchange_session_token_received")
             Observability.addBreadcrumb(.nativeAuthExchangeSucceeded,
@@ -755,16 +793,17 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
             Observability.addBreadcrumb(.nativeSessionPersisted)
           } else if let error { self.publishAuthFailure(error) }
         }
-      }, failure: { claim, error in
-        appState.reconcileAuthFailure(claim) { completion in
+      }, failure: { cleanup, error in
+        appState.reconcileAuthFailure(cleanup) { completion in
           NativeSessionTokenStore.performIfCurrent(completion) {
-            guard slot?.attempt == attempt, let self else { return }
+            guard slot?.attempt == attempt, pendingStore.isCurrent(claim), let self else { return }
             self.publishAuthFailure(error)
           }
         }
       }, settled: { result in
         NativeSessionTokenStore.performIfCurrent(result) {
-          guard slot?.attempt == attempt, let self else { return }
+          guard slot?.attempt == attempt, let self, let owned = self.acceptedPending,
+                pendingStore.isCurrent(owned) else { return }
 #if DEBUG
           if self.authErrorMessage == nil, let userID = appState.activeUserID {
             LiveAuthUITestStatus.setRouteStatus(appState.route, userID: userID)
@@ -851,6 +890,13 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
 
   fileprivate static func makeCodeVerifier() throws -> String {
     var bytes = [UInt8](repeating: 0, count: 64)
+    let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+    guard status == errSecSuccess else { throw MobileAuthCoordinatorError.randomGenerationFailed(status) }
+    return Data(bytes).base64URLEncodedString()
+  }
+
+  fileprivate static func makeNativeAttempt() throws -> String {
+    var bytes = [UInt8](repeating: 0, count: 32)
     let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
     guard status == errSecSuccess else { throw MobileAuthCoordinatorError.randomGenerationFailed(status) }
     return Data(bytes).base64URLEncodedString()
