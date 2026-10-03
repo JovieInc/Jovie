@@ -54,7 +54,7 @@ export function AdminCreatorsTableHeader({
           style={stickyStyle}
         >
           <Checkbox
-            aria-label='Select all creators'
+            aria-label='Select All Creators'
             checked={headerCheckboxState}
             onCheckedChange={onToggleSelectAll}
           />

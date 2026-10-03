@@ -171,7 +171,7 @@ export function ProfileNotificationsMenu({
       return (
         <DropdownMenuItem
           key={targetChannel}
-          className='flex items-start gap-2 focus-visible:outline-none'
+          className='flex items-start'
           disabled={isLoading}
           onSelect={event => {
             event.preventDefault();
@@ -204,7 +204,7 @@ export function ProfileNotificationsMenu({
     return (
       <DropdownMenuItem
         key={targetChannel}
-        className='flex items-start gap-2 focus-visible:outline-none'
+        className='flex items-start'
         disabled={isLoading}
         onSelect={event => {
           event.preventDefault();
@@ -244,18 +244,14 @@ export function ProfileNotificationsMenu({
         </DropdownMenuTrigger>
         <DropdownMenuContent align='end' className='w-72' sideOffset={8}>
           {/* ── Channels ─────────────────────────────── */}
-          <DropdownMenuLabel className='text-sm font-semibold text-primary-token'>
-            How You Get Notified
-          </DropdownMenuLabel>
+          <DropdownMenuLabel>How You Get Notified</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {smsEnabled && renderChannelMenuItem('sms', 'Text')}
           {renderChannelMenuItem('email', 'Email')}
 
           {/* ── Listening preference ───────────────────── */}
           <DropdownMenuSeparator />
-          <DropdownMenuLabel className='text-sm font-semibold text-primary-token'>
-            Listening Preference
-          </DropdownMenuLabel>
+          <DropdownMenuLabel>Listening Preference</DropdownMenuLabel>
           <div className='px-2 pb-1.5'>
             <label htmlFor='preferred-dsp-select' className='sr-only'>
               Preferred streaming platform
@@ -280,14 +276,12 @@ export function ProfileNotificationsMenu({
 
           {/* ── Content types ────────────────────────── */}
           <DropdownMenuSeparator />
-          <DropdownMenuLabel className='text-sm font-semibold text-primary-token'>
-            What You Hear About
-          </DropdownMenuLabel>
+          <DropdownMenuLabel>What You Hear About</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {NOTIFICATION_CONTENT_TYPES.map(({ key, label, description }) => (
             <DropdownMenuItem
               key={key}
-              className='flex items-center gap-3 focus-visible:outline-none'
+              className='flex items-center'
               onSelect={event => {
                 // Prevent menu from closing on toggle
                 event.preventDefault();
@@ -320,30 +314,30 @@ export function ProfileNotificationsMenu({
           }
         }}
       >
-        <AlertDialogContent className='max-w-md rounded-lg bg-surface-0'>
-          <AlertDialogHeader className='gap-2'>
-            <AlertDialogTitle className='text-base font-semibold text-primary-token'>
+        <AlertDialogContent className='max-w-md'>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
               {confirmChannel
                 ? `Unsubscribe from ${labelForChannel(confirmChannel)}`
                 : 'Unsubscribe'}
             </AlertDialogTitle>
-            <AlertDialogDescription className='text-sm text-secondary-token'>
+            <AlertDialogDescription>
               {confirmChannel
                 ? `You will stop receiving ${labelForChannel(confirmChannel).toLowerCase()} updates from this artist.`
                 : 'You will stop receiving updates from this artist.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className='gap-2 sm:gap-2'>
+          <AlertDialogFooter>
             <AlertDialogCancel
               disabled={isConfirming}
-              className='flex-1 rounded-full bg-surface-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token sm:flex-none'
+              className='flex-1 sm:flex-none'
             >
               Keep
             </AlertDialogCancel>
             <AlertDialogAction
               variant='destructive'
               disabled={isConfirming || confirmChannel === null}
-              className='flex-1 rounded-full sm:flex-none'
+              className='flex-1 sm:flex-none'
               onClick={() => handleConfirm(onUnsubscribe)}
             >
               {isConfirming ? 'Unsubscribing…' : 'Unsubscribe'}

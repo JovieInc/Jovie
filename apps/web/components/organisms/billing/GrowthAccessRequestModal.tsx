@@ -64,7 +64,7 @@ export function GrowthAccessRequestModal({
           <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-success/10 text-success'>
             <CheckCircle className='h-6 w-6' />
           </div>
-          <DialogTitle className='text-center'>Request received</DialogTitle>
+          <DialogTitle className='text-center'>Request Received</DialogTitle>
           <DialogDescription className='text-center'>
             We&apos;ll review your request and reach out soon to learn more
             about your needs.
@@ -85,20 +85,21 @@ export function GrowthAccessRequestModal({
             <Sparkles className='h-6 w-6' />
           </div>
           <DialogTitle className='text-center'>
-            Growth is in early access
+            Request Early Access
           </DialogTitle>
           <DialogDescription className='text-center'>
+            {/* ui-casing-allow: Growth is a product feature name */}
             Tell us what you want from Growth.
           </DialogDescription>
 
           <DialogBody>
             <ContentSurfaceCard className='space-y-2 p-2.5'>
               <Label htmlFor='growth-reason'>
-                What feature are you most excited about?
+                What Feature Are You Most Excited About?
               </Label>
               <Textarea
                 id='growth-reason'
-                placeholder='What would you use Growth for?'
+                placeholder='What would you use Growth for?' // ui-casing-allow: Growth is a product feature name
                 value={reason}
                 onChange={e => setReason(e.target.value)}
                 rows={3}

@@ -15,7 +15,7 @@ describe('GrowthAccessRequestModal', () => {
     render(<GrowthAccessRequestModal open onOpenChange={vi.fn()} />);
 
     expect(
-      screen.getByRole('heading', { name: 'Growth is in early access' })
+      screen.getByRole('heading', { name: 'Request Early Access' })
     ).toBeInTheDocument();
     expect(screen.getByText('Tell us what you want from Growth.')).toBeTruthy();
     expect(screen.queryByText(/coming soon/i)).not.toBeInTheDocument();
