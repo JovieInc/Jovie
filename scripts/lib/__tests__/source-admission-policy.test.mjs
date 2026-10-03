@@ -426,6 +426,21 @@ test('fork approval must be current human collaborator latest opinionated state'
   input.reviews = [review('APPROVED'), review('DISMISSED', 2)];
   assert.equal(evaluateSourceAdmission(input).allowed, false);
 });
+test('base-branch hold blocks until main moves past the failing revision', () => {
+  const input = fixture();
+  const recorded = 'a'.repeat(40);
+  input.statuses = [tombstone('jovie-queue-failure-hold/v1')];
+  input.statuses[0].description = `class=base-branch;n=1;run=123;try=1;main=${recorded}`;
+  assert.ok(
+    evaluateSourceAdmission(input).blockers.includes(
+      'tombstone:jovie-queue-failure-hold/v1'
+    )
+  );
+  input.currentMainSha = recorded;
+  assert.equal(evaluateSourceAdmission(input).allowed, false);
+  input.currentMainSha = 'b'.repeat(40);
+  assert.equal(evaluateSourceAdmission(input).allowed, true);
+});
 test('pre-land changelog collision preserves existing release branch exception', () => {
   const input = fixture();
   input.files = [{ filename: 'CHANGELOG.md' }];
@@ -471,7 +486,9 @@ function requester(input, change = () => {}) {
         ? input.reviews
         : path.includes('/statuses?')
           ? input.statuses
-          : input.pr;
+          : path.includes('/commits/main')
+            ? { sha: 'c'.repeat(40) }
+            : input.pr;
     const response = { data: structuredClone(data), link: null };
     change(path, response, calls);
     return response;
@@ -489,12 +506,13 @@ test('runtime fetch pins status endpoint, preserves deadline and rechecks metada
   const mock = requester(fixture());
   const result = await runSourceAdmission({ ...args, request: mock.request });
   assert.equal(result.allowed, true);
-  assert.equal(mock.calls.length, 5);
+  assert.equal(mock.calls.length, 6);
   assert.ok(
     mock.calls.some(call => call.path.includes(`/commits/${head}/statuses`))
   );
   assert.ok(mock.calls.every(call => call.options.deadlineMs === 12345));
-  assert.equal(mock.calls.at(-1).path, '/repos/JovieInc/Jovie/pulls/7');
+  assert.equal(mock.calls.at(-2).path, '/repos/JovieInc/Jovie/pulls/7');
+  assert.equal(mock.calls.at(-1).path, '/repos/JovieInc/Jovie/commits/main');
 });
 test('late hold blocks and concurrent push cannot inherit earlier evidence', async () => {
   for (const mutate of [

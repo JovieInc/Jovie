@@ -97,6 +97,7 @@ export function evaluateSourceAdmission({
   reviews,
   statuses,
   complete = false,
+  currentMainSha,
 } = {}) {
   const blockers = [];
   const result = () => ({
@@ -179,8 +180,23 @@ export function evaluateSourceAdmission({
             status.description
           )
         : null;
+    const baseBranchMatch =
+      status.context === 'jovie-queue-failure-hold/v1' &&
+      typeof status.description === 'string'
+        ? /^class=base-branch;n=[1-9][0-9]*;run=([1-9][0-9]*);try=[1-9][0-9]*;main=([0-9a-f]{40})$/.exec(
+            status.description
+          )
+        : null;
+    if (
+      baseBranchMatch &&
+      typeof currentMainSha === 'string' &&
+      currentMainSha !== baseBranchMatch[2]
+    ) {
+      continue;
+    }
+    const matchedFailure = failureMatch ?? baseBranchMatch;
     const description =
-      failureMatch !== null ||
+      matchedFailure !== null ||
       (status.context === 'jovie-queue-product-failure/v1'
         ? status.description === 'blocked:merge-group-product-failure'
         : status.context === 'jovie-native-unmergeable/v1' &&
@@ -201,8 +217,9 @@ export function evaluateSourceAdmission({
       typeof status.target_url !== 'string' ||
       !status.target_url.startsWith(prefix) ||
       !/^[1-9][0-9]*$/.test(status.target_url.slice(prefix.length)) ||
-      (failureMatch !== null &&
-        status.target_url.slice(prefix.length) !== failureMatch[2])
+      (matchedFailure !== null &&
+        status.target_url.slice(prefix.length) !==
+          (failureMatch ? failureMatch[2] : baseBranchMatch[1]))
     ) {
       blockers.push('tombstone-provenance-unavailable');
       continue;
@@ -268,6 +285,11 @@ export async function runSourceAdmission({
     throw new Error('PR identity changed during evidence read');
   if (prResponse.data?.head?.sha !== finalPr?.head?.sha)
     throw new Error('head changed during evidence read');
+  const currentMainSha = (
+    await request(`/repos/${repository}/commits/main`, options)
+  ).data?.sha;
+  if (!/^[0-9a-f]{40}$/.test(currentMainSha ?? ''))
+    throw new Error('current main sha is unavailable');
   return evaluateSourceAdmission({
     repository,
     expectedHead,
@@ -276,6 +298,7 @@ export async function runSourceAdmission({
     reviews,
     statuses,
     complete: true,
+    currentMainSha,
   });
 }
 
