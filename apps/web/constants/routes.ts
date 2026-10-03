@@ -323,6 +323,11 @@ export function buildReleaseDownloadsRoute(releaseId: string): string {
   return `${APP_ROUTES.RELEASES}/${encodeURIComponent(releaseId)}/downloads`;
 }
 
+/** Earnings settings live on the profile pay tab. Shortcuts should open this, not the legacy earnings redirect. */
+export function buildArtistProfilePayRoute(): string {
+  return `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`;
+}
+
 export function buildLibraryViewRoute(
   view?: 'releases' | 'merch' | 'images' | 'videos' | 'audio' | 'documents'
 ): string {
