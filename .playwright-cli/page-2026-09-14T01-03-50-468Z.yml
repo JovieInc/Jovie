@@ -1,0 +1,453 @@
+- generic [ref=e2]:
+  - link "Skip to content" [ref=e3] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - navigation "Primary Navigation" [ref=e4]:
+      - generic [ref=e5]:
+        - link "Jovie" [ref=e7] [cursor=pointer]:
+          - /url: /
+          - img "Jovie" [ref=e9]
+        - generic [ref=e11]:
+          - link "Jovie" [ref=e12] [cursor=pointer]:
+            - /url: /
+          - link "Customers" [ref=e13] [cursor=pointer]:
+            - /url: /artists
+          - link "Product" [ref=e14] [cursor=pointer]:
+            - /url: /artist-profiles
+          - link "Pricing" [ref=e15] [cursor=pointer]:
+            - /url: /pricing
+        - generic [ref=e17]:
+          - link "Log in" [ref=e18] [cursor=pointer]:
+            - /url: /signin
+          - link "Get started" [ref=e19] [cursor=pointer]:
+            - /url: https://jov.ie/waitlist
+  - main [ref=e20]:
+    - generic [ref=e22]:
+      - generic [ref=e23]:
+        - paragraph [ref=e24]: Integrations
+        - heading "Your music. Your tools. Connected." [level=1] [ref=e25]
+        - paragraph [ref=e26]: Bring your catalog, channels, and working day into Jovie. Explore what each integration can do, then connect it in your workspace.
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - group "Integration categories" [ref=e29]:
+            - button "All" [pressed] [ref=e30]
+            - button "Music" [ref=e32]
+            - button "Productivity" [ref=e34]
+            - button "Video & Social" [ref=e36]
+            - button "Music Data" [ref=e38]
+          - searchbox "Search integrations" [ref=e42]
+        - status [ref=e43]: 43 integrations
+        - generic [ref=e44]:
+          - generic [ref=e45]:
+            - heading "Spotify" [level=2] [ref=e49]
+            - paragraph [ref=e50]: Artist Catalog
+            - paragraph [ref=e51]: Connect your artist catalog and import releases from Spotify.
+            - 'link "Connect Artist Catalog: Spotify" [ref=e52] [cursor=pointer]':
+              - /url: /app/dashboard/releases?connect=spotify
+              - text: Connect Artist Catalog
+          - generic [ref=e53]:
+            - heading "Apple Music" [level=2] [ref=e57]
+            - paragraph [ref=e58]: Catalog Links
+            - paragraph [ref=e59]: Match Apple Music links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Apple Music" [ref=e60] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e61]:
+            - heading "YouTube Music" [level=2] [ref=e65]
+            - paragraph [ref=e66]: Catalog Links
+            - paragraph [ref=e67]: Match YouTube Music links to your music through catalog enrichment.
+            - 'link "Manage Music Links: YouTube Music" [ref=e68] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e69]:
+            - heading "SoundCloud" [level=2] [ref=e73]
+            - paragraph [ref=e74]: Catalog Links
+            - paragraph [ref=e75]: Match SoundCloud links to your music through catalog enrichment.
+            - 'link "Manage Music Links: SoundCloud" [ref=e76] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e77]:
+            - heading "Deezer" [level=2] [ref=e81]
+            - paragraph [ref=e82]: Catalog Links
+            - paragraph [ref=e83]: Match Deezer links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Deezer" [ref=e84] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e85]:
+            - heading "Tidal" [level=2] [ref=e89]
+            - paragraph [ref=e90]: Catalog Links
+            - paragraph [ref=e91]: Match Tidal links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Tidal" [ref=e92] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e93]:
+            - heading "Amazon Music" [level=2] [ref=e97]
+            - paragraph [ref=e98]: Catalog Links
+            - paragraph [ref=e99]: Match Amazon Music links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Amazon Music" [ref=e100] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e101]:
+            - heading "Bandcamp" [level=2] [ref=e105]
+            - paragraph [ref=e106]: Catalog Links
+            - paragraph [ref=e107]: Match Bandcamp links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Bandcamp" [ref=e108] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e109]:
+            - heading "Pandora" [level=2] [ref=e113]
+            - paragraph [ref=e114]: Catalog Links
+            - paragraph [ref=e115]: Match Pandora links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Pandora" [ref=e116] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e117]:
+            - heading "Napster" [level=2] [ref=e121]
+            - paragraph [ref=e122]: Catalog Links
+            - paragraph [ref=e123]: Match Napster links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Napster" [ref=e124] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e125]:
+            - heading "Audiomack" [level=2] [ref=e129]
+            - paragraph [ref=e130]: Catalog Links
+            - paragraph [ref=e131]: Match Audiomack links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Audiomack" [ref=e132] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e133]:
+            - heading "Qobuz" [level=2] [ref=e137]
+            - paragraph [ref=e138]: Catalog Links
+            - paragraph [ref=e139]: Match Qobuz links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Qobuz" [ref=e140] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e141]:
+            - heading "Anghami" [level=2] [ref=e145]
+            - paragraph [ref=e146]: Catalog Links
+            - paragraph [ref=e147]: Match Anghami links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Anghami" [ref=e148] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e149]:
+            - heading "Boomplay" [level=2] [ref=e153]
+            - paragraph [ref=e154]: Catalog Links
+            - paragraph [ref=e155]: Match Boomplay links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Boomplay" [ref=e156] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e157]:
+            - heading "iHeartRadio" [level=2] [ref=e161]
+            - paragraph [ref=e162]: Catalog Links
+            - paragraph [ref=e163]: Match iHeartRadio links to your music through catalog enrichment.
+            - 'link "Manage Music Links: iHeartRadio" [ref=e164] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e165]:
+            - heading "Beatport" [level=2] [ref=e169]
+            - paragraph [ref=e170]: Catalog Links
+            - paragraph [ref=e171]: Match Beatport links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Beatport" [ref=e172] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e173]:
+            - heading "Amazon" [level=2] [ref=e177]
+            - paragraph [ref=e178]: Catalog Links
+            - paragraph [ref=e179]: Match Amazon links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Amazon" [ref=e180] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e181]:
+            - heading "AWA" [level=2] [ref=e185]
+            - paragraph [ref=e186]: Catalog Links
+            - paragraph [ref=e187]: Match AWA links to your music through catalog enrichment.
+            - 'link "Manage Music Links: AWA" [ref=e188] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e189]:
+            - heading "Audius" [level=2] [ref=e193]
+            - paragraph [ref=e194]: Catalog Links
+            - paragraph [ref=e195]: Match Audius links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Audius" [ref=e196] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e197]:
+            - heading "FLO" [level=2] [ref=e201]
+            - paragraph [ref=e202]: Catalog Links
+            - paragraph [ref=e203]: Match FLO links to your music through catalog enrichment.
+            - 'link "Manage Music Links: FLO" [ref=e204] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e205]:
+            - heading "Gaana" [level=2] [ref=e209]
+            - paragraph [ref=e210]: Catalog Links
+            - paragraph [ref=e211]: Match Gaana links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Gaana" [ref=e212] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e213]:
+            - heading "JioSaavn" [level=2] [ref=e217]
+            - paragraph [ref=e218]: Catalog Links
+            - paragraph [ref=e219]: Match JioSaavn links to your music through catalog enrichment.
+            - 'link "Manage Music Links: JioSaavn" [ref=e220] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e221]:
+            - heading "JOOX" [level=2] [ref=e225]
+            - paragraph [ref=e226]: Catalog Links
+            - paragraph [ref=e227]: Match JOOX links to your music through catalog enrichment.
+            - 'link "Manage Music Links: JOOX" [ref=e228] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e229]:
+            - heading "KKBOX" [level=2] [ref=e233]
+            - paragraph [ref=e234]: Catalog Links
+            - paragraph [ref=e235]: Match KKBOX links to your music through catalog enrichment.
+            - 'link "Manage Music Links: KKBOX" [ref=e236] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e237]:
+            - heading "LINE MUSIC" [level=2] [ref=e241]
+            - paragraph [ref=e242]: Catalog Links
+            - paragraph [ref=e243]: Match LINE MUSIC links to your music through catalog enrichment.
+            - 'link "Manage Music Links: LINE MUSIC" [ref=e244] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e245]:
+            - heading "NetEase Music" [level=2] [ref=e249]
+            - paragraph [ref=e250]: Catalog Links
+            - paragraph [ref=e251]: Match NetEase Music links to your music through catalog enrichment.
+            - 'link "Manage Music Links: NetEase Music" [ref=e252] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e253]:
+            - heading "QQ Music" [level=2] [ref=e257]
+            - paragraph [ref=e258]: Catalog Links
+            - paragraph [ref=e259]: Match QQ Music links to your music through catalog enrichment.
+            - 'link "Manage Music Links: QQ Music" [ref=e260] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e261]:
+            - heading "Trebel" [level=2] [ref=e265]
+            - paragraph [ref=e266]: Catalog Links
+            - paragraph [ref=e267]: Match Trebel links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Trebel" [ref=e268] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e269]:
+            - heading "Yandex Music" [level=2] [ref=e273]
+            - paragraph [ref=e274]: Catalog Links
+            - paragraph [ref=e275]: Match Yandex Music links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Yandex Music" [ref=e276] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e277]:
+            - heading "TikTok" [level=2] [ref=e281]
+            - paragraph [ref=e282]: Catalog Links
+            - paragraph [ref=e283]: Match TikTok links to your music through catalog enrichment.
+            - 'link "Manage Music Links: TikTok" [ref=e284] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e285]:
+            - heading "Instagram" [level=2] [ref=e289]
+            - paragraph [ref=e290]: Catalog Links
+            - paragraph [ref=e291]: Match Instagram links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Instagram" [ref=e292] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e293]:
+            - heading "YouTube Shorts" [level=2] [ref=e297]
+            - paragraph [ref=e298]: Catalog Links
+            - paragraph [ref=e299]: Match YouTube Shorts links to your music through catalog enrichment.
+            - 'link "Manage Music Links: YouTube Shorts" [ref=e300] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e301]:
+            - heading "YouTube" [level=2] [ref=e305]
+            - paragraph [ref=e306]: Account Connection
+            - paragraph [ref=e307]: Import channel videos into Library and verify approved thumbnail changes.
+            - 'link "Connect Account: YouTube" [ref=e308] [cursor=pointer]':
+              - /url: /app/library
+              - text: Connect Account
+          - generic [ref=e309]:
+            - heading "Genius" [level=2] [ref=e313]
+            - paragraph [ref=e314]: Catalog Links
+            - paragraph [ref=e315]: Match Genius links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Genius" [ref=e316] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e317]:
+            - heading "Discogs" [level=2] [ref=e321]
+            - paragraph [ref=e322]: Catalog Links
+            - paragraph [ref=e323]: Match Discogs links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Discogs" [ref=e324] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e325]:
+            - heading "AllMusic" [level=2] [ref=e329]
+            - paragraph [ref=e330]: Catalog Links
+            - paragraph [ref=e331]: Match AllMusic links to your music through catalog enrichment.
+            - 'link "Manage Music Links: AllMusic" [ref=e332] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e333]:
+            - heading "MusicBrainz" [level=2] [ref=e337]
+            - paragraph [ref=e338]: Catalog Links
+            - paragraph [ref=e339]: Match MusicBrainz links to your music through catalog enrichment.
+            - 'link "Manage Music Links: MusicBrainz" [ref=e340] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e341]:
+            - heading "Shazam" [level=2] [ref=e345]
+            - paragraph [ref=e346]: Catalog Links
+            - paragraph [ref=e347]: Match Shazam links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Shazam" [ref=e348] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e349]:
+            - heading "7digital" [level=2] [ref=e353]
+            - paragraph [ref=e354]: Catalog Links
+            - paragraph [ref=e355]: Match 7digital links to your music through catalog enrichment.
+            - 'link "Manage Music Links: 7digital" [ref=e356] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e357]:
+            - heading "Telmor Musik" [level=2] [ref=e361]
+            - paragraph [ref=e362]: Catalog Links
+            - paragraph [ref=e363]: Match Telmor Musik links to your music through catalog enrichment.
+            - 'link "Manage Music Links: Telmor Musik" [ref=e364] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e365]:
+            - heading "YouSee Musik" [level=2] [ref=e369]
+            - paragraph [ref=e370]: Catalog Links
+            - paragraph [ref=e371]: Match YouSee Musik links to your music through catalog enrichment.
+            - 'link "Manage Music Links: YouSee Musik" [ref=e372] [cursor=pointer]':
+              - /url: /app/releases
+              - text: Manage Music Links
+          - generic [ref=e373]:
+            - heading "Gmail" [level=2] [ref=e379]
+            - paragraph [ref=e380]: Account Connection
+            - paragraph [ref=e381]: Scan booking emails for tour confirmation signals.
+            - 'link "Connect Account: Gmail" [ref=e382] [cursor=pointer]':
+              - /url: /app/settings/connectors
+              - text: Connect Account
+          - generic [ref=e383]:
+            - heading "Google Calendar" [level=2] [ref=e389]
+            - paragraph [ref=e390]: Account Connection
+            - paragraph [ref=e391]: Read events to detect conflicts and write approved bookings.
+            - 'link "Connect Account: Google Calendar" [ref=e392] [cursor=pointer]':
+              - /url: /app/settings/connectors
+              - text: Connect Account
+      - generic [ref=e393]:
+        - heading "Missing An Integration?" [level=2] [ref=e394]
+        - paragraph [ref=e395]: Tell us which tool you need and what you want to do with it.
+        - generic [ref=e396]:
+          - text: Tool Or Service
+          - textbox "Tool Or Service" [ref=e398]
+        - generic [ref=e399]:
+          - text: What Would You Like To Do?
+          - textbox "What Would You Like To Do?" [ref=e400]
+        - button "Request Integration" [ref=e401]
+        - status [ref=e403]
+  - contentinfo [ref=e404]:
+    - generic [ref=e405]:
+      - generic [ref=e409]:
+        - heading "Request Access to Jovie." [level=2] [ref=e410]
+        - link "Get started" [ref=e412] [cursor=pointer]:
+          - /url: /signup
+      - generic [ref=e413]:
+        - link "Jovie Home" [ref=e415] [cursor=pointer]:
+          - /url: /
+        - navigation "Footer" [ref=e419]:
+          - generic [ref=e420]:
+            - heading "Product" [level=2] [ref=e421]
+            - list [ref=e422]:
+              - listitem [ref=e423]:
+                - link "Artist Profiles" [ref=e424] [cursor=pointer]:
+                  - /url: /artist-profiles
+              - listitem [ref=e425]:
+                - link "Notifications" [ref=e426] [cursor=pointer]:
+                  - /url: /artist-notifications
+              - listitem [ref=e427]:
+                - link "Pay" [ref=e428] [cursor=pointer]:
+                  - /url: /pay
+              - listitem [ref=e429]:
+                - link "Pricing" [ref=e430] [cursor=pointer]:
+                  - /url: /pricing
+          - generic [ref=e431]:
+            - heading "Features" [level=2] [ref=e432]
+            - list [ref=e433]:
+              - listitem [ref=e434]:
+                - link "Fan Capture" [ref=e435] [cursor=pointer]:
+                  - /url: /artist-profiles#capture-every-fan
+              - listitem [ref=e436]:
+                - link "Fan Reactivation" [ref=e437] [cursor=pointer]:
+                  - /url: /artist-profiles#bring-them-back-automatically
+              - listitem [ref=e438]:
+                - link "Product Demo" [ref=e439] [cursor=pointer]:
+                  - /url: /demovideo
+              - listitem [ref=e440]:
+                - link "Release System" [ref=e441] [cursor=pointer]:
+                  - /url: /launch
+          - generic [ref=e442]:
+            - heading "Company" [level=2] [ref=e443]
+            - list [ref=e444]:
+              - listitem [ref=e445]:
+                - link "About" [ref=e446] [cursor=pointer]:
+                  - /url: /about
+              - listitem [ref=e447]:
+                - link "Blog" [ref=e448] [cursor=pointer]:
+                  - /url: /blog
+              - listitem [ref=e449]:
+                - link "Changelog" [ref=e450] [cursor=pointer]:
+                  - /url: /changelog
+              - listitem [ref=e451]:
+                - link "Integrations" [ref=e452] [cursor=pointer]:
+                  - /url: /integrations
+              - listitem [ref=e453]:
+                - link "Investors" [ref=e454] [cursor=pointer]:
+                  - /url: /investors
+              - listitem [ref=e455]:
+                - link "Pitch" [ref=e456] [cursor=pointer]:
+                  - /url: /pitch
+          - generic [ref=e457]:
+            - heading "Resources" [level=2] [ref=e458]
+            - list [ref=e459]:
+              - listitem [ref=e460]:
+                - link "Developers" [ref=e461] [cursor=pointer]:
+                  - /url: /developers
+              - listitem [ref=e462]:
+                - link "CLI" [ref=e463] [cursor=pointer]:
+                  - /url: /cli
+              - listitem [ref=e464]:
+                - link "Support" [ref=e465] [cursor=pointer]:
+                  - /url: /support
+              - listitem [ref=e466]:
+                - link "Compare" [ref=e467] [cursor=pointer]:
+                  - /url: /compare
+              - listitem [ref=e468]:
+                - link "Alternatives" [ref=e469] [cursor=pointer]:
+                  - /url: /alternatives
+              - listitem [ref=e470]:
+                - link "Status" [ref=e471] [cursor=pointer]:
+                  - /url: https://status.jov.ie
+          - generic [ref=e472]:
+            - heading "Connect" [level=2] [ref=e473]
+            - list [ref=e474]:
+              - listitem [ref=e475]:
+                - link "Instagram" [ref=e476] [cursor=pointer]:
+                  - /url: https://instagram.com/meetjovie
+              - listitem [ref=e477]:
+                - link "X" [ref=e478] [cursor=pointer]:
+                  - /url: https://x.com/meetjovie
+              - listitem [ref=e479]:
+                - link "Contact" [ref=e480] [cursor=pointer]:
+                  - /url: /support
+      - generic [ref=e481]:
+        - generic [ref=e482]: © 2026 Jovie Technology Inc.
+        - navigation "Legal" [ref=e483]:
+          - link "Privacy" [ref=e484] [cursor=pointer]:
+            - /url: /legal/privacy
+          - link "Terms" [ref=e485] [cursor=pointer]:
+            - /url: /legal/terms

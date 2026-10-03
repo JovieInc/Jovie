@@ -850,6 +850,26 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/integrations/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'unverified',
+      source:
+        'JOV-6259: generated integration reference directory; PR receipt pending',
+    },
+    exempt: {
+      reason:
+        'Generated integration reference directory shared with app settings, not a conversion-page recipe.',
+      linearId: 'JOV-6259',
+      approvedBy: 'Tim White (requested integration directory)',
+      prUrl: '',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/integrations',
+    healthCheck: { path: '/integrations', expected: 'page' },
+  },
+  {
     glob: '(marketing)/changelog/page.tsx',
     renderedSections: [],
     bindingEvidence: {

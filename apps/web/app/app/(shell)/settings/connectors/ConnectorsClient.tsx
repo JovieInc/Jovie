@@ -9,7 +9,14 @@ import { SuggestedActionCard } from '@/components/features/connectors/SuggestedA
 import { SettingsSection } from '@/components/features/dashboard/organisms/SettingsSection';
 import { toast } from '@/components/feedback';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
+import { IntegrationDirectory } from '@/components/organisms/integrations/IntegrationDirectory';
+import { IntegrationRequestForm } from '@/components/organisms/integrations/IntegrationRequestForm';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  type ConnectorDefinition,
+  type ConnectorProviderId,
+  getConnectorDefinitions,
+} from '@/lib/connectors/registry';
 
 interface ConnectorState {
   readonly status: ConnectorStatus;
@@ -39,6 +46,8 @@ interface SuggestedActionPreview {
 }
 
 interface ConnectorsClientProps {
+  readonly creatorProfileId?: string | null;
+  readonly accounts?: Record<ConnectorProviderId, ConnectorState>;
   readonly gmail: ConnectorState;
   readonly calendar: ConnectorState;
   readonly suggestedActions: SuggestedActionPreview[];
@@ -46,6 +55,8 @@ interface ConnectorsClientProps {
 }
 
 export function ConnectorsClient({
+  creatorProfileId,
+  accounts,
   gmail,
   calendar,
   suggestedActions,
@@ -54,21 +65,32 @@ export function ConnectorsClient({
   const router = useRouter();
   const [isPendingExtract, startExtract] = useTransition();
 
-  const handleConnect = () => {
-    router.push(
-      `/api/connectors/google/authorize?returnTo=${encodeURIComponent(APP_ROUTES.SETTINGS_CONNECTORS)}`
-    );
+  const handleConnect = (definition: ConnectorDefinition) => {
+    if (definition.connectionScope === 'profile' && !creatorProfileId) {
+      router.push(APP_ROUTES.LIBRARY);
+      return;
+    }
+    const params = new URLSearchParams({
+      returnTo: APP_ROUTES.SETTINGS_CONNECTORS,
+    });
+    if (definition.connectionScope === 'profile' && creatorProfileId)
+      params.set('creatorProfileId', creatorProfileId);
+    router.push(`${definition.authorizePath}?${params.toString()}`);
   };
 
-  const handleDisconnect = async () => {
+  const handleDisconnect = async (definition: ConnectorDefinition) => {
     try {
-      const res = await fetch('/api/connectors/google/disconnect', {
+      const res = await fetch(definition.disconnectPath, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify(
+          definition.connectionScope === 'profile' ? { creatorProfileId } : {}
+        ),
       });
       if (!res.ok) throw new Error('Disconnect failed');
-      toast.success('Google connectors disconnected');
+      toast.success(
+        `${definition.oauthBundle === 'google' ? 'Google account connections' : definition.label} disconnected`
+      );
       router.refresh();
     } catch {
       toast.error('Failed to disconnect. Please try again.');
@@ -104,27 +126,33 @@ export function ConnectorsClient({
       id='connectors'
       title='Connections'
       // ui-casing-allow: sentence-case description (Found === Expected)
-      description='Connect Gmail and Google Calendar to automatically detect booking confirmations.'
+      description='Manage account connections and explore music integrations.'
     >
-      <SettingsPanel title='Google Account'>
+      <SettingsPanel title='Connected Accounts'>
         <div className='divide-y divide-subtle'>
-          <ConnectorCard
-            provider='gmail'
-            status={gmail.status}
-            email={gmail.email}
-            errorMessage={gmail.errorMessage}
-            onConnect={handleConnect}
-            onDisconnect={handleDisconnect}
-          />
-          <ConnectorCard
-            provider='google_calendar'
-            status={calendar.status}
-            email={calendar.email}
-            errorMessage={calendar.errorMessage}
-            onConnect={handleConnect}
-            onDisconnect={handleDisconnect}
-          />
+          {getConnectorDefinitions().map(definition => {
+            const state =
+              accounts?.[definition.id] ??
+              (definition.id === 'gmail'
+                ? gmail
+                : definition.id === 'google_calendar'
+                  ? calendar
+                  : { status: 'not_connected' as const });
+            return (
+              <ConnectorCard
+                key={definition.id}
+                provider={definition.id}
+                {...state}
+                onConnect={() => handleConnect(definition)}
+                onDisconnect={() => void handleDisconnect(definition)}
+              />
+            );
+          })}
         </div>
+      </SettingsPanel>
+      <SettingsPanel title='Explore Integrations'>
+        <IntegrationDirectory />
+        <IntegrationRequestForm />
       </SettingsPanel>
 
       {suggestedActions.length > 0 && (

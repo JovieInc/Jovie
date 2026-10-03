@@ -61,6 +61,9 @@ export const CONNECTOR_REGISTRY = {
     tokenHandler: 'shared_token_vault',
     syncRunner: CONNECTOR_PROVIDERS.gmail,
     webhookHandler: null,
+    connectionScope: 'user',
+    authorizePath: '/api/connectors/google/authorize',
+    disconnectPath: '/api/connectors/google/disconnect',
     displayOrder: 1,
   },
   [CONNECTOR_PROVIDERS.google_calendar]: {
@@ -77,6 +80,9 @@ export const CONNECTOR_REGISTRY = {
     tokenHandler: 'shared_token_vault',
     syncRunner: CONNECTOR_PROVIDERS.google_calendar,
     webhookHandler: null,
+    connectionScope: 'user',
+    authorizePath: '/api/connectors/google/authorize',
+    disconnectPath: '/api/connectors/google/disconnect',
     displayOrder: 2,
   },
   [CONNECTOR_PROVIDERS.youtube]: {
@@ -90,6 +96,9 @@ export const CONNECTOR_REGISTRY = {
     tokenHandler: 'shared_token_vault',
     syncRunner: CONNECTOR_PROVIDERS.youtube,
     webhookHandler: null,
+    connectionScope: 'profile',
+    authorizePath: '/api/connectors/youtube/authorize',
+    disconnectPath: '/api/connectors/youtube/disconnect',
     displayOrder: 3,
   },
 } as const satisfies Record<ConnectorProviderId, ConnectorDefinition>;

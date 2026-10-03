@@ -1,9 +1,9 @@
-import { Cable, Database, Wrench } from 'lucide-react';
+import { Database, Wrench } from 'lucide-react';
 import type { SystemMapTab } from '@/app/app/(shell)/admin/system/page';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { EmptyState } from '@/components/molecules/EmptyState';
+import { IntegrationDirectory } from '@/components/organisms/integrations/IntegrationDirectory';
 import { SKILL_REGISTRY } from '@/lib/agents/registry';
-import { getConnectorDefinitions } from '@/lib/connectors/registry';
 import { AdminSystemMapSkillsTab } from './AdminSystemMapSkillsTab';
 
 interface AdminSystemMapProps {
@@ -16,26 +16,9 @@ export function AdminSystemMap({ activeTab }: AdminSystemMapProps) {
   }
 
   if (activeTab === 'connectors') {
-    const connectors = getConnectorDefinitions();
     return (
-      <div data-testid='system-map-connectors' className='space-y-3'>
-        {connectors.map(c => (
-          <ContentSurfaceCard
-            key={c.id}
-            surface='nested'
-            className='flex items-start gap-3 p-4'
-          >
-            <Cable className='mt-0.5 h-4 w-4 shrink-0 text-secondary-token' />
-            <div className='min-w-0'>
-              <p className='text-sm font-medium text-primary-token'>
-                {c.label}
-              </p>
-              <p className='mt-0.5 text-xs text-secondary-token'>
-                {c.description}
-              </p>
-            </div>
-          </ContentSurfaceCard>
-        ))}
+      <div data-testid='system-map-connectors'>
+        <IntegrationDirectory />
       </div>
     );
   }

@@ -80,5 +80,8 @@ export interface ConnectorDefinition {
    * Inbound webhook handler key. Null for OAuth-polled providers with no push.
    */
   readonly webhookHandler: string | null;
+  readonly connectionScope: 'user' | 'profile';
+  readonly authorizePath: string;
+  readonly disconnectPath: string;
   readonly displayOrder: number;
 }

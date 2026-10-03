@@ -17,12 +17,21 @@ export default async function SettingsConnectionsPage() {
   });
   if (!routeContext.ok) return routeContext.error;
 
-  const data = await loadSettingsConnectorsData(routeContext.userId);
+  const data = await loadSettingsConnectorsData(
+    routeContext.userId,
+    routeContext.profileId
+  );
   if (!data) {
     return (
       <PageErrorState message='Unable to load your account connections. Please refresh the page.' />
     );
   }
 
-  return <ConnectorsClient {...data} isDev={isDevelopment()} />;
+  return (
+    <ConnectorsClient
+      creatorProfileId={routeContext.profileId}
+      {...data}
+      isDev={isDevelopment()}
+    />
+  );
 }

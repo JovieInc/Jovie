@@ -143,6 +143,7 @@ export const APP_ROUTES = {
   // Marketing
   HOME: '/',
   ABOUT: '/about',
+  INTEGRATIONS: '/integrations',
   AI: '/ai',
   ALTERNATIVES: '/alternatives',
   ARTIST_NOTIFICATIONS: '/artist-notifications',

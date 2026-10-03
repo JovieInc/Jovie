@@ -87,6 +87,7 @@
     }
   },
   "scripts": {
+    "integrations:build": "tsx --tsconfig apps/web/tsconfig.json apps/web/scripts/build-integration.ts",
     "dev": "bash scripts/dev-web-fast.sh",
     "dev:all": "turbo dev",
     "dev:cleanup": "bash scripts/cleanup-stale-dev.sh",
