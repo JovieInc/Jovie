@@ -1,11 +1,13 @@
 'use client';
 
 import { th as MotionTableHeader } from 'motion/react-m';
+import { useContext } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import type { Header, RowData } from '@/lib/tanstack-table';
 import { flexRender } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import '../table.types';
+import { ColumnSnapReducedMotionContext } from '../ColumnSnapMotion';
 import { columnSnapTransition } from '../column-snap';
 import { iconColors, tableAlignment } from '../table.styles';
 
@@ -38,6 +40,7 @@ export function TableHeaderCell<TData extends RowData>({
   onToggleSort,
   columnSnap = false,
 }: TableHeaderCellProps<TData>) {
+  const reducedMotion = useContext(ColumnSnapReducedMotionContext);
   // Determine aria-sort attribute without nested ternaries
   let ariaSort: 'ascending' | 'descending' | 'none' | undefined;
   if (!canSort || header.isPlaceholder) {
@@ -107,7 +110,7 @@ export function TableHeaderCell<TData extends RowData>({
       aria-sort={ariaSort}
       className={headerClassName}
       style={headerStyle}
-      {...(columnSnap
+      {...(columnSnap && !reducedMotion
         ? {
             layout: true,
             transition: columnSnapTransition(0),

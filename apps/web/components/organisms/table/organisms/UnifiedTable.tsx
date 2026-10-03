@@ -12,7 +12,6 @@ import React, {
 } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TABLE_MIN_WIDTHS, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
-import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import {
   type ColumnDef,
   type ColumnPinningState,
@@ -473,8 +472,9 @@ function UnifiedTableContent<TData extends RowData>({
   renderExpandedContent,
   getExpandableRowId,
 }: UnifiedTableProps<TData>) {
-  const prefersReducedMotion = useReducedMotion();
-  const snapColumns = columnSnap && !prefersReducedMotion;
+  // Cell identity follows the table option. The provider disables layout
+  // animation for reduced motion without remounting cells after hydration.
+  const snapColumns = columnSnap;
   const resolvedRowHeight = rowMode
     ? TABLE_ROW_MODES[rowMode].rowHeight
     : rowHeight;

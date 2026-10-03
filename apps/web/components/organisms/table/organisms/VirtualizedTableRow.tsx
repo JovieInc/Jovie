@@ -1,13 +1,14 @@
 'use client';
 
 import { td as MotionTableCell } from 'motion/react-m';
-import React, { memo, useCallback, useEffect, useRef } from 'react';
+import React, { memo, useCallback, useContext, useEffect, useRef } from 'react';
 // @coverage-via apps/web/tests/unit/organisms/table/VirtualizedTableRow.test.tsx
 import type { Row, RowData } from '@/lib/tanstack-table';
 import { flexRender } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import '../table.types';
 import { TABLE_CELL_CONTENT_CLASSNAME } from '../atoms/TableCell';
+import { ColumnSnapReducedMotionContext } from '../ColumnSnapMotion';
 import { usePrimaryColumnCompacts } from '../column-priority-context';
 import { columnSnapTransition } from '../column-snap';
 import { presets, rowState, tableAlignment } from '../table.styles';
@@ -101,6 +102,7 @@ function VirtualizedTableRowComponent<TData extends RowData>({
   ...htmlProps
 }: VirtualizedTableRowProps<TData> &
   Omit<React.ComponentPropsWithoutRef<'tr'>, ManagedTrProps>) {
+  const reducedMotion = useContext(ColumnSnapReducedMotionContext);
   const rowData = row.original as TData;
   const isRowSelected = (row.getIsSelected?.() ?? false) || isSelected;
   const { primaryId, node: compactNode } = usePrimaryColumnCompacts(rowData);
@@ -235,10 +237,16 @@ function VirtualizedTableRowComponent<TData extends RowData>({
           return (
             <MotionTableCell
               key={cell.id}
-              layout
-              transition={columnSnapTransition(columnSnapOrder)}
-              data-column-snap='on'
-              data-column-snap-order={columnSnapOrder}
+              layout={!reducedMotion}
+              transition={
+                reducedMotion
+                  ? undefined
+                  : columnSnapTransition(columnSnapOrder)
+              }
+              data-column-snap={reducedMotion ? undefined : 'on'}
+              data-column-snap-order={
+                reducedMotion ? undefined : columnSnapOrder
+              }
               className={cellClassName}
               style={cellStyle}
             >

@@ -1,8 +1,10 @@
 'use client';
 
 import { type FeatureBundle, LazyMotion } from 'motion/react';
-import { type ReactNode, useEffect, useState } from 'react';
+import { createContext, type ReactNode, useEffect, useState } from 'react';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
+
+export const ColumnSnapReducedMotionContext = createContext(false);
 
 function createFeatureGate() {
   let release!: (features: FeatureBundle) => void;
@@ -43,5 +45,9 @@ export function ColumnSnapMotion({
 
   // Keep one provider and child identity while features arrive or preferences
   // change. LazyMotion's asynchronous loader only runs on its initial mount.
-  return <LazyMotion features={gate.load}>{children}</LazyMotion>;
+  return (
+    <ColumnSnapReducedMotionContext.Provider value={reducedMotion}>
+      <LazyMotion features={gate.load}>{children}</LazyMotion>
+    </ColumnSnapReducedMotionContext.Provider>
+  );
 }
