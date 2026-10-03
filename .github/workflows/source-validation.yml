@@ -98,12 +98,27 @@ jobs:
         run: |
           set -euo pipefail
           base_sha="$(git merge-base 'origin/${{ github.base_ref }}' HEAD)"
-          changed_cli="$(git diff --name-only "$base_sha" HEAD -- packages/jovie-cli .github/workflows/npm-publish.yml .github/workflows/source-validation.yml)"
+          # The CLI and every public API route it calls (JOV-7714): a route
+          # change can break the CLI's error contract as surely as a CLI edit.
+          changed_cli="$(git diff --name-only "$base_sha" HEAD -- \
+            packages/jovie-cli \
+            .github/workflows/npm-publish.yml \
+            .github/workflows/cli-chaos-nightly.yml \
+            .github/workflows/source-validation.yml \
+            ':(literal)apps/web/app/api/v1/[username]' \
+            apps/web/app/api/v1/openapi.json \
+            apps/web/app/api/v1/actions \
+            apps/web/app/api/agents \
+            apps/web/app/llms.txt \
+            apps/web/app/llms-full.txt \
+            ':(literal)apps/web/app/[username]/llms.txt' \
+            apps/web/lib/api/v1)"
           if [ -n "$changed_cli" ]; then
             pnpm --filter @jovie/cli run test:coverage
             pnpm --filter @jovie/cli run typecheck
             pnpm --filter @jovie/cli run build
             pnpm --filter @jovie/cli run pack:dry
+            pnpm --filter @jovie/cli run chaos:gate
           fi
   security:
     name: Security Evidence
