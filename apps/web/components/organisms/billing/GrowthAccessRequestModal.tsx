@@ -61,7 +61,7 @@ export function GrowthAccessRequestModal({
     <Dialog open={open} onClose={() => handleClose(false)} size='md'>
       {submitted ? (
         <>
-          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400'>
+          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-success/10 text-success'>
             <CheckCircle className='h-6 w-6' />
           </div>
           <DialogTitle className='text-center'>Request received</DialogTitle>
@@ -81,14 +81,14 @@ export function GrowthAccessRequestModal({
         </>
       ) : (
         <>
-          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:bg-violet-400/10 dark:text-violet-400'>
+          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-accent/10 text-accent'>
             <Sparkles className='h-6 w-6' />
           </div>
           <DialogTitle className='text-center'>
             Growth is in early access
           </DialogTitle>
           <DialogDescription className='text-center'>
-            Growth is coming soon. What matters most to you?
+            Tell us what you want from Growth.
           </DialogDescription>
 
           <DialogBody>
@@ -98,7 +98,7 @@ export function GrowthAccessRequestModal({
               </Label>
               <Textarea
                 id='growth-reason'
-                placeholder='e.g., A/B testing for my pre-save pages, Meta pixel for ad retargeting...'
+                placeholder='What would you use Growth for?'
                 value={reason}
                 onChange={e => setReason(e.target.value)}
                 rows={3}

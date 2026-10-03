@@ -4,7 +4,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@jovie/ui';
 import { Copy, MoreHorizontal } from 'lucide-react';
@@ -76,10 +75,6 @@ export function AudienceRowActionsMenu({
           <Copy className='h-4 w-4' />
           Copy phone
         </DropdownMenuItem>
-
-        <DropdownMenuSeparator />
-
-        <DropdownMenuItem disabled>Copy ID (coming soon)</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

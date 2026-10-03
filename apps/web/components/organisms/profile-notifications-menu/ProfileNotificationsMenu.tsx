@@ -250,21 +250,6 @@ export function ProfileNotificationsMenu({
           <DropdownMenuSeparator />
           {smsEnabled && renderChannelMenuItem('sms', 'Text')}
           {renderChannelMenuItem('email', 'Email')}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            disabled
-            className='flex items-start gap-2 cursor-default opacity-70'
-          >
-            <div className='flex-1'>
-              <p className='text-sm font-semibold text-primary-token'>
-                Instagram DMs
-              </p>
-              <p className='text-xs text-tertiary-token'>Coming soon</p>
-            </div>
-            <span aria-hidden className='text-xs text-tertiary-token'>
-              …
-            </span>
-          </DropdownMenuItem>
 
           {/* ── Listening preference ───────────────────── */}
           <DropdownMenuSeparator />

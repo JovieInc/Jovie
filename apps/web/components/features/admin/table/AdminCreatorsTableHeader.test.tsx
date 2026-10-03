@@ -43,12 +43,14 @@ describe('AdminCreatorsTableHeader', () => {
     ).toBe(true);
   });
 
-  it('keeps bulk actions in the creator column without resizing headings', () => {
+  it('keeps the creator heading when rows are selected', () => {
     const { container } = renderHeader({ selectedCount: 3 });
 
+    expect(screen.getByText('Creator')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Bulk actions' })
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: 'Bulk actions' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/coming soon/i)).not.toBeInTheDocument();
     expect(
       Array.from(container.querySelectorAll('th')).every(heading =>
         heading.className.includes('whitespace-nowrap')

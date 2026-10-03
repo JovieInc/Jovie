@@ -100,13 +100,7 @@ async function syncSingleProvider(params: {
       });
     }
     if (provider.method === 'api') {
-      return await syncBioViaApi({
-        profile,
-        providerId,
-        provider,
-        match,
-        bioText,
-      });
+      return unsupportedApiBioSync(providerId, provider.displayName);
     }
     return {
       providerId,
@@ -378,33 +372,17 @@ async function syncBioViaEmail(params: SyncParams): Promise<BioSyncResult> {
 // API-based sync (stub for future OAuth integration)
 // ============================================================================
 
-async function syncBioViaApi(params: SyncParams): Promise<BioSyncResult> {
-  const { profile, providerId, provider, bioText } = params;
-
-  // API-based providers are not yet implemented - they require OAuth tokens
-  // from the artist's connected DSP accounts
-  const [syncRequest] = await db
-    .insert(dspBioSyncRequests)
-    .values({
-      creatorProfileId: profile.id,
-      providerId,
-      method: 'api',
-      status: 'unsupported',
-      bioText,
-      error: `API-based bio sync for ${provider.displayName} requires OAuth connection (coming soon)`,
-      metadata: {
-        bioSnapshot: bioText,
-        apiEndpoint: provider.artistPortalUrl,
-      } satisfies DspBioSyncMetadata,
-    })
-    .returning({ id: dspBioSyncRequests.id });
-
+/** API bio sync stays hidden until OAuth exists. Do not persist a coming-soon row. */
+export function unsupportedApiBioSync(
+  providerId: string,
+  displayName: string
+): BioSyncResult {
   return {
     providerId,
     method: 'api',
     status: 'unsupported',
-    syncRequestId: syncRequest.id,
-    error: `API-based bio sync for ${provider.displayName} requires OAuth connection (coming soon)`,
+    syncRequestId: '',
+    error: `${displayName} bio sync is not available yet`,
   };
 }
 
