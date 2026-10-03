@@ -2103,6 +2103,7 @@ export async function runStructural(opts = {}) {
       ? ['pnpm invariants:check']
       : [];
   const operationsParts = [
+    'node --test .github/scripts/publish-queue-junit.test.mjs scripts/record-quarantine-releases.test.mjs',
     'node --test .github/scripts/dependency-parity-evidence.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-controller.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-controller.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-reconcile.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-reconcile.test.mjs',

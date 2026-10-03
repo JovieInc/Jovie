@@ -241,6 +241,7 @@ nodes:
       - Lane Fix Relay
       - Merge Queue Green Enroll
       - PR Conflict Handler
+      - Quarantine Recovery
       - Rolling CI Dispatch
       - Staging Controller
       - Test Flakiness Report
@@ -1064,8 +1065,9 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:recover-quarantine
-    jobCount: 1
+      - workflow_run
+    terminalReceipt: job:publish-queue-results
+    jobCount: 2
   - name: Remediation Sweep
     path: .github/workflows/remediation-sweep.yml
     active: true
@@ -1514,6 +1516,9 @@ edges:
   - from: Production Release
     to: Canary Health Gate
     type: workflow_call
+  - from: CI
+    to: Quarantine Recovery
+    type: workflow_run
   - from: Eve Pilot
     to: Safe PR Remediation
     type: workflow_run
