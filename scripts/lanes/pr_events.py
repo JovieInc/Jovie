@@ -422,9 +422,9 @@ NON_CHECK_BLOCKER = re.compile(
     r"(?i)dependenc|blocked\s+(?:by|on)|qualification|pricing|red[ -]?line|spend|taste")
 
 HOLD_CONTEXT_QUERY = ('{repository(owner:"%s",name:"%s"){pullRequest(number:%d){'
-                      "timelineItems(last:30,itemTypes:[LABELED_EVENT]){nodes{... on LabeledEvent{"
+                      "timelineItems(last:100,itemTypes:[LABELED_EVENT]){pageInfo{hasPreviousPage}nodes{... on LabeledEvent{"
                       "createdAt label{name} actor{login}}}}"
-                      "comments(last:30){nodes{createdAt author{login} body}}"
+                      "comments(last:100){pageInfo{hasPreviousPage}nodes{createdAt author{login} body}}"
                       "commits(last:1){nodes{commit{oid committedDate}}}}}}")
 
 
@@ -440,6 +440,17 @@ def hold_context(number: int, sh=run) -> dict | None:
         node = json.loads(result.stdout)["data"]["repository"]["pullRequest"]
     except (ValueError, KeyError, TypeError):
         return None
+    if not isinstance(node, dict):
+        return None
+    # Missing or truncated provenance cannot prove absence of founder authority.
+    # Keep the hold intact instead of suggesting an automatic lift.
+    for connection in ("timelineItems", "comments"):
+        value = node.get(connection)
+        if not isinstance(value, dict) or not isinstance(value.get("nodes"), list):
+            return None
+        page = value.get("pageInfo")
+        if not isinstance(page, dict) or page.get("hasPreviousPage") is not False:
+            return None
     events = []
     for item in (node.get("timelineItems") or {}).get("nodes") or []:
         label = str((item.get("label") or {}).get("name") or "")
@@ -468,7 +479,8 @@ def stale_hold(number: int, pr: dict, now: float, sh=run) -> dict | None:
     hold_at = event["at"]
     if now - hold_at <= STALE_HOLD_S:
         return None
-    notes = [n for n in ctx["notes"] if n["at"] is None or n["at"] >= hold_at - 3600]
+    # A later bot label does not supersede an earlier founder hold note.
+    notes = ctx["notes"]
     if event["actor"] in TIM_LOGINS or any(n["author"] in TIM_LOGINS for n in notes):
         return None  # Tim's hold or Tim's hold note: stays, silently
     blocker = any(NON_CHECK_BLOCKER.search(n["body"]) for n in notes)
