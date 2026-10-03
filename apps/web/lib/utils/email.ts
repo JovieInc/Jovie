@@ -115,6 +115,15 @@ const TEST_ACCOUNT_LOCAL_PART_PATTERN = new RegExp(
 /** Clerk test-address tag, e.g. browse+clerk_test@jov.ie */
 const CLERK_TEST_TAG_PATTERN = /\+clerk_test(\+|$)/;
 
+/**
+ * Synthetic dogfood principal tag (JOV-7697), e.g.
+ * canary+synthetic-grokbot-run42@mail.example. The canonical roster lives in
+ * `lib/synthetic/principals.ts`; any address carrying the tag is quarantined
+ * from customer metrics even after its roster entry is revoked.
+ */
+export const SYNTHETIC_PRINCIPAL_EMAIL_TAG = '+synthetic-' as const;
+const SYNTHETIC_PRINCIPAL_TAG_PATTERN = /\+synthetic-[a-z0-9]/;
+
 /** Seeded demo personas, e.g. dualipa-public@jov.ie */
 const DEMO_PLACEHOLDER_LOCAL_PART_PATTERN = /-public$/;
 
@@ -135,6 +144,8 @@ export const INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN = [
   '@(.*\\.)?(example\\.(com|net|org)|invalid|localhost|test)$',
   // Clerk test-address tag anywhere in the local part
   `^[^@]*\\+clerk_test(\\+[^@]*)?@`,
+  // Synthetic dogfood principal tag anywhere in the local part (JOV-7697)
+  '^[^@]*\\+synthetic-[a-z0-9][^@]*@',
   // Demo placeholder personas: *-public@…
   '^[^@]+-public@',
   // Known test/QA local-part prefixes on any domain (separator or bare local)
@@ -145,9 +156,9 @@ export const INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN = [
  * True when the email belongs to an internal or test/demo account rather than
  * a real external customer: team domains (jov.ie, admin domain), dogfood/QA
  * mailbox domains (test.jovie.com), reserved test domains, Clerk `+clerk_test`
- * tags, `*-public` demo placeholders, and seeded QA local-part prefixes (e2e,
- * browse, qa, auth-qa, smoke, staging, test, demo, dogfood, seed, fixture,
- * autotest).
+ * tags, synthetic principal `+synthetic-` tags, `*-public` demo placeholders,
+ * and seeded QA local-part prefixes (e2e, browse, qa, auth-qa, smoke, staging,
+ * test, demo, dogfood, seed, fixture, autotest).
  */
 export function isInternalOrTestAccountEmail(
   email: string | null | undefined
@@ -174,6 +185,7 @@ export function isInternalOrTestAccountEmail(
   return (
     TEST_ACCOUNT_LOCAL_PART_PATTERN.test(localPart) ||
     CLERK_TEST_TAG_PATTERN.test(localPart) ||
+    SYNTHETIC_PRINCIPAL_TAG_PATTERN.test(localPart) ||
     DEMO_PLACEHOLDER_LOCAL_PART_PATTERN.test(localPart)
   );
 }
