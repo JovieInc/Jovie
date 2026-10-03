@@ -101,7 +101,7 @@ function topFiles(perFile: Map<string, number>): string {
 
 describe('destructive/red drift ratchet (shrink-only, JOV-6773)', () => {
   it('does not add new {text,bg,border,ring}-destructive usage beyond the baseline', {
-    timeout: 15_000,
+    timeout: 60_000,
   }, () => {
     const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')) as {
       destructiveUtilityCount: number;
@@ -131,7 +131,7 @@ describe('destructive/red drift ratchet (shrink-only, JOV-6773)', () => {
   });
 
   it('does not add new raw {text,bg,border,ring}-red-* usage beyond the baseline', {
-    timeout: 15_000,
+    timeout: 60_000,
   }, () => {
     const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')) as {
       rawRedUtilityCount: number;

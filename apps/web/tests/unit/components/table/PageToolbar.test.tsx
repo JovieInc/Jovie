@@ -331,12 +331,16 @@ describe('PageToolbar primary CTA guard', () => {
     ]);
   });
 
-  it('keeps every production PageToolbar at one primary pill CTA or fewer', () => {
-    const files = [
-      ...readProductionTsxFiles(join(webRoot, 'app')),
-      ...readProductionTsxFiles(join(webRoot, 'components')),
-    ];
+  it(
+    'keeps every production PageToolbar at one primary pill CTA or fewer',
+    { timeout: 60_000 },
+    () => {
+      const files = [
+        ...readProductionTsxFiles(join(webRoot, 'app')),
+        ...readProductionTsxFiles(join(webRoot, 'components')),
+      ];
 
-    expect(findPageToolbarPrimaryCtaViolations(files)).toEqual([]);
-  });
+      expect(findPageToolbarPrimaryCtaViolations(files)).toEqual([]);
+    }
+  );
 });

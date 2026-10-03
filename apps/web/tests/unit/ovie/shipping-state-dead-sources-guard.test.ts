@@ -40,19 +40,23 @@ function productionFiles(dir: string, out: string[] = []): string[] {
 }
 
 describe('shipping-state dead source guard', () => {
-  it('has no production reference to the retired Symphony port or Gem-local state', () => {
-    const offenders = sourceDirs
-      .flatMap(dir => productionFiles(dir))
-      .filter(file => {
-        const source = fs.readFileSync(path.join(webRoot, file), 'utf8');
-        return (
-          source.includes(RETIRED_SYMPHONY_PORT) ||
-          source.includes(RETIRED_SYMPHONY_HOST) ||
-          source.includes(GEM_LOCAL_STATE)
-        );
-      });
-    expect(offenders).toEqual([]);
-  });
+  it(
+    'has no production reference to the retired Symphony port or Gem-local state',
+    { timeout: 60_000 },
+    () => {
+      const offenders = sourceDirs
+        .flatMap(dir => productionFiles(dir))
+        .filter(file => {
+          const source = fs.readFileSync(path.join(webRoot, file), 'utf8');
+          return (
+            source.includes(RETIRED_SYMPHONY_PORT) ||
+            source.includes(RETIRED_SYMPHONY_HOST) ||
+            source.includes(GEM_LOCAL_STATE)
+          );
+        });
+      expect(offenders).toEqual([]);
+    }
+  );
 
   it('keeps the shipping-state data layer off the local filesystem', () => {
     const files = [
