@@ -1363,8 +1363,8 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:analyze-flakiness
-    jobCount: 1
+    terminalReceipt: job:publish-queue-results
+    jobCount: 2
   - name: TSC Cache Warm
     path: .github/workflows/tsc-cache-warm.yml
     active: true
