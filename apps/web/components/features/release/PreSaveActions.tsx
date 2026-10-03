@@ -83,10 +83,7 @@ export function PreSaveActions({
   return (
     <div className='space-y-3'>
       {/* Countdown */}
-      <div
-        className='flex w-full items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-3 backdrop-blur-2xl'
-        data-testid='release-countdown'
-      >
+      <div className='flex w-full items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-3 backdrop-blur-2xl'>
         <ReleaseCountdown releaseDate={releaseDate} compact />
       </div>
 
