@@ -1,5 +1,6 @@
 import {
   ADMIN_LEGACY_REDIRECT_MAP,
+  ADMIN_NAV_REGISTRY,
   buildAdminGrowthHref,
   buildAdminPeopleHref,
 } from '@/constants/admin-navigation';
@@ -58,14 +59,40 @@ function getRedirectName(path: string): string {
   return `Admin ${label} Redirect`;
 }
 
-export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
+const renderSurfaces = [
   {
     id: 'ops',
-    name: 'Admin Ops',
+    name: 'Admin Now',
     path: APP_ROUTES.HUD,
     rootTestId: 'hud-admin-page',
     snapshotSlug: 'admin-ops',
-    primaryWorkspace: true,
+    utilityRoot: false,
+    includeInFastHealth: true,
+  },
+  {
+    id: 'product',
+    name: 'Admin Product',
+    path: APP_ROUTES.ADMIN_PRODUCT,
+    rootTestId: 'founder-product-page',
+    snapshotSlug: 'admin-product',
+    utilityRoot: false,
+    includeInFastHealth: true,
+  },
+  {
+    id: 'operations',
+    name: 'Admin Operations',
+    path: APP_ROUTES.ADMIN_OPERATIONS,
+    rootTestId: 'founder-operations-page',
+    snapshotSlug: 'admin-operations',
+    utilityRoot: false,
+    includeInFastHealth: true,
+  },
+  {
+    id: 'needs-you',
+    name: 'Admin Needs You',
+    path: APP_ROUTES.ADMIN_NEEDS_YOU,
+    rootTestId: 'founder-needs-you-page',
+    snapshotSlug: 'admin-needs-you',
     utilityRoot: false,
     includeInFastHealth: true,
   },
@@ -75,8 +102,7 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     path: buildAdminPeopleHref('contacts'),
     rootTestId: 'admin-people-view-contacts',
     snapshotSlug: 'admin-people-contacts',
-    primaryWorkspace: true,
-    utilityRoot: false,
+    utilityRoot: true,
     includeInFastHealth: true,
   },
   {
@@ -85,7 +111,6 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     path: buildAdminPeopleHref('waitlist'),
     rootTestId: 'admin-people-view-waitlist',
     snapshotSlug: 'admin-people-waitlist',
-    primaryWorkspace: true,
     utilityRoot: false,
     includeInFastHealth: true,
   },
@@ -98,7 +123,6 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     ),
     rootTestId: 'admin-people-view-creators',
     snapshotSlug: 'admin-people-creators',
-    primaryWorkspace: false,
     utilityRoot: false,
     includeInFastHealth: false,
   },
@@ -111,7 +135,6 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     ),
     rootTestId: 'admin-people-view-users',
     snapshotSlug: 'admin-people-users',
-    primaryWorkspace: false,
     utilityRoot: false,
     includeInFastHealth: false,
   },
@@ -124,7 +147,15 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     ),
     rootTestId: 'admin-people-view-releases',
     snapshotSlug: 'admin-people-releases',
-    primaryWorkspace: false,
+    utilityRoot: false,
+    includeInFastHealth: false,
+  },
+  {
+    id: 'people-assets',
+    name: 'Admin People Assets',
+    path: buildAdminPeopleHref('assets'),
+    rootTestId: 'admin-people-view-assets',
+    snapshotSlug: 'admin-people-assets',
     utilityRoot: false,
     includeInFastHealth: false,
   },
@@ -134,9 +165,17 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     path: buildAdminPeopleHref('feedback'),
     rootTestId: 'admin-people-view-feedback',
     snapshotSlug: 'admin-people-feedback',
-    primaryWorkspace: false,
     utilityRoot: false,
     includeInFastHealth: false,
+  },
+  {
+    id: 'growth',
+    name: 'Admin Growth',
+    path: APP_ROUTES.ADMIN_GROWTH,
+    rootTestId: 'admin-growth-page',
+    snapshotSlug: 'admin-growth',
+    utilityRoot: false,
+    includeInFastHealth: true,
   },
   {
     id: 'growth-leads',
@@ -147,7 +186,6 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     ),
     rootTestId: 'admin-growth-view-leads',
     snapshotSlug: 'admin-growth-leads',
-    primaryWorkspace: true,
     utilityRoot: false,
     includeInFastHealth: true,
   },
@@ -161,17 +199,25 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     path: buildAdminGrowthHref('outreach'),
     rootTestId: 'admin-growth-page',
     snapshotSlug: 'admin-growth-outreach',
-    primaryWorkspace: false,
     utilityRoot: false,
     includeInFastHealth: true,
+  },
+  {
+    id: 'growth-campaigns',
+    name: 'Admin Growth Campaigns',
+    path: buildAdminGrowthHref('campaigns'),
+    rootTestId: 'admin-growth-page',
+    snapshotSlug: 'admin-growth-campaigns',
+    utilityRoot: false,
+    includeInFastHealth: false,
   },
   {
     id: 'growth-ingest',
     name: 'Admin Growth Ingest',
     path: buildAdminGrowthHref('ingest'),
-    rootTestId: 'admin-growth-view-ingest',
+    // Ingest is an accordion in Growth, not a separate view root.
+    rootTestId: 'admin-growth-page',
     snapshotSlug: 'admin-growth-ingest',
-    primaryWorkspace: false,
     utilityRoot: false,
     includeInFastHealth: false,
   },
@@ -181,8 +227,7 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     path: APP_ROUTES.ADMIN_ACTIVITY,
     rootTestId: 'admin-activity-page',
     snapshotSlug: 'admin-activity',
-    primaryWorkspace: true,
-    utilityRoot: false,
+    utilityRoot: true,
     includeInFastHealth: true,
   },
   {
@@ -191,7 +236,6 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     path: APP_ROUTES.ADMIN_INVESTORS,
     rootTestId: 'admin-investors-page',
     snapshotSlug: 'admin-investors',
-    primaryWorkspace: false,
     utilityRoot: true,
     includeInFastHealth: true,
   },
@@ -201,7 +245,6 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     path: APP_ROUTES.ADMIN_INVESTORS_LINKS,
     rootTestId: 'admin-investors-links-page',
     snapshotSlug: 'admin-investors-links',
-    primaryWorkspace: false,
     utilityRoot: false,
     includeInFastHealth: false,
   },
@@ -211,7 +254,6 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     path: APP_ROUTES.ADMIN_INVESTOR_UPDATES,
     rootTestId: 'admin-investor-updates-page',
     snapshotSlug: 'admin-investor-updates',
-    primaryWorkspace: false,
     utilityRoot: false,
     includeInFastHealth: false,
   },
@@ -221,7 +263,6 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     path: APP_ROUTES.ADMIN_INVESTORS_SETTINGS,
     rootTestId: 'admin-investors-settings-page',
     snapshotSlug: 'admin-investors-settings',
-    primaryWorkspace: false,
     utilityRoot: false,
     includeInFastHealth: false,
   },
@@ -231,7 +272,6 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     path: APP_ROUTES.ADMIN_SCREENSHOTS,
     rootTestId: 'admin-screenshots-page',
     snapshotSlug: 'admin-screenshots',
-    primaryWorkspace: false,
     utilityRoot: true,
     includeInFastHealth: true,
   },
@@ -241,11 +281,24 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     path: APP_ROUTES.ADMIN_SHARE_STUDIO,
     rootTestId: 'admin-share-studio-page',
     snapshotSlug: 'admin-share-studio',
-    primaryWorkspace: false,
     utilityRoot: true,
     includeInFastHealth: false,
   },
 ] as const;
+
+// Navigation owns primary membership. A filtered subview must not masquerade
+// as another primary workspace in navigation or narrow-window coverage.
+const primaryPaths = new Set(
+  ADMIN_NAV_REGISTRY.filter(item => item.section === 'workspaces').map(
+    item => item.href
+  )
+);
+
+export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] =
+  renderSurfaces.map(surface => ({
+    ...surface,
+    primaryWorkspace: primaryPaths.has(surface.path),
+  }));
 
 export const ADMIN_REDIRECT_SURFACES: readonly AdminRedirectDescriptor[] =
   Object.entries(ADMIN_LEGACY_REDIRECT_MAP).map(([path, redirect]) => ({
@@ -255,9 +308,15 @@ export const ADMIN_REDIRECT_SURFACES: readonly AdminRedirectDescriptor[] =
     destination: redirect.href,
   }));
 
-export const ADMIN_PRIMARY_NAV_SURFACES = ADMIN_RENDER_SURFACES.filter(
-  surface => surface.primaryWorkspace
-);
+export const ADMIN_PRIMARY_NAV_SURFACES = ADMIN_NAV_REGISTRY.filter(
+  item => item.section === 'workspaces'
+).map(item => {
+  const surface = ADMIN_RENDER_SURFACES.find(entry => entry.path === item.href);
+  if (!surface) {
+    throw new Error(`Missing primary admin surface for "${item.id}"`);
+  }
+  return surface;
+});
 
 export const ADMIN_FAST_HEALTH_SURFACES = ADMIN_RENDER_SURFACES.filter(
   surface => surface.includeInFastHealth
