@@ -121,11 +121,17 @@ describe('marketing route health contract', () => {
     expect(getRouteRecipeParity(pricing).matches).toBe(false);
   });
 
-  it('keeps pay, support, and the public waitlist source-bound and renderable', () => {
+  it('tracks intentional redirects and keeps public pages renderable', () => {
     const redirects = MARKETING_ROUTE_HEALTH_TARGETS.filter(
       target => target.expected === 'redirect'
     );
-    expect(redirects).toEqual([]);
+    expect(redirects).toEqual([
+      expect.objectContaining({
+        glob: '(marketing)/artist-profile/page.tsx',
+        path: '/artist-profile',
+        allowedFinalPaths: ['/artist-profiles'],
+      }),
+    ]);
 
     expect(
       MARKETING_ROUTE_HEALTH_TARGETS.find(

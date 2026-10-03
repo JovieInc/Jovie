@@ -487,13 +487,19 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     ),
     bindingEvidence: {
       status: 'verified',
-      source: 'route audit 2026-08-02',
+      source: 'JOV-7607 navigation audit 2026-10-03',
       notes:
-        'Alias renders the same route component and chrome as /artist-profiles. Release-cycle gallery is product evidence, not social proof.',
+        'The singular alias permanently redirects to /artist-profiles before this fallback page renders.',
     },
-    status: 'active',
+    status: 'deprecated',
     specVersion: '1.0.0',
     url: '/artist-profile',
+    healthCheck: {
+      path: '/artist-profile',
+      expected: 'redirect',
+      allowedFinalPaths: ['/artist-profiles'],
+      requiresSharedChrome: false,
+    },
     productEvidence: {
       kind: 'framed-screenshot',
       componentPath:
