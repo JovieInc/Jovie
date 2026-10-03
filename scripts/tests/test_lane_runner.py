@@ -179,6 +179,29 @@ class SelectionTest(unittest.TestCase):
         ], {"JOV-4": 3})
         self.assertEqual(picked.identifier, "JOV-3")
 
+    def test_remediation_label_is_not_skipped_for_no_symphony(self):
+        self.assertIsNone(lane.pick_issue([issue("JOV-7540", labels=["no-symphony"])], {}))
+        picked = lane.pick_issue([
+            issue("JOV-7540", labels=["no-symphony", "remediation:router"]),
+            issue("JOV-7551", labels=["no-symphony", "remediation:billing-health"]),
+        ], {})
+        self.assertEqual(picked.identifier, "JOV-7540")
+        self.assertIsNone(lane.admission_rejection(
+            issue("JOV-7540", labels=["no-symphony", "remediation:router"]), {}, 10000))
+        self.assertEqual(lane.admission_rejection(
+            issue("JOV-1", labels=["no-symphony", "remediation:router", "type:epic"]), {}, 10000),
+            "excluded-label:type:epic")
+        self.assertEqual(lane.admission_rejection(
+            issue("JOV-1", labels=["no-symphony", "remediation"]), {}, 10000),
+            "excluded-label:no-symphony")
+        os.environ["LANES_ESCALATION"] = "0"
+        try:
+            self.assertEqual(lane.admission_rejection(
+                issue("JOV-7540", labels=["no-symphony", "remediation:router"]), {}, 10000),
+                "excluded-label:no-symphony")
+        finally:
+            os.environ.pop("LANES_ESCALATION", None)
+
     def test_issues_with_an_open_lane_pr_anywhere_are_skipped(self):
         picked = lane.pick_issue([issue("JOV-1", priority=1), issue("JOV-2", priority=2)], {},
                                  in_flight=frozenset({"JOV-1"}))
@@ -3226,7 +3249,7 @@ class OnePrPerIssueTest(unittest.TestCase):
 
     def pr(self, number, issue="jov-7", draft=True, state="BLOCKED", pushed_ago=0, lane_name="devin"):
         return {"number": number, "headRefName": f"{lane_name}/{issue}-20260927t0{number:05d}", "isDraft": draft,
-                "mergeStateStatus": state, "url": f"u{number}", "pushedAgo": pushed_ago}
+                "mergeStateStatus": state, "url": f"u{number}", "pushedAgo": pushed_ago, "headRefOid": f"h{number}", "labels": []}
 
     def test_in_flight_reads_branches_and_markers_and_fails_closed(self):
         saved = lane.sh
@@ -3294,6 +3317,91 @@ class OnePrPerIssueTest(unittest.TestCase):
         self.assertEqual(closed, ["1", "3", "4"])
         self.assertIn("superseded by #2", next(a for a in calls if a[:3] == ["gh", "pr", "close"])[-1])
         self.assertEqual(linear.moves, [("JOV-8", "Todo")])
+
+
+    def test_sweep_preserves_terminal_holds_and_active_repairs_before_any_close(self):
+        targets = [self.pr(1), self.pr(2, draft=False, state="CLEAN"),
+                   self.pr(3, issue="jov-8"), self.pr(4, issue="jov-9"),
+                   self.pr(5, issue="jov-10"), self.pr(6, issue="jov-11")]
+        targets[2]["labels"] = [{"name": "lane-fix-exhausted"}]
+        targets[3]["labels"] = [{"name": "Tim:Hold"}]
+        attempts = {"1": {"sha": "h1", "count": 2},
+                    "5": {"sha": "h5", "count": 1, "at": self.NOW - 1}}
+        calls = []
+        def shell(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=0,stdout="",stderr="")
+        with tempfile.TemporaryDirectory() as tmp:
+            host=lane.Host(state=Path(tmp))
+            (host.state/"fix-attempts.json").write_text(json.dumps(attempts))
+            with patch.dict(sys.modules, {"lane_runner": SimpleNamespace()}), \
+                 patch.object(lane,"sh",side_effect=shell), patch.object(lane,"lane_prs",return_value=targets), \
+                 patch.object(lane,"last_pushes",return_value={p["number"]:self.NOW-lane.STALE_DRAFT_S-1 for p in targets}), \
+                 patch.object(lane,"claimed_elsewhere",side_effect=lambda n,*args:n==6):
+                lane.sweep_lane_prs(host,"devin",FakeLinear([]),now=self.NOW)
+            self.assertEqual(json.loads((host.state/"fix-attempts.json").read_text()),attempts)
+        self.assertFalse(any(c[:3]==["gh","pr","close"] for c in calls))
+
+    def test_red_selector_blocks_exhaustion_without_history_and_missing_head(self):
+        target={**self.pr(1),"mergeStateStatus":"DIRTY","labels":[{"name":"lane-fix-exhausted"}]}
+        self.assertIsNone(lane.red_pr([target],{}))
+        self.assertIsNone(lane.red_pr([{**target,"labels":[],"headRefOid":""}],{}))
+        history={"1":{"sha":"external-before","count":2,"endedAt":1}}
+        self.assertEqual(lane.red_pr([target],history),target,"a proven external dirty head still enters the existing claim path")
+
+
+    def test_red_claim_writes_linked_receipt_before_consuming_exhaustion(self):
+        target={**self.pr(1),"mergeStateStatus":"DIRTY","labels":[{"name":"lane-fix-exhausted"}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            host=lane.Host(state=Path(tmp));path=host.state/"fix-attempts.json"
+            path.write_text(json.dumps({"1":{"sha":"h0","count":2,"endedAt":1}}))
+            calls=[]
+            def shell(args,**kwargs):
+                calls.append(args)
+                if args[-1].endswith("/lane-fix-exhausted"):
+                    receipt=json.loads(path.read_text())["1"]
+                    self.assertEqual(receipt["count"],1)
+                    self.assertEqual(receipt["reentry"]["fromGeneration"]["head"],"h0")
+                    self.assertEqual(receipt["reentry"]["toGeneration"]["head"],"h1")
+                return SimpleNamespace(returncode=0,stdout="",stderr="")
+            with patch.dict(sys.modules, {"lane_runner": SimpleNamespace()}), \
+                 patch.object(lane,"sh",side_effect=shell), patch.object(lane,"load_providers",return_value={"devin":{"slots":4}}), \
+                 patch.object(lane,"claimed_elsewhere",return_value=False), patch.object(lane,"post_claim"), \
+                 patch.object(lane,"reconcile_fix_target",side_effect=lambda pr:{**pr,"state":"OPEN"}):
+                self.assertEqual(lane.claim_red_pr(host,"devin",[target])["number"],1)
+            self.assertTrue(any(c[-1].endswith("/lane-fix-exhausted") for c in calls))
+
+
+    def test_red_claim_rejects_stale_head_or_unreadable_reentry_without_spending(self):
+        target={**self.pr(1),"headRefOid":"cached-h1","mergeStateStatus":"DIRTY", "labels":[{"name":"lane-fix-exhausted"}]}
+        history={"1":{"sha":"current-h2","count":2,"endedAt":1}}
+        for observed in [None,{**target,"headRefOid":"current-h2","state":"OPEN"},
+                         {**target,"state":"OPEN","labels":[{"name":"hold"}]}]:
+            with self.subTest(observed=observed), tempfile.TemporaryDirectory() as tmp:
+                host=lane.Host(state=Path(tmp));path=host.state/"fix-attempts.json";path.write_text(json.dumps(history))
+                with patch.object(lane,"load_providers",return_value={"devin":{"slots":4}}), \
+                     patch.object(lane,"claimed_elsewhere",return_value=False), patch.object(lane,"reconcile_fix_target",return_value=observed), \
+                     patch.object(lane,"sh") as writes,patch.object(lane,"post_claim") as claims:
+                    self.assertIsNone(lane.claim_red_pr(host,"devin",[target]))
+                self.assertEqual(json.loads(path.read_text()),history)
+                writes.assert_not_called();claims.assert_not_called()
+
+    def test_red_claim_rechecks_fresh_clean_state_before_spending(self):
+        target = {**self.pr(1), "mergeStateStatus": "DIRTY", "labels": [{"name": "lane-fix-exhausted"}]}
+        history = {"1": {"sha": "h0", "count": 2, "endedAt": 1}}
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            path = host.state / "fix-attempts.json"
+            path.write_text(json.dumps(history))
+            live = {**target, "state": "OPEN", "mergeStateStatus": "CLEAN", "statusCheckRollup": []}
+            with patch.object(lane, "load_providers", return_value={"devin": {"slots": 4}}), \
+                 patch.object(lane, "claimed_elsewhere", return_value=False), \
+                 patch.object(lane, "reconcile_fix_target", return_value=live), \
+                 patch.object(lane, "sh") as writes, patch.object(lane, "post_claim") as claims:
+                self.assertIsNone(lane.claim_red_pr(host, "devin", [target]))
+            self.assertEqual(json.loads(path.read_text()), history)
+            writes.assert_not_called()
+            claims.assert_not_called()
 
 
 class LockfileConflictTest(unittest.TestCase):

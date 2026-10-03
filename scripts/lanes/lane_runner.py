@@ -40,6 +40,7 @@ import disk_guard  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
 import pr_events  # noqa: E402
+import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
 import reason_lane  # noqa: E402
 import yc_corpus  # noqa: E402
@@ -84,7 +85,8 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py",
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_continuity_clock.py",
-              "scripts/tests/test_design_gate.py"]
+              "scripts/tests/test_design_gate.py",
+              "scripts/tests/test_remediation.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
@@ -488,6 +490,11 @@ def admission_rejection(issue: Issue, failures: dict, now: float,
     """Final claim predicate; in_flight contains normalized lowercase identifiers."""
     labels = {label.lower() for label in issue.labels}
     excluded = sorted(HARD_EXCLUDED_LABELS & labels)
+    # `remediation:*` outranks `no-symphony` (JOV-7540, JOV-7551). Other hard
+    # exclusions still apply. The bare `remediation` label does not.
+    if ("no-symphony" in excluded and remediation.escalation_enabled()
+            and remediation.has_remediation_event_label(issue.labels)):
+        excluded = [name for name in excluded if name != "no-symphony"]
     if excluded:
         return "excluded-label:" + excluded[0]
     if issue_hits_red_line(issue):
@@ -1809,7 +1816,8 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
     for pr in sorted(best_per_issue(prs), key=lambda item: item["number"]):
         # A held PR is Tim's/Summer's call: fixing it re-arms auto-merge and re-enqueues it
         # (#17541, 2026-09-28). The event path already skips holds via pr_events.in_scope.
-        if {label.lower() for label in pr_events.label_names(pr)} & pr_events.HOLD_LABELS:
+        if pr_events.preservation_reason(pr, attempts.get(str(pr["number"]), {}), MAX_FIX_ATTEMPTS,
+                                         now=time.time(), allow_reentry=True):
             continue
         checks = pr.get("statusCheckRollup") or []
         conflicted = pr.get("mergeStateStatus") == "DIRTY"
@@ -2811,10 +2819,14 @@ def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> N
     marker.write_text(json.dumps({"at": now}))
     superseded, stale = sweep_plan(lane_prs(name, fields=LIGHT_PR_FIELDS), now, last_pushes())
     for pr, keep in superseded:
-        pr_events.close_duplicate(THIS, pr, f"superseded by #{keep} for the same issue")
+        if pr_events.maintenance_hold(host, THIS, pr, now):
+            continue
+        pr_events.close_duplicate(THIS, pr, f"superseded by #{keep} for the same issue", host=host, now=now)
     for pr in stale:
+        if pr_events.maintenance_hold(host, THIS, pr, now):
+            continue
         issue = LANE_BRANCH.match(pr["headRefName"]).group("issue").upper()
-        closed = pr_events.close_duplicate(THIS, pr, "stale draft explicitly labeled duplicate")
+        closed = pr_events.close_duplicate(THIS, pr, "stale draft explicitly labeled duplicate", host=host, now=now)
         # Only reopen work the lane still owns; a Done or Canceled issue stays closed.
         if closed and linear.state_of(issue) == "In Progress":
             linear.move(issue, "Todo")
@@ -2857,15 +2869,22 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     prs = [pr for pr in prs if pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
     pr = red_pr(prs, attempts, held)
     # A head another host is fixing is skipped (no attempt charged); the next red PR is ours.
-    while pr and claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
+    while pr:
+        live = None if claimed_elsewhere(pr["number"], pr["headRefOid"], "fix") else \
+            pr_events.fresh_reentry(THIS, pr, attempts.get(str(pr["number"]), {}))
+        if live is not None and red_pr([live], attempts, held) is not None:
+            pr = live
+            break
         prs = [other for other in prs if other["number"] != pr["number"]]
         pr = red_pr(prs, attempts, held)
     if pr:
         entry = held.get(str(pr["number"]), {})
         if entry.get("sha") == pr["headRefOid"]:
             pr = {**pr, "gateEvidence": entry.get("evidence", [])}
-        pr_events.record_attempt(attempts, pr["number"], pr["headRefOid"], name, now)
-        path.write_text(json.dumps(attempts))
+        if not pr_events.charge_reentry(THIS, path, pr, attempts.get(str(pr["number"]), {}), name, now):
+            return None
+        if pr_events.PREFIX + pr_events.EXHAUSTED in {label.lower() for label in pr_events.label_names(pr)}:
+            pr_events.consume(THIS, pr, [pr_events.EXHAUSTED])
         post_claim(pr["number"], pr["headRefOid"], "fix")
     return pr
 
