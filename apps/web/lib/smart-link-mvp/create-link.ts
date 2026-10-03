@@ -120,19 +120,18 @@ async function persist(
   if (reused) return reused;
   if (release.providers.length === 0) return failure('NOT_FOUND', input.origin);
 
-  const now = input.now ?? new Date();
-  if (!input.actor.userId) {
-    const hash = input.actor.anonymousSubjectHash;
-    if (!hash) return failure('UPSTREAM_FAILURE', input.origin);
-    const used = await input.store.countAnonymousSince(hash, monthStart(now));
-    if (used >= FREE_LINKS_PER_MONTH) {
-      return failure('LIMIT_REACHED', input.origin);
-    }
+  const createdAt = new Date(input.now ?? Date.now());
+  const anonymousHash = input.actor.userId
+    ? null
+    : input.actor.anonymousSubjectHash;
+  if (!input.actor.userId && !anonymousHash) {
+    return failure('UPSTREAM_FAILURE', input.origin);
   }
+  const anonymousMonth = anonymousHash ? monthStart(createdAt) : null;
 
   const allocate = input.allocateCode ?? allocateLinkCode;
   for (let attempt = 0; attempt < 5; attempt++) {
-    const inserted = await input.store.insert({
+    const inserted = await input.store.insertWithQuota({
       code: allocate(),
       query,
       kind,
@@ -144,9 +143,9 @@ async function persist(
       upc: release.upc,
       providerKey,
       createdByUserId: input.actor.userId,
-      anonymousSubjectHash: input.actor.userId
-        ? null
-        : input.actor.anonymousSubjectHash,
+      anonymousSubjectHash: anonymousHash,
+      createdAt,
+      anonymousMonth,
     });
     if (inserted !== 'conflict') {
       return fromStored(inserted, input.origin, 'created');
@@ -156,6 +155,15 @@ async function persist(
       providerKey,
     });
     if (again) return again;
+    if (anonymousHash && anonymousMonth) {
+      const used = await input.store.countAnonymousInMonth(
+        anonymousHash,
+        anonymousMonth
+      );
+      if (used >= FREE_LINKS_PER_MONTH) {
+        return failure('LIMIT_REACHED', input.origin);
+      }
+    }
   }
   return failure('UPSTREAM_FAILURE', input.origin);
 }

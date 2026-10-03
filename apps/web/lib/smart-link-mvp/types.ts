@@ -21,6 +21,12 @@ export interface CanonicalRelease {
   readonly artworkUrl: string | null;
 }
 
+export interface NewStoredLink extends StoredLink {
+  readonly anonymousSubjectHash: string | null;
+  readonly createdAt: Date;
+  readonly anonymousMonth: Date | null;
+}
+
 export interface SmartLinkStore {
   findByIsrc(isrc: string): Promise<StoredLink | null>;
   findByProviderKey(providerKey: string): Promise<StoredLink | null>;
@@ -28,21 +34,14 @@ export interface SmartLinkStore {
     readonly isrc?: string | null;
     readonly providerKey?: string | null;
   }): Promise<CanonicalRelease | null>;
-  countAnonymousSince(subjectHash: string, since: Date): Promise<number>;
-  insert(row: {
-    readonly code: string;
-    readonly query: string;
-    readonly kind: 'track' | 'artist';
-    readonly title: string | null;
-    readonly artistName: string | null;
-    readonly artworkUrl: string | null;
-    readonly providers: readonly LinkProvider[];
-    readonly isrc: string | null;
-    readonly upc: string | null;
-    readonly providerKey: string | null;
-    readonly createdByUserId: string | null;
-    readonly anonymousSubjectHash: string | null;
-  }): Promise<StoredLink | 'conflict'>;
+  /** Diagnostic after a conflict; this read never grants permission to insert. */
+  countAnonymousInMonth(subjectHash: string, month: Date): Promise<number>;
+  /**
+   * Atomically admit at most three rows per anonymous subject/UTC month while
+   * enforcing code/recording uniqueness. A conflict writes nothing; actual
+   * storage failures throw. Bind the month to createdAt, never to a later clock.
+   */
+  insertWithQuota(row: NewStoredLink): Promise<StoredLink | 'conflict'>;
 }
 
 export interface ResolvedRelease {

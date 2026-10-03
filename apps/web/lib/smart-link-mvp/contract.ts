@@ -14,7 +14,7 @@ export const JOVIE_PLANS_PATH = '/smart-links#pricing';
 export const MAKE_LINK_ANNOTATIONS = {
   readOnlyHint: false,
   destructiveHint: false,
-  idempotentHint: true,
+  idempotentHint: false,
   openWorldHint: true,
 } as const;
 
@@ -96,10 +96,17 @@ export type LinkCandidate = z.infer<typeof candidateSchema>;
 const COMMERCIAL_COPY =
   /\$\s?\d|\bupgrade\b|\bcheckout\b|\bstripe\b|\bper month\b|\bpricing\b|\/mo\b/i;
 
-/** MCP tool text must stay neutral. The plans URL is the only commercial pointer. */
+/**
+ * Catalog text and its URLs are data, even when a title happens to be "Upgrade".
+ * Errors carry first-party copy only; plansUrl is their sole commercial pointer.
+ */
 export function assertNeutralToolResult(result: LinkResult): void {
-  const { plansUrl: _plansUrl, ...rest } = result;
-  if (COMMERCIAL_COPY.test(JSON.stringify(rest))) {
+  const { plansUrl: _plansUrl, ...rest } = linkResultSchema.parse(result);
+  const copy =
+    rest.status === 'error' || rest.status === 'not_found'
+      ? rest
+      : { status: rest.status };
+  if (COMMERCIAL_COPY.test(JSON.stringify(copy))) {
     throw new Error('Jovie link tool output includes commercial copy');
   }
 }
