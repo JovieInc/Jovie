@@ -2,6 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { UnreleasedReleaseHero } from '@/features/release/UnreleasedReleaseHero';
+import { ReleaseLandingPage } from '../../../app/r/[slug]/ReleaseLandingPage';
 
 type LinkProps = {
   readonly href: string;
@@ -69,14 +71,6 @@ vi.mock('@/features/release/AlbumArtworkContextMenu', () => ({
   ),
   buildArtworkSizes: () => [],
 }));
-
-// Lazy-import after mocks are set up
-const { ReleaseLandingPage } = await import(
-  '../../../app/r/[slug]/ReleaseLandingPage'
-);
-const { UnreleasedReleaseHero } = await import(
-  '@/features/release/UnreleasedReleaseHero'
-);
 
 function renderWithQueryClient(ui: ReactElement) {
   const queryClient = new QueryClient({
@@ -147,7 +141,16 @@ describe('release artist links', () => {
   });
 
   it('links artist name in unreleased hero to artist profile', () => {
-    renderWithQueryClient(
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    render(
       <UnreleasedReleaseHero
         release={{
           slug: 'future-release',
@@ -161,7 +164,8 @@ describe('release artist links', () => {
           handle: 'test-artist',
           avatarUrl: null,
         }}
-      />
+      />,
+      { wrapper }
     );
 
     const artistLink = screen.getByRole('link', { name: 'Test Artist' });

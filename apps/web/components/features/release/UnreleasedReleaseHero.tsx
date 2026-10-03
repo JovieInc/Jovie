@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/release/release-artist-link.test.tsx
 'use client';
 
 /**
