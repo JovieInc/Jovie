@@ -143,7 +143,8 @@ export function planVictimRearms({
 
 export function rearmDescription({ n, headSha, runId }) {
   const description = `n=${n};sha=${headSha};run=${runId}`;
-  if (description.length > 140) fail('rearm description exceeds 140 characters');
+  if (description.length > 140)
+    fail('rearm description exceeds 140 characters');
   return description;
 }
 
@@ -209,7 +210,8 @@ function loadCandidates(repository, headSha, frontPr) {
       `repos/${repository}/commits/${headSha}/pulls`,
     ]);
     for (const pr of associated) {
-      if (Number.isSafeInteger(pr?.number) && pr.number > 0) numbers.add(pr.number);
+      if (Number.isSafeInteger(pr?.number) && pr.number > 0)
+        numbers.add(pr.number);
     }
   } catch {
     // The front PR from the queue ref is enough when the commit has no pulls.
@@ -301,7 +303,8 @@ function readArmState(repository, prNumber) {
 function main() {
   const eventFlag = process.argv.indexOf('--event-path');
   const eventPath = eventFlag === -1 ? '' : process.argv[eventFlag + 1];
-  if (!eventPath) fail('usage: merge-group-victim-rearm.mjs --event-path <file>');
+  if (!eventPath)
+    fail('usage: merge-group-victim-rearm.mjs --event-path <file>');
   const event = JSON.parse(readFileSync(eventPath, 'utf8'));
   const run = event.workflow_run;
   const repository = process.env.GITHUB_REPOSITORY;
@@ -313,9 +316,10 @@ function main() {
     console.log('skip: not a failed merge group');
     return;
   }
-  const front = /^gh-readonly-queue\/main\/pr-([1-9][0-9]*)-([0-9a-f]{40})$/.exec(
-    String(run.head_branch ?? '')
-  );
+  const front =
+    /^gh-readonly-queue\/main\/pr-([1-9][0-9]*)-([0-9a-f]{40})$/.exec(
+      String(run.head_branch ?? '')
+    );
   if (!front || !SHA.test(String(run.head_sha ?? '').toLowerCase())) {
     fail('run is not an exact main merge-queue ref');
   }
@@ -361,21 +365,26 @@ function main() {
         '--squash',
       ]);
     },
-  }).then(applied => {
-    for (const decision of decisions) {
-      console.log(
-        decision.action === 'rearm'
-          ? `rearm #${decision.prNumber} class=${decision.classification} n=${decision.n} increment=${decision.increment}`
-          : `skip #${decision.prNumber} ${decision.reason}`
-      );
-    }
-    console.log(`applied=${applied.length}`);
-  }).catch(error => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  });
+  })
+    .then(applied => {
+      for (const decision of decisions) {
+        console.log(
+          decision.action === 'rearm'
+            ? `rearm #${decision.prNumber} class=${decision.classification} n=${decision.n} increment=${decision.increment}`
+            : `skip #${decision.prNumber} ${decision.reason}`
+        );
+      }
+      console.log(`applied=${applied.length}`);
+    })
+    .catch(error => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    });
 }
 
-if (process.argv[1] && process.argv[1].endsWith('merge-group-victim-rearm.mjs')) {
+if (
+  process.argv[1] &&
+  process.argv[1].endsWith('merge-group-victim-rearm.mjs')
+) {
   main();
 }

@@ -3,11 +3,11 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import {
-  REARM_CAP,
-  REARM_CONTEXT,
   applyVictimRearms,
   implicatedPathsFromAnnotations,
   planVictimRearms,
+  REARM_CAP,
+  REARM_CONTEXT,
   trustedRearmRecords,
 } from '../../merge-group-victim-rearm.mjs';
 
@@ -73,7 +73,13 @@ test('another PR in the group is rearmed once, then capped, and the culprit is n
     candidates: group,
   });
   assert.deepEqual(
-    first.map(item => [item.prNumber, item.action, item.classification, item.n, item.reason]),
+    first.map(item => [
+      item.prNumber,
+      item.action,
+      item.classification,
+      item.n,
+      item.reason,
+    ]),
     [
       [10, 'rearm', 'another-pr', 1, undefined],
       [11, 'skip', undefined, undefined, 'own-failure'],
@@ -101,7 +107,11 @@ test('the same CI run does not spend a second rearm', () => {
         files: ['docs/guide.md'],
         statuses: [status(1, sha, 501)],
       }),
-      candidate({ prNumber: 11, headSha: other, files: ['apps/web/story.tsx'] }),
+      candidate({
+        prNumber: 11,
+        headSha: other,
+        files: ['apps/web/story.tsx'],
+      }),
     ],
   });
   assert.equal(decision.increment, false);
@@ -184,8 +194,18 @@ test('apply writes the receipt before enabling and skips a moved head', async ()
       targetUrl: 'https://github.com/JovieInc/Jovie/actions/runs/7',
       async readPullRequest(prNumber) {
         return prNumber === 10
-          ? { headSha: sha, mergeStateStatus: 'CLEAN', inQueue: false, autoMerge: false }
-          : { headSha: 'e'.repeat(40), mergeStateStatus: 'CLEAN', inQueue: false, autoMerge: false };
+          ? {
+              headSha: sha,
+              mergeStateStatus: 'CLEAN',
+              inQueue: false,
+              autoMerge: false,
+            }
+          : {
+              headSha: 'e'.repeat(40),
+              mergeStateStatus: 'CLEAN',
+              inQueue: false,
+              autoMerge: false,
+            };
       },
       async writeStatus(receipt) {
         writes.push(receipt);
