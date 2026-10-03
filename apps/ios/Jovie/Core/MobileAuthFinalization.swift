@@ -34,6 +34,12 @@ private struct MobileAuthFinalizationStageError: LocalizedError, CustomNSError {
     [NSUnderlyingErrorKey: underlyingError as NSError]
   }
 
+  var isPreconsumeExchangeRejection: Bool {
+    guard stage == "exchange", let error = underlyingError as? NativeAuthExchangeError else { return false }
+    if case .rejectedBeforeConsume = error { return true }
+    return false
+  }
+
   var errorDescription: String? {
     let message = underlyingError.localizedDescription.isEmpty
       ? String(describing: underlyingError)
@@ -146,6 +152,14 @@ func finalizeMobileAuthAttempt(
   } catch {
     if error is CancellationError || Task.isCancelled {
       await cancel()?.value
+    } else if (error as? MobileAuthFinalizationStageError)?.isPreconsumeExchangeRejection == true {
+      // This request was rejected before consuming a server credential. Retire
+      // only its accepted intent; the previous session keeps its authority.
+      if let result = NativeSessionTokenStore.cancelAuthAttempt(attempt) {
+        let work = reconcile(result, error)
+        await work?.value
+        settled(result)
+      }
     } else if let claim = NativeSessionTokenStore.claimCleanup(for: attempt) {
       let work = failure(claim, error)
       await work?.value
