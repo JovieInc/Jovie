@@ -1,0 +1,12 @@
+{
+ "schema": "jovie-preserved-repair/v1",
+ "runId": "20261002T024853Z-PR19910-devin-fix-45e4bf",
+ "pr": 19910,
+ "issue": null,
+ "reason": [
+  "target-head-superseded"
+ ],
+ "branch": "cursor/about-footer-refresh-37d4",
+ "headBefore": "339a16b337b772088e7225de7d451721c81ffd81",
+ "at": "2026-10-02T02:54:03Z"
+}
