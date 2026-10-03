@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionManagementCard } from './SessionManagementCard';
 
 const listSessions = vi.fn();
+const signOut = vi.fn();
+vi.mock('@/hooks/useJovieAuth', () => ({
+  signOut: (...args: unknown[]) => signOut(...args),
+}));
 const revokeSession = vi.fn();
 const revokeOtherSessions = vi.fn();
 
@@ -53,12 +57,48 @@ describe('SessionManagementCard', () => {
     expect(await screen.findByText('No active sessions.')).toBeVisible();
   });
 
-  it('shows an empty state when the session payload is not an array', async () => {
+  it('reports a malformed response as unavailable rather than empty', async () => {
     listSessions.mockResolvedValue({ data: {}, error: null });
 
     render(<SessionManagementCard activeSessionId='session-current' />);
 
-    expect(await screen.findByText('No active sessions.')).toBeVisible();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to load active sessions'
+    );
+    expect(screen.queryByText('No active sessions.')).not.toBeInTheDocument();
+  });
+
+  it('recovers from a failed read without remounting or changing any sessions', async () => {
+    listSessions
+      .mockResolvedValueOnce({ data: null, error: new Error('offline') })
+      .mockResolvedValueOnce({ data: [currentSession], error: null });
+    render(<SessionManagementCard activeSessionId='session-current' />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('This device')).toBeVisible();
+    expect(listSessions).toHaveBeenCalledTimes(2);
+    expect(revokeSession).not.toHaveBeenCalled();
+    expect(revokeOtherSessions).not.toHaveBeenCalled();
+  });
+
+  it('offers explicit sign-in recovery when the session is no longer fresh', async () => {
+    listSessions.mockResolvedValue({
+      data: null,
+      error: { code: 'SESSION_NOT_FRESH', status: 403 },
+    });
+    signOut.mockResolvedValue(undefined);
+    render(<SessionManagementCard activeSessionId='session-current' />);
+    const action = await screen.findByRole('button', { name: 'Sign In Again' });
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Sign out of this device'
+    );
+    expect(signOut).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole('button', { name: 'Retry' })
+    ).not.toBeInTheDocument();
+    await userEvent.click(action);
+    expect(signOut).toHaveBeenCalledWith({
+      redirectUrl: '/signin?redirect_url=%2Fapp%2Fsettings%2Faccount',
+    });
   });
 
   it('lists sessions, labels the current device, and hides the bulk action with one session', async () => {

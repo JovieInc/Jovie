@@ -11,7 +11,8 @@
 import { Badge, Button, ConfirmDialog } from '@jovie/ui';
 import { useEffect, useState } from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
-import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
+import { APP_ROUTES } from '@/constants/routes';
+import { signOut } from '@/hooks/useJovieAuth';
 import { authClient } from '@/lib/auth/client';
 import { captureError } from '@/lib/error-tracking';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -34,6 +35,9 @@ export function SessionManagementCard({
   const [sessions, setSessions] = useState<BetterAuthSessionResource[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [requiresSignIn, setRequiresSignIn] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
   const [endingSessionId, setEndingSessionId] = useState<string | null>(null);
   const [endingAllOthers, setEndingAllOthers] = useState(false);
   const [sessionToEnd, setSessionToEnd] =
@@ -46,16 +50,30 @@ export function SessionManagementCard({
     async function loadSessions() {
       setSessionsLoading(true);
       setSessionsError(null);
+      setRequiresSignIn(false);
 
       try {
         const { data, error } = await authClient.listSessions();
         if (error) throw error;
+        if (!Array.isArray(data))
+          throw new Error('Invalid session list response');
         if (!cancelled) {
-          setSessions(Array.isArray(data) ? data : []);
+          setSessions(data);
         }
       } catch (error) {
         if (!cancelled) {
-          setSessionsError('Unable to load active sessions right now.');
+          const code =
+            error && typeof error === 'object' && 'code' in error
+              ? error.code
+              : null;
+          const needsSignIn =
+            code === 'SESSION_NOT_FRESH' || code === 'UNAUTHORIZED';
+          setRequiresSignIn(needsSignIn);
+          setSessionsError(
+            needsSignIn
+              ? 'Sign out of this device, then sign in again to manage active sessions.'
+              : 'Unable to load active sessions right now.'
+          );
           void captureError('Failed to load sessions', error, {
             source: 'SessionManagementCard',
           });
@@ -72,7 +90,7 @@ export function SessionManagementCard({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [retryCount]);
 
   const handleEndSession = async (session: BetterAuthSessionResource) => {
     setEndingSessionId(session.id);
@@ -112,46 +130,64 @@ export function SessionManagementCard({
 
   if (sessionsLoading) {
     return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='divide-y divide-subtle/60 overflow-hidden'
-      >
+      <div className='divide-y divide-subtle/60 overflow-hidden'>
         <div className='px-4 py-3 sm:px-5'>
           <LoadingSkeleton height='h-10' />
         </div>
         <div className='px-4 py-3 sm:px-5'>
           <LoadingSkeleton height='h-10' />
         </div>
-      </DashboardCard>
+      </div>
     );
   }
 
   if (sessionsError) {
     return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
-      >
-        <div className='px-4 py-3 sm:px-5'>
-          <p className='text-app text-destructive'>{sessionsError}</p>
+      <div className='overflow-hidden'>
+        <div
+          role='alert'
+          className='flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5'
+        >
+          <p className='text-app text-secondary-token'>{sessionsError}</p>
+          {requiresSignIn ? (
+            <Button
+              variant='secondary'
+              size='sm'
+              disabled={signingIn}
+              onClick={async () => {
+                setSigningIn(true);
+                try {
+                  await signOut({
+                    redirectUrl: `${APP_ROUTES.SIGNIN}?redirect_url=${encodeURIComponent(APP_ROUTES.SETTINGS_ACCOUNT)}`,
+                  });
+                } finally {
+                  setSigningIn(false);
+                }
+              }}
+            >
+              Sign In Again
+            </Button>
+          ) : (
+            <Button
+              variant='secondary'
+              size='sm'
+              onClick={() => setRetryCount(count => count + 1)}
+            >
+              Retry
+            </Button>
+          )}
         </div>
-      </DashboardCard>
+      </div>
     );
   }
 
   if (sessions.length === 0) {
     return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
-      >
+      <div className='overflow-hidden'>
         <div className='px-4 py-3 sm:px-5'>
           <p className='text-app text-secondary-token'>No active sessions.</p>
         </div>
-      </DashboardCard>
+      </div>
     );
   }
 
@@ -171,11 +207,7 @@ export function SessionManagementCard({
         </div>
       ) : null}
 
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='divide-y divide-subtle/60 overflow-hidden'
-      >
+      <div className='divide-y divide-subtle/60 overflow-hidden'>
         {sessions.map(session => {
           const isCurrent = session.id === activeSessionId;
 
@@ -217,7 +249,7 @@ export function SessionManagementCard({
             </div>
           );
         })}
-      </DashboardCard>
+      </div>
 
       <ConfirmDialog
         open={Boolean(sessionToEnd)}
