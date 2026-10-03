@@ -8,9 +8,9 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@jovie/ui';
-import { ArrowLeft, Copy, LogOut } from 'lucide-react';
+import { ArrowLeft, Copy, LogOut, SquarePen } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { type PropsWithChildren, useCallback, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
@@ -32,6 +32,10 @@ import {
 } from '@/components/organisms/sidebar';
 import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
+import {
+  buildOvNewChatHref,
+  OV_NEW_CHAT_LABEL,
+} from '@/constants/admin-navigation';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
@@ -130,11 +134,25 @@ function SettingsNavGroup({
 
 /** Dedicated operator navigation; customer DashboardNav stays customer-only. */
 function OperatorNavigation({ pathname }: { readonly pathname: string }) {
+  const router = useRouter();
   return (
     <nav
       aria-label='OV Navigation'
       className='flex flex-1 flex-col gap-4 overflow-hidden pt-1'
     >
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            tooltip={OV_NEW_CHAT_LABEL}
+            aria-label={OV_NEW_CHAT_LABEL}
+            onClick={() => router.push(buildOvNewChatHref())}
+            className='w-fit bg-sidebar-accent/40 font-medium text-sidebar-item-foreground shadow-none hover:bg-sidebar-accent/70'
+          >
+            <SquarePen className='size-3.5' aria-hidden='true' />
+            <span className='truncate'>{OV_NEW_CHAT_LABEL}</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
       {OPERATOR_NAV_SECTIONS.map(section => (
         <div key={section.label}>
           <span className='mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden'>

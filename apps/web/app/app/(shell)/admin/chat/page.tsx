@@ -24,8 +24,13 @@ export const metadata: Metadata = {
  * surrounding layouts in parallel. Turns are tagged `chatMode: 'ov'` and the
  * /api/chat route re-verifies the admin role per request.
  */
-export default async function AdminChatPage() {
+export default async function AdminChatPage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await requireCurrentAdminPageAccess();
+  const { new: newChatKey } = await searchParams;
 
   const currentUser = await getCachedCurrentUser();
   let snapshot: Awaited<ReturnType<typeof getOvieMacHudSnapshot>> | null = null;
@@ -46,5 +51,8 @@ export default async function AdminChatPage() {
     timeZone: TIM_DEFAULT_TIMEZONE,
   });
 
-  return <OvChatClient homeBriefing={homeBriefing} />;
+  // `?new=<nonce>` is the sidebar New Chat entry point (JOV-7358): a changed
+  // nonce remounts the chat client so an in-progress thread resets cleanly.
+  const resetKey = typeof newChatKey === 'string' ? newChatKey : null;
+  return <OvChatClient homeBriefing={homeBriefing} resetKey={resetKey} />;
 }

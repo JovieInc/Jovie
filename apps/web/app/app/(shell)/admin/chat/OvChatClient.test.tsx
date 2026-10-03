@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { OvieHomeBriefing } from '@/lib/ovie/home-briefing';
 
@@ -54,6 +54,8 @@ vi.mock('@/components/jovie/ChatWorkspaceSurface', () => ({
   ),
 }));
 
+const jovieChatMounts = vi.hoisted(() => vi.fn());
+
 vi.mock('@/components/jovie/JovieChat', () => ({
   JovieChat: ({
     profileId,
@@ -63,14 +65,19 @@ vi.mock('@/components/jovie/JovieChat', () => ({
     readonly profileId?: string;
     readonly chatMode?: 'ov' | null;
     readonly ovieHomeBriefing?: OvieHomeBriefing;
-  }) => (
-    <div
-      data-testid='shared-jovie-chat'
-      data-profile-id={profileId}
-      data-chat-mode={chatMode ?? undefined}
-      data-signal-id={ovieHomeBriefing?.signal.id}
-    />
-  ),
+  }) => {
+    useEffect(() => {
+      jovieChatMounts();
+    }, []);
+    return (
+      <div
+        data-testid='shared-jovie-chat'
+        data-profile-id={profileId}
+        data-chat-mode={chatMode ?? undefined}
+        data-signal-id={ovieHomeBriefing?.signal.id}
+      />
+    );
+  },
 }));
 
 import { OvChatClient } from './OvChatClient';
@@ -99,6 +106,20 @@ describe('OvChatClient shared component ownership', () => {
       'data-signal-id',
       'shipping.milestone'
     );
+  });
+
+  it('remounts the chat thread when the New Chat reset key changes (JOV-7358)', () => {
+    jovieChatMounts.mockClear();
+    const { rerender } = render(
+      <OvChatClient homeBriefing={homeBriefing} resetKey='a' />
+    );
+    expect(jovieChatMounts).toHaveBeenCalledTimes(1);
+
+    rerender(<OvChatClient homeBriefing={homeBriefing} resetKey='a' />);
+    expect(jovieChatMounts).toHaveBeenCalledTimes(1);
+
+    rerender(<OvChatClient homeBriefing={homeBriefing} resetKey='b' />);
+    expect(jovieChatMounts).toHaveBeenCalledTimes(2);
   });
 
   it('renders founder OV chat without an artist profile', () => {

@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
@@ -20,12 +26,13 @@ import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { resetDashboardNavTestMocks } from '@/tests/utils/dashboard-nav-test-support';
 
 const unifiedPathnameMock = vi.hoisted(() => vi.fn(() => '/app'));
+const routerPushMock = vi.hoisted(() => vi.fn());
 
 vi.mock('next/navigation', () => ({
   usePathname: () => unifiedPathnameMock(),
   useParams: () => ({}),
   useRouter: () => ({
-    push: vi.fn(),
+    push: routerPushMock,
     replace: vi.fn(),
     back: vi.fn(),
   }),
@@ -191,6 +198,7 @@ describe('UnifiedSidebar library route', () => {
     electronRuntimeMock.isElectronRuntime = true;
     document.documentElement.removeAttribute('data-desktop-runtime');
     signOutMock.mockReset();
+    routerPushMock.mockReset();
     userButtonPropsMock.mockReset();
     nowPlayingBridgePropsMock.mockReset();
     resetDashboardNavTestMocks();
@@ -492,6 +500,37 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.getByRole('button', { name: 'Sign Out' })
     ).toBeInTheDocument();
+  });
+
+  it('exposes a New Chat entry point that opens a fresh OV thread (JOV-7358)', async () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.ADMIN_CHAT,
+      section: 'ov',
+    });
+
+    const operatorNavigation = screen.getByRole('navigation', {
+      name: 'OV Navigation',
+    });
+    const newChat = within(operatorNavigation).getByRole('button', {
+      name: 'New Chat',
+    });
+    fireEvent.click(newChat);
+
+    expect(routerPushMock).toHaveBeenCalledTimes(1);
+    expect(routerPushMock.mock.calls[0]?.[0]).toMatch(
+      /^\/app\/ov\/chat\?new=.+/
+    );
+  });
+
+  it('keeps New Chat out of customer and non-OV sections', () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.LEGACY_ADMIN,
+      section: 'admin',
+    });
+
+    expect(
+      screen.queryByRole('button', { name: 'New Chat' })
+    ).not.toBeInTheDocument();
   });
 
   it('marks only the exact Operations destination current', () => {

@@ -14,8 +14,11 @@ import type { OvieHomeBriefing } from '@/lib/ovie/home-briefing';
  */
 export function OvChatClient({
   homeBriefing,
+  resetKey,
 }: {
   readonly homeBriefing: OvieHomeBriefing;
+  /** New Chat nonce — a changed value remounts the chat with a fresh thread. */
+  readonly resetKey?: string | null;
 }) {
   const { selectedProfile, creatorProfiles } = useDashboardData();
   const activeProfile = selectedProfile ?? creatorProfiles[0] ?? null;
@@ -23,6 +26,7 @@ export function OvChatClient({
   return (
     <ChatWorkspaceSurface>
       <JovieChat
+        key={resetKey ?? 'default'}
         profileId={activeProfile?.id}
         displayName={activeProfile?.displayName ?? undefined}
         avatarUrl={activeProfile?.avatarUrl}

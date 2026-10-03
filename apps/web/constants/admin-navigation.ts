@@ -228,6 +228,19 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
   },
 ] as const;
 
+/**
+ * Fresh OV conversation URL (JOV-7358). The `new` nonce remounts the OV chat
+ * workspace so an in-progress thread yields to a clean composer instead of a
+ * no-op same-route navigation.
+ */
+export const OV_NEW_CHAT_LABEL = 'New Chat';
+
+export function buildOvNewChatHref(
+  nonce: number | string = Date.now()
+): string {
+  return `${APP_ROUTES.ADMIN_CHAT}?new=${encodeURIComponent(String(nonce))}`;
+}
+
 export const ADMIN_PEOPLE_VIEW_LABELS: Record<AdminPeopleView, string> = {
   contacts: 'Customers',
   waitlist: 'Waitlist',

@@ -1,7 +1,9 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef } from 'react';
+import { buildOvNewChatHref } from '@/constants/admin-navigation';
+import { getCurrentAppShellWorkspace } from '@/lib/app-shell/workspaces';
 import { KEYBOARD_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { isFormElement } from '@/lib/utils/keyboard';
 
@@ -33,6 +35,7 @@ export function useSequentialShortcuts({
   onOpenShortcutsModal,
 }: UseSequentialShortcutsConfig = {}) {
   const router = useRouter();
+  const pathname = usePathname();
   const sequenceStartRef = useRef<string | null>(null);
   const sequenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -118,14 +121,28 @@ export function useSequentialShortcuts({
       if (matchingShortcut?.href) {
         event.preventDefault();
         clearSequence();
-        router.push(matchingShortcut.href);
+        // In the OV workspace the chat shortcut must start a fresh operator
+        // thread, not jump to the customer chat route (JOV-7358).
+        router.push(
+          matchingShortcut.id === 'nav-chat' &&
+            getCurrentAppShellWorkspace(pathname).id === 'ov'
+            ? buildOvNewChatHref()
+            : matchingShortcut.href
+        );
         return;
       }
 
       // No match, clear sequence
       clearSequence();
     },
-    [enabled, onOpenShortcutsModal, clearSequence, sequenceTimeout, router]
+    [
+      enabled,
+      onOpenShortcutsModal,
+      clearSequence,
+      sequenceTimeout,
+      router,
+      pathname,
+    ]
   );
 
   useEffect(() => {

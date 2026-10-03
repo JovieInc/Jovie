@@ -2,14 +2,17 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockPush = vi.fn();
+const mockPathname = vi.hoisted(() => vi.fn(() => '/app'));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
+  usePathname: () => mockPathname(),
 }));
 
 vi.mock('@/lib/keyboard-shortcuts', () => ({
   KEYBOARD_SHORTCUTS: [
     {
+      id: 'nav-dashboard',
       key: 'G then D',
       description: 'Go to Dashboard',
       firstKey: 'g',
@@ -18,11 +21,21 @@ vi.mock('@/lib/keyboard-shortcuts', () => ({
       isSequential: true,
     },
     {
+      id: 'nav-settings',
       key: 'G then S',
       description: 'Go to Settings',
       firstKey: 'g',
       secondKey: 's',
       href: '/app/settings',
+      isSequential: true,
+    },
+    {
+      id: 'nav-chat',
+      key: 'G then T',
+      description: 'Go to conversation',
+      firstKey: 'g',
+      secondKey: 't',
+      href: '/app/chat',
       isSequential: true,
     },
   ],
@@ -33,6 +46,7 @@ import { useSequentialShortcuts } from '@/hooks/useSequentialShortcuts';
 describe('useSequentialShortcuts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPathname.mockReturnValue('/app');
     vi.useFakeTimers();
   });
 
@@ -78,6 +92,34 @@ describe('useSequentialShortcuts', () => {
     });
 
     expect(mockPush).toHaveBeenCalledWith('/app/settings');
+  });
+
+  it('routes G then T to the customer chat route in the customer workspace', () => {
+    renderHook(() => useSequentialShortcuts());
+
+    act(() => {
+      dispatchKeyDown({ key: 'g' });
+    });
+    act(() => {
+      dispatchKeyDown({ key: 't' });
+    });
+
+    expect(mockPush).toHaveBeenCalledWith('/app/chat');
+  });
+
+  it('routes G then T to a fresh OV thread inside the OV workspace', () => {
+    mockPathname.mockReturnValue('/app/ov/chat');
+    renderHook(() => useSequentialShortcuts());
+
+    act(() => {
+      dispatchKeyDown({ key: 'g' });
+    });
+    act(() => {
+      dispatchKeyDown({ key: 't' });
+    });
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush.mock.calls[0]?.[0]).toMatch(/^\/app\/ov\/chat\?new=.+/);
   });
 
   it('does not crash when event.key is undefined', () => {
