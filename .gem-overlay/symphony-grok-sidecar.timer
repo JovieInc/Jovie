@@ -1,0 +1,8 @@
+[Unit]
+Description=Keep filling Symphony empty chairs (Grok/Kimi)
+[Timer]
+OnBootSec=15s
+OnUnitInactiveSec=30s
+Persistent=true
+[Install]
+WantedBy=timers.target
