@@ -22,7 +22,7 @@ test.describe
       await page.waitForLoadState('domcontentloaded');
       await expect(page).toHaveURL(
         url =>
-          url.pathname === APP_ROUTES.SETTINGS_ARTIST_PROFILE &&
+          url.pathname === APP_ROUTES.SETTINGS_PROFILE &&
           url.searchParams.get('tab') === 'music',
         { timeout: 60_000 }
       );
