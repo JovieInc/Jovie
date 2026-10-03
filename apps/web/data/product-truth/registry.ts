@@ -735,6 +735,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
     nonMarketing:
       'auth offer recap; default off; no price, trial, or entitlement change',
   },
+  INVESTOR_PORTAL_YC_DECK: {
+    nonMarketing:
+      'investor brief section order; default off until founder design approval',
+  },
 } as const satisfies Readonly<Record<ProductFlagKey, FlagCapabilityBinding>>;
 
 /**

@@ -12,6 +12,10 @@ import {
   resolveTestBypassUserId,
 } from '@/lib/auth/test-mode';
 import { captureError } from '@/lib/error-tracking';
+import {
+  isInvestorClaimTokenShape,
+  isInvestorClaimUnexpired,
+} from '@/lib/investors/claim-token';
 import { apiLimiter } from '@/lib/rate-limit';
 import { analyzeHost } from '@/lib/routing/proxy-routing';
 
@@ -218,6 +222,8 @@ export async function handleInvestorRequest(
  * Returns true if valid.
  */
 async function validateInvestorToken(token: string): Promise<boolean> {
+  if (!isInvestorClaimTokenShape(token)) return false;
+
   try {
     // Lazy import to avoid loading DB in every middleware invocation
     const { db } = await import('@/lib/db');
@@ -236,14 +242,8 @@ async function validateInvestorToken(token: string): Promise<boolean> {
       )
       .limit(1);
 
-    if (!link) return false;
-
-    // Check expiry
-    if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
-      return false;
-    }
-
-    return true;
+    if (!link || !link.isActive) return false;
+    return isInvestorClaimUnexpired(link.expiresAt);
   } catch (error) {
     // Fail closed: if DB is down, deny access
     await captureError('Investor token validation failed', error, {
