@@ -53,6 +53,27 @@ describe('DashboardNav route warming', () => {
     resetDashboardNavTestMocks();
   });
 
+  it('leaves Inbox to the brand-row bell without removing other destinations', () => {
+    const destinations = () =>
+      screen.getAllByRole('link').map(link => ({
+        label: link.getAttribute('aria-label') ?? link.textContent?.trim(),
+        href: link.getAttribute('href'),
+      }));
+    const baseline = renderDashboardNav({ renderFn: render });
+    const before = destinations();
+    expect(before.filter(link => link.label === 'Inbox')).toEqual([
+      { label: 'Inbox', href: APP_ROUTES.DASHBOARD },
+    ]);
+    const retained = before.filter(link => link.label !== 'Inbox');
+    expect(retained.length).toBeGreaterThan(0);
+    baseline.unmount();
+    renderDashboardNav({ renderFn: render, headerOwnsInbox: true });
+    expect(
+      screen.queryByRole('link', { name: 'Inbox' })
+    ).not.toBeInTheDocument();
+    expect(destinations()).toEqual(retained);
+  });
+
   it('fully prefetches every canonical dynamic customer route', () => {
     renderDashboardNav({ renderFn: render });
 
