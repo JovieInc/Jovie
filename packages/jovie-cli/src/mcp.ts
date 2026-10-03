@@ -215,7 +215,7 @@ export async function handleMcpMessage(
         capabilities: { tools: {} },
         serverInfo: { name: 'jovie', title: 'Jovie', version: context.version },
         instructions:
-          'Create a Jovie artist profile from a Spotify artist URL with create_profile, then give the artist the claimUrl.',
+          'Create a Jovie artist profile from a Spotify URL with create_profile, or resolve a YouTube channel to a public Jovie profile with lookup_creator.',
       });
     }
     case 'ping':

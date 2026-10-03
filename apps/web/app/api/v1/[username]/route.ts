@@ -86,7 +86,11 @@ export async function GET(
   }
 
   const { username } = await params;
-  const requestExclusion = getPublicProfileDiscoveryExclusionResponse(username);
+  const requestExclusion = getPublicProfileDiscoveryExclusionResponse(
+    username,
+    'Artist not found',
+    'ARTIST_NOT_FOUND'
+  );
   if (requestExclusion) {
     return addPublicApiHeaders(requestExclusion, rateLimitHeaders);
   }
@@ -95,7 +99,7 @@ export async function GET(
 
   if (!profile?.isPublic) {
     return NextResponse.json(
-      { error: 'Artist not found' },
+      { error: 'Artist not found', code: 'ARTIST_NOT_FOUND' },
       {
         status: 404,
         headers: {
@@ -106,11 +110,15 @@ export async function GET(
       }
     );
   }
-  const profileExclusion = getPublicProfileDiscoveryExclusionResponse({
-    handle: profile.username,
-    displayName: profile.displayName,
-    isPublic: profile.isPublic,
-  });
+  const profileExclusion = getPublicProfileDiscoveryExclusionResponse(
+    {
+      handle: profile.username,
+      displayName: profile.displayName,
+      isPublic: profile.isPublic,
+    },
+    'Artist not found',
+    'ARTIST_NOT_FOUND'
+  );
   if (profileExclusion) {
     return addPublicApiHeaders(profileExclusion, rateLimitHeaders);
   }

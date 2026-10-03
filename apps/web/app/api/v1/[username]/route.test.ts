@@ -90,7 +90,10 @@ describe('GET /api/v1/[username]', () => {
       /^"public-artist";r=99;t=\d+$/
     );
     expect(res.headers.get('X-RateLimit-Remaining')).toBe('99');
-    expect(await res.json()).toEqual({ error: 'Artist not found' });
+    expect(await res.json()).toEqual({
+      error: 'Artist not found',
+      code: 'ARTIST_NOT_FOUND',
+    });
     expect(hoisted.getProfileByUsername).not.toHaveBeenCalled();
     expect(hoisted.publicArtistApiLimiterLimit).toHaveBeenCalledWith(
       '203.0.113.10'
@@ -159,7 +162,10 @@ describe('GET /api/v1/[username]', () => {
     });
 
     expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ error: 'Artist not found' });
+    expect(await res.json()).toEqual({
+      error: 'Artist not found',
+      code: 'ARTIST_NOT_FOUND',
+    });
     expect(hoisted.getReleasesForProfileLite).not.toHaveBeenCalled();
   });
 
@@ -182,7 +188,10 @@ describe('GET /api/v1/[username]', () => {
     );
     expect(res.headers.get('X-RateLimit-Reset')).toMatch(/^\d+$/);
     expect(res.headers.get('Retry-After')).toBeNull();
-    expect(await res.json()).toEqual({ error: 'Artist not found' });
+    expect(await res.json()).toEqual({
+      error: 'Artist not found',
+      code: 'ARTIST_NOT_FOUND',
+    });
   });
 
   it('returns 429 with standard and legacy headers without touching profile data', async () => {

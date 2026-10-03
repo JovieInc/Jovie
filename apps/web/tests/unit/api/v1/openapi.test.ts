@@ -163,6 +163,9 @@ describe('public artist OpenAPI contract', () => {
     );
     expect(ARTIST_OPENAPI_DOCUMENT.paths).toHaveProperty('/api/v1');
     expect(ARTIST_OPENAPI_DOCUMENT.paths).toHaveProperty('/api/v1/{username}');
+    expect(ARTIST_OPENAPI_DOCUMENT.paths).toHaveProperty(
+      '/api/v1/creators/lookup'
+    );
     expect(ARTIST_OPENAPI_DOCUMENT.paths).not.toHaveProperty('/{username}');
 
     const indexOperation = ARTIST_OPENAPI_DOCUMENT.paths['/api/v1'].get;
@@ -170,6 +173,17 @@ describe('public artist OpenAPI contract', () => {
 
     const profileOperation =
       ARTIST_OPENAPI_DOCUMENT.paths['/api/v1/{username}'].get;
+    const lookupOperation =
+      ARTIST_OPENAPI_DOCUMENT.paths['/api/v1/creators/lookup'].get;
+    expect(lookupOperation.operationId).toBe('lookupCreator');
+    expect(lookupOperation.parameters?.[0]).toMatchObject({
+      name: 'input',
+      in: 'query',
+      required: true,
+    });
+    expect(
+      lookupOperation.responses['200'].content['application/json'].schema
+    ).toEqual({ $ref: '#/components/schemas/CreatorLookupResponse' });
     expect(profileOperation.parameters?.[0]?.schema.examples).toEqual([
       'public-handle',
     ]);
@@ -183,6 +197,13 @@ describe('public artist OpenAPI contract', () => {
       ARTIST_OPENAPI_DOCUMENT.components.schemas.ArtistApiIndex.properties
         ?.endpoints?.properties?.artistTemplate?.format
     ).toBe('uri-template');
+    expect(
+      ARTIST_OPENAPI_DOCUMENT.components.schemas.ArtistApiIndex.properties
+        ?.endpoints?.properties?.creatorLookup?.format
+    ).toBe('uri');
+    expect(
+      ARTIST_OPENAPI_DOCUMENT.components.schemas.Error.properties?.code?.enum
+    ).toEqual(['ARTIST_NOT_FOUND']);
     expect(
       ARTIST_OPENAPI_DOCUMENT.components.schemas.ArtistApiIndex.properties
         ?.rateLimit?.properties?.appliesTo

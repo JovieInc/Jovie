@@ -110,7 +110,13 @@ describe('resolveYouTubeChannel / listRecentPublicVideos', () => {
         items: [
           {
             id: 'UC123',
-            snippet: { title: 'Tim White', customUrl: '@itstimwhite' },
+            snippet: {
+              title: 'Tim White',
+              customUrl: '@itstimwhite',
+              description: 'Artist and producer',
+              country: 'US',
+              thumbnails: { high: { url: 'https://i/avatar.jpg' } },
+            },
             contentDetails: { relatedPlaylists: { uploads: 'UU123' } },
           },
         ],
@@ -127,6 +133,9 @@ describe('resolveYouTubeChannel / listRecentPublicVideos', () => {
       title: 'Tim White',
       handle: 'itstimwhite',
       uploadsPlaylistId: 'UU123',
+      description: 'Artist and producer',
+      country: 'US',
+      avatarUrl: 'https://i/avatar.jpg',
     });
     const requested = new URL(String(fetchImpl.mock.calls[0]?.[0]));
     expect(requested.pathname).toBe('/youtube/v3/channels');

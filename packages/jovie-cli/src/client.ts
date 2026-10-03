@@ -284,6 +284,20 @@ export function validateUsername(username: string): string {
   return normalized;
 }
 
+export function validateCreatorLookupInput(input: string): string {
+  const normalized = input.trim();
+  if (
+    normalized.length === 0 ||
+    normalized.length > 200 ||
+    /[\u0000-\u001f\u007f]/.test(normalized)
+  ) {
+    throw new JovieInputError(
+      'Creator lookup requires a YouTube channel URL or youtube:<handle-or-channel-id> value.'
+    );
+  }
+  return normalized;
+}
+
 /** Fetch the public, unauthenticated artist API response. */
 export function fetchArtist(
   username: string,
@@ -291,6 +305,18 @@ export function fetchArtist(
 ): Promise<unknown> {
   const normalized = validateUsername(username);
   return requestJson(`/api/v1/${encodeURIComponent(normalized)}`, options);
+}
+
+/** Resolve a creator by verified YouTube identity, not by a guessed Jovie username. */
+export function fetchCreatorLookup(
+  input: string,
+  options: ResourceOptions = {}
+): Promise<unknown> {
+  const normalized = validateCreatorLookupInput(input);
+  return requestJson(
+    `/api/v1/creators/lookup?input=${encodeURIComponent(normalized)}`,
+    options
+  );
 }
 
 /** Fetch the canonical public OpenAPI 3.1 contract. */

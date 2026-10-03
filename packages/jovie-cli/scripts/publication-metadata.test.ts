@@ -63,6 +63,7 @@ describe('public CLI publication metadata', () => {
     expect(readme).toContain('jovie --help');
     expect(readme).toContain('jovie --version');
     expect(readme).toContain('artist get <username>');
+    expect(readme).toContain('creator lookup <input>');
     expect(readme).toContain('https://jov.ie/cli');
     expect(readme).toContain(
       'A repository build is not proof that npm has the package'

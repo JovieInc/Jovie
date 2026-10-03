@@ -20,6 +20,10 @@ describe('docs API reference contract', () => {
   it('documents the live anonymous read-only API origin and discovery surfaces', () => {
     expect(apiReference).toContain('GET https://jov.ie/api/v1');
     expect(apiReference).toContain('GET https://jov.ie/api/v1/{username}');
+    expect(apiReference).toContain(
+      'GET https://jov.ie/api/v1/creators/lookup?input=...'
+    );
+    expect(apiReference).toContain('code: "ARTIST_NOT_FOUND"');
     expect(apiReference).toContain('https://jov.ie/api/v1/openapi.json');
     expect(apiReference).toContain('https://jov.ie/openapi.json');
     expect(apiReference).toContain('No API key, OAuth token');

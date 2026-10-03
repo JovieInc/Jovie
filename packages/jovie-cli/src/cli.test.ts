@@ -43,6 +43,7 @@ describe('jovie CLI', () => {
 
     expect(result).toBe(0);
     expect(stdout.read()).toContain('artist get <username>');
+    expect(stdout.read()).toContain('creator lookup <input>');
     expect(stdout.read()).toContain('profile create <url>');
     expect(stdout.read()).toContain(
       'No login or API key is needed for public commands.'
@@ -68,6 +69,12 @@ describe('jovie CLI', () => {
   });
 
   it.each([
+    {
+      args: ['creator', 'lookup', 'youtube:aristake'],
+      body: '{"exists":false,"creator":{"handle":"aristake"}}',
+      expectedPath: '/api/v1/creators/lookup?input=youtube%3Aaristake',
+      expectedOutput: { exists: false, creator: { handle: 'aristake' } },
+    },
     {
       args: ['artist', 'get', 'demo'],
       body: '{"artist":{"username":"demo"}}',
@@ -163,6 +170,26 @@ describe('jovie CLI', () => {
       },
     });
     expect(stderr.read()).toBe('');
+  });
+
+  it('surfaces the stable artist-not-found API code', async () => {
+    const stdout = createOutput();
+    const fetch = createFetch(
+      '{"error":"Artist not found","code":"ARTIST_NOT_FOUND"}',
+      404
+    );
+
+    await expect(
+      runCli(['artist', 'get', 'aristake', '--json'], {
+        fetchImpl: fetch.fetchImpl,
+        stdout: stdout.output,
+      })
+    ).resolves.toBe(1);
+    expect(JSON.parse(stdout.read()).error).toMatchObject({
+      code: 'REQUEST_FAILED',
+      apiCode: 'ARTIST_NOT_FOUND',
+      status: 404,
+    });
   });
 
   it.each([

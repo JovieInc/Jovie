@@ -2,7 +2,7 @@
   "name": "@jovie/cli",
   "private": false,
   "type": "module",
-  "description": "Jovie for AI agents: create artist profiles from a Spotify URL and read public artist data. CLI + MCP server + agent skill.",
+  "description": "Jovie for AI agents: create artist profiles and resolve public creators by Jovie or YouTube identity. CLI + MCP server + agent skill.",
   "keywords": [
     "mcp",
     "mcp-server",

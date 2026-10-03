@@ -2,6 +2,7 @@ import {
   createProfile,
   fetchArtist,
   fetchArtistLlms,
+  fetchCreatorLookup,
   fetchOpenApi,
   fetchSiteLlms,
   type ReportKind,
@@ -127,6 +128,18 @@ export const COMMANDS: readonly CommandSpec[] = [
     },
     readOnly: false,
     run: (input, options) => createProfile(required(input), options),
+  },
+  {
+    path: ['creator', 'lookup'],
+    tool: 'lookup_creator',
+    summary:
+      'Resolve a creator from a YouTube channel URL or youtube:handle. Returns the matching Jovie profile or an exists:false extraction.',
+    arg: {
+      name: 'input',
+      description: 'YouTube channel URL or youtube:<handle-or-channel-id>',
+    },
+    readOnly: true,
+    run: (input, options) => fetchCreatorLookup(required(input), options),
   },
   {
     path: ['artist', 'get'],

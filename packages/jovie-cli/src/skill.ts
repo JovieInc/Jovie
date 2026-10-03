@@ -32,9 +32,14 @@ Returns:
 ## Look up an artist
 
 \`\`\`sh
+npx -y @jovie/cli creator lookup youtube:<handle> --json # channel identity
 npx -y @jovie/cli artist get <username> --json   # structured profile
 npx -y @jovie/cli artist llms <username>         # markdown guide
 \`\`\`
+
+Use \`creator lookup\` when you have a YouTube channel URL or handle but do not
+know the Jovie username. It resolves the channel identity before matching and
+returns \`exists:false\` with fresh public metadata when no Jovie profile matches.
 
 ## Errors
 
@@ -60,6 +65,6 @@ in a report. The CLI only attaches its version, platform, and runtime.
 ## MCP
 
 The same tools are available as an MCP server: \`npx -y @jovie/cli mcp\`
-(stdio). Tools: create_profile, get_artist, get_artist_guide, get_openapi,
-get_docs, report_issue, report_feedback.
+(stdio). Tools: create_profile, lookup_creator, get_artist, get_artist_guide,
+get_openapi, get_docs, report_issue, report_feedback.
 `;

@@ -50,6 +50,7 @@ export const PUBLIC_ARTIST_API_RATE_LIMIT_POLICY_VALUE = `${JSON.stringify(
 
 export const PUBLIC_ARTIST_API_INDEX_URL = `${BASE_URL}/api/v1`;
 export const PUBLIC_ARTIST_API_PROFILE_TEMPLATE_URL = `${BASE_URL}/api/v1/{username}`;
+export const PUBLIC_CREATOR_LOOKUP_API_URL = `${BASE_URL}/api/v1/creators/lookup`;
 export const PUBLIC_ARTIST_API_OPENAPI_URL = `${BASE_URL}/api/v1/openapi.json`;
 export const PUBLIC_ARTIST_API_DEVELOPERS_URL = `${BASE_URL}/developers`;
 export const PUBLIC_ARTIST_API_SITEMAP_URL = `${BASE_URL}/sitemap.xml`;
@@ -92,12 +93,14 @@ export interface PublicArtistApiIndex {
   readonly endpoints: {
     readonly index: typeof PUBLIC_ARTIST_API_INDEX_URL;
     readonly artistTemplate: typeof PUBLIC_ARTIST_API_PROFILE_TEMPLATE_URL;
+    readonly creatorLookup: typeof PUBLIC_CREATOR_LOOKUP_API_URL;
     readonly openapi: typeof PUBLIC_ARTIST_API_OPENAPI_URL;
     readonly developers: typeof PUBLIC_ARTIST_API_DEVELOPERS_URL;
     readonly sitemap: typeof PUBLIC_ARTIST_API_SITEMAP_URL;
   };
   readonly _links: {
     readonly self: typeof PUBLIC_ARTIST_API_INDEX_URL;
+    readonly creatorLookup: typeof PUBLIC_CREATOR_LOOKUP_API_URL;
     readonly policy: typeof PUBLIC_ARTIST_API_POLICY_URL;
     readonly openapi: typeof PUBLIC_ARTIST_API_OPENAPI_URL;
     readonly developers: typeof PUBLIC_ARTIST_API_DEVELOPERS_URL;
@@ -114,7 +117,7 @@ export const PUBLIC_ARTIST_API_INDEX: PublicArtistApiIndex = {
   name: 'Jovie Artist API',
   version: PUBLIC_ARTIST_API_VERSION,
   description:
-    'Anonymous, read-only JSON access to public Jovie artist profiles. This index advertises the supported contract without listing artist handles.',
+    'Anonymous, read-only JSON access to public Jovie artist profiles and platform-identity creator lookup. This index advertises the supported contract without listing artist handles.',
   access: 'anonymous',
   scope: 'read-only',
   methods: ['GET'],
@@ -129,12 +132,14 @@ export const PUBLIC_ARTIST_API_INDEX: PublicArtistApiIndex = {
   endpoints: {
     index: PUBLIC_ARTIST_API_INDEX_URL,
     artistTemplate: PUBLIC_ARTIST_API_PROFILE_TEMPLATE_URL,
+    creatorLookup: PUBLIC_CREATOR_LOOKUP_API_URL,
     openapi: PUBLIC_ARTIST_API_OPENAPI_URL,
     developers: PUBLIC_ARTIST_API_DEVELOPERS_URL,
     sitemap: PUBLIC_ARTIST_API_SITEMAP_URL,
   },
   _links: {
     self: PUBLIC_ARTIST_API_INDEX_URL,
+    creatorLookup: PUBLIC_CREATOR_LOOKUP_API_URL,
     policy: PUBLIC_ARTIST_API_POLICY_URL,
     openapi: PUBLIC_ARTIST_API_OPENAPI_URL,
     developers: PUBLIC_ARTIST_API_DEVELOPERS_URL,
