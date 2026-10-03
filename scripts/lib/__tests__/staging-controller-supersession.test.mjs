@@ -19,8 +19,8 @@ const workflow = readFileSync(
   'utf8'
 );
 const script = workflow
-  .split('        run: |\n')[1]
-  .split('\n      - uses:')[0]
+  .split('        run: |\n')[2]
+  .split('\n      - ')[0]
   .split('\n')
   .map(line => line.replace(/^ {10}/, ''))
   .join('\n');
@@ -36,22 +36,28 @@ afterEach(() => {
 
 function authorize(
   candidateRelation,
-  { candidateMainRelation = 'ahead', web = true } = {}
+  {
+    candidateMainRelation = 'ahead',
+    web = true,
+    missingReceipt = false,
+    main = mainSha,
+  } = {}
 ) {
   const root = mkdtempSync(join(tmpdir(), 'staging-supersession-'));
   roots.push(root);
   const bin = join(root, 'bin');
   mkdirSync(bin);
   mkdirSync(join(root, 'product-lane-release'));
-  writeFileSync(
-    join(root, 'product-lane-release/release.json'),
-    JSON.stringify({
-      provenance: { sha: sourceSha },
-      releaseRouting: { sourceMainRunId: '100' },
-      aggregatePassed: true,
-      selectedLanes: web ? ['web'] : ['operations'],
-    })
-  );
+  if (!missingReceipt)
+    writeFileSync(
+      join(root, 'product-lane-release/release.json'),
+      JSON.stringify({
+        provenance: { sha: sourceSha },
+        releaseRouting: { sourceMainRunId: '100' },
+        aggregatePassed: true,
+        selectedLanes: web ? ['web'] : ['operations'],
+      })
+    );
   const gh = join(bin, 'gh');
   writeFileSync(
     gh,
@@ -104,7 +110,7 @@ if (args[0] === 'api') {
       SOURCE_CI_HEAD_REPOSITORY: 'JovieInc/Jovie',
       REPOSITORY: 'JovieInc/Jovie',
       SOURCE_SHA: sourceSha,
-      MAIN_SHA: mainSha,
+      MAIN_SHA: main,
       CANDIDATE_SHA: candidateSha,
       CANDIDATE_RELATION: candidateRelation,
       CANDIDATE_MAIN_RELATION: candidateMainRelation,
@@ -116,6 +122,15 @@ if (args[0] === 'api') {
 }
 
 describe('Staging Controller supersession', () => {
+  it('queries successful runs when searching for a superseding generation', () => {
+    expect(workflow).toContain(
+      'branch=main&event=push&status=success&per_page=100'
+    );
+    expect(workflow).not.toContain(
+      'branch=main&event=push&status=completed&per_page=100'
+    );
+  });
+
   it.each(['behind', 'identical', 'diverged', ''])(
     'keeps the source generation when a later CI run is %s to its SHA',
     relation => {
@@ -148,5 +163,53 @@ describe('Staging Controller supersession', () => {
       outcome: 'not_applicable',
       replacementSha: sourceSha,
     });
+  });
+
+  it('supersedes an unreceipted generation once current main is a descendant', () => {
+    expect(authorize('ahead', { missingReceipt: true })).toMatchObject({
+      outcome: 'superseded',
+      replacementSha: mainSha,
+    });
+  });
+
+  it('fails closed when current main itself sealed no release receipt', () => {
+    const root = mkdtempSync(join(tmpdir(), 'staging-supersession-'));
+    roots.push(root);
+    const bin = join(root, 'bin');
+    mkdirSync(bin);
+    mkdirSync(join(root, 'product-lane-release'));
+    const gh = join(bin, 'gh');
+    writeFileSync(
+      gh,
+      `#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args[0] === 'api' && args[1].endsWith('/commits/main'))
+  console.log(process.env.MAIN_SHA);
+else process.exit(2);
+`
+    );
+    chmodSync(gh, 0o755);
+    const result = spawnSync('bash', ['-c', script], {
+      encoding: 'utf8',
+      timeout: 5000,
+      env: {
+        ...process.env,
+        PATH: `${bin}${delimiter}${process.env.PATH}`,
+        RUNNER_TEMP: root,
+        GITHUB_OUTPUT: join(root, 'github-output'),
+        EXPECTED_SHA: sourceSha,
+        SOURCE_CI_RUN_ID: '100',
+        SOURCE_CI_RUN_ATTEMPT: '1',
+        SOURCE_CI_WORKFLOW_PATH: '.github/workflows/ci.yml',
+        SOURCE_CI_HEAD_BRANCH: 'main',
+        SOURCE_CI_HEAD_REPOSITORY: 'JovieInc/Jovie',
+        REPOSITORY: 'JovieInc/Jovie',
+        MAIN_SHA: sourceSha,
+      },
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stdout).toContain(
+      'Current main CI attempt sealed no product-lane release receipt'
+    );
   });
 });
