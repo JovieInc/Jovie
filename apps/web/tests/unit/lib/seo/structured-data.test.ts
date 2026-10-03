@@ -103,9 +103,11 @@ function findInGraph(
 }
 
 describe('structured-data entity types', () => {
-  it('resolves solo artists as MusicGroup + Person', () => {
+  it('resolves solo artists as MusicGroup + Person and other creators as Person', () => {
     expect(resolveArtistEntityType('artist')).toEqual(['MusicGroup', 'Person']);
-    expect(resolveArtistEntityType('podcaster')).toBe('MusicGroup');
+    expect(resolveArtistEntityType('podcaster')).toBe('Person');
+    expect(resolveArtistEntityType('influencer')).toBe('Person');
+    expect(resolveArtistEntityType('creator')).toBe('Person');
   });
 
   it('resolves releases as MusicAlbum + MusicRelease', () => {
@@ -148,14 +150,60 @@ describe('generateProfileStructuredData', () => {
     expect(validateProfileRichResults(data)).toEqual([]);
   });
 
-  it('emits MusicGroup + Person for solo artists', () => {
+  it('emits MusicGroup + Person and music wording for an artist profile', () => {
     const data = generateProfileStructuredData(
-      BASE_PROFILE,
-      ['pop'],
+      { ...BASE_PROFILE, bio: null },
+      null,
       MOCK_LINKS
     );
     const artist = findInGraph(data, 'MusicGroup');
+    const page = findInGraph(data, 'ProfilePage');
     expect(artist?.['@type']).toEqual(['MusicGroup', 'Person']);
+    expect(artist?.['@id']).toBe('https://jov.ie/testartist#musicgroup');
+    expect(artist?.description).toBe('Music by Test Artist');
+    expect(artist?.genre).toEqual(['Music']);
+    expect(page?.mainEntity).toEqual({
+      '@id': 'https://jov.ie/testartist#musicgroup',
+    });
+    expect(validateProfileRichResults(data)).toEqual([]);
+  });
+
+  it('emits Person and a neutral description for a non-artist profile', () => {
+    const data = generateProfileStructuredData(
+      {
+        ...BASE_PROFILE,
+        creator_type: 'podcaster',
+        username: 'ada',
+        username_normalized: 'ada',
+        display_name: 'Ada Founder',
+        bio: null,
+        spotify_url: null,
+        apple_music_url: null,
+        youtube_url: null,
+      },
+      null,
+      [
+        {
+          id: 'link-ada',
+          artist_id: 'profile-123',
+          platform: 'instagram',
+          url: 'https://instagram.com/ada',
+          clicks: 0,
+          created_at: '2024-01-01T00:00:00Z',
+        },
+      ]
+    );
+    const person = findInGraph(data, 'Person');
+    const page = findInGraph(data, 'ProfilePage');
+    expect(findInGraph(data, 'MusicGroup')).toBeUndefined();
+    expect(person?.['@type']).toBe('Person');
+    expect(person?.['@id']).toBe('https://jov.ie/ada#person');
+    expect(person?.name).toBe('Ada Founder');
+    expect(person?.description).toBe('Ada Founder');
+    expect(person?.description).not.toMatch(/Music by/);
+    expect(person).not.toHaveProperty('genre');
+    expect(page?.mainEntity).toEqual({ '@id': 'https://jov.ie/ada#person' });
+    expect(validateProfileRichResults(data)).toEqual([]);
   });
 
   it('includes MusicEvent with offset startDate, location, and offers', () => {

@@ -71,7 +71,7 @@ export async function POST(request: Request) {
         capabilities: { tools: {} },
         serverInfo: { name: 'jovie-artist-drafts', version: '1.0.0' },
         instructions:
-          'Resolve an exact public artist, create an unpublished workspace, then prepare a release launch draft. Preserve acquisition fields. Keep draft_token private. Ownership, publishing and purchases require a separate verified human handoff; these tools grant none of those permissions.',
+          'Resolve an exact public creator profile, create an unpublished workspace, then prepare a release launch draft. Preserve acquisition fields. Keep draft_token private. Ownership, publishing and purchases require a separate verified human handoff; these tools grant none of those permissions.',
       });
     if (method === 'ping') return ok({});
     if (method === 'tools/list') return ok({ tools: AGENT_DRAFT_TOOLS });
