@@ -15,7 +15,7 @@ const data: RowData[] = [
   { id: 'one', title: 'Never Say A Word' },
   { id: 'two', title: 'Seaside Heights' },
 ];
-// biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
+// TanStack column arrays mix value types, so the value slot is any.
 const columns: ColumnDef<RowData, any>[] = [
   createColumnHelper<RowData>().accessor('title', { header: 'Title' }),
 ];
