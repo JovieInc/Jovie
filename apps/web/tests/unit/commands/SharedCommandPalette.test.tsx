@@ -460,10 +460,16 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
   it('navigates to the nav href when a nav item is committed', () => {
     pushMock.mockClear();
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
-    // Click the Releases nav row.
+    // Releases sits beyond the five-row empty-state cap; search to reveal it.
+    fireEvent.change(
+      screen.getByRole('combobox', { name: 'Command Palette Search' }),
+      { target: { value: 'releases' } }
+    );
     const releasesNav = screen
       .getAllByRole('option')
-      .find(el => el.textContent?.includes('Manage your release catalog'));
+      .find(el =>
+        el.textContent?.includes('Open the releases view of your work')
+      );
     expect(releasesNav).toBeDefined();
     fireEvent.mouseDown(releasesNav!);
     expect(pushMock).toHaveBeenCalledWith('/app/releases');
