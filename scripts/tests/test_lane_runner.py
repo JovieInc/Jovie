@@ -4549,6 +4549,30 @@ class TerminalPublicationTest(unittest.TestCase):
 
 
 class PublicationBundlePrerequisitesTest(unittest.TestCase):
+    def test_promotion_metrics_imports_from_only_declared_release_files(self):
+        # Import from a standalone bundle so checkout files cannot hide missing dependencies.
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = Path(tmp)
+            for name in lane.RELEASE_EXTRAS:
+                destination = bundle / name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / name, destination)
+            code = '''import childProcess from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
+const denied = () => { throw new Error('transport forbidden in bundle import'); };
+for (const name of ['execFileSync', 'execSync', 'spawnSync', 'execFile', 'exec', 'spawn', 'fork'])
+  childProcess[name] = denied;
+globalThis.fetch = denied;
+syncBuiltinESMExports();
+const metrics = await import(process.argv[1]);
+process.stdout.write(JSON.stringify({ loaded: typeof metrics.computeMetrics === 'function' }));
+'''
+            result = subprocess.run(['node', '--input-type=module', '-e', code,
+                                     (bundle / 'scripts/promotion-loss-metrics.mjs').as_uri()],
+                                    cwd=bundle, capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout), {'loaded': True})
+
     def test_legacy_archive_cannot_activate_without_canonical_policy_dependencies(self):
         # Kept in the legacy selector so an old updater cannot skip this check.
         for path in lane.RELEASE_EXTRAS:
