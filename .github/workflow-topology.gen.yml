@@ -743,8 +743,8 @@ nodes:
       - pull_request_target
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:enroll
-    jobCount: 2
+    terminalReceipt: job:rearm-green-victims
+    jobCount: 3
   - name: Merge Queue Ruleset Verify
     path: .github/workflows/merge-queue-ruleset-verify.yml
     active: true

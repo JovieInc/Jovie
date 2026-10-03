@@ -3,22 +3,9 @@ name: E2E Full Browser Matrix
 on:
   push:
     branches: [main]
-    paths:
-      - 'apps/web/app/**'
-      - 'apps/web/components/**'
-      - 'apps/web/drizzle/**'
-      - 'apps/web/lib/auth/**'
-      - 'apps/web/lib/db/**'
-      - 'apps/web/playwright*.ts'
-      - 'apps/web/tests/e2e/**'
-      - 'apps/web/tests/helpers/**'
-      - 'apps/web/tests/seed-test-data.ts'
-      - 'packages/action-contracts/**'
-      - 'packages/auth-routing/**'
-      - '.github/actions/setup-playwright/**'
-      - '.github/workflows/e2e-full-matrix.yml'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
+    # Every main push must enter the concurrency group below. A path-filtered
+    # push cannot supersede an older matrix, leaving the external stale-run
+    # sweep to kill its runners and misreport the cancellation as a failure.
   workflow_dispatch:
     inputs:
       test_filter:
