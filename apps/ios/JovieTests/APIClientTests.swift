@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import Testing
 @testable import Jovie
 
@@ -1154,4 +1155,294 @@ extension APIClientTests {
       #expect(NativeSessionTokenStore.captureSessionContext() == before)
     }
   }
+}
+
+/// Raw Security fixture shared by finalization tests; every callback is synchronous and non-reentrant.
+final class NativeAuthSecurityScript: @unchecked Sendable {
+  private let lock = NSLock()
+  private var bytes: Data?
+  private var events: [String] = []
+  private var reads: [(OSStatus, Data?)] = []
+  private var copies = 0
+  private var deleted = errSecSuccess
+  private var added = errSecSuccess
+  private var cancelAt: String?
+  var calls: [String] { lock.withLock { events } }
+  var data: Data? { lock.withLock { bytes } }
+
+  func configure(deleteStatus: OSStatus = errSecSuccess, addStatus: OSStatus = errSecSuccess,
+                 reads: [(OSStatus, Data?)] = [], cancelAt: String? = nil) {
+    lock.withLock {
+      deleted = deleteStatus
+      added = addStatus
+      self.reads = reads
+      self.cancelAt = cancelAt
+      events = []
+      copies = 0
+    }
+  }
+
+  var operations: NativeSessionSecurityOperations {
+    NativeSessionSecurityOperations(delete: { self.run("delete", $0).0 },
+      add: { self.run("add", $0).0 }, copy: { self.run("copy", $0) })
+  }
+
+  private func run(_ operation: String, _ query: CFDictionary) -> (OSStatus, Data?) {
+    lock.withLock {
+      if operation == "copy" { copies += 1 }
+      let event = operation == "copy" ? "copy\(copies)" : operation
+      events.append(event)
+      if cancelAt == event { withUnsafeCurrentTask { $0?.cancel() } }
+      if operation == "copy" {
+        return reads.isEmpty ? (bytes == nil ? errSecItemNotFound : errSecSuccess, bytes) : reads.removeFirst()
+      }
+      if operation == "delete" {
+        if deleted == errSecSuccess || deleted == errSecItemNotFound { bytes = nil }
+        return (deleted, nil)
+      }
+      if added == errSecSuccess { bytes = (query as NSDictionary)[kSecValueData as String] as? Data }
+      return (added, nil)
+    }
+  }
+}
+
+func withNativeAuthSecurityScript<T: Sendable>(
+  _ body: @Sendable (NativeAuthSecurityScript) async throws -> T
+) async rethrows -> T {
+  try await withNativeSessionTokenStoreTestIsolation {
+    let script = NativeAuthSecurityScript()
+    let previous = NativeSessionTokenStore.replaceSecurityOperationsForTesting(script.operations)
+    defer { _ = NativeSessionTokenStore.replaceSecurityOperationsForTesting(previous) }
+    return try await body(script)
+  }
+}
+
+private let nativeAuthA = NativeStoredSession(userID: "a", token: "a", expiresAt: .distantFuture)
+private let nativeAuthB = NativeStoredSession(userID: "b", token: "b", expiresAt: .distantFuture)
+private let nativeAuthUserKey = "ie.jov.Jovie.nativeSession.userID"
+private let nativeAuthExpiryKey = "ie.jov.Jovie.nativeSession.expiresAt"
+private let nativeAuthFallbackKey = "ie.jov.Jovie.nativeSession.token"
+
+extension APIClientTests {
+  @Test(arguments: ["success", "same", "preserved", "preserved-same", "consumed", "empty", "readback", "mismatch", "fractional-expiry",
+                    "unreadable", "nil-data", "malformed", "orphan", "empty-user", "missing-expiry", "nan", "infinite", "expired"])
+  func nativeAuthCommitClassifiesActualRawStorage(mode: String) async throws {
+    try await withNativeAuthSecurityScript { io in
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+      let original = try #require(NativeSessionTokenStore.requestAuthorization())
+      if mode == "empty" { NativeSessionTokenStore.clear() }
+      if mode == "orphan" { UserDefaults.standard.removeObject(forKey: nativeAuthUserKey) }
+      if mode == "empty-user" { UserDefaults.standard.set("", forKey: nativeAuthUserKey) }
+      if mode == "missing-expiry" { UserDefaults.standard.removeObject(forKey: nativeAuthExpiryKey) }
+      if mode == "nan" { UserDefaults.standard.set(Double.nan, forKey: nativeAuthExpiryKey) }
+      if mode == "infinite" { UserDefaults.standard.set(Double.infinity, forKey: nativeAuthExpiryKey) }
+      if mode == "expired" { UserDefaults.standard.set(0, forKey: nativeAuthExpiryKey) }
+      let owner = NativeSessionTokenStore.captureOwnership()
+      let invalid = ["empty-user", "missing-expiry", "nan", "infinite", "expired"].contains(mode)
+      let preserved = mode.hasPrefix("preserved")
+      let untouched = ["unreadable", "nil-data"].contains(mode)
+      var reads: [(OSStatus, Data?)] = []
+      if untouched { reads = [(mode == "nil-data" ? errSecSuccess : errSecInteractionNotAllowed, nil)] }
+      if mode == "malformed" { reads = [(errSecSuccess, Data([0xff]))] }
+      if mode == "readback" || mode == "mismatch" {
+        reads = [(errSecSuccess, Data("a".utf8)),
+                 mode == "readback" ? (errSecInteractionNotAllowed, nil) : (errSecSuccess, Data("wrong".utf8))]
+      }
+      io.configure(deleteStatus: preserved || invalid ? errSecInteractionNotAllowed : errSecSuccess,
+        addStatus: preserved || ["consumed", "empty"].contains(mode) || invalid ? errSecDuplicateItem : errSecSuccess,
+        reads: reads)
+      var proposed = mode == "same" || mode == "preserved-same" ? nativeAuthA : nativeAuthB
+      if mode == "fractional-expiry" {
+        proposed = NativeStoredSession(userID: "b", token: "b",
+          expiresAt: Date(timeIntervalSinceReferenceDate: 1_000_000_000.0.nextUp))
+      }
+      let expectedStored = NativeStoredSession(userID: proposed.userID, token: proposed.token,
+        expiresAt: Date(timeIntervalSince1970: proposed.expiresAt.timeIntervalSince1970))
+      if mode == "fractional-expiry" { #expect(expectedStored != proposed) }
+      let attempt = NativeSessionTokenStore.beginAuthAttempt()
+      let result = try #require(NativeSessionTokenStore.commit(attempt, session: proposed))
+      let expected: NativeAuthResolution.Outcome = untouched || invalid || ["readback", "mismatch"].contains(mode)
+        ? .unknown : (preserved ? .preserved : (["consumed", "empty"].contains(mode) ? .consumed : .persisted))
+      #expect(result.outcome == expected && result.origin == .persistence)
+      #expect(result.storageWasUntouched == untouched)
+      #expect(io.calls == (untouched ? ["copy1"] : ["copy1", "delete", "add", "copy2"]))
+      #expect((result.ownership == owner) == (untouched || expected == .preserved))
+      #expect(result.cleanupUserID == (mode == "consumed" ? "a" : nil))
+      #expect(!NativeSessionTokenStore.hasPendingAuth)
+      #expect(NativeSessionTokenStore.commit(attempt, session: proposed) == nil)
+      if expected == .persisted { #expect(NativeSessionTokenStore.load() == expectedStored) }
+      else if expected == .preserved || untouched {
+        #expect(NativeSessionTokenStore.requestAuthorization() == original)
+      } else {
+        #expect(UserDefaults.standard.object(forKey: nativeAuthUserKey) == nil)
+        #expect(UserDefaults.standard.object(forKey: nativeAuthExpiryKey) == nil)
+        #expect(NativeSessionTokenStore.load() == nil)
+        #expect(io.data == (expected == .consumed ? nil : Data((invalid ? "a" : "b").utf8)))
+      }
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func fencedOrphanPermitsRetryButUnreadableStorageDoesNot(unreadable: Bool) async throws {
+    try await withNativeAuthSecurityScript { io in
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+      io.configure(reads: [(errSecSuccess, Data("a".utf8)), (errSecInteractionNotAllowed, nil)])
+      let first = try #require(NativeSessionTokenStore.commit(NativeSessionTokenStore.beginAuthAttempt(), session: nativeAuthB))
+      #expect(first.outcome == .unknown && !first.storageWasUntouched)
+      #expect(io.data == Data("b".utf8))
+      io.configure(reads: unreadable ? [(errSecInteractionNotAllowed, nil)] : [])
+      let retried = try #require(NativeSessionTokenStore.commit(NativeSessionTokenStore.beginAuthAttempt(), session: nativeAuthB))
+      #expect(retried.outcome == (unreadable ? .unknown : .persisted))
+      #expect(io.calls == (unreadable ? ["copy1"] : ["copy1", "delete", "add", "copy2"]))
+      #expect(unreadable ? retried.ownership == first.ownership : retried.ownership != first.ownership)
+    }
+  }
+
+  @Test(arguments: ["save", "clear", "logout", "accept", "rotation", "same-bearer", "expiry"])
+  func acceptedAuthKeepsOnlyItsIntentThroughStoreChanges(change: String) async throws {
+    try await withNativeAuthSecurityScript { io in
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+      let authorization = try #require(NativeSessionTokenStore.requestAuthorization())
+      let attempt = NativeSessionTokenStore.beginAuthAttempt()
+      switch change {
+      case "save": NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+      case "clear": NativeSessionTokenStore.clear()
+      case "logout": _ = NativeSessionTokenStore.claimCleanup(invalidatingAuthIntent: true)
+      case "accept": _ = NativeSessionTokenStore.beginAuthAttempt()
+      case "expiry":
+        UserDefaults.standard.set(0, forKey: nativeAuthExpiryKey)
+        #expect(NativeSessionTokenStore.load() == nil)
+      default:
+        NativeSessionTokenStore.refresh(from: HTTPURLResponse(url: URL(string: "https://jov.ie")!, statusCode: 200,
+          httpVersion: nil, headerFields: ["set-auth-token": change == "rotation" ? "a2" : "a"])!, authorizedBy: authorization)
+      }
+      io.configure()
+      let valid = ["rotation", "same-bearer", "expiry"].contains(change)
+      let result = NativeSessionTokenStore.commit(attempt, session: nativeAuthB)
+      #expect((result?.outcome == .persisted) == valid)
+      #expect(io.calls == (valid ? ["copy1", "delete", "add", "copy2"] : []))
+      #expect(!NativeSessionTokenStore.performIfCurrent(attempt, {}))
+    }
+  }
+
+  @Test(arguments: ["current", "intent", "same-login"])
+  func nativeAuthDeliveryIsSingleUseButGuardsRemainReusable(change: String) async throws {
+    try await withNativeAuthSecurityScript { _ in
+      let result = try #require(NativeSessionTokenStore.commit(NativeSessionTokenStore.beginAuthAttempt(), session: nativeAuthA))
+      if change == "intent" { _ = NativeSessionTokenStore.beginAuthAttempt() }
+      if change == "same-login" { NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture) }
+      var delivered: NativeStoredSession?
+      let consumed = NativeSessionTokenStore.consume(result) { session, receipt in
+        delivered = session
+        #expect(receipt == nil)
+      }
+      #expect(consumed == (change == "current"))
+      #expect(delivered == (change == "current" ? nativeAuthA : nil))
+      #expect(!NativeSessionTokenStore.consume(result, { _, _ in Issue.record("Duplicate delivery") }))
+      #expect(NativeSessionTokenStore.performIfCurrent(result, {}) == (change == "current"))
+      #expect(NativeSessionTokenStore.performIfCurrent(result, {}) == (change == "current"))
+    }
+  }
+
+  @Test(arguments: ["consumed", "failure", "preserved-then-expired"])
+  func authRecoveryReusesTheExactExistingExpiryReceipt(mode: String) async throws {
+    try await withNativeAuthSecurityScript { io in
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+      let authorization = try #require(NativeSessionTokenStore.requestAuthorization())
+      let attempt = NativeSessionTokenStore.beginAuthAttempt()
+      var result: NativeAuthResolution?
+      if mode == "preserved-then-expired" {
+        io.configure(deleteStatus: errSecInteractionNotAllowed, addStatus: errSecDuplicateItem)
+        result = NativeSessionTokenStore.commit(attempt, session: nativeAuthB)
+        io.configure()
+      }
+      var expiry: NativeSessionExpiryReceipt?
+      do { _ = try NativeSessionTokenStore.resolveUnauthorized(authorizedBy: authorization, allowRetry: false) }
+      catch let NativeSessionRequestError.expired(receipt) { expiry = receipt }
+      let receipt = try #require(expiry)
+      io.configure(addStatus: errSecDuplicateItem)
+      if mode == "consumed" { result = NativeSessionTokenStore.commit(attempt, session: nativeAuthB) }
+      if mode == "failure" {
+        #expect(NativeSessionTokenStore.claimCleanup(for: attempt) == nil)
+        #expect(NativeSessionTokenStore.performIfCurrent(attempt, {}))
+        result = NativeSessionTokenStore.cancelAuthAttempt(attempt)
+      }
+      let resolved = try #require(result)
+      var deliveredReceipt: NativeSessionExpiryReceipt?
+      let consumed = NativeSessionTokenStore.consume(resolved) { session, value in
+        #expect(session == nil)
+        deliveredReceipt = value
+      }
+      #expect(consumed)
+      #expect(deliveredReceipt == receipt)
+      #expect(NativeSessionTokenStore.captureOwnership() == receipt.ownership)
+      #expect(io.calls.filter { $0 == "delete" }.count == (mode == "consumed" ? 1 : 0))
+      #expect(NativeSessionTokenStore.performIfCurrent(resolved, {}))
+    }
+  }
+
+  @Test(arguments: ["before", "copy1", "delete", "add", "copy2"], ["persisted", "preserved", "consumed", "unknown"])
+  func cancellationHonorsTheActualWriteAdmission(point: String, outcome: String) async throws {
+    try await withNativeAuthSecurityScript { io in
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+      io.configure(deleteStatus: outcome == "preserved" ? errSecInteractionNotAllowed : errSecSuccess,
+        addStatus: ["preserved", "consumed"].contains(outcome) ? errSecDuplicateItem : errSecSuccess,
+        reads: outcome == "unknown" ? [(errSecSuccess, Data("a".utf8)), (errSecInteractionNotAllowed, nil)] : [], cancelAt: point)
+      let attempt = NativeSessionTokenStore.beginAuthAttempt()
+      let task = Task {
+        if point == "before" { withUnsafeCurrentTask { $0?.cancel() } }
+        return NativeSessionTokenStore.commit(attempt, session: nativeAuthB)
+      }
+      let result = try #require(await task.value)
+      let early = point == "before" || point == "copy1"
+      let expected: NativeAuthResolution.Outcome = early || outcome == "preserved" ? .preserved
+        : (outcome == "persisted" ? .persisted : (outcome == "consumed" ? .consumed : .unknown))
+      #expect(result.outcome == expected && result.origin == (early ? .cancellation : .persistence))
+      #expect(result.storageWasUntouched == early)
+      #expect(io.calls == (early ? ["copy1"] : ["copy1", "delete", "add", "copy2"]))
+      #expect(!Task.isCancelled && !NativeSessionTokenStore.hasPendingAuth)
+      io.configure()
+      let delivered = expected == .preserved ? nativeAuthA : (expected == .persisted ? nativeAuthB : nil)
+      let consumed = NativeSessionTokenStore.consume(result) { session, _ in
+        #expect(session == delivered)
+      }
+      #expect(consumed)
+      #expect(!NativeSessionTokenStore.consume(result, { _, _ in Issue.record("Canceled result replayed") }))
+    }
+  }
+
+#if targetEnvironment(simulator)
+  @Test(arguments: ["new-fallback", "preserved-fallback", "shadow", "keychain"])
+  func authCommitClassifiesTheEffectiveSimulatorBackend(mode: String) async throws {
+    try await withNativeAuthSecurityScript { io in
+      if mode == "preserved-fallback" { io.configure(addStatus: errSecMissingEntitlement) }
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+      UserDefaults.standard.set("a", forKey: nativeAuthFallbackKey)
+      let owner = NativeSessionTokenStore.captureOwnership()
+      io.configure(deleteStatus: ["preserved-fallback", "shadow"].contains(mode) ? errSecInteractionNotAllowed : errSecSuccess,
+        addStatus: mode == "keychain" ? errSecSuccess : (mode == "preserved-fallback" ? errSecDuplicateItem : errSecMissingEntitlement))
+      let result = try #require(NativeSessionTokenStore.commit(NativeSessionTokenStore.beginAuthAttempt(), session: nativeAuthB))
+      let expected: NativeAuthResolution.Outcome = mode == "shadow" ? .unknown : (mode == "preserved-fallback" ? .preserved : .persisted)
+      #expect(result.outcome == expected)
+      #expect((result.ownership == owner) == (mode == "preserved-fallback"))
+      #expect(NativeSessionTokenStore.load() == (mode == "shadow" ? nil : (mode == "preserved-fallback" ? nativeAuthA : nativeAuthB)))
+      #expect(UserDefaults.standard.string(forKey: nativeAuthFallbackKey) == (mode == "keychain" ? nil : (mode == "preserved-fallback" ? "a" : "b")))
+    }
+  }
+#else
+  @Test(arguments: [false, true])
+  func nonSimulatorNeverAdoptsAStaleFallback(unreadable: Bool) async throws {
+    try await withNativeAuthSecurityScript { io in
+      UserDefaults.standard.set("a", forKey: nativeAuthFallbackKey)
+      UserDefaults.standard.set("a", forKey: nativeAuthUserKey)
+      UserDefaults.standard.set(Date.distantFuture.timeIntervalSince1970, forKey: nativeAuthExpiryKey)
+      io.configure(addStatus: errSecMissingEntitlement, reads: unreadable ? [(errSecMissingEntitlement, nil)] : [])
+      let result = try #require(NativeSessionTokenStore.commit(NativeSessionTokenStore.beginAuthAttempt(), session: nativeAuthB))
+      #expect(result.outcome == (unreadable ? .unknown : .consumed))
+      #expect(result.storageWasUntouched == unreadable)
+      #expect(NativeSessionTokenStore.load() == nil)
+      #expect(UserDefaults.standard.string(forKey: nativeAuthFallbackKey) == "a")
+    }
+  }
+#endif
 }

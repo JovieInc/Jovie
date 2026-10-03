@@ -216,9 +216,10 @@ describe('CommandPalette', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('opens on Cmd+K in the main plane and focuses the breadcrumb input', () => {
+  it('opens on Cmd+K in the main plane and focuses the breadcrumb input', async () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
     const input = screen.getByLabelText('Command Palette Search');
     expect(input).toBeInTheDocument();
     // React applies autofocus by calling .focus() on mount, not by emitting
@@ -228,13 +229,35 @@ describe('CommandPalette', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('continues to open on Ctrl+K independently of sidebar Search', () => {
-    render(withDashboard(<CommandPalette />));
-    fireEvent.keyDown(globalThis, { key: 'k', ctrlKey: true });
+  it('cancels a pending first open with Escape and can open again', async () => {
+    render(
+      withDashboard(
+        <>
+          <button type='button'>Return target</button>
+          <CommandPalette />
+        </>
+      )
+    );
+    const origin = screen.getByRole('button', { name: 'Return target' });
+    origin.focus();
+    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis, { key: 'Escape' });
+    await waitFor(() => expect(origin).toHaveFocus());
+    expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
+
+    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
   });
 
-  it('opens the same main plane from the sidebar Search trigger', () => {
+  it('continues to open on Ctrl+K independently of sidebar Search', async () => {
+    render(withDashboard(<CommandPalette />));
+    fireEvent.keyDown(globalThis, { key: 'k', ctrlKey: true });
+    await screen.findByTestId('cmdk-main-plane');
+    expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
+  });
+
+  it('opens the same main plane from the sidebar Search trigger', async () => {
     render(
       withDashboard(
         <>
@@ -245,12 +268,13 @@ describe('CommandPalette', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+    await screen.findByTestId('cmdk-main-plane');
 
     expect(screen.getByTestId('cmdk-main-plane')).toBeInTheDocument();
     expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
   });
 
-  it('toggles the main plane closed from the active sidebar Search trigger', () => {
+  it('toggles the main plane closed from the active sidebar Search trigger', async () => {
     render(
       withDashboard(
         <>
@@ -262,13 +286,14 @@ describe('CommandPalette', () => {
 
     const trigger = screen.getByRole('button', { name: 'Search Jovie' });
     fireEvent.click(trigger);
+    await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByTestId('cmdk-main-plane')).toBeInTheDocument();
 
     fireEvent.click(trigger);
     expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
   });
 
-  it('dismisses the main plane before a persistent sidebar destination runs', () => {
+  it('dismisses the main plane before a persistent sidebar destination runs', async () => {
     render(
       withDashboard(
         <div data-app-shell-sidebar-mount='true'>
@@ -280,13 +305,14 @@ describe('CommandPalette', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+    await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByTestId('cmdk-main-plane')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Library' }));
     expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
   });
 
-  it('commits the selected sidebar-triggered main-plane result with Enter', () => {
+  it('commits the selected sidebar-triggered main-plane result with Enter', async () => {
     pushMock.mockClear();
     render(
       withDashboard(
@@ -298,6 +324,7 @@ describe('CommandPalette', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+    await screen.findByTestId('cmdk-main-plane');
     const input = screen.getByLabelText('Command Palette Search');
     fireEvent.change(input, { target: { value: 'Calendar' } });
     expect(input).toHaveValue('Calendar');
@@ -315,9 +342,10 @@ describe('CommandPalette', () => {
     expect(pushMock).toHaveBeenCalledWith('/app/calendar');
   });
 
-  it('lists recent chats with safe fallback titles', () => {
+  it('lists recent chats with safe fallback titles', async () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByText('Recent Chats')).toBeInTheDocument();
     expect(screen.getByText('Q1 release plan')).toBeInTheDocument();
     expect(screen.getByText('Untitled chat')).toBeInTheDocument();
@@ -326,10 +354,11 @@ describe('CommandPalette', () => {
     expect(screen.queryByText('Hidden default chat')).toBeNull();
   });
 
-  it('prioritizes the current chat and still finds chats outside the default five', () => {
+  it('prioritizes the current chat and still finds chats outside the default five', async () => {
     pathnameMock.mockReturnValue('/app/chat/thread-d');
     const { container } = render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
 
     const recentSection = container.querySelector(
       '[data-palette-section="recent-chats"]'
@@ -346,10 +375,11 @@ describe('CommandPalette', () => {
     expect(screen.getByText('Older hidden chat')).toBeVisible();
   });
 
-  it('shows the admin workspace action and its shortcut', () => {
+  it('shows the admin workspace action and its shortcut', async () => {
     pathnameMock.mockReturnValue('/app');
     render(withDashboard(<CommandPalette />, true));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
 
     const action = screen
       .getAllByRole('option')
@@ -358,11 +388,12 @@ describe('CommandPalette', () => {
     expect(action).toHaveTextContent('⌥ ⇧ W');
   });
 
-  it('document-navigates the admin workspace action to the next workspace', () => {
+  it('document-navigates the admin workspace action to the next workspace', async () => {
     pushMock.mockClear();
     pathnameMock.mockReturnValue('/app');
     render(withDashboard(<CommandPalette />, true));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
 
     const action = screen
       .getAllByRole('option')
@@ -373,11 +404,12 @@ describe('CommandPalette', () => {
     expect(pushMock).not.toHaveBeenCalled();
   });
 
-  it('document-navigates the admin workspace action from OV back to Jovie', () => {
+  it('document-navigates the admin workspace action from OV back to Jovie', async () => {
     pushMock.mockClear();
     pathnameMock.mockReturnValue('/app/ov/ops');
     render(withDashboard(<CommandPalette />, true));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
 
     const action = screen
       .getAllByRole('option')
@@ -388,18 +420,20 @@ describe('CommandPalette', () => {
     expect(pushMock).not.toHaveBeenCalled();
   });
 
-  it('does not leak the workspace action to non-admins', () => {
+  it('does not leak the workspace action to non-admins', async () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
 
     expect(screen.queryByText('Switch to OV')).not.toBeInTheDocument();
     expect(screen.queryByText('Switch to Jovie')).not.toBeInTheDocument();
   });
 
-  it('routes a recent-chat commit to the chat route', () => {
+  it('routes a recent-chat commit to the chat route', async () => {
     pushMock.mockClear();
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
     const threadRow = screen
       .getAllByRole('option')
       .find(el => el.textContent?.includes('Q1 release plan'));
@@ -408,9 +442,10 @@ describe('CommandPalette', () => {
     expect(pushMock).toHaveBeenCalledWith('/app/chat/thread-a');
   });
 
-  it('toggles closed when Cmd+K is pressed again', () => {
+  it('toggles closed when Cmd+K is pressed again', async () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByLabelText('Command Palette Search')).toBeInTheDocument();
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
     expect(
@@ -430,6 +465,7 @@ describe('CommandPalette', () => {
     const origin = screen.getByRole('button', { name: 'Return target' });
     origin.focus();
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
     fireEvent.keyDown(globalThis, { key: 'Escape' });
     expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();

@@ -81,7 +81,6 @@
     "/engineering": [
       "agentic:structured-data",
       "geo:geo-jsonld-type",
-      "geo:geo-orphan",
       "geo:geo-sibling-links"
     ],
     "/engineering/preview": ["agentic:structured-data"],

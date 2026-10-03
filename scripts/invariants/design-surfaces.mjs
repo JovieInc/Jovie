@@ -481,6 +481,7 @@ export const NAV_LABEL_DESTINATIONS = Object.freeze({
   'Artist Directory': ['ARTISTS'],
   About: ['ABOUT'],
   Blog: ['BLOG'],
+  Engineering: ['ENGINEERING'],
   Changelog: ['CHANGELOG'],
   Support: ['SUPPORT'],
   Contact: ['SUPPORT'],
