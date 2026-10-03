@@ -304,6 +304,13 @@ export const COMMANDS: readonly Command[] = [
     APP_ROUTES.TASKS
   ),
   nav(
+    'go-youtube-revival',
+    'YouTube revival queue',
+    'Review and revive back-catalog YouTube videos.',
+    'Video',
+    APP_ROUTES.YOUTUBE_REVIVAL
+  ),
+  nav(
     'go-settings',
     'Settings',
     'Account, billing, and artist settings.',

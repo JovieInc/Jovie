@@ -237,6 +237,26 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     );
   });
 
+  it('adds the YouTube revival queue as a cmd+k-only nav route', () => {
+    expect(commandsForSurface('cmdk')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'nav',
+          id: 'go-youtube-revival',
+          href: APP_ROUTES.YOUTUBE_REVIVAL,
+        }),
+      ])
+    );
+    expect(commandsForSurface('chat-slash')).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'nav',
+          id: 'go-youtube-revival',
+        }),
+      ])
+    );
+  });
+
   it('adds Chats as a cmd+k-only nav route', () => {
     expect(commandsForSurface('cmdk')).toEqual(
       expect.arrayContaining([
