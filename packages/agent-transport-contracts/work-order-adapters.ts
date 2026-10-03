@@ -503,6 +503,11 @@ export function fromReasoningResult(
   binding: Binding & {
     readonly record: ReasoningResultRecord;
     readonly issueState: string;
+    /** Read back from GBrain: a slug in the receipt does not prove a stored memo. */
+    readonly storedMemo: {
+      readonly slug: string;
+      readonly bodyChars: number;
+    } | null;
   }
 ): WorkResult {
   requireClass(order, 'reasoning-lane');
@@ -554,8 +559,12 @@ export function fromReasoningResult(
   }
   // Confidence is a receipt, not fulfillment: it must match the requested verifier.
   const verifier = order.successPredicate.verifier;
+  const stored =
+    binding.storedMemo?.slug === record.gbrainSlug &&
+    (binding.storedMemo?.bodyChars ?? 0) > 0;
   const verified =
     memo !== null &&
+    stored &&
     ((verifier === 'review' &&
       record.confidence === 'high' &&
       record.reviewer !== null) ||
@@ -579,7 +588,11 @@ export function fromReasoningResult(
       : unmet().certification,
     failures: verified
       ? []
-      : [`confidence ${record.confidence} does not satisfy ${verifier}`],
+      : [
+          stored
+            ? `confidence ${record.confidence} does not satisfy ${verifier}`
+            : `memo ${memo ?? 'missing'} is not stored with content`,
+        ],
     next: verified
       ? null
       : {

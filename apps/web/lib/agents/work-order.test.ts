@@ -10,6 +10,7 @@ const T0 = '2026-10-03T19:00:00.000Z';
 const at = (minutes: number) =>
   new Date(Date.parse(T0) + minutes * 60_000).toISOString();
 const SHA = 'a'.repeat(40);
+const storedMemo = { slug: 'ops/summer/decisions/x', bodyChars: 4000 };
 
 // biome-ignore format: one compact fixture per actor class keeps the contract inspectable.
 function order(overrides: Partial<WorkOrder> = {}): WorkOrder {
@@ -55,7 +56,7 @@ function threeActorResults() {
     orders: [code, founder, research], acks, merged,
     code: fromLaneRun(code, { ack: acks[0], observedAt: at(80), ...merged }),
     founder: fromSummerCard(founder, { ack: acks[1], observedAt: at(31), card: card('approved', founderCardKey(founder)) }),
-    research: fromReasoningResult(research, { ack: acks[2], observedAt: at(40), issueState: 'Done', record: memo() }),
+    research: fromReasoningResult(research, { ack: acks[2], observedAt: at(40), issueState: 'Done', record: memo(), storedMemo }),
   };
 }
 
@@ -169,15 +170,17 @@ describe('gate reconciliation across three actor classes', () => {
   it('treats partial research and disagreeing terminals as non-advancing', () => {
     const { orders, acks, code, founder, research } = threeActorResults();
     const record = memo({ confidence: 'low', reviewer: 'grok', reasons: ['reviewer disagreed'] });
-    const partial = fromReasoningResult(orders[2], { ack: acks[2], observedAt: at(40), issueState: 'Done', record });
+    const partial = fromReasoningResult(orders[2], { ack: acks[2], observedAt: at(40), issueState: 'Done', record, storedMemo });
     expect(partial.terminalState).toBe('partial');
     expect(reconcile(orders, [code, founder, partial]).orders[2].decision).toBe('escalate');
     expect(reconcile(orders, [code, founder, research, partial]).orders[2].decision).toBe('conflict');
+    const empty = fromReasoningResult(orders[2], { ack: acks[2], observedAt: at(40), issueState: 'Done', record: memo(), storedMemo: { ...storedMemo, bodyChars: 0 } });
+    expect(empty).toMatchObject({ terminalState: 'partial', failures: [expect.stringMatching(/not stored/)] });
   });
 
   it('rejects receipts that predate their dispatch or answer another card', () => {
     const { orders, acks } = threeActorResults();
-    expect(() => fromReasoningResult(orders[2], { ack: acks[2], observedAt: at(40), issueState: 'Done', record: memo({ completedAt: at(-5) }) })).toThrow(/predates/);
+    expect(() => fromReasoningResult(orders[2], { ack: acks[2], observedAt: at(40), issueState: 'Done', record: memo({ completedAt: at(-5) }), storedMemo })).toThrow(/predates/);
     expect(() => fromSummerCard(orders[1], { ack: acks[1], observedAt: at(31), card: card('approved', 'wo_other_revision') })).toThrow(/different work order revision/);
   });
 });
