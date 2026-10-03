@@ -99,7 +99,8 @@ describe('keyboard-shortcuts definitions', () => {
       expect(ids).toContain('nav-calendar');
       expect(ids).toContain('nav-tour-dates');
       expect(ids).not.toContain('nav-audience');
-      expect(ids).toContain('nav-earnings');
+      expect(ids).not.toContain('nav-earnings');
+      expect(sequential.map(s => s.href)).not.toContain(APP_ROUTES.EARNINGS);
       expect(ids).toContain('nav-chat');
       expect(ids).toContain('nav-settings');
     });
@@ -168,7 +169,7 @@ describe('keyboard-shortcuts definitions', () => {
       expect(NAV_SHORTCUTS.calendar).toBeDefined();
       expect(NAV_SHORTCUTS.touring).toBeDefined();
       expect(NAV_SHORTCUTS.audience).toBeUndefined();
-      expect(NAV_SHORTCUTS.earnings).toBeDefined();
+      expect(NAV_SHORTCUTS.earnings).toBeUndefined();
       expect(NAV_SHORTCUTS.chat).toBeDefined();
       expect(NAV_SHORTCUTS.account).toBeDefined();
     });
