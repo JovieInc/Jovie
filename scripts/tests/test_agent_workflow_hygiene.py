@@ -1295,18 +1295,42 @@ def test_nightly_unit_suite_fetches_storybook_provenance_history() -> None:
     assert "pnpm --filter=@jovie/web run test" in job
 
 
-def test_nightly_bypass_server_warms_auth_landing_route() -> None:
-    """The chaos sweep's first navigation must not eat a cold dev compile.
+def test_nightly_bypass_server_is_seeded_built_and_shared() -> None:
+    """External BASE_URL skips Playwright seeding and dev-route warmup.
 
-    Playwright global setup skips route warmup when BASE_URL is external, so
-    the readiness step has to compile /app via the test-auth enter route or
-    auth.setup times out on page.goto (JOV-6818).
+    Every run, including a filtered dispatch, must prepare the shared server.
     """
-    step = _step_block("nightly-tests.yml", "Start route QA bypass server")
+    job = _job_block("nightly-tests.yml", "e2e-tests")
+    seed = _step_block("nightly-tests.yml", "Seed nightly QA data")
+    build = _step_block("nightly-tests.yml", "Build nightly QA standalone server")
+    start = _step_block("nightly-tests.yml", "Start route QA bypass server")
+    chaos = _step_block("nightly-tests.yml", "Run full surface chaos sweep")
+    nightly = _step_block("nightly-tests.yml", "Run nightly E2E tests")
+    stop = _step_block("nightly-tests.yml", "Stop route QA bypass server")
 
-    assert "api/dev/test-auth/enter?persona=creator&redirect=/app" in step
-    assert "curl -fsSL" in step
-    assert "--max-time" in step
+    assert "pnpm run seed:test-data" in seed
+    assert not re.search(r"^        if:", seed, re.MULTILINE)
+    assert job.index(seed) < job.index(build) < job.index(start)
+    assert "pnpm turbo build --filter=@jovie/web" in build
+    assert "NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100" in build
+    assert "NEXT_PUBLIC_E2E_MODE: '1'" in build
+    assert "PORT=3100 node .next/standalone/apps/web/server.js" in start
+    assert "cp -r .next/static .next/standalone/apps/web/.next/static" in start
+    assert "cp -r public .next/standalone/apps/web/public" in start
+    assert "HOSTNAME: localhost" in start
+    assert "VERCEL_ENV: development" in start
+    assert "E2E_USE_TEST_AUTH_BYPASS: '1'" in start
+    assert "curl -fsS http://127.0.0.1:3100/api/dev/test-auth/session" in start
+    assert 'echo $! > "$RUNNER_TEMP/nightly-qa-web.pid"' in start
+    assert "curl -fsS -X POST http://127.0.0.1:3100/api/dev/test-auth/session" in start
+    assert "for persona in creator creator-ready; do" in start
+    for consumer in (start, chaos, nightly):
+        assert "BASE_URL: http://127.0.0.1:3100" in consumer
+    assert "dev:local:playwright" not in job
+    assert job.index(start) < job.index(chaos) < job.index(nightly) < job.index(stop)
+    assert "if: always()" in stop
+    assert 'cat "$RUNNER_TEMP/nightly-qa-web.pid"' in stop
+    assert 'kill "$pid"' in stop
 
 
 def test_nightly_notifications_skip_when_slack_credentials_are_absent() -> None:
