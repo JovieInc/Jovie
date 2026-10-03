@@ -2242,6 +2242,59 @@ extension ChatRepositoryTests {
 }
 
 extension ChatRepositoryTests {
+  @Test(arguments: ["throw", "return", "error"], ["current", "replacement", "thread", "draft"])
+  func eyesFreeCancellationTerminatesOnlyTheCurrentOwnedTurn(stage: String, context: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let h = try OwnedChatHarness(); defer { h.cleanup() }
+      await h.cache.store(ownedChatSnapshot("cached"), for: "same-user")
+      let gate = ProfileLoadGate()
+      let cache = HeldChatCache(h.cache)
+      let client = OwnedChatTestClient(h.authorization, gate: gate, operation: "eyes")
+      let repository = h.repository(client, cache: cache)
+      await repository.bootstrap()
+      let task = Task {
+        let readback = await repository.submitEyesFreeCapture(transcript: "A complete thought", destination: .jovie,
+          idempotencyKey: "voice")
+        await gate.ownerFinished()
+        return readback
+      }
+      #expect(await gate.waitUntilEntered())
+      #expect(repository.timeline.last?.status == .sending)
+      if context == "replacement" {
+        h.replace()
+        await h.cache.store(ownedChatSnapshot("replacement"), for: "same-user")
+      } else if context == "thread" {
+        await repository.openConversation("thread-b")
+      } else if context == "draft" {
+        repository.startNewConversation()
+      }
+      let before = repository.timeline
+      let activeBefore = repository.activeConversationID
+      let cacheBefore = await h.cache.load(for: "same-user")
+      let writesBefore = await cache.writes
+      if stage != "return" { await client.fail(with: CancellationError()) }
+      if stage != "error" { task.cancel() }
+      await gate.complete(true)
+      let readback = await task.value
+      #expect(readback.isEmpty)
+      #expect(!repository.isSending && !repository.isOffline && repository.lastErrorMessage == nil)
+      #expect(repository.activeConversationID == activeBefore)
+      #expect(await cache.writes == writesBefore + (context == "current" ? 1 : 0))
+      let warm = await h.cache.load(for: "same-user")
+      let disk = await ChatCache(defaults: h.defaults).load(for: "same-user")
+      #expect(warm == disk)
+      if context == "current" {
+        #expect(repository.timeline.last?.status == .canceled)
+        #expect(repository.timeline.filter { $0.role == .user }.last?.content == "A complete thought")
+        #expect(!repository.timeline.contains { $0.status.isInFlight })
+        #expect(warm?.messagesByConversationID["thread"]?.last?.turnStatus == "canceled")
+      } else {
+        #expect(repository.timeline == before)
+        #expect(warm == cacheBefore)
+      }
+    }
+  }
+
   @Test func eyesFreeCannotSpeakAfterTheActualOwnedStoreRejectsReplacement() async throws {
     try await withNativeSessionTokenStoreTestIsolation { @MainActor in
       let h = try OwnedChatHarness(); defer { h.cleanup() }

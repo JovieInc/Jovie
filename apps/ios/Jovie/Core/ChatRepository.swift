@@ -467,7 +467,8 @@ final class ChatRepository {
           clientMessageId: clientMessageId
         )
       )
-      guard await acceptsCompletion(), generation == sendGeneration, selection == selectionRevision else { return "" }
+      guard await acceptsCompletion(allowingCancellation: true), generation == sendGeneration, selection == selectionRevision else { return "" }
+      try Task.checkCancellation()
       let failed = ["failed", "forbidden", "unavailable"].contains(response.status)
       applyEyesFreeResponse(response, clientTurnId: idempotencyKey, failed: failed)
       isOffline = response.status == "failed"
@@ -475,7 +476,12 @@ final class ChatRepository {
       guard await persistCache(generation: generation, selection: selection), generation == sendGeneration, selection == selectionRevision else { return "" }
       return response.readback
     } catch {
-      guard await acceptsCompletion(error), generation == sendGeneration, selection == selectionRevision else { return "" }
+      guard await acceptsCompletion(error, allowingCancellation: true), generation == sendGeneration, selection == selectionRevision else { return "" }
+      if Task.isCancelled || error is CancellationError {
+        markAssistantCanceled(clientTurnId: idempotencyKey)
+        await persistCache(generation: generation, selection: selection, allowingCancellation: true)
+        return ""
+      }
       applySendFailure(error, clientTurnId: idempotencyKey)
       guard await persistCache(generation: generation, selection: selection), generation == sendGeneration, selection == selectionRevision else { return "" }
       return lastErrorMessage ?? EyesFreeCaptureGate.retryMessage
