@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   select: vi.fn(),
   update: vi.fn(),
   insert: vi.fn(),
+  insertValues: vi.fn(async () => []),
 }));
 
 vi.mock('next/navigation', () => ({ notFound: mocks.notFound }));
@@ -39,20 +40,22 @@ function searchParams(value: { t?: string; action?: string }) {
   return Promise.resolve(value);
 }
 
+function mockLink(stage: string) {
+  mocks.select.mockReturnValue({
+    from: () => ({
+      where: () => ({
+        limit: async () => [{ id: 'link-1', stage, expiresAt: LIVE_EXPIRY }],
+      }),
+    }),
+  });
+}
+
 describe('investor respond page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.select.mockReturnValue({
-      from: () => ({
-        where: () => ({
-          limit: async () => [
-            { id: 'link-1', stage: 'viewed', expiresAt: LIVE_EXPIRY },
-          ],
-        }),
-      }),
-    });
+    mockLink('viewed');
     mocks.update.mockReturnValue({ set: () => ({ where: async () => [] }) });
-    mocks.insert.mockReturnValue({ values: async () => [] });
+    mocks.insert.mockReturnValue({ values: mocks.insertValues });
   });
 
   it('records a call request instead of redirecting to a calendar', async () => {
@@ -62,7 +65,27 @@ describe('investor respond page', () => {
       })
     );
 
-    expect(mocks.insert).toHaveBeenCalled();
+    expect(mocks.update).toHaveBeenCalled();
+    expect(mocks.insertValues).toHaveBeenCalledWith({
+      investorLinkId: 'link-1',
+      pagePath: '/investor-portal#event/call_requested',
+    });
+    expect(
+      screen.getByRole('heading', { name: 'Thanks for your interest!' })
+    ).toBeInTheDocument();
+  });
+
+  it('does not record another call request from a terminal stage', async () => {
+    mockLink('committed');
+
+    render(
+      await InvestorRespondPage({
+        searchParams: searchParams({ t: CLAIM_TOKEN, action: 'interested' }),
+      })
+    );
+
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.insert).not.toHaveBeenCalled();
     expect(
       screen.getByRole('heading', { name: 'Thanks for your interest!' })
     ).toBeInTheDocument();

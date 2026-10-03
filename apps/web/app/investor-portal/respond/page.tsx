@@ -68,12 +68,11 @@ export default async function InvestorRespondPage({
         .update(investorLinks)
         .set({ stage: 'engaged', updatedAt: new Date() })
         .where(eq(investorLinks.id, link.id));
+      await db.insert(investorViews).values({
+        investorLinkId: link.id,
+        pagePath: buildInvestorEventPath('call_requested'),
+      });
     }
-
-    await db.insert(investorViews).values({
-      investorLinkId: link.id,
-      pagePath: buildInvestorEventPath('call_requested'),
-    });
 
     return (
       <div className='dark flex min-h-screen items-center justify-center bg-(--color-bg-base)'>
