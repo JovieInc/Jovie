@@ -38,10 +38,19 @@ export const CODE_FLAGS = {
   // 404s and is not a live connector. FEATURE_CHATGPT_APP_DIRECTORY_MCP=true
   // enables the anonymous public-artist tools. Does not enable DCR.
   CHATGPT_APP_DIRECTORY_MCP: false,
+  // JOV-7323: legacy release and provider-link reads use the in-house
+  // cross-DSP ladder before MusicFetch. Default off. Smart-link creation
+  // does not call MusicFetch either way. FEATURE_IN_HOUSE_RESOLVER=true
+  // turns the product cutover on; false is the kill switch.
+  IN_HOUSE_RESOLVER: false,
   // JOV-6202: signup/signin offer recap. Default off so auth pages and copy
   // stay unchanged. FEATURE_AUTH_OFFER_SUMMARY=true shows the 14-day Pro
   // trial recap. No price, trial-length, Stripe, or entitlement effect.
   AUTH_OFFER_SUMMARY: false,
+  // Fundraising YC section order. Default off until Tim approves the
+  // narrative in Pen. FEATURE_INVESTOR_PORTAL_YC_DECK=true reorders the
+  // existing brief sentences and shows only sourced traction stats.
+  INVESTOR_PORTAL_YC_DECK: false,
 } as const satisfies Record<string, boolean>;
 
 export type CodeFlagName = keyof typeof CODE_FLAGS;

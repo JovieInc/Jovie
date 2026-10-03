@@ -936,3 +936,222 @@ struct APIClientTests {
     #expect(await tokenProvider.recordedForceRefreshValues() == [false])
   }
 }
+
+extension APIClientTests {
+  @Test(arguments: ["current", "rotation", "same-bearer", "expiry", "save", "clear", "intent"])
+  func cleanupClaimFollowsOnlyItsOriginalLifecycle(change: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+      let original = NativeSessionTokenStore.captureSessionContext()
+      let authorization = try #require(original.authorization)
+      let claim = NativeSessionTokenStore.claimCleanup(invalidatingAuthIntent: true)
+      if change == "rotation" || change == "same-bearer" {
+        let response = HTTPURLResponse(url: URL(string: "https://jov.ie")!, statusCode: 200,
+          httpVersion: nil, headerFields: ["set-auth-token": change == "rotation" ? "a2" : "a"])!
+        NativeSessionTokenStore.refresh(from: response, authorizedBy: authorization)
+      } else if change == "expiry" {
+        UserDefaults.standard.set(0, forKey: "ie.jov.Jovie.nativeSession.expiresAt")
+        #expect(NativeSessionTokenStore.load() == nil)
+      } else if change == "save" {
+        NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+      } else if change == "clear" {
+        NativeSessionTokenStore.clear()
+      } else if change == "intent" {
+        _ = NativeSessionTokenStore.claimCleanup(invalidatingAuthIntent: true)
+      }
+      let current = NativeSessionTokenStore.captureSessionContext()
+      let valid = !["save", "clear", "intent"].contains(change)
+      let requestContext = NativeSessionTokenStore.captureSessionContext(for: claim)
+      #expect(requestContext == (valid ? current : nil))
+      var mutations = 0
+      #expect(NativeSessionTokenStore.performIfCurrent(claim, { _ in mutations += 1 }) == valid)
+      #expect(mutations == (valid ? 1 : 0))
+      let completion = NativeSessionTokenStore.completeCleanup(claim)
+      #expect((completion != nil) == valid)
+      if let completion {
+        #expect(completion.ownership != current.ownership)
+        #expect(NativeSessionTokenStore.captureSessionContext().authorization == nil)
+        #expect(!NativeSessionTokenStore.canContinueProfileLoad(ownedBy: original.ownership))
+        #expect(NativeSessionTokenStore.performIfCurrent(completion, {}))
+      } else {
+        #expect(NativeSessionTokenStore.captureSessionContext() == current)
+      }
+      #expect(NativeSessionTokenStore.completeCleanup(claim) == nil)
+      #expect(NativeSessionTokenStore.captureSessionContext(for: claim) == nil)
+    }
+  }
+
+  @Test func emptyCleanupConsumesOnceAndCompletionRejectsNewIntent() async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      let before = NativeSessionTokenStore.captureSessionContext()
+      let claim = NativeSessionTokenStore.claimCleanup(invalidatingAuthIntent: true)
+      #expect(NativeSessionTokenStore.captureSessionContext(for: claim) == before)
+      let completion = try #require(NativeSessionTokenStore.completeCleanup(claim))
+      #expect(completion.ownership != before.ownership)
+      #expect(NativeSessionTokenStore.completeCleanup(claim) == nil)
+      #expect(!NativeSessionTokenStore.performIfCurrent(claim, { _ in Issue.record("Consumed claim ran") }))
+      let empty = NativeSessionTokenStore.captureSessionContext()
+      _ = NativeSessionTokenStore.claimCleanup(invalidatingAuthIntent: true)
+      #expect(NativeSessionTokenStore.captureSessionContext() == empty)
+      // This is the same atomic completion guard consumed by LiveRoot after its await.
+      var didResetRoot = false
+      #expect(!NativeSessionTokenStore.performIfCurrent(completion, { didResetRoot = true }))
+      #expect(!didResetRoot)
+    }
+  }
+
+  @Test(arguments: [200, 503], [false, true])
+  func pinnedRevocationNeverAcquiresTheProviderOrReplacement(status: Int, empty: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+      let authorization = try #require(NativeSessionTokenStore.requestAuthorization())
+      let provider = MockTokenProvider(tokens: ["provider-b"])
+      var requests = 0
+      MockURLProtocol.requestHandler = { request in
+        requests += 1
+        #expect(request.url?.path == "/api/auth/sign-out" && request.httpMethod == "POST")
+        #expect(request.httpBody == nil && request.timeoutInterval == 4)
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer a")
+        NativeSessionTokenStore.save(token: "b", userID: "b", expiresAt: .distantFuture)
+        return (HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!, Data())
+      }
+      defer { MockURLProtocol.requestHandler = nil }
+      let revoker = NativeSessionRevoker(baseURL: URL(string: "https://jov.ie")!, session: makeSession(),
+        tokenProvider: provider, requestTimeout: 4)
+      let result = await revoker.revokeSession(authorizedBy: empty ? nil : authorization)
+      let expected: NativeSessionRevocationResult = empty ? .noSession : (status == 200 ? .revoked : .failed(statusCode: status))
+      #expect(result == expected)
+      #expect(requests == (empty ? 0 : 1))
+      #expect(await provider.recordedForceRefreshValues().isEmpty)
+      #expect(NativeSessionTokenStore.load()?.token == (empty ? "a" : "b"))
+    }
+  }
+
+  @Test(arguments: ["current", "new-user", "same-login", "clear", "retry-success", "retry-revised", "same-bearer", "cancel"])
+  func ownedMeUsesOnlyItsCapturedRequestAuthority(outcome: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      NativeSessionTokenStore.save(token: "t0", userID: "a", expiresAt: .distantFuture)
+      let owner = NativeSessionTokenStore.captureOwnership()
+      let first = try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: owner)
+      var requests = 0
+      var preserved = NativeSessionTokenStore.captureSessionContext()
+      MockURLProtocol.requestHandler = { request in
+        requests += 1
+        #expect(request.url?.path == "/api/mobile/v1/me")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer \(requests == 1 ? "t0" : "t1")")
+        let response: (Int, String?) -> HTTPURLResponse = { status, token in
+          HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil,
+                          headerFields: token.map { ["set-auth-token": $0] })!
+        }
+        if outcome == "cancel" { throw URLError(.cancelled) }
+        if requests == 1 {
+          switch outcome {
+          case "new-user", "same-login":
+            NativeSessionTokenStore.save(
+              token: outcome == "same-login" ? "t0" : "b",
+              userID: outcome == "same-login" ? "a" : "b", expiresAt: .distantFuture
+            )
+          case "clear": NativeSessionTokenStore.clear()
+          case "retry-success", "retry-revised", "same-bearer":
+            NativeSessionTokenStore.refresh(
+              from: response(200, outcome == "same-bearer" ? "t0" : "t1"), authorizedBy: first
+            )
+          default: break
+          }
+        } else if outcome == "retry-success" {
+          return (response(200, "t2"), try JSONEncoder().encode(MobileMeResponse.previewReady))
+        } else if outcome == "retry-revised" {
+          let retry = try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: owner)
+          NativeSessionTokenStore.refresh(from: response(200, "t2"), authorizedBy: retry)
+        }
+        preserved = NativeSessionTokenStore.captureSessionContext()
+        return (response(401, nil), Data())
+      }
+      defer { MockURLProtocol.requestHandler = nil }
+      let client: any APIClientProtocol = APIClient(
+        baseURL: URL(string: "https://jov.ie")!, session: makeSession(),
+        tokenProvider: NativeSessionTokenProvider()
+      )
+      if outcome == "retry-success" {
+        #expect(try await client.fetchMe(for: "a", ifOwnedBy: owner) == .previewReady)
+        #expect(NativeSessionTokenStore.load()?.token == "t2")
+        #expect(NativeSessionTokenStore.captureOwnership() == owner)
+      } else if outcome == "current" {
+        do {
+          _ = try await client.fetchMe(for: "a", ifOwnedBy: owner)
+          Issue.record("Current rejection must produce its expiry receipt")
+        } catch let NativeSessionRequestError.expired(receipt) {
+          #expect(receipt.userID == "a")
+          #expect(NativeSessionTokenStore.captureOwnership() == receipt.ownership)
+          #expect(NativeSessionTokenStore.load() == nil)
+        }
+      } else if outcome == "cancel" {
+        await #expect(throws: CancellationError.self) { try await client.fetchMe(for: "a", ifOwnedBy: owner) }
+        #expect(NativeSessionTokenStore.captureSessionContext() == preserved)
+      } else {
+        await #expect(throws: NativeSessionRequestError.superseded) {
+          try await client.fetchMe(for: "a", ifOwnedBy: owner)
+        }
+        #expect(NativeSessionTokenStore.captureSessionContext() == preserved)
+      }
+      #expect(requests == (outcome.hasPrefix("retry-") ? 2 : 1))
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func ownedMeCannotAcquireAReplacementBeforeDispatch(sameLogin: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+      let owner = NativeSessionTokenStore.captureOwnership()
+      NativeSessionTokenStore.save(
+        token: sameLogin ? "a" : "b", userID: sameLogin ? "a" : "b", expiresAt: .distantFuture
+      )
+      let replacement = NativeSessionTokenStore.captureSessionContext()
+      var requests = 0
+      MockURLProtocol.requestHandler = { _ in
+        requests += 1
+        throw APIClientError.invalidResponse
+      }
+      defer { MockURLProtocol.requestHandler = nil }
+      let client = APIClient(baseURL: URL(string: "https://jov.ie")!, session: makeSession(),
+                             tokenProvider: NativeSessionTokenProvider())
+      await #expect(throws: NativeSessionRequestError.superseded) {
+        try await client.fetchMe(for: "a", ifOwnedBy: owner)
+      }
+      #expect(requests == 0)
+      #expect(NativeSessionTokenStore.captureSessionContext() == replacement)
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func ownedMeUnmanagedRetryHasNoNativeMutationAuthority(succeed: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      NativeSessionTokenStore.save(token: "t0", userID: "a", expiresAt: .distantFuture)
+      let before = NativeSessionTokenStore.captureSessionContext()
+      let provider = MockTokenProvider(tokens: ["t0", "t1"])
+      var requests = 0
+      MockURLProtocol.requestHandler = { request in
+        requests += 1
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer \(requests == 1 ? "t0" : "t1")")
+        let status = requests == 2 && succeed ? 200 : 401
+        return (HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil,
+                                headerFields: ["set-auth-token": "unmanaged-header"])!,
+                try JSONEncoder().encode(MobileMeResponse.previewReady))
+      }
+      defer { MockURLProtocol.requestHandler = nil }
+      let client = APIClient(baseURL: URL(string: "https://jov.ie")!, session: makeSession(),
+                             tokenProvider: provider)
+      if succeed {
+        let response = try await client.fetchMe(for: "a", ifOwnedBy: before.ownership)
+        #expect(response == .previewReady)
+      } else {
+        await #expect(throws: APIClientError.requestFailed(statusCode: 401)) {
+          try await client.fetchMe(for: "a", ifOwnedBy: before.ownership)
+        }
+      }
+      #expect(requests == 2)
+      #expect(await provider.recordedForceRefreshValues() == [false, true])
+      #expect(NativeSessionTokenStore.captureSessionContext() == before)
+    }
+  }
+}

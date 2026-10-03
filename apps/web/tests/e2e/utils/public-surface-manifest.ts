@@ -604,6 +604,85 @@ const AUTH_SURFACES = [
   },
 ] as const satisfies readonly PublicSurfaceSpec[];
 
+/**
+ * Landmarks profile Home always paints. `waitForAnyVisible` ORs ready
+ * selectors, so any other surface that lists one of these passes on Home
+ * without its target flow.
+ */
+export const PROFILE_HOME_READY_SELECTORS = [
+  '[data-testid="profile-header"]',
+  'h1',
+] as const;
+
+/** Present on profile Home and on every document. */
+export const PROFILE_HOME_UNIVERSAL_READY_SELECTORS = ['body', 'main'] as const;
+
+/**
+ * These surfaces succeed by landing on profile Home, so Home landmarks are
+ * their ready target.
+ */
+export const PROFILE_HOME_SETTLED_SURFACE_IDS = [
+  'profile-main',
+  'profile-shop',
+] as const;
+
+const LISTEN_FLOW_READY_SELECTORS = [
+  '[data-testid="profile-primary-tab-releases"]',
+  '[data-testid="profile-primary-tab-listen"]',
+  '[data-testid="profile-mode-drawer-listen"]',
+] as const;
+
+const SUBSCRIBE_FLOW_READY_SELECTORS = [
+  '[data-testid="profile-mobile-notifications-flow"]',
+] as const;
+
+const TOUR_FLOW_READY_SELECTORS = [
+  '[data-testid="profile-primary-tab-tour"]',
+  '[data-testid="profile-mode-drawer-tour"]',
+] as const;
+
+const PAY_DRAWER_READY_SELECTORS = [
+  '[data-testid="profile-mode-drawer-pay"]',
+] as const;
+
+const ABOUT_MODE_READY_SELECTORS = [
+  '[data-testid="profile-primary-tab-about"]',
+  '[data-testid="profile-mode-drawer-about"]',
+] as const;
+
+const CONTACT_DRAWER_READY_SELECTORS = [
+  '[data-testid="profile-mode-drawer-contact"]',
+] as const;
+
+const INTENT_PAGE_READY_SELECTORS = [
+  '[data-testid="profile-intent-page-body"]',
+] as const;
+
+const SMART_LINK_READY_SELECTORS = [
+  '[data-testid="smart-link-artist-byline"]',
+] as const;
+
+const NOT_FOUND_READY_SELECTORS = ['[data-testid="not-found"]'] as const;
+
+/**
+ * True when `selector` is satisfied by profile Home, including a CSS comma
+ * group that ORs a Home landmark with anything else.
+ */
+export function readySelectorMatchesProfileHome(
+  selector: string,
+  genericSelectors: ReadonlySet<string>
+): boolean {
+  const alternatives = selector
+    .split(',')
+    .map(part => part.trim())
+    .filter(part => part.length > 0);
+  if (alternatives.length === 0) return false;
+  if (alternatives.length === 1) {
+    return genericSelectors.has(alternatives[0] ?? selector);
+  }
+  return alternatives.some(part => genericSelectors.has(part));
+}
+
 const PROFILE_SURFACES = [
   {
     id: 'profile-main',
@@ -611,7 +690,7 @@ const PROFILE_SURFACES = [
     expectedState: 'ok',
     path: '/[username]',
     resolvePath: () => `/${resolveProfileHandle('music')}`,
-    readySelectors: ['[data-testid="profile-header"]', 'h1'],
+    readySelectors: [...PROFILE_HOME_READY_SELECTORS],
     mainSelector: 'main',
     minMainTextLength: 30,
     lighthouse: true,
@@ -624,7 +703,7 @@ const PROFILE_SURFACES = [
     expectedState: 'ok',
     path: '/[username]/about',
     resolvePath: () => `/${resolveProfileHandle('music')}/about`,
-    readySelectors: ['[data-testid="profile-intent-page-body"]', 'h1'],
+    readySelectors: [...INTENT_PAGE_READY_SELECTORS],
     mainSelector: 'main',
     minMainTextLength: 60,
     lighthouse: false,
@@ -637,7 +716,7 @@ const PROFILE_SURFACES = [
     expectedState: 'ok',
     path: '/[username]/contact',
     resolvePath: () => `/${resolveProfileHandle('music')}/contact`,
-    readySelectors: ['[data-testid="profile-intent-page-body"]', 'h1'],
+    readySelectors: [...INTENT_PAGE_READY_SELECTORS],
     mainSelector: 'main',
     minMainTextLength: 60,
     lighthouse: false,
@@ -650,7 +729,7 @@ const PROFILE_SURFACES = [
     expectedState: 'redirect',
     path: '/[username]/listen',
     resolvePath: () => `/${resolveProfileHandle('music')}/listen`,
-    readySelectors: ['[data-testid="profile-header"]', 'h1'],
+    readySelectors: [...LISTEN_FLOW_READY_SELECTORS],
     mainSelector: 'main',
     minMainTextLength: 60,
     expectedRedirects: [/^\/[^/?#]+\?mode=listen$/],
@@ -668,7 +747,7 @@ const PROFILE_SURFACES = [
     expectedState: 'redirect',
     path: '/[username]/music',
     resolvePath: () => `/${resolveProfileHandle('music')}/music`,
-    readySelectors: ['[data-testid="profile-header"]', 'h1'],
+    readySelectors: [...LISTEN_FLOW_READY_SELECTORS],
     mainSelector: 'main',
     minMainTextLength: 60,
     expectedRedirects: [/^\/[^/?#]+\?mode=listen$/],
@@ -685,11 +764,11 @@ const PROFILE_SURFACES = [
     family: 'profile-core',
     expectedState: 'redirect',
     path: '/[username]/notifications',
-    resolvePath: () => `/${resolveProfileHandle('tip')}/notifications`,
-    readySelectors: [
-      '[data-testid="profile-primary-tab-subscribe"]',
-      '[data-testid="profile-header"]',
-    ],
+    // Unclaimed tip profiles keep Home and never mount the subscribe flow.
+    // waitForAnyVisible treats this list as OR, so a generic header is a
+    // false pass. Require the flow that only claimed profiles render.
+    resolvePath: () => `/${resolveProfileHandle('music')}/notifications`,
+    readySelectors: [...SUBSCRIBE_FLOW_READY_SELECTORS],
     mainSelector: 'main',
     minMainTextLength: 60,
     expectedRedirects: [/\/[^/]+\?mode=subscribe$/],
@@ -707,7 +786,7 @@ const PROFILE_SURFACES = [
     expectedState: 'ok',
     path: '/[username]/pay',
     resolvePath: () => `/${resolveProfileHandle('tip')}/pay`,
-    readySelectors: ['[data-testid="profile-intent-page-body"]', 'h1'],
+    readySelectors: [...INTENT_PAGE_READY_SELECTORS],
     mainSelector: 'main',
     minMainTextLength: 50,
     lighthouse: false,
@@ -720,7 +799,9 @@ const PROFILE_SURFACES = [
     expectedState: 'redirect',
     path: '/[username]/shop',
     resolvePath: () => `/${resolveProfileHandle('music')}/shop`,
-    readySelectors: ['body'],
+    // Music fixture has no Shopify URL, so this route redirects to profile Home.
+    // Home landmarks are the target. `body` also matches the shop interstitial.
+    readySelectors: [...PROFILE_HOME_READY_SELECTORS],
     mainSelector: 'main',
     minMainTextLength: 60,
     expectedRedirects: [
@@ -739,7 +820,7 @@ const PROFILE_SURFACES = [
     expectedState: 'redirect',
     path: '/[username]/releases',
     resolvePath: () => `/${resolveProfileHandle('music')}/releases`,
-    readySelectors: ['[data-testid="profile-header"]', 'h1'],
+    readySelectors: [...LISTEN_FLOW_READY_SELECTORS],
     mainSelector: 'main',
     minMainTextLength: 60,
     expectedRedirects: [/^\/[^/?#]+\?mode=releases$/],
@@ -754,7 +835,7 @@ const PROFILE_SURFACES = [
     expectedState: 'redirect',
     path: '/[username]/subscribe',
     resolvePath: () => `/${resolveProfileHandle('music')}/subscribe`,
-    readySelectors: ['[data-testid="profile-header"]', 'h1'],
+    readySelectors: [...SUBSCRIBE_FLOW_READY_SELECTORS],
     mainSelector: 'main',
     minMainTextLength: 60,
     expectedRedirects: [/^\/[^/?#]+\?mode=subscribe$/],
@@ -769,7 +850,7 @@ const PROFILE_SURFACES = [
     expectedState: 'redirect',
     path: '/[username]/tip',
     resolvePath: () => `/${resolveProfileHandle('tip')}/tip`,
-    readySelectors: ['[data-testid="profile-header"]', 'h1'],
+    readySelectors: [...PAY_DRAWER_READY_SELECTORS],
     mainSelector: 'main',
     minMainTextLength: 60,
     expectedRedirects: [/^\/[^/?#]+\?mode=pay$/],
@@ -784,7 +865,7 @@ const PROFILE_SURFACES = [
     expectedState: 'redirect',
     path: '/[username]/tour',
     resolvePath: () => `/${resolveProfileHandle('music')}/tour`,
-    readySelectors: ['[data-testid="profile-header"]', 'h1'],
+    readySelectors: [...TOUR_FLOW_READY_SELECTORS],
     mainSelector: 'main',
     minMainTextLength: 60,
     expectedRedirects: [/^\/[^/?#]+\?mode=tour$/],
@@ -799,7 +880,7 @@ const PROFILE_SURFACES = [
     expectedState: 'redirect',
     path: '/[username]/shows',
     resolvePath: () => `/${resolveProfileHandle('music')}/shows`,
-    readySelectors: ['[data-testid="profile-header"]', 'h1'],
+    readySelectors: [...TOUR_FLOW_READY_SELECTORS],
     mainSelector: 'main',
     minMainTextLength: 60,
     expectedRedirects: [/^\/[^/?#]+\?mode=tour$/],
@@ -814,7 +895,7 @@ const PROFILE_SURFACES = [
     expectedState: 'redirect',
     path: '/[username]/events',
     resolvePath: () => `/${resolveProfileHandle('music')}/events`,
-    readySelectors: ['[data-testid="profile-header"]', 'h1'],
+    readySelectors: [...TOUR_FLOW_READY_SELECTORS],
     mainSelector: 'main',
     minMainTextLength: 60,
     expectedRedirects: [/^\/[^/?#]+\?mode=tour$/],
@@ -830,7 +911,7 @@ const PROFILE_SURFACES = [
     path: '/[username]/claim',
     resolvePath: () =>
       `/${E2E_PREBUILT_CLAIM_USERNAME}/claim?token=${E2E_PREBUILT_CLAIM_TOKEN}`,
-    readySelectors: ['body', 'form, button, h1'],
+    readySelectors: ['[data-testid="claim-banner"]'],
     mainSelector: 'body',
     minMainTextLength: 60,
     expectedRedirects: [
@@ -851,11 +932,7 @@ const PROFILE_MODE_SURFACES = [
     expectedState: 'ok',
     path: '/[username]?mode=about',
     resolvePath: () => `/${resolveProfileHandle('music')}?mode=about`,
-    readySelectors: [
-      '[data-testid="profile-primary-tab-about"]',
-      '[data-testid="profile-mode-drawer-about"]',
-      '[data-testid="profile-header"]',
-    ],
+    readySelectors: [...ABOUT_MODE_READY_SELECTORS],
     mainSelector: 'main',
     allowMissingMain: true,
     minMainTextLength: 30,
@@ -870,10 +947,7 @@ const PROFILE_MODE_SURFACES = [
     expectedState: 'ok',
     path: '/[username]?mode=contact',
     resolvePath: () => `/${resolveProfileHandle('music')}?mode=contact`,
-    readySelectors: [
-      '[data-testid="profile-mode-drawer-contact"]',
-      '[data-testid="profile-header"]',
-    ],
+    readySelectors: [...CONTACT_DRAWER_READY_SELECTORS],
     mainSelector: 'main',
     allowMissingMain: true,
     minMainTextLength: 30,
@@ -888,12 +962,7 @@ const PROFILE_MODE_SURFACES = [
     expectedState: 'ok',
     path: '/[username]?mode=listen',
     resolvePath: () => `/${resolveProfileHandle('music')}?mode=listen`,
-    readySelectors: [
-      '[data-testid="profile-primary-tab-releases"]',
-      '[data-testid="profile-primary-tab-listen"]',
-      '[data-testid="profile-mode-drawer-listen"]',
-      '[data-testid="profile-header"]',
-    ],
+    readySelectors: [...LISTEN_FLOW_READY_SELECTORS],
     mainSelector: 'main',
     allowMissingMain: true,
     minMainTextLength: 30,
@@ -911,13 +980,8 @@ const PROFILE_MODE_SURFACES = [
     expectedState: 'ok',
     path: '/[username]?mode=subscribe',
     resolvePath: () => `/${resolveProfileHandle('music')}?mode=subscribe`,
-    readySelectors: [
-      '[data-testid="profile-primary-tab-subscribe"]',
-      '[data-testid="notifications-page"]',
-      '[data-testid="notifications-flow"]',
-      '[data-testid="profile-mode-drawer-subscribe"]',
-      '[data-testid="profile-header"]',
-    ],
+    // The subscribe card counts only after this flow mounts.
+    readySelectors: [...SUBSCRIBE_FLOW_READY_SELECTORS],
     mainSelector: 'main',
     allowMissingMain: true,
     minMainTextLength: 30,
@@ -935,10 +999,7 @@ const PROFILE_MODE_SURFACES = [
     expectedState: 'ok',
     path: '/[username]?mode=pay',
     resolvePath: () => `/${resolveProfileHandle('tip')}?mode=pay`,
-    readySelectors: [
-      '[data-testid="profile-mode-drawer-pay"]',
-      '[data-testid="profile-header"]',
-    ],
+    readySelectors: [...PAY_DRAWER_READY_SELECTORS],
     mainSelector: 'main',
     allowMissingMain: true,
     minMainTextLength: 30,
@@ -953,11 +1014,7 @@ const PROFILE_MODE_SURFACES = [
     expectedState: 'ok',
     path: '/[username]?mode=tour',
     resolvePath: () => `/${resolveProfileHandle('music')}?mode=tour`,
-    readySelectors: [
-      '[data-testid="profile-primary-tab-tour"]',
-      '[data-testid="profile-mode-drawer-tour"]',
-      '[data-testid="profile-header"]',
-    ],
+    readySelectors: [...TOUR_FLOW_READY_SELECTORS],
     mainSelector: 'main',
     allowMissingMain: true,
     minMainTextLength: 30,
@@ -975,7 +1032,7 @@ const SMART_LINK_SURFACES = [
     expectedState: 'ok',
     path: '/[username]/[slug]',
     resolvePath: () => resolveReleasePath('/[username]/[slug]'),
-    readySelectors: ['h1'],
+    readySelectors: [...SMART_LINK_READY_SELECTORS],
     mainSelector: 'main',
     minMainTextLength: 40,
     lighthouse: true,
@@ -988,7 +1045,7 @@ const SMART_LINK_SURFACES = [
     expectedState: 'ok',
     path: '/[username]/[slug]/[trackSlug]',
     resolvePath: () => resolveReleasePath('/[username]/[slug]/[trackSlug]'),
-    readySelectors: ['h1'],
+    readySelectors: [...SMART_LINK_READY_SELECTORS],
     mainSelector: 'main',
     minMainTextLength: 40,
     lighthouse: true,
@@ -1010,7 +1067,7 @@ const SMART_LINK_SURFACES = [
         'slug',
         DEFAULTS.countdownReleaseSlug
       ),
-    readySelectors: ['h1'],
+    readySelectors: ['[data-testid="release-countdown"]'],
     mainSelector: 'body',
     minMainTextLength: 45,
     lighthouse: false,
@@ -1023,7 +1080,7 @@ const SMART_LINK_SURFACES = [
     expectedState: 'ok',
     path: '/[username]/[slug]/sounds',
     resolvePath: () => resolveReleasePath('/[username]/[slug]/sounds'),
-    readySelectors: ['h1'],
+    readySelectors: ['[data-testid="smart-link-back"]'],
     mainSelector: 'main',
     minMainTextLength: 40,
     lighthouse: true,
@@ -1046,8 +1103,6 @@ const SMART_LINK_SURFACES = [
         DEFAULTS.releaseSlug
       ),
     readySelectors: [
-      'main',
-      'h1',
       '#promo-download-email',
       'button:has-text("Get Download")',
       '[aria-label^="Download "]',
@@ -1070,7 +1125,7 @@ const EDGE_CASE_SURFACES = [
     path: '/[username]/performance-extra-path',
     resolvePath: () =>
       `/${resolveProfileHandle('music')}/performance-extra-path`,
-    readySelectors: ['h1'],
+    readySelectors: [...NOT_FOUND_READY_SELECTORS],
     mainSelector: 'body',
     minMainTextLength: 20,
     allowedFinalDocumentStatuses: [404],
@@ -1084,7 +1139,7 @@ const EDGE_CASE_SURFACES = [
     expectedState: 'not-found',
     path: '/missing-qa-user',
     resolvePath: () => `/${DEFAULTS.missingProfile}`,
-    readySelectors: ['h1'],
+    readySelectors: [...NOT_FOUND_READY_SELECTORS],
     mainSelector: 'body',
     minMainTextLength: 20,
     allowedFinalDocumentStatuses: [404],
@@ -1099,7 +1154,7 @@ const EDGE_CASE_SURFACES = [
     path: '/[username]/missing-release-qa',
     resolvePath: () =>
       `/${resolveProfileHandle('music')}/${DEFAULTS.missingReleaseSlug}`,
-    readySelectors: ['h1'],
+    readySelectors: [...NOT_FOUND_READY_SELECTORS],
     mainSelector: 'body',
     minMainTextLength: 20,
     allowedFinalDocumentStatuses: [404],

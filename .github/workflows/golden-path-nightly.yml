@@ -89,20 +89,27 @@ jobs:
           if [ "$conclusion" != "success" ]; then exit 1; fi
 
       - name: File Linear issue on red
-        if: ${{ failure() && steps.run.outputs.run_id != '' }}
+        if: ${{ failure() && steps.skip.outputs.skip != 'true' }}
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
           RUN_URL: ${{ steps.run.outputs.run_url }}
           CONCLUSION: ${{ steps.run.outputs.conclusion }}
           MAIN_SHA: ${{ steps.skip.outputs.main_sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
           node --input-type=module -e '
-            import { upsertLinearIssueByTitleFingerprint } from "./scripts/lib/linear-issue-intake.mjs";
+            import { logRemediationDryRun, remediationTriggersEnabled, upsertLinearIssueByTitleFingerprint } from "./scripts/lib/linear-issue-intake.mjs";
             const { RUN_URL, CONCLUSION, MAIN_SHA } = process.env;
             const fingerprint = "golden-path-nightly:" + (CONCLUSION || "missing");
+            if (!remediationTriggersEnabled()) {
+              console.log(JSON.stringify(logRemediationDryRun({ action: "upsert", key: "golden-path-nightly", fingerprint })));
+              process.exit(0);
+            }
             const result = await upsertLinearIssueByTitleFingerprint({
               fingerprint,
+              labelKey: "golden-path-nightly",
               title: "P0: Golden Path nightly is red (" + fingerprint + ")",
               description: [
                 "## Source",
@@ -119,8 +126,34 @@ jobs:
                 "Fingerprint: " + fingerprint,
               ].join("\n"),
               priority: 1,
+              createStateName: "Todo",
+              reopenTerminal: true,
               apiKey: process.env.LINEAR_API_KEY,
             });
             if (!result.ok) throw new Error("Linear intake failed: " + result.reason);
+            console.log(JSON.stringify(result));
+          '
+
+      - name: Resolve Linear issue on green
+        if: ${{ success() || steps.skip.outputs.skip == 'true' }}
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          node --input-type=module -e '
+            import { closeLinearIssueByFingerprint, logRemediationDryRun, remediationTriggersEnabled } from "./scripts/lib/linear-issue-intake.mjs";
+            if (!remediationTriggersEnabled()) {
+              console.log(JSON.stringify(logRemediationDryRun({ action: "resolve", key: "golden-path-nightly", fingerprint: "golden-path-nightly" })));
+              process.exit(0);
+            }
+            const result = await closeLinearIssueByFingerprint({
+              fingerprint: "golden-path-nightly",
+              labelKey: "golden-path-nightly",
+              comment: "Golden Path nightly is green.",
+              runId: process.env.GITHUB_RUN_ID,
+            });
+            if (!result.ok) throw new Error("Linear resolve failed: " + result.reason);
             console.log(JSON.stringify(result));
           '

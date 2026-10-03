@@ -6,6 +6,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
@@ -36,6 +37,23 @@ class ExecutionAttemptTest(unittest.TestCase):
         children = [subprocess.Popen([sys.executable, str(MODULE)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True) for _ in range(2)]
         results = [json.loads(child.communicate(json.dumps(request))[0]) for child in children]
         self.assertEqual([row["admitted"] for row in results].count(True), 1)
+    def test_resume_preserves_live_owner_fence_lease_and_budget(self):
+        claimed = self.claim()
+        before = self.path.read_text()
+        resumed = attempt.resume(self.path, self.ident, claimed["fencingToken"], owner(), now=105, coordination=LOCAL)
+        self.assertTrue(resumed["admitted"])
+        self.assertTrue(resumed["resumed"])
+        self.assertEqual(resumed["fencingToken"], claimed["fencingToken"])
+        self.assertEqual(resumed["leaseExpiresAt"], 110)
+        self.assertEqual(resumed["remainingBudgets"], claimed["remainingBudgets"])
+        self.assertEqual(self.path.read_text(), before)
+    def test_resume_rejects_foreign_owner_wrong_fence_expiry_and_terminal(self):
+        claimed = self.claim()
+        for who, fence, now in [(owner("other"), claimed["fencingToken"], 105),
+                                (owner(), "wrong", 105), (owner(), claimed["fencingToken"], 110)]:
+            self.assertFalse(attempt.resume(self.path, self.ident, fence, who, now=now, coordination=LOCAL)["admitted"])
+        self.finish(self.ident, claimed, "succeeded", {}, 106)
+        self.assertFalse(attempt.resume(self.path, self.ident, claimed["fencingToken"], owner(), now=107, coordination=LOCAL)["admitted"])
     def test_github_coordination_dedupes_racing_local_paths(self):
         rows, lock, barrier = [], threading.Lock(), threading.Barrier(2)
         def fake_rows(*_):
@@ -92,4 +110,101 @@ class ExecutionAttemptTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "execution-budget-exhausted"): attempt.boundary(self.path, self.ident, fence, {"spend": .01}, 102, coordination=LOCAL)
         self.finish(self.ident, claimed, "succeeded", {"costs": {}, "dependencies": []}, 103)
         with self.assertRaisesRegex(RuntimeError, "stale-fencing-token"): attempt.boundary(self.path, self.ident, fence, {}, 104, coordination=LOCAL)
+class GithubCoordinationBoundaryTest(unittest.TestCase):
+    def setUp(self):
+        self.coord = {"kind": "github-status", "repository": "Fixture/Repo", "sha": "a" * 40}
+        self.ident = attempt.identity("fixture", {"pr": 1}, {"head": "a" * 40})
+
+    def row(self, **fields):
+        return {**self.ident, "schema": attempt.SCHEMA, "event": "attempt_finished", "attempt": 1, **fields}
+
+    def status(self, number, previous=None, **fields):
+        row = self.row(_remote={"prevStatusId": previous}, **fields)
+        return {"id": number, "context": f"jovie-execution/{self.ident['identityDigest']}",
+                "target_url": f"https://fixture.invalid/#jovie-execution={attempt._pack(row)}"}
+
+    def test_transport_rejects_http_failure_but_ref_conflict_is_a_lost_race(self):
+        response = subprocess.CompletedProcess([], 1, "", "HTTP422 ref exists")
+        with patch.object(attempt.subprocess, "run", return_value=response):
+            self.assertIsNone(attempt._gh(self.coord, "POST", "fixture/refs", {"ref": "refs/fixture"}))
+            with self.assertRaisesRegex(RuntimeError, "execution-coordinator-http-1"):
+                attempt._gh(self.coord, "GET", "fixture/statuses")
+
+    def test_transport_passes_only_declared_fixture_auth_and_json(self):
+        response = subprocess.CompletedProcess([], 0, "{}", "")
+        with patch.dict(attempt.os.environ, {"GH_TOKEN": "fixture-only-token"}, clear=True), \
+             patch.object(attempt.subprocess, "run", return_value=response) as run:
+            self.assertEqual(attempt._gh(self.coord, "POST", "fixture/statuses", {"state": "pending"}), {})
+            args, kwargs = run.call_args
+            self.assertEqual(args[0], ["gh", "api", "-X", "POST", "fixture/statuses", "--input", "-"])
+            self.assertEqual(json.loads(kwargs["input"]), {"state": "pending"})
+            self.assertEqual(kwargs["env"], {"GH_TOKEN": "fixture-only-token"})
+            self.assertEqual(kwargs["timeout"], 30)
+
+    def test_history_validates_identity_and_bounded_page_shape(self):
+        for coord in [{**self.coord, "repository": "missing-owner-separator"}, {**self.coord, "sha": "not-a-sha"}]:
+            with self.subTest(coord=coord), patch.object(attempt, "_gh") as transport:
+                with self.assertRaisesRegex(ValueError, "execution-coordinator-malformed"):
+                    attempt._github_rows(coord, self.ident)
+                transport.assert_not_called()
+        for pages in [None, [[]] * 101, ["not-a-page"]]:
+            with self.subTest(pages=pages), patch.object(attempt, "_gh", return_value=pages):
+                with self.assertRaisesRegex(RuntimeError, "execution-coordinator-history-unbounded"):
+                    attempt._github_rows(self.coord, self.ident)
+
+    def test_history_rejects_missing_or_foreign_receipts(self):
+        bad = self.status(1)
+        bad["target_url"] = "https://fixture.invalid/no-receipt"
+        for status, error in [(bad, "receipt-malformed"),
+                              (self.status(1, schema="wrong"), "receipt-mismatch"),
+                              (self.status(1, identityDigest="other"), "receipt-mismatch")]:
+            with self.subTest(error=error), patch.object(attempt, "_gh", return_value=[[status]]):
+                with self.assertRaisesRegex(RuntimeError, error):
+                    attempt._github_rows(self.coord, self.ident)
+
+    def test_history_selects_one_canonical_branch_and_ignores_other_contexts(self):
+        pages = [[self.status(12), {"context": "other", "id": 999}, self.status(9)],
+                 [self.status(18, previous=9), self.status(20, previous=12)]]
+        with patch.object(attempt, "_gh", return_value=pages):
+            rows, head = attempt._github_rows(self.coord, self.ident)
+        self.assertEqual([r["_remote"]["statusId"] for r in rows], [9, 18])
+        self.assertEqual(head, 18)
+
+    def test_append_ref_collision_does_not_publish_a_status(self):
+        with patch.object(attempt, "_gh", return_value=None) as transport:
+            self.assertIsNone(attempt._github_append(self.coord, self.ident, self.row(event="attempt_started"), None))
+            self.assertEqual(transport.call_count, 1)
+            self.assertIn("/git/refs", transport.call_args.args[2])
+
+    def test_append_maps_terminal_states_and_preserves_predecessor(self):
+        for terminal, expected in [(None, "pending"), ("succeeded", "success"),
+                                   ("no_op_stale", "success"), ("superseded", "success"),
+                                   ("failed_known", "failure")]:
+            with self.subTest(terminal=terminal), patch.object(attempt, "_gh", return_value={} ) as transport:
+                event = attempt._github_append(self.coord, self.ident, self.row(terminalState=terminal), 7)
+                self.assertEqual(transport.call_count, 1)
+                body = transport.call_args.args[3]
+                self.assertEqual(body["state"], expected)
+                packed = body["target_url"].split("#jovie-execution=", 1)[1]
+                row = attempt._unpack(packed)
+                self.assertEqual(row["_remote"], {"prevStatusId": 7, "eventId": event})
+                self.assertEqual(row["identityDigest"], self.ident["identityDigest"])
+
+    def test_append_rejects_oversize_before_status_publication(self):
+        with patch.object(attempt, "_gh") as transport:
+            with self.assertRaisesRegex(RuntimeError, "receipt-too-large"):
+                attempt._github_append({**self.coord, "targetUrl": "https://fixture.invalid/" + "x" * 2000},
+                                       self.ident, self.row(), None)
+            transport.assert_not_called()
+
+    def test_remote_contention_is_bounded_and_creates_no_local_receipt(self):
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(attempt, "_github_rows", return_value=([], None)), \
+             patch.object(attempt, "_github_append", return_value=None) as append:
+            path = Path(directory) / "ledger.jsonl"
+            with self.assertRaisesRegex(RuntimeError, "execution-coordinator-contention"):
+                attempt._locked(path, self.ident, self.coord, lambda _: ({"admitted": True}, [self.row()]))
+            self.assertEqual(append.call_count, 4)
+            self.assertFalse(path.exists())
+
 if __name__ == "__main__": unittest.main()

@@ -277,6 +277,25 @@ const nextConfig = {
         source: '/api/health/:path*',
         headers: healthNoStoreHeaders,
       },
+      {
+        // `:path*` does not match the exact root. Keep failure and liveness
+        // bodies out of the public CDN cache. Vary stays on this exact rule
+        // so build-info and redis keep the shared health header block.
+        source: '/api/health',
+        headers: [
+          ...healthNoStoreHeaders,
+          { key: 'Vary', value: 'Authorization, Cookie' },
+        ],
+      },
+      {
+        // Billing sync detail is credentialed. A public s-maxage would let
+        // the CDN replay an authorized body to anonymous callers (JOV-7557).
+        source: '/api/billing/health',
+        headers: [
+          ...healthNoStoreHeaders,
+          { key: 'Vary', value: 'Authorization, Cookie' },
+        ],
+      },
       // Homepage is content-negotiated (HTML vs Markdown). Do not mark it
       // immutable: a year-long HTML object cannot safely mix with Accept.
       {

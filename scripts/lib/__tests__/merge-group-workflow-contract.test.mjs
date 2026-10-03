@@ -2343,7 +2343,7 @@ ${selectedGateScript}`,
 
     expect(coalesce).toContain('timeout-minutes: 5');
     expect(coalesce).toContain(
-      "github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'"
+      "needs.release-source.outputs.eligible == 'true'"
     );
     // No universal fixed delay: the bounded window derives from merge-queue
     // depth and is capped inside the 5-minute job budget.
@@ -2368,7 +2368,7 @@ ${selectedGateScript}`,
     expect(coalesce).toContain('echo "is_current=false"');
     expect(coalesce).toContain('echo "is_current=true" >> "$GITHUB_OUTPUT"');
     expect(authorize).toContain(
-      'needs: [coalesce-production, fleet-promotion]'
+      'needs: [release-source, coalesce-production, fleet-promotion]'
     );
     expect(authorize).toContain(
       "needs.coalesce-production.outputs.is_current == 'true'"
@@ -2421,7 +2421,10 @@ ${selectedGateScript}`,
     expect(PRODUCTION_RELEASE_WORKFLOW).toContain('  promote-production:');
     expect(PRODUCTION_RELEASE_WORKFLOW).not.toContain('concurrency:');
 
-    expect(verified).toContain("github.event.workflow_run.event == 'push'");
+    expect(verified).toContain("needs.release-source.result == 'success'");
+    expect(verified).toContain(
+      "fromJSON(needs.release-source.outputs.ci || '{}').event == 'push'"
+    );
     expect(verified).toContain(
       "needs.authorize-production.result == 'success'"
     );
@@ -3844,6 +3847,12 @@ describe('merge-queue green enroll scan window and failure hold', () => {
 
   it('pages through every open PR instead of one oldest-first window', () => {
     expect(ENROLL).toContain('github.paginate(github.rest.pulls.list');
+    expect(ENROLL).toContain(
+      'github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit'
+    );
+    expect(ENROLL).not.toContain(
+      'github.rest.commits.listPullRequestsAssociatedWithCommit'
+    );
     expect(ENROLL).toContain("state: 'open', base: 'main', per_page: 100");
     expect(ENROLL).toContain('pullRequest(number: $number)');
     expect(ENROLL).not.toContain('pullRequests(');
@@ -3879,5 +3888,26 @@ describe('merge-queue green enroll scan window and failure hold', () => {
     expect(ENROLL.indexOf('FAILURE_RETRY_CONTEXT')).toBeLessThan(
       ENROLL.indexOf('enqueuePullRequest(input:')
     );
+  });
+
+  it('keeps a denied dequeue from failing the exact-head hold', () => {
+    const hold = ENROLL.slice(
+      ENROLL.indexOf('  hold-failed-revision:'),
+      ENROLL.indexOf('\n  enroll:')
+    );
+    expect(hold).toContain('GH_TOKEN: ${{ steps.app-token.outputs.token }}');
+    expect(hold).toContain('permission-pull-requests: write');
+    expect(hold).toContain('permission-statuses: write');
+    expect(hold).not.toContain('permission-merge-queues:');
+    expect(hold).not.toContain('permission-administration:');
+    expect(hold).toContain('Resource not accessible by integration');
+    expect(hold).toContain('not in queue');
+    const script = readFileSync(
+      resolve(REPO_ROOT, 'scripts/merge-group-failure-hold.mjs'),
+      'utf8'
+    );
+    expect(script).toContain('resource not accessible by integration');
+    expect(script).toContain('not in queue');
+    expect(script).toContain('dequeueOutcome');
   });
 });

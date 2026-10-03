@@ -5,6 +5,10 @@ import { db } from '@/lib/db';
 import { investorLinks, investorViews } from '@/lib/db/schema/investors';
 import { captureError } from '@/lib/error-tracking';
 import {
+  isInvestorClaimTokenShape,
+  isInvestorClaimUnexpired,
+} from '@/lib/investors/claim-token';
+import {
   buildInvestorEventPath,
   INVESTOR_PORTAL_EVENT_NAMES,
 } from '@/lib/investors/portal-events';
@@ -40,7 +44,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const cookieStore = await cookies();
   const token = cookieStore.get('__investor_token')?.value;
-  if (!token) {
+  if (!token || !isInvestorClaimTokenShape(token)) {
     return new Response(null, { status: 404 });
   }
 
@@ -63,7 +67,7 @@ export async function POST(request: Request): Promise<Response> {
       )
       .limit(1);
 
-    if (!link || (link.expiresAt && link.expiresAt <= new Date())) {
+    if (!link || !isInvestorClaimUnexpired(link.expiresAt)) {
       return new Response(null, { status: 404 });
     }
 

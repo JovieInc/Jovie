@@ -80,8 +80,6 @@ export const APP_ROUTES = {
   SETTINGS_AUDIENCE: '/app/settings/audience',
   SETTINGS_ANALYTICS: '/app/settings/analytics',
   SETTINGS_ADMIN: '/app/settings/admin',
-  SETTINGS_RETARGETING_ADS: '/app/settings/retargeting-ads',
-  SETTINGS_REFERRAL: '/app/settings/referral',
   /** @deprecated Use SETTINGS_DATA_PRIVACY instead */
   SETTINGS_DELETE_ACCOUNT: '/app/settings/delete-account',
 
@@ -321,6 +319,11 @@ export function buildReleaseTasksRoute(releaseId: string): string {
 
 export function buildReleaseDownloadsRoute(releaseId: string): string {
   return `${APP_ROUTES.RELEASES}/${encodeURIComponent(releaseId)}/downloads`;
+}
+
+/** Earnings settings live on the profile pay tab. Shortcuts should open this, not the legacy earnings redirect. */
+export function buildArtistProfilePayRoute(): string {
+  return `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`;
 }
 
 export function buildLibraryViewRoute(
