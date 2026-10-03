@@ -179,6 +179,29 @@ class SelectionTest(unittest.TestCase):
         ], {"JOV-4": 3})
         self.assertEqual(picked.identifier, "JOV-3")
 
+    def test_remediation_label_is_not_skipped_for_no_symphony(self):
+        self.assertIsNone(lane.pick_issue([issue("JOV-7540", labels=["no-symphony"])], {}))
+        picked = lane.pick_issue([
+            issue("JOV-7540", labels=["no-symphony", "remediation:router"]),
+            issue("JOV-7551", labels=["no-symphony", "remediation:billing-health"]),
+        ], {})
+        self.assertEqual(picked.identifier, "JOV-7540")
+        self.assertIsNone(lane.admission_rejection(
+            issue("JOV-7540", labels=["no-symphony", "remediation:router"]), {}, 10000))
+        self.assertEqual(lane.admission_rejection(
+            issue("JOV-1", labels=["no-symphony", "remediation:router", "type:epic"]), {}, 10000),
+            "excluded-label:type:epic")
+        self.assertEqual(lane.admission_rejection(
+            issue("JOV-1", labels=["no-symphony", "remediation"]), {}, 10000),
+            "excluded-label:no-symphony")
+        os.environ["LANES_ESCALATION"] = "0"
+        try:
+            self.assertEqual(lane.admission_rejection(
+                issue("JOV-7540", labels=["no-symphony", "remediation:router"]), {}, 10000),
+                "excluded-label:no-symphony")
+        finally:
+            os.environ.pop("LANES_ESCALATION", None)
+
     def test_issues_with_an_open_lane_pr_anywhere_are_skipped(self):
         picked = lane.pick_issue([issue("JOV-1", priority=1), issue("JOV-2", priority=2)], {},
                                  in_flight=frozenset({"JOV-1"}))
