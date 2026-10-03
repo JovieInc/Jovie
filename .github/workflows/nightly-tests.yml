@@ -166,7 +166,6 @@ jobs:
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
       - name: Seed nightly QA data
-        if: ${{ github.event_name == 'push' || github.event.inputs.test_filter == '' || github.event.inputs.suite == 'design-v1' }}
         run: |
           cd apps/web
           pnpm run seed:test-data
