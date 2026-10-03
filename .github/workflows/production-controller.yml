@@ -689,14 +689,11 @@ jobs:
                 # Completion binds this artifact to the staging producer and CI attempt.
                 staging_artifact_id="$EXACT_STAGING_ARTIFACT_ID"
               else
-                staging_artifact_id=""
-                # 25 min bound: staging queue + deploy took ~20 min on 2026-09-29; a 10 min wait
-                # failed valid releases with "receipt missing" (JOV-19527).
-                for attempt in $(seq 1 150); do
-                  staging_artifact_id="$(gh api \
-                    "repos/$REPOSITORY/actions/artifacts?name=$staging_artifact_name&per_page=100" \
-                    --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at, .id) | last | .id // empty')"
-                  [ -n "$staging_artifact_id" ] && break
+                # Preserve cumulative-range historical Web evidence, without polling.
+                staging_artifact_id="$(gh api \
+                  "repos/$REPOSITORY/actions/artifacts?name=$staging_artifact_name&per_page=100" \
+                  --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at, .id) | last | .id // empty')"
+                if [ -z "$staging_artifact_id" ]; then
                   # A superseded staging generation never deploys, so its exact
                   # receipt can never exist. Its durable lineage receipt either
                   # rebinds this wait to the exact replacement SHA on this
@@ -713,6 +710,9 @@ jobs:
                       staging_receipt_sha="${staging_receipt_sha#action=rebind replacement=}"
                       staging_deployment_id=""
                       staging_artifact_name="staging-deployment-${staging_receipt_sha}"
+                      staging_artifact_id="$(gh api \
+                        "repos/$REPOSITORY/actions/artifacts?name=$staging_artifact_name&per_page=100" \
+                        --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at, .id) | last | .id // empty')"
                       ;;
                     "action=yield") exit 0 ;;
                     "action=wait") ;;
@@ -721,8 +721,7 @@ jobs:
                       exit 1
                       ;;
                   esac
-                  [ "$attempt" -lt 150 ] && sleep 10
-                done
+                fi
               fi
               [[ "$staging_artifact_id" =~ ^[1-9][0-9]*$ ]] || {
                 echo "::error::Exact staging receipt is missing. Next: inspect Staging Controller for $staging_receipt_sha. Proof: $staging_artifact_name."
