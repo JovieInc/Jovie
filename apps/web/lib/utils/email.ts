@@ -177,3 +177,23 @@ export function isInternalOrTestAccountEmail(
     DEMO_PLACEHOLDER_LOCAL_PART_PATTERN.test(localPart)
   );
 }
+
+/**
+ * Reporting cohort for events that may not carry a durable user id. Unknown
+ * principals stay unattributed instead of being optimistically counted as
+ * customers; this keeps synthetic traffic out of customer-only metrics.
+ */
+export const ACCOUNT_METRIC_COHORTS = [
+  'customer',
+  'synthetic',
+  'unattributed',
+] as const;
+
+export type AccountMetricCohort = (typeof ACCOUNT_METRIC_COHORTS)[number];
+
+export function getAccountMetricCohort(
+  email: string | null | undefined
+): AccountMetricCohort {
+  if (!email?.trim()) return 'unattributed';
+  return isInternalOrTestAccountEmail(email) ? 'synthetic' : 'customer';
+}

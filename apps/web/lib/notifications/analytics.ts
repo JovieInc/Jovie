@@ -1,5 +1,6 @@
 import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
 import { trackServerEvent } from '@/lib/server-analytics';
+import { getAccountMetricCohort } from '@/lib/utils/email';
 import type { NotificationChannel } from '@/types/notifications';
 
 type BaseEventProps = {
@@ -87,6 +88,9 @@ export const trackSubscribeAttempt = async (
   await recordFunnelStep({
     funnel: 'fan_subscribe',
     step: 'contact_submitted',
+    cohort: getAccountMetricCohort(
+      typeof payload.email === 'string' ? payload.email : null
+    ),
   });
 };
 
