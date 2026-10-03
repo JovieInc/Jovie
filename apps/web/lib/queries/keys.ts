@@ -89,6 +89,11 @@ export const queryKeys = {
       [...queryKeys.creators.all, 'social-links', profileId] as const,
   },
 
+  // Ovie founder inbox (Summer cards + Design Lab taste)
+  ovieInbox: {
+    all: ['ovie-inbox'] as const,
+  },
+
   // Admin releases
   adminReleases: {
     all: ['admin-releases'] as const,

@@ -25,6 +25,7 @@ import {
   SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
@@ -49,6 +50,7 @@ import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { useAppFlag } from '@/lib/flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
+import { useOvieInboxQuery } from '@/lib/queries/useOvieInboxQuery';
 import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
 import {
@@ -98,6 +100,9 @@ function SettingsNavGroup({
                     <span className='truncate'>{item.name}</span>
                   </Link>
                 </SidebarMenuButton>
+                {item.badge ? (
+                  <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
+                ) : null}
               </SidebarMenuItem>
             </ContextMenuTrigger>
             <ContextMenuContent>
@@ -129,12 +134,22 @@ function SettingsNavGroup({
 
 /** Dedicated operator navigation; customer DashboardNav stays customer-only. */
 function OperatorNavigation({ pathname }: { readonly pathname: string }) {
+  const { data: inbox } = useOvieInboxQuery();
+  const pendingCount = inbox?.pending.length ?? 0;
+  const sections = OPERATOR_NAV_SECTIONS.map(section => ({
+    ...section,
+    items: section.items.map(item =>
+      item.registryId === 'inbox' && pendingCount > 0
+        ? { ...item, badge: pendingCount > 99 ? '99+' : pendingCount }
+        : item
+    ),
+  }));
   return (
     <nav
       aria-label='OV Navigation'
       className='flex flex-1 flex-col gap-4 overflow-hidden pt-1'
     >
-      {OPERATOR_NAV_SECTIONS.map(section => (
+      {sections.map(section => (
         <div key={section.label}>
           <span className='mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden'>
             {section.label}

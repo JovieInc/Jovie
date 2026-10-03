@@ -29,6 +29,7 @@ export const adminOutreachQueues = ['all', 'email', 'dm', 'review'] as const;
 export type AdminOutreachQueue = (typeof adminOutreachQueues)[number];
 
 export type AdminWorkspaceId =
+  | 'inbox'
   | 'overview'
   | 'chat'
   | 'ops'
@@ -55,6 +56,7 @@ export interface AdminNavRegistryItem {
 }
 
 export const ADMIN_PRIMARY_WORKSPACE_IDS = [
+  'inbox',
   'ops',
   'people',
   'growth',
@@ -73,6 +75,13 @@ export const ADMIN_SETTINGS_TOOL_IDS = [
 ] as const satisfies readonly AdminWorkspaceId[];
 
 export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
+  {
+    id: 'inbox',
+    label: 'Inbox',
+    href: APP_ROUTES.ADMIN_INBOX,
+    description: 'Summer approval cards and taste proposals waiting on you',
+    section: 'workspaces',
+  },
   {
     id: 'chat',
     label: 'Chat',

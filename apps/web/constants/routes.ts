@@ -84,6 +84,8 @@ export const APP_ROUTES = {
   /** Legacy admin root. Redirect-only; use OV or an ADMIN_* constant. */
   LEGACY_ADMIN: '/app/admin',
   ADMIN: '/app/ov',
+  /** Founder decision queue; Ovie lands here. */
+  ADMIN_INBOX: '/app/ov/inbox',
   ADMIN_CHAT: '/app/ov/chat',
   ADMIN_OPS: '/hud',
   ADMIN_PEOPLE: '/app/ov/people',

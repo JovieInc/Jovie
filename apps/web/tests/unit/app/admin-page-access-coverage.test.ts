@@ -36,7 +36,11 @@ describe('admin page access boundary', () => {
       );
 
       expect(defaultPage, page).toBeDefined();
-      if (source.includes('redirect(APP_ROUTES.HUD)')) {
+      // Redirect-only aliases; the target page owns the guard.
+      if (
+        source.includes('redirect(APP_ROUTES.HUD)') ||
+        source.includes('redirect(APP_ROUTES.ADMIN_INBOX)')
+      ) {
         continue;
       }
       expect(source, page).toContain(

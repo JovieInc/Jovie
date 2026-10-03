@@ -23,10 +23,10 @@ const ADMIN_LOADING_ROUTE = join(
 const ADMIN_NAV = join(TEST_DIR, '../../../constants/admin-navigation.ts');
 
 describe('admin overview shell normalization (JOV-5256)', () => {
-  it('folds the overview index into canonical Ops at /hud', () => {
+  it('folds the overview index into the Inbox landing', () => {
     const source = readFileSync(ADMIN_OVERVIEW_ROUTE, 'utf8');
 
-    expect(source).toContain('redirect(APP_ROUTES.HUD)');
+    expect(source).toContain('redirect(APP_ROUTES.ADMIN_INBOX)');
     expect(source).not.toContain('<AdminPage');
     expect(source).not.toContain("testId='admin-overview-page'");
   });

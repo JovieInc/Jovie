@@ -17,10 +17,10 @@ describe('/app/ov compatibility alias', () => {
     redirectMock.mockClear();
   });
 
-  it('redirects Overview to canonical Ops', () => {
+  it('lands the founder on the Inbox', () => {
     expect(() => AdminOverviewRedirectPage()).toThrow(
-      `NEXT_REDIRECT:${APP_ROUTES.HUD}`
+      `NEXT_REDIRECT:${APP_ROUTES.ADMIN_INBOX}`
     );
-    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.HUD);
+    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.ADMIN_INBOX);
   });
 });

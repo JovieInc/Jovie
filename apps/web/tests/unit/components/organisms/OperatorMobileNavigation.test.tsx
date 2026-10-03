@@ -99,13 +99,13 @@ describe('OperatorMobileNavigation', () => {
     const menu = screen.getByRole('navigation', {
       name: 'OV Navigation Menu',
     });
+    expect(within(menu).getByRole('link', { name: 'Inbox' })).toHaveFocus();
+
+    await user.tab();
     expect(within(menu).getByRole('link', { name: 'Chat' })).toHaveFocus();
 
     await user.tab();
     expect(within(menu).getByRole('link', { name: 'Ops' })).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'People' })).toHaveFocus();
 
     await user.keyboard('{Escape}');
     expect(
@@ -131,7 +131,7 @@ describe('OperatorMobileNavigation', () => {
     expect(
       within(
         screen.getByRole('navigation', { name: 'OV Navigation Menu' })
-      ).getByRole('link', { name: 'Chat' })
+      ).getByRole('link', { name: 'Inbox' })
     ).toHaveFocus();
 
     pathnameMock.mockReturnValue('/app/ov/ops');

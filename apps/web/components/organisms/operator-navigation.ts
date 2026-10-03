@@ -7,6 +7,7 @@ import {
   FolderKanban,
   Gauge,
   Image as ImageIcon,
+  Inbox,
   LayoutDashboard,
   type LucideIcon,
   Map,
@@ -24,6 +25,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
 
 const OPERATOR_ICON_BY_ID = {
+  inbox: Inbox,
   overview: LayoutDashboard,
   chat: MessageSquare,
   ops: Gauge,
