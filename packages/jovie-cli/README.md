@@ -1,8 +1,9 @@
 # `@jovie/cli`
 
 Jovie for AI agents. One package is a CLI, an MCP server, and an agent skill.
-An agent can give a music artist a Jovie profile from their Spotify artist
-URL, then hand the artist a claim link. No login or API key is required.
+An agent can extract public creator data from a supported social URL or give a
+music artist a Jovie profile from Spotify, then hand the artist a claim link.
+No login or API key is required.
 
 ## Install
 
@@ -23,6 +24,7 @@ automated install. A repository build is not proof that npm has the package.
 
 | Command | Request |
 | --- | --- |
+| `creator lookup <url>` | `GET /api/agents/creator-lookup`; supports YouTube channels, Instagram profiles, TikTok profiles, and Linktree |
 | `profile create <url>` | `POST /api/agents/profiles` with a Spotify artist URL |
 | `artist get <username>` | `GET /api/v1/{username}` |
 | `artist llms <username>` | `GET /{username}/llms.txt` |
@@ -38,6 +40,10 @@ that Spotify artist. Otherwise it creates an unclaimed profile. The response
 has `profileUrl` and, when unclaimed, a `claimUrl`. The claim URL is not an
 ownership token: the artist still verifies that they own the Spotify artist.
 Creation is anonymous and rate limited per IP.
+
+`creator lookup` is read-only. It returns the display name, bio, avatar URL,
+and public links extracted by the existing ingestion strategy without creating
+or changing a Jovie profile.
 
 `--json` emits JSON for API responses and wraps text resources as
 `{"content":"..."}`. Failures print `{"error":{...}}`, and API failures carry
@@ -72,14 +78,15 @@ transport settings. Configure Node's proxy support in that application or pass
 { "mcpServers": { "jovie": { "command": "npx", "args": ["-y", "@jovie/cli", "mcp"] } } }
 ```
 
-Tools: `create_profile`, `get_artist`, `get_artist_guide`, `get_openapi`,
+Tools: `lookup_creator`, `create_profile`, `get_artist`, `get_artist_guide`, `get_openapi`,
 `get_docs`, `report_issue`, `report_feedback`. `server.json` describes the package for the MCP registry.
 
 ## JavaScript client
 
 ```js
-import { createProfile, fetchArtist } from '@jovie/cli';
+import { createProfile, fetchArtist, lookupCreator } from '@jovie/cli';
 
+const creator = await lookupCreator('https://www.youtube.com/@creator');
 const profile = await createProfile('https://open.spotify.com/artist/<id>');
 const artist = await fetchArtist('artist-username');
 ```

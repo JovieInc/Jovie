@@ -13,6 +13,7 @@ export {
   fetchSiteLlms,
   JovieInputError,
   JovieRequestError,
+  lookupCreator,
   normalizeBaseUrl,
   validateUsername,
 } from './client.js';

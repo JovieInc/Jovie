@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A07571000000000000000002 /* MacComposerTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A07571000000000000000001 /* MacComposerTextView.swift */; };
 		1896A3883415894102BD7253 /* JovieTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB44E21E153FB9E310A070D5 /* JovieTheme.swift */; };
 		3353B95B121A56335FF6FE38 /* JovieMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 757F8502356A59A5F57050B8 /* JovieMacApp.swift */; };
 		3AE40D4F04A738A193B7ABF6 /* Inter-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 0ED25F3AE58B87A3EC2CB07D /* Inter-Variable.ttf */; };
@@ -30,6 +31,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A07571000000000000000001 /* MacComposerTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacComposerTextView.swift; sourceTree = "<group>"; };
 		0ED25F3AE58B87A3EC2CB07D /* Inter-Variable.ttf */ = {isa = PBXFileReference; includeInIndex = 1; path = "Inter-Variable.ttf"; sourceTree = "<group>"; };
 		29D5ED72B96DE18C73D3034E /* MacDevelopmentBoundaryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacDevelopmentBoundaryTests.swift; sourceTree = "<group>"; };
 		757F8502356A59A5F57050B8 /* JovieMacApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieMacApp.swift; sourceTree = "<group>"; };
@@ -129,6 +131,7 @@
 			children = (
 				757F8502356A59A5F57050B8 /* JovieMacApp.swift */,
 				CF034425181827A1F0DE391F /* MacDevelopmentContent.swift */,
+				A07571000000000000000001 /* MacComposerTextView.swift */,
 			);
 			path = JovieMac;
 			sourceTree = "<group>";
@@ -261,6 +264,7 @@
 				1896A3883415894102BD7253 /* JovieTheme.swift in Sources */,
 				3353B95B121A56335FF6FE38 /* JovieMacApp.swift in Sources */,
 				BAFBC828F71AF1EDD6AD73A4 /* MacDevelopmentContent.swift in Sources */,
+				A07571000000000000000002 /* MacComposerTextView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

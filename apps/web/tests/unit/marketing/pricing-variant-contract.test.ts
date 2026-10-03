@@ -13,7 +13,7 @@ function readSource(sourcePath: string): string {
   return readFileSync(resolve(process.cwd(), sourcePath), 'utf8');
 }
 
-function pricingBinding(route: '/new' | '/pricing') {
+function pricingBinding(route: '/pricing') {
   const manifestEntry = MARKETING_ROUTE_MANIFEST.find(
     entry => entry.url === route
   );
@@ -55,15 +55,17 @@ describe('section.pricing variant contract', () => {
     );
   });
 
-  it('binds /pricing to neutral and /new to Pro-recommended', () => {
+  it('binds /pricing to neutral and keeps retired /new free of rendered pricing sections', () => {
     expect(pricingBinding('/pricing')).toMatchObject({
       componentPath: 'apps/web/components/organisms/PricingRecipeBody.tsx',
       variantId: 'tier-cards-neutral',
     });
-    expect(pricingBinding('/new')).toMatchObject({
-      componentPath:
-        'apps/web/components/marketing/homepage-v2/HomepageV2Ctas.tsx',
-      variantId: 'tier-cards-recommended',
+    expect(
+      MARKETING_ROUTE_MANIFEST.find(entry => entry.url === '/new')
+    ).toMatchObject({
+      status: 'deprecated',
+      aliasOf: '/',
+      renderedSections: [],
     });
 
     const pricingRoute = readSource('app/(marketing)/pricing/page.tsx');

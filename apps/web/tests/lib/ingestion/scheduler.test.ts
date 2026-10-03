@@ -85,6 +85,20 @@ describe('ingestion scheduler helpers', () => {
     });
   });
 
+  it('classifies MusicFetch 401 and 403 as permanent vendor unavailable', () => {
+    for (const statusCode of [401, 403]) {
+      const error = new MusicfetchRequestError(
+        'MusicFetch vendor unavailable',
+        statusCode
+      );
+
+      expect(determineJobFailure(error)).toEqual({
+        message: 'MusicFetch vendor unavailable',
+        reason: 'permanent',
+      });
+    }
+  });
+
   it('classifies invalid-services MusicFetch 400 errors as permanent', () => {
     const error = new MusicfetchRequestError(
       'MusicFetch API error: 400 - services - Invalid value "soundCloud"',
@@ -169,6 +183,40 @@ describe('ingestion scheduler helpers', () => {
       expect.objectContaining({
         status: 'failed',
       })
+    );
+  });
+
+  it('does not page when a MusicFetch 401 fails the job permanently', async () => {
+    const where = vi.fn().mockResolvedValue(undefined);
+    const set = vi.fn().mockReturnValue({ where });
+    const update = vi.fn().mockReturnValue({ set });
+    const tx = { update } as never;
+    const error = new MusicfetchRequestError(
+      'MusicFetch vendor unavailable',
+      401
+    );
+
+    await handleIngestionJobFailure(
+      tx,
+      {
+        id: 'job-401',
+        jobType: 'musicfetch_enrichment',
+        payload: {
+          creatorProfileId: '7e093f2b-a8f9-4559-a9df-8f789b4432f8',
+          spotifyUrl: 'https://open.spotify.com/artist/123',
+          dedupKey: 'musicfetch_enrichment:123',
+        },
+        attempts: 1,
+        maxAttempts: 3,
+      } as never,
+      error
+    );
+
+    expect(mockRecordErrorForRetry).not.toHaveBeenCalled();
+    expect(mockMarkFailedAfterRetries).toHaveBeenCalled();
+    expect(mockCaptureError).not.toHaveBeenCalled();
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'failed' })
     );
   });
 
