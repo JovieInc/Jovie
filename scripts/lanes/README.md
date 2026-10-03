@@ -358,3 +358,31 @@ Re-evaluate when observed dispatches and real workflow/check-in receipts prove
 recurrence, or native scheduling reliably supplies the cadence again. Then:
 remove unnecessary recovery calls while retaining the independent deadman.
 JOV-6909 remains commissioning until recurrence is observed after deployment.
+
+## Design gate (JOV-7541)
+
+UI and landing work does not enter a build lane until a design brief has
+finished the founder's IA-first pipeline (steps 1–9 of
+`docs/design/design-brief-template.md`). Step 2 may cite only certified
+capability ids from `scripts/lanes/certified-capabilities.gen.json`, a
+checked-in projection of `apps/web/data/product-truth/registry.ts`:
+publication `public`, `marketing.proofAuthorized` true, maturity not
+`proposed`, access not `unavailable`.
+
+`design_gate.py` is pure stdlib, no I/O at import. An issue is gated on
+`ws:ui-ia`, `ws:profiles-marketing`, or `ws:design-gate`, or when title or
+description names a `GATED_PATH_PREFIXES` path or clearly targets a
+homepage, landing, or marketing page. `worker()` calls
+`design_gate.pick_build_issue(...)`, passing the existing `pick_issue`; a
+gated issue with an incomplete brief is not claimed, and the runner writes
+`needs-design-brief` plus the matching Linear label at most once. The label
+routes a design pass — it does not itself block — and the next claim admits
+the issue once steps 1–9 are complete.
+
+`doctor.py` adds `designGate` to the admission census (`gated`, `admitted`,
+`needsBrief`, `missingSteps`), deduped; incomplete briefs also increment
+`rejectedByProvider["needs-design-brief"]`.
+
+CI (`.github/workflows/design-gate.yml`) warns when a PR touches the same
+paths with no completed brief; it enforces only when `DESIGN_GATE_ENFORCE`
+is truthy, and unreadable briefs stay warnings even then.
