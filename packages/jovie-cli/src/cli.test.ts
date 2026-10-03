@@ -164,8 +164,10 @@ describe('jovie CLI', () => {
     expect(JSON.parse(stdout.read())).toEqual({
       error: {
         code: 'REQUEST_FAILED',
-        message: 'GET https://jov.ie/api/v1/demo returned HTTP 404',
+        apiCode: 'ARTIST_NOT_FOUND',
+        message: 'No public Jovie artist named "demo". Check the username.',
         responseBody: 'missing',
+        retryable: false,
         status: 404,
       },
     });
