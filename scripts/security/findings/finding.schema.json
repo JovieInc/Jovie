@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "jovie/security-finding/v1",
+  "title": "Normalized security finding",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "source",
+    "source_id",
+    "repo",
+    "severity",
+    "title",
+    "status",
+    "key"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "source": {
+      "enum": [
+        "codex-cloud",
+        "daybreak",
+        "codex-cli",
+        "codeql",
+        "semgrep",
+        "trivy",
+        "osv",
+        "gitleaks",
+        "trufflehog",
+        "deepsec",
+        "dependabot"
+      ]
+    },
+    "source_id": { "type": "string" },
+    "repo": {
+      "enum": [
+        "JovieInc/Jovie",
+        "JovieInc/LogYourBody",
+        "JovieInc/summer-config",
+        "JovieInc/symphony-control"
+      ]
+    },
+    "commit_sha": { "type": ["string", "null"] },
+    "severity": { "enum": ["critical", "high", "medium", "low", "info"] },
+    "validated": { "type": "boolean" },
+    "rule_id": { "type": ["string", "null"] },
+    "cwe": { "type": "array", "items": { "type": "integer" } },
+    "file": { "type": ["string", "null"] },
+    "start_line": { "type": ["integer", "null"] },
+    "end_line": { "type": ["integer", "null"] },
+    "symbol": { "type": ["string", "null"] },
+    "title": { "type": "string" },
+    "url": { "type": ["string", "null"] },
+    "status": { "enum": ["open", "fixed", "dismissed", "false_positive"] },
+    "coverage": { "enum": ["complete", "partial", "unknown"] },
+    "key": {
+      "type": "string",
+      "pattern": "^sec-(jovie|lyb|summer|symphony)-[a-z0-9]+(-[a-z0-9]+)*-([0-9a-f]{8}|grp)$"
+    },
+    "aliases": { "type": "array", "items": { "type": "string" } },
+    "sources": { "type": "array", "items": { "type": "object" } },
+    "conflict": { "type": "boolean" },
+    "first_seen": { "type": "string", "format": "date-time" },
+    "last_seen": { "type": "string", "format": "date-time" },
+    "linear_id": { "type": ["string", "null"] },
+    "claim": {
+      "type": ["object", "null"],
+      "properties": {
+        "pr": { "type": "string" },
+        "strength": { "enum": ["strong", "weak"] },
+        "since": { "type": "string" }
+      }
+    }
+  }
+}

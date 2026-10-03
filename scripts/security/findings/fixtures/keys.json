@@ -1,0 +1,401 @@
+{
+  "version": 1,
+  "vectors": [
+    {
+      "id": "codex-sarif-same-key",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "codex-cli",
+        "file": "apps/web/app/api/x/route.ts",
+        "symbol": "GET",
+        "cwe": [89],
+        "rule_id": "js/sql-injection",
+        "start_line": 10,
+        "end_line": 12
+      },
+      "expectKey": "sec-jovie-cwe89-9b88791d",
+      "throws": null
+    },
+    {
+      "id": "codeql-same-key",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "codeql",
+        "file": "apps/web/app/api/x/route.ts",
+        "symbol": "GET",
+        "cwe": [89],
+        "rule_id": "js/sql-injection",
+        "start_line": 40,
+        "end_line": 12
+      },
+      "expectKey": "sec-jovie-cwe89-9b88791d",
+      "throws": null
+    },
+    {
+      "id": "line-drift-same-symbol",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "codeql",
+        "file": "apps/web/app/api/x/route.ts",
+        "symbol": "GET",
+        "cwe": [89],
+        "rule_id": "js/sql-injection",
+        "start_line": 80,
+        "end_line": 90
+      },
+      "expectKey": "sec-jovie-cwe89-9b88791d",
+      "throws": null
+    },
+    {
+      "id": "file-level-no-symbol",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "codeql",
+        "file": "apps/web/app/api/x/route.ts",
+        "symbol": null,
+        "cwe": [89],
+        "rule_id": "js/sql-injection",
+        "start_line": 4,
+        "end_line": 12
+      },
+      "expectKey": "sec-jovie-cwe89-2a5b819c",
+      "throws": null
+    },
+    {
+      "id": "file-level-other-line",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "codeql",
+        "file": "apps/web/app/api/x/route.ts",
+        "symbol": "",
+        "cwe": [89],
+        "rule_id": "js/sql-injection",
+        "start_line": 90,
+        "end_line": 12
+      },
+      "expectKey": "sec-jovie-cwe89-2a5b819c",
+      "throws": null
+    },
+    {
+      "id": "secret-gitleaks",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "gitleaks",
+        "file": "config/keys.env",
+        "rule_id": "generic-api-key",
+        "cwe": []
+      },
+      "expectKey": "sec-jovie-cwe798-afcd6894",
+      "throws": null
+    },
+    {
+      "id": "secret-trufflehog",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "trufflehog",
+        "file": "config/keys.env",
+        "rule_id": "PrivateKey",
+        "cwe": [89]
+      },
+      "expectKey": "sec-jovie-cwe798-afcd6894",
+      "throws": null
+    },
+    {
+      "id": "cwe-798-explicit",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "semgrep",
+        "file": "apps/web/lib/config.ts",
+        "symbol": "load",
+        "cwe": [798],
+        "rule_id": "hardcoded",
+        "start_line": 10,
+        "end_line": 12
+      },
+      "expectKey": "sec-jovie-cwe798-f4c2fe9f",
+      "throws": null
+    },
+    {
+      "id": "family-564-to-89",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "codeql",
+        "file": "apps/web/app/api/x/route.ts",
+        "symbol": "query",
+        "cwe": [564],
+        "rule_id": "js/sql-injection",
+        "start_line": 10,
+        "end_line": 12
+      },
+      "expectKey": "sec-jovie-cwe89-54a489ea",
+      "throws": null
+    },
+    {
+      "id": "family-943-to-89",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "codeql",
+        "file": "apps/web/app/api/x/route.ts",
+        "symbol": "query",
+        "cwe": [943],
+        "rule_id": "js/sql-injection",
+        "start_line": 10,
+        "end_line": 12
+      },
+      "expectKey": "sec-jovie-cwe89-54a489ea",
+      "throws": null
+    },
+    {
+      "id": "family-80-to-79",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "codeql",
+        "file": "apps/web/app/page.tsx",
+        "symbol": "render",
+        "cwe": [80],
+        "rule_id": "js/sql-injection",
+        "start_line": 10,
+        "end_line": 12
+      },
+      "expectKey": "sec-jovie-cwe79-57aa99b2",
+      "throws": null
+    },
+    {
+      "id": "family-83-to-79",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "codeql",
+        "file": "apps/web/app/page.tsx",
+        "symbol": "render",
+        "cwe": [83],
+        "rule_id": "js/sql-injection",
+        "start_line": 10,
+        "end_line": 12
+      },
+      "expectKey": "sec-jovie-cwe79-57aa99b2",
+      "throws": null
+    },
+    {
+      "id": "lowest-cwe-after-map",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "codeql",
+        "file": "apps/web/app/page.tsx",
+        "symbol": "render",
+        "cwe": [89, 80],
+        "rule_id": "js/sql-injection",
+        "start_line": 10,
+        "end_line": 12
+      },
+      "expectKey": "sec-jovie-cwe79-57aa99b2",
+      "throws": null
+    },
+    {
+      "id": "rule-only-class-slug",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "codex-cloud",
+        "file": "apps/web/lib/auth/session.ts",
+        "rule_id": "codex-authz-bypass",
+        "cwe": [],
+        "symbol": "requireUser"
+      },
+      "expectKey": "sec-jovie-codex-authz-bypass-33091e45",
+      "throws": null
+    },
+    {
+      "id": "rule-map-sql",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "semgrep",
+        "file": "apps/web/lib/db.ts",
+        "rule_id": "js/sql-injection",
+        "cwe": [],
+        "symbol": "query"
+      },
+      "expectKey": "sec-jovie-cwe89-8c5cdb32",
+      "throws": null
+    },
+    {
+      "id": "invalid-key-guard",
+      "finding": {
+        "repo": "not-a-repo",
+        "file": "a.ts",
+        "rule_id": "x",
+        "cwe": []
+      },
+      "expectKey": null,
+      "throws": "unknown_repo"
+    },
+    {
+      "id": "invalid-class-guard",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "file": "a.ts",
+        "rule_id": "!!!",
+        "cwe": []
+      },
+      "expectKey": null,
+      "throws": "bad_class"
+    },
+    {
+      "id": "lyb-repo",
+      "finding": {
+        "repo": "JovieInc/LogYourBody",
+        "source": "codeql",
+        "file": "apps/web/app/api/x/route.ts",
+        "symbol": "GET",
+        "cwe": [89],
+        "rule_id": "js/sql-injection",
+        "start_line": 10,
+        "end_line": 12
+      },
+      "expectKey": "sec-lyb-cwe89-9b88791d",
+      "throws": null
+    },
+    {
+      "id": "summer-repo",
+      "finding": {
+        "repo": "JovieInc/summer-config",
+        "source": "codeql",
+        "file": "src/main.ts",
+        "symbol": "GET",
+        "cwe": [89],
+        "rule_id": "js/sql-injection",
+        "start_line": 10,
+        "end_line": 12
+      },
+      "expectKey": "sec-summer-cwe89-5660b462",
+      "throws": null
+    },
+    {
+      "id": "symphony-repo",
+      "finding": {
+        "repo": "JovieInc/symphony-control",
+        "source": "codeql",
+        "file": "cmd/main.go",
+        "symbol": "main",
+        "cwe": [89],
+        "rule_id": "js/sql-injection",
+        "start_line": 10,
+        "end_line": 12
+      },
+      "expectKey": "sec-symphony-cwe89-9b0617b7",
+      "throws": null
+    },
+    {
+      "id": "path-case-and-dot-slash",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "codeql",
+        "file": "./Apps/Web/App/API/X/Route.ts",
+        "symbol": "GET",
+        "cwe": [89],
+        "rule_id": "js/sql-injection",
+        "start_line": 10,
+        "end_line": 12
+      },
+      "expectKey": "sec-jovie-cwe89-9b88791d",
+      "throws": null
+    },
+    {
+      "id": "windows-path",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "codeql",
+        "file": "Apps\\Web\\App\\API\\X\\Route.ts",
+        "symbol": "GET",
+        "cwe": [89],
+        "rule_id": "js/sql-injection",
+        "start_line": 10,
+        "end_line": 12
+      },
+      "expectKey": "sec-jovie-cwe89-9b88791d",
+      "throws": null
+    },
+    {
+      "id": "dependency-package-anchor",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "osv",
+        "file": "pnpm-lock.yaml",
+        "package": "LeftPad",
+        "symbol": "ignored",
+        "cwe": [1395],
+        "rule_id": "GHSA-1"
+      },
+      "expectKey": "sec-jovie-cwe1395-6c705945",
+      "throws": null
+    },
+    {
+      "id": "dependency-same-package",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "dependabot",
+        "file": "pnpm-lock.yaml",
+        "package": "LeftPad",
+        "symbol": "other",
+        "cwe": [1395],
+        "rule_id": "GHSA-2"
+      },
+      "expectKey": "sec-jovie-cwe1395-6c705945",
+      "throws": null
+    },
+    {
+      "id": "different-symbol",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "codeql",
+        "file": "apps/web/app/api/x/route.ts",
+        "symbol": "POST",
+        "cwe": [89],
+        "rule_id": "js/sql-injection",
+        "start_line": 10,
+        "end_line": 12
+      },
+      "expectKey": "sec-jovie-cwe89-a243cdd8",
+      "throws": null
+    },
+    {
+      "id": "rule-slug-truncated",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "codex-cli",
+        "file": "apps/web/lib/a.ts",
+        "rule_id": "Codex Authz Bypass Extra Long Name",
+        "cwe": [],
+        "symbol": "check"
+      },
+      "expectKey": "sec-jovie-codex-authz-bypass-extra-69c33ac8",
+      "throws": null
+    },
+    {
+      "id": "leading-slash-stripped",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "codeql",
+        "file": "/apps/web/app/api/x/route.ts",
+        "symbol": "GET",
+        "cwe": [89],
+        "rule_id": "js/sql-injection",
+        "start_line": 10,
+        "end_line": 12
+      },
+      "expectKey": "sec-jovie-cwe89-9b88791d",
+      "throws": null
+    },
+    {
+      "id": "empty-anchor-other-file",
+      "finding": {
+        "repo": "JovieInc/Jovie",
+        "source": "semgrep",
+        "file": "apps/web/lib/other.ts",
+        "cwe": [22],
+        "symbol": null,
+        "rule_id": "path"
+      },
+      "expectKey": "sec-jovie-cwe22-376181d0",
+      "throws": null
+    }
+  ]
+}

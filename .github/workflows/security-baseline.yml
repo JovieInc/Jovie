@@ -1,0 +1,74 @@
+name: Security Baseline
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Devin
+# necessary-trust-boundary: A hosted weekly schedule runs Semgrep CE and osv-scanner against the default branch and uploads SARIF with only the built-in read-contents/security-events token; no merge, deploy, or credential authority is added.
+# revisit-trigger: Remove the scheduled hop if Semgrep/osv findings are ingested by a hosted scanner and this workflow no longer needs to run inside Actions.
+
+on:
+  schedule:
+    - cron: '0 14 * * 1'
+  workflow_dispatch:
+
+concurrency: security-baseline
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  semgrep:
+    name: Semgrep CE
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Scan with Semgrep CE
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check semgrep==1.179.0
+          set +e
+          semgrep scan --config p/default --sarif -o semgrep.sarif --metrics=off
+          code=$?
+          set -e
+          if [[ "$code" -gt 1 ]]; then
+            exit "$code"
+          fi
+      - name: Upload Semgrep SARIF
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+  osv:
+    name: osv-scanner
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Scan lockfiles with osv-scanner
+        run: |
+          set -euo pipefail
+          version=v2.5.1
+          sha=f9f25499a2c8cc367b3af45df2ea7eeca7fbccceab9c35079968f4b3652194be
+          curl -fsSL -o osv-scanner "https://github.com/google/osv-scanner/releases/download/${version}/osv-scanner_linux_amd64"
+          echo "${sha}  osv-scanner" | sha256sum -c -
+          chmod +x osv-scanner
+          set +e
+          ./osv-scanner scan source --format sarif --output-file osv.sarif .
+          code=$?
+          set -e
+          if [[ "$code" -gt 1 ]]; then
+            exit "$code"
+          fi
+      - name: Upload osv SARIF
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: osv.sarif
+          category: osv

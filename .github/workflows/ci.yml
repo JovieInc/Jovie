@@ -7877,6 +7877,28 @@ jobs:
 
   # Homepage smoke is a blocking probe of the immutable production deployment.
 
+  security-gate:
+    name: security-gate
+    # Source PRs run this script from source-validation.yml. ci.yml has no
+    # pull_request trigger; the same-repo clause is here for that event.
+    if: >-
+      github.event_name == 'merge_group' ||
+      (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Report-only security gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          SECURITY_GATE_ENABLED: ${{ vars.SECURITY_GATE_ENABLED }}
+        run: node scripts/security/security-gate.mjs
+
   main-release-ready:
     name: Main Release Ready
     needs:

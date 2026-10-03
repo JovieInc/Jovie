@@ -249,7 +249,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
-    jobCount: 61
+    jobCount: 62
   - name: Claude Review (gbrain-aware)
     path: .github/workflows/claude-review.yml
     active: true
@@ -1160,6 +1160,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:certify
     jobCount: 3
+  - name: Security Baseline
+    path: .github/workflows/security-baseline.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:osv
+    jobCount: 2
   - name: Security Suppression Audit
     path: .github/workflows/security-suppression-audit.yml
     active: true
