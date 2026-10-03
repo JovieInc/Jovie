@@ -28,9 +28,9 @@ import {
   Music2,
   Settings,
   Sparkles,
+  SquarePlay,
   UserCircle,
   Users,
-  Youtube,
 } from 'lucide-react';
 import Image from 'next/image';
 import { memo } from 'react';
@@ -56,7 +56,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   CalendarDays,
   LineChart,
   ListTodo,
-  Youtube,
+  Youtube: SquarePlay,
 };
 
 export interface PickerSkillItem {
