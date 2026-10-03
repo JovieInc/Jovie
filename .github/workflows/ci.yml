@@ -324,12 +324,15 @@ jobs:
       - name: Revalidate published workspace receipt
         run: node scripts/lib/ci-dependency-workspace.mjs validate
       - name: Measure actual installed combined dependency graph
+        env:
+          DEPENDENCY_PARITY_RECEIPT_DIR: ${{ runner.temp }}/jovie-dependency-parity
         run: node .github/scripts/dependency-parity-evidence.mjs write
       - name: Compare verified constituent dependency digests
         if: ${{ vars.DEPENDENCY_PARITY_ENFORCED == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           DEPENDENCY_PARITY_ENFORCED: ${{ vars.DEPENDENCY_PARITY_ENFORCED }}
+          DEPENDENCY_PARITY_RECEIPT_DIR: ${{ runner.temp }}/jovie-dependency-parity
         run: node .github/scripts/dependency-parity-evidence.mjs compare
       - name: Preserve combined dependency evidence
         if: ${{ always() && !cancelled() }}
@@ -337,8 +340,8 @@ jobs:
         with:
           name: dependency-digest-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.event.merge_group.head_sha }}
           path: |
-            dep-digest.json
-            dep-parity.json
+            ${{ runner.temp }}/jovie-dependency-parity/dep-digest.json
+            ${{ runner.temp }}/jovie-dependency-parity/dep-parity.json
           if-no-files-found: error
           retention-days: 14
 

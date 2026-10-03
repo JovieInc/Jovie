@@ -1,6 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +22,11 @@ const REPO = 'JovieInc/Jovie';
 const SHA = /^[a-f0-9]{40}$/;
 const HASH = /^[a-f0-9]{64}$/;
 const positive = n => Number.isSafeInteger(n) && n > 0;
+function receiptPath(name, environment = process.env) {
+  const directory = resolve(environment.DEPENDENCY_PARITY_RECEIPT_DIR || '.');
+  mkdirSync(directory, { recursive: true });
+  return join(directory, name);
+}
 function fact(ok, message) {
   if (!ok) throw new Error(message);
 }
@@ -100,9 +111,13 @@ export function writeDependencyDigest(
     runAttempt: Number(environment.GITHUB_RUN_ATTEMPT),
     event: environment.GITHUB_EVENT_NAME,
   });
-  writeFileSync('dep-digest.json', `${JSON.stringify(digest, null, 2)}\n`, {
-    flag: 'wx',
-  });
+  writeFileSync(
+    receiptPath('dep-digest.json', environment),
+    `${JSON.stringify(digest, null, 2)}\n`,
+    {
+      flag: 'wx',
+    }
+  );
   return digest;
 }
 export function compareDependencyDigests(group, sources) {
@@ -306,11 +321,17 @@ export function main() {
       })
     );
   const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
-  const group = JSON.parse(readFileSync('dep-digest.json', 'utf8'));
+  const group = JSON.parse(
+    readFileSync(receiptPath('dep-digest.json'), 'utf8')
+  );
   const result = collectDependencyParity({ event, group, api });
-  writeFileSync('dep-parity.json', `${JSON.stringify(result, null, 2)}\n`, {
-    flag: 'wx',
-  });
+  writeFileSync(
+    receiptPath('dep-parity.json'),
+    `${JSON.stringify(result, null, 2)}\n`,
+    {
+      flag: 'wx',
+    }
+  );
   console.log(JSON.stringify(result));
 }
 if (
