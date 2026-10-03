@@ -1082,6 +1082,7 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set(
     'reason_lane',
     'doctor',
     'disk_guard',
+    'worktree_sweep',
     'hyperagent_lane',
     'execution_attempt',
   ].flatMap(name => [

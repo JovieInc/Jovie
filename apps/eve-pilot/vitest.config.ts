@@ -17,6 +17,7 @@ export default defineConfig({
         'agent/lib/summer-commercial-readback.ts',
         'agent/lib/summer-photon-offline-proof.ts',
         'agent/lib/summer-product-bet-lifecycle.ts',
+        'agent/lib/summer-product-bet-review.ts',
         'agent/lib/summer-shadow-ingress.ts',
         'agent/lib/summer-web-conversation.ts',
         'agent/lib/runtime-commissioning-health.ts',

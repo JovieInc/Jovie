@@ -560,6 +560,13 @@ const nextConfig = {
         destination: '/artists',
         permanent: true,
       },
+      // Consolidate the singular marketing alias onto the canonical lander.
+      // Use an explicit 301 for search engines and existing inbound links.
+      {
+        source: '/artist-profile',
+        destination: '/artist-profiles',
+        statusCode: 301,
+      },
       // No /solutions index page exists; send it to the shipped solutions
       // route instead of falling through to profile resolution ("Profile
       // not found").

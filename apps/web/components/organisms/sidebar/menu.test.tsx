@@ -59,3 +59,31 @@ describe('sidebar menu motion tokens (JOV-4873)', () => {
     expect(source).not.toContain('duration-0');
   });
 });
+
+describe('sidebar menu rail-motion label exit (JOV-4522)', () => {
+  it('stages the label span on max-width/opacity/travel instead of display:none', () => {
+    render(
+      <SidebarMenuButton>
+        <span>Library</span>
+      </SidebarMenuButton>
+    );
+    const className =
+      screen.getByText('Library').closest('button')?.className ?? '';
+    // The label stays mounted and collapses in lockstep with the rail
+    // allocation; a `hidden` collapse popped it at frame one.
+    expect(className).toContain(
+      '[&>span:is(:last-child,[data-rail-label])]:transition-[max-width,opacity,transform]'
+    );
+    expect(className).toContain('duration-cinematic');
+    expect(className).toContain(
+      'group-data-[collapsible=icon]:[&>span:is(:last-child,[data-rail-label])]:max-w-0'
+    );
+    expect(className).not.toContain(
+      'group-data-[collapsible=icon]:[&>span:last-child]:hidden'
+    );
+    // Non-label spans still leave the layout instantly.
+    expect(className).toContain(
+      'group-data-[collapsible=icon]:[&>span:not(.sr-only):not(:last-child):not([data-rail-label])]:hidden'
+    );
+  });
+});

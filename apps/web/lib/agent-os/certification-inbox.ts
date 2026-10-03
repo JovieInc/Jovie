@@ -1,6 +1,8 @@
 import {
   type CertificationAdmission,
   type CertificationBlocker,
+  type CertificationEvidenceReceipt,
+  type CertificationOperationalEvidenceTier,
   type CertificationReviewPacket,
   type CertificationState,
   type CertificationSubject,
@@ -53,6 +55,41 @@ export interface CertificationInboxRankingSignals {
   readonly founderMinutes?: number;
 }
 
+/**
+ * Revenue-cone tiers for the $5K sprint (JOV-7695), ranked before any score:
+ * 1. first-dollar blocker where the founder is the remaining blocker;
+ * 2. live revenue-path regression that needs judgment;
+ * 3. human certification on stranger → claim/signup → $199 → paid → activated;
+ * 4. high-traffic or high-impact non-revenue surface;
+ * 5. everything else.
+ */
+export const CERTIFICATION_INBOX_REVENUE_TIERS = [
+  'first_dollar_blocker',
+  'revenue_path_regression',
+  'revenue_path_certification',
+  'high_impact_surface',
+  'other',
+] as const;
+
+export type CertificationInboxRevenueTier =
+  (typeof CERTIFICATION_INBOX_REVENUE_TIERS)[number];
+
+export interface CertificationInboxRevenue {
+  readonly tier: CertificationInboxRevenueTier;
+  /** The user or revenue path a decision unblocks, in plain words. */
+  readonly unblocks?: string;
+}
+
+/**
+ * Required machine evidence a domain checks outside the packet (for example
+ * ACQUISITION_ELIGIBLE for outreach prospects). Anything but green keeps the
+ * item out of the founder queue.
+ */
+export interface CertificationInboxMachineEvidence {
+  readonly status: 'green' | 'red' | 'unknown';
+  readonly summary: string;
+}
+
 export interface CertificationInboxDelivery {
   /** Typed projection domain, e.g. 'marketing_component' or 'artist_candidate'. */
   readonly domain: string;
@@ -63,6 +100,28 @@ export interface CertificationInboxDelivery {
   readonly ranking?: CertificationInboxRankingSignals;
   /** Exact decision the machine is asking for, e.g. 'certify publish to cohort'. */
   readonly requestedDecision?: string | null;
+  /** Producer-declared revenue tier; otherwise derived from domain/subject. */
+  readonly revenue?: CertificationInboxRevenue;
+  readonly machineEvidence?: CertificationInboxMachineEvidence;
+}
+
+/**
+ * The six things a founder card must answer (JOV-7695). Present on every
+ * needs-you item; null elsewhere because nothing is being asked.
+ */
+export interface CertificationInboxCard {
+  readonly whyNow: string;
+  readonly journey: string;
+  /** Exact source revision the decision binds to, e.g. `main@abc123`. */
+  readonly revision: string | null;
+  readonly greenEvidence: readonly string[];
+  readonly unblocks: string;
+  readonly decision: string;
+  readonly consequences: {
+    readonly accept: string;
+    readonly reject: string;
+    readonly comment: string;
+  };
 }
 
 export interface CertificationInboxItem {
@@ -80,13 +139,26 @@ export interface CertificationInboxItem {
   readonly blockers: readonly CertificationBlocker[];
   readonly actions: readonly CertificationInboxAction[];
   readonly observedAt: string;
+  /** 1 = first-dollar blocker … 5 = everything else. Ranks before score. */
+  readonly revenueTierRank: number;
+  readonly revenueTier: CertificationInboxRevenueTier;
+  /** True when required machine evidence is red/unknown (held from founder). */
+  readonly heldForMachineEvidence: boolean;
+  readonly card: CertificationInboxCard | null;
 }
 
 export interface CertificationInboxQueue {
   readonly contract: typeof CERTIFICATION_INBOX_CONTRACT;
-  /** Ranked founder-judgment queue: review-ready items only. */
+  /**
+   * Ranked founder-judgment queue: review-ready items whose required machine
+   * evidence is green, ordered by revenue tier, then decision score. Empty
+   * means no founder decision is actionable now, not that nothing is running.
+   */
   readonly needsYou: readonly CertificationInboxItem[];
-  /** Working/blocked items with explicit blocker evidence. */
+  /**
+   * Working/blocked items with explicit blocker evidence, including
+   * review-ready items held because machine evidence is red or unknown.
+   */
   readonly blocked: readonly CertificationInboxItem[];
   /** Items whose prior founder approval no longer matches the digest. */
   readonly stale: readonly CertificationInboxItem[];
@@ -125,14 +197,72 @@ function estimatedFounderMinutes(
   return Math.max(0, signals.founderMinutes);
 }
 
-function bucketFor(
+const OPERATIONAL_TIERS = {
+  ci: 'ci',
+  queueMerge: 'queue_merge',
+  deploy: 'deploy',
+  runtimeDogfood: 'runtime_dogfood',
+} as const satisfies Record<
+  keyof NonNullable<CertificationReviewPacket['operational']>,
+  CertificationOperationalEvidenceTier
+>;
+
+function operationalReceipts(
+  packet: CertificationReviewPacket
+): CertificationEvidenceReceipt[] {
+  const operational = packet.operational ?? {};
+  return (
+    Object.keys(OPERATIONAL_TIERS) as (keyof typeof OPERATIONAL_TIERS)[]
+  ).flatMap(key => [...(operational[key] ?? [])]);
+}
+
+/**
+ * Machine evidence a founder decision depends on but the kernel does not
+ * require for review-ready: any operational receipt the packet declares (CI,
+ * merge, deploy, runtime dogfood) and any domain-level evidence. Red or
+ * unknown holds the item from the founder queue (fail closed).
+ */
+function machineEvidenceBlockers(
   delivery: CertificationInboxDelivery
+): CertificationBlocker[] {
+  const blockers: CertificationBlocker[] = operationalReceipts(delivery.packet)
+    .filter(receipt => receipt.status !== 'passed')
+    .map(receipt => ({
+      code:
+        receipt.status === 'failed'
+          ? `${receipt.tier as CertificationOperationalEvidenceTier}_failed`
+          : `${receipt.tier as CertificationOperationalEvidenceTier}_missing`,
+      id: receipt.id,
+      summary: `${receipt.tier} receipt is ${receipt.status}: ${receipt.summary}`,
+      tier: receipt.tier,
+    }));
+  const machine = delivery.machineEvidence;
+  if (machine && machine.status !== 'green') {
+    blockers.push({
+      code:
+        machine.status === 'red'
+          ? 'machine_evidence_failed'
+          : 'machine_evidence_unknown',
+      id: `${delivery.domain}:machine-evidence`,
+      summary: machine.summary,
+      tier: 'state',
+    });
+  }
+  return blockers;
+}
+
+function bucketFor(
+  delivery: CertificationInboxDelivery,
+  machineBlockers: readonly CertificationBlocker[]
 ): CertificationInboxBucket {
   const { admission } = delivery;
-  if (admission.staleFounderLock) return 'stale';
+  // A stale founder lock whose new revision is review-ready is a
+  // re-certification the founder can act on; it stays in `stale` only while
+  // its new evidence is incomplete.
   if (admission.state === 'review_ready' && admission.decisionEvidenceDigest) {
-    return 'needs_you';
+    return machineBlockers.length === 0 ? 'needs_you' : 'blocked';
   }
+  if (admission.staleFounderLock) return 'stale';
   if (
     admission.state === 'working' &&
     (admission.currentDecision?.decision === 'rejected' ||
@@ -150,15 +280,109 @@ function actionsFor(
   return bucket === 'needs_you' ? CERTIFICATION_INBOX_ACTIONS : [];
 }
 
+const REVENUE_PATH_PATTERN =
+  /\b(home|homepage|landing|claim|signup|sign-up|onboarding|start|pricing|checkout|billing|pay|paid|subscription|activation|profile)\b/i;
+
+const DOMAIN_TIERS: Readonly<Record<string, CertificationInboxRevenueTier>> = {
+  // The public artist profile is the canonical object the $199 offer sells.
+  public_profiles: 'revenue_path_certification',
+  smart_links: 'high_impact_surface',
+  customers: 'high_impact_surface',
+  lyb: 'other',
+};
+
+const TIER_UNBLOCKS: Record<CertificationInboxRevenueTier, string> = {
+  first_dollar_blocker:
+    'First dollar: this is the remaining founder blocker on the $199 path.',
+  revenue_path_regression:
+    'Keeps the live stranger → claim/signup → $199 → paid → activated path certified after a change.',
+  revenue_path_certification:
+    'Certifies a step on the stranger → claim/signup → $199 → paid → activated path.',
+  high_impact_surface:
+    'A high-traffic or high-impact surface outside the $199 path.',
+  other: 'Not on the $199 revenue path.',
+};
+
+function revenueTierFor(
+  delivery: CertificationInboxDelivery
+): CertificationInboxRevenueTier {
+  if (delivery.revenue) return delivery.revenue.tier;
+  const { subject } = delivery.packet;
+  const domainTier = DOMAIN_TIERS[delivery.domain];
+  const onRevenuePath =
+    domainTier === 'revenue_path_certification' ||
+    (domainTier === undefined &&
+      REVENUE_PATH_PATTERN.test(
+        `${subject.id} ${subject.kind} ${subject.title}`
+      ));
+  if (onRevenuePath) {
+    // A previously human-certified revenue surface whose evidence moved is a
+    // live revenue-path change that needs judgment.
+    return delivery.admission.baselineStatus ===
+      'candidate_pending_recertification'
+      ? 'revenue_path_regression'
+      : 'revenue_path_certification';
+  }
+  return domainTier ?? 'high_impact_surface';
+}
+
+function passedEvidence(packet: CertificationReviewPacket): string[] {
+  return [
+    ...packet.canonicalReferences,
+    ...packet.invariantEvaluation,
+    ...packet.testsCoverage,
+    ...packet.visualProof,
+    ...operationalReceipts(packet),
+  ]
+    .filter(receipt => receipt.status === 'passed')
+    .map(receipt => `${receipt.tier}: ${receipt.summary} (${receipt.ref})`);
+}
+
+function cardFor(
+  delivery: CertificationInboxDelivery,
+  tier: CertificationInboxRevenueTier
+): CertificationInboxCard {
+  const { admission, packet } = delivery;
+  const { subject } = packet;
+  const revision = packet.source
+    ? `${packet.source.ref}@${packet.source.sha.slice(0, 12)}`
+    : null;
+  const digest = admission.decisionEvidenceDigest ?? 'the current evidence';
+  const tierRank = CERTIFICATION_INBOX_REVENUE_TIERS.indexOf(tier) + 1;
+  return {
+    consequences: {
+      accept: `Records one human approval receipt bound to ${digest}${revision ? ` at ${revision}` : ''}. It completes only this required evidence; lifecycle advances from the receipt, not from Ovie.`,
+      comment:
+        'Records a changes-requested receipt with your note as the remediation brief. The item returns to rework and comes back only after machine evidence reruns green.',
+      reject:
+        'Records a rejection receipt with your reason. The item returns to rework; any new revision must pass machine evidence again before it can return here.',
+    },
+    decision:
+      delivery.requestedDecision ??
+      `Certify ${subject.title} as canonical at ${revision ?? 'its current revision'}.`,
+    greenEvidence: passedEvidence(packet),
+    journey: `${subject.title} (${subject.kind}, ${delivery.domain})`,
+    revision,
+    unblocks: delivery.revenue?.unblocks ?? TIER_UNBLOCKS[tier],
+    whyNow: `Revenue tier ${tierRank} (${tier.replaceAll('_', ' ')}): required machine evidence is green, so your judgment is the only missing requirement.${admission.staleFounderLock ? ' The evidence changed since your last approval, so that approval no longer covers this revision.' : ''}`,
+  };
+}
+
 function toItem(
   delivery: CertificationInboxDelivery,
-  bucket: CertificationInboxBucket
+  bucket: CertificationInboxBucket,
+  machineBlockers: readonly CertificationBlocker[] = []
 ): CertificationInboxItem {
   const { admission, packet } = delivery;
+  const revenueTier = revenueTierFor(delivery);
   return {
     actions: actionsFor(bucket),
-    blockers: admission.blockers,
+    blockers: [...admission.blockers, ...machineBlockers],
     bucket,
+    card: bucket === 'needs_you' ? cardFor(delivery, revenueTier) : null,
+    heldForMachineEvidence: machineBlockers.length > 0,
+    revenueTier,
+    revenueTierRank: CERTIFICATION_INBOX_REVENUE_TIERS.indexOf(revenueTier) + 1,
     contract: CERTIFICATION_INBOX_CONTRACT,
     decisionEvidenceDigest: admission.decisionEvidenceDigest,
     decisionScore: certificationDecisionScore(delivery.ranking),
@@ -194,7 +418,11 @@ function newestDelivery(
   return candidateDigest >= currentDigest ? candidate : current;
 }
 
+/** Revenue tier first (never FIFO), then expected decision value, then cost. */
 function byRank(left: CertificationInboxItem, right: CertificationInboxItem) {
+  if (left.revenueTierRank !== right.revenueTierRank) {
+    return left.revenueTierRank - right.revenueTierRank;
+  }
   if (left.decisionScore !== right.decisionScore) {
     return right.decisionScore - left.decisionScore;
   }
@@ -239,8 +467,9 @@ export function projectCertificationInbox(
   const certified: CertificationInboxItem[] = [];
 
   for (const delivery of latest.values()) {
-    const bucket = bucketFor(delivery);
-    const item = toItem(delivery, bucket);
+    const machineBlockers = machineEvidenceBlockers(delivery);
+    const bucket = bucketFor(delivery, machineBlockers);
+    const item = toItem(delivery, bucket, machineBlockers);
     switch (bucket) {
       case 'needs_you':
         needsYou.push(item);
