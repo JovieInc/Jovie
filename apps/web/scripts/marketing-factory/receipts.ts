@@ -69,6 +69,7 @@ const RUN_STATUSES = [
   'failed',
   'credentials-unavailable',
   'incomplete',
+  'budget-blocked',
 ] as const;
 
 export const FactoryRunManifestSchema = z.object({
@@ -90,6 +91,13 @@ export const FactoryRunManifestSchema = z.object({
     })
   ),
   attempts: z.array(z.string().min(1)),
+  paidBudget: z
+    .object({
+      id: z.string().min(1),
+      policyDigest: z.string().min(1),
+      ledgerPath: z.string().min(1),
+    })
+    .optional(),
   /** Set when the preflight refused the run before any stage ran. */
   preflight: z
     .array(
