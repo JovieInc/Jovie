@@ -316,7 +316,7 @@ BOT REVIEWS
 - Pre-merge: typecheck + lint (CI fast path, ~10–15s)
 - DB migrations: run before staging deploy (production DB, additive only)
 - Deploy trigger: automatic after successful exact-attempt `main` CI authorization
-- Health check: https://jov.ie/api/health/deploy (returns `{"status":"healthy"}`)
+- Health check: https://jov.ie/api/health/deploy (anonymous `{healthy:true}` or legacy `{"status":"healthy"}`; checks require admin or `CRON_SECRET`)
 
 ## Version Stamping (main-only)
 

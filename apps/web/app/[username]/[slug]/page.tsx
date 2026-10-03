@@ -475,21 +475,10 @@ function ContentPageBody({
     return (
       <UnreleasedReleaseHero
         release={{
-          id:
-            content.type === 'release'
-              ? content.id
-              : (content.releaseId ?? content.id),
-          trackId: content.type === 'track' ? content.id : null,
           slug: content.slug,
           title: content.title,
           artworkUrl: content.artworkUrl,
           releaseDate: content.releaseDate!,
-          hasSpotify: content.providerLinks.some(
-            link => link.providerId === 'spotify'
-          ),
-          hasAppleMusic: content.providerLinks.some(
-            link => link.providerId === 'apple_music'
-          ),
         }}
         artist={artist}
       />

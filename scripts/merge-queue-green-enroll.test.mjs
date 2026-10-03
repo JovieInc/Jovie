@@ -200,14 +200,38 @@ test('read failures abort without enqueue and a raced mutation does not stop the
   assert.equal(result.warnings.length, 2);
 });
 
-test('wakes both existing controllers on completed Source Validation without a polling schedule', () => {
+test('failure-hold dequeue uses the Jovie Bot token without a merge-queue grant', () => {
+  const hold = workflow.jobs['hold-failed-revision'];
+  const token = hold.steps.find(step => step.id === 'app-token');
+  const persist = hold.steps.find(step => step.id === 'failure-hold');
+  assert.equal(
+    String(token.uses).startsWith('actions/create-github-app-token@'),
+    true
+  );
+  assert.equal(token.with['app-id'], '${{ vars.JOVIE_BOT_APP_ID }}');
+  assert.equal(token.with['permission-actions'], 'read');
+  assert.equal(token.with['permission-contents'], 'read');
+  assert.equal(token.with['permission-pull-requests'], 'write');
+  assert.equal(token.with['permission-statuses'], 'write');
+  assert.equal(token.with['permission-merge-queues'], undefined);
+  assert.equal(token.with['permission-administration'], undefined);
+  assert.equal(persist.env.GH_TOKEN, '${{ steps.app-token.outputs.token }}');
+});
+
+test('wakes on completed Source Validation and on the bounded reconciliation sweep', () => {
   assert.ok(workflow.on.workflow_run.workflows.includes('Source Validation'));
   assert.deepEqual(workflow.on.workflow_run.types, ['completed']);
   assert.deepEqual(workflow.on.pull_request_target.types, [
     'unlabeled',
     'reopened',
   ]);
-  assert.equal(workflow.on.schedule, undefined);
+  // JOV-7589: a dequeue while checks are already green emits no completion
+  // event, so a periodic full-roster sweep re-arms within the cadence.
+  const [sweep] = workflow.on.schedule;
+  const cadenceMinutes = Number(
+    /^\*\/([1-9][0-9]*) \* \* \* \*$/.exec(sweep.cron)?.[1]
+  );
+  assert.ok(cadenceMinutes > 0 && cadenceMinutes <= 15);
   assert.match(workflow.jobs.enroll.if, /conclusion == 'success'/);
   const ready = load(
     readFileSync('.github/workflows/auto-ready-agent-drafts.yml', 'utf8')
@@ -324,6 +348,25 @@ test('a PR wake reads only its current candidate instead of rescanning the whole
   }
 });
 
+test('a scheduled sweep re-enqueues a dequeued PR whose repaired head turned green', async () => {
+  // JOV-7589 regression: after a merge-queue ejection the lane pushes a newer
+  // head and the checks go green without a wake. The sweep must find and
+  // re-enroll it; a still-removed head stays blocked without a bounded retry.
+  const overrides = {
+    1: { timelineItems: { nodes: [{ createdAt: '2026-10-02T11:00:00Z' }] } },
+    2: {
+      timelineItems: { nodes: [{ createdAt: '2026-10-02T13:00:00Z' }] },
+    },
+  };
+  const result = await fixture({
+    roster: [candidate(1), candidate(2)],
+    overrides,
+    eventName: 'schedule',
+  });
+  assert.equal(result.inventories.length, 1);
+  assert.deepEqual(result.mutations, [{ id: 'PR_1', oid: sha }]);
+});
+
 test('an unattributable automatic wake cannot authorize a global queue scan', async () => {
   for (const { eventName, payload } of [
     {
@@ -388,4 +431,73 @@ test('duplicated automatic PR associations do not multiply live reads or enqueue
   assert.deepEqual(result.gets, [7]);
   assert.deepEqual(result.reads, [7]);
   assert.equal(result.mutations.length, 1);
+});
+
+// GitHub keeps only one pending run per concurrency group, even when
+// cancel-in-progress is false. Evaluate the actual YAML expression so a
+// repository-wide group cannot silently replace another PR's final wake.
+function concurrencyGroup(github) {
+  const group = workflow.concurrency.group;
+  return group.replace(/\$\{\{([\s\S]*?)\}\}/g, (_whole, expression) => {
+    const js = expression
+      .replaceAll(
+        'github.event.pull_request.number',
+        'github.event.pull_request?.number'
+      )
+      .replaceAll(
+        'github.event.workflow_run.pull_requests[0].number',
+        'github.event.workflow_run?.pull_requests?.[0]?.number'
+      )
+      .replaceAll(
+        'github.event.workflow_run.id',
+        'github.event.workflow_run?.id'
+      );
+    return new Function('github', `return (${js});`)(github);
+  });
+}
+
+const wake = (number, id) => ({
+  event_name: 'workflow_run',
+  event: { workflow_run: { id, pull_requests: number ? [{ number }] : [] } },
+  run_id: id + 1000,
+});
+
+test('independent PR wakes survive replacement of GitHub pending runs', async () => {
+  const pending = new Map();
+  for (const event of [wake(7, 101), wake(8, 102)]) {
+    pending.set(concurrencyGroup(event), event);
+  }
+  const reads = [];
+  for (const event of pending.values()) {
+    const result = await fixture({
+      eventName: event.event_name,
+      payload: event.event,
+    });
+    reads.push(...result.gets);
+    assert.equal(result.mutations.length, 1);
+  }
+  assert.deepEqual(reads.sort(), [7, 8]);
+});
+
+test('same-PR wakes coalesce while unattributed receipts and manual reconciliation stay isolated', () => {
+  assert.equal(concurrencyGroup(wake(7, 101)), concurrencyGroup(wake(7, 102)));
+  assert.notEqual(
+    concurrencyGroup(wake(null, 101)),
+    concurrencyGroup(wake(null, 102))
+  );
+  const manual = id => ({
+    event_name: 'workflow_dispatch',
+    event: {},
+    run_id: id,
+  });
+  assert.equal(concurrencyGroup(manual(1)), concurrencyGroup(manual(2)));
+  assert.notEqual(concurrencyGroup(manual(1)), concurrencyGroup(wake(7, 101)));
+  const label = {
+    event_name: 'pull_request_target',
+    event: { pull_request: { number: 7 } },
+    run_id: 1,
+  };
+  assert.equal(concurrencyGroup(label), concurrencyGroup(wake(7, 101)));
+  assert.equal(workflow.concurrency['cancel-in-progress'], false);
+  assert.equal(workflow.jobs.enroll['timeout-minutes'], 5);
 });

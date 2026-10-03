@@ -342,6 +342,35 @@ export function createProfile(
   return requestJson('/api/agents/profiles', options, { url: url.toString() });
 }
 
+/** Extract public creator fields without creating or modifying a profile. */
+export function lookupCreator(
+  creatorUrl: string,
+  options: ResourceOptions = {}
+): Promise<unknown> {
+  const candidate = creatorUrl.trim();
+  let url: URL;
+  try {
+    url = new URL(candidate);
+  } catch {
+    throw new JovieInputError(`Invalid URL: ${creatorUrl}`);
+  }
+  if (
+    candidate.length > 2048 ||
+    url.protocol !== 'https:' ||
+    url.username ||
+    url.password
+  ) {
+    throw new JovieInputError(
+      'Expected an HTTPS YouTube, Instagram, TikTok, or Linktree profile URL.'
+    );
+  }
+
+  return requestJson(
+    `/api/agents/creator-lookup?url=${encodeURIComponent(url.toString())}`,
+    options
+  );
+}
+
 export type ReportKind = 'bug' | 'feedback';
 
 /** Safe execution context only; never env, credentials, or file contents. */
