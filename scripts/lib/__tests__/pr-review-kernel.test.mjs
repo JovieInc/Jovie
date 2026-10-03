@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  classifyReviewRisk,
   parseCompare,
   parsePull,
   readRiskRuleIds,
@@ -630,6 +631,52 @@ describe('replay outcomes', () => {
 });
 
 describe('readRiskRuleIds', () => {
+  it('classifies exact source paths with canonical policy beyond prompt-context limits', async () => {
+    const paths = [
+      ...Array.from({ length: 45 }, (_, i) => `lib/example-${i}.ts`),
+      PATH,
+    ];
+    const git = async args => {
+      expect(args).toEqual(['diff', '--name-only', BASE, HEAD]);
+      return paths.join('\n');
+    };
+    expect(
+      await classifyReviewRisk({ baseSha: BASE, headSha: HEAD, git })
+    ).toContain('billing-money');
+  });
+
+  it('keeps package and lockfile risk when trusted checkout differs from PR head', async () => {
+    expect(
+      await classifyReviewRisk({
+        baseSha: BASE,
+        headSha: HEAD,
+        git: async () => 'apps/web/package.json\npnpm-lock.yaml\n',
+      })
+    ).toContain('env-config');
+  });
+
+  it('keeps unavailable classification unknown and distinguishes a genuine empty diff', async () => {
+    expect(
+      await classifyReviewRisk({
+        baseSha: BASE,
+        headSha: HEAD,
+        git: async () => '',
+      })
+    ).toEqual([]);
+    expect(
+      await classifyReviewRisk({
+        baseSha: BASE,
+        headSha: HEAD,
+        git: async () => {
+          throw new Error('missing source');
+        },
+      })
+    ).toBeNull();
+    expect(
+      await classifyReviewRisk({ baseSha: 'invalid', headSha: HEAD })
+    ).toBeNull();
+  });
+
   it('reads rule ids and distinguishes missing from empty', () => {
     const dir = mkdtempSync(join(tmpdir(), 'pr-review-'));
     const good = join(dir, 'risk.json');
