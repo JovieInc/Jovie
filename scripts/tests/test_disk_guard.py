@@ -209,6 +209,23 @@ class CheckTest(unittest.TestCase):
             self.assertEqual(cwds["xcrun"], Path.home())
             self.assertIn("preserved shared pnpm store", report["actions"])
 
+    def test_low_disk_sheds_idle_worktree_pool_slots(self):
+        saved = (guard.free_pct, guard.worktree_pool.shed)
+        guard.free_pct = lambda path: 10.0
+        shed_repos = []
+        guard.worktree_pool.shed = lambda repo: shed_repos.append(repo) or ["slot-a"]
+
+        def run(args, **kw):
+            return self._porcelain_empty() if args[:3] == ["git", "worktree", "list"] else ok(args)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                report = guard.check(self.host(tmp), run=run, now=NOW, sweep=True)
+            finally:
+                guard.free_pct, guard.worktree_pool.shed = saved
+            self.assertEqual(shed_repos, [self.host(tmp).repo])
+            self.assertIn("drained pool slot slot-a", report["actions"])
+
     def _porcelain_empty(self):
         return SimpleNamespace(returncode=0, stdout="worktree /repo\nHEAD x\nbranch refs/heads/main\n", stderr="")
 
