@@ -115,7 +115,7 @@ const ALL_LANES = [...PRODUCT_LANES, 'operations', 'cross-product'];
 const JS_WORKSPACE_PRODUCTS = ['mac', 'web'];
 const OPERATIONS_ONLY_PACKAGE_SCRIPTS = new Set(['invariants:check']);
 const OPERATIONS_ONLY_INVARIANT_ADDITION =
-  /^python3 scripts\/hermes\/tests\/[a-z0-9-]+\.test\.py$/;
+  /^python3 scripts\/symphony\/tests\/[a-z0-9-]+\.test\.py$/;
 const IOS_PACKAGE_SCRIPT = /^(?:ios:|ci:ios-|test:auth:ios$)/;
 const IOS_PACKAGE_COMMAND = /(?:apps\/ios\/|\bxcodebuild\b|\bfastlane ios\b)/;
 const PACKAGE_MANAGER_COMMAND = /\b(?:pnpm|npm|yarn)\s+([^;&|\n]+)/g;
