@@ -15,6 +15,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { GREEN_MARKER } from './remediation-signal.mjs';
 import { LIFECYCLE_STATES } from './validation-lifecycle.mjs';
 import {
   createProductionFacts,
@@ -639,11 +640,15 @@ export async function reconcileIssueLifecycle(ctx) {
     );
     return { action: 'skip', identifier: '', target: null, comment: '' };
   }
+  const checkGreen = (issue.commentRecords ?? []).some(comment =>
+    String(comment?.body ?? '').includes(GREEN_MARKER)
+  );
   const { holds } = lifecycleHolds({
     issue,
     pullRequests: ctx.openPulls.pulls,
     mergingNumber: ctx.eventPull?.number,
     scanComplete: ctx.openPulls.complete,
+    checkGreen,
   });
   /** @param {string} query @param {Record<string, unknown>} variables */
   const linear = (query, variables) =>
@@ -814,13 +819,14 @@ export async function syncLinearIssueOnMerge(options = {}) {
       log(`Lifecycle evaluation failed for ${lookupId}: ${message}`);
     }
   }
-  if (!openPulls.complete && results.length > 0 && !sweep) {
-    throw new Error(
-      'Left the issue in place because the open pull request scan failed'
+  const reasons = [...failures];
+  if (!openPulls.complete) {
+    reasons.unshift(
+      'the open pull request scan failed, so issues were left in place'
     );
   }
-  if (failures.length > 0) {
-    throw new Error(`Lifecycle evaluation failed: ${failures.join('; ')}`);
+  if (reasons.length > 0) {
+    throw new Error(`Lifecycle evaluation failed: ${reasons.join('; ')}`);
   }
   const first = results[0];
   return {
