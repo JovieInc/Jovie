@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AudioWaveformEditor } from '@/components/features/release/AudioWaveformEditor';
 import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
 
 const blobUploadMock = vi.fn();
@@ -33,6 +34,25 @@ describe('ReleaseAudioAssetPanel', () => {
       peaks: [0.2, 0.8, 0.5],
       durationMs: 120_000,
     });
+  });
+
+  it('retries a failed waveform directly without replacing its attachment', async () => {
+    const { AudioPreviewError } = await import(
+      '@/lib/audio/decode-waveform-peaks'
+    );
+    decodeWaveformPeaksMock.mockRejectedValueOnce(
+      new AudioPreviewError('network')
+    );
+    const audioUrl = 'https://cdn.example.com/preview.mp3';
+    render(<AudioWaveformEditor audioUrl={audioUrl} />);
+
+    fireEvent.click(await screen.findByTestId('audio-preview-retry'));
+    await screen.findByTestId('audio-waveform-editor');
+
+    expect(decodeWaveformPeaksMock).toHaveBeenCalledTimes(2);
+    expect(decodeWaveformPeaksMock).toHaveBeenNthCalledWith(1, audioUrl);
+    expect(decodeWaveformPeaksMock).toHaveBeenNthCalledWith(2, audioUrl);
+    expect(screen.queryByTestId('audio-preview-unavailable')).toBeNull();
   });
 
   it('renders an upload dropzone when audio is missing', () => {

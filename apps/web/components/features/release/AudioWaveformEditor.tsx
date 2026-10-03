@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/features/release/ReleaseAudioAssetPanel.test.tsx
+
 import { Loader2, Pause, Play, RotateCcw } from 'lucide-react';
 import {
   type PointerEvent as ReactPointerEvent,
