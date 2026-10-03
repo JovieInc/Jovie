@@ -28,8 +28,17 @@ describe('production controller risk lane (JOV-5939 follow-up)', () => {
     expect(step).toContain('select(.path == ".github/workflows/ci.yml")');
     expect(step).toContain('ci-risk-classification-');
     expect(step).toContain(
-      'SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}'
+      'SOURCE_SHA: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}'
     );
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../../../.github/scripts/staging-release-source.mjs'
+      ),
+      'utf8'
+    );
+    expect(source).toContain("exactRun(ci, repository, CI_PATH, 'push')");
+    expect(source).toContain('ci.head_sha === completion.sha');
   });
 
   it('still fails closed to unknown when no exact classification exists', () => {

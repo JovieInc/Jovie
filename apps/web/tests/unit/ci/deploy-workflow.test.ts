@@ -5275,7 +5275,14 @@ describe('production promotion exact-artifact contract', () => {
     expect(health).toContain('polling-exception:');
     expect(health).toContain('safety net only');
     expect(controller).toContain(
-      'run-name: Production Controller ${{ github.event.workflow_run.head_sha }} from CI'
+      'run-name: Production Controller ${{ github.event.workflow_run.display_title }}'
+    );
+    const staging = readFileSync(
+      resolve(repoRoot, '.github/workflows/staging-controller.yml'),
+      'utf8'
+    );
+    expect(staging).toContain(
+      'run-name: ${{ github.event.workflow_run.head_sha }} from CI ${{ github.event.workflow_run.id }} attempt ${{ github.event.workflow_run.run_attempt }}'
     );
     expect(controller).toContain('actions/workflows/production-controller.yml');
     expect(health).toContain('actions/workflows/production-controller.yml');

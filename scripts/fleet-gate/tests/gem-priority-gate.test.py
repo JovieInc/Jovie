@@ -4325,9 +4325,17 @@ class WorkflowContractTests(unittest.TestCase):
         content = (self.WORKFLOWS / "production-controller.yml").read_text(encoding="utf-8")
         self.assertIn("./.github/actions/evaluate-fleet-gate", content)
         self.assertIn("consumer: deployment", content)
+        # Staging completion binds this to the source CI push run's head_sha,
+        # the same commit the controller used to read from workflow_run.
         self.assertIn(
-            "expected-sha: ${{ github.event.workflow_run.head_sha }}", content
+            "expected-sha: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}",
+            content,
         )
+        source = (ROOT / ".github/scripts/staging-release-source.mjs").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("exactRun(ci, repository, CI_PATH, 'push')", source)
+        self.assertIn("ci.head_sha === completion.sha", source)
         self.assertIn("dry-run: 'false'", content)
         self.assertNotIn("python3 scripts/fleet-gate/gem-priority-gate.py", content)
         wrapper = (ROOT / "scripts/fleet-gate/evaluate-fleet-gate.sh").read_text(encoding="utf-8")
