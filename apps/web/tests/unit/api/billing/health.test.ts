@@ -197,14 +197,7 @@ describe('GET /api/billing/health', () => {
     expect(data.healthy).toBe(true);
     expect(data.checks.recentReconciliation.status).toBe('warning');
     expect(data.metrics.lastReconciliationAt).toBe(lastReconciliationAt);
-    expect(mockCaptureWarning).toHaveBeenCalledWith(
-      'Billing sync stale',
-      undefined,
-      expect.objectContaining({
-        remediation: 'billing-sync-stale',
-        fingerprint: 'billing-sync-stale',
-      })
-    );
+    expect(mockCaptureWarning).not.toHaveBeenCalled();
   });
 
   it('does not file Sentry for warning-level checks (JOV-5242)', async () => {

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { lstatSync, readFileSync } from 'node:fs';
+
 import {
   closeLinearIssueByFingerprint,
   logRemediationDryRun,
@@ -9,10 +11,41 @@ import {
 
 export const BILLING_HEALTH_PUBLIC_KEY = 'billing-health-public';
 
-export function planBillingHealthPublic(status) {
+/** @param {string | undefined} path */
+export function readBillingHealthResponse(path) {
+  if (!path) return undefined;
+  try {
+    const stat = lstatSync(path);
+    if (!stat.isFile() || stat.size > 32768) return undefined;
+    return /** @type {unknown} */ (JSON.parse(readFileSync(path, 'utf8')));
+  } catch {
+    return undefined;
+  }
+}
+
+/** @param {number} status @param {unknown} [response] */
+export function planBillingHealthPublic(status, response) {
   const code = Number(status);
-  if (code === 200) return { action: 'upsert', key: BILLING_HEALTH_PUBLIC_KEY };
+  const body =
+    response && typeof response === 'object' && !Array.isArray(response)
+      ? /** @type {Record<string, unknown>} */ (response)
+      : undefined;
+  // A successful public liveness response is intentional. Only actual detailed
+  // billing state proves exposure; unavailable/malformed evidence cannot close it.
+  if (body && ('checks' in body || 'metrics' in body)) {
+    return { action: 'upsert', key: BILLING_HEALTH_PUBLIC_KEY };
+  }
   if (code === 401 || code === 403) {
+    return { action: 'resolve', key: BILLING_HEALTH_PUBLIC_KEY };
+  }
+  if (
+    code === 200 &&
+    body &&
+    Object.keys(body).length === 2 &&
+    typeof body.healthy === 'boolean' &&
+    typeof body.timestamp === 'string' &&
+    Number.isFinite(Date.parse(body.timestamp))
+  ) {
     return { action: 'resolve', key: BILLING_HEALTH_PUBLIC_KEY };
   }
   return { action: 'skip', key: BILLING_HEALTH_PUBLIC_KEY, status: code };
@@ -38,7 +71,7 @@ export async function applyBillingHealthPublicPlan(
     return closeLinearIssueByFingerprint({
       fingerprint: plan.key,
       labelKey: plan.key,
-      comment: 'Anonymous billing health now requires auth.',
+      comment: 'Anonymous billing health exposes no detailed billing state.',
       runId,
       fetchImpl,
     });
@@ -46,9 +79,9 @@ export async function applyBillingHealthPublicPlan(
   return upsertLinearIssueByTitleFingerprint({
     fingerprint: plan.key,
     labelKey: plan.key,
-    title: `P0: billing health is anonymously reachable (${plan.key})`,
+    title: `P0: billing health exposes anonymous detail (${plan.key})`,
     description:
-      'GET https://jov.ie/api/billing/health returned 200 without credentials. The endpoint must answer 401 or 403 to anonymous callers.',
+      'GET https://jov.ie/api/billing/health exposed checks or metrics without credentials. Anonymous callers may receive only process liveness; detailed billing state requires authorization.',
     priority: 1,
     reopenTerminal: true,
     fetchImpl,
@@ -57,7 +90,10 @@ export async function applyBillingHealthPublicPlan(
 
 async function main() {
   const status = Number.parseInt(process.env.BILLING_HEALTH_STATUS || '', 10);
-  const plan = planBillingHealthPublic(status);
+  const plan = planBillingHealthPublic(
+    status,
+    readBillingHealthResponse(process.env.BILLING_HEALTH_RESPONSE_FILE)
+  );
   const result = await applyBillingHealthPublicPlan(plan, {
     runId: process.env.GITHUB_RUN_ID,
   });

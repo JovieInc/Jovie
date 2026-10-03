@@ -266,14 +266,6 @@ export async function GET(request: Request) {
         checks: result.checks,
         metrics: result.metrics,
       });
-    } else if (recentReconciliation.status === 'warning') {
-      await captureWarning('Billing sync stale', undefined, {
-        service: 'billing',
-        route: BILLING_HEALTH_ROUTE,
-        remediation: 'billing-sync-stale',
-        fingerprint: 'billing-sync-stale',
-        lastReconciliationAt: result.metrics.lastReconciliationAt,
-      });
     }
 
     const statusCode = hasCritical ? 503 : 200;

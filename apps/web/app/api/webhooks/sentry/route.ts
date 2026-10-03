@@ -198,13 +198,18 @@ export async function POST(request: NextRequest) {
       culprit,
       frames,
     });
-    dedupeKeyForClear = dedupeKey;
+    const sentryAction = boundedString(payload.action, 32);
+    // Resolution retries dedupe independently from new/regressed incidents so
+    // a close event cannot suppress remediation for the same root cause.
+    const dispatchDedupeKey =
+      sentryAction === 'resolved' ? `${dedupeKey}:resolved` : dedupeKey;
+    dedupeKeyForClear = dispatchDedupeKey;
 
     // Dedupe equivalent reports by a bounded, non-PII root signature. The
     // issue ID is still forwarded for direct Sentry linkage.
     const dedupeResult = await acquireRecentDispatch(
       'sentry',
-      dedupeKey,
+      dispatchDedupeKey,
       DEDUPE_TTL_SECONDS
     );
     dedupeAcquired = dedupeResult.acquired;
@@ -331,7 +336,6 @@ export async function POST(request: NextRequest) {
           .join('\n')
       : '';
 
-    const sentryAction = boundedString(payload.action, 32);
     const shortId = boundedString(issue.shortId, 64);
     const remediation = await syncSentryRemediationIssue({
       action: sentryAction,

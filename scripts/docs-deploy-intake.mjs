@@ -23,6 +23,33 @@ export function docsShaOnMain(compareStatus) {
   return compareStatus === 'ahead' || compareStatus === 'identical';
 }
 
+/** @param {unknown} deployment @param {unknown} status */
+export function docsDeploymentUrl(deployment, status) {
+  const details = /** @type {{ payload?: { web_url?: unknown } } | null} */ (
+    deployment
+  );
+  const latest = /** @type {{ environment_url?: unknown } | null} */ (status);
+  for (const candidate of [
+    latest?.environment_url,
+    details?.payload?.web_url,
+  ]) {
+    if (typeof candidate !== 'string') continue;
+    try {
+      const url = new URL(candidate);
+      if (
+        url.protocol === 'https:' &&
+        !url.username &&
+        !url.password &&
+        url.hostname !== 'api.github.com'
+      )
+        return url.href;
+    } catch {
+      // Missing or malformed provider links are not operator-facing URLs.
+    }
+  }
+  return undefined;
+}
+
 /**
  * @param {{ action: string, key: string }} plan
  * @param {{ runId?: string, deploymentUrl?: string, fetchImpl?: typeof fetch }} [options]
@@ -52,7 +79,7 @@ export async function applyDocsDeployPlan(
     fingerprint: plan.key,
     labelKey: plan.key,
     title: `P1: jovie-docs production deploy failed (${plan.key})`,
-    description: `The latest Production – jovie-docs deployment whose SHA is on main failed.\n\n${deploymentUrl ?? ''}`,
+    description: `The latest Production – jovie-docs deployment whose SHA is on main failed.\n\n${deploymentUrl ?? 'Deployment URL unavailable in provider metadata.'}`,
     priority: 2,
     reopenTerminal: true,
     fetchImpl,
@@ -104,7 +131,10 @@ async function main() {
   const plan = planDocsDeploy({ status, onMain });
   const result = await applyDocsDeployPlan(plan, {
     runId: process.env.GITHUB_RUN_ID,
-    deploymentUrl: deployment.payload?.web_url || deployment.url,
+    deploymentUrl: docsDeploymentUrl(
+      deployment,
+      Array.isArray(statusRows) ? statusRows[0] : null
+    ),
   });
   if (!result.ok)
     throw new Error(`docs deploy intake failed: ${result.reason}`);
