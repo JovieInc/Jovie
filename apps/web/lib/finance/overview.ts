@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { setupDbSession } from '@/lib/auth/session';
 import { buildMoneyOverview, type MoneyOverview } from '@/lib/finance/metrics';
 import { requireFinancialOwnerId } from '@/lib/finance/owner';
 import {
@@ -17,6 +18,7 @@ import {
  */
 export async function getMoneyOverview(): Promise<MoneyOverview> {
   const ownerUserId = await requireFinancialOwnerId();
+  await setupDbSession(ownerUserId);
   const [institutions, accounts, transactions] = await Promise.all([
     listFinanceInstitutions(ownerUserId),
     listFinanceAccounts(ownerUserId),
