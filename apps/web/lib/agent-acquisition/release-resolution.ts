@@ -352,9 +352,12 @@ function factsFromMetadata(
 
 function inHouseQuery(input: PrepareReleaseLaunchInput): InHouseQuery | null {
   if (input.release_url) {
-    const album = /\/(?:album|albums)(?:\/|$)/i.test(
-      new URL(input.release_url).pathname
-    );
+    const parsed = new URL(input.release_url);
+    const appleTrackOnAlbumPage =
+      parsed.hostname === 'music.apple.com' && parsed.searchParams.has('i');
+    const album =
+      !appleTrackOnAlbumPage &&
+      /\/(?:album|albums)(?:\/|$)/i.test(parsed.pathname);
     return album
       ? { kind: 'album', url: input.release_url }
       : { kind: 'track', url: input.release_url };

@@ -148,13 +148,20 @@ describe('createDefaultInHouseSources', () => {
     const sources = createDefaultInHouseSources();
 
     await expect(
-      sources.trackByUrl('https://music.apple.com/us/album/example/123')
+      sources.trackByUrl(
+        'https://music.apple.com/us/album/example/123?i=456&app=music'
+      )
     ).resolves.toEqual(
       expect.objectContaining({
         provider: 'apple_music',
         title: 'Apple Song',
         isrc: 'USAPPLE12345',
       })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'https://itunes.apple.com/lookup?id=456&entity=song&country=us',
+      expect.any(Object)
     );
     await expect(
       sources.trackByUrl('https://www.deezer.com/track/789')
@@ -301,12 +308,19 @@ describe('createDefaultInHouseSources', () => {
     const sources = createDefaultInHouseSources();
 
     await expect(
-      sources.albumByUrl('https://music.apple.com/us/album/example/123')
+      sources.albumByUrl(
+        'https://music.apple.com/us/album/example/123?i=456&app=music'
+      )
     ).resolves.toEqual(
       expect.objectContaining({
         provider: 'apple_music',
         provenance: 'input_url',
       })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'https://itunes.apple.com/lookup?id=123&entity=album',
+      expect.any(Object)
     );
     await expect(sources.searchAlbums('Artist', 'Album')).resolves.toEqual([
       expect.objectContaining({

@@ -219,7 +219,10 @@ export function createDefaultInHouseSources(): InHouseSources {
       const href = httpsUrl(url);
       if (!provider || !href) return null;
       if (provider === 'apple_music') {
-        const id = href.match(/\/(\d+)\/?$/)?.[1];
+        const parsed = new URL(href);
+        const id =
+          parsed.searchParams.get('i') ??
+          parsed.pathname.match(/\/(\d+)\/?$/)?.[1];
         if (!id) return null;
         const [row] = await appleLookup(
           `id=${encodeURIComponent(id)}&entity=song&country=us`
@@ -387,7 +390,7 @@ export function createDefaultInHouseSources(): InHouseSources {
       const provider = href ? providerForListenUrl(href) : null;
       if (!href || !provider) return null;
       if (provider === 'apple_music') {
-        const id = href.match(/\/(\d+)\/?$/)?.[1];
+        const id = new URL(href).pathname.match(/\/(\d+)\/?$/)?.[1];
         if (!id) return null;
         const [row] = await appleLookup(
           `id=${encodeURIComponent(id)}&entity=album`

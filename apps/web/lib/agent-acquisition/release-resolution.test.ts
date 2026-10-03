@@ -489,4 +489,42 @@ describe('agent release resolution', () => {
     expect(request).not.toHaveBeenCalled();
     expect(resolveInHouse).toHaveBeenCalledTimes(1);
   });
+
+  it('treats an Apple Music album URL with a song id as a track', async () => {
+    process.env.FEATURE_IN_HOUSE_RESOLVER = 'true';
+    resolveInHouse.mockResolvedValue({
+      status: 'resolved',
+      kind: 'track',
+      title: 'Signal Fire',
+      artist: 'The Artist',
+      isrc: 'USABC1234567',
+      upc: null,
+      mbid: null,
+      confidence: 0.95,
+      provenance: { apple_music: 'input_url' },
+      candidateCount: 1,
+      candidates: [],
+      links: [
+        {
+          provider: 'apple_music',
+          url: 'https://music.apple.com/us/album/signal-fire/1234?i=5678',
+          provenance: 'input_url',
+          confidence: 0.95,
+        },
+      ],
+    });
+
+    await resolveAgentRelease(
+      prepareReleaseLaunchSchema.parse({
+        ...draft,
+        release_url: 'https://music.apple.com/us/album/signal-fire/1234?i=5678',
+      })
+    );
+
+    expect(resolveInHouse).toHaveBeenCalledWith({
+      kind: 'track',
+      url: 'https://music.apple.com/us/album/signal-fire/1234?i=5678',
+    });
+    expect(request).not.toHaveBeenCalled();
+  });
 });
