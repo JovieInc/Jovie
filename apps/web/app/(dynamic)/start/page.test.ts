@@ -7,6 +7,20 @@ const mocks = vi.hoisted(() => ({
   }),
   getWaitlistAccess: vi.fn(),
   isWaitlistGateEnabled: vi.fn(),
+  getSession: vi.fn(),
+  resolveSyntheticPassage: vi.fn(),
+}));
+
+vi.mock('next/headers', () => ({
+  headers: async () => new Headers(),
+}));
+
+vi.mock('@/lib/auth/better-auth', () => ({
+  auth: { api: { getSession: mocks.getSession } },
+}));
+
+vi.mock('@/lib/synthetic/passage.server', () => ({
+  resolveSyntheticPassage: mocks.resolveSyntheticPassage,
 }));
 
 // OnboardingShell is a UI component we don't need to render in this test.
@@ -117,5 +131,60 @@ describe('StartPage', () => {
     await expect(
       StartPage({ searchParams: Promise.resolve({}) })
     ).rejects.toThrow('redirect:/waitlist');
+  });
+
+  describe('synthetic principal test sitekey (JOV-7697)', () => {
+    it('keeps anonymous visitors on the production widget without a session read', async () => {
+      mocks.getSession.mockClear();
+      const result = await StartPage({ searchParams: Promise.resolve({}) });
+
+      expect(result.props.turnstileTestMode).toBe(false);
+      expect(mocks.getSession).not.toHaveBeenCalled();
+    });
+
+    it('keeps a signed-in account without passage on the production widget', async () => {
+      mocks.resolveUserState.mockResolvedValueOnce({
+        state: 'NEEDS_ONBOARDING',
+        context: { email: 'artist@band.com' },
+      });
+      mocks.getSession.mockResolvedValueOnce({ user: { id: 'u1' } });
+      mocks.resolveSyntheticPassage.mockResolvedValueOnce(null);
+
+      const result = await StartPage({ searchParams: Promise.resolve({}) });
+
+      expect(result.props.turnstileTestMode).toBe(false);
+    });
+
+    it('mounts the test sitekey for a server-approved synthetic principal', async () => {
+      mocks.resolveUserState.mockResolvedValueOnce({
+        state: 'NEEDS_ONBOARDING',
+        context: { email: 'signup+synthetic-grokbot@canary.example' },
+      });
+      const session = { user: { id: 'u2' } };
+      mocks.getSession.mockResolvedValueOnce(session);
+      mocks.resolveSyntheticPassage.mockResolvedValueOnce({
+        actorId: 'grokbot',
+      });
+
+      const result = await StartPage({ searchParams: Promise.resolve({}) });
+
+      expect(mocks.resolveSyntheticPassage).toHaveBeenCalledWith(
+        session,
+        'onboarding_chat'
+      );
+      expect(result.props.turnstileTestMode).toBe(true);
+    });
+
+    it('falls back to the production widget when the passage check throws', async () => {
+      mocks.resolveUserState.mockResolvedValueOnce({
+        state: 'NEEDS_ONBOARDING',
+        context: { email: 'signup+synthetic-grokbot@canary.example' },
+      });
+      mocks.getSession.mockRejectedValueOnce(new Error('db down'));
+
+      const result = await StartPage({ searchParams: Promise.resolve({}) });
+
+      expect(result.props.turnstileTestMode).toBe(false);
+    });
   });
 });
