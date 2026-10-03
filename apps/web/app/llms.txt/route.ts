@@ -53,15 +53,15 @@ ${COMPANY_IDENTITY.definition}
 - A claimable public profile at jov.ie/username for work, links, and identity
 - Audience capture is included with the free public-profile offer
 
-### Artist Workflows
+### Music workflows
 - Release smart links and pre-saves are generally available
-- Fan notifications, advanced analytics, and release planning require enrolled access
+- Audience notifications, advanced analytics, and release planning require enrolled access
 - AI-assistant capabilities are in limited testing with enrolled access
 
 ## Key Page Types
 
 - [Public profiles](${BASE_URL}/{username})
-- [Artist release smart links](${BASE_URL}/{username}/{slug})
+- [Release smart links](${BASE_URL}/{username}/{slug})
 - [Homepage](${BASE_URL})
 - [About](${BASE_URL}/about)
 - [Pricing](${BASE_URL}/pricing)

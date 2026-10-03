@@ -50,8 +50,14 @@ struct MobileAuthProviderError: Equatable {
 final class MobileAuthPendingStore {
   static let shared = MobileAuthPendingStore()
 
+  struct Snapshot: Equatable, Sendable {
+    fileprivate let generation: UUID
+    fileprivate let verifier: String?
+  }
+
   private let defaults: UserDefaults
   private let codeVerifierKey = "ie.jov.Jovie.auth.pendingCodeVerifier"
+  private var generation = UUID()
 
   init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
@@ -64,7 +70,28 @@ final class MobileAuthPendingStore {
       return
     }
 
+    generation = UUID()
     defaults.set(trimmedVerifier, forKey: codeVerifierKey)
+  }
+
+  func snapshot() -> Snapshot {
+    let value = defaults.string(forKey: codeVerifierKey)?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    return Snapshot(generation: generation, verifier: value?.isEmpty == false ? value : nil)
+  }
+
+  func isCurrent(_ snapshot: Snapshot) -> Bool { self.snapshot() == snapshot }
+
+  func consumeCodeVerifier(matching snapshot: Snapshot) -> String? {
+    guard isCurrent(snapshot), snapshot.verifier != nil else { return nil }
+    return consumeCodeVerifier()
+  }
+
+  @discardableResult
+  func clear(matching snapshot: Snapshot) -> Bool {
+    guard isCurrent(snapshot) else { return false }
+    clear()
+    return true
   }
 
   func consumeCodeVerifier() -> String? {
@@ -90,6 +117,7 @@ final class MobileAuthPendingStore {
   }
 
   func clear() {
+    generation = UUID()
     defaults.removeObject(forKey: codeVerifierKey)
   }
 }
@@ -221,6 +249,14 @@ enum MobileAuthReturnParser {
       state: components.state,
       codeVerifier: verifier
     )
+  }
+
+  @MainActor
+  static func parse(_ url: URL, pendingStore: MobileAuthPendingStore,
+                    matching snapshot: MobileAuthPendingStore.Snapshot) -> MobileAuthReturn? {
+    guard let components = parseCallbackComponents(url),
+          let verifier = pendingStore.consumeCodeVerifier(matching: snapshot) else { return nil }
+    return MobileAuthReturn(code: components.code, state: components.state, codeVerifier: verifier)
   }
 
   private static func parseCallbackComponents(_ url: URL) -> (code: String, state: String)? {

@@ -12,11 +12,12 @@ const mockDbInsert = vi.hoisted(() => vi.fn());
 const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockDbUpdate = vi.hoisted(() => vi.fn());
 const mockLoggerWarn = vi.hoisted(() => vi.fn());
+const mockEnv = vi.hoisted(() => ({
+  STRIPE_WEBHOOK_SECRET_TIPS: 'whsec_tips' as string | undefined,
+}));
 
 vi.mock('@/lib/env-server', () => ({
-  env: {
-    STRIPE_WEBHOOK_SECRET_TIPS: 'whsec_tips',
-  },
+  env: mockEnv,
 }));
 
 vi.mock('@/lib/db', () => {
@@ -82,7 +83,25 @@ describe('POST /api/webhooks/stripe-tips', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mockEnv.STRIPE_WEBHOOK_SECRET_TIPS = 'whsec_tips';
     mockCaptureCriticalError.mockResolvedValue(undefined);
+  });
+
+  it('acknowledges a missing tip webhook secret without a 500', async () => {
+    mockEnv.STRIPE_WEBHOOK_SECRET_TIPS = undefined;
+    const { logger } = await import('@/lib/utils/logger');
+    const { POST } = await import('@/app/api/webhooks/stripe-tips/route');
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      received: false,
+      reason: 'not_configured',
+    });
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('STRIPE_WEBHOOK_SECRET_TIPS')
+    );
+    expect(mockDbInsert).not.toHaveBeenCalled();
   });
 
   it('returns 400 when the Stripe signature header is missing', async () => {

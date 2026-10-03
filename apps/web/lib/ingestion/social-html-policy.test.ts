@@ -105,6 +105,42 @@ describe('core social HTML policy', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('blocks redirected social HTML without contacting the target or retrying', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { location: 'https://mobile.twitter.com/artist' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(
+      fetchDocument('https://example.com/profile', { maxRetries: 2 })
+    ).rejects.toMatchObject({
+      code: 'SOCIAL_HTML_DISABLED',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('https://example.com/profile');
+    expect(fetchMock.mock.calls[0][1].redirect).toBe('manual');
+  });
+
+  it('preserves approved redirects and reports their final URL', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(null, { status: 302, headers: { location: '/artist' } })
+      )
+      .mockResolvedValueOnce(
+        new Response('<html>Artist</html>', {
+          headers: { 'content-type': 'text/html' },
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await fetchDocument('https://example.com/profile');
+    expect(result.finalUrl).toBe('https://example.com/artist');
+    expect(result.html).toBe('<html>Artist</html>');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('fails when core source fetches social HTML', () => {
     expect(
       socialHtmlFetchViolations("await fetch('https://instagram.com/artist')")

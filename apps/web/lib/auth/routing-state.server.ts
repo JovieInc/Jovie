@@ -344,6 +344,10 @@ export async function createStoredNativeExchangeCode(input: {
   return record;
 }
 
+type StoredNativeExchangeValidationResult = NativeExchangeValidationResult & {
+  readonly exchangePhase?: 'preconsume';
+};
+
 export async function consumeStoredNativeExchangeCode(input: {
   readonly client: NativeAuthClient;
   readonly code: string;
@@ -351,7 +355,7 @@ export async function consumeStoredNativeExchangeCode(input: {
   readonly codeVerifier?: string | null;
   readonly now?: number;
   readonly createCodeChallenge: (verifier: string) => string;
-}): Promise<NativeExchangeValidationResult> {
+}): Promise<StoredNativeExchangeValidationResult> {
   const now = input.now ?? Date.now();
   const identifier = buildNativeExchangeKey(input.code);
   const stored = await readVerificationRecord(identifier);
@@ -370,7 +374,9 @@ export async function consumeStoredNativeExchangeCode(input: {
   // consume the real user's one-time exchange. Once validation succeeds, the
   // database adapter atomically claims the row; concurrent attempts cannot
   // both succeed.
-  if (!preliminary.ok) return preliminary;
+  if (!preliminary.ok) {
+    return { ...preliminary, exchangePhase: 'preconsume' };
+  }
 
   const consumed = await consumeVerificationRecord(identifier);
   const record = parseStoredNativeExchange(consumed);

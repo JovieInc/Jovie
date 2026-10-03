@@ -455,6 +455,21 @@ export const RATE_LIMITERS = {
     requireRedis: true,
   } satisfies RateLimitConfig,
 
+  /**
+   * Anonymous creator extraction (GET /api/agents/creator-lookup): 60 per hour
+   * per IP. Each request performs one bounded fetch to a supported platform.
+   */
+  agentCreatorLookup: {
+    name: 'Agent Creator Lookup',
+    limit: 60,
+    window: '1 h',
+    prefix: 'public:agent-creator-lookup',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
   /** Public click: 50 requests per minute per IP */
   publicClick: {
     name: 'Public Click',

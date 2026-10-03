@@ -760,10 +760,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
   color: rgb(255 255 255 / 0.58);
 }
 
+/* No border: the phone preview is the surface; a bordered stage around it
+   is nested decorative carding (ui.md). */
 .homepage-spotlight-stage {
   min-height: clamp(33rem, 55vw, 45rem);
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.055);
   border-radius: 1.25rem;
   background:
     radial-gradient(

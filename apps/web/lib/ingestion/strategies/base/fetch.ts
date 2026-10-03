@@ -103,12 +103,11 @@ async function handleRedirect(
   response: Response,
   currentUrl: string,
   redirects: number,
-  allowedHosts: Set<string>
+  allowedHosts?: Set<string>
 ): Promise<string | null> {
-  const finalHost = new URL(response.url).hostname.toLowerCase();
-  if (!allowedHosts.has(finalHost)) {
-    throw new ExtractionError('Invalid host', 'INVALID_HOST');
-  }
+  const responseUrl = response.url || currentUrl;
+  rejectCoreSocialHtmlFetch(responseUrl);
+  normalizeAndValidateUrl(responseUrl, allowedHosts);
 
   const isRedirect =
     response.status >= 300 &&
@@ -163,21 +162,21 @@ async function fetchWithRedirects(
         Connection: 'keep-alive',
         ...options.headers,
       },
-      redirect: options.allowedHosts ? 'manual' : 'follow',
+      // Inspect every hop before contacting it, including generic reads that
+      // have no platform allowlist. Automatic following bypasses the policy.
+      redirect: 'manual',
     });
 
-    if (options.allowedHosts) {
-      const nextUrl = await handleRedirect(
-        response,
-        currentUrl,
-        redirects,
-        options.allowedHosts
-      );
-      if (nextUrl) {
-        currentUrl = nextUrl;
-        redirects += 1;
-        continue;
-      }
+    const nextUrl = await handleRedirect(
+      response,
+      currentUrl,
+      redirects,
+      options.allowedHosts
+    );
+    if (nextUrl) {
+      currentUrl = nextUrl;
+      redirects += 1;
+      continue;
     }
 
     validateResponseStatus(response);

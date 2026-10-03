@@ -187,8 +187,34 @@ class AdmissionTest(unittest.TestCase):
     def setUp(self):
         self.lane = load_lane()
 
-    def test_pick_skips_an_incomplete_brief_and_still_picks_the_next_issue(self):
+    def test_pick_routes_an_incomplete_brief_to_one_brief_lane_run(self):
         blocked = self.lane.Issue("id-JOV-1", "JOV-1", "Homepage hero", "no brief yet",
+                                  1, "2026-09-01T00:00:00Z", ["ws:ui-ia"])
+        nxt = self.lane.Issue("id-JOV-2", "JOV-2", "Tab indicator collapses JOV-2", "body",
+                              2, "2026-09-02T00:00:00Z", [])
+        calls = []
+
+        class Linear:
+            def gql(self, query, variables):
+                calls.append(("gql", query, variables))
+
+            def comment(self, issue_id, body):
+                calls.append(("comment", issue_id, body))
+
+        picked = design_gate.pick_build_issue(
+            [blocked, nxt], {}, pick=self.lane.pick_issue, linear=Linear(), provider="devin")
+        self.assertEqual(picked.identifier, "JOV-1")
+        self.assertTrue(design_gate.wants_brief(picked))
+        self.assertEqual(calls[0][2]["label"], design_gate.NEEDS_BRIEF_LABEL_ID)
+        self.assertNotIn("no separate design lane", calls[1][2])
+        # Remote-only lanes never take the brief run; they skip to buildable work.
+        picked = design_gate.pick_build_issue(
+            [blocked, nxt], {}, pick=self.lane.pick_issue, provider="hyperagent")
+        self.assertEqual(picked.identifier, "JOV-2")
+
+    def test_pick_skips_an_incomplete_brief_after_the_brief_lane_ran(self):
+        blocked = self.lane.Issue("id-JOV-1", "JOV-1", "Homepage hero",
+                                  "no brief yet\n" + design_gate.BRIEF_MARKER,
                                   1, "2026-09-01T00:00:00Z", ["ws:ui-ia"])
         nxt = self.lane.Issue("id-JOV-2", "JOV-2", "Tab indicator collapses JOV-2", "body",
                               2, "2026-09-02T00:00:00Z", [])
@@ -210,9 +236,11 @@ class AdmissionTest(unittest.TestCase):
         self.assertIn("needs-design-brief", calls[1][2])
 
     def test_label_is_applied_once_and_only_to_the_issue_that_would_have_been_picked(self):
-        first = self.lane.Issue("id-JOV-1", "JOV-1", "Homepage hero", "no brief",
+        first = self.lane.Issue("id-JOV-1", "JOV-1", "Homepage hero",
+                                "no brief\n" + design_gate.BRIEF_MARKER,
                                 1, "2026-09-01T00:00:00Z", ["ws:ui-ia", "needs-design-brief"])
-        second = self.lane.Issue("id-JOV-3", "JOV-3", "Landing page copy", "also empty",
+        second = self.lane.Issue("id-JOV-3", "JOV-3", "Landing page copy",
+                                 "Design brief: docs/design/briefs/missing.md",
                                  2, "2026-09-02T00:00:00Z", ["ws:design-gate"])
         later = self.lane.Issue("id-JOV-4", "JOV-4", "Tab indicator collapses JOV-4", "body",
                                 3, "2026-09-03T00:00:00Z", [])
@@ -231,6 +259,90 @@ class AdmissionTest(unittest.TestCase):
         # The head issue already carries the label, so this pass does not write
         # again, and it does not label the later incomplete issue in bulk.
         self.assertEqual(calls, [])
+
+
+class BriefLaneTest(unittest.TestCase):
+    class Linear:
+        def __init__(self, description="Homepage hero"):
+            self.description, self.calls, self.comments = description, [], []
+
+        def gql(self, query, variables):
+            self.calls.append(variables)
+            if query.startswith("query"):
+                return {"issue": {"description": self.description}}
+            if "d" in variables:
+                self.description = variables["d"]
+            return {"issueUpdate": {"success": True}}
+
+        def comment(self, issue_id, body):
+            self.comments.append(body)
+
+    def test_complete_brief_is_appended_once_and_admits_the_issue(self):
+        linear = self.Linear()
+        gated = issue(labels=["ws:ui-ia", "needs-design-brief"], description="Homepage hero")
+        result = design_gate.publish_brief(linear, gated, complete_brief())
+        self.assertEqual(result["verdict"], "brief-complete")
+        self.assertIn(design_gate.BRIEF_MARKER, linear.description)
+        self.assertEqual(linear.calls[-1]["label"], design_gate.NEEDS_BRIEF_LABEL_ID)
+        gated.description = linear.description
+        self.assertTrue(design_gate.build_admission(gated)["admit"])
+        self.assertFalse(design_gate.wants_brief(gated))
+        again = design_gate.publish_brief(linear, gated, complete_brief())
+        self.assertEqual(again["reasons"], ["brief-already-published"])
+        self.assertEqual(linear.description.count(design_gate.BRIEF_MARKER), 1)
+
+    def test_partial_brief_is_kept_and_reports_missing_steps_without_a_rerun(self):
+        linear = self.Linear()
+        gated = issue(labels=["ws:ui-ia"], description="Homepage hero")
+        result = design_gate.publish_brief(linear, gated, complete_brief(pen=""))
+        self.assertEqual((result["verdict"], result["missing"]), ("brief-incomplete", [9]))
+        self.assertIn("Steps 9 still need a design pass", linear.comments[0])
+        self.assertFalse(any("removedLabelIds" in str(call) for call in linear.calls))
+        gated.description = linear.description
+        decision = design_gate.build_admission(gated)
+        self.assertFalse(decision["admit"])
+        self.assertFalse(design_gate.brief_due(gated, decision))
+
+    def test_empty_output_fails_without_touching_the_issue(self):
+        linear = self.Linear()
+        result = design_gate.publish_brief(linear, issue(labels=["ws:ui-ia"]), "I could not do it.")
+        self.assertEqual(result, {"verdict": "failed", "reasons": ["brief-empty"]})
+        self.assertEqual(linear.calls, [])
+
+    def test_prompt_is_brief_only_and_forbids_invented_artifacts(self):
+        prompt = design_gate.render_brief_prompt(issue(title="Homepage hero"), "ctx")
+        self.assertIn(design_gate.BRIEF_FILE, prompt)
+        self.assertIn("Do not build, commit, push or open a PR", prompt)
+        self.assertIn("leave the `Pen:` and `ImageGen:` lines empty", prompt)
+
+    def test_runner_routes_a_brief_run_without_a_pr(self):
+        lane = load_lane()
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+
+            def fake_sh(args, cwd=None, timeout=600, env=None, log=None):
+                if args[:3] == ["git", "worktree", "add"]:
+                    Path(args[-2]).mkdir(parents=True)
+                return SimpleNamespace(returncode=0, stdout="0", stderr="")
+
+            def fake_agent(cmd, cwd, log, timeout, **kwargs):
+                (cwd / design_gate.BRIEF_FILE).write_text(complete_brief())
+                return SimpleNamespace(returncode=0)
+
+            linear = self.Linear()
+            gated = lane.Issue("id-JOV-9", "JOV-9", "Homepage hero", "Homepage hero",
+                               1, "2026-09-01T00:00:00Z", ["ws:ui-ia"])
+            with mock.patch.object(lane, "sh", fake_sh), \
+                    mock.patch.object(lane, "run_agent", fake_agent), \
+                    mock.patch.object(lane, "context_pack", lambda issue: "ctx"), \
+                    mock.patch.object(lane.disk_guard, "free_pct", return_value=50.0):
+                receipt = lane.run_brief(host, "devin", {"cmd": ["true"]}, linear, gated)
+            self.assertEqual((receipt["verdict"], receipt["kind"]), ("brief-complete", "design-brief"))
+            self.assertIsNone(receipt["result"]["pr"])
+            prompt = next((host.state / "runs").glob("*-brief-*.prompt.md")).read_text()
+            self.assertIn("Do not build", prompt)
+            ledger = (host.state / "runs/ledger.jsonl").read_text()
+            self.assertIn('"design-brief"', ledger)
 
 
 class DoctorCensusTest(unittest.TestCase):

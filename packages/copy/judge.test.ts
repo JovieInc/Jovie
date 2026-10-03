@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   type CopyBrief,
   excludeGeneratorFamily,
@@ -164,5 +164,207 @@ describe('tiered judge panel', () => {
     );
     expect(blocked.status).toBe('blocked');
     expect(seen[1]?.[0]).toMatch(/artificial-engagement/);
+  });
+});
+
+describe('gateway request policy', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const request = {
+    model: 'zai/glm-5.3',
+    system: 'judge',
+    prompt: 'copy',
+  };
+  const allowed = (model: string) => model === request.model;
+  const reply = () =>
+    new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }));
+
+  it('awaits authorization before sending its token cap and single provider', async () => {
+    const fetch = vi.fn(async () => reply());
+    vi.stubGlobal('fetch', fetch);
+    let release!: (value: { maxTokens: number; provider: string }) => void;
+    const authorize = vi.fn(
+      () =>
+        new Promise<{ maxTokens: number; provider: string }>(resolve => {
+          release = resolve;
+        })
+    );
+    const send = gatewayTransport('key', 'https://gateway.example/v1', {
+      allowed,
+      authorize,
+    });
+    expect(send.available?.(request.model)).toBe(true);
+    expect(authorize).not.toHaveBeenCalled();
+    const pending = send(request);
+    expect(authorize).toHaveBeenCalledWith(request);
+    expect(fetch).not.toHaveBeenCalled();
+    release({ maxTokens: 512, provider: 'zai' });
+    await expect(pending).resolves.toBe('ok');
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [url, options] = fetch.mock.calls[0]! as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe('https://gateway.example/v1/chat/completions');
+    expect(JSON.parse(options.body as string)).toEqual({
+      model: request.model,
+      temperature: 0,
+      max_tokens: 512,
+      providerOptions: { gateway: { only: ['zai'] } },
+      messages: [
+        { role: 'system', content: request.system },
+        { role: 'user', content: request.prompt },
+      ],
+    });
+  });
+
+  it('rejects an unknown model before authorization or fetch', async () => {
+    const fetch = vi.fn();
+    const authorize = vi.fn(async () => ({ maxTokens: 512, provider: 'zai' }));
+    vi.stubGlobal('fetch', fetch);
+    const send = gatewayTransport('key', undefined, { allowed, authorize });
+    expect(send.available?.('zai/unknown')).toBe(false);
+    await expect(send({ ...request, model: 'zai/unknown' })).rejects.toThrow(
+      /not allowed/
+    );
+    expect(authorize).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('never fetches when authorization rejects', async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const authorize = vi.fn(async () => {
+      throw new Error('budget exhausted');
+    });
+    await expect(
+      gatewayTransport('key', undefined, { allowed, authorize })(request)
+    ).rejects.toThrow('budget exhausted');
+    expect(authorize).toHaveBeenCalledTimes(1);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    0,
+    -1,
+    1.5,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    Number.MAX_SAFE_INTEGER + 1,
+  ])('rejects invalid token cap %s before fetch', async maxTokens => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const send = gatewayTransport('key', undefined, {
+      allowed,
+      authorize: async () => ({ maxTokens, provider: 'zai' }),
+    });
+    await expect(send(request)).rejects.toThrow(/maxTokens/);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each(['', '  ', ' zai '])(
+    'rejects invalid provider %j before fetch',
+    async provider => {
+      const fetch = vi.fn();
+      vi.stubGlobal('fetch', fetch);
+      const send = gatewayTransport('key', undefined, {
+        allowed,
+        authorize: async () => ({ maxTokens: 512, provider }),
+      });
+      await expect(send(request)).rejects.toThrow(/provider/);
+      expect(fetch).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['openai/gpt-5.5', 'anthropic/claude-opus-5.5', 'unknown/model'])(
+    'enforces the gateway family restriction on send for %s',
+    async model => {
+      const fetch = vi.fn();
+      const authorize = vi.fn(async () => ({
+        maxTokens: 512,
+        provider: 'zai',
+      }));
+      vi.stubGlobal('fetch', fetch);
+      await expect(
+        gatewayTransport('key')({ ...request, model })
+      ).rejects.toThrow(/not allowed/);
+      await expect(
+        gatewayTransport('key', undefined, { allowed: () => true, authorize })({
+          ...request,
+          model,
+        })
+      ).rejects.toThrow(/not allowed/);
+      expect(authorize).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps the unconfigured request shape for existing callers', async () => {
+    const fetch = vi.fn(async () => reply());
+    vi.stubGlobal('fetch', fetch);
+    await expect(gatewayTransport('key')(request)).resolves.toBe('ok');
+    const [, options] = fetch.mock.calls[0]! as unknown as [
+      string,
+      RequestInit,
+    ];
+    const body = JSON.parse(options.body as string);
+    expect(body).not.toHaveProperty('max_tokens');
+    expect(body).not.toHaveProperty('providerOptions');
+  });
+
+  it.each([
+    { finishReason: 'length', error: undefined, expected: /truncated/ },
+    {
+      finishReason: 'stop',
+      error: { message: 'provider failed' },
+      expected: /error payload/,
+    },
+  ])(
+    'rejects an incomplete or failed protected response without retrying or releasing its reservation',
+    async ({ finishReason, error, expected }) => {
+      const fetch = vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              // Parseable content must not conceal a truncated or errored response.
+              choices: [
+                {
+                  finish_reason: finishReason,
+                  message: { content: '{"score":0.9}' },
+                },
+              ],
+              ...(error ? { error } : {}),
+            })
+          )
+      );
+      vi.stubGlobal('fetch', fetch);
+      let reservedTokens = 0;
+      const authorize = vi.fn(async () => {
+        reservedTokens += 512;
+        return { maxTokens: 512, provider: 'zai' };
+      });
+      await expect(
+        gatewayTransport('key', undefined, { allowed, authorize })(request)
+      ).rejects.toThrow(expected);
+      expect(authorize).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(reservedTokens).toBe(512);
+    }
+  );
+
+  it.each(['http', 'network'])('does not retry a %s failure', async failure => {
+    const fetch = vi.fn(async () => {
+      if (failure === 'network') throw new Error('network unavailable');
+      return new Response('unavailable', { status: 503 });
+    });
+    vi.stubGlobal('fetch', fetch);
+    const authorize = vi.fn(async () => ({ maxTokens: 512, provider: 'zai' }));
+    await expect(
+      gatewayTransport('key', undefined, { allowed, authorize })(request)
+    ).rejects.toThrow(
+      failure === 'network' ? 'network unavailable' : 'gateway 503'
+    );
+    expect(authorize).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

@@ -20,6 +20,7 @@ import {
 } from '@/constants/routes';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
+import { detectReversibleControl } from '@/tests/utils/reversible-control-detector';
 
 const toggleTrack = vi.fn().mockResolvedValue(undefined);
 const playNext = vi.fn().mockResolvedValue(undefined);
@@ -731,7 +732,7 @@ describe('PersistentAudioBar', () => {
     });
   });
 
-  it('collapses and re-expands the dock as the player closes and reopens', async () => {
+  it('certifies repeated pointer and keyboard audio reveal cycles', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool' });
 
@@ -739,18 +740,41 @@ describe('PersistentAudioBar', () => {
 
     const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
 
-    expect(expandedSurface).toHaveAttribute('aria-hidden', 'false');
-    expect(getDock()).toHaveAttribute('data-state', 'open');
-
-    await user.click(getPlayerVisibilityToggle());
-
-    expect(expandedSurface).toHaveAttribute('aria-hidden', 'true');
-    await waitFor(() => {
-      expect(getDock()).toHaveAttribute('data-state', 'closed');
+    getPlayerVisibilityToggle().focus();
+    await detectReversibleControl({
+      name: 'persistent audio-player reveal',
+      states: ['open', 'closed'],
+      activationSequence: ['pointer', 'keyboard', 'keyboard', 'keyboard'],
+      observe: () => ({
+        state:
+          getPlayerVisibilityToggle().getAttribute('aria-expanded') === 'true'
+            ? 'open'
+            : 'closed',
+      }),
+      activate: async via => {
+        getPlayerVisibilityToggle().focus();
+        if (via === 'pointer') {
+          await user.click(getPlayerVisibilityToggle());
+        } else {
+          fireEvent.keyDown(window, { key: '`' });
+        }
+      },
+      assertContinuity: observation => {
+        const expanded = String(observation.state === 'open');
+        expect(getPlayerVisibilityToggle()).toHaveAttribute(
+          'aria-expanded',
+          expanded
+        );
+        expect(getPlayerVisibilityToggle()).toHaveAccessibleName(
+          observation.state === 'open' ? 'Hide Player' : 'Show Player'
+        );
+        expect(getPlayerVisibilityToggle()).toHaveFocus();
+        expect(expandedSurface).toHaveAttribute(
+          'aria-hidden',
+          String(observation.state === 'closed')
+        );
+      },
     });
-
-    // Keyboard reopen still works while the dock is collapsed.
-    fireEvent.keyDown(window, { key: '`' });
 
     await waitFor(() => {
       expect(getDock()).toHaveAttribute('data-state', 'open');
