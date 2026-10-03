@@ -1,8 +1,4 @@
-/**
- * Daily reconciliation is fresh inside 48 hours. Stuck webhooks are unprocessed
- * Stripe rows older than 30 minutes. Findings are Linear issues labeled
- * `remediation:<fingerprint>` (JOV-7540).
- */
+/** 48h reconciliation freshness, 30m stuck webhooks, 12h Linear refire. */
 
 export const RECONCILIATION_STALE_AFTER_MS = 48 * 60 * 60 * 1000;
 export const STUCK_WEBHOOK_AFTER_MS = 30 * 60 * 1000;

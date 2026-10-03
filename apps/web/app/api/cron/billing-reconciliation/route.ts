@@ -1,13 +1,6 @@
 /**
- * Billing Reconciliation
- *
- * Runs once a day inside `/api/cron/daily-maintenance` (midnight UTC).
- * The standalone route stays callable with the cron secret for a manual pass.
- *
- * What it does:
- * 1. Replays stored Stripe events that never reached processed_at
- * 2. Compares DB isPro status with Stripe subscription status
- * 3. Fixes mismatches and writes a reconciliation heartbeat even when nothing changed
+ * Daily billing reconciliation (also callable with the cron secret).
+ * Replays unprocessed stored events, then fixes DB/Stripe status drift.
  */
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';

@@ -81,12 +81,7 @@ describe('parseStoredEvent', () => {
         stripeEventId: 'evt_1',
         type: 'customer.subscription.updated',
         stripeCreatedAt: now,
-        payload: {
-          id: 'evt_other',
-          type: 'customer.subscription.updated',
-          created: 1,
-          data: { object: { id: 'sub_1' } },
-        },
+        payload: { id: 'evt_other', type: 'customer.subscription.updated' },
       })
     ).toBeNull();
   });
