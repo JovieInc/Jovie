@@ -314,6 +314,7 @@ function ApprovalFixture() {
       </StateSample>
       <StateSample label='Interactive Proposal'>
         <ChatLinkConfirmationCard
+          preview
           profileId='playground-profile'
           platform={{
             id: 'spotify',

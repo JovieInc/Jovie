@@ -5,6 +5,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { ToolPartsRenderer } from '@/components/jovie/tool-ui';
 import type { MessagePart } from '@/components/jovie/types';
 
+const { confirmLink } = vi.hoisted(() => ({ confirmLink: vi.fn() }));
+vi.mock('@/lib/queries', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/queries')>()),
+  useConfirmChatLinkMutation: () => ({ mutate: confirmLink }),
+}));
+
 vi.mock('@/components/jovie/components/ChatMessage', () => ({
   ChatMessage: ({
     id,
@@ -27,6 +33,18 @@ import {
 } from './ChatUiPlayground';
 
 describe('ChatUiPlayground', () => {
+  it('confirms the interactive proposal locally without a real mutation', async () => {
+    confirmLink.mockClear();
+    const user = userEvent.setup();
+    render(<ChatUiPlayground />);
+    await user.click(
+      screen.getByRole('button', { name: 'Approvals and outcomes' })
+    );
+    const proposal = within(screen.getByLabelText('Interactive Proposal'));
+    await user.click(proposal.getByRole('button', { name: 'Add' }));
+    expect(confirmLink).not.toHaveBeenCalled();
+    expect(proposal.getByText('Spotify link added')).toBeInTheDocument();
+  });
   it('uses the canonical running tool presentation without an unsupported summary', async () => {
     const user = userEvent.setup();
     render(<ChatUiPlayground />);

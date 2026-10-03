@@ -3,8 +3,9 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ChatLinkConfirmationCard } from './ChatLinkConfirmationCard';
 
+const { confirmLink } = vi.hoisted(() => ({ confirmLink: vi.fn() }));
 vi.mock('@/lib/queries', () => ({
-  useConfirmChatLinkMutation: () => ({ mutate: vi.fn() }),
+  useConfirmChatLinkMutation: () => ({ mutate: confirmLink }),
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
@@ -22,6 +23,36 @@ vi.mock('@/components/atoms/SocialIcon', () => ({
 }));
 
 describe('ChatLinkConfirmationCard', () => {
+  it('retains the real confirmation mutation outside preview fixtures', async () => {
+    confirmLink.mockClear();
+    const user = userEvent.setup();
+    render(
+      <ChatLinkConfirmationCard
+        profileId='profile-1'
+        platform={{
+          id: 'spotify',
+          name: 'Spotify',
+          icon: 'spotify',
+          color: 'brand-spotify',
+        }}
+        normalizedUrl='https://open.spotify.com/artist/example'
+        originalUrl='https://open.spotify.com/artist/example'
+      />
+    );
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    expect(confirmLink).toHaveBeenCalledWith(
+      {
+        profileId: 'profile-1',
+        platform: 'spotify',
+        url: 'https://open.spotify.com/artist/example',
+        normalizedUrl: 'https://open.spotify.com/artist/example',
+      },
+      expect.objectContaining({
+        onSuccess: expect.any(Function),
+        onError: expect.any(Function),
+      })
+    );
+  });
   it('keeps the dismissed Undo action at the canonical 28px visible / 44px hit geometry', async () => {
     const user = userEvent.setup();
     render(
