@@ -35,7 +35,7 @@ struct NativeRequestAuthorization: Equatable, Sendable {
 }
 
 /// Login ownership outlives bearer rotation, but never an explicit save or clear.
-struct NativeSessionOwnership: Equatable, Sendable {
+struct NativeSessionOwnership: Hashable, Sendable {
   fileprivate let generation: UUID
 }
 
