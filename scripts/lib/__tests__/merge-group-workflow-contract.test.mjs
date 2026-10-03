@@ -3847,6 +3847,12 @@ describe('merge-queue green enroll scan window and failure hold', () => {
 
   it('pages through every open PR instead of one oldest-first window', () => {
     expect(ENROLL).toContain('github.paginate(github.rest.pulls.list');
+    expect(ENROLL).toContain(
+      'github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit'
+    );
+    expect(ENROLL).not.toContain(
+      'github.rest.commits.listPullRequestsAssociatedWithCommit'
+    );
     expect(ENROLL).toContain("state: 'open', base: 'main', per_page: 100");
     expect(ENROLL).toContain('pullRequest(number: $number)');
     expect(ENROLL).not.toContain('pullRequests(');
