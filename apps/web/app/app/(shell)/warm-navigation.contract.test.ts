@@ -15,6 +15,7 @@ const warmNavigationLoadingBoundaries = [
   'settings/loading.tsx',
   'settings/account/loading.tsx',
   'settings/artist-profile/loading.tsx',
+  'settings/profile/loading.tsx',
   'settings/audience/loading.tsx',
   'settings/billing/loading.tsx',
   'settings/contacts/loading.tsx',

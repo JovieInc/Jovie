@@ -19,7 +19,7 @@ const { route, lifecycle, routeEscape, privacyState, routeConfig, railScope } =
     lifecycle: vi.fn(),
     routeEscape: vi.fn(),
     privacyState: vi.fn(),
-    routeConfig: { isChatRoute: false, isArtistProfileSettings: false },
+    routeConfig: { isChatRoute: false, isProfileSettings: false },
     railScope: { current: undefined as string | undefined },
   }));
 vi.mock('next/navigation', () => ({
@@ -33,7 +33,7 @@ vi.mock('@/hooks/useAuthRouteConfig', () => ({
     showMobileTabs: false,
     isTableRoute: true,
     isChatRoute: routeConfig.isChatRoute,
-    isArtistProfileSettings: routeConfig.isArtistProfileSettings,
+    isProfileSettings: routeConfig.isProfileSettings,
   }),
 }));
 vi.mock('@/hooks/useDashboardShortcuts', () => ({
@@ -222,7 +222,7 @@ function closeSearch() {
 beforeEach(() => {
   route.pathname = '/app/tasks';
   routeConfig.isChatRoute = false;
-  routeConfig.isArtistProfileSettings = false;
+  routeConfig.isProfileSettings = false;
   railScope.current = undefined;
   lifecycle.mockClear();
   routeEscape.mockClear();
@@ -376,7 +376,7 @@ describe('main-plane Search route recovery', () => {
   });
 
   it('keeps the artist-profile-settings rail scope on profile settings', () => {
-    routeConfig.isArtistProfileSettings = true;
+    routeConfig.isProfileSettings = true;
     render(
       <DashboardDataProvider value={dashboard}>
         <AuthShellWrapper mode='customer'>

@@ -27,7 +27,7 @@
     "app/app/(shell)/library/CreatorDocumentsWorkspace.tsx": 7,
     "app/app/(shell)/library/LibraryPageClient.tsx": 7,
     "app/app/(shell)/library/LibrarySurface.tsx": 121,
-    "app/app/(shell)/settings/artist-profile/ArtistProfileContent.tsx": 11,
+    "app/app/(shell)/settings/profile/ArtistProfileContent.tsx": 11,
     "app/billing/success/page.tsx": 2,
     "app/investor-portal/_components/InvestorNav.tsx": 12,
     "app/investor-portal/_components/InvestorThemeToggle.tsx": 12,

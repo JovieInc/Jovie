@@ -13,7 +13,7 @@ import {
 describe('SETTINGS_SIDEBAR_GROUPS', () => {
   it('defines the approved 4-group IA', () => {
     expect(SETTINGS_SIDEBAR_GROUPS.map(group => group.id)).toEqual([
-      'profile',
+      'identity',
       'account',
       'workspace',
       'billing',
@@ -29,7 +29,7 @@ describe('SETTINGS_SIDEBAR_GROUPS', () => {
     );
 
     expect(membership).toEqual({
-      profile: ['artist-profile', 'contacts'],
+      identity: ['profile', 'contacts'],
       account: ['account', 'data-privacy', 'delete-account'],
       workspace: ['connections'],
       billing: ['billing', 'usage'],

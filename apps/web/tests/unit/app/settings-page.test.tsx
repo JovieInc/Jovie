@@ -22,12 +22,9 @@ describe('settings page aliases', () => {
     expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.SETTINGS_ACCOUNT);
   });
 
-  it('keeps artist profile settings on the shared shell route context path', () => {
+  it('keeps profile settings on the shared shell route context path', () => {
     const source = readFileSync(
-      resolve(
-        process.cwd(),
-        'app/app/(shell)/settings/artist-profile/page.tsx'
-      ),
+      resolve(process.cwd(), 'app/app/(shell)/settings/profile/page.tsx'),
       'utf8'
     );
 

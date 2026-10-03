@@ -1448,7 +1448,7 @@ const CREATOR_SHELL_ROUTES = [
     measureMode: 'redirect',
     readySelectors: {
       content: ['section#artist-profile'],
-      redirectDestinations: [`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn`],
+      redirectDestinations: [`${APP_ROUTES.SETTINGS_PROFILE}?tab=earn`],
     },
     timings: [
       { metric: 'redirect-complete', budget: 700 },
@@ -1496,7 +1496,7 @@ const CREATOR_SHELL_ROUTES = [
       content: ['[data-testid="profiles-workspace"]', 'section#artist-profile'],
       redirectDestinations: [
         APP_ROUTES.PRESENCE,
-        `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`,
+        `${APP_ROUTES.SETTINGS_PROFILE}?tab=music`,
       ],
     },
     timings: [
@@ -1926,7 +1926,7 @@ const CREATOR_ALIAS_ROUTES = [
     measureMode: 'redirect',
     readySelectors: {
       content: ['section#artist-profile'],
-      redirectDestinations: [`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn`],
+      redirectDestinations: [`${APP_ROUTES.SETTINGS_PROFILE}?tab=earn`],
     },
     timings: [
       { metric: 'redirect-complete', budget: 100 },

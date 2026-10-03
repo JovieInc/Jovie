@@ -193,7 +193,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     keys: 'G then P',
     category: 'navigation',
     icon: UserCircle,
-    href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+    href: APP_ROUTES.SETTINGS_PROFILE,
     isSequential: true,
     firstKey: 'g',
     secondKey: 'p',
