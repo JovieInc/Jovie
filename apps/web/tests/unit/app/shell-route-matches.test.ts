@@ -6,6 +6,7 @@ import {
   isChatShellRoute,
   isInsightsShellRoute,
   isLibraryShellRoute,
+  isLinksShellRoute,
   isLyricsShellRoute,
   isOvShellRoute,
   isPresenceShellRoute,
@@ -113,6 +114,16 @@ describe('isLyricsShellRoute', () => {
 
   it('matches lyrics track subroutes', () => {
     expect(isLyricsShellRoute(`${APP_ROUTES.LYRICS}/track-abc`)).toBe(true);
+  });
+});
+
+describe('isLinksShellRoute', () => {
+  it('matches the canonical links workspace and the legacy dashboard alias', () => {
+    expect(isLinksShellRoute(APP_ROUTES.LINKS)).toBe(true);
+    expect(isLinksShellRoute(`${APP_ROUTES.LINKS}/nested`)).toBe(true);
+    expect(isLinksShellRoute(APP_ROUTES.DASHBOARD_LINKS)).toBe(true);
+    expect(isLinksShellRoute(APP_ROUTES.LIBRARY)).toBe(false);
+    expect(shouldUseEssentialShellData(APP_ROUTES.LINKS)).toBe(true);
   });
 });
 
@@ -369,6 +380,8 @@ describe('shouldRedirectToOnboarding', () => {
     expect(shouldRedirectToOnboarding('/app/dashboard/releases')).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.LYRICS)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.LIBRARY)).toBe(true);
+    expect(shouldRedirectToOnboarding(APP_ROUTES.LINKS)).toBe(true);
+    expect(shouldRedirectToOnboarding(APP_ROUTES.DASHBOARD_LINKS)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.TASKS)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.DASHBOARD_TASKS)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.INSIGHTS)).toBe(true);

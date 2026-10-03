@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { MarketingContainer } from '@/components/marketing/MarketingContainer';
 import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
+import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import type { MarketingPenContractId } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 
@@ -65,7 +66,7 @@ function MarketingTerminalCtaAction({
     <Button variant={variant} size={size} asChild className={className}>
       <Link
         href={href}
-        prefetch={prefetch}
+        prefetch={resolveMarketingAuthPrefetch(href, prefetch)}
         data-analytics-event={analyticsEvent}
         data-analytics-source={analyticsSource}
         data-testid={testId}
