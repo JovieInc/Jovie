@@ -51,6 +51,12 @@ test('workflow only fetches logs from successful Build jobs', () => {
     'utf8'
   );
   assert.match(workflow, /\.conclusion == "success"/);
+  // gh v2.97+ rejects raw logs containing ANSI escapes unless the caller opts
+  // in; build logs are captured to a file here and parsed rather than rendered.
+  assert.match(
+    workflow,
+    /gh api --allow-escape-sequences "repos\/\$GITHUB_REPOSITORY\/actions\/jobs\/\$job\/logs"/
+  );
   // Main push runs skip the Build jobs under the merge-queue model; the
   // queue run is the real "main build".
   assert.match(workflow, /--event merge_group/);

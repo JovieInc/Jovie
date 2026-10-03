@@ -387,6 +387,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/queue-deferred-release-admission.test.mjs',
   'scripts/lib/__tests__/setup-worktree-health.test.mjs',
   'scripts/lib/__tests__/linear-issue-intake.test.mjs',
+  'scripts/lib/__tests__/remediation-signal.test.mjs',
   'scripts/lib/__tests__/agent-qc-wires.test.mjs',
   'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
   'scripts/lib/__tests__/product-lane-classifier.test.mjs',
@@ -1081,6 +1082,7 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set(
     'reason_lane',
     'doctor',
     'disk_guard',
+    'worktree_sweep',
     'hyperagent_lane',
     'execution_attempt',
   ].flatMap(name => [

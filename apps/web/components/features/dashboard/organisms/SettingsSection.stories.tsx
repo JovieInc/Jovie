@@ -1,5 +1,6 @@
 import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { RenderedFamily } from '@/.storybook/rendered-family';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { SettingsSection } from './SettingsSection';
 
@@ -9,6 +10,17 @@ const meta = {
   parameters: {
     layout: 'fullscreen',
   },
+  decorators: [
+    (Story, context) => (
+      <RenderedFamily
+        name='settings-section'
+        owner='SettingsSection'
+        interactive={Boolean(context.args.headerAction)}
+      >
+        <Story />
+      </RenderedFamily>
+    ),
+  ],
   args: {
     id: 'audience',
     title: 'Audience & Tracking',

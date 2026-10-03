@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { DbOrTransaction } from '@/lib/db/client/types';
 
 const mockWhere = vi.hoisted(() => vi.fn());
 const mockFrom = vi.hoisted(() => vi.fn());
@@ -35,6 +36,32 @@ describe('finance repository owner scoping (JOV-4609)', () => {
       'Invalid financial owner id'
     );
     expect(mockSelect).not.toHaveBeenCalled();
+  });
+
+  it('runs all overview queries on the supplied session handle instead of the global pool', async () => {
+    const limit = vi.fn().mockResolvedValue([]);
+    const where = vi
+      .fn()
+      .mockReturnValue(
+        Object.assign(Promise.resolve([]), { orderBy: () => ({ limit }) })
+      );
+    const client = {
+      select: vi.fn().mockReturnValue({ from: () => ({ where }) }),
+    };
+    const tx = client as unknown as DbOrTransaction;
+    const {
+      listFinanceInstitutions,
+      listFinanceAccounts,
+      listFinanceTransactions,
+    } = await import('@/lib/finance/repository');
+    await expect(listFinanceInstitutions(OWNER_A, tx)).resolves.toEqual([]);
+    await expect(listFinanceAccounts(OWNER_A, tx)).resolves.toEqual([]);
+    await expect(
+      listFinanceTransactions(OWNER_A, { limit: 10000 }, tx)
+    ).resolves.toEqual([]);
+    expect(mockSelect).not.toHaveBeenCalled();
+    expect(client.select).toHaveBeenCalledTimes(3);
+    expect(limit).toHaveBeenCalledWith(10000);
   });
 
   it('getFinanceAccount filters by both account id and owner', async () => {

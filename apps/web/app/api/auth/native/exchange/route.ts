@@ -177,7 +177,13 @@ export async function POST(request: Request) {
       });
 
       return NextResponse.json(
-        { error: 'Invalid native auth exchange', reason: result.reason },
+        {
+          error: 'Invalid native auth exchange',
+          reason: result.reason,
+          ...(result.exchangePhase === 'preconsume'
+            ? { exchangePhase: 'preconsume' }
+            : {}),
+        },
         { status: 401, headers: NO_STORE_HEADERS }
       );
     }

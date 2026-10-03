@@ -117,6 +117,13 @@ describe('keyboard-shortcuts definitions', () => {
     it('uses the canonical calendar route for calendar navigation', () => {
       expect(NAV_SHORTCUTS.calendar.href).toBe(APP_ROUTES.CALENDAR);
     });
+
+    it('keeps the uncertified earnings chord out of global navigation', () => {
+      expect(
+        KEYBOARD_SHORTCUTS.find(shortcut => shortcut.keys === 'G then E')
+      ).toBeUndefined();
+      expect(NAV_SHORTCUTS.earnings).toBeUndefined();
+    });
   });
 
   describe('modifier shortcuts', () => {

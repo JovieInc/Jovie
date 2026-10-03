@@ -673,3 +673,16 @@ jobs:
           fi
           gh issue create --title "$title" --label incident --body \
             "Automatic recovery failed closed (${RECOVERY_REASON:-unknown}). Inspect exact controller evidence before any manual rerun or production mutation: ${RUN_URL:-https://github.com/${GH_REPO}/actions}"
+
+      - name: File controller-health remediation
+        if: always()
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: monitor
+          REMEDIATION_FINGERPRINT: production-monitor-controller-health
+          REMEDIATION_SOURCE: production-controller-health.yml
+          REMEDIATION_CONCLUSION: ${{ steps.evaluate.outputs.needs_manual == 'true' && 'failure' || 'success' }}
+          REMEDIATION_DETAIL: ${{ steps.evaluate.outputs.recovery_reason }}
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/remediation-signal-intake.mjs

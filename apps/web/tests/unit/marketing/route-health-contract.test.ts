@@ -12,6 +12,25 @@ import {
 } from '@/data/marketing';
 
 describe('marketing route health contract', () => {
+  it('keeps the retired /new alias bound to the live homepage redirect', () => {
+    const alias = MARKETING_ROUTE_MANIFEST.find(entry => entry.url === '/new');
+    expect(alias).toMatchObject({
+      status: 'deprecated',
+      noindex: true,
+      aliasOf: '/',
+      renderedSections: [],
+      bindingEvidence: { status: 'unverified' },
+    });
+    expect(getMarketingRouteHealthTarget(alias!)).toMatchObject({
+      path: '/new',
+      expected: 'redirect',
+      allowedFinalPaths: ['/'],
+    });
+    expect(
+      MARKETING_EXACT_PUBLIC_ROUTE_TARGETS.some(target => target.url === '/new')
+    ).toBe(false);
+  });
+
   it('has one concrete target per manifest entry', () => {
     expect(MARKETING_ROUTE_HEALTH_TARGETS).toHaveLength(
       MARKETING_ROUTE_MANIFEST.length
@@ -125,7 +144,16 @@ describe('marketing route health contract', () => {
     const redirects = MARKETING_ROUTE_HEALTH_TARGETS.filter(
       target => target.expected === 'redirect'
     );
-    expect(redirects).toEqual([]);
+    expect(redirects).toEqual([
+      {
+        glob: '(marketing)/new/page.tsx',
+        path: '/new',
+        expected: 'redirect',
+        allowedFinalPaths: ['/'],
+        allowsAuthShell: false,
+        requiresSharedChrome: true,
+      },
+    ]);
 
     expect(
       MARKETING_ROUTE_HEALTH_TARGETS.find(

@@ -31,12 +31,45 @@ const TRACKING_ISSUE_TITLE = 'Auto-merge stuck PRs — diagnostic tracker';
 const FAILURE_HOLD_CONTEXT = 'jovie-queue-failure-hold/v1';
 const FAILURE_DESCRIPTION =
   /^class=(deterministic-source|retryable-product|transient-infrastructure|unclassified);n=[1-9][0-9]*;run=([1-9][0-9]*);try=[1-9][0-9]*$/;
+const BASE_BRANCH_DESCRIPTION =
+  /^class=base-branch;n=[1-9][0-9]*;run=([1-9][0-9]*);try=[1-9][0-9]*;main=([0-9a-f]{40})$/;
 
-function gh(args) {
-  return execFileSync('gh', args, {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+const GH_MAX_ATTEMPTS = 4;
+const TRANSIENT_GH_ERROR =
+  /HTTP 5\d\d|connection (?:reset|refused|timed? ?out)|i\/o timeout|TLS handshake timeout|EOF|Bad Gateway/i;
+
+function isTransientGhError(err) {
+  const text = `${err?.stderr ?? ''}\n${err?.stdout ?? ''}\n${err?.message ?? ''}`;
+  return TRANSIENT_GH_ERROR.test(text);
+}
+
+function defaultSleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+// GitHub's API occasionally returns transient 5xx mid-sweep; a single retry
+// usually clears it, so scheduled triage must not die on the first blip.
+function gh(
+  args,
+  { attempts = GH_MAX_ATTEMPTS, exec = execFileSync, sleep = defaultSleep } = {}
+) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return exec('gh', args, {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (err) {
+      if (attempt === attempts || !isTransientGhError(err)) throw err;
+      const delayMs = 1000 * 2 ** (attempt - 1);
+      console.error(
+        `gh ${args.slice(0, 2).join(' ')} failed transiently ` +
+          `(attempt ${attempt}/${attempts}); retrying in ${delayMs}ms.`
+      );
+      sleep(delayMs);
+    }
+  }
+  return undefined;
 }
 
 function ghJson(args) {
@@ -154,6 +187,11 @@ function hasRevisionFailureHold(statuses, repo) {
       status.creator?.login !== 'jovie-bot[bot]'
     ) {
       return false;
+    }
+    const base = BASE_BRANCH_DESCRIPTION.exec(status.description ?? '');
+    if (base && status.target_url === `${prefix}${base[1]}`) {
+      // Only queue enrollment may reserve the bounded retry after main moves.
+      return true;
     }
     const match = FAILURE_DESCRIPTION.exec(status.description ?? '');
     return Boolean(match && status.target_url === `${prefix}${match[2]}`);
@@ -452,6 +490,8 @@ module.exports = {
   ISSUE_MARKER,
   TRACKING_ISSUE_TITLE,
   parseArgs,
+  gh,
+  isTransientGhError,
   diagnoseStuckPr,
   buildCommentBody,
   buildIssueBody,

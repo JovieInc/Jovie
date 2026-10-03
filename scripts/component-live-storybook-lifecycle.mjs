@@ -515,7 +515,9 @@ export function createStorybookVitestLease(options) {
     deadlineAt: options.deadlineAt,
     armFile: options.armFile ?? null,
     tempRoot: options.tempRoot,
-    controllers: options.controllers ?? [],
+    // Kernel/task-host ancestors can report PGID zero. They cannot be safely
+    // signaled and would make the persisted lease fail its own validator.
+    controllers: (options.controllers ?? []).filter(isValidProcessReceipt),
     browserGroups: options.browserGroups ?? [],
     watchdogPid: options.watchdogPid ?? null,
     watchdogPgid: options.watchdogPgid ?? null,

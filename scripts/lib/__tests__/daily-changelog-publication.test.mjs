@@ -6,6 +6,7 @@ import { collectCustomerCandidates } from '../daily-changelog-collector.mjs';
 import {
   checkPublicationBinding,
   evaluateCustomerNoteContract,
+  isTrustedControllerRun,
   planDailyPublication,
   readCustomerNote,
 } from '../daily-changelog-publication.mjs';
@@ -533,6 +534,67 @@ describe('publication transport', () => {
     );
     expect(workflow.jobs['production-verified'].needs).not.toContain(
       'publish-customer-changelog'
+    );
+  });
+});
+
+describe('controller run trust', () => {
+  const deployed = 'd'.repeat(40);
+  const later = 'c'.repeat(40);
+  const marker = { sha: deployed };
+  const run = head => ({
+    path: '.github/workflows/production-controller.yml',
+    head_branch: 'main',
+    event: 'workflow_run',
+    head_sha: head,
+  });
+
+  it('trusts the exact deployed head and a workflow_run head that descends from it', () => {
+    expect(isTrustedControllerRun(run(deployed), marker, null)).toBe(true);
+    // Run 37144574062 deployed ddd83d2 while its run head was c75c559.
+    expect(
+      isTrustedControllerRun(run(later), marker, {
+        status: 'ahead',
+        merge_base_commit: { sha: deployed },
+      })
+    ).toBe(true);
+  });
+
+  it('rejects unrelated heads, other workflows, branches and events', () => {
+    expect(isTrustedControllerRun(run(later), marker, null)).toBe(false);
+    for (const status of ['behind', 'diverged', 'identical']) {
+      expect(
+        isTrustedControllerRun(run(later), marker, {
+          status,
+          merge_base_commit: { sha: deployed },
+        })
+      ).toBe(false);
+    }
+    expect(
+      isTrustedControllerRun(run(later), marker, {
+        status: 'ahead',
+        merge_base_commit: { sha: 'e'.repeat(40) },
+      })
+    ).toBe(false);
+    expect(
+      isTrustedControllerRun(
+        { ...run(deployed), path: '.github/workflows/ci.yml' },
+        marker,
+        null
+      )
+    ).toBe(false);
+    expect(
+      isTrustedControllerRun(
+        { ...run(deployed), head_branch: 'x' },
+        marker,
+        null
+      )
+    ).toBe(false);
+    expect(
+      isTrustedControllerRun({ ...run(deployed), event: 'push' }, marker, null)
+    ).toBe(false);
+    expect(isTrustedControllerRun(run(deployed), { sha: 'bad' }, null)).toBe(
+      false
     );
   });
 });

@@ -11,11 +11,14 @@ enum MobileAuthFinalizationPlan: Equatable {
 
 enum MobileAuthReturnError: LocalizedError {
   case missingExchangeCredential
+  case sessionNotPersisted
 
   var errorDescription: String? {
     switch self {
     case .missingExchangeCredential:
       "The native auth exchange did not return a usable session credential."
+    case .sessionNotPersisted:
+      "The native session could not be saved. Try signing in again."
     }
   }
 }
@@ -29,6 +32,12 @@ private struct MobileAuthFinalizationStageError: LocalizedError, CustomNSError {
 
   var errorUserInfo: [String: Any] {
     [NSUnderlyingErrorKey: underlyingError as NSError]
+  }
+
+  var isPreconsumeExchangeRejection: Bool {
+    guard stage == "exchange", let error = underlyingError as? NativeAuthExchangeError else { return false }
+    if case .rejectedBeforeConsume = error { return true }
+    return false
   }
 
   var errorDescription: String? {
@@ -46,6 +55,8 @@ func runMobileAuthFinalizationStage<Value>(
 ) async throws -> Value {
   do {
     return try await operation()
+  } catch is CancellationError {
+    throw CancellationError()
   } catch {
     throw MobileAuthFinalizationStageError(
       stage: stage,
@@ -73,4 +84,100 @@ enum MobileAuthFinalizationPlanner {
     // page consumes the OTT via `completeDesktopNativeAuth`.
     return nil
   }
+}
+
+/// The app owner keeps one exchange handle, never profile/terminal work.
+/// Matching release also keeps a late A completion from losing B's handle.
+@MainActor
+final class MobileAuthFinalizationSlot {
+  private(set) var attempt: NativeAuthAttempt?
+  private(set) var task: Task<Void, Never>?
+
+  deinit { task?.cancel() }
+
+  func install(_ attempt: NativeAuthAttempt, operation: @escaping @MainActor () async -> Void) {
+    let old = task
+    self.attempt = attempt
+    task = Task { await operation() }
+    old?.cancel()
+  }
+
+  func release(_ attempt: NativeAuthAttempt) {
+    guard self.attempt == attempt else { return }
+    self.attempt = nil
+    task = nil
+  }
+
+  func cancel(_ attempt: NativeAuthAttempt, reconcile: (NativeAuthResolution) -> Void) {
+    guard self.attempt == attempt else { return }
+    if let result = NativeSessionTokenStore.cancelAuthAttempt(attempt) { reconcile(result) }
+    let old = task
+    release(attempt)
+    old?.cancel()
+  }
+}
+
+@MainActor
+func finalizeMobileAuthAttempt(
+  _ attempt: NativeAuthAttempt,
+  exchange: () async throws -> NativeAuthExchangeResponse,
+  reconcile: (NativeAuthResolution, Error?) -> Task<Void, Never>?,
+  failure: (NativeSessionCleanupClaim, Error) -> Task<Void, Never>?,
+  settled: (NativeAuthResolution) -> Void
+) async {
+  func cancel() -> Task<Void, Never>? {
+    guard let result = NativeSessionTokenStore.cancelAuthAttempt(attempt) else { return nil }
+    return reconcile(result, nil)
+  }
+  guard !Task.isCancelled else { await cancel()?.value; return }
+  guard NativeSessionTokenStore.performIfCurrent(attempt, {}) else { return }
+  do {
+    let response = try await runMobileAuthFinalizationStage("exchange", operation: exchange)
+    guard !Task.isCancelled else { await cancel()?.value; return }
+    guard let plan = MobileAuthFinalizationPlanner.plan(for: response) else {
+      throw MobileAuthReturnError.missingExchangeCredential
+    }
+    switch plan {
+    case let .completeWithNativeSession(token, userID, expiresInSeconds):
+      let session = NativeStoredSession(userID: userID, token: token,
+        expiresAt: Date().addingTimeInterval(TimeInterval(expiresInSeconds)))
+      if let result = NativeSessionTokenStore.commit(attempt, session: session) {
+        // Mandatory synchronous handoff precedes every await/cancellation check.
+        let work = reconcile(result, result.outcome == .persisted || result.origin == .cancellation
+          ? nil : MobileAuthReturnError.sessionNotPersisted)
+        await work?.value
+        settled(result)
+      } else {
+        await cancel()?.value
+      }
+    }
+  } catch {
+    if error is CancellationError || Task.isCancelled {
+      await cancel()?.value
+    } else if (error as? MobileAuthFinalizationStageError)?.isPreconsumeExchangeRejection == true {
+      // This request was rejected before consuming a server credential. Retire
+      // only its accepted intent; the previous session keeps its authority.
+      if let result = NativeSessionTokenStore.cancelAuthAttempt(attempt) {
+        let work = reconcile(result, error)
+        await work?.value
+        settled(result)
+      }
+    } else if let claim = NativeSessionTokenStore.claimCleanup(for: attempt) {
+      let work = failure(claim, error)
+      await work?.value
+    } else if let result = NativeSessionTokenStore.cancelAuthAttempt(attempt) {
+      let work = reconcile(result, Task.isCancelled ? nil : error)
+      await work?.value
+      settled(result)
+    }
+  }
+}
+
+@MainActor
+@discardableResult
+func presentUnprovenMobileAuthError(
+  route: AppRouter, hasFinalizeInFlight: Bool, _ presentation: () -> Void
+) -> Bool {
+  guard route == .signedOut, !hasFinalizeInFlight else { return false }
+  return NativeSessionTokenStore.performIfNoPendingAuth(presentation)
 }

@@ -658,3 +658,58 @@ test('actual health shell fails closed on failed or changed staging and grants o
   );
   assert.match(healthRun('queued', { ciAttempt: 1 }).output, /staging_pending/);
 });
+
+test('a completed run with more than one artifact page preserves exact receipt binding', () => {
+  const f = fixture();
+  const route = `repos/${repository}/actions/runs/${stageId}/artifacts?per_page=100`;
+  const extras = Array.from({ length: 99 }, (_, index) => ({
+    ...f.artifacts[0],
+    id: 1000 + index,
+    name: `unrelated-${index}`,
+  }));
+  f.routes[route] = {
+    total_count: 101,
+    artifacts: [...extras, f.artifacts[0]],
+  };
+  f.routes[`${route}&page=2`] = {
+    total_count: 101,
+    artifacts: [f.artifacts[1]],
+  };
+  const result = resolveStagingReleaseSource(f.input);
+  assert.equal(result.stagingArtifactId, '102');
+  assert.equal(result.ci.id, ciId);
+  assert.ok(f.reads.includes(`${route}&page=2`));
+});
+
+test('paginated run artifacts reject truncated, changing, duplicate and excessive listings', () => {
+  for (const change of [
+    page => {
+      page.artifacts = [];
+    },
+    page => {
+      page.total_count = 102;
+    },
+    page => {
+      page.artifacts[0].id = 101;
+    },
+    page => {
+      page.total_count = 1001;
+    },
+  ]) {
+    const f = fixture();
+    const route = `repos/${repository}/actions/runs/${stageId}/artifacts?per_page=100`;
+    const extras = Array.from({ length: 99 }, (_, index) => ({
+      ...f.artifacts[0],
+      id: 1000 + index,
+      name: `unrelated-${index}`,
+    }));
+    f.routes[route] = {
+      total_count: 101,
+      artifacts: [...extras, f.artifacts[0]],
+    };
+    const page = { total_count: 101, artifacts: [{ ...f.artifacts[1] }] };
+    f.routes[`${route}&page=2`] = page;
+    change(page);
+    assert.throws(() => resolveStagingReleaseSource(f.input));
+  }
+});
