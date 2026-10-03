@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { sql as drizzleSql } from 'drizzle-orm';
 import {
   check,
   index,
@@ -56,7 +56,7 @@ export const billingAuditLog = pgTable(
   table => ({
     userIdRequiredUnlessSystem: check(
       'billing_audit_log_user_id_check',
-      sql`${table.userId} IS NOT NULL OR ${table.eventType} IN ('reconciliation_run', 'billing_sync_remediation_filed')`
+      drizzleSql`${table.userId} IS NOT NULL OR ${table.eventType} IN ('reconciliation_run', 'billing_sync_remediation_filed')`
     ),
     userIdIdx: index('billing_audit_log_user_id_idx').on(table.userId),
     stripeEventIdIdx: index('billing_audit_log_stripe_event_id_idx').on(
