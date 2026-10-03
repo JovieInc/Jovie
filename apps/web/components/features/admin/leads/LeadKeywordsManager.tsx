@@ -212,7 +212,7 @@ export function LeadKeywordsManager({
     <ContentSurfaceCard className='overflow-hidden'>
       <ContentSectionHeader
         title='Discovery keywords'
-        subtitle={`Web search queries used to find new Linktree leads. ${keywords.length} keyword${keywords.length === 1 ? '' : 's'} configured.`}
+        subtitle={`Google CSE queries used to find new Linktree leads. ${keywords.length} keyword${keywords.length === 1 ? '' : 's'} configured.`}
         actions={seedButton}
         className='min-h-0 px-(--app-shell-header-padding-x) py-3'
         actionsClassName='shrink-0'
