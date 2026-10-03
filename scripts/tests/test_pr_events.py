@@ -1449,15 +1449,21 @@ class GreenPublicationProofTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host = runner.Host(state=Path(tmp))
             target = pr(draft=True, merge='CLEAN', kinds=['green'], labels=['lane-fix-green'])
-            shell = Shell()
-            lane = fake_lane(shell)
             for busy in (False, True):
+                shell = Shell()
+                lane = fake_lane(shell)
                 claim = runner.reserve_gate(host, target) if busy else None
                 try:
                     with patch.object(events,'reconcile',return_value=None), patch.object(events,'queued_prs',return_value=[target]):
                         outcome = events.tick(host,lane,lambda:None,NOW)
                     self.assertTrue(outcome[5].startswith('held:'))
-                    self.assertEqual(shell.calls, [])
+                    # The normal remediation read is allowed; every publication,
+                    # label, closure, sync and other command remains forbidden.
+                    self.assertEqual(shell.calls, [[
+                        "gh", "issue", "list", "--repo", "JovieInc/Jovie", "--state", "open",
+                        "--label", "symphony-remediation", "--limit", "30",
+                        "--json", "number,title,body,updatedAt",
+                    ]])
                     self.assertFalse((host.state/'runs/ledger.jsonl').exists())
                 finally:
                     if claim:claim.lock.release()
