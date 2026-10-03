@@ -4782,10 +4782,10 @@ extension AppStateTests {
       let tasks = owner!.workTasks
       _ = await harness.entered(accepted ? harness.exchangeGate : harness.windows[0], tasks: tasks)
       owner!.cancelCurrentAuth()
-      let recovery = state.reconciliationTask
-      #expect((recovery != nil) == accepted)
+      let recoveryTask = state.reconciliationTask
+      #expect((recoveryTask != nil) == accepted)
       let completion = await state.signOut()
-      await recovery?.value
+      await recoveryTask?.value
       #expect(completion != nil && state.route == .signedOut && NativeSessionTokenStore.load() == nil)
       harness.pending.save(codeVerifier: "later-B")
       let pending = harness.pending.snapshot()
