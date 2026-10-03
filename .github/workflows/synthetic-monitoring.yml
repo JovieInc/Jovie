@@ -27,6 +27,9 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '17 */6 * * *' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true', PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true' }
 
     steps:
@@ -249,13 +252,34 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      - name: File Linear issue on failure
+      - name: Warn when the synthetic Slack channel is unconfigured
         if: ${{ always() && (failure() || steps.test-results.outputs.test_status != 'passed') }}
         env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -z "${SLACK_WEBHOOK_URL}" ]; then
+            echo "::warning::synthetic alert channel unconfigured"
+          fi
+
+      - name: File or resolve the synthetic Linear issue
+        if: ${{ always() }}
+        env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
           FAILED_TESTS: ${{ steps.test-results.outputs.failed_tests }}
+          TEST_STATUS: ${{ steps.test-results.outputs.test_status }}
+          FLAKY_TESTS: ${{ steps.test-results.outputs.flaky_tests }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: node scripts/synthetic-monitoring-intake.mjs
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          previous="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/synthetic-monitoring.yml/runs?event=schedule&status=completed&per_page=10" \
+            --jq "[.workflow_runs[] | select(.id != ${GITHUB_RUN_ID})][0].conclusion // \"\"" || true)"
+          PREVIOUS_CONCLUSION="$previous" node scripts/synthetic-monitoring-intake.mjs
 
       - name: Send Slack Success Notification (Scheduled Summary)
         if: ${{ always() && !failure() && steps.test-results.outputs.test_status == 'passed' && github.event_name == 'schedule' }}
@@ -393,8 +417,19 @@ jobs:
         if: ${{ always() && (steps.health.outcome != 'success' || steps.health.outputs.health_status != 'passed') }}
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           WEB_AI_HEALTH_RECEIPT_PATH: ${{ runner.temp }}/web-ai-health/receipt.json
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: node scripts/web-ai-health-intake.mjs
+
+      - name: Resolve Linear issue when Web AI health is green
+        if: ${{ steps.health.outcome == 'success' && steps.health.outputs.health_status == 'passed' }}
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
+          WEB_AI_HEALTH_STATUS: passed
+          GITHUB_RUN_ID: ${{ github.run_id }}
         run: node scripts/web-ai-health-intake.mjs
 
       - name: Record green Web AI health summary

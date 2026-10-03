@@ -448,6 +448,13 @@ export async function runMusicResolverShadow(
   return receipt;
 }
 
+/** Catalog plus official DSP lookups. Does not call MusicFetch. */
+export function resolveJovieRelease(
+  input: MusicResolverInput
+): Promise<ResolverOutput> {
+  return resolveJovie(input);
+}
+
 export const runMusicResolverParityCorpus = () =>
   Promise.all(
     MUSIC_RESOLVER_PARITY_CORPUS.map(seed =>

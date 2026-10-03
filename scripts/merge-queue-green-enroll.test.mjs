@@ -40,18 +40,21 @@ const current = number => ({
   timelineItems: { nodes: [] },
 });
 
-async function fixture({
-  roster = [candidate(1)],
-  overrides = {},
-  dry = false,
-  failRead = false,
-  failMutation = false,
-  statuses = [],
-  mutationError = undefined,
-  failureReceipt = '',
-  eventName = 'workflow_dispatch',
-  payload = {},
-} = {}) {
+async function fixture(
+  /** @type {any} */ {
+    roster = [candidate(1)],
+    overrides = {},
+    dry = false,
+    failRead = false,
+    failMutation = false,
+    statuses = [],
+    mutationError = undefined,
+    failureReceipt = '',
+    eventName = 'workflow_dispatch',
+    payload = {},
+    associatedPages,
+  } = {}
+) {
   const mutations = [];
   const reads = [];
   const warnings = [];
@@ -73,8 +76,8 @@ async function fixture({
           };
         },
       },
-      commits: { listPullRequestsAssociatedWithCommit: Symbol('associated') },
       repos: {
+        listPullRequestsAssociatedWithCommit: Symbol('associated'),
         listCommitStatusesForRef: Symbol('statuses.list'),
         createCommitStatus: async receipt => statusWrites.push(receipt),
       },
@@ -83,16 +86,14 @@ async function fixture({
       if (endpoint === github.rest.repos.listCommitStatusesForRef)
         return statuses;
       inventories.push(endpoint);
-      if (
-        endpoint === github.rest.commits.listPullRequestsAssociatedWithCommit
-      ) {
+      if (endpoint === github.rest.repos.listPullRequestsAssociatedWithCommit) {
         assert.deepEqual(params, {
           owner: 'JovieInc',
           repo: 'Jovie',
           commit_sha: sha,
           per_page: 100,
         });
-        return roster;
+        return associatedPages === undefined ? roster : associatedPages;
       }
       assert.equal(endpoint, github.rest.pulls.list);
       assert.deepEqual(params, {
@@ -391,6 +392,8 @@ test('PR-target workflow receipts resolve only an exact same-repo source associa
     head: { ...candidate(7).head, ref: 'codex/source' },
   };
   const roster = [
+    null,
+    { state: 'open' },
     valid,
     { ...valid, number: 8, head: { ...valid.head, sha: 'b'.repeat(40) } },
     { ...valid, number: 9, head: { ...valid.head, ref: 'other' } },
@@ -417,6 +420,64 @@ test('PR-target workflow receipts resolve only an exact same-repo source associa
   assert.deepEqual(result.gets, [7]);
   assert.deepEqual(result.reads, [7]);
   assert.equal(result.mutations.length, 1);
+});
+
+test('commit association uses the repos route and tolerates an empty page', async () => {
+  assert.match(
+    script,
+    /github\.paginate\(github\.rest\.repos\.listPullRequestsAssociatedWithCommit/
+  );
+  assert.doesNotMatch(
+    script,
+    /github\.rest\.commits\.listPullRequestsAssociatedWithCommit/
+  );
+  const payload = {
+    workflow_run: {
+      head_sha: sha,
+      head_branch: 'codex/source',
+      pull_requests: [],
+    },
+  };
+  for (const associatedPages of [[], null, { data: [] }]) {
+    const result = await fixture({
+      associatedPages,
+      eventName: 'workflow_run',
+      payload,
+    });
+    assert.equal(result.inventories.length, 1);
+    assert.deepEqual(result.gets, []);
+    assert.deepEqual(result.reads, []);
+    assert.deepEqual(result.mutations, []);
+  }
+});
+
+test('paginated commit associations enqueue each exact open main PR once', async () => {
+  const head = {
+    sha,
+    ref: 'codex/source',
+    repo: { full_name: 'JovieInc/Jovie' },
+  };
+  const row = number => ({
+    ...candidate(number),
+    state: 'open',
+    base: { ref: 'main' },
+    head,
+  });
+  const result = await fixture({
+    associatedPages: [row(7), row(7), row(8)],
+    eventName: 'workflow_run',
+    payload: {
+      workflow_run: {
+        head_sha: sha,
+        head_branch: 'codex/source',
+        pull_requests: [],
+      },
+    },
+  });
+  assert.equal(result.inventories.length, 1);
+  assert.deepEqual(result.gets, [7, 8]);
+  assert.deepEqual(result.reads, [7, 8]);
+  assert.equal(result.mutations.length, 2);
 });
 
 test('duplicated automatic PR associations do not multiply live reads or enqueue mutations', async () => {
