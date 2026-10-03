@@ -82,6 +82,7 @@ describe('PricingRecipeBody', () => {
         comparisonChart={
           <div data-testid='comparison-slot'>Production comparison</div>
         }
+        auditOffer={<div data-testid='audit-offer-slot'>Audit offer</div>}
       />
     );
 
@@ -100,6 +101,7 @@ describe('PricingRecipeBody', () => {
     ).toBeNull();
     expect(screen.getByTestId('plans-slot')).toBeVisible();
     expect(screen.getByTestId('comparison-slot')).toBeVisible();
+    expect(screen.getByTestId('audit-offer-slot')).toBeVisible();
     expect(screen.getByText(expectedRequestAccessCopy)).toBeVisible();
     expect(
       screen.getAllByRole('link', { name: 'Claim my free profile' })[0]

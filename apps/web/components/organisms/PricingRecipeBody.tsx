@@ -21,6 +21,8 @@ interface PricingRecipeBodyProps {
   readonly plans: ReactNode;
   readonly comparisonChart: ReactNode;
   readonly structuredData?: ReactNode;
+  /** Renders nothing when the visibility-audit offer is off. */
+  readonly auditOffer?: ReactNode;
 }
 
 export function PricingRecipeBody({
@@ -28,6 +30,7 @@ export function PricingRecipeBody({
   plans,
   comparisonChart,
   structuredData,
+  auditOffer = null,
 }: Readonly<PricingRecipeBodyProps>) {
   const freeClaim = getPublicPriceClaim('free');
   const proClaim = getPublicPriceClaim('pro');
@@ -67,6 +70,7 @@ export function PricingRecipeBody({
         >
           <MarketingContainer width='page'>
             <div className='system-b-pricing-plans'>{plans}</div>
+            {auditOffer}
           </MarketingContainer>
         </section>
 

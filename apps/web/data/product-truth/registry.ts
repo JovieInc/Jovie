@@ -718,6 +718,9 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   CREATOR_FINANCE: {
     nonMarketing: 'owner-only finance release gate; no public claim (JOV-4621)',
   },
+  VISIBILITY_AUDIT_OFFER: {
+    nonMarketing: 'hidden until the flag and a Stripe Payment Link are set',
+  },
   NEW_RELEASE_PAGE: { nonMarketing: 'UI layout toggle' },
   CANVAS_GRAIN: { nonMarketing: 'UI visual treatment' },
   CYAN_FOCUS_GLOW: { nonMarketing: 'UI visual treatment' },
