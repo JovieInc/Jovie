@@ -18,11 +18,11 @@ import {
  * stays disabled without it, and declared caps are bounded.
  */
 
-const BASE_ENV = {
+const BASE_ENV: NodeJS.ProcessEnv = {
   JOVIE_RUN_REAL_MODEL_EVALS: '1',
   AI_GATEWAY_API_KEY: 'gateway-key',
   HELICONE_API_KEY: 'helicone-key',
-} as const;
+};
 
 const ELIGIBILITY = JSON.stringify({
   account: 'jovie-eval',
@@ -47,7 +47,10 @@ describe('real-model eval cost eligibility', () => {
   });
 
   it('enables only with a valid explicit eligibility token', () => {
-    const env = { ...BASE_ENV, REAL_EVAL_ELIGIBILITY: ELIGIBILITY };
+    const env: NodeJS.ProcessEnv = {
+      ...BASE_ENV,
+      REAL_EVAL_ELIGIBILITY: ELIGIBILITY,
+    };
     expect(isRealModelEvalEnabled(env)).toBe(true);
     const resolved = resolveRealEvalEligibility(env);
     expect(resolved).not.toBeNull();
@@ -69,21 +72,27 @@ describe('real-model eval cost eligibility', () => {
       JSON.stringify({ account: 'a', provider: 'p', capUsd: -1 }),
       JSON.stringify({ account: 'a', provider: 'p', capUsd: '2' }),
     ]) {
-      const env = { ...BASE_ENV, REAL_EVAL_ELIGIBILITY: malformed };
+      const env: NodeJS.ProcessEnv = {
+        ...BASE_ENV,
+        REAL_EVAL_ELIGIBILITY: malformed,
+      };
       expect(parseRealEvalEligibility(malformed), malformed).toBeNull();
       expect(isRealModelEvalEnabled(env), malformed).toBe(false);
     }
   });
 
   it('stays disabled without the opt-in flag or provider keys even when eligible', () => {
-    const eligible = { ...BASE_ENV, REAL_EVAL_ELIGIBILITY: ELIGIBILITY };
+    const eligible: NodeJS.ProcessEnv = {
+      ...BASE_ENV,
+      REAL_EVAL_ELIGIBILITY: ELIGIBILITY,
+    };
     expect(
       isRealModelEvalEnabled({ ...eligible, JOVIE_RUN_REAL_MODEL_EVALS: '0' })
     ).toBe(false);
-    const noGatewayKey = { ...eligible } as Record<string, string | undefined>;
+    const noGatewayKey: NodeJS.ProcessEnv = { ...eligible };
     delete noGatewayKey.AI_GATEWAY_API_KEY;
     expect(isRealModelEvalEnabled(noGatewayKey)).toBe(false);
-    const noHeliconeKey = { ...eligible } as Record<string, string | undefined>;
+    const noHeliconeKey: NodeJS.ProcessEnv = { ...eligible };
     delete noHeliconeKey.HELICONE_API_KEY;
     expect(isRealModelEvalEnabled(noHeliconeKey)).toBe(false);
   });
