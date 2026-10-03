@@ -350,6 +350,26 @@ describe('product lane classifier', () => {
     }
   });
 
+  it('requires every product lane for release-channel contract files', () => {
+    for (const file of [
+      'index.ts',
+      'package.json',
+      'release-channel.test.ts',
+      'tsconfig.json',
+      'vitest.config.mts',
+    ]) {
+      expect(
+        classifyProductLanes([`packages/release-channel-contracts/${file}`])
+          .selectedLanes
+      ).toEqual(ALL);
+    }
+    expect(() =>
+      classifyProductLanes([
+        'packages/release-channel-contracts-extra/index.ts',
+      ])
+    ).toThrow(ProductLaneClassificationError);
+  });
+
   it('maps isolated, shared, and operations-only paths', () => {
     for (const [path, lanes] of /** @type {Array<[string, string[]]>} */ ([
       ['apps/ios/Jovie/App.swift', ['ios']],
