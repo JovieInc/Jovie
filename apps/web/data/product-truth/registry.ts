@@ -742,6 +742,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
     nonMarketing:
       'auth offer recap; default off; no price, trial, or entitlement change',
   },
+  SOCIAL_HTML_ISOLATED_PROVIDER: {
+    nonMarketing:
+      'internal ingestion routing kill switch; reserved for future isolated provider rollout',
+  },
   INVESTOR_PORTAL_YC_DECK: {
     nonMarketing:
       'investor brief section order; default off until founder design approval',
