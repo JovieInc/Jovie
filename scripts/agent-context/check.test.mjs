@@ -19,12 +19,89 @@ import { generateVoiceDirective } from '../../.agents/skills/gstack/scripts/reso
 import { evaluate, references } from './check.mjs';
 import { grade } from './grade.mjs';
 import renderPrompt from './prompt.cjs';
+import { checkRuleScopes, collectRuleScopes } from './rule-scopes.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const cases = JSON.parse(
   readFileSync(new URL('./cases.json', import.meta.url), 'utf8')
 );
 const valid = cases.map(c => ({ id: c.id, decision: c.expected }));
+
+test('rule integrity authoring rejects malformed frontmatter and incomplete records', () => {
+  const file = '.claude/rules/auth.md';
+  const scopes = collectRuleScopes(
+    [file],
+    () => '---\npaths: ["apps/web/**"]\n---\n\nReviewed policy\n'
+  );
+  assert.deepEqual(scopes[0].paths, ['apps/web/**']);
+  assert.equal(
+    scopes[0].bodySha256,
+    createHash('sha256').update('Reviewed policy\n').digest('hex')
+  );
+  checkRuleScopes(scopes, structuredClone(scopes));
+  for (const recorded of [
+    [],
+    [...scopes, scopes[0]],
+    [{ ...scopes[0], bodySha256: 'stale' }],
+  ])
+    assert.throws(
+      () => checkRuleScopes(scopes, recorded),
+      /integrity record is stale/
+    );
+  for (const text of [
+    'missing frontmatter',
+    '---\npaths: []\n---\n\nPolicy',
+    '---\npaths: [null]\n---\n\nPolicy',
+    '---\npaths: [" "]\n---\n\nPolicy',
+    '---\npaths: {}\n---\n\nPolicy',
+    '---\npaths: broken\n---\n\nPolicy',
+  ])
+    assert.throws(() => collectRuleScopes([file], () => text));
+});
+
+test('staged integrity check cannot be masked by an unstaged policy or missing rule', t => {
+  const dir = mkdtempSync(resolve(tmpdir(), 'rule-index-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  mkdirSync(resolve(dir, '.claude/rules'), { recursive: true });
+  mkdirSync(resolve(dir, 'scripts/agent-context'), { recursive: true });
+  const file = '.claude/rules/auth.md';
+  const manifest = 'scripts/agent-context/rule-scopes.json';
+  const policy = body => `---\npaths: ["apps/web/**"]\n---\n\n${body}\n`;
+  const old = policy('Original policy');
+  writeFileSync(resolve(dir, file), old);
+  writeFileSync(
+    resolve(dir, manifest),
+    JSON.stringify(collectRuleScopes([file], () => old))
+  );
+  const git = args => {
+    const r = spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+  };
+  git(['init', '-q']);
+  writeFileSync(resolve(dir, file), policy('Reviewed change'));
+  git(['add', '.']);
+  writeFileSync(resolve(dir, file), old);
+  const script = fileURLToPath(new URL('./rule-scopes.mjs', import.meta.url));
+  const run = args =>
+    spawnSync(process.execPath, [script, ...args], {
+      cwd: dir,
+      encoding: 'utf8',
+    });
+  assert.equal(run([]).status, 0);
+  assert.equal(run(['--staged']).status, 1);
+  writeFileSync(resolve(dir, file), policy('Reviewed change'));
+  assert.equal(run(['--write']).status, 0);
+  git(['add', '.']);
+  assert.equal(run(['--staged']).status, 0);
+  writeFileSync(resolve(dir, file), policy('Unstaged change'));
+  assert.equal(run([]).status, 1);
+  assert.equal(run(['--staged']).status, 0);
+  assert.equal(run(['--staged', '--write']).status, 1);
+  assert.equal(run(['--unknown']).status, 1);
+  git(['rm', '-f', '-q', file]);
+  assert.equal(run(['--staged']).status, 1);
+});
+
 function fixture(t) {
   const dir = mkdtempSync(resolve(tmpdir(), 'context-eval-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));

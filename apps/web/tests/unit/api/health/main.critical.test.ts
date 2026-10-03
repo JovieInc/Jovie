@@ -29,6 +29,13 @@ vi.mock('@/lib/error-tracking', () => ({
 vi.mock('@/lib/env-server', () => ({
   env: mockEnv,
 }));
+vi.mock('@/lib/health/detail-access', async () => {
+  const double = await import('./detail-access-double');
+  return {
+    ...double,
+    canReadHealthDetail: async () => false,
+  };
+});
 
 describe('@critical GET /api/health', () => {
   beforeEach(() => {
@@ -124,6 +131,10 @@ describe('@critical GET /api/health', () => {
     const response = await GET(new Request('http://localhost/api/health'));
 
     expect(response.status).toBe(503);
+    const body = await response.json();
+    expect(Object.keys(body).sort()).toEqual(['healthy', 'timestamp']);
+    expect(body.healthy).toBe(false);
+    expect(body).not.toHaveProperty('database');
     expect(mockCaptureWarning).toHaveBeenCalledWith(
       'Health check degraded',
       expect.any(Error),
