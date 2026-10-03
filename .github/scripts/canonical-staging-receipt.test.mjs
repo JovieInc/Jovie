@@ -164,6 +164,32 @@ test('reuses a unique current deployment with its original successful CI attempt
     )
   );
 });
+test('an authenticated failed producer does not hide a later valid canonical receipt', () => {
+  const f = canonicalFixture();
+  const failedId = stageId + 50;
+  const artifact = {
+    ...f.artifacts[1],
+    id: 500,
+    workflow_run: { ...f.artifacts[1].workflow_run, id: failedId },
+  };
+  f.routes[f.route] = { total_count: 2, artifacts: [artifact, f.artifacts[1]] };
+  f.routes[`repos/${repository}/actions/runs/${failedId}/attempts/1`] = {
+    ...f.trigger,
+    id: failedId,
+    conclusion: 'failure',
+  };
+  const read = f.canonical.readArtifact;
+  f.canonical.readArtifact = (id, name) =>
+    id === 500
+      ? { ...f.deployment, controllerRunId: String(failedId) }
+      : read(id, name);
+  assert.equal(resolveCanonicalStagingReceipt(f.canonical), '102');
+  f.routes[f.route] = { total_count: 1, artifacts: [artifact] };
+  assert.throws(
+    () => resolveCanonicalStagingReceipt(f.canonical),
+    /missing or ambiguous/
+  );
+});
 for (const [name, mutate] of [
   [
     'foreign repository',

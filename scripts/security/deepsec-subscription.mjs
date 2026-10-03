@@ -14,6 +14,23 @@ const ALLOWED_ENV = new Set([
   'LANG',
   'CODEX_HOME',
   'TMPDIR',
+  // Preserve the managed runtime's transport and TLS trust; API keys and
+  // provider overrides remain excluded from native subscription execution.
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'ALL_PROXY',
+  'NO_PROXY',
+  'http_proxy',
+  'https_proxy',
+  'all_proxy',
+  'no_proxy',
+  'NODE_EXTRA_CA_CERTS',
+  'CODEX_PROXY_CERT',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+  'REQUESTS_CA_BUNDLE',
+  'CURL_CA_BUNDLE',
+  'CODEX_EXEC_SERVER_PROXY_PRIVATE_IPS_VIA_UPSTREAM',
 ]);
 
 export function subscriptionEnvironment(environment) {
@@ -141,13 +158,16 @@ export function subscriptionReceipt({
   const scanned = [...output.matchAll(/^Scanning (\d+) file\(s\)…$/gm)];
   const analyses = [...output.matchAll(/^  Analyses: (\d+)$/gm)];
   const counts = [...output.matchAll(/^  Findings: (\d+)$/gm)];
+  const runs = [
+    ...output.matchAll(/^Processing complete\. Run: ([A-Za-z0-9_-]{1,100})$/gm),
+  ];
   if (
     scanned.length !== 1 ||
     Number(scanned[0][1]) !== plan.files.length ||
     analyses.length !== 1 ||
     counts.length !== 1 ||
     Number(analyses[0][1]) > plan.files.length ||
-    !/^Processing complete\. Run: \S+$/m.test(output)
+    runs.length !== 1
   )
     throw new Error('complete native scan summary required');
   const count = Number(counts[0][1]);
@@ -195,6 +215,7 @@ export function subscriptionReceipt({
     schemaVersion: 1,
     route: 'native-subscription',
     scannerVersion: DEEPSEC_SUBSCRIPTION_VERSION,
+    nativeRunId: runs[0][1],
     headSha: plan.headSha,
     fingerprint: plan.fingerprint,
     filesScanned: plan.files.length,
