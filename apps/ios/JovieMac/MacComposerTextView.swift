@@ -71,7 +71,7 @@ struct MacComposerTextView: NSViewRepresentable {
 
     func observeUndo(in editor: MacComposerEditor) {
       self.editor = editor
-      for name in [UndoManager.didUndoChangeNotification, UndoManager.didRedoChangeNotification] {
+      for name in [Notification.Name.NSUndoManagerDidUndoChange, Notification.Name.NSUndoManagerDidRedoChange] {
         NotificationCenter.default.addObserver(
           self, selector: #selector(undoOrRedoDidComplete(_:)), name: name, object: editor.draftUndoManager
         )
