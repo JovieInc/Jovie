@@ -12,6 +12,7 @@ import {
   vi,
 } from 'vitest';
 import { CHAT_COMPOSER_DOCK_CLASSNAME } from '@/components/jovie/chat-layout';
+import { createComposerDraft } from '@/components/jovie/hooks/useComposerDraft';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { CHAT_TRANSCRIPT_ROW_ESTIMATE_PX } from '@/lib/chat/transcript-window';
 import { getDesktopWorkState } from '@/lib/desktop/session-work-state';
@@ -138,8 +139,8 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
       reject: vi.fn(),
       isActioning: false,
     }),
-    useJovieChat: () => ({
-      input: '',
+    useJovieChatController: () => ({
+      draft: createComposerDraft(''),
       setInput: vi.fn(),
       messages: mockChatState.messages,
       chatError: null,

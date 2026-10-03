@@ -349,7 +349,8 @@ export function evaluateBillingHealth({ status, body } = {}) {
     return {
       id: 'billing-health',
       ok: true,
-      reason: 'billing health endpoint is live and healthy',
+      reason:
+        'public billing health liveness is 200 { healthy: true } with no sync metrics required',
     };
   }
   return {
@@ -608,7 +609,7 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/chat with ${JSON.stringify(buildProdProbeChatPayload())} — must not 401 or say "Too many messages"; this probe supplies no Turnstile token, so TURNSTILE_REQUIRED leaves the post-challenge path untested`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/waitlist unauthenticated — must 401`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/onboarding/claim unauthenticated — must 401`,
-    `- GET ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/billing/health — must 200 { healthy: true }`,
+    `- GET ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/billing/health — anonymous liveness must 200 { healthy: true }. Sync counts require Authorization: Bearer $CRON_SECRET or an admin session and are not part of this probe`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/stripe/webhooks unsigned — must 400`,
     '',
     'Fix the product regression. Add or update a regression test. Do not skip because secrets are missing.',

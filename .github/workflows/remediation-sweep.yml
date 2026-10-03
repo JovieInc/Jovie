@@ -1,0 +1,79 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: A hosted schedule reads pull requests, public Summer health, and an optional read-only Vercel deployment list, then files or reopens Linear issues. It never closes, edits, or labels pull requests.
+# removal-trigger: Remove when the lanes host files these same fingerprinted remediation issues on the event that makes each condition true.
+name: Remediation Sweep
+
+# clock-class: temporal-resource
+# JOV-7552: age is the signal. Drafts, exhausted labels, idle holds, and
+# Summer receipts are stale only after a deadline. Vercel production ERROR
+# has no repository event, so the same daily read is the reconciliation.
+
+on:
+  schedule:
+    - cron: '11 8 * * *'
+    - cron: '17 8 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print the Linear issues that would be filed or reopened without writing
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: remediation-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    name: File returning remediation issues
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Resolve dry run
+        id: mode
+        if: github.event_name == 'workflow_dispatch'
+        run: echo "dry_run=${{ inputs.dry_run }}" >> "$GITHUB_OUTPUT"
+
+      - name: File returning conditions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          VERCEL_READONLY_TOKEN: ${{ secrets.VERCEL_READONLY_TOKEN }}
+          SUMMER_PIN_CHECK_VERCEL_TOKEN: ${{ secrets.SUMMER_PIN_CHECK_VERCEL_TOKEN }}
+          DRY_RUN: ${{ steps.mode.outputs.dry_run }}
+          EVENT_NAME: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          set -euo pipefail
+          flag=
+          if [ "$DRY_RUN" = "true" ]; then flag=--dry-run; fi
+          weekly=false
+          daily=false
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then weekly=true; daily=true; fi
+          if [ "$SCHEDULE" = "17 8 * * 1" ]; then weekly=true; fi
+          if [ "$SCHEDULE" = "11 8 * * *" ]; then daily=true; fi
+          run_mode() { node scripts/remediation-sweep.mjs --mode "$1" $flag; }
+          if [ "$weekly" = true ]; then run_mode drafts; fi
+          if [ "$daily" = true ]; then
+            run_mode exhausted
+            run_mode holds
+            run_mode summer
+            run_mode vercel
+          fi

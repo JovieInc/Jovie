@@ -58,6 +58,9 @@
     }
   ],
   "functions": {
+    "app/api/internal/ovie/fleet/events/**/*": {
+      "maxDuration": 100
+    },
     "app/api/**/*": {
       "maxDuration": 30
     },

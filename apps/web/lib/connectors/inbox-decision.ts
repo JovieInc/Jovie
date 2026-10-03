@@ -8,6 +8,7 @@
 
 import { createFeedbackItem } from '@/lib/feedback';
 import { logger } from '@/lib/utils/logger';
+import { getSocialReplyRankingFeatureKeys } from './social-reply-draft';
 
 export type InboxDecisionVerdict = 'approved' | 'rejected';
 
@@ -17,6 +18,7 @@ export interface InboxDecisionEvent {
   readonly verdict: InboxDecisionVerdict;
   readonly reason?: string | null;
   readonly cardKind?: string | null;
+  readonly cardPayload?: unknown;
   readonly surface?: string;
 }
 
@@ -33,6 +35,11 @@ export async function recordInboxDecision(
     ? ` reason=${event.reason.trim().slice(0, 200)}`
     : '';
   const message = `Inbox decision: ${event.verdict} action=${event.suggestedActionId}${reasonPart}`;
+  const socialInboxFeatureKeys = getSocialReplyRankingFeatureKeys({
+    id: event.suggestedActionId,
+    kind: event.cardKind ?? '',
+    payload: event.cardPayload,
+  });
 
   try {
     const item = await createFeedbackItem({
@@ -47,6 +54,9 @@ export async function recordInboxDecision(
         verdict: event.verdict,
         reason: event.reason ?? null,
         cardKind: event.cardKind ?? null,
+        ...(socialInboxFeatureKeys.length > 0
+          ? { socialInboxFeatureKeys }
+          : {}),
         surface,
         decisionKind: 'inbox_swipe',
       },
