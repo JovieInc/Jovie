@@ -25,6 +25,7 @@ import {
 import { useChatThreadContextMenu } from '@/components/shell/useChatThreadContextMenu';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { useAppFlag } from '@/lib/flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import {
@@ -40,6 +41,7 @@ import {
   canonicalSidebarNavigation,
   chatNavItem,
   inboxNavItem,
+  navigationVisibleForFlags,
   userSettingsNavigation,
 } from './config';
 import { NavMenuItem } from './NavMenuItem';
@@ -70,8 +72,21 @@ const PENDING_NAVIGATION_RECOVERY_MS = NAVIGATION_DROP_OFF_MS;
 
 export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   const { selectedProfile, inboxNavigation } = useDashboardData();
+  const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
+  const inboxHomeEnabled = useAppFlag('INBOX_HOME');
+  const sidebarNavigation = useMemo(
+    () =>
+      navigationVisibleForFlags(canonicalSidebarNavigation, {
+        PROFILES_WORKSPACE: profilesWorkspaceEnabled,
+      }),
+    [profilesWorkspaceEnabled]
+  );
   const runtimeUpdate = useRuntimeUpdate();
   const hasRuntimeUpdate = Boolean(runtimeUpdate?.available);
+  const homeAttentionLabel = inboxHomeEnabled ? 'Inbox' : 'Home';
+  const homeAttentionName = hasRuntimeUpdate
+    ? `${homeAttentionLabel} — App Update Available`
+    : homeAttentionLabel;
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -225,16 +240,23 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     trackNavigationImpressions(
       isInSettings
         ? ['settings']
-        : ['inbox', 'chat', ...canonicalSidebarNavigation.map(item => item.id)],
+        : ['inbox', 'chat', ...sidebarNavigation.map(item => item.id)],
       pathname,
       telemetryContext
     );
-  }, [isDemo, isInSettings, isMobile, pathname, telemetryContext]);
+  }, [
+    isDemo,
+    isInSettings,
+    isMobile,
+    pathname,
+    sidebarNavigation,
+    telemetryContext,
+  ]);
 
   const artistSettingsLabel = 'Artist';
 
   const navSections: readonly DashboardNavSection[] = [
-    { key: 'primary', items: [...canonicalSidebarNavigation] },
+    { key: 'primary', items: [...sidebarNavigation] },
   ];
 
   // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
@@ -452,9 +474,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                 aria-busy={
                   pendingNavigation?.itemId === inboxNavItem.id || undefined
                 }
-                aria-label={
-                  hasRuntimeUpdate ? 'Inbox — App Update Available' : 'Inbox'
-                }
+                aria-label={homeAttentionName}
                 data-inbox-attention={
                   hasRuntimeUpdate
                     ? 'available'

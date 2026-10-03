@@ -81,7 +81,7 @@ describe('updates in the central Inbox', () => {
       overrides: { inboxNavigation: { state: 'empty', pendingCount: 0 } },
     });
     expect(
-      getByRole('link', { name: 'Inbox — App Update Available' })
+      getByRole('link', { name: 'Home — App Update Available' })
     ).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
   });
 
