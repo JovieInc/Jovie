@@ -48,8 +48,22 @@ describe('SETTINGS_SIDEBAR_GROUPS', () => {
     );
 
     expect(hrefs).not.toContain(APP_ROUTES.SETTINGS_APPEARANCE);
-    expect(hrefs).not.toContain(APP_ROUTES.SETTINGS_RETARGETING_ADS);
+    // The retired route no longer has an APP_ROUTES entry on Main.
+    expect(hrefs).not.toContain('/app/settings/retargeting-ads');
     expect(hrefs).not.toContain(APP_ROUTES.SETTINGS_DELETE_ACCOUNT);
+  });
+
+  it('keeps each live row label, icon and tooltip when the rail changes', () => {
+    const rows = SETTINGS_SIDEBAR_GROUPS.flatMap(group => group.items);
+    for (const live of LIVE_SETTINGS) {
+      expect(rows.find(row => row.id === live.id)).toEqual({
+        id: live.id,
+        label: live.name,
+        href: live.href,
+        icon: live.icon,
+        ...(live.description ? { title: live.description } : {}),
+      });
+    }
   });
 
   it('points every item at a settings route', () => {

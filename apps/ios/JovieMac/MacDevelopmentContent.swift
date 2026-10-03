@@ -1,14 +1,18 @@
 import JovieKit
 
-/// Immutable development content only. Live product ownership remains in the shared client workstream.
+/// Explicit local development modes only. Live product ownership remains in the shared client workstream.
 enum MacDevelopmentContent: Equatable {
   case unavailable
   #if DEBUG
   case fixture(MobileConversationSummary, [MobileConversationMessage])
+  case localDraft
   #endif
 
   static func resolve(arguments: [String]) -> Self {
     #if DEBUG
+    if arguments.contains("--jovie-development-composer") {
+      return .localDraft
+    }
     if arguments.contains("--jovie-development-fixture") {
       return .fixture(
         MobileConversationSummary(

@@ -10,6 +10,7 @@ color `#E5484D`). `doctor.json` is what the HUD renders.
 """
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import shutil
@@ -832,6 +833,39 @@ def _issue_id(lane, host, identifier: str) -> str:
     return data["issues"]["nodes"][0]["id"]
 
 
+def apply_linear_budget(result: dict, state: Path) -> None:
+    """Copy the best-effort Linear snapshot onto the doctor report. Never raises."""
+    try:
+        budget = read_json(state / "api-budget.json", None)
+        if not isinstance(budget, dict):
+            return
+        result["linearBudget"] = {key: budget.get(key)
+                                  for key in ("remaining", "limit", "reset", "rateLimitedAt", "observedAt")}
+    except Exception:
+        return
+
+
+def locked_doctor_write(state: Path, write) -> None:
+    """Serialize doctor.json updates with the lane's budget stamp. A missing lock still writes."""
+    handle = None
+    try:
+        state.mkdir(parents=True, exist_ok=True)
+        handle = open(state / "doctor.lock", "a")
+        fcntl.flock(handle, fcntl.LOCK_EX)
+    except OSError:
+        # flock can fail after open. Dropping the handle without closing it leaks an fd
+        # on every doctor tick.
+        if handle is not None:
+            handle.close()
+        handle = None
+    try:
+        write()
+    finally:
+        if handle is not None:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+            handle.close()
+
+
 def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     path = host.state / "doctor.json"
     previous = read_json(path, {})
@@ -872,8 +906,11 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
             result["statusFeed"] = publish_status(host, lane, feed)
         except Exception as error:  # a broken feed never blocks the doctor
             result["statusFeedError"] = f"{type(error).__name__}: {error}"[:120]
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(result, indent=1, default=str))
-    os.replace(tmp, path)
+    def write_report():
+        apply_linear_budget(result, host.state)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(result, indent=1, default=str))
+        os.replace(tmp, path)
+    locked_doctor_write(host.state, write_report)
     return result

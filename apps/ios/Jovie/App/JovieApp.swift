@@ -129,6 +129,30 @@ final class PushNotificationManager: PushNotificationCoordinating {
     finishDeactivation(operation: operation, ownership: context.ownership)
   }
 
+  func deactivate(for claim: NativeSessionCleanupClaim) async {
+    let operation = UUID()
+    var accepted: NativeSessionContext?
+    var token: String?
+    NativeSessionTokenStore.performIfCurrent(claim) { context in
+      guard context.authorization == nil || ownership == nil || ownership == context.ownership else { return }
+      epoch = operation
+      shouldRegister = false
+      ownership = context.ownership
+      token = defaults.string(forKey: Self.storedTokenKey)
+      accepted = context
+    }
+    guard let accepted else { return }
+    if let authorization = accepted.authorization, let token, let apiClient {
+      try? await apiClient.unregisterPushDevice(token: token, authorization: authorization)
+    }
+    NativeSessionTokenStore.performIfCurrent(claim) { _ in
+      // The store lock is already held: do not call isCurrent here.
+      guard epoch == operation, ownership == accepted.ownership else { return }
+      system.unregister()
+      defaults.removeObject(forKey: Self.storedTokenKey)
+    }
+  }
+
   private func finishDeactivation(operation: UUID, ownership: NativeSessionOwnership) {
     guard isCurrent(operation: operation, ownership: ownership) else { return }
     system.unregister()
@@ -219,6 +243,7 @@ enum LiveLaunchConfigurationResolver {
 struct JovieApp: App {
   @UIApplicationDelegateAdaptor(JovieAppDelegate.self) private var appDelegate
   @State private var appState: AppState
+  @StateObject private var authCoordinator: MobileAuthCoordinator
   private let isLiveAuthAvailable: Bool
   private let launchAuthErrorMessage: String?
 
@@ -252,15 +277,15 @@ struct JovieApp: App {
     let pushNotifications = PushNotificationManager.shared
     pushNotifications.configure(apiClient: apiClient)
 
-    _appState = State(
-      initialValue: AppState(
+    let state = AppState(
         configuration: configuration,
         launchMode: launchMode,
         repository: repository,
         brightnessManager: ScreenBrightnessManager(),
         pushNotifications: pushNotifications
       )
-    )
+    _appState = State(initialValue: state)
+    _authCoordinator = StateObject(wrappedValue: MobileAuthCoordinator(appState: state))
   }
 
   var body: some Scene {
@@ -268,9 +293,9 @@ struct JovieApp: App {
       Group {
 #if DEBUG
         if appState.launchMode == .uiTestingAuthCallback {
-          UITestingAuthCallbackRoot(appState: appState)
+          UITestingAuthCallbackRoot(appState: appState, authCoordinator: authCoordinator)
         } else if appState.launchMode.usesLiveAuth, isLiveAuthAvailable {
-          LiveRootContainer(appState: appState)
+          LiveRootContainer(appState: appState, authCoordinator: authCoordinator)
         } else {
           RootView(
             appState: appState,
@@ -278,14 +303,13 @@ struct JovieApp: App {
             isSignInUnavailable: launchAuthErrorMessage != nil,
             authenticatedUserID: nil,
             authErrorMessage: launchAuthErrorMessage,
-            onLogout: { await appState.signOut() },
-            onAuthReturn: { _ in },
-            onAuthError: { _ in }
+            authCoordinator: authCoordinator,
+            onLogout: { authCoordinator.cancelCurrentAuth(); _ = await appState.signOut() }
           )
         }
 #else
         if appState.launchMode.usesLiveAuth, isLiveAuthAvailable {
-          LiveRootContainer(appState: appState)
+          LiveRootContainer(appState: appState, authCoordinator: authCoordinator)
         } else {
           RootView(
             appState: appState,
@@ -293,9 +317,8 @@ struct JovieApp: App {
             isSignInUnavailable: launchAuthErrorMessage != nil,
             authenticatedUserID: nil,
             authErrorMessage: launchAuthErrorMessage,
-            onLogout: { await appState.signOut() },
-            onAuthReturn: { _ in },
-            onAuthError: { _ in }
+            authCoordinator: authCoordinator,
+            onLogout: { authCoordinator.cancelCurrentAuth(); _ = await appState.signOut() }
           )
         }
 #endif
