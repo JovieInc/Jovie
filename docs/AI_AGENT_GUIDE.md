@@ -39,6 +39,20 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 
 The optional per-user Ovie privacy gate protects operator data and actions server-side. It is independent of ordinary Jovie access and existing privileged-action/passkey-management authorization. A client cookie never grants operator access. Independent signed machine/service tokens and anonymous kiosk signage retain their existing authority; a valid kiosk token used in an authenticated browser still obeys that user's privacy policy. Credential-bearing claim-token exports and kiosk-secret retrieval retain privileged MFA even when privacy is unlocked.
 
+### External operational contracts (no in-repo HTTP caller)
+
+These handlers are called by sibling deployments, machine publishers, or
+source-repository automation. Keep them in the inventory even though Jovie has
+no literal `fetch` call for their paths.
+
+| Endpoint | Method | Auth | External caller / purpose |
+|----------|--------|------|---------------------------|
+| `/api/hud/hermes-events` | GET/POST | HUD auth (GET); `HERMES_HUD_API_KEY` bearer (POST) | Hermes laptop publisher sends Agent OS events; HUD clients read the current feed |
+| `/api/ovie/certifications/metrics` | GET | Ovie principal + Summer control | Ovie/Summer certification clients read section 8 metrics through the shared Ovie route projection |
+| `/api/ovie/ingest` | POST | Ovie principal + Summer control | Ovie/Summer clients submit durable operating-store dumps through the shared Ovie route projection |
+| `/api/internal/ovie/lyb-mrr` | GET | `CRON_SECRET` + trusted origin | Ovie and Summer company tools read the LogYourBody RevenueCat MRR record |
+| `/api/internal/release-communications/merge-events` | POST | HMAC `x-jovie-signature-256` | Source-repository merge automation submits verified release events |
+
 ### Admin (requires admin role)
 
 | Endpoint | Method | Auth | Purpose |
@@ -167,7 +181,6 @@ The optional per-user Ovie privacy gate protects operator data and actions serve
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
 | `/api/dsp/bio-sync` | POST | Better Auth | Sync bio to DSPs |
-| `/api/dsp/bio-sync/status` | GET | Better Auth | Bio sync status |
 | `/api/dsp/discover` | POST | Better Auth | Discover DSP profiles |
 | `/api/dsp/enrichment/status` | GET | Better Auth | Enrichment job status |
 | `/api/dsp/matches` | GET | Better Auth | List DSP matches |
@@ -255,7 +268,6 @@ The optional per-user Ovie privacy gate protects operator data and actions serve
 |----------|--------|------|---------|
 | `/api/pre-save/apple` | POST | Public | Apple Music pre-save |
 | `/api/pre-save/spotify/callback` | GET | OAuth | Spotify pre-save callback |
-| `/api/pre-save/spotify/start` | GET | Public | Start Spotify pre-save |
 
 ### Public / Misc
 
@@ -274,9 +286,6 @@ The optional per-user Ovie privacy gate protects operator data and actions serve
 | `/api/monitoring/performance` | GET | Admin | Performance metrics |
 | `/api/profile/view` | POST | Public | Track profile view |
 | `/api/px` | POST | Public | Tracking pixel |
-| `/api/referrals/apply` | POST | Better Auth | Apply referral code |
-| `/api/referrals/code` | GET/POST | Better Auth | Get/create referral code |
-| `/api/referrals/stats` | GET | Better Auth | Referral stats |
 | `/api/report` | POST | Public | Submit abuse/security report (rate-limited) |
 | `/api/revalidate/featured-creators` | POST | Internal | Revalidate featured cache |
 | `/api/suggestions` | GET | Better Auth | Profile suggestions |
