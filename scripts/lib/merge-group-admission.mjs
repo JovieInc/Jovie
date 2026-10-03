@@ -40,7 +40,11 @@ const TERMINAL_CHECK_CONCLUSIONS = new Set([
 // ci.yml `Merge Group Admission` job timeout with room for setup/checkout.
 export const MERGE_GROUP_ADMISSION_WAIT_MS = 360_000;
 const MAX_WAIT_MS = MERGE_GROUP_ADMISSION_WAIT_MS;
-const POLL_INTERVAL_MS = 3_000;
+// Every iteration spends one GraphQL and three REST calls from the
+// repository's shared GITHUB_TOKEN quota. A 3 s cadence across ten queue
+// groups drained it within minutes on 2026-10-03 (JOV-7744).
+const POLL_INTERVAL_MS = 15_000;
+const RATE_LIMIT_PATTERN = /\b(?:secondary )?rate limit\b/i;
 const MAX_API_REQUEST_MS = 10_000;
 const LIVE_QUEUE_QUERY = `query MergeGroupAdmissionLiveQueue(
   $owner:String!,
@@ -424,6 +428,21 @@ function requireTimingBound(value, field, maximum) {
   }
 }
 
+// Quota exhaustion says nothing about the combined head, so it waits within
+// the admission budget instead of failing a valid group.
+export function isRateLimitError(error) {
+  if (!(error instanceof MergeGroupAdmissionError)) return false;
+  if (error.status === 403 || error.status === 429) {
+    return RATE_LIMIT_PATTERN.test(error.message);
+  }
+  return (
+    error.status === null &&
+    /^live merge queue GraphQL returned errors: .*rate limit/i.test(
+      error.message
+    )
+  );
+}
+
 function defaultSleep(delayMs) {
   return new Promise(resolve => setTimeout(resolve, delayMs));
 }
@@ -503,12 +522,7 @@ export async function waitForMergeGroupAdmission({
     };
   };
 
-  while (true) {
-    attempt += 1;
-    if (attempt > 1 && now() >= deadlineMs) {
-      failStillPending();
-    }
-
+  const poll = async () => {
     const liveReceipt = await readLiveReceipt();
     if (!liveReceipt.admitted) {
       return { ...evidence, admitted: false, receipt: liveReceipt };
@@ -573,9 +587,28 @@ export async function waitForMergeGroupAdmission({
       };
     }
 
-    const gateStatus = REQUIRED_CHECKS.map(
+    return REQUIRED_CHECKS.map(
       (name, index) => `${name}=${states[index].detail}`
     ).join(', ');
+  };
+
+  while (true) {
+    attempt += 1;
+    if (attempt > 1 && now() >= deadlineMs) {
+      failStillPending();
+    }
+
+    let outcome;
+    try {
+      outcome = await poll();
+    } catch (error) {
+      if (!isRateLimitError(error)) throw error;
+      outcome = `GitHub API rate-limited (${
+        error instanceof Error ? error.message : String(error)
+      })`;
+    }
+    if (typeof outcome !== 'string') return outcome;
+    const gateStatus = outcome;
     lastGateStatus = gateStatus;
     const remainingMs = deadlineMs - now();
     if (remainingMs <= 0) {

@@ -8,7 +8,9 @@ import {
   ADMISSION_CONTRACT_VERSION,
   buildLiveQueueAdmissionReceipt,
   classifyRequiredCheckPage,
+  isRateLimitError,
   MERGE_GROUP_ADMISSION_WAIT_MS,
+  MergeGroupAdmissionError,
   normalizeLiveQueueEntriesPage,
   parseQueueHeadPullRequestNumber,
   runAdmissionFromEnv,
@@ -805,6 +807,106 @@ describe('merge-group admission evidence', () => {
     ).rejects.toThrow(
       /within 6ms \(still pending: Fork PR Gate=success, PR Size Guard=in_progress\)/
     );
+  });
+
+  // Regression: 2026-10-03 runs 37151507995 / 37154869758 failed valid groups
+  // with "API rate limit already exceeded for site ID installation" (JOV-7744).
+  it('waits out a rate-limited live queue read within the budget, then admits', async () => {
+    let elapsed = 0;
+    const statuses = [];
+    const loadLiveQueueEntries = vi.fn(async () => {
+      if (elapsed < 30) {
+        throw new MergeGroupAdmissionError(
+          'live merge queue GraphQL returned errors: API rate limit already exceeded for site ID installation.'
+        );
+      }
+      return [liveEntry()];
+    });
+    const result = await waitForMergeGroupAdmission({
+      event: event(),
+      loadCheckRuns: async ({ checkName }) =>
+        checkPage(checkName, 'completed', 'success'),
+      loadLiveQueueEntries,
+      loadQueueRef: async () => queueRef(),
+      maxWaitMs: 60,
+      now: () => elapsed,
+      onStatus: message => statuses.push(message),
+      pollIntervalMs: 15,
+      sleep: async delayMs => {
+        elapsed += delayMs;
+      },
+    });
+
+    expect(result.admitted).toBe(true);
+    expect(elapsed).toBe(30);
+    expect(statuses.filter(s => /rate-limited/.test(s))).toHaveLength(2);
+  });
+
+  it('fails at the deadline when the quota never recovers', async () => {
+    let elapsed = 0;
+    await expect(
+      waitForMergeGroupAdmission({
+        event: event(),
+        loadCheckRuns: async ({ checkName }) =>
+          checkPage(checkName, 'completed', 'success'),
+        loadLiveQueueEntries: async () => [liveEntry()],
+        loadQueueRef: async () => {
+          throw new MergeGroupAdmissionError(
+            'GitHub API 403 for /repos/x/git/ref/y: API rate limit exceeded for installation',
+            { status: 403 }
+          );
+        },
+        maxWaitMs: 6,
+        now: () => elapsed,
+        onStatus: () => {},
+        pollIntervalMs: 3,
+        sleep: async delayMs => {
+          elapsed += delayMs;
+        },
+      })
+    ).rejects.toThrow(/within 6ms \(still pending: GitHub API rate-limited/);
+  });
+
+  it('treats only GitHub rate-limit signatures as retryable', () => {
+    const graphqlLimit = new MergeGroupAdmissionError(
+      'live merge queue GraphQL returned errors: API rate limit already exceeded for site ID installation.'
+    );
+    expect(isRateLimitError(graphqlLimit)).toBe(true);
+    expect(
+      isRateLimitError(
+        new MergeGroupAdmissionError(
+          'GitHub API 429 for /x: secondary rate limit',
+          {
+            status: 429,
+          }
+        )
+      )
+    ).toBe(true);
+    expect(
+      isRateLimitError(
+        new MergeGroupAdmissionError(
+          'GitHub API 403 for /x: Resource not accessible',
+          {
+            status: 403,
+          }
+        )
+      )
+    ).toBe(false);
+    expect(
+      isRateLimitError(
+        new MergeGroupAdmissionError(
+          'live merge queue GraphQL returned errors: Not found'
+        )
+      )
+    ).toBe(false);
+    expect(
+      isRateLimitError(
+        new MergeGroupAdmissionError(
+          'PR Size Guard completed with rate limit failure'
+        )
+      )
+    ).toBe(false);
+    expect(isRateLimitError(new Error('API rate limit exceeded'))).toBe(false);
   });
 
   it('defaults to a multi-minute admission budget', () => {
