@@ -422,9 +422,9 @@ NON_CHECK_BLOCKER = re.compile(
     r"(?i)dependenc|blocked\s+(?:by|on)|qualification|pricing|red[ -]?line|spend|taste")
 
 HOLD_CONTEXT_QUERY = ('{repository(owner:"%s",name:"%s"){pullRequest(number:%d){'
-                      "timelineItems(last:30,itemTypes:[LABELED_EVENT]){nodes{... on LabeledEvent{"
+                      "timelineItems(last:100,itemTypes:[LABELED_EVENT]){pageInfo{hasPreviousPage}nodes{... on LabeledEvent{"
                       "createdAt label{name} actor{login}}}}"
-                      "comments(last:30){nodes{createdAt author{login} body}}"
+                      "comments(last:100){pageInfo{hasPreviousPage}nodes{createdAt author{login} body}}"
                       "commits(last:1){nodes{commit{oid committedDate}}}}}}")
 
 
@@ -440,6 +440,17 @@ def hold_context(number: int, sh=run) -> dict | None:
         node = json.loads(result.stdout)["data"]["repository"]["pullRequest"]
     except (ValueError, KeyError, TypeError):
         return None
+    if not isinstance(node, dict):
+        return None
+    # Missing or truncated provenance cannot prove absence of founder authority.
+    # Keep the hold intact instead of suggesting an automatic lift.
+    for connection in ("timelineItems", "comments"):
+        value = node.get(connection)
+        if not isinstance(value, dict) or not isinstance(value.get("nodes"), list):
+            return None
+        page = value.get("pageInfo")
+        if not isinstance(page, dict) or page.get("hasPreviousPage") is not False:
+            return None
     events = []
     for item in (node.get("timelineItems") or {}).get("nodes") or []:
         label = str((item.get("label") or {}).get("name") or "")
@@ -468,7 +479,8 @@ def stale_hold(number: int, pr: dict, now: float, sh=run) -> dict | None:
     hold_at = event["at"]
     if now - hold_at <= STALE_HOLD_S:
         return None
-    notes = [n for n in ctx["notes"] if n["at"] is None or n["at"] >= hold_at - 3600]
+    # A later bot label does not supersede an earlier founder hold note.
+    notes = ctx["notes"]
     if event["actor"] in TIM_LOGINS or any(n["author"] in TIM_LOGINS for n in notes):
         return None  # Tim's hold or Tim's hold note: stays, silently
     blocker = any(NON_CHECK_BLOCKER.search(n["body"]) for n in notes)
@@ -974,8 +986,6 @@ def charge_reentry(lane, path: Path, pr: dict, expected: dict, name: str, now: f
 def ready_green(host, lane, pr: dict, held: dict, now: float) -> str:
     """The lane is the PR's writer (JOV-INV-022): a CLEAN lane draft whose head no diff policy
     held is marked ready together with its native merge intent. Returns what happened."""
-    if reason := maintenance_hold(host, lane, pr, now):
-        return f"held:{reason}"
     entry = held.get(str(pr["number"]), {})
     if entry.get("sha") == pr["headRefOid"]:
         code = entry.get("reason") or held_reason(entry.get("evidence") or [])[0]
@@ -990,15 +1000,13 @@ def ready_green(host, lane, pr: dict, held: dict, now: float) -> str:
     revoked = lane.publication_revocation(host, pr.get("headRefName"))
     if revoked:
         return f"revoked:{revoked.get('reason', '?')}"
-    lane.sh(["gh", "pr", "ready", str(pr["number"]), "--repo", lane.REPO_SLUG])
-    queued = lane.sh(["gh", "pr", "merge", str(pr["number"]), "--repo", lane.REPO_SLUG, "--auto"])
-    if queued.returncode != 0:
-        lane.update_json(host.state / "requeue.json",
-                         lambda requeue: requeue.update({str(pr["number"]): pr["headRefOid"]}))
+    outcome = lane.publish_verified(host, pr)
+    if outcome not in {"landing", "verified-not-queued"}:
+        return outcome
     receipt = {"schema": "jovie-lane-run/v1", "kind": "ready-green", "origin": "autonomous-lane",
                "attribution": {"category": "finalizer-only", "provider": "lane-event"},
                "pr": pr["number"], "headSha": pr["headRefOid"],
-               "prUrl": pr.get("url"), "verdict": "landing" if queued.returncode == 0 else "verified-not-queued",
+               "prUrl": pr.get("url"), "verdict": outcome,
                "endedAt": lane.now_iso()}
     ledger(host, receipt)
     return receipt["verdict"]
@@ -1363,6 +1371,13 @@ def tick(host, lane, linear_factory, now: float | None = None) -> dict:
     for pr in prs:
         if reason := maintenance_hold(host, lane, pr, now):
             outcomes[pr["number"]] = f"held:{reason}"
+            # A finished final self-push stays spent for repair, but its completed
+            # independent gate may authorize promotion through the shared consumer.
+            if "green" in pr["eventKinds"]:
+                outcome = ready_green(host, lane, pr, held, now)
+                if outcome in {"landing", "verified-not-queued"}:
+                    outcomes[pr["number"]] = outcome
+                    consume(lane, pr, ["green"])
             continue
         if "dequeued" in pr["eventKinds"] and str(pr["number"]) not in synced and pr.get("mergeStateStatus") != "DIRTY" \
                 and POISON_LABEL not in label_names(pr) \

@@ -35,6 +35,7 @@ extension MeRepository: AppStateRepository {}
 protocol PushNotificationCoordinating {
   func activate() async
   func deactivate() async
+  func deactivate(for claim: NativeSessionCleanupClaim) async
   func deactivateLocally(ifOwnedBy ownership: NativeSessionOwnership) async
 }
 
@@ -42,6 +43,7 @@ protocol PushNotificationCoordinating {
 struct NoopPushNotificationCoordinator: PushNotificationCoordinating {
   func activate() async {}
   func deactivate() async {}
+  func deactivate(for _: NativeSessionCleanupClaim) async {}
   func deactivateLocally(ifOwnedBy _: NativeSessionOwnership) async {}
 }
 
@@ -73,6 +75,7 @@ final class AppState {
   var isOffline = false
   var didInitializeAuth = false
   var activeUserID: String?
+  private(set) var activeSessionOwnership: NativeSessionOwnership?
 
   private let repository: AppStateRepository
   private let sessionRevoker: NativeSessionRevoking
@@ -215,21 +218,24 @@ final class AppState {
     }
 
     let previousUserID = activeUserID
-    activeUserID = userID
-
     guard let userID, let attempt = newAttempt else {
-      if previousUserID != nil {
-        await pushNotifications.deactivate()
+      let claim = NativeSessionTokenStore.claimCleanup()
+      NativeSessionTokenStore.performIfCurrent(claim) { _ in
+        activeUserID = nil
+        activeSessionOwnership = nil
+        profileLoadAttempt = nil
       }
-      Observability.clearUser()
-      profileLoadAttempt = nil
-      route = .signedOut
-      dashboardState = .idle
-      isOffline = false
-      MobileAuthDiagnostics.record("route_signed_out")
+      if previousUserID != nil {
+        await pushNotifications.deactivate(for: claim)
+      }
+      NativeSessionTokenStore.performIfCurrent(claim) { _ in
+        _ = resetSignedOutPresentation()
+      }
       return
     }
 
+    activeUserID = userID
+    activeSessionOwnership = attempt.context.ownership
     Observability.setUser(id: userID)
     let pushNotifications = pushNotifications
     Task {
@@ -370,29 +376,42 @@ final class AppState {
     await handleSignedInUserChange(activeUserID)
   }
 
-  func signOut() async {
-    await pushNotifications.deactivate()
-    let revocation = await sessionRevoker.revokeCurrentSession()
-    if case let .failed(statusCode) = revocation {
-      MobileAuthDiagnostics.record(
-        "native_session_revocation_failed",
-        detail: statusCode.map(String.init) ?? "transport"
-      )
+  @discardableResult
+  func signOut() async -> NativeSessionCleanupCompletion? {
+    let claim = NativeSessionTokenStore.claimCleanup(invalidatingAuthIntent: true)
+    var userID: String?
+    guard NativeSessionTokenStore.performIfCurrent(claim, { _ in
+      userID = activeUserID
+      profileLoadAttempt = nil
+    }) else { return nil }
+    await pushNotifications.deactivate(for: claim)
+    // DELETE may have rotated A. Capture POST's bearer within the same claim.
+    guard let context = NativeSessionTokenStore.captureSessionContext(for: claim) else { return nil }
+    let revocation = await sessionRevoker.revokeSession(authorizedBy: context.authorization)
+    NativeSessionTokenStore.performIfCurrent(claim) { _ in
+      if case let .failed(statusCode) = revocation {
+        MobileAuthDiagnostics.record(
+          "native_session_revocation_failed",
+          detail: statusCode.map(String.init) ?? "transport"
+        )
+      }
     }
 
-    // Always clear the device token even if the network is unavailable. A
-    // remote revocation failure must never trap someone in an authenticated UI.
-    NativeSessionTokenStore.clear()
-
-    await resetToSignedOut()
+    // Network failure still clears this operation's local session.
+    return await finishCleanup(claim, for: userID)
   }
 
   /// A terminal authenticated request has already proven the local session unusable.
   /// Return to native sign-in without attempting another remote revocation with that token.
   func handleExpiredSession() async {
-    await pushNotifications.deactivate()
-    NativeSessionTokenStore.clear()
-    await resetToSignedOut()
+    let claim = NativeSessionTokenStore.claimCleanup()
+    var userID: String?
+    guard NativeSessionTokenStore.performIfCurrent(claim, { _ in
+      userID = activeUserID
+      profileLoadAttempt = nil
+    }) else { return }
+    await pushNotifications.deactivate(for: claim)
+    _ = await finishCleanup(claim, for: userID)
   }
 
   func handleExpiredSession(_ receipt: NativeSessionExpiryReceipt) async {
@@ -404,16 +423,22 @@ final class AppState {
     await clearCaches(for: userID, ifOwnedBy: receipt.ownership)
   }
 
-  private func resetToSignedOut() async {
-    let cleanupOwnership = NativeSessionTokenStore.captureSessionContext().ownership
-    let userID = resetSignedOutPresentation()
-    await clearCaches(for: userID, ifOwnedBy: cleanupOwnership)
+  private func finishCleanup(
+    _ claim: NativeSessionCleanupClaim, for userID: String?
+  ) async -> NativeSessionCleanupCompletion? {
+    guard let completion = NativeSessionTokenStore.completeCleanup(claim) else { return nil }
+    guard NativeSessionTokenStore.performIfCurrent(completion, {
+      _ = resetSignedOutPresentation()
+    }) else { return nil }
+    await clearCaches(for: userID, ifOwnedBy: completion.ownership)
+    return NativeSessionTokenStore.performIfCurrent(completion, {}) ? completion : nil
   }
 
   private func resetSignedOutPresentation() -> String? {
     let userID = activeUserID
     Observability.clearUser()
     activeUserID = nil
+    activeSessionOwnership = nil
     profileLoadAttempt = nil
     route = .signedOut
     dashboardState = .idle

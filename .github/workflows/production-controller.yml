@@ -686,8 +686,18 @@ jobs:
               [[ "$staging_compare" =~ ^(ahead|identical)$ ]] || { echo "::error::Canonical staging SHA $staging_receipt_sha is not on the production lineage to $EXPECTED_SHA."; exit 1; }
               staging_artifact_name="staging-deployment-${staging_receipt_sha}"
               if [ "$staging_receipt_sha" = "$EXPECTED_SHA" ]; then
-                # Completion binds this artifact to the staging producer and CI attempt.
-                staging_artifact_id="$EXACT_STAGING_ARTIFACT_ID"
+                if [ -n "$EXACT_STAGING_ARTIFACT_ID" ]; then
+                  # Completion binds this artifact to the staging producer and CI attempt.
+                  staging_artifact_id="$EXACT_STAGING_ARTIFACT_ID"
+                else
+                  # A same-SHA CI rerun can select no Web lane. Authenticate the
+                  # existing canonical deployment rather than using an empty ID.
+                  canonical_staging_identity="$(curl --fail --silent --show-error --max-time 20 https://staging.jov.ie/api/health/build-info)"
+                  staging_deployment_id="$(jq -er '.deploymentId | select(type == "string" and test("^dpl_[A-Za-z0-9]+$"))' <<<"$canonical_staging_identity")"
+                  staging_artifact_id="$(CANONICAL_STAGING_IDENTITY="$canonical_staging_identity" \
+                    REPOSITORY="$REPOSITORY" EXPECTED_SHA="$EXPECTED_SHA" \
+                    node .github/scripts/canonical-staging-receipt.mjs)"
+                fi
               else
                 # Preserve cumulative-range historical Web evidence, without polling.
                 staging_artifact_id="$(gh api \

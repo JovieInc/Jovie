@@ -19,6 +19,16 @@ const run = new AsyncFunction(
   script
 );
 const sha = 'a'.repeat(40);
+test('both native queue mutation clients request repository contents write', () => {
+  for (const job of [
+    workflow.jobs['hold-failed-revision'],
+    workflow.jobs.enroll,
+  ]) {
+    const token = job.steps.find(step => step.id === 'app-token');
+    assert.equal(token.with['permission-contents'], 'write');
+    assert.equal(token.with['permission-pull-requests'], 'write');
+  }
+});
 const candidate = number => ({
   number,
   draft: false,
@@ -40,18 +50,21 @@ const current = number => ({
   timelineItems: { nodes: [] },
 });
 
-async function fixture({
-  roster = [candidate(1)],
-  overrides = {},
-  dry = false,
-  failRead = false,
-  failMutation = false,
-  statuses = [],
-  mutationError = undefined,
-  failureReceipt = '',
-  eventName = 'workflow_dispatch',
-  payload = {},
-} = {}) {
+async function fixture(
+  /** @type {any} */ {
+    roster = [candidate(1)],
+    overrides = {},
+    dry = false,
+    failRead = false,
+    failMutation = false,
+    statuses = [],
+    mutationError = undefined,
+    failureReceipt = '',
+    eventName = 'workflow_dispatch',
+    payload = {},
+    associatedPages,
+  } = {}
+) {
   const mutations = [];
   const reads = [];
   const warnings = [];
@@ -73,8 +86,8 @@ async function fixture({
           };
         },
       },
-      commits: { listPullRequestsAssociatedWithCommit: Symbol('associated') },
       repos: {
+        listPullRequestsAssociatedWithCommit: Symbol('associated'),
         listCommitStatusesForRef: Symbol('statuses.list'),
         createCommitStatus: async receipt => statusWrites.push(receipt),
       },
@@ -83,16 +96,14 @@ async function fixture({
       if (endpoint === github.rest.repos.listCommitStatusesForRef)
         return statuses;
       inventories.push(endpoint);
-      if (
-        endpoint === github.rest.commits.listPullRequestsAssociatedWithCommit
-      ) {
+      if (endpoint === github.rest.repos.listPullRequestsAssociatedWithCommit) {
         assert.deepEqual(params, {
           owner: 'JovieInc',
           repo: 'Jovie',
           commit_sha: sha,
           per_page: 100,
         });
-        return roster;
+        return associatedPages === undefined ? roster : associatedPages;
       }
       assert.equal(endpoint, github.rest.pulls.list);
       assert.deepEqual(params, {
@@ -210,7 +221,7 @@ test('failure-hold dequeue uses the Jovie Bot token without a merge-queue grant'
   );
   assert.equal(token.with['app-id'], '${{ vars.JOVIE_BOT_APP_ID }}');
   assert.equal(token.with['permission-actions'], 'read');
-  assert.equal(token.with['permission-contents'], 'read');
+  assert.equal(token.with['permission-contents'], 'write');
   assert.equal(token.with['permission-pull-requests'], 'write');
   assert.equal(token.with['permission-statuses'], 'write');
   assert.equal(token.with['permission-merge-queues'], undefined);
@@ -218,14 +229,20 @@ test('failure-hold dequeue uses the Jovie Bot token without a merge-queue grant'
   assert.equal(persist.env.GH_TOKEN, '${{ steps.app-token.outputs.token }}');
 });
 
-test('wakes both existing controllers on completed Source Validation without a polling schedule', () => {
+test('wakes on completed Source Validation and on the bounded reconciliation sweep', () => {
   assert.ok(workflow.on.workflow_run.workflows.includes('Source Validation'));
   assert.deepEqual(workflow.on.workflow_run.types, ['completed']);
   assert.deepEqual(workflow.on.pull_request_target.types, [
     'unlabeled',
     'reopened',
   ]);
-  assert.equal(workflow.on.schedule, undefined);
+  // JOV-7589: a dequeue while checks are already green emits no completion
+  // event, so a periodic full-roster sweep re-arms within the cadence.
+  const [sweep] = workflow.on.schedule;
+  const cadenceMinutes = Number(
+    /^\*\/([1-9][0-9]*) \* \* \* \*$/.exec(sweep.cron)?.[1]
+  );
+  assert.ok(cadenceMinutes > 0 && cadenceMinutes <= 15);
   assert.match(workflow.jobs.enroll.if, /conclusion == 'success'/);
   const ready = load(
     readFileSync('.github/workflows/auto-ready-agent-drafts.yml', 'utf8')
@@ -342,6 +359,25 @@ test('a PR wake reads only its current candidate instead of rescanning the whole
   }
 });
 
+test('a scheduled sweep re-enqueues a dequeued PR whose repaired head turned green', async () => {
+  // JOV-7589 regression: after a merge-queue ejection the lane pushes a newer
+  // head and the checks go green without a wake. The sweep must find and
+  // re-enroll it; a still-removed head stays blocked without a bounded retry.
+  const overrides = {
+    1: { timelineItems: { nodes: [{ createdAt: '2026-10-02T11:00:00Z' }] } },
+    2: {
+      timelineItems: { nodes: [{ createdAt: '2026-10-02T13:00:00Z' }] },
+    },
+  };
+  const result = await fixture({
+    roster: [candidate(1), candidate(2)],
+    overrides,
+    eventName: 'schedule',
+  });
+  assert.equal(result.inventories.length, 1);
+  assert.deepEqual(result.mutations, [{ id: 'PR_1', oid: sha }]);
+});
+
 test('an unattributable automatic wake cannot authorize a global queue scan', async () => {
   for (const { eventName, payload } of [
     {
@@ -366,6 +402,8 @@ test('PR-target workflow receipts resolve only an exact same-repo source associa
     head: { ...candidate(7).head, ref: 'codex/source' },
   };
   const roster = [
+    null,
+    { state: 'open' },
     valid,
     { ...valid, number: 8, head: { ...valid.head, sha: 'b'.repeat(40) } },
     { ...valid, number: 9, head: { ...valid.head, ref: 'other' } },
@@ -392,6 +430,64 @@ test('PR-target workflow receipts resolve only an exact same-repo source associa
   assert.deepEqual(result.gets, [7]);
   assert.deepEqual(result.reads, [7]);
   assert.equal(result.mutations.length, 1);
+});
+
+test('commit association uses the repos route and tolerates an empty page', async () => {
+  assert.match(
+    script,
+    /github\.paginate\(github\.rest\.repos\.listPullRequestsAssociatedWithCommit/
+  );
+  assert.doesNotMatch(
+    script,
+    /github\.rest\.commits\.listPullRequestsAssociatedWithCommit/
+  );
+  const payload = {
+    workflow_run: {
+      head_sha: sha,
+      head_branch: 'codex/source',
+      pull_requests: [],
+    },
+  };
+  for (const associatedPages of [[], null, { data: [] }]) {
+    const result = await fixture({
+      associatedPages,
+      eventName: 'workflow_run',
+      payload,
+    });
+    assert.equal(result.inventories.length, 1);
+    assert.deepEqual(result.gets, []);
+    assert.deepEqual(result.reads, []);
+    assert.deepEqual(result.mutations, []);
+  }
+});
+
+test('paginated commit associations enqueue each exact open main PR once', async () => {
+  const head = {
+    sha,
+    ref: 'codex/source',
+    repo: { full_name: 'JovieInc/Jovie' },
+  };
+  const row = number => ({
+    ...candidate(number),
+    state: 'open',
+    base: { ref: 'main' },
+    head,
+  });
+  const result = await fixture({
+    associatedPages: [row(7), row(7), row(8)],
+    eventName: 'workflow_run',
+    payload: {
+      workflow_run: {
+        head_sha: sha,
+        head_branch: 'codex/source',
+        pull_requests: [],
+      },
+    },
+  });
+  assert.equal(result.inventories.length, 1);
+  assert.deepEqual(result.gets, [7, 8]);
+  assert.deepEqual(result.reads, [7, 8]);
+  assert.equal(result.mutations.length, 2);
 });
 
 test('duplicated automatic PR associations do not multiply live reads or enqueue mutations', async () => {

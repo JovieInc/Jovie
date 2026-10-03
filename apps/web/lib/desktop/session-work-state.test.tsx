@@ -2,6 +2,7 @@ import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { reportDesktopWorkState } from './electron-bridge';
 import {
+  beginDesktopWorkOperation,
   DESKTOP_WORK_HEARTBEAT_MS,
   getDesktopWorkState,
   subscribeDesktopWorkState,
@@ -27,6 +28,74 @@ afterEach(() => {
 });
 
 describe('desktop work owner', () => {
+  it('publishes operations synchronously and releases concurrent work independently', () => {
+    renderHook(() => useDesktopWorkState(idle));
+    const first = beginDesktopWorkOperation('pending-action');
+    const second = beginDesktopWorkOperation('pending-action');
+    const auth = beginDesktopWorkOperation('authentication');
+    try {
+      expect(reportDesktopWorkState).toHaveBeenLastCalledWith({
+        ...idle,
+        hasPendingAction: true,
+        isAuthenticating: true,
+      });
+      first();
+      first();
+      expect(getDesktopWorkState()?.hasPendingAction).toBe(true);
+      second();
+      expect(getDesktopWorkState()).toEqual({
+        ...idle,
+        isAuthenticating: true,
+      });
+      auth();
+      expect(getDesktopWorkState()).toEqual(idle);
+    } finally {
+      first();
+      second();
+      auth();
+    }
+  });
+
+  it('never creates idle ownership or a heartbeat for an operation alone', () => {
+    vi.useFakeTimers();
+    const finish = beginDesktopWorkOperation('pending-action');
+    try {
+      expect(getDesktopWorkState()).toBeNull();
+      expect(vi.getTimerCount()).toBe(0);
+      const owner = renderHook(() => useDesktopWorkState(idle));
+      expect(getDesktopWorkState()?.hasPendingAction).toBe(true);
+      owner.unmount();
+      expect(getDesktopWorkState()).toBeNull();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      finish();
+    }
+    expect(getDesktopWorkState()).toBeNull();
+    renderHook(() => useDesktopWorkState(idle));
+    expect(getDesktopWorkState()).toEqual(idle);
+  });
+
+  it('uses the mounted heartbeat for the current operation aggregate', () => {
+    vi.useFakeTimers();
+    const owner = renderHook(() => useDesktopWorkState(idle));
+    const finish = beginDesktopWorkOperation('pending-action');
+    try {
+      expect(vi.getTimerCount()).toBe(1);
+      act(() => vi.advanceTimersByTime(DESKTOP_WORK_HEARTBEAT_MS));
+      expect(reportDesktopWorkState).toHaveBeenLastCalledWith({
+        ...idle,
+        hasPendingAction: true,
+      });
+      finish();
+      act(() => vi.advanceTimersByTime(DESKTOP_WORK_HEARTBEAT_MS));
+      expect(reportDesktopWorkState).toHaveBeenLastCalledWith(idle);
+      owner.unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      finish();
+    }
+  });
+
   it('notifies navigation subscribers and never lets another idle owner erase active work', () => {
     const listener = vi.fn();
     const unsubscribe = subscribeDesktopWorkState(listener);
