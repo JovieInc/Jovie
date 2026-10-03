@@ -3,6 +3,10 @@ import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { investorLinks, investorSettings } from '@/lib/db/schema/investors';
+import {
+  isInvestorClaimTokenShape,
+  isInvestorClaimUnexpired,
+} from '@/lib/investors/claim-token';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const metadata: Metadata = {
@@ -25,7 +29,12 @@ export default async function InvestorRespondPage({
 }: RespondPageProps) {
   const { t: token, action } = await searchParams;
 
-  if (!token || !action || !['interested', 'pass'].includes(action)) {
+  if (
+    !token ||
+    !isInvestorClaimTokenShape(token) ||
+    !action ||
+    !['interested', 'pass'].includes(action)
+  ) {
     notFound();
   }
 
@@ -47,8 +56,7 @@ export default async function InvestorRespondPage({
     notFound();
   }
 
-  // Reject expired tokens
-  if (link.expiresAt && new Date(link.expiresAt) < now) {
+  if (!isInvestorClaimUnexpired(link.expiresAt, now)) {
     notFound();
   }
 

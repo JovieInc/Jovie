@@ -30,6 +30,7 @@ vi.mock('@/components/features/pitch/InvestorBrief', () => ({
   InvestorBrief: () => null,
 }));
 
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import { generateMetadata as memoMetadata } from './[slug]/page';
 import InvestorLayout from './layout';
 import InvestorLandingPage, {
@@ -71,10 +72,13 @@ describe('investor portal gate', () => {
       await expect(InvestorLayout({ children: null })).resolves.toBeTruthy();
       await expect(InvestorLandingPage()).resolves.toBeTruthy();
       expect((await landingMetadata()).title).toBe('Jovie — Investors');
-      expect(
-        (await memoMetadata({ params: Promise.resolve({ slug: 'memo' }) }))
-          .title
-      ).toBe('Memo — Jovie Investors');
+      const memo = await memoMetadata({
+        params: Promise.resolve({ slug: 'memo' }),
+      });
+      expect(memo.title).toBe('Memo — Jovie Investors');
+      expect(memo.robots).toEqual(NOINDEX_ROBOTS);
+      expect(landingMetadata).toBeTypeOf('function');
+      expect((await landingMetadata()).robots).toEqual(NOINDEX_ROBOTS);
     }
   );
 });
