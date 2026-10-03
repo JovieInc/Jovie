@@ -1,0 +1,12 @@
+{
+ "schema": "jovie-preserved-repair/v1",
+ "runId": "20261002T091629Z-PR19919-devin-fix-15e132",
+ "pr": 19919,
+ "issue": null,
+ "reason": [
+  "target-head-superseded"
+ ],
+ "branch": "dependabot/npm_and_yarn/dev-patch-0c2fdefa95",
+ "headBefore": "7f76253a7570b7c921b1173aef6681a45a04dba1",
+ "at": "2026-10-02T09:18:59Z"
+}
