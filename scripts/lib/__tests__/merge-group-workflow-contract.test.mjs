@@ -3886,9 +3886,7 @@ describe('merge-queue green enroll scan window and failure hold', () => {
       ENROLL.indexOf('  hold-failed-revision:'),
       ENROLL.indexOf('\n  enroll:')
     );
-    expect(hold).toContain(
-      'GH_TOKEN: ${{ steps.app-token.outputs.token }}'
-    );
+    expect(hold).toContain('GH_TOKEN: ${{ steps.app-token.outputs.token }}');
     expect(hold).toContain('permission-pull-requests: write');
     expect(hold).toContain('permission-statuses: write');
     expect(hold).not.toContain('permission-merge-queues:');

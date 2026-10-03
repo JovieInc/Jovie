@@ -215,10 +215,7 @@ test('failure-hold dequeue uses the Jovie Bot token without a merge-queue grant'
   assert.equal(token.with['permission-statuses'], 'write');
   assert.equal(token.with['permission-merge-queues'], undefined);
   assert.equal(token.with['permission-administration'], undefined);
-  assert.equal(
-    persist.env.GH_TOKEN,
-    '${{ steps.app-token.outputs.token }}'
-  );
+  assert.equal(persist.env.GH_TOKEN, '${{ steps.app-token.outputs.token }}');
 });
 
 test('wakes both existing controllers on completed Source Validation without a polling schedule', () => {
