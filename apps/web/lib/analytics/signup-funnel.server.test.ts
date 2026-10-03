@@ -27,8 +27,9 @@ const row = (
   count7d: number,
   count24h = count7d,
   outcome = 'reached',
-  reason: string | null = null
-): Row => ({ funnelId, step, outcome, reason, count7d, count24h });
+  reason: string | null = null,
+  cohort: Row['cohort'] = 'customer'
+): Row => ({ cohort, funnelId, step, outcome, reason, count7d, count24h });
 
 const NOW = new Date('2026-09-26T12:00:00.000Z');
 
@@ -46,6 +47,7 @@ describe('recordFunnelStep', () => {
       outcome: 'reached',
       surface: 'server',
       reason: undefined,
+      cohort: 'unattributed',
     });
   });
 
@@ -99,10 +101,11 @@ describe('buildSummerFunnelResponse', () => {
     );
 
     expect(response).toMatchObject({
-      contractVersion: 'summer-funnel/v1',
-      eventContract: 'signup-funnel/v1',
+      contractVersion: 'summer-funnel/v2',
+      eventContract: 'signup-funnel/v2',
       observedAt: NOW.toISOString(),
       unit: 'events',
+      metricScope: 'customer_only',
     });
     expect(response.windows['7d'].since).toBe('2026-09-19T12:00:00.000Z');
     expect(response.windows['24h'].since).toBe('2026-09-25T12:00:00.000Z');
@@ -189,5 +192,34 @@ describe('buildSummerFunnelResponse', () => {
       expect(funnel.overallConversion).toBeNull();
       expect(funnel.steps.every(step => step.count === 0)).toBe(true);
     }
+  });
+
+  it('keeps synthetic and unclassified events out of customer windows', () => {
+    const response = buildSummerFunnelResponse(
+      [
+        row('artist_signup', 'auth_success', 2, 1, 'reached', null, 'customer'),
+        row(
+          'artist_signup',
+          'auth_success',
+          4,
+          3,
+          'reached',
+          null,
+          'synthetic'
+        ),
+        row('artist_signup', 'auth_success', 8, 5, 'reached', null, null),
+      ],
+      NOW
+    );
+    const count = (windows: typeof response.windows, window: '24h' | '7d') =>
+      windows[window].funnels
+        .find(funnel => funnel.funnelId === 'artist_signup')
+        ?.steps.find(step => step.step === 'auth_success')?.count;
+
+    expect(count(response.windows, '7d')).toBe(2);
+    expect(count(response.syntheticHealth.windows, '7d')).toBe(4);
+    expect(count(response.unattributed.windows, '7d')).toBe(8);
+    expect(count(response.rawWindows, '7d')).toBe(14);
+    expect(count(response.windows, '24h')).toBe(1);
   });
 });
