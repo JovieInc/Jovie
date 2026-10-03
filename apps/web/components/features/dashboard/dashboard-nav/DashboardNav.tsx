@@ -73,6 +73,7 @@ const PENDING_NAVIGATION_RECOVERY_MS = NAVIGATION_DROP_OFF_MS;
 export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   const { selectedProfile, inboxNavigation } = useDashboardData();
   const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
+  const inboxHomeEnabled = useAppFlag('INBOX_HOME');
   const sidebarNavigation = useMemo(
     () =>
       navigationVisibleForFlags(canonicalSidebarNavigation, {
@@ -82,6 +83,10 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   );
   const runtimeUpdate = useRuntimeUpdate();
   const hasRuntimeUpdate = Boolean(runtimeUpdate?.available);
+  const homeAttentionLabel = inboxHomeEnabled ? 'Inbox' : 'Home';
+  const homeAttentionName = hasRuntimeUpdate
+    ? `${homeAttentionLabel} — App Update Available`
+    : homeAttentionLabel;
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -469,9 +474,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                 aria-busy={
                   pendingNavigation?.itemId === inboxNavItem.id || undefined
                 }
-                aria-label={
-                  hasRuntimeUpdate ? 'Inbox — App Update Available' : 'Inbox'
-                }
+                aria-label={homeAttentionName}
                 data-inbox-attention={
                   hasRuntimeUpdate
                     ? 'available'

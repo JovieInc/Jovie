@@ -102,7 +102,10 @@ describe('DashboardNav', () => {
       navChildren: <button type='button'>Search</button>,
     });
 
-    const inbox = getByRole('link', { name: 'Inbox' });
+    const inbox = document.querySelector('[data-navigation-item-id="inbox"]');
+    expect(inbox).toBeInstanceOf(HTMLElement);
+    if (!(inbox instanceof HTMLElement)) return;
+    expect(inbox).toHaveAccessibleName('Home');
     const search = getByRole('button', { name: 'Search' });
     const newChat = getByRole('link', { name: 'New Chat' });
 
@@ -144,7 +147,9 @@ describe('DashboardNav', () => {
       },
     });
 
-    expect(getByRole('link', { name: 'Inbox' })).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-navigation-item-id="inbox"]')
+    ).toHaveAccessibleName('Home');
     expect(getByRole('link', { name: 'New Chat' })).toBeInTheDocument();
   });
 
@@ -157,13 +162,12 @@ describe('DashboardNav', () => {
       },
     });
 
-    expect(getByRole('link', { name: 'Home' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    );
-    expect(getByRole('link', { name: 'Inbox' })).not.toHaveAttribute(
-      'aria-current'
-    );
+    expect(
+      document.querySelector('[data-navigation-item-id="home"]')
+    ).toHaveAttribute('aria-current', 'page');
+    expect(
+      document.querySelector('[data-navigation-item-id="inbox"]')
+    ).not.toHaveAttribute('aria-current');
   });
 
   it('keeps Inbox visible when availability is unknown', () => {
@@ -174,7 +178,9 @@ describe('DashboardNav', () => {
       },
     });
 
-    expect(getByRole('link', { name: 'Inbox' })).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-navigation-item-id="inbox"]')
+    ).toHaveAccessibleName('Home');
   });
 
   it('keeps the exact customer IA invariant for admin users', () => {

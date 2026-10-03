@@ -14,11 +14,14 @@
 
 import {
   Calendar,
+  CalendarDays,
   CheckSquare,
   Columns2,
   Image as ImageIcon,
+  LineChart,
   Link2Off,
   Link as LinkIcon,
+  ListTodo,
   type LucideIcon,
   MessageSquare,
   Music,
@@ -27,6 +30,7 @@ import {
   Sparkles,
   UserCircle,
   Users,
+  Youtube,
 } from 'lucide-react';
 import Image from 'next/image';
 import { memo } from 'react';
@@ -49,6 +53,10 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Columns2,
   Settings,
   Calendar,
+  CalendarDays,
+  LineChart,
+  ListTodo,
+  Youtube,
 };
 
 export interface PickerSkillItem {

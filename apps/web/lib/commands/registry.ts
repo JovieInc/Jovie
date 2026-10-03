@@ -11,7 +11,7 @@
  * additional wiring.
  */
 
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { ToolSchemaKey } from '@/lib/chat/tool-schemas';
 import type { AppFlagName } from '@/lib/flags/contracts';
@@ -253,13 +253,13 @@ export const COMMANDS: readonly Command[] = [
   skill(
     'proposeSocialLink',
     'Add social link',
-    'Add a social profile URL to your artist profile.',
+    'Add a social profile URL to your profile.',
     'Link'
   ),
   skill(
     'proposeSocialLinkRemoval',
     'Remove social link',
-    'Remove a social link from your artist profile.',
+    'Remove a social link from your profile.',
     'Link2Off'
   ),
   skill(
@@ -278,7 +278,7 @@ export const COMMANDS: readonly Command[] = [
   nav(
     'go-presence',
     'Presence',
-    'Monitor artist profiles, public pages, and search visibility.',
+    'Monitor public pages and search visibility.',
     'Waypoints',
     APP_ROUTES.PRESENCE,
     'PROFILES_WORKSPACE'
@@ -300,9 +300,37 @@ export const COMMANDS: readonly Command[] = [
   nav(
     'go-releases',
     'Releases',
-    'Manage your release catalog and smart links.',
+    'Open your work catalog.',
     'Music',
-    APP_ROUTES.RELEASES
+    buildLibraryViewRoute('releases')
+  ),
+  nav(
+    'go-youtube',
+    'YouTube',
+    'Open the YouTube workspace.',
+    'Youtube',
+    APP_ROUTES.YOUTUBE_REVIVAL
+  ),
+  nav(
+    'go-insights',
+    'Insights',
+    'Open the insights workspace.',
+    'LineChart',
+    APP_ROUTES.INSIGHTS
+  ),
+  nav(
+    'go-jovie-work',
+    'Jovie work',
+    'Open autonomous work for this identity.',
+    'ListTodo',
+    APP_ROUTES.JOVIE_WORK
+  ),
+  nav(
+    'go-tour-dates',
+    'Tour dates',
+    'Open scheduled dates.',
+    'CalendarDays',
+    APP_ROUTES.TOUR_DATES
   ),
   nav(
     'go-calendar',
@@ -321,7 +349,7 @@ export const COMMANDS: readonly Command[] = [
   nav(
     'go-settings',
     'Settings',
-    'Account, billing, and artist settings.',
+    'Account, billing, and profile settings.',
     'Settings',
     APP_ROUTES.SETTINGS
   ),
