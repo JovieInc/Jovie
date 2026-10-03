@@ -158,13 +158,16 @@ export function subscriptionReceipt({
   const scanned = [...output.matchAll(/^Scanning (\d+) file\(s\)…$/gm)];
   const analyses = [...output.matchAll(/^  Analyses: (\d+)$/gm)];
   const counts = [...output.matchAll(/^  Findings: (\d+)$/gm)];
+  const runs = [
+    ...output.matchAll(/^Processing complete\. Run: ([A-Za-z0-9_-]{1,100})$/gm),
+  ];
   if (
     scanned.length !== 1 ||
     Number(scanned[0][1]) !== plan.files.length ||
     analyses.length !== 1 ||
     counts.length !== 1 ||
     Number(analyses[0][1]) > plan.files.length ||
-    !/^Processing complete\. Run: \S+$/m.test(output)
+    runs.length !== 1
   )
     throw new Error('complete native scan summary required');
   const count = Number(counts[0][1]);
@@ -212,6 +215,7 @@ export function subscriptionReceipt({
     schemaVersion: 1,
     route: 'native-subscription',
     scannerVersion: DEEPSEC_SUBSCRIPTION_VERSION,
+    nativeRunId: runs[0][1],
     headSha: plan.headSha,
     fingerprint: plan.fingerprint,
     filesScanned: plan.files.length,
