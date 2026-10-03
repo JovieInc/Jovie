@@ -278,19 +278,3 @@ enum MobileChatAllComponentsFixture {
     ),
   ]
 }
-
-struct EyesFreeCaptureAPIRequest: Encodable, Sendable {
-  let destination: String
-  let transcript: String
-  let clientTurnId: String
-  let clientMessageId: String
-}
-
-struct EyesFreeCaptureAPIResponse: Decodable, Equatable, Sendable {
-  let destination: String
-  let status: String
-  let conversationId: String?
-  let turnId: String?
-  let readback: String
-  let errorCode: String?
-}
