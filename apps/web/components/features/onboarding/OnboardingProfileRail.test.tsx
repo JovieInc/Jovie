@@ -49,22 +49,17 @@ describe('OnboardingProfileRail', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('keeps the DSP match strip in flow below the phone, never over the CTA', () => {
+  it('keeps the DSP match strip outside the phone preview', () => {
     render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
 
     const rail = screen.getByTestId('onboarding-profile-rail');
     const phonePreview = screen.getByTestId('onboarding-phone-preview');
     const strip = screen.getByTestId('onboarding-dsp-match-strip');
 
+    // Geometry (clear of Listen now at 1280x720 and 390x844) is asserted by
+    // tests/e2e/storybook-onboarding-dsp-strip-clearance.spec.ts.
     expect(rail).toContainElement(strip);
     expect(phonePreview).not.toContainElement(strip);
-    // Regression: the strip was absolutely positioned and could cover the
-    // preview's Listen now CTA (JOV DSP-strip clearance fix).
-    expect(strip.className).not.toContain('absolute');
-    expect(
-      phonePreview.compareDocumentPosition(strip) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
   });
 
   it('renders the inline rail variant at mobile widths', () => {
