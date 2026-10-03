@@ -38,6 +38,22 @@ describe('pr-review workflow contract', () => {
     expect(workflow).toContain('runs-on: ubuntu-latest');
   });
 
+  it('wakes from a producer that actually validates pull requests', () => {
+    const { load } = createRequire(import.meta.url)('js-yaml');
+    const review = load(workflow);
+    const producer = load(
+      readFileSync(
+        resolve(REPO_ROOT, '.github/workflows/source-validation.yml'),
+        'utf8'
+      )
+    );
+    expect(review.on.workflow_run.workflows).toContain(producer.name);
+    expect(producer.on.pull_request).toBeDefined();
+    expect(review.jobs.review.if).toContain(
+      "github.event.workflow_run.event == 'pull_request'"
+    );
+  });
+
   it('never gets write access, never posts, never executes PR code', () => {
     expect(workflow).not.toMatch(/:\s*write\b/);
     expect(workflow).toContain('permissions: {}');

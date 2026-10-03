@@ -241,7 +241,6 @@ nodes:
       - Lane Fix Relay
       - Merge Queue Green Enroll
       - PR Conflict Handler
-      - PR Review (shadow)
       - Rolling CI Dispatch
       - Staging Controller
       - Test Flakiness Report
@@ -1277,6 +1276,7 @@ nodes:
       - Auto-Ready Agent Drafts
       - Lane Fix Relay
       - Merge Queue Green Enroll
+      - PR Review (shadow)
     triggeringStateTransition:
       - pull_request
     terminalReceipt: job:ready
@@ -1489,7 +1489,7 @@ edges:
   - from: PR Size Guard
     to: Merge Queue Green Enroll
     type: workflow_run
-  - from: CI
+  - from: Source Validation
     to: PR Review (shadow)
     type: workflow_run
   - from: Staging Controller
