@@ -940,6 +940,59 @@ class MergeWindowTest(unittest.TestCase):
         self.assertEqual(self.collect(self.pages([]), max_pages=0)["reason"], "invalid_fetch_options")
         self.assertEqual(self.collect(self.pages([]), timeout_s=float("nan"))["reason"], "invalid_fetch_options")
 
+    def test_default_transport_paginates_both_scans_under_one_deadline(self):
+        source = self.pages([self.row(i + 1, i + 1) for i in range(120)])
+        calls = []
+        def run(args, **kwargs):
+            calls.append((args, kwargs))
+            cursor = next((arg.removeprefix("cursor=") for arg in args
+                           if arg.startswith("cursor=")), None)
+            return SimpleNamespace(returncode=0, stdout=json.dumps({
+                "data": {"repository": {"pullRequests": source(cursor)}}}))
+        with mock.patch.object(doctor.merge_evidence.subprocess, "run", side_effect=run):
+            result = doctor.merge_evidence.collect("JovieInc/Jovie", self.NOW - 200, self.NOW)
+        self.assertTrue(result["complete"])
+        self.assertEqual((result["pages"], result["scans"], len(result["prs"])), (4, 2, 120))
+        self.assertEqual(len(calls), 4)
+        for args, kwargs in calls:
+            self.assertEqual(args[:3], ["gh", "api", "graphql"])
+            self.assertIn("owner=JovieInc", args)
+            self.assertIn("name=Jovie", args)
+            self.assertGreater(kwargs["timeout"], 0)
+            self.assertLessEqual(kwargs["timeout"], 60)
+        self.assertEqual(sum("cursor=100" in args for args, _ in calls), 2)
+        timeouts = [kwargs["timeout"] for _, kwargs in calls]
+        self.assertEqual(timeouts, sorted(timeouts, reverse=True))
+
+    def test_default_transport_suppresses_bad_response_and_timeout(self):
+        cases = [
+            (SimpleNamespace(returncode=1, stdout=""), "fetch_failed"),
+            (SimpleNamespace(returncode=0, stdout="not json"), "fetch_failed"),
+            (SimpleNamespace(returncode=0, stdout="[]"), "fetch_failed"),
+            (SimpleNamespace(returncode=0, stdout='{"errors":[{"message":"unavailable"}]}'), "fetch_failed"),
+            (SimpleNamespace(returncode=0, stdout='{"data":{"repository":null}}'), "fetch_failed"),
+            (doctor.merge_evidence.subprocess.TimeoutExpired("gh", 1), "deadline_exceeded"),
+        ]
+        for response, reason in cases:
+            with self.subTest(response=response):
+                kwargs = {"side_effect": response} if isinstance(response, Exception) else {"return_value": response}
+                with mock.patch.object(doctor.merge_evidence.subprocess, "run", **kwargs):
+                    result = doctor.merge_evidence.collect("JovieInc/Jovie", 1, 2)
+                self.assertEqual(result["reason"], reason)
+                self.assertEqual(result["prs"], [])
+
+    def test_deadline_before_fetch_and_invalid_timestamp_relations(self):
+        with mock.patch.object(doctor.merge_evidence.time, "monotonic", side_effect=[0, 61]):
+            with mock.patch.object(doctor.merge_evidence.subprocess, "run") as run:
+                self.assertEqual(self.collect(self.pages([]))["reason"], "deadline_exceeded")
+                run.assert_not_called()
+        for stamp in [None, "2026-01-01T00:00:00"]:
+            with self.subTest(stamp=stamp), self.assertRaises(ValueError):
+                doctor.merge_evidence._epoch(stamp)
+        bad = self.row(1, 1)
+        bad["updatedAt"] = doctor.epoch_iso(self.NOW - 2)
+        self.assertEqual(self.collect(self.pages([bad]))["reason"], "malformed_pr")
+
     def test_doctor_legacy_reader_uses_shared_complete_evidence(self):
         rows = [self.row(1, 1)]
         lane = SimpleNamespace(REPO_SLUG="JovieInc/Jovie")

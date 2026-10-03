@@ -575,13 +575,17 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
         lines.append(rgb(DIM, f" … {len(open_prs) - pipeline_budget} more"))
 
     # recently merged
-    merged = github.get("merged24h", [])
+    merge_error = github.get("errors", {}).get("merged")
+    if not merge_error and "merged24h" not in github:
+        merge_error = "merged-pr-evidence:not-read-yet"
+    if not merge_error and (github.get("mergedWindow") or {}).get("complete") is False:
+        merge_error = "merged-pr-evidence:" + str(github["mergedWindow"].get("reason") or "incomplete")
+    merged = [] if merge_error else github.get("merged24h", [])
     attribution_receipts = local.get("attributionReceipts") or []
     attributions = {m["number"]: lane.pr_attribution(m, attribution_receipts) for m in merged}
     autonomous = sum(value.get("origin") == lane.AUTONOMOUS_ORIGIN for value in attributions.values())
     manual_codex = sum(value.get("originCategory") == "manual-codex-app-created" for value in attributions.values())
     old_codex = sum(value.get("originCategory") == "old-codex-branch-landed-later" for value in attributions.values())
-    merge_error = github.get("errors", {}).get("merged")
     if merge_error:
         lines.append(rgb(FG, "RECENTLY MERGED · unknown · ", bold=True) + rgb(RED, merge_error))
     else:

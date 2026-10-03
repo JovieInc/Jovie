@@ -31,6 +31,8 @@ describe('lane Python qualification coverage', () => {
   it.each([
     ['lane source', ['scripts/lanes/hyperagent_lane.py']],
     ['attempt regression', ['scripts/tests/test_execution_attempt.py']],
+    ['merge reader', ['scripts/lanes/merge_evidence.py']],
+    ['HUD regression', ['scripts/tests/test_hud.py']],
     ['falsy inputs', [null, false, '', 'scripts/lanes/execution_attempt.py']],
     ['missing pinned dependencies', ['scripts/lanes/hyperagent_lane.py'], true],
     [
@@ -95,6 +97,73 @@ describe('lane Python qualification coverage', () => {
       }
     }
   );
+});
+
+describe('merge evidence coverage selection', () => {
+  const inputs = [
+    'scripts/lanes/merge_evidence.py',
+    'scripts/lanes/doctor.py',
+    'scripts/lanes/hud.py',
+    'scripts/tests/test_doctor.py',
+    'scripts/tests/test_hud.py',
+  ];
+  it('qualifies the complete reader and both consumers with structural Python coverage', () => {
+    const plan = buildAffectedTestPlan(inputs, { isFileAvailable: () => true });
+    expect(plan.mode).toBe('selected');
+    expect(plan.lanePythonCoverage).toBe(true);
+    const commands = buildSelectedTestCommands(plan, '1');
+    const command = commands.find(
+      ([binary, args]) =>
+        binary === 'env' &&
+        args.some(arg => arg.includes('coverage run --branch'))
+    );
+    expect(command).toBeDefined();
+    expect(command[1].join(' ')).toContain('scripts/tests/test_hud.py');
+    expect(command[1].join(' ')).toContain('scripts/tests/test_doctor.py');
+    expect(command[1].join(' ')).toContain(
+      '*/scripts/lanes/merge_evidence.py" --fail-under=85'
+    );
+  });
+  it.each(['scripts/tests/test_doctor.py', 'scripts/tests/test_hud.py'])(
+    'fails closed when %s is unavailable',
+    missing => {
+      const plan = buildAffectedTestPlan(inputs, {
+        isFileAvailable: file => file !== missing,
+      });
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toBe(
+        'merge evidence coverage proof is unavailable'
+      );
+      expect(plan.lanePythonCoverage).toBe(true);
+    }
+  );
+  it.each([
+    'scripts/lanes/unknown-new.py',
+    'scripts/tests/test_merge_evidence.py',
+  ])('retains full fallback for unmapped peer %s', peer => {
+    const plan = buildAffectedTestPlan([...inputs, peer], {
+      isFileAvailable: () => true,
+    });
+    expect(plan.mode).toBe('full');
+    expect(plan.fallbackReason).toBe(
+      'unmapped Python peer mixed with lane coverage'
+    );
+    expect(plan.lanePythonCoverage).toBe(true);
+  });
+  it('retains full fallback when changing the selector infrastructure with the reader', () => {
+    const plan = buildAffectedTestPlan(
+      [
+        ...inputs,
+        'scripts/run-affected-tests.mjs',
+        'scripts/ci-fast-lanes.mjs',
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+      ],
+      { isFileAvailable: () => true }
+    );
+    expect(plan.mode).toBe('full');
+    expect(plan.lanePythonCoverage).toBe(true);
+  });
 });
 
 describe('lane coverage full fallback', () => {

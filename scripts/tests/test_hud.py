@@ -78,6 +78,30 @@ def model(**overrides) -> dict:
 
 
 class MergeEvidenceTest(unittest.TestCase):
+    def test_initial_remote_state_does_not_claim_zero_merges(self):
+        sample = model(github=hud.Remote(None).github)
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("RECENTLY MERGED · unknown", text)
+        self.assertIn("not-read-yet", text)
+        self.assertNotIn("total 0 in 24h", text)
+        self.assertIn("landed unknown", text)
+
+    def test_complete_empty_window_remains_true_zero(self):
+        sample = model()
+        sample["github"]["merged24h"] = []
+        sample["github"]["mergedWindow"] = {"complete": True}
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("total 0 in 24h", text)
+        self.assertIn("landed 0", text)
+
+    def test_explicit_incomplete_receipt_suppresses_stale_rows(self):
+        sample = model()
+        sample["github"]["mergedWindow"] = {"complete": False, "reason": "unstable_snapshot"}
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("RECENTLY MERGED · unknown", text)
+        self.assertNotIn("total 2 in 24h", text)
+        self.assertNotIn("#18671", text)
+
     def test_unreadable_merge_evidence_is_unknown_not_zero(self):
         sample = model()
         sample["github"]["errors"]["merged"] = "merged-pr-evidence:unstable_snapshot"

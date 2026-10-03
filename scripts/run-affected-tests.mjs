@@ -1074,20 +1074,23 @@ export function classifyBlogContentForAffectedTests(base, head, options) {
   }
 }
 
-const LANE_PYTHON_COVERAGE_INPUTS = new Set(
-  [
+const LANE_PYTHON_COVERAGE_INPUTS = new Set([
+  ...[
     'lane_runner',
     'pr_events',
     'reason_lane',
     'doctor',
+    'hud',
     'disk_guard',
     'hyperagent_lane',
     'execution_attempt',
   ].flatMap(name => [
     `scripts/lanes/${name}.py`,
     `scripts/tests/test_${name}.py`,
-  ])
-);
+  ]),
+  // The merge reader is exercised by the doctor transport/window regressions.
+  'scripts/lanes/merge_evidence.py',
+]);
 
 export function buildAffectedTestPlan(changedFiles, options) {
   const files = unique(changedFiles.filter(Boolean));
@@ -1099,6 +1102,19 @@ export function buildAffectedTestPlan(changedFiles, options) {
     lanePythonCoverage &&
     files.some(
       file => file.endsWith('.py') && !LANE_PYTHON_COVERAGE_INPUTS.has(file)
+    );
+  const isFileAvailable =
+    options?.isFileAvailable ?? (file => existsSync(resolve(REPO_ROOT, file)));
+  const missingMergeEvidenceProof =
+    files.some(file =>
+      [
+        'scripts/lanes/merge_evidence.py',
+        'scripts/lanes/hud.py',
+        'scripts/tests/test_hud.py',
+      ].includes(file)
+    ) &&
+    !['scripts/tests/test_doctor.py', 'scripts/tests/test_hud.py'].every(
+      isFileAvailable
     );
   // Global/full early returns need the same command fields as focused plans.
   // Retain lane coverage even when an unrelated input requires the full suite.
@@ -1116,16 +1132,20 @@ export function buildAffectedTestPlan(changedFiles, options) {
     ...(lanePythonCoverage
       ? {
           lanePythonCoverage: true,
-          mode: unknownPythonPeer
-            ? 'full'
-            : plan.mode === 'none'
-              ? 'selected'
-              : plan.mode,
-          ...(unknownPythonPeer
-            ? {
-                fallbackReason: 'unmapped Python peer mixed with lane coverage',
-              }
-            : {}),
+          mode:
+            unknownPythonPeer || missingMergeEvidenceProof
+              ? 'full'
+              : plan.mode === 'none'
+                ? 'selected'
+                : plan.mode,
+          ...(missingMergeEvidenceProof
+            ? { fallbackReason: 'merge evidence coverage proof is unavailable' }
+            : unknownPythonPeer
+              ? {
+                  fallbackReason:
+                    'unmapped Python peer mixed with lane coverage',
+                }
+              : {}),
         }
       : {}),
   };
