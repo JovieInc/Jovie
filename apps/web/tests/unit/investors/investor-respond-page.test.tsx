@@ -32,6 +32,9 @@ vi.mock('@/lib/db/schema/investors', () => ({
 import { InvestorStickyBar } from '@/app/investor-portal/_components/InvestorStickyBar';
 import InvestorRespondPage from '@/app/investor-portal/respond/page';
 
+const CLAIM_TOKEN = 'a'.repeat(43);
+const LIVE_EXPIRY = new Date('2099-01-01T00:00:00.000Z');
+
 function searchParams(value: { t?: string; action?: string }) {
   return Promise.resolve(value);
 }
@@ -43,7 +46,7 @@ describe('investor respond page', () => {
       from: () => ({
         where: () => ({
           limit: async () => [
-            { id: 'link-1', stage: 'viewed', expiresAt: null },
+            { id: 'link-1', stage: 'viewed', expiresAt: LIVE_EXPIRY },
           ],
         }),
       }),
@@ -55,7 +58,7 @@ describe('investor respond page', () => {
   it('records a call request instead of redirecting to a calendar', async () => {
     render(
       await InvestorRespondPage({
-        searchParams: searchParams({ t: 'tok', action: 'interested' }),
+        searchParams: searchParams({ t: CLAIM_TOKEN, action: 'interested' }),
       })
     );
 
@@ -68,7 +71,7 @@ describe('investor respond page', () => {
   it('marks the link passed without recording a call request', async () => {
     render(
       await InvestorRespondPage({
-        searchParams: searchParams({ t: 'tok', action: 'pass' }),
+        searchParams: searchParams({ t: CLAIM_TOKEN, action: 'pass' }),
       })
     );
 
