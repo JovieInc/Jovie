@@ -35,6 +35,10 @@ export const CODE_FLAGS = {
   // stay unchanged. FEATURE_AUTH_OFFER_SUMMARY=true shows the 14-day Pro
   // trial recap. No price, trial-length, Stripe, or entitlement effect.
   AUTH_OFFER_SUMMARY: false,
+  // Social-network HTML must not be fetched from Jovie server IPs. Default
+  // off. FEATURE_SOCIAL_HTML_ISOLATED_PROVIDER=true is reserved for a future
+  // isolated provider and still fails closed until that provider exists.
+  SOCIAL_HTML_ISOLATED_PROVIDER: false,
 } as const satisfies Record<string, boolean>;
 
 export type CodeFlagName = keyof typeof CODE_FLAGS;

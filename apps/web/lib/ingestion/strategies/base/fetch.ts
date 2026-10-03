@@ -4,6 +4,7 @@
  * Document fetching with timeout, retries, and proper error handling.
  */
 
+import { rejectCoreSocialHtmlFetch } from '@/lib/ingestion/social-html-policy';
 import { logger } from '@/lib/utils/logger';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import {
@@ -150,6 +151,7 @@ async function fetchWithRedirects(
   let redirects = 0;
 
   while (true) {
+    rejectCoreSocialHtmlFetch(currentUrl);
     const response = await fetch(currentUrl, {
       signal: controller.signal,
       headers: {
@@ -197,6 +199,7 @@ function shouldRetryError(error: unknown): boolean {
       'RATE_LIMITED',
       'INVALID_URL',
       'INVALID_HOST',
+      'SOCIAL_HTML_DISABLED',
     ].includes(error.code);
   }
   return true;
@@ -238,6 +241,7 @@ export async function fetchDocument(
   } = options;
 
   const normalizedUrl = normalizeUrl(url);
+  rejectCoreSocialHtmlFetch(normalizedUrl);
   const initialUrl = normalizeAndValidateUrl(normalizedUrl, allowedHosts);
   let lastError: Error | null = null;
 
