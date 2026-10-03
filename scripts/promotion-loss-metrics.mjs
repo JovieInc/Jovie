@@ -105,6 +105,14 @@ export function computeMetrics({ prs, openPrs, queue, runs, since, now }) {
   const hours = (now - since) / UNITS.h;
   const opened = prs.filter(pr => inWindow(pr.createdAt, since, now));
   const merged = prs.filter(pr => inWindow(pr.mergedAt, since, now));
+  const queueEntries = prs.reduce(
+    (total, pr) =>
+      total +
+      (pr.events ?? []).filter(
+        event => event.type === 'added' && inWindow(event.at, since, now)
+      ).length,
+    0
+  );
   const closedUnmerged = opened.filter(
     pr => pr.state === 'CLOSED' && !pr.mergedAt
   );
@@ -155,6 +163,10 @@ export function computeMetrics({ prs, openPrs, queue, runs, since, now }) {
       since: new Date(since).toISOString(),
       hours: Math.round(hours * 10) / 10,
     },
+    queueEntries,
+    queueEntriesPerMerge: merged.length
+      ? Math.round((queueEntries / merged.length) * 10) / 10
+      : null,
     firstPass: {
       rate: resolved ? Math.round((firstPass / resolved) * 1000) / 1000 : null,
       merged: firstPass,
@@ -236,6 +248,7 @@ export function renderMarkdown(m) {
     '|---|---|',
     `| Merge-group first-pass rate | ${pct} (${m.firstPass.merged}/${m.firstPass.resolvedEntries} entries) |`,
     `| Queue removals by reason | ${reasons} |`,
+    `| Queue entries / per merged PR | ${m.queueEntries} / ${fmt(m.queueEntriesPerMerge)} |`,
     `| merge_group CI runs (failed) / per merged PR | ${m.ejections.mergeGroupRuns} (${m.ejections.mergeGroupFailed}) / ${fmt(m.ejections.mergeGroupRunsPerMergedPr)} |`,
     `| Revision failure holds / deterministic same-head recurrence | ${m.ejections.revisionFailureHolds} / ${m.ejections.deterministicFailureRecurrence} |`,
     `| Queue now: entries / max build · CLEAN PRs not queued | ${m.occupancy.inQueue} / ${fmt(m.occupancy.maxEntriesToBuild)} · ${m.occupancy.cleanNotQueued} |`,

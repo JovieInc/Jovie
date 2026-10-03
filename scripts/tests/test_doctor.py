@@ -805,6 +805,8 @@ class RunTest(unittest.TestCase):
             written = json.loads((state / "doctor.json").read_text())
             self.assertEqual(set(written["alerts"]) >= {"provider-down:devin", "linear-down"}, True)
             self.assertEqual(written["conditions"]["linear-down"]["source"]["status"], "unknown")
+            self.assertEqual(written["fileOverlap"]["mode"], "enforce")
+            self.assertEqual(written["fileOverlap"]["pairs"], [])
             self.assertEqual(sorted(k for k, _ in tracker.opened), sorted(result["alerts"]))
 
 

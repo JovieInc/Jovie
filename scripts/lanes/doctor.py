@@ -24,6 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pr_events  # noqa: E402  (sibling module of the release)
 import design_gate  # noqa: E402  (design-brief admission census)
+import file_overlap  # noqa: E402
 import remediation  # noqa: E402
 
 COOL_OFF_S = 6 * 3600
@@ -205,6 +206,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "qualifiedJobsByProvider": qualified_jobs,
         "candidatePoolByProvider": candidate_counts, "rejectedByProvider": rejected,
         "designGate": design_census,
+        "fileOverlap": file_overlap.doctor_view(state),
         "linearError": linear_error, "githubRemaining": github,
         "merged24h": merged, "mergedAttributionError": merged_error,
         "diskFreePct": round(100 * disk.free / disk.total, 1),
@@ -760,7 +762,12 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
                              "outcomes": {key: 0 for key in ("useful", "certified", "duplicate", "retry", "failed", "unknown")},
                              "incidents": [], "topBlocker": "capacity projector unavailable",
                              "founderJudgmentRequired": False, "controls": "show-only"}
+    overlap = obs.get("fileOverlap")
+    if not overlap:
+        overlap = (file_overlap.doctor_view(host.state) if getattr(host, "state", None) else
+                   {"mode": file_overlap.guard_mode(), "pairs": [], "metrics": {}})
     return {"schema": "symphony-lanes-status/v1", "at": now_iso(), "host": lane.HOST, "release": tick.get("release"),
+            "fileOverlap": overlap,
             "lanes": counts, "running": sum(c["running"] for c in counts.values()),
             "idle": sum(max(0, c["slots"] - c["running"]) for c in counts.values()),
             "pool": obs.get("pool"), "candidatePool": obs.get("candidatePool"), "lastLandingAgeS": obs.get("lastLandingAge"),
@@ -890,6 +897,7 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     result["providerIdleSince"] = previous["providerIdleSince"]
     result["escalation"] = obs.get("escalation") or remediation.empty_escalation()
     result["remediation"] = obs.get("remediation") or remediation.empty_remediation()
+    result["fileOverlap"] = obs.get("fileOverlap") or file_overlap.doctor_view(host.state)
     for key in ("eventsOpen", "eventsClaimed", "eventsHuman", "eventsExhausted"):
         result[key] = result["remediation"].get(key, 0)
     result["byFingerprint"] = result["remediation"].get("byFingerprint") or {}

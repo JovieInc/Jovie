@@ -130,7 +130,12 @@ class RenderTest(unittest.TestCase):
         self.assertIn("show-only", text)
 
     def test_pipeline_attention_and_backlog_rows(self):
-        text = "\n".join(plain(line) for line in hud.render(model(), 160, 45))
+        value = model()
+        value["local"]["doctor"]["fileOverlap"] = {
+            "mode": "enforce", "pairs": [{"first": "pr:#20141", "later": "pr:#20166",
+                                             "actionTaken": "stack", "files": ["scripts/lanes/lane_runner.py"]}],
+            "metrics": {"conflicts_prevented": 2, "overlap_flags": 3, "rebases_caused_by_overlap": 1}}
+        text = "\n".join(plain(line) for line in hud.render(value, 160, 45))
         self.assertIn("#18724 devin  JOV-6544", text)
         self.assertIn("unstable", text)
         self.assertIn("in queue awaiting_checks", text)
@@ -144,6 +149,8 @@ class RenderTest(unittest.TestCase):
         self.assertIn("THROUGHPUT 24h · codex offer 0", text)
         self.assertIn("devin offer 1 start 1 productive 1 PR 1 first-pass 100%", text)
         self.assertIn("disk 3.1% free", text)
+        self.assertIn("FILE OVERLAP  enforce · active 1 · prevented 2 · flags 3 · rebases 1", text)
+        self.assertIn("pr:#20141 → pr:#20166 stack scripts/lanes/lane_runner.py", text)
 
     def test_failed_sources_render_their_reason_never_a_blank(self):
         broken = model(linear={"ok": False, "error": "HTTPError: 429"},
@@ -282,7 +289,8 @@ class PromotionTest(unittest.TestCase):
     """JOV-6836: the HUD surfaces promotion-loss metrics, cached, and never blanks on failure."""
     METRICS = {"firstPass": {"rate": 0.74}, "reenqueueMinutes": {"p75": 365, "pending": 2},
                "openToFirstEnqueueMinutes": {"p75": 106.7}, "occupancy": {"cleanNotQueued": 6},
-               "intake": {"opensPerHour": 12.6, "mergesPerHour": 7.3, "keysWithMultipleOpenPrs": 10}}
+               "intake": {"opensPerHour": 12.6, "mergesPerHour": 7.3, "keysWithMultipleOpenPrs": 10},
+               "queueEntriesPerMerge": 2.2}
 
     def setUp(self):
         hud._promotion.update(at=0.0, data=None)
@@ -291,6 +299,7 @@ class PromotionTest(unittest.TestCase):
         text = "\n".join(plain(line) for line in hud.render(model(github={**model()["github"], "promotion": self.METRICS}), 200, 45))
         self.assertIn("first-pass 74% · ejected→back p75 365m (2 waiting) · open→enqueue p75 106.7m", text)
         self.assertIn("opens/h 12.6 vs merges/h 7.3 · CLEAN not queued 6 · keys >1 PR 10", text)
+        self.assertIn("queue entries/merge 2.2", text)
         self.assertIn("PROMOTION 8h  unread", plain(hud.promotion_line(None)))
         self.assertIn("boom", plain(hud.promotion_line({"error": "boom"})))
 
