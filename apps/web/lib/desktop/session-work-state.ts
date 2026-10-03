@@ -15,6 +15,8 @@ export interface DesktopWorkState {
 export const DESKTOP_WORK_HEARTBEAT_MS = 10_000;
 
 const owners = new Map<symbol, DesktopWorkState>();
+type DesktopWorkOperation = 'pending-action' | 'authentication';
+const operations = new Map<symbol, DesktopWorkOperation>();
 const listeners = new Set<() => void>();
 let currentWorkState: DesktopWorkState | null = null;
 
@@ -30,8 +32,21 @@ export function subscribeDesktopWorkState(listener: () => void): () => void {
   };
 }
 
+/** Release on operation settlement, never on view or effect cleanup. */
+export function beginDesktopWorkOperation(
+  kind: DesktopWorkOperation
+): () => void {
+  const operation = Symbol('desktop-work-operation');
+  operations.set(operation, kind);
+  publishWorkState();
+  return () => {
+    if (operations.delete(operation)) publishWorkState();
+  };
+}
+
 function publishWorkState(): boolean {
   const states = [...owners.values()];
+  const pending = [...operations.values()];
   currentWorkState =
     states.length === 0
       ? null
@@ -39,8 +54,12 @@ function publishWorkState(): boolean {
           hasDraft: states.some(state => state.hasDraft),
           isStreaming: states.some(state => state.isStreaming),
           isUploading: states.some(state => state.isUploading),
-          hasPendingAction: states.some(state => state.hasPendingAction),
-          isAuthenticating: states.some(state => state.isAuthenticating),
+          hasPendingAction:
+            pending.includes('pending-action') ||
+            states.some(state => state.hasPendingAction),
+          isAuthenticating:
+            pending.includes('authentication') ||
+            states.some(state => state.isAuthenticating),
         };
   const supported = reportDesktopWorkState(currentWorkState);
   for (const listener of listeners) listener();

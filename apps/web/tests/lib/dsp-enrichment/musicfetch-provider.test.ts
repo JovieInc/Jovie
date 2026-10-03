@@ -34,6 +34,11 @@ vi.mock('@sentry/nextjs', () => ({
 vi.mock('@/lib/musicfetch/resilient-client', () => ({
   musicfetchRequest: (...args: unknown[]) => mockMusicfetchRequest(...args),
   isMusicfetchInvalidServicesError: vi.fn(() => false),
+  isMusicfetchVendorUnavailable: (error: unknown) => {
+    if (!(error instanceof Error)) return false;
+    const status = (error as { statusCode?: number }).statusCode;
+    return status === 401 || status === 403;
+  },
   MusicfetchBudgetExceededError: class extends Error {},
   MusicfetchRequestError: class extends Error {},
 }));
@@ -91,5 +96,19 @@ describe('musicfetch artist lookup provider', () => {
     expect(params.get('services')).toBe(
       provider.MUSICFETCH_ARTIST_LOOKUP_SERVICES.join(',')
     );
+  });
+
+  it('returns null when MusicFetch responds 401', async () => {
+    const error = new Error('MusicFetch vendor unavailable');
+    (error as Error & { statusCode: number }).statusCode = 401;
+    mockMusicfetchRequest.mockRejectedValue(error);
+
+    const provider = await import('@/lib/dsp-enrichment/providers/musicfetch');
+
+    await expect(
+      provider.fetchArtistBySpotifyUrl(
+        'https://open.spotify.com/artist/6M2wZ9GZgrQXHCFfjv46we'
+      )
+    ).resolves.toBeNull();
   });
 });
