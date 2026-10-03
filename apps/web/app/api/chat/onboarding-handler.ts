@@ -57,8 +57,10 @@ import {
   rateLimitDenialStatus,
 } from '@/lib/rate-limit';
 import { isLocalDevelopmentAutomationHostname } from '@/lib/security/development-only';
+import { resolveSyntheticPassage } from '@/lib/synthetic/passage.server';
 import {
   isTurnstileConfigured,
+  verifyTurnstileTestModeToken,
   verifyTurnstileToken,
 } from '@/lib/turnstile/verify';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
@@ -364,11 +366,25 @@ export async function tryHandleAnonymousOnboardingChat(
     }
 
     if (!shouldBypassTurnstile) {
-      const verify = await verifyTurnstileToken(
-        parsed.data.turnstileToken,
-        ip,
-        extractRequestHostname(req)
+      // Approved synthetic principals (JOV-7697) verify in Cloudflare's test
+      // mode. Passage needs a verified session on the controlled canary
+      // mailbox plus a roster grant and a default-off gate. Anonymous
+      // visitors and every other account still verify against the real key.
+      const syntheticPrincipal = await resolveSyntheticPassage(
+        signedInSession,
+        'onboarding_chat',
+        { requestId }
       );
+      if (syntheticPrincipal) {
+        Sentry.setTag('synthetic_principal', syntheticPrincipal.actorId);
+      }
+      const verify = syntheticPrincipal
+        ? await verifyTurnstileTestModeToken(parsed.data.turnstileToken, ip)
+        : await verifyTurnstileToken(
+            parsed.data.turnstileToken,
+            ip,
+            extractRequestHostname(req)
+          );
       if (!verify.success) {
         return NextResponse.json(
           {
