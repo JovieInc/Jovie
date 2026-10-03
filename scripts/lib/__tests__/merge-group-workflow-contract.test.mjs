@@ -2422,7 +2422,10 @@ ${selectedGateScript}`,
     expect(PRODUCTION_RELEASE_WORKFLOW).not.toContain('concurrency:');
 
     expect(verified).toContain(
-      "fromJSON(needs.release-source.outputs.ci).event == 'push'"
+      "needs.release-source.result == 'success'"
+    );
+    expect(verified).toContain(
+      "fromJSON(needs.release-source.outputs.ci || '{}').event == 'push'"
     );
     expect(verified).toContain(
       "needs.authorize-production.result == 'success'"

@@ -43,6 +43,50 @@ const DEPLOYMENT_ID = 'dpl_exact_generation';
 const DEPLOYMENT_URL = 'https://jovie-exact-generation-jovie.vercel.app';
 const tempRoots = [];
 
+describe('production verification admission', () => {
+  const job = getJobBlock(CONTROLLER_WORKFLOW, 'production-verified');
+  const condition = job.match(/if: >-\s*\$\{\{([\s\S]*?)\}\}/)?.[1];
+  if (!condition) throw new Error('Missing production verification condition');
+  // Evaluate the actual workflow expression with GitHub's JSON and status
+  // primitives so an empty skipped-job output cannot hide behind YAML parsing.
+  const evaluate = new Function(
+    'needs',
+    'fromJSON',
+    'always',
+    `return (${condition.replace(/needs\.([\w-]+)/g, "needs['$1']")});`
+  );
+  const admission = (result, ci, authorized = 'success', verified = 'false') =>
+    evaluate(
+      {
+        'release-source': { result, outputs: { ci } },
+        'authorize-production': {
+          result: authorized,
+          outputs: { already_verified: verified },
+        },
+      },
+      JSON.parse,
+      () => true
+    );
+
+  it('skips verification safely when source resolution has no receipt', () => {
+    for (const result of ['skipped', 'failure', 'cancelled']) {
+      expect(admission(result, '', 'skipped')).toBe(false);
+    }
+    expect(admission('success', '')).toBe(false);
+  });
+
+  it('requires a push receipt and successful unverified authorization', () => {
+    const push = JSON.stringify({ event: 'push' });
+    expect(admission('success', push)).toBe(true);
+    expect(
+      admission('success', JSON.stringify({ event: 'pull_request' }))
+    ).toBe(false);
+    expect(admission('success', push, 'failure')).toBe(false);
+    expect(admission('success', push, 'success', 'true')).toBe(false);
+    expect(() => admission('success', '{malformed')).toThrow();
+  });
+});
+
 afterEach(() => {
   vi.mocked(spawnSync).mockRestore();
   vi.mocked(spawn).mockRestore();

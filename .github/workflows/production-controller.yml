@@ -1058,7 +1058,8 @@ jobs:
     if: >-
       ${{
         always() &&
-        fromJSON(needs.release-source.outputs.ci).event == 'push' &&
+        needs.release-source.result == 'success' &&
+        fromJSON(needs.release-source.outputs.ci || '{}').event == 'push' &&
         needs.authorize-production.result == 'success' &&
         needs.authorize-production.outputs.already_verified != 'true'
       }}
