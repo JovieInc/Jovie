@@ -13,6 +13,7 @@ import type {
   PlanInput,
   PlanRateLimitConfig,
   RateLimitConfig,
+  RateLimitReadResult,
   RateLimitResult,
   RateLimitStatus,
 } from './types';
@@ -173,6 +174,13 @@ export function createPlanAwareRateLimiter(
       const normalizedPlan = normalizePlan(plan);
       const limiter = getLimiterForPlan(normalizedPlan);
       return limiter.getStatus(identifier);
+    },
+
+    async readStatus(
+      identifier: string,
+      plan: PlanInput
+    ): Promise<RateLimitReadResult> {
+      return getLimiterForPlan(normalizePlan(plan)).readStatus(identifier);
     },
 
     async wouldBeRateLimited(

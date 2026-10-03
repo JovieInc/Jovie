@@ -2,6 +2,12 @@
   "schema": "jovie.design-system-source-identity/v1",
   "identities": [
     {
+      "file": "apps/web/lib/smart-link-mvp/parse-input.ts",
+      "rule": "arbitrary-value",
+      "value": "intl-[a-z]",
+      "reason": "JOV-7663: regex literal matching Spotify's intl-<locale> path prefix on track and artist URLs, not a Tailwind class or visual token. No canonical design token applies."
+    },
+    {
       "file": "apps/web/app/api/internal/ovie/summer-bottleneck/route.ts",
       "rule": "arbitrary-value",
       "value": "JOV-[1-9]",
