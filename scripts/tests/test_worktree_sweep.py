@@ -141,6 +141,21 @@ class SweepTest(unittest.TestCase):
         self.assertIn("remove:", report["errors"][0])
         self.assertEqual(report["kept"], 1)
 
+    def test_a_timed_out_checkout_is_kept_and_the_sweep_continues(self):
+        slow = self.worktree("slow")
+        (slow / "a.txt").write_text("edited\n")
+        clean = self.worktree("clean-after")
+
+        def run(args, **kw):
+            if args[2:4] == [str(slow), "add"]:
+                raise subprocess.TimeoutExpired(args, kw.get("timeout"))
+            return no_processes(args, **kw)
+
+        report = self.sweep(run=run)
+        self.assertTrue((slow / "a.txt").exists(), "unsaved work stays when its backup cannot finish")
+        self.assertFalse(clean.exists(), "later checkouts are still swept")
+        self.assertEqual(report["errors"], [f"{slow}:TimeoutExpired"])
+
     def test_unreadable_process_inventory_removes_nothing(self):
         path = self.worktree("idle")
 

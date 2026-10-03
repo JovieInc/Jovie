@@ -198,6 +198,33 @@ def decide(path: Path, branch: str | None, info: dict, now: float, closed: set[s
     return "idle" if idle >= idle_s else None
 
 
+def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: dict, *, run, now: float,
+           closed: set[str], idle_s: float, preserved_ttl_s: float, prefix: str, date: str) -> None:
+    if busy(path, live):
+        report["kept"] += 1
+        return
+    info = inspect(path, run)
+    if info is None:
+        report["kept"] += 1
+        return
+    reason = decide(path, branch, info, now, closed, idle_s=idle_s, preserved_ttl_s=preserved_ttl_s)
+    if reason is None:
+        report["kept"] += 1
+        return
+    if info["dirty"] or info["unpushed"] != "0":
+        saved = backup(path, info, run, prefix, date)
+        if not saved:
+            strip_build_dirs(path)
+            report["stripped"].append(str(path))
+            return
+        report["backups"].append(saved)
+    removed = git(repo, run, "worktree", "remove", "--force", str(path), timeout=900)
+    if removed.returncode == 0:
+        report["removed"].append({"path": str(path), "reason": reason})
+    else:
+        report["errors"].append(f"remove:{path}:{removed.stderr.strip()[:120]}")
+
+
 def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=subprocess.run,
           now: float | None = None, closed: dict[Path, set[str]] | None = None, idle_s: float = IDLE_S,
           preserved_ttl_s: float = PRESERVED_TTL_S, prefix: str = "backup/mac",
@@ -212,34 +239,26 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=subpro
         report["errors"].append("process-state-unavailable")
         return report
     for repo in repos:
-        for path, branch in linked_worktrees(repo, run):
+        try:
+            entries = linked_worktrees(repo, run)
+        except (OSError, subprocess.SubprocessError) as error:
+            report["errors"].append(f"list:{repo}:{type(error).__name__}")
+            continue
+        for path, branch in entries:
             if not path.exists() or not in_scope(path, roots, never):
                 continue
-            if busy(path, live):
+            try:
+                retire(repo, path, branch, live, report, run=run, now=now, closed=closed.get(repo, set()),
+                       idle_s=idle_s, preserved_ttl_s=preserved_ttl_s, prefix=prefix, date=date)
+            except (OSError, subprocess.SubprocessError) as error:
+                # One slow or broken checkout (e.g. `git add` timing out under load) must not end
+                # the sweep; it stays in place and is retried next interval.
                 report["kept"] += 1
-                continue
-            info = inspect(path, run)
-            if info is None:
-                report["kept"] += 1
-                continue
-            reason = decide(path, branch, info, now, closed.get(repo, set()),
-                            idle_s=idle_s, preserved_ttl_s=preserved_ttl_s)
-            if reason is None:
-                report["kept"] += 1
-                continue
-            if info["dirty"] or info["unpushed"] != "0":
-                saved = backup(path, info, run, prefix, date)
-                if not saved:
-                    strip_build_dirs(path)
-                    report["stripped"].append(str(path))
-                    continue
-                report["backups"].append(saved)
-            removed = git(repo, run, "worktree", "remove", "--force", str(path), timeout=900)
-            if removed.returncode == 0:
-                report["removed"].append({"path": str(path), "reason": reason})
-            else:
-                report["errors"].append(f"remove:{path}:{removed.stderr.strip()[:120]}")
-        git(repo, run, "worktree", "prune", timeout=120)
+                report["errors"].append(f"{path}:{type(error).__name__}"[:200])
+        try:
+            git(repo, run, "worktree", "prune", timeout=120)
+        except (OSError, subprocess.SubprocessError):
+            pass
     return report
 
 
