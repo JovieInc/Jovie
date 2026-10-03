@@ -37,7 +37,8 @@ describe('shared investor brief routing', () => {
     );
 
     expect(stickyBar).toContain("data-pitch-event='invest_cta_clicked'");
-    expect(stickyBar).toContain("data-pitch-event='meeting_cta_clicked'");
+    expect(stickyBar).toContain("data-pitch-event='call_requested'");
+    expect(stickyBar).not.toContain('bookCallUrl');
   });
 });
 

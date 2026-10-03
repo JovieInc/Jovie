@@ -1,7 +1,6 @@
 import { FundraiseProgress } from './FundraiseProgress';
 
 interface InvestorStickyBarProps {
-  readonly bookCallUrl: string | null;
   readonly investUrl: string | null;
   readonly showProgress: boolean;
   readonly raiseTarget: number | null;
@@ -11,21 +10,17 @@ interface InvestorStickyBarProps {
 
 /**
  * Bottom persistent action bar for investor portal.
- * Liquid glass background with Invest + Book a Call buttons.
+ * Liquid glass background with Invest and Request a call.
+ * Request a call records the ask. It does not open a calendar.
  * Optional fundraise progress indicator.
  */
 export function InvestorStickyBar({
-  bookCallUrl,
   investUrl,
   showProgress,
   raiseTarget,
   committedAmount,
   investorCount,
 }: InvestorStickyBarProps) {
-  const hasAnyButton = bookCallUrl || investUrl;
-
-  if (!hasAnyButton && !showProgress) return null;
-
   return (
     <div
       className='fixed bottom-0 left-0 right-0 z-50 border-t'
@@ -64,21 +59,17 @@ export function InvestorStickyBar({
               Invest
             </a>
           )}
-          {bookCallUrl && (
-            <a
-              data-pitch-event='meeting_cta_clicked'
-              href={bookCallUrl}
-              target='_blank'
-              rel='noopener noreferrer'
-              className='w-full rounded-(--radius-pill) px-6 py-2.5 text-center text-[length:var(--text-sm)] font-(--font-weight-semibold) sm:w-auto'
-              style={{
-                background: 'var(--color-btn-secondary-bg)',
-                color: 'var(--color-btn-secondary-fg)',
-              }}
-            >
-              Book a Call
-            </a>
-          )}
+          <button
+            type='button'
+            data-pitch-event='call_requested'
+            className='w-full rounded-(--radius-pill) px-6 py-2.5 text-center text-[length:var(--text-sm)] font-(--font-weight-semibold) sm:w-auto'
+            style={{
+              background: 'var(--color-btn-secondary-bg)',
+              color: 'var(--color-btn-secondary-fg)',
+            }}
+          >
+            Request a call
+          </button>
         </div>
       </div>
     </div>

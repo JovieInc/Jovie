@@ -265,7 +265,7 @@ export function InvestorSettingsForm() {
         <div className='space-y-4 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'>
           <DrawerFormField
             label='Book A Call URL'
-            helperText='Link to your Calendly, Cal.com, or scheduling page.'
+            helperText='Stored only. The portal records a call request and does not open a scheduling page.'
           >
             <Input
               type='url'
