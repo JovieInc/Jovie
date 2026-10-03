@@ -1,0 +1,7 @@
+{
+  "schema": "jovie-preserved-repair/v1",
+  "pr": 19702,
+  "issue": "JOV-7306",
+  "receipt": "/Users/timwhite/Documents/Codex/receipts/2026-09-30-jov7306-preserved-mac-repair",
+  "reason": "obsolete merged PR; distinct follow-up preserved; root owns remaining implementation"
+}

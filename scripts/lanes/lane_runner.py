@@ -672,6 +672,18 @@ def sh(args: list[str], cwd: Path | None = None, timeout: int = 600, env=None, l
     return result
 
 
+def install_deps(host: Host, worktree: Path, log):
+    """Every lane install holds the disk_guard store lock shared so a pressure-sweep
+    `pnpm store prune` (exclusive) can never delete store content mid-install — the
+    race behind `ERR_PNPM_GenericFailure ... reflink` gate failures (JOV-7301)."""
+    fd = disk_guard.store_lock(host, exclusive=False, wait=True)
+    try:
+        return sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
 def log_tail(log, limit: int = 12000) -> str:
     """What a streamed command wrote, for evidence extraction."""
     try:
@@ -872,7 +884,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
             sh(["git", "worktree", "add", "-q", "-b", branch, str(worktree), "origin/main"], cwd=host.repo, log=log)
             # Always installed: the gate's checks need it even when the provider works remotely.
-            sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
+            install_deps(host, worktree, log)
             prompt = render_prompt(issue, branch, context_pack(issue), provider=name)
             prompt_file = runs / f"{run_id}.prompt.md"
             prompt_file.write_text(prompt)
@@ -1418,7 +1430,7 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
             if lockfile_only:
                 receipt.update(resolution="lockfile-regenerated")
             else:
-                sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
+                install_deps(host, worktree, log)
                 prompt = render_fix_prompt(pr, failure_excerpt(pr))
                 prompt_file = runs / f"{run_id}.prompt.md"
                 prompt_file.write_text(prompt)
@@ -1517,7 +1529,7 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
         try:
             sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
             add_worktree(host, ["--detach", str(worktree), "origin/main"], log)
-            sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
+            install_deps(host, worktree, log)
             labels = {label["name"].lower() for label in pr.get("labels", [])}
             receipt.update(gate_pr(host, pr, worktree, log, sensitive=SENSITIVE_PR_LABEL in labels))
         except WorktreeUnavailable as error:

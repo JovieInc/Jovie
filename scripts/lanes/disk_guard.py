@@ -8,9 +8,16 @@ in order: DerivedData idle > 5h, clean worktrees idle > 12h (branches kept),
 unavailable`, `pnpm store prune`. Free space at or below CRITICAL_PCT after the
 sweep is `critical` in the receipt; the doctor turns that reading into a Linear
 Triage signal for Summer. Every step fails soft: one bad path never stops the rest.
+
+The store prune runs under an exclusive flock on `state/pnpm-store.lock`; lane
+installs hold it shared (lane_runner.install_deps). Without it a prune racing an
+in-flight install deletes content files the install still links, failing the lane
+gate with `ERR_PNPM_GenericFailure ... No such file or directory ... reflink`
+(JOV-7301).
 """
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import shutil
@@ -28,6 +35,32 @@ DERIVED_DATA_ROOT = Path(os.environ.get("LANES_DERIVED_DATA",
 # Reclaimed inside idle worktrees that are kept; .git and node_modules are never walked.
 PRUNE_DIRS = frozenset({".next", "test-results"})
 SKIP_DIRS = PRUNE_DIRS | {".git", "node_modules"}
+STORE_LOCK_NAME = "pnpm-store.lock"
+
+
+def store_lock(host, exclusive: bool, wait: bool = False) -> int | None:
+    """flock the shared pnpm-store lock; returns the held fd or None. Installs take it
+    shared and block; the store prune takes it exclusive and skips when contended."""
+    try:
+        host.state.mkdir(parents=True, exist_ok=True)
+        fd = os.open(host.state / STORE_LOCK_NAME, os.O_CREAT | os.O_RDWR, 0o644)
+    except OSError:
+        return None
+    try:
+        fcntl.flock(fd, (fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH) | (0 if wait else fcntl.LOCK_NB))
+    except OSError:
+        os.close(fd)
+        return None
+    return fd
+
+
+def pnpm_install_running(run) -> bool:
+    """Belt for installs that bypass the lock (manual/agent shells): pgrep the host."""
+    try:
+        result = run(["pgrep", "-f", "pnpm install"], capture_output=True, text=True, timeout=30)
+    except Exception:
+        return False
+    return result.returncode == 0
 
 
 def now_iso() -> str:
@@ -116,14 +149,26 @@ def sweep_worktrees(host, run, now: float, report: dict) -> None:
             prune_build_dirs(path, report)
 
 
-def sweep_host_tools(run, report: dict) -> None:
+def sweep_host_tools(host, run, report: dict) -> None:
     for cmd in (["xcrun", "simctl", "delete", "unavailable"], ["pnpm", "store", "prune"]):
         if shutil.which(cmd[0]) is None:
             continue
-        # launchd starts lanes in "/" (read-only); pnpm writes a temp file into its cwd and exits 226 (EROFS).
-        result = run(cmd, capture_output=True, text=True, timeout=600, cwd=Path.home())
-        (report["actions"] if result.returncode == 0 else report["errors"]).append(
-            f"{' '.join(cmd)} -> {result.returncode}" if result.returncode else f"ran {' '.join(cmd)}")
+        lock = None
+        if cmd[0] == "pnpm":
+            lock = store_lock(host, exclusive=True)
+            if lock is None or pnpm_install_running(run):
+                if lock is not None:
+                    os.close(lock)
+                report["actions"].append("skipped pnpm store prune: install in progress")
+                continue
+        try:
+            # launchd starts lanes in "/" (read-only); pnpm writes a temp file into its cwd and exits 226 (EROFS).
+            result = run(cmd, capture_output=True, text=True, timeout=600, cwd=Path.home())
+            (report["actions"] if result.returncode == 0 else report["errors"]).append(
+                f"{' '.join(cmd)} -> {result.returncode}" if result.returncode else f"ran {' '.join(cmd)}")
+        finally:
+            if lock is not None:
+                os.close(lock)
 
 
 def check(host, *, run=subprocess.run, now: float | None = None) -> dict:
@@ -135,7 +180,7 @@ def check(host, *, run=subprocess.run, now: float | None = None) -> dict:
         report["low"] = True
         for step in (lambda: sweep_derived_data(now, report),
                      lambda: sweep_worktrees(host, run, now, report),
-                     lambda: sweep_host_tools(run, report)):
+                     lambda: sweep_host_tools(host, run, report)):
             try:
                 step()
             except Exception as error:

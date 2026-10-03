@@ -159,7 +159,10 @@ class CheckTest(unittest.TestCase):
         def run(args, **kw):
             ran.append(args[0] if isinstance(args, list) else args)
             cwds[args[0]] = kw.get("cwd")
-            return self._porcelain_empty() if args[:3] == ["git", "worktree", "list"] else ok(args)
+            if args[:3] == ["git", "worktree", "list"]:
+                return self._porcelain_empty()
+            # No lane install in flight: pgrep finds nothing.
+            return SimpleNamespace(returncode=1, stdout="", stderr="") if args[0] == "pgrep" else ok(args)
 
         with tempfile.TemporaryDirectory() as tmp:
             try:
@@ -171,6 +174,28 @@ class CheckTest(unittest.TestCase):
             self.assertIn("xcrun", ran)
             self.assertIn("pnpm", ran)
             self.assertEqual(cwds["pnpm"], Path.home())
+
+    def test_store_prune_skips_while_an_install_is_in_flight(self):
+        """The prune deletes store content an in-flight install still links (JOV-7301):
+        pgrep seeing `pnpm install` must skip it, and the lock must serialize the rest."""
+        saved = guard.shutil.which
+        guard.shutil.which = lambda name: "/bin/" + name
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                host = self.host(tmp)
+                report = {"actions": [], "errors": []}
+                guard.sweep_host_tools(host, lambda *a, **k: SimpleNamespace(returncode=0, stdout="", stderr=""), report)
+                self.assertIn("skipped pnpm store prune: install in progress", report["actions"])
+
+                report = {"actions": [], "errors": []}
+                fd = guard.store_lock(host, exclusive=False)
+                try:  # a contended exclusive prune is skipped without waiting on the install
+                    guard.sweep_host_tools(host, lambda *a, **k: SimpleNamespace(returncode=1, stdout="", stderr=""), report)
+                finally:
+                    os.close(fd)
+                self.assertIn("skipped pnpm store prune: install in progress", report["actions"])
+        finally:
+            guard.shutil.which = saved
 
     def _porcelain_empty(self):
         return SimpleNamespace(returncode=0, stdout="worktree /repo\nHEAD x\nbranch refs/heads/main\n", stderr="")
