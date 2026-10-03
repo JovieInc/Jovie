@@ -1516,3 +1516,228 @@ extension APIClientTests {
     }
   }
 }
+
+
+// These HTTP fixtures share the existing token-store lease across both suites.
+actor ProfileCompletionHTTP {
+  struct Reply: Sendable {
+    var status = 200
+    var body = Data(#"{"profileId":"profile-a"}"#.utf8)
+    var headers: [String: String] = [:]
+    var gate: ProfileLoadGate?
+    var failure: URLError.Code?
+  }
+  private var replies: [Reply]
+  private(set) var requests: [URLRequest] = []
+  init(_ replies: [Reply]) { self.replies = replies }
+  func respond(to request: URLRequest) async throws -> Reply {
+    requests.append(request)
+    guard !replies.isEmpty else { throw URLError(.badServerResponse) }
+    let reply = replies.removeFirst()
+    if let gate = reply.gate { _ = await gate.wait() }
+    if let failure = reply.failure { throw URLError(failure) }
+    return reply
+  }
+}
+
+final class ProfileCompletionURLProtocol: URLProtocol {
+  private static let lock = NSLock()
+  private static var script: ProfileCompletionHTTP?
+  private static var tasks: [Task<Void, Never>] = []
+  private let stopLock = NSLock()
+  private var stopped = false
+
+  static func session(_ script: ProfileCompletionHTTP) -> URLSession {
+    lock.withLock { Self.script = script; tasks = [] }
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [Self.self]
+    return URLSession(configuration: configuration)
+  }
+  static func drain() async {
+    let tasks = lock.withLock { Self.tasks }
+    for task in tasks { await task.value }
+  }
+  override class func canInit(with request: URLRequest) -> Bool { true }
+  override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+  override func startLoading() {
+    // Register the worker before it can deliver callbacks or be missed by drain.
+    Self.lock.lock()
+    defer { Self.lock.unlock() }
+    let task = Task {
+      let script = Self.lock.withLock { Self.script }
+      do {
+        guard let script else { throw URLError(.badServerResponse) }
+        let reply = try await script.respond(to: request)
+        guard !stopLock.withLock({ stopped }) else { return }
+        client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: reply.status,
+          httpVersion: nil, headerFields: reply.headers)!, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: reply.body)
+        client?.urlProtocolDidFinishLoading(self)
+      } catch {
+        guard !stopLock.withLock({ stopped }) else { return }
+        client?.urlProtocol(self, didFailWithError: error)
+      }
+    }
+    Self.tasks.append(task)
+  }
+  override func stopLoading() { stopLock.withLock { stopped = true } }
+}
+
+private struct PausedCompletionAuthorization: TokenProviding {
+  let authorization: NativeRequestAuthorization
+  let gate: ProfileLoadGate
+  func bearerToken(forceRefresh: Bool) async throws -> String { authorization.bearerToken }
+  func ownedRequestAuthorization(for userID: String, ifOwnedBy owner: NativeSessionOwnership) async throws
+    -> NativeRequestAuthorization {
+    _ = await gate.wait()
+    return authorization
+  }
+}
+
+extension APIClientTests {
+  @Test(arguments: ["current", "different-user", "same-login", "clear", "rotation", "same-bearer", "second-rotation"])
+  func ownedProfileCompletionRejectionUsesOnlyItsOriginalBearer(scenario: String) async throws {
+    try await withNativeAuthSecurityScript { _ in
+      NativeSessionTokenStore.save(token: "a0", userID: "a", expiresAt: .distantFuture)
+      let owner = NativeSessionTokenStore.captureOwnership()
+      let original = try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: owner)
+      let firstGate = ProfileLoadGate(), retryGate = ProfileLoadGate()
+      let script = ProfileCompletionHTTP([
+        .init(status: 401, gate: firstGate),
+        .init(status: scenario == "rotation" ? 200 : 401, headers: ["set-auth-token": "a2"], gate: retryGate),
+      ])
+      let session = ProfileCompletionURLProtocol.session(script)
+      defer { session.invalidateAndCancel() }
+      let client = APIClient(baseURL: URL(string: "https://jov.ie")!, session: session,
+        tokenProvider: NativeSessionTokenProvider())
+      let caller = Task { () -> Error? in
+        let failure: Error?
+        do { try await client.completeProfile(displayName: "A", username: "a", for: "a", ifOwnedBy: owner); failure = nil }
+        catch { failure = error }
+        await firstGate.ownerFinished(); await retryGate.ownerFinished()
+        return failure
+      }
+      #expect(await firstGate.waitUntilEntered())
+      if scenario == "different-user" || scenario == "same-login" {
+        NativeSessionTokenStore.save(token: scenario == "same-login" ? "a0" : "b",
+          userID: scenario == "same-login" ? "a" : "b", expiresAt: .distantFuture)
+      } else if scenario == "clear" { NativeSessionTokenStore.clear() }
+      else if ["rotation", "same-bearer", "second-rotation"].contains(scenario) {
+        NativeSessionTokenStore.refresh(from: HTTPURLResponse(url: URL(string: "https://jov.ie")!, statusCode: 200,
+          httpVersion: nil, headerFields: ["set-auth-token": scenario == "same-bearer" ? "a0" : "a1"])!,
+          authorizedBy: original)
+      }
+      var preserved = NativeSessionTokenStore.captureSessionContext()
+      await firstGate.complete(true)
+      let retries = scenario == "rotation" || scenario == "second-rotation"
+      #expect(await retryGate.waitUntilEntered() == retries)
+      if scenario == "second-rotation" {
+        // This capture is synchronous and optional so fixture failure cannot strand the retry.
+        if let authorization = NativeSessionTokenStore.requestAuthorization(ifOwnedBy: owner) {
+          NativeSessionTokenStore.refresh(from: HTTPURLResponse(url: URL(string: "https://jov.ie")!, statusCode: 200,
+            httpVersion: nil, headerFields: ["set-auth-token": "a2"])!, authorizedBy: authorization)
+        } else { Issue.record("Expected retry authority") }
+        preserved = NativeSessionTokenStore.captureSessionContext()
+      }
+      await retryGate.complete(true)
+      let error = await caller.value
+      await ProfileCompletionURLProtocol.drain()
+      if scenario == "current" {
+        if let failure = error as? NativeSessionRequestError, case let .expired(receipt) = failure {
+          #expect(receipt.userID == "a" && NativeSessionTokenStore.captureOwnership() == receipt.ownership)
+          #expect(NativeSessionTokenStore.load() == nil)
+        } else { Issue.record("Expected exact current-owner expiry") }
+      } else if scenario == "rotation" {
+        #expect(error == nil && NativeSessionTokenStore.load()?.token == "a2")
+        #expect(NativeSessionTokenStore.captureOwnership() == owner)
+      } else {
+        #expect(error as? NativeSessionRequestError == .superseded)
+        #expect(NativeSessionTokenStore.captureSessionContext() == preserved)
+      }
+      let requests = await script.requests
+      #expect(requests.count == (retries ? 2 : 1))
+      for (index, request) in requests.enumerated() {
+        #expect(request.url?.path == "/api/mobile/v1/profile/complete" && request.httpMethod == "POST")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer \(index == 0 ? "a0" : "a1")")
+        let payload = try JSONSerialization.jsonObject(with: requestBodyData(request)) as? [String: String]
+        #expect(payload == ["displayName": "A", "username": "a"])
+      }
+    }
+  }
+
+  @Test(arguments: ["success", "conflict", "decode", "transport", "cancel"], [false, true])
+  func ownedProfileCompletionSuppressesLateResults(outcome: String, replace: Bool) async throws {
+    try await withNativeAuthSecurityScript { _ in
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+      let owner = NativeSessionTokenStore.captureOwnership(), gate = ProfileLoadGate()
+      let reply = ProfileCompletionHTTP.Reply(status: outcome == "conflict" ? 409 : 200,
+        body: Data((outcome == "decode" ? "{" : outcome == "conflict" ? #"{"error":"Taken"}"# : #"{"profileId":"p"}"#).utf8),
+        headers: ["set-auth-token": "rolled"], gate: gate,
+        failure: outcome == "transport" ? .networkConnectionLost : outcome == "cancel" ? .cancelled : nil)
+      let script = ProfileCompletionHTTP([reply]), session = ProfileCompletionURLProtocol.session(script)
+      defer { session.invalidateAndCancel() }
+      let client = APIClient(baseURL: URL(string: "https://jov.ie")!, session: session,
+        tokenProvider: NativeSessionTokenProvider())
+      let caller = Task { () -> Error? in
+        do {
+          try await client.completeProfile(displayName: "A", username: "a", for: "a", ifOwnedBy: owner)
+          await gate.ownerFinished(); return nil
+        } catch { await gate.ownerFinished(); return error }
+      }
+      #expect(await gate.waitUntilEntered())
+      if replace { NativeSessionTokenStore.save(token: "b", userID: "b", expiresAt: .distantFuture) }
+      let preserved = NativeSessionTokenStore.captureSessionContext()
+      await gate.complete(true)
+      let error = await caller.value
+      await ProfileCompletionURLProtocol.drain()
+      if outcome == "cancel" { #expect(error is CancellationError) }
+      else if replace { #expect(error as? NativeSessionRequestError == .superseded) }
+      else if outcome == "success" { #expect(error == nil) }
+      else if outcome == "conflict" { #expect(error as? APIClientError == .profileCompletionFailed(statusCode: 409, message: "Taken")) }
+      else if outcome == "decode" { #expect(error as? APIClientError == .decodingFailed) }
+      else { #expect(error as? APIClientError == .transportFailed(code: URLError.networkConnectionLost.rawValue)) }
+      if replace || ["conflict", "transport", "cancel"].contains(outcome) {
+        #expect(NativeSessionTokenStore.captureSessionContext() == preserved)
+      } else { #expect(NativeSessionTokenStore.load()?.token == "rolled") }
+      #expect(await script.requests.count == 1)
+    }
+  }
+
+  @Test(arguments: ["replace", "same-login", "cancel", "cancel-before", "unmanaged", "mismatched"])
+  func ownedProfileCompletionValidatesAfterAuthorizationWait(scenario: String) async throws {
+    try await withNativeAuthSecurityScript { _ in
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+      let owner = NativeSessionTokenStore.captureOwnership(), gate = ProfileLoadGate()
+      let original = try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: owner)
+      if scenario == "mismatched" { NativeSessionTokenStore.save(token: "b", userID: "b", expiresAt: .distantFuture) }
+      let supplied: NativeRequestAuthorization
+      if scenario == "unmanaged" { supplied = NativeRequestAuthorization(unmanagedBearerToken: "a") }
+      else if scenario == "mismatched" {
+        supplied = try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: NativeSessionTokenStore.captureOwnership())
+      } else { supplied = original }
+      let script = ProfileCompletionHTTP([]), session = ProfileCompletionURLProtocol.session(script)
+      defer { session.invalidateAndCancel() }
+      let client = APIClient(baseURL: URL(string: "https://jov.ie")!, session: session,
+        tokenProvider: PausedCompletionAuthorization(authorization: supplied, gate: gate))
+      let caller = Task { () -> Error? in
+        if scenario == "cancel-before" { withUnsafeCurrentTask { $0?.cancel() } }
+        do {
+          try await client.completeProfile(displayName: "A", username: "a", for: "a", ifOwnedBy: owner)
+          await gate.ownerFinished(); return nil
+        } catch { await gate.ownerFinished(); return error }
+      }
+      #expect(await gate.waitUntilEntered() == (scenario != "cancel-before"))
+      if scenario == "replace" || scenario == "same-login" {
+        NativeSessionTokenStore.save(token: scenario == "same-login" ? "a" : "b",
+          userID: scenario == "same-login" ? "a" : "b", expiresAt: .distantFuture)
+      } else if scenario == "cancel" { caller.cancel() }
+      let preserved = NativeSessionTokenStore.captureSessionContext()
+      await gate.complete(true)
+      let error = await caller.value
+      await ProfileCompletionURLProtocol.drain()
+      #expect(scenario.hasPrefix("cancel") ? error is CancellationError : error as? NativeSessionRequestError == .superseded)
+      #expect(await script.requests.isEmpty)
+      #expect(NativeSessionTokenStore.captureSessionContext() == preserved)
+    }
+  }
+}
