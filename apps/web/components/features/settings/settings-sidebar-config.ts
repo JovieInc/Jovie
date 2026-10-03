@@ -3,6 +3,7 @@ import {
   Cable,
   Contact,
   Gauge,
+  Gift,
   Lock,
   type LucideIcon,
   Palette,
@@ -14,7 +15,7 @@ import {
 import { APP_ROUTES } from '@/constants/routes';
 
 // Settings IA — approved 2026-07-03 via Design Shootout (`settings-ia`).
-// Groups the settings sub-pages under 4 top-level groups. This config is
+// Groups the 11 settings sub-pages under 4 top-level groups. This config is
 // the single source of truth for the settings sidebar; the nav snapshot test
 // in settings-sidebar-config.test.ts locks the structure so changes require
 // a deliberate review (see #12645 IA guardrails).
@@ -118,6 +119,12 @@ export const SETTINGS_SIDEBAR_GROUPS: readonly SettingsSidebarGroup[] = [
         label: 'Usage',
         href: APP_ROUTES.SETTINGS_USAGE,
         icon: Gauge,
+      },
+      {
+        id: 'referral',
+        label: 'Referral',
+        href: APP_ROUTES.SETTINGS_REFERRAL,
+        icon: Gift,
       },
     ],
   },
