@@ -96,6 +96,12 @@ test('computeMetrics measures first pass, ejections, latency, intake and duplica
       state: 'OPEN',
       createdAt: at(0),
       events: [added(50), removed(55)],
+      failureReceipts: [
+        {
+          classification: 'deterministic-source',
+          failureNumber: 2,
+        },
+      ],
     },
     // silently re-added (no removal recorded): outcome unknown, not counted
     {
@@ -159,6 +165,8 @@ test('computeMetrics measures first pass, ejections, latency, intake and duplica
   assert.equal(m.ejections.mergeGroupRuns, 3);
   assert.equal(m.ejections.mergeGroupFailed, 1);
   assert.equal(m.ejections.mergeGroupRunsPerMergedPr, 1);
+  assert.equal(m.ejections.revisionFailureHolds, 1);
+  assert.equal(m.ejections.deterministicFailureRecurrence, 1);
   assert.deepEqual(m.occupancy, {
     inQueue: 1,
     maxEntriesToBuild: 10,
@@ -180,6 +188,10 @@ test('computeMetrics measures first pass, ejections, latency, intake and duplica
   const text = renderMarkdown(m);
   assert.match(text, /first-pass rate \| 50% \(2\/4 entries\)/);
   assert.match(text, /failed_checks 2/);
+  assert.match(
+    text,
+    /failure holds \/ deterministic same-head recurrence \| 1 \/ 1/
+  );
 });
 
 test('computeMetrics degrades to n/a on an empty window', () => {

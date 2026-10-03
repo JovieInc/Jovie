@@ -1,6 +1,11 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TimActionRequiredSection } from '@/components/features/admin/TimActionRequiredSection';
+import { fixtureInventory } from '@/lib/ovie/certifications/fixtures';
+
+const certificationOverrides = vi.hoisted(() =>
+  vi.fn<() => Record<string, unknown>>()
+);
 
 vi.mock('@/lib/queries/useOvieCertificationsQuery', () => ({
   useOvieCertificationsQuery: () => ({
@@ -41,6 +46,7 @@ vi.mock('@/lib/queries/useOvieCertificationsQuery', () => ({
     isError: false,
     isFetching: false,
     refetch: vi.fn(),
+    ...(certificationOverrides() ?? {}),
   }),
   useOvieCertificationDecisionMutation: () => ({ mutateAsync: vi.fn() }),
   getCertificationDecisionErrorMessage: () =>
@@ -50,7 +56,52 @@ vi.mock('@/lib/queries/useOvieCertificationsQuery', () => ({
 describe('TimActionRequiredSection observation states', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    certificationOverrides.mockReset();
   });
+
+  it.each([
+    { label: 'unavailable', data: undefined, isError: true },
+    {
+      label: 'unexpected contract',
+      data: { ...fixtureInventory(), contract: 'unexpected' },
+      isError: false,
+    },
+    {
+      label: 'uncovered',
+      data: {
+        ...fixtureInventory(),
+        domains: [],
+        rows: [],
+        queue: { ...fixtureInventory().queue, needsYou: [] },
+      },
+      isError: false,
+    },
+  ])(
+    'does not claim healthy empty when certification is $label',
+    async ({ data, isError }) => {
+      certificationOverrides.mockReturnValue({ data, isError });
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            issues: [],
+            fetchedAt: '2026-09-27T00:00:00.000Z',
+            available: true,
+            observation: 'empty',
+            errorMessage: null,
+          }),
+          { status: 200 }
+        )
+      );
+      await act(async () => {
+        render(<TimActionRequiredSection />);
+      });
+      expect(
+        screen.getByTestId('needs-you-judgments-observation')
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Nothing needs you.')).toBeNull();
+      expect(screen.queryByTestId('tim-action-observation')).toBeNull();
+    }
+  );
 
   it('shows empty after a successful observation with no issues', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(

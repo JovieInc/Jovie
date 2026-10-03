@@ -936,6 +936,7 @@ describe('DevToolbar', () => {
       expect(
         await screen.findByText('Active: browse-ready+clerk_test@jov.ie')
       ).toBeInTheDocument();
+      expect(screen.getByText('Pro Creator')).toBeInTheDocument();
       expect(screen.getByText('/browse-ready-user')).toBeInTheDocument();
       expect(
         screen.getByRole('menuitem', { name: /Pro Creator/ })

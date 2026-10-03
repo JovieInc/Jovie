@@ -4,10 +4,13 @@
 An alert is a stable key plus a one-line cause. New keys open a Linear issue in Triage
 (label `symphony`, title "Symphony doctor: <key>") so Summer routes it; a key that clears
 moves its issue to Done with a comment; a key that fires again within the cool-off reopens
-the same issue instead of spamming a new one. `doctor.json` is what the HUD renders.
+the same issue instead of spamming a new one. While `LANES_ESCALATION` is on, open, reopen,
+and close also apply `remediation:<alert-key-slug>` (created on the JOV team when missing,
+color `#E5484D`). `doctor.json` is what the HUD renders.
 """
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import shutil
@@ -20,6 +23,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pr_events  # noqa: E402  (sibling module of the release)
+import design_gate  # noqa: E402  (design-brief admission census)
+import remediation  # noqa: E402
 
 COOL_OFF_S = 6 * 3600
 NO_LANDING_S = 6 * 3600
@@ -56,7 +61,7 @@ def read_json(path: Path, default):
 
 
 def age_s(stamp: str | None, now: float) -> float | None:
-    if not stamp:
+    if not isinstance(stamp, str) or not stamp:
         return None
     try:
         return now - datetime.fromisoformat(stamp.replace("Z", "+00:00")).timestamp()
@@ -91,8 +96,11 @@ def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, d
     qualified, rejected = {}, {}
     for name in capacity:
         qualified[name], rejected[name] = [], {}
+        duplicates = lane.pool_rejections(candidates.get(name, []))
         for issue in candidates.get(name, []):
-            reason = lane.admission_rejection(issue, failures, now, in_flight, name)
+            # Census key stays bounded: one bucket for all duplicate candidates.
+            reason = ("duplicate-candidate" if issue.identifier in duplicates
+                      else lane.admission_rejection(issue, failures, now, in_flight, name))
             if reason is None:
                 qualified[name].append(issue)
             else:
@@ -103,7 +111,8 @@ def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, d
 
 def observe(host, lane, codex, now: float | None = None) -> dict:
     """Everything the doctor judges, gathered once (cheap: local files plus two API reads)."""
-    now = time.time() if now is None else now
+    sample_clock = time.time if now is None else lambda: now
+    now = sample_clock()
     state = host.state
     tick = read_json(state / "tick.json", {})
     all_receipts, receipts = [], []
@@ -125,17 +134,31 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         accounts = codex.status()
     except Exception as error:
         accounts = {"error": str(error)[:80], "accounts": {}, "available": []}
+    account_observed_at = sample_clock()
     capacity_by_provider = host_capacity(host, lane)
+    design_census = None
     try:
         qualified_by_provider, candidate_pool, candidate_counts, rejected = qualified_pool(host, lane, capacity_by_provider, now)
-        pool_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
+        design_census = design_gate.apply_to_pool(
+            qualified_by_provider, rejected, read_text=design_gate.repo_reader(host.repo))
+        eligible_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
+        eligible_pool = len({issue.identifier for issues in qualified_by_provider.values() for issue in issues})
+        budgets = {name: lane.read_new_issue_budget(name, seats["slots"])
+                   for name, seats in capacity_by_provider.items()}
+        qualified_by_provider = {name: issues if budgets[name]["allowed"] else []
+                                 for name, issues in qualified_by_provider.items()}
+        pool_by_provider = {name: (None if budgets[name]["used"] is None else len(issues))
+                            for name, issues in qualified_by_provider.items()}
         qualified_jobs = {name: [issue.identifier for issue in issues]
                           for name, issues in qualified_by_provider.items()}
-        pool = len({issue.identifier for issues in qualified_by_provider.values() for issue in issues})
+        pool = (None if any(value is None for value in pool_by_provider.values()) else
+                len({issue.identifier for issues in qualified_by_provider.values() for issue in issues}))
         linear_error = None
     except Exception as error:
         pool, candidate_pool, pool_by_provider, qualified_jobs, linear_error = None, None, {}, {}, f"{type(error).__name__}: {error}"[:100]
         candidate_counts, rejected = {}, {}
+        eligible_pool, eligible_by_provider, budgets = None, {}, {}
+        design_census = None
     github = None
     merged, merged_error = [], None
     try:
@@ -156,6 +179,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     except OSError:
         pass
     gate_waits = [r["gateWaitS"] for r in receipts if isinstance(r.get("gateWaitS"), (int, float))]
+    open_numbers = open_pr_numbers()
     return {
         "now": now, "tick": tick, "tickAge": age_s(tick.get("at"), now),
         "gateTimeouts24h": sum(1 for r in receipts if r.get("verdict") == "gate-timeout"),
@@ -175,15 +199,21 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "busy": sum(seats["running"] for seats in capacity_by_provider.values()),
         "capacityByProvider": capacity_by_provider,
         "codex": accounts, "pool": pool, "candidatePool": candidate_pool, "poolByProvider": pool_by_provider,
+        "eligiblePool": eligible_pool, "eligiblePoolByProvider": eligible_by_provider,
+        "newIssueBudgetByProvider": budgets, "openPRCount": len(open_numbers) if open_numbers is not None else None,
+        "codexAttribution": codex_attribution(accounts, account_observed_at),
         "qualifiedJobsByProvider": qualified_jobs,
         "candidatePoolByProvider": candidate_counts, "rejectedByProvider": rejected,
+        "designGate": design_census,
         "linearError": linear_error, "githubRemaining": github,
         "merged24h": merged, "mergedAttributionError": merged_error,
         "diskFreePct": round(100 * disk.free / disk.total, 1),
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
-        "heldByReason": pr_events.by_reason(held, open_pr_numbers()),
+        "heldByReason": pr_events.by_reason(held, open_numbers),
         "reconcile": read_json(state / "reconcile.json", {}),
         "failedByReason": failed_by_reason(failures),
+        "escalation": remediation.escalation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
+        "remediation": remediation.remediation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
         "_receipts24h": receipts, "_allReceipts": all_receipts,
     }
 
@@ -199,7 +229,10 @@ def open_pr_numbers() -> set[int] | None:
         return None
     if result.returncode != 0:
         return None
-    return {int(line) for line in result.stdout.split() if line.isdigit()}
+    values = result.stdout.split()
+    if len(values) >= 500 or any(not value.isdigit() for value in values):
+        return None
+    return {int(value) for value in values}
 
 
 def merged_prs_24h(lane, now: float) -> list[dict]:
@@ -240,7 +273,8 @@ def provider_idle_with_qualified_work(obs: dict, provider: str) -> bool:
     capacity = (obs.get("capacityByProvider") or {}).get(provider) or {}
     pool = (obs.get("poolByProvider") or {}).get(provider)
     tick = obs.get("tick") or {}
-    account_ready = provider != "codex" or bool((obs.get("codex") or {}).get("available"))
+    account_state = obs.get("codexAttribution") or codex_attribution(obs.get("codex") or {}, obs["now"])
+    account_ready = provider != "codex" or bool(account_state.get("unleasedAvailable"))
     return bool(pool and account_ready and capacity.get("slots") and not capacity.get("running")
                 and provider in (tick.get("spawned") or []) and provider not in (tick.get("unhealthy") or []))
 
@@ -259,6 +293,55 @@ def provider_idle_since(obs: dict, previous: dict) -> dict[str, float]:
     return started
 
 
+def codex_attribution(report: dict, now: float) -> dict:
+    """Attribute existing lease/cooldown policy; never treat it as a live quota probe."""
+    unknown = {"state": "unknown", "reason": "account-status-unavailable"}
+    if not isinstance(report, dict) or report.get("error"):
+        return unknown
+    age = age_s(report.get("generatedAt"), now)
+    rows, count = report.get("accounts"), report.get("count")
+    if (age is None or age < 0 or age > HUD_STALE_S or type(count) is not int or count < 0
+            or not isinstance(rows, dict) or len(rows) != count):
+        return unknown
+    counts = {"leased": 0, "eligibleByCooldown": 0, "unleasedAvailable": 0,
+              "quotaBanked": 0, "authCooldown": 0, "rateCooldown": 0, "unknownCooldown": 0}
+    resets = []
+    for row in rows.values():
+        if not isinstance(row, dict) or type(row.get("available")) is not bool or type(row.get("leased")) is not bool:
+            return unknown
+        counts["leased"] += int(row["leased"])
+        counts["eligibleByCooldown"] += int(row["available"])
+        counts["unleasedAvailable"] += int(row["available"] and not row["leased"])
+        if not row["available"]:
+            until = age_s(row.get("exhaustedUntil"), now)
+            if until is None or until >= 0:
+                return unknown
+            kind = row.get("lastKind")
+            if kind is not None and not isinstance(kind, str):
+                return unknown
+            key = {"limit": "quotaBanked", "auth": "authCooldown", "rate": "rateCooldown"}.get(kind, "unknownCooldown")
+            counts[key] += 1
+            resets.append(int(-until))
+    state = ("none-configured" if count == 0 else
+             "unleased-available" if counts["unleasedAvailable"] else
+             "leases-occupied" if counts["eligibleByCooldown"] else
+             "quota-banked" if counts["quotaBanked"] == count else
+             "cooldown")
+    return {"state": state, "count": count, **counts,
+            "earliestCooldownS": min(resets) if resets else None, "observedAt": report["generatedAt"],
+            "semantics": "existing cooldown policy and lease occupancy; not live quota health"}
+
+
+def new_work_empty(obs: dict) -> bool:
+    """Only assert empty demand when eligibility and absence of PR work are known."""
+    budgets = obs.get("newIssueBudgetByProvider") or {}
+    return (not obs.get("linearError") and obs.get("eligiblePool", obs.get("pool")) == 0
+            and obs.get("openPRCount") == 0
+            and any(row.get("reason") == "within-budget" for row in budgets.values())
+            and all(row.get("reason") in {"within-budget", "provider-disabled"}
+                    for row in budgets.values()))
+
+
 # ---------------------------------------------------------------- judgement
 
 def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
@@ -267,39 +350,48 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     tick = obs.get("tick") or {}
     if tick.get("error"):
         alerts["tick-error"] = f"last dispatch tick failed: {tick['error'][:140]}"
+    account_state = obs.get("codexAttribution") or codex_attribution(obs.get("codex") or {}, obs["now"])
     for name in tick.get("unhealthy", []):
+        if name == "codex" and account_state["state"] in {"leases-occupied", "quota-banked", "cooldown"}:
+            continue
         alerts[f"provider-down:{name}"] = f"{name} lane health check failing; slots idle while work waits"
     codex = obs.get("codex") or {}
     if codex.get("error"):
         alerts["codex-broken"] = f"codex account probe failed: {codex['error']}"
-    elif codex.get("count") and not codex.get("available"):
-        soonest = min((row.get("resetsInS") or 0) for row in codex["accounts"].values())
-        alerts["codex-all-banked"] = f"all {codex['count']} codex accounts exhausted; earliest reset in {soonest // 60}m"
-    pool, busy = obs.get("pool"), obs.get("busy", 0)
+    elif account_state["state"] == "quota-banked":
+        alerts["codex-all-banked"] = (f"all {account_state['count']} codex accounts have recorded usage-limit holds; "
+                                      f"earliest reset in {account_state['earliestCooldownS'] // 60}m")
+    pool, busy = obs.get("eligiblePool", obs.get("pool")), obs.get("busy", 0)
+    waiting = pool or obs.get("openPRCount")
+    for name, budget in (obs.get("newIssueBudgetByProvider") or {}).items():
+        if budget.get("reason") == "pr-inventory-unavailable":
+            alerts[f"pr-inventory-unavailable:{name}"] = (
+                f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
     if obs.get("linearError"):
         alerts["linear-down"] = f"Linear unreadable: {obs['linearError']}"
-    elif pool == 0:
+    elif new_work_empty(obs):
         since = (previous or {}).get("poolEmptySince") or obs["now"]
         if obs["now"] - since >= POOL_EMPTY_S:
-            alerts["pool-empty"] = "no runnable Todo issues after admission checks; Summer: route work to the lanes"
-    if pool and busy and obs.get("runs24h") and (obs.get("lastLandingAge") is None or obs["lastLandingAge"] > NO_LANDING_S):
+            alerts["pool-empty"] = "no eligible new Todo issues and no open PR maintenance; Summer: route work to the lanes"
+    if waiting and busy and obs.get("runs24h") and (obs.get("lastLandingAge") is None or obs["lastLandingAge"] > NO_LANDING_S):
         last = "never in 24h" if obs.get("lastLandingAge") is None else f"{int(obs['lastLandingAge'] // 3600)}h ago"
-        alerts["no-landing"] = f"{busy} slots busy with {pool} issues waiting but nothing passed the gate ({last})"
+        alerts["no-landing"] = (f"{busy} slots busy with {pool if pool is not None else 'unknown'} eligible new issues "
+                                f"and {obs.get('openPRCount', 'unknown')} open PRs but nothing passed the gate ({last})")
     spawned = (obs.get("tick") or {}).get("spawned") or []
     idle_ages = obs.get("idleExitAge") or {}
     clean_exit = bool(spawned) and all(
         (idle_ages.get(provider) if idle_ages.get(provider) is not None else NO_WORK_S + 1) <= NO_WORK_S
         for provider in set(spawned))
-    if pool and spawned and not clean_exit and not obs.get("worktrees", 1) \
+    if waiting and spawned and not clean_exit and not obs.get("worktrees", 1) \
             and (obs.get("lastWorkAge") or NO_WORK_S + 1) > NO_WORK_S:
         alerts["spawn-exit"] = (f"{len(spawned)} workers spawn each tick but no agent run started or ended in "
-                                f"{NO_WORK_S // 60}m with {pool} issues waiting; workers exit on claim")
+                                f"{NO_WORK_S // 60}m with work waiting; workers exit on claim")
     for provider, idle_since in ((previous or {}).get("providerIdleSince") or {}).items():
         if not provider_idle_with_qualified_work(obs, provider) or obs["now"] - idle_since < PROVIDER_IDLE_S:
             continue
         capacity = (obs.get("capacityByProvider") or {}).get(provider) or {}
         pool_for_provider = (obs.get("poolByProvider") or {}).get(provider)
-        accounts = f", {len(codex['available'])} available account(s)" if provider == "codex" else ""
+        accounts = f", {account_state['unleasedAvailable']} available account(s)" if provider == "codex" else ""
         alerts[f"provider-idle:{provider}"] = (f"{provider} has {pool_for_provider} compatible issue(s){accounts}, "
                                                f"but 0/{capacity['slots']} workers after dispatch retried for "
                                                f"{PROVIDER_IDLE_S // 60}m")
@@ -314,6 +406,9 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["disk-low"] = f"root disk {obs['diskFreePct']}% free; worktrees and installs will start failing"
     if obs.get("githubRemaining") is not None and obs["githubRemaining"] < GITHUB_MIN_REMAINING:
         alerts["github-quota"] = f"GitHub GraphQL budget {obs['githubRemaining']} left this hour; enqueues and listings will fail"
+    escalation_line = remediation.alert_reason(obs.get("escalation") or {})
+    if escalation_line:
+        alerts["escalation-needs-human"] = escalation_line
     sweep = obs.get("reconcile") or {}
     swept_age = obs["now"] - float(sweep.get("atEpoch") or 0) if obs.get("now") else None
     if sweep.get("orphans") and swept_age is not None and swept_age < 2 * pr_events.RECONCILE_S:
@@ -410,9 +505,51 @@ class Tracker:
     """Linear Triage issues, one per alert key, reused within the cool-off."""
     def __init__(self, linear, host_name: str):
         self.linear, self.host = linear, host_name
+        self._team_node = None
 
     def title(self, key: str) -> str:
         return f"Symphony doctor: {key} ({self.host})"
+
+    def _team(self) -> dict:
+        if self._team_node is None:
+            self._team_node = self.linear.gql(
+                'query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}',
+                {})["teams"]["nodes"][0]
+        return self._team_node
+
+    def _remediation_label_id(self, key: str) -> str | None:
+        """`remediation:<slug>` on the JOV team. Created when missing, color #E5484D."""
+        if not remediation.escalation_enabled():
+            return None
+        name = remediation.remediation_label_for_alert(key)
+        if not name:
+            return None
+        team = self._team()
+        for label in team["labels"]["nodes"]:
+            if label.get("name") == name and label.get("id"):
+                return label["id"]
+        created = self.linear.gql(
+            'mutation($i:IssueLabelCreateInput!){issueLabelCreate(input:$i){issueLabel{id name}}}',
+            {"i": {"teamId": team["id"], "name": name, "color": remediation.REMEDIATION_LABEL_COLOR}})
+        label = ((created or {}).get("issueLabelCreate") or {}).get("issueLabel") or {}
+        if not label.get("id"):
+            return None
+        team["labels"]["nodes"].append({"id": label["id"], "name": label.get("name") or name})
+        return label["id"]
+
+    def apply_alert_label(self, issue_id: str | None, key: str) -> None:
+        """Attach the alert's remediation label. No-op when the router flag is off."""
+        if not issue_id:
+            return
+        try:
+            label_id = self._remediation_label_id(key)
+            if not label_id:
+                return
+            self.linear.gql(
+                'mutation($id:String!,$l:String!){issueAddLabel(id:$id,labelId:$l){success}}',
+                {"id": issue_id, "l": label_id})
+        except Exception:
+            return
 
     def existing(self, key: str) -> str | None:
         """An open issue for this key and host, if a previous tick (or a lost doctor.json)
@@ -429,13 +566,17 @@ class Tracker:
     def open(self, key: str, text: str) -> str | None:
         found = self.existing(key)
         if found:
+            self.apply_alert_label(found, key)
             return found
         try:
-            priority = 1 if key.startswith(("provider-idle:", "provider-down:")) or key in (
+            priority = 1 if key.startswith(("provider-idle:", "provider-down:", "pr-inventory-unavailable:")) or key in (
                 "linear-down", "spawn-exit", "tick-error") else 2
-            team = self.linear.gql('query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}', {})["teams"]["nodes"][0]
+            team = self._team()
             triage = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Triage")
             labels = [l["id"] for l in team["labels"]["nodes"] if l["name"] == "symphony"]
+            remediation_label = self._remediation_label_id(key)
+            if remediation_label:
+                labels.append(remediation_label)
             data = self.linear.gql(
                 'mutation($i:IssueCreateInput!){issueCreate(input:$i){issue{id identifier}}}',
                 {"i": {"teamId": team["id"], "stateId": triage, "labelIds": labels, "priority": priority,
@@ -466,17 +607,21 @@ class Tracker:
         except Exception:
             pass
 
-    def reopen(self, issue_id: str, text: str) -> None:
+    def reopen(self, issue_id: str, text: str, key: str | None = None) -> None:
         try:
             self.linear.move(issue_id, "Triage")
             self.linear.comment(issue_id, f"🤖 doctor: fired again on `{self.host}` at {now_iso()}: {text}")
+            if key:
+                self.apply_alert_label(issue_id, key)
         except Exception:
             pass
 
-    def close(self, issue_id: str) -> None:
+    def close(self, issue_id: str, key: str | None = None) -> None:
         try:
             self.linear.comment(issue_id, f"🤖 doctor: cleared on `{self.host}` at {now_iso()}.")
             self.linear.move(issue_id, "Done")
+            if key:
+                self.apply_alert_label(issue_id, key)
         except Exception:
             pass
 
@@ -498,7 +643,7 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
             continue
         if entry and now - float(entry.get("closedAt") or 0) < COOL_OFF_S and entry.get("id"):
             if tracker:
-                tracker.reopen(entry["id"], text)
+                tracker.reopen(entry["id"], text, key)
                 contradict = getattr(tracker, "contradict_invariant", None)
                 if contradict and conditions and key in conditions:
                     contradict(conditions[key])
@@ -513,7 +658,7 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
     for key, entry in issues.items():
         if key not in alerts and entry.get("closedAt") is None:
             if tracker and entry.get("id"):
-                tracker.close(entry["id"])
+                tracker.close(entry["id"], key)
             entry["closedAt"] = now
     receipts = {}
     for key, event in (conditions or {}).items():
@@ -567,17 +712,31 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
     )
     idle_since = dict((previous or {}).get("idleQualifiedSince") or {})
     next_idle_since = {}
+    account_state = obs.get("codexAttribution") or codex_attribution(obs.get("codex") or {}, obs["now"])
     for provider, metric in throughput["providers"].items():
         capacity = counts.get(provider, {"running": 0, "slots": 0})
         qualified = (obs.get("poolByProvider") or {}).get(provider)
-        account_available = len((obs.get("codex") or {}).get("available") or []) if provider == "codex" else None
+        account_available = (account_state.get("unleasedAvailable") if provider == "codex" else None)
         metric["qualifiedWorkWaiting"] = qualified
+        metric["eligibleNewWorkWaiting"] = (obs.get("eligiblePoolByProvider") or {}).get(provider)
+        budget = (obs.get("newIssueBudgetByProvider") or {}).get(provider) or {}
+        metric["newIssueBudget"] = budget
         metric["idleSlots"] = max(0, capacity["slots"] - capacity["running"])
         metric["idleReason"] = (
-            "linear-unreadable" if obs.get("linearError") else
+            "provider-disabled" if not capacity["slots"] else
+            "admission-unreadable" if obs.get("linearError") else
+            "pr-inventory-unavailable" if budget.get("reason") == "pr-inventory-unavailable" else
+            "fully-utilized" if not metric["idleSlots"] else
+            "open-pr-budget" if budget.get("reason") == "over-budget" else
+            "terminal-pr-backlog" if budget.get("reason") == "terminal-pr-backlog" else
+            "account-status-unknown" if provider == "codex" and account_state["state"] == "unknown" else
+            "account-leases-occupied" if provider == "codex" and account_state["state"] == "leases-occupied" else
+            "account-quota-banked" if provider == "codex" and account_state["state"] == "quota-banked" else
+            "account-cooldown" if provider == "codex" and account_state["state"] == "cooldown" else
             "provider-unhealthy" if provider in (tick.get("unhealthy") or []) else
             "no-account-available" if provider == "codex" and account_available == 0 else
-            "no-qualified-work" if not qualified else
+            "new-issue-admission-unknown" if qualified is None else
+            "no-eligible-new-work" if not qualified else
             "capacity-idle-with-qualified-work" if metric["idleSlots"] else
             "fully-utilized"
         )
@@ -587,7 +746,9 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             next_idle_since[provider] = started
             metric["accountIdleSecondsWhileQualifiedWorkExists"] = max(0, int((obs.get("now") or time.time()) - started))
         else:
-            metric["accountIdleSecondsWhileQualifiedWorkExists"] = None if obs.get("linearError") else 0
+            metric["accountIdleSecondsWhileQualifiedWorkExists"] = (
+                None if obs.get("linearError") or qualified is None or
+                (provider == "codex" and account_available is None) else 0)
     idle_start = ((previous or {}).get("providerIdleSince", {}).get("codex") or
                   (previous or {}).get("idleQualifiedSince", {}).get("codex"))
     projector = getattr(lane, "capacity_horizon", None)
@@ -604,14 +765,21 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "idle": sum(max(0, c["slots"] - c["running"]) for c in counts.values()),
             "pool": obs.get("pool"), "candidatePool": obs.get("candidatePool"), "lastLandingAgeS": obs.get("lastLandingAge"),
             "admission": {"pool": obs.get("pool"), "candidatePool": obs.get("candidatePool"),
+                          "semantics": "new Todo work after PR budget; slots, leases and PR maintenance are separate",
+                          "eligiblePool": obs.get("eligiblePool"),
+                          "eligiblePoolByProvider": obs.get("eligiblePoolByProvider") or {},
+                          "newIssuePool": obs.get("pool"),
+                          "newIssueBudgetByProvider": obs.get("newIssueBudgetByProvider") or {},
                           "poolByProvider": obs.get("poolByProvider") or {},
                           "candidatePoolByProvider": obs.get("candidatePoolByProvider") or {},
                           "rejectedByProvider": obs.get("rejectedByProvider") or {},
+                          "designGate": obs.get("designGate"),
                           "error": obs.get("linearError")},
             "gateWaits24h": obs.get("gateWaits24h"),
             "gateWaitMedianS24h": obs.get("gateWaitMedianS24h"),
             "gateWaitMaxS24h": obs.get("gateWaitMaxS24h"),
-            "codexAvailable": len((obs.get("codex") or {}).get("available") or []),
+            "codexAvailable": account_state.get("unleasedAvailable"),
+            "codexAttribution": account_state,
             "alerts": alerts, "conditions": conditions or {},
             "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
             "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {},
@@ -621,7 +789,9 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "orphan_prs": (obs.get("reconcile") or {}).get("orphans") or [],
             "oldest_prs": [row for row in (obs.get("reconcile") or {}).get("dispositions") or []][:10],
             "dep_holds": (obs.get("reconcile") or {}).get("depHolds") or [],
-            "slo": obs.get("slo")}
+            "slo": obs.get("slo"),
+            "escalation": obs.get("escalation") or remediation.empty_escalation(),
+            "remediation": obs.get("remediation") or remediation.empty_remediation()}
 
 
 PRIMARY_FLAG = Path.home() / ".config/jovie-lanes/primary"
@@ -663,12 +833,45 @@ def _issue_id(lane, host, identifier: str) -> str:
     return data["issues"]["nodes"][0]["id"]
 
 
+def apply_linear_budget(result: dict, state: Path) -> None:
+    """Copy the best-effort Linear snapshot onto the doctor report. Never raises."""
+    try:
+        budget = read_json(state / "api-budget.json", None)
+        if not isinstance(budget, dict):
+            return
+        result["linearBudget"] = {key: budget.get(key)
+                                  for key in ("remaining", "limit", "reset", "rateLimitedAt", "observedAt")}
+    except Exception:
+        return
+
+
+def locked_doctor_write(state: Path, write) -> None:
+    """Serialize doctor.json updates with the lane's budget stamp. A missing lock still writes."""
+    handle = None
+    try:
+        state.mkdir(parents=True, exist_ok=True)
+        handle = open(state / "doctor.lock", "a")
+        fcntl.flock(handle, fcntl.LOCK_EX)
+    except OSError:
+        # flock can fail after open. Dropping the handle without closing it leaks an fd
+        # on every doctor tick.
+        if handle is not None:
+            handle.close()
+        handle = None
+    try:
+        write()
+    finally:
+        if handle is not None:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+            handle.close()
+
+
 def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     path = host.state / "doctor.json"
     previous = read_json(path, {})
     obs = observe(host, lane, codex)
     # remember when the pool first went empty so the alert needs 30 sustained minutes
-    if obs.get("pool") == 0:
+    if new_work_empty(obs):
         previous["poolEmptySince"] = previous.get("poolEmptySince") or obs["now"]
     else:
         previous["poolEmptySince"] = None
@@ -685,6 +888,11 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     result["poolEmptySince"] = previous["poolEmptySince"]
     result["codexIdleSince"] = previous["codexIdleSince"]
     result["providerIdleSince"] = previous["providerIdleSince"]
+    result["escalation"] = obs.get("escalation") or remediation.empty_escalation()
+    result["remediation"] = obs.get("remediation") or remediation.empty_remediation()
+    for key in ("eventsOpen", "eventsClaimed", "eventsHuman", "eventsExhausted"):
+        result[key] = result["remediation"].get(key, 0)
+    result["byFingerprint"] = result["remediation"].get("byFingerprint") or {}
     result["observed"] = {k: v for k, v in obs.items() if k not in ("tick", "codex", "_receipts24h", "_allReceipts")}
     if not os.environ.get("LANES_SELFTEST"):
         try:
@@ -698,8 +906,11 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
             result["statusFeed"] = publish_status(host, lane, feed)
         except Exception as error:  # a broken feed never blocks the doctor
             result["statusFeedError"] = f"{type(error).__name__}: {error}"[:120]
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(result, indent=1, default=str))
-    os.replace(tmp, path)
+    def write_report():
+        apply_linear_budget(result, host.state)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(result, indent=1, default=str))
+        os.replace(tmp, path)
+    locked_doctor_write(host.state, write_report)
     return result

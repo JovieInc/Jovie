@@ -1,6 +1,38 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { collectRaw } from '../../shipping-slo-report.mjs';
+
+vi.mock('node:child_process', async importOriginal => {
+  /** @type {typeof import('node:child_process')} */
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    execFileSync: (_file, args) => {
+      if (!args[1]?.includes('/actions/workflows/')) return '[]';
+      return actual.execFileSync('jq', ['-c', args.at(-1)], {
+        encoding: 'utf8',
+        input: JSON.stringify({
+          workflow_runs: [
+            { id: 7, pull_requests: null },
+            { id: 8, pull_requests: [{ number: 42 }] },
+          ],
+        }),
+      });
+    },
+  };
+});
+
+it('retains a workflow batch containing null PR associations through the real jq filter', () => {
+  const raw = collectRaw({ workflows: ['ci.yml'], days: 1 });
+  for (const runs of Object.values(raw.runs)) {
+    expect(runs.map(run => [run.id, run.prNumbers])).toEqual([
+      [7, []],
+      [8, [42]],
+    ]);
+  }
+});
+
 import {
   buildGistSloBlock,
   capacityUtilization,
@@ -65,6 +97,18 @@ describe('shipping SLO workflow credentials', () => {
     expect(WORKFLOW).toContain(
       'git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"'
     );
+    expect(WORKFLOW).toContain('docs/metrics/blog-publish-latency-latest.json');
+  });
+
+  it('publishes generated snapshots through a pull request instead of protected main', () => {
+    expect(WORKFLOW).toContain(
+      'BRANCH="bot/shipping-slo-snapshot-${{ github.run_id }}-${{ github.run_attempt }}"'
+    );
+    expect(WORKFLOW).toContain('git push -u origin "$BRANCH"');
+    expect(WORKFLOW).toContain(
+      'gh pr create --repo "${{ github.repository }}" --base main --head "$BRANCH"'
+    );
+    expect(WORKFLOW).not.toContain('git push origin HEAD:main');
   });
 });
 

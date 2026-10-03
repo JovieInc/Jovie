@@ -63,6 +63,8 @@ vi.mock('@/features/auth', async () => {
       authShellMock(props);
       return reactModule.createElement('div', { 'data-testid': 'auth-shell' });
     },
+    AuthOfferSummary: () =>
+      reactModule.createElement('div', { 'data-testid': 'auth-offer-summary' }),
   };
 });
 
@@ -272,6 +274,56 @@ describe('signup page', () => {
         fallbackRedirectUrl: '/mobile-auth-return?route=%2Fapp',
       })
     );
+  });
+
+  it('records interval on plan intent and hides the offer recap while the flag is off', () => {
+    searchParamsState.value =
+      'plan=pro&interval=year&desktop_return=%2Fapp&mobile_return=%2Fstart';
+
+    render(<SignUpPageClient />);
+
+    expect(trackMock).toHaveBeenCalledWith('plan_intent_captured', {
+      plan: 'pro',
+      interval: 'year',
+      source: 'pricing',
+    });
+    expect(screen.queryByTestId('auth-offer-summary')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Start your 14-day Pro trial')
+    ).not.toBeInTheDocument();
+  });
+
+  it('forwards plan and interval on the desktop auth-return link', () => {
+    searchParamsState.value = 'plan=pro&interval=year&desktop_return=%2Fapp';
+
+    render(<SignUpPageClient />);
+
+    expect(authShellMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        oppositeModeUrl: '/signin?plan=pro&interval=year&desktop_return=%2Fapp',
+      })
+    );
+  });
+
+  it('forwards plan and interval on the mobile auth-return link', () => {
+    searchParamsState.value = 'plan=pro&interval=year&mobile_return=%2Fapp';
+
+    render(<SignUpPageClient />);
+
+    expect(authShellMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        oppositeModeUrl: '/signin?plan=pro&interval=year&mobile_return=%2Fapp',
+      })
+    );
+  });
+
+  it('shows the offer recap only when the page enables it', () => {
+    searchParamsState.value = 'plan=pro&interval=month';
+
+    render(<SignUpPageClient showOfferSummary />);
+
+    expect(screen.getByTestId('auth-offer-summary')).toBeInTheDocument();
+    expect(screen.getByTestId('auth-shell')).toBeInTheDocument();
   });
 
   it('ignores invalid plan values and does not track plan intent', async () => {

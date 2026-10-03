@@ -48,7 +48,7 @@ interface JudgmentRowProps {
     row: OvieCertificationRow,
     kind: OvieCertificationDecisionKind,
     notes: string | null
-  ) => Promise<void>;
+  ) => Promise<boolean>;
 }
 
 function JudgmentRow({
@@ -71,16 +71,17 @@ function JudgmentRow({
     ? `${OVIE_CERTIFICATION_DOMAIN_LABELS[row.domain]} · ${row.surface}`
     : item.domain;
 
-  const confirm = (kind: OvieCertificationDecisionKind) => {
-    const trimmed = note.trim();
+  const confirm = async (kind: OvieCertificationDecisionKind) => {
+    const trimmed = kind === 'approved' ? '' : note.trim();
     if (NOTE_REQUIRED.has(kind) && trimmed.length === 0) {
       toast.error('Add a note so the worker knows what to change.');
       return;
     }
     if (!row) return;
-    void onDecide(item, row, kind, trimmed.length > 0 ? trimmed : null);
-    setArmedKind(null);
-    setNote('');
+    if (await onDecide(item, row, kind, trimmed.length > 0 ? trimmed : null)) {
+      setArmedKind(null);
+      setNote('');
+    }
   };
 
   return (
@@ -139,13 +140,14 @@ function JudgmentRow({
                         : 'ghost'
                   }
                   disabled={pendingKind !== null}
-                  onClick={() =>
-                    kind === 'approved'
-                      ? confirm(kind)
-                      : setArmedKind(current =>
-                          current === kind ? null : kind
-                        )
-                  }
+                  onClick={() => {
+                    if (kind === 'approved') {
+                      void confirm(kind);
+                      return;
+                    }
+                    setArmedKind(current => (current === kind ? null : kind));
+                    setNote('');
+                  }}
                   aria-label={`${DECISION_LABELS[kind]} "${item.subject.title}"`}
                 >
                   {pendingKind === kind ? 'Recording…' : DECISION_LABELS[kind]}
@@ -162,6 +164,7 @@ function JudgmentRow({
                 <input
                   type='text'
                   value={note}
+                  disabled={pendingKind !== null}
                   onChange={event => setNote(event.target.value)}
                   placeholder={
                     armedKind === 'changes_requested'
@@ -177,7 +180,7 @@ function JudgmentRow({
                   size='sm'
                   variant='secondary'
                   disabled={pendingKind !== null}
-                  onClick={() => confirm(armedKind)}
+                  onClick={() => void confirm(armedKind)}
                 >
                   Confirm {DECISION_LABELS[armedKind]}
                 </Button>
@@ -185,6 +188,7 @@ function JudgmentRow({
                   type='button'
                   size='sm'
                   variant='ghost'
+                  disabled={pendingKind !== null}
                   onClick={() => {
                     setArmedKind(null);
                     setNote('');
@@ -224,8 +228,10 @@ export function CertificationJudgments() {
   const judgments = useMemo(() => inventory?.queue.needsYou ?? [], [inventory]);
   const rowBySubject = useMemo(
     () =>
-      new Map(
-        (inventory?.rows ?? []).map(row => [row.subject.id, row] as const)
+      new Map<string, OvieCertificationRow>(
+        (inventory?.rows ?? []).map(
+          row => [`${row.domain}:${row.subject.id}`, row] as const
+        )
       ),
     [inventory]
   );
@@ -239,7 +245,7 @@ export function CertificationJudgments() {
     ) => {
       const evidenceDigest =
         row.decision.evidenceDigest ?? item.decisionEvidenceDigest;
-      if (!evidenceDigest) return;
+      if (!evidenceDigest) return false;
       setPendingKey(`${row.id}:${kind}`);
       try {
         await mutation.mutateAsync({
@@ -250,9 +256,11 @@ export function CertificationJudgments() {
           actionId: crypto.randomUUID(),
         });
         toast.success(DECISION_TOASTS[kind]);
+        return true;
       } catch (error) {
         toast.error(getCertificationDecisionErrorMessage(error));
         void query.refetch();
+        return false;
       } finally {
         setPendingKey(null);
       }
@@ -274,7 +282,7 @@ export function CertificationJudgments() {
     );
   }
 
-  if (query.isError && !inventory) {
+  if (!inventory && (query.isError || query.data !== undefined)) {
     const locked =
       query.error instanceof FetchError && query.error.status === 403;
     return (
@@ -309,7 +317,7 @@ export function CertificationJudgments() {
   return (
     <div className='grid gap-2' data-testid='needs-you-judgments'>
       {judgments.map(item => {
-        const row = rowBySubject.get(item.subject.id);
+        const row = rowBySubject.get(`${item.domain}:${item.subject.id}`);
         const pendingKind =
           row && pendingKey?.startsWith(`${row.id}:`)
             ? (pendingKey.slice(

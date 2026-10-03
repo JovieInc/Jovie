@@ -118,6 +118,55 @@ describe('customer publication integrity', () => {
     ).toEqual([]);
   });
 
+  it('carries receipt-approved supporting copy and a safe next-step action', () => {
+    const base = publication();
+    const receipt = {
+      ...base,
+      stories: [
+        {
+          ...base.stories[0],
+          bullets: [
+            'Fans opt in per artist; nothing is sent without a signup.',
+          ],
+          action: {
+            label: 'See it on a demo profile',
+            href: '/demo/showcase/tim-white-profile?mode=subscribe',
+          },
+        },
+      ],
+    };
+    const outcomes = projectCustomerChangelog(
+      parseChangelog(markdown(receipt))
+    );
+    expect(outcomes[0].supporting).toEqual([
+      'Fans opt in per artist; nothing is sent without a signup.',
+    ]);
+    expect(outcomes[0].action).toEqual({
+      label: 'See it on a demo profile',
+      href: '/demo/showcase/tim-white-profile?mode=subscribe',
+    });
+  });
+
+  it.each([
+    'javascript:alert(1)',
+    'https://example.com/x',
+    'https://jov.ie.evil.example/x',
+    '//evil.example/x',
+    'http://jov.ie/x',
+    '/ /spaces',
+  ])('drops an unsafe action destination instead of rendering it: %s', href => {
+    const base = publication();
+    const receipt = {
+      ...base,
+      stories: [{ ...base.stories[0], action: { label: 'Next', href } }],
+    };
+    const outcomes = projectCustomerChangelog(
+      parseChangelog(markdown(receipt))
+    );
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0].action).toBeNull();
+  });
+
   it('keeps test and agent maintenance out of the real customer archive while preserving its technical history', () => {
     const releases = parseChangelog(readFileSync('../../CHANGELOG.md', 'utf8'));
     const outcomes = projectCustomerChangelog(releases);

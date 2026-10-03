@@ -77,9 +77,12 @@ const imageUploads =
     '|'
   );
 const markdownUploads = [
+  'ci.yml:${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}',
   'ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}',
   'ci.yml:combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}',
+  'ci.yml:e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}',
   'ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}',
+  'ci.yml:smoke-required-report-${{ github.run_id }}',
   'ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}',
   'nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}',
   'postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}',
@@ -102,9 +105,9 @@ const protectedJobs: Record<string, string[]> = {
   'visual-regression.yml': ['visual-regression'],
 };
 const producerCounts: Record<string, number> = {
-  'agent-tick.yml': 6,
+  'agent-tick.yml': 7,
   'canary-health-gate.yml': 1,
-  'ci.yml': 16,
+  'ci.yml': 17,
   'e2e-full-matrix.yml': 2,
   'nightly-testing-agent.yml': 2,
   'nightly-tests.yml': 4,
@@ -112,7 +115,7 @@ const producerCounts: Record<string, number> = {
   'production-controller.yml': 1,
   'production-release.yml': 3,
   'screenshots.yml': 11,
-  'synthetic-monitoring.yml': 6,
+  'synthetic-monitoring.yml': 7,
   'visual-regression.yml': 6,
 };
 
@@ -896,6 +899,38 @@ describe('Playwright artifact secret boundary', () => {
     expect(upload).toContain("allow-markdown: 'true'");
   });
 
+  it('redacts smoke and full E2E error context and keeps golden-path keyframes off the failure upload', () => {
+    const source = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
+    for (const [jobId, stepName] of [
+      ['ci-e2e-smoke', 'Run E2E Smoke (Chromium)'],
+      ['ci-smoke-required', 'Run Required Smoke Tests'],
+      ['ci-e2e-tests', 'E2E Full (Main Branch)'],
+      ['ci-e2e-tests', 'E2E Quarantine (retries)'],
+    ] as const) {
+      const job = jobBlock(source, jobId);
+      const step = stepBlock(job, stepName);
+      expect(step, `${jobId}:${stepName}`).toContain(
+        "PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'"
+      );
+      expect(yamlPropertyBlock(job, 'env', 4), jobId).not.toContain(
+        'PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN'
+      );
+    }
+    const golden = jobBlock(source, 'ci-golden-path');
+    const failureUpload = stepBlock(
+      golden,
+      'Upload Playwright Artifacts on Failure'
+    );
+    expect(failureUpload).toContain('!apps/web/test-results/**/*.png');
+    expect(failureUpload).not.toMatch(/allow-images:\s*['"]?true/);
+    const visualUpload = stepBlock(
+      golden,
+      'Upload golden-path visual review evidence'
+    );
+    expect(visualUpload).toContain("allow-images: 'true'");
+    expect(visualUpload).toContain("public-images: 'true'");
+  });
+
   it('routes the exact upload and producer inventory through staged-only guards', () => {
     const uploads: string[] = [];
     const images: string[] = [];
@@ -1113,9 +1148,15 @@ ${fixtureCheckout}
       }
     }
     const waitlistDopplerCommand =
-      'run: doppler run --project jovie-web --config prd --only-secrets=E2E_PROD_SIGNUP_EMAIL_BASE,E2E_PROD_MAILBOX_PROVIDER,E2E_PROD_OTP_CHECK_ORIGIN,E2E_PROD_OTP_CHECK_TOKEN,E2E_PROD_OTP_CHECK_URL,PRODUCTION_WAITLIST_CANARY_READ_TOKEN --no-fallback -- env -u DOPPLER_TOKEN node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-production-waitlist.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-production-waitlist';
+      'doppler run --project jovie-web --config prd --only-secrets="$WAITLIST_SECRETS" --no-fallback -- env -u DOPPLER_TOKEN node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-production-waitlist.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-production-waitlist';
     for (const file of ['agent-tick.yml', 'synthetic-monitoring.yml']) {
-      const doppler = readFileSync(join(workflowsRoot, file), 'utf8')
+      const source = readFileSync(join(workflowsRoot, file), 'utf8');
+      const waitlist = stepBlock(source, 'Run Production Waitlist Canary');
+      expect(waitlist).toContain(
+        'env -u DOPPLER_TOKEN node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm'
+      );
+      expect(waitlist.match(/env -u DOPPLER_TOKEN node /g)).toHaveLength(2);
+      const doppler = source
         .split('\n')
         .filter(line => line.includes('doppler run --'));
       const guarded = doppler.filter(line => line.includes(guardScriptName));
@@ -1133,12 +1174,17 @@ ${fixtureCheckout}
       ).toHaveLength(1);
       const expectedNonPlaywrightCommands = [
         expect.stringContaining('scripts/check-signup-readiness.ts'),
+        '          if doppler run --project jovie-web --config prd --only-secrets="$WAITLIST_SECRETS" --no-fallback -- env >/dev/null 2>&1; then',
         ...(file === 'synthetic-monitoring.yml'
           ? [
               expect.stringContaining(
                 '--only-secrets=CRON_SECRET --no-fallback'
               ),
               // JOV-6870: limiter-store probe of /api/health/redis.
+              expect.stringContaining(
+                '--only-secrets=CRON_SECRET --no-fallback'
+              ),
+              // Authenticated billing-health HTTP probe; it produces no browser artifacts.
               expect.stringContaining(
                 '--only-secrets=CRON_SECRET --no-fallback'
               ),
@@ -1151,6 +1197,18 @@ ${fixtureCheckout}
       expect(doppler.filter(line => !line.includes(guardScriptName))).toEqual(
         expectedNonPlaywrightCommands
       );
+      if (file === 'synthetic-monitoring.yml') {
+        const billingProbe = jobBlock(
+          readFileSync(join(workflowsRoot, file), 'utf8'),
+          'billing-sync-stale'
+        );
+        expect(billingProbe).toContain(
+          'doppler run --project jovie-web --config prd --only-secrets=CRON_SECRET --no-fallback --'
+        );
+        expect(billingProbe).toContain('env -u DOPPLER_TOKEN sh -c');
+        expect(billingProbe).toContain('https://jov.ie/api/billing/health');
+        expect(billingProbe).not.toMatch(/playwright|run test:e2e/);
+      }
     }
     const screenshots = readFileSync(
       join(workflowsRoot, 'screenshots.yml'),
@@ -1541,6 +1599,18 @@ ${fixtureCheckout}
     ).toBeLessThan(chaosSweep.indexOf('exit \\"\\$status\\"'));
     expect(nightly.indexOf(chaosSweep)).toBeLessThan(
       nightly.indexOf(chaosUpload)
+    );
+    expect(chaosSweep).toMatch(/^        continue-on-error: true$/m);
+    expect(chaosSweep).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
+    expect(nightly).toContain(
+      'PORT=3100 node .next/standalone/apps/web/server.js'
+    );
+    expect(nightly).not.toContain('dev:local:playwright');
+    const nightlyE2e = stepBlock(nightly, 'Run nightly E2E tests');
+    expect(nightlyE2e).toContain('BASE_URL: http://127.0.0.1:3100');
+    expect(nightlyE2e).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
+    expect(nightly.indexOf('Run nightly E2E tests')).toBeLessThan(
+      nightly.indexOf('Stop route QA bypass server')
     );
     expect(stepBlock(nightly, 'Upload route QA ledger')).toMatch(
       /workflow_dispatch[\s\S]*suite != 'design-v1'[\s\S]*route-matrix\.json[\s\S]*findings-ledger\.json/

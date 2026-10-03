@@ -6,9 +6,12 @@
  * Linked means a linear-issue-id / linear-issue-identifier marker in the PR
  * body, a jov-NNNN branch reference, or the identifier in the title.
  * Commissioning parents are detected by label, sub-issues, or the allowlist.
+ * Invariant consumer: JOV-INV-041.
  */
 
 import { pathToFileURL } from 'node:url';
+
+import { evaluateEscapedDefectClosure } from './escaped-defect-closure.mjs';
 
 export const LINEAR_API = 'https://api.linear.app/graphql';
 export const COMMISSIONING_PARENT_ALLOWLIST = new Set([
@@ -182,6 +185,8 @@ export function pullRequestLinksIssue(pull, issue) {
  *   title: string,
  *   description: string,
  *   labels: string[],
+ *   description: string,
+ *   comments: string[],
  *   children: string[],
  *   hasChildren: boolean,
  *   acceptanceMetadataVerified: boolean,
@@ -209,6 +214,15 @@ export function readIssueSnapshot(issue) {
         )
       ? /** @type {{ nodes: unknown[] }} */ (record.children).nodes
       : [];
+  const commentNodes = Array.isArray(record.comments)
+    ? record.comments
+    : record.comments &&
+        typeof record.comments === 'object' &&
+        Array.isArray(
+          /** @type {{ nodes?: unknown }} */ (record.comments).nodes
+        )
+      ? /** @type {{ nodes: unknown[] }} */ (record.comments).nodes
+      : [];
   const team =
     record.team && typeof record.team === 'object'
       ? /** @type {{ states?: { nodes?: unknown } }} */ (record.team)
@@ -232,6 +246,14 @@ export function readIssueSnapshot(issue) {
     description:
       typeof record.description === 'string' ? record.description : '',
     labels: labelNodes.map(labelName).filter(Boolean),
+    comments: commentNodes
+      .map(comment => {
+        if (typeof comment === 'string') return comment;
+        if (!comment || typeof comment !== 'object') return '';
+        const body = Reflect.get(comment, 'body');
+        return typeof body === 'string' ? body : '';
+      })
+      .filter(Boolean),
     children,
     hasChildren: childNodes.length > 0,
     acceptanceMetadataVerified:
@@ -317,6 +339,20 @@ export function selectDoneStateId(states) {
 }
 
 /**
+ * @param {{ id?: string, name?: string, type?: string }[]} states
+ * @returns {string}
+ */
+export function selectValidatingStateId(states) {
+  const match = (states ?? []).find(
+    state =>
+      String(state?.name ?? '')
+        .trim()
+        .toLowerCase() === 'validating'
+  );
+  return typeof match?.id === 'string' ? match.id : '';
+}
+
+/**
  * @param {string | null | undefined} header
  * @returns {string}
  */
@@ -337,6 +373,7 @@ export function nextLink(header) {
  *     readonly title?: string,
  *     readonly description?: string,
  *     readonly labels?: readonly string[],
+ *     readonly comments?: readonly string[],
  *     readonly children?: readonly string[],
  *     readonly hasChildren?: boolean,
  *   },
@@ -344,8 +381,9 @@ export function nextLink(header) {
  *   readonly mergingPull: { readonly number: number, readonly url: string, readonly sha: string },
  *   readonly allowlist?: ReadonlySet<string>,
  *   readonly scanComplete?: boolean,
+ *   readonly checkGreen?: boolean,
  * }} input
- * @returns {{ action: 'close' | 'skip', comment: string, blockingNumbers: number[] }}
+ * @returns {{ action: 'close' | 'validate' | 'skip', comment: string, blockingNumbers: number[] }}
  */
 export function decideLinearCloseOnMerge(input) {
   const identifier = String(input.issue.identifier ?? '').toUpperCase();
@@ -364,13 +402,42 @@ export function decideLinearCloseOnMerge(input) {
   const reasons = [];
   const parent = parentHoldReason(input.issue, input.allowlist);
   if (parent) reasons.push(parent);
+  const escapedDefect = evaluateEscapedDefectClosure(input.issue);
+  if (escapedDefect.applicable) {
+    reasons.push(
+      'Escaped defects stay open at merge: closure requires product repair and detector evidence from the exact deployed build.'
+    );
+    if (!escapedDefect.ok) {
+      reasons.push(
+        `Closure evidence is incomplete: ${escapedDefect.errors.join('; ')}.`
+      );
+    }
+  }
   if (blocking.length > 0) reasons.push(formatBlockingPulls(blocking));
   if (input.scanComplete === false) {
     reasons.push(
       'The open pull request scan stopped before the last page, so the issue was left open.'
     );
   }
+  const remediationLabeled = (input.issue.labels ?? []).some(label =>
+    String(label).startsWith('remediation:')
+  );
+  if (remediationLabeled && input.checkGreen !== true) {
+    reasons.push(
+      'Fingerprinted remediation issues stay open while the check is red.'
+    );
+  }
   const lead = `Did not mark ${identifier} Done after ${input.mergingPull.url} merged (merge SHA: ${input.mergingPull.sha}).`;
+  if (escapedDefect.applicable) {
+    return {
+      action: 'validate',
+      comment: [
+        `Moved ${identifier} to Validating after ${input.mergingPull.url} merged (merge SHA: ${input.mergingPull.sha}).`,
+        ...reasons,
+      ].join('\n'),
+      blockingNumbers: blocking.map(pull => pull.number),
+    };
+  }
   if (reasons.length > 0) {
     return {
       action: 'skip',
@@ -463,9 +530,12 @@ const ISSUE_QUERY = `query IssueDoneState($issueId: String!) {
   issue(id: $issueId) {
     id
     identifier
+
+
     title
     description
     labels(first: 50) { nodes { name } }
+    comments(first: 50) { nodes { body } }
     children(first: 50) { nodes { identifier } }
     team { states { nodes { id name type } } }
   }
@@ -564,6 +634,26 @@ export async function syncLinearIssueOnMerge(options = {}) {
     if (updated.issueUpdate?.success !== true) {
       throw new Error(`Linear refused to mark ${issue.identifier} Done`);
     }
+  } else if (decision.action === 'validate') {
+    const stateId = selectValidatingStateId(issue.states);
+    if (!stateId) {
+      throw new Error(
+        `No Validating Linear state for ${issue.identifier}; left the issue open`
+      );
+    }
+    const updated = await linearGraphql(
+      fetchImpl,
+      apiKey,
+      `mutation SetIssueValidating($issueId: String!, $stateId: String!) {
+        issueUpdate(id: $issueId, input: { stateId: $stateId }) { success }
+      }`,
+      { issueId: issue.id, stateId }
+    );
+    if (updated.issueUpdate?.success !== true) {
+      throw new Error(
+        `Linear refused to move ${issue.identifier} to Validating`
+      );
+    }
   }
   const commented = await linearGraphql(
     fetchImpl,
@@ -584,7 +674,9 @@ export async function syncLinearIssueOnMerge(options = {}) {
   log(
     decision.action === 'close'
       ? `Marked ${issue.identifier} Done`
-      : `Left ${issue.identifier} open`
+      : decision.action === 'validate'
+        ? `Moved ${issue.identifier} to Validating`
+        : `Left ${issue.identifier} open`
   );
   return {
     action: decision.action,

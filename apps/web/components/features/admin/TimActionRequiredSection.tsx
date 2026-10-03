@@ -195,10 +195,18 @@ export function TimActionRequiredSection({
   }
 
   const certificationQuery = useOvieCertificationsQuery();
-  const judgmentCount =
+  const certificationInventory =
     certificationQuery.data?.contract === OVIE_CERTIFICATION_INVENTORY_CONTRACT
-      ? certificationQuery.data.queue.needsYou.length
-      : 0;
+      ? certificationQuery.data
+      : undefined;
+  const judgmentCount = certificationInventory?.queue.needsYou.length ?? 0;
+  const certificationObserved = Boolean(
+    !certificationQuery.isLoading &&
+      !certificationQuery.isError &&
+      certificationInventory?.domains.some(
+        domain => domain.status === 'connected'
+      )
+  );
 
   const visibleIssues = (data?.issues ?? []).filter(
     issue => !optimisticallyClosedIds.has(issue.id)
@@ -268,7 +276,7 @@ export function TimActionRequiredSection({
               ))}
             </div>
           </div>
-        ) : pendingCount === 0 && !certificationQuery.isLoading ? (
+        ) : pendingCount === 0 && certificationObserved ? (
           <HudObservationStatus
             state={observation}
             message={timActionsMessage(observation, data, locked)}

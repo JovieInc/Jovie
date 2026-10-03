@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/release/release-artist-link.test.tsx
 'use client';
 
 /**
@@ -26,14 +27,10 @@ import { ReleaseNotificationsProvider } from './ReleaseNotificationsProvider';
 
 interface UnreleasedReleaseHeroProps {
   readonly release: {
-    readonly id: string;
     readonly slug: string;
     readonly title: string;
     readonly artworkUrl: string | null;
     readonly releaseDate: Date;
-    readonly trackId: string | null;
-    readonly hasSpotify: boolean;
-    readonly hasAppleMusic: boolean;
   };
   readonly artist: {
     readonly id: string;
@@ -102,12 +99,6 @@ export function UnreleasedReleaseHero({
           </p>
           <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
             <PreSaveActions
-              releaseId={release.id}
-              trackId={release.trackId}
-              username={artist.handle}
-              slug={release.slug}
-              hasSpotify={release.hasSpotify}
-              hasAppleMusic={release.hasAppleMusic}
               releaseDate={release.releaseDate}
               artistData={artistData}
             />

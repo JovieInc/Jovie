@@ -8,6 +8,8 @@ Operating rules for the native iOS app at `apps/ios` (SwiftUI, dark-only, Clerk-
 
 The north star: **rock solid and blazing fast — 0 jank.** Every change should make the existing surface faster or more reliable, never add main-thread work, flicker, or layout shift.
 
+Release channels follow [docs/IOS_RELEASE_CHANNELS.md](../../docs/IOS_RELEASE_CHANNELS.md): TestFlight is the dogfood rail, the App Store is stable, and in-app UI may only report provenance — never simulate a channel switch.
+
 ## Hard Invariants (Enforced by `scripts/ios-best-practices-lint.sh`)
 
 The guardrail lint runs in `ios-ci.yml` and via `pnpm run ios:lint`. It scans production Swift (`apps/ios/Jovie/**`, tests excluded) and **fails the build** on any of these:

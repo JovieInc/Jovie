@@ -98,6 +98,11 @@ vi.mock('@/lib/musicfetch/resilient-client', () => {
       ),
     MusicfetchRequestError,
     MusicfetchBudgetExceededError,
+    isMusicfetchVendorUnavailable: (error: unknown) => {
+      if (!(error instanceof Error)) return false;
+      const status = (error as { statusCode?: number }).statusCode;
+      return status === 401 || status === 403;
+    },
   };
 });
 
@@ -314,6 +319,27 @@ describe('musicfetch client', () => {
       );
       mockMusicfetchRequest.mockRejectedValue(
         new MusicfetchRequestError('MusicFetch API error: 400', 400)
+      );
+
+      const { fetchArtistBySpotifyUrl } = await import(
+        '@/lib/dsp-enrichment/providers/musicfetch'
+      );
+
+      await expect(
+        fetchArtistBySpotifyUrl('https://open.spotify.com/artist/123')
+      ).resolves.toBeNull();
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('returns null when the MusicFetch subscription is inactive', async () => {
+      const { MusicfetchRequestError } = await import(
+        '@/lib/musicfetch/resilient-client'
+      );
+      mockMusicfetchRequest.mockRejectedValue(
+        new MusicfetchRequestError(
+          'MusicFetch API error: 401 - subscription not active',
+          401
+        )
       );
 
       const { fetchArtistBySpotifyUrl } = await import(

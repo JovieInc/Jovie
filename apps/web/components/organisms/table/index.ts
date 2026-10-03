@@ -222,8 +222,18 @@ export { UnifiedTableSkeleton } from './organisms/UnifiedTableSkeleton';
 // Hooks
 // =============================================================================
 
+export {
+  COLUMN_PRIORITY_HYSTERESIS_PX,
+  type ColumnPriorityLayout,
+  type ColumnPrioritySpec,
+  columnPrioritySpecsFromDefs,
+  resolveColumnPriorityLayout,
+  stabilizeColumnPriorityLayout,
+} from './column-priority';
 export type { UseAmbientListSelectionParams } from './hooks/useAmbientListSelection';
 export { useAmbientListSelection } from './hooks/useAmbientListSelection';
+export { useColumnPriorityLayout } from './hooks/useColumnPriorityLayout';
+export { useContainerWidth } from './hooks/useContainerWidth';
 export type {
   UseRowKeyboardOptions,
   UseRowKeyboardResult,

@@ -485,18 +485,6 @@
   background: var(--system-b-app-content-surface);
 }
 
-:where(.system-b-chat-profile-preview-phone-notch) {
-  width: var(--space-10);
-  height: var(--space-1-5);
-  margin: var(--space-2) auto 0;
-  border-radius: var(--radius-full);
-  background: color-mix(
-    in oklab,
-    var(--color-text-tertiary-token) 28%,
-    transparent
-  );
-}
-
 :where(.system-b-chat-profile-preview-phone-card) {
   overflow: hidden;
   margin: var(--space-5) var(--space-3) 0;

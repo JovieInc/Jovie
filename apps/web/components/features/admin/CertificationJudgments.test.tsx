@@ -150,6 +150,109 @@ describe('CertificationJudgments', () => {
     });
   });
 
+  it('binds decisions to the matching domain when subject IDs collide', async () => {
+    const inventory = fixtureInventory();
+    const flow = inventory.rows.find(
+      row => row.id === 'flows:signup-golden-path'
+    );
+    const judgment = inventory.queue.needsYou.find(
+      item => item.domain === 'flows'
+    );
+    if (!flow || !judgment) throw new Error('Expected the flow fixture');
+    const profile = {
+      ...flow,
+      id: 'public_profiles:signup-golden-path',
+      domain: 'public_profiles' as const,
+      subject: { ...flow.subject, title: 'Profile signup-golden-path' },
+      decision: { ...flow.decision, evidenceDigest: 'profile-evidence' },
+    };
+    mockQuery({
+      data: {
+        ...inventory,
+        rows: [...inventory.rows, profile],
+        queue: {
+          ...inventory.queue,
+          needsYou: [
+            ...inventory.queue.needsYou,
+            {
+              ...judgment,
+              domain: 'public_profiles',
+              subject: profile.subject,
+              decisionEvidenceDigest: 'profile-evidence',
+            },
+          ],
+        },
+      },
+    });
+    render(<CertificationJudgments />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Certify "Flow signup-golden-path"' })
+    );
+    await waitFor(() =>
+      expect(mocks.mutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          rowId: flow.id,
+          evidenceDigest: flow.decision.evidenceDigest,
+        })
+      )
+    );
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Certify "Profile signup-golden-path"',
+      })
+    );
+    await waitFor(() =>
+      expect(mocks.mutateAsync).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          rowId: profile.id,
+          evidenceDigest: 'profile-evidence',
+        })
+      )
+    );
+  });
+
+  it('does not attach a change-request draft note to an approval', async () => {
+    mockQuery({ data: fixtureInventory() });
+    render(<CertificationJudgments />);
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Request changes "Flow signup-golden-path"',
+      })
+    );
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'Note for Request changes' }),
+      {
+        target: { value: 'This note belongs to a request for changes' },
+      }
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Certify "Flow signup-golden-path"' })
+    );
+    await waitFor(() =>
+      expect(mocks.mutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ decision: 'approved', notes: null })
+      )
+    );
+  });
+
+  it('offers recovery for an unexpected inventory contract instead of claiming no coverage', () => {
+    mockQuery({
+      data: {
+        ...fixtureInventory(),
+        contract: 'unexpected',
+      } as unknown as OvieCertificationInventory,
+    });
+    render(<CertificationJudgments />);
+    expect(
+      screen.getByText('Certification judgments could not be loaded.')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/No certification domains are connected/)
+    ).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(mocks.refetch).toHaveBeenCalledOnce();
+  });
+
   it('shows the server message and refetches when a decision is rejected', async () => {
     mocks.mutateAsync.mockRejectedValue(new Error('boom'));
     mockQuery({ data: fixtureInventory() });
@@ -163,6 +266,52 @@ describe('CertificationJudgments', () => {
       expect(mocks.toastError).toHaveBeenCalledWith('The evidence changed.');
     });
     expect(mocks.refetch).toHaveBeenCalled();
+  });
+
+  it('keeps the change-request note through a failed write and clears it after retry succeeds', async () => {
+    let rejectDecision: (error: Error) => void = () => undefined;
+    const pendingDecision = new Promise<void>((_, reject) => {
+      rejectDecision = reject;
+    });
+    mocks.mutateAsync
+      .mockReturnValueOnce(pendingDecision)
+      .mockResolvedValueOnce(undefined);
+    mockQuery({ data: fixtureInventory() });
+    render(<CertificationJudgments />);
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Request changes "Flow signup-golden-path"',
+      })
+    );
+    const note = screen.getByRole('textbox', {
+      name: 'Note for Request changes',
+    });
+    fireEvent.change(note, {
+      target: { value: 'Keep the recovery action visible' },
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Confirm Request changes' })
+    );
+    expect(note).toHaveValue('Keep the recovery action visible');
+    expect(note).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+
+    rejectDecision(new Error('temporarily unavailable'));
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalled());
+    expect(note).toHaveValue('Keep the recovery action visible');
+    expect(note).toBeEnabled();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Confirm Request changes' })
+    );
+    await waitFor(() =>
+      expect(mocks.toastSuccess).toHaveBeenCalledWith('Changes requested')
+    );
+    expect(mocks.mutateAsync).toHaveBeenLastCalledWith(
+      expect.objectContaining({ notes: 'Keep the recovery action visible' })
+    );
+    expect(
+      screen.queryByRole('textbox', { name: 'Note for Request changes' })
+    ).toBeNull();
   });
 
   it('renders an unavailable state with retry when the inventory fails', () => {
